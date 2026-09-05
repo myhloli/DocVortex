@@ -17,6 +17,7 @@ from pydantic import (
     JsonValue,
 )
 
+from .version import __version__ as engine_version
 from .foundation.hyperlink import OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
 
 # 这些字符串不能作为公开 Block.type discriminator，只用于 raw 阶段或 Block 内部枚举值。
@@ -925,7 +926,7 @@ class Producer(_StrictMiddleModel):
     """记录语言无关的文档生产者，避免绑定宿主产品元数据。"""
 
     name: str = Field(default="docgale", min_length=1)
-    version: str = Field(default="0.1.0", min_length=1)
+    version: str = Field(default=engine_version, min_length=1)
 
 
 class DocumentModel(_StrictMiddleModel):
@@ -1037,3 +1038,6 @@ class MiddleJson(DocumentModel):
                         )
         return self
 
+
+
+__all__ = ['RawBlockType', 'RAW_ALGORITHM', 'RAW_CAPTION', 'RAW_FOOTNOTE', 'RAW_FORMULA_NUMBER', 'RAW_PHONETIC', 'RAW_ONLY_BLOCK_TYPES', 'FileSuffix', 'FILE_SUFFIXES', 'BlockType', 'ContentType', 'ContentTypeV2', 'BlockTypes', 'PageBlockTypes', 'BLOCK_TYPES', 'PAGE_BLOCK_TYPES', 'PAGE_AUXILIARY_BLOCK_TYPES', 'MERGE_TRANSPARENT_BLOCK_TYPES', 'VISUAL_RELATION_IGNORED_TYPES', 'VISUAL_MAIN_TYPES', 'VISUAL_TYPE_MAPPING', 'BBox', 'IntBBox', 'InlineStyle', 'INLINE_STYLE_ORDER', 'TextSpan', 'EquationInlineSpan', 'CodeInlineSpan', 'NonLinkInlineSpan', 'HyperlinkSpan', 'InlineSpan', 'INLINE_SPAN_ADAPTER', 'INLINE_SPAN_LIST_ADAPTER', 'parse_inline_span', 'parse_inline_spans', 'BlockBase', 'StringContentBlock', 'InlineContentBlock', 'ContinuableTextBlockBase', 'TextBlock', 'RefTextBlock', 'TitleBlockBase', 'DocTitleBlock', 'ParagraphTitleBlock', 'PageAuxTextBlock', 'PageFootnoteBlock', 'ImagePayloadBlock', 'ImagePayloadContentBlock', 'EquationBlock', 'ImageBodyBlock', 'TableBodyBlock', 'ChartBodyBlock', 'CodeBodyBlock', 'AlgorithmBodyBlock', 'ImageAnnotationBlock', 'TableAnnotationBlock', 'ChartAnnotationBlock', 'CodeAnnotationBlock', 'ListChildBlock', 'ListBlock', 'IndexChildBlock', 'IndexBlock', 'ImageChildBlock', 'ImageBlock', 'TableChildBlock', 'TableBlock', 'ChartChildBlock', 'ChartBlock', 'CodeChildBlock', 'CodeBlock', 'PageBlock', 'Block', 'BLOCK_ADAPTER', 'parse_block', 'Producer', 'DocumentModel', 'ModelJson', 'PageInfo', 'MiddleJson']

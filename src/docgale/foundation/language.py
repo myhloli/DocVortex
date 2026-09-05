@@ -8,12 +8,9 @@ DEFAULT_CODE_LANGUAGE = "txt"
 
 def _detect_language(text: str) -> object:
     """首次检测时配置本地模型缓存并惰性加载语言识别器。"""
-    if not os.getenv("FTLANG_CACHE"):
-        cache_dir = Path(__file__).resolve().parents[1] / "resources" / "fasttext-langdetect"
-        os.environ["FTLANG_CACHE"] = str(cache_dir)
     from fast_langdetect import detect_language
 
-    return detect_language(text)
+    return detect_language(text, low_memory=True)
 
 
 def remove_invalid_surrogates(text: str) -> str:

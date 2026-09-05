@@ -196,4 +196,10 @@ def _export_middle_json(
     )
 
 
-__all__ = ["MiddleJsonExportResult"]
+def export_middle_json(middle_json: MiddleJson, output_dir: str | Path, *,
+                       json_name: str = "middle_json.json", overwrite: bool = False) -> MiddleJsonExportResult:
+    """显式导出语义协议及图片，保持基础 schema 无文件系统依赖。"""
+    return _export_middle_json(middle_json, Path(output_dir), json_name=json_name, overwrite=overwrite)
+
+
+__all__ = ["MiddleJsonExportResult", "export_middle_json"]

@@ -46,7 +46,7 @@ docgale = ["resources/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tests"]
+pythonpath = ["tests", "tests/unittest"]
 
 [tool.ruff]
 line-length = 128

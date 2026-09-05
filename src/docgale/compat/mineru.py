@@ -27,7 +27,9 @@ def _from_payload(payload: dict[str, Any], *, middle: bool) -> ModelJson | Middl
     """把旧版顶层字段移入扩展，并复用唯一一套语义类型验证。"""
     data = dict(payload)
     data.pop("schema_version", None)
-    metadata = MinerUMetadata.model_validate({key: data.pop(key) for key in MinerUMetadata.model_fields})
+    if "pages" not in data:
+        raise ValueError("Missing required pages in MinerU document")
+    metadata = MinerUMetadata.model_validate({key: data.pop(key, None) for key in MinerUMetadata.model_fields})
     data["producer"] = Producer(name="mineru", version=metadata.mineru_version)
     data["extensions"] = {"mineru": metadata.model_dump(mode="json")}
     return MiddleJson.model_validate(data) if middle else ModelJson.model_validate(data)
