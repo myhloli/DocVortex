@@ -9,10 +9,10 @@ import click
 from .version import __version__
 
 
-@click.group()
+@click.group(help="DocGale: native multi-format document parsing and conversion.")
 @click.version_option(__version__)
 def main() -> None:
-    """DocGale: native multi-format document parsing and conversion."""
+    """提供独立文档引擎的命令行入口。"""
 
 
 @main.command("convert")
