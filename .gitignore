@@ -9,4 +9,5 @@ dist/
 build/
 *.egg-info/
 .baseline/
+.baseline-*.log
 .DS_Store

@@ -43,7 +43,7 @@ def main() -> None:
     config.llm_aided.features.title_leveling = False
     config.llm_aided.features.cross_page_table_cell_merge = False
     sources = sorted((args.source_root / "demo/office_docs").glob("*"))
-    sources = [path for path in sources if path.suffix.lower() != ".md"]
+    sources = [path for path in sources if path.suffix.lower() in {".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".rtf"}]
     sources += [args.source_root / "demo/pdfs" / name for name in (
         "demo1.pdf", "demo2.pdf", "中文论文2.pdf", "mixed_elements_pages_39_40.pdf",
     )]

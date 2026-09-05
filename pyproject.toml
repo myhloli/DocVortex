@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=77.0.3", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "docgale"
+dynamic = ["version"]
+description = "A fast, multi-format document parsing and conversion engine"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = "LicenseRef-MinerU-Open-Source-License"
+license-files = ["LICENSE.md", "THIRD_PARTY_NOTICES.md", "licenses/*"]
+dependencies = [
+    "click>=8.1.7", "loguru>=0.7.2", "numpy>=1.24", "pillow>=11.0.0",
+    "pypdfium2>=5.10.1", "pypdf>=5.6.0", "pydantic>=2.0.0",
+    "metafile-render>=0.3.0,<1.0.0", "ftfy>=6.3.1,<7", "fonttools>=4,<5",
+    "beautifulsoup4>=4.13.5,<5", "lxml>=4,<7", "nh3>=0.3.6,<0.4",
+    "python-docx>=1.2.0,<2", "pypptx-with-oxml>=1.0.3,<2",
+    "mammoth>=1.11.0,<2", "openpyxl>=3.1.5,<4", "olefile>=0.47,<1",
+    "pylatexenc>=2.10,<3", "latex2mathml>=3.81.0,<4", "mathml2omml==0.0.2",
+    "reportlab", "ziamath>=0.13,<0.14", "fast-langdetect>=0.2.3,<0.3.0",
+    "magika>=0.6.2,<1.1.0", "opencv-python>=4.11.0.86",
+]
+
+[project.optional-dependencies]
+test = ["pytest", "pytest-cov"]
+dev = ["ruff", "build", "twine"]
+
+[project.urls]
+Repository = "https://github.com/myhloli/docgale"
+Issues = "https://github.com/myhloli/docgale/issues"
+
+[project.scripts]
+docgale = "docgale.cli:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "docgale.version.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["docgale*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+docgale = ["resources/**"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+
+[tool.ruff]
+line-length = 128
+target-version = "py310"
