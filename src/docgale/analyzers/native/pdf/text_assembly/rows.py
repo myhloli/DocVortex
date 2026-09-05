@@ -10,9 +10,26 @@ from typing import Sequence
 from .....schema import BBox
 from .....foundation.text import is_hyphen_at_line_end
 from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _rotate_bbox_to_upright
-from ..line_layout import _connection_crosses_table, _effective_body_text_row_gap, _effective_text_row_gap, _horizontal_rule_separates_rows, _line_effective_height, _line_tight_output_bbox, _title_fonts_compatible
+from ..line_layout import (
+    _connection_crosses_table,
+    _effective_body_text_row_gap,
+    _effective_text_row_gap,
+    _horizontal_rule_separates_rows,
+    _line_effective_height,
+    _line_tight_output_bbox,
+    _title_fonts_compatible,
+)
 from ..models import _LineItem, _LocalAxisLine, _TextLane
-from .common import _ABSTRACT_METADATA_RE, _BULLET_ITEM_RE, _EMAIL_METADATA_RE, _FRONT_MATTER_FIELD_RE, _LABELLED_METADATA_RE, _LIST_ITEM_RE, _REFERENCE_ENTRY_RE, _URL_LINE_RE
+from .common import (
+    _ABSTRACT_METADATA_RE,
+    _BULLET_ITEM_RE,
+    _EMAIL_METADATA_RE,
+    _FRONT_MATTER_FIELD_RE,
+    _LABELLED_METADATA_RE,
+    _LIST_ITEM_RE,
+    _REFERENCE_ENTRY_RE,
+    _URL_LINE_RE,
+)
 
 
 def _local_tight_output_line_bboxes(

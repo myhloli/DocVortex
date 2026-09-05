@@ -22,9 +22,7 @@ class BoundedOleReader:
         if not isinstance(file_bytes, bytes):
             raise TypeError("legacy Office input must be bytes")
         if len(file_bytes) > MAX_TOTAL_BYTES:
-            raise LegacyOfficeResourceLimitError(
-                f"input exceeds max_total_bytes={MAX_TOTAL_BYTES}"
-            )
+            raise LegacyOfficeResourceLimitError(f"input exceeds max_total_bytes={MAX_TOTAL_BYTES}")
         try:
             self._ole: Any = olefile.OleFileIO(BytesIO(file_bytes), raise_defects=olefile.DEFECT_FATAL)
         except Exception as exc:
@@ -74,22 +72,16 @@ class BoundedOleReader:
         except Exception as exc:
             raise LegacyOfficeMalformedError(f"cannot read OLE stream size: {name}: {exc}") from exc
         if size > MAX_ENTRY_BYTES:
-            raise LegacyOfficeResourceLimitError(
-                f"stream {name!r} exceeds max_entry_bytes={MAX_ENTRY_BYTES}"
-            )
+            raise LegacyOfficeResourceLimitError(f"stream {name!r} exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
         if self._total_read + size > MAX_TOTAL_BYTES:
-            raise LegacyOfficeResourceLimitError(
-                f"OLE streams exceed max_total_bytes={MAX_TOTAL_BYTES}"
-            )
+            raise LegacyOfficeResourceLimitError(f"OLE streams exceed max_total_bytes={MAX_TOTAL_BYTES}")
         try:
             with self._ole.openstream(list(parts)) as stream:
                 payload = stream.read(MAX_ENTRY_BYTES + 1)
         except Exception as exc:
             raise LegacyOfficeMalformedError(f"cannot read OLE stream {name!r}: {exc}") from exc
         if len(payload) > MAX_ENTRY_BYTES:
-            raise LegacyOfficeResourceLimitError(
-                f"stream {name!r} exceeds max_entry_bytes={MAX_ENTRY_BYTES}"
-            )
+            raise LegacyOfficeResourceLimitError(f"stream {name!r} exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
         self._total_read += len(payload)
         return payload
 

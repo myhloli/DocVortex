@@ -30,9 +30,49 @@ from ..common.index import strip_index_page_tail
 from ..common.list_items import parse_list_item_marker, reference_list_needs_bullets
 from ..common.planner import PlannedBlock, build_render_plan
 from ...contracts import AssetResolver
-from ....schema import PAGE_AUXILIARY_BLOCK_TYPES, RAW_ALGORITHM, AlgorithmBodyBlock, BlockBase, BlockType, ChartAnnotationBlock, ChartBlock, ChartBodyBlock, CodeAnnotationBlock, CodeBlock, CodeBodyBlock, DocTitleBlock, EquationBlock, HyperlinkSpan, ImageAnnotationBlock, ImageBlock, ImageBodyBlock, ImagePayloadBlock, IndexBlock, InlineSpan, ListBlock, MiddleJson, NonLinkInlineSpan, PageFootnoteBlock, ParagraphTitleBlock, RefTextBlock, TableAnnotationBlock, TableBlock, TableBodyBlock, TextBlock, TextSpan, TitleBlockBase
+from ....schema import (
+    PAGE_AUXILIARY_BLOCK_TYPES,
+    RAW_ALGORITHM,
+    AlgorithmBodyBlock,
+    BlockBase,
+    BlockType,
+    ChartAnnotationBlock,
+    ChartBlock,
+    ChartBodyBlock,
+    CodeAnnotationBlock,
+    CodeBlock,
+    CodeBodyBlock,
+    DocTitleBlock,
+    EquationBlock,
+    HyperlinkSpan,
+    ImageAnnotationBlock,
+    ImageBlock,
+    ImageBodyBlock,
+    ImagePayloadBlock,
+    IndexBlock,
+    InlineSpan,
+    ListBlock,
+    MiddleJson,
+    NonLinkInlineSpan,
+    PageFootnoteBlock,
+    ParagraphTitleBlock,
+    RefTextBlock,
+    TableAnnotationBlock,
+    TableBlock,
+    TableBodyBlock,
+    TextBlock,
+    TextSpan,
+    TitleBlockBase,
+)
 from .assets import PdfAssetError, PreparedImage, prepare_block_image, prepare_html_image
-from .formula import DisplayFormulaFlowable, FormulaRenderer, InlineFormulaImage, PdfFormulaError, draw_inline_formula, split_formula_tag
+from .formula import (
+    DisplayFormulaFlowable,
+    FormulaRenderer,
+    InlineFormulaImage,
+    PdfFormulaError,
+    draw_inline_formula,
+    split_formula_tag,
+)
 from .inline import PdfAnchorRegistry, PdfInlineContext, build_pdf_paragraph, render_plain_text_markup
 from .styles import BORDER_COLOR, PAGE_MARGIN, SURFACE_COLOR, build_pdf_styles
 from .table import PdfTableError, build_pdf_tables

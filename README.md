@@ -16,4 +16,96 @@ DocGale does not implement OCR or VLM inference and does not depend on MinerU.
 PDF classification is an explicit document operation; native analysis does not
 silently classify the document or select another inference backend.
 
-The code and its third-party attributions retain their applicable licenses.
+## Install
+
+```bash
+pip install docgale
+docgale convert report.pdf --format markdown --output output/report.md
+docgale classify report.pdf
+```
+
+Python 3.10–3.13 is supported. Native parsing does not require OCR/VLM inference
+services. PDF access uses `pypdfium2>=5.10.1` without a fixed upper bound; the
+compatibility matrix also exercises 5.13.0.
+
+## Parse once, export many times
+
+```python
+import docgale
+
+result = docgale.parse("report.pdf", keep_model_json=True)
+result.export("output/report.md", output_format="markdown")
+result.export("output/report.docx", output_format="docx")
+result.export("output/report.epub", output_format="epub")
+result.save_bundle("output/report.bundle")
+
+# This works after the source document and its parsing process are gone.
+restored = docgale.load_bundle("output/report.bundle")
+restored.export("output/report.pdf", output_format="pdf")
+```
+
+Bundles contain `manifest.json`, `middle.json`, optional `model.json`, and image
+assets. The loader verifies asset hashes. Missing external assets must be supplied
+before saving a portable bundle. Existing files are protected unless the caller
+explicitly sets `overwrite=True`.
+
+## Stage APIs
+
+```python
+from docgale.api import analyze, postprocess, render
+
+analysis = analyze("report.pdf", page_range="1-5")
+result = postprocess(analysis)
+artifact = render(result.middle_json, "docx", assets=result.assets)
+artifact.write("output/report.docx")
+```
+
+The stage API lives in `docgale.api`. Root-level conveniences include `parse`,
+`analyze`, `convert`, `postprocess_document`, and `render_artifact`. The
+`docgale.render` package also exposes the low-level renderers and their original
+string, bytes, dictionary, or list return values.
+
+PDF page selections use `1-5`, `r1` and `all`; other native formats are parsed as
+whole documents. A caller-owned `PDFDocument` can be passed to `analyze` or `parse`
+and remains open afterward.
+
+## Explicit PDF classification
+
+```python
+from docgale.document.pdf import PDFDocument
+
+with PDFDocument("report.pdf") as document:
+    mode = document.classify()  # "txt" or "ocr"; no inference is started
+    if mode == "txt":
+        result = docgale.parse(document)
+```
+
+Native analysis trusts the caller's choice and does not classify automatically.
+An application such as MinerU owns OCR routing. MinerU uses classification only
+for `auto`: Flash `txt` goes to DocGale; Flash `ocr` goes to MinerU's existing OCR
+implementation. Other MinerU tiers retain their inference paths and share
+DocGale's PDF foundations, document schema, deterministic processing and rendering.
+
+DocGale JSON uses schema identity `docgale.model` or `docgale.middle`, schema
+version `1.0`, and neutral producer metadata. Definitions are in `schemas/`.
+`docgale.compat.mineru` provides the explicit MinerU envelope codecs; product
+metadata is carried in `extensions["mineru"]`.
+
+## Scope and development
+
+PDF output is a semantic reflow of the document, not a lossless reproduction of
+the original page drawing instructions. Input support for PPTX/XLSX does not imply
+PPTX/XLSX output support. Rust implementation work is a future stage behind these
+public data and processing boundaries.
+
+```bash
+uv venv
+uv pip install -e ".[test,dev]"
+uv run --no-project python -m pytest -q
+uv run --no-project ruff check src
+uv run --no-project ruff format --check src
+uv build
+```
+
+The code and its third-party attributions retain their applicable licenses; see
+`LICENSE.md` and `THIRD_PARTY_NOTICES.md`.

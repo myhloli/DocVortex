@@ -6,11 +6,38 @@ from __future__ import annotations
 from typing import Any, TypeAlias
 
 from ....options import LatexDelimitersConfig
-from ..markdown.blocks import render_single_block, render_title_inline_content, render_visual_annotation, render_visual_body_content
+from ..markdown.blocks import (
+    render_single_block,
+    render_title_inline_content,
+    render_visual_annotation,
+    render_visual_body_content,
+)
 from ..markdown.assets import normalize_image_source, resolve_image_source
 from ..markdown.escaping import escape_standalone_marker_rule, escape_text_block_markdown_prefix
 from ..markdown.inline import render_inline_content
-from ....schema import BlockType, ChartAnnotationBlock, ChartBlock, ChartBodyBlock, CodeAnnotationBlock, CodeBlock, DocTitleBlock, EquationBlock, ImageAnnotationBlock, ImageBlock, ImageBodyBlock, ImagePayloadBlock, MiddleJson, PageAuxTextBlock, PageFootnoteBlock, PageBlock, ParagraphTitleBlock, TextBlock, TableAnnotationBlock, TableBlock, TableBodyBlock
+from ....schema import (
+    BlockType,
+    ChartAnnotationBlock,
+    ChartBlock,
+    ChartBodyBlock,
+    CodeAnnotationBlock,
+    CodeBlock,
+    DocTitleBlock,
+    EquationBlock,
+    ImageAnnotationBlock,
+    ImageBlock,
+    ImageBodyBlock,
+    ImagePayloadBlock,
+    MiddleJson,
+    PageAuxTextBlock,
+    PageFootnoteBlock,
+    PageBlock,
+    ParagraphTitleBlock,
+    TextBlock,
+    TableAnnotationBlock,
+    TableBlock,
+    TableBodyBlock,
+)
 
 VisualBlock: TypeAlias = ImageBlock | TableBlock | ChartBlock | CodeBlock
 VisualAnnotationBlock: TypeAlias = ImageAnnotationBlock | TableAnnotationBlock | ChartAnnotationBlock | CodeAnnotationBlock

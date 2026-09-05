@@ -21,8 +21,7 @@ from _ooxml_mtef_test_utils import (
 )
 
 _VALID_TINY_PNG = base64.b64decode(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/"
-    "x8AAusB9Wl2l9sAAAAASUVORK5CYII="
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2l9sAAAAASUVORK5CYII="
 )
 
 
@@ -35,11 +34,7 @@ def _replace_media_parts(
     """把指定 OOXML media 目录下的图片成员替换为原始测试载荷。"""
 
     with ZipFile(BytesIO(package)) as source:
-        replacements = {
-            name: payload
-            for name in source.namelist()
-            if name.startswith(prefix)
-        }
+        replacements = {name: payload for name in source.namelist() if name.startswith(prefix)}
     if not replacements:
         raise ValueError(f"OOXML image fixture has no media under {prefix}")
     return _rewrite_zip(package, replacements, {})
@@ -84,9 +79,7 @@ def _move_pptx_picture_to_notes(package: bytes) -> bytes:
     replacements: dict[str, bytes] = {}
     with ZipFile(BytesIO(package)) as source:
         slide_root = etree.fromstring(source.read("ppt/slides/slide1.xml"))
-        notes_root = etree.fromstring(
-            source.read("ppt/notesSlides/notesSlide1.xml")
-        )
+        notes_root = etree.fromstring(source.read("ppt/notesSlides/notesSlide1.xml"))
         pictures = slide_root.xpath(".//*[local-name()='pic']")
         note_trees = notes_root.xpath(".//*[local-name()='spTree']")
         if not pictures or not note_trees:
@@ -100,15 +93,9 @@ def _move_pptx_picture_to_notes(package: bytes) -> bytes:
         if not blips:
             raise ValueError("PPTX notes image fixture has no blip")
         relationship_id = blips[0].get(f"{{{REL_NS}}}embed")
-        slide_rels = etree.fromstring(
-            source.read("ppt/slides/_rels/slide1.xml.rels")
-        )
+        slide_rels = etree.fromstring(source.read("ppt/slides/_rels/slide1.xml.rels"))
         target = next(
-            (
-                rel.get("Target")
-                for rel in slide_rels
-                if rel.get("Id") == relationship_id
-            ),
+            (rel.get("Target") for rel in slide_rels if rel.get("Id") == relationship_id),
             None,
         )
         if not target:

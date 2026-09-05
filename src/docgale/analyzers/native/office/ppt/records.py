@@ -38,9 +38,7 @@ class RecordBudget:
 
         self.count += 1
         if self.count > MAX_RECORDS:
-            raise LegacyOfficeResourceLimitError(
-                f"record stream exceeds max_records={MAX_RECORDS}"
-            )
+            raise LegacyOfficeResourceLimitError(f"record stream exceeds max_records={MAX_RECORDS}")
 
 
 def record_at(
@@ -113,14 +111,10 @@ def iter_descendants(
 
     if record.version != CONTAINER_VERSION:
         return
-    stack: list[tuple[bytes, Iterator[PptRecord]]] = [
-        (record.payload, iter_records(record.payload, budget=budget))
-    ]
+    stack: list[tuple[bytes, Iterator[PptRecord]]] = [(record.payload, iter_records(record.payload, budget=budget))]
     while stack:
         if len(stack) > MAX_RECORD_DEPTH:
-            raise LegacyOfficeResourceLimitError(
-                f"record nesting exceeds max_record_depth={MAX_RECORD_DEPTH}"
-            )
+            raise LegacyOfficeResourceLimitError(f"record nesting exceeds max_record_depth={MAX_RECORD_DEPTH}")
         _, iterator = stack[-1]
         try:
             child = next(iterator)
@@ -128,13 +122,8 @@ def iter_descendants(
             stack.pop()
             continue
         yield child
-        if (
-            child.version == CONTAINER_VERSION
-            and not ROUNDTRIP_OPAQUE_MIN <= child.record_type <= ROUNDTRIP_OPAQUE_MAX
-        ):
-            stack.append(
-                (child.payload, iter_records(child.payload, budget=budget))
-            )
+        if child.version == CONTAINER_VERSION and not ROUNDTRIP_OPAQUE_MIN <= child.record_type <= ROUNDTRIP_OPAQUE_MAX:
+            stack.append((child.payload, iter_records(child.payload, budget=budget)))
 
 
 def utf16_text(payload: bytes) -> str:

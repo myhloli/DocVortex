@@ -5,24 +5,52 @@ Office Math Markup Language (OMML)
 Adapted from https://github.com/xiilei/dwml/blob/master/dwml/omml.py
 On 23/01/2025
 """
+
 import re
 
 import lxml.etree as ET
 from loguru import logger
 from pylatexenc.latexencode import UnicodeToLatexEncoder
 
-from .latex_dict import ALN, ARR, BACKSLASH, BLANK, BRK, CHARS, CHR, CHR_BO, CHR_DEFAULT, D_DEFAULT, F_DEFAULT, FUNC, FUNC_PLACE, LIM_FUNC, LIM_TO, LIM_UPP, POS, POS_DEFAULT, RAD, RAD_DEFAULT, SUB, SUP, D, F, M, T
+from .latex_dict import (
+    ALN,
+    ARR,
+    BACKSLASH,
+    BLANK,
+    BRK,
+    CHARS,
+    CHR,
+    CHR_BO,
+    CHR_DEFAULT,
+    D_DEFAULT,
+    F_DEFAULT,
+    FUNC,
+    FUNC_PLACE,
+    LIM_FUNC,
+    LIM_TO,
+    LIM_UPP,
+    POS,
+    POS_DEFAULT,
+    RAD,
+    RAD_DEFAULT,
+    SUB,
+    SUP,
+    D,
+    F,
+    M,
+    T,
+)
 
 OMML_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
 
 # Mapping from OMML <m:scr> values to LaTeX math font commands.
 # Used in do_r to convert math script/font style to appropriate LaTeX commands.
 SCR_TO_LATEX = {
-    "script":       "\\mathscr{{{0}}}",       # 手写体/花体 — \mathscr covers both upper and lowercase
-    "fraktur":      "\\mathfrak{{{0}}}",       # 德国哥特体 — \mathfrak for upper and lowercase
-    "double-struck": "\\mathbb{{{0}}}",        # 双线体/黑板粗体 — \mathbb
-    "sans-serif":   "\\mathsf{{{0}}}",         # 无衬线体
-    "monospace":    "\\mathtt{{{0}}}",         # 等宽字体
+    "script": "\\mathscr{{{0}}}",  # 手写体/花体 — \mathscr covers both upper and lowercase
+    "fraktur": "\\mathfrak{{{0}}}",  # 德国哥特体 — \mathfrak for upper and lowercase
+    "double-struck": "\\mathbb{{{0}}}",  # 双线体/黑板粗体 — \mathbb
+    "sans-serif": "\\mathsf{{{0}}}",  # 无衬线体
+    "monospace": "\\mathtt{{{0}}}",  # 等宽字体
 }
 
 LOWER_GROUP_LIMITS = ("\\underbrace{", "\\underbracket{", "\\underparen{")
@@ -117,10 +145,7 @@ class Tag2Method:
         process children of the elm,return string
         """
         return BLANK.join(
-            (
-                t if not isinstance(t, Tag2Method) else str(t)
-                for stag, t, e in self.process_children_list(elm, include)
-            )
+            (t if not isinstance(t, Tag2Method) else str(t) for stag, t, e in self.process_children_list(elm, include))
         )
 
     def process_unknow(self, elm, stag):
@@ -238,9 +263,7 @@ class oMath2Latex(Tag2Method):
         the accent function
         """
         c_dict = self.process_children_dict(elm)
-        latex_s = get_val(
-            c_dict["accPr"].chr, default=CHR_DEFAULT.get("ACC_VAL"), store=CHR
-        )
+        latex_s = get_val(c_dict["accPr"].chr, default=CHR_DEFAULT.get("ACC_VAL"), store=CHR)
         return latex_s.format(c_dict["e"])
 
     def do_bar(self, elm):
@@ -260,12 +283,8 @@ class oMath2Latex(Tag2Method):
         pr = c_dict["dPr"]
         null = D_DEFAULT.get("null")
 
-        s_val = _normalize_latex_delimiter(
-            get_val(pr.begChr, default=D_DEFAULT.get("left"), store=T)
-        )
-        e_val = _normalize_latex_delimiter(
-            get_val(pr.endChr, default=D_DEFAULT.get("right"), store=T)
-        )
+        s_val = _normalize_latex_delimiter(get_val(pr.begChr, default=D_DEFAULT.get("left"), store=T))
+        e_val = _normalize_latex_delimiter(get_val(pr.endChr, default=D_DEFAULT.get("right"), store=T))
         delim = pr.text + D.format(
             left=null if not s_val else escape_latex(s_val),
             text=c_dict["e"],
@@ -374,11 +393,11 @@ class oMath2Latex(Tag2Method):
             # to "\# " (escaped hash with surrounding spaces due to brace-
             # protection stripping).  Match that at the end of the row,
             # allowing optional whitespace between "\#" and the opening "(".
-            tag_match = re.search(r'\\#\s*\(([^)]*)\)\s*$', row)
+            tag_match = re.search(r"\\#\s*\(([^)]*)\)\s*$", row)
             if tag_match:
-                formula = row[:tag_match.start()].rstrip()
+                formula = row[: tag_match.start()].rstrip()
                 tag_content = tag_match.group(1)
-                return f'{formula}\\tag{{{tag_content}}}'
+                return f"{formula}\\tag{{{tag_content}}}"
             # Single row without tag — no array wrapper required.
             return row
 
@@ -428,9 +447,7 @@ class oMath2Latex(Tag2Method):
         """
         a single row of the matrix m
         """
-        return ALN.join(
-            [t for stag, t, e in self.process_children_list(elm, include=("e",))]
-        )
+        return ALN.join([t for stag, t, e in self.process_children_list(elm, include=("e",))])
 
     def do_nary(self, elm):
         """
@@ -484,7 +501,6 @@ class oMath2Latex(Tag2Method):
         # the T dictionary above; for all others we keep the pylatexenc output as-is.
 
         return out_latex_str
-
 
     def do_r(self, elm):
         """

@@ -64,8 +64,14 @@ class DocumentResult:
     model_json: ModelJson | None = None
     diagnostics: tuple[Diagnostic, ...] = ()
 
-    def export(self, path: str | Path, *, output_format: RenderFormat | str = RenderFormat.MARKDOWN,
-               options: RenderOptions | None = None, overwrite: bool = False) -> ExportResult:
+    def export(
+        self,
+        path: str | Path,
+        *,
+        output_format: RenderFormat | str = RenderFormat.MARKDOWN,
+        options: RenderOptions | None = None,
+        overwrite: bool = False,
+    ) -> ExportResult:
         """复用当前解析结果渲染指定格式，不重新分析输入。"""
         from .api import render
 

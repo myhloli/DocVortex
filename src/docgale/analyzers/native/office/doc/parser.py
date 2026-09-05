@@ -11,12 +11,46 @@ from ..errors import LegacyOfficeMalformedError
 from ..legacy.binary import bounded_slice
 
 from .bookmarks import parse_bookmarks
-from .fib import FCLCB_BOOKMARK_END, FCLCB_BOOKMARK_NAMES, FCLCB_BOOKMARK_START, FCLCB_BTE_CHPX, FCLCB_BTE_PAPX, FCLCB_CLX, FCLCB_DGG_INFO, FCLCB_ENDNOTE_REF, FCLCB_ENDNOTE_TEXT, FCLCB_FOOTNOTE_REF, FCLCB_FOOTNOTE_TEXT, FCLCB_HEADER, FCLCB_LIST_OVERRIDES, FCLCB_LISTS, FCLCB_SECTION, FCLCB_SHAPE_MAIN, FCLCB_STSHF, FileInformationBlock
+from .fib import (
+    FCLCB_BOOKMARK_END,
+    FCLCB_BOOKMARK_NAMES,
+    FCLCB_BOOKMARK_START,
+    FCLCB_BTE_CHPX,
+    FCLCB_BTE_PAPX,
+    FCLCB_CLX,
+    FCLCB_DGG_INFO,
+    FCLCB_ENDNOTE_REF,
+    FCLCB_ENDNOTE_TEXT,
+    FCLCB_FOOTNOTE_REF,
+    FCLCB_FOOTNOTE_TEXT,
+    FCLCB_HEADER,
+    FCLCB_LIST_OVERRIDES,
+    FCLCB_LISTS,
+    FCLCB_SECTION,
+    FCLCB_SHAPE_MAIN,
+    FCLCB_STSHF,
+    FileInformationBlock,
+)
 from .fields import apply_field_result, field_keyword, is_chart_embed_field, is_toc_field
 from .formatting import FormattingRuns, parse_formatting_runs
 from .images import ImageStore, floating_pictures, inline_picture
 from .lists import ListTables, parse_list_tables
-from .models import DocCharStyle, DocChartPayload, DocDocument, DocElement, DocImage, DocParagraph, DocSection, DocTable, DocTableCell, DocTableCellFormat, DocTableFormat, DocTableRow, DocTextRun, DocVisualPayload
+from .models import (
+    DocCharStyle,
+    DocChartPayload,
+    DocDocument,
+    DocElement,
+    DocImage,
+    DocParagraph,
+    DocSection,
+    DocTable,
+    DocTableCell,
+    DocTableCellFormat,
+    DocTableFormat,
+    DocTableRow,
+    DocTextRun,
+    DocVisualPayload,
+)
 from .pieces import Piece, TextStream, codec_for_lid, extract_text, legacy_single_piece, parse_clx
 from .records import DocBudget, parse_plc
 from .sprm import PapDelta, apply_character_sprms, apply_paragraph_sprms, chpx_picture_location, chpx_style_id

@@ -11,6 +11,8 @@ def _payload(value: dict[str, Any], expected_schema: str) -> dict[str, Any]:
     """先验证协议身份和版本，再交给严格类型校验内容。"""
     if value.get("schema") != expected_schema or value.get("schema_version") != "1.0":
         raise ValueError(f"Expected {expected_schema} schema version 1.0")
+    if "producer" not in value:
+        raise ValueError("Missing document producer")
     return {key: item for key, item in value.items() if key not in {"schema", "schema_version"}}
 
 

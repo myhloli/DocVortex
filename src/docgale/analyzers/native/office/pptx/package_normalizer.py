@@ -14,9 +14,7 @@ LEGACY_PPT_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 WORDPROCESSINGML_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 MARKUP_COMPATIBILITY_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 PRESENTATIONML_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
-PACKAGE_RELATIONSHIPS_NS = (
-    "http://schemas.openxmlformats.org/package/2006/relationships"
-)
+PACKAGE_RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 
 CONTENT_PART_TAG = f"{{{PRESENTATIONML_NS}}}contentPart"
 RELATIONSHIP_TAG = f"{{{PACKAGE_RELATIONSHIPS_NS}}}Relationship"
@@ -28,9 +26,7 @@ PPTX_SHAPE_TAGS = {
     f"{{{PRESENTATIONML_NS}}}pic",
 }
 
-ROOT_TAG_PATTERN = re.compile(
-    br"<(?![?!])(?:[A-Za-z_][\w.-]*:)?[A-Za-z_][\w.-]*(?=\s|/?>)"
-)
+ROOT_TAG_PATTERN = re.compile(rb"<(?![?!])(?:[A-Za-z_][\w.-]*:)?[A-Za-z_][\w.-]*(?=\s|/?>)")
 
 STRICT_OOXML_REPLACEMENTS = (
     (
@@ -91,9 +87,7 @@ KNOWN_NAMESPACE_DECLARATIONS = {
 def normalize_pptx_package(file_bytes: bytes) -> bytes:
     """在进入 python-pptx 前修复常见包级兼容问题，避免修复逻辑散落到形状解析阶段。"""
     if file_bytes.startswith(LEGACY_PPT_MAGIC):
-        raise ValueError(
-            "Legacy binary PPT files are not supported; convert the file to PPTX before parsing."
-        )
+        raise ValueError("Legacy binary PPT files are not supported; convert the file to PPTX before parsing.")
 
     try:
         with ZipFile(BytesIO(file_bytes)) as source:
@@ -134,9 +128,7 @@ def _read_member_best_effort(source: ZipFile, info: ZipInfo) -> bytes | None:
         return source.read(info.filename)
     except BadZipFile as exc:
         if _is_skippable_corrupt_member(info.filename):
-            logger.warning(
-                f"Skipping corrupt non-critical PPTX media member {info.filename}: {exc}"
-            )
+            logger.warning(f"Skipping corrupt non-critical PPTX media member {info.filename}: {exc}")
             return None
         raise
 
@@ -185,10 +177,7 @@ def _remove_relationships_to_skipped_members(
 
     removed_count = 0
     for relationship in list(root):
-        if (
-            relationship.tag != RELATIONSHIP_TAG
-            and etree.QName(relationship).localname != "Relationship"
-        ):
+        if relationship.tag != RELATIONSHIP_TAG and etree.QName(relationship).localname != "Relationship":
             continue
         if relationship.get("TargetMode") == "External":
             continue
@@ -290,9 +279,7 @@ def _replace_content_part_alternate_content_with_fallback(xml_bytes: bytes) -> b
         return xml_bytes
 
     replaced_count = 0
-    alternate_content_nodes = root.findall(
-        f".//{{{MARKUP_COMPATIBILITY_NS}}}AlternateContent"
-    )
+    alternate_content_nodes = root.findall(f".//{{{MARKUP_COMPATIBILITY_NS}}}AlternateContent")
     for alternate_content in alternate_content_nodes:
         if _replace_single_alternate_content(alternate_content):
             replaced_count += 1

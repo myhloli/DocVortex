@@ -14,7 +14,13 @@ from lxml import etree  # type: ignore[reportMissingImports]
 
 from .....schema import BlockType
 from ..._shared.hyperlink import sanitize_hyperlink_target
-from .....content.spans import append_equation_span, append_text_span, extend_inline_spans, inline_span_plain_text, strip_span_dicts
+from .....content.spans import (
+    append_equation_span,
+    append_text_span,
+    extend_inline_spans,
+    inline_span_plain_text,
+    strip_span_dicts,
+)
 from ..._shared.mathml import mathml_to_latex
 from ..._shared.image import image_to_b64str
 from ..image import create_text_placeholder, serialize_office_image

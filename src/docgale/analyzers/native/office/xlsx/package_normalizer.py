@@ -29,9 +29,7 @@ VALID_UNDERLINE_VALUES = {
 }
 ROW_ONLY_RANGE_RE = re.compile(r"^\$?([1-9][0-9]*):\$?([1-9][0-9]*)$")
 CELL_REF_RE = re.compile(r"^\$?([A-Za-z]{1,3})\$?[1-9][0-9]*$")
-CELL_RANGE_RE = re.compile(
-    r"^\$?([A-Za-z]{1,3})\$?[1-9][0-9]*:\$?([A-Za-z]{1,3})\$?[1-9][0-9]*$"
-)
+CELL_RANGE_RE = re.compile(r"^\$?([A-Za-z]{1,3})\$?[1-9][0-9]*:\$?([A-Za-z]{1,3})\$?[1-9][0-9]*$")
 WHOLE_COLUMN_RANGE_RE = re.compile(r"^\$?([A-Za-z]{1,3}):\$?([A-Za-z]{1,3})$")
 MAX_EXCEL_COLUMN = "XFD"
 

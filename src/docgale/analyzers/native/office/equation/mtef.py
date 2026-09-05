@@ -57,9 +57,7 @@ class _MtefReader:
 
         self.records += 1
         if self.records > MAX_RECORDS:
-            raise LegacyOfficeResourceLimitError(
-                f"MTEF record count exceeds max_records={MAX_RECORDS}"
-            )
+            raise LegacyOfficeResourceLimitError(f"MTEF record count exceeds max_records={MAX_RECORDS}")
 
     def _u8(self) -> int:
         """有界读取一个无符号字节。"""
@@ -93,9 +91,7 @@ class _MtefReader:
 
         self.depth += 1
         if self.depth > MAX_RECORD_DEPTH:
-            raise LegacyOfficeResourceLimitError(
-                f"MTEF nesting exceeds max_record_depth={MAX_RECORD_DEPTH}"
-            )
+            raise LegacyOfficeResourceLimitError(f"MTEF nesting exceeds max_record_depth={MAX_RECORD_DEPTH}")
 
     def _leave(self) -> None:
         """离开一个嵌套 object list。"""
@@ -630,9 +626,7 @@ def _render_node(node: _Node) -> str:
     if node.kind == "character_v5":
         character, embellishments, style_bits, typeface, _function_start = node.value  # type: ignore[misc]
         value = _apply_embellishments(
-            _render_character(character)
-            if isinstance(character, int)
-            else str(character),
+            _render_character(character) if isinstance(character, int) else str(character),
             tuple(embellishments),
         )
         if int(typeface) in {1, 12}:

@@ -18,7 +18,19 @@ from ....content.spans import text_spans
 from ....schema import BBox
 from .constants import MAX_DELTA_TOKENS, MAX_EXPANDED_GLYPHS, MAX_EXPANDED_TEXT_BYTES, MAX_FONT_BYTES, MAX_GLYPH_TOKENS
 from .errors import OfdResourceLimitError
-from .geometry import Affine, bbox_intersection, bbox_union, canonical_angle, parse_affine, parse_st_box, quad_bbox, rect_quad, transform_angle, transform_bbox, transform_quad
+from .geometry import (
+    Affine,
+    bbox_intersection,
+    bbox_union,
+    canonical_angle,
+    parse_affine,
+    parse_st_box,
+    quad_bbox,
+    rect_quad,
+    transform_angle,
+    transform_bbox,
+    transform_quad,
+)
 from .models import FontResource, GlyphItem, ResourceRegistry, TextLine
 from .package import OfdPackage, element_text, local_name, parse_int
 

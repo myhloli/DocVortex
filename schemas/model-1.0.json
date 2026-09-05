@@ -1,0 +1,95 @@
+{
+  "$defs": {
+    "JsonValue": {},
+    "Producer": {
+      "additionalProperties": false,
+      "description": "记录语言无关的文档生产者，避免绑定宿主产品元数据。",
+      "properties": {
+        "name": {
+          "default": "docgale",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "default": "0.1.0",
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "title": "Producer",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Analyze 返回的完整严格 Model JSON 对象。",
+  "properties": {
+    "producer": {
+      "$ref": "#/$defs/Producer"
+    },
+    "extensions": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Extensions",
+      "type": "object"
+    },
+    "pages": {
+      "items": {
+        "items": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "title": "Pages",
+      "type": "array"
+    },
+    "page_index_map": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Page Index Map",
+      "type": "array"
+    },
+    "file_suffix": {
+      "enum": [
+        "pdf",
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "rtf",
+        "csv",
+        "epub",
+        "html",
+        "ofd",
+        "odt",
+        "ods",
+        "odp"
+      ],
+      "title": "File Suffix",
+      "type": "string"
+    },
+    "schema": {
+      "const": "docgale.model"
+    },
+    "schema_version": {
+      "const": "1.0"
+    }
+  },
+  "required": [
+    "pages",
+    "page_index_map",
+    "file_suffix",
+    "schema",
+    "schema_version",
+    "producer"
+  ],
+  "title": "ModelJson",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

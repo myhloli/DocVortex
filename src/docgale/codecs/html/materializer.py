@@ -13,7 +13,22 @@ from ...analyzers.native._shared.markup import MarkupProjector, MarkupStylesheet
 from ...analyzers.native._shared.markup.projector import BLOCK_TAGS, local_name
 from ...content.spans import text_spans
 from ...analyzers.native.html.resources import HtmlResourceContext
-from .contracts import AnnotationWireSpec, CodeBodyWireSpec, EquationWireSpec, FlowchartBodyWireSpec, IndexBlockWireSpec, IndexLeafWireSpec, IndexWireSpec, ListBlockWireSpec, ListWireSpec, MineruHtmlWirePlan, RichVisualBodyWireSpec, TableBodyWireSpec, TextWireSpec, VisualWireSpec
+from .contracts import (
+    AnnotationWireSpec,
+    CodeBodyWireSpec,
+    EquationWireSpec,
+    FlowchartBodyWireSpec,
+    IndexBlockWireSpec,
+    IndexLeafWireSpec,
+    IndexWireSpec,
+    ListBlockWireSpec,
+    ListWireSpec,
+    MineruHtmlWirePlan,
+    RichVisualBodyWireSpec,
+    TableBodyWireSpec,
+    TextWireSpec,
+    VisualWireSpec,
+)
 
 
 class ExactAnchorResolver:

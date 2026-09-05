@@ -13,7 +13,12 @@ from lxml import etree  # type: ignore[reportMissingImports]
 from ....foundation.image_payload import parse_image_data_uri_strict, validate_remote_image_url
 from .._shared.hyperlink import sanitize_hyperlink_target
 from .._shared.markup import ResolvedMarkupImage
-from .constants import MAX_HTML_IMAGE_BYTES, MAX_HTML_IMAGE_TOTAL_BYTES, MAX_HTML_STYLESHEET_BYTES, MAX_HTML_STYLESHEET_TOTAL_BYTES
+from .constants import (
+    MAX_HTML_IMAGE_BYTES,
+    MAX_HTML_IMAGE_TOTAL_BYTES,
+    MAX_HTML_STYLESHEET_BYTES,
+    MAX_HTML_STYLESHEET_TOTAL_BYTES,
+)
 from .contracts import HtmlSourceContext
 from .errors import HtmlResourceLimitError
 

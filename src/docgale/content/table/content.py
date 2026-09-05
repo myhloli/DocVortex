@@ -10,7 +10,16 @@ from bs4 import Tag
 from ...schema import BlockType
 
 from .blocks import _build_post_body_child_index, _build_table_state, _table_children
-from .html import _colspan, _refresh_table_state_metrics, _rowspan, _scan_rows, _serialize_table_state_html, build_visual_col_mapping, calculate_row_columns, calculate_visual_columns
+from .html import (
+    _colspan,
+    _refresh_table_state_metrics,
+    _rowspan,
+    _scan_rows,
+    _serialize_table_state_html,
+    build_visual_col_mapping,
+    calculate_row_columns,
+    calculate_visual_columns,
+)
 from .models import BlockDict, TableMergeState
 from .structure import _expand_header_count_by_rowspan, can_merge_tables, check_row_columns_match, detect_table_headers
 

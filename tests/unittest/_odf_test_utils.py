@@ -38,11 +38,9 @@ def build_odf_package(
             "<manifest:encryption-data/>"
             "</manifest:file-entry>"
         )
-    for name in (extra_parts or {}):
+    for name in extra_parts or {}:
         media_type = "image/png" if name.endswith(".png") else "text/xml"
-        manifest_entries.append(
-            f'<manifest:file-entry manifest:full-path="{name}" manifest:media-type="{media_type}"/>'
-        )
+        manifest_entries.append(f'<manifest:file-entry manifest:full-path="{name}" manifest:media-type="{media_type}"/>')
     manifest = (
         '<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">'
         + "".join(manifest_entries)

@@ -9,8 +9,41 @@ from typing import Any, Sequence
 
 from .....schema import BBox
 from .....document.pdf.document import PDFLinkAnnotation
-from .common import _bbox_intersection_area, _canonical_styles, _coerce_bbox, _normalize_match_fragment, _ordered_line_chars, _style_line_reading_order_key
-from .types import _PDF_BOLD_FONT_NAME_RE, _PDF_FONT_SUBSET_PREFIX_RE, _PDF_LIST_MARKER_CHARS, _PDF_TEXT_DECORATION_ORDER, PDF_BOLD_MIN_COMPARABLE_CHAR_COUNT, PDF_BOLD_MIN_WEIGHT, PDF_FONT_FORCE_BOLD_FLAG, PDF_LINK_CHAR_OVERLAP_THRESHOLD, STRIKETHROUGH_CENTER_TOLERANCE_HEIGHT_RATIO, TEXT_DECORATION_ENDPOINT_TOLERANCE_HEIGHT_RATIO, TEXT_DECORATION_MAX_WIDTH_HEIGHT_RATIO, TEXT_DECORATION_MIN_LENGTH_HEIGHT_RATIO, TEXT_DECORATION_MIN_TEXT_COVERAGE_RATIO, UNDERLINE_BOTTOM_TOLERANCE_HEIGHT_RATIO, UNDERLINE_FRACTION_MAX_GAP_HEIGHT_RATIO, UNDERLINE_FRACTION_MIN_LOWER_LINE_COVERAGE, PDFTextDecoration, PDFTextLinkLine, PDFTextLinkRange, PDFTextStyle, PDFTextStyleLine, PDFTextStyleRange, _DrawingMatch, _LineCandidate, _VisibleChar
+from .common import (
+    _bbox_intersection_area,
+    _canonical_styles,
+    _coerce_bbox,
+    _normalize_match_fragment,
+    _ordered_line_chars,
+    _style_line_reading_order_key,
+)
+from .types import (
+    _PDF_BOLD_FONT_NAME_RE,
+    _PDF_FONT_SUBSET_PREFIX_RE,
+    _PDF_LIST_MARKER_CHARS,
+    _PDF_TEXT_DECORATION_ORDER,
+    PDF_BOLD_MIN_COMPARABLE_CHAR_COUNT,
+    PDF_BOLD_MIN_WEIGHT,
+    PDF_FONT_FORCE_BOLD_FLAG,
+    PDF_LINK_CHAR_OVERLAP_THRESHOLD,
+    STRIKETHROUGH_CENTER_TOLERANCE_HEIGHT_RATIO,
+    TEXT_DECORATION_ENDPOINT_TOLERANCE_HEIGHT_RATIO,
+    TEXT_DECORATION_MAX_WIDTH_HEIGHT_RATIO,
+    TEXT_DECORATION_MIN_LENGTH_HEIGHT_RATIO,
+    TEXT_DECORATION_MIN_TEXT_COVERAGE_RATIO,
+    UNDERLINE_BOTTOM_TOLERANCE_HEIGHT_RATIO,
+    UNDERLINE_FRACTION_MAX_GAP_HEIGHT_RATIO,
+    UNDERLINE_FRACTION_MIN_LOWER_LINE_COVERAGE,
+    PDFTextDecoration,
+    PDFTextLinkLine,
+    PDFTextLinkRange,
+    PDFTextStyle,
+    PDFTextStyleLine,
+    PDFTextStyleRange,
+    _DrawingMatch,
+    _LineCandidate,
+    _VisibleChar,
+)
 
 
 def _pdf_font_metadata(char: dict[str, Any]) -> tuple[str, int, float | None]:

@@ -11,7 +11,19 @@ from zipfile import BadZipFile, ZipFile, ZipInfo
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
-from .constants import MAX_ASSET_TOTAL_BYTES, MAX_ENTRY_BYTES, MAX_ENTRY_COUNT, MAX_TOTAL_BYTES, MAX_XML_DEPTH, MAX_XML_NODES, ODF_BODY_BY_SUFFIX, ODF_MIME_BY_SUFFIX, ODF_SUFFIX_BY_MIME, OdfSuffix, qname
+from .constants import (
+    MAX_ASSET_TOTAL_BYTES,
+    MAX_ENTRY_BYTES,
+    MAX_ENTRY_COUNT,
+    MAX_TOTAL_BYTES,
+    MAX_XML_DEPTH,
+    MAX_XML_NODES,
+    ODF_BODY_BY_SUFFIX,
+    ODF_MIME_BY_SUFFIX,
+    ODF_SUFFIX_BY_MIME,
+    OdfSuffix,
+    qname,
+)
 from .errors import OdfEncryptedError, OdfParseError, OdfResourceLimitError
 
 
@@ -115,9 +127,7 @@ class OdfPackage:
         self._asset_parts.add(part_name)
         self._asset_bytes += byte_count
         if self._asset_bytes > MAX_ASSET_TOTAL_BYTES:
-            raise OdfResourceLimitError(
-                f"ODF resource limit exceeded: max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}"
-            )
+            raise OdfResourceLimitError(f"ODF resource limit exceeded: max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}")
 
     def xml_part(self, part_name: str, *, required: bool = False) -> etree._Element | None:
         """禁用实体和网络后解析 XML，并校验节点数及最大深度。"""
@@ -144,13 +154,9 @@ class OdfPackage:
             element, depth = stack.pop()
             node_count += 1
             if node_count > MAX_XML_NODES:
-                raise OdfResourceLimitError(
-                    f"ODF resource limit exceeded: {part_name!r} exceeds max_xml_nodes={MAX_XML_NODES}"
-                )
+                raise OdfResourceLimitError(f"ODF resource limit exceeded: {part_name!r} exceeds max_xml_nodes={MAX_XML_NODES}")
             if depth > MAX_XML_DEPTH:
-                raise OdfResourceLimitError(
-                    f"ODF resource limit exceeded: {part_name!r} exceeds max_xml_depth={MAX_XML_DEPTH}"
-                )
+                raise OdfResourceLimitError(f"ODF resource limit exceeded: {part_name!r} exceeds max_xml_depth={MAX_XML_DEPTH}")
             for child in element:
                 if isinstance(child.tag, str):
                     stack.append((child, depth + 1))

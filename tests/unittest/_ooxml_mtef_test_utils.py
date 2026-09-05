@@ -60,20 +60,14 @@ def _content_types_with_ole(content_types: bytes) -> bytes:
     """为 .bin 公式 OLE persistence part 添加默认内容类型。"""
 
     root = etree.fromstring(content_types)
-    if not any(
-        child.get("Extension", "").casefold() == "bin"
-        for child in root
-    ):
+    if not any(child.get("Extension", "").casefold() == "bin" for child in root):
         etree.SubElement(
             root,
             f"{{{CONTENT_TYPES_NS}}}Default",
             Extension="bin",
             ContentType="application/vnd.openxmlformats-officedocument.oleObject",
         )
-    if not any(
-        child.get("Extension", "").casefold() == "png"
-        for child in root
-    ):
+    if not any(child.get("Extension", "").casefold() == "png" for child in root):
         etree.SubElement(
             root,
             f"{{{CONTENT_TYPES_NS}}}Default",
@@ -160,11 +154,7 @@ def _replace_word_placeholder(
     """用公式 run 或 AlternateContent 替换指定占位 run。"""
 
     text_node = next(
-        (
-            node
-            for node in root.findall(f".//{{{W_NS}}}t")
-            if node.text == placeholder
-        ),
+        (node for node in root.findall(f".//{{{W_NS}}}t") if node.text == placeholder),
         None,
     )
     if text_node is None:
@@ -206,9 +196,7 @@ def _patch_word_part(
             rels,
             image_rid,
             IMAGE_REL_TYPE,
-            f"../media/{image_part.rsplit('/', 1)[-1]}"
-            if directory != "word"
-            else f"media/{image_part.rsplit('/', 1)[-1]}",
+            f"../media/{image_part.rsplit('/', 1)[-1]}" if directory != "word" else f"media/{image_part.rsplit('/', 1)[-1]}",
         )
         additions[object_part] = build_equation_object(
             mtef,
@@ -334,14 +322,10 @@ def build_equation_docx(
     with ZipFile(BytesIO(package)) as source:
         if header_footer:
             header_parts = sorted(
-                name
-                for name in source.namelist()
-                if name.startswith("word/header") and name.endswith(".xml")
+                name for name in source.namelist() if name.startswith("word/header") and name.endswith(".xml")
             )
             footer_parts = sorted(
-                name
-                for name in source.namelist()
-                if name.startswith("word/footer") and name.endswith(".xml")
+                name for name in source.namelist() if name.startswith("word/footer") and name.endswith(".xml")
             )
             assignments: dict[str, list[tuple[str, bytes, bool]]] = {}
             for index, (placeholder, mtef) in enumerate(zip(placeholders, formulas, strict=True)):
@@ -370,9 +354,7 @@ def build_equation_docx(
                     mtef,
                     alternate_omml and index == 0,
                 )
-                for index, (placeholder, mtef) in enumerate(
-                    zip(placeholders, formulas, strict=True)
-                )
+                for index, (placeholder, mtef) in enumerate(zip(placeholders, formulas, strict=True))
             ]
             xml, rels = _patch_word_part(
                 source,
@@ -388,9 +370,7 @@ def build_equation_docx(
                 xml = _set_word_equations_as_icons(xml)
             replacements[target_part] = xml
             replacements["word/_rels/document.xml.rels"] = rels
-        replacements["[Content_Types].xml"] = _content_types_with_ole(
-            source.read("[Content_Types].xml")
-        )
+        replacements["[Content_Types].xml"] = _content_types_with_ole(source.read("[Content_Types].xml"))
     return _rewrite_zip(package, replacements, additions)
 
 
@@ -408,11 +388,7 @@ def build_equation_pptx(
     presentation = Presentation()
     presentation.slides.add_slide(presentation.slide_layouts[6])
     for index, mtef in enumerate(formulas):
-        slide = (
-            presentation.slides[0]
-            if index == 0
-            else presentation.slides.add_slide(presentation.slide_layouts[6])
-        )
+        slide = presentation.slides[0] if index == 0 else presentation.slides.add_slide(presentation.slide_layouts[6])
         slide.shapes.add_ole_object(
             BytesIO(build_equation_object(mtef, prog_id=prog_id)),
             prog_id,
@@ -430,11 +406,7 @@ def build_equation_pptx(
     if preview_image != _TINY_PNG:
         replacements = {}
         with ZipFile(BytesIO(package)) as source:
-            replacements = {
-                name: preview_image
-                for name in source.namelist()
-                if name.startswith("ppt/media/")
-            }
+            replacements = {name: preview_image for name in source.namelist() if name.startswith("ppt/media/")}
         package = _rewrite_zip(package, replacements, {})
     if notes:
         return _move_pptx_equations_to_notes(
@@ -479,9 +451,7 @@ def _move_pptx_equations_to_notes(
     replacements: dict[str, bytes] = {}
     with ZipFile(BytesIO(package)) as source:
         slide_parts = sorted(
-            name
-            for name in source.namelist()
-            if name.startswith("ppt/slides/slide") and name.endswith(".xml")
+            name for name in source.namelist() if name.startswith("ppt/slides/slide") and name.endswith(".xml")
         )
         for index, slide_part in enumerate(slide_parts, start=1):
             notes_part = f"ppt/notesSlides/notesSlide{index}.xml"
@@ -505,11 +475,7 @@ def _move_pptx_equations_to_notes(
                 for attribute, value in node.attrib.items()
                 if attribute in {f"{{{REL_NS}}}id", f"{{{REL_NS}}}embed"}
             }
-            copied_relationships = [
-                relationship
-                for relationship in slide_rels
-                if relationship.get("Id") in referenced_ids
-            ]
+            copied_relationships = [relationship for relationship in slide_rels if relationship.get("Id") in referenced_ids]
             notes_rels_name = f"ppt/notesSlides/_rels/notesSlide{index}.xml.rels"
             notes_rels = _relationships_root(source.read(notes_rels_name))
             id_mapping: dict[str, str] = {}
@@ -628,9 +594,7 @@ def _xlsx_vml_parts(
     shape = etree.SubElement(root, f"{{{V_NS}}}shape", id=f"_x0000_s{shape_id}")
     etree.SubElement(shape, f"{{{V_NS}}}imagedata", {f"{{{REL_NS}}}id": "rIdPreview"})
     client_data = etree.SubElement(shape, f"{{{XVML_NS}}}ClientData")
-    etree.SubElement(client_data, f"{{{XVML_NS}}}Anchor").text = (
-        f"{col}, 0, {row}, 0, {col + 2}, 0, {row + 3}, 0"
-    )
+    etree.SubElement(client_data, f"{{{XVML_NS}}}Anchor").text = f"{col}, 0, {row}, 0, {col + 2}, 0, {row + 3}, 0"
     rels = _relationships_root(None)
     _append_relationship(rels, "rIdPreview", IMAGE_REL_TYPE, "../media/equationMtef.png")
     return (
@@ -702,19 +666,13 @@ def build_equation_xlsx(
                 rels,
                 ole_rid,
                 OLE_REL_TYPE,
-                (
-                    "https://example.test/equation.bin"
-                    if linked
-                    else f"../embeddings/oleObjectMtef{index}.bin"
-                ),
+                ("https://example.test/equation.bin" if linked else f"../embeddings/oleObjectMtef{index}.bin"),
                 external=linked,
             )
             if linked:
                 ole_object.set("link", "https://example.test/equation.bin")
             else:
-                additions[
-                    f"xl/embeddings/oleObjectMtef{index}.bin"
-                ] = build_equation_object(
+                additions[f"xl/embeddings/oleObjectMtef{index}.bin"] = build_equation_object(
                     mtef,
                     prog_id=prog_id,
                 )
@@ -766,7 +724,5 @@ def build_equation_xlsx(
             replacements[rels_name] = rels_payload
         else:
             additions[rels_name] = rels_payload
-        replacements["[Content_Types].xml"] = _content_types_with_ole(
-            source.read("[Content_Types].xml")
-        )
+        replacements["[Content_Types].xml"] = _content_types_with_ole(source.read("[Content_Types].xml"))
     return _rewrite_zip(package, replacements, additions)

@@ -9,7 +9,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from .candidate import serialize_candidate_html
-from .contracts import NativeTableCandidate, NativeTableInput, NativeTableRectangle, NativeTableResult, NativeTableRule, NativeTableText
+from .contracts import (
+    NativeTableCandidate,
+    NativeTableInput,
+    NativeTableRectangle,
+    NativeTableResult,
+    NativeTableRule,
+    NativeTableText,
+)
 from .geometry import bbox_intersection, normalize_bbox
 from .sparse_hybrid import build_sparse_hybrid_candidates, diagnose_sparse_hybrid_candidate_builds
 from .sparse_multiline import build_sparse_multiline_candidates, diagnose_sparse_multiline_candidate_builds

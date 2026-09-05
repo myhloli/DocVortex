@@ -18,7 +18,18 @@ from ..image import serialize_office_image
 from ..equation.image import OfficeImageEquationDecoder
 
 from .chart import chart_source_axes, chart_source_selection
-from .models import XlsCell, XlsChart, XlsChartSheet, XlsEquation, XlsFontStyle, XlsImage, XlsRichRun, XlsRichText, XlsSheet, XlsWorkbook
+from .models import (
+    XlsCell,
+    XlsChart,
+    XlsChartSheet,
+    XlsEquation,
+    XlsFontStyle,
+    XlsImage,
+    XlsRichRun,
+    XlsRichText,
+    XlsSheet,
+    XlsWorkbook,
+)
 from .number_format import builtin_number_format, format_number, format_text
 from .records import BOF, CONTINUE, EOF, BiffRecord, RecordBudget, SegmentReader, collect_continues, iter_records, record_at
 from .strings import DecodedString, clean_text, codepage_name, read_biff8_string, read_byte_string, read_txo_text, to_rich_text

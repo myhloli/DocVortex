@@ -9,13 +9,40 @@ from typing import Any, Sequence
 from .....schema import BBox
 from .....foundation.text import is_hyphen_at_line_end
 from ..geometry import _bbox_union_many, _rotate_bbox_to_upright, _transform_axis_lines
-from ..line_layout import _estimate_lane_gap, _infer_text_lanes, _line_effective_height, _should_connect_semantic_rows, _should_connect_text_rows
+from ..line_layout import (
+    _estimate_lane_gap,
+    _infer_text_lanes,
+    _line_effective_height,
+    _should_connect_semantic_rows,
+    _should_connect_text_rows,
+)
 from ..models import _AxisLine, _LineItem
 from ..native_text import _normalize_native_run_text
 from .common import _PARAGRAPH_FORMULA_CONTEXT_MARKER, _merge_text_line_content
 from .footnotes import _build_grouped_page_footnote_blocks
-from .merging import _merge_inline_math_fragment_text_blocks, _merge_list_intro_text_components, _merge_overlapping_same_line_text_blocks, _merge_paragraph_formula_context_blocks, _merge_short_same_baseline_prefix_blocks, _merge_spatial_text_components, _merge_unterminated_text_components
-from .rows import _build_hanging_indent_group_map, _centered_visual_reset_break_sources, _component_starts_with_emphasized_row, _explicit_text_break_sources, _formula_style_text_row_break_sources, _front_matter_keyword_break_sources, _infer_local_text_lane_map, _isolated_indented_paragraph_break_sources, _leading_typography_reset_break_sources, _local_tight_output_line_bboxes, _starts_structural_reference_entry, _structured_text_break_sources
+from .merging import (
+    _merge_inline_math_fragment_text_blocks,
+    _merge_list_intro_text_components,
+    _merge_overlapping_same_line_text_blocks,
+    _merge_paragraph_formula_context_blocks,
+    _merge_short_same_baseline_prefix_blocks,
+    _merge_spatial_text_components,
+    _merge_unterminated_text_components,
+)
+from .rows import (
+    _build_hanging_indent_group_map,
+    _centered_visual_reset_break_sources,
+    _component_starts_with_emphasized_row,
+    _explicit_text_break_sources,
+    _formula_style_text_row_break_sources,
+    _front_matter_keyword_break_sources,
+    _infer_local_text_lane_map,
+    _isolated_indented_paragraph_break_sources,
+    _leading_typography_reset_break_sources,
+    _local_tight_output_line_bboxes,
+    _starts_structural_reference_entry,
+    _structured_text_break_sources,
+)
 
 
 def _build_text_blocks(

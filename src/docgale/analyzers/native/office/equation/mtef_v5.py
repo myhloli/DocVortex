@@ -200,18 +200,14 @@ class _MtefV5Reader:
 
         self.records += 1
         if self.records > MAX_RECORDS:
-            raise LegacyOfficeResourceLimitError(
-                f"MTEF record count exceeds max_records={MAX_RECORDS}"
-            )
+            raise LegacyOfficeResourceLimitError(f"MTEF record count exceeds max_records={MAX_RECORDS}")
 
     def _enter(self) -> None:
         """进入嵌套 object list 并限制共享深度。"""
 
         self.depth += 1
         if self.depth > MAX_RECORD_DEPTH:
-            raise LegacyOfficeResourceLimitError(
-                f"MTEF nesting exceeds max_record_depth={MAX_RECORD_DEPTH}"
-            )
+            raise LegacyOfficeResourceLimitError(f"MTEF nesting exceeds max_record_depth={MAX_RECORD_DEPTH}")
 
     def _leave(self) -> None:
         """离开当前 object list。"""
@@ -252,7 +248,7 @@ class _MtefV5Reader:
         end = self.data.find(b"\x00", self.pos, end_limit)
         if end < 0:
             raise _MtefError("MTEF v5 string is not null-terminated")
-        raw = self.data[self.pos:end]
+        raw = self.data[self.pos : end]
         self.pos = end + 1
         try:
             return raw.decode("ascii")
@@ -356,9 +352,7 @@ class _MtefV5Reader:
             raise _MtefError("MTEF v5 font style bits are invalid")
         if font_index <= 0 or font_index >= len(self.font_definitions):
             raise _MtefError("MTEF v5 FONT_STYLE_DEF reference is invalid")
-        self.font_style_definitions.append(
-            _FontStyleDefinition(font_index, style_bits)
-        )
+        self.font_style_definitions.append(_FontStyleDefinition(font_index, style_bits))
         return _Node("metadata")
 
     def _parse_color_definition(self) -> _Node:
@@ -529,14 +523,7 @@ class _MtefV5Reader:
         """读取 CHAR 的 typeface、MTCode/font position 和 embellishments。"""
 
         options = self._u8()
-        allowed = (
-            _OPT_NUDGE
-            | _CHAR_EMBELL
-            | _CHAR_FUNC_START
-            | _CHAR_ENC_8
-            | _CHAR_ENC_16
-            | _CHAR_NO_MTCODE
-        )
+        allowed = _OPT_NUDGE | _CHAR_EMBELL | _CHAR_FUNC_START | _CHAR_ENC_8 | _CHAR_ENC_16 | _CHAR_NO_MTCODE
         if options & ~allowed or options & _CHAR_ENC_8 and options & _CHAR_ENC_16:
             raise _MtefError("MTEF v5 CHAR options are invalid")
         if options & _OPT_NUDGE:
@@ -568,9 +555,7 @@ class _MtefV5Reader:
                 self._character_encoding(typeface),
                 font_position,
             )
-        embellishments = (
-            self._parse_embellishments() if options & _CHAR_EMBELL else ()
-        )
+        embellishments = self._parse_embellishments() if options & _CHAR_EMBELL else ()
         return _Node(
             "character_v5",
             (
@@ -639,11 +624,7 @@ class _MtefV5Reader:
         vertical_alignment = self._u8()
         horizontal_justification = self._u8()
         vertical_justification = self._u8()
-        if (
-            vertical_alignment > 4
-            or horizontal_justification not in {1, 2, 3, 4, 5}
-            or vertical_justification > 4
-        ):
+        if vertical_alignment > 4 or horizontal_justification not in {1, 2, 3, 4, 5} or vertical_justification > 4:
             raise _MtefError("MTEF v5 MATRIX alignment is invalid")
         rows = self._u8()
         cols = self._u8()
@@ -731,12 +712,7 @@ class _MtefV5Reader:
                 index += 1
                 continue
             character, embellishments, style_bits, typeface, function_start = node.value  # type: ignore[misc]
-            if (
-                isinstance(character, int)
-                and int(typeface) in {1, 12}
-                and not embellishments
-                and not style_bits
-            ):
+            if isinstance(character, int) and int(typeface) in {1, 12} and not embellishments and not style_bits:
                 characters = [chr(character)]
                 cursor = index + 1
                 while cursor < len(nodes):
@@ -744,25 +720,14 @@ class _MtefV5Reader:
                     if candidate.kind != "character_v5":
                         break
                     c_char, c_embell, c_style, c_typeface, _c_start = candidate.value  # type: ignore[misc]
-                    if (
-                        not isinstance(c_char, int)
-                        or c_embell
-                        or c_style
-                        or int(c_typeface) != int(typeface)
-                    ):
+                    if not isinstance(c_char, int) or c_embell or c_style or int(c_typeface) != int(typeface):
                         break
                     characters.append(chr(c_char))
                     cursor += 1
                 grouped.append(_Node("text", "".join(characters)))
                 index = cursor
                 continue
-            if (
-                not isinstance(character, int)
-                or not function_start
-                or int(typeface) != 2
-                or embellishments
-                or style_bits
-            ):
+            if not isinstance(character, int) or not function_start or int(typeface) != 2 or embellishments or style_bits:
                 grouped.append(node)
                 index += 1
                 continue
@@ -773,12 +738,7 @@ class _MtefV5Reader:
                 if candidate.kind != "character_v5":
                     break
                 c_char, c_embell, c_style, c_typeface, _c_start = candidate.value  # type: ignore[misc]
-                if (
-                    not isinstance(c_char, int)
-                    or c_embell
-                    or c_style
-                    or int(c_typeface) != 2
-                ):
+                if not isinstance(c_char, int) or c_embell or c_style or int(c_typeface) != 2:
                     break
                 characters.append(chr(int(c_char)))
                 cursor += 1
@@ -926,16 +886,8 @@ def _semantic_template(
     if selector in {27, 28, 29}:
         if variation & ~0x01 or options != 0:
             raise _MtefError("unsupported MTEF v5 script variation")
-        subscript = (
-            _slot_node(slots, 0)
-            if selector in {27, 29}
-            else _Node("sequence")
-        )
-        superscript = (
-            _slot_node(slots, 1)
-            if selector in {28, 29}
-            else _Node("sequence")
-        )
+        subscript = _slot_node(slots, 0) if selector in {27, 29} else _Node("sequence")
+        superscript = _slot_node(slots, 1) if selector in {28, 29} else _Node("sequence")
         return _Node(
             "scripts_semantic",
             bool(variation & 0x01),

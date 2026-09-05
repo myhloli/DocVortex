@@ -12,7 +12,12 @@ from ..foundation.text import clean_isolated_formula
 
 from .content import clean_inline_content, code_content_clean, collapse_inline_newlines
 from .lists import fix_office_index_blocks, fix_office_list_blocks, fix_pdf_index_blocks, fix_pdf_list_blocks
-from .visual import fallback_inline_caption_fragments, fallback_leading_table_continuation_captions, fallback_no_bbox_caption_fragments, regroup_visual_blocks
+from .visual import (
+    fallback_inline_caption_fragments,
+    fallback_leading_table_continuation_captions,
+    fallback_no_bbox_caption_fragments,
+    regroup_visual_blocks,
+)
 
 BlockDict = dict[str, Any]
 

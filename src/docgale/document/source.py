@@ -27,8 +27,13 @@ class PreparedSource:
     owns_document: bool = False
 
 
-def prepare_source(source: str | Path | bytes | PDFDocument, *, file_suffix: FileSuffix | None = None,
-                   page_range: str = "", source_context: HtmlSourceContext | None = None) -> PreparedSource:
+def prepare_source(
+    source: str | Path | bytes | PDFDocument,
+    *,
+    file_suffix: FileSuffix | None = None,
+    page_range: str = "",
+    source_context: HtmlSourceContext | None = None,
+) -> PreparedSource:
     """准备原生解析输入，调用者持有的 PDFDocument 不由引擎关闭。"""
     from .detection import guess_suffix_by_bytes
     from .page_range import normalize_page_range_input, parse_page_range

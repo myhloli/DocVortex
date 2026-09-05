@@ -6,7 +6,15 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
-from ..schema import INLINE_STYLE_ORDER, CodeInlineSpan, EquationInlineSpan, HyperlinkSpan, InlineSpan, TextSpan, parse_inline_spans
+from ..schema import (
+    INLINE_STYLE_ORDER,
+    CodeInlineSpan,
+    EquationInlineSpan,
+    HyperlinkSpan,
+    InlineSpan,
+    TextSpan,
+    parse_inline_spans,
+)
 
 
 def append_text_span(output: list[dict[str, Any]], content: str, styles: Iterable[str] = ()) -> None:

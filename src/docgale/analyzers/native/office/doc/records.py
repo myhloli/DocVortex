@@ -38,8 +38,5 @@ def parse_plc(data: bytes, *, item_size: int, budget: DocBudget) -> tuple[list[i
     budget.charge(count + 1)
     cp_bytes = (count + 1) * 4
     cps = [int(struct.unpack_from("<I", data, index * 4)[0]) for index in range(count + 1)]
-    items = [
-        data[cp_bytes + index * item_size : cp_bytes + (index + 1) * item_size]
-        for index in range(count)
-    ]
+    items = [data[cp_bytes + index * item_size : cp_bytes + (index + 1) * item_size] for index in range(count)]
     return cps, items

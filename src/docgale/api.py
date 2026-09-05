@@ -7,7 +7,7 @@ from io import BytesIO
 import json
 from pathlib import Path
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from .assets import AssetStore
 from .document.source import HtmlSourceContext, prepare_source
@@ -19,8 +19,13 @@ if TYPE_CHECKING:
     from .document.pdf.document import PDFDocument
 
 
-def analyze(source: str | Path | bytes | PDFDocument, *, file_suffix: FileSuffix | None = None,
-            page_range: str = "", source_context: HtmlSourceContext | None = None) -> AnalysisResult:
+def analyze(
+    source: str | Path | bytes | PDFDocument,
+    *,
+    file_suffix: FileSuffix | None = None,
+    page_range: str = "",
+    source_context: HtmlSourceContext | None = None,
+) -> AnalysisResult:
     """执行原生分析，显式调用者选择不会被隐式分类或 OCR 改写。"""
     from .analyzers.native import models
 
@@ -35,9 +40,11 @@ def analyze(source: str | Path | bytes | PDFDocument, *, file_suffix: FileSuffix
             pages = models.PdfModel().predict(prepared.document)
             for start in range(0, len(pages), 64):
                 end = min(start + 63, len(pages) - 1)
-                images = load_images_from_pdf_bytes_range(prepared.data, start_page_id=start, end_page_id=end, image_type="pil_img")
+                images = load_images_from_pdf_bytes_range(
+                    prepared.data, start_page_id=start, end_page_id=end, image_type="pil_img"
+                )
                 try:
-                    _attach_visual_block_images(pages[start:end + 1], images, page_start_index=start)
+                    _attach_visual_block_images(pages[start : end + 1], images, page_start_index=start)
                 finally:
                     for item in images:
                         if item.get("img_pil") is not None:
@@ -45,22 +52,36 @@ def analyze(source: str | Path | bytes | PDFDocument, *, file_suffix: FileSuffix
         elif prepared.file_suffix == "html":
             pages = models.HtmlModel().predict(BytesIO(prepared.data), source_context=prepared.source_context)
         else:
-            model_types = {"csv": models.CsvModel, "epub": models.EpubModel, "ofd": models.OfdModel,
-                           "doc": models.DocModel, "docx": models.DocxModel, "ppt": models.PptModel,
-                           "pptx": models.PptxModel, "xls": models.XlsModel, "xlsx": models.XlsxModel,
-                           "rtf": models.RtfModel, "odt": models.OdtModel, "ods": models.OdsModel, "odp": models.OdpModel}
+            model_types = {
+                "csv": models.CsvModel,
+                "epub": models.EpubModel,
+                "ofd": models.OfdModel,
+                "doc": models.DocModel,
+                "docx": models.DocxModel,
+                "ppt": models.PptModel,
+                "pptx": models.PptxModel,
+                "xls": models.XlsModel,
+                "xlsx": models.XlsxModel,
+                "rtf": models.RtfModel,
+                "odt": models.OdtModel,
+                "ods": models.OdsModel,
+                "odp": models.OdpModel,
+            }
             pages = model_types[prepared.file_suffix]().predict(BytesIO(prepared.data))
         model = ModelJson(pages=pages, page_index_map=prepared.page_index_map or [], file_suffix=prepared.file_suffix)
-        diagnostics = tuple(Diagnostic("broken_page", "The selected PDF page could not be loaded", index)
-                            for index in prepared.broken_page_indices)
+        diagnostics = tuple(
+            Diagnostic("broken_page", "The selected PDF page could not be loaded", index)
+            for index in prepared.broken_page_indices
+        )
         return AnalysisResult(model, diagnostics=diagnostics, elapsed_seconds=time.perf_counter() - started)
     finally:
         if prepared.owns_document and prepared.document is not None:
             prepared.document.close()
 
 
-def postprocess(analysis: AnalysisResult | ModelJson, *, assets: AssetStore | None = None,
-                keep_model_json: bool = False) -> DocumentResult:
+def postprocess(
+    analysis: AnalysisResult | ModelJson, *, assets: AssetStore | None = None, keep_model_json: bool = False
+) -> DocumentResult:
     """执行确定性后处理并物化结果素材，智能增强由上层显式调用。"""
     from .postprocess.document import model_json_to_middle_json
     from .export.files import materialize_middle
@@ -82,24 +103,39 @@ def postprocess(analysis: AnalysisResult | ModelJson, *, assets: AssetStore | No
     return DocumentResult(middle, result_assets, model if keep_model_json else None, diagnostics)
 
 
-def parse(source: str | Path | bytes | PDFDocument, *, file_suffix: FileSuffix | None = None,
-          page_range: str = "", source_context: HtmlSourceContext | None = None,
-          keep_model_json: bool = False) -> DocumentResult:
+def parse(
+    source: str | Path | bytes | PDFDocument,
+    *,
+    file_suffix: FileSuffix | None = None,
+    page_range: str = "",
+    source_context: HtmlSourceContext | None = None,
+    keep_model_json: bool = False,
+) -> DocumentResult:
     """完成输入、分析及后处理，返回可脱离原文件使用的结果。"""
-    return postprocess(analyze(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context),
-                       keep_model_json=keep_model_json)
+    return postprocess(
+        analyze(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context),
+        keep_model_json=keep_model_json,
+    )
 
 
-def render(middle_json: MiddleJson, output_format: RenderFormat | str, *, assets: AssetStore | None = None,
-           options: RenderOptions | None = None) -> RenderArtifact:
+def render(
+    middle_json: MiddleJson,
+    output_format: RenderFormat | str,
+    *,
+    assets: AssetStore | None = None,
+    options: RenderOptions | None = None,
+) -> RenderArtifact:
     """把同一语义文档编码为目标文件，返回值不产生文件系统副作用。"""
     from .render.api import render as render_value
     from .export.files import materialize_middle
 
     target = RenderFormat(output_format)
     middle, resolved_assets = materialize_middle(middle_json, assets)
-    resolver_options = {RenderFormat.DOCX: DocxRenderOptions, RenderFormat.EPUB: EpubRenderOptions,
-                        RenderFormat.PDF: PdfRenderOptions}
+    resolver_options = {
+        RenderFormat.DOCX: DocxRenderOptions,
+        RenderFormat.EPUB: EpubRenderOptions,
+        RenderFormat.PDF: PdfRenderOptions,
+    }
     if target in resolver_options:
         if options is None:
             options = resolver_options[target](asset_resolver=resolved_assets.__getitem__)
@@ -112,17 +148,31 @@ def render(middle_json: MiddleJson, output_format: RenderFormat | str, *, assets
         content = value.encode("utf-8")
     else:
         content = json.dumps(value, ensure_ascii=False, indent=2).encode("utf-8")
-    mime_types = {RenderFormat.MARKDOWN: "text/markdown", RenderFormat.HTML: "text/html",
-                  RenderFormat.LATEX: "application/x-tex", RenderFormat.DOCX: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                  RenderFormat.EPUB: "application/epub+zip", RenderFormat.PDF: "application/pdf"}
+    mime_types = {
+        RenderFormat.MARKDOWN: "text/markdown",
+        RenderFormat.HTML: "text/html",
+        RenderFormat.LATEX: "application/x-tex",
+        RenderFormat.DOCX: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        RenderFormat.EPUB: "application/epub+zip",
+        RenderFormat.PDF: "application/pdf",
+    }
     packaged = target in resolver_options
-    return RenderArtifact(content, target, mime_types.get(target, "application/json"), AssetStore() if packaged else resolved_assets)
+    return RenderArtifact(
+        content, target, mime_types.get(target, "application/json"), AssetStore() if packaged else resolved_assets
+    )
 
 
-def convert(source: str | Path | bytes | PDFDocument, output_path: str | Path, *,
-            output_format: RenderFormat | str = RenderFormat.MARKDOWN, file_suffix: FileSuffix | None = None,
-            page_range: str = "", source_context: HtmlSourceContext | None = None,
-            options: RenderOptions | None = None, overwrite: bool = False) -> ExportResult:
+def convert(
+    source: str | Path | bytes | PDFDocument,
+    output_path: str | Path,
+    *,
+    output_format: RenderFormat | str = RenderFormat.MARKDOWN,
+    file_suffix: FileSuffix | None = None,
+    page_range: str = "",
+    source_context: HtmlSourceContext | None = None,
+    options: RenderOptions | None = None,
+    overwrite: bool = False,
+) -> ExportResult:
     """使用完整原生流程进行一次转换，并返回实际写出的文件路径。"""
     result = parse(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context)
     return result.export(output_path, output_format=output_format, options=options, overwrite=overwrite)

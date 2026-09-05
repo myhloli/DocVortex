@@ -101,9 +101,7 @@ def _resolve_internal_target(source_part: str, target: str) -> str | None:
     if candidate.startswith("/"):
         normalized = posixpath.normpath(candidate.lstrip("/"))
     else:
-        normalized = posixpath.normpath(
-            posixpath.join(posixpath.dirname(source_part), candidate)
-        )
+        normalized = posixpath.normpath(posixpath.join(posixpath.dirname(source_part), candidate))
     if normalized in {"", "."} or normalized == ".." or normalized.startswith("../"):
         return None
     return normalized
@@ -158,14 +156,10 @@ def _read_member_bounded(source: ZipFile, part_name: str | None) -> bytes | None
     except KeyError:
         return None
     if info.file_size > MAX_ENTRY_BYTES:
-        raise LegacyOfficeResourceLimitError(
-            f"XLSX embedded part exceeds max_entry_bytes={MAX_ENTRY_BYTES}: {part_name}"
-        )
+        raise LegacyOfficeResourceLimitError(f"XLSX embedded part exceeds max_entry_bytes={MAX_ENTRY_BYTES}: {part_name}")
     payload = source.read(info)
     if len(payload) > MAX_ENTRY_BYTES:
-        raise LegacyOfficeResourceLimitError(
-            f"XLSX embedded part exceeds max_entry_bytes={MAX_ENTRY_BYTES}: {part_name}"
-        )
+        raise LegacyOfficeResourceLimitError(f"XLSX embedded part exceeds max_entry_bytes={MAX_ENTRY_BYTES}: {part_name}")
     return payload
 
 
@@ -233,11 +227,7 @@ def _anchor_from_object_properties(ole_object: ET.Element) -> tuple[int, int] | 
             if _local_name(anchor.tag) != "anchor":
                 continue
             from_marker = next(
-                (
-                    child
-                    for child in anchor
-                    if _local_name(child.tag) == "from"
-                ),
+                (child for child in anchor if _local_name(child.tag) == "from"),
                 None,
             )
             if from_marker is None:
@@ -283,18 +273,10 @@ def _drawing_shape_info(
     for anchor in root:
         if _local_name(anchor.tag) not in {"oneCellAnchor", "twoCellAnchor", "absoluteAnchor"}:
             continue
-        if not any(
-            _local_name(node.tag) == "cNvPr"
-            and _shape_id_matches(node.get("id"), shape_id)
-            for node in anchor.iter()
-        ):
+        if not any(_local_name(node.tag) == "cNvPr" and _shape_id_matches(node.get("id"), shape_id) for node in anchor.iter()):
             continue
         from_marker = next(
-            (
-                child
-                for child in anchor
-                if _local_name(child.tag) == "from"
-            ),
+            (child for child in anchor if _local_name(child.tag) == "from"),
             None,
         )
         coordinate = None
@@ -342,11 +324,7 @@ def read_sheet_image_artifacts(
             }:
                 continue
             from_marker = next(
-                (
-                    child
-                    for child in anchor
-                    if _local_name(child.tag) == "from"
-                ),
+                (child for child in anchor if _local_name(child.tag) == "from"),
                 None,
             )
             coordinate = None
@@ -358,14 +336,8 @@ def read_sheet_image_artifacts(
             for node in anchor.iter():
                 if _local_name(node.tag) != "blip":
                     continue
-                relationship = relationships.get(
-                    _relationship_embed_id(node) or ""
-                )
-                if (
-                    relationship is None
-                    or relationship.external
-                    or relationship.target is None
-                ):
+                relationship = relationships.get(_relationship_embed_id(node) or "")
+                if relationship is None or relationship.external or relationship.target is None:
                     continue
                 payload = _read_member_bounded(source, relationship.target)
                 if payload is None:
@@ -407,11 +379,7 @@ def _vml_shape_info(
         )
         if client_data is not None:
             anchor_text = next(
-                (
-                    node.text
-                    for node in client_data
-                    if _local_name(node.tag) == "Anchor" and node.text
-                ),
+                (node.text for node in client_data if _local_name(node.tag) == "Anchor" and node.text),
                 None,
             )
             if anchor_text:
@@ -484,16 +452,12 @@ def read_sheet_equation_artifacts(
         return []
     relationships = _relationships(source, worksheet_part)
     artifacts: list[XlsxOleEquationArtifact] = []
-    for order, ole_object in enumerate(
-        node for node in worksheet.iter() if _local_name(node.tag) == "oleObject"
-    ):
+    for order, ole_object in enumerate(node for node in worksheet.iter() if _local_name(node.tag) == "oleObject"):
         prog_id = ole_object.get("progId") or ole_object.get("ProgID")
         if not is_mathtype_equation_prog_id(prog_id):
             continue
         relationship = relationships.get(_relationship_id(ole_object) or "")
-        is_linked = bool(ole_object.get("link")) or (
-            relationship is not None and relationship.external
-        )
+        is_linked = bool(ole_object.get("link")) or (relationship is not None and relationship.external)
         draw_aspect = (ole_object.get("dvAspect") or "").casefold()
         show_as_icon = "icon" in draw_aspect
 
@@ -512,13 +476,9 @@ def read_sheet_equation_artifacts(
             )
 
         coordinate = _anchor_from_object_properties(ole_object)
-        preview_relationship = relationships.get(
-            _object_preview_relationship_id(ole_object) or ""
-        )
+        preview_relationship = relationships.get(_object_preview_relationship_id(ole_object) or "")
         preview_part = (
-            preview_relationship.target
-            if preview_relationship is not None and not preview_relationship.external
-            else None
+            preview_relationship.target if preview_relationship is not None and not preview_relationship.external else None
         )
         shape_coordinate, shape_preview = _shape_anchor_and_preview(
             source,

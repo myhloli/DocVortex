@@ -11,7 +11,16 @@ from typing import Protocol, TypeAlias
 from lxml import etree  # type: ignore[reportMissingImports]
 
 from .....schema import RAW_ALGORITHM, BlockType, VISUAL_TYPE_MAPPING
-from .....content.spans import append_code_span, append_equation_span, append_hyperlink_span, append_text_span, extend_inline_spans, inline_span_plain_text, strip_span_dicts, text_spans
+from .....content.spans import (
+    append_code_span,
+    append_equation_span,
+    append_hyperlink_span,
+    append_text_span,
+    extend_inline_spans,
+    inline_span_plain_text,
+    strip_span_dicts,
+    text_spans,
+)
 from ..names import local_name
 from .formula import FormulaExtraction, extract_formula
 from .styles import MarkupStylesheet, TextStyle

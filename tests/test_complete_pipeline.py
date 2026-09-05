@@ -26,6 +26,7 @@ def pdf_bytes() -> bytes:
 
 def test_native_parse_never_classifies(monkeypatch: pytest.MonkeyPatch) -> None:
     """显式原生入口不会隐式调用分类或触发 OCR。"""
+
     def forbidden(_document: PDFDocument) -> str:
         """一旦原生解析调用分类就立即失败。"""
         raise AssertionError("Native parsing must not classify")
@@ -39,6 +40,7 @@ def test_native_parse_never_classifies(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_classification_is_cached_in_document(monkeypatch: pytest.MonkeyPatch) -> None:
     """调用方可以先分类再解析，同一文档不会重复执行分类。"""
     from docgale.document.pdf import document as module
+
     calls: list[bytes] = []
 
     def classify(_handle: object, payload: bytes) -> str:
@@ -80,7 +82,9 @@ def test_invalid_bundle_asset_is_rejected(tmp_path: Path) -> None:
     from docgale.result import DocumentResult
     from docgale.schema import MiddleJson
 
-    result = DocumentResult(MiddleJson(pages=[], file_suffix="html", is_full_document=True), AssetStore({"images/a.png": b"image"}))
+    result = DocumentResult(
+        MiddleJson(pages=[], file_suffix="html", is_full_document=True), AssetStore({"images/a.png": b"image"})
+    )
     result.save_bundle(tmp_path)
     (tmp_path / "images/a.png").write_bytes(b"changed")
     with pytest.raises(ValueError, match="integrity"):
@@ -90,5 +94,60 @@ def test_invalid_bundle_asset_is_rejected(tmp_path: Path) -> None:
 def test_asset_paths_cannot_escape() -> None:
     """素材索引不允许绝对路径或目录穿越。"""
     from docgale.assets import AssetStore
+
     with pytest.raises(ValueError):
         AssetStore({"../outside.png": b"data"})
+
+
+def test_bundle_rejects_unmaterialized_asset_before_writing(tmp_path: Path) -> None:
+    """结果包不能把缺失图片当作成功导出，避免离线恢复后才发现丢失。"""
+    from docgale.result import DocumentResult
+    from docgale.schema import ImageBlock, ImageBodyBlock, MiddleJson, PageInfo
+
+    middle = MiddleJson(
+        pages=[
+            PageInfo(
+                page_idx=0,
+                blocks=[
+                    ImageBlock(
+                        type="image",
+                        index=0,
+                        content=[ImageBodyBlock(type="image_body", index=0, content="", image_path="images/missing.png")],
+                    )
+                ],
+            )
+        ],
+        file_suffix="html",
+        is_full_document=True,
+    )
+    target = tmp_path / "bundle"
+    with pytest.raises(ValueError, match="Missing materialized asset"):
+        DocumentResult(middle).save_bundle(target)
+    assert not target.exists()
+
+
+def test_materialized_image_does_not_keep_external_render_dependency(tmp_path: Path) -> None:
+    """已有图片字节在副本中改用本地素材，原始来源对象不被修改。"""
+    from docgale.result import DocumentResult
+    from docgale.schema import ImageBlock, ImageBodyBlock, MiddleJson, PageInfo
+
+    image = BytesIO()
+    Image.new("RGB", (2, 2), color="green").save(image, format="PNG")
+    body = ImageBodyBlock(
+        type="image_body",
+        index=0,
+        content="",
+        image_url="https://example.invalid/image.png",
+        image_base64="data:image/png;base64," + base64.b64encode(image.getvalue()).decode(),
+    )
+    middle = MiddleJson(
+        pages=[PageInfo(page_idx=0, blocks=[ImageBlock(type="image", index=0, content=[body])])],
+        file_suffix="html",
+        is_full_document=True,
+    )
+    DocumentResult(middle).save_bundle(tmp_path / "bundle")
+    restored = docgale.load_bundle(tmp_path / "bundle")
+    restored_body = restored.middle_json.pages[0].blocks[0].content[0]
+    assert restored_body.image_url is None
+    assert restored.assets[restored_body.image_path] == image.getvalue()
+    assert body.image_url == "https://example.invalid/image.png"

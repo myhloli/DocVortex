@@ -23,7 +23,18 @@ from ..image import serialize_office_image
 from ..equation.image import OfficeImageEquationDecoder
 from ..xls.embedded_chart import extract_embedded_chart_html_from_storage
 
-from .models import PptChartElement, PptEquationElement, PptImageElement, PptParagraph, PptPresentation, PptSlide, PptTableCell, PptTableElement, PptTextElement, PptTextRun
+from .models import (
+    PptChartElement,
+    PptEquationElement,
+    PptImageElement,
+    PptParagraph,
+    PptPresentation,
+    PptSlide,
+    PptTableCell,
+    PptTableElement,
+    PptTextElement,
+    PptTextRun,
+)
 from .records import CONTAINER_VERSION, PptRecord, RecordBudget, iter_descendants, iter_records, record_at, utf16_text
 from .style_text import CharacterRun, MasterLevel, ParagraphRun, StyleRuns, parse_master_style, parse_style_text
 

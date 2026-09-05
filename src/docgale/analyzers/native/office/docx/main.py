@@ -39,14 +39,12 @@ if __name__ == "__main__":
     project_root = find_project_root(script_path.parent)
     default_docx = project_root / "demo" / "docx" / "demo1.docx"
 
-    parser = argparse.ArgumentParser(
-        description="Convert a DOCX file to internal JSON representation"
-    )
+    parser = argparse.ArgumentParser(description="Convert a DOCX file to internal JSON representation")
     parser.add_argument(
         "docx",
         nargs="?",
         default=str(default_docx),
-        help="path to the .docx file to convert (defaults to demo/docx/demo1.docx)"
+        help="path to the .docx file to convert (defaults to demo/docx/demo1.docx)",
     )
     args = parser.parse_args()
 

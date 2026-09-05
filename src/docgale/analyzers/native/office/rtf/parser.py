@@ -16,7 +16,26 @@ from ..errors import LegacyOfficeMalformedError, LegacyOfficeResourceLimitError
 from ..limits import MAX_ASSET_TOTAL_BYTES, MAX_ENTRY_BYTES, MAX_GRID_SLOTS
 from .lexer import RtfBinary, RtfClose, RtfControlSymbol, RtfControlWord, RtfHexByte, RtfLexer, RtfOpen, RtfTextBytes
 from .math import parse_rtf_math
-from .models import RtfAnchor, RtfBlock, RtfDisplayEquation, RtfDocument, RtfImage, RtfInline, RtfInlineEquation, RtfLineBreak, RtfListInfo, RtfMetadata, RtfNote, RtfNoteReference, RtfParagraph, RtfTable, RtfTableCell, RtfTableRow, RtfTextRun, RtfTextStyle
+from .models import (
+    RtfAnchor,
+    RtfBlock,
+    RtfDisplayEquation,
+    RtfDocument,
+    RtfImage,
+    RtfInline,
+    RtfInlineEquation,
+    RtfLineBreak,
+    RtfListInfo,
+    RtfMetadata,
+    RtfNote,
+    RtfNoteReference,
+    RtfParagraph,
+    RtfTable,
+    RtfTableCell,
+    RtfTableRow,
+    RtfTextRun,
+    RtfTextStyle,
+)
 
 MAX_RTF_BYTES = MAX_ENTRY_BYTES
 MAX_RTF_LIST_DEPTH = 8

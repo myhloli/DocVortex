@@ -7,10 +7,43 @@ import re
 from typing import Any, Sequence
 
 from .....schema import BBox
-from .....content.spans import append_equation_span, append_hyperlink_span, append_text_span, extend_inline_spans, normalize_span_dicts
+from .....content.spans import (
+    append_equation_span,
+    append_hyperlink_span,
+    append_text_span,
+    extend_inline_spans,
+    normalize_span_dicts,
+)
 from .common import _canonical_styles
-from .matching import _assign_lines_to_blocks, _assign_script_lines_to_blocks, _block_bbox_to_page_bbox, _filter_line_styles_for_block, _match_link_ranges, _match_script_line_ranges, _match_style_ranges, _merge_raw_link_intervals, _merge_style_ranges, _project_content_chars, _raw_link_intervals
-from .types import _NATIVE_SCRIPT_TAG_RE, _PDF_INLINE_SPAN_BLOCK_TYPES, _PDF_LINK_INTERVALS_KEY, _PDF_STYLE_INTERVALS_KEY, PDF_NATIVE_SCRIPT_MARKUP_KEY, PDFTextLinkLine, PDFTextScriptLine, PDFTextScriptRange, PDFTextStyle, PDFTextStyleLine, PDFTextStyleRange, _NativeScriptMarkup, _ProjectedChar, _RawStyleInterval
+from .matching import (
+    _assign_lines_to_blocks,
+    _assign_script_lines_to_blocks,
+    _block_bbox_to_page_bbox,
+    _filter_line_styles_for_block,
+    _match_link_ranges,
+    _match_script_line_ranges,
+    _match_style_ranges,
+    _merge_raw_link_intervals,
+    _merge_style_ranges,
+    _project_content_chars,
+    _raw_link_intervals,
+)
+from .types import (
+    _NATIVE_SCRIPT_TAG_RE,
+    _PDF_INLINE_SPAN_BLOCK_TYPES,
+    _PDF_LINK_INTERVALS_KEY,
+    _PDF_STYLE_INTERVALS_KEY,
+    PDF_NATIVE_SCRIPT_MARKUP_KEY,
+    PDFTextLinkLine,
+    PDFTextScriptLine,
+    PDFTextScriptRange,
+    PDFTextStyle,
+    PDFTextStyleLine,
+    PDFTextStyleRange,
+    _NativeScriptMarkup,
+    _ProjectedChar,
+    _RawStyleInterval,
+)
 
 
 def apply_pdf_text_links(

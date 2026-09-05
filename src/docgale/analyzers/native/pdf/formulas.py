@@ -16,9 +16,31 @@ from ....document.pdf.document import PDFPathInfo
 from ....foundation.text import build_tagged_formula_content
 
 from .models import _AxisLine, _FormulaAnchor, _LineItem, _PageSource, _TextLane
-from .geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_distance, _bbox_intersects, _bbox_overlap_in_first, _bbox_overlap_in_smaller, _bbox_union, _bbox_union_many, _clip_bbox, _coerce_bbox, _expand_bbox, _rotate_bbox_to_upright, _transform_axis_lines
+from .geometry import (
+    _bbox_axis_overlap_ratio,
+    _bbox_center_x,
+    _bbox_center_y,
+    _bbox_distance,
+    _bbox_intersects,
+    _bbox_overlap_in_first,
+    _bbox_overlap_in_smaller,
+    _bbox_union,
+    _bbox_union_many,
+    _clip_bbox,
+    _coerce_bbox,
+    _expand_bbox,
+    _rotate_bbox_to_upright,
+    _transform_axis_lines,
+)
 from .native_text import _sanitize_pdf_control_text
-from .line_layout import _connection_crosses_table, _infer_text_lanes, _line_effective_height, _line_style_scale, _line_tight_output_bbox, _lines_tight_output_bbox
+from .line_layout import (
+    _connection_crosses_table,
+    _infer_text_lanes,
+    _line_effective_height,
+    _line_style_scale,
+    _line_tight_output_bbox,
+    _lines_tight_output_bbox,
+)
 from .line_merging import _join_formula_visual_row
 
 
@@ -638,13 +660,11 @@ def _build_formula_like_blocks(
                     dominant_body_font,
                     median_height,
                 )
-                has_isolated_numbered_fraction = (
-                    _formula_component_has_isolated_numbered_fraction(
-                        members,
-                        lane,
-                        median_height,
-                        local_horizontal_rules,
-                    )
+                has_isolated_numbered_fraction = _formula_component_has_isolated_numbered_fraction(
+                    members,
+                    lane,
+                    median_height,
+                    local_horizontal_rules,
                 )
                 if (
                     _formula_component_has_left_prose(
@@ -755,45 +775,22 @@ def _formula_component_has_isolated_numbered_fraction(
 
     if len(members) < 3 or not horizontal_rules:
         return False
-    markers = [
-        (line, bbox)
-        for line, bbox in members
-        if _standalone_formula_number_marker(line.text) is not None
-    ]
+    markers = [(line, bbox) for line, bbox in members if _standalone_formula_number_marker(line.text) is not None]
     if len(markers) != 1:
         return False
     marker_line, marker_bbox = markers[0]
     lane_width = max(0.1, lane.right - lane.left)
-    if (
-        marker_bbox[2] < lane.right - max(3.0, 0.08 * lane_width)
-        or marker_bbox[2] - marker_bbox[0] > 0.12 * lane_width
-    ):
+    if marker_bbox[2] < lane.right - max(3.0, 0.08 * lane_width) or marker_bbox[2] - marker_bbox[0] > 0.12 * lane_width:
         return False
-    body_members = [
-        (line, bbox)
-        for line, bbox in members
-        if line is not marker_line
-    ]
+    body_members = [(line, bbox) for line, bbox in members if line is not marker_line]
     if len(body_members) < 2:
         return False
     body_bbox = _bbox_union_many(
         [bbox for _line, bbox in body_members],
     )
-    member_sources = {
-        line.source_index for line, _bbox in members
-    }
-    rows_above = [
-        bbox
-        for line, bbox in lane.lines
-        if line.source_index not in member_sources
-        and bbox[3] <= body_bbox[1]
-    ]
-    rows_below = [
-        bbox
-        for line, bbox in lane.lines
-        if line.source_index not in member_sources
-        and bbox[1] >= body_bbox[3]
-    ]
+    member_sources = {line.source_index for line, _bbox in members}
+    rows_above = [bbox for line, bbox in lane.lines if line.source_index not in member_sources and bbox[3] <= body_bbox[1]]
+    rows_below = [bbox for line, bbox in lane.lines if line.source_index not in member_sources and bbox[1] >= body_bbox[3]]
     if not rows_above or not rows_below:
         return False
     gap_above = body_bbox[1] - max(bbox[3] for bbox in rows_above)
@@ -801,34 +798,20 @@ def _formula_component_has_isolated_numbered_fraction(
     if min(gap_above, gap_below) < 0.75 * median_height:
         return False
 
-    body_centers = [
-        _bbox_center_y(bbox) for _line, bbox in body_members
-    ]
+    body_centers = [_bbox_center_y(bbox) for _line, bbox in body_members]
     for rule_bbox in horizontal_rules:
         rule_width = rule_bbox[2] - rule_bbox[0]
-        if not (
-            3.0 * median_height
-            <= rule_width
-            <= 0.75 * lane_width
-        ):
+        if not (3.0 * median_height <= rule_width <= 0.75 * lane_width):
             continue
         horizontal_overlap = max(
             0.0,
-            min(rule_bbox[2], body_bbox[2])
-            - max(rule_bbox[0], body_bbox[0]),
+            min(rule_bbox[2], body_bbox[2]) - max(rule_bbox[0], body_bbox[0]),
         )
         if horizontal_overlap < 0.6 * rule_width:
             continue
         rule_center = _bbox_center_y(rule_bbox)
-        if (
-            any(
-                center <= rule_center - 0.1 * median_height
-                for center in body_centers
-            )
-            and any(
-                center >= rule_center + 0.1 * median_height
-                for center in body_centers
-            )
+        if any(center <= rule_center - 0.1 * median_height for center in body_centers) and any(
+            center >= rule_center + 0.1 * median_height for center in body_centers
         ):
             return True
     return False

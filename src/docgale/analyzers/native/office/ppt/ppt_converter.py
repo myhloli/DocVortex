@@ -12,7 +12,18 @@ from ..streams import read_stream_bytes_from_start
 from .....schema import BlockType
 from ..rich_text import OfficeRichTextSegment, build_rich_text_from_segments, build_rich_text_html_from_segments
 
-from .models import PptChartElement, PptEquationElement, PptImageElement, PptParagraph, PptPresentation, PptSlide, PptTableCell, PptTableElement, PptTextElement, PptTextRun
+from .models import (
+    PptChartElement,
+    PptEquationElement,
+    PptImageElement,
+    PptParagraph,
+    PptPresentation,
+    PptSlide,
+    PptTableCell,
+    PptTableElement,
+    PptTextElement,
+    PptTextRun,
+)
 from .parser import parse_ppt_document
 
 PPT_XYCUT_BETA = 2.0

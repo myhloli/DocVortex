@@ -19,7 +19,16 @@ from ....document.pdf.document import PDFDocument, PDFDrawingLine
 
 from .typography import _normalized_font_family
 from .models import _AxisLine, _LineItem
-from .geometry import _bbox_center_y, _bbox_union, _bbox_union_many, _clip_bbox, _coerce_bbox, _horizontal_bbox_gap, _rotate_bbox_from_upright, _rotate_bbox_to_upright
+from .geometry import (
+    _bbox_center_y,
+    _bbox_union,
+    _bbox_union_many,
+    _clip_bbox,
+    _coerce_bbox,
+    _horizontal_bbox_gap,
+    _rotate_bbox_from_upright,
+    _rotate_bbox_to_upright,
+)
 
 
 _PDF_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")

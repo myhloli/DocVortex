@@ -27,13 +27,65 @@ from ....content.inline import normalize_inline_spans
 from ..common.list_items import parse_list_item_marker
 from ..common.planner import PlannedBlock, build_render_plan
 from .assets import DocxAssetError, PreparedImage, prepare_block_image, prepare_html_image
-from .inline import BookmarkRegistry, InlineRenderContext, append_inline_content, append_inline_spans, append_internal_link, append_joined_inline_contents, sanitize_xml_text
+from .inline import (
+    BookmarkRegistry,
+    InlineRenderContext,
+    append_inline_content,
+    append_inline_spans,
+    append_internal_link,
+    append_joined_inline_contents,
+    sanitize_xml_text,
+)
 from .math import DocxFormulaError, latex_to_omml, split_formula_tag
-from .styles import BODY_STYLE, CAPTION_STYLE, CODE_STYLE, FOOTNOTE_STYLE, FORMULA_FALLBACK_STYLE, SPATIAL_TABLE_STYLE, configure_document, usable_width_emu, usable_width_twips
+from .styles import (
+    BODY_STYLE,
+    CAPTION_STYLE,
+    CODE_STYLE,
+    FOOTNOTE_STYLE,
+    FORMULA_FALLBACK_STYLE,
+    SPATIAL_TABLE_STYLE,
+    configure_document,
+    usable_width_emu,
+    usable_width_twips,
+)
 from .table import DocxTableError, NestedTableWriter, materialize_docx_tables
 from ...contracts import AssetResolver
 from ...docx import DocxRenderError
-from ....schema import PAGE_AUXILIARY_BLOCK_TYPES, RAW_ALGORITHM, AlgorithmBodyBlock, BlockBase, BlockType, BBox, ChartAnnotationBlock, ChartBlock, ChartBodyBlock, CodeAnnotationBlock, CodeBlock, CodeBodyBlock, DocTitleBlock, EquationBlock, ImageAnnotationBlock, ImageBlock, ImageBodyBlock, ImagePayloadBlock, IndexBlock, InlineSpan, ListBlock, MiddleJson, PageFootnoteBlock, ParagraphTitleBlock, RefTextBlock, TableAnnotationBlock, TableBlock, TableBodyBlock, TextBlock, TextSpan, EquationInlineSpan, HyperlinkSpan, TitleBlockBase
+from ....schema import (
+    PAGE_AUXILIARY_BLOCK_TYPES,
+    RAW_ALGORITHM,
+    AlgorithmBodyBlock,
+    BlockBase,
+    BlockType,
+    BBox,
+    ChartAnnotationBlock,
+    ChartBlock,
+    ChartBodyBlock,
+    CodeAnnotationBlock,
+    CodeBlock,
+    CodeBodyBlock,
+    DocTitleBlock,
+    EquationBlock,
+    ImageAnnotationBlock,
+    ImageBlock,
+    ImageBodyBlock,
+    ImagePayloadBlock,
+    IndexBlock,
+    InlineSpan,
+    ListBlock,
+    MiddleJson,
+    PageFootnoteBlock,
+    ParagraphTitleBlock,
+    RefTextBlock,
+    TableAnnotationBlock,
+    TableBlock,
+    TableBodyBlock,
+    TextBlock,
+    TextSpan,
+    EquationInlineSpan,
+    HyperlinkSpan,
+    TitleBlockBase,
+)
 from ....foundation.image_payload import validate_remote_image_url
 
 _SVG_BLIP_NAMESPACE = "http://schemas.microsoft.com/office/drawing/2016/SVG/main"

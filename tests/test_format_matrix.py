@@ -16,8 +16,13 @@ from _ofd_test_utils import build_multi_document_ofd
 def source_payload(suffix: str) -> bytes:
     """使用迁移的公共样例和合成容器构造原生输入。"""
     root = Path(__file__).resolve().parents[1]
-    builders = {"epub": build_epub_fixture, "ofd": build_multi_document_ofd,
-                "odt": build_odt_fixture, "odp": build_odp_fixture, "ods": build_ods_fixture}
+    builders = {
+        "epub": build_epub_fixture,
+        "ofd": build_multi_document_ofd,
+        "odt": build_odt_fixture,
+        "odp": build_odp_fixture,
+        "ods": build_ods_fixture,
+    }
     if suffix in builders:
         return builders[suffix]()
     if suffix == "csv":
@@ -29,7 +34,9 @@ def source_payload(suffix: str) -> bytes:
     return next((root / "demo/office_docs").glob(f"*.{suffix}")).read_bytes()
 
 
-@pytest.mark.parametrize("suffix", ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "rtf", "csv", "html", "epub", "ofd", "odt", "ods", "odp"])
+@pytest.mark.parametrize(
+    "suffix", ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "rtf", "csv", "html", "epub", "ofd", "odt", "ods", "odp"]
+)
 def test_all_native_formats_render_all_targets(suffix: str) -> None:
     """每种原生格式完成分析、后处理和九种目标编码，不导入宿主。"""
     result = docgale.parse(source_payload(suffix), file_suffix=suffix, keep_model_json=True)

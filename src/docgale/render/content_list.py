@@ -18,7 +18,7 @@ def render_content_list(
     """惰性加载 Content List V1 实现并渲染严格 MiddleJson。"""
     from ._internal.content_list.v1 import render_content_list as _render_content_list
 
-    return _render_content_list(middle_json, asset_base_url=asset_base_url)
+    return _render_content_list(middle_json, asset_base_url=asset_base_url, latex_delimiters=latex_delimiters)
 
 
 __all__ = ["render_content_list"]

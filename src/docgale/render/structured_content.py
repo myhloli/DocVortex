@@ -18,7 +18,7 @@ def render_structured_content(
     """惰性加载 Structured Content 实现并渲染严格 MiddleJson。"""
     from ._internal.structured_content.renderer import render_structured_content as _render_structured_content
 
-    return _render_structured_content(middle_json, asset_base_url=asset_base_url)
+    return _render_structured_content(middle_json, asset_base_url=asset_base_url, latex_delimiters=latex_delimiters)
 
 
 __all__ = ["render_structured_content"]

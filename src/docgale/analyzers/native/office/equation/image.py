@@ -45,10 +45,7 @@ def _charge_picture_record(counter: list[int]) -> None:
 
     counter[0] += 1
     if counter[0] > MAX_PICTURE_RECORDS:
-        raise LegacyOfficeResourceLimitError(
-            "image equation records exceed "
-            f"max_picture_records={MAX_PICTURE_RECORDS}"
-        )
+        raise LegacyOfficeResourceLimitError(f"image equation records exceed max_picture_records={MAX_PICTURE_RECORDS}")
 
 
 def _signature_components(value: str) -> tuple[str, ...] | None:
@@ -88,12 +85,7 @@ def _parse_apps_chunk(comment: bytes) -> _AppsChunk | None:
     version, total_length, data_length = struct.unpack_from("<HII", comment, 8)
     if version != 1:
         raise _ImageEquationError("AppsMFCC version is unsupported")
-    if (
-        total_length <= 0
-        or data_length <= 0
-        or data_length > total_length
-        or total_length > MAX_ENTRY_BYTES
-    ):
+    if total_length <= 0 or data_length <= 0 or data_length > total_length or total_length > MAX_ENTRY_BYTES:
         raise _ImageEquationError("AppsMFCC lengths are invalid")
 
     signature_start = 18
@@ -109,11 +101,8 @@ def _parse_apps_chunk(comment: bytes) -> _AppsChunk | None:
     if components is None:
         raise _ImageEquationError("AppsMFCC signature is malformed")
     normalized = tuple(component.strip().casefold() for component in components)
-    is_mtef = (
-        len(normalized) >= 2 and normalized[1] == "mtef"
-    ) or (
-        len(normalized) == 1
-        and normalized[0] in _HISTORICAL_APPS_SIGNATURES
+    is_mtef = (len(normalized) >= 2 and normalized[1] == "mtef") or (
+        len(normalized) == 1 and normalized[0] in _HISTORICAL_APPS_SIGNATURES
     )
     if not is_mtef:
         return None
@@ -258,10 +247,7 @@ def _wmf_mtef_candidates(image_data: bytes) -> tuple[list[bytes], bool]:
                 pending_data = bytearray(chunk.data)
             continue
 
-        if (
-            chunk.key != pending.key
-            or chunk.total_length != pending.total_length
-        ):
+        if chunk.key != pending.key or chunk.total_length != pending.total_length:
             pending = None
             pending_data.clear()
             if len(chunk.data) == chunk.total_length:
@@ -306,9 +292,7 @@ def _gif_subblocks(
             raise _ImageEquationError("GIF sub-block data is truncated")
         total += size
         if total > MAX_ENTRY_BYTES:
-            raise LegacyOfficeResourceLimitError(
-                f"GIF extension exceeds max_entry_bytes={MAX_ENTRY_BYTES}"
-            )
+            raise LegacyOfficeResourceLimitError(f"GIF extension exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
         chunks.append(image_data[cursor:end])
         cursor = end
 
@@ -386,11 +370,7 @@ def _gif_mtef_candidates(image_data: bytes) -> tuple[list[bytes], bool]:
 def _select_candidate_latex(candidates: list[bytes]) -> str | None:
     """解码全部 candidates；仅返回唯一且完整一致的 LaTeX。"""
 
-    decoded = {
-        latex
-        for candidate in candidates
-        if (latex := decode_mtef(candidate)) is not None
-    }
+    decoded = {latex for candidate in candidates if (latex := decode_mtef(candidate)) is not None}
     return next(iter(decoded)) if len(decoded) == 1 else None
 
 
@@ -405,11 +385,7 @@ def _format_hint(
         return "gif"
     if image_data.startswith(_PLACEABLE_WMF_MAGIC):
         return "wmf"
-    if (
-        len(image_data) >= 4
-        and image_data[:2] in {b"\x01\x00", b"\x02\x00"}
-        and image_data[2:4] == b"\x09\x00"
-    ):
+    if len(image_data) >= 4 and image_data[:2] in {b"\x01\x00", b"\x02\x00"} and image_data[2:4] == b"\x09\x00":
         return "wmf"
     suffix = PurePosixPath(str(part_name or "")).suffix.casefold()
     normalized_content_type = (content_type or "").split(";", 1)[0].strip().casefold()
@@ -447,18 +423,14 @@ class OfficeImageEquationDecoder:
         if image_format is None:
             return None
         if len(image_data) > MAX_ENTRY_BYTES:
-            raise LegacyOfficeResourceLimitError(
-                "image equation payload exceeds "
-                f"max_entry_bytes={MAX_ENTRY_BYTES}"
-            )
+            raise LegacyOfficeResourceLimitError(f"image equation payload exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
         digest = hashlib.sha256(image_data).digest()
         cache_key = (image_format, digest)
         if cache_key in self._cache:
             return self._cache[cache_key]
         if self.total_bytes + len(image_data) > MAX_ASSET_TOTAL_BYTES:
             raise LegacyOfficeResourceLimitError(
-                "image equation payloads exceed "
-                f"max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}"
+                f"image equation payloads exceed max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}"
             )
         self.total_bytes += len(image_data)
 
@@ -473,10 +445,7 @@ class OfficeImageEquationDecoder:
             raise
         except (_ImageEquationError, ArithmeticError, IndexError, struct.error):
             latex = None
-            recognized = (
-                b"MathType" in image_data
-                or _APPS_MFCC_ID in image_data
-            )
+            recognized = b"MathType" in image_data or _APPS_MFCC_ID in image_data
         self._cache[cache_key] = latex
         if recognized and latex is None and cache_key not in self._warned:
             self._warned.add(cache_key)

@@ -1,9 +1,11 @@
 # Portions derived from pdftext 0.7.1, Copyright Vik Paruchuri, Apache-2.0.
 """基础文本行与上下标分组；保留已验证的几何判断。"""
+
 from __future__ import annotations
 import math
 import unicodedata
-from .contracts import Bbox, Char, Line, Lines, Span, Spans
+from .contracts import Line, Lines, Spans
+
 
 def is_math_symbol(char: str) -> bool:
     """判断单字符数学符号。"""
@@ -11,7 +13,8 @@ def is_math_symbol(char: str) -> bool:
         return False
 
     category = unicodedata.category(char)
-    return category == 'Sm'
+    return category == "Sm"
+
 
 def _top2(values: list[float]) -> tuple[float, int, float]:
     # Returns (max1, max1_idx, max2) so that max-excluding-index can be answered in O(1)
@@ -27,6 +30,7 @@ def _top2(values: list[float]) -> tuple[float, int, float]:
             max2 = v
     return max1, max1_idx, max2
 
+
 def _bottom2(values: list[float]) -> tuple[float, int, float]:
     """在线性时间内找到两个最小值。"""
     min1 = min2 = float("inf")
@@ -39,6 +43,7 @@ def _bottom2(values: list[float]) -> tuple[float, int, float]:
         elif v < min2:
             min2 = v
     return min1, min1_idx, min2
+
 
 def assign_scripts(lines: Lines, height_threshold: float = 0.8, line_distance_threshold: float = 0.1) -> None:
     """根据邻接片段几何设置基础上下标提示。"""
@@ -95,27 +100,21 @@ def assign_scripts(lines: Lines, height_threshold: float = 0.8, line_distance_th
             next_below = is_last or span_bottom > y_ends[i + 1]
 
             span_text = span["text"].strip()
-            span_text_okay = all([
-                (len(span_text) == 1 or span_text.isdigit()), # Ensure that the span text is a single char or a number
-                span_text.isalnum() or is_math_symbol(span_text) # Ensure that the span text is an alphanumeric or a math symbol
-            ])
+            span_text_okay = all(
+                [
+                    (len(span_text) == 1 or span_text.isdigit()),  # Ensure that the span text is a single char or a number
+                    span_text.isalnum()
+                    or is_math_symbol(span_text),  # Ensure that the span text is an alphanumeric or a math symbol
+                ]
+            )
 
-            if all([
-                (prev_fullheight or next_fullheight),
-                (prev_above or next_above),
-                above,
-                line_fullheight,
-                span_text_okay
-            ]):
+            if all([(prev_fullheight or next_fullheight), (prev_above or next_above), above, line_fullheight, span_text_okay]):
                 span["superscript"] = True
-            elif all([
-                (prev_fullheight or next_fullheight),
-                (prev_below or next_below),
-                below,
-                line_fullheight,
-                span_text_okay
-            ]):
+            elif all(
+                [(prev_fullheight or next_fullheight), (prev_below or next_below), below, line_fullheight, span_text_okay]
+            ):
                 span["subscript"] = True
+
 
 def get_lines(spans: Spans) -> Lines:
     """按换行、角度和位置将片段聚合为行。"""

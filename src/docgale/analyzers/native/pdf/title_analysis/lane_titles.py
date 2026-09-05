@@ -8,7 +8,14 @@ from typing import Literal
 
 from .....schema import BBox
 from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_union_many
-from ..line_layout import _effective_text_row_gap, _font_signatures_share_family, _font_weights_conflict, _line_effective_height, _should_connect_semantic_rows, _title_fonts_compatible
+from ..line_layout import (
+    _effective_text_row_gap,
+    _font_signatures_share_family,
+    _font_weights_conflict,
+    _line_effective_height,
+    _should_connect_semantic_rows,
+    _title_fonts_compatible,
+)
 from ..models import _DocumentBodyProfile, _DocumentTitleProfile, _LaneBodyProfile, _LineItem, _TextLane
 from .body_profile import _line_uses_document_regular_font
 from .common import _line_inside_visual_container, _line_near_visual_container

@@ -10,8 +10,22 @@ from lxml import etree  # type: ignore[reportMissingImports]
 
 from ....foundation.image_payload import parse_image_data_uri_strict
 from .._shared.hyperlink import sanitize_hyperlink_target
-from .._shared.markup import MarkupAnchorDocument, MarkupAnchorRegistry, MarkupProjector, MarkupStylesheet, ResolvedMarkupImage, element_id, visible_element_text
-from .._shared.markup.projector import BLOCK_TAGS as _BLOCK_TAGS, SKIPPED_TAGS as _SKIPPED_TAGS, clean_text_node as _clean_text_node, entity_text as _entity_text, local_name as _local_name
+from .._shared.markup import (
+    MarkupAnchorDocument,
+    MarkupAnchorRegistry,
+    MarkupProjector,
+    MarkupStylesheet,
+    ResolvedMarkupImage,
+    element_id,
+    visible_element_text,
+)
+from .._shared.markup.projector import (
+    BLOCK_TAGS as _BLOCK_TAGS,
+    SKIPPED_TAGS as _SKIPPED_TAGS,
+    clean_text_node as _clean_text_node,
+    entity_text as _entity_text,
+    local_name as _local_name,
+)
 from .constants import IMAGE_MEDIA_BY_EXTENSION, SVG_MEDIA_TYPE
 from .package import EpubPackage
 

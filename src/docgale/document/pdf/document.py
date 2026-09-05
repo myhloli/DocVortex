@@ -2172,7 +2172,8 @@ def _deduplicate_near_identical_chars(chars: list[Char]) -> list[Char]:
 def _restore_pdfium_surrogate_pairs(
     chars: list[Char],
     textpage: pdfium.PdfTextPage,
-    *, raw_codes: dict[int, int] | None = None,
+    *,
+    raw_codes: dict[int, int] | None = None,
 ) -> list[Char]:
     """利用 PDFium 原始 UTF-16 code unit 恢复 pdftext 丢失的补充平面字符。"""
     if not any(
@@ -2189,6 +2190,7 @@ def _restore_pdfium_surrogate_pairs(
 
     restored_chars: list[Char] = []
     consumed_char_indices: set[int] = set()
+
     def get_unicode(handle: object, index: int) -> int:
         """优先复用首次读取的原始码值，仅为独立辅助调用读取原生接口。"""
         return raw_codes[index] if raw_codes is not None else int(pdfium_c.FPDFText_GetUnicode(handle, index))
@@ -2230,7 +2232,16 @@ def _restore_pdfium_surrogate_pairs(
         if high_surrogate is not None and low_surrogate is not None:
             restored_char = cast(Char, dict(char))
             restored_char["char"] = chr(0x10000 + ((high_surrogate - 0xD800) << 10) + (low_surrogate - 0xDC00))
-            restored_char["source_indices"] = tuple(sorted(set((*char.get("source_indices", (char_idx,)), char_idx + 1 if raw_code is not None and raw_code <= 0xDBFF else char_idx - 1))))
+            restored_char["source_indices"] = tuple(
+                sorted(
+                    set(
+                        (
+                            *char.get("source_indices", (char_idx,)),
+                            char_idx + 1 if raw_code is not None and raw_code <= 0xDBFF else char_idx - 1,
+                        )
+                    )
+                )
+            )
             restored_chars.append(restored_char)
             continue
 
@@ -2271,7 +2282,6 @@ def _extract_page_text_geometry(
     try:
         textpage = page.get_textpage()
         raw_page_bbox: list[float] = list(page.get_bbox())
-        page_bbox = _normalize_pdf_page_bbox(tuple(raw_page_bbox))
         page_rotation: int = 0
         try:
             page_rotation = page.get_rotation()
@@ -2283,8 +2293,11 @@ def _extract_page_text_geometry(
         chars = _restore_pdfium_surrogate_pairs(chars, textpage, raw_codes=raw_codes)
         chars = _deduplicate_near_identical_chars(chars)
         if include_extended_geometry:
-            loose_bboxes = {char["char_idx"]: char["loose_bbox"] for char in chars
-                            if char.get("loose_bbox") is not None and abs(char["rotation"]) > 1e-9}
+            loose_bboxes = {
+                char["char_idx"]: char["loose_bbox"]
+                for char in chars
+                if char.get("loose_bbox") is not None and abs(char["rotation"]) > 1e-9
+            }
             tight_bboxes = {char["char_idx"]: char["tight_bbox"] for char in chars if char.get("tight_bbox") is not None}
             origins = {char["char_idx"]: char["origin"] for char in chars if char.get("origin") is not None}
         else:

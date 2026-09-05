@@ -105,18 +105,14 @@ class DocxEquationXmlDecoder:
         except UnicodeEncodeError:
             return None
         if len(payload) > MAX_ENTRY_BYTES:
-            raise LegacyOfficeResourceLimitError(
-                "DOCX equationxml exceeds "
-                f"max_entry_bytes={MAX_ENTRY_BYTES}"
-            )
+            raise LegacyOfficeResourceLimitError(f"DOCX equationxml exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
 
         digest = hashlib.sha256(payload).digest()
         if digest in self._cache:
             return self._cache[digest]
         if self.total_bytes + len(payload) > MAX_ASSET_TOTAL_BYTES:
             raise LegacyOfficeResourceLimitError(
-                "DOCX equationxml payloads exceed "
-                f"max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}"
+                f"DOCX equationxml payloads exceed max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}"
             )
 
         self.total_bytes += len(payload)

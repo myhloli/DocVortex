@@ -10,7 +10,35 @@ from typing import TypeAlias
 
 from ....content.inline import inline_plain_text
 from ....options import LatexDelimitersConfig
-from ....schema import BBox, AlgorithmBodyBlock, ChartAnnotationBlock, ChartBlock, ChartBodyBlock, CodeAnnotationBlock, CodeBlock, CodeBodyBlock, CodeInlineSpan, DocTitleBlock, EquationInlineSpan, HyperlinkSpan, ImageAnnotationBlock, ImageBlock, ImageBodyBlock, ImagePayloadBlock, IndexBlock, InlineSpan, ListBlock, PageBlock, ParagraphTitleBlock, RefTextBlock, TableAnnotationBlock, TableBlock, TableBodyBlock, TextBlock, TextSpan
+from ....schema import (
+    BBox,
+    AlgorithmBodyBlock,
+    ChartAnnotationBlock,
+    ChartBlock,
+    ChartBodyBlock,
+    CodeAnnotationBlock,
+    CodeBlock,
+    CodeBodyBlock,
+    CodeInlineSpan,
+    DocTitleBlock,
+    EquationInlineSpan,
+    HyperlinkSpan,
+    ImageAnnotationBlock,
+    ImageBlock,
+    ImageBodyBlock,
+    ImagePayloadBlock,
+    IndexBlock,
+    InlineSpan,
+    ListBlock,
+    PageBlock,
+    ParagraphTitleBlock,
+    RefTextBlock,
+    TableAnnotationBlock,
+    TableBlock,
+    TableBodyBlock,
+    TextBlock,
+    TextSpan,
+)
 from ..common.index import strip_index_page_tail
 from ..common.list_items import parse_list_item_marker
 from ..markdown.assets import normalize_image_source, resolve_image_source

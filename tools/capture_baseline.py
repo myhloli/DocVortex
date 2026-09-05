@@ -44,21 +44,35 @@ def main() -> None:
     config.llm_aided.features.cross_page_table_cell_merge = False
     sources = sorted((args.source_root / "demo/office_docs").glob("*"))
     sources = [path for path in sources if path.suffix.lower() in {".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".rtf"}]
-    sources += [args.source_root / "demo/pdfs" / name for name in (
-        "demo1.pdf", "demo2.pdf", "中文论文2.pdf", "mixed_elements_pages_39_40.pdf",
-    )]
+    sources += [
+        args.source_root / "demo/pdfs" / name
+        for name in (
+            "demo1.pdf",
+            "demo2.pdf",
+            "中文论文2.pdf",
+            "mixed_elements_pages_39_40.pdf",
+        )
+    ]
     args.output_root.mkdir(parents=True, exist_ok=True)
-    manifest: dict[str, Any] = {"versions": {name: version(name) for name in ("mineru", "pdftext", "pypdfium2")}, "documents": []}
+    manifest: dict[str, Any] = {
+        "versions": {name: version(name) for name in ("mineru", "pdftext", "pypdfium2")},
+        "documents": [],
+    }
     for path in sources:
         output = args.output_root / (path.stem + "_" + path.suffix[1:])
         output.mkdir(exist_ok=True)
-        entry: dict[str, Any] = {"source": str(path.relative_to(args.source_root)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        entry: dict[str, Any] = {
+            "source": str(path.relative_to(args.source_root)),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
         started = time.perf_counter()
         try:
             if path.suffix == ".pdf":
                 with PDFDocument(path.read_bytes()) as document:
                     entry["classification"] = document.classify()
-                    geometry = [json_value(document.get_page_chars_with_geometry(index)) for index in range(min(document.page_count, 2))]
+                    geometry = [
+                        json_value(document.get_page_chars_with_geometry(index)) for index in range(min(document.page_count, 2))
+                    ]
                     (output / "characters.json").write_text(json.dumps(geometry, ensure_ascii=False, indent=2))
             middle, model = doc_analyze(path.read_bytes(), effort="flash", parse_mode="txt", file_suffix=path.suffix[1:])
             entry["analysis_seconds"] = time.perf_counter() - started
@@ -69,7 +83,13 @@ def main() -> None:
             for target in RenderFormat:
                 try:
                     result = render(middle, target)
-                    payload = result if isinstance(result, bytes) else (result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, sort_keys=True)).encode()
+                    payload = (
+                        result
+                        if isinstance(result, bytes)
+                        else (
+                            result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, sort_keys=True)
+                        ).encode()
+                    )
                     (output / target.value).write_bytes(payload)
                     entry["outputs"][target.value] = hashlib.sha256(payload).hexdigest()
                 except Exception as error:

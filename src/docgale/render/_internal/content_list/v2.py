@@ -6,8 +6,43 @@ from __future__ import annotations
 from typing import Any
 
 from ....options import LatexDelimitersConfig
-from ....schema import RAW_ALGORITHM, AlgorithmBodyBlock, BlockType, ChartBlock, CodeBlock, CodeBodyBlock, DocTitleBlock, EquationBlock, ImageBlock, IndexBlock, ListBlock, MiddleJson, PageAuxTextBlock, PageFootnoteBlock, ParagraphTitleBlock, TableBlock, TextBlock
-from .common import PageRenderUnit, ReferenceGroup, classify_table, flatten_index_leaves, flatten_list_leaves, infer_list_attribute, iter_page_units, normalize_bbox, normalized_index_content, render_annotation_spans, render_embedded_content, resolve_legacy_image_source, serialize_v2_spans, string_as_v2_spans, unit_bbox, visual_body
+from ....schema import (
+    RAW_ALGORITHM,
+    AlgorithmBodyBlock,
+    BlockType,
+    ChartBlock,
+    CodeBlock,
+    CodeBodyBlock,
+    DocTitleBlock,
+    EquationBlock,
+    ImageBlock,
+    IndexBlock,
+    ListBlock,
+    MiddleJson,
+    PageAuxTextBlock,
+    PageFootnoteBlock,
+    ParagraphTitleBlock,
+    TableBlock,
+    TextBlock,
+)
+from .common import (
+    PageRenderUnit,
+    ReferenceGroup,
+    classify_table,
+    flatten_index_leaves,
+    flatten_list_leaves,
+    infer_list_attribute,
+    iter_page_units,
+    normalize_bbox,
+    normalized_index_content,
+    render_annotation_spans,
+    render_embedded_content,
+    resolve_legacy_image_source,
+    serialize_v2_spans,
+    string_as_v2_spans,
+    unit_bbox,
+    visual_body,
+)
 
 _IMAGE_CAPTION_TYPES = {str(BlockType.IMAGE_CAPTION)}
 _IMAGE_FOOTNOTE_TYPES = {str(BlockType.IMAGE_FOOTNOTE)}

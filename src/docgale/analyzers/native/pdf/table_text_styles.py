@@ -17,7 +17,14 @@ from .models import _LineItem
 from .native_text import _fill_native_typography
 from .script_geometry import ScriptRole
 from .table_recovery.candidate import serialize_native_table_html
-from .table_recovery.contracts import NativeTableCell, NativeTableGlyph, NativeTableInput, NativeTableResult, NativeTableRule, NativeTableText
+from .table_recovery.contracts import (
+    NativeTableCell,
+    NativeTableGlyph,
+    NativeTableInput,
+    NativeTableResult,
+    NativeTableRule,
+    NativeTableText,
+)
 from .table_recovery.geometry import page_bbox_to_table_local
 from .table_recovery.text import build_cell_text_parts
 from .inline.scripts import _fraction_member_indices, _script_line_char_roles

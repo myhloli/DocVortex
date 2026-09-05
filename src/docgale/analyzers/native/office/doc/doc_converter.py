@@ -19,7 +19,20 @@ from ..rich_text import OfficeRichTextSegment, build_rich_text_from_segments, bu
 from .fib import parse_fib
 from ..equation.mtef import read_object_pool_equations
 from ..xls.embedded_chart import extract_embedded_chart_html
-from .models import DocCharStyle, DocChartPayload, DocDocument, DocElement, DocImage, DocImagePayload, DocParagraph, DocSection, DocTable, DocTableCell, DocTextRun, DocVisualPayload
+from .models import (
+    DocCharStyle,
+    DocChartPayload,
+    DocDocument,
+    DocElement,
+    DocImage,
+    DocImagePayload,
+    DocParagraph,
+    DocSection,
+    DocTable,
+    DocTableCell,
+    DocTextRun,
+    DocVisualPayload,
+)
 from .parser import parse_doc_document
 
 _OBJECT_POOL_CHART_RE = re.compile(

@@ -14,10 +14,19 @@ from docgale.schema import BlockType, EquationBlock, MiddleJson, PageInfo, TextB
 
 def document() -> MiddleJson:
     """建立不携带宿主信息的最小语义文档。"""
-    return MiddleJson(pages=[PageInfo(page_idx=0, blocks=[
-        TextBlock(type=BlockType.TEXT, index=0, content=[TextSpan(type="text", content="Hello 文档")]),
-        EquationBlock(type=BlockType.EQUATION, index=1, content="x^2"),
-    ])], is_full_document=True, file_suffix="html")
+    return MiddleJson(
+        pages=[
+            PageInfo(
+                page_idx=0,
+                blocks=[
+                    TextBlock(type=BlockType.TEXT, index=0, content=[TextSpan(type="text", content="Hello 文档")]),
+                    EquationBlock(type=BlockType.EQUATION, index=1, content="x^2"),
+                ],
+            )
+        ],
+        is_full_document=True,
+        file_suffix="html",
+    )
 
 
 def test_neutral_roundtrip() -> None:
@@ -59,3 +68,45 @@ def test_render_options_are_per_call() -> None:
 def test_schema_has_no_filesystem_export_method() -> None:
     """基础数据类型不再承担目录写入。"""
     assert not hasattr(document(), "export")
+
+
+@pytest.mark.parametrize("target_name", ["markdown", "structured_content", "content_list", "content_list_v2"])
+def test_inline_delimiters_reach_each_text_renderer(target_name: str) -> None:
+    """四种文本目标实际采用调用方的公式分隔符，防止门面丢失选项。"""
+    from docgale.schema import EquationInlineSpan, ChartBlock, ChartBodyBlock
+    from docgale.render.contracts import (
+        MarkdownRenderOptions,
+        StructuredContentRenderOptions,
+        ContentListRenderOptions,
+        ContentListV2RenderOptions,
+    )
+
+    middle = document()
+    middle.pages[0].blocks[0].content.append(EquationInlineSpan(type="equation_inline", content="x"))
+    middle.pages[0].blocks.append(
+        ChartBlock(
+            type="chart",
+            index=2,
+            content=[ChartBodyBlock(type="chart_body", index=2, content="<table><tr><td><eq>x</eq></td></tr></table>")],
+        )
+    )
+    delimiters = LatexDelimitersConfig(inline=LatexDelimiterConfig(left="\\(", right="\\)"))
+    option_types = {
+        "markdown": MarkdownRenderOptions,
+        "structured_content": StructuredContentRenderOptions,
+        "content_list": ContentListRenderOptions,
+        "content_list_v2": ContentListV2RenderOptions,
+    }
+    value = render(middle, RenderFormat(target_name), options=option_types[target_name](latex_delimiters=delimiters))
+
+    def strings(item: object) -> list[str]:
+        """读取目标中所有文本叶子，避免依赖格式各自的封装层级。"""
+        if isinstance(item, str):
+            return [item]
+        if isinstance(item, dict):
+            return [text for child in item.values() for text in strings(child)]
+        if isinstance(item, list):
+            return [text for child in item for text in strings(child)]
+        return []
+
+    assert any("\\(x\\)" in text for text in strings(value))

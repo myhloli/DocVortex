@@ -15,14 +15,60 @@ from loguru import logger
 from ..common.index import strip_index_page_tail
 from ....content.inline import inline_plain_text, normalize_inline_spans
 from ....codecs.html import MINERU_HTML_VERSION
-from ....codecs.html.contracts import WIRE_BLOCK_CLASS, WIRE_DOCUMENT_CLASS, WIRE_INDEX_CLASS, WIRE_LIST_CONTENT_CLASS, WIRE_LIST_MARKER_CLASS, WIRE_PAGE_BREAK_CLASS, WIRE_PAGE_CLASS, WIRE_VISUAL_BODY_CLASS
+from ....codecs.html.contracts import (
+    WIRE_BLOCK_CLASS,
+    WIRE_DOCUMENT_CLASS,
+    WIRE_INDEX_CLASS,
+    WIRE_LIST_CONTENT_CLASS,
+    WIRE_LIST_MARKER_CLASS,
+    WIRE_PAGE_BREAK_CLASS,
+    WIRE_PAGE_CLASS,
+    WIRE_VISUAL_BODY_CLASS,
+)
 from ..common.list_items import ListItem, parse_list_item_marker, reference_list_needs_bullets
 from ..common.planner import PlannedBlock, build_render_plan
-from .inline import HtmlInlineResult, render_inline_content_html, render_inline_spans_html, render_joined_inline_contents_html, render_math_html
+from .inline import (
+    HtmlInlineResult,
+    render_inline_content_html,
+    render_inline_spans_html,
+    render_joined_inline_contents_html,
+    render_math_html,
+)
 from .sanitizer import is_supported_html_markup, sanitize_html_fragment, sanitize_image_source
 from .table import looks_like_gfm_table, render_gfm_table_html
 from ...contracts import RenderMode
-from ....schema import PAGE_AUXILIARY_BLOCK_TYPES, RAW_ALGORITHM, AlgorithmBodyBlock, BlockBase, BlockType, ChartAnnotationBlock, ChartBlock, ChartBodyBlock, CodeAnnotationBlock, CodeBlock, CodeBodyBlock, DocTitleBlock, EquationBlock, ImageAnnotationBlock, ImageBlock, ImageBodyBlock, InlineSpan, IndexBlock, ListBlock, MiddleJson, PageAuxTextBlock, PageFootnoteBlock, ParagraphTitleBlock, RefTextBlock, TableAnnotationBlock, TableBlock, TableBodyBlock, TextBlock, TextSpan, TitleBlockBase
+from ....schema import (
+    PAGE_AUXILIARY_BLOCK_TYPES,
+    RAW_ALGORITHM,
+    AlgorithmBodyBlock,
+    BlockBase,
+    BlockType,
+    ChartAnnotationBlock,
+    ChartBlock,
+    ChartBodyBlock,
+    CodeAnnotationBlock,
+    CodeBlock,
+    CodeBodyBlock,
+    DocTitleBlock,
+    EquationBlock,
+    ImageAnnotationBlock,
+    ImageBlock,
+    ImageBodyBlock,
+    InlineSpan,
+    IndexBlock,
+    ListBlock,
+    MiddleJson,
+    PageAuxTextBlock,
+    PageFootnoteBlock,
+    ParagraphTitleBlock,
+    RefTextBlock,
+    TableAnnotationBlock,
+    TableBlock,
+    TableBodyBlock,
+    TextBlock,
+    TextSpan,
+    TitleBlockBase,
+)
 
 _STYLE_RESOURCE_NAME = "mineru.min.css"
 _MATHJAX_URL = "https://cdn.jsdelivr.net/npm/mathjax@4.1.2/tex-chtml.js"

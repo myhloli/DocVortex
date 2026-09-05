@@ -9,7 +9,36 @@ from bs4 import BeautifulSoup
 from loguru import logger
 
 from ....content.inline import inline_plain_text
-from ....schema import PAGE_AUXILIARY_BLOCK_TYPES, RAW_ALGORITHM, AlgorithmBodyBlock, BlockType, ChartAnnotationBlock, ChartBlock, ChartBodyBlock, CodeAnnotationBlock, CodeBlock, CodeBodyBlock, DocTitleBlock, EquationBlock, ImageAnnotationBlock, ImageBlock, ImageBodyBlock, ImagePayloadBlock, IndexBlock, InlineSpan, ListBlock, MiddleJson, PageFootnoteBlock, ParagraphTitleBlock, RefTextBlock, TableAnnotationBlock, TableBlock, TableBodyBlock, TextBlock, TitleBlockBase
+from ....schema import (
+    PAGE_AUXILIARY_BLOCK_TYPES,
+    RAW_ALGORITHM,
+    AlgorithmBodyBlock,
+    BlockType,
+    ChartAnnotationBlock,
+    ChartBlock,
+    ChartBodyBlock,
+    CodeAnnotationBlock,
+    CodeBlock,
+    CodeBodyBlock,
+    DocTitleBlock,
+    EquationBlock,
+    ImageAnnotationBlock,
+    ImageBlock,
+    ImageBodyBlock,
+    ImagePayloadBlock,
+    IndexBlock,
+    InlineSpan,
+    ListBlock,
+    MiddleJson,
+    PageFootnoteBlock,
+    ParagraphTitleBlock,
+    RefTextBlock,
+    TableAnnotationBlock,
+    TableBlock,
+    TableBodyBlock,
+    TextBlock,
+    TitleBlockBase,
+)
 from ..common.index import strip_index_page_tail
 from ..common.list_items import ListItem, parse_list_item_marker, reference_list_needs_bullets
 from ..common.planner import PlannedBlock, build_render_plan

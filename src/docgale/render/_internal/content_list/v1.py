@@ -6,9 +6,40 @@ from __future__ import annotations
 from typing import Any
 
 from ....options import LatexDelimitersConfig
-from ....schema import RAW_ALGORITHM, AlgorithmBodyBlock, BlockType, ChartBlock, CodeBlock, CodeBodyBlock, DocTitleBlock, EquationBlock, ImageBlock, IndexBlock, ListBlock, MiddleJson, PageAuxTextBlock, PageFootnoteBlock, ParagraphTitleBlock, TableBlock, TextBlock
+from ....schema import (
+    RAW_ALGORITHM,
+    AlgorithmBodyBlock,
+    BlockType,
+    ChartBlock,
+    CodeBlock,
+    CodeBodyBlock,
+    DocTitleBlock,
+    EquationBlock,
+    ImageBlock,
+    IndexBlock,
+    ListBlock,
+    MiddleJson,
+    PageAuxTextBlock,
+    PageFootnoteBlock,
+    ParagraphTitleBlock,
+    TableBlock,
+    TextBlock,
+)
 from ..markdown.inline import render_inline_content, render_internal_link
-from .common import PageRenderUnit, ReferenceGroup, flatten_index_leaves, flatten_list_leaves, iter_page_units, normalize_bbox, normalized_index_content, render_annotation_texts, render_embedded_content, resolve_legacy_image_source, unit_bbox, visual_body
+from .common import (
+    PageRenderUnit,
+    ReferenceGroup,
+    flatten_index_leaves,
+    flatten_list_leaves,
+    iter_page_units,
+    normalize_bbox,
+    normalized_index_content,
+    render_annotation_texts,
+    render_embedded_content,
+    resolve_legacy_image_source,
+    unit_bbox,
+    visual_body,
+)
 
 _IMAGE_CAPTION_TYPES = {str(BlockType.IMAGE_CAPTION)}
 _IMAGE_FOOTNOTE_TYPES = {str(BlockType.IMAGE_FOOTNOTE)}

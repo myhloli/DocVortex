@@ -170,10 +170,6 @@ def is_flash_only_parse_extension(path_or_ext: str | Path) -> bool:
     return normalize_parse_extension(path_or_ext) in FLASH_ONLY_PARSE_EXTENSIONS
 
 
-
-
-
-
 def is_office_temp_lock_file(path: str | Path) -> bool:
     file_path = Path(path)
     return file_path.name.startswith("~$") and file_path.suffix.lower().lstrip(".") in OFFICE_EXTENSIONS

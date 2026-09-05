@@ -13,7 +13,17 @@ from zipfile import BadZipFile, ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 from loguru import logger
 from lxml import etree  # type: ignore[reportMissingImports]
 
-from .constants import EPUB_MIME, MAX_ASSET_TOTAL_BYTES, MAX_ENTRY_BYTES, MAX_ENTRY_COUNT, MAX_TOTAL_BYTES, MAX_XML_DEPTH, MAX_XML_NODES, SVG_MEDIA_TYPE, XHTML_MEDIA_TYPES
+from .constants import (
+    EPUB_MIME,
+    MAX_ASSET_TOTAL_BYTES,
+    MAX_ENTRY_BYTES,
+    MAX_ENTRY_COUNT,
+    MAX_TOTAL_BYTES,
+    MAX_XML_DEPTH,
+    MAX_XML_NODES,
+    SVG_MEDIA_TYPE,
+    XHTML_MEDIA_TYPES,
+)
 from .errors import EpubEncryptedError, EpubParseError, EpubResourceLimitError
 
 

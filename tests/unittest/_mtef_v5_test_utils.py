@@ -59,11 +59,7 @@ def v5_char(
     if not omit_mtcode:
         payload += struct.pack("<H", ord(value))
     if font_position is not None:
-        payload += (
-            bytes([font_position])
-            if font_position <= 0xFF
-            else struct.pack("<H", font_position)
-        )
+        payload += bytes([font_position]) if font_position <= 0xFF else struct.pack("<H", font_position)
     if embellishments:
         payload += b"".join(bytes([6, 0, item]) for item in embellishments)
         payload += b"\x00"
@@ -94,13 +90,7 @@ def v5_template(
 ) -> bytes:
     """构造一个含完整 subobject list 的 MTEF v5 TMPL。"""
 
-    return (
-        bytes([3, 0, selector])
-        + v5_variation(variation)
-        + bytes([options])
-        + b"".join(slots)
-        + b"\x00"
-    )
+    return bytes([3, 0, selector]) + v5_variation(variation) + bytes([options]) + b"".join(slots) + b"\x00"
 
 
 def v5_pile(*lines: bytes) -> bytes:
@@ -119,13 +109,7 @@ def v5_matrix(rows: list[list[bytes]]) -> bytes:
     row_parts = b"\x00" * ((2 * (row_count + 1) + 7) // 8)
     col_parts = b"\x00" * ((2 * (col_count + 1) + 7) // 8)
     cells = b"".join(v5_line(cell) for row in rows for cell in row)
-    return (
-        bytes([5, 0, 0, 2, 0, row_count, col_count])
-        + row_parts
-        + col_parts
-        + cells
-        + b"\x00"
-    )
+    return bytes([5, 0, 0, 2, 0, row_count, col_count]) + row_parts + col_parts + cells + b"\x00"
 
 
 def v5_encoding_definition(name: str) -> bytes:
@@ -329,7 +313,4 @@ def v5_template_corpus() -> list[tuple[str, bytes, str]]:
         ("cross_cancel", v5_template(36, line_x, variation=6), r"\xcancel{x}"),
         ("box", v5_template(37, line_x, variation=0x1E), r"\boxed{x}"),
     ]
-    return [
-        (name, v5_equation(template), expected)
-        for name, template, expected in cases
-    ]
+    return [(name, v5_equation(template), expected) for name, template, expected in cases]

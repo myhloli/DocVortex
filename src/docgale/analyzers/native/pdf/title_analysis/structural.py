@@ -11,10 +11,26 @@ from dataclasses import replace
 
 from .....schema import BBox
 from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_union_many, _rotate_bbox_to_upright
-from ..line_layout import _effective_text_row_gap, _estimate_lane_gap, _font_signatures_share_family, _infer_text_lanes, _line_canonical_style_scale, _line_effective_height, _normalized_font_family, _title_fonts_compatible
+from ..line_layout import (
+    _effective_text_row_gap,
+    _estimate_lane_gap,
+    _font_signatures_share_family,
+    _infer_text_lanes,
+    _line_canonical_style_scale,
+    _line_effective_height,
+    _normalized_font_family,
+    _title_fonts_compatible,
+)
 from ..models import _DocumentBodyProfile, _DocumentTitleProfile, _LineItem, _PreparedPage, _TextLane
 from .body_profile import _line_uses_document_regular_font
-from .common import _NUMBERED_SECTION_TITLE_RE, _SECTION_NUMBER_ONLY_RE, _SECTION_TITLE_TERMINAL_RE, _UNNUMBERED_SECTION_HEADING_RE, _build_physical_title_gap_map, _line_inside_visual_container
+from .common import (
+    _NUMBERED_SECTION_TITLE_RE,
+    _SECTION_NUMBER_ONLY_RE,
+    _SECTION_TITLE_TERMINAL_RE,
+    _UNNUMBERED_SECTION_HEADING_RE,
+    _build_physical_title_gap_map,
+    _line_inside_visual_container,
+)
 from .page_titles import _classify_page_titles
 
 

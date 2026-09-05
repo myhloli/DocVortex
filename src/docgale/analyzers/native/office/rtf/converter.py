@@ -12,7 +12,21 @@ from .....content.spans import append_equation_span, extend_inline_spans, inline
 from ..image import ensure_bmp_header, is_valid_vector_image_payload, is_vector_image_part, serialize_office_image
 from ..equation.image import OfficeImageEquationDecoder
 from ..rich_text import OfficeRichTextSegment, build_rich_text_from_segments
-from .models import RtfAnchor, RtfBlock, RtfDisplayEquation, RtfDocument, RtfImage, RtfInline, RtfInlineEquation, RtfLineBreak, RtfNoteReference, RtfParagraph, RtfTable, RtfTableCell, RtfTextRun
+from .models import (
+    RtfAnchor,
+    RtfBlock,
+    RtfDisplayEquation,
+    RtfDocument,
+    RtfImage,
+    RtfInline,
+    RtfInlineEquation,
+    RtfLineBreak,
+    RtfNoteReference,
+    RtfParagraph,
+    RtfTable,
+    RtfTableCell,
+    RtfTextRun,
+)
 from .parser import MAX_RTF_LIST_DEPTH, parse_rtf, parse_rtf_prelude, read_rtf_bytes
 
 

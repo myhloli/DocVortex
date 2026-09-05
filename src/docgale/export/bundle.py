@@ -12,7 +12,7 @@ from ..assets import AssetStore
 from ..codecs.json import load_middle, load_model
 from ..foundation.image_payload import INLINE_IMAGE_DATA_URI_RE, parse_image_data_uri_strict
 from ..result import Diagnostic, DocumentResult, ExportResult
-from .files import materialize_middle
+from .files import materialize_middle, validate_materialized_assets
 from .middle import _commit_export_files, _resolve_export_target, _validate_export_path_relationships
 
 
@@ -43,15 +43,23 @@ def _add_image(data_uri: str, assets: AssetStore) -> str:
 def save_bundle(result: DocumentResult, path: Path, *, overwrite: bool = False) -> ExportResult:
     """将中间协议与素材清单放入同一文件事务。"""
     middle, assets = materialize_middle(result.middle_json, result.assets)
+    validate_materialized_assets(middle, assets)
     files: dict[str, bytes] = {"middle.json": middle.to_json(skip_defaults=False).encode("utf-8")}
-    manifest: dict[str, Any] = {"schema": "docgale.bundle", "schema_version": "1.0", "middle": "middle.json",
-                                "diagnostics": [asdict(item) for item in result.diagnostics]}
+    manifest: dict[str, Any] = {
+        "schema": "docgale.bundle",
+        "schema_version": "1.0",
+        "middle": "middle.json",
+        "diagnostics": [asdict(item) for item in result.diagnostics],
+    }
     if result.model_json is not None:
         model = _externalize_model(result.model_json.to_dict(skip_defaults=False), assets)
         files["model.json"] = json.dumps(model, ensure_ascii=False, indent=2).encode("utf-8")
         manifest["model"] = "model.json"
-    manifest["assets"] = [{"path": name, "size": len(payload), "sha256": sha256(payload).hexdigest()}
-                          for name, payload in sorted(assets.items())]
+    manifest["assets"] = [
+        {"path": name, "size": len(payload), "sha256": sha256(payload).hexdigest()} for name, payload in sorted(assets.items())
+    ]
+    if {"manifest.json", "middle.json", "model.json"}.intersection(assets):
+        raise ValueError("Bundle assets conflict with reserved document files")
     files.update(assets)
     files["manifest.json"] = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
     _validate_export_path_relationships(list(files))
@@ -70,12 +78,19 @@ def load_bundle(path: str | Path) -> DocumentResult:
         raise ValueError("Invalid bundle document paths")
     assets = AssetStore()
     for item in manifest["assets"]:
+        if item["path"] in {"manifest.json", "middle.json", "model.json"}:
+            raise ValueError("Bundle asset uses a reserved document path")
         payload = _resolve_export_target(root, item["path"]).read_bytes()
         if len(payload) != item["size"] or sha256(payload).hexdigest() != item["sha256"]:
             raise ValueError(f"Bundle asset integrity mismatch: {item['path']}")
         assets.add(item["path"], payload)
     middle = load_middle(json.loads(_resolve_export_target(root, "middle.json").read_text(encoding="utf-8")))
-    model = load_model(json.loads(_resolve_export_target(root, "model.json").read_text(encoding="utf-8"))) if manifest.get("model") else None
+    validate_materialized_assets(middle, assets)
+    model = (
+        load_model(json.loads(_resolve_export_target(root, "model.json").read_text(encoding="utf-8")))
+        if manifest.get("model")
+        else None
+    )
     diagnostics = tuple(Diagnostic(**item) for item in manifest.get("diagnostics", []))
     return DocumentResult(middle_json=middle, assets=assets, model_json=model, diagnostics=diagnostics)
 

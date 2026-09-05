@@ -1,4 +1,5 @@
 """语义文档与图片旁文件的原子导出。"""
+
 from __future__ import annotations
 import os
 from dataclasses import dataclass
@@ -6,6 +7,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any, Sequence
 from ..schema import MiddleJson, BlockBase, _iter_child_blocks
+
 
 @dataclass(frozen=True, slots=True)
 class MiddleJsonExportResult:
@@ -196,8 +198,9 @@ def _export_middle_json(
     )
 
 
-def export_middle_json(middle_json: MiddleJson, output_dir: str | Path, *,
-                       json_name: str = "middle_json.json", overwrite: bool = False) -> MiddleJsonExportResult:
+def export_middle_json(
+    middle_json: MiddleJson, output_dir: str | Path, *, json_name: str = "middle_json.json", overwrite: bool = False
+) -> MiddleJsonExportResult:
     """显式导出语义协议及图片，保持基础 schema 无文件系统依赖。"""
     return _export_middle_json(middle_json, Path(output_dir), json_name=json_name, overwrite=overwrite)
 

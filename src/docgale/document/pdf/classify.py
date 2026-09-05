@@ -317,13 +317,9 @@ def _collect_pdfium_text_sample_from_page(page_index: int, page: Any) -> dict[st
             if font_name:
                 font_name_counts[font_name] = font_name_counts.get(font_name, 0) + 1
                 if not is_generated:
-                    font_non_generated_char_counts[font_name] = (
-                        font_non_generated_char_counts.get(font_name, 0) + 1
-                    )
+                    font_non_generated_char_counts[font_name] = font_non_generated_char_counts.get(font_name, 0) + 1
                     if _is_cjk_unicode_code(unicode_code):
-                        font_non_generated_cjk_char_counts[font_name] = (
-                            font_non_generated_cjk_char_counts.get(font_name, 0) + 1
-                        )
+                        font_non_generated_cjk_char_counts[font_name] = font_non_generated_cjk_char_counts.get(font_name, 0) + 1
 
         return {
             "page_index": page_index,
@@ -471,22 +467,10 @@ def _get_latin_charset_with_to_unicode_signal(font: Any) -> dict[str, Any]:
 
     glyph_names = set(re.findall(r"/([^/\s]+)", str(charset)))
     charset_glyph_count = len(glyph_names)
-    latin_glyph_count = sum(
-        1 for glyph_name in glyph_names if re.fullmatch(r"[A-Za-z]", glyph_name)
-    )
-    cjk_charset_glyph_count = sum(
-        1
-        for glyph_name in glyph_names
-        if _get_cjk_glyph_name_code(glyph_name) is not None
-    )
-    latin_glyph_ratio = (
-        latin_glyph_count / charset_glyph_count if charset_glyph_count else 0.0
-    )
-    cjk_charset_glyph_ratio = (
-        cjk_charset_glyph_count / charset_glyph_count
-        if charset_glyph_count
-        else 0.0
-    )
+    latin_glyph_count = sum(1 for glyph_name in glyph_names if re.fullmatch(r"[A-Za-z]", glyph_name))
+    cjk_charset_glyph_count = sum(1 for glyph_name in glyph_names if _get_cjk_glyph_name_code(glyph_name) is not None)
+    latin_glyph_ratio = latin_glyph_count / charset_glyph_count if charset_glyph_count else 0.0
+    cjk_charset_glyph_ratio = cjk_charset_glyph_count / charset_glyph_count if charset_glyph_count else 0.0
 
     signal.update(
         {
@@ -618,10 +602,7 @@ def _get_latin_font_cjk_usage_signal_from_samples(
 
         font_name_counts = text_sample.get("font_non_generated_char_counts") or {}
         font_cjk_char_counts = text_sample.get("font_non_generated_cjk_char_counts") or {}
-        candidate_font_names = {
-            _normalize_pdf_font_name(font_name)
-            for font_name in page_fonts.get(page_index, set())
-        }
+        candidate_font_names = {_normalize_pdf_font_name(font_name) for font_name in page_fonts.get(page_index, set())}
         candidate_font_names.discard("")
 
         for font_name in sorted(candidate_font_names):
@@ -732,9 +713,7 @@ def _get_cross_script_text_signal_from_samples(text_samples: list[Any]) -> dict[
     suspicious_ratio = 0.0
     if total_chars > 0:
         suspicious_ratio = suspicious_chars / total_chars
-    dense_script_count = sum(
-        1 for count in script_counts.values() if count >= SUSPICIOUS_CROSS_SCRIPT_DENSE_SCRIPT_CHARS
-    )
+    dense_script_count = sum(1 for count in script_counts.values() if count >= SUSPICIOUS_CROSS_SCRIPT_DENSE_SCRIPT_CHARS)
     top_scripts = sorted(
         script_counts.items(),
         key=lambda item: (-item[1], item[0]),
@@ -1066,9 +1045,7 @@ def _get_font_resource_signals_pypdf(
             if analysis["cid_without_to_unicode"]:
                 cid_page_fonts.setdefault(page_index, set()).add(font_name)
 
-            page_latin_font_resources.setdefault(font_name, {})[cache_key] = analysis[
-                "latin_charset_with_to_unicode"
-            ]
+            page_latin_font_resources.setdefault(font_name, {})[cache_key] = analysis["latin_charset_with_to_unicode"]
 
         for font_name, resource_states in page_latin_font_resources.items():
             if len(resource_states) == 1 and set(resource_states.values()) == {True}:
@@ -1085,11 +1062,7 @@ def _get_font_resource_signals_pypdf(
                 font_analysis_cache,
             )
             cid_page_usage[page_index] = {
-                "font_names": sorted(
-                    font_name
-                    for font_name, char_count in usage_counts.items()
-                    if char_count > 0
-                ),
+                "font_names": sorted(font_name for font_name, char_count in usage_counts.items() if char_count > 0),
                 "cid_font_char_count": sum(usage_counts.values()),
             }
 

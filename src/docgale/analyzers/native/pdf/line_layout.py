@@ -15,7 +15,15 @@ from ....schema import BBox
 
 from .typography import _normalized_font_family
 from .models import _LineItem, _LocalAxisLine, _TextLane
-from .geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_union_many, _clip_bbox, _bbox_intersects, _coerce_bbox
+from .geometry import (
+    _bbox_axis_overlap_ratio,
+    _bbox_center_x,
+    _bbox_center_y,
+    _bbox_union_many,
+    _clip_bbox,
+    _bbox_intersects,
+    _coerce_bbox,
+)
 
 
 _TIGHT_OUTPUT_PADDING = 1.0

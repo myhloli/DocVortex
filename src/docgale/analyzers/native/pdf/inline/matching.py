@@ -15,7 +15,23 @@ if TYPE_CHECKING:
     from ..models import _LineItem
     from ..native_text import _NativeVisualResplit
 from .common import _bbox_overlap_ratio, _canonical_styles, _coerce_bbox, _normalize_match_fragment, _ordered_line_chars
-from .types import _PDF_GEOMETRIC_TEXT_STYLES, _PDF_TEXT_STYLE_TARGET_BLOCK_TYPES, PDF_NATURAL_TEXT_STYLE_BLOCK_TYPES, PDFTextEvidenceLine, PDFTextLinkLine, PDFTextLinkRange, PDFTextScriptLine, PDFTextScriptRange, PDFTextStyle, PDFTextStyleLine, PDFTextStyleRange, _LineProjectionMatch, _MatchedLinkRange, _ProjectedChar, _RawLinkInterval
+from .types import (
+    _PDF_GEOMETRIC_TEXT_STYLES,
+    _PDF_TEXT_STYLE_TARGET_BLOCK_TYPES,
+    PDF_NATURAL_TEXT_STYLE_BLOCK_TYPES,
+    PDFTextEvidenceLine,
+    PDFTextLinkLine,
+    PDFTextLinkRange,
+    PDFTextScriptLine,
+    PDFTextScriptRange,
+    PDFTextStyle,
+    PDFTextStyleLine,
+    PDFTextStyleRange,
+    _LineProjectionMatch,
+    _MatchedLinkRange,
+    _ProjectedChar,
+    _RawLinkInterval,
+)
 
 
 def _resplit_evidence_segments(

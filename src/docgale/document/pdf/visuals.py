@@ -12,8 +12,20 @@ from loguru import logger
 from ...schema import BBox, BlockType
 from ...foundation.geometry import calculate_overlap_area_2_minbox_area_ratio, calculate_overlap_area_in_bbox1_area_ratio
 
-from .constants import IMAGE_BLOCK_CONTAINMENT_THRESHOLD, IMAGE_BLOCK_LAYOUT_COVERAGE_THRESHOLD, IMAGE_BLOCK_LAYOUT_MIN_VISUAL_COUNT, LOCAL_LAYOUT_IMAGE_BLOCK_AREA_TYPES, LOCAL_LAYOUT_IMAGE_BLOCK_BODY_TYPES, MODEL_JSON_VISUAL_BLOCK_TYPES
-from .visual_geometry import _bbox_to_pixel_bbox, _encode_page_crop_as_jpeg_data_uri, _normalize_page_size, _normalize_visual_block_angle
+from .constants import (
+    IMAGE_BLOCK_CONTAINMENT_THRESHOLD,
+    IMAGE_BLOCK_LAYOUT_COVERAGE_THRESHOLD,
+    IMAGE_BLOCK_LAYOUT_MIN_VISUAL_COUNT,
+    LOCAL_LAYOUT_IMAGE_BLOCK_AREA_TYPES,
+    LOCAL_LAYOUT_IMAGE_BLOCK_BODY_TYPES,
+    MODEL_JSON_VISUAL_BLOCK_TYPES,
+)
+from .visual_geometry import (
+    _bbox_to_pixel_bbox,
+    _encode_page_crop_as_jpeg_data_uri,
+    _normalize_page_size,
+    _normalize_visual_block_angle,
+)
 
 
 def _normalize_model_bbox_for_containment(raw_bbox: Any) -> BBox | None:

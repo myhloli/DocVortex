@@ -11,9 +11,7 @@ from lxml import etree
 from ..opc import relationship_source_base_dir, write_zip_package
 
 
-PACKAGE_RELATIONSHIPS_NS = (
-    "http://schemas.openxmlformats.org/package/2006/relationships"
-)
+PACKAGE_RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 RELATIONSHIP_TAG = f"{{{PACKAGE_RELATIONSHIPS_NS}}}Relationship"
 ZIP_MEMBER_READ_ERRORS = (BadZipFile, RuntimeError, NotImplementedError, zlib.error)
 DOCX_EMBEDDED_OFFICE_PREFIX = "word/embeddings/"
@@ -23,12 +21,8 @@ def normalize_docx_package(file_bytes: bytes) -> bytes:
     """在进入 python-docx 前修复 DOCX 包级容错问题。"""
     with ZipFile(BytesIO(file_bytes)) as source:
         package_members = {info.filename for info in source.infolist()}
-        reachable_members, relationship_graph_complete = (
-            _collect_relationship_reachable_members(source, package_members)
-        )
-        trusted_reachable_members = (
-            reachable_members if relationship_graph_complete else None
-        )
+        reachable_members, relationship_graph_complete = _collect_relationship_reachable_members(source, package_members)
+        trusted_reachable_members = reachable_members if relationship_graph_complete else None
         loaded_members: list[tuple[ZipInfo, bytes]] = []
         skipped_members: set[str] = set()
         changed = False
@@ -89,9 +83,7 @@ def _collect_relationship_reachable_members(
 
         rels_xml = source.read(rels_filename)
         try:
-            targets = list(
-                _iter_internal_relationship_targets(rels_filename, rels_xml)
-            )
+            targets = list(_iter_internal_relationship_targets(rels_filename, rels_xml))
         except etree.XMLSyntaxError:
             graph_complete = False
             continue
@@ -102,11 +94,7 @@ def _collect_relationship_reachable_members(
             reachable_members.add(target)
 
             target_rels = _relationship_part_rels_filename(target)
-            if (
-                target_rels is not None
-                and target_rels in package_members
-                and target_rels not in processed_relationships
-            ):
+            if target_rels is not None and target_rels in package_members and target_rels not in processed_relationships:
                 relationship_queue.append(target_rels)
 
     return reachable_members, graph_complete
@@ -217,11 +205,7 @@ def _remove_missing_internal_relationships(
             rels_filename,
             relationship.get("Target"),
         )
-        if (
-            resolved_target is not None
-            and resolved_target in package_members
-            and resolved_target not in skipped_members
-        ):
+        if resolved_target is not None and resolved_target in package_members and resolved_target not in skipped_members:
             continue
 
         root.remove(relationship)

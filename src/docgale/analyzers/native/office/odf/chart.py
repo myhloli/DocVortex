@@ -10,7 +10,14 @@ from lxml import etree  # type: ignore[reportMissingImports]
 from .....schema import BlockType
 from .constants import qname
 from .models import TableGrid
-from .table import OdfTableExpansionBudget, crop_table_grid, parse_cell_range_bounds, parse_table_grid, table_grid_to_html, union_bounds
+from .table import (
+    OdfTableExpansionBudget,
+    crop_table_grid,
+    parse_cell_range_bounds,
+    parse_table_grid,
+    table_grid_to_html,
+    union_bounds,
+)
 
 
 def _chart_range_bounds(chart: etree._Element) -> tuple[int, int, int, int] | None:

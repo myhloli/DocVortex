@@ -156,9 +156,7 @@ class PapDelta:
         return PapDelta(
             in_table=over.in_table if over.in_table is not None else self.in_table,
             row_mark=over.row_mark if over.row_mark is not None else self.row_mark,
-            outline_level=(
-                over.outline_level if over.outline_level is not None else self.outline_level
-            ),
+            outline_level=(over.outline_level if over.outline_level is not None else self.outline_level),
             ilfo=over.ilfo if over.ilfo is not None else self.ilfo,
             ilvl=over.ilvl if over.ilvl is not None else self.ilvl,
             table_depth=over.table_depth if over.table_depth is not None else self.table_depth,

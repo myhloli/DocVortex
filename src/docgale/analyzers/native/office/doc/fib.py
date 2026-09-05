@@ -253,15 +253,9 @@ def parse_fib(word_document: bytes) -> FileInformationBlock:
         # 仅在标准布局不可用时按这些公开槽位做恢复读取。
         if len(word_document) < 0x6C:
             raise LegacyOfficeMalformedError("FIB does not contain ccpText")
-        rglw = tuple(
-            int(struct.unpack_from("<I", word_document, 0x40 + index * 4)[0])
-            for index in range(11)
-        )
+        rglw = tuple(int(struct.unpack_from("<I", word_document, 0x40 + index * 4)[0]) for index in range(11))
         if not pairs and len(word_document) >= 0x382:
-            pairs = tuple(
-                FcLcb(*struct.unpack_from("<II", word_document, 0x9A + index * 8))
-                for index in range(93)
-            )
+            pairs = tuple(FcLcb(*struct.unpack_from("<II", word_document, 0x9A + index * 8)) for index in range(93))
         cursor = max(cursor, 0x382)
     fib = FileInformationBlock(base=base, rgw=rgw, rglw=rglw, pairs=pairs, csw_new=csw_new, size=cursor)
     if fib.total_story_cp < fib.ccp_text:

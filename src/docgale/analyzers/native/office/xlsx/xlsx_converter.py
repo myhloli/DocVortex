@@ -24,7 +24,13 @@ from ..spreadsheet.html import EQUATION_BOOKENDS, render_spreadsheet_table
 from ..spreadsheet.models import AnchoredBlock, FormulaMap, SheetImage
 from ..spreadsheet.projector import SpreadsheetProjector
 from .package_normalizer import normalize_xlsx_package, strip_xlsx_ole_objects_for_openpyxl
-from .ooxml_ole import XlsxOleEquationArtifact, package_has_sheet_ole_objects, read_sheet_image_artifacts, read_sheet_equation_artifacts, workbook_sheet_parts
+from .ooxml_ole import (
+    XlsxOleEquationArtifact,
+    package_has_sheet_ole_objects,
+    read_sheet_image_artifacts,
+    read_sheet_equation_artifacts,
+    workbook_sheet_parts,
+)
 from .....schema import BlockType
 
 
@@ -47,9 +53,7 @@ class XlsxConverter(SpreadsheetProjector):
         self._ole_artifacts: list[XlsxOleEquationArtifact] = []
         self._omml_shape_ids: set[str] = set()
         self._omml_artifacts: list[tuple[int, int, str, int]] = []
-        self._suppressed_ole_previews: set[
-            tuple[tuple[int, int], str]
-        ] = set()
+        self._suppressed_ole_previews: set[tuple[tuple[int, int], str]] = set()
         self._ooxml_equation_decoder = OoxmlEquationDecoder()
         self._image_equation_decoder = OfficeImageEquationDecoder()
 
@@ -109,9 +113,7 @@ class XlsxConverter(SpreadsheetProjector):
                 self._sheet_part_by_title,
             ):
                 file_bytes = read_stream_bytes_from_start(file_stream)
-                workbook_stream = BytesIO(
-                    strip_xlsx_ole_objects_for_openpyxl(file_bytes)
-                )
+                workbook_stream = BytesIO(strip_xlsx_ole_objects_for_openpyxl(file_bytes))
             else:
                 rewind_stream(file_stream)
             self.workbook = load_workbook(
@@ -161,11 +163,7 @@ class XlsxConverter(SpreadsheetProjector):
             and artifact.col is not None
             and artifact.preview_base64 is not None
         }
-        self._ole_artifacts = [
-            artifact
-            for artifact in self._ole_artifacts
-            if artifact.shape_id not in self._omml_shape_ids
-        ]
+        self._ole_artifacts = [artifact for artifact in self._ole_artifacts if artifact.shape_id not in self._omml_shape_ids]
         for artifact in self._ole_artifacts:
             if artifact.latex is None or artifact.row is None or artifact.col is None:
                 continue
@@ -175,15 +173,9 @@ class XlsxConverter(SpreadsheetProjector):
         ole_previews = self._suppressed_ole_previews | {
             ((artifact.row, artifact.col), artifact.preview_base64)
             for artifact in self._ole_artifacts
-            if artifact.row is not None
-            and artifact.col is not None
-            and artifact.preview_base64
+            if artifact.row is not None and artifact.col is not None and artifact.preview_base64
         }
-        self.sheet_images = [
-            image
-            for image in self.sheet_images
-            if (image.anchor, image.image_base64) not in ole_previews
-        ]
+        self.sheet_images = [image for image in self.sheet_images if (image.anchor, image.image_base64) not in ole_previews]
         self.table_image_map = collections.defaultdict(list)
         for image in self.sheet_images:
             row, col = image.anchor
@@ -194,16 +186,9 @@ class XlsxConverter(SpreadsheetProjector):
             elif image.image_base64:
                 self.table_image_map[(row, col)].append(f'<img src="{image.image_base64}" />')
         for artifact in self._ole_artifacts:
-            if (
-                artifact.latex is not None
-                or artifact.preview_base64 is None
-                or artifact.row is None
-                or artifact.col is None
-            ):
+            if artifact.latex is not None or artifact.preview_base64 is None or artifact.row is None or artifact.col is None:
                 continue
-            self.table_image_map[(artifact.row, artifact.col)].append(
-                f'<img src="{artifact.preview_base64}" />'
-            )
+            self.table_image_map[(artifact.row, artifact.col)].append(f'<img src="{artifact.preview_base64}" />')
 
     def _find_additional_visual_artifacts(
         self,
@@ -258,11 +243,7 @@ class XlsxConverter(SpreadsheetProjector):
                 artifact.row if artifact.row is not None else 10**9,
                 artifact.col if artifact.col is not None else 10**9,
             )
-            if (
-                artifact.row is not None
-                and artifact.col is not None
-                and (artifact.row, artifact.col) in used_cells
-            ):
+            if artifact.row is not None and artifact.col is not None and (artifact.row, artifact.col) in used_cells:
                 continue
             block = None
             if artifact.latex is not None:
@@ -290,11 +271,7 @@ class XlsxConverter(SpreadsheetProjector):
             if not image.latex:
                 continue
             row, col = image.anchor
-            if (
-                row is not None
-                and col is not None
-                and (row, col) in used_cells
-            ):
+            if row is not None and col is not None and (row, col) in used_cells:
                 continue
             coordinate = (
                 row if row is not None else 10**9,
@@ -319,15 +296,11 @@ class XlsxConverter(SpreadsheetProjector):
             return None
         info = self.zf.getinfo(normalized)
         if info.file_size > MAX_ENTRY_BYTES:
-            raise LegacyOfficeResourceLimitError(
-                f"XLSX image exceeds max_entry_bytes={MAX_ENTRY_BYTES}"
-            )
+            raise LegacyOfficeResourceLimitError(f"XLSX image exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
         with self.zf.open(info) as stream:
             payload = stream.read(MAX_ENTRY_BYTES + 1)
         if len(payload) > MAX_ENTRY_BYTES:
-            raise LegacyOfficeResourceLimitError(
-                f"XLSX image exceeds max_entry_bytes={MAX_ENTRY_BYTES}"
-            )
+            raise LegacyOfficeResourceLimitError(f"XLSX image exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
         return payload
 
     def _raw_sheet_image(
@@ -337,20 +310,14 @@ class XlsxConverter(SpreadsheetProjector):
         """优先从原 ZIP 读取 openpyxl 图片的未转码原始字节。"""
 
         part_name = str(getattr(image, "path", "") or "") or None
-        payload = (
-            self._read_xlsx_image_member(part_name)
-            if part_name is not None
-            else None
-        )
+        payload = self._read_xlsx_image_member(part_name) if part_name is not None else None
         if payload is None:
             try:
                 payload = image._data()  # type: ignore[attr-defined]
             except Exception:
                 return None
             if len(payload) > MAX_ENTRY_BYTES:
-                raise LegacyOfficeResourceLimitError(
-                    f"XLSX image exceeds max_entry_bytes={MAX_ENTRY_BYTES}"
-                )
+                raise LegacyOfficeResourceLimitError(f"XLSX image exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
         image_format = str(getattr(image, "format", "") or "").casefold()
         content_type = f"image/{image_format}" if image_format else None
         return payload, part_name, content_type
@@ -517,9 +484,7 @@ class XlsxConverter(SpreadsheetProjector):
                         if latex:
                             math_map[(r, c)].append(latex)
                             anchor_latex.append(latex)
-                            self._omml_artifacts.append(
-                                (r, c, latex, len(self._omml_artifacts))
-                            )
+                            self._omml_artifacts.append((r, c, latex, len(self._omml_artifacts)))
                     if anchor_latex:
                         for node in anchor.findall(".//xdr:cNvPr", ns):
                             shape_id = node.get("id")
@@ -536,9 +501,6 @@ class XlsxConverter(SpreadsheetProjector):
         if hasattr(anchor, "_from"):
             return anchor._from.row, anchor._from.col
         return None, None
-
-
-
 
     def _extract_chart_range_formula(self, value_source) -> str | None:
         if value_source is None:
@@ -618,8 +580,6 @@ class XlsxConverter(SpreadsheetProjector):
 
         return sorted(referenced_rows), sorted(referenced_cols)
 
-
-
     def _find_charts_in_sheet(self, sheet: Worksheet) -> list[AnchoredBlock]:
         chart_artifacts = []
         for order, chart in enumerate(getattr(sheet, "_charts", [])):
@@ -650,26 +610,6 @@ class XlsxConverter(SpreadsheetProjector):
             )
 
         return chart_artifacts
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     def _resolve_cell_image(self, text: str) -> str:
         """解析 WPS DISPIMG 单元格函数并返回图片或公式 HTML。"""

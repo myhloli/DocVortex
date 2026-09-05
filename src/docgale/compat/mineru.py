@@ -49,8 +49,9 @@ def from_mineru_middle(payload: dict[str, Any]) -> MiddleJson:
     return result
 
 
-def _to_payload(document: ModelJson | MiddleJson, *, skip_defaults: bool,
-                exclude_block_fields: set[str] | None = None) -> dict[str, Any]:
+def _to_payload(
+    document: ModelJson | MiddleJson, *, skip_defaults: bool, exclude_block_fields: set[str] | None = None
+) -> dict[str, Any]:
     """恢复旧版顶层字段，仅接受调用方真实提供的产品元数据。"""
     metadata = MinerUMetadata.model_validate(document.extensions.get("mineru"))
     payload = document.to_dict(skip_defaults=skip_defaults, exclude_block_fields=exclude_block_fields)
@@ -64,9 +65,13 @@ def to_mineru_model(document: ModelJson, *, skip_defaults: bool = False) -> dict
     return _to_payload(document, skip_defaults=skip_defaults)
 
 
-def to_mineru_middle(document: MiddleJson, *, skip_defaults: bool = True,
-                    include_schema_version: bool = True,
-                    exclude_block_fields: set[str] | None = None) -> dict[str, Any]:
+def to_mineru_middle(
+    document: MiddleJson,
+    *,
+    skip_defaults: bool = True,
+    include_schema_version: bool = True,
+    exclude_block_fields: set[str] | None = None,
+) -> dict[str, Any]:
     """写出 MinerU schema 2.0，允许调用方明确选择素材省略策略。"""
     payload = _to_payload(document, skip_defaults=skip_defaults, exclude_block_fields=exclude_block_fields)
     return {"schema_version": "2.0", **payload} if include_schema_version else payload
@@ -79,4 +84,12 @@ def to_mineru_structured_content(value: dict[str, Any]) -> dict[str, Any]:
     return {**payload, **metadata.model_dump(mode="json")}
 
 
-__all__ = ["MinerUMetadata", "from_mineru_model", "from_mineru_middle", "to_mineru_model", "to_mineru_middle", "to_mineru_structured_content", "with_mineru_metadata"]
+__all__ = [
+    "MinerUMetadata",
+    "from_mineru_model",
+    "from_mineru_middle",
+    "to_mineru_model",
+    "to_mineru_middle",
+    "to_mineru_structured_content",
+    "with_mineru_metadata",
+]

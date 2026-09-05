@@ -12,7 +12,36 @@ from lxml import etree  # type: ignore[reportMissingImports]
 from ...schema import PAGE_BLOCK_TYPES, RAW_ALGORITHM, BlockType, VISUAL_TYPE_MAPPING
 from ...analyzers.native._shared.markup import extract_formula
 from ...analyzers.native._shared.markup.projector import BLOCK_TAGS, local_name
-from .contracts import AnnotationWireSpec, CodeBodyWireSpec, EquationWireSpec, FlowchartBodyWireSpec, IndexBlockWireSpec, IndexLeafWireSpec, IndexWireSpec, ListBlockWireSpec, ListLeafWireSpec, ListWireSpec, MINERU_HTML_VERSION, MineruHtmlWirePlan, PageWireSpec, RichVisualBodyWireSpec, TableBodyWireSpec, TextWireSpec, VisualBodyWireSpec, VisualWireSpec, WireFallbackReason, WireRenderMode, WIRE_BLOCK_CLASS, WIRE_DOCUMENT_CLASS, WIRE_INDEX_CLASS, WIRE_LIST_CONTENT_CLASS, WIRE_LIST_MARKER_CLASS, WIRE_PAGE_BREAK_CLASS, WIRE_PAGE_CLASS, WIRE_VISUAL_BODY_CLASS
+from .contracts import (
+    AnnotationWireSpec,
+    CodeBodyWireSpec,
+    EquationWireSpec,
+    FlowchartBodyWireSpec,
+    IndexBlockWireSpec,
+    IndexLeafWireSpec,
+    IndexWireSpec,
+    ListBlockWireSpec,
+    ListLeafWireSpec,
+    ListWireSpec,
+    MINERU_HTML_VERSION,
+    MineruHtmlWirePlan,
+    PageWireSpec,
+    RichVisualBodyWireSpec,
+    TableBodyWireSpec,
+    TextWireSpec,
+    VisualBodyWireSpec,
+    VisualWireSpec,
+    WireFallbackReason,
+    WireRenderMode,
+    WIRE_BLOCK_CLASS,
+    WIRE_DOCUMENT_CLASS,
+    WIRE_INDEX_CLASS,
+    WIRE_LIST_CONTENT_CLASS,
+    WIRE_LIST_MARKER_CLASS,
+    WIRE_PAGE_BREAK_CLASS,
+    WIRE_PAGE_CLASS,
+    WIRE_VISUAL_BODY_CLASS,
+)
 
 
 _SIMPLE_TEXT_TYPES = frozenset(

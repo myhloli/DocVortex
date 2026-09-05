@@ -186,9 +186,7 @@ def parse_style_text(body: bytes, text_utf16_length: int) -> StyleRuns:
         if parsed is None:
             return runs
         bullet, position = parsed
-        runs.paragraphs.append(
-            ParagraphRun(count=int(count), depth=min(int(depth), 8), bullet=bullet)
-        )
+        runs.paragraphs.append(ParagraphRun(count=int(count), depth=min(int(depth), 8), bullet=bullet))
         covered += int(count)
         if count == 0:
             break

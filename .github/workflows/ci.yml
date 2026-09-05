@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.10', '3.11', '3.12', '3.13']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv venv
+      - run: uv pip install ".[test]" "pypdfium2==5.10.1"
+      - run: uv run --no-project python -m pytest -q
+      - name: Verify independent installation
+        run: uv run --no-project python -c "import importlib.util, docgale; assert importlib.util.find_spec('mineru') is None; assert importlib.util.find_spec('pdftext') is None"
+
+  pdfium-current:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.13'
+      - run: uv venv
+      - run: uv pip install ".[test]" "pypdfium2==5.13.0"
+      - run: uv run --no-project python -m pytest -q
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uvx ruff==0.14.2 check src
+      - run: uvx ruff==0.14.2 format --check src

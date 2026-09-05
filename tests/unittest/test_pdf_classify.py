@@ -83,33 +83,19 @@ def _build_nested_form_pdf() -> bytes:
     page_fonts = page_resources["/Font"].get_object()
     bad_font_ref = page_fonts["/C2_0"]
 
-    inner_resources = DictionaryObject(
-        {
-            NameObject("/Font"): DictionaryObject(
-                {NameObject("/C2_0"): bad_font_ref}
-            )
-        }
-    )
+    inner_resources = DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/C2_0"): bad_font_ref})})
     inner_ref, _inner = _make_form_xobject(
         writer,
         b"BT /C2_0 12 Tf <01380138> Tj ET",
         inner_resources,
     )
-    outer_resources = DictionaryObject(
-        {
-            NameObject("/XObject"): DictionaryObject(
-                {NameObject("/Inner"): inner_ref}
-            )
-        }
-    )
+    outer_resources = DictionaryObject({NameObject("/XObject"): DictionaryObject({NameObject("/Inner"): inner_ref})})
     outer_ref, _outer = _make_form_xobject(
         writer,
         b"/Inner Do",
         outer_resources,
     )
-    page_resources[NameObject("/XObject")] = DictionaryObject(
-        {NameObject("/Outer"): outer_ref}
-    )
+    page_resources[NameObject("/XObject")] = DictionaryObject({NameObject("/Outer"): outer_ref})
     page_content = DecodedStreamObject()
     page_content.set_data(b"/Outer Do /Outer Do")
     page[NameObject("/Contents")] = writer._add_object(page_content)
@@ -130,9 +116,7 @@ def _build_cyclic_form_pdf() -> bytes:
 
     loop_resources = DictionaryObject(
         {
-            NameObject("/Font"): DictionaryObject(
-                {NameObject("/C2_0"): bad_font_ref}
-            ),
+            NameObject("/Font"): DictionaryObject({NameObject("/C2_0"): bad_font_ref}),
             NameObject("/XObject"): DictionaryObject(),
         }
     )
@@ -143,9 +127,7 @@ def _build_cyclic_form_pdf() -> bytes:
     )
     loop_resources["/XObject"].get_object()[NameObject("/Self")] = loop_ref
     loop_form[NameObject("/Resources")] = loop_resources
-    page_resources[NameObject("/XObject")] = DictionaryObject(
-        {NameObject("/Loop"): loop_ref}
-    )
+    page_resources[NameObject("/XObject")] = DictionaryObject({NameObject("/Loop"): loop_ref})
     page_content = DecodedStreamObject()
     page_content.set_data(b"/Loop Do")
     page[NameObject("/Contents")] = writer._add_object(page_content)
@@ -177,9 +159,7 @@ def test_mixed_elements_uses_exact_cid_counts_and_classifies_as_txt() -> None:
 
 def test_dominant_bad_cid_font_still_classifies_as_ocr_with_same_name_resource() -> None:
     """验证同名正常字体存在时，大量实际使用的坏 CID 字体仍触发 OCR。"""
-    pdf_bytes = _write_single_sample_page(
-        b"BT /C2_0 12 Tf 72 720 Td <" + b"0138" * 64 + b"> Tj ET"
-    )
+    pdf_bytes = _write_single_sample_page(b"BT /C2_0 12 Tf 72 720 Td <" + b"0138" * 64 + b"> Tj ET")
     usage = _get_exact_cid_usage(pdf_bytes)
 
     assert usage[0] == {
@@ -216,9 +196,7 @@ def test_exact_cid_count_recurses_nested_forms_per_invocation() -> None:
 
 def test_unused_bad_cid_resource_is_not_counted() -> None:
     """验证页面资源中存在但内容流未选择的坏 CID 字体用量为零。"""
-    pdf_bytes = _write_single_sample_page(
-        b"BT /TT2 12 Tf 72 720 Td (normal TimesNewRoman text) Tj ET"
-    )
+    pdf_bytes = _write_single_sample_page(b"BT /TT2 12 Tf 72 720 Td (normal TimesNewRoman text) Tj ET")
 
     assert _get_exact_cid_usage(pdf_bytes)[0] == {
         "font_names": [],

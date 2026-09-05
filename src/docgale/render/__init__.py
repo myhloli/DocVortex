@@ -1,7 +1,23 @@
 # Copyright (c) Opendatalab. All rights reserved.
 
 from .api import render
-from .contracts import AssetResolver, ContentListRenderOptions, ContentListV2RenderOptions, DocxRenderOptions, EpubRenderOptions, HtmlRenderOptions, ImageRenderer, LatexRenderOptions, MarkdownRenderOptions, PdfRenderOptions, RenderFormat, RenderMode, RenderOptions, RenderOutput, StructuredContentRenderOptions
+from .contracts import (
+    AssetResolver,
+    ContentListRenderOptions,
+    ContentListV2RenderOptions,
+    DocxRenderOptions,
+    EpubRenderOptions,
+    HtmlRenderOptions,
+    ImageRenderer,
+    LatexRenderOptions,
+    MarkdownRenderOptions,
+    PdfRenderOptions,
+    RenderFormat,
+    RenderMode,
+    RenderOptions,
+    RenderOutput,
+    StructuredContentRenderOptions,
+)
 from .content_list import render_content_list
 from .content_list_v2 import render_content_list_v2
 from .docx import DocxRenderError, render_docx

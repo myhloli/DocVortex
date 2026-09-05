@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import math
-from collections.abc import Iterable, Sequence
 from enum import Enum
 from typing import Annotated, Any, ClassVar, Literal, TypeAlias, Union, cast, get_args
 
@@ -63,6 +62,7 @@ FileSuffix: TypeAlias = Literal[
     "odp",
 ]
 FILE_SUFFIXES: frozenset[FileSuffix] = frozenset(cast(tuple[FileSuffix, ...], get_args(FileSuffix)))
+
 
 class BlockType(str, Enum):
     IMAGE = "image"
@@ -936,13 +936,19 @@ class DocumentModel(_StrictMiddleModel):
     extensions: dict[str, JsonValue] = Field(default_factory=dict)
     schema_name: ClassVar[str]
 
-    def to_dict(self, *, skip_defaults: bool = True, exclude_none: bool = False,
-                exclude_block_fields: set[str] | None = None) -> dict[str, Any]:
+    def to_dict(
+        self, *, skip_defaults: bool = True, exclude_none: bool = False, exclude_block_fields: set[str] | None = None
+    ) -> dict[str, Any]:
         """始终输出协议标识和生产者，保证默认值省略后的数据仍可识别。"""
-        payload = super().to_dict(skip_defaults=skip_defaults, exclude_none=exclude_none,
-                                  exclude_block_fields=exclude_block_fields)
-        return {"schema": self.schema_name, "schema_version": "1.0",
-                **payload, "producer": self.producer.model_dump(mode="json")}
+        payload = super().to_dict(
+            skip_defaults=skip_defaults, exclude_none=exclude_none, exclude_block_fields=exclude_block_fields
+        )
+        return {
+            "schema": self.schema_name,
+            "schema_version": "1.0",
+            **payload,
+            "producer": self.producer.model_dump(mode="json"),
+        }
 
 
 class ModelJson(DocumentModel):
@@ -1039,5 +1045,84 @@ class MiddleJson(DocumentModel):
         return self
 
 
-
-__all__ = ['RawBlockType', 'RAW_ALGORITHM', 'RAW_CAPTION', 'RAW_FOOTNOTE', 'RAW_FORMULA_NUMBER', 'RAW_PHONETIC', 'RAW_ONLY_BLOCK_TYPES', 'FileSuffix', 'FILE_SUFFIXES', 'BlockType', 'ContentType', 'ContentTypeV2', 'BlockTypes', 'PageBlockTypes', 'BLOCK_TYPES', 'PAGE_BLOCK_TYPES', 'PAGE_AUXILIARY_BLOCK_TYPES', 'MERGE_TRANSPARENT_BLOCK_TYPES', 'VISUAL_RELATION_IGNORED_TYPES', 'VISUAL_MAIN_TYPES', 'VISUAL_TYPE_MAPPING', 'BBox', 'IntBBox', 'InlineStyle', 'INLINE_STYLE_ORDER', 'TextSpan', 'EquationInlineSpan', 'CodeInlineSpan', 'NonLinkInlineSpan', 'HyperlinkSpan', 'InlineSpan', 'INLINE_SPAN_ADAPTER', 'INLINE_SPAN_LIST_ADAPTER', 'parse_inline_span', 'parse_inline_spans', 'BlockBase', 'StringContentBlock', 'InlineContentBlock', 'ContinuableTextBlockBase', 'TextBlock', 'RefTextBlock', 'TitleBlockBase', 'DocTitleBlock', 'ParagraphTitleBlock', 'PageAuxTextBlock', 'PageFootnoteBlock', 'ImagePayloadBlock', 'ImagePayloadContentBlock', 'EquationBlock', 'ImageBodyBlock', 'TableBodyBlock', 'ChartBodyBlock', 'CodeBodyBlock', 'AlgorithmBodyBlock', 'ImageAnnotationBlock', 'TableAnnotationBlock', 'ChartAnnotationBlock', 'CodeAnnotationBlock', 'ListChildBlock', 'ListBlock', 'IndexChildBlock', 'IndexBlock', 'ImageChildBlock', 'ImageBlock', 'TableChildBlock', 'TableBlock', 'ChartChildBlock', 'ChartBlock', 'CodeChildBlock', 'CodeBlock', 'PageBlock', 'Block', 'BLOCK_ADAPTER', 'parse_block', 'Producer', 'DocumentModel', 'ModelJson', 'PageInfo', 'MiddleJson']
+__all__ = [
+    "RawBlockType",
+    "RAW_ALGORITHM",
+    "RAW_CAPTION",
+    "RAW_FOOTNOTE",
+    "RAW_FORMULA_NUMBER",
+    "RAW_PHONETIC",
+    "RAW_ONLY_BLOCK_TYPES",
+    "FileSuffix",
+    "FILE_SUFFIXES",
+    "BlockType",
+    "ContentType",
+    "ContentTypeV2",
+    "BlockTypes",
+    "PageBlockTypes",
+    "BLOCK_TYPES",
+    "PAGE_BLOCK_TYPES",
+    "PAGE_AUXILIARY_BLOCK_TYPES",
+    "MERGE_TRANSPARENT_BLOCK_TYPES",
+    "VISUAL_RELATION_IGNORED_TYPES",
+    "VISUAL_MAIN_TYPES",
+    "VISUAL_TYPE_MAPPING",
+    "BBox",
+    "IntBBox",
+    "InlineStyle",
+    "INLINE_STYLE_ORDER",
+    "TextSpan",
+    "EquationInlineSpan",
+    "CodeInlineSpan",
+    "NonLinkInlineSpan",
+    "HyperlinkSpan",
+    "InlineSpan",
+    "INLINE_SPAN_ADAPTER",
+    "INLINE_SPAN_LIST_ADAPTER",
+    "parse_inline_span",
+    "parse_inline_spans",
+    "BlockBase",
+    "StringContentBlock",
+    "InlineContentBlock",
+    "ContinuableTextBlockBase",
+    "TextBlock",
+    "RefTextBlock",
+    "TitleBlockBase",
+    "DocTitleBlock",
+    "ParagraphTitleBlock",
+    "PageAuxTextBlock",
+    "PageFootnoteBlock",
+    "ImagePayloadBlock",
+    "ImagePayloadContentBlock",
+    "EquationBlock",
+    "ImageBodyBlock",
+    "TableBodyBlock",
+    "ChartBodyBlock",
+    "CodeBodyBlock",
+    "AlgorithmBodyBlock",
+    "ImageAnnotationBlock",
+    "TableAnnotationBlock",
+    "ChartAnnotationBlock",
+    "CodeAnnotationBlock",
+    "ListChildBlock",
+    "ListBlock",
+    "IndexChildBlock",
+    "IndexBlock",
+    "ImageChildBlock",
+    "ImageBlock",
+    "TableChildBlock",
+    "TableBlock",
+    "ChartChildBlock",
+    "ChartBlock",
+    "CodeChildBlock",
+    "CodeBlock",
+    "PageBlock",
+    "Block",
+    "BLOCK_ADAPTER",
+    "parse_block",
+    "Producer",
+    "DocumentModel",
+    "ModelJson",
+    "PageInfo",
+    "MiddleJson",
+]

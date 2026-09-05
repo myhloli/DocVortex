@@ -23,8 +23,7 @@ def is_mathtype_equation_prog_id(prog_id: object | None) -> bool:
         return False
     normalized = prog_id.strip().casefold()
     return normalized == EQUATION_PROG_ID or (
-        normalized.startswith(EQUATION_PROG_ID_PREFIX)
-        and len(normalized) > len(EQUATION_PROG_ID_PREFIX)
+        normalized.startswith(EQUATION_PROG_ID_PREFIX) and len(normalized) > len(EQUATION_PROG_ID_PREFIX)
     )
 
 
@@ -49,9 +48,7 @@ class OoxmlEquationDecoder:
         if not isinstance(blob, bytes):
             return None
         if len(blob) > MAX_ENTRY_BYTES:
-            raise LegacyOfficeResourceLimitError(
-                f"OOXML equation object exceeds max_entry_bytes={MAX_ENTRY_BYTES}"
-            )
+            raise LegacyOfficeResourceLimitError(f"OOXML equation object exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
         if not blob.startswith(CFB_MAGIC):
             return None
 
@@ -59,10 +56,7 @@ class OoxmlEquationDecoder:
         if digest in self._cache:
             return self._cache[digest]
         if self.total_bytes + len(blob) > MAX_ASSET_TOTAL_BYTES:
-            raise LegacyOfficeResourceLimitError(
-                "OOXML equation objects exceed "
-                f"max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}"
-            )
+            raise LegacyOfficeResourceLimitError(f"OOXML equation objects exceed max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}")
 
         self.total_bytes += len(blob)
         latex = decode_equation_object(blob)

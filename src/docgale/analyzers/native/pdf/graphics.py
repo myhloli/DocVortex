@@ -15,7 +15,22 @@ from ....schema import BBox
 from ....document.pdf.document import PDFPathInfo
 
 from .models import _AxisLine, _GraphicCandidate, _LineItem, _PageSource, _TextLane
-from .geometry import _bbox_area, _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_distance, _bbox_intersects, _bbox_overlap_in_first, _bbox_overlap_in_smaller, _bbox_union, _bbox_union_many, _clip_bbox, _coerce_bbox, _point_in_bbox, _rotate_bbox_to_upright
+from .geometry import (
+    _bbox_area,
+    _bbox_axis_overlap_ratio,
+    _bbox_center_x,
+    _bbox_center_y,
+    _bbox_distance,
+    _bbox_intersects,
+    _bbox_overlap_in_first,
+    _bbox_overlap_in_smaller,
+    _bbox_union,
+    _bbox_union_many,
+    _clip_bbox,
+    _coerce_bbox,
+    _point_in_bbox,
+    _rotate_bbox_to_upright,
+)
 from .native_text import _fill_native_typography, _normalize_native_run_text, _sanitize_pdf_control_text
 from .line_layout import _infer_text_lanes, _line_effective_height
 from .line_merging import _join_formula_visual_row

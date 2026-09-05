@@ -19,7 +19,40 @@ from latex2mathml.converter import convert as latex_to_mathml
 from lxml import etree
 
 from ....content.inline import inline_plain_text, join_inline_spans, normalize_inline_spans
-from ....schema import PAGE_AUXILIARY_BLOCK_TYPES, RAW_ALGORITHM, AlgorithmBodyBlock, BlockBase, BlockType, ChartAnnotationBlock, ChartBlock, ChartBodyBlock, CodeAnnotationBlock, CodeBlock, CodeBodyBlock, CodeInlineSpan, DocTitleBlock, EquationBlock, EquationInlineSpan, HyperlinkSpan, ImageAnnotationBlock, ImageBlock, ImageBodyBlock, IndexBlock, InlineSpan, ListBlock, MiddleJson, PageFootnoteBlock, ParagraphTitleBlock, RefTextBlock, TableAnnotationBlock, TableBlock, TableBodyBlock, TextBlock, TextSpan, TitleBlockBase
+from ....schema import (
+    PAGE_AUXILIARY_BLOCK_TYPES,
+    RAW_ALGORITHM,
+    AlgorithmBodyBlock,
+    BlockBase,
+    BlockType,
+    ChartAnnotationBlock,
+    ChartBlock,
+    ChartBodyBlock,
+    CodeAnnotationBlock,
+    CodeBlock,
+    CodeBodyBlock,
+    CodeInlineSpan,
+    DocTitleBlock,
+    EquationBlock,
+    EquationInlineSpan,
+    HyperlinkSpan,
+    ImageAnnotationBlock,
+    ImageBlock,
+    ImageBodyBlock,
+    IndexBlock,
+    InlineSpan,
+    ListBlock,
+    MiddleJson,
+    PageFootnoteBlock,
+    ParagraphTitleBlock,
+    RefTextBlock,
+    TableAnnotationBlock,
+    TableBlock,
+    TableBodyBlock,
+    TextBlock,
+    TextSpan,
+    TitleBlockBase,
+)
 from ...contracts import AssetResolver, EpubRenderOptions
 from ..common.index import strip_index_page_tail
 from ..common.list_items import ListItem, parse_list_item_marker, reference_list_needs_bullets

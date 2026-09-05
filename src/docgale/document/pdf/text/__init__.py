@@ -6,8 +6,7 @@ from .contracts import Bbox, Char, Line, Span
 from .groups import assign_scripts, get_lines
 
 
-def get_spans(chars: list[Char], superscript_height_threshold: float = 0.8,
-              line_distance_threshold: float = 0.1) -> list[Span]:
+def get_spans(chars: list[Char], superscript_height_threshold: float = 0.8, line_distance_threshold: float = 0.1) -> list[Span]:
     """直接从自有字符记录构建片段，避免容器与数组往返转换。"""
     spans: list[Span] = []
     for char in chars:
@@ -17,15 +16,31 @@ def get_spans(chars: list[Char], superscript_height_threshold: float = 0.8,
         if current is not None:
             previous = current["chars"][-1]
             height = current["bbox"].height
-            new_span = (char["font"] != current["font"] or char["rotation"] != current["rotation"]
-                        or previous["char"] in {"\x02", "\n"}
-                        or (box.y_start < current["bbox"].y_start - height * line_distance_threshold
-                            and box.y_end < height * superscript_height_threshold + current["bbox"].y_start
-                            and box.x_start > current["bbox"].x_end))
+            new_span = (
+                char["font"] != current["font"]
+                or char["rotation"] != current["rotation"]
+                or previous["char"] in {"\x02", "\n"}
+                or (
+                    box.y_start < current["bbox"].y_start - height * line_distance_threshold
+                    and box.y_end < height * superscript_height_threshold + current["bbox"].y_start
+                    and box.x_start > current["bbox"].x_end
+                )
+            )
         if new_span:
-            spans.append({"bbox": box.copy(), "text": char["char"], "font": char["font"],
-                          "chars": [char], "char_start_idx": char["char_idx"], "char_end_idx": char["char_idx"],
-                          "rotation": char["rotation"], "url": "", "superscript": False, "subscript": False})
+            spans.append(
+                {
+                    "bbox": box.copy(),
+                    "text": char["char"],
+                    "font": char["font"],
+                    "chars": [char],
+                    "char_start_idx": char["char_idx"],
+                    "char_end_idx": char["char_idx"],
+                    "rotation": char["rotation"],
+                    "url": "",
+                    "superscript": False,
+                    "subscript": False,
+                }
+            )
         else:
             current["bbox"].merge_inplace(box)
             current["text"] += char["char"]
@@ -34,8 +49,9 @@ def get_spans(chars: list[Char], superscript_height_threshold: float = 0.8,
     return spans
 
 
-def get_lines_from_chars(chars: list[Char], superscript_height_threshold: float = 0.7,
-                         line_distance_threshold: float = 0.1) -> list[Line]:
+def get_lines_from_chars(
+    chars: list[Char], superscript_height_threshold: float = 0.7, line_distance_threshold: float = 0.1
+) -> list[Line]:
     """由已物化字符生成基础文本行，不访问 PDFium 或源文档。"""
     spans = get_spans(chars, superscript_height_threshold, line_distance_threshold)
     lines = get_lines(spans)

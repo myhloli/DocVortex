@@ -18,8 +18,15 @@ def main() -> None:
 @main.command("convert")
 @click.argument("source", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--output", "-o", required=True, type=click.Path(path_type=Path))
-@click.option("--format", "output_format", default="markdown", show_default=True,
-              type=click.Choice(["markdown", "html", "latex", "docx", "epub", "pdf", "structured_content", "content_list", "content_list_v2"]))
+@click.option(
+    "--format",
+    "output_format",
+    default="markdown",
+    show_default=True,
+    type=click.Choice(
+        ["markdown", "html", "latex", "docx", "epub", "pdf", "structured_content", "content_list", "content_list_v2"]
+    ),
+)
 @click.option("--pages", "page_range", default="", help="PDF page selection: 1-5, r1, all.")
 @click.option("--overwrite", is_flag=True)
 def convert_command(source: Path, output: Path, output_format: str, page_range: str, overwrite: bool) -> None:

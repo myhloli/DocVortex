@@ -1,0 +1,2400 @@
+{
+  "$defs": {
+    "AlgorithmBodyBlock": {
+      "additionalProperties": false,
+      "description": "保存预格式算法文字与行内公式 Span。",
+      "properties": {
+        "type": {
+          "const": "algorithm_body",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "hyperlink": "#/$defs/HyperlinkSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/HyperlinkSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "AlgorithmBodyBlock",
+      "type": "object"
+    },
+    "ChartAnnotationBlock": {
+      "additionalProperties": false,
+      "description": "图表标题与图表脚注的共享结构。",
+      "properties": {
+        "type": {
+          "enum": [
+            "chart_caption",
+            "chart_footnote"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "hyperlink": "#/$defs/HyperlinkSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/HyperlinkSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "ChartAnnotationBlock",
+      "type": "object"
+    },
+    "ChartBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "chart",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "chart_body": "#/$defs/ChartBodyBlock",
+                "chart_caption": "#/$defs/ChartAnnotationBlock",
+                "chart_footnote": "#/$defs/ChartAnnotationBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ChartBodyBlock"
+              },
+              {
+                "$ref": "#/$defs/ChartAnnotationBlock"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "sub_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sub Type"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "ChartBlock",
+      "type": "object"
+    },
+    "ChartBodyBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "chart_body",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "image_base64": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Base64"
+        },
+        "image_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Path"
+        },
+        "image_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Url"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "ChartBodyBlock",
+      "type": "object"
+    },
+    "CodeAnnotationBlock": {
+      "additionalProperties": false,
+      "description": "代码标题与代码脚注的共享结构。",
+      "properties": {
+        "type": {
+          "enum": [
+            "code_caption",
+            "code_footnote"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "hyperlink": "#/$defs/HyperlinkSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/HyperlinkSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "CodeAnnotationBlock",
+      "type": "object"
+    },
+    "CodeBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "code",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "algorithm_body": "#/$defs/AlgorithmBodyBlock",
+                "code_body": "#/$defs/CodeBodyBlock",
+                "code_caption": "#/$defs/CodeAnnotationBlock",
+                "code_footnote": "#/$defs/CodeAnnotationBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/CodeBodyBlock"
+              },
+              {
+                "$ref": "#/$defs/AlgorithmBodyBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeAnnotationBlock"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "sub_type": {
+          "enum": [
+            "code",
+            "algorithm"
+          ],
+          "title": "Sub Type",
+          "type": "string"
+        },
+        "guess_lang": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guess Lang"
+        }
+      },
+      "required": [
+        "type",
+        "content",
+        "sub_type"
+      ],
+      "title": "CodeBlock",
+      "type": "object"
+    },
+    "CodeBodyBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "code_body",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "CodeBodyBlock",
+      "type": "object"
+    },
+    "CodeInlineSpan": {
+      "additionalProperties": false,
+      "description": "保存需要按字面量显示的行内代码。",
+      "properties": {
+        "type": {
+          "const": "code_inline",
+          "title": "Type",
+          "type": "string"
+        },
+        "content": {
+          "minLength": 1,
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "CodeInlineSpan",
+      "type": "object"
+    },
+    "DocTitleBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "doc_title",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "hyperlink": "#/$defs/HyperlinkSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/HyperlinkSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "anchor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anchor"
+        },
+        "level": {
+          "maximum": 1,
+          "minimum": 1,
+          "title": "Level",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "content",
+        "level"
+      ],
+      "title": "DocTitleBlock",
+      "type": "object"
+    },
+    "EquationBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "equation",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "image_base64": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Base64"
+        },
+        "image_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Path"
+        },
+        "image_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Url"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "EquationBlock",
+      "type": "object"
+    },
+    "EquationInlineSpan": {
+      "additionalProperties": false,
+      "description": "保存不含外层定界符的行内 LaTeX。",
+      "properties": {
+        "type": {
+          "const": "equation_inline",
+          "title": "Type",
+          "type": "string"
+        },
+        "content": {
+          "minLength": 1,
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "EquationInlineSpan",
+      "type": "object"
+    },
+    "HyperlinkSpan": {
+      "additionalProperties": false,
+      "description": "保存安全超链接目标及其非链接行内子节点。",
+      "properties": {
+        "type": {
+          "const": "hyperlink",
+          "title": "Type",
+          "type": "string"
+        },
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Content",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "url",
+        "content"
+      ],
+      "title": "HyperlinkSpan",
+      "type": "object"
+    },
+    "ImageAnnotationBlock": {
+      "additionalProperties": false,
+      "description": "图片标题与图片脚注的共享结构。",
+      "properties": {
+        "type": {
+          "enum": [
+            "image_caption",
+            "image_footnote"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "hyperlink": "#/$defs/HyperlinkSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/HyperlinkSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "ImageAnnotationBlock",
+      "type": "object"
+    },
+    "ImageBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "image",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "image_body": "#/$defs/ImageBodyBlock",
+                "image_caption": "#/$defs/ImageAnnotationBlock",
+                "image_footnote": "#/$defs/ImageAnnotationBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ImageBodyBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageAnnotationBlock"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "sub_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sub Type"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "ImageBlock",
+      "type": "object"
+    },
+    "ImageBodyBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "image_body",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "image_base64": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Base64"
+        },
+        "image_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Path"
+        },
+        "image_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Url"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "ImageBodyBlock",
+      "type": "object"
+    },
+    "IndexBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "index",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "doc_title": "#/$defs/DocTitleBlock",
+                "index": "#/$defs/IndexBlock",
+                "paragraph_title": "#/$defs/ParagraphTitleBlock",
+                "text": "#/$defs/TextBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextBlock"
+              },
+              {
+                "$ref": "#/$defs/DocTitleBlock"
+              },
+              {
+                "$ref": "#/$defs/ParagraphTitleBlock"
+              },
+              {
+                "$ref": "#/$defs/IndexBlock"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "IndexBlock",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "ListBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "list",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "list": "#/$defs/ListBlock",
+                "ref_text": "#/$defs/RefTextBlock",
+                "text": "#/$defs/TextBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextBlock"
+              },
+              {
+                "$ref": "#/$defs/RefTextBlock"
+              },
+              {
+                "$ref": "#/$defs/ListBlock"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "sub_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "text",
+                "ref_text"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sub Type"
+        },
+        "continues_prev": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Continues Prev"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "ListBlock",
+      "type": "object"
+    },
+    "PageAuxTextBlock": {
+      "additionalProperties": false,
+      "description": "页眉、页脚、页码和边栏的共享文本结构。",
+      "properties": {
+        "type": {
+          "enum": [
+            "header",
+            "footer",
+            "page_number",
+            "aside_text"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "hyperlink": "#/$defs/HyperlinkSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/HyperlinkSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "PageAuxTextBlock",
+      "type": "object"
+    },
+    "PageFootnoteBlock": {
+      "additionalProperties": false,
+      "description": "保存需要参与默认输出并可被文档内链接引用的页面脚注。",
+      "properties": {
+        "type": {
+          "const": "page_footnote",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "hyperlink": "#/$defs/HyperlinkSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/HyperlinkSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "anchor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anchor"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "PageFootnoteBlock",
+      "type": "object"
+    },
+    "PageInfo": {
+      "additionalProperties": false,
+      "description": "一页的严格 Middle JSON 内容。",
+      "properties": {
+        "page_idx": {
+          "minimum": 0,
+          "title": "Page Idx",
+          "type": "integer"
+        },
+        "blocks": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "aside_text": "#/$defs/PageAuxTextBlock",
+                "chart": "#/$defs/ChartBlock",
+                "code": "#/$defs/CodeBlock",
+                "doc_title": "#/$defs/DocTitleBlock",
+                "equation": "#/$defs/EquationBlock",
+                "footer": "#/$defs/PageAuxTextBlock",
+                "header": "#/$defs/PageAuxTextBlock",
+                "image": "#/$defs/ImageBlock",
+                "index": "#/$defs/IndexBlock",
+                "list": "#/$defs/ListBlock",
+                "page_footnote": "#/$defs/PageFootnoteBlock",
+                "page_number": "#/$defs/PageAuxTextBlock",
+                "paragraph_title": "#/$defs/ParagraphTitleBlock",
+                "ref_text": "#/$defs/RefTextBlock",
+                "table": "#/$defs/TableBlock",
+                "text": "#/$defs/TextBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextBlock"
+              },
+              {
+                "$ref": "#/$defs/RefTextBlock"
+              },
+              {
+                "$ref": "#/$defs/DocTitleBlock"
+              },
+              {
+                "$ref": "#/$defs/ParagraphTitleBlock"
+              },
+              {
+                "$ref": "#/$defs/PageAuxTextBlock"
+              },
+              {
+                "$ref": "#/$defs/PageFootnoteBlock"
+              },
+              {
+                "$ref": "#/$defs/EquationBlock"
+              },
+              {
+                "$ref": "#/$defs/ListBlock"
+              },
+              {
+                "$ref": "#/$defs/IndexBlock"
+              },
+              {
+                "$ref": "#/$defs/ImageBlock"
+              },
+              {
+                "$ref": "#/$defs/TableBlock"
+              },
+              {
+                "$ref": "#/$defs/ChartBlock"
+              },
+              {
+                "$ref": "#/$defs/CodeBlock"
+              }
+            ]
+          },
+          "title": "Blocks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "page_idx"
+      ],
+      "title": "PageInfo",
+      "type": "object"
+    },
+    "ParagraphTitleBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "paragraph_title",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "hyperlink": "#/$defs/HyperlinkSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/HyperlinkSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "anchor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anchor"
+        },
+        "level": {
+          "maximum": 6,
+          "minimum": 2,
+          "title": "Level",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "content",
+        "level"
+      ],
+      "title": "ParagraphTitleBlock",
+      "type": "object"
+    },
+    "Producer": {
+      "additionalProperties": false,
+      "description": "记录语言无关的文档生产者，避免绑定宿主产品元数据。",
+      "properties": {
+        "name": {
+          "default": "docgale",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "default": "0.1.0",
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "title": "Producer",
+      "type": "object"
+    },
+    "RefTextBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "ref_text",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "hyperlink": "#/$defs/HyperlinkSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/HyperlinkSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "continues_prev": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Continues Prev"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "RefTextBlock",
+      "type": "object"
+    },
+    "TableAnnotationBlock": {
+      "additionalProperties": false,
+      "description": "表格标题与表格脚注的共享结构。",
+      "properties": {
+        "type": {
+          "enum": [
+            "table_caption",
+            "table_footnote"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "hyperlink": "#/$defs/HyperlinkSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/HyperlinkSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "TableAnnotationBlock",
+      "type": "object"
+    },
+    "TableBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "table",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "table_body": "#/$defs/TableBodyBlock",
+                "table_caption": "#/$defs/TableAnnotationBlock",
+                "table_footnote": "#/$defs/TableAnnotationBlock"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TableBodyBlock"
+              },
+              {
+                "$ref": "#/$defs/TableAnnotationBlock"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "continues_prev": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Continues Prev"
+        },
+        "cell_merge": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  0,
+                  1
+                ],
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cell Merge"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "TableBlock",
+      "type": "object"
+    },
+    "TableBodyBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "table_body",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "image_base64": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Base64"
+        },
+        "image_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Path"
+        },
+        "image_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Url"
+        },
+        "content": {
+          "title": "Content",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "TableBodyBlock",
+      "type": "object"
+    },
+    "TextBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "text",
+          "title": "Type",
+          "type": "string"
+        },
+        "index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "maxItems": 4,
+              "minItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bbox"
+        },
+        "content": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code_inline": "#/$defs/CodeInlineSpan",
+                "equation_inline": "#/$defs/EquationInlineSpan",
+                "hyperlink": "#/$defs/HyperlinkSpan",
+                "text": "#/$defs/TextSpan"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TextSpan"
+              },
+              {
+                "$ref": "#/$defs/EquationInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/CodeInlineSpan"
+              },
+              {
+                "$ref": "#/$defs/HyperlinkSpan"
+              }
+            ]
+          },
+          "title": "Content",
+          "type": "array"
+        },
+        "continues_prev": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Continues Prev"
+        },
+        "anchor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anchor"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "TextBlock",
+      "type": "object"
+    },
+    "TextSpan": {
+      "additionalProperties": false,
+      "description": "保存普通行内文字及其可见字体样式。",
+      "properties": {
+        "type": {
+          "const": "text",
+          "title": "Type",
+          "type": "string"
+        },
+        "content": {
+          "minLength": 1,
+          "title": "Content",
+          "type": "string"
+        },
+        "styles": {
+          "items": {
+            "enum": [
+              "bold",
+              "italic",
+              "underline",
+              "emphasis",
+              "strikethrough",
+              "superscript",
+              "subscript"
+            ],
+            "type": "string"
+          },
+          "title": "Styles",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "content"
+      ],
+      "title": "TextSpan",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Analyze 返回的完整严格 Middle JSON 对象。",
+  "properties": {
+    "producer": {
+      "$ref": "#/$defs/Producer"
+    },
+    "extensions": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Extensions",
+      "type": "object"
+    },
+    "pages": {
+      "items": {
+        "$ref": "#/$defs/PageInfo"
+      },
+      "title": "Pages",
+      "type": "array"
+    },
+    "is_full_document": {
+      "title": "Is Full Document",
+      "type": "boolean"
+    },
+    "file_suffix": {
+      "enum": [
+        "pdf",
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "rtf",
+        "csv",
+        "epub",
+        "html",
+        "ofd",
+        "odt",
+        "ods",
+        "odp"
+      ],
+      "title": "File Suffix",
+      "type": "string"
+    },
+    "schema": {
+      "const": "docgale.middle"
+    },
+    "schema_version": {
+      "const": "1.0"
+    }
+  },
+  "required": [
+    "pages",
+    "is_full_document",
+    "file_suffix",
+    "schema",
+    "schema_version",
+    "producer"
+  ],
+  "title": "MiddleJson",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

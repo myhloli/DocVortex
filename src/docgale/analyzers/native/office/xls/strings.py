@@ -160,11 +160,7 @@ def to_rich_text(
         start = utf16_unit_to_index(decoded.text, unit_start)
         end = utf16_unit_to_index(decoded.text, unit_end)
         resolved_font_index = font_index if font_index < 4 else font_index - 1
-        style = (
-            fonts[resolved_font_index]
-            if 0 <= resolved_font_index < len(fonts)
-            else XlsFontStyle()
-        )
+        style = fonts[resolved_font_index] if 0 <= resolved_font_index < len(fonts) else XlsFontStyle()
         if start < end and style != XlsFontStyle():
             runs.append(XlsRichRun(start=start, end=end, style=style))
     return XlsRichText(decoded.text, tuple(runs))

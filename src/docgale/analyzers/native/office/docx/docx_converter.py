@@ -30,8 +30,24 @@ from ..equation.omml import oMath2Latex
 from .office_xml import read_str
 from .....schema import BlockType
 from .formatting_types import Formatting, Script
-from .....content.spans import append_equation_span, append_text_span, extend_inline_spans, inline_span_plain_text, slice_span_dicts, strip_span_dicts, text_spans
-from ..rich_text import append_rich_text_element, build_spans_from_elements, formatting_to_style_str, has_non_visible_text_style, has_visible_style, normalize_format_for_text, should_keep_group_text
+from .....content.spans import (
+    append_equation_span,
+    append_text_span,
+    extend_inline_spans,
+    inline_span_plain_text,
+    slice_span_dicts,
+    strip_span_dicts,
+    text_spans,
+)
+from ..rich_text import (
+    append_rich_text_element,
+    build_spans_from_elements,
+    formatting_to_style_str,
+    has_non_visible_text_style,
+    has_visible_style,
+    normalize_format_for_text,
+    should_keep_group_text,
+)
 
 
 _ParagraphHyperlink: TypeAlias = Optional[Union[AnyUrl, Path, str]]

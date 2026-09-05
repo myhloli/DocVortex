@@ -371,7 +371,7 @@ def _render_scientific(value: float, pattern: str) -> str | None:
     rounded = _decimal_quantize(mantissa, frac_places)
     if abs(rounded) >= 10**int_places:
         exponent += max(int_places, 1)
-        rounded /= Decimal(10**max(int_places, 1))
+        rounded /= Decimal(10 ** max(int_places, 1))
     mantissa_text = f"{rounded:.{frac_places}f}"
     exponent_sign = "+" if exponent >= 0 else "-"
     if match.group(3) == "-" and exponent >= 0:

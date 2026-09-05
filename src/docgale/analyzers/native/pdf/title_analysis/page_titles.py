@@ -9,7 +9,13 @@ import statistics
 from .....schema import BBox
 from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_union_many, _rotate_bbox_to_upright
 from ..inline.types import PDF_FONT_ITALIC_FLAG
-from ..line_layout import _effective_text_row_gap, _font_signatures_share_family, _infer_text_lanes, _line_effective_height, _title_fonts_compatible
+from ..line_layout import (
+    _effective_text_row_gap,
+    _font_signatures_share_family,
+    _infer_text_lanes,
+    _line_effective_height,
+    _title_fonts_compatible,
+)
 from ..models import _DocumentBodyProfile, _DocumentTitleProfile, _LineItem, _TextLane
 from .body_profile import _infer_lane_body_profile, _line_uses_document_regular_font
 from .common import _build_physical_title_gap_map, _line_inside_visual_container, _line_near_visual_container

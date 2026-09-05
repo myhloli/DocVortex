@@ -7,7 +7,20 @@ from typing import Any, Literal, overload
 
 from ..schema import MiddleJson
 
-from .contracts import ContentListRenderOptions, ContentListV2RenderOptions, DocxRenderOptions, EpubRenderOptions, HtmlRenderOptions, LatexRenderOptions, MarkdownRenderOptions, PdfRenderOptions, RenderFormat, RenderOptions, RenderOutput, StructuredContentRenderOptions
+from .contracts import (
+    ContentListRenderOptions,
+    ContentListV2RenderOptions,
+    DocxRenderOptions,
+    EpubRenderOptions,
+    HtmlRenderOptions,
+    LatexRenderOptions,
+    MarkdownRenderOptions,
+    PdfRenderOptions,
+    RenderFormat,
+    RenderOptions,
+    RenderOutput,
+    StructuredContentRenderOptions,
+)
 from .content_list import render_content_list
 from .content_list_v2 import render_content_list_v2
 from .docx import render_docx

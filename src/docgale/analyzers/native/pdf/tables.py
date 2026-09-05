@@ -12,7 +12,14 @@ from typing import Any, Literal
 from loguru import logger
 from ....document.pdf.text.contracts import Char
 
-from .table_recovery import NativeTableInput, NativeTableRectangle, NativeTableRule, coerce_native_table_rectangles, coerce_native_table_rules, recover_native_pdf_table
+from .table_recovery import (
+    NativeTableInput,
+    NativeTableRectangle,
+    NativeTableRule,
+    coerce_native_table_rectangles,
+    coerce_native_table_rules,
+    recover_native_pdf_table,
+)
 from .table_text_styles import render_native_table_html_with_scripts
 from ....foundation.text import merge_text_line_contents
 from .spatial_text import project_pdf_table_text
@@ -21,7 +28,21 @@ from ....document.pdf.document import PDFPathInfo
 from ....foundation.language import detect_lang
 
 from .models import _Fragment, _LineItem, _LocalAxisLine, _PageSource, _TableAnnotation, _TableCandidate, _VisualRow
-from .geometry import _bbox_area, _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_overlap_in_smaller, _bbox_union, _bbox_union_many, _coerce_bbox, _expand_bbox, _point_in_bbox, _rotate_bbox_from_upright, _rotate_bbox_to_upright, _transform_axis_lines
+from .geometry import (
+    _bbox_area,
+    _bbox_axis_overlap_ratio,
+    _bbox_center_x,
+    _bbox_center_y,
+    _bbox_overlap_in_smaller,
+    _bbox_union,
+    _bbox_union_many,
+    _coerce_bbox,
+    _expand_bbox,
+    _point_in_bbox,
+    _rotate_bbox_from_upright,
+    _rotate_bbox_to_upright,
+    _transform_axis_lines,
+)
 from .line_layout import _font_signatures_share_family, _line_effective_height, _line_tight_output_bbox
 from .line_merging import _same_baseline_geometry
 from .native_text import _normalize_native_run_text

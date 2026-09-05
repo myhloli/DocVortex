@@ -12,7 +12,14 @@ import unicodedata
 from ....schema import BBox
 
 from .models import _LineItem, _TextLane
-from .geometry import _bbox_axis_overlap_ratio, _bbox_center_y, _bbox_intersects, _bbox_union_many, _horizontal_bbox_gap, _rotate_bbox_to_upright
+from .geometry import (
+    _bbox_axis_overlap_ratio,
+    _bbox_center_y,
+    _bbox_intersects,
+    _bbox_union_many,
+    _horizontal_bbox_gap,
+    _rotate_bbox_to_upright,
+)
 from .native_text import _fill_native_typography, _median_native_glyph_width
 from .line_layout import _connection_crosses_table, _font_signatures_share_family, _infer_text_lanes, _line_effective_height
 
@@ -359,9 +366,7 @@ def _merge_overlapping_inline_cluster(
         median_glyph_width=host.median_glyph_width,
         leading_emphasis_width=ordered_members[0].leading_emphasis_width,
         leading_typography_width=ordered_members[0].leading_typography_width,
-        paragraph_formula_context=any(
-            line.paragraph_formula_context for line in ordered_members
-        ),
+        paragraph_formula_context=any(line.paragraph_formula_context for line in ordered_members),
         split_from_row=any(line.split_from_row for line in ordered_members),
         preserve_split_boundary=any(line.preserve_split_boundary for line in ordered_members),
         semantic_type=host.semantic_type,
@@ -659,9 +664,7 @@ def _merge_same_baseline_group(
         else None,
         leading_emphasis_width=members[0].leading_emphasis_width,
         leading_typography_width=members[0].leading_typography_width,
-        paragraph_formula_context=any(
-            member.paragraph_formula_context for member in members
-        ),
+        paragraph_formula_context=any(member.paragraph_formula_context for member in members),
         split_from_row=any(member.split_from_row for member in members),
         preserve_split_boundary=any(member.preserve_split_boundary for member in members),
         semantic_type=members[0].semantic_type,
@@ -791,19 +794,12 @@ def _merge_title_resolved_visual_rows(
             members,
             page_size,
         )
-        sparse_short_prefix_text = (
-            _is_sparse_short_prefix_two_run_row(
-                members,
-                page_size,
-            )
+        sparse_short_prefix_text = _is_sparse_short_prefix_two_run_row(
+            members,
+            page_size,
         )
         if semantic_type != "paragraph_title" and not (
-            semantic_type is None
-            and (
-                len(font_signatures) > 1
-                or dense_same_font_text
-                or sparse_short_prefix_text
-            )
+            semantic_type is None and (len(font_signatures) > 1 or dense_same_font_text or sparse_short_prefix_text)
         ):
             continue
         local_geometry = [
@@ -820,11 +816,7 @@ def _merge_title_resolved_visual_rows(
                 _line_effective_height(*previous),
                 current[1],
                 _line_effective_height(*current),
-                maximum_gap=(
-                    5.0
-                    if sparse_short_prefix_text
-                    else 3.0
-                )
+                maximum_gap=(5.0 if sparse_short_prefix_text else 3.0)
                 * max(
                     _line_effective_height(*previous),
                     _line_effective_height(*current),
@@ -1036,19 +1028,12 @@ def _is_sparse_short_prefix_two_run_row(
         _line_effective_height(*first),
         _line_effective_height(*second),
     )
-    local_page_width = (
-        page_size[1]
-        if ordered[0].angle in {90, 270}
-        else page_size[0]
-    )
+    local_page_width = page_size[1] if ordered[0].angle in {90, 270} else page_size[0]
     horizontal_gap = second[1][0] - first[1][2]
     return (
         first[1][2] - first[1][0] <= 2.0 * pair_height
-        and second[1][2] - second[1][0]
-        >= 0.3 * local_page_width
-        and 3.0 * pair_height
-        < horizontal_gap
-        <= 5.0 * pair_height
+        and second[1][2] - second[1][0] >= 0.3 * local_page_width
+        and 3.0 * pair_height < horizontal_gap <= 5.0 * pair_height
         and _same_baseline_geometry(
             first[1],
             _line_effective_height(*first),
@@ -1198,9 +1183,7 @@ def _merge_dense_split_visual_row(
         else None,
         leading_emphasis_width=ordered_members[0].leading_emphasis_width,
         leading_typography_width=ordered_members[0].leading_typography_width,
-        paragraph_formula_context=any(
-            member.paragraph_formula_context for member in ordered_members
-        ),
+        paragraph_formula_context=any(member.paragraph_formula_context for member in ordered_members),
         split_from_row=False,
         preserve_split_boundary=any(member.preserve_split_boundary for member in ordered_members),
         semantic_type=ordered_members[0].semantic_type,

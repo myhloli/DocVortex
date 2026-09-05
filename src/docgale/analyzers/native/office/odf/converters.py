@@ -16,7 +16,13 @@ from .models import InlineNote
 from .package import OdfPackage
 from .styles import OdfStyles
 from .table import OdfTableExpansionBudget, parse_table_grid, split_table_regions, table_grid_to_html
-from .text import OdfBlockParser, OdfMasterPageChange, OdfTextExpansionBudget, collect_emittable_anchor_targets, flatten_block_text
+from .text import (
+    OdfBlockParser,
+    OdfMasterPageChange,
+    OdfTextExpansionBudget,
+    collect_emittable_anchor_targets,
+    flatten_block_text,
+)
 
 
 _LENGTH_RE = re.compile(r"^\s*(?P<value>[+-]?(?:\d+(?:\.\d*)?|\.\d+))(?P<unit>cm|mm|in|pt|pc|px)?\s*$")

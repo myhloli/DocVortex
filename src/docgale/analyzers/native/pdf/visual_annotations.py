@@ -15,7 +15,14 @@ from typing import Any, Literal
 from .._shared.xycut import sort_entries
 from ....schema import BBox
 
-from .geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_union_many, _coerce_bbox, _rotate_bbox_to_upright
+from .geometry import (
+    _bbox_axis_overlap_ratio,
+    _bbox_center_x,
+    _bbox_center_y,
+    _bbox_union_many,
+    _coerce_bbox,
+    _rotate_bbox_to_upright,
+)
 
 
 _VISUAL_BLOCK_TYPES = {"image", "table", "code"}

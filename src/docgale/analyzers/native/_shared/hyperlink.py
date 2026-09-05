@@ -3,7 +3,11 @@
 
 from __future__ import annotations
 
-from ....foundation.hyperlink import DEFAULT_EXTERNAL_HYPERLINK_SCHEMES, OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
+from ....foundation.hyperlink import (
+    DEFAULT_EXTERNAL_HYPERLINK_SCHEMES,
+    OFFICE_EXTERNAL_HYPERLINK_SCHEMES,
+    sanitize_hyperlink_target,
+)
 
 
 __all__ = [

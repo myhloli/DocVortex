@@ -10,7 +10,18 @@ from typing import Any
 
 from .candidate import GridCellSpec, build_candidate
 from .contracts import NativeTableCandidate, NativeTableInput, NativeTableText
-from .geometry import bbox_area, bbox_intersection, clamp, cluster_positions, covered_interval_ratio, normalize_angle, normalize_bbox, page_bbox_to_table_local, rotate_local_bbox, table_local_size
+from .geometry import (
+    bbox_area,
+    bbox_intersection,
+    clamp,
+    cluster_positions,
+    covered_interval_ratio,
+    normalize_angle,
+    normalize_bbox,
+    page_bbox_to_table_local,
+    rotate_local_bbox,
+    table_local_size,
+)
 
 MAX_PRIMITIVES_PER_TABLE = 5000
 MAX_TRACKS_PER_AXIS = 200

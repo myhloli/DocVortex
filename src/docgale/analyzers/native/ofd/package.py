@@ -13,7 +13,17 @@ from zipfile import BadZipFile, ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 from loguru import logger
 from lxml import etree  # type: ignore[reportMissingImports]
 
-from .constants import MAX_ASSET_TOTAL_BYTES, MAX_DOCUMENT_COUNT, MAX_ENTRY_BYTES, MAX_ENTRY_COUNT, MAX_TOTAL_BYTES, MAX_XML_DEPTH, MAX_XML_NODES, OFD_KNOWN_VERSIONS, OFD_NAMESPACES
+from .constants import (
+    MAX_ASSET_TOTAL_BYTES,
+    MAX_DOCUMENT_COUNT,
+    MAX_ENTRY_BYTES,
+    MAX_ENTRY_COUNT,
+    MAX_TOTAL_BYTES,
+    MAX_XML_DEPTH,
+    MAX_XML_NODES,
+    OFD_KNOWN_VERSIONS,
+    OFD_NAMESPACES,
+)
 from .errors import OfdEncryptedError, OfdParseError, OfdResourceLimitError
 from .models import OfdDocumentRef
 

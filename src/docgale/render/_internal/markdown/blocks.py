@@ -12,10 +12,43 @@ from ..common.list_items import has_markdown_unordered_marker, reference_list_ne
 from ..common.planner import PlannedBlock
 from .assets import build_markdown_image, resolve_image_source
 from .escaping import escape_standalone_marker_rule, escape_text_block_markdown_prefix
-from .inline import render_inline_content, render_inline_spans, render_inline_spans_in_html_context, render_internal_link, render_joined_inline_contents
+from .inline import (
+    render_inline_content,
+    render_inline_spans,
+    render_inline_spans_in_html_context,
+    render_internal_link,
+    render_joined_inline_contents,
+)
 from .table import _strip_embedded_images, format_embedded_html, render_html_table
 from ...contracts import ImageRenderer
-from ....schema import RAW_ALGORITHM, AlgorithmBodyBlock, BlockType, ChartAnnotationBlock, ChartBlock, ChartBodyBlock, CodeAnnotationBlock, CodeBlock, CodeBodyBlock, DocTitleBlock, EquationBlock, ImageAnnotationBlock, ImageBlock, ImageBodyBlock, InlineSpan, IndexBlock, ListBlock, PageAuxTextBlock, PageFootnoteBlock, PageBlock, ParagraphTitleBlock, RefTextBlock, TableAnnotationBlock, TableBlock, TableBodyBlock, TextBlock
+from ....schema import (
+    RAW_ALGORITHM,
+    AlgorithmBodyBlock,
+    BlockType,
+    ChartAnnotationBlock,
+    ChartBlock,
+    ChartBodyBlock,
+    CodeAnnotationBlock,
+    CodeBlock,
+    CodeBodyBlock,
+    DocTitleBlock,
+    EquationBlock,
+    ImageAnnotationBlock,
+    ImageBlock,
+    ImageBodyBlock,
+    InlineSpan,
+    IndexBlock,
+    ListBlock,
+    PageAuxTextBlock,
+    PageFootnoteBlock,
+    PageBlock,
+    ParagraphTitleBlock,
+    RefTextBlock,
+    TableAnnotationBlock,
+    TableBlock,
+    TableBodyBlock,
+    TextBlock,
+)
 
 _VALID_CODE_LANGUAGE_RE = re.compile(r"[A-Za-z0-9_.+#-]+")
 

@@ -76,9 +76,7 @@ def _extract_index_blocks(
                 for line in row.members:
                     line.semantic_type = BlockType.INDEX
                     claimed_line_ids.add(id(line))
-            candidate_lines = [
-                line for row in candidate for line in row.members
-            ]
+            candidate_lines = [line for row in candidate for line in row.members]
             block: dict[str, object] = {
                 "type": BlockType.INDEX,
                 "bbox": _bbox_union_many([line.bbox for line in candidate_lines]),

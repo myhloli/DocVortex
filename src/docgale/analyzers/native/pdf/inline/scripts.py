@@ -11,7 +11,18 @@ from .....schema import BBox
 from ..geometry import _rotate_bbox_to_upright
 from ..script_geometry import ScriptRole, classify_char_script_roles
 from .common import _coerce_bbox, _normalize_match_fragment, _ordered_line_chars
-from .types import _PDF_SCRIPT_AUTHOR_MARKS, _PDF_SCRIPT_CITATION_BRACKETS, _PDF_SCRIPT_COMPACT_JOINERS, _PDF_SCRIPT_MATH_BASE_CHARS, _PDF_SCRIPT_SIGN_CHARS, _PDF_SCRIPT_SPACED_OPERATORS, _PDF_SCRIPT_TOKEN_CONNECTORS, _PDF_SCRIPT_TRAILING_MARKS, PDFTextScriptLine, PDFTextScriptRange
+from .types import (
+    _PDF_SCRIPT_AUTHOR_MARKS,
+    _PDF_SCRIPT_CITATION_BRACKETS,
+    _PDF_SCRIPT_COMPACT_JOINERS,
+    _PDF_SCRIPT_MATH_BASE_CHARS,
+    _PDF_SCRIPT_SIGN_CHARS,
+    _PDF_SCRIPT_SPACED_OPERATORS,
+    _PDF_SCRIPT_TOKEN_CONNECTORS,
+    _PDF_SCRIPT_TRAILING_MARKS,
+    PDFTextScriptLine,
+    PDFTextScriptRange,
+)
 
 
 def _rotate_origin_to_upright(

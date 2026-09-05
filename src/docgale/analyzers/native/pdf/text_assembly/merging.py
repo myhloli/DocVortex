@@ -9,7 +9,28 @@ from typing import Any
 
 from .....schema import BBox
 from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_y, _bbox_union_many, _rotate_bbox_from_upright
-from .common import _FIGURE_CAPTION_MARKER_RE, _INLINE_MATH_RECOVERY_MARKER, _LABELLED_METADATA_RE, _LIST_ITEM_RE, _PARAGRAPH_FORMULA_CONTEXT_MARKER, _SHORT_SAME_BASELINE_PREFIX_RE, _URL_LINE_RE, _block_starts_with_short_wide_rows, _compatible_component_lane_width, _component_connection_skips_block, _component_declared_lane_interval, _component_lane_interval, _components_share_lane_role, _find_short_opener_pairs, _has_parallel_text_component, _merge_internal_text_block_group, _merge_text_line_content, _nearest_following_text_component, _nearest_tapered_tail_component, _text_component_sort_key
+from .common import (
+    _FIGURE_CAPTION_MARKER_RE,
+    _INLINE_MATH_RECOVERY_MARKER,
+    _LABELLED_METADATA_RE,
+    _LIST_ITEM_RE,
+    _PARAGRAPH_FORMULA_CONTEXT_MARKER,
+    _SHORT_SAME_BASELINE_PREFIX_RE,
+    _URL_LINE_RE,
+    _block_starts_with_short_wide_rows,
+    _compatible_component_lane_width,
+    _component_connection_skips_block,
+    _component_declared_lane_interval,
+    _component_lane_interval,
+    _components_share_lane_role,
+    _find_short_opener_pairs,
+    _has_parallel_text_component,
+    _merge_internal_text_block_group,
+    _merge_text_line_content,
+    _nearest_following_text_component,
+    _nearest_tapered_tail_component,
+    _text_component_sort_key,
+)
 
 
 def _merge_short_same_baseline_prefix_blocks(

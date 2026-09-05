@@ -39,9 +39,7 @@ class RecordBudget:
 
         self.count += 1
         if self.count > MAX_RECORDS:
-            raise LegacyOfficeResourceLimitError(
-                f"workbook stream exceeds max_records={MAX_RECORDS}"
-            )
+            raise LegacyOfficeResourceLimitError(f"workbook stream exceeds max_records={MAX_RECORDS}")
 
 
 def record_at(
@@ -134,10 +132,7 @@ class SegmentReader:
     def normalize(self) -> None:
         """跳过已经耗尽的 segments。"""
 
-        while (
-            self.segment_index < len(self.segments)
-            and self.offset >= len(self.segments[self.segment_index])
-        ):
+        while self.segment_index < len(self.segments) and self.offset >= len(self.segments[self.segment_index]):
             self.segment_index += 1
             self.offset = 0
 
@@ -160,7 +155,7 @@ class SegmentReader:
         end = self.offset + size
         if end > len(segment):
             return None
-        output = segment[self.offset:end]
+        output = segment[self.offset : end]
         self.offset = end
         return output
 

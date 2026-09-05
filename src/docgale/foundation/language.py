@@ -1,6 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
 import os
-from pathlib import Path
 import unicodedata
 
 DEFAULT_CODE_LANGUAGE = "txt"

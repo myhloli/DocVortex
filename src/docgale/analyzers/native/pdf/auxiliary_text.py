@@ -14,7 +14,19 @@ from typing import Literal
 from ....schema import BBox
 
 from .models import _AxisLine, _LineItem, _LocalAxisLine, _MarginalCandidate, _PageSource, _PreparedPage, _TextLane
-from .geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_intersects, _bbox_union_many, _clip_bbox, _coerce_bbox, _expand_bbox, _horizontal_bbox_gap, _rotate_bbox_to_upright, _transform_axis_lines
+from .geometry import (
+    _bbox_axis_overlap_ratio,
+    _bbox_center_x,
+    _bbox_center_y,
+    _bbox_intersects,
+    _bbox_union_many,
+    _clip_bbox,
+    _coerce_bbox,
+    _expand_bbox,
+    _horizontal_bbox_gap,
+    _rotate_bbox_to_upright,
+    _transform_axis_lines,
+)
 from .line_layout import _effective_text_row_gap, _infer_text_lanes, _line_effective_height
 
 _PAGE_NUMBER_RE = re.compile(

@@ -7,7 +7,15 @@ import math
 from typing import Any, Iterable, cast
 
 from .....schema import BBox
-from .types import _LIGATURE_REPLACEMENTS, _PDF_CONTROL_CHAR_RE, _PDF_SEPARATOR_SPACE_CHARS, _PDF_ZERO_WIDTH_CHARS, PDF_TEXT_STYLE_ORDER, PDFTextStyle, PDFTextStyleLine
+from .types import (
+    _LIGATURE_REPLACEMENTS,
+    _PDF_CONTROL_CHAR_RE,
+    _PDF_SEPARATOR_SPACE_CHARS,
+    _PDF_ZERO_WIDTH_CHARS,
+    PDF_TEXT_STYLE_ORDER,
+    PDFTextStyle,
+    PDFTextStyleLine,
+)
 
 
 def _style_line_reading_order_key(

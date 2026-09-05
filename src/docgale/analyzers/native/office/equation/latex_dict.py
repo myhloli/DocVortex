@@ -82,9 +82,9 @@ CHR_BO = {
 
 T = {
     # Whitespace characters
-    " ": " ",   # NON-BREAKING SPACE (U+00A0) — pylatexenc maps this to "~" (text-mode),
-                   # which escape_latex would mangle to "\~" (invalid in math mode);
-                   # use a plain space instead.
+    " ": " ",  # NON-BREAKING SPACE (U+00A0) — pylatexenc maps this to "~" (text-mode),
+    # which escape_latex would mangle to "\~" (invalid in math mode);
+    # use a plain space instead.
     # Greek letters
     "\U0001d6fc": "\\alpha ",
     "\U0001d6fd": "\\beta ",
@@ -153,29 +153,29 @@ T = {
     "\u00b1": "\\pm ",
     "\u2213": "\\mp ",
     # Characters whose pylatexenc text-mode mappings are invalid in math environments
-    "\u00f0": "\\eth ",          # ð LATIN SMALL LETTER ETH — pylatexenc: \dh (tipa, not in KaTeX/MathJax)
-    "\u0131": "\\imath ",        # ı LATIN SMALL LETTER DOTLESS I — pylatexenc: \i (text-mode only)
-    "\u2127": "\\mho ",          # ℧ INVERTED OHM SIGN — pylatexenc: \textmho (textcomp, not in KaTeX/MathJax)
-    "\u212e": "e",               # ℮ ESTIMATED SIGN — pylatexenc: \textestimated (no math equivalent; use 'e')
+    "\u00f0": "\\eth ",  # ð LATIN SMALL LETTER ETH — pylatexenc: \dh (tipa, not in KaTeX/MathJax)
+    "\u0131": "\\imath ",  # ı LATIN SMALL LETTER DOTLESS I — pylatexenc: \i (text-mode only)
+    "\u2127": "\\mho ",  # ℧ INVERTED OHM SIGN — pylatexenc: \textmho (textcomp, not in KaTeX/MathJax)
+    "\u212e": "e",  # ℮ ESTIMATED SIGN — pylatexenc: \textestimated (no math equivalent; use 'e')
     "\u00c5": "\\mathring{A} ",  # Å LATIN CAPITAL LETTER A WITH RING — pylatexenc: \r{A} (text-mode only)
-    "\u2103": "\\text{°C}",       # ℃ DEGREE CELSIUS — pylatexenc: \textcelsius (textcomp, not in KaTeX/MathJax)
+    "\u2103": "\\text{°C}",  # ℃ DEGREE CELSIUS — pylatexenc: \textcelsius (textcomp, not in KaTeX/MathJax)
     # Multiplication/division operators (text-mode pylatexenc mappings overridden to math-mode)
-    "\u00b7": "\\cdot ",   # MIDDLE DOT (·) — common in Chinese scientific notation
-    "\u22c5": "\\cdot ",   # DOT OPERATOR (⋅)
-    "\u2219": "\\bullet ", # BULLET OPERATOR (∙)
+    "\u00b7": "\\cdot ",  # MIDDLE DOT (·) — common in Chinese scientific notation
+    "\u22c5": "\\cdot ",  # DOT OPERATOR (⋅)
+    "\u2219": "\\bullet ",  # BULLET OPERATOR (∙)
     "\u00d7": "\\times ",  # MULTIPLICATION SIGN (×)
-    "\u00f7": "\\div ",    # DIVISION SIGN (÷)
-    "\u2212": "-",         # MINUS SIGN (−)
-    "\u2010": "-",         # HYPHEN
-    "\u2011": "-",         # NON-BREAKING HYPHEN
-    "\u2012": "-",         # FIGURE DASH
-    "\u2013": "-",         # EN DASH
-    "\u2014": "-",         # EM DASH
-    "\u2015": "-",         # HORIZONTAL BAR
+    "\u00f7": "\\div ",  # DIVISION SIGN (÷)
+    "\u2212": "-",  # MINUS SIGN (−)
+    "\u2010": "-",  # HYPHEN
+    "\u2011": "-",  # NON-BREAKING HYPHEN
+    "\u2012": "-",  # FIGURE DASH
+    "\u2013": "-",  # EN DASH
+    "\u2014": "-",  # EM DASH
+    "\u2015": "-",  # HORIZONTAL BAR
     # Degree / prime — avoid ^{} syntax since escape_latex will mangle bare ^ and braces
-    "\u00b0": "\\circ ",   # DEGREE SIGN (°) — caller's context (e.g. 90°) provides the ^
-    "\u2032": "'",         # PRIME (′)
-    "\u2033": "''",        # DOUBLE PRIME (″)
+    "\u00b0": "\\circ ",  # DEGREE SIGN (°) — caller's context (e.g. 90°) provides the ^
+    "\u2032": "'",  # PRIME (′)
+    "\u2033": "''",  # DOUBLE PRIME (″)
     # Superscript digits — avoid \texttwosuperior / \textthreesuperior from pylatexenc
     "\u00b2": "2",
     "\u00b3": "3",
@@ -183,20 +183,20 @@ T = {
     # Big operators as plain text characters — pylatexenc maps some to non-KaTeX commands
     # (e.g. ∯→\surfintegral, ∰→\volintegral, ∱→\clwintegral) which don't render in KaTeX/MathJax.
     # Override with standard KaTeX-compatible commands; if no KaTeX equivalent exists, keep Unicode.
-    "\u222f": "\\oiint ",          # ∯ SURFACE INTEGRAL — pylatexenc: \surfintegral (not in KaTeX)
-    "\u2230": "\\oiiint ",         # ∰ VOLUME INTEGRAL — pylatexenc: \volintegral (not in KaTeX)
-    "\u2231": "\u2231",            # ∱ CLOCKWISE INTEGRAL — pylatexenc: \clwintegral (not in KaTeX); keep Unicode
-    "\u2232": "\u2232",            # ∲ CLOCKWISE CONTOUR INTEGRAL — no KaTeX equivalent; keep Unicode
-    "\u2233": "\u2233",            # ∳ ANTICLOCKWISE CONTOUR INTEGRAL — no KaTeX equivalent; keep Unicode
+    "\u222f": "\\oiint ",  # ∯ SURFACE INTEGRAL — pylatexenc: \surfintegral (not in KaTeX)
+    "\u2230": "\\oiiint ",  # ∰ VOLUME INTEGRAL — pylatexenc: \volintegral (not in KaTeX)
+    "\u2231": "\u2231",  # ∱ CLOCKWISE INTEGRAL — pylatexenc: \clwintegral (not in KaTeX); keep Unicode
+    "\u2232": "\u2232",  # ∲ CLOCKWISE CONTOUR INTEGRAL — no KaTeX equivalent; keep Unicode
+    "\u2233": "\u2233",  # ∳ ANTICLOCKWISE CONTOUR INTEGRAL — no KaTeX equivalent; keep Unicode
     # N-ary operators: ⨀⨁⨂ have KaTeX commands; ⨃⨄ do not — keep Unicode for those
-    "\u2a00": "\\bigodot ",        # ⨀ N-ARY CIRCLED DOT OPERATOR
-    "\u2a01": "\\bigoplus ",       # ⨁ N-ARY CIRCLED PLUS OPERATOR
-    "\u2a02": "\\bigotimes ",      # ⨂ N-ARY CIRCLED TIMES OPERATOR
-    "\u2a03": "\u2a03",            # ⨃ N-ARY UNION WITH DOT — no exact KaTeX equivalent; keep Unicode
-    "\u2a04": "\u2a04",            # ⨄ N-ARY UNION WITH PLUS — no exact KaTeX equivalent; keep Unicode
+    "\u2a00": "\\bigodot ",  # ⨀ N-ARY CIRCLED DOT OPERATOR
+    "\u2a01": "\\bigoplus ",  # ⨁ N-ARY CIRCLED PLUS OPERATOR
+    "\u2a02": "\\bigotimes ",  # ⨂ N-ARY CIRCLED TIMES OPERATOR
+    "\u2a03": "\u2a03",  # ⨃ N-ARY UNION WITH DOT — no exact KaTeX equivalent; keep Unicode
+    "\u2a04": "\u2a04",  # ⨄ N-ARY UNION WITH PLUS — no exact KaTeX equivalent; keep Unicode
     # Wave arrows — pylatexenc: \arrowwaveleft / \arrowwaveright (not in KaTeX); keep Unicode
-    "\u219c": "\u219c",            # ↜ LEFTWARDS WAVE ARROW
-    "\u219d": "\u219d",            # ↝ RIGHTWARDS WAVE ARROW
+    "\u219c": "\u219c",  # ↜ LEFTWARDS WAVE ARROW
+    "\u219d": "\u219d",  # ↝ RIGHTWARDS WAVE ARROW
     # Italic, Latin, uppercase
     "\U0001d434": "A",
     "\U0001d435": "B",
