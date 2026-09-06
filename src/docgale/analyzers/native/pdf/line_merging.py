@@ -524,6 +524,8 @@ def _can_merge_same_baseline_pair(
         return False
     if first.visual_row_id == second.visual_row_id and (first.split_from_row or second.split_from_row):
         return False
+    if _consecutive_source_row(first, second):
+        return not _connection_crosses_table(first.bbox, second.bbox, table_bboxes)
     first_height = _line_effective_height(first, first_bbox)
     second_height = _line_effective_height(second, second_bbox)
     has_compatible_dominant_font = not (
@@ -546,6 +548,44 @@ def _can_merge_same_baseline_pair(
         second_bbox,
         second_height,
     ) and not _connection_crosses_table(first.bbox, second.bbox, table_bboxes)
+
+
+def _consecutive_source_row(first: _LineItem, second: _LineItem) -> bool:
+    """以连续源字符和原始行框验证同行，避免替代字形的 ink 修复扩大字体间隙。"""
+    if first.angle != 0 or second.angle != 0 or first.baseline is None or second.baseline is None:
+        return False
+    if first.preserve_split_boundary or second.preserve_split_boundary or not first.chars or not second.chars:
+        return False
+    first_box, second_box = first.source_bbox, second.source_bbox
+    if first_box is None or second_box is None:
+        return False
+    first_height, second_height = first_box[3] - first_box[1], second_box[3] - second_box[1]
+    # 原始大框可能覆盖整条分式，仍须有相近基线才能按普通同行处理。
+    if abs(first.baseline - second.baseline) > 0.25 * min(first_height, second_height):
+        return False
+    if not _same_baseline_geometry(first_box, first_height, second_box, second_height):
+        return False
+    font_sizes = [
+        [
+            float(size)
+            for char in line.chars
+            if isinstance(size := (char.get("font") or {}).get("size"), (int, float)) and size > 0
+        ]
+        for line in (first, second)
+    ]
+    if not all(font_sizes):
+        return False
+    first_size, second_size = (statistics.median(sizes) for sizes in font_sizes)
+    # 上下标虽可能与宿主框相交，字号不同的片段仍交给二维公式恢复。
+    if max(first_size, second_size) > 1.2 * min(first_size, second_size):
+        return False
+    left, right = sorted((first, second), key=lambda line: line.bbox[0])
+    left_indices = [index for char in left.chars for index in char.get("source_indices", (char.get("char_idx"),))]
+    right_indices = [index for char in right.chars for index in char.get("source_indices", (char.get("char_idx"),))]
+    # 最多容许一个 PDFium 空格；跨行或跨阅读顺序的 run 不以字形距离强行合并。
+    if not left_indices or not right_indices or not all(isinstance(index, int) for index in left_indices + right_indices):
+        return False
+    return 1 <= min(right_indices) - max(left_indices) <= 2
 
 
 def _touching_same_baseline_geometry(

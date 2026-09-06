@@ -41,7 +41,7 @@ from .line_layout import (
     _line_tight_output_bbox,
     _lines_tight_output_bbox,
 )
-from .line_merging import _join_formula_visual_row
+from .line_merging import _join_formula_visual_row, _merge_overlapping_inline_cluster
 
 
 _FORMULA_NUMBER_SUFFIX_RE = re.compile(r"^(?P<prefix>.*?)(?P<marker>[(（﹙][^()（）﹙﹚\r\n]+[)）﹚])\s*$")
@@ -520,6 +520,7 @@ def _build_formula_like_blocks(
         table_bboxes,
         page_size,
     )
+    paragraph_lines: list[_LineItem] = []
     for angle in sorted({line.angle for line in lines}):
         angle_geometry = [
             (line, _rotate_bbox_to_upright(line.bbox, page_size, angle))
@@ -676,6 +677,9 @@ def _build_formula_like_blocks(
                 ):
                     for member_line, _member_bbox in members:
                         member_line.paragraph_formula_context = True
+                    if _fragmented_left_prose(members, lane, median_height):
+                        paragraph_lines.append(_merge_paragraph_formula_members(members, page_size, median_height))
+                        claimed_source_indices.update(line.source_index for line, _bbox in members)
                     continue
                 if len(members) < 2:
                     continue
@@ -722,7 +726,7 @@ def _build_formula_like_blocks(
         if line.source_index not in claimed_source_indices
         and (not line.formula_candidate_only or line.paragraph_formula_context)
     ]
-    return blocks, remaining_lines
+    return blocks, remaining_lines + paragraph_lines
 
 
 def _formula_line_has_math_operator(text: str) -> bool:
@@ -753,16 +757,55 @@ def _formula_component_has_left_prose(
     """识别贴栏左缘且在首个运算符前带同行正文的伪行间公式。"""
 
     for line, bbox in members:
-        if abs(bbox[0] - lane.left) > 0.75 * median_height:
-            continue
         normalized = unicodedata.normalize("NFKC", line.text).strip()
         operator_positions = [index for index, character in enumerate(normalized) if character in _FORMULA_OPERATOR_CHARS]
         if not operator_positions:
             continue
         prefix = normalized[: min(operator_positions)]
-        if _formula_prefix_has_prose(prefix):
+        if not _formula_prefix_has_prose(prefix):
+            continue
+        if abs(bbox[0] - lane.left) <= 0.75 * median_height:
+            return True
+    return _fragmented_left_prose(members, lane, median_height)
+
+
+def _fragmented_left_prose(members: list[tuple[_LineItem, BBox]], lane: _TextLane, median_height: float) -> bool:
+    """运算符前的正文被拆成多个 run 时，沿同行邻接找到栏左缘的正文证据。"""
+    for line, bbox in members:
+        normalized = unicodedata.normalize("NFKC", line.text).strip()
+        positions = [index for index, character in enumerate(normalized) if character in _FORMULA_OPERATOR_CHARS]
+        if not positions or not _formula_prefix_has_prose(normalized[: min(positions)]):
+            continue
+        if any(
+            other is not line
+            and abs(other_bbox[0] - lane.left) <= 0.75 * median_height
+            and 0 <= bbox[0] - other_bbox[2] <= 0.75 * median_height
+            and _bbox_axis_overlap_ratio(bbox, other_bbox, axis="y") >= 0.7
+            for other, other_bbox in members
+        ):
             return True
     return False
+
+
+def _merge_paragraph_formula_members(
+    members: list[tuple[_LineItem, BBox]], page_size: tuple[float, float], median_height: float
+) -> _LineItem:
+    """把已确认的行内分式按重叠视觉行恢复顺序，避免字形高度差把正文前缀排到分子之后。"""
+    rows: list[list[tuple[_LineItem, BBox]]] = []
+    for item in sorted(members, key=lambda item: (item[1][1], item[1][0])):
+        match = next(
+            (row for row in rows if any(_bbox_axis_overlap_ratio(item[1], other[1], axis="y") >= 0.55 for other in row)),
+            None,
+        )
+        if match is None:
+            rows.append([item])
+        else:
+            match.append(item)
+    merged = _merge_overlapping_inline_cluster(members, page_size, median_height, compact_formula_cluster=False)
+    merged.text = " ".join(_join_formula_visual_row(row, page_size) for row in rows)
+    merged.paragraph_formula_context = True
+    merged.formula_candidate_only = False
+    return merged
 
 
 def _formula_component_has_isolated_numbered_fraction(
