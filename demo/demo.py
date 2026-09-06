@@ -13,7 +13,7 @@ def run_demo(input_path: Path, output_dir: Path, *, page_range: str = "", overwr
     """解析一次后复用结果导出，结果包可在没有源文件的环境中恢复。"""
     result = parse(input_path, page_range=page_range, keep_model_json=True)
     markdown = result.export(output_dir / f"{input_path.stem}.md", overwrite=overwrite)
-    bundle = result.save_bundle(output_dir / f"{input_path.stem}.docgale.zip", overwrite=overwrite)
+    bundle = result.save_bundle(output_dir / f"{input_path.stem}.docgale", overwrite=overwrite)
     print(f"Markdown: {markdown.path}")
     print(f"Bundle: {bundle.path}")
 
