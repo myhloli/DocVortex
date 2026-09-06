@@ -11,3 +11,7 @@ build/
 .baseline/
 .baseline-*.log
 .DS_Store
+
+# Generated demonstration outputs
+/demo/output/
+/output/

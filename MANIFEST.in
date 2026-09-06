@@ -4,6 +4,6 @@ recursive-include schemas *.json
 recursive-include docs *.md
 include tools/__init__.py tools/build_html_css.py tools/capture_baseline.py
 recursive-include tests *.py *.json *.pdf *.xor *.rtf
-recursive-include demo *.pdf *.doc *.docx *.ppt *.pptx *.xls *.xlsx *.rtf
+recursive-include demo *.py *.md *.pdf *.doc *.docx *.ppt *.pptx *.xls *.xlsx *.rtf
 recursive-include src/docgale/resources *
 global-exclude __pycache__ *.py[cod] .DS_Store

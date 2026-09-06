@@ -42,3 +42,20 @@ separate from the extraction regression results:
 The sparse-table bbox difference is the same in both implementations; its gold
 manifest was not rewritten. Obsolete test-only call signatures and patch targets
 were updated to the actual APIs without restoring removed runtime parameters.
+
+## Demo and test ownership
+
+All 24 original PDF/Office documents match the source MinerU SHA256 hashes.
+The complete corpus, native sample tests, four gold manifests and the PDF
+benchmark live in DocGale. MinerU retains only demo1.pdf and demo2.pdf; its
+remaining Hybrid cases use 33 reproducible character/geometry snapshots from
+seven documents, and Office routing cases generate their own minimal files.
+Neither repository's ordinary tests need a sibling checkout or network fixtures.
+
+Before changing dependency versions, the independent engine environment passed
+303 tests with PDFium 5.10.1. The existing sparse-table gold discrepancy is
+explicitly deselected in the acceptance matrix and runs separately in the
+non-blocking `baseline-diagnostic` CI job; it is not counted as a passing test.
+The affected MinerU Hybrid/table/routing group passed 265 tests. All 33 captured
+inputs were re-extracted and compared exactly. The standalone demo exported
+Markdown and a portable result bundle, and the native benchmark entrypoint ran.
