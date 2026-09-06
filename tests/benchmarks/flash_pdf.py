@@ -105,12 +105,15 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
     }
     del pages, middle, output
     if profile:
+        import docgale
+
+        package_root = Path(docgale.__file__).resolve().parent
         profiler = cProfile.Profile()
         profiler.runcall(_predict, payload)
         stats = pstats.Stats(profiler)
         result["profile"] = [
             {
-                "file": str(Path(filename).relative_to(ROOT)),
+                "file": "docgale/" + Path(filename).relative_to(package_root).as_posix(),
                 "line": line,
                 "function": name,
                 "calls": values[1],
@@ -198,11 +201,15 @@ def main() -> None:
             if expected != record["page_fingerprints"] or expected_bbox != record["bbox_fingerprints"]:
                 history_differences.append(record["path"])
     report = {
-        "git_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-        "git_status": subprocess.check_output(["git", "status", "--short"], cwd=ROOT, text=True),
+        "git_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        if (ROOT / ".git").exists()
+        else None,
+        "git_status": subprocess.check_output(["git", "status", "--short"], cwd=ROOT, text=True)
+        if (ROOT / ".git").exists()
+        else None,
         "python": sys.version,
         "platform": platform.platform(),
-        "dependencies": {name: importlib.metadata.version(name) for name in ("pdftext", "pypdfium2", "numpy", "pydantic")},
+        "dependencies": {name: importlib.metadata.version(name) for name in ("docgale", "pypdfium2", "numpy", "pydantic")},
         "runs": args.runs,
         "historical_baseline_sha": manifest["baseline_git_sha"],
         "historical_differences": history_differences,

@@ -86,3 +86,9 @@ resolution succeeds for Linux x86_64, Windows x86_64 and macOS Apple Silicon 14+
 The macOS floor comes from the available ONNX Runtime wheels. CI runs the full
 five-version, three-platform matrix and additional Pydantic 2.12.5 jobs on
 Python 3.10 and 3.14, while the normal matrix resolves newer allowed versions.
+
+An additional POSIX benchmark smoke test runs a real one-page sample and its
+profiler in an independent Python 3.14 environment. It verifies that metadata
+uses DocGale instead of pdftext and that profile paths are package-relative.
+The CI suite now includes this test (skipped on Windows, where POSIX resource
+accounting is unavailable).
