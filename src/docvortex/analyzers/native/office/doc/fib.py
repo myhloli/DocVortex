@@ -1,4 +1,3 @@
-
 """读取 Word 97–2003 WordDocument stream 中的变长 FIB。"""
 
 from __future__ import annotations

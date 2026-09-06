@@ -1,4 +1,3 @@
-
 """解析 Word CHPX/PAPX FKP 页面并提供按 FC 查询的格式 run。"""
 
 from __future__ import annotations

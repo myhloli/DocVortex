@@ -1,4 +1,3 @@
-
 """检测 Form、矢量图形和栅格图片并认领内部文本。"""
 
 from __future__ import annotations

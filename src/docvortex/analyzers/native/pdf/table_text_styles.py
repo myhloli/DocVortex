@@ -1,4 +1,3 @@
-
 """使用 PDF 原生字符几何为高置信表格 HTML 恢复上下标。"""
 
 from __future__ import annotations

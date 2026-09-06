@@ -1,4 +1,3 @@
-
 """解析 DOC 标准书签名称及其主文档 CP 范围。"""
 
 from __future__ import annotations

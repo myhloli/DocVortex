@@ -1,4 +1,3 @@
-
 """Flash 原生 PDF 提取使用的内部数据模型。"""
 
 from __future__ import annotations

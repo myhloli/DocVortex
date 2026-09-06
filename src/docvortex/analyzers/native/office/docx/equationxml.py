@@ -1,4 +1,3 @@
-
 """DOCX 兼容模式 VML ``equationxml`` 公式解码器。"""
 
 from __future__ import annotations

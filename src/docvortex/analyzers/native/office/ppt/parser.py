@@ -1,4 +1,3 @@
-
 """PowerPoint 97–2003 二进制文档的分页语义解析器。"""
 
 from __future__ import annotations

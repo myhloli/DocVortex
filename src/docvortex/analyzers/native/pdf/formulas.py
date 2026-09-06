@@ -1,4 +1,3 @@
-
 """按空间关系检测并物化原生 PDF 公式块。"""
 
 from __future__ import annotations

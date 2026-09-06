@@ -1,4 +1,3 @@
-
 """DOC 二进制结构使用的有界整数、PLC 和记录预算工具。"""
 
 from __future__ import annotations

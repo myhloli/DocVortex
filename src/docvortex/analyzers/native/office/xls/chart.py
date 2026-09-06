@@ -1,4 +1,3 @@
-
 """解析 BIFF chart BRAI 中的简单单元格引用。"""
 
 from __future__ import annotations

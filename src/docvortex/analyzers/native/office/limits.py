@@ -1,4 +1,3 @@
-
 """Flash Office 二进制、嵌入对象与 RTF 解析共享的固定安全限制。"""
 
 from typing import Final

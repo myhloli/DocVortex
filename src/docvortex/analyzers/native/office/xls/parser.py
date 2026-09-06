@@ -1,4 +1,3 @@
-
 """纯 Python 解析 Excel 97–2003 Workbook BIFF stream。"""
 
 from __future__ import annotations

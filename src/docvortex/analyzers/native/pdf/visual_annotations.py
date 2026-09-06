@@ -1,4 +1,3 @@
-
 """识别独立视觉块的强规则 caption/footnote，并构造局部阅读区域。"""
 
 from __future__ import annotations

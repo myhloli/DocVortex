@@ -1,4 +1,3 @@
-
 """Excel 数值格式解析与稳定显示文本生成。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-
 """把 WordDocument/Table/Data streams 解析为逐 section DOC 语义模型。"""
 
 from __future__ import annotations

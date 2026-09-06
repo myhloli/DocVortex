@@ -1,4 +1,3 @@
-
 """有界读取 MS-PPT 与 OfficeArt 记录流。"""
 
 from __future__ import annotations

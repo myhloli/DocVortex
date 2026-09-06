@@ -1,4 +1,3 @@
-
 """将 PDF 原生字符重建为带排版信息的视觉文本行。"""
 
 from __future__ import annotations

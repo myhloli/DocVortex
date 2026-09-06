@@ -1,4 +1,3 @@
-
 """把 Word 97–2003 语义模型转换为 DocVortex 分页 model-list。"""
 
 from __future__ import annotations

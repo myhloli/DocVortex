@@ -1,4 +1,3 @@
-
 """Flash 原生 PDF 提取使用的纯几何工具。"""
 
 from __future__ import annotations

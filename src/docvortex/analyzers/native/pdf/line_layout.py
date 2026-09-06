@@ -1,4 +1,3 @@
-
 """提供文本栏带、行距和行连接的共享布局判定。"""
 
 from __future__ import annotations

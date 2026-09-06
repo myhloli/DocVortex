@@ -1,4 +1,3 @@
-
 """识别带填充背景的等宽代码区域并投影其空间文本。"""
 
 from __future__ import annotations

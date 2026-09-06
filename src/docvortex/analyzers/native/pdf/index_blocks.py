@@ -1,4 +1,3 @@
-
 """识别并构造 Flash 原生 PDF 的目录正文块。"""
 
 from __future__ import annotations

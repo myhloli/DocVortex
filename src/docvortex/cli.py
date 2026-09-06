@@ -23,9 +23,7 @@ def main() -> None:
     "output_format",
     default="markdown",
     show_default=True,
-    type=click.Choice(
-        ["markdown", "html", "latex", "docx", "epub", "pdf", "structured_content"]
-    ),
+    type=click.Choice(["markdown", "html", "latex", "docx", "epub", "pdf", "structured_content"]),
 )
 @click.option("--pages", "page_range", default="", help="PDF page selection: 1-5, r1, all.")
 @click.option("--overwrite", is_flag=True)

@@ -1,4 +1,3 @@
-
 """按照 WIRIS 规范安全读取 MathType MTEF v5 record tree。"""
 
 from __future__ import annotations

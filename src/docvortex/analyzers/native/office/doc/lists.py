@@ -1,4 +1,3 @@
-
 """解析 Word PlfLst/PlfLfo 并维护九级列表编号状态。"""
 
 from __future__ import annotations

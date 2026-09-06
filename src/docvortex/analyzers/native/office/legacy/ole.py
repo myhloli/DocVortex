@@ -1,4 +1,3 @@
-
 """基于 olefile 的有界 OLE2/CFB 只读包装。"""
 
 from __future__ import annotations

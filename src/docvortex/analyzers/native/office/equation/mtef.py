@@ -1,4 +1,3 @@
-
 """安全解析 Equation Native 中的 MTEF v3/v5 公式。"""
 
 from __future__ import annotations

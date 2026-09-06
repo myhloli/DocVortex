@@ -1,4 +1,3 @@
-
 """分类页眉、页脚、页码、侧栏和页脚注。"""
 
 from __future__ import annotations

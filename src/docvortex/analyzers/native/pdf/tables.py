@@ -1,4 +1,3 @@
-
 """检测、投影并物化 Flash 原生 PDF 表格。"""
 
 from __future__ import annotations

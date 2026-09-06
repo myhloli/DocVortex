@@ -1,4 +1,3 @@
-
 """从 DOC Data/PICF 与 Word OfficeArt drawing 中恢复图片。"""
 
 from __future__ import annotations

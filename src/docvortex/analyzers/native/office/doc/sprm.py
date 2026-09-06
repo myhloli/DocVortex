@@ -1,4 +1,3 @@
-
 """遍历并应用 Word 二进制单属性修饰符 SPRM。"""
 
 from __future__ import annotations

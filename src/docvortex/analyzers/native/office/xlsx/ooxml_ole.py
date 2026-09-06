@@ -1,4 +1,3 @@
-
 """读取 XLSX worksheet 中的 MathType/Equation OLE 对象、anchor 与预览。"""
 
 from __future__ import annotations

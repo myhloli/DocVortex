@@ -1,4 +1,3 @@
-
 """解析 StyleTextPropAtom 与 TextMasterStyleAtom。"""
 
 from __future__ import annotations

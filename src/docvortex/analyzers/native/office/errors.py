@@ -1,4 +1,3 @@
-
 """Flash Office 二进制、嵌入对象与 RTF 解析共享的稳定错误类型。"""
 
 from __future__ import annotations

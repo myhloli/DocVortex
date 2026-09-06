@@ -1,4 +1,3 @@
-
 """提供同基线文本和拆分视觉行的几何合并。"""
 
 from __future__ import annotations

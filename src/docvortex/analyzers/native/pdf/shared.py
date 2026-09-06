@@ -1,4 +1,3 @@
-
 """原生 PDF 的公共复用能力；模型区域融合可独立使用这些纯数据操作。"""
 
 from .native_text import _build_native_line_items as build_native_line_items

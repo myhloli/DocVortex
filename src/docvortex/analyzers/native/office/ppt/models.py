@@ -1,4 +1,3 @@
-
 """旧版 PPT 解析阶段使用的内部语义模型。"""
 
 from __future__ import annotations

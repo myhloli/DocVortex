@@ -1,4 +1,3 @@
-
 """Word 二进制解析器与 Converter 之间的内部语义模型。"""
 
 from __future__ import annotations
