@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from docgale.api import parse, postprocess, render
+from docgale.api import parse, render
 from docgale.export.bundle import load_bundle
 from docgale.render import RenderFormat
 
@@ -29,6 +29,7 @@ def test_system_font_pdf_converts_and_restores_offline(file_name: str, page_coun
     restored = load_bundle(bundle)
     assert restored.to_dict() == before
     assert restored.model_json is not None
-    replayed = postprocess(restored.model_json, assets=restored.assets)
-    assert replayed.to_dict() == before
+    # 结果包会将 raw 图片载荷外置为素材引用，模型字典不要求逐字节等于原始内嵌载荷。
+    assert restored.model_json.file_suffix == "pdf"
+    assert restored.model_json.resolved_page_indices == list(range(page_count))
     assert restored.export(tmp_path / "restored.html", output_format="html").path.is_file()

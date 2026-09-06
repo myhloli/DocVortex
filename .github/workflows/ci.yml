@@ -77,3 +77,23 @@ jobs:
       - run: uv venv
       - run: uv pip install ".[test]" "pydantic==2.12.5" "pypdfium2==5.10.1"
       - run: uv run --no-project python -m pytest -q --deselect tests/unittest/test_native_pdf_table_demo_manifest.py::test_demo_sparse_table_confidence_manifest
+
+  platform-artifacts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.14'
+      - run: uv venv
+      - run: uv pip install . "pydantic==2.12.5" "pypdfium2==5.10.1"
+      - run: uv run --no-project python tools/capture_platform_layout.py --output platform-output
+      - uses: actions/upload-artifact@v4
+        with:
+          name: platform-layout-${{ matrix.os }}
+          path: platform-output/
+          retention-days: 14
