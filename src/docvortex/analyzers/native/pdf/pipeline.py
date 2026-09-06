@@ -10,7 +10,7 @@ from ..contracts import NativePdfSource, RawBlock
 
 from ....schema import BBox
 from .._shared.xycut import sort_entries
-from ....document.pdf.document import PDFImageInfo, PDFPageTextGeometry, get_lines_from_chars
+from ....document.pdf.document import PDFDocument as PDFDocument, PDFImageInfo, PDFPageTextGeometry, get_lines_from_chars
 from .inline.detection import detect_pdf_text_link_lines, detect_pdf_text_style_lines
 from .inline.matching import _realign_repaired_text_evidence
 from .inline.materialize import (

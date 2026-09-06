@@ -259,6 +259,7 @@ def _restore_pdfium_surrogate_pairs(
 
 
 def _page_to_image(page: pdfium.PdfPage, scale: float, max_edge: int) -> PDFPageImage:
+    """按原缩放与长边上限复制页面像素，并返回独立持有的图片。"""
     long_edge_length = max(*page.get_size())
     if (long_edge_length * scale) > max_edge:
         scale = max_edge / long_edge_length

@@ -8,6 +8,7 @@ logger = logging.getLogger("docvortex.document.pdf.document")
 
 
 def _try_close(obj: object) -> None:
+    """尽力关闭原生子资源，清理失败不得覆盖原有解析异常。"""
     if callable(close := getattr(obj, "close", None)):
         try:
             close()
