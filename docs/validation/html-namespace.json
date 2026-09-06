@@ -1,0 +1,96 @@
+{
+  "source_commit": "5f2fd59acefb2f3ed247d1e59c63fcb7cd73aae4",
+  "workflow_run": "https://github.com/myhloli/docgale/actions/runs/34042886135",
+  "comparisons": [
+    {
+      "platform": "windows",
+      "document": "paper-3",
+      "geometry.json": true,
+      "model.json": true,
+      "middle.json": true,
+      "html_namespace_only": true,
+      "markdown_namespace_only": true,
+      "all_pngs_identical": true
+    },
+    {
+      "platform": "windows",
+      "document": "paper-4",
+      "geometry.json": true,
+      "model.json": true,
+      "middle.json": true,
+      "html_namespace_only": true,
+      "markdown_namespace_only": true,
+      "all_pngs_identical": true
+    },
+    {
+      "platform": "windows",
+      "document": "cjk-synthetic",
+      "geometry.json": true,
+      "model.json": true,
+      "middle.json": true,
+      "html_namespace_only": true,
+      "markdown_namespace_only": true,
+      "all_pngs_identical": true
+    },
+    {
+      "platform": "linux",
+      "document": "paper-3",
+      "geometry.json": true,
+      "model.json": true,
+      "middle.json": true,
+      "html_namespace_only": true,
+      "markdown_namespace_only": true,
+      "all_pngs_identical": true
+    },
+    {
+      "platform": "linux",
+      "document": "paper-4",
+      "geometry.json": true,
+      "model.json": true,
+      "middle.json": true,
+      "html_namespace_only": true,
+      "markdown_namespace_only": true,
+      "all_pngs_identical": true
+    },
+    {
+      "platform": "linux",
+      "document": "cjk-synthetic",
+      "geometry.json": true,
+      "model.json": true,
+      "middle.json": true,
+      "html_namespace_only": true,
+      "markdown_namespace_only": true,
+      "all_pngs_identical": true
+    },
+    {
+      "platform": "macos",
+      "document": "paper-3",
+      "geometry.json": true,
+      "model.json": true,
+      "middle.json": true,
+      "html_namespace_only": true,
+      "markdown_namespace_only": true,
+      "all_pngs_identical": true
+    },
+    {
+      "platform": "macos",
+      "document": "paper-4",
+      "geometry.json": true,
+      "model.json": true,
+      "middle.json": true,
+      "html_namespace_only": true,
+      "markdown_namespace_only": true,
+      "all_pngs_identical": true
+    },
+    {
+      "platform": "macos",
+      "document": "cjk-synthetic",
+      "geometry.json": true,
+      "model.json": true,
+      "middle.json": true,
+      "html_namespace_only": true,
+      "markdown_namespace_only": true,
+      "all_pngs_identical": true
+    }
+  ]
+}

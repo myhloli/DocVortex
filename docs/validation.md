@@ -1,5 +1,45 @@
 # Extraction validation
 
+## DocGale HTML namespace (2026-09-06)
+
+HTML v1, EPUB XHTML/CSS and Markdown's embedded HTML now use DocGale markers.
+Only the new namespace receives exact HTML decoding; previous MinerU-marked HTML
+uses ordinary webpage parsing. JSON adapters and user payload strings are not
+rewritten. See the [HTML protocol](HTML_PROTOCOL.md) for the migration boundary.
+
+Source commit `5f2fd59acefb2f3ed247d1e59c63fcb7cd73aae4` passed the complete
+[CI matrix](https://github.com/myhloli/docgale/actions/runs/34042886135): Python
+3.10–3.14 on Linux/macOS/Windows, Pydantic 2.12.5, PDFium 5.10.1 and the separate
+5.13.0 job. Linux/macOS passed 396 tests; Windows passed 395 with one POSIX-only
+skip. The existing sparse-table diagnostic is still separate and excluded from
+the passing suite; its failure has not been fixed or hidden.
+
+- Local DocGale: 396 passed, one existing diagnostic deselected. Fourteen new
+  namespace cases cover exact decoding, ordinary/old/invalid/empty input,
+  absence of old aliases, literal payload preservation and related output formats.
+- Local MinerU: 459 HTML/EPUB/Markdown/rendering/anchor/routing checks passed.
+  Existing all-semantic-type round trips and HTML security cases remain strict.
+- Isolated Python 3.14 wheel: 80 namespace, protocol, complete-pipeline and text
+  cleanup checks passed with PDFium 5.10.1. No MinerU/pdftext dependency is needed.
+- Three actual platform captures of Chinese papers 3/4 and the CJK synthetic
+  document retain identical ModelJson, MiddleJson, source geometry and all 78
+  source/layout PNGs relative to the pre-migration captures. HTML and Markdown
+  differ only in implementation-owned marker names. The synthetic document's
+  original MinerU text, filename and URL remain unchanged. See the
+  [artifact comparison](validation/html-namespace.json).
+- The three-platform font/semantic comparison passed unchanged. This HTML change
+  does not relax geometry, block-order or table-structure assertions.
+- Chromium review checked three rendered formulas (including a table formula),
+  Mermaid, Prism, styles, 18 layout images and four Windows/Linux paper HTML views.
+  No page errors or failed resources were observed. Screenshots were inspected.
+- Wheel/sdist resource checks ensure new HTML/EPUB CSS paths are present, old CSS
+  paths are absent and pinned font/license resources remain unchanged. CSS
+  regeneration checks, Ruff and Twine pass.
+
+Saved JSON/bundles are not migrated on load. Re-render complete saved results for
+new HTML without reparsing the original PDF. Updated 0.1.0 archives remain attached
+to the draft release, without PyPI publication.
+
 ## Independent branding, MIT license and dependency bounds (2026-09-06)
 
 Project code now uses the MIT License, retaining existing copyright ownership.
