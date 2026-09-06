@@ -9,11 +9,11 @@ from typing import Any, BinaryIO
 from loguru import logger
 
 from ....schema import BlockType
-from .._shared.markup import MarkupProjector, MarkupStylesheet
+from docvortex.content.markup import MarkupProjector, MarkupStylesheet
 from ....content.spans import text_spans
 from .anchors import HtmlAnchorRegistry, append_referenced_notes
 from .constants import MAX_HTML_BYTES, MAX_HTML_RENDERED_BYTES
-from .contracts import HtmlSourceContext
+from docvortex.document.contracts import HtmlSourceContext
 from .document import HtmlDocument, parse_html_document
 from .errors import HtmlResourceLimitError
 from .resources import HtmlResourceContext

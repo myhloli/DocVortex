@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from ..analyzers.native.html.contracts import HtmlSourceContext
+from docvortex.document.contracts import HtmlSourceContext
 from ..errors import InvalidRequestError
 from ..schema import FILE_SUFFIXES, FileSuffix
 

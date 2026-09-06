@@ -16,6 +16,7 @@ from .schema import FileSuffix, MiddleJson, ModelJson, PageInfo
 from .render.contracts import DocxRenderOptions, EpubRenderOptions, PdfRenderOptions, RenderFormat, RenderOptions
 
 if TYPE_CHECKING:
+    from .analyzers.native.contracts import NativeBinaryAnalyzer
     from .document.pdf.document import PDFDocument
 
 
@@ -62,7 +63,7 @@ def analyze(
         elif prepared.file_suffix == "html":
             pages = models.HtmlModel().predict(BytesIO(prepared.data), source_context=prepared.source_context)
         else:
-            model_types = {
+            model_types: dict[FileSuffix, type[NativeBinaryAnalyzer]] = {
                 "csv": models.CsvModel,
                 "epub": models.EpubModel,
                 "ofd": models.OfdModel,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, BinaryIO
 
-from .html.contracts import HtmlSourceContext
+from docvortex.document.contracts import HtmlSourceContext
 
 if TYPE_CHECKING:
     from ...document.pdf.document import PDFDocument

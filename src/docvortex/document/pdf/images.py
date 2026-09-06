@@ -16,7 +16,7 @@ from loguru import logger
 from PIL import Image
 
 from .pdfium import close_pdfium_child, close_pdfium_document, initialize_pdfium_runtime, pdfium_guard
-from ...analyzers.native._shared.image import image_to_b64str
+from docvortex.foundation.image_encoding import image_to_b64str
 from .raster import page_to_image
 from ...schema import BBox, IntBBox
 from ...foundation.geometry import normalize_to_int_bbox

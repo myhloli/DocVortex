@@ -10,10 +10,10 @@ from typing import Literal
 
 from lxml import etree, html as lxml_html  # type: ignore[reportMissingImports]
 
-from .._shared.markup.formula import FormulaExtraction, extract_formula, is_tex_script
-from .._shared.markup.projector import local_name
+from docvortex.content.markup.formula import FormulaExtraction, extract_formula, is_tex_script
+from docvortex.content.markup.projector import local_name
 from .constants import MAX_HTML_BYTES, MAX_HTML_DEPTH, MAX_HTML_NODES
-from .contracts import HtmlSourceContext
+from docvortex.document.contracts import HtmlSourceContext
 from .errors import HtmlParseError, HtmlResourceLimitError
 
 

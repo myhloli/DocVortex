@@ -19,8 +19,8 @@ from PIL import Image, ImageOps
 
 from ...schema import BBox, PageInfo
 from ...foundation.image import crop_pil_image
-from ...analyzers.native._shared.hyperlink import sanitize_hyperlink_target
-from ...analyzers.native._shared.image import image_to_bytes
+from ...foundation.hyperlink import sanitize_hyperlink_target
+from docvortex.foundation.image_encoding import image_to_bytes
 from .classify import classify
 from .pdfium import _pdfium_lock, pdfium_guard
 from .text.geometry import char_bbox_values as _char_bbox_values

@@ -9,8 +9,8 @@ from urllib.parse import unquote
 from lxml import etree  # type: ignore[reportMissingImports]
 
 from ...schema import PAGE_BLOCK_TYPES, RAW_ALGORITHM, BlockType, VISUAL_TYPE_MAPPING
-from ...analyzers.native._shared.markup import extract_formula
-from ...analyzers.native._shared.markup.projector import BLOCK_TAGS, local_name
+from docvortex.content.markup import extract_formula
+from docvortex.content.markup.projector import BLOCK_TAGS, local_name
 from .contracts import (
     AnnotationWireSpec,
     CodeBodyWireSpec,

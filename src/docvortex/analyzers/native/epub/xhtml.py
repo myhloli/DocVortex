@@ -9,7 +9,7 @@ from lxml import etree  # type: ignore[reportMissingImports]
 
 from ....foundation.image_payload import parse_image_data_uri_strict
 from .._shared.hyperlink import sanitize_hyperlink_target
-from .._shared.markup import (
+from docvortex.content.markup import (
     MarkupAnchorDocument,
     MarkupAnchorRegistry,
     MarkupProjector,
@@ -18,7 +18,7 @@ from .._shared.markup import (
     element_id,
     visible_element_text,
 )
-from .._shared.markup.projector import (
+from docvortex.content.markup.projector import (
     BLOCK_TAGS as _BLOCK_TAGS,
     SKIPPED_TAGS as _SKIPPED_TAGS,
     clean_text_node as _clean_text_node,

@@ -1,18 +1,27 @@
-"""Flash EPUB 与 HTML 共用的静态标记文档投影能力。"""
+"""保留原有导入入口；共享实现由下层模块唯一维护。"""
 
-from .anchors import (
-    AnchorTextNormalization,
-    AnchorVisibilityScope,
-    MarkupAnchorDocument,
-    MarkupAnchorPolicy,
-    MarkupAnchorRegistry,
-    canonical_anchor,
-    element_id,
-    visible_element_text,
+from docvortex.content.markup import (
+    AnchorTextNormalization as AnchorTextNormalization,
+    AnchorVisibilityScope as AnchorVisibilityScope,
+    ElementStyle as ElementStyle,
+    FormulaDisplay as FormulaDisplay,
+    FormulaExtraction as FormulaExtraction,
+    FormulaSourceKind as FormulaSourceKind,
+    MarkupAnchorDocument as MarkupAnchorDocument,
+    MarkupAnchorPolicy as MarkupAnchorPolicy,
+    MarkupAnchorRegistry as MarkupAnchorRegistry,
+    MarkupContext as MarkupContext,
+    MarkupProjector as MarkupProjector,
+    MarkupStylesheet as MarkupStylesheet,
+    ResolvedMarkupImage as ResolvedMarkupImage,
+    TextStyle as TextStyle,
+    TextStyleDelta as TextStyleDelta,
+    canonical_anchor as canonical_anchor,
+    element_id as element_id,
+    extract_formula as extract_formula,
+    strip_formula_delimiters as strip_formula_delimiters,
+    visible_element_text as visible_element_text,
 )
-from .formula import FormulaDisplay, FormulaExtraction, FormulaSourceKind, extract_formula, strip_formula_delimiters
-from .projector import MarkupContext, MarkupProjector, ResolvedMarkupImage
-from .styles import ElementStyle, MarkupStylesheet, TextStyle, TextStyleDelta
 
 __all__ = [
     "AnchorTextNormalization",
