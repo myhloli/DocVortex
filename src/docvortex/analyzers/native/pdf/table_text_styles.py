@@ -43,10 +43,12 @@ def _table_char_map(chars: tuple[Char, ...]) -> dict[int, Char]:
 def _cell_glyphs(
     result: NativeTableResult,
     cell: NativeTableCell,
+    glyph_by_source: dict[int, NativeTableGlyph] | None = None,
 ) -> list[NativeTableGlyph]:
     """按 cell 的稳定字符来源收集并恢复视觉行内顺序。"""
 
-    glyph_by_source = {glyph.source_index: glyph for glyph in result.text.glyphs}
+    if glyph_by_source is None:
+        glyph_by_source = {glyph.source_index: glyph for glyph in result.text.glyphs}
     return sorted(
         (glyph_by_source[source_index] for source_index in cell.source_char_indices if source_index in glyph_by_source),
         key=lambda glyph: (glyph.visual_row, glyph.bbox[0], glyph.bbox[1], glyph.glyph_id),
@@ -238,7 +240,9 @@ def render_native_table_html_with_scripts(
         return result.html
     chars_by_source = _table_char_map(table_input.chars)
     fraction_rules = _non_grid_fraction_rules(table_input, result)
-    cell_glyphs = {(cell.row, cell.col): _cell_glyphs(result, cell) for cell in result.cells}
+    # 一张表只建立一次来源索引；保持原字典推导式的后项覆盖语义。
+    glyph_by_source = {glyph.source_index: glyph for glyph in result.text.glyphs}
+    cell_glyphs = {(cell.row, cell.col): _cell_glyphs(result, cell, glyph_by_source) for cell in result.cells}
     cell_roles: dict[tuple[int, int], dict[int, ScriptRole]] = {}
     for cell in result.cells:
         key = (cell.row, cell.col)
