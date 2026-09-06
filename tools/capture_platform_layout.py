@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from dataclasses import asdict
 from hashlib import sha256
 from html import escape
 from importlib.metadata import version
@@ -16,7 +17,8 @@ from typing import Any
 from PIL import Image, ImageDraw
 
 from docgale.api import parse
-from docgale.document.pdf import PDFDocument
+from docgale.document.pdf import PDFDocument, initialize_pdfium_runtime
+from font_geometry import capture_geometry
 
 _COLORS = {
     "text": "#2563eb",
@@ -31,7 +33,11 @@ _COLORS = {
     "page_number": "#64748b",
     "footnote": "#92400e",
 }
-_DOCUMENTS = (("paper-3", "中文论文3.pdf"), ("paper-4", "中文论文4.pdf"))
+_DOCUMENTS = (
+    ("paper-3", "demo/pdfs/中文论文3.pdf"),
+    ("paper-4", "demo/pdfs/中文论文4.pdf"),
+    ("cjk-synthetic", "tests/unittest/pdfs/native_cjk_layout_synthetic.pdf"),
+)
 
 
 def block_type(block: dict[str, Any]) -> str:
@@ -68,6 +74,7 @@ def draw_layout(source: Image.Image, blocks: list[dict[str, Any]], destination: 
 def capture_document(source: Path, destination: Path) -> dict[str, Any]:
     """一次分析生成原始/中间协议、真实页面标注图和带素材的渲染 HTML。"""
     destination.mkdir(parents=True, exist_ok=True)
+    (destination / "geometry.json").write_text(json.dumps(capture_geometry(source), ensure_ascii=False), encoding="utf-8")
     result = parse(source, keep_model_json=True)
     assert result.model_json is not None
     result.export(destination / "render.html", output_format="html")
@@ -112,11 +119,12 @@ def main() -> None:
         "platform": platform.platform(),
         "system": platform.system(),
         "python": sys.version,
+        "runtime": asdict(initialize_pdfium_runtime()),
         "dependencies": {name: version(name) for name in ("docgale", "pypdfium2", "pydantic", "numpy", "pillow")},
         "documents": {},
     }
     for key, name in _DOCUMENTS:
-        metadata["documents"][key] = capture_document(root / "demo/pdfs" / name, args.output / key)
+        metadata["documents"][key] = capture_document(root / name, args.output / key)
     (args.output / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Platform review artifacts: {args.output}")
 

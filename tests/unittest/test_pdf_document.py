@@ -379,6 +379,10 @@ class _TrackingLock:
 def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: pytest.MonkeyPatch) -> None:
     lock = _TrackingLock()
     monkeypatch.setattr(pdf_document, "_pdfium_lock", lock)
+    # 操作入口和清理入口必须使用同一个共享锁，允许初始化及清理时重入。
+    from docgale.document.pdf import pdfium as pdfium_runtime
+
+    monkeypatch.setattr(pdfium_runtime, "_pdfium_lock", lock)
 
     events: list[str] = []
 
