@@ -3,9 +3,9 @@
 from pathlib import Path
 
 import pytest
-from docgale.api import analyze
-from docgale.postprocess.document import model_json_to_middle_json
-from docgale.schema import BlockType, FileSuffix, MiddleJson, ModelJson
+from docvortex.api import analyze
+from docvortex.postprocess.document import model_json_to_middle_json
+from docvortex.schema import BlockType, FileSuffix, MiddleJson, ModelJson
 
 _OFFICE_SAMPLE_DIR = Path(__file__).parents[2] / "demo/office_docs"
 

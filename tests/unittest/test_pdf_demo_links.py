@@ -4,11 +4,11 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
 
-from docgale.analyzers.native import PdfModel
-from docgale.document.pdf.document import PDFDocument
-from docgale.postprocess.pages import model_json_to_pages
-from docgale.render import render_docx, render_html, render_markdown, render_structured_content
-from docgale.schema import MiddleJson, ModelJson, PageInfo
+from docvortex.analyzers.native import PdfModel
+from docvortex.document.pdf.document import PDFDocument
+from docvortex.postprocess.pages import model_json_to_pages
+from docvortex.render import render_docx, render_html, render_markdown, render_structured_content
+from docvortex.schema import MiddleJson, ModelJson, PageInfo
 from _span_test_utils import inline_text, inline_urls
 
 

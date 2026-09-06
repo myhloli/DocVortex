@@ -11,26 +11,26 @@ from importlib.util import resolve_name
 SOURCE = Path(__file__).resolve().parents[2] / "Magic-PDF"
 TARGET = Path(__file__).resolve().parents[1]
 PREFIXES = {
-    "mineru.model.flash": "docgale.analyzers.native",
-    "mineru.model.flash._shared.spans": "docgale.content.spans",
-    "mineru.model.flash.html.wire": "docgale.codecs.html",
-    "mineru.backend.postprocess": "docgale.postprocess",
-    "mineru.backend.postprocess.inline": "docgale.content.inline",
-    "mineru.backend.postprocess.table_merge": "docgale.content.table",
-    "mineru.backend.postprocess.legacy_schema_adapter": "docgale.compat.legacy_schema_adapter",
-    "mineru.render": "docgale.render",
-    "mineru.types": "docgale.schema",
-    "mineru.utils": "docgale.foundation",
-    "mineru.filetypes": "docgale.document.filetypes",
-    "mineru.parser.file_type": "docgale.document.detection",
-    "mineru.parser.page_range": "docgale.document.page_range",
-    "mineru.config": "docgale.options",
-    "mineru.errors": "docgale.errors",
+    "mineru.model.flash": "docvortex.analyzers.native",
+    "mineru.model.flash._shared.spans": "docvortex.content.spans",
+    "mineru.model.flash.html.wire": "docvortex.codecs.html",
+    "mineru.backend.postprocess": "docvortex.postprocess",
+    "mineru.backend.postprocess.inline": "docvortex.content.inline",
+    "mineru.backend.postprocess.table_merge": "docvortex.content.table",
+    "mineru.backend.postprocess.legacy_schema_adapter": "docvortex.compat.legacy_schema_adapter",
+    "mineru.render": "docvortex.render",
+    "mineru.types": "docvortex.schema",
+    "mineru.utils": "docvortex.foundation",
+    "mineru.filetypes": "docvortex.document.filetypes",
+    "mineru.parser.file_type": "docvortex.document.detection",
+    "mineru.parser.page_range": "docvortex.document.page_range",
+    "mineru.config": "docvortex.options",
+    "mineru.errors": "docvortex.errors",
 }
 for name in ("document", "pdfium", "raster", "classify", "diagnostics"):
-    PREFIXES[f"mineru.model.flash.pdf.{name}"] = f"docgale.document.pdf.{name}"
+    PREFIXES[f"mineru.model.flash.pdf.{name}"] = f"docvortex.document.pdf.{name}"
 for name in ("images", "visuals", "geometry", "constants"):
-    PREFIXES[f"mineru.backend.analysis.pdf.{name}"] = f"docgale.document.pdf.{name if name != 'geometry' else 'visual_geometry'}"
+    PREFIXES[f"mineru.backend.analysis.pdf.{name}"] = f"docvortex.document.pdf.{name if name != 'geometry' else 'visual_geometry'}"
 
 
 def renamed(module: str) -> str:
@@ -43,7 +43,7 @@ def renamed(module: str) -> str:
 
 def relative_module(module: str, package: str) -> str:
     """计算包内静态相对导入，保留第三方绝对导入。"""
-    if not module.startswith("docgale"):
+    if not module.startswith("docvortex"):
         return module
     destination = module.split(".")
     source = package.split(".")
@@ -133,7 +133,7 @@ __all__ = ["model_json_to_middle_json"]
         destination.write_text(text)
         mapping[old_module] = new_module
     for folder in ("html", "epub", "fasttext-langdetect"):
-        shutil.copytree(SOURCE / "mineru/resources" / folder, TARGET / "src/docgale/resources" / folder, dirs_exist_ok=True)
+        shutil.copytree(SOURCE / "mineru/resources" / folder, TARGET / "src/docvortex/resources" / folder, dirs_exist_ok=True)
     shutil.copyfile(SOURCE / "LICENSE.md", TARGET / "LICENSE.md")
     (TARGET / ".baseline/module_mapping.json").write_text(json.dumps(mapping, indent=2))
     print(f"Extracted {len(mapping)} modules")

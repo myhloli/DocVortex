@@ -3,7 +3,7 @@
 """生成 Flash PDF 完整输出基线，并在独立进程中测量耗时和峰值内存。"""
 
 from __future__ import annotations
-from docgale.schema import Producer
+from docvortex.schema import Producer
 
 import argparse
 import cProfile
@@ -29,11 +29,11 @@ sys.path.insert(0, str(ROOT / "tests" / "unittest"))
 
 from _flash_pdf_test_utils import _page_bbox_fingerprint, _page_fingerprint
 
-from docgale.postprocess.document import model_json_to_middle_json
-from docgale.document.pdf import initialize_pdfium_runtime
-from docgale.document.pdf.document import PDFDocument
-from docgale.analyzers.native import PdfModel
-from docgale.schema import ModelJson
+from docvortex.postprocess.document import model_json_to_middle_json
+from docvortex.document.pdf import initialize_pdfium_runtime
+from docvortex.document.pdf.document import PDFDocument
+from docvortex.analyzers.native import PdfModel
+from docvortex.schema import ModelJson
 
 
 def _read_pdf(path: Path) -> bytes:
@@ -66,7 +66,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
     """隔离一份文档的计时、完整输出和进程峰值内存，避免其它文档污染 RSS。"""
     from loguru import logger
 
-    logger.disable("docgale")
+    logger.disable("docvortex")
     payload = _read_pdf(path)
     if runs:
         _predict(payload)
@@ -89,7 +89,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
             pages=deepcopy(pages),
             page_index_map=[],
             file_suffix="pdf",
-            producer=Producer(name="docgale", version="refactor-baseline"),
+            producer=Producer(name="docvortex", version="refactor-baseline"),
         ),
     ).model_dump(mode="json")
     output = {"model_list": pages, "middle_json": middle}
@@ -108,15 +108,15 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
     }
     del pages, middle, output
     if profile:
-        import docgale
+        import docvortex
 
-        package_root = Path(docgale.__file__).resolve().parent
+        package_root = Path(docvortex.__file__).resolve().parent
         profiler = cProfile.Profile()
         profiler.runcall(_predict, payload)
         stats = pstats.Stats(profiler)
         result["profile"] = [
             {
-                "file": "docgale/" + Path(filename).relative_to(package_root).as_posix(),
+                "file": "docvortex/" + Path(filename).relative_to(package_root).as_posix(),
                 "line": line,
                 "function": name,
                 "calls": values[1],
@@ -124,7 +124,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
                 "cumulative_seconds": values[3],
             }
             for (filename, line, name), values in stats.stats.items()
-            if "/docgale/analyzers/native/pdf/" in filename
+            if "/docvortex/analyzers/native/pdf/" in filename
         ]
     _write_json(destination / "result.json", result)
 
@@ -212,7 +212,7 @@ def main() -> None:
         else None,
         "python": sys.version,
         "platform": platform.platform(),
-        "dependencies": {name: importlib.metadata.version(name) for name in ("docgale", "pypdfium2", "numpy", "pydantic")},
+        "dependencies": {name: importlib.metadata.version(name) for name in ("docvortex", "pypdfium2", "numpy", "pydantic")},
         "runs": args.runs,
         "historical_baseline_sha": manifest["baseline_git_sha"],
         "historical_differences": history_differences,

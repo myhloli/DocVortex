@@ -1,6 +1,6 @@
 # Native document examples
 
-Install DocGale, then run from the repository root:
+Install DocVortex, then run from the repository root:
 
 ```bash
 uv pip install .
@@ -9,7 +9,7 @@ python demo/demo.py demo/office_docs/docx_01.docx --output-dir output/office
 ```
 
 The example parses once, exports Markdown and saves a portable result bundle.
-PDF input is expected to contain native text; DocGale does not perform OCR.
+PDF input is expected to contain native text; DocVortex does not perform OCR.
 `small_ocr.pdf` is retained for classification and low-level PDF regression tests.
 Use `PDFDocument.classify()` explicitly when a caller needs to route scanned PDFs.
 

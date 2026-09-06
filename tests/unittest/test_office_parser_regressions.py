@@ -2,9 +2,9 @@ from pathlib import Path
 
 from pytest import MonkeyPatch
 
-from docgale.api import parse
-from docgale.analyzers.native.office import image as office_image
-from docgale.render.markdown import render_markdown
+from docvortex.api import parse
+from docvortex.analyzers.native.office import image as office_image
+from docvortex.render.markdown import render_markdown
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]

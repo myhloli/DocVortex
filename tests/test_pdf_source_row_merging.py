@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from docgale.analyzers.native.pdf.line_merging import _can_merge_same_baseline_pair
-from docgale.analyzers.native.pdf.models import _LineItem
-from docgale.document.pdf.text import Bbox
+from docvortex.analyzers.native.pdf.line_merging import _can_merge_same_baseline_pair
+from docvortex.analyzers.native.pdf.models import _LineItem
+from docvortex.document.pdf.text import Bbox
 
 
 def _fragment(

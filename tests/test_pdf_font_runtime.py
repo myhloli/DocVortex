@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 import pypdfium2.raw as raw
 
-from docgale.document.pdf.font_runtime import PdfiumFontError, _FontProvider, _cjk_charset, _load_font
+from docvortex.document.pdf.font_runtime import PdfiumFontError, _FontProvider, _cjk_charset, _load_font
 
 
 @pytest.mark.parametrize(
@@ -171,7 +171,7 @@ def test_callback_failure_is_reported_after_native_boundary() -> None:
 @pytest.mark.parametrize("missing", [False, True])
 def test_font_resource_hash_is_enforced(monkeypatch: pytest.MonkeyPatch, missing: bool) -> None:
     """损坏的发行资源必须显式失败，不能交由系统字体兜底。"""
-    from docgale.document.pdf import font_runtime
+    from docvortex.document.pdf import font_runtime
 
     class BrokenResource:
         """仅替换资源读取，保持测试不修改安装文件。"""
@@ -208,8 +208,8 @@ def test_runtime_initialization_is_thread_safe_and_idempotent() -> None:
     """并发首次访问只安装一次提供器，返回同一不可变身份。"""
     _run("""
 from concurrent.futures import ThreadPoolExecutor
-from docgale.document.pdf import initialize_pdfium_runtime
-from docgale.document.pdf import pdfium
+from docvortex.document.pdf import initialize_pdfium_runtime
+from docvortex.document.pdf import pdfium
 with ThreadPoolExecutor(max_workers=8) as pool:
     results=list(pool.map(lambda _:initialize_pdfium_runtime(),range(32)))
 assert all(value is results[0] for value in results)
@@ -221,7 +221,7 @@ assert pdfium._font_provider.pid > 0
 def test_cleanup_does_not_initialize_fonts() -> None:
     """只有关闭操作时不应加载字库或安装原生回调。"""
     _run("""
-from docgale.document.pdf import pdfium
+from docvortex.document.pdf import pdfium
 class Child:
     def close(self):
         # 仅模拟关闭资源，不访问 PDFium。
@@ -237,7 +237,7 @@ def test_import_does_not_read_font_resources() -> None:
     _run("""
 from unittest.mock import patch
 with patch('importlib.resources.files',side_effect=AssertionError('font read during import')):
-    from docgale.document.pdf import PDFDocument,initialize_pdfium_runtime
+    from docvortex.document.pdf import PDFDocument,initialize_pdfium_runtime
 """)
 
 
@@ -249,8 +249,8 @@ def test_render_worker_initializes_its_own_font_runtime(tmp_path: Path) -> None:
 import json,os
 from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import get_context
-from docgale.document.pdf import initialize_pdfium_runtime
-from docgale.document.pdf.images import _initialize_pdf_render_worker
+from docvortex.document.pdf import initialize_pdfium_runtime
+from docvortex.document.pdf.images import _initialize_pdf_render_worker
 
 def identity():
     """返回当前 worker 的运行时身份。"""

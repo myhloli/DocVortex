@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-import docgale
-from docgale.render.contracts import RenderFormat
+import docvortex
+from docvortex.render.contracts import RenderFormat
 from _epub_test_utils import build_epub_fixture
 from _odf_test_utils import build_odt_fixture, build_odp_fixture, build_ods_fixture
 from _ofd_test_utils import build_multi_document_ofd
@@ -40,18 +40,18 @@ def source_payload(suffix: str) -> bytes:
 def test_all_native_formats_render_all_targets(suffix: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """每种原生格式完成分析、后处理和九种目标编码，不导入宿主。"""
     if suffix != "pdf":
-        from docgale import content
+        from docvortex import content
 
         def forbidden(_pages: object) -> None:
             """非 PDF 格式不应调用 PDF 专用文字清洗。"""
             raise AssertionError("PDF normalization used for another input format")
 
         monkeypatch.setattr(content, "normalize_pdf_model_text", forbidden)
-    result = docgale.parse(source_payload(suffix), file_suffix=suffix, keep_model_json=True)
+    result = docvortex.parse(source_payload(suffix), file_suffix=suffix, keep_model_json=True)
     assert result.middle_json.pages
     assert result.model_json is not None
     before = result.to_dict()
     for target in RenderFormat:
-        artifact = docgale.render_artifact(result.middle_json, target, assets=result.assets)
+        artifact = docvortex.render_artifact(result.middle_json, target, assets=result.assets)
         assert artifact.content, (suffix, target)
     assert result.to_dict() == before

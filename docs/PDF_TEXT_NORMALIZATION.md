@@ -1,12 +1,12 @@
 # PDF 输出的全角英数与符号归一化
 
-DocGale 在 `PdfModel.predict()` 返回前统一 PDF 自然语言和表格单元格中的
+DocVortex 在 `PdfModel.predict()` 返回前统一 PDF 自然语言和表格单元格中的
 全角英文字母、数字及明确符号白名单。`analyze()`、`parse()` 和 `convert()` 自动使用这一路径。
 外部分析器可在 PDF 回填和 Span 构造完成后显式调用共享接口，
 接入时机见[兼容指南](COMPATIBILITY.md)。
 
 ```python
-from docgale.content import normalize_pdf_model_text
+from docvortex.content import normalize_pdf_model_text
 
 pages = [[{"type": "text", "content": "ＡＢＣ１２３，。"}]]
 normalize_pdf_model_text(pages)
@@ -36,8 +36,8 @@ Unicode、字符索引、`source_indices`、字体及 loose/tight/origin 几何�
 Layout 底图仍显示 PDF 原字形，半角文字出现在模型输出和后续语义渲染中。
 
 Office、HTML、EPUB、OFD、CSV 等非 PDF 输入不会自动调用此函数。ModelJson
-构造、加载、序列化、显式后处理和 renderer 也不会自动重写旧文本。已有结果包
+构造、加载、序列化、显式后处理和 renderer 也不会自动重写旧文本。符合当前 DocVortex 协议的已有结果包
 继续有效；升级后重启正在运行的服务并重新解析源文档，以获取新输出。
 
-清洗单测由 DocGale 维护，应用侧负责验证委托时机与输出接入；
+清洗单测由 DocVortex 维护，应用侧负责验证委托时机与输出接入；
 源字符、布局、表格结构和字体策略的既有断言继续适用。

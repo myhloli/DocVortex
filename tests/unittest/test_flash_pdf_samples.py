@@ -1,5 +1,5 @@
 from __future__ import annotations
-from docgale.schema import Producer
+from docvortex.schema import Producer
 
 import re
 import sys
@@ -15,20 +15,20 @@ import pytest
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
 
-from docgale.postprocess.page_blocks import process_page_blocks
-from docgale.postprocess.pages import model_json_to_pages
-from docgale.analyzers.native import PdfModel
-from docgale.analyzers.native.pdf import formulas
-from docgale.analyzers.native.pdf import geometry
-from docgale.analyzers.native.pdf import graphics
-from docgale.analyzers.native.pdf import line_merging
-from docgale.analyzers.native.pdf import models
-from docgale.analyzers.native.pdf import native_text
-from docgale.analyzers.native.pdf import tables
-from docgale.render import render_markdown
-from docgale.schema import MiddleJson, ModelJson
-from docgale.document.pdf.document import PDFDocument
-from docgale.document.pdf.document import get_lines_from_chars
+from docvortex.postprocess.page_blocks import process_page_blocks
+from docvortex.postprocess.pages import model_json_to_pages
+from docvortex.analyzers.native import PdfModel
+from docvortex.analyzers.native.pdf import formulas
+from docvortex.analyzers.native.pdf import geometry
+from docvortex.analyzers.native.pdf import graphics
+from docvortex.analyzers.native.pdf import line_merging
+from docvortex.analyzers.native.pdf import models
+from docvortex.analyzers.native.pdf import native_text
+from docvortex.analyzers.native.pdf import tables
+from docvortex.render import render_markdown
+from docvortex.schema import MiddleJson, ModelJson
+from docvortex.document.pdf.document import PDFDocument
+from docvortex.document.pdf.document import get_lines_from_chars
 
 from _span_test_utils import inline_text, inline_urls, visible_content
 
@@ -85,7 +85,7 @@ def _model_json(
         pages=pages,
         page_index_map=page_index_map or [],
         file_suffix="pdf",
-        producer=Producer(name="docgale", version="test"),
+        producer=Producer(name="docvortex", version="test"),
     )
 
 
@@ -702,7 +702,7 @@ def test_demo2_page1_forms_sixteen_blocks_and_keeps_figure_caption_separate() ->
             pages=model_json_to_pages(_model_json([page], page_index_map=[0])),
             is_full_document=False,
             file_suffix="pdf",
-            producer=Producer(name="docgale", version="test"),
+            producer=Producer(name="docvortex", version="test"),
         )
     )
     abstract_markdown = next(
@@ -1145,7 +1145,7 @@ def test_demo3_pages6_7_and10_fix_caption_inline_titles_and_reference_tail() -> 
             pages=model_json_to_pages(_model_json([page7], page_index_map=[6])),
             is_full_document=False,
             file_suffix="pdf",
-            producer=Producer(name="docgale", version="test"),
+            producer=Producer(name="docvortex", version="test"),
         )
     )
     assert "**Attention Bias Scaling.** Unlike" in page7_markdown
@@ -1764,9 +1764,9 @@ def test_caibao_page2_parallel_chart_captions_stay_separate() -> None:
     assert len(page7_table_note) == 1
     assert page7_table_note[0]["type"] == "footnote"
     assert page7_table_note[0]["bbox"] == [0.073, 0.483, 0.219, 0.504]
-    assert "资料来源：Wind、华泰研究" in _visible_content(page7_table_note[0])
+    assert "资料来源:Wind、华泰研究" in _visible_content(page7_table_note[0])
     assert all(
-        _visible_content(block).startswith("资料来源：")
+        _visible_content(block).startswith("资料来源:")
         for page_number in expected_new_footnotes
         for block in model_list[page_number - 1]
         if block["type"] == "footnote" and block is not page7_table_note[0]

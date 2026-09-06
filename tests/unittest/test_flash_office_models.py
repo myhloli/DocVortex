@@ -10,32 +10,32 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import docgale.analyzers.native as flash_models
-import docgale.analyzers.native.models as flat_model_module
-from docgale.analyzers.native import DocModel
-from docgale.analyzers.native import DocxModel
-from docgale.analyzers.native import EpubModel
-from docgale.analyzers.native import OdpModel
-from docgale.analyzers.native import OdsModel
-from docgale.analyzers.native import OdtModel
-from docgale.analyzers.native import OfdModel
-from docgale.analyzers.native import PdfModel
-from docgale.analyzers.native import PptModel
-from docgale.analyzers.native import PptxModel
-from docgale.analyzers.native import RtfModel
-from docgale.analyzers.native import XlsModel
-from docgale.analyzers.native import XlsxModel
-from docgale.analyzers.native.office.doc import doc_converter as doc_converter_module
-from docgale.analyzers.native.office.docx import docx_converter as docx_converter_module
-from docgale.analyzers.native.office.docx import main as docx_main
-from docgale.analyzers.native.office.odf import converters as odf_converter_module
-from docgale.analyzers.native.office.pptx import main as pptx_main
-from docgale.analyzers.native.office.pptx import pptx_converter as pptx_converter_module
-from docgale.analyzers.native.office.ppt import ppt_converter as ppt_converter_module
-from docgale.analyzers.native.office.rtf import converter as rtf_converter_module
-from docgale.analyzers.native.office.xls import xls_converter as xls_converter_module
-from docgale.analyzers.native.office.xlsx import main as xlsx_main
-from docgale.analyzers.native.office.xlsx import xlsx_converter as xlsx_converter_module
+import docvortex.analyzers.native as flash_models
+import docvortex.analyzers.native.models as flat_model_module
+from docvortex.analyzers.native import DocModel
+from docvortex.analyzers.native import DocxModel
+from docvortex.analyzers.native import EpubModel
+from docvortex.analyzers.native import OdpModel
+from docvortex.analyzers.native import OdsModel
+from docvortex.analyzers.native import OdtModel
+from docvortex.analyzers.native import OfdModel
+from docvortex.analyzers.native import PdfModel
+from docvortex.analyzers.native import PptModel
+from docvortex.analyzers.native import PptxModel
+from docvortex.analyzers.native import RtfModel
+from docvortex.analyzers.native import XlsModel
+from docvortex.analyzers.native import XlsxModel
+from docvortex.analyzers.native.office.doc import doc_converter as doc_converter_module
+from docvortex.analyzers.native.office.docx import docx_converter as docx_converter_module
+from docvortex.analyzers.native.office.docx import main as docx_main
+from docvortex.analyzers.native.office.odf import converters as odf_converter_module
+from docvortex.analyzers.native.office.pptx import main as pptx_main
+from docvortex.analyzers.native.office.pptx import pptx_converter as pptx_converter_module
+from docvortex.analyzers.native.office.ppt import ppt_converter as ppt_converter_module
+from docvortex.analyzers.native.office.rtf import converter as rtf_converter_module
+from docvortex.analyzers.native.office.xls import xls_converter as xls_converter_module
+from docvortex.analyzers.native.office.xlsx import main as xlsx_main
+from docvortex.analyzers.native.office.xlsx import xlsx_converter as xlsx_converter_module
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -206,16 +206,16 @@ def test_models_are_exported_from_flash_root() -> None:
 @pytest.mark.parametrize(
     ("package_name", "model_name"),
     [
-        ("docgale.analyzers.native.office.doc", "DocModel"),
-        ("docgale.analyzers.native.office.docx", "DocxModel"),
-        ("docgale.analyzers.native.office.pptx", "PptxModel"),
-        ("docgale.analyzers.native.office.ppt", "PptModel"),
-        ("docgale.analyzers.native.office.xls", "XlsModel"),
-        ("docgale.analyzers.native.office.xlsx", "XlsxModel"),
-        ("docgale.analyzers.native.office.rtf", "RtfModel"),
-        ("docgale.analyzers.native.office.odf", "OdtModel"),
-        ("docgale.analyzers.native.office.odf", "OdsModel"),
-        ("docgale.analyzers.native.office.odf", "OdpModel"),
+        ("docvortex.analyzers.native.office.doc", "DocModel"),
+        ("docvortex.analyzers.native.office.docx", "DocxModel"),
+        ("docvortex.analyzers.native.office.pptx", "PptxModel"),
+        ("docvortex.analyzers.native.office.ppt", "PptModel"),
+        ("docvortex.analyzers.native.office.xls", "XlsModel"),
+        ("docvortex.analyzers.native.office.xlsx", "XlsxModel"),
+        ("docvortex.analyzers.native.office.rtf", "RtfModel"),
+        ("docvortex.analyzers.native.office.odf", "OdtModel"),
+        ("docvortex.analyzers.native.office.odf", "OdsModel"),
+        ("docvortex.analyzers.native.office.odf", "OdpModel"),
     ],
 )
 def test_office_subpackages_do_not_export_models(package_name: str, model_name: str) -> None:
@@ -232,17 +232,17 @@ def test_importing_pdf_model_does_not_load_office_converters() -> None:
     script = "\n".join(
         [
             "import sys",
-            "from docgale.analyzers.native import PdfModel",
+            "from docvortex.analyzers.native import PdfModel",
             "assert PdfModel.__name__ == 'PdfModel'",
-            "assert 'docgale.analyzers.native.office.docx.docx_converter' not in sys.modules",
-            "assert 'docgale.analyzers.native.office.doc.doc_converter' not in sys.modules",
-            "assert 'docgale.analyzers.native.office.pptx.pptx_converter' not in sys.modules",
-            "assert 'docgale.analyzers.native.office.ppt.ppt_converter' not in sys.modules",
-            "assert 'docgale.analyzers.native.office.xls.xls_converter' not in sys.modules",
+            "assert 'docvortex.analyzers.native.office.docx.docx_converter' not in sys.modules",
+            "assert 'docvortex.analyzers.native.office.doc.doc_converter' not in sys.modules",
+            "assert 'docvortex.analyzers.native.office.pptx.pptx_converter' not in sys.modules",
+            "assert 'docvortex.analyzers.native.office.ppt.ppt_converter' not in sys.modules",
+            "assert 'docvortex.analyzers.native.office.xls.xls_converter' not in sys.modules",
             "assert 'olefile' not in sys.modules",
-            "assert 'docgale.analyzers.native.office.xlsx.xlsx_converter' not in sys.modules",
-            "assert 'docgale.analyzers.native.office.rtf.converter' not in sys.modules",
-            "assert 'docgale.analyzers.native.office.odf.converters' not in sys.modules",
+            "assert 'docvortex.analyzers.native.office.xlsx.xlsx_converter' not in sys.modules",
+            "assert 'docvortex.analyzers.native.office.rtf.converter' not in sys.modules",
+            "assert 'docvortex.analyzers.native.office.odf.converters' not in sys.modules",
         ]
     )
     result = subprocess.run(

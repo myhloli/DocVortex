@@ -16,14 +16,14 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
 
-from docgale.document.pdf.font_runtime import _FONT_SHA256
+from docvortex.document.pdf.font_runtime import _FONT_SHA256
 from tools.font_geometry import capture_geometry
 
 _ROOT = Path(__file__).resolve().parents[1]
 
 
 def _system_geometry(source: Path, destination: Path) -> dict[str, Any]:
-    """从独立解释器读取默认 PDFium，保证从未安装过 DocGale 的字体接口。"""
+    """从独立解释器读取默认 PDFium，保证从未安装过 DocVortex 的字体接口。"""
     completed = subprocess.run(
         [sys.executable, str(_ROOT / "tools/font_geometry.py"), str(source), str(destination), "--system-fonts"],
         capture_output=True,
@@ -93,7 +93,7 @@ def _mixed_font_pdf(destination: Path) -> None:
     from pypdf import PdfReader, PdfWriter
 
     payload = BytesIO()
-    font_resource = resources.files("docgale").joinpath("resources/fonts/DroidSansFallbackFull.ttf")
+    font_resource = resources.files("docvortex").joinpath("resources/fonts/DroidSansFallbackFull.ttf")
     pdfmetrics.registerFont(TTFont("EmbeddedDroidFixture", BytesIO(font_resource.read_bytes())))
     pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
     canvas = Canvas(payload, pagesize=(595.3, 841.7), pageCompression=0)

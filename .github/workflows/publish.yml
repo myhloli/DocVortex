@@ -27,7 +27,7 @@ jobs:
           import ast
           import os
           import pathlib
-          tree = ast.parse(pathlib.Path('src/docgale/version.py').read_text())
+          tree = ast.parse(pathlib.Path('src/docvortex/version.py').read_text())
           version = next(ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == '__version__' for target in node.targets))
           if os.environ['RELEASE_TAG'] != f'v{version}':
               raise SystemExit('Release tag does not match package version')
@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/docgale/
+      url: https://pypi.org/project/docvortex/
     permissions:
       id-token: write
     steps:

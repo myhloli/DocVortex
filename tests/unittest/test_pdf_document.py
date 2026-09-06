@@ -17,12 +17,12 @@ from pypdf.generic import (
     NumberObject,
     TextStringObject,
 )
-from docgale.document.pdf.text.contracts import Bbox
+from docvortex.document.pdf.text.contracts import Bbox
 from PIL import Image
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen.canvas import Canvas
 
-from docgale.document.pdf import document as pdf_document
+from docvortex.document.pdf import document as pdf_document
 
 
 def test_pdf_document_does_not_expose_span_bbox_visualization() -> None:
@@ -380,7 +380,7 @@ def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: p
     lock = _TrackingLock()
     monkeypatch.setattr(pdf_document, "_pdfium_lock", lock)
     # 操作入口和清理入口必须使用同一个共享锁，允许初始化及清理时重入。
-    from docgale.document.pdf import pdfium as pdfium_runtime
+    from docvortex.document.pdf import pdfium as pdfium_runtime
 
     monkeypatch.setattr(pdfium_runtime, "_pdfium_lock", lock)
 

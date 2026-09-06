@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from docgale.codecs.json import load_middle
-from docgale.compat.mineru import from_mineru_middle, to_mineru_middle
-from docgale.options import LatexDelimiterConfig, LatexDelimitersConfig
-from docgale.render import RenderFormat, render
-from docgale.render.markdown import render_markdown
-from docgale.schema import BlockType, EquationBlock, MiddleJson, PageInfo, TextBlock, TextSpan
+from docvortex.codecs.json import load_middle
+from docvortex.compat.mineru import from_mineru_middle, to_mineru_middle
+from docvortex.options import LatexDelimiterConfig, LatexDelimitersConfig
+from docvortex.render import RenderFormat, render
+from docvortex.render.markdown import render_markdown
+from docvortex.schema import BlockType, EquationBlock, MiddleJson, PageInfo, TextBlock, TextSpan
 
 
 def document() -> MiddleJson:
@@ -33,8 +33,8 @@ def test_neutral_roundtrip() -> None:
     """协议默认值完整输出，读取后无需构造 MinerU 元数据。"""
     middle = document()
     payload = middle.to_dict()
-    assert payload["schema"] == "docgale.middle"
-    assert payload["producer"] == {"name": "docgale", "version": "0.1.0"}
+    assert payload["schema"] == "docvortex.middle"
+    assert payload["producer"] == {"name": "docvortex", "version": "0.1.0"}
     assert "mineru_version" not in payload
     assert load_middle(payload) == middle
 
@@ -73,8 +73,8 @@ def test_schema_has_no_filesystem_export_method() -> None:
 @pytest.mark.parametrize("target_name", ["markdown", "structured_content", "content_list", "content_list_v2"])
 def test_inline_delimiters_reach_each_text_renderer(target_name: str) -> None:
     """四种文本目标实际采用调用方的公式分隔符，防止门面丢失选项。"""
-    from docgale.schema import EquationInlineSpan, ChartBlock, ChartBodyBlock
-    from docgale.render.contracts import (
+    from docvortex.schema import EquationInlineSpan, ChartBlock, ChartBodyBlock
+    from docvortex.render.contracts import (
         MarkdownRenderOptions,
         StructuredContentRenderOptions,
         ContentListRenderOptions,

@@ -5,13 +5,13 @@ from typing import Any
 
 import pytest
 
-from docgale.analyzers.native import PdfModel
-from docgale.analyzers.native.pdf import code_blocks
-from docgale.analyzers.native.pdf import models
-from docgale.analyzers.native.pdf import pipeline
-from docgale.document.pdf.document import PDFDocument
-from docgale.document.pdf.document import PDFPathInfo
-from docgale.analyzers.native.pdf.spatial_text import project_pdf_spatial_text
+from docvortex.analyzers.native import PdfModel
+from docvortex.analyzers.native.pdf import code_blocks
+from docvortex.analyzers.native.pdf import models
+from docvortex.analyzers.native.pdf import pipeline
+from docvortex.document.pdf.document import PDFDocument
+from docvortex.document.pdf.document import PDFPathInfo
+from docvortex.analyzers.native.pdf.spatial_text import project_pdf_spatial_text
 
 from _flash_pdf_test_utils import _text_line
 from _span_test_utils import inline_text

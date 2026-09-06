@@ -1775,7 +1775,7 @@
       "description": "记录语言无关的文档生产者，避免绑定宿主产品元数据。",
       "properties": {
         "name": {
-          "default": "docgale",
+          "default": "docvortex",
           "minLength": 1,
           "title": "Name",
           "type": "string"
@@ -2380,7 +2380,7 @@
       "type": "string"
     },
     "schema": {
-      "const": "docgale.middle"
+      "const": "docvortex.middle"
     },
     "schema_version": {
       "const": "1.0"

@@ -8,20 +8,20 @@ from collections import defaultdict
 from pathlib import Path
 
 from bs4 import BeautifulSoup
-from docgale.document.pdf.text.contracts import Bbox, Char
+from docvortex.document.pdf.text.contracts import Bbox, Char
 import pytest
 
-from docgale.analyzers.native.pdf import table_text_styles as pdf_table_text_styles
-from docgale.analyzers.native.pdf.geometry import _rotate_bbox_from_upright
-from docgale.document.pdf.document import PDFDocument
-from docgale.analyzers.native.pdf.table_recovery import (
+from docvortex.analyzers.native.pdf import table_text_styles as pdf_table_text_styles
+from docvortex.analyzers.native.pdf.geometry import _rotate_bbox_from_upright
+from docvortex.document.pdf.document import PDFDocument
+from docvortex.analyzers.native.pdf.table_recovery import (
     NativeTableInput,
     coerce_native_table_rectangles,
     coerce_native_table_rules,
     recover_native_pdf_table,
 )
-from docgale.analyzers.native.pdf.table_recovery.candidate import serialize_native_table_html
-from docgale.analyzers.native.pdf.table_recovery.contracts import (
+from docvortex.analyzers.native.pdf.table_recovery.candidate import serialize_native_table_html
+from docvortex.analyzers.native.pdf.table_recovery.contracts import (
     NativeTableCell,
     NativeTableGlyph,
     NativeTableResult,
@@ -29,7 +29,7 @@ from docgale.analyzers.native.pdf.table_recovery.contracts import (
     NativeTableText,
     NativeTableTextRow,
 )
-from docgale.analyzers.native.pdf.table_text_styles import (
+from docvortex.analyzers.native.pdf.table_text_styles import (
     _non_grid_fraction_rules,
     render_native_table_html_with_scripts,
 )

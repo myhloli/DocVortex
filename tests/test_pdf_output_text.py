@@ -10,13 +10,13 @@ from typing import Any
 from bs4 import BeautifulSoup
 import pytest
 
-import docgale
-from docgale.api import postprocess
-from docgale.analyzers.native import PdfModel
-from docgale.analyzers.native.pdf.pipeline import _analyze_native_document
-from docgale.codecs.json import load_model
-from docgale.document.pdf import PDFDocument
-from docgale.schema import ModelJson
+import docvortex
+from docvortex.api import postprocess
+from docvortex.analyzers.native import PdfModel
+from docvortex.analyzers.native.pdf.pipeline import _analyze_native_document
+from docvortex.codecs.json import load_model
+from docvortex.document.pdf import PDFDocument
+from docvortex.schema import ModelJson
 
 _SOURCE = Path(__file__).parents[1] / "demo/pdfs/中文论文4.pdf"
 _FULLWIDTH = re.compile("[Ａ-Ｚａ-ｚ０-９：．／＼－＿％＋＝＠＃＆＊]")
@@ -79,7 +79,7 @@ def test_pdf_model_normalizes_after_geometry_and_inline_matching() -> None:
 
 def test_public_pdf_parse_exports_normalized_text_and_offline_bundle(tmp_path: Path) -> None:
     """API、HTML、Markdown 和离线结果包使用同一份已经清洗的 ModelJson。"""
-    result = docgale.parse(_SOURCE, keep_model_json=True)
+    result = docvortex.parse(_SOURCE, keep_model_json=True)
     assert result.model_json is not None
     _assert_paper_text_is_normalized(result.model_json.pages)
     before = result.to_dict()
@@ -88,7 +88,7 @@ def test_public_pdf_parse_exports_normalized_text_and_offline_bundle(tmp_path: P
         result.export(path, output_format=target)
         assert not _FULLWIDTH.search(path.read_text(encoding="utf-8"))
     result.save_bundle(tmp_path / "bundle")
-    restored = docgale.load_bundle(tmp_path / "bundle")
+    restored = docvortex.load_bundle(tmp_path / "bundle")
     assert restored.to_dict() == before
     assert restored.model_json is not None
     _assert_paper_text_is_normalized(restored.model_json.pages)
@@ -104,14 +104,14 @@ def test_public_pdf_parse_exports_normalized_text_and_offline_bundle(tmp_path: P
 )
 def test_non_pdf_public_analysis_does_not_normalize(suffix: str, source: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """其他格式中的全角英数保留，不能在通用 API 边界无条件清洗。"""
-    from docgale import content
+    from docvortex import content
 
     def forbidden(_pages: list[list[dict[str, Any]]]) -> None:
         """禁止非 PDF 分析进入 PDF 专用清洗。"""
         raise AssertionError("Non-PDF normalization")
 
     monkeypatch.setattr(content, "normalize_pdf_model_text", forbidden)
-    result = docgale.analyze(source.encode(), file_suffix=suffix)
+    result = docvortex.analyze(source.encode(), file_suffix=suffix)
     assert "Ａ１" in result.model_json.to_json()
 
 
@@ -135,6 +135,6 @@ def test_model_loading_and_rendering_do_not_rewrite_old_pdf_results(tmp_path: Pa
     assert restored.to_dict() == model.to_dict()
     result = postprocess(restored, keep_model_json=True)
     result.save_bundle(tmp_path / "old-bundle")
-    loaded = docgale.load_bundle(tmp_path / "old-bundle")
+    loaded = docvortex.load_bundle(tmp_path / "old-bundle")
     loaded.export(tmp_path / "old.md", output_format="markdown")
     assert "旧Ａ１" in (tmp_path / "old.md").read_text(encoding="utf-8")

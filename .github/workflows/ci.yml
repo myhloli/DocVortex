@@ -29,7 +29,7 @@ jobs:
       - run: uv pip install ".[test]" "pypdfium2==5.10.1"
       - run: uv run --no-project python -m pytest -q --deselect tests/unittest/test_native_pdf_table_demo_manifest.py::test_demo_sparse_table_confidence_manifest
       - name: Verify independent installation
-        run: uv run --no-project python -c "import importlib.util, docgale; assert importlib.util.find_spec('mineru') is None; assert importlib.util.find_spec('pdftext') is None"
+        run: uv run --no-project python -c "import importlib.util, docvortex; assert importlib.util.find_spec('docgale') is None; assert importlib.util.find_spec('mineru') is None; assert importlib.util.find_spec('pdftext') is None"
 
   pdfium-current:
     runs-on: ubuntu-latest

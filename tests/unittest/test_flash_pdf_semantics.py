@@ -9,8 +9,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from docgale.document.pdf.document import PDFDocument
-from docgale.analyzers.native.pdf.pipeline import _analyze_native_document
+from docvortex.document.pdf.document import PDFDocument
+from docvortex.analyzers.native.pdf.pipeline import _analyze_native_document
 from _flash_pdf_test_utils import (
     _geometry_summary_mismatch,
     _page_bbox_fingerprint,

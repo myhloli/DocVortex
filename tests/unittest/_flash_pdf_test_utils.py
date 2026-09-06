@@ -4,7 +4,7 @@ import hashlib
 import json
 from typing import Any
 
-from docgale.analyzers.native.pdf import (
+from docvortex.analyzers.native.pdf import (
     models,
 )
 

@@ -2,7 +2,7 @@
 
 The engine has one pipeline: document input → ModelJson and assets → deterministic
 postprocessing → MiddleJson and assets → rendering/export. Public document values
-are owned by DocGale. They do not open files, render documents, or import MinerU.
+are owned by DocVortex. They do not open files, render documents, or import MinerU.
 
 - `schema` and `foundation` define values and leaf operations.
 - `document` owns input preparation, metadata and low-level document lifetimes.

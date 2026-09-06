@@ -13,7 +13,7 @@ from typing import Any
 import pypdfium2 as pdfium
 import pypdfium2.raw as raw
 
-from docgale.document.pdf.pdfium import pdfium_guard
+from docvortex.document.pdf.pdfium import pdfium_guard
 
 
 def capture_geometry(source: Path, *, system_fonts: bool = False) -> dict[str, Any]:

@@ -18,8 +18,8 @@ from typing import Any
 
 from PIL import Image, ImageDraw
 
-from docgale.api import parse
-from docgale.document.pdf import PDFDocument, initialize_pdfium_runtime
+from docvortex.api import parse
+from docvortex.document.pdf import PDFDocument, initialize_pdfium_runtime
 from font_geometry import capture_geometry
 
 _COLORS = {
@@ -138,7 +138,7 @@ def main() -> None:
         "python": sys.version,
         "runtime": asdict(initialize_pdfium_runtime()),
         "pdf_text_normalization": "pdf-text-v2",
-        "dependencies": {name: version(name) for name in ("docgale", "pypdfium2", "pydantic", "numpy", "pillow")},
+        "dependencies": {name: version(name) for name in ("docvortex", "pypdfium2", "pydantic", "numpy", "pillow")},
         "documents": {},
     }
     if platform.system() == "Linux" and shutil.which("fc-list"):

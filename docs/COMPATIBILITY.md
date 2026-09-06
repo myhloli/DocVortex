@@ -1,60 +1,62 @@
 # Application compatibility and migration
 
-DocGale owns native analysis, PDF access and classification, shared document
+DocVortex owns native analysis, PDF access and classification, shared document
 types, deterministic postprocessing, assets, rendering and export. It does not
 import or require MinerU. Applications retain their inference services, routing,
 configuration and caches.
 
 ## MinerU integration
 
-`docgale.compat.mineru` reads and writes MinerU schema 2.0 envelopes around
-DocGale's neutral ModelJson/MiddleJson schema 1.0. `MinerUMetadata` validates
+`docvortex.compat.mineru` reads and writes MinerU schema 2.0 envelopes around
+DocVortex's neutral ModelJson/MiddleJson schema 1.0. `MinerUMetadata` validates
 `effort`, `parse_mode` and `mineru_version`, stored in `extensions["mineru"]`.
-The existing `docgale.compat.legacy_schema_adapter` retains its supported legacy
+The existing `docvortex.compat.legacy_schema_adapter` retains its supported legacy
 result-reading boundary. These adapters do not import the host application.
 
 MinerU's unified analysis entrypoint preserves the following routing:
 
 | PDF route | Classification | Analysis |
 | --- | --- | --- |
-| Flash + txt | None | DocGale native PDF model |
-| Flash + auto | Shared `PDFDocument.classify()` | txt uses DocGale; ocr uses MinerU Flash OCR |
+| Flash + txt | None | DocVortex native PDF model |
+| Flash + auto | Shared `PDFDocument.classify()` | txt uses DocVortex; ocr uses MinerU Flash OCR |
 | Flash + ocr | None | MinerU Flash OCR |
 | Other tiers | Existing auto-mode rules | Existing Hybrid/VLM inference |
 
 Other tiers reuse the shared PDF foundations, schema, postprocessing and
-rendering. DocGale native analysis trusts the caller's selection and does not
+rendering. DocVortex native analysis trusts the caller's selection and does not
 add classification or an OCR fallback. Optional LLM enhancement runs in MinerU
-after DocGale's deterministic postprocessing.
+after DocVortex's deterministic postprocessing.
 
 MinerU calls `normalize_pdf_model_text()` after PDF content assembly, Span
 construction and host metadata cleanup. Flash, Hybrid and OCR/VLM therefore use
 the same PDF text cleanup; repeated Flash cleanup is idempotent. Host tests cover
-delegation and routing, while DocGale maintains the native text and geometry tests.
+delegation and routing, while DocVortex maintains the native text and geometry tests.
 
 Saved results and Doclib caches are not rewritten automatically. After upgrading,
 restart running services and use the existing `mineru parse ... --force` option
 to regenerate results with the current font and text policies.
 
-MinerU declares `docgale>=0.1.0,<1.0.0`. DocGale declares
+MinerU declares `docvortex>=0.1.0,<1.0.0`. DocVortex declares
 `pypdfium2>=5.10.1,<6`; this constraint also applies when MinerU installs its own
 direct PDFium dependency. Other shared dependency floors remain aligned, including
 `pydantic>=2.12.5,<3` and `numpy>=1.21.6`.
 
 ## Existing serialized formats
 
-HTML output now uses `docgale-*`, `data-docgale-html-version="1"` and
-`data-docgale-latex`. EPUB XHTML/CSS and Markdown's embedded HTML use the same
-namespace. Only DocGale HTML markers receive exact decoding; old MinerU-marked
+HTML output now uses `docvortex-*`, `data-docvortex-html-version="1"` and
+`data-docvortex-latex`. EPUB XHTML/CSS and Markdown's embedded HTML use the same
+namespace. Only DocVortex HTML markers receive exact decoding; old DocGale- or MinerU-marked
 HTML follows ordinary webpage parsing, without an exact semantic round-trip
 guarantee. No legacy codec aliases or marker compatibility branches are provided.
 See the [HTML protocol](HTML_PROTOCOL.md) for the current contract.
 
-JSON schema identities, MinerU JSON adapters and host metadata are unchanged.
-Existing saved JSON and bundles are not rewritten. Re-render a complete saved
-result to obtain current HTML; this does not require reparsing the source PDF.
-PDF/DOCX/LaTeX non-HTML identifiers and MinerU's own UI markers are outside this
-HTML migration.
+MinerU JSON adapters and host metadata are unchanged; native DocVortex schema
+identities replace the former DocGale identities.
+Saved files are never rewritten on load. DocVortex only accepts its own native
+JSON/bundle schema identities; old DocGale native artifacts are rejected. MinerU's
+schema 2.0 and supported legacy results remain readable through the adapters.
+PDF/DOCX/LaTeX generated identifiers now use DocVortex; MinerU's UI markers and
+product identity remain unchanged.
 
 ## Source and sample history
 
@@ -66,7 +68,7 @@ Apache-2.0 portions remain identified in the PDF text source, and the Droid font
 retains its original NOTICE and provenance manifest.
 
 The full demo corpus was moved unchanged from MinerU, preserving filenames and
-the recorded hashes and regression manifests. DocGale maintains native parsing,
+the recorded hashes and regression manifests. DocVortex maintains native parsing,
 geometry, semantic and export regressions; MinerU retains `demo1.pdf` and
 `demo2.pdf` for inference integration tests. Other host-specific geometry inputs
 are frozen as JSON fixtures in MinerU. Neither test suite requires an adjacent

@@ -1,0 +1,601 @@
+/* DocVortex 独立 HTML 主题。所有文档规则均限定在 DocVortex 根节点内。 */
+.docvortex-html-body {
+  background: #ffffff;
+  margin: 0;
+}
+
+.docvortex-html-body > .docvortex-document {
+  margin: 0 auto;
+  max-width: 60rem;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+.docvortex-document {
+  --docvortex-accent: #0b6fc2;
+  --docvortex-accent-hover: #075a9c;
+  --docvortex-background: #ffffff;
+  --docvortex-border: #d1d5db;
+  --docvortex-muted: #6b7280;
+  --docvortex-surface: #f8fafc;
+  --docvortex-text: #1f2937;
+  background: var(--docvortex-background);
+  box-sizing: border-box;
+  color: var(--docvortex-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  overflow-wrap: break-word;
+  width: 100%;
+}
+
+.docvortex-document *,
+.docvortex-document *::before,
+.docvortex-document *::after {
+  box-sizing: inherit;
+}
+
+/* 标题与正文使用紧凑但稳定的阅读节奏。 */
+.docvortex-document :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--docvortex-text);
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.5em 0 0.65em;
+}
+
+.docvortex-document h1 {
+  font-size: 2rem;
+}
+
+.docvortex-document h2 {
+  font-size: 1.5rem;
+}
+
+.docvortex-document h3 {
+  font-size: 1.25rem;
+}
+
+.docvortex-document h4 {
+  font-size: 1.125rem;
+}
+
+.docvortex-document h5 {
+  font-size: 1rem;
+}
+
+.docvortex-document h6 {
+  color: var(--docvortex-muted);
+  font-size: 0.875rem;
+}
+
+.docvortex-document .docvortex-block:first-child > :first-child,
+.docvortex-document .docvortex-page > .docvortex-block:first-child > :first-child {
+  margin-top: 0;
+}
+
+.docvortex-document p {
+  margin: 0 0 1rem;
+}
+
+.docvortex-document :is(strong, b) {
+  font-weight: 700;
+}
+
+.docvortex-document :is(s, del) {
+  color: var(--docvortex-muted);
+}
+
+.docvortex-document a {
+  color: var(--docvortex-accent);
+  text-decoration: none;
+  text-underline-offset: 0.15em;
+}
+
+.docvortex-document a:hover {
+  color: var(--docvortex-accent-hover);
+  text-decoration: underline;
+}
+
+.docvortex-document a:focus-visible {
+  border-radius: 0.15rem;
+  outline: 2px solid var(--docvortex-accent);
+  outline-offset: 2px;
+}
+
+.docvortex-document blockquote {
+  background: var(--docvortex-surface);
+  border-left: 0.25rem solid var(--docvortex-accent);
+  color: var(--docvortex-muted);
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+}
+
+.docvortex-document blockquote > :first-child {
+  margin-top: 0;
+}
+
+.docvortex-document blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* 普通列表使用浏览器语义，混合标记列表使用 renderer 输出的显式网格。 */
+.docvortex-document :is(ol, ul) {
+  margin: 0 0 1rem;
+  padding-left: 1.75rem;
+}
+
+.docvortex-document ul {
+  list-style: disc;
+}
+
+.docvortex-document ul ul {
+  list-style: circle;
+}
+
+.docvortex-document ul ul ul {
+  list-style: square;
+}
+
+.docvortex-document ol {
+  list-style: decimal;
+}
+
+.docvortex-document :is(ol, ul) ol {
+  list-style-type: lower-roman;
+}
+
+.docvortex-document :is(ol, ul) :is(ol, ul) ol {
+  list-style-type: lower-alpha;
+}
+
+.docvortex-document li + li {
+  margin-top: 0.25rem;
+}
+
+.docvortex-document li > :is(ol, ul) {
+  margin-bottom: 0;
+  margin-top: 0.25rem;
+}
+
+.docvortex-document .docvortex-list--explicit {
+  list-style: none;
+  padding-left: 1.5rem;
+}
+
+.docvortex-document .docvortex-list--unmarked {
+  list-style: none;
+  padding-left: 0;
+}
+
+.docvortex-document .docvortex-list-item--explicit {
+  align-items: start;
+  display: grid;
+  gap: 0.5em;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+.docvortex-document .docvortex-list-item--orphan {
+  display: grid;
+  grid-template-columns: 0 minmax(0, 1fr);
+  list-style: none;
+}
+
+.docvortex-document .docvortex-list-item--markerless {
+  list-style: none;
+}
+
+.docvortex-document .docvortex-list-marker {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  user-select: none;
+  white-space: pre;
+}
+
+.docvortex-document .docvortex-list-content {
+  min-width: 0;
+}
+
+.docvortex-document .docvortex-list-item--orphan > .docvortex-list-marker {
+  visibility: hidden;
+}
+
+.docvortex-document .docvortex-list-item--orphan > :is(ol, ul),
+.docvortex-document .docvortex-list-item--explicit > :is(ol, ul) {
+  grid-column: 2;
+  margin-bottom: 0;
+}
+
+.docvortex-document .docvortex-index,
+.docvortex-document .docvortex-index ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.docvortex-document .docvortex-index ul ul {
+  padding-left: 1.5rem;
+}
+
+.docvortex-document .docvortex-index a {
+  overflow-wrap: anywhere;
+}
+
+/* 表格在屏幕内独立滚动，打印时恢复为完整 table。 */
+.docvortex-document table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  display: block;
+  margin: 1rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+  width: 100%;
+}
+
+.docvortex-document :is(th, td) {
+  border: 1px solid var(--docvortex-border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.docvortex-document th {
+  background: var(--docvortex-surface);
+  font-weight: 600;
+}
+
+.docvortex-document caption {
+  color: var(--docvortex-muted);
+  margin-bottom: 0.5rem;
+  text-align: left;
+}
+
+.docvortex-document :is(th, td).docvortex-align-left {
+  text-align: left;
+}
+
+.docvortex-document :is(th, td).docvortex-align-center {
+  text-align: center;
+}
+
+.docvortex-document :is(th, td).docvortex-align-right {
+  text-align: right;
+}
+
+/* 图片、图表及说明共享同一视觉容器。 */
+.docvortex-document img {
+  height: auto;
+  max-width: 100%;
+}
+
+.docvortex-document .docvortex-figure {
+  margin: 1.5rem 0;
+  max-width: 100%;
+}
+
+.docvortex-document .docvortex-figure > img,
+.docvortex-document .docvortex-visual-body > img {
+  display: block;
+  margin-inline: 0;
+}
+
+/* Mermaid 成功后替换 raster；无 JS、加载或语法失败时保留图片/源码回退。 */
+.docvortex-document .docvortex-flowchart {
+  margin: 1rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.docvortex-document .docvortex-flowchart-canvas {
+  display: none;
+  min-width: 0;
+  text-align: left;
+}
+
+.docvortex-document .docvortex-flowchart-canvas svg {
+  display: block;
+  height: auto;
+  margin-inline: 0;
+  max-width: 100%;
+}
+
+.docvortex-document .docvortex-flowchart-fallback {
+  display: block;
+  margin-inline: 0;
+}
+
+.docvortex-document .docvortex-flowchart[data-mermaid-state="rendered"] .docvortex-flowchart-canvas {
+  display: block;
+}
+
+.docvortex-document .docvortex-flowchart[data-mermaid-state="rendered"] .docvortex-flowchart-fallback {
+  display: none;
+}
+
+.docvortex-document .docvortex-flowchart-details {
+  max-width: 100%;
+}
+
+.docvortex-document .docvortex-flowchart-source {
+  max-height: 24rem;
+  text-align: left;
+  white-space: pre;
+}
+
+.docvortex-document .docvortex-caption {
+  color: var(--docvortex-muted);
+  font-size: 0.9em;
+  margin-top: 0.5rem;
+  text-align: left;
+}
+
+.docvortex-document .docvortex-footnote,
+.docvortex-document .docvortex-page-footnote {
+  color: var(--docvortex-muted);
+  font-size: 0.875em;
+  margin-top: 0.4rem;
+  text-align: left;
+}
+
+.docvortex-document .docvortex-details {
+  border: 1px solid var(--docvortex-border);
+  border-radius: 0.375rem;
+  margin: 1rem 0;
+  padding: 0.65rem 0.85rem;
+}
+
+.docvortex-document .docvortex-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.docvortex-document .docvortex-page-aux {
+  color: var(--docvortex-muted);
+  font-size: 0.875rem;
+}
+
+/* 行内代码、预格式内容和 Prism token 采用 DocVortex 自有配色。 */
+.docvortex-document code,
+.docvortex-document pre,
+.docvortex-document .docvortex-algorithm {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.docvortex-document code {
+  background: var(--docvortex-surface);
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  padding: 0.15em 0.35em;
+}
+
+.docvortex-document pre {
+  background: var(--docvortex-surface);
+  border: 1px solid var(--docvortex-border);
+  border-radius: 0.375rem;
+  line-height: 1.5;
+  margin: 1rem 0;
+  max-width: 100%;
+  overflow: auto;
+  padding: 1rem;
+  tab-size: 4;
+  white-space: pre;
+}
+
+.docvortex-document pre > code {
+  background: transparent;
+  border-radius: 0;
+  display: inline;
+  font-size: inherit;
+  line-height: inherit;
+  padding: 0;
+  white-space: inherit;
+}
+
+.docvortex-document :is(code, pre)[class*="language-"] {
+  color: #374151;
+  text-align: left;
+  text-shadow: none;
+  word-break: normal;
+  word-spacing: normal;
+}
+
+.docvortex-document .token.comment,
+.docvortex-document .token.prolog,
+.docvortex-document .token.doctype,
+.docvortex-document .token.cdata {
+  color: #6b7280;
+}
+
+.docvortex-document .token.punctuation {
+  color: #374151;
+}
+
+.docvortex-document .token.namespace {
+  opacity: 0.75;
+}
+
+.docvortex-document .token.keyword,
+.docvortex-document .token.operator,
+.docvortex-document .token.important,
+.docvortex-document .token.atrule {
+  color: #7c3aed;
+}
+
+.docvortex-document .token.string,
+.docvortex-document .token.attr-value,
+.docvortex-document .token.regex,
+.docvortex-document .token.url {
+  color: #047857;
+}
+
+.docvortex-document .token.number,
+.docvortex-document .token.boolean,
+.docvortex-document .token.constant,
+.docvortex-document .token.property,
+.docvortex-document .token.symbol {
+  color: #0369a1;
+}
+
+.docvortex-document .token.tag,
+.docvortex-document .token.selector,
+.docvortex-document .token.builtin {
+  color: #b45309;
+}
+
+.docvortex-document .token.function,
+.docvortex-document .token.class-name,
+.docvortex-document .token.attr-name {
+  color: #be123c;
+}
+
+.docvortex-document .token.important,
+.docvortex-document .token.bold {
+  font-weight: 700;
+}
+
+.docvortex-document .token.italic {
+  font-style: italic;
+}
+
+.docvortex-document .token.inserted {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.docvortex-document .token.deleted {
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.docvortex-document .token.entity {
+  cursor: help;
+}
+
+.docvortex-document .docvortex-algorithm {
+  max-width: 100%;
+  overflow-x: auto;
+  tab-size: 4;
+  white-space: pre-wrap;
+  word-break: normal;
+}
+
+/* 空间投影表格和无法结构化的原文保留空白与换行。 */
+.docvortex-document .docvortex-table-text,
+.docvortex-document .docvortex-raw-fallback {
+  overflow: auto;
+  tab-size: 4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.docvortex-document .docvortex-table-text {
+  white-space: pre;
+}
+
+.docvortex-document .docvortex-raw-fallback {
+  border-left: 0.2rem solid var(--docvortex-border);
+  color: var(--docvortex-muted);
+}
+
+/* MathJax 接管前保持 TeX 可见，长公式只在自身容器内滚动。 */
+.docvortex-document .docvortex-math {
+  overflow-wrap: anywhere;
+}
+
+.docvortex-document .docvortex-math--block {
+  display: block;
+  margin: 1rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+.docvortex-document mjx-container[display="true"] {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.docvortex-document .docvortex-preserve-whitespace {
+  white-space: pre-wrap;
+}
+
+.docvortex-document .docvortex-text-emphasis {
+  -webkit-text-emphasis: dot;
+  -webkit-text-emphasis-position: under right;
+  text-emphasis: dot;
+  text-emphasis-position: under right;
+}
+
+/* FULL 模式在屏幕上显示页间边界，在打印时改用硬分页。 */
+.docvortex-document .docvortex-page {
+  min-width: 0;
+  position: relative;
+}
+
+.docvortex-document--full .docvortex-page {
+  min-height: 1.5rem;
+}
+
+.docvortex-document .docvortex-page-break {
+  background: transparent;
+  border: 0;
+  border-top: 1px dashed var(--docvortex-border);
+  height: 0;
+  margin: 2rem 0;
+}
+
+@media screen and (max-width: 40rem) {
+  .docvortex-html-body > .docvortex-document {
+    padding: 1rem;
+  }
+
+  .docvortex-document h1 {
+    font-size: 1.75rem;
+  }
+
+  .docvortex-document :is(th, td) {
+    padding: 0.4rem 0.55rem;
+  }
+}
+
+@media print {
+  .docvortex-html-body {
+    background: #ffffff;
+  }
+
+  .docvortex-html-body > .docvortex-document {
+    max-width: none;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .docvortex-document .docvortex-page-break {
+    display: none;
+  }
+
+  .docvortex-document--full .docvortex-page {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .docvortex-document--full .docvortex-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .docvortex-document .docvortex-figure {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .docvortex-document table {
+    display: table;
+    overflow: visible;
+  }
+
+  .docvortex-document pre {
+    overflow: visible;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}

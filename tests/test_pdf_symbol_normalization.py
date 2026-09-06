@@ -7,8 +7,8 @@ from copy import deepcopy
 from bs4 import BeautifulSoup
 import pytest
 
-from docgale.content import normalize_pdf_model_text
-from docgale.foundation.text import full_to_half_exclude_marks
+from docvortex.content import normalize_pdf_model_text
+from docvortex.foundation.text import full_to_half_exclude_marks
 
 _SYMBOLS = "：．／＼－＿％＋＝＠＃＆＊"
 _ASCII = ":./\\-_%+=@#&*"
@@ -63,7 +63,7 @@ def test_table_entities_attributes_and_opaque_nodes_are_preserved() -> None:
     markup = r"""<table data-note="："><tr><td colspan="2"><b>&#xff1a;</b><sup>％</sup>
 <a href="https://example.test/：">／</a><img src="images/：.png">
 <span>\(Ａ</span><b>＋Ｂ\)</b><eq>Ａ＋Ｂ</eq><code>：／</code>
-<span data-docgale-latex="Ａ＋Ｂ">Ａ＋Ｂ</span></td></tr></table>"""
+<span data-docvortex-latex="Ａ＋Ｂ">Ａ＋Ｂ</span></td></tr></table>"""
     model = [[{"type": "table", "content": markup}]]
     normalize_pdf_model_text(model)
     actual = BeautifulSoup(model[0][0]["content"], "html.parser")
@@ -71,7 +71,7 @@ def test_table_entities_attributes_and_opaque_nodes_are_preserved() -> None:
     assert [node.attrs for node in actual.find_all()] == [node.attrs for node in original.find_all()]
     assert actual.b.get_text() == ":" and actual.sup.get_text() == "%" and actual.a.get_text() == "/"
     assert actual.eq.get_text() == "Ａ＋Ｂ" and actual.code.get_text() == "：／"
-    assert actual.select_one("[data-docgale-latex]").get_text() == "Ａ＋Ｂ"
+    assert actual.select_one("[data-docvortex-latex]").get_text() == "Ａ＋Ｂ"
     assert r"\(Ａ＋Ｂ\)" in actual.get_text()
     expected = deepcopy(model)
     normalize_pdf_model_text(model)

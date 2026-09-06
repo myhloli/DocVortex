@@ -1,8 +1,8 @@
-# DocGale
+# DocVortex
 
 A fast, multi-format document parsing and conversion engine.
 
-DocGale provides a complete, standalone document pipeline:
+DocVortex provides a complete, standalone document pipeline:
 
 ```text
 Document -> ModelJson + Assets -> MiddleJson + Assets -> Render / Export
@@ -19,9 +19,9 @@ silently classify the document or select another inference backend.
 ## Install
 
 ```bash
-pip install docgale
-docgale convert report.pdf --format markdown --output output/report.md
-docgale classify report.pdf
+pip install docvortex
+docvortex convert report.pdf --format markdown --output output/report.md
+docvortex classify report.pdf
 ```
 
 Python 3.10–3.14 is supported. Native parsing does not require OCR/VLM inference
@@ -31,16 +31,16 @@ compatibility matrix also exercises 5.13.0.
 ## Parse once, export many times
 
 ```python
-import docgale
+import docvortex
 
-result = docgale.parse("report.pdf", keep_model_json=True)
+result = docvortex.parse("report.pdf", keep_model_json=True)
 result.export("output/report.md", output_format="markdown")
 result.export("output/report.docx", output_format="docx")
 result.export("output/report.epub", output_format="epub")
 result.save_bundle("output/report.bundle")
 
 # This works after the source document and its parsing process are gone.
-restored = docgale.load_bundle("output/report.bundle")
+restored = docvortex.load_bundle("output/report.bundle")
 restored.export("output/report.pdf", output_format="pdf")
 ```
 
@@ -52,7 +52,7 @@ explicitly sets `overwrite=True`.
 ## Stage APIs
 
 ```python
-from docgale.api import analyze, postprocess, render
+from docvortex.api import analyze, postprocess, render
 
 analysis = analyze("report.pdf", page_range="1-5")
 result = postprocess(analysis)
@@ -60,9 +60,9 @@ artifact = render(result.middle_json, "docx", assets=result.assets)
 artifact.write("output/report.docx")
 ```
 
-The stage API lives in `docgale.api`. Root-level conveniences include `parse`,
+The stage API lives in `docvortex.api`. Root-level conveniences include `parse`,
 `analyze`, `convert`, `postprocess_document`, and `render_artifact`. The
-`docgale.render` package also exposes the low-level renderers and their original
+`docvortex.render` package also exposes the low-level renderers and their original
 string, bytes, dictionary, or list return values.
 
 PDF page selections use `1-5`, `r1` and `all`; other native formats are parsed as
@@ -72,24 +72,24 @@ and remains open afterward.
 ## Explicit PDF classification
 
 ```python
-from docgale.document.pdf import PDFDocument
+from docvortex.document.pdf import PDFDocument
 
 with PDFDocument("report.pdf") as document:
     mode = document.classify()  # "txt" or "ocr"; no inference is started
     if mode == "txt":
-        result = docgale.parse(document)
+        result = docvortex.parse(document)
 ```
 
 Native analysis trusts the caller's choice and does not classify automatically.
 Applications can use the classification result to select their own OCR or
 inference service when a document requires it.
 
-DocGale JSON uses schema identity `docgale.model` or `docgale.middle`, schema
+DocVortex JSON uses schema identity `docvortex.model` or `docvortex.middle`, schema
 version `1.0`, and neutral producer metadata. Definitions are in `schemas/`.
 Application-specific metadata belongs in `extensions`. See the
 [compatibility guide](docs/COMPATIBILITY.md) for existing application integrations
 and historical data formats. The [HTML protocol](docs/HTML_PROTOCOL.md) describes
-DocGale markers and semantic round trips.
+DocVortex markers and semantic round trips.
 
 ## Scope and development
 
@@ -107,10 +107,10 @@ uv run --no-project ruff format --check src
 uv build
 ```
 
-DocGale project code is licensed under the [MIT License](LICENSE.md). Bundled
+DocVortex project code is licensed under the [MIT License](LICENSE.md). Bundled
 third-party portions retain their own licenses: the PDF text layer includes
 Apache-2.0 portions attributed in its source, and the bundled Droid font retains
-its [original NOTICE](src/docgale/resources/fonts/NOTICE). The
+its [original NOTICE](src/docvortex/resources/fonts/NOTICE). The
 [Apache-2.0 license](licenses/Apache-2.0.txt) ships with both distributions; package
 metadata therefore declares `MIT AND Apache-2.0`.
 
@@ -130,3 +130,6 @@ PDF output normalizes fullwidth Latin letters, digits and selected technical
 symbols in natural-language text and table cells, preserving Chinese punctuation,
 formulas, code and link targets. See
 [PDF text normalization](docs/PDF_TEXT_NORMALIZATION.md) for scope and API usage.
+
+See [the DocVortex upgrade guide](docs/DOCVORTEX_UPGRADE.md) for package, protocol,
+PDF text rules and publishing configuration changes.

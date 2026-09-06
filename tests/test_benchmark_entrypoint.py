@@ -32,11 +32,11 @@ def test_native_benchmark_generates_report_and_portable_profile(tmp_path: Path) 
     )
     assert completed.returncode == 0, completed.stderr
     report = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
-    assert "docgale" in report["dependencies"]
+    assert "docvortex" in report["dependencies"]
     assert "pdftext" not in report["dependencies"]
     assert len(report["documents"]) == 1
     record = report["documents"][0]
     assert record["pages"] == 1
     assert record["profile"]
-    assert all(item["file"].startswith("docgale/analyzers/native/pdf/") for item in record["profile"])
+    assert all(item["file"].startswith("docvortex/analyzers/native/pdf/") for item in record["profile"])
     assert (tmp_path / record["artifact"] / "output.json").is_file()

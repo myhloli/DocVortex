@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from docgale.api import parse, render
-from docgale.export.bundle import load_bundle
-from docgale.render import RenderFormat
+from docvortex.api import parse, render
+from docvortex.export.bundle import load_bundle
+from docvortex.render import RenderFormat
 
 
 @pytest.mark.parametrize(("file_name", "page_count"), [("中文论文3.pdf", 4), ("中文论文4.pdf", 5)])

@@ -3,13 +3,13 @@ requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "docgale"
+name = "docvortex"
 dynamic = ["version"]
 description = "A fast, multi-format document parsing and conversion engine"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
 license = "MIT AND Apache-2.0"
-license-files = ["LICENSE.md", "licenses/*", "src/docgale/resources/fonts/NOTICE"]
+license-files = ["LICENSE.md", "licenses/*", "src/docvortex/resources/fonts/NOTICE"]
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.10",
@@ -35,22 +35,22 @@ test = ["pytest", "pytest-cov"]
 dev = ["ruff==0.14.2", "build", "twine"]
 
 [project.urls]
-Repository = "https://github.com/myhloli/docgale"
-Issues = "https://github.com/myhloli/docgale/issues"
+Repository = "https://github.com/myhloli/docvortex"
+Issues = "https://github.com/myhloli/docvortex/issues"
 
 [project.scripts]
-docgale = "docgale.cli:main"
+docvortex = "docvortex.cli:main"
 
 [tool.setuptools.dynamic]
-version = {attr = "docgale.version.__version__"}
+version = {attr = "docvortex.version.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["docgale*"]
+include = ["docvortex*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-docgale = ["resources/**"]
+docvortex = ["resources/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -10,13 +10,13 @@ from typing import Any
 
 from bs4 import BeautifulSoup
 
-from docgale.analyzers.native import PdfModel
-from docgale.analyzers.native.pdf.table_recovery import NativeTableInput
-from docgale.analyzers.native.pdf.table_recovery import coerce_native_table_rectangles
-from docgale.analyzers.native.pdf.table_recovery import coerce_native_table_rules
-from docgale.analyzers.native.pdf.table_recovery import recover_native_pdf_table
-from docgale.analyzers.native.pdf.table_recovery.engine import diagnose_native_pdf_table
-from docgale.document.pdf.document import PDFDocument
+from docvortex.analyzers.native import PdfModel
+from docvortex.analyzers.native.pdf.table_recovery import NativeTableInput
+from docvortex.analyzers.native.pdf.table_recovery import coerce_native_table_rectangles
+from docvortex.analyzers.native.pdf.table_recovery import coerce_native_table_rules
+from docvortex.analyzers.native.pdf.table_recovery import recover_native_pdf_table
+from docvortex.analyzers.native.pdf.table_recovery.engine import diagnose_native_pdf_table
+from docvortex.document.pdf.document import PDFDocument
 
 
 _PROJECT_ROOT = Path(__file__).parents[2]

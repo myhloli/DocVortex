@@ -4,11 +4,11 @@ from collections import Counter
 from pathlib import Path
 
 from bs4 import BeautifulSoup
-from docgale.api import analyze
-from docgale.analyzers.native import RtfModel
-from docgale.export.middle import export_middle_json
-from docgale.postprocess.document import model_json_to_middle_json
-from docgale.schema import BlockType, ChartBlock, ImageBlock, MiddleJson, ModelJson, TableBlock
+from docvortex.api import analyze
+from docvortex.analyzers.native import RtfModel
+from docvortex.export.middle import export_middle_json
+from docvortex.postprocess.document import model_json_to_middle_json
+from docvortex.schema import BlockType, ChartBlock, ImageBlock, MiddleJson, ModelJson, TableBlock
 from _span_test_utils import inline_text, visible_content
 
 _OFFICE_SAMPLE_DIR = Path(__file__).parents[2] / "demo" / "office_docs"

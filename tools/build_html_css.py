@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""生成并校验 DocGale HTML 渲染器使用的压缩 CSS。"""
+"""生成并校验 DocVortex HTML 渲染器使用的压缩 CSS。"""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from typing import Sequence
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_SOURCE_PATH = _PROJECT_ROOT / "src" / "docgale" / "resources" / "html" / "docgale.css"
-_OUTPUT_PATH = _PROJECT_ROOT / "src" / "docgale" / "resources" / "html" / "docgale.min.css"
+_SOURCE_PATH = _PROJECT_ROOT / "src" / "docvortex" / "resources" / "html" / "docvortex.css"
+_OUTPUT_PATH = _PROJECT_ROOT / "src" / "docvortex" / "resources" / "html" / "docvortex.min.css"
 _COMPACT_PUNCTUATION = frozenset("{}:;,>")
 
 
@@ -146,7 +146,7 @@ def build_html_css(*, check: bool) -> bool:
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     """解析构建脚本的只校验选项。"""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="仅校验 docgale.min.css 是否需要重新生成")
+    parser.add_argument("--check", action="store_true", help="仅校验 docvortex.min.css 是否需要重新生成")
     return parser.parse_args(argv)
 
 
