@@ -7,6 +7,7 @@ from typing import Literal, TypeAlias
 from .text.contracts import Char
 from PIL import Image
 from ...schema import BBox
+from docvortex.foundation.type_identity import preserve_type_module
 
 
 logger = logging.getLogger("docvortex.document.pdf.document")
@@ -158,11 +159,11 @@ class _PathSubpath:
     closed: bool = False
 
 
-PDFPageImage.__module__ = "docvortex.document.pdf.document"
-PDFPageTextGeometry.__module__ = "docvortex.document.pdf.document"
-PDFDrawingLine.__module__ = "docvortex.document.pdf.document"
-PDFLinkAnnotation.__module__ = "docvortex.document.pdf.document"
-PDFPathInfo.__module__ = "docvortex.document.pdf.document"
-PDFImageInfo.__module__ = "docvortex.document.pdf.document"
-_PDFPageSnapshot.__module__ = "docvortex.document.pdf.document"
-_PathSubpath.__module__ = "docvortex.document.pdf.document"
+preserve_type_module(PDFPageImage, "docvortex.document.pdf.document")
+preserve_type_module(PDFPageTextGeometry, "docvortex.document.pdf.document")
+preserve_type_module(PDFDrawingLine, "docvortex.document.pdf.document")
+preserve_type_module(PDFLinkAnnotation, "docvortex.document.pdf.document")
+preserve_type_module(PDFPathInfo, "docvortex.document.pdf.document")
+preserve_type_module(PDFImageInfo, "docvortex.document.pdf.document")
+preserve_type_module(_PDFPageSnapshot, "docvortex.document.pdf.document")
+preserve_type_module(_PathSubpath, "docvortex.document.pdf.document")

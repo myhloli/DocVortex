@@ -49,3 +49,27 @@ def test_existing_shared_imports_keep_type_and_function_identity() -> None:
         restored = pickle.loads(pickle.dumps(value))
         assert type(restored) is type(value)
         assert restored == value
+
+
+def test_canonical_type_annotations_work_without_importing_old_facades() -> None:
+    """新入口单独导入时也能解析注解和构造 Pydantic 适配器，不要求预加载旧模块。"""
+    import subprocess
+    import sys
+
+    code = """
+import sys
+from typing import get_type_hints
+from pydantic import TypeAdapter
+from docvortex.document.contracts import HtmlSourceContext
+from docvortex.content.markup.formula import FormulaExtraction
+from docvortex.content.markup.styles import ElementStyle, TextStyle
+from docvortex.content.markup.anchors import MarkupAnchorDocument
+assert 'docvortex.analyzers.native.html.contracts' not in sys.modules
+for cls in (HtmlSourceContext, FormulaExtraction, ElementStyle, MarkupAnchorDocument):
+    assert get_type_hints(cls)
+assert get_type_hints(ElementStyle)['text'] is TextStyle
+context = TypeAdapter(HtmlSourceContext).validate_python({'source_uri': 'https://example.com'})
+assert context.source_uri == 'https://example.com'
+"""
+    result = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr

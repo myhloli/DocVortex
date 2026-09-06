@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from lxml import etree  # type: ignore[reportMissingImports]
 
 from docvortex.foundation.xml_names import local_name
+from docvortex.foundation.type_identity import preserve_type_module
 
 
 _CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
@@ -318,9 +319,9 @@ class MarkupStylesheet:
 __all__ = ["ElementStyle", "MarkupStylesheet", "TextStyle", "TextStyleDelta"]
 
 # 保持既有公开类型的 pickle 路径，所有旧、新入口指向同一个类。
-TextStyle.__module__ = "docvortex.analyzers.native._shared.markup.styles"
-TextStyleDelta.__module__ = "docvortex.analyzers.native._shared.markup.styles"
-ElementStyle.__module__ = "docvortex.analyzers.native._shared.markup.styles"
-_SelectorCascade.__module__ = "docvortex.analyzers.native._shared.markup.styles"
-_ParsedDeclarations.__module__ = "docvortex.analyzers.native._shared.markup.styles"
-MarkupStylesheet.__module__ = "docvortex.analyzers.native._shared.markup.styles"
+preserve_type_module(TextStyle, "docvortex.analyzers.native._shared.markup.styles")
+preserve_type_module(TextStyleDelta, "docvortex.analyzers.native._shared.markup.styles")
+preserve_type_module(ElementStyle, "docvortex.analyzers.native._shared.markup.styles")
+preserve_type_module(_SelectorCascade, "docvortex.analyzers.native._shared.markup.styles")
+preserve_type_module(_ParsedDeclarations, "docvortex.analyzers.native._shared.markup.styles")
+preserve_type_module(MarkupStylesheet, "docvortex.analyzers.native._shared.markup.styles")

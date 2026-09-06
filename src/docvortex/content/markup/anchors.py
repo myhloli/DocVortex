@@ -12,6 +12,7 @@ from lxml import etree  # type: ignore[reportMissingImports]
 
 from docvortex.content.markup.projector import local_name, visible_raw_text_with_style
 from docvortex.content.markup.styles import MarkupStylesheet, TextStyle
+from docvortex.foundation.type_identity import preserve_type_module
 
 
 AnchorVisibilityScope: TypeAlias = Literal["all_ancestors", "nearest_body"]
@@ -182,6 +183,6 @@ __all__ = [
 ]
 
 # 保持既有公开类型的 pickle 路径，所有旧、新入口指向同一个类。
-MarkupAnchorDocument.__module__ = "docvortex.analyzers.native._shared.markup.anchors"
-MarkupAnchorPolicy.__module__ = "docvortex.analyzers.native._shared.markup.anchors"
-MarkupAnchorRegistry.__module__ = "docvortex.analyzers.native._shared.markup.anchors"
+preserve_type_module(MarkupAnchorDocument, "docvortex.analyzers.native._shared.markup.anchors")
+preserve_type_module(MarkupAnchorPolicy, "docvortex.analyzers.native._shared.markup.anchors")
+preserve_type_module(MarkupAnchorRegistry, "docvortex.analyzers.native._shared.markup.anchors")

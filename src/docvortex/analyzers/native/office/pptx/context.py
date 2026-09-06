@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Any, Final, Optional
 from pptx.enum.shapes import PP_PLACEHOLDER
+from docvortex.foundation.type_identity import preserve_type_module
 
 
 IGNORED_NOTES_PLACEHOLDER_TYPES: Final = {
@@ -108,5 +109,5 @@ class _FlattenedShape:
     bbox: Optional[tuple[float, float, float, float]]
 
 
-_SlideTransform.__module__ = "docvortex.analyzers.native.office.pptx.pptx_converter"
-_FlattenedShape.__module__ = "docvortex.analyzers.native.office.pptx.pptx_converter"
+preserve_type_module(_SlideTransform, "docvortex.analyzers.native.office.pptx.pptx_converter")
+preserve_type_module(_FlattenedShape, "docvortex.analyzers.native.office.pptx.pptx_converter")

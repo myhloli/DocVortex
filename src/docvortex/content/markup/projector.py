@@ -23,6 +23,7 @@ from docvortex.content.spans import (
 from docvortex.foundation.xml_names import local_name
 from docvortex.content.markup.formula import FormulaExtraction, extract_formula
 from docvortex.content.markup.styles import MarkupStylesheet, TextStyle
+from docvortex.foundation.type_identity import preserve_type_module
 
 
 BLOCK_TAGS = frozenset(
@@ -1231,6 +1232,6 @@ __all__ = [
 ]
 
 # 保持既有公开类型的 pickle 路径，所有旧、新入口指向同一个类。
-ResolvedMarkupImage.__module__ = "docvortex.analyzers.native._shared.markup.projector"
-MarkupContext.__module__ = "docvortex.analyzers.native._shared.markup.projector"
-MarkupProjector.__module__ = "docvortex.analyzers.native._shared.markup.projector"
+preserve_type_module(ResolvedMarkupImage, "docvortex.analyzers.native._shared.markup.projector")
+preserve_type_module(MarkupContext, "docvortex.analyzers.native._shared.markup.projector")
+preserve_type_module(MarkupProjector, "docvortex.analyzers.native._shared.markup.projector")

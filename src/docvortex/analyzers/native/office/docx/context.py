@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Final, Optional, TypeAlias, Union
 from pydantic import AnyUrl
 from .formatting_types import Formatting
+from docvortex.foundation.type_identity import preserve_type_module
 
 _ParagraphHyperlink: TypeAlias = Optional[Union[AnyUrl, Path, str]]
 _ParagraphElement: TypeAlias = tuple[str, Optional[Formatting], _ParagraphHyperlink]
@@ -67,4 +68,4 @@ class _DocxConstants:
     """
 
 
-_DocxComplexFieldFrame.__module__ = "docvortex.analyzers.native.office.docx.docx_converter"
+preserve_type_module(_DocxComplexFieldFrame, "docvortex.analyzers.native.office.docx.docx_converter")

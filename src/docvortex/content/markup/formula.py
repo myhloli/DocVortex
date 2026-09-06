@@ -10,6 +10,7 @@ from lxml import etree  # type: ignore[reportMissingImports]
 
 from docvortex.content.mathml import mathml_to_latex
 from docvortex.foundation.xml_names import local_name
+from docvortex.foundation.type_identity import preserve_type_module
 
 
 FormulaDisplay: TypeAlias = Literal["inline", "block"]
@@ -276,4 +277,4 @@ __all__ = [
 ]
 
 # 保持既有公开类型的 pickle 路径，所有旧、新入口指向同一个类。
-FormulaExtraction.__module__ = "docvortex.analyzers.native._shared.markup.formula"
+preserve_type_module(FormulaExtraction, "docvortex.analyzers.native._shared.markup.formula")
