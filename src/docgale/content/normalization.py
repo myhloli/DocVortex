@@ -10,7 +10,24 @@ from typing import Any
 from ..foundation.text import full_to_half_exclude_marks
 from ..schema import BlockType, RAW_CAPTION, RAW_FOOTNOTE, RAW_PHONETIC
 
-_FULLWIDTH_ALNUM = re.compile("[Ａ-Ｚａ-ｚ０-９]")
+_FULLWIDTH_MODEL_TEXT = re.compile("[Ａ-Ｚａ-ｚ０-９：．／＼－＿％＋＝＠＃＆＊]")
+_PDF_SYMBOL_TRANSLATION = str.maketrans(
+    {
+        "：": ":",
+        "．": ".",
+        "／": "/",
+        "＼": "\\",
+        "－": "-",
+        "＿": "_",
+        "％": "%",
+        "＋": "+",
+        "＝": "=",
+        "＠": "@",
+        "＃": "#",
+        "＆": "&",
+        "＊": "*",
+    }
+)
 _FORMULA_OPENING = re.compile(r"\\[\(\[]")
 _NATURAL_LANGUAGE_TYPES = frozenset(
     {
@@ -43,14 +60,19 @@ _OPAQUE_HTML_TAGS = frozenset(
 )
 
 
+def _normalize_plain_text(content: str) -> str:
+    """按一对一码点映射转换英数和 PDF 符号白名单，不改变通用英数工具的契约。"""
+    return full_to_half_exclude_marks(content).translate(_PDF_SYMBOL_TRANSLATION)
+
+
 def _normalize_text(content: str) -> str:
-    """只转换公式范围之外的英数；未闭合定界符保护到本逻辑文字段末尾。"""
-    if not _FULLWIDTH_ALNUM.search(content):
+    """转换公式范围之外的英数及白名单符号；未闭合公式保护到逻辑文字段末尾。"""
+    if not _FULLWIDTH_MODEL_TEXT.search(content):
         return content
     parts: list[str] = []
     cursor = 0
     while match := _FORMULA_OPENING.search(content, cursor):
-        parts.append(full_to_half_exclude_marks(content[cursor : match.start()]))
+        parts.append(_normalize_plain_text(content[cursor : match.start()]))
         closing = r"\)" if match.group() == r"\(" else r"\]"
         end = content.find(closing, match.end())
         if end < 0:
@@ -58,7 +80,7 @@ def _normalize_text(content: str) -> str:
             return "".join(parts)
         cursor = end + len(closing)
         parts.append(content[match.start() : cursor])
-    parts.append(full_to_half_exclude_marks(content[cursor:]))
+    parts.append(_normalize_plain_text(content[cursor:]))
     return "".join(parts)
 
 
@@ -68,7 +90,7 @@ def _normalize_parts(parts: Sequence[str]) -> list[str]:
     normalized = _normalize_text(source)
     if source == normalized:
         return list(parts)
-    # 英数映射始终一对一；不要在此使用可能扩展字符的整体 Unicode 规范化。
+    # 英数及符号映射始终一对一；不要使用可能扩展字符的整体 Unicode 规范化。
     result: list[str] = []
     offset = 0
     for part in parts:
@@ -115,7 +137,7 @@ def _is_opaque_html_node(node: Any) -> bool:
 
 def _normalize_table(markup: str) -> str:
     """只修改单元格的可见文本节点；没有实际变化时保留原 HTML 字节表示。"""
-    if not _FULLWIDTH_ALNUM.search(markup) and "&#" not in markup:
+    if not _FULLWIDTH_MODEL_TEXT.search(markup) and "&#" not in markup:
         return markup
     # 与现有表格处理保持同一 HTML 解析器，公开模块导入不触发 HTML 依赖。
     from bs4 import BeautifulSoup, NavigableString, Tag
@@ -147,7 +169,7 @@ def _normalize_table(markup: str) -> str:
 
 
 def normalize_pdf_model_text(model_list: list[list[dict[str, Any]]]) -> None:
-    """原地统一 PDF 自然语言及表格可见英数，保留公式、代码、链接目标与全部结构信息。
+    """统一 PDF 自然语言及表格可见英数与白名单符号，保留公式、代码、URL 和结构。
 
     应在样式、上下标和链接匹配结束后、ModelJson 构造前调用；函数幂等，不修改
     原始字符证据，也不会将字符串转换为 Span 或清理其它模型元数据。

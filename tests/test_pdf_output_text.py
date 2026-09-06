@@ -19,7 +19,7 @@ from docgale.document.pdf import PDFDocument
 from docgale.schema import ModelJson
 
 _SOURCE = Path(__file__).parents[1] / "demo/pdfs/中文论文4.pdf"
-_FULLWIDTH = re.compile("[Ａ-Ｚａ-ｚ０-９]")
+_FULLWIDTH = re.compile("[Ａ-Ｚａ-ｚ０-９：．／＼－＿％＋＝＠＃＆＊]")
 
 
 def _raw_geometry(document: PDFDocument) -> str:
@@ -45,7 +45,7 @@ def _text_spans(content: Any) -> list[str]:
 
 
 def _assert_paper_text_is_normalized(pages: list[list[dict[str, Any]]]) -> None:
-    """真实论文的普通文字及单元格不再包含全角英数，但全角标点仍然存在。"""
+    """真实论文的普通文字及单元格不再包含目标全角字符，中文标点仍然存在。"""
     text = "".join(text for page in pages for block in page for text in _text_spans(block.get("content")))
     assert text and not _FULLWIDTH.search(text)
     assert "，" in text and "40" in text
@@ -98,8 +98,8 @@ def test_public_pdf_parse_exports_normalized_text_and_offline_bundle(tmp_path: P
 @pytest.mark.parametrize(
     ("suffix", "source"),
     [
-        ("html", "<html><body><p>Ａ１，。</p></body></html>"),
-        ("csv", "名称,值\nＡ１,Ｂ２\n"),
+        ("html", "<html><body><p>Ａ１，。：．／</p></body></html>"),
+        ("csv", "名称,值\nＡ１：．／,Ｂ２\n"),
     ],
 )
 def test_non_pdf_public_analysis_does_not_normalize(suffix: str, source: str, monkeypatch: pytest.MonkeyPatch) -> None:

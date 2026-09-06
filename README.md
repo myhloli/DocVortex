@@ -126,6 +126,7 @@ PDFium uses a bundled, pinned CJK fallback font for non-embedded CJK fonts;
 no system font installation is required. See [PDF font policy](docs/PDF_FONTS.md)
 for initialization, diagnostics and replacement boundaries.
 
-PDF output normalizes fullwidth Latin letters and digits in natural-language
-text and table cells, while preserving formulas, code and link targets. See
+PDF output normalizes fullwidth Latin letters, digits and selected technical
+symbols in natural-language text and table cells, preserving Chinese punctuation,
+formulas, code and link targets. See
 [PDF text normalization](docs/PDF_TEXT_NORMALIZATION.md) for scope and API usage.

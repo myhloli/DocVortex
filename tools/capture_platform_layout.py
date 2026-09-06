@@ -137,7 +137,7 @@ def main() -> None:
         "system": platform.system(),
         "python": sys.version,
         "runtime": asdict(initialize_pdfium_runtime()),
-        "pdf_text_normalization": "fullwidth-alphanumeric-v1",
+        "pdf_text_normalization": "pdf-text-v2",
         "dependencies": {name: version(name) for name in ("docgale", "pypdfium2", "pydantic", "numpy", "pillow")},
         "documents": {},
     }
