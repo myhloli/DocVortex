@@ -202,3 +202,54 @@ The downloadable Windows/Linux viewer was checked in Chromium: all 18 layout
 images and four HTML documents loaded without failed resources or browser errors.
 The original system-font viewer is archived separately. Linux CI reported an
 empty `fc-list :lang=zh` inventory, confirming installation without system CJK fonts.
+
+
+## PDF fullwidth alphanumeric normalization
+
+Validation source: `0afb1607452ebd79a1cae70c7d06fe5bede83cc7`.
+[CI run](https://github.com/myhloli/docgale/actions/runs/34034656162) passed the
+Python 3.10–3.14 three-platform matrix, Pydantic floor checks and PDFium 5.13.0.
+The suite passed 382 tests on Linux/macOS and 381 on Windows, where the POSIX
+benchmark smoke is skipped. One known sparse-table test remains deselected and
+runs separately as a non-blocking diagnostic. The previous font validation
+remains applicable.
+
+`docgale.content.normalize_pdf_model_text()` now runs at the public PDF model
+output boundary and at MinerU's final PDF content boundary. Only fullwidth Latin
+letters and digits in natural language and table-cell text are converted;
+formulas, code, link targets, punctuation, source characters and geometry are
+preserved. All fourteen other input formats assert that this PDF-only cleanup is
+never called. ModelJson construction/loading, explicit postprocessing, rendering
+and saved-bundle loading preserve historical text.
+
+The shared cleaning tests moved out of MinerU. DocGale additionally tests formula
+boundaries across spans/HTML nodes, entities, table structure and attributes,
+styles, nested tables, idempotence, raw geometry, public exports and old bundles.
+MinerU retains delegation timing, phonetic/Span conversion, and Flash/Hybrid/VLM
+routing tests. Its full suite passed 3,954 tests, with the same four skips and four
+pre-existing failures excluded; the count changed because the shared tests moved.
+
+For `中文论文4.pdf`, 1,992 fullwidth alphanumeric characters in natural-language
+content and 398 in table content are converted. The post-conversion ModelJson,
+HTML and Markdown contain none of these target characters. The two papers and
+synthetic PDF retain exactly the same raw geometry, non-content model fields and
+local source/layout PNG bytes. Per-document counts and output hashes are recorded
+in [the text baseline](validation/pdf-text-normalization.json). No layout, table
+structure or character-geometry gold was weakened. The native benchmark now uses
+`PdfModel.predict()` so its output baseline includes the public cleanup stage.
+
+See [PDF text normalization](PDF_TEXT_NORMALIZATION.md) for the public interface
+and boundaries. Existing Doclib caches are refreshed only with an explicit
+`--force` request; source PDF images retain their original glyphs.
+
+The refreshed 31-document public-model baseline has one changed full output
+(`中文论文4.pdf`) and 30 byte-equivalent ModelJson/MiddleJson outputs. Every
+document retains its non-content model fields. See the
+[public output fingerprints](validation/pdf-text-output-baseline.json); this
+run records functional outputs rather than a new warm performance measurement.
+
+The refreshed browser viewer passed 18 Windows/Linux page-image checks and four
+HTML document checks with no failed resources or browser errors. Both rendered
+HTML documents were checked for remaining fullwidth Latin letters/digits.
+MiddleJson hierarchy and non-content fields are also unchanged in the three
+reviewed PDF fixtures.
