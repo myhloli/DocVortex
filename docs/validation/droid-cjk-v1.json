@@ -1,0 +1,1579 @@
+{
+  "policy": "droid-cjk-v1",
+  "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e",
+  "baseline_commit": "c2de3fa2772b74a05477a1240dd195179c764687",
+  "implementation_commit": "5dffad610b40dd31b8be28e4b6656f377d79abf5",
+  "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+  "python": "3.14.4",
+  "dependencies": {
+    "docgale": "0.1.0",
+    "pypdfium2": "5.10.1",
+    "numpy": "2.5.2",
+    "pydantic": "2.12.5"
+  },
+  "measurement_note": "One warm measured run per document; observational local baseline, not a speedup claim. Five separate processes for startup medians.",
+  "median_time_ratio": 0.9348238572234169,
+  "median_peak_rss_ratio": 1.0377314814814815,
+  "startup": {
+    "env-314": {
+      "runs": [
+        {
+          "import_seconds": 0.4784132500644773,
+          "font_init_seconds": 3.7509016692638397e-07,
+          "first_page_seconds": 0.07648275000974536,
+          "total_seconds": 0.5548963751643896,
+          "peak_rss_bytes": 169082880
+        },
+        {
+          "import_seconds": 0.17029258306138217,
+          "font_init_seconds": 4.998873919248581e-07,
+          "first_page_seconds": 0.049261084059253335,
+          "total_seconds": 0.21955416700802743,
+          "peak_rss_bytes": 169181184
+        },
+        {
+          "import_seconds": 0.17346066585741937,
+          "font_init_seconds": 3.7509016692638397e-07,
+          "first_page_seconds": 0.05159820895642042,
+          "total_seconds": 0.22505924990400672,
+          "peak_rss_bytes": 169099264
+        },
+        {
+          "import_seconds": 0.18411062518134713,
+          "font_init_seconds": 4.169996827840805e-07,
+          "first_page_seconds": 0.05417541600763798,
+          "total_seconds": 0.2382864581886679,
+          "peak_rss_bytes": 169148416
+        },
+        {
+          "import_seconds": 0.17934816586785018,
+          "font_init_seconds": 5.420297384262085e-07,
+          "first_page_seconds": 0.05239316704683006,
+          "total_seconds": 0.23174187494441867,
+          "peak_rss_bytes": 169279488
+        }
+      ],
+      "median": {
+        "import_seconds": 0.17934816586785018,
+        "font_init_seconds": 4.169996827840805e-07,
+        "first_page_seconds": 0.05239316704683006,
+        "total_seconds": 0.23174187494441867,
+        "peak_rss_bytes": 169148416
+      }
+    },
+    "env-font314": {
+      "runs": [
+        {
+          "import_seconds": 0.19296462484635413,
+          "font_init_seconds": 0.0032796659506857395,
+          "first_page_seconds": 0.052118750056251884,
+          "total_seconds": 0.24836304085329175,
+          "peak_rss_bytes": 113164288
+        },
+        {
+          "import_seconds": 0.20588512509129941,
+          "font_init_seconds": 0.002945665968582034,
+          "first_page_seconds": 0.054244291968643665,
+          "total_seconds": 0.2630750830285251,
+          "peak_rss_bytes": 113754112
+        },
+        {
+          "import_seconds": 0.21972879185341299,
+          "font_init_seconds": 0.0031813750974833965,
+          "first_page_seconds": 0.0502982079051435,
+          "total_seconds": 0.2732083748560399,
+          "peak_rss_bytes": 112836608
+        },
+        {
+          "import_seconds": 0.18828283390030265,
+          "font_init_seconds": 0.002858166117221117,
+          "first_page_seconds": 0.04403470898978412,
+          "total_seconds": 0.2351757090073079,
+          "peak_rss_bytes": 112836608
+        },
+        {
+          "import_seconds": 0.18705708300694823,
+          "font_init_seconds": 0.00270791701041162,
+          "first_page_seconds": 0.04175508301705122,
+          "total_seconds": 0.23152008303441107,
+          "peak_rss_bytes": 112771072
+        }
+      ],
+      "median": {
+        "import_seconds": 0.19296462484635413,
+        "font_init_seconds": 0.002945665968582034,
+        "first_page_seconds": 0.0502982079051435,
+        "total_seconds": 0.24836304085329175,
+        "peak_rss_bytes": 112836608
+      }
+    }
+  },
+  "documents": [
+    {
+      "path": "demo/pdfs/2407.00079v4_origi-10.pdf",
+      "source_sha256": "3cd842a5f427997e9104f0f5304fb329bc0a4f9a4688c5e1269b936e52b21f7c",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 1,
+      "full_output_sha256": "667bc57cd3baf259ca9087f793a7405aa4fdff4df407a500b9c66348d0c56b44",
+      "page_fingerprints": [
+        "17b3aa88346ab53ed0adbe313461a5ebf1a82752a384e7df5b7c07dcc3eb849c"
+      ],
+      "bbox_fingerprints": [
+        "67b0e7fffb336d4f2ed062c6aa573634a8fbed88279f9621edf71f562e0faff4"
+      ],
+      "seconds": [
+        0.12606345792301
+      ],
+      "median_seconds": 0.12606345792301,
+      "peak_rss_bytes": 131317760,
+      "artifact": "00-2407.00079v4_origi-10"
+    },
+    {
+      "path": "demo/pdfs/IEBM_A_2667169_O-5.pdf",
+      "source_sha256": "0a9eb0fba0b51552cb35f036e99ed808ac22ae4a610f655dede142e55626060d",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 1,
+      "full_output_sha256": "45edc880969f4303e670c8596d8dc3182f48cebb540aafdbda403b08ea692822",
+      "page_fingerprints": [
+        "28ee44b47ce9e0225f8a16a7973e3712bce005c4888ebdb366c278da8498dfb2"
+      ],
+      "bbox_fingerprints": [
+        "9e09077594f8628992c7ce30d721adcc748dd4c8168bdbcc19bde5bc86ecf581"
+      ],
+      "seconds": [
+        0.18036750005558133
+      ],
+      "median_seconds": 0.18036750005558133,
+      "peak_rss_bytes": 130908160,
+      "artifact": "01-IEBM_A_2667169_O-5"
+    },
+    {
+      "path": "demo/pdfs/caibao1.pdf",
+      "source_sha256": "8ed2d930833f2d5528747f74e1748a178e5ebca828034c7f7f72aa73f8e4d9e8",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 22,
+      "full_output_sha256": "e5d5f8a471b06183fec70afe2c8bd7cab723fe3492eafa351416812d26814380",
+      "page_fingerprints": [
+        "9004558bc9889b49bb0ea7e39df7ac6126cc74d0d57137a94f46165916b7a61a",
+        "fa22e09c4e7765589ebf0ee263915c60f18d2f971d6c969d4365eb33c5d9edb1",
+        "c41fc23f8f3bb7ed5218795f9acb05c9cee469eee2cd636a47a18ef216191e2f",
+        "373e8e0cf5d8121d39923f02b7bf5fbce01ae2797d487e9670c1f11757af0721",
+        "33ca67bfe8c43eeb43e74c6044d9428a96a5322b09204a0f3576f8115bc224e2",
+        "998148e0d807a311b5a4ac57ea00c4e8b29d30bad9e1342172d2ff35ad9dc5c5",
+        "c8b6cf1b6af850e96c27b456154997dd1ecc099e4b3772d7db0fc23909537af2",
+        "c5a5d174761362995e1a6d9329e335dd29f5b6a1f6b50b6d174ac992374b5bea",
+        "80c41f15e35574a5be7631e0462465557844a849f4caf32db27caee5c5371f6f",
+        "141b58d8a7868fd9d066cf56577fdf0779997e4bdafc813e72dc42341fafaffe",
+        "0aef117331ee1455e81d5bc515bedc3c0df67dad1be2cb5189c6d610932aa157",
+        "2ab8ce4bfddfc7c2204982990d625417e7df3ba3802ffc9ce1c1a9f439d6c38f",
+        "3bb0f6befae8f7a7c415c8b2542becb8b2a388c0ffff4ef1a376efe81a129877",
+        "8eb02c0da5bff1c159da77debc83a71ee519fd2b727594eb2994347de7bc55d4",
+        "2c5ccd58ec39fdbc534ad32b7ac5b49bc90ceae3c7adf43a9921689e4df59577",
+        "a9707a45fac86760bab1cb9b085ef14258686c403a9557b3d1f19882b2fd5c28",
+        "b8b1ebf15b5f4c8628980d8df98cf3937ebffc2bdb65dab45410d9fdac375999",
+        "58b3fa306d49ac15920d5627d322efefeb3993fd7d69b4ca3ff32fc3f7d7fdb1",
+        "34f0c4b9f918971fcc44f72339d24d8c66ba72942619981f4c92fe71ff484863",
+        "80f1eaaa92b6bcb97503b925375b57233ab7ab18bb99f24844145a7b3f53a449",
+        "2e249ae8407ed7bf2f87260cb1925e058049a179895d8fb829c7d49c6f6ca3c8",
+        "90df9a5e46583c417f26c8e45b1c8e4e20a13d15ebcc2e8c5112afe5c5a87c88"
+      ],
+      "bbox_fingerprints": [
+        "d286fc61f042f296120ee4904b51bc355cfd4b8878e4bcb7c865015623b0d245",
+        "207f3d438a0be03cdee47728a92cc1cd5b1f05847e831b86dfa2aa49e26d134a",
+        "b4178f4169265522b9620ba7ddfb530c71484094046f92eef7e862c729d250ee",
+        "98d1c4c2d67deaaaa2aaae66d53cd07583c3ce14c6bc32200830aed8f42180f8",
+        "b17995445ceb38d0dc4f9f5945dad840656d90c4f9f01b04c0920be9234516b2",
+        "17262a65c1dff4e97626c6652a8456f971eb9625efb3ff62284ddf740fcc0739",
+        "111a7606a0fc3447dd04a1a47ce664a1193a1ea651a20a1f78f9fdbec05eb1f0",
+        "3a22e6a17c6f68c4ac6c8711241bd659748bc9417317712dade3c5725ecf610f",
+        "c699d6a8a8b3fd6332d45e2dcb6925a6af0e8294d35efe8ea1c09a10828b777d",
+        "6a04058216c6a65a7624158a1c8c99952dd9609354edadbc408e599dc28e3fb1",
+        "c8987e06b22cd1c4a1fac3660be229511e1487831fade79cf068211b815c55c0",
+        "ee1ec28f7c5f99d1058f7ae99a47fd31f7c02cf97c4a2d518296182d53bf8c29",
+        "0895afb3a6485cd0c92c21484e5d0f723b0b0dd7fbdccb75ca35a0926f861413",
+        "2060408c7d5216467b636ccea2bb6661ee59915c7036cdc0060efea3bec132d1",
+        "a474206c3e1007892cb7c1b835a6d104ed5dcc764b85ce5e1666e68e7a948d01",
+        "fb7bc2679068d5aa41b87e4719e5a35f117d37ff1f5308431d4f7868ed804586",
+        "e49248463038f77101314a87f222a7fbc125d9a8c0545f1548070d40019c7804",
+        "ac5727a4556a4b60ccdf3718287de0d8b5f8c9cdedeb7bc8b8a8b67657b1bcf4",
+        "c4fb92f66beaded040b3a014696d9dd5b75f8a83cb8b1a26bb0c9d3df3834833",
+        "ef82bcd85e74af91eacf39299dd816d89dab0708ba2f84fbae3bd4507c3db6eb",
+        "1ce3364d9c7bed58f530b7ea77f3444c8dade75d0826d74883946d3d80f91467",
+        "091a5b2a6fe8a21e4c42b11529dc76cbb4052402ec33bf31ec6e08d6b2411c28"
+      ],
+      "seconds": [
+        2.594796041958034
+      ],
+      "median_seconds": 2.594796041958034,
+      "peak_rss_bytes": 208551936,
+      "artifact": "02-caibao1"
+    },
+    {
+      "path": "demo/pdfs/demo1.pdf",
+      "source_sha256": "f3b3be345bf2df8979f2491ca9466e078e4fd1d6a216611faa8566e4c44d474b",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 13,
+      "full_output_sha256": "09ab6f5bdac1207964082e146358a6fb9bac5761e04236f7ccc0989eac158204",
+      "page_fingerprints": [
+        "b4bbd21b66f82e1803dd9a0ee3b0920b56673d75bd22f0af65629eb105206dc1",
+        "04bed5d788762c71236eca818a9aec8624c63be906c5b046c3ab5f432cd5a917",
+        "53173f2a92982ac86c09259058585b306f0d520cd107b823c545a128851496e6",
+        "3f08a1a71f942246e14402f578772be44d28f4a205f3d149d45c72c2eee0df4c",
+        "9628364973945ac7ffbceb9094aa09b9d25a0c88783b814637291bce20122ea6",
+        "d0c5b10e95824c4c6cb7afe80baf1a2fa7a13f6b7bd3d44cacc981f5344f5c54",
+        "cbe0a0fbf3bf8fdcf819156f5d5d0afe0e8446740956914a34efff5667548e25",
+        "8a0e038280f518a5101b587b8c54e5e4a0eaa077812607842500122f45e404f3",
+        "9abbc0cb54cc8352417834f172db2d3dbf1457c672c583aff3ef67a930bdd464",
+        "44f98070b95108d79c4c303f1ba06834cef47c297df0498b333b0ce51d0b5310",
+        "fffcb840a9b2c428a5970809f6148bc6415cd765cb18d98a6b650839b7cae0b9",
+        "7593cc85eab1d1080931a603da358d87780ee778f99c55bd116a0192cca4ce34",
+        "5b708976562bfd2e8867101e480c97e32f217d1b8cd42824d25f58ff3c361434"
+      ],
+      "bbox_fingerprints": [
+        "08d17943df25430fd9d9b0ddb7154b749007d9b62b03a8a16b3e1797e5d3f8b1",
+        "03e32ba13a9aaa1c677c8b9891d0b764ac885764ae6f2a491e30dc5006e21a3f",
+        "f761cff13223e296c032b86d30d39cf08b74d48e0bd14e0632c73c5f4cd8e9ff",
+        "57b913c61dbe1a48c792f3359d74b256723bd3cb8db49e43e896b11c95880226",
+        "2f52c50b71aa97c63efc144b8760ae9841b1b97b522f121dc366198d8e006300",
+        "83846e7e1febc609a42adcde2e14e1856d8d6e2eb97760ec23bf12cc1992ba5c",
+        "6fb1bec6fba0588c197454d02c963f57fce372537c22c4336b070b63aa83904e",
+        "fc6f6f03c133de15d863fa0af8d473a264af969fe416a606cc0dd1cf7494013c",
+        "a055502cdd81c55d0ee6d277afb37ce35af896134ed5a24216c3d9473933141e",
+        "42f09ebb33e12021f7b0854aed33597ed3758a6953b298c34b75deea0a1bc4f3",
+        "2e098256ab0920eb004ae6779fc09cbe4c92c4d0a6a62ecff9c44e8d13ade6f4",
+        "577630d04663d48f5aa08879c232514d70321600c31fc40b697a296acc25e6c2",
+        "4a20e07d6d0217ece8cb4f8276528462d3bc37273bf50f7f6e5b5ed24a54a157"
+      ],
+      "seconds": [
+        1.9599277081433684
+      ],
+      "median_seconds": 1.9599277081433684,
+      "peak_rss_bytes": 201097216,
+      "artifact": "03-demo1"
+    },
+    {
+      "path": "demo/pdfs/demo2.pdf",
+      "source_sha256": "9e94e95637356e1599510436278747d1150a3dfb822233bdc77a9dcb9a4fc6e4",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 6,
+      "full_output_sha256": "b6a4b16334808913b08171a18887e400bda853bfb4b6f79132996ba679d681d8",
+      "page_fingerprints": [
+        "28996e11461de5f05f2811f966344778b57894511fb7a425f1399c8ab945fa21",
+        "5a65be2fe78dd264a39e60d93630ada1273d40b210f91f4b7152075ac6003c15",
+        "d681ad09b8d3bf7e3e95354a1d7b490d3a3be9e5ce0d6dbe1f54f5ae113e5df9",
+        "2fc4da6d28979b981e6555ae58493fca2b50e8941dd854d3474d756d46531738",
+        "ce8de6bc4a7431d1d51af19dd48c325365dfea8ff60c3978b47a8481f0e31f4d",
+        "0980955875bb408f3cad3f10c5228e26a20e418957b6a43319c0a42152459b04"
+      ],
+      "bbox_fingerprints": [
+        "c88c4b2f1808523b5c446eb194cccffe050497d2b7e90cc45c603ab701376e06",
+        "83e5d9c65b7b7fa3ecb34b4d0f382621fe39216f14e7aa2838954bed9f9aec29",
+        "4eefffa781c180624dc91dbf0f9973549582ff8b4b6c4f5f0e89f8ec13cadb53",
+        "8c9ad4989d4263d5427af2fe2202a1b698e76618a0d4a9d5f167fb680286911f",
+        "171ccc322e57e9cabd07bc70f1c5c2a6bca6bb7b070b03863b519a8db7124a21",
+        "42137c8c69d1ed3c3c3f40d726c787e34bccf971414045a9dbb770a84f2d6532"
+      ],
+      "seconds": [
+        1.266806666040793
+      ],
+      "median_seconds": 1.266806666040793,
+      "peak_rss_bytes": 179388416,
+      "artifact": "04-demo2"
+    },
+    {
+      "path": "demo/pdfs/demo3.pdf",
+      "source_sha256": "7fa1e7e571b093a671c5daff7c1d4838144114ceca80fd57c127537f4da3a5c2",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 10,
+      "full_output_sha256": "861d66cb0b4af8ab4662503bd058f00034f224bb0d9fe47389bc05b53fb4f682",
+      "page_fingerprints": [
+        "c3360418ed48a04066d426f3360d4734891896fecc868e60e96b418edffaefad",
+        "f731d4f92b827171331c9750a8bacdec710bcd0ee42d328e68b52e917cc5af91",
+        "d1e3d51e284cdb5a19485dc45110ee96a83a95edeb5c3dec993256583d99500c",
+        "0be2146eff0763b514491f559660aedc0ec175e062fb772cc8e4d508257bc69f",
+        "1f069eb28cce68ae4ccf93dc612ef41e4f402ee0e249c1ca06346773fdca3772",
+        "3d9e662591b1a3a6f719f5ea4497accdec88f3267a437bf82e74607050488762",
+        "cf97331f6483d4b684c92715ac8d8e951d110f103d4d138ec49d93e3dcb36790",
+        "08ed08c7ad1bd6c22655491c0eb40c2481bc6987bb5cbf0c51c74624620b1f88",
+        "abf7ebd40f9fa66a28b14014bbce8b87f7de090c63d69f57e8b066aa0cc110ac",
+        "df13848368214f9c46fcafe2fcb1443c6bbc696c90d48340dbdf004529372635"
+      ],
+      "bbox_fingerprints": [
+        "a51187d2bd4e91caa1b3b2bcb71960804208894792423f2d3b18485fcdf018ef",
+        "fea79353f1c7ae689e51b07626b50bc8f7fa086863b7713a2841a52efee92342",
+        "991904cc11a6fa112abdfb12054972fb076ed39f77fe9563cf17be249f8f23f4",
+        "956f95f2b97f074611a9ddad8383ef6d9c4b10bf286943daf2b3180224874ab7",
+        "356edc9a1cb11109fe1223fc3cb479d429f2fb0844baebb8f031ff77ebdd78a5",
+        "c1f7f778536816e4b3958e60d02f7ae78725e0919e1790a77320d946ab126bf5",
+        "9644f46ea5a17c4d75d3737f67c93db6ab46181a0d052d795f6b543a8acee125",
+        "1969f829ee503f320270ee0c83fb3dba0282f056e5fc255e01b9e429010f5706",
+        "cc3d9eefd3b5864cfb625e3c334ae7450fd5a9bfdb35ccdbe3d0d46a6c86178f",
+        "393808b70eb1ffff66a014aafb19b4230c14ba6f6c1d5894aa461c277a05b80e"
+      ],
+      "seconds": [
+        2.2183227092027664
+      ],
+      "median_seconds": 2.2183227092027664,
+      "peak_rss_bytes": 202014720,
+      "artifact": "05-demo3"
+    },
+    {
+      "path": "demo/pdfs/demo4.pdf",
+      "source_sha256": "82402139a9e6f337c341efab819502c8d3ab597f5b974a9e9fa5844eda9cd5ba",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 11,
+      "full_output_sha256": "36028a8771863501cb79871cf3827a447442a2d9baa94541419212a46cd3954b",
+      "page_fingerprints": [
+        "c6fc76c570e642ce06cfb5f85c49e600a3aa163397b81b8e6c91a7f8c519d921",
+        "6f3764ff04fb26dd8784097b60b7ed442589d3ff017e60666f6c5bae479dfd90",
+        "55aa07c62414bfb6e73f1bc34936fb2b7acf83e0e6a411b8cad87dc3a6b871f1",
+        "2e3f8796267b55fc36b081ff2e3c83a9be4a30fe96b41edda341a8b260365314",
+        "386cc57a405882c3bcdc57b3bec4667507aeb6d54e2e633b4ab61cfb5000ff1a",
+        "2b6e9d3daa918e45ca69b4e960eb1c0c66a499aa72b83b422abca7bacd377011",
+        "4ea05e72f2ccd53f2064e1dc30006e4ca0b9bd4dc1e49b1cff80b0afdbdc0800",
+        "f117ee1dc1e3a09c667f0b2a67ebe0c55019ab151ce877bd4d620feb007644b9",
+        "f49820e9394e2287dcd70baefee6dd4e7d3c7554f521448c5327b0b5811e7bef",
+        "d5bd9497a0c0669196cfada318a9e019ecfb1b4932fd985f4ce1939b08294381",
+        "c178e981804aeae6402ff3a9e1937523c1f8c0b595db582e388dcd5b08d410e4"
+      ],
+      "bbox_fingerprints": [
+        "853411294b0b192e8289f16daa377b21abac8fd0eb92411bd15ab53825c7edb9",
+        "2b8e39bdbe1975b138a5195224c67165ba597e8f842ef6314c3ce3938b181c05",
+        "25d58df83fb86054d11b76320dbdb004cc989ceb1a5275739077f1e066902a9a",
+        "6899ede3064c5254ed69996e9c0e4c3451fda810537331c17ecacf52058c208f",
+        "74b1f53939d266ca89fb30da1264dfae036a5a2d079d3953ce51f9bda92af6fb",
+        "41f64ef7696d662cda43a6726ac32a9d16429f4faacd1bb5586544383b6498e7",
+        "847375d7834720aa4499fb5d0958244dab1be66cd434bd495d4984f9ce99aa91",
+        "8b19a0e7b2563ddf2014496d78c28cc005c80d7f6c6a7f76c8bd77a7b7b1f87a",
+        "43ba3b5f667ab3e9cdde596cb1eaf85a5739a12ddccb100c0c8dd9299f392784",
+        "57b2d53e7edf7a8bc4f904106193fa2473a0ffdaaace31a9f5293b93decbc16f",
+        "f5a7447bbc78c62c59746fdafe6355c6f2c6dabb4d841cfa86952bede0aa489d"
+      ],
+      "seconds": [
+        2.31380383297801
+      ],
+      "median_seconds": 2.31380383297801,
+      "peak_rss_bytes": 225181696,
+      "artifact": "06-demo4"
+    },
+    {
+      "path": "demo/pdfs/demo6.pdf",
+      "source_sha256": "e7e4c215e14320c14b6d02e7e5af6f12630a4418757815dc385f1cdf2d3fde45",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 7,
+      "full_output_sha256": "f0f420bee464eccb82f9b08ee4434f14109f253d0028c9b77e849a5e5b8bfc53",
+      "page_fingerprints": [
+        "40bfd9f6e1a69208ebe8296c411c649c617690890f355c6ef40dba5b45fd4896",
+        "82ed0d2c8a78837d805efa710d9281f207dc2f9067301a697e755ef865a069a4",
+        "050e57d1ebec029b49f630c6c6b0b1bd97ed6073d724ec9b4ca39bb272caf7a7",
+        "c422b17ece67d73a94e4625e4b55c73f6d1f555ecb489f210302c82e9a09303f",
+        "1fda4ad3d4e335660f9c69e5cf463d27c30162a1192dc2f6291958c69775484d",
+        "dc32fdd44813e5a8882f9d2acfbb58edbf1259a69cd5a81953fee6f36f67cece",
+        "172d9928fff7edf14002b3208d4a40fd550defcafae4687a55e86e9ee37ec01c"
+      ],
+      "bbox_fingerprints": [
+        "9ad9061c82c0115b645e71c7401aa43c6fc4dc2ccc80c5150c9733ecbad3546b",
+        "3d482635b03ee3ebc20cf13c99b85f101fbd5d255b20f1c6e54e06c077c5b964",
+        "28a2c5a920010f0e27b59f584ea9a6340db26a1eaeec00bf4b3ccf5afb8e2b47",
+        "8e02a7d9794ef433115f0e56e9a0b029ab8586958dddb3300e19935fe91e0d79",
+        "0b138cb777fc302b11a8a7aa751f87b0ebf9935a39fa4498ae864f594daf513c",
+        "29b409f5a9526bc2e5283ab0fd644415421c3a27911d1130f799ab38230aa3fd",
+        "5fb75f718c5701943bbe3a538a815e34a2290da06dd8035992d8ec8f10c8b0a4"
+      ],
+      "seconds": [
+        0.2388830001000315
+      ],
+      "median_seconds": 0.2388830001000315,
+      "peak_rss_bytes": 131530752,
+      "artifact": "07-demo6"
+    },
+    {
+      "path": "demo/pdfs/mixed_elements_pages_03_06.pdf",
+      "source_sha256": "d2f2ad073819403cd9abd866b1883349e9d1665144d7274295abba1a1a27bd4d",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 4,
+      "full_output_sha256": "02d2f5cbc7efc0c3030ab78a603e1685d3a69c5723cd3b745cbb024bf595043e",
+      "page_fingerprints": [
+        "9fd60cf34ac968ff9b76722a617b430e5b3a26c7117566c4cb6f8c2f1cf99b00",
+        "81651a1551e8e190c36afa393d4b06d01fac31e26931cd81177503f4ba620134",
+        "5f5fb6d8f9be2bac47c477c6a1ee60cadc50a02daf39c0b833f4c9dfce2fa64f",
+        "c97a424f59b9ff225901d9b217c6289876176b5250ddbfc0c51effbe6938b55d"
+      ],
+      "bbox_fingerprints": [
+        "13ba9654520aee09dca237c934570db71af75d5582fe978dc24d099c9c08c979",
+        "fd471df4b6199491ec0389b9c17cd1581e15c01ccfb9bbb5a7a3c7d53085470b",
+        "62bee4e7ab08f59314ad1419ebd0b98dc6fc4abf3ac3605b25959d62a9783acb",
+        "0c10606fc4b602f8c0cb5f6d528d67833bde76fa841bb37e8310ae7eb44ad28f"
+      ],
+      "seconds": [
+        0.5745271248742938
+      ],
+      "median_seconds": 0.5745271248742938,
+      "peak_rss_bytes": 146898944,
+      "artifact": "08-mixed_elements_pages_03_06"
+    },
+    {
+      "path": "demo/pdfs/mixed_elements_pages_07_10.pdf",
+      "source_sha256": "89076ee9cce2168ab894ee7e280872f8a3c09053b9dcdeda9c1da76d111adc1e",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 4,
+      "full_output_sha256": "6ad8d19e2e4e85978a62beee16f4ab8fdba4ca66c615bc0ebdae6078e912dbd6",
+      "page_fingerprints": [
+        "72c39d7d1f3a7cc60d3dde026fb3654916d141334070ae02c1463db3e7b5aef0",
+        "26cee58438fb701943762e6818ecd9f2e9827c39cd15fc92296f3c33a7b39caf",
+        "223f8dc3618805a8688095824d638d00348540403923ffddb74ba95a3a1961df",
+        "bda3019aa268f7a2464d355cea0a25de59d968c3b80f5d79eddf666d75034444"
+      ],
+      "bbox_fingerprints": [
+        "e7ab56193d2a18a40dfbcc9b6ee4b0727c1308086e22bfa84b0aeee148a730b8",
+        "be68782f34da219498b19fe57c51debe23ed92a72b23dec5bd13d0b78ce63f2d",
+        "d11e2e4659f5b97eaaa59b8f7f5e683cc1781e5a5f5d1429e111dad7141e4327",
+        "ce18a78066c97622d1783768c0c608d8dcf59e5422d5853c5c55229b405f9c1a"
+      ],
+      "seconds": [
+        0.894342124927789
+      ],
+      "median_seconds": 0.894342124927789,
+      "peak_rss_bytes": 156811264,
+      "artifact": "09-mixed_elements_pages_07_10"
+    },
+    {
+      "path": "demo/pdfs/mixed_elements_pages_11_15.pdf",
+      "source_sha256": "1fcf7d5e8e0eb0ef901b170f9825ac8aa0d0f9ed60514bb350175a1ae4c43d17",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 5,
+      "full_output_sha256": "0297b25e858929c51a7c210d6b6b349749257a2f7dda28d67d11b41047b0b1ee",
+      "page_fingerprints": [
+        "e8c7373da4ff33552d4680a87332f779d61f14ca2ce8ccad418dd19f6d434178",
+        "de41614800af2744ac923df98b75258195676ea84a8859dac60d20c742a40d6c",
+        "09067faddddbb5ba4fc8546043bb0083a36778afe2906cce5f1404b85f0aa58b",
+        "160d67e3999c10f0b0a04280d2ee2007244ab858f31663496ad64b49707e8124",
+        "78d09b52da5f98e58e26466684b0e1aa9a75b7fedf7b22eccc7a71583db876d9"
+      ],
+      "bbox_fingerprints": [
+        "70b6df5ee386b8a09fd7264d1ded0d9db6ec28bc62225997b0ccebdbb92d1ffb",
+        "ef440221392995c6a72a649e69032604b48a486fc14671b825eb008b3c6314f8",
+        "992153c5ca2ce189b27cb843e90877e1bcb7f5f046e346d8db9bbedd9fd27315",
+        "dca9390672a8f460c1a7cced7b6d280177a56a8da0fd49931a9741a9dd2b898b",
+        "d9de7f35cfe2ec79864a5d2c6f938ddb34390d9cd11ab916bb9a340bea27dee5"
+      ],
+      "seconds": [
+        1.1608545831404626
+      ],
+      "median_seconds": 1.1608545831404626,
+      "peak_rss_bytes": 170082304,
+      "artifact": "10-mixed_elements_pages_11_15"
+    },
+    {
+      "path": "demo/pdfs/mixed_elements_pages_39_40.pdf",
+      "source_sha256": "34332c9ff06ea6ebed9c5870652f29d31dd59a8119e12bc884356e31b7f1c087",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 2,
+      "full_output_sha256": "76d50875a2ed7d9afc518da6180366e8cfd0d347ee99b66ab93f8459346fb68f",
+      "page_fingerprints": [
+        "6f0a5842fceaa948f312c9fea8c8153fb7480fca2f57688cf5c1983a2816ae2b",
+        "15c3f007075b89306066c2f934c4e0333bdbb413143cc7a92fbcc78b1a6f8f40"
+      ],
+      "bbox_fingerprints": [
+        "e78dcf20e6fe56ef19832742f3fbbd87dd0d29dea08710e9729dd0357a8b16d7",
+        "0361176f07f0298e10fbcd24673f9f754ea695146ae83b2e187ed8f1120e93f1"
+      ],
+      "seconds": [
+        0.25922599993646145
+      ],
+      "median_seconds": 0.25922599993646145,
+      "peak_rss_bytes": 137592832,
+      "artifact": "11-mixed_elements_pages_39_40"
+    },
+    {
+      "path": "tests/unittest/pdfs/flash_layout/mixed_text_layout_sample.pdf.xor",
+      "source_sha256": "fc3150c68c9f88b78d10dd2c321871f63a2e08be2099528fe00cf62d8a17e3d3",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 24,
+      "full_output_sha256": "b3bbcfefbdc4b0512570b7a83d880c0e7fc8dbb254f0bf503aa8b5bea578e38f",
+      "page_fingerprints": [
+        "ba7bcf4be6afc505c5a9abbae2f335d0a466a3b5995dcbfa115f436cc5a93320",
+        "3e3705c60b6ee7542b58631adf5f50a0a93ad94a3d841bb3c71cc2a4e51e7cf1",
+        "995e10ce974ade1042fafa8d1d5c686e9d792c8a63da9ee73913f2f4b8865432",
+        "edb5bd80303233a5c50cb450515752c5bc1af2222ce4f7e8a757aa72e79be08d",
+        "ee5fa5b6311e65b4c30e668dab6f41b0acaff6a3e01c48aa17355037e136103c",
+        "abee9b87128e89537f59454f078156f7981d9b35405b07ce7b5039cdb1c4f1a4",
+        "d3558191fcf113b956e4ab78d4af38e32c3f0b89ea6eb01e6ba59f0d19d689e3",
+        "f3f9e9382fe3769ef808fcaf12fadee48bdefe37cfccd5badb6bc08b37abbcb8",
+        "bd2c489e665e33ef2be2698a6b2bb1a817ddb16684c472f18e34012222b85860",
+        "700b753b8514b891a1d8cc422172ac7cf7c0be0f24b90f6c9b0abc9a8292aca0",
+        "ef1773593b81f2c97df533f83465bfbef4bdd4cdcf25776924b4bdd2142fb36d",
+        "fc28bec0ff3847cf44056bf8c2e6b4c0e87689e39d5bd99f0d9c70c1a897729c",
+        "c727b7e1d248b0c04748ea0eff2b5f00ef1a45b07df46b663724ca93a186404f",
+        "470f8d8d45e5a44bafdef24fbb854c8fb3eb044648137762edc96a587461b04f",
+        "6cbb4a6ff577214b2a43e25dcf8bb4674c99d81733c19837306609ea6ed8911f",
+        "1eec718dbc0f644192370debcc9edc30f73d57eecb7bbf7710a3a4d57e88bf1d",
+        "ba7e32c89da62e890243acc6fd4b7eb7700590b2f1e9428f87030439e03b2645",
+        "e9bc73efb3f1b77ced28bf5389cb95be53d263aa598cb5d8a2f425eb2f5b80e8",
+        "66cb509b4e5100b34b43453e6a20b79dcdf1942400f5b8a50612d6628be9c9f2",
+        "0ec3a7dee8883f637091ff6a921e8fda8a269de466f3f4290ed111ab8f88b17a",
+        "4dba454eee528d58a5f597daa5d1de4d233c0a3fa83ebe6a62b627c082a88a87",
+        "eadb8041770aaafc3ceaf66ed279cbd4a6f2b83c4f2ff2256c5bda1971a1640c",
+        "ebcfbcd786596b5c47f347926faef96aedde8edb48f25e0007e981e60b3385bb",
+        "a202eacf99a98cc6410f4180aa87bd8c7ecf4dfeca2f729117ee9a609ba0cb43"
+      ],
+      "bbox_fingerprints": [
+        "e0e141950b2861578f223174a045fdc0642f956599ae45a9100c38a2d960a286",
+        "b1a399bc249a3714db6b816188f33a78f5e8d9ece7dcc8157f0bd03f9e74b577",
+        "6aa7e44ad613ebcdf2fb80b339d85bdf713733730f650f1de9d58896c3d577e3",
+        "bee9777d42d9c05a9e17d514c03acfcd15309e5f8cfe17a7df78e018ebdfa99b",
+        "04a002521778c5ef296d5a3468c8c1c111cc54dcbac2457ee3f6a23f11c735ab",
+        "1b3887124eca5f098165bcde0ead0c84c99f6d68821d0640164e5f585c2aa9fe",
+        "4a2e9cce7649cd0cf3d1c0b29582c62acf3d2cbcabe9a7227dd69931019eaf3b",
+        "5d5fec7c1ddb28880b9a1f3115ab1ec4a21e80d3aa127ca077facb7f7f3cf94d",
+        "43606b72732bb29ccf312bf71309022a826b33017d48b4650f7a0dcaf56598b0",
+        "790fa4a8a9b0c616d7968b0e76ab4e7bbc586cd8a381e46246ff36609d2687ca",
+        "310cfe8c1592f956f394bba17ce9662bdb6820de0a4329789b8af57cf40aea71",
+        "0650705ec8076107155c52991341f922f2bcbb1e8a2574213351871ad90e3ad2",
+        "46d07efb34bfc61133049555f35737d92f66049cae6506be9c098400895cd628",
+        "12517bb2192287d04aa97bd4a766b9befe088eb87068c138a47bda749568bd03",
+        "b360dbb35ed1b3d5d8c701ea59fdce24a33571f71727bf1525359a0bbcc999b5",
+        "1827184a751a69e2b019ac912086778ae2584b5fd80103c9b72ee41b1e3481ec",
+        "53b95cc06d90b09acb2d2ed977ca873211645580e19ac579c112425ccbfaf785",
+        "a8167d1d58f2da32e85b48e9758419c71d60d2dbaf98841a4a55c82a53e90185",
+        "ddfa121a4c0c4d29dc26c0d4cfe22f326d12587378fa4c49c4f6389e22e180d4",
+        "1c0f0f3189207fc34e2dcf24143e2dbbbf57c3c822f5a159f7a5fd0e93aa3f1b",
+        "3225e4fc8a43bee2bc653316c7bcdc2ae20ba9a1ac3c28fad6bacecd86cac26b",
+        "291f454836522a43ef17799ba92246f075983282f2e2a0b7a2316064a9964032",
+        "addbf86173a037336742ecbef64caf6651b996c3d06e029348e6b5b14d2121b4",
+        "7b289ca58a9adf51d4d8c32ed26117d1547399e0c98d51c3e1a964e573827be7"
+      ],
+      "seconds": [
+        0.7326909580733627
+      ],
+      "median_seconds": 0.7326909580733627,
+      "peak_rss_bytes": 164610048,
+      "artifact": "12-mixed_text_layout_sample.pdf"
+    },
+    {
+      "path": "demo/pdfs/中文论文.pdf",
+      "source_sha256": "7fe627f5c376d1fd32a231648a6d9f3cd95a071e0773bb4a00cb9d359ea20a9a",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 10,
+      "full_output_sha256": "04cfa6b97197462b3be67f9ee8e46a2fa2932ee606c45bb7e5367e1df92707b6",
+      "page_fingerprints": [
+        "29c6ee99392dc49b632c3bd813817d09eeb3dbb9ef87edb513612b2c0e08a91b",
+        "7f0f6e87593c4865ed610f5800dec848878373779a7c23b32486a0533d06884b",
+        "a4b2c328a7065534f1ef2d4f0ceed9b7be682d870f03a582126957ddf7a63094",
+        "4941a9458a95bbcdc7f4a2141d42e59c007d693d698acb7a1b48ddd6a88994ee",
+        "e4277916d0889dc238f5f4d1cc802c7d194e66b7d3b76898bf35130744c60b29",
+        "c8fb1703e8772aa31113e35da97fdb7ecf2ac45e05a8f32175ca25b119ee949c",
+        "7093af52db65ac5491bd3a20e36a6299c73af7113004330af0c4172618c6381f",
+        "4f3b830d196f35175716bf5e6586723aca8a8201e4cb42d9dd22e1d869599bcb",
+        "1969d30a25a6a6e1f081f42ae0aa62892e0af7f07922d778e190064c4c73c1a5",
+        "4c26107a0ac41248dd6e3946fc775cf24933223ed8b890cbb6d855bb0fcccfa7"
+      ],
+      "bbox_fingerprints": [
+        "e03fd27a178ae2df253a985491834a688dd95e8c3c709480b7b2033045a8a2ab",
+        "9d1578ce69df8ced592fdb81597322bf9d3094357a8b8c76ad5a90abca9e87cd",
+        "d10f00b989a0b594d00f762f93b5ac095ee10104b534dad5feccf96bf04bb212",
+        "93c0802ef95807407f3ccdda650f573446961efd0d050088950a6212db16a6da",
+        "ddc556f9cc27f9b600aec03dad2a2999d1f1e95f02d0b73fb5437af265f92be8",
+        "89e08415a20da7f90349a3d9a40577597b6b218647749ba45478c7ef14994abe",
+        "3e679b89e6fef4a2a71c55bf4e52f046ed824301bbfb2c01408e841b62caa060",
+        "fbf8c41195ae7cf94fe990b6b7e7e7f8abd2e748e77f7d66758bf036863eaaf0",
+        "f4d16039959ab4b73d9e4c332efb151549065ddb7ffabf092a3bff86991ad448",
+        "ebe9d1954ff93a0f181ab629ff996ffcd2149ed76e990a0b6012786b8e4067a9"
+      ],
+      "seconds": [
+        1.1910833329893649
+      ],
+      "median_seconds": 1.1910833329893649,
+      "peak_rss_bytes": 180961280,
+      "artifact": "13-中文论文"
+    },
+    {
+      "path": "demo/pdfs/中文论文2.pdf",
+      "source_sha256": "937cfb51e9e8abc6b3a2d8c46d38003cd2ad795a0692eab3f9e92ac604fcc9ad",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 23,
+      "full_output_sha256": "2e63597c7c86b4218c9748349503887a43da42007fbefaedf329fe1b3212ab63",
+      "page_fingerprints": [
+        "8412b58c8c4fc008727a8e32ca4120ce6fcb60bdb1b59df3c2e3a7ef09402bea",
+        "05b1a3f807727e1755d88dc6601248f8e72c30302dd29a469d3abc5c18f4e54f",
+        "cf2459e7e96bf155f79cd206280eddc901087b4bfb1f67ed1aa2b71d375bd5db",
+        "a77ea73e04b9a1d6b03b7bb002b82a2a46ef22d3f557cc208c397309cc5784b9",
+        "c515944b86d94b2645e6d0403183a698b2da98c672ba7ff7ec339912880c786f",
+        "7986ebc989b837e5bb0417a2fc746ca2410ee7fec80e4562fb89c6bccccf4717",
+        "e5625fbff8dda5468116443423657ca22b91691a8798e231ecadd0d28cf22771",
+        "73af3d8ee5d4bb198a36bb25a7eb7ba0efcbc0d0cc8529aa4593d2f093307f14",
+        "b55f448ed902a3b800266e168cc988877233442a2d255a3c0c8ccdb5eaff8615",
+        "e042ae6457bf5d66a3822d7ee5054ac604009fef57fe7dad3a0aebf9de636300",
+        "2148e2392183c2d0d7b914fa556f742b77e56658450dcbfd97cd7569119f6188",
+        "879d679c0b0cb326883ce21c14651c48e89d6d57644300d02eb4ef08f68672a3",
+        "7762d0cded1992b9a620108bfa4b96c0c277e2284d7cc68cbdc168c714a3689e",
+        "7a9bcba4f94aecc86bedb0441fcce0c6114d63923dd591bc84880552450873c2",
+        "d0f57c0291afd643d4622b1af0c2ab70da43a4289d1fe4dca1d2bb9d57af97a7",
+        "7128c1729eecf20a97e26d7e196217991d87914f70d625bd53df35141728e851",
+        "04d2fffae87d96832073e4224f1fc6c39657124e7416df42999a8cfbae745876",
+        "fbc33c3b99a1e76d69006d37faf97e22cb7dac10e698c488d4e7ca0d27da1236",
+        "53930dd52b98d4b9c87f226f62d3b812c4fe30c81af79059d3e9469c1b90c556",
+        "51882f9de7307ec46b4c6b1973576597212bbb2a46cf6e1485bc9bda41bc3bfc",
+        "e09808e87f9fe007eff7207bd846649ef31eabd59a90a2c43b65045dca49930e",
+        "fb6c406124dcf05203a83c81baa0d345fecd9ff4c3b80ac5aaa0922ba15d1e29",
+        "4477c4e4f1e8d7bba5d61b82dd078d9c49a645d9af9b0928faa1719bd6e646c7"
+      ],
+      "bbox_fingerprints": [
+        "df2a97c3af2098d3f7d3198d4b205ccd35c45c61cb3b100e90ef079f20b6ab87",
+        "6d8c72fa3617e1e4e84643bd5aa82084547a4f750bd38e9cd02a9d9b09938ff6",
+        "845713ffff2b1cecfaab81910039133e5c1937c835c9408af904b5008869a9da",
+        "f76e43d301cb1712842eddf98201383f08583d97d001f247f05de8df71e75a52",
+        "0342e28f229501b3d5d78e9bb86589d012eb5398b69f32196bca46a12f30ed3d",
+        "c738f475a43c88b78286eba8da3bed2dbbd82a8d8932c7fc10b1dca562d09414",
+        "97e36c6f5cc149c61163384bfbe7ed89216af97ad2fe5c08247b12644786fd35",
+        "007a1657030f2c6f4d0ea69cd1af059867723b969a771cfd2ef25d05353761dd",
+        "9089c1d08cbef7319770cbfecab9530156fd490eb723adac7ae1d75fccb4b2ad",
+        "21a2f6e5fd48a621555907c50a86ecadf0dc29ab13d5122d0872ec9f335b149b",
+        "23832b0602615362c1aaefdf4802b2566111870d961439d225202929629b8c55",
+        "1a40a196e15e4aa5ffbddba43b9eae1d775d883463fec0dec783ee927ba6b531",
+        "89f58d9bb6681bef8c04f4d67042877096a1742e782871d295f41eee8c5f3bd3",
+        "4504bf26154dbe3b4a158740491e0386cfba7913fb0427d27726499e89f98e84",
+        "8e6a9310d85cdb9c67222368f06ce5df33f9f7bec987bb706793cabc0b354c95",
+        "20d0f2a060ae8076fcbf70adc275dc611db944f29a2bb0073d78501de4a72784",
+        "aa8becddaaf9fed7a9a712626c1d0cd5c4b4d237a9b6512e18c071dab65d3a54",
+        "24999775645f3ff671d7fb7bc5ada94ac099b594507b60e588ce27d1bd99bc2f",
+        "e6187538497b713b6d8eed5c36e70a6b935571e5903e1c7b99d83582d1db5cd4",
+        "1ddc7adf023afd19b5ecbd027007d86f0659f8ee2385f3e851d743ef18792b19",
+        "38651bbcaaf6e69d4d4ac8002961288d36bd71c695fd5a17987d6e59310bdc69",
+        "98baab6daa7730c23df0cd5ce81a28beb4388193bbcaae82bb2297b93268d7c8",
+        "b37c4907d30a889ae49c7cdfbdd201ea8c7800b0981dd7db2ae2eb901fe64b56"
+      ],
+      "seconds": [
+        4.533771542133763
+      ],
+      "median_seconds": 4.533771542133763,
+      "peak_rss_bytes": 257851392,
+      "artifact": "14-中文论文2"
+    },
+    {
+      "path": "demo/pdfs/small_ocr.pdf",
+      "source_sha256": "c48baa1997e719d414061bea6ca197ce36f1c47341837fbfbc976bbb1d226998",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 8,
+      "full_output_sha256": "d3a852cafa00ffbd3d142ec3ca55e0355b2890d43d7ce331769d5e1b31ca3a39",
+      "page_fingerprints": [
+        "cfa35aadf6023e6e5a54f1558dc3a9d31250d7368b45b52e4198d0fe5caa2a8b",
+        "9b69ae7af99067c29449971ce5c7b9c90bf74d28e06beafb5bb2c2d9901fd1b1",
+        "9b69ae7af99067c29449971ce5c7b9c90bf74d28e06beafb5bb2c2d9901fd1b1",
+        "9b69ae7af99067c29449971ce5c7b9c90bf74d28e06beafb5bb2c2d9901fd1b1",
+        "9b69ae7af99067c29449971ce5c7b9c90bf74d28e06beafb5bb2c2d9901fd1b1",
+        "9b69ae7af99067c29449971ce5c7b9c90bf74d28e06beafb5bb2c2d9901fd1b1",
+        "9b69ae7af99067c29449971ce5c7b9c90bf74d28e06beafb5bb2c2d9901fd1b1",
+        "9b69ae7af99067c29449971ce5c7b9c90bf74d28e06beafb5bb2c2d9901fd1b1"
+      ],
+      "bbox_fingerprints": [
+        "c8dcdb57936e0ef73ac69f3a10227075a40e252fcfc4073f8c212d4bed6beda5",
+        "dd48bc6ca1d088e3fbde5967998e1e470b6b760631951df6aae3346a8dfc32f6",
+        "dd48bc6ca1d088e3fbde5967998e1e470b6b760631951df6aae3346a8dfc32f6",
+        "dd48bc6ca1d088e3fbde5967998e1e470b6b760631951df6aae3346a8dfc32f6",
+        "dd48bc6ca1d088e3fbde5967998e1e470b6b760631951df6aae3346a8dfc32f6",
+        "dd48bc6ca1d088e3fbde5967998e1e470b6b760631951df6aae3346a8dfc32f6",
+        "dd48bc6ca1d088e3fbde5967998e1e470b6b760631951df6aae3346a8dfc32f6",
+        "dd48bc6ca1d088e3fbde5967998e1e470b6b760631951df6aae3346a8dfc32f6"
+      ],
+      "seconds": [
+        0.020633250009268522
+      ],
+      "median_seconds": 0.020633250009268522,
+      "peak_rss_bytes": 117243904,
+      "artifact": "15-small_ocr"
+    },
+    {
+      "path": "tests/unittest/pdfs/flash_table_annotations_synthetic.pdf",
+      "source_sha256": "96672df6a6ee9e1da225db8ff4875ee298e1fbf600752733c19b404c05566aa7",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 8,
+      "full_output_sha256": "42991da9c8dc1f32aa4442b137b0ccf879f2c2672e7d6993d86d0eaed3525b90",
+      "page_fingerprints": [
+        "b40b329dc2048492e5c23a8748ee52aaf7c2e19b777d7d1bbdeb532589d149d5",
+        "a7156a7ace57c8b4d5e782d5727b124be42582b37bb7b539ab24109c08875abd",
+        "f97b7927aa27004a3fac657fc9cd8d7ae98aa28bf2ebb758fc53be3f74c98347",
+        "1b67449d09d9d7da920b8dd3d1ed74ab3cc625978ae1d6e1b2c33c557ae83ff8",
+        "c774d84ecf514f64ebda06f19bc7b6c99e141bc9aab0bdfe8b8be05218eccf81",
+        "7f0382e702bf4d40bfe9e67f7b517134e03dd8d8ab8b8e0356c44126755b6832",
+        "78466fd315bf3c1261e072a11612c12edbe3518a40f91c8d1413769aec136840",
+        "0895d4f09ef47f536dce8135bc07e11a07cd5dda9499767fc99c2bea07284ac3"
+      ],
+      "bbox_fingerprints": [
+        "bab6f4432413b6e4031d821fa5ab44b75020049220c69e258c31f0f15d1b9a9c",
+        "2bd8d77744b40c893a071fd15f98e8f7b1cd8320185d6037f5e436b08c30760d",
+        "58c25b128f2ace7234b03022a54f8fb6fd462b95adbbb313697f1f1f261735aa",
+        "db11fa265514491e1249280c0dc4ecd73a8592b1cb429c4d791f437822f97fa5",
+        "f6a36101ea7e77a906627fad813e6267a3d32c7d498186528138a7a8f6539fec",
+        "b81ccaa8d0fdf137579d8c4a98446343604f7bdd960a27e01dab43754d566f35",
+        "b487310a7b56b5357a0d1a46a3b4476eeb509c12a910fb39605fa16d9c118392",
+        "8ec9c05473a0379936918a0b521c1a3f2002795497cd1aeb3dd6db0d13759431"
+      ],
+      "seconds": [
+        0.07860820810310543
+      ],
+      "median_seconds": 0.07860820810310543,
+      "peak_rss_bytes": 126926848,
+      "artifact": "16-flash_table_annotations_synthetic"
+    },
+    {
+      "path": "demo/pdfs/中文论文3.pdf",
+      "source_sha256": "a9edebcdff03ea03d80f61cfe0b5a875ea2f7122beacaf8177d59327eeab8154",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 4,
+      "full_output_sha256": "6df53683d38f89f69dded3fbe0dcbc1a96db5969b9a0e745b379f000741e1044",
+      "page_fingerprints": [
+        "691868af009d91fbdc4d43127d66717d83f64405f551a4c7896ba7d704926558",
+        "106d8aaa73e90ca5e76abd1f2c248efbd8fb0675db994e2191650cd3a3331655",
+        "b4931ae0f69ebd7ea7c620072c86dc4ec8a0fb3a6b22ca4509da185d4dea5163",
+        "719d8bd9873356c256d5b7a64d348fe8f93390f474c84b6cc09a36660ea7ea6f"
+      ],
+      "bbox_fingerprints": [
+        "3069613cb30d68415e6f685c0e94f32bde89397e91835d4244f281454ff1f4b6",
+        "0779f214f1db7ab5758f12aaa3ddaa54fcdb6cc49bcd105b6aa34243c9ae052d",
+        "1261e86a3c8ffa87c319aecdb5d6dbfab540cbe5cff5f7c639971fcdb9ceb0e5",
+        "ad7183f6a914ea48404dd516fb633ebfeb998876bd251ed30f1d382f26f160c6"
+      ],
+      "seconds": [
+        0.34794791601598263
+      ],
+      "median_seconds": 0.34794791601598263,
+      "peak_rss_bytes": 146964480,
+      "artifact": "17-中文论文3"
+    },
+    {
+      "path": "demo/pdfs/中文论文4.pdf",
+      "source_sha256": "697f37feb86cb49c905ceac0074e2569969e25043c15768cf6c0a86973fdc899",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 5,
+      "full_output_sha256": "9318ba0027ae4fa17a0daffa44e9a87691bdd6198805febab6a2bd574c970549",
+      "page_fingerprints": [
+        "4f815253c64fd7bd73d8597aa5385f5fac4366b84e7145be349b4f6e57877089",
+        "e83d84ba2162a181d6fcc64ffc41e33d3347fc9c63bb53929b2e5635cbcb1b0b",
+        "ceb9ca3a2a1222c2d22552dcd3a508e24e79a23b9f8c284b96a8b95c2096bc28",
+        "9b2683a58ce9d4777d57dfa87bbbc3b4c4804fecfab37b9cbf137efc1d5dc845",
+        "0c61c6b4193888c26754fdfad68c3276f12859b3ee22a9ca46d3d64d137a9a70"
+      ],
+      "bbox_fingerprints": [
+        "bd4b3249ec1e8419c8b848c62ec60eb58ae27c954103b55c7afb426a80fe442a",
+        "4fd6f5e0f7a0cc3e9bc56c9b159237b12feef982bc511322650c85a0a040cde4",
+        "60b63443037dde9fee35f5290fbbcc371250290dc83b16c58af95a2c31291cd5",
+        "842491c25159cd68d320f8c23681ca7564a86ff731f9d871e9284756df9ea435",
+        "b690e1d0373f11f58d441073cf69369473b0d8f242246c4142506b95e5fe2d18"
+      ],
+      "seconds": [
+        0.49860283406451344
+      ],
+      "median_seconds": 0.49860283406451344,
+      "peak_rss_bytes": 148307968,
+      "artifact": "18-中文论文4"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/annual_report_fundraising_projects_table.pdf",
+      "source_sha256": "373ac54585c666ab432792cf97ecce84f9b62b504f41382c4db8fc50886ca5b3",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 2,
+      "full_output_sha256": "d5c4e426838d44a03bc72b26e6da876141ef2c837381195d8b03a8e3fb8b2df2",
+      "page_fingerprints": [
+        "2bbf0b5f3edbe9b8027efd2c4c5abe2e7aa6d074c2ff6dd79b5397214c483358",
+        "c8359ee6cf866c5db5d5868a362ae4f02e76d4d948b7b041532d1518a0786ba0"
+      ],
+      "bbox_fingerprints": [
+        "9fb2c5683cd38a942441ce28162c0cfff86047c42432957d4763ff3063246dde",
+        "62d133d73e54df4e81aa2fdcf75cc4b039477773edfb360a1ffa114ec276dd7a"
+      ],
+      "seconds": [
+        0.17018983280286193
+      ],
+      "median_seconds": 0.17018983280286193,
+      "peak_rss_bytes": 131235840,
+      "artifact": "19-annual_report_fundraising_projects_table"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/annual_report_management_roles_table.pdf",
+      "source_sha256": "c9c5b949130ea2edbcba020635944deb75a17f96ecd84bffe42be8f3dbd3f477",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 2,
+      "full_output_sha256": "6c30f2c9a3c986455040a7e8bbc1d7fcc5e308bf5d94ac10a46f6eecfc90fb55",
+      "page_fingerprints": [
+        "055206edfe84fdbc91a54dcc39d09982129cdc36247a88977526c5eac77853d0",
+        "f6b0282933832ef862241eee14bbddc6fac48964c29d5c6f225ce50b88bff74a"
+      ],
+      "bbox_fingerprints": [
+        "6e1995ffe7546552bd497808dd16fe02cb1fe414497ec1e3c6918d9938356912",
+        "b5906ddeab9f74341d0a9f10ab1d6a2313f44822133115c13e28b64c7d4430ae"
+      ],
+      "seconds": [
+        0.3416378330439329
+      ],
+      "median_seconds": 0.3416378330439329,
+      "peak_rss_bytes": 136085504,
+      "artifact": "20-annual_report_management_roles_table"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/annual_report_research_projects_table.pdf",
+      "source_sha256": "223fd7e0bfe2ea29456c014325b2c033be4e20ace2db85db4366278d787d101a",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 2,
+      "full_output_sha256": "9cf2018e955f3163717c089cf1aeb3cad617b39fd1219d52d1d37d9a03cfccb7",
+      "page_fingerprints": [
+        "dcd5e5193a81fd0132dd4de74cd39d2867653f450f9cad53d8578d37bc9f0601",
+        "069fdb453720a9cd8cb3d64d39e023f04604d689eae0dfe94d8b4cfbaf332696"
+      ],
+      "bbox_fingerprints": [
+        "240e46b7d71d22d367c5b852bcfa1f64738cf5ca1228d44ab4d6aeaaeeffb477",
+        "d7f9cd3be30a31ff509e9f6e3ee5ae1bd1a6b947491823a496edbce77239c984"
+      ],
+      "seconds": [
+        0.19868316617794335
+      ],
+      "median_seconds": 0.19868316617794335,
+      "peak_rss_bytes": 132513792,
+      "artifact": "21-annual_report_research_projects_table"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/conference_schedule_tables.pdf",
+      "source_sha256": "ae1e4e3ab34a1a1e56fe18bae23d51e64a71229abfa83aeee7687415839f80d4",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 12,
+      "full_output_sha256": "df9054ad0fcaea04db2fe06ff4fb6da69930f3205599b5d2f777dae6b75c0ae0",
+      "page_fingerprints": [
+        "dae3c83875a0d80538a4aff86033912cf84d7979042786769c9b7b4b8e4423f9",
+        "4c05b24ea20618cd6e7d2c1f1c6d035c962df11b1caac22b272eda9d099cba3d",
+        "0dd8b9cef4306d597d1dad12ad3bb855d708a8c64e212ed44e6a0c0ffcf3300a",
+        "bd71a15f7a25368d9b3d85e3006d428d9ee7987d060353d1814ffddfb09196a6",
+        "a5f6b1cf33a856d44d40685cff82630e0655e240291459bde2edb03f51b428a5",
+        "5c3cae4770c10baf693ddca84d6241b0c04966f973cfd7e77ca4ffafe8d14db8",
+        "373c39d8da33b1d1b0371caefbb8ecf84e1fadce4fb73a940f5ae2227fa4b962",
+        "b4d7a9e9a5335d54c0fa48563e8ac167bf4a3b00e1860c3103361845efef6843",
+        "a43dfc25cc38d557a0ea285988f3f6353e84cd2b52a0de34b4b30fdbe7e17126",
+        "7e1ea8865c0a04293642fce1dd2831f202772b76b48d70421eda282ff2e5f44d",
+        "1a2c7ab3e22ce1e549c72ef1c32431bddcd2ddd4963153b8d38b392fef477728",
+        "df5325fa274a53e6e775d793be27144c0b078e226cd38daa270dcd5ffde7828a"
+      ],
+      "bbox_fingerprints": [
+        "9dd0be22fd5a5e33cfc4304c3cbe3d197ac388179ed2b082687aa1c88ebc86da",
+        "9b6b90c6750f3ec07bbc63d773552a4b6c483f3c9180a4853941a47135c555b5",
+        "78bb8a568ae5e54b49b4edcffcb746a1108c9f8c35b761aab1e58bf99d1e6c47",
+        "a95f6732bb2253bb6ab4ebb116f30e6b9e6db8bde40d4e83bc067eb9085b7c01",
+        "a60cfc1bce19cf14b5230d79a2dbb374b019d46c1b6c413737fd6997ed0f0fee",
+        "d6a65225727e68baae523ab23ea516157c091e893e897cc058cad8d3e790b68c",
+        "c039df919a7960ddee6abaeca84a2bb47c866c2903bfc59e5c361ca1d0481147",
+        "5621e2f3e7040fdb309bffb8d185b9d3b4961d79b6a7a4fb1b1198433cbafa5e",
+        "c8efeda4d66cf24b2a169b1fcb387d35cc034f819e9875529de39351c7fc5726",
+        "f1175f9a2b1c4c42c044be81b2cae96a5f9b26bca5c5eb470268e4793aa5667c",
+        "2491b1aaa6d074d0c6f8adb544a1265eea708aaf026f173adb54a84175a845ba",
+        "acc7674cfcb5e00c33d53d76f5a8afc665dc2dffd594452c336481492008d6c6"
+      ],
+      "seconds": [
+        0.5799292919691652
+      ],
+      "median_seconds": 0.5799292919691652,
+      "peak_rss_bytes": 155009024,
+      "artifact": "22-conference_schedule_tables"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/engineering_process_restrictions_table.pdf",
+      "source_sha256": "0974f675bf0ba4343f35b775ff5c5b897ffb57e4752d0907975c1f35c8b810a6",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 9,
+      "full_output_sha256": "f8b84443e64e526003e6d70e90b67e14ea42cef72b66f4793a6eafa739ce5903",
+      "page_fingerprints": [
+        "f799e05a591f9c89760788445c074642b8938fb2a1449459a8cf0f2f2123d058",
+        "773191b0aa012c873344fcb599d6b2a290acc42964b8a4c7155418bec4c66d87",
+        "018ebd42b673d1d7d478a25d07f2994d3b0dc436105e0b0f0ea67e5a4e7becaf",
+        "51d35b4fd8f96f6f4d2add58c8ca8656af15061df5dcd4e70180576fc4edefe5",
+        "ddff9327a862590140b3c96cdfa62ff3a2f68809ae188ef551f194be9d73f04c",
+        "6d5da3024b81601e3bf6136d5c249eecec562e695c4cf67b3298eb06d4206b12",
+        "6172e432bceaad3ecf4fe0fb7fe617c4ccdb24b8cac3b85961f6fd3dee6c74e8",
+        "24588c424d7796f6176df5e2ab64bde38a80dd8b0a4904f8bea87e98d137ee3a",
+        "18e2f9eb40c49b383684925c6f24138b53a6574feadd752ac0ec661898dfaf4a"
+      ],
+      "bbox_fingerprints": [
+        "e1fb47fef351d5334335ae4d37e5d6f186b14424b690414bbfdc6ee256bdb0fc",
+        "088878364cfeb0b4461c6ec0c61f274bec04f4bd709af02948a84b1757955a62",
+        "e84c76b8e7cd92fda534805c06a90e504cee000e0d1d41f3e520845778d59073",
+        "71349703b57526a36caf689cbbb29c4057f3765d1ce5e97db6b089123b104525",
+        "da99282a8a0498ff387a88af13d2cde812d404690d3c22add4cba9ba7c0d5e3c",
+        "dbfab5f2a87b8e191dcdcdbcd57c4dfe2308fce675be272f1992f503ba2c5d45",
+        "7d93dbd753329c050cc332813f527a55fe26cc4fc5cbef8f0417fe9c6780fd26",
+        "1f4c30e28aeaf164bd1af8dd78b47d3da375ea5e00d1b48c2ef9a138bcedba79",
+        "18344575d749d7437c3214adb597fc22582ff8cca546c06ab1a3068de1cb9798"
+      ],
+      "seconds": [
+        0.5317424579989165
+      ],
+      "median_seconds": 0.5317424579989165,
+      "peak_rss_bytes": 136200192,
+      "artifact": "23-engineering_process_restrictions_table"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/fund_asset_and_transaction_tables.pdf",
+      "source_sha256": "ced025bf6cee241a06078a59b72450d78d7f40d975431476752db6a857b0830a",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 2,
+      "full_output_sha256": "e0fc5bd95ce881047497e036053a6779c07c2bf72591df8ad4f84a0e8af0d4f8",
+      "page_fingerprints": [
+        "ec5fe200b0f127c5cd5a911496c67c56d82bfac9d84f46b9aa2d9875bf7206e0",
+        "e98f372af6e52ee462faca69425cbb8787e4545fc1c7f86b38b31115e0d217c8"
+      ],
+      "bbox_fingerprints": [
+        "611afb1aec614ffbf2001bc3e8daaefc58cf52881ec79f9f242b1167e7d39acb",
+        "b6723ca8da81b8f7eaba6a7980f76988b1bb13f0b0c458af47823a3cee8e15be"
+      ],
+      "seconds": [
+        0.08602720801718533
+      ],
+      "median_seconds": 0.08602720801718533,
+      "peak_rss_bytes": 131629056,
+      "artifact": "24-fund_asset_and_transaction_tables"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/fund_manager_profile_table.pdf",
+      "source_sha256": "7ad8fc2b538554a3885952bcc9e041f9ef0327eba452c9b628f97d583afbd850",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 2,
+      "full_output_sha256": "f9aab7e0c864aa6634b313c935aef1349eaa1818e68191de602df70bd9c2caf4",
+      "page_fingerprints": [
+        "7527268c0a9cab0e9cb9e5f663b888ddd16c624f63afa504d109264f004eb0b7",
+        "eb1568d9b9ca4d93440d651c4480981d488ad4ffa27cf76513b7cc0cc356dd74"
+      ],
+      "bbox_fingerprints": [
+        "c60b8be990c337a0f178274fc4b86e520b616b0366b3647214fd0d440623d656",
+        "ba96218c39b5fba4fbaf8c9fc0b89a25afeb641ba61d0cca9eb0d51b964618ea"
+      ],
+      "seconds": [
+        0.07305508386343718
+      ],
+      "median_seconds": 0.07305508386343718,
+      "peak_rss_bytes": 130351104,
+      "artifact": "25-fund_manager_profile_table"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/manufacturing_facilities_cross_page_table.pdf",
+      "source_sha256": "517c1f2326ab5405ba2fa3ed2db5c5aa8aeadc91761ff09b4401462ef922862e",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 2,
+      "full_output_sha256": "5f669222b85fa8a251bdee9d3b71bb69d69c61997b61671ab11335e12ce47fc2",
+      "page_fingerprints": [
+        "22fadcf2c7d7b0859cd268db38ff5d15175a50606d1f6395267f152cd039b8e8",
+        "a809e1ab4be1c0510c38666a6c27d53d375beb2af6100dd8488d0d9c2f815f0b"
+      ],
+      "bbox_fingerprints": [
+        "9bea0913449e3dbd29501b5e979110b3629a939e879edd46bf50ec480838f622",
+        "66f7dda4aa0b48e2b7468338799503f83710913c5942f609125ab6c2e4860681"
+      ],
+      "seconds": [
+        0.07519962498918176
+      ],
+      "median_seconds": 0.07519962498918176,
+      "peak_rss_bytes": 126140416,
+      "artifact": "26-manufacturing_facilities_cross_page_table"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/pollutant_discharge_tables.pdf",
+      "source_sha256": "11c25c8f4459174d57703fd225a1ea61a73cb8500158d08b80900ae050c9fc8a",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 89,
+      "full_output_sha256": "0b329313297237e671d6215551f81767f09258edc73990571476802c45aa2589",
+      "page_fingerprints": [
+        "801162d651a7ff3998fd862661e1a4879c3b1748e8d5bdf63a5c9abfcc8a4b87",
+        "b902ca93195c6f8e2539baa947e516ee8a7be2b770928ebdb0041a8949bab6b3",
+        "8028df03b235a9d027e7c7414104752ea8767c8a037384b2d37414285fc9c285",
+        "b80d29c4df38781305d8dc3c67cea1b20663488b2c32923e71b40cb8c10236bd",
+        "7747d151f09dc79827e56aec238a72390f1738113e6f1ac034307cee3c6ca831",
+        "6ada9c8d1b0fd90e6ac0a5ab6656a35ab3fb54ab35dcfc7ee09fd7c66e5e5161",
+        "75a91b5a57e15376204d01e49c0434ae883a4131fb57ca835fac55b00febcffd",
+        "5a14729f2cb8c4da511799a088eacf682cc377b866c4b1e25c3e0c8013cc8df6",
+        "b0bd25e97b53178ed99dc3d72a589353c9b8b72f2a166ac8508541351ebbe731",
+        "ba163abfb88013948767ab3874a49a830072fd27bcc8cb1dea7c4c6bea47c444",
+        "61310e1d46c3e79442a0eb00f89622b0fb262744239c4262d3df0db09b68907a",
+        "8d960b0b6baae55f7404ae7c78cd680ff738dc953e471c930baed5a9a1788c1b",
+        "acb22622456ba3301a2d8e877f96fd6789a1bcd94424c4f06ad0a68aecc4ab19",
+        "412da6c2295a0106d2233372a821d592e70938f3c28865b4007ca144221c05da",
+        "9931cb4532b0c2e70efcafff8f82933935a2008b6a6d842f59e2abcc7b585825",
+        "ab26e328cad88841f729c465dd701ccfa1ed20f35e2f0c818bf6d4c3d3ead47e",
+        "f6c4ab1b6fe76f679e5e457ea3889b910016c1467171c45c288df37f8a3358e7",
+        "3e4797a14b5bb76cf4dd6cc378c012db746bd2153fdcc3d09416b8b7b99f1bbe",
+        "f57e9ecdb270dac57306ddde342808e8510247937722e988b307747642621d1f",
+        "395a2bc9c46294cfc38c3e94b9d003480d6f716efce2fd90e10a1596d141f089",
+        "a8f0d56c02cef52b14e4e4c80b8a4aa7c03814d35f29caf9ec32fb82aae3b86f",
+        "f08f68e1bd5bf5c8f46e6acdc57a3b562237d721d13cf495c54733092723b286",
+        "448d207cc73cad462b2790421573509bcafa3fcd91dca327a753f14bab93afc6",
+        "698b355b197296fec15ae706bdbb7d58ebc9087744fd91e15ecd5b578435fd7d",
+        "3d0302c8330fb655baa1073561aa2f12b53e9ba2a9b602f6fb50df2e21d2d91b",
+        "bd5fa4ac027e90b82f9e98c99e0312aeb17979f7e4680be9c16493b9c3d5eb91",
+        "5d60d4436f57f5f840dded7c59b552bc76c16b3ee49d493df65e950af970df68",
+        "4dfce5a4d7d5b45016e206fb29c76feb98fddbc487c3c2d88fb6710c279e2826",
+        "1f1e782cebd384d8003189ad5a614adfaaac7efd4708de455ee06f5b5fba7cbe",
+        "6836dad3bafd41879e9a102e4ed31d6bd655d087148588df653d22ba074a84e4",
+        "0c3a96cebdba07f5f918c16a7beedd633ed9a5ac13d63e4c267afa0f6a681116",
+        "5095b751779dd98a95edbcb65cf32f3661f2ed55b68d93f9f1ce1f5f66ba35ef",
+        "ccb20038878cb4a4c1c99ee46827ab79214b7d1eab1e5e5b2a1dbe3521eb8544",
+        "a3af1d5ce45567a120b3457f0d04b8d5ad29e9bfb0120c8275aeab8b5c406e74",
+        "b0e546132d05f4bda0a0552483261fe54446f992d4a3f0898ba637eb67ab1571",
+        "53b4c12cfce308bb61646bea1d4b5132b1e953cd2af5a2eda5c7ed939bff93b2",
+        "0c09a99564909f28fa9e8ed1e152e1cc023af60331efc66060e6f226e1a77a06",
+        "9e750cd6ca03b0421c21b126073d6efa87b72dfd316bca825737f840bd96108d",
+        "062efebb4598ad16750b933cac25381d7369d79b2406c1ab53d0c10eb0140cbc",
+        "64f91b2a8c3ed75b5984ca58ece4a08b8d6fa3d03da6b08f745b7b70dbf16ab8",
+        "80c296fc6f5773f1c7e73361d85202a007182a5664a8acec9c5f08708dc4930b",
+        "886e3fdf38d7bfc4d4cb89accdbeb449484d049103cafc64eb87463ca1fd499a",
+        "b0ea43bcbbaf18930a12c71f08f179e6c640e5623f15e589c4b33d48f9561460",
+        "475ac34da35f8e0a935f8cdcf75cabe7c91a779ce0c64774143d5451cfd571cb",
+        "98d2aaff854dfab371497f76d4b01e0518f3dadacb5c23185646037545f1b334",
+        "6afe7ebfe4c90b7904ced6f2cec5572c118d92b015b47011a753ab20227b44fc",
+        "599984f48e2c1d3a25cd199f8e1183453502f06df08211beaa2c3427a88ba242",
+        "bc5563e986bb4721d3dadf7bc0adab1f92fb5fc2af12e3b11063edc8fa094699",
+        "59c768a1e79106330756a9a074e2bfc847d4cfb72229fd6dfd1dee76ddd76963",
+        "f36f6097a427380df451b75585957cb050928f03d0ddf0d1031668d85818b6b1",
+        "f2318205bebc1437af14eb2f9861155e2588dad0cc2d182c23f22d580de57efb",
+        "79b9fa56ed1fc89cf75a3d4bcd897729d1c161f22a539256c45f85c003a57c4f",
+        "1f5f35727beddead7c53a565e5ccfa5fb1220d69690bde5dbddbe6cb71c2b97e",
+        "88fee399a5c7287e2eebfeea4706f9e82277fed428397c3e79acf71998e7bd00",
+        "262075e0f0f808b497a523849f7d55d05d62ad1ddaf8b448a5f2d3fcf62886e6",
+        "3397d04a36fe79cecc4c4dabba0a648cb00b80a0c71b0ff2c992df0ff57c942d",
+        "23999d006806b422f84a1e4540e5ec59c4d6a167f8f5cafefc800726b54e8f12",
+        "4b056bbee6916ec8dcd4e64d363f60efa57a3494ff50b821bc8e62cfd9d27361",
+        "be4d2d2f5ffbc70895c1dc2e7ce6d556bb325d984a44cb06ec826513c853e64a",
+        "54ef8a3737dc1f805d1c62034550323880a7002daa9bf331c50160a303673d85",
+        "c2d3eaa5a4f25114c073d73b2d869185f4d05fd05bdb6c50efc28712b12cc310",
+        "e276519669b871b8e7208879a0d3a2c78968dfccd91bac08eaaa9640455d8746",
+        "5e608a22aac3cc7b73a24e6d559403aa31ba2a0a666c9e93a366aaa3d15d0e5d",
+        "b385c902e439d582fe078bd411cb487f99ecaaaa155d885aba3078dd9139d8bd",
+        "8832cc261bc69977f19b1bd29422544e2cf6b4bc262ffb7ea65a55a639b493e1",
+        "14b0cc877c74facc3667702192c57effcc0b8e7bc18b022e9b65947101c180b8",
+        "128d6c96722c942f9262ce68f9ca79e03e338e23fcd553c7874fbaacddeec9af",
+        "4a4f11b75d1cf9b3b3dc87d27011932c4cfdb2da6e06f67894660c102d12f388",
+        "5927de6adf69b937a9887ec5e9241c24f0ccfa6a0ae5e18406283e1792bc3d9d",
+        "b431bc64e42fe842e435297c7a7f024736e82d4692962d2bd881b8442b6895a2",
+        "9fb9ddb31321062fdb1fa2b74a763ceee6c7ba96b930af348dfe3c85275325ad",
+        "098ef660683d2e6e7fa07b970bac5b29ad58e66eb46322cf159daa4aaac90151",
+        "40f47327f30f01b61843b9fa9bf369d44164167c363ba022bdc3cd472498991a",
+        "6ef9a2bbe6296b8c85ada915ea569828bd88932bf53e8218517c3252db6424f8",
+        "4a75385f13825f5de10064a111a0bdcd439d7b7b0dfdb02db46e5d182c74fdd9",
+        "cb22482f9ef892d1f83c5afbb3cb8db8733398c92760f5196c09c1216093ac98",
+        "4e3a26a1cd43b5590c777348405f03b1b7220b3c328c8de44475c267c7133d4a",
+        "11eceb0afd10c8ae0b300fd282c6b834cb04a90428b01b4eb3f40ecff412fffd",
+        "501999a114321be8f21fac80cfcf8be94b4672e752871379767eb70309a6e4de",
+        "825c5e60f4c63380adb9a0410b5fb42e8b4ab1499d07456169a2b49c7260436f",
+        "713ed7080d78aedc19d6265a979d42c176b12994a0222891e55150b1237829c1",
+        "fda487626db4003fafb87457eee84f395e3f0e52a86ccb971fc2e1eb755f5ce4",
+        "22d45de047f272565d48154231a998d4045ceaeaf9991a26a5464cf735f61237",
+        "3ed38bf91a6ba15d5cf903518a50d83c549f31d99bacd17f1ca850259ba75554",
+        "456dcfebe7d13b92c37ff59602bf84f77d7da1e63715dfa35bfd898bb5707d87",
+        "7497b78d333d491f56186042fca63449ab2769da0c1c9b169b96ca01159bc7e9",
+        "56d19eeeb45a8f49d6d3c0713b9e7a8f6f20d6e023ff5d099530103e0cf1b02e",
+        "324f6a72111bc1c2cfa4ead27098a5839fa36d2238abe48ae6da3f9ed09a6562",
+        "1f3bfde8f7f6bcdc4f728044ecf9923d87ac3c64886f15487d6b0cb1e2470b53"
+      ],
+      "bbox_fingerprints": [
+        "25c33fe582d31c5725b1a002043caa3e2c128d81db632b228058851cb35d65d7",
+        "d4bfb8a0e5a68451521ef68bd05a83aa88f4368f34b30476790ac602f28e20f1",
+        "33cb52b45aad3f2269f2da8dd9c220ef06e9383ce405bb1b6d903a05fe202c4a",
+        "422a0f6dfe51529f55050ca8218706c7478dcc40703adba6590d8cc80bc99060",
+        "2ce276f2204a3bc7b24e364e5fc02a8f37724374c0647bb6849f63edee9f55bf",
+        "cce970683eab1eb8d039dd3ea1dbcd6b33f9aacd57c1c2c335ebf1aaf40d3c3f",
+        "fbde0e649d37544ce158400e5646958e22ed0170a2eee6cce1a24ebc69344ab2",
+        "ddbcf92988844c27b35eb5f798f4677938b967ad76a1517829fb23fd3d1ba06e",
+        "598744c271bac71c09d3ca6df9795d30188d054b9778155ba1d0dfe84e739aab",
+        "78708fb5c2e67495eae27af0bace9b54b53adc80b925f5df16502d915af9245a",
+        "973b945fbde295090e8dee78b6f81fa77904b30a470428d12eef05d1c8cb266f",
+        "7a92bb57cc57db41226b99a7b374a2a83f592503d102c6bad8e783af95655fa2",
+        "51290e1b95191207110303cc9eb5e41e1ddcc02641e2190690dec1e55b143e65",
+        "527587d8dff1ccad6e407b88a03031ebe474d28df17586bd5aaa14e35df29f93",
+        "eca080c911f2a88d67eecc5cf616834cb8e21c8a84b6c39e67ff6e12969bea34",
+        "cdf2a71b01c0fec245067ff42e612b1ed79ed9fedd28956ec441102d6eb96c0e",
+        "8db4a6b3b1eca6481c13ac2b60acec7d3f34da28f904d365db062d6dbed59392",
+        "1f68b5b8d40362998292e03443d8009f3ccadec24e30514c508683715c6bd66b",
+        "ccf4fb88083cff0d57865df0ee8b1b53f5e1aaf32506e48a982f5cf9a7f541e0",
+        "660f49473481939544f6c3c2bb291fafabdd1cc6a81db1225f422996c7c40596",
+        "0b330a3cacd010b0fa9b218408008c4301028363b0d793212ca7b1196dc41a54",
+        "ce991fd51f00d97ad779870567ffef8831fd27311276c11c89e7d08f1a64c77b",
+        "58f883cca427e7a9241d36eb4798a1c62d9c5c097940d5eacafea16dd1b5f57a",
+        "e0ed93d8761568670cda683b4482b00b2f0e2e4e7670647ae7fe510dced9dca0",
+        "2c248f2f6ba230326802e54edf163352c9fec6d67f96a2c2843183730a99c2c1",
+        "d657cd3a04750c94bbdd6dffcb6f44ced09a81325c40bd44b1cd1a9074356eab",
+        "00b1b621cc57f4a3e6dcb89d576c6905e0c94462a7f64faf25cbd38a9cc15b7a",
+        "85927a1e7f4578736a1c4f425e4a5b527f15e2aff35831b2c52c6384ea30a587",
+        "555a033a85bfde087c775ada2e2d3e4c68fc6788a0fdfec0d971e26bf40104d9",
+        "fefa28bf5a02760084c8d11647866a0d78300db371a086e83ec26a3f310b73e6",
+        "2fb02f937776d7935bc99f5d9ede131db8d0f05608b0709e4d3a23eb16cbab86",
+        "1524cf65c9716b0f7e21ac4b0a6beb20e0fbcab9cc34d1abe4d6fb8b866a3d52",
+        "46a1066f2df910d549af5461ed36d3600bd400e7285bd159df23cb5318dc29a6",
+        "17466f56f299e8128805585bb4331864ba7222e628ac4460d37cc6c948dd612e",
+        "ee4bb09d84c646f035f8e24979ab24b77a62d209b20fa45e9670c10e3d6ddd36",
+        "12eb1629be8f58307f52e34488b9de68cc3a301c65053d90c295c800ac0794ad",
+        "8ebaffa1aa1ee4988a50d3fe2678213ababcd484d5fc9fa9c0aec9b5ff9970e1",
+        "d2ee4bbb3b28d23d959b2370772ff13f55511859075481ac64130111a66a85f7",
+        "1be579794ff58eebc3b820e0928de3a96a89b74859fd84a2c3afc1caf939b59d",
+        "ad297e92e415d926df03f2471858f1a6f5d2a90a89e4dce7b72af2d83f66217a",
+        "1d4c68415feaa93b6ae22dd84c30bac83d466c762d915618ced3810bf4428519",
+        "5f6d270b37ea472c75040032ce25270677d9def2a79eabec5e8a82e09dd7622f",
+        "14d1dce83e98344e2b69935ed2b9f06479903144a9b59d89e217d98e5419db6b",
+        "88c210fad9bd691863f53529b45a5fd6d30f1a9ad0ccce60e224b419ecfe4e11",
+        "585559c12e2791ee7c0c3e51e1444f0793b06be30dc9b91952312f97bc549109",
+        "d8f51f51dd06e64871d9a91740aebee9565f05c23c21f0864f5c19925f0d63a6",
+        "1dde971d66f53c5f04ca485e8b1aa2983f25fef990ccf04528c51775fa262c77",
+        "2aace874a72844f13725e2d7fd32ebde43f6da95ce3297bfe4bd7a33197c3d85",
+        "5116620b71c27fd932ace542cfbd2a522bdfd799100fcd6b111d5476152a5639",
+        "2fa3da518daf068fde41fce2c8851970b94ae000795c8bf8f1f46b1148d858dc",
+        "b20a3885c018b3fff95bd4642530c3771e6c16aa134cd9df2631c4d41bd77a8d",
+        "ebaaef0815d3750c9c31d2651ef4ea3cd624d2d5d5c4cbdb934f6bb09678e14e",
+        "d6f49ac53478435c9ff519ba3141009a17975e0ba72f02f60ad79d93d0aac401",
+        "14fbd631fe964fa6dd36168a9ad7a25c9a6036569d3b08b99df7c3994e44e6ce",
+        "8a6385df1f34ae980572cb35d0612f58bb1ebf69cf5bfaa4681bddb98b8df45c",
+        "fcac686a6d3aebdf90a2758fde8182c484d24ce1bf27144810d290ccb677d029",
+        "370970a349d493a00aad7a7469c576f8f91363870dec1b770d381242d353353c",
+        "e7d1bc42d8f229bd2474b2548bdc41f5aad1bf762b3171584d3eaa7aa6a74b68",
+        "52e246324c5985ed8d381163d36341b5547d48e702b9aa91d0e5b8755fb6a758",
+        "07c18332022863a0ce3aa18036243646c8fec78f2fc363a6f2085b124a264487",
+        "94a9b2c2b3789555bea2e21f3fbc77d494debffa42aa40c9e2421a1ae520f984",
+        "61a0408b11785a26d8afebb760fb9f6233dffb3c8917e668908935a73a8a1313",
+        "e17aa5aea116343cca425cd33f7751383510d024cfa6dace0b8d17a693d7fa8d",
+        "c6151197d4e5e69ad46cb467c13ad34a94f834214cf5c456564fc2cc0a771c8b",
+        "34a9883f24d395956962764cbba11660a425618870611825914c82377c956fc6",
+        "bfdc30aaf9b8267ca8a3f92f36756620b3801f53f18d6f8b9c6d6c4bbebd9af8",
+        "d422f89410a54ed9c828c347733275328bc794376bddabe9d3b0f2daefa1829a",
+        "12021fd8753e256c4470f3e29645ccae262e21b496628d8282cf9e567a91b2af",
+        "96a0879c50014b9f9667df9d2101e1651ac1d877a882ce221e459d18b0e459fe",
+        "f0a67a12f0b8aba8c6443635077cebbe8af42a384933846567117c820a86bca5",
+        "f0f595f90d1fae2a7ca4884e6a31b8bcbe83fde54e60fb1c0146bdb19d69f8de",
+        "fc5fde3624f94173d241fe5ab4bc0468a3a991e9700e6c30d72a6bbe961367dc",
+        "45667f6507408eb9d7fecc85315ecb3d682c2f06a82108e51ac1c23314b5e9dc",
+        "0c308ea9ed007d582a35bc484544d0ba7ef639838b89837abaf983aca1bdcf07",
+        "bce1247313610645e80326b1859910ef72e5cfdb212092217690e83e56e362b9",
+        "a5594fca059a30a4c0a739795dbcb943a1ab7e56bb594bc007823ad7146270ab",
+        "1a88bfeb98965847c947d405c845817c494c1ab9cb3209ad08bcdd075f0bf53e",
+        "ec70cd375b7297fe8414da466aafb133e404e0b43332521d769741fbbbb941cb",
+        "d5dbd5a032be662e7e87d60bd5868ac4aecc35036b95219af3b420b48dd6dee7",
+        "f3998e11646a7171e61f54efebf77097c353a48091cd6ab6caa0519b680224b1",
+        "589f5e8951acbccfb33b3e18117c713221854e42fdbc40947cf689e59c34283b",
+        "05af114dce0fa131904a905101a11a890dcd1bb976ecaf8ad01f9f103458a660",
+        "2176a2fc057707bac6525ab0db1cfc1978247e1cbbe5fa1958457a15e4ee2a4e",
+        "0279a8ad44d65edd7b75fadc798bed131575e8c6eca62079d6f7d744fb9e30ad",
+        "24e95509cd1617f37455784363869ce1f87b29ee3bb0c6bc65d240d8472b2895",
+        "cd42e0130349512338f8adf99a54e8a91a0c07112958825f956f258e8e3ab3ef",
+        "c8044f3f2f911b7b2dc9f51a4af0fa5cf2ebd1882d2841acc4d40289bbab1bb0",
+        "8fb8311addc1f95feb29dc4575125b2f5f1eb1484820f6b2d7e77fe5edab3d1d",
+        "4981f19a3d27fca025f997478102632ac5dbbaeab0012db15df6ac49367510bf"
+      ],
+      "seconds": [
+        2.4814590408932418
+      ],
+      "median_seconds": 2.4814590408932418,
+      "peak_rss_bytes": 202326016,
+      "artifact": "27-pollutant_discharge_tables"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/procurement_contract_tables.pdf",
+      "source_sha256": "4315ab9dc69187a41a81ab4ac868a8d4ae6250be78a6b7c9805e98a4f311cdb4",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 2,
+      "full_output_sha256": "023b08c6fe71e57e39ed90e1f248c434c33dae4206a277225a6c307bf6cf6019",
+      "page_fingerprints": [
+        "e74344c2fa0ed0ff612dfed8ef4c37d3f2bde43db25ff3e4e80f950d0de74e2b",
+        "6f5f59df6762b6aeb51d33a2655672489cb51d1f13a28e858463acdc8133a37a"
+      ],
+      "bbox_fingerprints": [
+        "f33263eb4423d8cb51a557237d7dba949d7de0734848389ed7a13d55d2f71ec5",
+        "a4300274b6192674f1c7c223d95bba6dbea4d808b476bfa8b5caf45432441794"
+      ],
+      "seconds": [
+        0.0745245001744479
+      ],
+      "median_seconds": 0.0745245001744479,
+      "peak_rss_bytes": 130318336,
+      "artifact": "28-procurement_contract_tables"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/procurement_document_blank_page_tables.pdf",
+      "source_sha256": "deb909358f4d3f29b7c22427aeb4e6cfbed31dc518814b93004161cdf496b376",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 4,
+      "full_output_sha256": "9f1250d47383e9bc9cc7507325f201448752e228f8d8acc18f6e26a18c1844ee",
+      "page_fingerprints": [
+        "b34801a8a5c543e7ea547217d4d6f41754546cd85ffab69b224d0b0d029ce1e3",
+        "755baeb884c54507053eddd561a7bdd9c2f0d0793e5ac59c9aad91abe576bd54",
+        "411dd5edbd1e747c830eaccc76cb99637acc1432a0ef9d5152c53b8c4bccd055",
+        "1563df918fa35b5e84b235c0041cf19375ccc87df290de2c9bf099451106a155"
+      ],
+      "bbox_fingerprints": [
+        "3836168535686f88d830bd2616d5e75de25a240492b04ce847a1fc4c47684292",
+        "932e91b51823e9c79972619fd30de6a1d05a9b85845c76333ab56133447abc5a",
+        "e8e433786b3c3caec4e94b478d2ecdcec8e5d66c96243ed71658e0cf0a8c7547",
+        "d3b3953d636fe062a8a166387be78e6809cb6970855d1428a3dbc905f205536b"
+      ],
+      "seconds": [
+        0.1702855839394033
+      ],
+      "median_seconds": 0.1702855839394033,
+      "peak_rss_bytes": 130301952,
+      "artifact": "29-procurement_document_blank_page_tables"
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/quarterly_report_financial_tables.pdf",
+      "source_sha256": "3a14541366ec628cd28f5aed7d7418ecda0b210e4a31764772bfa2ac8d566ec1",
+      "runtime": {
+        "pdfium_version": "151.0.7891.0",
+        "font_policy": "droid-cjk-v1",
+        "font_name": "Droid Sans Fallback Full",
+        "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+      },
+      "pages": 2,
+      "full_output_sha256": "81cc5661d3dfab88be6c6cdd062560de33e506dd530e8ac0abd0cfbab293b50f",
+      "page_fingerprints": [
+        "970aaa531e5bc45092946819c7260d476a68cb28f2265cf647842b9f4ba82934",
+        "bacfb0cb08f080a765db591d260fda88e101be79a1a5f236f68eccf0de242d9b"
+      ],
+      "bbox_fingerprints": [
+        "7433864cc7651da90e768b65b0e65fd39d203bfd91f26f0a00d1dc8fcff8a226",
+        "32f668e8f59dd5e730537e154944f0bf97927026630d5b8074ff2e7bf45b5cc6"
+      ],
+      "seconds": [
+        0.12158274999819696
+      ],
+      "median_seconds": 0.12158274999819696,
+      "peak_rss_bytes": 127205376,
+      "artifact": "30-quarterly_report_financial_tables"
+    }
+  ],
+  "comparisons": [
+    {
+      "path": "demo/pdfs/2407.00079v4_origi-10.pdf",
+      "equal": true,
+      "time_ratio": 0.928835560455958,
+      "rss_ratio": 1.0399636693914622
+    },
+    {
+      "path": "demo/pdfs/IEBM_A_2667169_O-5.pdf",
+      "equal": true,
+      "time_ratio": 0.9790230666776707,
+      "rss_ratio": 1.0396877033181522
+    },
+    {
+      "path": "demo/pdfs/caibao1.pdf",
+      "equal": true,
+      "time_ratio": 0.9591951746729233,
+      "rss_ratio": 0.992979171542242
+    },
+    {
+      "path": "demo/pdfs/demo1.pdf",
+      "equal": true,
+      "time_ratio": 0.9281941537314934,
+      "rss_ratio": 0.9991045991045991
+    },
+    {
+      "path": "demo/pdfs/demo2.pdf",
+      "equal": true,
+      "time_ratio": 0.9400038068914642,
+      "rss_ratio": 1.02923481857492
+    },
+    {
+      "path": "demo/pdfs/demo3.pdf",
+      "equal": true,
+      "time_ratio": 0.9739185239766379,
+      "rss_ratio": 0.9953984015500121
+    },
+    {
+      "path": "demo/pdfs/demo4.pdf",
+      "equal": true,
+      "time_ratio": 0.9563648907982243,
+      "rss_ratio": 1.0259779038518961
+    },
+    {
+      "path": "demo/pdfs/demo6.pdf",
+      "equal": true,
+      "time_ratio": 0.9854306188723227,
+      "rss_ratio": 1.0438174489663243
+    },
+    {
+      "path": "demo/pdfs/mixed_elements_pages_03_06.pdf",
+      "equal": true,
+      "time_ratio": 0.9340239552214546,
+      "rss_ratio": 1.0377314814814815
+    },
+    {
+      "path": "demo/pdfs/mixed_elements_pages_07_10.pdf",
+      "equal": true,
+      "time_ratio": 0.9496920786688223,
+      "rss_ratio": 1.03526230394808
+    },
+    {
+      "path": "demo/pdfs/mixed_elements_pages_11_15.pdf",
+      "equal": true,
+      "time_ratio": 0.9588298523764496,
+      "rss_ratio": 1.0297589524848725
+    },
+    {
+      "path": "demo/pdfs/mixed_elements_pages_39_40.pdf",
+      "equal": true,
+      "time_ratio": 0.9437895627078371,
+      "rss_ratio": 1.038970679203266
+    },
+    {
+      "path": "tests/unittest/pdfs/flash_layout/mixed_text_layout_sample.pdf.xor",
+      "equal": false,
+      "time_ratio": 0.9366687198417988,
+      "rss_ratio": 0.7441670987334271
+    },
+    {
+      "path": "demo/pdfs/中文论文.pdf",
+      "equal": true,
+      "time_ratio": 0.9250956343494919,
+      "rss_ratio": 1.0331119633336452
+    },
+    {
+      "path": "demo/pdfs/中文论文2.pdf",
+      "equal": true,
+      "time_ratio": 1.0093795224860824,
+      "rss_ratio": 1.0003178033432911
+    },
+    {
+      "path": "demo/pdfs/small_ocr.pdf",
+      "equal": true,
+      "time_ratio": 0.8875438414336455,
+      "rss_ratio": 1.043757292882147
+    },
+    {
+      "path": "tests/unittest/pdfs/flash_table_annotations_synthetic.pdf",
+      "equal": true,
+      "time_ratio": 0.9348238572234169,
+      "rss_ratio": 1.0440700808625336
+    },
+    {
+      "path": "demo/pdfs/中文论文3.pdf",
+      "equal": false,
+      "time_ratio": 0.9451919391919692,
+      "rss_ratio": 0.7218154019473727
+    },
+    {
+      "path": "demo/pdfs/中文论文4.pdf",
+      "equal": false,
+      "time_ratio": 0.9201438505325328,
+      "rss_ratio": 0.722483837497007
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/annual_report_fundraising_projects_table.pdf",
+      "equal": true,
+      "time_ratio": 0.9345905361556832,
+      "rss_ratio": 1.0436482084690555
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/annual_report_management_roles_table.pdf",
+      "equal": true,
+      "time_ratio": 0.9385785846316606,
+      "rss_ratio": 1.0387693846923463
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/annual_report_research_projects_table.pdf",
+      "equal": true,
+      "time_ratio": 0.9582121149277996,
+      "rss_ratio": 1.0426711357483562
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/conference_schedule_tables.pdf",
+      "equal": true,
+      "time_ratio": 0.9360303311460076,
+      "rss_ratio": 1.0336501693433846
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/engineering_process_restrictions_table.pdf",
+      "equal": true,
+      "time_ratio": 0.9131027511655093,
+      "rss_ratio": 1.0196246780326261
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/fund_asset_and_transaction_tables.pdf",
+      "equal": true,
+      "time_ratio": 0.9052779739910615,
+      "rss_ratio": 1.0431056868345885
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/fund_manager_profile_table.pdf",
+      "equal": true,
+      "time_ratio": 0.9135296959533221,
+      "rss_ratio": 1.0419067574646412
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/manufacturing_facilities_cross_page_table.pdf",
+      "equal": true,
+      "time_ratio": 0.9314295479866418,
+      "rss_ratio": 1.042942292061772
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/pollutant_discharge_tables.pdf",
+      "equal": true,
+      "time_ratio": 0.9113055779403663,
+      "rss_ratio": 1.023878617030097
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/procurement_contract_tables.pdf",
+      "equal": true,
+      "time_ratio": 0.9223685955610342,
+      "rss_ratio": 1.041917736442232
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/procurement_document_blank_page_tables.pdf",
+      "equal": true,
+      "time_ratio": 0.9002868609306508,
+      "rss_ratio": 1.0412411626080125
+    },
+    {
+      "path": "tests/unittest/pdfs/native_pdf_tables/quarterly_report_financial_tables.pdf",
+      "equal": true,
+      "time_ratio": 0.9181571303342525,
+      "rss_ratio": 1.0417281631557762
+    }
+  ]
+}

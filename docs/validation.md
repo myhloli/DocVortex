@@ -94,7 +94,10 @@ The CI suite now includes this test (skipped on Windows, where POSIX resource
 accounting is unavailable).
 
 
-### System-font-sensitive PDF fixtures
+### Historical system-font-sensitive PDF fixtures (before Droid)
+
+The following observations describe commit `c2de3fa`, before the bundled font
+policy. The platform relaxations described here have now been removed.
 
 `中文论文3.pdf` and `中文论文4.pdf` contain non-embedded CJK fonts (verified with
 pdffonts). PDFium substitutes system fonts, so their exact text block counts and
@@ -130,3 +133,72 @@ The synthetic `native_cjk_layout_synthetic.pdf` also references non-embedded
 STSong-Light. Linux reports 13 text + 1 paragraph title instead of 12 + 2; its
 combined natural-text count and every other block count remain exact, with the
 existing detailed CJK text/script checks retained. No fixture bytes are changed.
+
+
+## Bundled Droid CJK runtime
+
+The font/provider, PDF access integration, and tests were committed separately.
+The approved follow-up repairs mixed-font source rows and fragmented inline prose
+formula components, preserving the existing caption, paragraph and formula
+assertions. Horizontal source adjacency is checked against raw boxes, source
+indices, font size and baselines; large overlapping fraction boxes do not qualify
+as ordinary text rows.
+
+The reviewed Droid baseline keeps all existing text/group assertions. The only
+inventory update is paper 4's header count, 19 → 18: the first-page volume/issue
+and date now form one header, whose complete text has an additional exact
+assertion. The original PDFs, existing sparse-table diagnostic and historical
+geometry manifest remain untouched. All prior OS-specific CJK gold relaxations
+were removed, including the synthetic STSong fixture.
+
+Validation source: `89a3c2308a2c64435f75086e8942e42323b3e112`.
+[GitHub Actions run](https://github.com/myhloli/docgale/actions/runs/34028564417)
+covers Python 3.10–3.14 on Linux/Windows/macOS, Pydantic 2.12.5 floor jobs and
+PDFium 5.13.0 separately. The main suite has 340 passing tests on Linux/macOS;
+Windows skips only the POSIX benchmark smoke. The known sparse-table test remains
+one explicit deselection and a separate failing, non-blocking diagnostic.
+
+The platform artifact job records both the original system-provider and Droid
+raw geometry, actual font byte hashes, PDFium identity, source SHA256, ModelJson,
+MiddleJson, page images, layout annotations and HTML. Its downstream comparison
+requires all new-policy character indices and Unicode to match, and applies a
+0.001 PDF point tolerance to the substituted font's loose/tight/origin geometry.
+The two papers and synthetic sample contain 8,702 substituted-font character
+records; the measured maximum CJK geometry difference across the three platforms
+is **0.0 points**. Block types, ordered text and table HTML are exactly equal.
+Unchanged default Latin-font geometry differences are recorded separately.
+
+A font-less Linux system baseline can omit CJK character records as well as
+synthesize different spaces. Those incomplete old CJK results are not treated as
+correct Unicode gold. The boundary tests protect embedded/non-CJK font bytes,
+Unicode and geometry exactly, verify the bundled bytes for each substituted font,
+and check that existing CJK character content is retained. The new-policy
+cross-platform check remains strict for every raw index and Unicode value.
+
+Both real papers pass all nine render formats, repeated rendering without tree
+mutation, and source-independent bundle restore. Standalone wheel environments
+contain neither MinerU nor pdftext. The font is present and SHA256-verified in both
+wheel and sdist, together with its Apache-2.0 NOTICE. Runtime dependencies and
+Python declarations are unchanged. The font is 5,074,864 bytes; its wheel ZIP
+entry is 2,382,564 bytes (2.27 MiB compressed).
+
+The matching Python 3.14.4 / PDFium 5.10.1 local before/after benchmark contains
+31 documents: 28 full ModelJson/MiddleJson outputs are exactly unchanged, and
+only the three font-affected fixtures differ. Per-document timing, peak RSS,
+source/output hashes and reviewed Droid page fingerprints are preserved in
+[the machine-readable baseline](validation/droid-cjk-v1.json).
+The median warm time ratio is 0.935 and median peak-RSS ratio 1.038; each document
+has one measured warm run, so these observations are not a speedup claim.
+Five fresh-process startup samples put the font initializer median at 2.95 ms.
+
+MinerU's source suite passed 3,972 tests, with four pre-existing failures excluded
+and four skips. The worker initializer test verifies that parent-exit monitoring
+still precedes font initialization. In an isolated Doclib home, a real Flash CLI
+parse completed, its repeat hit the cache, and `--force` created parse ID 2 with
+`cache_hit=false`; all three Markdown files had identical hashes. The isolated
+server was stopped after the check. Schema 2.0 and routing remain unchanged.
+
+The downloadable Windows/Linux viewer was checked in Chromium: all 18 layout
+images and four HTML documents loaded without failed resources or browser errors.
+The original system-font viewer is archived separately. Linux CI reported an
+empty `fc-list :lang=zh` inventory, confirming installation without system CJK fonts.

@@ -1,7 +1,7 @@
 include README.md LICENSE.md THIRD_PARTY_NOTICES.md
 recursive-include licenses *
 recursive-include schemas *.json
-recursive-include docs *.md
+recursive-include docs *.md *.json
 include tools/__init__.py tools/build_html_css.py tools/capture_baseline.py tools/capture_platform_layout.py tools/font_geometry.py tools/compare_font_platforms.py
 recursive-include tests *.py *.json *.pdf *.xor *.rtf
 recursive-include demo *.py *.md *.pdf *.doc *.docx *.ppt *.pptx *.xls *.xlsx *.rtf

@@ -1,0 +1,65 @@
+{
+  "runtime": {
+    "pdfium_version": "151.0.7891.0",
+    "font_policy": "droid-cjk-v1",
+    "font_name": "Droid Sans Fallback Full",
+    "font_sha256": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+  },
+  "tolerance_points": 0.001,
+  "comparisons": [
+    {
+      "reference": "Darwin",
+      "candidate": "Linux",
+      "document": "paper-3",
+      "cjk_chars": 4209,
+      "max_cjk_delta_points": 0.0,
+      "other_font_geometry_changes": 36,
+      "semantics_equal": true
+    },
+    {
+      "reference": "Darwin",
+      "candidate": "Linux",
+      "document": "paper-4",
+      "cjk_chars": 4064,
+      "max_cjk_delta_points": 0.0,
+      "other_font_geometry_changes": 0,
+      "semantics_equal": true
+    },
+    {
+      "reference": "Darwin",
+      "candidate": "Linux",
+      "document": "cjk-synthetic",
+      "cjk_chars": 429,
+      "max_cjk_delta_points": 0.0,
+      "other_font_geometry_changes": 1560,
+      "semantics_equal": true
+    },
+    {
+      "reference": "Darwin",
+      "candidate": "Windows",
+      "document": "paper-3",
+      "cjk_chars": 4209,
+      "max_cjk_delta_points": 0.0,
+      "other_font_geometry_changes": 0,
+      "semantics_equal": true
+    },
+    {
+      "reference": "Darwin",
+      "candidate": "Windows",
+      "document": "paper-4",
+      "cjk_chars": 4064,
+      "max_cjk_delta_points": 0.0,
+      "other_font_geometry_changes": 0,
+      "semantics_equal": true
+    },
+    {
+      "reference": "Darwin",
+      "candidate": "Windows",
+      "document": "cjk-synthetic",
+      "cjk_chars": 429,
+      "max_cjk_delta_points": 0.0,
+      "other_font_geometry_changes": 0,
+      "semantics_equal": true
+    }
+  ]
+}
