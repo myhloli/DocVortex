@@ -563,20 +563,7 @@ def _consecutive_source_row(first: _LineItem, second: _LineItem) -> bool:
         return False
     if not _same_baseline_geometry(first_box, first_height, second_box, second_height):
         return False
-    font_sizes = [
-        [
-            float(size)
-            for char in line.chars
-            if isinstance(size := (char.get("font") or {}).get("size"), (int, float)) and size > 0
-        ]
-        for line in (first, second)
-    ]
-    if not all(font_sizes):
-        return False
-    first_size, second_size = (statistics.median(sizes) for sizes in font_sizes)
-    # 上下标虽可能与宿主框相交，字号不同的片段仍交给二维公式恢复。
-    if max(first_size, second_size) > 1.2 * min(first_size, second_size):
-        return False
+    # 源框与基线已包含文本矩阵的缩放；名义字号比不能代表实际显示大小。
     left, right = sorted((first, second), key=lambda line: line.bbox[0])
     left_indices = [index for char in left.chars for index in char.get("source_indices", (char.get("char_idx"),))]
     right_indices = [index for char in right.chars for index in char.get("source_indices", (char.get("char_idx"),))]

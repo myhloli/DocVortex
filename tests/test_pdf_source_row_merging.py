@@ -53,3 +53,46 @@ def test_overlapping_fraction_is_not_an_ordinary_source_row() -> None:
     prose = _fragment("and σ0 = 3e2γph", 99, (141.7, 534.6, 208.0, 549.5), (141.7, 534.6, 208.0, 549.5))
     fraction.baseline, prose.baseline = 533.8, 546.9
     assert not _can_merge_same_baseline_pair(prose, prose.bbox, fraction, fraction.bbox, [])
+
+
+def test_source_row_uses_display_geometry_across_text_matrix_scales() -> None:
+    """8pt 与经过 0.5 倍矩阵缩放的 16pt 文本显示大小相同，不能被名义字号比拆开。"""
+    from io import BytesIO
+
+    from reportlab.pdfgen.canvas import Canvas
+
+    from docvortex.document.pdf import PDFDocument
+
+    payload = BytesIO()
+    canvas = Canvas(payload)
+    for letter, size, scale, left in (("A", 8, 1, 60), ("B", 16, 0.5, 69)):
+        text = canvas.beginText()
+        text.setTextTransform(scale, 0, 0, scale, left, 700)
+        text.setFont("Helvetica", size)
+        text.textOut(letter)
+        canvas.drawText(text)
+    canvas.save()
+    with PDFDocument(payload.getvalue()) as document:
+        chars = [char for char in document.get_page_chars_with_geometry(0).chars if char["char"] in {"A", "B"}]
+    assert [char["font"]["size"] for char in chars] == [8, 16]
+    lines = []
+    for char in chars:
+        box, origin = char["loose_bbox"], char["origin"]
+        assert box is not None and origin is not None
+        lines.append(
+            _LineItem(
+                text=char["char"],
+                bbox=box,
+                source_bbox=box,
+                angle=0,
+                source_index=char["char_idx"],
+                baseline=origin[1],
+                chars=[char],
+                effective_height=box[3] - box[1],
+            )
+        )
+    first, second = lines
+    assert abs(first.effective_height - second.effective_height) < 1e-3
+    assert second.bbox[0] - first.bbox[2] > 0.75
+    assert _can_merge_same_baseline_pair(first, first.bbox, second, second.bbox, [])
+    assert not _can_merge_same_baseline_pair(first, first.bbox, replace(second, baseline=second.baseline + 20), second.bbox, [])
