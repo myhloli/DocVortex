@@ -21,7 +21,7 @@ _XHTML_NS = "http://www.w3.org/1999/xhtml"
 _XML_NS = "http://www.w3.org/XML/1998/namespace"
 _EPUB_MIME = b"application/epub+zip"
 _CONTENT_PATH = "EPUB/text/content.xhtml"
-_STYLE_PATH = "EPUB/styles/mineru.css"
+_STYLE_PATH = "EPUB/styles/docgale.css"
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,7 +129,7 @@ def _build_package_document(metadata: EpubMetadata, assets: tuple[EpubAsset, ...
         manifest,
         f"{{{_OPF_NS}}}item",
         id="style",
-        href="styles/mineru.css",
+        href="styles/docgale.css",
         attrib={"media-type": "text/css"},
     )
     for position, asset in enumerate(assets, start=1):
@@ -160,7 +160,7 @@ def _build_navigation_xhtml(metadata: EpubMetadata, navigation: list[NavigationI
         head,
         f"{{{_XHTML_NS}}}link",
         rel="stylesheet",
-        href="styles/mineru.css",
+        href="styles/docgale.css",
         type="text/css",
     )
     body = etree.SubElement(root, f"{{{_XHTML_NS}}}body")

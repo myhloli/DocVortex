@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""把已验证的 MinerU HTML v1 typed plan 物化为 raw model-list。"""
+"""把已验证的 DocGale HTML v1 typed plan 物化为 raw model-list。"""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from .contracts import (
     IndexWireSpec,
     ListBlockWireSpec,
     ListWireSpec,
-    MineruHtmlWirePlan,
+    DocGaleHtmlWirePlan,
     RichVisualBodyWireSpec,
     TableBodyWireSpec,
     TextWireSpec,
@@ -34,7 +34,7 @@ from .contracts import (
 class ExactAnchorResolver:
     """把 renderer DOM id 恢复为 typed plan 中保存的原始 anchor。"""
 
-    def __init__(self, plan: MineruHtmlWirePlan) -> None:
+    def __init__(self, plan: DocGaleHtmlWirePlan) -> None:
         """预扫描标题和页面脚注的 id、文本及原始 anchor。"""
         self._targets: dict[str, str] = {}
         self._heading_anchors: dict[etree._Element, str] = {}
@@ -75,8 +75,8 @@ class ExactAnchorResolver:
         return self._note_anchors.get(note)
 
 
-def materialize_mineru_html_wire(
-    plan: MineruHtmlWirePlan,
+def materialize_docgale_html_wire(
+    plan: DocGaleHtmlWirePlan,
     resources: HtmlResourceContext,
 ) -> list[dict[str, object]]:
     """在整棵 canonical 树验证成功后一次性解析资源并生成 raw blocks。"""
@@ -218,7 +218,7 @@ def _materialize_list(spec: ListWireSpec, projector: MarkupProjector) -> dict[st
             children.append(_materialize_list(child, projector))
             continue
         content = _project_inline_content(projector, child.content_element) if child.content_element is not None else []
-        if child.marker and ({"mineru-list--reference", "mineru-list--explicit"} & spec.classes):
+        if child.marker and ({"docgale-list--reference", "docgale-list--explicit"} & spec.classes):
             content = [*text_spans(f"{child.marker} "), *content]
         block: dict[str, object] = {"type": child.block_type, "content": content}
         if child.block_index is not None:
@@ -329,4 +329,4 @@ def _resolve_image_payload(element: etree._Element, resources: HtmlResourceConte
     return {}
 
 
-__all__ = ["ExactAnchorResolver", "materialize_mineru_html_wire"]
+__all__ = ["ExactAnchorResolver", "materialize_docgale_html_wire"]

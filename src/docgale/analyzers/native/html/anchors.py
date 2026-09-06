@@ -38,7 +38,7 @@ def is_note_element(element: etree._Element) -> bool:
     """判断元素是否表示一条可独立投影的 Footnote/Endnote。"""
     roles = frozenset((element.get("role") or "").casefold().split())
     classes = frozenset((element.get("class") or "").casefold().split())
-    if (element.get("data-block-type") or "").casefold() == "page_footnote" or "mineru-page-footnote" in classes:
+    if (element.get("data-block-type") or "").casefold() == "page_footnote" or "docgale-page-footnote" in classes:
         return True
     types: set[str] = set()
     for name, value in element.attrib.items():

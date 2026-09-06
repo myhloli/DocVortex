@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""把 MinerU HTML v1 固定 DOM 解析为无资源副作用的 typed plan。"""
+"""把 DocGale HTML v1 固定 DOM 解析为无资源副作用的 typed plan。"""
 
 from __future__ import annotations
 
@@ -23,8 +23,8 @@ from .contracts import (
     ListBlockWireSpec,
     ListLeafWireSpec,
     ListWireSpec,
-    MINERU_HTML_VERSION,
-    MineruHtmlWirePlan,
+    DOCGALE_HTML_VERSION,
+    DocGaleHtmlWirePlan,
     PageWireSpec,
     RichVisualBodyWireSpec,
     TableBodyWireSpec,
@@ -61,7 +61,7 @@ _PAGE_AUXILIARY_TYPES = frozenset({BlockType.HEADER, BlockType.FOOTER, BlockType
 _LIST_LEAF_TYPES = frozenset({BlockType.TEXT, BlockType.REF_TEXT})
 _INDEX_LEAF_TYPES = frozenset({BlockType.TEXT, BlockType.DOC_TITLE, BlockType.PARAGRAPH_TITLE})
 _OWNED_VISUAL_IMAGE_TOKENS = frozenset(
-    {"mineru-chart-image", "mineru-flowchart-fallback", "mineru-image", "mineru-table-image"}
+    {"docgale-chart-image", "docgale-flowchart-fallback", "docgale-image", "docgale-table-image"}
 )
 
 
@@ -69,19 +69,19 @@ class NonCanonicalWire(ValueError):
     """表示当前 DOM 不是 renderer 能生成的 canonical v1 wire。"""
 
 
-def parse_mineru_html_wire(body: etree._Element) -> tuple[MineruHtmlWirePlan | None, WireFallbackReason | None]:
+def parse_docgale_html_wire(body: etree._Element) -> tuple[DocGaleHtmlWirePlan | None, WireFallbackReason | None]:
     """发现并解析 canonical v1 wire，非法结构只返回统一回退原因。"""
     roots = [
         element
         for element in body.iter()
-        if isinstance(element.tag, str) and element.get("data-mineru-html-version") is not None
+        if isinstance(element.tag, str) and element.get("data-docgale-html-version") is not None
     ]
     if not roots:
         return None, None
     if len(roots) != 1:
         return None, "non_canonical_wire"
     root = roots[0]
-    if (root.get("data-mineru-html-version") or "").strip() != MINERU_HTML_VERSION:
+    if (root.get("data-docgale-html-version") or "").strip() != DOCGALE_HTML_VERSION:
         return None, "unsupported_version"
     try:
         _validate_wire_root_ownership(body, root)
@@ -90,7 +90,7 @@ def parse_mineru_html_wire(body: etree._Element) -> tuple[MineruHtmlWirePlan | N
         return None, "non_canonical_wire"
 
 
-def _parse_wire_root(root: etree._Element) -> MineruHtmlWirePlan:
+def _parse_wire_root(root: etree._Element) -> DocGaleHtmlWirePlan:
     """解析根、渲染模式、页面容器和全部顶层 block。"""
     if local_name(root) != "article" or _class_tokens(root) != {
         WIRE_DOCUMENT_CLASS,
@@ -129,7 +129,7 @@ def _parse_wire_root(root: etree._Element) -> MineruHtmlWirePlan:
         raise NonCanonicalWire
     target_ids = _collect_anchor_target_ids(wrappers)
     blocks = tuple(_parse_top_block(wrapper, section_page_idx, target_ids) for wrapper, section_page_idx in wrappers)
-    return MineruHtmlWirePlan(root, mode, blocks)
+    return DocGaleHtmlWirePlan(root, mode, blocks)
 
 
 def _validate_wire_root_ownership(body: etree._Element, root: etree._Element) -> None:
@@ -243,7 +243,7 @@ def _validate_equation_content(content_root: etree._Element) -> None:
     if local_name(content_root) == "math":
         _validate_formula_carrier(content_root, expected_display="block")
         return
-    if local_name(content_root) != "img" or _class_tokens(content_root) != {"mineru-equation-image"}:
+    if local_name(content_root) != "img" or _class_tokens(content_root) != {"docgale-equation-image"}:
         raise NonCanonicalWire
 
 
@@ -334,7 +334,7 @@ def _parse_code_body(body: etree._Element, sub_type: str) -> CodeBodyWireSpec:
     if not children:
         empty = etree.Element("div")
         return CodeBodyWireSpec(body, "algorithm", empty)
-    if len(children) != 1 or local_name(children[0]) != "div" or _class_tokens(children[0]) != {"mineru-algorithm"}:
+    if len(children) != 1 or local_name(children[0]) != "div" or _class_tokens(children[0]) != {"docgale-algorithm"}:
         raise NonCanonicalWire
     _validate_inline_region(children[0])
     return CodeBodyWireSpec(body, "algorithm", _clone_fragment(children[0]))
@@ -353,9 +353,9 @@ def _parse_table_body(body: etree._Element) -> TableBodyWireSpec:
     classes = _class_tokens(child)
     if name == "table":
         return TableBodyWireSpec(body, "html", child)
-    if name == "pre" and classes in ({"mineru-table-text"}, {"mineru-raw-fallback"}) and not _element_children(child):
+    if name == "pre" and classes in ({"docgale-table-text"}, {"docgale-raw-fallback"}) and not _element_children(child):
         return TableBodyWireSpec(body, "text", child)
-    if name == "img" and classes == {"mineru-table-image"}:
+    if name == "img" and classes == {"docgale-table-image"}:
         return TableBodyWireSpec(body, "image", child)
     raise NonCanonicalWire
 
@@ -363,7 +363,7 @@ def _parse_table_body(body: etree._Element) -> TableBodyWireSpec:
 def _looks_like_flowchart_body(body: etree._Element) -> bool:
     """判断 body 是否使用 renderer 的 flowchart 固定外壳。"""
     children = _element_children(body)
-    return bool(children and local_name(children[0]) == "div" and "mineru-flowchart" in _class_tokens(children[0]))
+    return bool(children and local_name(children[0]) == "div" and "docgale-flowchart" in _class_tokens(children[0]))
 
 
 def _parse_flowchart_body(body: etree._Element) -> FlowchartBodyWireSpec:
@@ -374,14 +374,14 @@ def _parse_flowchart_body(body: etree._Element) -> FlowchartBodyWireSpec:
         raise NonCanonicalWire
     display, details = children
     display_classes = _class_tokens(display)
-    if local_name(display) != "div" or "mineru-flowchart" not in display_classes:
+    if local_name(display) != "div" or "docgale-flowchart" not in display_classes:
         raise NonCanonicalWire
     _validate_structural_text(display)
     display_children = _element_children(display)
     if not 1 <= len(display_children) <= 2:
         raise NonCanonicalWire
     canvas = display_children[0]
-    if local_name(canvas) != "div" or _class_tokens(canvas) != {"mineru-flowchart-canvas"}:
+    if local_name(canvas) != "div" or _class_tokens(canvas) != {"docgale-flowchart-canvas"}:
         raise NonCanonicalWire
     _validate_structural_text(canvas)
     if _element_children(canvas):
@@ -389,9 +389,9 @@ def _parse_flowchart_body(body: etree._Element) -> FlowchartBodyWireSpec:
     fallback_image = None
     if len(display_children) == 2:
         fallback_image = display_children[1]
-        if local_name(fallback_image) != "img" or _class_tokens(fallback_image) != {"mineru-flowchart-fallback"}:
+        if local_name(fallback_image) != "img" or _class_tokens(fallback_image) != {"docgale-flowchart-fallback"}:
             raise NonCanonicalWire
-    if local_name(details) != "details" or _class_tokens(details) != {"mineru-details", "mineru-flowchart-details"}:
+    if local_name(details) != "details" or _class_tokens(details) != {"docgale-details", "docgale-flowchart-details"}:
         raise NonCanonicalWire
     _validate_structural_text(details)
     details_children = _element_children(details)
@@ -404,7 +404,7 @@ def _parse_flowchart_body(body: etree._Element) -> FlowchartBodyWireSpec:
         or " ".join(summary.itertext()).strip() != "flowchart source"
     ):
         raise NonCanonicalWire
-    if local_name(source) != "pre" or _class_tokens(source) != {"mineru-flowchart-source"}:
+    if local_name(source) != "pre" or _class_tokens(source) != {"docgale-flowchart-source"}:
         raise NonCanonicalWire
     _validate_structural_text(source)
     code_children = _element_children(source)
@@ -415,7 +415,7 @@ def _parse_flowchart_body(body: etree._Element) -> FlowchartBodyWireSpec:
 
 def _parse_rich_visual_body(body: etree._Element, parent_type: BlockType, sub_type: str) -> RichVisualBodyWireSpec:
     """区分 renderer-owned 主图与开放但受 sanitizer 约束的富内容 carrier。"""
-    allowed_token = "mineru-image" if parent_type == BlockType.IMAGE else "mineru-chart-image"
+    allowed_token = "docgale-image" if parent_type == BlockType.IMAGE else "docgale-chart-image"
     children = _element_children(body)
     primary_image = (
         children[0] if children and local_name(children[0]) == "img" and allowed_token in _class_tokens(children[0]) else None
@@ -437,7 +437,7 @@ def _parse_rich_visual_body(body: etree._Element, parent_type: BlockType, sub_ty
     if len(remaining) != 1:
         raise NonCanonicalWire
     details = remaining[0]
-    if local_name(details) != "details" or _class_tokens(details) != {"mineru-details"}:
+    if local_name(details) != "details" or _class_tokens(details) != {"docgale-details"}:
         raise NonCanonicalWire
     if (details.text or "").strip() or (details.tail or "").strip():
         raise NonCanonicalWire
@@ -463,7 +463,7 @@ def _parse_list_container(container: etree._Element, *, top_wrapper: etree._Elem
     if top_wrapper is not None and sub_type != (top_wrapper.get("data-block-sub-type") or "").strip():
         raise NonCanonicalWire
     classes = _class_tokens(container)
-    if "mineru-list" not in classes or len(classes) != 2:
+    if "docgale-list" not in classes or len(classes) != 2:
         raise NonCanonicalWire
     children: list[ListLeafWireSpec | ListWireSpec] = []
     for item in _element_children(container):
@@ -761,4 +761,4 @@ def _canonical_list_start(element: etree._Element) -> int:
     return parsed
 
 
-__all__ = ["NonCanonicalWire", "parse_mineru_html_wire"]
+__all__ = ["NonCanonicalWire", "parse_docgale_html_wire"]

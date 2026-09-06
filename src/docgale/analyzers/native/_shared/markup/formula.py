@@ -15,18 +15,18 @@ from ..names import local_name
 
 FormulaDisplay: TypeAlias = Literal["inline", "block"]
 FormulaSourceKind: TypeAlias = Literal[
-    "mineru_latex",
+    "docgale_latex",
     "mathml_tex_annotation",
     "tex_script",
     "data_tex",
-    "legacy_mineru_text",
+    "docgale_text",
     "mathml_alttext",
     "embedded_mathml",
     "presentation_mathml",
 ]
 
 _MATH_SCRIPT_TYPE_RE = re.compile(r"^math/(?:tex|latex)(?:\s*;\s*mode\s*=\s*display)?$", re.IGNORECASE)
-_DISPLAY_FORMULA_TOKENS = frozenset({"display", "katex-display", "math-display", "mathjax-display", "mineru-math--block"})
+_DISPLAY_FORMULA_TOKENS = frozenset({"display", "katex-display", "math-display", "mathjax-display", "docgale-math--block"})
 _TEX_ANNOTATION_ENCODINGS = frozenset(
     {
         "application/tex",
@@ -92,8 +92,8 @@ def extract_formula(element: etree._Element) -> FormulaExtraction | None:
     """按固定优先级从公式节点或常见公式包装器中提取裸 LaTeX。"""
     display = _formula_display(element)
 
-    if latex := _subtree_attribute(element, "data-mineru-latex"):
-        return FormulaExtraction(latex, display, "mineru_latex")
+    if latex := _subtree_attribute(element, "data-docgale-latex"):
+        return FormulaExtraction(latex, display, "docgale_latex")
 
     if latex := _tex_annotation(element):
         return FormulaExtraction(latex, display, "mathml_tex_annotation")
@@ -104,10 +104,10 @@ def extract_formula(element: etree._Element) -> FormulaExtraction | None:
     if latex := _data_formula(element):
         return FormulaExtraction(latex, display, "data_tex")
 
-    if "mineru-math" in _class_tokens(element):
+    if "docgale-math" in _class_tokens(element):
         latex = strip_formula_delimiters("".join(element.itertext()))
         if latex:
-            return FormulaExtraction(latex, display, "legacy_mineru_text")
+            return FormulaExtraction(latex, display, "docgale_text")
 
     if latex := _mathml_alttext(element):
         return FormulaExtraction(latex, display, "mathml_alttext")

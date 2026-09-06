@@ -77,7 +77,7 @@ _ALLOWED_ATTRIBUTES = {
 }
 _ALLOWED_URL_SCHEMES = {"data", "http", "https", "mailto", "tel"}
 _LINK_SCHEMES = {"http", "https", "mailto", "tel"}
-_EQ_PLACEHOLDER_TAG = "mineru-eq-placeholder"
+_EQ_PLACEHOLDER_TAG = "docgale-eq-placeholder"
 _DATA_IMAGE_RE = re.compile(
     r"\Adata:(?P<mime>image/[a-z0-9.+-]+);base64,(?P<payload>[a-z0-9+/]*={0,2})\Z",
     re.IGNORECASE,

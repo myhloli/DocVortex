@@ -131,13 +131,13 @@ def render_math_html(latex: str, *, display: bool) -> HtmlInlineResult:
     escaped = _escape_text(normalized)
     if display:
         return HtmlInlineResult(
-            '<div class="mineru-math mineru-math--block" data-block-type="equation" '
-            f'data-formula-display="block" data-mineru-latex="{attribute_latex}">\\[\n{escaped}\n\\]</div>',
+            '<div class="docgale-math docgale-math--block" data-block-type="equation" '
+            f'data-formula-display="block" data-docgale-latex="{attribute_latex}">\\[\n{escaped}\n\\]</div>',
             has_math=True,
         )
     return HtmlInlineResult(
-        '<span class="mineru-math mineru-math--inline" data-block-type="equation" '
-        f'data-formula-display="inline" data-mineru-latex="{attribute_latex}">\\({escaped}\\)</span>',
+        '<span class="docgale-math docgale-math--inline" data-block-type="equation" '
+        f'data-formula-display="inline" data-docgale-latex="{attribute_latex}">\\({escaped}\\)</span>',
         has_math=True,
     )
 
@@ -159,7 +159,7 @@ def _render_inline_span_html(
         )
         styled_html = _apply_html_styles(rendered.html, span.styles)
         if span.styles and _needs_whitespace_preservation(span.content):
-            styled_html = f'<span class="mineru-preserve-whitespace">{styled_html}</span>'
+            styled_html = f'<span class="docgale-preserve-whitespace">{styled_html}</span>'
         return HtmlInlineResult(styled_html)
     if isinstance(span, CodeInlineSpan):
         return HtmlInlineResult(f"<code>{_escape_text(span.content)}</code>")
@@ -303,7 +303,7 @@ def _apply_html_styles(content: str, styles: list[str]) -> str:
     if "strikethrough" in styles:
         content = f"<s>{content}</s>"
     if "emphasis" in styles:
-        content = f'<span class="mineru-text-emphasis">{content}</span>'
+        content = f'<span class="docgale-text-emphasis">{content}</span>'
     return content
 
 

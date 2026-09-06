@@ -129,7 +129,7 @@ def _render_page_footnote(
         return ""
     rendered = rendered.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br>")
     attrs = [
-        'class="mineru-page-footnote"',
+        'class="docgale-page-footnote"',
         'data-block-type="page_footnote"',
         'style="color:#6b7280"',
     ]
@@ -606,7 +606,7 @@ def _render_algorithm_html(content: list[InlineSpan], delimiters: LatexDelimiter
     body = "".join(parts)
     if not body.strip():
         return ""
-    return f'<div class="mineru-algorithm" style="white-space: pre-wrap; font-family:monospace;">\n{body}\n</div>'
+    return f'<div class="docgale-algorithm" style="white-space: pre-wrap; font-family:monospace;">\n{body}\n</div>'
 
 
 def _render_algorithm_markdown(content: list[InlineSpan], delimiters: LatexDelimitersConfig) -> str:

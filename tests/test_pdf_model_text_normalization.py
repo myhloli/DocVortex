@@ -134,8 +134,8 @@ def test_table_formula_delimiters_cross_html_nodes() -> None:
 def test_table_opaque_nodes_and_unchanged_markup_remain_intact() -> None:
     """仅含受保护载荷或属性时，不重新序列化 HTML；普通标签不能侵入公式与代码。"""
     markup = """<table data-name='Ａ'><tr><td><!-- Ｂ --><eq>Ｃ１</eq><math><mi>Ｄ</mi></math>
-<code>Ｅ２</code><pre>Ｆ</pre><span data-mineru-latex='Ｇ'>Ｇ</span>
-<span class='mineru-math'>Ｈ</span><div data-block-type='algorithm'>Ｉ</div>
+<code>Ｅ２</code><pre>Ｆ</pre><span data-docgale-latex='Ｇ'>Ｇ</span>
+<span class='docgale-math'>Ｈ</span><div data-block-type='algorithm'>Ｉ</div>
 <svg><text>Ｊ</text></svg><a href='/Ｋ'>ascii</a><img alt='Ｌ' src='/Ｍ'></td></tr></table>"""
     model = [[{"type": "table", "content": markup}]]
     normalize_pdf_model_text(model)

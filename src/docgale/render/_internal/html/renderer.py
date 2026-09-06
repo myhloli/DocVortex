@@ -14,7 +14,7 @@ from loguru import logger
 
 from ..common.index import strip_index_page_tail
 from ....content.inline import inline_plain_text, normalize_inline_spans
-from ....codecs.html import MINERU_HTML_VERSION
+from ....codecs.html import DOCGALE_HTML_VERSION
 from ....codecs.html.contracts import (
     WIRE_BLOCK_CLASS,
     WIRE_DOCUMENT_CLASS,
@@ -70,7 +70,7 @@ from ....schema import (
     TitleBlockBase,
 )
 
-_STYLE_RESOURCE_NAME = "mineru.min.css"
+_STYLE_RESOURCE_NAME = "docgale.min.css"
 _MATHJAX_URL = "https://cdn.jsdelivr.net/npm/mathjax@4.1.2/tex-chtml.js"
 _MATHJAX_INTEGRITY = "sha384-zAhQQhdaMeHsMProNntGGg6nOUVcfuF9F22C3d1qJ9NZAVzCplXk1X85D2O5iufn"
 _PRISM_CORE_URL = "https://cdn.jsdelivr.net/npm/prismjs@1.30.0/components/prism-core.min.js"
@@ -137,19 +137,19 @@ class _HtmlRenderer:
             body = self._render_default_pages(planned_pages)
         article = (
             f'<article class="{WIRE_DOCUMENT_CLASS} {WIRE_DOCUMENT_CLASS}--{self.mode.value}" '
-            f'data-mineru-html-version="{MINERU_HTML_VERSION}" data-render-mode="{self.mode.value}">\n{body}\n</article>'
+            f'data-docgale-html-version="{DOCGALE_HTML_VERSION}" data-render-mode="{self.mode.value}">\n{body}\n</article>'
         )
         if not self.standalone:
             return article
         # 最终依赖以真实 DOM 为准，避免回退分支或普通文本中的 class 字样误触发。
         article_soup = BeautifulSoup(article, "html.parser")
-        self.has_math = article_soup.select_one(".mineru-math") is not None
+        self.has_math = article_soup.select_one(".docgale-math") is not None
         self.has_prism = any(
             any(str(class_name).startswith("language-") for class_name in code.get("class", []))
             for code in article_soup.find_all("code")
             if code.get_text()
         )
-        self.has_mermaid = article_soup.select_one(".mineru-flowchart") is not None
+        self.has_mermaid = article_soup.select_one(".docgale-flowchart") is not None
         return self._render_standalone(article)
 
     def _render_default_pages(self, planned_pages: list[list[PlannedBlock]]) -> str:
@@ -200,13 +200,13 @@ class _HtmlRenderer:
             self._observe_inline(rendered)
             if not rendered.html:
                 return ""
-            attrs = ['class="mineru-text"']
+            attrs = ['class="docgale-text"']
             self._append_anchor_attribute(attrs, block.anchor, block_type=str(block.type))
             return f"<p {' '.join(attrs)}>{rendered.html}</p>"
         if isinstance(block, RefTextBlock):
             rendered = render_joined_inline_contents_html(planned.text_contents or [block.content])
             self._observe_inline(rendered)
-            return f'<p class="mineru-ref-text">{rendered.html}</p>' if rendered.html else ""
+            return f'<p class="docgale-ref-text">{rendered.html}</p>' if rendered.html else ""
         if isinstance(block, (DocTitleBlock, ParagraphTitleBlock)):
             return self._render_title(block)
         if isinstance(block, PageFootnoteBlock):
@@ -214,7 +214,7 @@ class _HtmlRenderer:
             self._observe_inline(rendered)
             if not rendered.html:
                 return ""
-            attrs = ['class="mineru-page-footnote"', 'data-block-type="page_footnote"']
+            attrs = ['class="docgale-page-footnote"', 'data-block-type="page_footnote"']
             self._append_anchor_attribute(attrs, block.anchor, block_type=str(block.type))
             return f"<div {' '.join(attrs)}>{rendered.html}</div>"
         if isinstance(block, PageAuxTextBlock):
@@ -223,7 +223,7 @@ class _HtmlRenderer:
             if not rendered.html:
                 return ""
             class_name = html.escape(str(block.type).replace("_", "-"), quote=True)
-            attrs = [f'class="mineru-page-aux mineru-page-aux--{class_name}"']
+            attrs = [f'class="docgale-page-aux docgale-page-aux--{class_name}"']
             return f"<div {' '.join(attrs)}>{rendered.html}</div>"
         if isinstance(block, EquationBlock):
             return self._render_equation(block)
@@ -248,7 +248,7 @@ class _HtmlRenderer:
         if not rendered.html:
             return ""
         level = min(max(block.level, 1), 6)
-        attrs = [f'class="mineru-heading mineru-heading--{level}"', f'data-heading-level="{block.level}"']
+        attrs = [f'class="docgale-heading docgale-heading--{level}"', f'data-heading-level="{block.level}"']
         self._append_anchor_attribute(attrs, block.anchor, block_type=str(block.type))
         return f"<h{level} {' '.join(attrs)}>{rendered.html}</h{level}>"
 
@@ -278,7 +278,7 @@ class _HtmlRenderer:
             self._observe_inline(rendered)
             return rendered.html
         source = self._safe_block_image_source(block)
-        return self._render_image(source, alt="formula", class_name="mineru-equation-image") if source else ""
+        return self._render_image(source, alt="formula", class_name="docgale-equation-image") if source else ""
 
     def _render_list(self, block: ListBlock) -> str:
         """按直属 marker 类型渲染一层列表，并递归挂接嵌套列表。"""
@@ -298,7 +298,7 @@ class _HtmlRenderer:
                 if not nested:
                     continue
                 if not items:
-                    items.append({"content": "", "attrs": ['class="mineru-list-item--orphan"'], "nested": []})
+                    items.append({"content": "", "attrs": ['class="docgale-list-item--orphan"'], "nested": []})
                 nested_items = items[-1]["nested"]
                 assert isinstance(nested_items, list)
                 nested_items.append(nested)
@@ -308,7 +308,7 @@ class _HtmlRenderer:
             item_content, marker = _list_item_content(
                 parsed,
                 add_reference_bullets,
-                explicit_markers=class_name == "mineru-list--explicit",
+                explicit_markers=class_name == "docgale-list--explicit",
             )
             rendered = render_inline_content_html(item_content)
             self._observe_inline(rendered)
@@ -316,15 +316,15 @@ class _HtmlRenderer:
                 items.append(
                     {
                         "content": "",
-                        "attrs": ['class="mineru-list-item--markerless"', *_wire_block_attributes(child)],
+                        "attrs": ['class="docgale-list-item--markerless"', *_wire_block_attributes(child)],
                         "nested": [],
                     }
                 )
                 continue
 
             attrs = _wire_block_attributes(child)
-            if class_name == "mineru-list--explicit":
-                attrs.append('class="mineru-list-item--explicit"')
+            if class_name == "docgale-list--explicit":
+                attrs.append('class="docgale-list-item--explicit"')
             if container_tag == "ol" and parsed.kind == "ordered" and parsed.value is not None:
                 if expected_value is None:
                     expected_value = parsed.value
@@ -336,7 +336,7 @@ class _HtmlRenderer:
                 if marker
                 else ""
             )
-            if class_name == "mineru-list--explicit" and not marker_html:
+            if class_name == "docgale-list--explicit" and not marker_html:
                 marker_html = f'<span class="{WIRE_LIST_MARKER_CLASS}"></span>'
             items.append(
                 {
@@ -360,7 +360,7 @@ class _HtmlRenderer:
         if not rendered_items:
             return ""
 
-        container_attrs = [f'class="mineru-list {class_name}"', *_wire_block_attributes(block)]
+        container_attrs = [f'class="docgale-list {class_name}"', *_wire_block_attributes(block)]
         if list_type:
             container_attrs.append(f'type="{list_type}"')
         if container_tag == "ol" and parsed_leaves and parsed_leaves[0].value not in (None, 1):
@@ -376,7 +376,7 @@ class _HtmlRenderer:
                 if not nested:
                     continue
                 if not items:
-                    items.append({"content": "", "attrs": ['class="mineru-list-item--orphan"'], "nested": []})
+                    items.append({"content": "", "attrs": ['class="docgale-list-item--orphan"'], "nested": []})
                 nested_items = items[-1]["nested"]
                 assert isinstance(nested_items, list)
                 nested_items.append(nested)
@@ -395,7 +395,7 @@ class _HtmlRenderer:
                 nested = self._render_index_list(child)
                 if nested:
                     if not items:
-                        items.append({"content": "", "attrs": ['class="mineru-list-item--orphan"'], "nested": []})
+                        items.append({"content": "", "attrs": ['class="docgale-list-item--orphan"'], "nested": []})
                     nested_items = items[-1]["nested"]
                     assert isinstance(nested_items, list)
                     nested_items.append(nested)
@@ -431,7 +431,7 @@ class _HtmlRenderer:
                 raise TypeError(f"Unsupported image child: {type(child).__name__}")
             if body:
                 parts.append(body)
-        return f'<figure class="mineru-figure mineru-figure--image">{"".join(parts)}</figure>' if parts else ""
+        return f'<figure class="docgale-figure docgale-figure--image">{"".join(parts)}</figure>' if parts else ""
 
     def _render_image_body(self, parent: ImageBlock, block: ImageBodyBlock) -> str:
         """渲染图片，并把并存的识别内容放入原生 details。"""
@@ -443,7 +443,7 @@ class _HtmlRenderer:
         source = self._safe_block_image_source(block)
         content = self._render_embedded_content(block.content, linkify_text=parent.sub_type != "flowchart")
         alt = _plain_content_text(block.content) or parent.sub_type or "image"
-        parts = [self._render_image(source, alt=alt, class_name="mineru-image")] if source else []
+        parts = [self._render_image(source, alt=alt, class_name="docgale-image")] if source else []
         if content.html:
             if source:
                 parts.append(self._render_details(content.html, parent.sub_type or "image content"))
@@ -455,16 +455,16 @@ class _HtmlRenderer:
         """输出 Mermaid canvas，并保留 raster 与源码两级失败回退。"""
         source = self._safe_block_image_source(block)
         escaped_source = html.escape(_replace_html_controls(mermaid_source), quote=False)
-        fallback = self._render_image(source, alt="flowchart", class_name="mineru-flowchart-fallback") if source else ""
-        fallback_class = " mineru-flowchart--has-raster" if fallback else ""
+        fallback = self._render_image(source, alt="flowchart", class_name="docgale-flowchart-fallback") if source else ""
+        fallback_class = " docgale-flowchart--has-raster" if fallback else ""
         details_open = "" if fallback else " open"
         return (
-            f'<div class="mineru-flowchart{fallback_class}" data-mermaid-state="pending">'
-            '<div class="mineru-flowchart-canvas" role="img" aria-label="flowchart"></div>'
+            f'<div class="docgale-flowchart{fallback_class}" data-mermaid-state="pending">'
+            '<div class="docgale-flowchart-canvas" role="img" aria-label="flowchart"></div>'
             f"{fallback}</div>"
-            f'<details class="mineru-details mineru-flowchart-details"{details_open}>'
+            f'<details class="docgale-details docgale-flowchart-details"{details_open}>'
             "<summary>flowchart source</summary>"
-            f'<pre class="mineru-flowchart-source"><code>{escaped_source}</code></pre>'
+            f'<pre class="docgale-flowchart-source"><code>{escaped_source}</code></pre>'
             "</details>"
         )
 
@@ -480,7 +480,7 @@ class _HtmlRenderer:
                 raise TypeError(f"Unsupported table child: {type(child).__name__}")
             if body:
                 parts.append(body)
-        return f'<figure class="mineru-figure mineru-figure--table">{"".join(parts)}</figure>' if parts else ""
+        return f'<figure class="docgale-figure docgale-figure--table">{"".join(parts)}</figure>' if parts else ""
 
     def _render_table_body(self, block: TableBodyBlock) -> str:
         """优先保留安全 HTML table，空间文本和整体图片依次回退。"""
@@ -494,13 +494,13 @@ class _HtmlRenderer:
                     return _wrap_visual_body(rendered.html, block, "table")
                 source = self._safe_block_image_source(block)
                 if source:
-                    rendered_image = self._render_image(source, alt="table", class_name="mineru-table-image")
+                    rendered_image = self._render_image(source, alt="table", class_name="docgale-table-image")
                     return _wrap_visual_body(rendered_image, block, "table")
                 return _wrap_visual_body(_render_raw_fallback(content), block, "table")
-            rendered_text = f'<pre class="mineru-table-text">{html.escape(normalized_content, quote=False)}</pre>'
+            rendered_text = f'<pre class="docgale-table-text">{html.escape(normalized_content, quote=False)}</pre>'
             return _wrap_visual_body(rendered_text, block, "table")
         source = self._safe_block_image_source(block)
-        rendered_image = self._render_image(source, alt="table", class_name="mineru-table-image") if source else ""
+        rendered_image = self._render_image(source, alt="table", class_name="docgale-table-image") if source else ""
         return _wrap_visual_body(rendered_image, block, "table")
 
     def _render_chart_block(self, block: ChartBlock) -> str:
@@ -515,13 +515,13 @@ class _HtmlRenderer:
                 raise TypeError(f"Unsupported chart child: {type(child).__name__}")
             if body:
                 parts.append(body)
-        return f'<figure class="mineru-figure mineru-figure--chart">{"".join(parts)}</figure>' if parts else ""
+        return f'<figure class="docgale-figure docgale-figure--chart">{"".join(parts)}</figure>' if parts else ""
 
     def _render_chart_body(self, parent: ChartBlock, block: ChartBodyBlock) -> str:
         """渲染 chart 图片，并将并存结构内容放入 details。"""
         source = self._safe_block_image_source(block)
         content = self._render_chart_content(block.content)
-        parts = [self._render_image(source, alt=parent.sub_type or "chart", class_name="mineru-chart-image")] if source else []
+        parts = [self._render_image(source, alt=parent.sub_type or "chart", class_name="docgale-chart-image")] if source else []
         if content.html:
             if source:
                 parts.append(self._render_details(content.html, parent.sub_type or "chart content"))
@@ -558,7 +558,7 @@ class _HtmlRenderer:
                 raise TypeError(f"Unsupported code child: {type(child).__name__}")
             if body:
                 parts.append(body)
-        return f'<figure class="mineru-figure mineru-figure--code">{"".join(parts)}</figure>' if parts else ""
+        return f'<figure class="docgale-figure docgale-figure--code">{"".join(parts)}</figure>' if parts else ""
 
     def _render_code_body(self, parent: CodeBlock, block: CodeBodyBlock | AlgorithmBodyBlock) -> str:
         """代码使用 Prism class，算法直接使用结构化 Span 保留空白。"""
@@ -567,10 +567,10 @@ class _HtmlRenderer:
                 raise TypeError("code subtype requires CodeBodyBlock")
             escaped = html.escape(_replace_html_controls(block.content), quote=False)
             if not block.content:
-                return _wrap_visual_body('<pre class="mineru-code"><code></code></pre>', block, "code")
+                return _wrap_visual_body('<pre class="docgale-code"><code></code></pre>', block, "code")
             language = _normalize_prism_language(parent.guess_lang)
             class_attr = f' class="language-{language}"' if language else ""
-            pre_class = f"mineru-code language-{language}" if language else "mineru-code"
+            pre_class = f"docgale-code language-{language}" if language else "docgale-code"
             self.has_prism = bool(language) or self.has_prism
             rendered = f'<pre class="{pre_class}"><code{class_attr}>{escaped}</code></pre>'
             return _wrap_visual_body(rendered, block, "code")
@@ -584,7 +584,7 @@ class _HtmlRenderer:
                 preserve_newlines=True,
             )
             self._observe_inline(rendered)
-            algorithm = f'<div class="mineru-algorithm">{rendered.html}</div>' if rendered.html else ""
+            algorithm = f'<div class="docgale-algorithm">{rendered.html}</div>' if rendered.html else ""
             return _wrap_visual_body(algorithm, block, "code")
         raise ValueError(f"Unsupported code subtype: {parent.sub_type}")
 
@@ -598,7 +598,7 @@ class _HtmlRenderer:
         if not rendered.html:
             return ""
         is_caption = str(block.type).endswith("caption")
-        role_class = "mineru-caption" if is_caption else "mineru-footnote"
+        role_class = "docgale-caption" if is_caption else "docgale-footnote"
         type_class = html.escape(str(block.type).replace("_", "-"), quote=True)
         attrs = [f'class="{role_class} {role_class}--{type_class}"', *_wire_block_attributes(block)]
         return f"<p {' '.join(attrs)}>{rendered.html}</p>"
@@ -653,7 +653,7 @@ class _HtmlRenderer:
     def _render_details(self, content: str, summary: str) -> str:
         """构造浏览器原生折叠详情，不引入额外脚本。"""
         return (
-            '<details class="mineru-details">'
+            '<details class="docgale-details">'
             f"<summary>{html.escape(_replace_html_controls(summary), quote=False)}</summary>{content}</details>"
         )
 
@@ -686,7 +686,7 @@ class _HtmlRenderer:
             f"<style>{styles}</style>\n"
             f"{dependency_html}\n"
             "</head>\n"
-            '<body class="mineru-html-body">\n'
+            '<body class="docgale-html-body">\n'
             f"{article}\n"
             "</body>\n"
             "</html>"
@@ -724,9 +724,9 @@ def render_html(
 def _classify_list(items: list[ListItem], add_reference_bullets: bool) -> tuple[str, str | None, str]:
     """根据直属 marker 选择原生列表类型或显式 marker 模式。"""
     if add_reference_bullets:
-        return "ul", None, "mineru-list--reference"
+        return "ul", None, "docgale-list--reference"
     if items and all(item.kind == "unordered" for item in items):
-        return "ul", None, "mineru-list--unordered"
+        return "ul", None, "docgale-list--unordered"
     if items and all(item.kind == "ordered" for item in items):
         styles = {item.ordered_style for item in items}
         if len(styles) == 1:
@@ -737,10 +737,10 @@ def _classify_list(items: list[ListItem], add_reference_bullets: bool) -> tuple[
                 "lower-roman": "i",
                 "upper-roman": "I",
             }.get(style or "")
-            return "ol", list_type, "mineru-list--ordered"
+            return "ol", list_type, "docgale-list--ordered"
     if items and all(item.kind == "none" for item in items):
-        return "ul", None, "mineru-list--unmarked"
-    return "ul", None, "mineru-list--explicit"
+        return "ul", None, "docgale-list--unmarked"
+    return "ul", None, "docgale-list--explicit"
 
 
 def _list_item_content(
@@ -880,7 +880,7 @@ def _contains_usable_table(markup: str) -> bool:
 
 def _render_raw_fallback(content: str) -> str:
     """把无法安全结构化的原内容转义为可见 pre，避免静默丢失。"""
-    return f'<pre class="mineru-raw-fallback">{html.escape(_replace_html_controls(content), quote=False)}</pre>'
+    return f'<pre class="docgale-raw-fallback">{html.escape(_replace_html_controls(content), quote=False)}</pre>'
 
 
 def _normalize_prism_language(language: str | None) -> str | None:
@@ -902,7 +902,7 @@ def _resolve_document_title(middle_json: MiddleJson, explicit_title: str | None)
                 title = inline_plain_text(block.content).strip()
                 if title:
                     return title
-    return "MinerU Document"
+    return "DocGale Document"
 
 
 def _anchor_key(anchor: str | None) -> str:
@@ -941,8 +941,8 @@ window.MathJax = {{
     packages: {{'[-]': ['require']}}
   }},
   options: {{
-    ignoreHtmlClass: 'mineru-document',
-    processHtmlClass: 'mineru-math',
+    ignoreHtmlClass: 'docgale-document',
+    processHtmlClass: 'docgale-math',
     enableMenu: false,
     enableEnrichment: false,
     safeOptions: {{allow: {{URLs: 'none', classes: 'none', cssIDs: 'none', styles: 'none'}}}}
@@ -971,7 +971,7 @@ def _prism_head() -> str:
 document.addEventListener('DOMContentLoaded', function () {{
   if (!window.Prism || !Prism.plugins || !Prism.plugins.autoloader) return;
   Prism.plugins.autoloader.languages_path = '{_PRISM_LANGUAGES_PATH}';
-  var root = document.querySelector('.mineru-document');
+  var root = document.querySelector('.docgale-document');
   if (root) Prism.highlightAllUnder(root);
 }});
 </script>"""
@@ -982,19 +982,19 @@ def _mermaid_head() -> str:
     return f"""<script defer src="{_MERMAID_URL}"
   integrity="{_MERMAID_INTEGRITY}" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
-function markMineruMermaidError(host) {{
+function markDocGaleMermaidError(host) {{
   host.dataset.mermaidState = 'error';
-  if (!host.classList.contains('mineru-flowchart--has-raster')) {{
+  if (!host.classList.contains('docgale-flowchart--has-raster')) {{
     var details = host.nextElementSibling;
-    if (details && details.classList.contains('mineru-flowchart-details')) details.open = true;
+    if (details && details.classList.contains('docgale-flowchart-details')) details.open = true;
   }}
 }}
 document.addEventListener('DOMContentLoaded', function () {{
-  var root = document.querySelector('.mineru-document');
-  var hosts = root ? Array.from(root.querySelectorAll('.mineru-flowchart')) : [];
+  var root = document.querySelector('.docgale-document');
+  var hosts = root ? Array.from(root.querySelectorAll('.docgale-flowchart')) : [];
   if (!hosts.length) return;
   if (!window.mermaid) {{
-    hosts.forEach(markMineruMermaidError);
+    hosts.forEach(markDocGaleMermaidError);
     return;
   }}
   try {{
@@ -1008,20 +1008,20 @@ document.addEventListener('DOMContentLoaded', function () {{
       flowchart: {{htmlLabels: false, useMaxWidth: true}}
     }});
   }} catch (_error) {{
-    hosts.forEach(markMineruMermaidError);
+    hosts.forEach(markDocGaleMermaidError);
     return;
   }}
   (async function () {{
     for (var index = 0; index < hosts.length; index += 1) {{
       var host = hosts[index];
       var details = host.nextElementSibling;
-      var source = details && details.querySelector('.mineru-flowchart-source code');
-      var canvas = host.querySelector('.mineru-flowchart-canvas');
+      var source = details && details.querySelector('.docgale-flowchart-source code');
+      var canvas = host.querySelector('.docgale-flowchart-canvas');
       if (!source || !canvas) {{
-        markMineruMermaidError(host);
+        markDocGaleMermaidError(host);
         continue;
       }}
-      var renderId = 'mineru-mermaid-' + index;
+      var renderId = 'docgale-mermaid-' + index;
       while (document.getElementById(renderId)) renderId += '-x';
       host.dataset.mermaidState = 'rendering';
       try {{
@@ -1029,7 +1029,7 @@ document.addEventListener('DOMContentLoaded', function () {{
         canvas.innerHTML = result.svg;
         host.dataset.mermaidState = 'rendered';
       }} catch (_error) {{
-        markMineruMermaidError(host);
+        markDocGaleMermaidError(host);
       }}
     }}
   }})();

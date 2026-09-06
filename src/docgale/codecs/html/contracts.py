@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""MinerU HTML v1 canonical wire 的内部类型契约。"""
+"""DocGale HTML v1 canonical wire 的内部类型契约。"""
 
 from __future__ import annotations
 
@@ -11,15 +11,15 @@ from lxml import etree  # type: ignore[reportMissingImports]
 from ...schema import BlockType
 
 
-MINERU_HTML_VERSION = "1"
-WIRE_BLOCK_CLASS = "mineru-block"
-WIRE_DOCUMENT_CLASS = "mineru-document"
-WIRE_INDEX_CLASS = "mineru-index"
-WIRE_LIST_CONTENT_CLASS = "mineru-list-content"
-WIRE_LIST_MARKER_CLASS = "mineru-list-marker"
-WIRE_PAGE_BREAK_CLASS = "mineru-page-break"
-WIRE_PAGE_CLASS = "mineru-page"
-WIRE_VISUAL_BODY_CLASS = "mineru-visual-body"
+DOCGALE_HTML_VERSION = "1"
+WIRE_BLOCK_CLASS = "docgale-block"
+WIRE_DOCUMENT_CLASS = "docgale-document"
+WIRE_INDEX_CLASS = "docgale-index"
+WIRE_LIST_CONTENT_CLASS = "docgale-list-content"
+WIRE_LIST_MARKER_CLASS = "docgale-list-marker"
+WIRE_PAGE_BREAK_CLASS = "docgale-page-break"
+WIRE_PAGE_CLASS = "docgale-page"
+WIRE_VISUAL_BODY_CLASS = "docgale-visual-body"
 WireRenderMode: TypeAlias = Literal["default", "full"]
 WireFallbackReason: TypeAlias = Literal["unsupported_version", "non_canonical_wire"]
 
@@ -187,7 +187,7 @@ PageWireSpec: TypeAlias = Union[
 
 
 @dataclass(frozen=True, slots=True)
-class MineruHtmlWirePlan:
+class DocGaleHtmlWirePlan:
     """保存一次无资源副作用的完整 canonical wire 解析结果。"""
 
     root: etree._Element
@@ -214,8 +214,8 @@ __all__ = [
     "ListBlockWireSpec",
     "ListLeafWireSpec",
     "ListWireSpec",
-    "MINERU_HTML_VERSION",
-    "MineruHtmlWirePlan",
+    "DOCGALE_HTML_VERSION",
+    "DocGaleHtmlWirePlan",
     "PageWireSpec",
     "RichVisualBodyWireSpec",
     "TableBodyWireSpec",

@@ -11,8 +11,8 @@ def test_committed_minified_css_matches_readable_source() -> None:
     """验证仓库提交的 min 产物始终由当前可读源码确定性生成。"""
     project_root = Path(__file__).resolve().parents[2]
     resource_root = project_root / "src" / "docgale" / "resources" / "html"
-    source = resource_root.joinpath("mineru.css").read_text(encoding="utf-8")
-    minified = resource_root.joinpath("mineru.min.css").read_text(encoding="utf-8")
+    source = resource_root.joinpath("docgale.css").read_text(encoding="utf-8")
+    minified = resource_root.joinpath("docgale.min.css").read_text(encoding="utf-8")
 
     assert minified == build_html_css.minify_css(source)
 
@@ -20,28 +20,28 @@ def test_committed_minified_css_matches_readable_source() -> None:
 def test_visual_bodies_captions_and_footnotes_align_left() -> None:
     """验证视觉主体与说明统一贴正文左边，长说明也保持左对齐。"""
     project_root = Path(__file__).resolve().parents[2]
-    css_path = project_root.joinpath("src", "docgale", "resources", "html", "mineru.css")
+    css_path = project_root.joinpath("src", "docgale", "resources", "html", "docgale.css")
     source = css_path.read_text(encoding="utf-8")
 
     assert "width: fit-content" not in source
     assert (
-        ".mineru-document .mineru-figure > img,\n"
-        ".mineru-document .mineru-visual-body > img {\n  display: block;\n  margin-inline: 0;\n}"
+        ".docgale-document .docgale-figure > img,\n"
+        ".docgale-document .docgale-visual-body > img {\n  display: block;\n  margin-inline: 0;\n}"
     ) in source
-    assert ".mineru-document .mineru-flowchart {\n  margin: 1rem 0;" in source
-    assert ".mineru-document .mineru-flowchart-canvas {\n  display: none;\n  min-width: 0;\n  text-align: left;" in source
+    assert ".docgale-document .docgale-flowchart {\n  margin: 1rem 0;" in source
+    assert ".docgale-document .docgale-flowchart-canvas {\n  display: none;\n  min-width: 0;\n  text-align: left;" in source
     assert (
-        ".mineru-document .mineru-caption {\n"
-        "  color: var(--mineru-muted);\n"
+        ".docgale-document .docgale-caption {\n"
+        "  color: var(--docgale-muted);\n"
         "  font-size: 0.9em;\n"
         "  margin-top: 0.5rem;\n"
         "  text-align: left;\n"
         "}"
     ) in source
     assert (
-        ".mineru-document .mineru-footnote,\n"
-        ".mineru-document .mineru-page-footnote {\n"
-        "  color: var(--mineru-muted);\n"
+        ".docgale-document .docgale-footnote,\n"
+        ".docgale-document .docgale-page-footnote {\n"
+        "  color: var(--docgale-muted);\n"
         "  font-size: 0.875em;\n"
         "  margin-top: 0.4rem;\n"
         "  text-align: left;\n"
@@ -101,8 +101,8 @@ def test_build_html_css_check_detects_and_repairs_stale_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """验证 check 模式无写入地报告过期产物，普通模式再原子修复。"""
-    source_path = tmp_path / "mineru.css"
-    output_path = tmp_path / "mineru.min.css"
+    source_path = tmp_path / "docgale.css"
+    output_path = tmp_path / "docgale.min.css"
     source_path.write_text(".demo { color: red; }\n", encoding="utf-8")
     output_path.write_text("stale", encoding="utf-8")
     monkeypatch.setattr(build_html_css, "_SOURCE_PATH", source_path)

@@ -43,14 +43,18 @@ direct PDFium dependency. Other shared dependency floors remain aligned, includi
 
 ## Existing serialized formats
 
-The HTML wire protocol retains its existing `mineru-*` classes,
-`data-mineru-html-version`, formula carriers and reader/writer behavior. Related
-output style identifiers and renderer defaults remain unchanged. These names
-preserve existing integrations and do not imply a dependency on MinerU.
+HTML output now uses `docgale-*`, `data-docgale-html-version="1"` and
+`data-docgale-latex`. EPUB XHTML/CSS and Markdown's embedded HTML use the same
+namespace. Only DocGale HTML markers receive exact decoding; old MinerU-marked
+HTML follows ordinary webpage parsing, without an exact semantic round-trip
+guarantee. No legacy codec aliases or marker compatibility branches are provided.
+See the [HTML protocol](HTML_PROTOCOL.md) for the current contract.
 
-Independent branding and licensing do not rename public APIs, schema identities,
-adapter imports or serialized fields. Existing JSON/HTML round trips continue
-to use the same contracts.
+JSON schema identities, MinerU JSON adapters and host metadata are unchanged.
+Existing saved JSON and bundles are not rewritten. Re-render a complete saved
+result to obtain current HTML; this does not require reparsing the source PDF.
+PDF/DOCX/LaTeX non-HTML identifiers and MinerU's own UI markers are outside this
+HTML migration.
 
 ## Source and sample history
 

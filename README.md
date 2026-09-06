@@ -88,7 +88,8 @@ DocGale JSON uses schema identity `docgale.model` or `docgale.middle`, schema
 version `1.0`, and neutral producer metadata. Definitions are in `schemas/`.
 Application-specific metadata belongs in `extensions`. See the
 [compatibility guide](docs/COMPATIBILITY.md) for existing application integrations
-and historical data formats.
+and historical data formats. The [HTML protocol](docs/HTML_PROTOCOL.md) describes
+DocGale markers and semantic round trips.
 
 ## Scope and development
 

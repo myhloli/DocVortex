@@ -64,7 +64,7 @@ _EPUB_NS = "http://www.idpf.org/2007/ops"
 _MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 _XHTML_NS = "http://www.w3.org/1999/xhtml"
 _XML_NS = "http://www.w3.org/XML/1998/namespace"
-_STYLE_RESOURCE_NAME = "mineru.css"
+_STYLE_RESOURCE_NAME = "docgale.css"
 _INVALID_XML_TEXT_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\ud800-\udfff]")
 _MARKUP_TOKEN_RE = re.compile(
     r"<\s*(?P<closing>/)?\s*(?P<name>[A-Za-z][A-Za-z0-9:-]*)\b(?P<attrs>[^>]*)>",
@@ -273,15 +273,15 @@ class _EpubXhtmlRenderer:
             head,
             _xhtml("link"),
             rel="stylesheet",
-            href="../styles/mineru.css",
+            href="../styles/docgale.css",
             type="text/css",
         )
-        body = etree.SubElement(root, _xhtml("body"), attrib={"class": "mineru-epub-body"})
+        body = etree.SubElement(root, _xhtml("body"), attrib={"class": "docgale-epub-body"})
         article = etree.SubElement(
             body,
             _xhtml("article"),
             id="content-start",
-            attrib={"class": "mineru-document"},
+            attrib={"class": "docgale-document"},
         )
         self._render_pages(article, build_render_plan(self.middle_json))
         return etree.tostring(
@@ -312,7 +312,7 @@ class _EpubXhtmlRenderer:
         wrapper = etree.Element(
             _xhtml("div"),
             attrib={
-                "class": "mineru-block",
+                "class": "docgale-block",
                 "data-page-idx": str(planned.page_idx),
                 "data-block-type": str(block.type),
             },
@@ -329,7 +329,7 @@ class _EpubXhtmlRenderer:
             content = join_inline_spans(planned.text_contents or [block.content])
             paragraph = etree.Element(
                 _xhtml("p"),
-                attrib={"class": "mineru-ref-text" if isinstance(block, RefTextBlock) else "mineru-text"},
+                attrib={"class": "docgale-ref-text" if isinstance(block, RefTextBlock) else "docgale-text"},
             )
             if isinstance(block, TextBlock):
                 target_id = self.anchors.target_for_block(planned.page_idx, block)
@@ -362,7 +362,7 @@ class _EpubXhtmlRenderer:
         if not inline_plain_text(block.content).strip():
             return None
         level = min(max(block.level, 1), 6)
-        heading = etree.Element(_xhtml(f"h{level}"), attrib={"class": f"mineru-heading mineru-heading--{level}"})
+        heading = etree.Element(_xhtml(f"h{level}"), attrib={"class": f"docgale-heading docgale-heading--{level}"})
         target_id = self.anchors.target_for_block(page_idx, block)
         if target_id:
             heading.set("id", target_id)
@@ -373,7 +373,7 @@ class _EpubXhtmlRenderer:
         """把页面脚注保留为 EPUB footnote aside。"""
         footnote = etree.Element(
             _xhtml("aside"),
-            attrib={"class": "mineru-page-footnote", f"{{{_EPUB_NS}}}type": "footnote", "role": "doc-footnote"},
+            attrib={"class": "docgale-page-footnote", f"{{{_EPUB_NS}}}type": "footnote", "role": "doc-footnote"},
         )
         target_id = self.anchors.target_for_block(page_idx, block)
         if target_id:
@@ -383,7 +383,7 @@ class _EpubXhtmlRenderer:
 
     def _render_equation(self, block: EquationBlock) -> etree._Element | None:
         """优先渲染行间 MathML，空公式时才尝试包内图片。"""
-        container = etree.Element(_xhtml("div"), attrib={"class": "mineru-equation"})
+        container = etree.Element(_xhtml("div"), attrib={"class": "docgale-equation"})
         if block.content.strip():
             self._append_math(container, block.content, display="block")
         elif source := self.assets.resolve_block(block):
@@ -399,7 +399,7 @@ class _EpubXhtmlRenderer:
         ]
         add_reference_bullets = reference_list_needs_bullets(block)
         container_tag, list_type, class_name = _classify_list(parsed_leaves, add_reference_bullets)
-        container = etree.Element(_xhtml(container_tag), attrib={"class": f"mineru-list {class_name}"})
+        container = etree.Element(_xhtml(container_tag), attrib={"class": f"docgale-list {class_name}"})
         if list_type:
             container.set("type", list_type)
         if container_tag == "ol" and parsed_leaves and parsed_leaves[0].value not in (None, 1):
@@ -412,35 +412,35 @@ class _EpubXhtmlRenderer:
                 if nested is None:
                     continue
                 if last_item is None:
-                    last_item = etree.SubElement(container, _xhtml("li"), attrib={"class": "mineru-list-item--orphan"})
+                    last_item = etree.SubElement(container, _xhtml("li"), attrib={"class": "docgale-list-item--orphan"})
                 last_item.append(nested)
                 continue
             parsed = parse_list_item_marker(child.content)
             item_content, marker = _list_item_content(
                 parsed,
                 add_reference_bullets,
-                explicit_markers=class_name == "mineru-list--explicit",
+                explicit_markers=class_name == "docgale-list--explicit",
             )
             item = etree.SubElement(container, _xhtml("li"))
-            if class_name == "mineru-list--explicit":
-                item.set("class", "mineru-list-item--explicit")
+            if class_name == "docgale-list--explicit":
+                item.set("class", "docgale-list-item--explicit")
             if container_tag == "ol" and parsed.kind == "ordered" and parsed.value is not None:
                 if expected_value is None:
                     expected_value = parsed.value
                 if parsed.value != expected_value:
                     item.set("value", str(parsed.value))
                 expected_value = parsed.value + 1
-            if marker or class_name == "mineru-list--explicit":
-                marker_element = etree.SubElement(item, _xhtml("span"), attrib={"class": "mineru-list-marker"})
+            if marker or class_name == "docgale-list--explicit":
+                marker_element = etree.SubElement(item, _xhtml("span"), attrib={"class": "docgale-list-marker"})
                 marker_element.text = marker or ""
-            content_element = etree.SubElement(item, _xhtml("span"), attrib={"class": "mineru-list-content"})
+            content_element = etree.SubElement(item, _xhtml("span"), attrib={"class": "docgale-list-content"})
             self._append_inline_spans(content_element, item_content)
             last_item = item
         return container if len(container) else None
 
     def _render_index(self, block: IndexBlock) -> etree._Element | None:
         """把源目录保留为正文内导航，并只链接到真实正文目标。"""
-        navigation = etree.Element(_xhtml("nav"), attrib={"class": "mineru-index", "aria-label": "Table of contents"})
+        navigation = etree.Element(_xhtml("nav"), attrib={"class": "docgale-index", "aria-label": "Table of contents"})
         listing = etree.SubElement(navigation, _xhtml("ul"))
         self._append_index_children(listing, block)
         return navigation if len(listing) else None
@@ -455,7 +455,7 @@ class _EpubXhtmlRenderer:
                 if not len(nested):
                     continue
                 if last_item is None:
-                    last_item = etree.SubElement(parent, _xhtml("li"), attrib={"class": "mineru-list-item--orphan"})
+                    last_item = etree.SubElement(parent, _xhtml("li"), attrib={"class": "docgale-list-item--orphan"})
                 last_item.append(nested)
                 continue
             content = strip_index_page_tail(child.content)
@@ -471,7 +471,7 @@ class _EpubXhtmlRenderer:
 
     def _render_image_block(self, block: ImageBlock) -> etree._Element | None:
         """按子块顺序渲染图片主体及其标题、脚注。"""
-        figure = etree.Element(_xhtml("figure"), attrib={"class": "mineru-figure mineru-figure--image"})
+        figure = etree.Element(_xhtml("figure"), attrib={"class": "docgale-figure docgale-figure--image"})
         for child in block.content:
             rendered = (
                 self._render_image_body(block, child) if isinstance(child, ImageBodyBlock) else self._render_annotation(child)
@@ -482,13 +482,13 @@ class _EpubXhtmlRenderer:
 
     def _render_image_body(self, parent: ImageBlock, block: ImageBodyBlock) -> etree._Element | None:
         """渲染包内图片，并在缺图时保留已有结构或可见文字。"""
-        container = etree.Element(_xhtml("div"), attrib={"class": "mineru-visual-body mineru-visual-body--image"})
+        container = etree.Element(_xhtml("div"), attrib={"class": "docgale-visual-body docgale-visual-body--image"})
         source = self.assets.resolve_block(block)
         if source:
             alt = _plain_content_text(block.content) or parent.sub_type or "image"
-            etree.SubElement(container, _xhtml("img"), src=source, alt=alt, attrib={"class": "mineru-image"})
+            etree.SubElement(container, _xhtml("img"), src=source, alt=alt, attrib={"class": "docgale-image"})
         if block.content.strip():
-            content = etree.Element(_xhtml("div"), attrib={"class": "mineru-image-content"})
+            content = etree.Element(_xhtml("div"), attrib={"class": "docgale-image-content"})
             self._append_rich_or_text(content, block.content)
             if _has_visible_content(content):
                 container.append(content)
@@ -496,7 +496,7 @@ class _EpubXhtmlRenderer:
 
     def _render_table_block(self, block: TableBlock) -> etree._Element | None:
         """按子块顺序渲染结构表格、图片回退及说明。"""
-        figure = etree.Element(_xhtml("figure"), attrib={"class": "mineru-figure mineru-figure--table"})
+        figure = etree.Element(_xhtml("figure"), attrib={"class": "docgale-figure docgale-figure--table"})
         for child in block.content:
             rendered = self._render_table_body(child) if isinstance(child, TableBodyBlock) else self._render_annotation(child)
             if rendered is not None:
@@ -505,20 +505,20 @@ class _EpubXhtmlRenderer:
 
     def _render_table_body(self, block: TableBodyBlock) -> etree._Element | None:
         """优先输出安全结构内容，无内容时尝试整体表格图片。"""
-        container = etree.Element(_xhtml("div"), attrib={"class": "mineru-visual-body mineru-visual-body--table"})
+        container = etree.Element(_xhtml("div"), attrib={"class": "docgale-visual-body docgale-visual-body--table"})
         if block.content.strip():
             if _is_supported_markup(block.content):
                 self._append_markup(container, block.content)
             else:
-                pre = etree.SubElement(container, _xhtml("pre"), attrib={"class": "mineru-table-text"})
+                pre = etree.SubElement(container, _xhtml("pre"), attrib={"class": "docgale-table-text"})
                 pre.text = _normalize_xml_text(block.content)
         if not _has_visible_content(container) and (source := self.assets.resolve_block(block)):
-            etree.SubElement(container, _xhtml("img"), src=source, alt="table", attrib={"class": "mineru-table-image"})
+            etree.SubElement(container, _xhtml("img"), src=source, alt="table", attrib={"class": "docgale-table-image"})
         return container if _has_visible_content(container) else None
 
     def _render_chart_block(self, block: ChartBlock) -> etree._Element | None:
         """按子块顺序渲染图表图片、结构内容及说明。"""
-        figure = etree.Element(_xhtml("figure"), attrib={"class": "mineru-figure mineru-figure--chart"})
+        figure = etree.Element(_xhtml("figure"), attrib={"class": "docgale-figure docgale-figure--chart"})
         for child in block.content:
             rendered = (
                 self._render_chart_body(block, child) if isinstance(child, ChartBodyBlock) else self._render_annotation(child)
@@ -529,17 +529,17 @@ class _EpubXhtmlRenderer:
 
     def _render_chart_body(self, parent: ChartBlock, block: ChartBodyBlock) -> etree._Element | None:
         """渲染包内图表图片，并始终保留并存结构内容。"""
-        container = etree.Element(_xhtml("div"), attrib={"class": "mineru-visual-body mineru-visual-body--chart"})
+        container = etree.Element(_xhtml("div"), attrib={"class": "docgale-visual-body docgale-visual-body--chart"})
         if source := self.assets.resolve_block(block):
             etree.SubElement(
                 container,
                 _xhtml("img"),
                 src=source,
                 alt=parent.sub_type or "chart",
-                attrib={"class": "mineru-chart-image"},
+                attrib={"class": "docgale-chart-image"},
             )
         if block.content.strip():
-            content = etree.Element(_xhtml("div"), attrib={"class": "mineru-chart-content"})
+            content = etree.Element(_xhtml("div"), attrib={"class": "docgale-chart-content"})
             self._append_rich_or_text(content, block.content, preformatted=True)
             if _has_visible_content(content):
                 container.append(content)
@@ -547,7 +547,7 @@ class _EpubXhtmlRenderer:
 
     def _render_code_block(self, block: CodeBlock) -> etree._Element | None:
         """按子块顺序渲染静态代码、算法及其说明。"""
-        figure = etree.Element(_xhtml("figure"), attrib={"class": "mineru-figure mineru-figure--code"})
+        figure = etree.Element(_xhtml("figure"), attrib={"class": "docgale-figure docgale-figure--code"})
         for child in block.content:
             if isinstance(child, (CodeBodyBlock, AlgorithmBodyBlock)):
                 rendered = self._render_code_body(block, child)
@@ -559,11 +559,11 @@ class _EpubXhtmlRenderer:
 
     def _render_code_body(self, parent: CodeBlock, block: CodeBodyBlock | AlgorithmBodyBlock) -> etree._Element:
         """代码使用 pre/code，算法使用保留换行的结构化 Span。"""
-        container = etree.Element(_xhtml("div"), attrib={"class": "mineru-visual-body mineru-visual-body--code"})
+        container = etree.Element(_xhtml("div"), attrib={"class": "docgale-visual-body docgale-visual-body--code"})
         if parent.sub_type == BlockType.CODE:
             if not isinstance(block, CodeBodyBlock):
                 raise TypeError("code subtype requires CodeBodyBlock")
-            pre = etree.SubElement(container, _xhtml("pre"), attrib={"class": "mineru-code"})
+            pre = etree.SubElement(container, _xhtml("pre"), attrib={"class": "docgale-code"})
             code = etree.SubElement(pre, _xhtml("code"))
             language = _normalize_code_language(parent.guess_lang)
             if language:
@@ -573,7 +573,7 @@ class _EpubXhtmlRenderer:
         if parent.sub_type == RAW_ALGORITHM:
             if not isinstance(block, AlgorithmBodyBlock):
                 raise TypeError("algorithm subtype requires AlgorithmBodyBlock")
-            algorithm = etree.SubElement(container, _xhtml("div"), attrib={"class": "mineru-algorithm"})
+            algorithm = etree.SubElement(container, _xhtml("div"), attrib={"class": "docgale-algorithm"})
             self._append_inline_spans(algorithm, block.content, preserve_newlines=True, separate_adjacent_math=True)
             return container
         raise ValueError(f"Unsupported code subtype: {parent.sub_type}")
@@ -583,7 +583,7 @@ class _EpubXhtmlRenderer:
         block: ImageAnnotationBlock | TableAnnotationBlock | ChartAnnotationBlock | CodeAnnotationBlock,
     ) -> etree._Element | None:
         """按 caption 或 footnote 语义渲染视觉说明。"""
-        role = "mineru-caption" if str(block.type).endswith("caption") else "mineru-footnote"
+        role = "docgale-caption" if str(block.type).endswith("caption") else "docgale-footnote"
         annotation = etree.Element(
             _xhtml("p"),
             attrib={"class": f"{role} {role}--{str(block.type).replace('_', '-')}"},
@@ -648,7 +648,7 @@ class _EpubXhtmlRenderer:
             fallback = etree.SubElement(
                 parent,
                 _xhtml("code"),
-                attrib={"class": f"mineru-latex-fallback mineru-latex-fallback--{display}"},
+                attrib={"class": f"docgale-latex-fallback docgale-latex-fallback--{display}"},
             )
             fallback.text = _normalize_xml_text(normalized)
             return
@@ -904,9 +904,9 @@ def _navigation_from_index(block: IndexBlock, anchors: _AnchorRegistry) -> list[
 def _classify_list(items: list[ListItem], add_reference_bullets: bool) -> tuple[str, str | None, str]:
     """根据直属 marker 选择原生列表类型或显式 marker 模式。"""
     if add_reference_bullets:
-        return "ul", None, "mineru-list--reference"
+        return "ul", None, "docgale-list--reference"
     if items and all(item.kind == "unordered" for item in items):
-        return "ul", None, "mineru-list--unordered"
+        return "ul", None, "docgale-list--unordered"
     if items and all(item.kind == "ordered" for item in items):
         styles = {item.ordered_style for item in items}
         if len(styles) == 1:
@@ -916,10 +916,10 @@ def _classify_list(items: list[ListItem], add_reference_bullets: bool) -> tuple[
                 "lower-roman": "i",
                 "upper-roman": "I",
             }.get(next(iter(styles)) or "")
-            return "ol", list_type, "mineru-list--ordered"
+            return "ol", list_type, "docgale-list--ordered"
     if items and all(item.kind == "none" for item in items):
-        return "ul", None, "mineru-list--unmarked"
-    return "ul", None, "mineru-list--explicit"
+        return "ul", None, "docgale-list--unmarked"
+    return "ul", None, "docgale-list--explicit"
 
 
 def _list_item_content(
@@ -946,10 +946,10 @@ def _append_text_style_container(parent: etree._Element, span: TextSpan) -> etre
     """按固定样式顺序创建 TextSpan 的 XHTML 包装节点。"""
     target = parent
     if _needs_whitespace_preservation(span.content):
-        target = etree.SubElement(target, _xhtml("span"), attrib={"class": "mineru-preserve-whitespace"})
+        target = etree.SubElement(target, _xhtml("span"), attrib={"class": "docgale-preserve-whitespace"})
     wrappers: list[tuple[str, dict[str, str]]] = []
     if "emphasis" in span.styles:
-        wrappers.append(("span", {"class": "mineru-text-emphasis"}))
+        wrappers.append(("span", {"class": "docgale-text-emphasis"}))
     if "strikethrough" in span.styles:
         wrappers.append(("s", {}))
     if "italic" in span.styles:
@@ -1063,7 +1063,7 @@ def _resolve_document_title(middle_json: MiddleJson, explicit_title: str | None)
                 title = _normalize_xml_text(inline_plain_text(block.content)).strip()
                 if title:
                     return title
-    return "MinerU Document"
+    return "DocGale Document"
 
 
 def _stable_identifier(middle_json: MiddleJson, *, title: str, authors: tuple[str, ...], language: str) -> str:

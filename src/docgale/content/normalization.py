@@ -107,9 +107,9 @@ def _is_opaque_html_node(node: Any) -> bool:
     return (
         name in _OPAQUE_HTML_TAGS
         or node.get("data-block-type") in {"equation", "code", "code_body", "algorithm", "algorithm_body"}
-        or node.has_attr("data-mineru-latex")
+        or node.has_attr("data-docgale-latex")
         or node.has_attr("data-formula-display")
-        or "mineru-math" in (node.get("class") or [])
+        or "docgale-math" in (node.get("class") or [])
     )
 
 

@@ -37,7 +37,7 @@ _ACTIVE_TAGS = frozenset(
         "video",
     }
 )
-_FORMULA_GENERATOR_CLASS_TOKENS = frozenset({"katex", "mathjax", "mineru-math"})
+_FORMULA_GENERATOR_CLASS_TOKENS = frozenset({"katex", "mathjax", "docgale-math"})
 _GENERIC_FORMULA_CLASS_TOKENS = frozenset({"formula", "math", "tex"})
 _FORMULA_VISIBILITY_ATTRIBUTES = ("hidden", "aria-hidden", "style", "class")
 _MEANINGFUL_FORMULA_SIBLING_TAGS = frozenset(
@@ -269,7 +269,7 @@ def _is_formula_carrier(element: etree._Element) -> bool:
     """判断元素自身是否携带公式来源，而不是仅从任意后代继承。"""
     if local_name(element) == "math" or is_tex_script(element):
         return True
-    if any((element.get(attribute) or "").strip() for attribute in ("data-mineru-latex", "data-tex", "data-expr")):
+    if any((element.get(attribute) or "").strip() for attribute in ("data-docgale-latex", "data-tex", "data-expr")):
         return True
     classes = frozenset((element.get("class") or "").casefold().split())
     return bool(classes & _FORMULA_GENERATOR_CLASS_TOKENS)
@@ -326,7 +326,7 @@ def _preserve_asciimath_text(root: etree._Element) -> None:
         if parent is None:
             continue
         replacement = etree.Element("span")
-        replacement.set("class", "mineru-formula-fallback")
+        replacement.set("class", "docgale-formula-fallback")
         replacement.text = value
         replacement.tail = element.tail
         parent.replace(element, replacement)
@@ -338,7 +338,7 @@ def _replace_with_formula(element: etree._Element, formula: FormulaExtraction) -
     if parent is None:
         return
     replacement = etree.Element("math")
-    replacement.set("data-mineru-latex", formula.latex)
+    replacement.set("data-docgale-latex", formula.latex)
     replacement.set("data-formula-display", formula.display)
     for attribute in _FORMULA_VISIBILITY_ATTRIBUTES:
         if (value := element.get(attribute)) is not None:

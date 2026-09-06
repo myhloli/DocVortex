@@ -93,7 +93,7 @@ _CAPTION_TOKENS = frozenset(
         "table-caption",
         "chart-caption",
         "code-caption",
-        "mineru-caption",
+        "docgale-caption",
     }
 )
 _FOOTNOTE_TOKENS = frozenset(
@@ -104,7 +104,7 @@ _FOOTNOTE_TOKENS = frozenset(
         "table-footnote",
         "chart-footnote",
         "code-footnote",
-        "mineru-footnote",
+        "docgale-footnote",
     }
 )
 _VISUAL_ELEMENT_TAGS = frozenset({"img", "image", "pre", "svg", "table"})
@@ -600,13 +600,13 @@ class MarkupProjector:
             if isinstance(child.tag, str) and (kind := self._visual_annotation_kind(child)) is not None
         ]
         annotation_elements = {child for child, _ in annotations}
-        mineru_figure = "mineru-figure" in (element.get("class") or "").casefold().split()
+        docgale_figure = "docgale-figure" in (element.get("class") or "").casefold().split()
         blocks, visual_blocks_by_child = self._parse_figure_contents(
             element,
             style,
             visibility_hidden,
             annotation_elements=annotation_elements,
-            emit_alt_caption=not mineru_figure and not annotations,
+            emit_alt_caption=not docgale_figure and not annotations,
         )
         annotation_targets = self._figure_annotation_targets(
             element,

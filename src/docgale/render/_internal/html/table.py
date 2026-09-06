@@ -54,13 +54,13 @@ def render_gfm_table_html(content: str) -> HtmlInlineResult | None:
             )
             has_math = rendered.has_math or has_math
             alignment = alignments[index]
-            class_attr = f' class="mineru-align-{alignment}"' if alignment else ""
+            class_attr = f' class="docgale-align-{alignment}"' if alignment else ""
             rendered_cells.append(f"<{cell_tag}{class_attr}>{rendered.html}</{cell_tag}>")
         return f"<tr>{''.join(rendered_cells)}</tr>"
 
     table = "".join(
         [
-            '<table class="mineru-chart-table">',
+            '<table class="docgale-chart-table">',
             f"<thead>{_render_row(header, 'th')}</thead>",
             f"<tbody>{''.join(_render_row(row, 'td') for row in rows)}</tbody>",
             "</table>",

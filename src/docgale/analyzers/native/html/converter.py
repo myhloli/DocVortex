@@ -19,7 +19,7 @@ from .document import HtmlDocument, parse_html_document
 from .errors import HtmlResourceLimitError
 from .resources import HtmlResourceContext
 from .selector import select_auto_content
-from ....codecs.html import decode_mineru_html_wire
+from ....codecs.html import decode_docgale_html_wire
 
 
 class HtmlConverter:
@@ -41,13 +41,13 @@ class HtmlConverter:
             raise HtmlResourceLimitError(f"HTML resource limit exceeded: max_html_bytes={MAX_HTML_BYTES}")
         document = parse_html_document(file_bytes, source_context)
         resources = HtmlResourceContext(document.source_context, base_href=document.base_href)
-        wire_result = decode_mineru_html_wire(document.body, resources)
+        wire_result = decode_docgale_html_wire(document.body, resources)
         if wire_result.blocks is not None:
             blocks = wire_result.blocks
-            log_values = ("mineru_exact", 1.0, 1.0, "version_1")
+            log_values = ("docgale_exact", 1.0, 1.0, "version_1")
         else:
             if wire_result.fallback_reason is not None:
-                logger.warning("MinerU HTML marker fallback reason={}", wire_result.fallback_reason)
+                logger.warning("DocGale HTML marker fallback reason={}", wire_result.fallback_reason)
             stylesheet = _load_stylesheet(document, resources)
             selection = select_auto_content(document.body, stylesheet)
             selected_root = append_referenced_notes(

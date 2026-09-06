@@ -10,19 +10,19 @@ body {
   padding: 0 5%;
 }
 
-.mineru-document {
+.docgale-document {
   max-width: 48rem;
   margin: 0 auto;
 }
 
-.mineru-block,
-.mineru-figure,
-.mineru-visual-body,
-.mineru-page-footnote {
+.docgale-block,
+.docgale-figure,
+.docgale-visual-body,
+.docgale-page-footnote {
   margin: 1em 0;
 }
 
-.mineru-heading {
+.docgale-heading {
   line-height: 1.25;
   break-after: avoid;
 }
@@ -35,8 +35,8 @@ img {
 
 figure,
 figcaption,
-.mineru-caption,
-.mineru-footnote {
+.docgale-caption,
+.docgale-footnote {
   margin-left: 0;
   text-align: left;
 }
@@ -64,28 +64,28 @@ pre {
   font-family: monospace;
 }
 
-.mineru-preserve-whitespace,
-.mineru-algorithm {
+.docgale-preserve-whitespace,
+.docgale-algorithm {
   white-space: pre-wrap;
 }
 
-.mineru-page-footnote,
-.mineru-footnote,
+.docgale-page-footnote,
+.docgale-footnote,
 figcaption {
   color: #57606a;
   font-size: 0.9em;
 }
 
-.mineru-text-emphasis {
+.docgale-text-emphasis {
   font-weight: 600;
 }
 
-.mineru-list-marker {
+.docgale-list-marker {
   margin-right: 0.4em;
 }
 
-.mineru-list--explicit,
-.mineru-list--unmarked {
+.docgale-list--explicit,
+.docgale-list--unmarked {
   list-style: none;
   padding-left: 1.2em;
 }
