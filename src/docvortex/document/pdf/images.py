@@ -232,6 +232,13 @@ def _is_pdf_render_pool_still_spawning_workers(executor: ProcessPoolExecutor) ->
     if max_workers is None or max_workers <= 1:
         return False
 
+    # ProcessPoolExecutor 优先复用空闲 worker；未达到容量不等于本次会创建进程。
+    # 只探测并立即归还信号量，避免小批量任务永久重复支付冷启动的 100ms 等待。
+    idle_workers = getattr(executor, "_idle_worker_semaphore", None)
+    if idle_workers is not None and idle_workers.acquire(blocking=False):
+        idle_workers.release()
+        return False
+
     processes = getattr(executor, "_processes", None)
     process_count = 0 if processes is None else len(processes)
     return process_count < max_workers
