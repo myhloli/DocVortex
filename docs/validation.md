@@ -1,5 +1,34 @@
 # DocVortex validation
 
+## Content List ownership split (2026-09-07)
+
+DocVortex now provides seven general formats; MinerU owns Content List V1/V2,
+its nine-format enum, the dedicated options and product content constants.
+Shared document types/options remain unique, and the public `render.fragments`
+module keeps migrated production code independent of private engine modules.
+See [rendering ownership](RENDER_OWNERSHIP.md) for the current API boundary.
+
+- Six pre-migration V1/V2 JSON outputs (all semantic types and two real papers)
+  are byte-identical through the MinerU public APIs; source trees are unchanged.
+- MinerU full regression: 3957 passed, four skips and the same four baseline
+  exclusions. DocVortex local regression: 416 passed, one existing diagnostic
+  deselected. The independent Python 3.14 wheel passed 45 checks for seven-format
+  conversion, bundles, import boundaries and rejection of the removed targets.
+- [CI](https://github.com/myhloli/DocVortex/actions/runs/34047782292) passed at
+  `f87b87c58ace953ffc597f751de423d051da3907`, including the platform/version matrix.
+  The existing sparse-table diagnostic remains separate and is not claimed fixed.
+- 284 specified copyright header lines were removed from the remaining engine
+  code. That cleanup stage preserved every file's AST; subsequent leading-blank
+  formatting also preserved ASTs. MIT, pdftext attribution/modification notices,
+  Apache-2.0 and the original Droid NOTICE/font bytes are retained.
+- Repository display name is `myhloli/DocVortex`, with the original repository ID
+  and history; package/import/CLI/local directory names remain `docvortex`.
+
+The [difference record](validation/content-list-ownership.json) contains output
+hashes and the header-cleanup inventory. Updated archives remain version 0.1.0
+and are prepared for the existing draft only; no PyPI publication is performed.
+Historical records below retain the format counts supported at their own commits.
+
 ## DocVortex upgrade and PDF symbol whitelist (2026-09-07)
 
 The engine is now DocVortex, with `docvortex` package/import/CLI names and native

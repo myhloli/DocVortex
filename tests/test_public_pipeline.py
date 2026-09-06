@@ -41,7 +41,7 @@ def test_neutral_roundtrip() -> None:
 
 @pytest.mark.parametrize("target", list(RenderFormat))
 def test_all_renderers_are_independent_and_do_not_mutate(target: RenderFormat) -> None:
-    """九种输出共享同一文档，而且渲染不会修改源对象。"""
+    """七种输出共享同一文档，而且渲染不会修改源对象。"""
     middle = document()
     before = middle.to_dict(skip_defaults=False)
     assert render(middle, target)

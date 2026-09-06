@@ -133,3 +133,6 @@ formulas, code and link targets. See
 
 See [the DocVortex upgrade guide](docs/DOCVORTEX_UPGRADE.md) for package, protocol,
 PDF text rules and publishing configuration changes.
+
+See [rendering ownership](docs/RENDER_OWNERSHIP.md) for the seven engine targets,
+MinerU Content List integration and public fragment helpers.
