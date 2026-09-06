@@ -16,10 +16,13 @@ class PdfModel:
     """将 Flash 原生 PDF 流水线包装为无状态模型。"""
 
     def predict(self, pdf_doc: PDFDocument) -> list[list[dict[str, Any]]]:
-        """分析调用方持有的 PDFDocument，并原样返回分页 model_list。"""
+        """分析调用方持有的 PDFDocument，在所有文字匹配结束后统一输出可见英数。"""
         from .pdf import pipeline
+        from ...content import normalize_pdf_model_text
 
-        return pipeline._analyze_native_document(pdf_doc)
+        pages = pipeline._analyze_native_document(pdf_doc)
+        normalize_pdf_model_text(pages)
+        return pages
 
 
 class CsvModel:

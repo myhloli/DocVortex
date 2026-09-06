@@ -37,8 +37,16 @@ def source_payload(suffix: str) -> bytes:
 @pytest.mark.parametrize(
     "suffix", ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "rtf", "csv", "html", "epub", "ofd", "odt", "ods", "odp"]
 )
-def test_all_native_formats_render_all_targets(suffix: str) -> None:
+def test_all_native_formats_render_all_targets(suffix: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """每种原生格式完成分析、后处理和九种目标编码，不导入宿主。"""
+    if suffix != "pdf":
+        from docgale import content
+
+        def forbidden(_pages: object) -> None:
+            """非 PDF 格式不应调用 PDF 专用文字清洗。"""
+            raise AssertionError("PDF normalization used for another input format")
+
+        monkeypatch.setattr(content, "normalize_pdf_model_text", forbidden)
     result = docgale.parse(source_payload(suffix), file_suffix=suffix, keep_model_json=True)
     assert result.middle_json.pages
     assert result.model_json is not None

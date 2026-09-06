@@ -32,7 +32,7 @@ from _flash_pdf_test_utils import _page_bbox_fingerprint, _page_fingerprint
 from docgale.postprocess.document import model_json_to_middle_json
 from docgale.document.pdf import initialize_pdfium_runtime
 from docgale.document.pdf.document import PDFDocument
-from docgale.analyzers.native.pdf.pipeline import _analyze_native_document
+from docgale.analyzers.native import PdfModel
 from docgale.schema import ModelJson
 
 
@@ -59,7 +59,7 @@ def _write_json(path: Path, value: Any) -> None:
 def _predict(payload: bytes) -> list[list[dict[str, Any]]]:
     """在单次文档生命周期内执行原生分析，确保计时包含页面打开和关闭。"""
     with PDFDocument(payload) as document:
-        return _analyze_native_document(document)
+        return PdfModel().predict(document)
 
 
 def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:

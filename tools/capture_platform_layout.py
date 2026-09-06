@@ -94,6 +94,7 @@ def capture_document(source: Path, destination: Path) -> dict[str, Any]:
     result = parse(source, keep_model_json=True)
     assert result.model_json is not None
     result.export(destination / "render.html", output_format="html")
+    result.export(destination / "render.md", output_format="markdown")
     (destination / "model.json").write_text(result.model_json.to_json(skip_defaults=False), encoding="utf-8")
     (destination / "middle.json").write_text(result.middle_json.to_json(skip_defaults=False), encoding="utf-8")
     records = []
@@ -136,6 +137,7 @@ def main() -> None:
         "system": platform.system(),
         "python": sys.version,
         "runtime": asdict(initialize_pdfium_runtime()),
+        "pdf_text_normalization": "fullwidth-alphanumeric-v1",
         "dependencies": {name: version(name) for name in ("docgale", "pypdfium2", "pydantic", "numpy", "pillow")},
         "documents": {},
     }
