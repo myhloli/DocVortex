@@ -93,6 +93,8 @@ def _is_math_identifier_char(text: str) -> bool:
         return False
     if text.isascii():
         return text.isalnum()
+    if "０" <= text <= "９":
+        return True
     category = unicodedata.category(text)
     unicode_name = unicodedata.name(text, "")
     return (

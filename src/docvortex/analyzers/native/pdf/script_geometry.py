@@ -35,6 +35,7 @@ CONTROL_LINE_BREAK_CHARS = {"\r", "\n"}
 
 ScriptRole = Literal["body", "sup", "sub"]
 ScriptMarkRole = Literal["sup", "sub"]
+_ScriptFontKey = tuple[str, int | None, int | None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -459,11 +460,104 @@ def _expand_component_neighbors(
             changed = True
 
 
+def _script_font_key(char: Char) -> _ScriptFontKey | None:
+    """读取原始字体身份，不合并子集名称，也不把原始字号当作有效字形高度。"""
+    font = char.get("font")
+    if not isinstance(font, dict):
+        return None
+    name = font.get("name")
+    if not isinstance(name, str) or not name:
+        return None
+    flags, weight = font.get("flags"), font.get("weight")
+    return name, flags if type(flags) is int else None, weight if type(weight) is int else None
+
+
+def _local_font_run(
+    features: list[ScriptCharFeature],
+    font_keys: list[_ScriptFontKey | None],
+    component: set[int],
+    cluster: ScriptBaselineCluster,
+) -> set[int]:
+    """限定同一视觉组件内连续的同字体 ASCII/全角英数字串。"""
+    keys = {font_keys[index] for index in cluster.member_indices}
+    if len(keys) != 1 or None in keys:
+        return set()
+    key = next(iter(keys))
+
+    def belongs(index: int) -> bool:
+        """让空白、括号、运算符、CJK、缺失几何和字体边界阻断局部参考。"""
+        if index not in component or not features[index].is_valid or font_keys[index] != key:
+            return False
+        text = features[index].text
+        return len(text) == 1 and (
+            (text.isascii() and text.isalnum()) or "０" <= text <= "９" or "Ａ" <= text <= "Ｚ" or "ａ" <= text <= "ｚ"
+        )
+
+    left = min(cluster.member_indices)
+    right = left + 1
+    while belongs(left - 1):
+        left -= 1
+    while belongs(right):
+        right += 1
+    if not all(left <= index < right and belongs(index) for index in cluster.member_indices):
+        return set()
+    return set(range(left, right))
+
+
+def _recheck_weak_clusters_with_local_font_body(
+    features: list[ScriptCharFeature],
+    font_keys: list[_ScriptFontKey | None],
+    component_indices: list[int],
+    body_band: ScriptBodyBand,
+    cluster_roles: dict[ScriptBaselineCluster, ScriptRole],
+) -> None:
+    """用同字体局部正文撤销弱误判；不制造角标，不让撤销结果成为新参考。"""
+    initial_roles = dict(cluster_roles)
+    component = set(component_indices)
+    for cluster, role in initial_roles.items():
+        if role == "body" or abs(cluster.baseline - body_band.baseline) >= body_band.tight_height * SCRIPT_STRONG_SHIFT_RATIO:
+            continue
+        run = _local_font_run(features, font_keys, component, cluster)
+        if not run:
+            continue
+        references: list[tuple[float, int, ScriptBaselineCluster]] = []
+        for reference, reference_role in initial_roles.items():
+            if reference_role != "body":
+                continue
+            indices = tuple(index for index in reference.member_indices if index in run)
+            if len(indices) < 2:
+                continue
+            gap = min(
+                _horizontal_gap(features[first].tight_bbox, features[second].tight_bbox)
+                for first in cluster.member_indices
+                for second in indices
+                if features[first].tight_bbox is not None and features[second].tight_bbox is not None
+            )
+            if gap > max(2.5, body_band.tight_height * 1.2):
+                continue
+            baseline = statistics.median(features[index].origin[1] for index in indices if features[index].origin is not None)
+            references.append((gap, -len(indices), ScriptBaselineCluster(baseline, indices)))
+        if not references:
+            continue
+        reference = min(references, key=lambda item: item[:2])[2]
+        height = _cluster_tight_height(features, reference)
+        if height <= 0:
+            continue
+        shift = cluster.baseline - reference.baseline
+        strong_shift = abs(shift) >= height * SCRIPT_STRONG_SHIFT_RATIO
+        tight_ratio = _cluster_tight_height(features, cluster) / height
+        if abs(shift) < max(SCRIPT_ORIGIN_MIN_SHIFT_ABSOLUTE, height * SCRIPT_ORIGIN_MIN_SHIFT_RATIO) or (
+            tight_ratio > SCRIPT_TIGHT_HEIGHT_RATIO and not (strong_shift and tight_ratio <= SCRIPT_STRONG_MAX_HEIGHT_RATIO)
+        ):
+            cluster_roles[cluster] = "body"
+
+
 def _assign_component(
     features: list[ScriptCharFeature],
     component_indices: list[int],
     protected_body_indices: set[int],
     roles: list[ScriptRole],
+    font_keys: list[_ScriptFontKey | None],
 ) -> None:
     """在单个视觉组件内按 origin 基线簇和双 bbox 一致性分配角色。"""
     clusters, tolerance = _cluster_baselines(features, component_indices)
@@ -495,6 +589,7 @@ def _assign_component(
             cluster_roles[cluster] = "body"
         else:
             cluster_roles[cluster] = _script_role(shift)
+    _recheck_weak_clusters_with_local_font_body(features, font_keys, component_indices, body_band, cluster_roles)
     for index in component_indices:
         feature = features[index]
         if (
@@ -524,9 +619,10 @@ def classify_char_script_roles(
     """按视觉组件、origin 基线簇和双 bbox 一致性识别上下标。"""
     protected = protected_body_indices or set()
     features = build_script_features(chars, tight_bboxes, origins, protected)
+    font_keys = [_script_font_key(char) for char in chars]
     roles: list[ScriptRole] = ["body"] * len(features)
     for component_indices in split_script_visual_components(features):
-        _assign_component(features, component_indices, protected, roles)
+        _assign_component(features, component_indices, protected, roles, font_keys)
     return roles
 
 
