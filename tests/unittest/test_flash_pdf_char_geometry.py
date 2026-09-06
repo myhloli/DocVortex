@@ -698,7 +698,9 @@ def test_flash_layout_manifest_uses_portable_repository_paths() -> None:
     """验证版本化 layout manifest 不保存主机绝对路径且页数完整。"""
 
     project_root = Path(__file__).parents[2]
-    payload = json.loads((project_root / "tests" / "fixtures" / "flash_layout_geometry_manifest.json").read_text())
+    payload = json.loads(
+        (project_root / "tests" / "fixtures" / "flash_layout_geometry_manifest.json").read_text(encoding="utf-8")
+    )
     assert payload["schema_version"] == 1
     assert len(payload["documents"]) == 19
     assert sum(len(document["pages"]) for document in payload["documents"]) == 168

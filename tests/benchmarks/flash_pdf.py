@@ -128,7 +128,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
 
 def _compare(output: Path, baseline: Path, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """核对完整语料集合、源文件指纹及输出，并单独报告性能变化。"""
-    previous = json.loads((baseline / "report.json").read_text())
+    previous = json.loads((baseline / "report.json").read_text(encoding="utf-8"))
     by_path = {record["path"]: record for record in previous["documents"]}
     if set(by_path) != {record["path"] for record in results}:
         raise AssertionError("Baseline and candidate corpus differ")
@@ -166,7 +166,7 @@ def main() -> None:
         return
     if (args.output / "report.json").exists():
         parser.error("output already contains a report; choose a new directory")
-    manifest = json.loads((ROOT / "tests/fixtures/flash_layout_geometry_manifest.json").read_text())
+    manifest = json.loads((ROOT / "tests/fixtures/flash_layout_geometry_manifest.json").read_text(encoding="utf-8"))
     paths = args.path or [
         *(item["path"] for item in manifest["documents"]),
         *(str(path.relative_to(ROOT)) for path in sorted((ROOT / "tests/unittest/pdfs/native_pdf_tables").glob("*.pdf"))),
@@ -187,7 +187,7 @@ def main() -> None:
         if args.profile:
             command.append("--profile")
         subprocess.run(command, cwd=ROOT, check=True)
-        record = json.loads((destination / "result.json").read_text())
+        record = json.loads((destination / "result.json").read_text(encoding="utf-8"))
         record["artifact"] = str(destination.relative_to(args.output.resolve()))
         results.append(record)
         print(f"{index + 1}/{len(paths)} {relative}: {record['median_seconds']:.3f}s", flush=True)

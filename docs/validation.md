@@ -92,3 +92,18 @@ profiler in an independent Python 3.14 environment. It verifies that metadata
 uses DocGale instead of pdftext and that profile paths are package-relative.
 The CI suite now includes this test (skipped on Windows, where POSIX resource
 accounting is unavailable).
+
+
+### System-font-sensitive PDF fixtures
+
+`中文论文3.pdf` and `中文论文4.pdf` contain non-embedded CJK fonts (verified with
+pdffonts). PDFium substitutes system fonts, so their exact text block counts and
+grouping differ on Linux, Windows and macOS. The original documents and gold
+manifests remain unchanged. macOS retains all exact gold checks; Linux/Windows
+still run these documents and verify page counts, image/table inventory and every
+positive text probe from the versioned semantic gold, including group fragments.
+Other sample inventories retain exact cross-platform comparisons. This does not
+claim identical text geometry for PDFs with missing fonts on different systems.
+
+The migrated benchmark and geometry manifest now explicitly read UTF-8 JSON;
+Windows locale defaults must not alter Chinese filenames in the fixture index.
