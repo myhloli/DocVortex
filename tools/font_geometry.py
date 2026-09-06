@@ -34,7 +34,7 @@ def capture_geometry(source: Path, *, system_fonts: bool = False) -> dict[str, A
                             font_id = f"{page_index}:{len(font_ids)}"
                             font_ids[address] = font_id
                             name = ctypes.create_string_buffer(512)
-                            data_size = ctypes.c_ulong()
+                            data_size = ctypes.c_size_t()
                             data_hash = None
                             embedded = None
                             if font:
