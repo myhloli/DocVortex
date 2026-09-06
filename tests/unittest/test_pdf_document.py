@@ -18,6 +18,7 @@ from pypdf.generic import (
     TextStringObject,
 )
 from docvortex.document.pdf.text.contracts import Bbox
+from docvortex.document.pdf import native_text_geometry, native_objects, native_annotations
 from PIL import Image
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen.canvas import Canvas
@@ -525,7 +526,7 @@ def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: p
         return []
 
     monkeypatch.setattr(pdf_document.pdfium, "PdfDocument", _FakeDoc)
-    monkeypatch.setattr(pdf_document, "get_chars", fake_get_chars, raising=False)
+    monkeypatch.setattr(native_text_geometry, "get_chars", fake_get_chars, raising=False)
     monkeypatch.setattr(pdf_document, "_extract_page_drawing_lines", fake_extract_page_drawing_lines)
     monkeypatch.setattr(pdf_document, "_extract_page_path_infos", fake_extract_page_path_infos)
     monkeypatch.setattr(pdf_document, "_extract_page_image_bboxes", fake_extract_page_image_bboxes)
@@ -1036,7 +1037,7 @@ def test_extract_page_signature_bboxes_closes_handles_and_skips_bad_annotation(
     monkeypatch.setattr(pdf_document.pdfium_c, "FPDFPage_GetAnnotCount", lambda _page: 2)
     monkeypatch.setattr(pdf_document.pdfium_c, "FPDFPage_GetAnnot", fake_get_annot)
     monkeypatch.setattr(pdf_document.pdfium_c, "FPDFPage_CloseAnnot", closed.append)
-    monkeypatch.setattr(pdf_document, "_signature_bbox_from_annotation", fake_signature_bbox)
+    monkeypatch.setattr(native_annotations, "_signature_bbox_from_annotation", fake_signature_bbox)
 
     assert pdf_document._extract_page_signature_bboxes(
         _FakePage(),
@@ -1068,11 +1069,11 @@ def test_extract_page_form_bboxes_skips_one_bad_object(monkeypatch: pytest.Monke
         return iter((bad_object, good_object))
 
     monkeypatch.setattr(
-        pdf_document,
+        native_objects,
         "_iter_raw_root_form_objects",
         fake_root_forms,
     )
-    monkeypatch.setattr(pdf_document, "_form_bbox_from_object", fake_form_bbox)
+    monkeypatch.setattr(native_objects, "_form_bbox_from_object", fake_form_bbox)
 
     assert pdf_document._extract_page_form_bboxes(
         object(),
@@ -1094,7 +1095,7 @@ def test_get_page_drawing_lines_skips_one_bad_path(monkeypatch: pytest.MonkeyPat
             raise RuntimeError("broken path")
         return original_extract(*args, **kwargs)
 
-    monkeypatch.setattr(pdf_document, "_extract_path_drawing_lines", flaky_extract)
+    monkeypatch.setattr(native_objects, "_extract_path_drawing_lines", flaky_extract)
     with pdf_document.PDFDocument(_build_drawing_pdf()) as doc:
         lines = doc.get_page_drawing_lines(0)
 
@@ -1119,7 +1120,7 @@ def test_get_page_path_infos_skips_one_bad_path(monkeypatch: pytest.MonkeyPatch)
             raise RuntimeError("broken path")
         return original_extract(*args, **kwargs)
 
-    monkeypatch.setattr(pdf_document, "_path_info_from_object", flaky_extract)
+    monkeypatch.setattr(native_objects, "_path_info_from_object", flaky_extract)
     with pdf_document.PDFDocument(_build_drawing_pdf()) as doc:
         path_infos = doc.get_page_path_infos(0)
 
@@ -1207,7 +1208,7 @@ def test_native_page_snapshot_decodes_each_path_once(monkeypatch: pytest.MonkeyP
         counts.append(raw_object)
         return original(raw_object)
 
-    monkeypatch.setattr(pdf_document, "_read_raw_path_subpaths", record_decode)
+    monkeypatch.setattr(native_objects, "_read_raw_path_subpaths", record_decode)
     with pdf_document.PDFDocument(_build_drawing_pdf()) as document:
         document.get_page_drawing_lines(0)
         document.get_page_path_infos(0)
