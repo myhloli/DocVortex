@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """从字体、绘图线及链接注解提取原生行内证据。"""
 
 from __future__ import annotations

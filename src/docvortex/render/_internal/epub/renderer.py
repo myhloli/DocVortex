@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """严格 MiddleJson 到单正文 EPUB 3.3 的静态 XHTML renderer。"""
 
 from __future__ import annotations

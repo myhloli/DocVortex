@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """跨页表格的表头、宽度和边界行结构判定。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """严格 InlineSpan 到安全 LaTeX 行内源码的转换。"""
 
 from __future__ import annotations

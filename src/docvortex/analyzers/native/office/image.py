@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Flash Office 文档的图片识别、转码与占位图生成。"""
 
 import base64

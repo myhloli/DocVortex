@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """HTML table 到可分页 ReportLab 原生表格的安全物化。"""
 
 from __future__ import annotations

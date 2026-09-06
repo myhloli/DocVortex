@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """按照 WIRIS 规范安全读取 MathType MTEF v5 record tree。"""
 

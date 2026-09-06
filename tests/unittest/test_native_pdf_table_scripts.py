@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """验证原生 PDF 表格上下标的几何识别与安全 HTML 序列化。"""
 
 from __future__ import annotations

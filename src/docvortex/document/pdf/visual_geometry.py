@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """PDF 页面坐标、方向和裁图使用的无状态几何原语。"""
 
 from __future__ import annotations

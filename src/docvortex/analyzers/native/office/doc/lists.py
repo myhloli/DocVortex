@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """解析 Word PlfLst/PlfLfo 并维护九级列表编号状态。"""
 

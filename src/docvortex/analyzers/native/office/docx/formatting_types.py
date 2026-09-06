@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 from enum import Enum
 
 from pydantic import BaseModel

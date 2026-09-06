@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """为 Flash 原生文本生成 loose/tight/origin 协商后的 canonical 几何。"""
 

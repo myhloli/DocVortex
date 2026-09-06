@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """跨模型共享的轻量图像统计与裁剪原语。"""
 
 import cv2

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """EPUB renderer 的图片解析、规范化与包内去重。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Middle JSON 2.0 行内 Span 到 Markdown 的安全序列化。"""
 
 from __future__ import annotations

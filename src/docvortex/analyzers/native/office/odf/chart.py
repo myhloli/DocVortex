@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """恢复 ODF 嵌入图表的预览与源数据表。"""
 
 from __future__ import annotations

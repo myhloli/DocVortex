@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """把旧版 PPT 内部语义模型转换为 DocVortex 分页 model-list。"""
 

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """跨页表格结构检测和内容合并的稳定入口。"""
 
 from .content import merge_table_content

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """OFD 二进制流到分页 raw model-list 的转换入口。"""
 
 from __future__ import annotations

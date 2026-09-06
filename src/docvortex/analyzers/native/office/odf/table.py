@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """构造受限 ODF 表格网格并序列化为安全 HTML。"""
 
 from __future__ import annotations

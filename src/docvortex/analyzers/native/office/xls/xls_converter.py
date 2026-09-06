@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """把 Excel 97–2003 BIFF 工作簿转换为 DocVortex 分页 model-list。"""
 

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """使用 PDF 原生字符几何为高置信表格 HTML 恢复上下标。"""
 

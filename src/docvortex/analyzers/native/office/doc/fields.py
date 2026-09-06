@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """解析 DOC 字段指令并安全恢复超链接、目录和 caption 语义。"""
 

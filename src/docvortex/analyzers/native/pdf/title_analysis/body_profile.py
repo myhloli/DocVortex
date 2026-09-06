@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """统计全文和栏内正文排版基线。"""
 
 from __future__ import annotations

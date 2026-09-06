@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """PDF 模型输出的可见文字清洗；原始字符、布局证据及其它输入格式不在此处理。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """面向已有 table bbox 的 Native PDF 表格结构恢复公共内部入口。"""
 
 from .contracts import NativeTableCell, NativeTableInput, NativeTableRectangle, NativeTableResult, NativeTableRule

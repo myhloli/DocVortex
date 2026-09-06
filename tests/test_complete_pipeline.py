@@ -57,7 +57,7 @@ def test_classification_is_cached_in_document(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_bundle_renders_after_source_is_deleted(tmp_path: Path) -> None:
-    """移除源文件后，依靠结果包在九种目标中复用同一份素材。"""
+    """移除源文件后，依靠结果包在七种目标中复用同一份素材。"""
     image = BytesIO()
     Image.new("RGB", (20, 10), color="blue").save(image, format="PNG")
     data_uri = "data:image/png;base64," + base64.b64encode(image.getvalue()).decode()
@@ -69,7 +69,7 @@ def test_bundle_renders_after_source_is_deleted(tmp_path: Path) -> None:
     result.save_bundle(tmp_path / "bundle")
     source.unlink()
     restored = docvortex.load_bundle(tmp_path / "bundle")
-    for target in ("markdown", "html", "latex", "docx", "epub", "pdf", "structured_content", "content_list", "content_list_v2"):
+    for target in ("markdown", "html", "latex", "docx", "epub", "pdf", "structured_content"):
         restored.export(tmp_path / "outputs" / target / "result", output_format=target)
     assert restored.to_dict() == before
     assert result.to_dict() == before

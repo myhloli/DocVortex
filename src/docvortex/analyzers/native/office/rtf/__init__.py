@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """纯 Python RTF 语义解析实现。"""
 

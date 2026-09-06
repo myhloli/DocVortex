@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """所有入口共享的页码范围语法、求值和格式化；默认选页策略由调用方决定。"""
 
 from __future__ import annotations

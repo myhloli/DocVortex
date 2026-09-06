@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """集中识别静态 HTML/XHTML 公式并归一化为裸 LaTeX。"""
 
 from __future__ import annotations

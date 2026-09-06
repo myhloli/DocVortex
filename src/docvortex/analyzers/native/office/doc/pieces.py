@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """解析 DOC CLX piece table 并恢复全局 UTF-16 CP 文本流。"""
 

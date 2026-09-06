@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """DocVortex HTML v1 canonical wire 的轻量内部入口。"""
 
 from __future__ import annotations

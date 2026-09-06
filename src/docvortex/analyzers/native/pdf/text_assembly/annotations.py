@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """组装跨行标题、图片注释、页眉及首页信息块。"""
 
 from __future__ import annotations

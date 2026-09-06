@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """把常用 Presentation MathML 结构转换为 LaTeX。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """将 PDF 字符或 OCR 结果投影为空间文本的共享算法。"""
 
 from __future__ import annotations

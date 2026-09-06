@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """OFD 固定版式 Flash 解析入口。"""
 
 from .errors import OfdEncryptedError, OfdParseError, OfdResourceLimitError

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """解析 XHTML/HTML 使用的有限语义 CSS 子集。"""
 
 from __future__ import annotations

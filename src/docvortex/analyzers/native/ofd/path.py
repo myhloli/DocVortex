@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """解析 OFD PathObject 并提取表格可用的轴向线段。"""
 
 from __future__ import annotations

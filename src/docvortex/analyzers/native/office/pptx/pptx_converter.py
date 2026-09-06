@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 import base64
 from collections import Counter
 from dataclasses import dataclass

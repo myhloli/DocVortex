@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """从 DOC Data/PICF 与 Word OfficeArt drawing 中恢复图片。"""
 

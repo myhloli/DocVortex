@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """PDF 段落延续关系的 raw model-list 后处理。"""
 
 import math

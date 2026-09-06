@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """使用 DocVortex 公开接口完成原生解析、Markdown 导出和结果包保存。"""
 
 from __future__ import annotations

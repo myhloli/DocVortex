@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """EPUB OCF/OPF/spine 到 DocVortex raw model-list 的原生 converter。"""
 
 from __future__ import annotations

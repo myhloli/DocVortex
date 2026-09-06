@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Markdown 与 Content List 共用的图片资源解析。"""
 
 from __future__ import annotations

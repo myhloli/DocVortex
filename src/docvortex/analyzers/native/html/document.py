@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """安全加载、规范化并描述一个 standalone HTML 文档。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """旧版 Office 二进制格式共享的 OfficeArt 记录与图片解码。"""
 

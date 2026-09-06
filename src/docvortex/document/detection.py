@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """根据文件内容和容器结构识别 DocVortex 支持的输入后缀。"""
 
 from io import BytesIO

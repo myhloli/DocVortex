@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """二进制安全、位置显式的 RTF lexer。"""
 
 from __future__ import annotations

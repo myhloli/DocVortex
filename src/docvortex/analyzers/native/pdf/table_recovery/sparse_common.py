@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """共享稀疏表格的坐标聚类和局部物理规则转换，保留两路候选策略。"""
 
 from __future__ import annotations

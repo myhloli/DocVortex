@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """解析 DOC 标准书签名称及其主文档 CP 范围。"""
 

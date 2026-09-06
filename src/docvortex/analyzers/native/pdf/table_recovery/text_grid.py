@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """基于稀疏规则、行底纹和原生文本对齐恢复少线或无线表格。"""
 
 from __future__ import annotations

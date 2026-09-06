@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """HTML 表格解析、行列扫描和结构状态缓存。"""
 
 from __future__ import annotations

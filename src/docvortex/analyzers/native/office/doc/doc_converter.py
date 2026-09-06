@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """把 Word 97–2003 语义模型转换为 DocVortex 分页 model-list。"""
 

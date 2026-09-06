@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """匹配标题原型的字体、尺度和对齐特征。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """OFD ImageObject 资源解码与安全图片投影。"""
 
 from __future__ import annotations

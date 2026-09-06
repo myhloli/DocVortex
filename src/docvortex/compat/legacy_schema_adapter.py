@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """MinerU 3.4.5 Middle JSON page 到当前 raw ModelJson 的适配器。
 
 3.4.5 的页面仍使用 ``preproc_blocks``/``para_blocks``、``lines`` 和

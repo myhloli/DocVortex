@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """安全归一化 XML namespace 与 legacy HTML 前缀标签名。"""
 
 from __future__ import annotations

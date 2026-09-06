@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """跨页表格 HTML 内容、行列结构和单元格语义合并。"""
 
 from __future__ import annotations

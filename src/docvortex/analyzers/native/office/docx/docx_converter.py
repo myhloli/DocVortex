@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 import hashlib
 import re
 from dataclasses import dataclass, field

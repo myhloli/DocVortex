@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """HTML Flash 解析的稳定异常类型。"""
 
 

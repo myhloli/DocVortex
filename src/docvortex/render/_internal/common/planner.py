@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """各格式共用的逻辑块复制、延续合并与页面规划。"""
 
 from __future__ import annotations

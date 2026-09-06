@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """Flash 原生 PDF 提取使用的内部数据模型。"""
 

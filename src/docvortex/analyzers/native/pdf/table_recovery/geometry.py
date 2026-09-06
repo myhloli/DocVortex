@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Native PDF 表格结构恢复使用的局部坐标与聚类原语。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """OFD 原生解析错误类型。"""
 
 

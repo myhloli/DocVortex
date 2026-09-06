@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 from loguru import logger
 from PIL import Image
 from pypdfium2 import PdfBitmap, PdfPage

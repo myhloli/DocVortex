@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 from io import BytesIO
 import re
 from zipfile import BadZipFile, ZipFile, ZipInfo

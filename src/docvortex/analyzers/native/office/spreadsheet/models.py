@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """工作表投影阶段使用的中立内部数据模型。"""
 
 from __future__ import annotations

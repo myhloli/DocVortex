@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Middle JSON 2.0 行内 Span 的规范化、可见文本与段落边界操作。"""
 
 from __future__ import annotations

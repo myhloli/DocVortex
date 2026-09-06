@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """严格 MiddleJson 到树形 Markdown structured_content 的公共渲染实现。"""
 
 from __future__ import annotations

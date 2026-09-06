@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """Flash PDF、EPUB、HTML、OFD、CSV 与 Office 模型公开入口。"""
 

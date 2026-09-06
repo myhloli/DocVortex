@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """解析 StyleTextPropAtom 与 TextMasterStyleAtom。"""
 

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """EPUB 解析器内部使用的稳定错误类型。"""
 
 

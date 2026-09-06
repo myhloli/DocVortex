@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """HTML renderer 使用的严格 GFM pipe table 转换。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Flash EPUB 与 HTML 共用的静态标记文档投影能力。"""
 
 from .anchors import (

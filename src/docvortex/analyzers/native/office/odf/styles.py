@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """解析 OpenDocument 样式继承、列表和逻辑分页属性。"""
 
 from __future__ import annotations

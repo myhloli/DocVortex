@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """编排页面文档标题、跨栏标题及误判回退。"""
 
 from __future__ import annotations

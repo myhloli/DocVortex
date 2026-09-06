@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """现代 Office OOXML 包中的 MathType/Equation OLE 公式解码适配器。"""
 

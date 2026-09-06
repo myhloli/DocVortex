@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """在固定预算内读取 OFD ZIP/XML 包。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """HTML 静态解析使用的固定资源限制。"""
 
 from typing import Final

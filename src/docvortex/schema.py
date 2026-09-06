@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 from __future__ import annotations
 
 import json
@@ -106,44 +105,6 @@ class BlockType(str, Enum):
 
     def __str__(self) -> str:
         return self.value
-
-
-class ContentType:
-    IMAGE = "image"
-    TABLE = "table"
-    CHART = "chart"
-    TEXT = "text"
-    INTERLINE_EQUATION = "interline_equation"
-    INLINE_EQUATION = "inline_equation"
-    EQUATION = "equation"
-    HYPERLINK = "hyperlink"
-
-
-class ContentTypeV2:
-    CODE = "code"
-    ALGORITHM = "algorithm"
-    EQUATION_INTERLINE = "equation_interline"
-    IMAGE = "image"
-    TABLE = "table"
-    CHART = "chart"
-    TABLE_SIMPLE = "simple_table"
-    TABLE_COMPLEX = "complex_table"
-    LIST = "list"
-    LIST_TEXT = "text_list"
-    LIST_REF = "reference_list"
-    INDEX = "index"
-    TITLE = "title"
-    PARAGRAPH = "paragraph"
-    SPAN_TEXT = "text"
-    SPAN_EQUATION_INLINE = "equation_inline"
-    SPAN_PHONETIC = "phonetic"
-    SPAN_MD = "md"
-    SPAN_CODE_INLINE = "code_inline"
-    PAGE_HEADER = "page_header"
-    PAGE_FOOTER = "page_footer"
-    PAGE_NUMBER = "page_number"
-    PAGE_ASIDE_TEXT = "page_aside_text"
-    PAGE_FOOTNOTE = "page_footnote"
 
 
 BlockTypes = Literal[
@@ -1056,8 +1017,6 @@ __all__ = [
     "FileSuffix",
     "FILE_SUFFIXES",
     "BlockType",
-    "ContentType",
-    "ContentTypeV2",
     "BlockTypes",
     "PageBlockTypes",
     "BLOCK_TYPES",

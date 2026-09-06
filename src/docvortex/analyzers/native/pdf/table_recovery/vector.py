@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """基于 PDF 横竖线与矩形路径恢复原子网格和合并单元格。"""
 
 from __future__ import annotations

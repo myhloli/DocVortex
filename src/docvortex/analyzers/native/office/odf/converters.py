@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """ODT、ODS、ODP 到 DocVortex raw model-list 的原生 converter。"""
 
 from __future__ import annotations

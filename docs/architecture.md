@@ -2,7 +2,7 @@
 
 The engine has one pipeline: document input → ModelJson and assets → deterministic
 postprocessing → MiddleJson and assets → rendering/export. Public document values
-are owned by DocVortex. They do not open files, render documents, or import MinerU.
+are owned by DocVortex. Content List V1/V2 are owned by MinerU. They do not open files, render documents, or import MinerU.
 
 - `schema` and `foundation` define values and leaf operations.
 - `document` owns input preparation, metadata and low-level document lifetimes.
@@ -31,3 +31,8 @@ runtime ownership and use coarse stage or page boundaries.
 The initial extraction deliberately preserves current content, page-index and
 coordinate semantics. Replacing pdftext and upgrading PDFium are tested separately.
 The source baseline is recorded in `migration.md`.
+
+DocVortex renders seven general formats. MinerU owns Content List V1/V2, its
+nine-value RenderFormat and its product-specific options. Shared renderers,
+RenderMode and common options stay in DocVortex; the public render.fragments
+module supplies shared fragment operations without exposing private imports.

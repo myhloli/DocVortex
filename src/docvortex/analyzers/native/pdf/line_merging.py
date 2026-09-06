@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """提供同基线文本和拆分视觉行的几何合并。"""
 

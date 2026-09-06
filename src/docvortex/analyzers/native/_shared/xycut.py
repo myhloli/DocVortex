@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """基于几何信息实现不依赖语义模型的 XYCut++ 阅读顺序排序。"""
 
 from __future__ import annotations

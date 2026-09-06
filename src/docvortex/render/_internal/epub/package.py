@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """EPUB 3.3 的元数据 XML、导航文档与确定性 OCF 打包。"""
 
 from __future__ import annotations

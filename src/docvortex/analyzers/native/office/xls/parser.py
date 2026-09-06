@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """纯 Python 解析 Excel 97–2003 Workbook BIFF stream。"""
 

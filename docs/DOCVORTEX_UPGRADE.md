@@ -1,7 +1,7 @@
 # DocVortex 0.1.0 upgrade
 
 DocVortex is the new name of the standalone engine previously developed as
-DocGale. The GitHub repository is `myhloli/docvortex`; the Python distribution,
+DocGale. The GitHub repository is `myhloli/DocVortex`; the Python distribution,
 import and command are all `docvortex`. The existing repository history and release
 draft are retained. Version 0.1.0 remains a draft, not a PyPI publication.
 
@@ -72,7 +72,7 @@ before publishing the first version:
 | --- | --- |
 | PyPI project | `docvortex` |
 | GitHub owner | `myhloli` |
-| Repository | `docvortex` |
+| Repository | `DocVortex` |
 | Workflow filename | `publish.yml` |
 | Environment | `pypi` |
 

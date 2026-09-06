@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """PDF 分析各领域阶段共享的阈值、类型集合与映射。"""
 
 from __future__ import annotations

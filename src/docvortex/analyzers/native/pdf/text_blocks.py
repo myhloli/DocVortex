@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """保留既有入口的 Flash PDF 门面，内部实现按职责显式组织。"""
 
 from .text_assembly.annotations import (

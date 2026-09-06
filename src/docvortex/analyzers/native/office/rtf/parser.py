@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """RTF 1.9.1 常用语义的有界状态机 parser。"""
 
 from __future__ import annotations

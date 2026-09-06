@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """提供 PDF 字符 loose/tight/origin 驱动的通用上下标几何分类。"""
 

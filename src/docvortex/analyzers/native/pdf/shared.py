@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """原生 PDF 的公共复用能力；模型区域融合可独立使用这些纯数据操作。"""
 

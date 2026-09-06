@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """对齐原生行证据与输出块文本，保留来源和偏移。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """严格 MiddleJson 到 TeX Live XeLaTeX 完整文档的渲染实现。"""
 
 from __future__ import annotations

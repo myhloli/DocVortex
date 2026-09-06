@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """在固定资源预算内读取 EPUB OCF 容器、OPF manifest 与 spine。"""
 
 from __future__ import annotations

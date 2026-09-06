@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """使用既有页面分类探测构建全文标题原型。"""
 
 from __future__ import annotations

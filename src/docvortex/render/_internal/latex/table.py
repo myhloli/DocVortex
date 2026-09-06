@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """HTML table 到 TeX Live longtable/tabular 源码的安全物化。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 from typing import Any, BinaryIO
 
 from ... import PptxModel

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """解析 BIFF chart BRAI 中的简单单元格引用。"""
 

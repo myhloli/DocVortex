@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """读取 Word 97–2003 WordDocument stream 中的变长 FIB。"""
 

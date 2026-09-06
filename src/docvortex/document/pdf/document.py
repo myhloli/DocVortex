@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 from __future__ import annotations
 
 import ctypes

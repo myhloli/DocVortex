@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """DocVortex HTML v1 canonical wire 的内部类型契约。"""
 
 from __future__ import annotations

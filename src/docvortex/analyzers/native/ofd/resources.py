@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """OFD 资源文件索引与作用域合并。"""
 
 from __future__ import annotations

@@ -24,7 +24,7 @@ def main() -> None:
     default="markdown",
     show_default=True,
     type=click.Choice(
-        ["markdown", "html", "latex", "docx", "epub", "pdf", "structured_content", "content_list", "content_list_v2"]
+        ["markdown", "html", "latex", "docx", "epub", "pdf", "structured_content"]
     ),
 )
 @click.option("--pages", "page_range", default="", help="PDF page selection: 1-5, r1, all.")

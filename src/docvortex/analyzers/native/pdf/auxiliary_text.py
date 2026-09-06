@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """分类页眉、页脚、页码、侧栏和页脚注。"""
 

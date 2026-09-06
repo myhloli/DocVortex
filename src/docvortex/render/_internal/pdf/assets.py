@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """PDF renderer 的离线图片解析、签名校验与格式准备。"""
 
 from __future__ import annotations

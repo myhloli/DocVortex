@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """EPUB 媒体类型、命名空间与固定资源上限。"""
 
 from __future__ import annotations

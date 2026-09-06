@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """识别并构造 Flash 原生 PDF 的目录正文块。"""
 

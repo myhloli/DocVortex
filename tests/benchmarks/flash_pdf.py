@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 # ruff: noqa: E402
 """生成 Flash PDF 完整输出基线，并在独立进程中测量耗时和峰值内存。"""
 

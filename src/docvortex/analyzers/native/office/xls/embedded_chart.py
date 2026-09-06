@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """从 Excel.Chart 或 MSGraph.Chart OLE 对象恢复 HTML 数据表。"""
 

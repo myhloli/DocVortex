@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """单页 raw block 的内容清理、列表整理和视觉分组流水线。"""
 
 from __future__ import annotations

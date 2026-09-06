@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """检测、投影并物化 Flash 原生 PDF 表格。"""
 

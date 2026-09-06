@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """XLS 与 XLSX 复用的中立工作表投影器。"""
 
 from __future__ import annotations

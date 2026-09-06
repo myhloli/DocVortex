@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """编排 Flash 原生 PDF 的页面准备、语义处理和输出归一化。"""
 

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """严格 MiddleJson 到 EPUB 3.3 的轻量公共门面。"""
 
 from __future__ import annotations

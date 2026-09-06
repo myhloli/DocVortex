@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """把已验证的 DocVortex HTML v1 typed plan 物化为 raw model-list。"""
 
 from __future__ import annotations

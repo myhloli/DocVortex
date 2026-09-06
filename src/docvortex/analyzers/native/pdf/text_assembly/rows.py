@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """依据栏带、缩进和排版重置寻找正文行分组边界。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Standalone HTML 链接、图片与本地 stylesheet 的安全解析。"""
 
 from __future__ import annotations

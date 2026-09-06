@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """融合稀疏物理边界和文本对齐网络恢复少线表格结构。"""
 
 from __future__ import annotations

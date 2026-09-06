@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """把 typed RTF 语义文档转换为 DocVortex 单逻辑页 raw model-list。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Markdown 与 Content List 共用的 block 级序列化。"""
 
 from __future__ import annotations

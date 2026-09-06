@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """OpenDocument 内部行内、样式与表格模型。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """OFD 毫米坐标、仿射矩阵与 bbox 工具。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """把 DocVortex HTML v1 固定 DOM 解析为无资源副作用的 typed plan。"""
 
 from __future__ import annotations

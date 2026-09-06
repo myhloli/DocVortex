@@ -73,3 +73,13 @@ geometry, semantic and export regressions; MinerU retains `demo1.pdf` and
 `demo2.pdf` for inference integration tests. Other host-specific geometry inputs
 are frozen as JSON fixtures in MinerU. Neither test suite requires an adjacent
 checkout or runtime corpus download.
+
+## Content List ownership
+
+Content List V1/V2 and their options live in MinerU. DocVortex only accepts its
+seven general rendering targets, including when exporting a restored bundle.
+Applications needing Content List can pass the shared MiddleJson to MinerU's
+public render_content_list/render_content_list_v2 functions. The two projects
+have separate RenderFormat enums; import the enum belonging to the API you call.
+Shared options and RenderMode remain the same types. MinerU ContentType and
+ContentTypeV2 constants are defined in mineru.types.

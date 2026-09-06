@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """从 OFD.xml 与 Document.xml 提取 Doclib 基础元数据。"""
 
 from __future__ import annotations

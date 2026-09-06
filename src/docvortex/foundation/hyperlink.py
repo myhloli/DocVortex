@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """不依赖解析器层的安全超链接目标校验。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """从 EPUB OPF 提取 doclib 使用的基础元数据。"""
 
 from __future__ import annotations

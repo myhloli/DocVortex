@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """ZiaMath LaTeX 到受控 ReportLab 矢量路径的转换。"""
 
 from __future__ import annotations

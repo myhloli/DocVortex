@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Native PDF 表格候选的网格校验、字符落格和 HTML 序列化。"""
 
 from __future__ import annotations

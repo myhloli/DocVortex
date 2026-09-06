@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """各格式共用的目录页码尾部识别与清理。"""
 
 from __future__ import annotations

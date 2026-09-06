@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """提供原生文本与布局共享的字体族归一化。"""
 
 from __future__ import annotations

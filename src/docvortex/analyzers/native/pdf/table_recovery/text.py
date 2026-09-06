@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Native PDF 表格字符选择、视觉组行和单元格文本重建。"""
 
 from __future__ import annotations

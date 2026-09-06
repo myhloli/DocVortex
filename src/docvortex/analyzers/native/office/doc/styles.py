@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """解析 Word STSH/STD 样式表并解析继承链。"""
 

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """识别编号、排版重置及跨页一致的结构标题。"""
 
 from __future__ import annotations

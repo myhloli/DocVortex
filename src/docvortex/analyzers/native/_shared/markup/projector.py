@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """把静态 XHTML/HTML DOM 投影为 DocVortex raw blocks。"""
 
 from __future__ import annotations

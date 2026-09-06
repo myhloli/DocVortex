@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """基于 OFD 原生横竖线与文字框恢复高置信全线表。"""
 
 from __future__ import annotations

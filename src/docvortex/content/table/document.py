@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """文档页边界上的跨页表格识别与延续标记编排。"""
 
 from __future__ import annotations

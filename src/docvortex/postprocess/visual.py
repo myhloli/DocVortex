@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """视觉主体、标题和脚注的 raw block 关联与分组。"""
 
 from __future__ import annotations

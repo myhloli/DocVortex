@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """OOXML 格式复用的 Open Packaging Conventions 基础能力。"""
 
 from __future__ import annotations

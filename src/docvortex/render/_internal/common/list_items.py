@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """各格式共用的列表 marker 解析与参考文献判定。"""
 
 from __future__ import annotations

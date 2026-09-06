@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """把 OFD 页面场景投影为带 bbox 的有序 raw model-list。"""
 
 from __future__ import annotations

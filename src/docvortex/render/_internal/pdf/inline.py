@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Middle JSON InlineSpan 到 ReportLab Paragraph fragment 的转换。"""
 
 from __future__ import annotations

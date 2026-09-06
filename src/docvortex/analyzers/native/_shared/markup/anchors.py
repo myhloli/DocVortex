@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """集中建立静态 HTML/XHTML 标题、脚注与 fragment anchor 索引。"""
 
 from __future__ import annotations

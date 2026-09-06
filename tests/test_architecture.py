@@ -35,6 +35,7 @@ import os, sys
 before = dict(os.environ)
 import docvortex
 from docvortex.api import analyze, postprocess, parse, render, convert
+from docvortex.render.fragments import parse_list_item_marker, format_embedded_html
 assert callable(parse) and callable(render)
 assert before == dict(os.environ)
 for name in ('torch', 'cv2', 'pypdfium2', 'pdftext', 'docgale', 'mineru', 'lxml', 'bs4', 'PIL', 'docx', 'reportlab', 'openai'):

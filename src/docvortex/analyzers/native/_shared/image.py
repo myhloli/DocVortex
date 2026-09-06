@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Flash 各格式复用的轻量图片编码能力。"""
 
 from __future__ import annotations

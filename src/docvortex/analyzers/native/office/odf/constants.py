@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """OpenDocument 命名空间、MIME 与固定资源上限。"""
 
 from __future__ import annotations

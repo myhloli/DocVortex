@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """把已对齐的链接、样式及上下标区间物化为 InlineSpan。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """跨页表格延续文本与 caption 的轻量判定规则。"""
 
 from ...foundation.text import full_to_half

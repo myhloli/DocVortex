@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """从 TextObject/TextCode 恢复语义文字与页面几何。"""
 
 from __future__ import annotations

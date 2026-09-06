@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """Word 二进制解析器与 Converter 之间的内部语义模型。"""
 

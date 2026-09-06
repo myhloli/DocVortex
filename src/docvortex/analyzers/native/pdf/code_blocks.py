@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """识别带填充背景的等宽代码区域并投影其空间文本。"""
 

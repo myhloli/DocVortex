@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """安全解析 Equation Native 中的 MTEF v3/v5 公式。"""
 

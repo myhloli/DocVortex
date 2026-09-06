@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """DocVortex table block 的主体、辅助文本和 bbox 访问规则。"""
 
 from __future__ import annotations

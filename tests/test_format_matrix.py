@@ -38,7 +38,7 @@ def source_payload(suffix: str) -> bytes:
     "suffix", ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "rtf", "csv", "html", "epub", "ofd", "odt", "ods", "odp"]
 )
 def test_all_native_formats_render_all_targets(suffix: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    """每种原生格式完成分析、后处理和九种目标编码，不导入宿主。"""
+    """每种原生格式完成分析、后处理和七种目标编码，不导入宿主。"""
     if suffix != "pdf":
         from docvortex import content
 

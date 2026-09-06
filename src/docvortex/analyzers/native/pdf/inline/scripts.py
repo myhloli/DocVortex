@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """按公式区域和字符几何识别上下标证据。"""
 
 from __future__ import annotations

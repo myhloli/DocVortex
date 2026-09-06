@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 import os
 import threading
 from contextlib import contextmanager

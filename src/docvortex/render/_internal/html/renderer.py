@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """严格 MiddleJson 到兼容 HTML 的公共渲染实现。"""
 
 from __future__ import annotations

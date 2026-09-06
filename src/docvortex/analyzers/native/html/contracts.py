@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """HTML Flash 解析使用的来源上下文契约。"""
 
 from __future__ import annotations

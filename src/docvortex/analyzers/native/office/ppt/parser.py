@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """PowerPoint 97–2003 二进制文档的分页语义解析器。"""
 

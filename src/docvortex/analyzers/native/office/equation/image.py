@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """从 WMF/GIF 图片 comment 中安全恢复 MathType MTEF 公式。"""
 

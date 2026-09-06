@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """基于静态 DOM 指标执行保守的 HTML 正文自动选择。"""
 
 from __future__ import annotations

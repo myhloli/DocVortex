@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """RTF parser 与 DocVortex raw-block converter 之间的显式语义模型。"""
 
 from __future__ import annotations

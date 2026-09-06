@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """跨页表格合并使用的内部状态模型。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """共享正文块连接的几何、内容拼接和来源规则。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """定义原生 PDF 行内样式证据、区间及内部投影类型。"""
 
 from __future__ import annotations

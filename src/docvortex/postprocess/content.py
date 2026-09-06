@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """raw block 的文本、代码和公式内容清理规则。"""
 
 from __future__ import annotations

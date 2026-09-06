@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """保持既有顺序编排正文行分组与块级组装。"""
 
 from __future__ import annotations

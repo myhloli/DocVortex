@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """把 OFD 文档、模板、图层与资源组合成逐页场景。"""
 
 from __future__ import annotations

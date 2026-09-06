@@ -70,15 +70,13 @@ def test_schema_has_no_filesystem_export_method() -> None:
     assert not hasattr(document(), "export")
 
 
-@pytest.mark.parametrize("target_name", ["markdown", "structured_content", "content_list", "content_list_v2"])
+@pytest.mark.parametrize("target_name", ["markdown", "structured_content"])
 def test_inline_delimiters_reach_each_text_renderer(target_name: str) -> None:
-    """四种文本目标实际采用调用方的公式分隔符，防止门面丢失选项。"""
+    """两种共享文本目标实际采用调用方的公式分隔符，防止门面丢失选项。"""
     from docvortex.schema import EquationInlineSpan, ChartBlock, ChartBodyBlock
     from docvortex.render.contracts import (
         MarkdownRenderOptions,
         StructuredContentRenderOptions,
-        ContentListRenderOptions,
-        ContentListV2RenderOptions,
     )
 
     middle = document()
@@ -94,8 +92,6 @@ def test_inline_delimiters_reach_each_text_renderer(target_name: str) -> None:
     option_types = {
         "markdown": MarkdownRenderOptions,
         "structured_content": StructuredContentRenderOptions,
-        "content_list": ContentListRenderOptions,
-        "content_list_v2": ContentListV2RenderOptions,
     }
     value = render(middle, RenderFormat(target_name), options=option_types[target_name](latex_delimiters=delimiters))
 

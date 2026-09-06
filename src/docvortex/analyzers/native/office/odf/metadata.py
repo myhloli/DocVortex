@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """读取 OpenDocument meta.xml 与结构页数。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """编排 Native PDF 表格多候选生成、欠分割诊断和高置信仲裁。"""
 
 from __future__ import annotations

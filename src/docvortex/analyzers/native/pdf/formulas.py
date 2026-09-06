@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """按空间关系检测并物化原生 PDF 公式块。"""
 

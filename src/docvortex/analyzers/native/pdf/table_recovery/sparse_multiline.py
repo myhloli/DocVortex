@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """在既有候选全部失败后恢复多行少线表格结构。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """Excel 数值格式解析与稳定显示文本生成。"""
 

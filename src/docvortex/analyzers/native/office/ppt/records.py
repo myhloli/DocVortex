@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """有界读取 MS-PPT 与 OfficeArt 记录流。"""
 

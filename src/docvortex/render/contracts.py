@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """MiddleJson 多格式 renderer 共用的公共类型与调用选项。"""
 
 from __future__ import annotations
@@ -22,8 +21,6 @@ class RenderFormat(str, Enum):
     DOCX = "docx"
     EPUB = "epub"
     STRUCTURED_CONTENT = "structured_content"
-    CONTENT_LIST = "content_list"
-    CONTENT_LIST_V2 = "content_list_v2"
     PDF = "pdf"
 
 
@@ -179,32 +176,6 @@ class StructuredContentRenderOptions:
         _validate_asset_base_url(self.asset_base_url)
 
 
-@dataclass(frozen=True, slots=True)
-class ContentListRenderOptions:
-    """扁平 Content List V1 renderer 的统一入口选项。"""
-
-    latex_delimiters: LatexDelimitersConfig | None = None
-
-    asset_base_url: str = ""
-
-    def __post_init__(self) -> None:
-        """在构造时校验图片资源根地址。"""
-        _validate_asset_base_url(self.asset_base_url)
-
-
-@dataclass(frozen=True, slots=True)
-class ContentListV2RenderOptions:
-    """按页 Content List V2 renderer 的统一入口选项。"""
-
-    latex_delimiters: LatexDelimitersConfig | None = None
-
-    asset_base_url: str = ""
-
-    def __post_init__(self) -> None:
-        """在构造时校验图片资源根地址。"""
-        _validate_asset_base_url(self.asset_base_url)
-
-
 RenderOptions: TypeAlias = (
     MarkdownRenderOptions
     | HtmlRenderOptions
@@ -213,16 +184,12 @@ RenderOptions: TypeAlias = (
     | EpubRenderOptions
     | PdfRenderOptions
     | StructuredContentRenderOptions
-    | ContentListRenderOptions
-    | ContentListV2RenderOptions
 )
-RenderOutput: TypeAlias = str | bytes | dict[str, Any] | list[dict[str, Any]] | list[list[dict[str, Any]]]
+RenderOutput: TypeAlias = str | bytes | dict[str, Any]
 
 
 __all__ = [
     "AssetResolver",
-    "ContentListRenderOptions",
-    "ContentListV2RenderOptions",
     "DocxRenderOptions",
     "EpubRenderOptions",
     "HtmlRenderOptions",

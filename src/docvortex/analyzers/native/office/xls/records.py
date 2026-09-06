@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """有界读取 Excel 97–2003 BIFF 记录流。"""
 

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """严格 MiddleJson 到 TeX Live LaTeX 源码的轻量公共门面。"""
 
 from __future__ import annotations

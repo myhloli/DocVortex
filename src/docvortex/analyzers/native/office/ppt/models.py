@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """旧版 PPT 解析阶段使用的内部语义模型。"""
 

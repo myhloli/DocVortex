@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """遍历并应用 Word 二进制单属性修饰符 SPRM。"""
 

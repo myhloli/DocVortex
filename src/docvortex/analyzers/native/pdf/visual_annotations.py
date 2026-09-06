@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """识别独立视觉块的强规则 caption/footnote，并构造局部阅读区域。"""
 

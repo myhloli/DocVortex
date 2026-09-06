@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """跨模型共享的文本字符规范化与换行连接规则。"""
 
 import re

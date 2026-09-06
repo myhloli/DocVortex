@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """DOCX renderer 的页面几何与 Word 样式定义。"""
 
 from __future__ import annotations

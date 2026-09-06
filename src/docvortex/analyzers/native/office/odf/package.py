@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """受限读取 OpenDocument ZIP 包及 XML part。"""
 
 from __future__ import annotations

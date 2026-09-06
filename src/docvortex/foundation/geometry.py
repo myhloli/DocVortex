@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 import math
 
 import numpy as np

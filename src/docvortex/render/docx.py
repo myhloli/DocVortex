@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """严格 MiddleJson 到 DOCX 的轻量公共门面与稳定异常。"""
 
 from __future__ import annotations

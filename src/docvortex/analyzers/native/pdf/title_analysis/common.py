@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """提供标题分类共享的几何与文本规则。"""
 
 from __future__ import annotations

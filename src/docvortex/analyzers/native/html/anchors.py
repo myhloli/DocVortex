@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Standalone HTML 标题、脚注与 fragment anchor 规范化。"""
 
 from __future__ import annotations

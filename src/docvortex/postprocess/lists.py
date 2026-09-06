@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """PDF 与 Office 的列表、目录和标题编号后处理。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Flash EPUB 原生解析实现。"""
 
 from .converter import EpubConverter

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """BIFF5–BIFF8 字符串、富文本区间与 codepage 解码。"""
 

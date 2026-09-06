@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """LaTeX renderer 的纯路径 sidecar 图片解析。"""
 
 from __future__ import annotations

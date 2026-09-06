@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """DOCX Mammoth 兼容层使用的 Office XML 解析辅助函数。"""
 
 import xml.dom.minidom

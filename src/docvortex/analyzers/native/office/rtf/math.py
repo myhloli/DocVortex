@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """把 RTF Office Math destination 规范化为 OMML 并复用现有 LaTeX 转换器。"""
 
 from __future__ import annotations

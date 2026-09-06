@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """视觉块容器补全、方向归一化与页面裁图。"""
 
 from __future__ import annotations

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Flash Office 文档中的 OOXML 图表解析与表格化渲染。"""
 
 from __future__ import annotations

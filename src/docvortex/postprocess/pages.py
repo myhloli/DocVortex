@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """严格 ModelJson 到 PageInfo 列表的唯一转换边界。"""
 
 from __future__ import annotations

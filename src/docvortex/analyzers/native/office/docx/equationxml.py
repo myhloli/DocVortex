@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """DOCX 兼容模式 VML ``equationxml`` 公式解码器。"""
 

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """DOC 二进制结构使用的有界整数、PLC 和记录预算工具。"""
 

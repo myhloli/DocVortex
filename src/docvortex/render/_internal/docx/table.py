@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """DOCX renderer 的 HTML 表格占位网格解析与原生表格物化。"""
 
 from __future__ import annotations

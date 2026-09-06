@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """把完整工作表表格 IR 确定性渲染为 HTML。"""
 
 from __future__ import annotations

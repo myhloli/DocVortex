@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """Markdown renderer 的 HTML 表格判型与无损 GFM 转换。"""
 
 from __future__ import annotations

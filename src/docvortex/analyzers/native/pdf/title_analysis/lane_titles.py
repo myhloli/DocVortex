@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """在既有正文统计和结构证据下分类栏内标题。"""
 
 from __future__ import annotations

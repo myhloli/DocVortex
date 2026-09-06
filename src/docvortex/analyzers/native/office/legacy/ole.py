@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """基于 olefile 的有界 OLE2/CFB 只读包装。"""
 

@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """DOCX renderer 的安全图片素材解析与格式准备。"""
 
 from __future__ import annotations

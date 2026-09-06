@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 import html
 from dataclasses import dataclass
 from typing import Any, Optional

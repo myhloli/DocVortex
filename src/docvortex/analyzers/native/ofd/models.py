@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """OFD 解析器内部使用的确定性数据模型。"""
 
 from __future__ import annotations

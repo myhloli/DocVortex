@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """提供表格恢复与文本投影共享的局部几何，不改变各业务层校验策略。"""
 
 from __future__ import annotations

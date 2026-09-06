@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 import posixpath
 import re
 from io import BytesIO

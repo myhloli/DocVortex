@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """把 ODF 文本、列表、表格和嵌入对象投影为 DocVortex raw blocks。"""
 
 from __future__ import annotations

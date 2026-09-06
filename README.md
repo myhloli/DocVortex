@@ -10,7 +10,7 @@ Document -> ModelJson + Assets -> MiddleJson + Assets -> Render / Export
 
 Native inputs include text PDFs, DOC/DOCX, PPT/PPTX, XLS/XLSX, RTF, ODT/ODS/ODP,
 EPUB, HTML, OFD and CSV. Output formats include Markdown, HTML, LaTeX, DOCX,
-EPUB, PDF, structured content and both content-list formats.
+EPUB, PDF and structured content. Content List V1/V2 are provided by MinerU.
 
 Native parsing runs without OCR or VLM inference services.
 PDF classification is an explicit document operation; native analysis does not

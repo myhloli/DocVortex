@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 import platform
 
 from packaging import version

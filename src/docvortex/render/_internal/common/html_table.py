@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """多格式 renderer 共用的有界 HTML table 占位网格解析。"""
 
 from __future__ import annotations

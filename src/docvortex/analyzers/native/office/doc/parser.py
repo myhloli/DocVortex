@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 
 """把 WordDocument/Table/Data streams 解析为逐 section DOC 语义模型。"""
 

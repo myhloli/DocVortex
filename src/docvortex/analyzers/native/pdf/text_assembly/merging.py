@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """合并正文、公式上下文和列表引导块的空间组件。"""
 
 from __future__ import annotations

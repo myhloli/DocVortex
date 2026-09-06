@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """OpenDocument 内部稳定错误类型。"""
 
 from __future__ import annotations

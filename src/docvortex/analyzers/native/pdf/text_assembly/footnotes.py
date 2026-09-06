@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """按来源行和标记组装页面脚注。"""
 
 from __future__ import annotations

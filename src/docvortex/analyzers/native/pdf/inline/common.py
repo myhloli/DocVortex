@@ -1,4 +1,3 @@
-# Copyright (c) Opendatalab. All rights reserved.
 """提供行内证据共享的字符和几何规范化原语。"""
 
 from __future__ import annotations
