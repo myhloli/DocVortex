@@ -18,6 +18,7 @@ from ....document.pdf.document import PDFDocument, PDFDrawingLine
 from .typography import _normalized_font_family
 from .models import _AxisLine, _LineItem
 from .geometry import (
+    _clip_validated_bbox,
     _bbox_center_y,
     _bbox_union,
     _bbox_union_many,
@@ -94,7 +95,7 @@ def _build_native_line_items(
             if visual_angle is not None:
                 supported_lines.append((child_line, visual_angle, formula_candidate_only))
     for visual_row_id, (pdf_line, visual_angle, formula_candidate_only) in enumerate(supported_lines):
-        bbox = _clip_bbox(_coerce_bbox(pdf_line.get("bbox")), page_size)
+        bbox = _clip_validated_bbox(_coerce_bbox(pdf_line.get("bbox")), page_size)
         if bbox is None:
             continue
         spans = pdf_line.get("spans") or []
@@ -693,7 +694,7 @@ def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> 
         raw_char = str(char.get("char") or "")
         if not raw_char.isprintable() or raw_char.isspace():
             continue
-        bbox = _clip_bbox(_coerce_bbox(char.get("bbox")), page_size)
+        bbox = _clip_validated_bbox(_coerce_bbox(char.get("bbox")), page_size)
         if bbox is None:
             continue
         local_bbox = _rotate_bbox_to_upright(bbox, page_size, line.angle)
@@ -994,7 +995,7 @@ def _median_native_glyph_width(line: _LineItem, page_size: tuple[float, float]) 
     widths: list[float] = []
     for char in line.chars:
         raw_char = str(char.get("char") or "")
-        bbox = _clip_bbox(_coerce_bbox(char.get("bbox")), page_size)
+        bbox = _clip_validated_bbox(_coerce_bbox(char.get("bbox")), page_size)
         if not raw_char.isprintable() or raw_char.isspace() or bbox is None:
             continue
         local_bbox = _rotate_bbox_to_upright(bbox, page_size, line.angle)
