@@ -1,4 +1,5 @@
 # Portions derived from pdftext 0.7.1, Copyright Vik Paruchuri, Apache-2.0.
+# Changed in DocGale: direct PDFium extraction collects character and extended geometry together.
 """在一次 PDFium 字符遍历内收集原始码值、字体及可选几何。"""
 
 from __future__ import annotations

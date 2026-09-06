@@ -245,7 +245,7 @@ def _sanitize_absolute_image_url(source: str) -> str | None:
 
 
 def _sanitize_raster_data_uri(source: str) -> str | None:
-    """校验栅格图或 MinerU 生成的安全 SVG data URI。"""
+    """校验栅格图或 renderer 生成的安全 SVG data URI。"""
     match = _DATA_IMAGE_RE.fullmatch(source)
     if match is None:
         return None

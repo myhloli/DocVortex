@@ -2,7 +2,7 @@
 
 A fast, multi-format document parsing and conversion engine.
 
-DocGale owns the native document pipeline extracted from MinerU:
+DocGale provides a complete, standalone document pipeline:
 
 ```text
 Document -> ModelJson + Assets -> MiddleJson + Assets -> Render / Export
@@ -12,7 +12,7 @@ Native inputs include text PDFs, DOC/DOCX, PPT/PPTX, XLS/XLSX, RTF, ODT/ODS/ODP,
 EPUB, HTML, OFD and CSV. Output formats include Markdown, HTML, LaTeX, DOCX,
 EPUB, PDF, structured content and both content-list formats.
 
-DocGale does not implement OCR or VLM inference and does not depend on MinerU.
+Native parsing runs without OCR or VLM inference services.
 PDF classification is an explicit document operation; native analysis does not
 silently classify the document or select another inference backend.
 
@@ -25,7 +25,7 @@ docgale classify report.pdf
 ```
 
 Python 3.10–3.14 is supported. Native parsing does not require OCR/VLM inference
-services. PDF access uses `pypdfium2>=5.10.1` without a fixed upper bound; the
+services. PDF access uses `pypdfium2>=5.10.1,<6`; the
 compatibility matrix also exercises 5.13.0.
 
 ## Parse once, export many times
@@ -81,15 +81,14 @@ with PDFDocument("report.pdf") as document:
 ```
 
 Native analysis trusts the caller's choice and does not classify automatically.
-An application such as MinerU owns OCR routing. MinerU uses classification only
-for `auto`: Flash `txt` goes to DocGale; Flash `ocr` goes to MinerU's existing OCR
-implementation. Other MinerU tiers retain their inference paths and share
-DocGale's PDF foundations, document schema, deterministic processing and rendering.
+Applications can use the classification result to select their own OCR or
+inference service when a document requires it.
 
 DocGale JSON uses schema identity `docgale.model` or `docgale.middle`, schema
 version `1.0`, and neutral producer metadata. Definitions are in `schemas/`.
-`docgale.compat.mineru` provides the explicit MinerU envelope codecs; product
-metadata is carried in `extensions["mineru"]`.
+Application-specific metadata belongs in `extensions`. See the
+[compatibility guide](docs/COMPATIBILITY.md) for existing application integrations
+and historical data formats.
 
 ## Scope and development
 
@@ -107,11 +106,14 @@ uv run --no-project ruff format --check src
 uv build
 ```
 
-The code and its third-party attributions retain their applicable licenses; see
-`LICENSE.md` and `THIRD_PARTY_NOTICES.md`.
+DocGale project code is licensed under the [MIT License](LICENSE.md). Bundled
+third-party portions retain their own licenses: the PDF text layer includes
+Apache-2.0 portions attributed in its source, and the bundled Droid font retains
+its [original NOTICE](src/docgale/resources/fonts/NOTICE). The
+[Apache-2.0 license](licenses/Apache-2.0.txt) ships with both distributions; package
+metadata therefore declares `MIT AND Apache-2.0`.
 
-Shared dependency lower bounds match MinerU. Both projects require
-`pydantic>=2.12.5,<3`; `numpy>=1.21.6` is the shared declared floor, and the
+Dependencies include `pydantic>=2.12.5,<3` and `numpy>=1.21.6`; the
 installer selects versions compatible with the active Python interpreter.
 On Apple Silicon, Python 3.14 installation requires macOS 14 or newer because
 of the ONNX Runtime dependency used by file-type detection.

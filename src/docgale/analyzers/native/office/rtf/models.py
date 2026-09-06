@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""RTF parser 与 MinerU raw-block converter 之间的显式语义模型。"""
+"""RTF parser 与 DocGale raw-block converter 之间的显式语义模型。"""
 
 from __future__ import annotations
 

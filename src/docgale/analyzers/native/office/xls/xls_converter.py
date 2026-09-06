@@ -1,6 +1,6 @@
 # Copyright (c) Opendatalab. All rights reserved.
 
-"""把 Excel 97–2003 BIFF 工作簿转换为 MinerU 分页 model-list。"""
+"""把 Excel 97–2003 BIFF 工作簿转换为 DocGale 分页 model-list。"""
 
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""严格 MiddleJson 到 MinerU 风格 HTML 的公共渲染实现。"""
+"""严格 MiddleJson 到兼容 HTML 的公共渲染实现。"""
 
 from __future__ import annotations
 
@@ -922,7 +922,7 @@ def _replace_html_controls(content: str) -> str:
 
 @lru_cache(maxsize=1)
 def _load_html_styles() -> str:
-    """从包资源读取并缓存压缩后的 MinerU 独立样式。"""
+    """从包资源读取并缓存压缩后的独立 HTML 样式。"""
     root = resources.files("docgale").joinpath("resources", "html")
     return root.joinpath(_STYLE_RESOURCE_NAME).read_text(encoding="utf-8")
 

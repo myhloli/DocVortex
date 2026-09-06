@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""把 EPUB XHTML/SVG 内容文档转换为 MinerU raw blocks。"""
+"""把 EPUB XHTML/SVG 内容文档转换为 DocGale raw blocks。"""
 
 from __future__ import annotations
 

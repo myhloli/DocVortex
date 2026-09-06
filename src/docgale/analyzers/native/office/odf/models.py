@@ -19,7 +19,7 @@ class TextStyle:
     subscript: bool = False
 
     def names(self) -> tuple[str, ...]:
-        """按 MinerU 内联协议的稳定顺序返回已启用样式名。"""
+        """按 DocGale 内联协议的稳定顺序返回已启用样式名。"""
         result: list[str] = []
         if self.bold:
             result.append("bold")

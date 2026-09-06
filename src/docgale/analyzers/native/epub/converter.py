@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""EPUB OCF/OPF/spine 到 MinerU raw model-list 的原生 converter。"""
+"""EPUB OCF/OPF/spine 到 DocGale raw model-list 的原生 converter。"""
 
 from __future__ import annotations
 

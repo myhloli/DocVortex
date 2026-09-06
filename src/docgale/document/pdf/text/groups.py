@@ -1,4 +1,5 @@
 # Portions derived from pdftext 0.7.1, Copyright Vik Paruchuri, Apache-2.0.
+# Changed in DocGale: grouping uses owned dictionaries without upstream container adapters.
 """基础文本行与上下标分组；保留已验证的几何判断。"""
 
 from __future__ import annotations

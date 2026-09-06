@@ -1,4 +1,5 @@
 # Portions derived from pdftext 0.7.1, Copyright Vik Paruchuri, Apache-2.0.
+# Changed in DocGale: owned character types and source-index mappings replace upstream containers.
 """DocGale 自有 PDF 字符与几何数据，不携带 PDFium 句柄。"""
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""根据文件内容和容器结构识别 MinerU 支持的输入后缀。"""
+"""根据文件内容和容器结构识别 DocGale 支持的输入后缀。"""
 
 from io import BytesIO
 from functools import lru_cache

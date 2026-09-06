@@ -13,9 +13,9 @@ PDF input is expected to contain native text; DocGale does not perform OCR.
 `small_ocr.pdf` is retained for classification and low-level PDF regression tests.
 Use `PDFDocument.classify()` explicitly when a caller needs to route scanned PDFs.
 
-These files were moved unchanged from MinerU. The complete PDF/Office corpus,
-native regression manifests and benchmark now belong to this repository. MinerU
-retains `demo1.pdf` and `demo2.pdf` for its own inference integration tests.
+The complete PDF/Office corpus, native regression manifests and benchmark are
+available in this repository. Historical sample provenance is recorded in the
+[compatibility and migration guide](../docs/COMPATIBILITY.md).
 
 Run the native performance baseline with `python tests/benchmarks/flash_pdf.py --help`.
 The benchmark uses POSIX process resource accounting. Examples and regression

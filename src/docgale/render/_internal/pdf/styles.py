@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""PDF renderer 的页面几何、字体与 MinerU 打印样式。"""
+"""PDF renderer 的页面几何、字体与打印样式。"""
 
 from __future__ import annotations
 

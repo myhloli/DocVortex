@@ -1,5 +1,47 @@
 # Extraction validation
 
+## Independent branding, MIT license and dependency bounds (2026-09-06)
+
+Project code now uses the MIT License, retaining existing copyright ownership.
+The distribution declares `MIT AND Apache-2.0` for the project code and bundled
+Apache-2.0 portions. The root-level third-party summary has been removed; the
+PDF text source retains its attribution and modification notices, and the Apache
+license and original Droid font NOTICE remain in both wheel and sdist.
+
+DocGale requires `pypdfium2>=5.10.1,<6`; MinerU requires
+`docgale>=0.1.0,<1.0.0`. Requirement checks accept DocGale 0.1.0, 0.2.0 and 0.99.99
+and reject 1.0.0; they accept PDFium 5.10.1 and 5.13.0 and reject 5.10.0 and 6.0.0.
+Other dependency declarations, Python support ranges and package versions are
+unchanged. The existing host and isolated environments replaced only DocGale
+during installation, without upgrading other packages.
+
+Current package verification:
+
+- 47 DocGale checks passed against the rebuilt wheel: neutral and host protocol
+  round trips, nine renderers, complete pipeline/bundles, architecture and the
+  15-input-format matrix (Python 3.13.5, PDFium 5.10.1).
+- 247 MinerU route, ParseResult, legacy adapter and HTML reader/writer checks
+  passed against the rebuilt wheel. The pre-existing
+  `test_doclib_compaction_rejects_unknown_legacy_schema` exclusion remains; this
+  change does not claim to address it.
+- An isolated Python 3.14.4 environment with PDFium 5.10.1, no MinerU/pdftext and
+  no source-path import passed 29 protocol and complete-pipeline checks, including
+  the nine renderers and portable bundles. Font runtime initialization succeeded.
+- All 24 modified source files have identical executable ASTs after removing
+  docstrings. Adapter imports, serialized markers, renderer defaults and parsing
+  goldens remain unchanged. Ruff checks and formatting checks passed.
+- Wheel/sdist metadata, license contents, local documentation links and dependency
+  boundaries passed inspection; Twine accepted both archives. The wheel contains
+  no demo/test corpus. Both archives retain the unchanged Droid font with SHA256
+  `8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e`.
+
+This change does not rerun or replace the historical cross-platform geometry
+baseline below. Current host integration and sample provenance are documented in
+the [compatibility guide](COMPATIBILITY.md). Version 0.1.0 remains a release draft;
+preparing archives is not publication to PyPI.
+
+## Historical extraction reference
+
 Reference MinerU commit: `23d6e51185b1aa8868965fb45d644ccc0071ce68`.
 Reference PDF stack: pdftext 0.7.1 and pypdfium2 5.10.1.
 

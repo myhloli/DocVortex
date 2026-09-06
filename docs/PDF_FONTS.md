@@ -46,8 +46,8 @@ loose 和 tight bbox；原始 loose bbox 也不被承诺与旧系统字体完全
 
 此策略只控制源 PDF 的 PDFium 字体替代，不修改 HTML 的 CSS 字体，也不改变
 语义重排版 PDF 的字体嵌入策略。运行时信息不进入 ModelJson/MiddleJson 协议，
-而是记录在平台产物及性能报告中。MinerU 的既有 Doclib 结果仍可读取；需要新
-策略结果时使用现有 `mineru parse ... --force` 重新解析。
+而是记录在平台产物及性能报告中。既有结果不会自动改写，需要新策略结果时
+重新解析源文档；宿主缓存更新方式见[兼容指南](COMPATIBILITY.md)。
 
 ## 资源与验证
 
@@ -55,8 +55,8 @@ loose 和 tight bbox；原始 loose bbox 也不被承诺与旧系统字体完全
 `398b9126136fae6ffa78fb40bc768f2ebfdc4fa4` 的独立 Apache-2.0 字体资源，未裁剪、
 未修改；不引入 MuPDF 代码或运行时。固定 SHA256 为
 `8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e`。
-完整来源见 `THIRD_PARTY_NOTICES.md` 和包内 `resources/fonts/manifest.json`，
-对应 NOTICE 随 wheel 与 sdist 分发。
+完整来源见[字体清单](../src/docgale/resources/fonts/manifest.json)，
+对应[原始 NOTICE](../src/docgale/resources/fonts/NOTICE) 随 wheel 与 sdist 分发。
 
 `tools/capture_platform_layout.py` 同时记录实际字体数据 SHA256、原始字符几何、
 ModelJson、MiddleJson、源页面、layout 标注及 Render HTML。

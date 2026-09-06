@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""将分隔符文本 CSV 转换为 MinerU 单页表格 model-list。"""
+"""将分隔符文本 CSV 转换为 DocGale 单页表格 model-list。"""
 
 from __future__ import annotations
 

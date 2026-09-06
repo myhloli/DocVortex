@@ -1,6 +1,6 @@
 # Copyright (c) Opendatalab. All rights reserved.
 
-"""把旧版 PPT 内部语义模型转换为 MinerU 分页 model-list。"""
+"""把旧版 PPT 内部语义模型转换为 DocGale 分页 model-list。"""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ class PptConverter:
 
     @staticmethod
     def _run_styles(run: PptTextRun) -> list[str]:
-        """把内部字符属性转换为 MinerU 富文本样式名。"""
+        """把内部字符属性转换为 DocGale 富文本样式名。"""
 
         styles: list[str] = []
         if run.bold:

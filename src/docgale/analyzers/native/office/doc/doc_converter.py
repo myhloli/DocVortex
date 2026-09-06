@@ -1,6 +1,6 @@
 # Copyright (c) Opendatalab. All rights reserved.
 
-"""把 Word 97–2003 语义模型转换为 MinerU 分页 model-list。"""
+"""把 Word 97–2003 语义模型转换为 DocGale 分页 model-list。"""
 
 from __future__ import annotations
 
@@ -97,7 +97,7 @@ class DocConverter:
 
     @staticmethod
     def _style_names(style: DocCharStyle) -> list[str]:
-        """把 DOC 字符属性转换为 MinerU 富文本样式名。"""
+        """把 DOC 字符属性转换为 DocGale 富文本样式名。"""
 
         names: list[str] = []
         if style.bold:

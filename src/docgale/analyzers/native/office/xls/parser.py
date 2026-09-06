@@ -168,7 +168,7 @@ def _rk_number(value: int) -> float:
 
 
 def _read_font(payload: bytes, *, biff8: bool) -> XlsFontStyle:
-    """提取 FONT 中可映射为 MinerU 行内标签的字符属性。"""
+    """提取 FONT 中可映射为 DocGale 行内标签的字符属性。"""
 
     if len(payload) < 11:
         return XlsFontStyle()

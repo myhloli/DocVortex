@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""ODT、ODS、ODP 到 MinerU raw model-list 的原生 converter。"""
+"""ODT、ODS、ODP 到 DocGale raw model-list 的原生 converter。"""
 
 from __future__ import annotations
 
@@ -354,7 +354,7 @@ def _parse_ods_pages(context: _OdfContext) -> list[list[dict[str, Any]]]:
 
 
 class OdtConverter:
-    """把 OpenDocument Text 转换为 MinerU 分页 raw blocks。"""
+    """把 OpenDocument Text 转换为 DocGale 分页 raw blocks。"""
 
     def __init__(self) -> None:
         """初始化空分页结果，等待 convert 填充。"""
