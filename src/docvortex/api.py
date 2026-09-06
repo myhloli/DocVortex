@@ -137,6 +137,7 @@ def render(
 ) -> RenderArtifact:
     """把同一语义文档编码为目标文件，返回值不产生文件系统副作用。"""
     from .render.api import render as render_value
+    from .render._internal.common.context import owned_render_document
     from .export.files import materialize_middle
 
     target = RenderFormat(output_format)
@@ -151,7 +152,8 @@ def render(
             options = resolver_options[target](asset_resolver=resolved_assets.__getitem__)
         elif isinstance(options, resolver_options[target]) and options.asset_resolver is None:
             options = replace(options, asset_resolver=resolved_assets.__getitem__)
-    value = render_value(middle, target, options=options)
+    with owned_render_document(middle):
+        value = render_value(middle, target, options=options)
     if isinstance(value, bytes):
         content = value
     elif isinstance(value, str):

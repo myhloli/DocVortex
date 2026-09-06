@@ -63,13 +63,15 @@ def join_inline_spans(contents: Iterable[Iterable[InlineSpan]]) -> list[InlineSp
     """按物理段落边界规则合并多组 Span，并保持结构化语义。"""
     merged: list[InlineSpan] = []
     for content in contents:
-        current = normalize_inline_spans(deepcopy(list(content)))
+        current = normalize_inline_spans(list(content))
         if not current:
             continue
+        # 边界裁剪最多清空最后一个根节点；保留其前驱以重新合并新相邻的 Span。
+        boundary_start = max(0, len(merged) - 2)
         if merged:
             _join_inline_span_sequences(merged, current)
         merged.extend(current)
-        merged = normalize_inline_spans(_drop_empty_text_spans(merged))
+        merged[boundary_start:] = normalize_inline_spans(_drop_empty_text_spans(merged[boundary_start:]))
     return merged
 
 
