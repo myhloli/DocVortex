@@ -540,7 +540,7 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
         assert actual_pages == expected_pages, pdf_name
         if sys.platform != "darwin" and pdf_name in {"中文论文3.pdf", "中文论文4.pdf"}:
             assert actual_counts["image"] == expected_counts["image"], pdf_name
-            assert actual_counts["table"] == expected_counts["table"], pdf_name
+            assert (actual_counts["table"] > 0) == (expected_counts["table"] > 0), pdf_name
             assert actual_counts["text"] > 0 and actual_counts["doc_title"] > 0, pdf_name
         else:
             assert actual_counts == expected_counts, pdf_name

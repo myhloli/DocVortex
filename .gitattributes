@@ -1,0 +1,12 @@
+# Preserve document and fixture bytes on Windows (including ASCII-only PDFs).
+*.pdf binary
+*.xor binary
+*.doc binary
+*.docx binary
+*.ppt binary
+*.pptx binary
+*.xls binary
+*.xlsx binary
+*.rtf text eol=lf
+*.json text eol=lf
+*.py text eol=lf

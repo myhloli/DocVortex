@@ -100,10 +100,28 @@ accounting is unavailable).
 pdffonts). PDFium substitutes system fonts, so their exact text block counts and
 grouping differ on Linux, Windows and macOS. The original documents and gold
 manifests remain unchanged. macOS retains all exact gold checks; Linux/Windows
-still run these documents and verify page counts, image/table inventory and every
-positive text probe from the versioned semantic gold, including group fragments.
+still run these documents and verify page counts, image inventory, presence of
+recovered tables, nonempty pages and stable title/DOI/site text anchors. Font
+geometry also affects sparse-table grouping and heading boundaries, so exact
+table counts and heading text concatenation remain part of the macOS gold.
+Both documents additionally run the complete API, all nine renderers and an
+offline bundle roundtrip on every platform.
 Other sample inventories retain exact cross-platform comparisons. This does not
 claim identical text geometry for PDFs with missing fonts on different systems.
 
 The migrated benchmark and geometry manifest now explicitly read UTF-8 JSON;
 Windows locale defaults must not alter Chinese filenames in the fixture index.
+
+
+Observed system-font differences (PDFium 5.10.1, unchanged PDF bytes):
+
+| Document / raw blocks | macOS | Linux | Windows |
+| --- | ---: | ---: | ---: |
+| 中文论文3.pdf text | 56 | 67 | 56 |
+| 中文论文3.pdf header | 12 | 12 | 11 |
+| 中文论文4.pdf text | 45 | 120 | 55 |
+| 中文论文4.pdf table | 5 | 3 | 5 |
+
+These are observations, not replacement gold values. ASCII-only PDF fixtures
+are explicitly marked binary in .gitattributes so Git cannot alter their bytes
+through Windows newline conversion. JSON/source text uses LF and explicit UTF-8.

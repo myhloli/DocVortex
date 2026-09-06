@@ -708,4 +708,4 @@ def test_flash_layout_manifest_uses_portable_repository_paths() -> None:
         path = Path(document["path"])
         assert not path.is_absolute()
         assert ".." not in path.parts
-        assert hashlib.sha256((project_root / path).read_bytes()).hexdigest() == document["sha256"]
+        assert hashlib.sha256((project_root / path).read_bytes()).hexdigest() == document["sha256"], path
