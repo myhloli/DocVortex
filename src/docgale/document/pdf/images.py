@@ -16,7 +16,7 @@ import pypdfium2 as pdfium
 from loguru import logger
 from PIL import Image
 
-from .pdfium import close_pdfium_child, pdfium_guard
+from .pdfium import close_pdfium_child, close_pdfium_document, initialize_pdfium_runtime, pdfium_guard
 from ...analyzers.native._shared.image import image_to_b64str
 from .raster import page_to_image
 from ...schema import BBox, IntBBox
@@ -204,10 +204,16 @@ def _install_pdf_render_parent_exit_watcher() -> None:
     watcher.start()
 
 
+def _initialize_pdf_render_worker() -> None:
+    """保留父进程退出监控，并在本 worker 首次处理文档前安装固定字体。"""
+    _install_pdf_render_parent_exit_watcher()
+    initialize_pdfium_runtime()
+
+
 def _create_pdf_render_executor(max_workers: int) -> ProcessPoolExecutor:
     """使用安全 multiprocessing 上下文创建 PDF 渲染进程池。"""
     if is_windows_environment():
-        return ProcessPoolExecutor(max_workers=max_workers, initializer=_install_pdf_render_parent_exit_watcher)
+        return ProcessPoolExecutor(max_workers=max_workers, initializer=_initialize_pdf_render_worker)
 
     start_method = multiprocessing.get_start_method()
     if start_method != "spawn":
@@ -215,10 +221,10 @@ def _create_pdf_render_executor(max_workers: int) -> ProcessPoolExecutor:
         return ProcessPoolExecutor(
             max_workers=max_workers,
             mp_context=multiprocessing.get_context("spawn"),
-            initializer=_install_pdf_render_parent_exit_watcher,
+            initializer=_initialize_pdf_render_worker,
         )
 
-    return ProcessPoolExecutor(max_workers=max_workers, initializer=_install_pdf_render_parent_exit_watcher)
+    return ProcessPoolExecutor(max_workers=max_workers, initializer=_initialize_pdf_render_worker)
 
 
 def _is_pdf_render_pool_still_spawning_workers(executor: ProcessPoolExecutor) -> bool:
@@ -555,9 +561,7 @@ def load_images_from_pdf_core(
                 finally:
                     close_pdfium_child(page)
     finally:
-        if pdf_doc is not None:
-            with pdfium_guard():
-                pdf_doc.close()
+        close_pdfium_document(pdf_doc)
 
     return images_list
 

@@ -23,7 +23,7 @@ from ...foundation.image import crop_pil_image
 from ...analyzers.native._shared.hyperlink import sanitize_hyperlink_target
 from ...analyzers.native._shared.image import image_to_bytes
 from .classify import classify
-from .pdfium import _pdfium_lock
+from .pdfium import _pdfium_lock, pdfium_guard
 from .text.geometry import char_bbox_values as _char_bbox_values
 from .text import get_lines_from_chars as get_lines_from_chars
 
@@ -300,6 +300,7 @@ class PDFDocument:
     # ------------------------------------------------------------------ #
 
     def close(self) -> None:
+        """关闭原生文档；清理路径不触发字体初始化。"""
         if self._pdf_doc_opened is not None:
             with _pdfium_lock:
                 _try_close(self._pdf_doc_opened)
@@ -326,12 +327,12 @@ class PDFDocument:
 
     @property
     def page_count(self) -> int:
-        with _pdfium_lock:
+        with pdfium_guard():
             return len(self._pdf_doc)
 
     @property
     def metadata(self) -> dict[PDFMetadataKey, str]:
-        with _pdfium_lock:
+        with pdfium_guard():
             metadata = self._pdf_doc.get_metadata_dict()
         return cast(dict[PDFMetadataKey, str], metadata)
 
@@ -569,7 +570,7 @@ class PDFDocument:
     @property
     def _pdf_doc(self) -> pdfium.PdfDocument:
         if self._pdf_doc_opened is None:
-            with _pdfium_lock:
+            with pdfium_guard():
                 if self._pdf_doc_opened is None:
                     pdf_doc = pdfium.PdfDocument(self._pdf_bytes)
                     try:
@@ -583,8 +584,8 @@ class PDFDocument:
 
     @contextmanager
     def _open_page(self, page_idx: int) -> Iterator[pdfium.PdfPage]:
-        """Open and process page with _pdfium_lock"""
-        with _pdfium_lock:
+        """在统一字体运行时与共享锁内打开页面，离开时释放原生句柄。"""
+        with pdfium_guard():
             page = None
             try:
                 page = self._pdf_doc[page_idx]

@@ -13,7 +13,7 @@ from loguru import logger
 from pypdf import PdfReader
 from pypdf.generic import ContentStream
 
-from .pdfium import close_pdfium_child, pdfium_guard
+from .pdfium import PdfiumFontError, close_pdfium_child, pdfium_guard
 
 MAX_SAMPLE_PAGES = 10
 CHARS_THRESHOLD = 50
@@ -217,6 +217,8 @@ def classify(pdf_doc: pdfium.PdfDocument, pdf_bytes: bytes) -> str:
             if get_high_image_coverage_ratio_pdfium(pdf_doc, page_indices) >= HIGH_IMAGE_COVERAGE_THRESHOLD:
                 return "ocr"
 
+    except PdfiumFontError:
+        raise
     except Exception as e:
         logger.error(f"Failed to classify PDF: {e}")
         return "ocr"

@@ -1,4 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
+import os
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -7,9 +8,35 @@ from typing import Any, Iterator, Sequence, TypeVar
 
 from loguru import logger
 
+from .font_runtime import PdfiumFontError, PdfiumRuntimeInfo, _FontProvider
+
 _pdfium_lock = threading.RLock()
+_font_provider: _FontProvider | None = None
 
 T = TypeVar("T")
+
+
+def _check_runtime_process() -> None:
+    """拒绝复用 fork 继承的字体接口；渲染 worker 应通过 spawn/forkserver 独立初始化。"""
+    if _font_provider is not None and _font_provider.pid != os.getpid():
+        raise PdfiumFontError("Inherited PDFium font runtime: use spawn/forkserver instead of forking after PDF use")
+
+
+def initialize_pdfium_runtime() -> PdfiumRuntimeInfo:
+    """幂等安装本进程的固定 CJK 字体提供器；必须先于首次 PDF 字体使用。"""
+    global _font_provider
+    _check_runtime_process()
+    with _pdfium_lock:
+        if _font_provider is None:
+            import pypdfium2 as pdfium
+            import pypdfium2.raw as raw
+
+            provider = _FontProvider(raw, str(pdfium.PDFIUM_INFO))
+            # 注册前保留强引用，保证即使安装阶段回调失败，C 指针也不会指向被回收的对象。
+            _font_provider = provider
+            provider.install()
+        _font_provider.raise_if_failed()
+        return _font_provider.info
 
 
 @dataclass
@@ -24,14 +51,22 @@ class PdfiumRewriteResult:
 
 @contextmanager
 def pdfium_guard() -> Iterator[None]:
+    """串行化访问并确保字体运行时就绪，在原生栈退出后传播字体故障。"""
+    _check_runtime_process()
     with _pdfium_lock:
-        yield
+        initialize_pdfium_runtime()
+        assert _font_provider is not None
+        try:
+            yield
+        finally:
+            _font_provider.raise_if_failed()
 
 
 def close_pdfium_document(pdf_doc: Any) -> None:
+    """清理时只持锁，不安装字体、不重建已销毁的 PDFium 运行时。"""
     if pdf_doc is None:
         return
-    with pdfium_guard():
+    with _pdfium_lock:
         pdf_doc.close()
 
 
@@ -41,7 +76,7 @@ def close_pdfium_child(pdfium_obj: Any) -> None:
         return
     close = getattr(pdfium_obj, "close", None)
     if callable(close):
-        with pdfium_guard():
+        with _pdfium_lock:
             close()
 
 
@@ -227,6 +262,8 @@ def safe_rewrite_pdf_bytes_with_pdfium_result(
                 retained_page_indices=retained_page_indices,
             )
         logger.warning("PDFium rewrite returned empty bytes, trying to skip broken pages.")
+    except PdfiumFontError:
+        raise
     except Exception as fallback_error:
         logger.warning(f"Error in converting PDF bytes with pdfium: {fallback_error}, trying to skip broken pages.")
 
@@ -280,6 +317,8 @@ def safe_rewrite_pdf_bytes_with_pdfium_result(
                 broken_page_indices=broken_page_indices,
             )
         logger.warning("PDFium skip-broken-page rewrite returned empty bytes, using original PDF bytes.")
+    except PdfiumFontError:
+        raise
     except Exception as fallback_error:
         logger.warning(
             f"Error in converting PDF bytes with skip-broken-page fallback: {fallback_error}, using original PDF bytes."
