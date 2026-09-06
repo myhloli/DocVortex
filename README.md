@@ -24,7 +24,7 @@ docgale convert report.pdf --format markdown --output output/report.md
 docgale classify report.pdf
 ```
 
-Python 3.10–3.13 is supported. Native parsing does not require OCR/VLM inference
+Python 3.10–3.14 is supported. Native parsing does not require OCR/VLM inference
 services. PDF access uses `pypdfium2>=5.10.1` without a fixed upper bound; the
 compatibility matrix also exercises 5.13.0.
 
@@ -109,3 +109,12 @@ uv build
 
 The code and its third-party attributions retain their applicable licenses; see
 `LICENSE.md` and `THIRD_PARTY_NOTICES.md`.
+
+Shared dependency lower bounds match MinerU. Both projects require
+`pydantic>=2.12.5,<3`; `numpy>=1.21.6` is the shared declared floor, and the
+installer selects versions compatible with the active Python interpreter.
+On Apple Silicon, Python 3.14 installation requires macOS 14 or newer because
+of the ONNX Runtime dependency used by file-type detection.
+
+See [the standalone example](demo/README.md) for native parsing and portable
+result bundles, and [the validation record](docs/validation.md) for test coverage.

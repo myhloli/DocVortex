@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ['3.10', '3.11', '3.12', '3.13']
+        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -58,3 +58,18 @@ jobs:
       - run: uv venv
       - run: uv pip install ".[test]" "pypdfium2==5.10.1"
       - run: uv run --no-project python -m pytest -q --tb=short tests/unittest/test_native_pdf_table_demo_manifest.py
+
+  pydantic-minimum:
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.14']
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv venv
+      - run: uv pip install ".[test]" "pydantic==2.12.5" "pypdfium2==5.10.1"
+      - run: uv run --no-project python -m pytest -q --deselect tests/unittest/test_native_pdf_table_demo_manifest.py::test_demo_sparse_table_confidence_manifest

@@ -110,3 +110,23 @@ def test_inline_delimiters_reach_each_text_renderer(target_name: str) -> None:
         return []
 
     assert any("\\(x\\)" in text for text in strings(value))
+
+
+def test_nested_json_extensions_roundtrip() -> None:
+    """Pydantic 升级后仍保留严格 JSON 扩展中的嵌套类型与数值。"""
+    middle = document()
+    middle.extensions = {"consumer": {"items": [None, True, 3, 1.25, "文档", {"enabled": False}]}}
+    restored = load_middle(middle.to_dict(skip_defaults=False))
+    assert restored.extensions == middle.extensions
+    assert type(restored.extensions["consumer"]["items"][1]) is bool
+    assert type(restored.extensions["consumer"]["items"][2]) is int
+
+
+@pytest.mark.parametrize("invalid", [object(), {"nested": object()}, {"values": {1, 2}}, {1: "non-string key"}])
+def test_extensions_reject_non_json_values(invalid: object) -> None:
+    """扩展信息不得接收任意 Python 对象或非 JSON 容器。"""
+    from pydantic import ValidationError
+
+    middle = document()
+    with pytest.raises(ValidationError):
+        middle.extensions = {"consumer": invalid}
