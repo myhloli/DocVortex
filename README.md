@@ -136,3 +136,6 @@ PDF text rules and publishing configuration changes.
 
 See [rendering ownership](docs/RENDER_OWNERSHIP.md) for the seven engine targets,
 MinerU Content List integration and public fragment helpers.
+
+See [refactor validation](docs/REFACTOR_PROGRESS.md) for the staged internal
+refactoring, compatibility checks, corpus comparisons and measured performance.

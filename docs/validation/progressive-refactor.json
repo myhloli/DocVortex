@@ -1,0 +1,700 @@
+{
+  "base_sha": "b0cdd9a53e5299f5b6d595db86d724547168ae39",
+  "validated_code_sha": "653f49d44d0df1e62a94799197f84e2947eae3b7",
+  "ci_url": "https://github.com/myhloli/DocVortex/actions/runs/34059793389",
+  "native": {
+    "documents": 31,
+    "all_outputs_equal": true,
+    "median_time_ratio": 0.9761043816036493,
+    "regressions_above_5_percent": [],
+    "comparisons": [
+      {
+        "path": "demo/pdfs/2407.00079v4_origi-10.pdf",
+        "equal": true,
+        "time_ratio": 0.962874909353476,
+        "rss_ratio": 1.000528611074402
+      },
+      {
+        "path": "demo/pdfs/IEBM_A_2667169_O-5.pdf",
+        "equal": true,
+        "time_ratio": 0.9840351310550681,
+        "rss_ratio": 1.0009250693802034
+      },
+      {
+        "path": "demo/pdfs/caibao1.pdf",
+        "equal": true,
+        "time_ratio": 0.9417308872151113,
+        "rss_ratio": 0.9992110453648915
+      },
+      {
+        "path": "demo/pdfs/demo1.pdf",
+        "equal": true,
+        "time_ratio": 0.9665542369106616,
+        "rss_ratio": 0.9982731683249733
+      },
+      {
+        "path": "demo/pdfs/demo2.pdf",
+        "equal": true,
+        "time_ratio": 0.9653974227913316,
+        "rss_ratio": 1.0005718097779472
+      },
+      {
+        "path": "demo/pdfs/demo3.pdf",
+        "equal": true,
+        "time_ratio": 0.9639876613979261,
+        "rss_ratio": 1.0039161295586196
+      },
+      {
+        "path": "demo/pdfs/demo4.pdf",
+        "equal": true,
+        "time_ratio": 0.9618039805534884,
+        "rss_ratio": 1.0005290205562274
+      },
+      {
+        "path": "demo/pdfs/demo6.pdf",
+        "equal": true,
+        "time_ratio": 0.9719779442823602,
+        "rss_ratio": 0.9993426242440179
+      },
+      {
+        "path": "demo/pdfs/mixed_elements_pages_03_06.pdf",
+        "equal": true,
+        "time_ratio": 0.9644570741083373,
+        "rss_ratio": 1.0014102714772595
+      },
+      {
+        "path": "demo/pdfs/mixed_elements_pages_07_10.pdf",
+        "equal": true,
+        "time_ratio": 0.9793122312539426,
+        "rss_ratio": 0.9997810858143608
+      },
+      {
+        "path": "demo/pdfs/mixed_elements_pages_11_15.pdf",
+        "equal": true,
+        "time_ratio": 0.9685054360806248,
+        "rss_ratio": 1.0008040201005026
+      },
+      {
+        "path": "demo/pdfs/mixed_elements_pages_39_40.pdf",
+        "equal": true,
+        "time_ratio": 0.9766657671788616,
+        "rss_ratio": 1.0038910505836576
+      },
+      {
+        "path": "tests/unittest/pdfs/flash_layout/mixed_text_layout_sample.pdf.xor",
+        "equal": true,
+        "time_ratio": 0.9767020817760728,
+        "rss_ratio": 1.0008327261371917
+      },
+      {
+        "path": "demo/pdfs/中文论文.pdf",
+        "equal": true,
+        "time_ratio": 0.9684302154839949,
+        "rss_ratio": 1.000189627382194
+      },
+      {
+        "path": "demo/pdfs/中文论文2.pdf",
+        "equal": true,
+        "time_ratio": 0.9761043816036493,
+        "rss_ratio": 1.0008375209380234
+      },
+      {
+        "path": "demo/pdfs/small_ocr.pdf",
+        "equal": true,
+        "time_ratio": 1.0006893019801208,
+        "rss_ratio": 1.0009003601440576
+      },
+      {
+        "path": "tests/unittest/pdfs/flash_table_annotations_synthetic.pdf",
+        "equal": true,
+        "time_ratio": 0.9753805398087504,
+        "rss_ratio": 0.9993207444640674
+      },
+      {
+        "path": "demo/pdfs/中文论文3.pdf",
+        "equal": true,
+        "time_ratio": 0.9784509278088636,
+        "rss_ratio": 1.0008168028004667
+      },
+      {
+        "path": "demo/pdfs/中文论文4.pdf",
+        "equal": true,
+        "time_ratio": 0.9779839503140725,
+        "rss_ratio": 1.00046344571892
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/annual_report_fundraising_projects_table.pdf",
+        "equal": true,
+        "time_ratio": 0.9724586932909838,
+        "rss_ratio": 1.0005285412262157
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/annual_report_management_roles_table.pdf",
+        "equal": true,
+        "time_ratio": 0.9870145015631446,
+        "rss_ratio": 1.0054693462223352
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/annual_report_research_projects_table.pdf",
+        "equal": true,
+        "time_ratio": 0.9780761923748479,
+        "rss_ratio": 1.0014382845188285
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/conference_schedule_tables.pdf",
+        "equal": true,
+        "time_ratio": 0.9523781664165123,
+        "rss_ratio": 1.0
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/engineering_process_restrictions_table.pdf",
+        "equal": true,
+        "time_ratio": 0.971690749268174,
+        "rss_ratio": 1.0011146891255882
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/fund_asset_and_transaction_tables.pdf",
+        "equal": true,
+        "time_ratio": 0.9821466038890411,
+        "rss_ratio": 1.000655565753245
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/fund_manager_profile_table.pdf",
+        "equal": true,
+        "time_ratio": 0.9771178447164164,
+        "rss_ratio": 1.0002612671456563
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/manufacturing_facilities_cross_page_table.pdf",
+        "equal": true,
+        "time_ratio": 0.9837240579584707,
+        "rss_ratio": 1.0004127682993946
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/pollutant_discharge_tables.pdf",
+        "equal": true,
+        "time_ratio": 0.9745232622858013,
+        "rss_ratio": 1.0001682935038707
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/procurement_contract_tables.pdf",
+        "equal": true,
+        "time_ratio": 0.9776619083822115,
+        "rss_ratio": 1.0006623393826997
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/procurement_document_blank_page_tables.pdf",
+        "equal": true,
+        "time_ratio": 0.9771782892260332,
+        "rss_ratio": 1.0
+      },
+      {
+        "path": "tests/unittest/pdfs/native_pdf_tables/quarterly_report_financial_tables.pdf",
+        "equal": true,
+        "time_ratio": 0.9933120946040374,
+        "rss_ratio": 1.0
+      }
+    ],
+    "measurement_sha": "f05f69f6f580d3eea5c75984097693929073d93e"
+  },
+  "public_pipeline": {
+    "cases": 18,
+    "all_outputs_equal": true,
+    "regressions_above_5_percent": [],
+    "comparisons": [
+      {
+        "path": "demo/pdfs/2407.00079v4_origi-10.pdf",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.9875048187655211,
+          "native_pdf": 0.9662225395870033,
+          "analyze": 0.4931420125237725,
+          "postprocess_core": 0.9426907039530539,
+          "materialize": 0.8697027918836528,
+          "postprocess": 0.9405295426854776,
+          "parse": 0.5093708349894095,
+          "render_markdown": 0.6834262413818065,
+          "render_html": 0.7644592529279374,
+          "render_latex": 0.6682043070982451,
+          "render_docx": 0.8891361235323474,
+          "render_epub": 0.8319840821857237,
+          "render_structured_content": 0.9726108476631626,
+          "render_pdf": 0.941668587592462,
+          "multi_export": 0.8850423893854974,
+          "total": 0.5441406835962397
+        },
+        "rss_ratio": 0.4086510111346214
+      },
+      {
+        "path": "demo/pdfs/中文论文4.pdf",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 1.046893022341581,
+          "native_pdf": 0.9725720792547259,
+          "raster": 0.39616586982715396,
+          "analyze": 0.8188130321491284,
+          "postprocess_core": 1.0087205456033979,
+          "materialize": 0.8487361165911466,
+          "postprocess": 1.006210403663893,
+          "parse": 0.820789428747793,
+          "render_markdown": 0.8163315725492981,
+          "render_html": 0.9117384545794337,
+          "render_latex": 0.8925774849377119,
+          "render_docx": 0.9803969861198709,
+          "render_epub": 0.9179945857808006,
+          "render_structured_content": 0.9705999644322769,
+          "render_pdf": 0.9683542581364762,
+          "multi_export": 0.9626340437535034,
+          "total": 0.8636042114667292
+        },
+        "rss_ratio": 0.5783313480760267
+      },
+      {
+        "path": "demo/pdfs/caibao1.pdf",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 1.0001129172248668,
+          "native_pdf": 0.9402196586024657,
+          "raster": 0.827897647082228,
+          "analyze": 0.9329487997346919,
+          "postprocess_core": 0.9741267198857864,
+          "materialize": 0.6324845894510673,
+          "postprocess": 0.9862376877330669,
+          "parse": 0.9340600452507,
+          "render_markdown": 0.9692476347798671,
+          "render_html": 0.9751217500470593,
+          "render_latex": 0.9503944983102324,
+          "render_docx": 1.0276156219165384,
+          "render_epub": 0.9638212135758267,
+          "render_structured_content": 0.8851994118618203,
+          "render_pdf": 1.0417762780707718,
+          "multi_export": 1.0237667404092545,
+          "total": 1.0013427626845195
+        },
+        "rss_ratio": 0.3172164300097509
+      },
+      {
+        "path": "fixture:doc",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.893184223786963,
+          "analyze": 0.995585539277587,
+          "postprocess_core": 1.0109043749407916,
+          "materialize": 0.8296766139861731,
+          "postprocess": 0.9989469244849964,
+          "parse": 0.9956337413304869,
+          "render_markdown": 0.8348759978300974,
+          "render_html": 0.9538910228542588,
+          "render_latex": 0.8769483490216315,
+          "render_docx": 1.0188123792996924,
+          "render_epub": 0.9641212486716821,
+          "render_structured_content": 1.0544493466258265,
+          "render_pdf": 0.9861582689276595,
+          "multi_export": 1.0078360565757893,
+          "total": 1.0030557408722138
+        },
+        "rss_ratio": 0.9462744803781796
+      },
+      {
+        "path": "fixture:docx",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.8409091510409914,
+          "analyze": 0.9835809629543786,
+          "postprocess_core": 0.9685910222428783,
+          "materialize": 0.9313461966983293,
+          "postprocess": 0.9687454053190567,
+          "parse": 0.9834286417516844,
+          "render_markdown": 0.8295785971390148,
+          "render_html": 0.945585044346519,
+          "render_latex": 0.8984562607380324,
+          "render_docx": 0.9949971109353137,
+          "render_epub": 0.8683555700852806,
+          "render_structured_content": 0.965127911969369,
+          "render_pdf": 0.9866799267992776,
+          "multi_export": 0.9872749876636675,
+          "total": 0.987705749602259
+        },
+        "rss_ratio": 0.9308105687416032
+      },
+      {
+        "path": "fixture:ppt",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.9597442501341271,
+          "analyze": 0.9906166930445616,
+          "postprocess_core": 0.9912708785547342,
+          "materialize": 0.78832693671498,
+          "postprocess": 0.9806751862854229,
+          "parse": 0.9896143245425534,
+          "render_markdown": 0.7853641267139694,
+          "render_html": 0.9449799995839965,
+          "render_latex": 0.808210708123351,
+          "render_docx": 0.9861058401988758,
+          "render_epub": 0.9743508946128528,
+          "render_structured_content": 1.0109166933158957,
+          "render_pdf": 0.9918856399054228,
+          "multi_export": 0.9835430630985893,
+          "total": 0.9841838387693962
+        },
+        "rss_ratio": 0.9550722155620255
+      },
+      {
+        "path": "fixture:pptx",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.9120584200217384,
+          "analyze": 0.9952100396167742,
+          "postprocess_core": 0.983382350466519,
+          "materialize": 0.803038078377812,
+          "postprocess": 0.9931461804864692,
+          "parse": 0.995053273413239,
+          "render_markdown": 0.7862143744371376,
+          "render_html": 0.9456061970532795,
+          "render_latex": 0.8183980550125837,
+          "render_docx": 0.9975305744277004,
+          "render_epub": 0.9695909288562894,
+          "render_structured_content": 0.913874753133069,
+          "render_pdf": 0.9854346257945176,
+          "multi_export": 0.9812640160989232,
+          "total": 0.9828764077876975
+        },
+        "rss_ratio": 0.9574184577950292
+      },
+      {
+        "path": "fixture:xls",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.9416002310845037,
+          "analyze": 0.9916774281050802,
+          "postprocess_core": 0.9966214488231969,
+          "materialize": 0.7844551953665306,
+          "postprocess": 0.9938275983802836,
+          "parse": 0.9923271193576725,
+          "render_markdown": 0.9699067643123943,
+          "render_html": 0.9692116549724811,
+          "render_latex": 0.9618979504188103,
+          "render_docx": 0.9755407852462222,
+          "render_epub": 0.9739644017874395,
+          "render_structured_content": 0.9488936171114285,
+          "render_pdf": 0.9759352676745715,
+          "multi_export": 0.9758949157984989,
+          "total": 0.9769340224487986
+        },
+        "rss_ratio": 0.9246111619396158
+      },
+      {
+        "path": "fixture:xlsx",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.9350246211354897,
+          "analyze": 0.9938348587978623,
+          "postprocess_core": 0.9953579833199984,
+          "materialize": 0.7321189665426767,
+          "postprocess": 1.0037251975969468,
+          "parse": 0.9946191265515557,
+          "render_markdown": 0.9345117624497897,
+          "render_html": 0.9694150977598787,
+          "render_latex": 0.9300572023336485,
+          "render_docx": 0.9822239649521567,
+          "render_epub": 0.9868885123078949,
+          "render_structured_content": 0.9300881828641494,
+          "render_pdf": 0.9907507056130384,
+          "multi_export": 0.98302932961379,
+          "total": 0.9846970907227435
+        },
+        "rss_ratio": 0.9503288003575305
+      },
+      {
+        "path": "fixture:rtf",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.8389256977970146,
+          "analyze": 0.9910122894678737,
+          "postprocess_core": 0.9966003255701131,
+          "materialize": 1.0122188067683768,
+          "postprocess": 0.9974641297316389,
+          "parse": 0.992304914083492,
+          "render_markdown": 0.8704819240142472,
+          "render_html": 0.9289457851534497,
+          "render_latex": 0.8185156171273914,
+          "render_docx": 0.984965696557874,
+          "render_epub": 0.9171314229311501,
+          "render_structured_content": 1.0190506903061591,
+          "render_pdf": 0.9740946160506154,
+          "multi_export": 0.9751887704063784,
+          "total": 0.9876935796272064
+        },
+        "rss_ratio": 0.9968778696051424
+      },
+      {
+        "path": "fixture:html",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.8684215766617905,
+          "analyze": 0.9455588600444846,
+          "postprocess_core": 0.9346055381003698,
+          "materialize": 0.9897226758112196,
+          "postprocess": 0.9536645624119103,
+          "parse": 0.9567882411079752,
+          "render_markdown": 0.8618420863678385,
+          "render_html": 0.9202301214180879,
+          "render_latex": 0.7287647071537573,
+          "render_docx": 0.9931821356814591,
+          "render_epub": 0.935275664178859,
+          "render_structured_content": 1.0056799565678363,
+          "render_pdf": 0.956778827789348,
+          "multi_export": 0.9806283201473482,
+          "total": 0.97830037786015
+        },
+        "rss_ratio": 0.9136857655376174
+      },
+      {
+        "path": "fixture:csv",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.8662664317235572,
+          "analyze": 0.9704898201140989,
+          "postprocess_core": 1.00622839519563,
+          "materialize": 0.9935478528586262,
+          "postprocess": 0.9978018726565554,
+          "parse": 0.9885738135065312,
+          "render_markdown": 0.9455505884177209,
+          "render_html": 0.9755893811390792,
+          "render_latex": 0.9367610870277079,
+          "render_docx": 0.9976930392610818,
+          "render_epub": 0.961088617321072,
+          "render_structured_content": 0.995426815491947,
+          "render_pdf": 0.9679520755708546,
+          "multi_export": 0.9876835042410058,
+          "total": 0.9874279410497855
+        },
+        "rss_ratio": 0.9143274548679954
+      },
+      {
+        "path": "fixture:epub",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.8385911649278248,
+          "analyze": 1.016611530189273,
+          "postprocess_core": 0.9434718636496754,
+          "materialize": 0.9443927433151414,
+          "postprocess": 0.9455274656669104,
+          "parse": 0.954675297486178,
+          "render_markdown": 0.8120471649259539,
+          "render_html": 0.9403145329935754,
+          "render_latex": 0.8201830720385133,
+          "render_docx": 0.9800047742604543,
+          "render_epub": 0.8761359799594204,
+          "render_structured_content": 0.9502252374639361,
+          "render_pdf": 0.982239244023528,
+          "multi_export": 0.9582613359371157,
+          "total": 0.9625746768940809
+        },
+        "rss_ratio": 0.9989694584972831
+      },
+      {
+        "path": "fixture:ofd",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.821842533224226,
+          "analyze": 0.9163923637028484,
+          "postprocess_core": 0.9725018166933249,
+          "materialize": 1.0228559002207585,
+          "postprocess": 0.9849170605578941,
+          "parse": 0.9263424135823285,
+          "render_markdown": 0.8262017777419528,
+          "render_html": 0.9242433534614857,
+          "render_latex": 0.7964022300037783,
+          "render_docx": 0.9971129565560979,
+          "render_epub": 0.9506407167835693,
+          "render_structured_content": 1.0168378117811192,
+          "render_pdf": 0.9644427380010079,
+          "multi_export": 0.9912684653224316,
+          "total": 0.9828975790913013
+        },
+        "rss_ratio": 0.9174609612654634
+      },
+      {
+        "path": "fixture:odt",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.8415995459803985,
+          "analyze": 1.0241794607528196,
+          "postprocess_core": 1.017845985566646,
+          "materialize": 0.9479291046407708,
+          "postprocess": 1.0308737564450114,
+          "parse": 1.0253022465001165,
+          "render_markdown": 0.8070363861691237,
+          "render_html": 0.9197288217038828,
+          "render_latex": 0.8222735871667612,
+          "render_docx": 0.9821007649594359,
+          "render_epub": 0.9113465947008648,
+          "render_structured_content": 0.9922940147282462,
+          "render_pdf": 0.9668459917936478,
+          "multi_export": 0.9629160343526065,
+          "total": 0.9672443968042117
+        },
+        "rss_ratio": 0.9171948476794112
+      },
+      {
+        "path": "fixture:ods",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.9058461377730349,
+          "analyze": 1.010373631966343,
+          "postprocess_core": 1.0074041140026453,
+          "materialize": 0.9363022028053167,
+          "postprocess": 0.9932685148005221,
+          "parse": 1.0062549266622354,
+          "render_markdown": 0.9141262749506314,
+          "render_html": 0.9509005554346645,
+          "render_latex": 0.9226535435342521,
+          "render_docx": 0.9733138877276064,
+          "render_epub": 0.9301422810649984,
+          "render_structured_content": 0.9990604425681431,
+          "render_pdf": 0.9725847533374631,
+          "multi_export": 0.9702682749142046,
+          "total": 0.9713361846285999
+        },
+        "rss_ratio": 0.9169315967593067
+      },
+      {
+        "path": "fixture:odp",
+        "equal": true,
+        "time_ratios": {
+          "prepare_source": 0.8695740634596478,
+          "analyze": 0.9929013799967423,
+          "postprocess_core": 0.9922680572830399,
+          "materialize": 0.9144608385072295,
+          "postprocess": 1.0159067475388168,
+          "parse": 0.9942509632611722,
+          "render_markdown": 0.9059605218959305,
+          "render_html": 0.9546236930199643,
+          "render_latex": 0.8900989690715013,
+          "render_docx": 0.99299019669024,
+          "render_epub": 0.9195890880479632,
+          "render_structured_content": 0.9732875440596028,
+          "render_pdf": 0.9940998586972866,
+          "multi_export": 0.9811687330768892,
+          "total": 0.9817745147949278
+        },
+        "rss_ratio": 0.9174717368961973
+      },
+      {
+        "path": "synthetic:continuations",
+        "equal": true,
+        "time_ratios": {
+          "parse": 1.134890919428775,
+          "materialize": 0.9883135096992783,
+          "render_markdown": 0.878497261430881,
+          "render_html": 0.8658827793001658,
+          "render_latex": 0.8716164089741748,
+          "render_docx": 0.884426385970121,
+          "render_epub": 0.8811575210275715,
+          "render_structured_content": 0.9702111426856087,
+          "render_pdf": 0.8885062247335364,
+          "multi_export": 0.8797918522688942,
+          "total": 0.8797973753592715
+        },
+        "rss_ratio": 0.9898328853570176
+      }
+    ],
+    "render_errors": {
+      "demo/pdfs/caibao1.pdf": {
+        "pdf": {
+          "error_type": "LayoutError",
+          "message": "Flowable <LongTable@0xOBJECT 18 rows x 3 cols(tallest row 85)> with cell(0,2) containing\n'<Paragraph at 0xOBJECT>ps://crm.htsc.com.cn/pdf_finchina/CNSESH_STOCK\\\\2024\\\\2024-7\\\\2'(481.8897637795276 x 1057), tallest cell 85.0 points,  too large on page 14 in frame 'normal'(469.88976377952764 x 716.5039370078742*) of template 'Later'"
+        }
+      }
+    },
+    "measurement_sha": "653f49d44d0df1e62a94799197f84e2947eae3b7"
+  },
+  "platforms": [
+    {
+      "platform": "ubuntu",
+      "files": 62,
+      "differences": [],
+      "dependencies": {
+        "docvortex": "0.1.0",
+        "pypdfium2": "5.10.1",
+        "pydantic": "2.12.5",
+        "numpy": "2.5.3",
+        "pillow": "12.3.0"
+      }
+    },
+    {
+      "platform": "windows",
+      "files": 62,
+      "differences": [],
+      "dependencies": {
+        "docvortex": "0.1.0",
+        "pypdfium2": "5.10.1",
+        "pydantic": "2.12.5",
+        "numpy": "2.5.3",
+        "pillow": "12.3.0"
+      }
+    },
+    {
+      "platform": "macos",
+      "files": 62,
+      "differences": [],
+      "dependencies": {
+        "docvortex": "0.1.0",
+        "pypdfium2": "5.10.1",
+        "pydantic": "2.12.5",
+        "numpy": "2.5.3",
+        "pillow": "12.3.0"
+      }
+    }
+  ],
+  "stress": {
+    "pages": 96,
+    "assets": 96,
+    "outputs_equal": true,
+    "time_ratio": 0.9621946573991973,
+    "rss_ratio": 0.33323783475859403
+  },
+  "random_differential": {
+    "inline_cases": 2000,
+    "planner_cases": 2000,
+    "differences": 0
+  },
+  "module_move": {
+    "pdf_and_table_function_asts": 118,
+    "differences": 0
+  },
+  "wheel": {
+    "wheel": "docvortex-0.1.0-py3-none-any.whl",
+    "files": 369,
+    "font_hashes": {
+      "docvortex/resources/fonts/DroidSansFallbackFull.ttf": "8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e"
+    },
+    "wheel_sha256": "1db945e3be6097225116ca6fdb6e0c55d4d28c89aa0760fb03a418e7b4692ee8"
+  },
+  "mineru": {
+    "source_sha": "7ddc17fc7",
+    "test_adapter_sha": "e5a672b42bd891bd84cce515b8ef2b17af5dc318",
+    "test_adapter_branch": "codex/docvortex-refactor-tests",
+    "full_suite_passed": 3947,
+    "local_ofd_passed": 11,
+    "remaining_skips": 4,
+    "existing_deselections": 4
+  },
+  "measurement": {
+    "python": "3.13.5 (v3.13.5:6cb20a219a8, Jun 11 2025, 12:23:45) [Clang 16.0.0 (clang-1600.0.26.6)]",
+    "dependencies": {
+      "docvortex": "0.1.0",
+      "pypdfium2": "5.10.1",
+      "numpy": "2.2.6",
+      "pydantic": "2.12.5"
+    },
+    "runs": 5,
+    "rss": "50ms sampled parent and render subprocess RSS; shared pages count in each process; profiler runs separate"
+  },
+  "tests": {
+    "local_before_annotation_guard": 460,
+    "final_ci_macos_python314": 461,
+    "wheel": 46
+  }
+}
