@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 import pytest
 
 from docvortex.analyzers.native.pdf.geometry import _rotate_bbox_from_upright
-from docvortex.analyzers.native.pdf.inline.scripts import _script_line_char_roles
+from docvortex.analyzers.native.pdf.inline.scripts import _script_line_char_roles, _refine_math_script_tokens
 from docvortex.analyzers.native.pdf.script_geometry import classify_char_script_roles
 from docvortex.api import parse
 
@@ -23,7 +23,7 @@ _FIXTURE = _ROOT / "tests/fixtures/pdf_mixed_font_script_line.json"
 
 def _fixture() -> tuple[list[dict[str, Any]], dict[int, tuple[float, ...]], dict[int, tuple[float, ...]]]:
     """读取最小原始字符片段，为每个测试提供独立副本。"""
-    data = json.loads(_FIXTURE.read_text())
+    data = json.loads(_FIXTURE.read_text(encoding="utf-8"))
     chars, tight, origins = [], {}, {}
     for row in data["chars"]:
         char = dict(row)
@@ -56,7 +56,7 @@ def test_target_roles_are_width_and_rotation_independent(halfwidth: bool, angle:
     line = SimpleNamespace(chars=chars, angle=angle, inline_math_regions=[])
     ordered, roles, _, _ = _script_line_char_roles(line, size, tight, rotated_origins, set())
     actual = {str(c["char_idx"]): role for c, role in zip(ordered, roles) if 1353 <= c["char_idx"] <= 1360}
-    assert actual == json.loads(_FIXTURE.read_text())["expected"]
+    assert actual == json.loads(_FIXTURE.read_text(encoding="utf-8"))["expected"]
     assert (chars, tight, rotated_origins) == before
 
 
@@ -102,7 +102,7 @@ def test_body_reference_is_not_forced_to_superscript() -> None:
 def test_real_paper_exports_correct_unit_and_complete_citation(tmp_path: Path) -> None:
     """公开 Model/Middle/HTML/Markdown 保留完整正文单位和整体引用上标。"""
     source = _ROOT / "demo/pdfs/中文论文4.pdf"
-    assert hashlib.sha256(source.read_bytes()).hexdigest() == json.loads(_FIXTURE.read_text())["source_sha256"]
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == json.loads(_FIXTURE.read_text(encoding="utf-8"))["source_sha256"]
     result = parse(source, keep_model_json=True)
     model = result.model_json.to_dict(skip_defaults=False)
     middle = result.middle_json.to_dict(skip_defaults=False)
@@ -111,12 +111,39 @@ def test_real_paper_exports_correct_unit_and_complete_citation(tmp_path: Path) -
         content = next(b["content"] for b in blocks if "850hPa" in json.dumps(b.get("content"), ensure_ascii=False))
         assert any("12gpm" in s.get("content", "") and not s.get("styles") for s in content)
         assert any(s.get("content") == "［8］" and s.get("styles") == ["superscript"] for s in content)
+    author_block = next(
+        b
+        for b in model["pages"][4]
+        if "TangJiaping"
+        in "".join(
+            s.get("content", "") for s in b.get("content", []) if isinstance(s, dict) and isinstance(s.get("content"), str)
+        )
+    )
+    assert all("subscript" not in span.get("styles", []) for span in author_block["content"])
+    assert any(span.get("content") == "1，2" and span.get("styles") == ["superscript"] for span in author_block["content"])
     for target, suffix in [("html", "html"), ("markdown", "md")]:
         path = tmp_path / f"paper.{suffix}"
         result.export(path, output_format=target)
-        markup = path.read_text()
+        markup = path.read_text(encoding="utf-8")
         assert "<sup>［8］</sup>" in markup
         assert "12gpm" in markup and "<sub>12</sub>" not in markup
         if target == "html":
             paragraph = next(p for p in BeautifulSoup(markup, "html.parser").find_all("p") if "850hPa" in p.get_text())
             assert not paragraph.find_all("sub")
+
+
+@pytest.mark.parametrize("halfwidth", [False, True])
+@pytest.mark.parametrize("word", ["TangJiaping", "Sample"])
+def test_numeric_superscript_does_not_rebase_body_word(word: str, halfwidth: bool) -> None:
+    """正文词语后已有数字上标时，下伸字形不应成为新的 token 切分点。"""
+    text = word + "1"
+    chars, tight, origins = [], {}, {}
+    for index, char in enumerate(text):
+        shift = -3.0 if char.isdigit() else 0.6 if char in "gp" else 0.0
+        source = char if halfwidth else chr(ord(char) + 0xFEE0)
+        box = (index * 6.0, shift, index * 6.0 + 5.0, 8.0 + shift)
+        chars.append({"char": source, "char_idx": index, "bbox": box})
+        tight[index] = box
+        origins[index] = (index * 6.0, 10.0 + shift)
+    expected = ["body"] * len(word) + ["sup"]
+    assert _refine_math_script_tokens(chars, expected, tight, origins, formula_region=False) == expected

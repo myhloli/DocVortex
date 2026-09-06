@@ -215,13 +215,24 @@ def _token_split_position(
     ]
     if leading_connectors:
         return alnum_positions[1]
+    scripted_positions = [position for position in alnum_positions[1:] if roles[position] != "body"]
+    if roles[first] == "body" and scripted_positions:
+        first_scripted = scripted_positions[0]
+        prefix = [index for index in token if index < first_scripted]
+        suffix = [index for index in token if index >= first_scripted]
+        if (
+            len(prefix) >= 2
+            and all(roles[index] == "body" and _script_char_text(chars[index]).isalpha() for index in prefix)
+            and all(roles[index] == "sup" and _script_char_text(chars[index]).isdigit() for index in suffix)
+        ):
+            # 姓名、词语后的数字上标已具备明确边界，不用正文内部的下伸字形重新切分。
+            return first_scripted
     for position in alnum_positions[1:]:
         if any(_script_char_text(chars[index]) in _PDF_SCRIPT_TOKEN_CONNECTORS for index in range(first + 1, position)):
             return position
         origin = _token_origin(chars[position], origins)
         if first_origin is not None and origin is not None and abs(origin - first_origin) > origin_tolerance:
             return position
-    scripted_positions = [position for position in alnum_positions[1:] if roles[position] != "body"]
     if roles[first] == "body" and scripted_positions:
         return scripted_positions[0]
     return None
