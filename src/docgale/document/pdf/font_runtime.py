@@ -116,7 +116,7 @@ def _cjk_charset(face: bytes, charset: int) -> int | None:
             name = face.decode(encoding)
         except UnicodeDecodeError:
             continue
-        name = re.sub(r"^[A-Z]{6}\+", "", name).lstrip("@")
+        name = re.sub(r"^[A-Z]{6}\+", "", name.lstrip("@"))
         name = re.sub(r"[\s,_-]+", "", name).casefold()
         candidates = [name]
         for suffix in _STYLE_SUFFIXES:

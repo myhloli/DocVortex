@@ -118,3 +118,7 @@ of the ONNX Runtime dependency used by file-type detection.
 
 See [the standalone example](demo/README.md) for native parsing and portable
 result bundles, and [the validation record](docs/validation.md) for test coverage.
+
+PDFium uses a bundled, pinned CJK fallback font for non-embedded CJK fonts;
+no system font installation is required. See [PDF font policy](docs/PDF_FONTS.md)
+for initialization, diagnostics and replacement boundaries.

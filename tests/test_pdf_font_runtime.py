@@ -24,6 +24,7 @@ from docgale.document.pdf.font_runtime import PdfiumFontError, _FontProvider, _c
         (b"anything", 128, 128),
         (b"anything", 129, 129),
         (b"ABCDEF+SimSun-Bold", 0, 134),
+        (b"@ABCDEF+SimSun", 1, 134),
         ("宋体".encode("gb18030"), 1, 134),
         (b"MingLiU", 0, 136),
         (b"MS-PGothic", 1, 128),
@@ -167,7 +168,8 @@ def test_callback_failure_is_reported_after_native_boundary() -> None:
     provider._release(None)
 
 
-def test_font_resource_hash_is_enforced(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("missing", [False, True])
+def test_font_resource_hash_is_enforced(monkeypatch: pytest.MonkeyPatch, missing: bool) -> None:
     """损坏的发行资源必须显式失败，不能交由系统字体兜底。"""
     from docgale.document.pdf import font_runtime
 
@@ -186,10 +188,12 @@ def test_font_resource_hash_is_enforced(monkeypatch: pytest.MonkeyPatch) -> None
 
         def read_bytes(self) -> bytes:
             """返回不匹配固定哈希的内容。"""
+            if missing:
+                raise FileNotFoundError("bundled font missing")
             return b"broken font"
 
     monkeypatch.setattr(font_runtime.resources, "files", lambda package: BrokenResource())
-    with pytest.raises(PdfiumFontError, match="SHA256"):
+    with pytest.raises(PdfiumFontError, match="missing" if missing else "SHA256"):
         _load_font()
 
 
@@ -220,6 +224,7 @@ def test_cleanup_does_not_initialize_fonts() -> None:
 from docgale.document.pdf import pdfium
 class Child:
     def close(self):
+        # 仅模拟关闭资源，不访问 PDFium。
         pass
 pdfium.close_pdfium_document(Child())
 pdfium.close_pdfium_child(Child())

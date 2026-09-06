@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import sys
 import unicodedata
 from collections import Counter
 from functools import lru_cache
@@ -289,16 +288,6 @@ def test_chinese_papers_match_versioned_block_group_expectations() -> None:
         pages = _pages_for_expectation(expectation)
         normalize_nfkc = expectation.get("normalize_nfkc") is True
         counts = Counter(str(block.get("type")) for page in pages for block in page)
-        if sys.platform != "darwin" and Path(expectation["path"]).name in {"中文论文3.pdf", "中文论文4.pdf"}:
-            # 未嵌入字体还会影响标题和少线表的几何分组；跨平台检查稳定的文档身份与正文锚点。
-            stable_anchors = {
-                "中文论文3.pdf": ("DOI:10.16270/j.cnki.slgc.2013.03.029", "APS在制造业中的定位研究", "FORESTENGINEERING"),
-                "中文论文4.pdf": ("http://www.qxkj.net.cn", "逆温"),
-            }
-            assert all(_normalized_text(page, nfkc=True) for page in pages)
-            first_page = _normalized_text(pages[0], nfkc=True)
-            assert all(anchor in first_page for anchor in stable_anchors[Path(expectation["path"]).name])
-            continue
         assert counts == Counter(expectation["type_counts"])
 
         for item in expectation.get("exact_typed_text", []):
@@ -373,13 +362,7 @@ def test_chinese_paper_four_third_page_upper_band_inventory() -> None:
     ]
 
     counts = Counter(str(block.get("type")) for block in upper_band)
-    if sys.platform == "darwin":
-        assert counts == Counter({"paragraph_title": 3, "text": 4, "image": 1, "caption": 2, "table": 1})
-    else:
-        # 未嵌入字体的标题、正文、caption 分块可能变化，图表与标题区域仍须保留。
-        assert counts["image"] == counts["table"] == 1
-        assert counts["paragraph_title"] == 3
-        assert counts["text"] > 0
+    assert counts == Counter({"paragraph_title": 3, "text": 4, "image": 1, "caption": 2, "table": 1})
 
 
 def test_chinese_paper_continuation_caption_precedes_tight_table_body() -> None:

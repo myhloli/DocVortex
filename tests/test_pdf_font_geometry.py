@@ -34,16 +34,19 @@ def _system_geometry(source: Path, destination: Path) -> dict[str, Any]:
 
 
 def _assert_replacement_boundary(old: dict[str, Any], new: dict[str, Any]) -> tuple[int, int]:
-    """所有原始 Unicode/索引不变；有效嵌入及非 CJK 字体连同几何保持精确一致。"""
+    """源字符不变；缺字环境可改变 PDFium 自动补空格数量，但索引仍来自原始 textpage。"""
     assert old["source_sha256"] == new["source_sha256"]
     assert len(old["pages"]) == len(new["pages"])
     replaced = embedded = 0
     for before_page, after_page in zip(old["pages"], new["pages"]):
         assert before_page["size"] == after_page["size"]
         assert before_page["rotation"] == after_page["rotation"]
-        assert len(before_page["chars"]) == len(after_page["chars"])
-        for before, after in zip(before_page["chars"], after_page["chars"]):
-            assert (before["index"], before["unicode"]) == (after["index"], after["unicode"])
+        before_source = [char for char in before_page["chars"] if not char["generated"]]
+        after_source = [char for char in after_page["chars"] if not char["generated"]]
+        assert [char["index"] for char in after_page["chars"]] == list(range(len(after_page["chars"])))
+        assert len(before_source) == len(after_source)
+        for before, after in zip(before_source, after_source):
+            assert before["unicode"] == after["unicode"]
             source_font = old["fonts"][before["font"]]
             target_font = new["fonts"][after["font"]]
             if target_font["data_sha256"] == _FONT_SHA256:
@@ -51,7 +54,7 @@ def _assert_replacement_boundary(old: dict[str, Any], new: dict[str, Any]) -> tu
                 replaced += 1
             else:
                 assert target_font == source_font
-                assert after == before
+                assert all(after[field] == before[field] for field in ("loose", "tight", "origin"))
                 embedded += source_font["embedded"] == 1
     return replaced, embedded
 

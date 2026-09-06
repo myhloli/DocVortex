@@ -7,6 +7,7 @@ from docgale.schema import Producer
 
 import argparse
 import cProfile
+from dataclasses import asdict
 import gc
 import hashlib
 import importlib.metadata
@@ -29,6 +30,7 @@ sys.path.insert(0, str(ROOT / "tests" / "unittest"))
 from _flash_pdf_test_utils import _page_bbox_fingerprint, _page_fingerprint
 
 from docgale.postprocess.document import model_json_to_middle_json
+from docgale.document.pdf import initialize_pdfium_runtime
 from docgale.document.pdf.document import PDFDocument
 from docgale.analyzers.native.pdf.pipeline import _analyze_native_document
 from docgale.schema import ModelJson
@@ -95,6 +97,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
     result = {
         "path": str(path.relative_to(ROOT)),
         "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "runtime": asdict(initialize_pdfium_runtime()),
         "pages": len(pages),
         "full_output_sha256": _digest(output),
         "page_fingerprints": [_page_fingerprint(page) for page in pages],

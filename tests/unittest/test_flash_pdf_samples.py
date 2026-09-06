@@ -478,7 +478,7 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
                 {
                     "caption": 10,
                     "doc_title": 2,
-                    "header": 19,
+                    "header": 18,
                     "image": 5,
                     "page_footnote": 1,
                     "paragraph_title": 14,
@@ -533,24 +533,11 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
             if (unsafe_chars := _unsafe_flash_content_characters(str(block.get("content", ""))))
         )
 
-    # 这两份 PDF 未嵌入中文字体；文字分块金标来自 macOS 的替代字体环境。
-    # 其他语料继续精确比较，所有平台仍验证这两份文档的页数及视觉结构。
+    # 固定 Droid 字库后，各平台使用同一份完整库存断言。
     for pdf_name, (expected_pages, expected_counts) in expected_inventory.items():
         actual_pages, actual_counts = actual_inventory[pdf_name]
         assert actual_pages == expected_pages, pdf_name
-        if sys.platform != "darwin" and pdf_name in {"中文论文3.pdf", "中文论文4.pdf"}:
-            assert actual_counts["image"] == expected_counts["image"], pdf_name
-            assert (actual_counts["table"] > 0) == (expected_counts["table"] > 0), pdf_name
-            assert actual_counts["text"] > 0 and actual_counts["doc_title"] > 0, pdf_name
-        elif sys.platform.startswith("linux") and pdf_name == _CJK_SYNTHETIC_PDF_NAME:
-            # 合成 CJK 样例同样使用未嵌入的 STSong-Light；仅允许标题/正文之间的字体分类差异。
-            combined_actual = actual_counts.copy()
-            combined_expected = expected_counts.copy()
-            combined_actual["text"] += combined_actual.pop("paragraph_title", 0)
-            combined_expected["text"] += combined_expected.pop("paragraph_title", 0)
-            assert combined_actual == combined_expected, pdf_name
-        else:
-            assert actual_counts == expected_counts, pdf_name
+        assert actual_counts == expected_counts, pdf_name
     assert unsafe_content == []
 
 

@@ -57,6 +57,7 @@ def capture_geometry(source: Path, *, system_fonts: bool = False) -> dict[str, A
                             {
                                 "index": index,
                                 "unicode": raw.FPDFText_GetUnicode(textpage.raw, index),
+                                "generated": raw.FPDFText_IsGenerated(textpage.raw, index) == 1,
                                 "font": font_ids[address],
                                 "tight": [value.value for value in tight]
                                 if raw.FPDFText_GetCharBox(textpage.raw, index, *tight)

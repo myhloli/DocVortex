@@ -97,3 +97,22 @@ jobs:
           name: platform-layout-${{ matrix.os }}
           path: platform-output/
           retention-days: 14
+
+  font-platform-consistency:
+    needs: platform-artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.14'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: platform-layout-*
+          path: platforms
+      - run: uv run --no-project python tools/compare_font_platforms.py platforms/platform-layout-macos-latest platforms/platform-layout-ubuntu-latest platforms/platform-layout-windows-latest --output font-platform-comparison.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: font-platform-comparison
+          path: font-platform-comparison.json
+          retention-days: 14

@@ -1,5 +1,6 @@
 {
   "schema_version": 1,
+  "font_policy": "droid-cjk-v1",
   "documents": [
     {
       "path": "demo/pdfs/中文论文.pdf",
@@ -323,7 +324,7 @@
       "type_counts": {
         "caption": 10,
         "doc_title": 2,
-        "header": 19,
+        "header": 18,
         "image": 5,
         "page_footnote": 1,
         "paragraph_title": 14,
@@ -331,6 +332,7 @@
         "text": 45
       },
       "exact_typed_text": [
+        {"page_index": 0, "type": "header", "text": "第４０卷第５期２０１２年１０月"},
         {"page_index": 0, "type": "paragraph_title", "text": "引言"},
         {"page_index": 0, "type": "paragraph_title", "text": "1资料与分析方法"},
         {"page_index": 0, "type": "text", "text": "http：／／www．qxkj．net．cn气象科技"},
