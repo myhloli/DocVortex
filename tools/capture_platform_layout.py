@@ -11,7 +11,9 @@ from importlib.metadata import version
 import json
 from pathlib import Path
 import platform
+import shutil
 import sys
+import subprocess
 from typing import Any
 
 from PIL import Image, ImageDraw
@@ -74,6 +76,20 @@ def draw_layout(source: Image.Image, blocks: list[dict[str, Any]], destination: 
 def capture_document(source: Path, destination: Path) -> dict[str, Any]:
     """一次分析生成原始/中间协议、真实页面标注图和带素材的渲染 HTML。"""
     destination.mkdir(parents=True, exist_ok=True)
+    # 单独的全新进程保留默认提供器对照，不能在当前 PDFium 上切换字体策略。
+    subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).with_name("font_geometry.py")),
+            str(source),
+            str(destination / "system-geometry.json"),
+            "--system-fonts",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
     (destination / "geometry.json").write_text(json.dumps(capture_geometry(source), ensure_ascii=False), encoding="utf-8")
     result = parse(source, keep_model_json=True)
     assert result.model_json is not None
@@ -123,6 +139,9 @@ def main() -> None:
         "dependencies": {name: version(name) for name in ("docgale", "pypdfium2", "pydantic", "numpy", "pillow")},
         "documents": {},
     }
+    if platform.system() == "Linux" and shutil.which("fc-list"):
+        font_list = subprocess.run(["fc-list", ":lang=zh", "family"], capture_output=True, text=True, check=True)
+        metadata["system_cjk_font_families"] = sorted(set(font_list.stdout.splitlines()))
     for key, name in _DOCUMENTS:
         metadata["documents"][key] = capture_document(root / name, args.output / key)
     (args.output / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")

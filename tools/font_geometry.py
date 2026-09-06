@@ -46,6 +46,7 @@ def capture_geometry(source: Path, *, system_fonts: bool = False) -> dict[str, A
                                         data_hash = sha256(bytes(buffer)).hexdigest()
                             fonts[font_id] = {
                                 "name": name.value.decode("utf-8", errors="replace"),
+                                "name_hex": name.value.hex(),
                                 "embedded": embedded,
                                 "data_sha256": data_hash,
                             }
