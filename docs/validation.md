@@ -125,3 +125,8 @@ Observed system-font differences (PDFium 5.10.1, unchanged PDF bytes):
 These are observations, not replacement gold values. ASCII-only PDF fixtures
 are explicitly marked binary in .gitattributes so Git cannot alter their bytes
 through Windows newline conversion. JSON/source text uses LF and explicit UTF-8.
+
+The synthetic `native_cjk_layout_synthetic.pdf` also references non-embedded
+STSong-Light. Linux reports 13 text + 1 paragraph title instead of 12 + 2; its
+combined natural-text count and every other block count remain exact, with the
+existing detailed CJK text/script checks retained. No fixture bytes are changed.

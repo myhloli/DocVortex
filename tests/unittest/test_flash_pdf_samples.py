@@ -542,6 +542,13 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
             assert actual_counts["image"] == expected_counts["image"], pdf_name
             assert (actual_counts["table"] > 0) == (expected_counts["table"] > 0), pdf_name
             assert actual_counts["text"] > 0 and actual_counts["doc_title"] > 0, pdf_name
+        elif sys.platform.startswith("linux") and pdf_name == _CJK_SYNTHETIC_PDF_NAME:
+            # 合成 CJK 样例同样使用未嵌入的 STSong-Light；仅允许标题/正文之间的字体分类差异。
+            combined_actual = actual_counts.copy()
+            combined_expected = expected_counts.copy()
+            combined_actual["text"] += combined_actual.pop("paragraph_title", 0)
+            combined_expected["text"] += combined_expected.pop("paragraph_title", 0)
+            assert combined_actual == combined_expected, pdf_name
         else:
             assert actual_counts == expected_counts, pdf_name
     assert unsafe_content == []
