@@ -1,4 +1,48 @@
-# Extraction validation
+# DocVortex validation
+
+## DocVortex upgrade and PDF symbol whitelist (2026-09-07)
+
+The engine is now DocVortex, with `docvortex` package/import/CLI names and native
+schema identities. Old DocGale native JSON/bundles are rejected; old HTML goes
+through ordinary parsing. MinerU's own JSON compatibility and routing remain.
+PDF visible text additionally normalizes the approved 13 symbols while retaining
+Chinese punctuation, formula/code payloads, URL targets and raw evidence.
+
+The [CI matrix](https://github.com/myhloli/docvortex/actions/runs/34045249479) at
+`a50bbbf4b0663280a73eaa5c98ef315b69ccdf84` passed Python 3.10–3.14 on all platforms,
+PDFium 5.10.1 and 5.13.0, and Pydantic 2.12.5. Linux/macOS: 418 passed; Windows:
+417 passed and one POSIX-only skip. The existing sparse-table diagnostic remains
+separate. A subsequent test-only adjustment materializes the same 13 parameter
+pairs to avoid a future pytest iterator deprecation; runtime code is unchanged.
+
+- MinerU full suite: 3954 passed, four skips and the same four historical baseline
+  exclusions. Three renderer-brand expectation updates preserve the original
+  safety and anchor assertions; a native PDF test changes only its expected colon.
+- Independent Python 3.14 wheel: 107 checks passed, with no DocGale/MinerU/pdftext
+  or source-path import. CLI conversion of demo1.pdf also passed outside the repo.
+- Chinese papers 3/4 normalize 57/239 additional symbols. All nine actual
+  platform/document captures preserve tree structure, table attributes, raw
+  geometry and 78 source/layout PNGs. Native schema/default producer change only
+  as specified. See the [stage difference report](validation/docvortex-upgrade.json).
+- A [31-document functional text baseline](validation/docvortex-text-baseline.json)
+  verifies unchanged structure, geometry and HTML attributes; only approved symbols
+  and the default producer change. Its bbox fingerprints also include text hashes,
+  so text edits intentionally change those fingerprints. Runs=0 is not a warm
+  performance measurement.
+- Re-rendering the two saved paper bundles covers all nine outputs. The branding
+  phase produces identical Poppler pixels for all 12 pages of semantic PDF output.
+  PDF metadata, DOCX styles and LaTeX macros use DocVortex; user titles are preserved.
+- Chromium verifies HTML, EPUB XHTML/CSS, three formulas, Mermaid, Prism, 18 layout
+  images and four Windows/Linux paper HTML views. Screenshots were reviewed.
+- Python and dependency constraints remain unchanged apart from the package name;
+  the pinned Droid font SHA256 remains
+  `8a4dea0899424438af25a6f1f6eb61e5d111d85367eece0a5d30170861ae6b2e`.
+
+The original repository ID/history and draft release are retained under
+`myhloli/docvortex`. MIT and required Apache-2.0 attribution remain intact.
+[Upgrade and Trusted Publisher settings](DOCVORTEX_UPGRADE.md) describe the new
+names. Distribution preparation does not publish to PyPI. Earlier records below
+retain their original names and measured results as historical evidence.
 
 ## DocGale HTML namespace (2026-09-06)
 

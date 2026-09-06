@@ -14,7 +14,7 @@ _SYMBOLS = "：．／＼－＿％＋＝＠＃＆＊"
 _ASCII = ":./\\-_%+=@#&*"
 
 
-@pytest.mark.parametrize(("source", "target"), zip(_SYMBOLS, _ASCII))
+@pytest.mark.parametrize(("source", "target"), tuple(zip(_SYMBOLS, _ASCII)))
 def test_symbol_only_text_and_table(source: str, target: str) -> None:
     """没有全角英数时，正文和单元格仍执行每一项符号映射。"""
     model = [[{"type": "text", "content": source}, {"type": "table", "content": f"<table><tr><td>{source}</td></tr></table>"}]]

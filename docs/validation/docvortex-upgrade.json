@@ -1,0 +1,288 @@
+{
+  "punctuation_commit": "96c4578",
+  "implementation_commit": "a50bbbf4b0663280a73eaa5c98ef315b69ccdf84",
+  "workflow_run": "https://github.com/myhloli/docvortex/actions/runs/34045249479",
+  "punctuation": {
+    "中文论文3": {
+      "model.json": {
+        "changed_symbols": {
+          "－": 18,
+          "．": 39
+        },
+        "total": 57,
+        "structure_and_attributes_equal": true
+      },
+      "middle.json": {
+        "changed_symbols": {
+          "－": 18,
+          "．": 39
+        },
+        "total": 57,
+        "structure_and_attributes_equal": true
+      }
+    },
+    "中文论文4": {
+      "model.json": {
+        "changed_symbols": {
+          "．": 85,
+          "：": 84,
+          "％": 13,
+          "／": 34,
+          "＝": 4,
+          "－": 18,
+          "＠": 1
+        },
+        "total": 239,
+        "structure_and_attributes_equal": true
+      },
+      "middle.json": {
+        "changed_symbols": {
+          "．": 85,
+          "：": 84,
+          "％": 13,
+          "／": 34,
+          "＝": 4,
+          "－": 18,
+          "＠": 1
+        },
+        "total": 239,
+        "structure_and_attributes_equal": true
+      }
+    }
+  },
+  "platforms": {
+    "source_commit": "a50bbbf4b0663280a73eaa5c98ef315b69ccdf84",
+    "workflow_run": "https://github.com/myhloli/docvortex/actions/runs/34045249479",
+    "comparisons": [
+      {
+        "platform": "windows-latest",
+        "document": "paper-3",
+        "model.json": {
+          "symbol_changes": {
+            "－": 18,
+            "．": 39
+          },
+          "count": 57,
+          "structure_and_attributes_equal": true
+        },
+        "middle.json": {
+          "symbol_changes": {
+            "－": 18,
+            "．": 39
+          },
+          "count": 57,
+          "structure_and_attributes_equal": true
+        },
+        "raw_geometry_equal": true,
+        "png_count": 8,
+        "all_pngs_equal": true
+      },
+      {
+        "platform": "windows-latest",
+        "document": "paper-4",
+        "model.json": {
+          "symbol_changes": {
+            "．": 85,
+            "：": 84,
+            "％": 13,
+            "／": 34,
+            "＝": 4,
+            "－": 18,
+            "＠": 1
+          },
+          "count": 239,
+          "structure_and_attributes_equal": true
+        },
+        "middle.json": {
+          "symbol_changes": {
+            "．": 85,
+            "：": 84,
+            "％": 13,
+            "／": 34,
+            "＝": 4,
+            "－": 18,
+            "＠": 1
+          },
+          "count": 239,
+          "structure_and_attributes_equal": true
+        },
+        "raw_geometry_equal": true,
+        "png_count": 10,
+        "all_pngs_equal": true
+      },
+      {
+        "platform": "windows-latest",
+        "document": "cjk-synthetic",
+        "model.json": {
+          "symbol_changes": {},
+          "count": 0,
+          "structure_and_attributes_equal": true
+        },
+        "middle.json": {
+          "symbol_changes": {},
+          "count": 0,
+          "structure_and_attributes_equal": true
+        },
+        "raw_geometry_equal": true,
+        "png_count": 8,
+        "all_pngs_equal": true
+      },
+      {
+        "platform": "ubuntu-latest",
+        "document": "paper-3",
+        "model.json": {
+          "symbol_changes": {
+            "－": 18,
+            "．": 39
+          },
+          "count": 57,
+          "structure_and_attributes_equal": true
+        },
+        "middle.json": {
+          "symbol_changes": {
+            "－": 18,
+            "．": 39
+          },
+          "count": 57,
+          "structure_and_attributes_equal": true
+        },
+        "raw_geometry_equal": true,
+        "png_count": 8,
+        "all_pngs_equal": true
+      },
+      {
+        "platform": "ubuntu-latest",
+        "document": "paper-4",
+        "model.json": {
+          "symbol_changes": {
+            "．": 85,
+            "：": 84,
+            "％": 13,
+            "／": 34,
+            "＝": 4,
+            "－": 18,
+            "＠": 1
+          },
+          "count": 239,
+          "structure_and_attributes_equal": true
+        },
+        "middle.json": {
+          "symbol_changes": {
+            "．": 85,
+            "：": 84,
+            "％": 13,
+            "／": 34,
+            "＝": 4,
+            "－": 18,
+            "＠": 1
+          },
+          "count": 239,
+          "structure_and_attributes_equal": true
+        },
+        "raw_geometry_equal": true,
+        "png_count": 10,
+        "all_pngs_equal": true
+      },
+      {
+        "platform": "ubuntu-latest",
+        "document": "cjk-synthetic",
+        "model.json": {
+          "symbol_changes": {},
+          "count": 0,
+          "structure_and_attributes_equal": true
+        },
+        "middle.json": {
+          "symbol_changes": {},
+          "count": 0,
+          "structure_and_attributes_equal": true
+        },
+        "raw_geometry_equal": true,
+        "png_count": 8,
+        "all_pngs_equal": true
+      },
+      {
+        "platform": "macos-latest",
+        "document": "paper-3",
+        "model.json": {
+          "symbol_changes": {
+            "－": 18,
+            "．": 39
+          },
+          "count": 57,
+          "structure_and_attributes_equal": true
+        },
+        "middle.json": {
+          "symbol_changes": {
+            "－": 18,
+            "．": 39
+          },
+          "count": 57,
+          "structure_and_attributes_equal": true
+        },
+        "raw_geometry_equal": true,
+        "png_count": 8,
+        "all_pngs_equal": true
+      },
+      {
+        "platform": "macos-latest",
+        "document": "paper-4",
+        "model.json": {
+          "symbol_changes": {
+            "．": 85,
+            "：": 84,
+            "％": 13,
+            "／": 34,
+            "＝": 4,
+            "－": 18,
+            "＠": 1
+          },
+          "count": 239,
+          "structure_and_attributes_equal": true
+        },
+        "middle.json": {
+          "symbol_changes": {
+            "．": 85,
+            "：": 84,
+            "％": 13,
+            "／": 34,
+            "＝": 4,
+            "－": 18,
+            "＠": 1
+          },
+          "count": 239,
+          "structure_and_attributes_equal": true
+        },
+        "raw_geometry_equal": true,
+        "png_count": 10,
+        "all_pngs_equal": true
+      },
+      {
+        "platform": "macos-latest",
+        "document": "cjk-synthetic",
+        "model.json": {
+          "symbol_changes": {},
+          "count": 0,
+          "structure_and_attributes_equal": true
+        },
+        "middle.json": {
+          "symbol_changes": {},
+          "count": 0,
+          "structure_and_attributes_equal": true
+        },
+        "raw_geometry_equal": true,
+        "png_count": 8,
+        "all_pngs_equal": true
+      }
+    ]
+  },
+  "pdf_rendering": {
+    "中文论文3": {
+      "pages": 5,
+      "all_rendered_pixels_identical": true
+    },
+    "中文论文4": {
+      "pages": 7,
+      "all_rendered_pixels_identical": true
+    }
+  }
+}

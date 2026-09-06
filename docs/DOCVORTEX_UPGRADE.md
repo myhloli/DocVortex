@@ -7,7 +7,12 @@ draft are retained. Version 0.1.0 remains a draft, not a PyPI publication.
 
 ## Package and protocol names
 
+Stop old services/interpreters before switching packages. Remove the old package
+from the environment, then install DocVortex; do not reuse an initialized old
+PDFium runtime across the change.
+
 ```bash
+pip uninstall docgale
 pip install docvortex
 docvortex convert report.pdf --format html --output output/report.html
 ```
