@@ -34,17 +34,27 @@ def analyze(
     try:
         if prepared.file_suffix == "pdf":
             from .document.pdf.images import load_images_from_pdf_bytes_range
-            from .document.pdf.visuals import _attach_visual_block_images
+            from .document.pdf.raster import estimate_page_image_bytes
+            from .document.pdf.visuals import (
+                _attach_prepared_visual_block_images,
+                _prepare_page_visual_blocks,
+                _visual_page_ranges,
+            )
 
             assert prepared.document is not None
             pages = models.PdfModel().predict(prepared.document)
-            for start in range(0, len(pages), 64):
-                end = min(start + 63, len(pages) - 1)
+            prepared_visuals = [_prepare_page_visual_blocks(page) for page in pages]
+            image_bytes = {
+                index: estimate_page_image_bytes(prepared.document.page_size(index))
+                for index, blocks in enumerate(prepared_visuals)
+                if blocks
+            }
+            for start, end in _visual_page_ranges(prepared_visuals, image_bytes):
                 images = load_images_from_pdf_bytes_range(
                     prepared.data, start_page_id=start, end_page_id=end, image_type="pil_img"
                 )
                 try:
-                    _attach_visual_block_images(pages[start : end + 1], images, page_start_index=start)
+                    _attach_prepared_visual_block_images(prepared_visuals[start : end + 1], images, page_start_index=start)
                 finally:
                     for item in images:
                         if item.get("img_pil") is not None:
