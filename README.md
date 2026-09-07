@@ -8,12 +8,12 @@ A fast, multi-format document parsing and conversion engine.
 DocVortex provides a complete, standalone document pipeline:
 
 ```text
-Document -> ModelJson + Assets -> MiddleJson + Assets -> Render / Export
+Document -> Unified Intermediate Representation -> Render / Export
 ```
 
 Native inputs include text PDFs, DOC/DOCX, PPT/PPTX, XLS/XLSX, RTF, ODT/ODS/ODP,
 EPUB, HTML, OFD and CSV. Output formats include Markdown, HTML, LaTeX, DOCX,
-EPUB, PDF and structured content. Content List V1/V2 are provided by MinerU.
+EPUB, PDF and structured content. 
 
 Native parsing runs without OCR or VLM inference services.
 PDF classification is an explicit document operation; native analysis does not
@@ -28,8 +28,7 @@ docvortex classify report.pdf
 ```
 
 Python 3.10–3.14 is supported. Native parsing does not require OCR/VLM inference
-services. PDF access uses `pypdfium2>=5.10.1,<6`; the
-compatibility matrix also exercises 5.13.0.
+services. 
 
 ## Parse once, export many times
 
@@ -113,28 +112,5 @@ uv build
 
 DocVortex project code is licensed under the [MIT License](LICENSE.md).
 
-Dependencies include `pydantic>=2.12.5,<3` and `numpy>=1.21.6`; the
-installer selects versions compatible with the active Python interpreter.
-On Apple Silicon, Python 3.14 installation requires macOS 14 or newer because
-of the ONNX Runtime dependency used by file-type detection.
-
-See [the standalone example](demo/README.md) for native parsing and portable
-result bundles, and [the validation record](docs/validation.md) for test coverage.
-
-PDFium uses a bundled, pinned CJK fallback font for non-embedded CJK fonts;
-no system font installation is required. See [PDF font policy](docs/PDF_FONTS.md)
-for initialization, diagnostics and replacement boundaries.
-
-PDF output normalizes fullwidth Latin letters, digits and selected technical
-symbols in natural-language text and table cells, preserving Chinese punctuation,
-formulas, code and link targets. See
-[PDF text normalization](docs/PDF_TEXT_NORMALIZATION.md) for scope and API usage.
-
-See [the DocVortex upgrade guide](docs/DOCVORTEX_UPGRADE.md) for package, protocol,
-PDF text rules and publishing configuration changes.
-
 See [rendering ownership](docs/RENDER_OWNERSHIP.md) for the seven engine targets,
 MinerU Content List integration and public fragment helpers.
-
-See [refactor validation](docs/REFACTOR_PROGRESS.md) for the staged internal
-refactoring, compatibility checks, corpus comparisons and measured performance.
