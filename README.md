@@ -1,5 +1,5 @@
 
-![DocVortex overview: native document inputs flow through a unified document model to Markdown, HTML, LaTeX, DOCX, EPUB, PDF and structured content.](https://gcore.jsdelivr.net/gh/myhloli/DocVortex/@main/docs/images/docvortex-overview.jpg)
+![DocVortex overview: native document inputs flow through a unified document model to Markdown, HTML, LaTeX, DOCX, EPUB, PDF and structured content.](https://gcore.jsdelivr.net/gh/myhloli/DocVortex@main/docs/images/docvortex-overview.jpg)
 
 # DocVortex
 
