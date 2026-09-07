@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import ast
-from importlib.util import find_spec
-from pathlib import Path
 import subprocess
 import sys
+from importlib.util import find_spec
+from pathlib import Path
 
 import docvortex
 
@@ -32,6 +32,25 @@ def test_source_has_no_host_or_pdftext_imports() -> None:
             )
             if any(name.split(".")[0] in {"mineru", "pdftext"} for name in names):
                 offenders.append(f"{path}:{node.lineno}")
+    assert not offenders
+
+
+def test_engine_tests_do_not_import_host_packages() -> None:
+    """测试与辅助模块也必须独立运行，避免依赖宿主安装或测试服务器。"""
+    root = Path(__file__).parent
+    offenders = []
+    forbidden = {"mineru", "pdftext", "fastapi", "httpx"}
+    for path in root.rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            names = (
+                [item.name for item in node.names]
+                if isinstance(node, ast.Import)
+                else [node.module or ""]
+                if isinstance(node, ast.ImportFrom) and node.level == 0
+                else []
+            )
+            if any(name.split(".")[0] in forbidden for name in names):
+                offenders.append(f"{path.relative_to(root)}:{node.lineno}")
     assert not offenders
 
 

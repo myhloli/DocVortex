@@ -16,3 +16,6 @@ build/
 # Generated demonstration outputs
 /demo/output/
 /output/
+
+# Optional local OFD corpus; never part of source distributions
+/tmp/ofd_samples/ofdrw_issues_20260828/ofd/

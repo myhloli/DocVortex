@@ -201,13 +201,18 @@ were updated to the actual APIs without restoring removed runtime parameters.
 ## Demo and test ownership
 
 All 24 original PDF/Office documents match the source MinerU SHA256 hashes.
-The complete corpus, native sample tests, four gold manifests and the PDF
-benchmark live in DocGale. MinerU retains only demo1.pdf and demo2.pdf; its
-remaining Hybrid cases use 33 reproducible character/geometry snapshots from
-seven documents, and Office routing cases generate their own minimal files.
+The complete corpus, native parsing tests, shared schema/postprocessing tests,
+renderer/export tests, gold manifests, fixture generators and the PDF benchmark
+live in DocVortex. MinerU retains demo1.pdf and demo2.pdf plus product integration
+tests. Its Hybrid regressions use the unchanged 33 original snapshots and five
+additional CJK/rotated-page cases; ordinary tests no longer read
+`tests/unittest/pdfs`. Office routing cases generate their own minimal files.
 Neither repository's ordinary tests need a sibling checkout or network fixtures.
+The optional local OFD corpus remains outside Git. See the
+[complete test migration report](validation/test-migration.md) for case-level
+destinations, resource hashes, independent test results and regeneration commands.
 
-Before changing dependency versions, the independent engine environment passed
+Historically, before changing dependency versions, the independent engine environment passed
 303 tests with PDFium 5.10.1. The existing sparse-table gold discrepancy is
 explicitly deselected in the acceptance matrix and runs separately in the
 non-blocking `baseline-diagnostic` CI job; it is not counted as a passing test.
