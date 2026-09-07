@@ -107,12 +107,7 @@ uv run --no-project ruff format --check src
 uv build
 ```
 
-DocVortex project code is licensed under the [MIT License](LICENSE.md). Bundled
-third-party portions retain their own licenses: the PDF text layer includes
-Apache-2.0 portions attributed in its source, and the bundled Droid font retains
-its [original NOTICE](src/docvortex/resources/fonts/NOTICE). The
-[Apache-2.0 license](licenses/Apache-2.0.txt) ships with both distributions; package
-metadata therefore declares `MIT AND Apache-2.0`.
+DocVortex project code is licensed under the [MIT License](LICENSE.md).
 
 Dependencies include `pydantic>=2.12.5,<3` and `numpy>=1.21.6`; the
 installer selects versions compatible with the active Python interpreter.
