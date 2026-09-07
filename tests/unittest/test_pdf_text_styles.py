@@ -2158,12 +2158,24 @@ def test_never_styles_equations_or_excluded_blocks() -> None:
     assert _span_snapshot(blocks[1]["content"]) == "deleted"
 
 
-def test_flash_native_pdf_styles_reach_model_middle_and_renderers() -> None:
+def test_flash_native_pdf_styles_reach_model_middle_and_renderers(monkeypatch) -> None:
     """验证真实 PDF 字体和 drawing 样式贯穿 model、MiddleJson 与 renderer。"""
 
+    from docvortex.analyzers.native.pdf import pipeline
+
+    style_inputs = []
+    original_apply = pipeline.apply_pdf_text_styles
+
+    def capture_style_inputs(blocks, lines, page_size):
+        """在断言失败时输出物化前证据，定位跨平台样式丢失的阶段。"""
+        style_inputs.extend(lines)
+        original_apply(blocks, lines, page_size)
+
+    monkeypatch.setattr(pipeline, "apply_pdf_text_styles", capture_style_inputs)
     document = PDFDocument(_build_native_text_style_pdf())
     try:
         model_list = PdfModel().predict(document)
+        font_inputs = {str(char.get("font")) for char in document.get_page_chars(0)}
     finally:
         document.close()
     model_contents = [_span_snapshot(block.get("content")) for page in model_list for block in page]
@@ -2174,7 +2186,14 @@ def test_flash_native_pdf_styles_reach_model_middle_and_renderers() -> None:
     assert '<text style="strikethrough">underlined</text>' not in joined_model_content
     assert '<text style="strikethrough">x</text>' not in joined_model_content
     assert '<text style="strikethrough">separator' not in joined_model_content
-    assert '<text style="bold">bold sample</text>' in joined_model_content, model_list
+    if '<text style="bold">bold sample</text>' not in joined_model_content:
+        print("Native fonts:", sorted(font_inputs))
+        for line in style_inputs:
+            print("Style evidence:", line)
+        for page in model_list:
+            for block in page:
+                print("Model block:", block)
+    assert '<text style="bold">bold sample</text>' in joined_model_content
     assert "italic sample" in joined_model_content
     assert '<text style="italic">' not in joined_model_content
     assert '<text style="bold">bold italic sample</text>' in joined_model_content
