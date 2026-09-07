@@ -42,7 +42,11 @@ and authors retain their existing precedence.
 
 MinerU now depends on `docvortex>=0.1.0,<1.0.0`. Its product fields, schema 2.0,
 supported historical results, OCR/VLM/Hybrid routing and UI identity remain intact.
-Those adapters live in `docvortex.compat.mineru`; they do not import MinerU.
+Current JSON adapters live in `mineru.integrations.docvortex`; historical page
+conversion lives in `mineru.backend.postprocess.legacy_schema_adapter`.
+Update adapter imports to these MinerU modules. DocVortex no longer ships the
+`compat` package or aliases for its former adapter imports. Its generic `producer`
+and `extensions` fields remain available to applications.
 
 ## PDF text and font policies
 

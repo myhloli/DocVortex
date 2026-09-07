@@ -7,11 +7,14 @@ configuration and caches.
 
 ## MinerU integration
 
-`docvortex.compat.mineru` reads and writes MinerU schema 2.0 envelopes around
-DocVortex's neutral ModelJson/MiddleJson schema 1.0. `MinerUMetadata` validates
-`effort`, `parse_mode` and `mineru_version`, stored in `extensions["mineru"]`.
-The existing `docvortex.compat.legacy_schema_adapter` retains its supported legacy
-result-reading boundary. These adapters do not import the host application.
+MinerU owns its JSON envelopes and historical result conversion.
+`mineru.integrations.docvortex` reads and writes MinerU schema 2.0 envelopes around
+DocVortex's neutral ModelJson/MiddleJson schema 1.0. MinerU's `MinerUMetadata`
+validates `effort`, `parse_mode` and `mineru_version`, stored in the generic
+`extensions["mineru"]` field. DocVortex does not interpret these product fields.
+`mineru.backend.postprocess.legacy_schema_adapter` converts supported 3.4.5 pages
+before MinerU passes the resulting ModelJson to shared postprocessing.
+DocVortex does not ship a `compat` package or forwarding imports for these adapters.
 
 MinerU's unified analysis entrypoint preserves the following routing:
 
@@ -54,7 +57,7 @@ MinerU JSON adapters and host metadata are unchanged; native DocVortex schema
 identities replace the former DocGale identities.
 Saved files are never rewritten on load. DocVortex only accepts its own native
 JSON/bundle schema identities; old DocGale native artifacts are rejected. MinerU's
-schema 2.0 and supported legacy results remain readable through the adapters.
+schema 2.0 and supported legacy results remain readable through MinerU's adapters.
 PDF/DOCX/LaTeX generated identifiers now use DocVortex; MinerU's UI markers and
 product identity remain unchanged.
 

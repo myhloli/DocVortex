@@ -1,11 +1,10 @@
-"""验证中性协议、宿主协议适配和独立的渲染后半程。"""
+"""验证中性协议和独立的渲染后半程。"""
 
 from __future__ import annotations
 
 import pytest
 
 from docvortex.codecs.json import load_middle
-from docvortex.compat.mineru import from_mineru_middle, to_mineru_middle
 from docvortex.options import LatexDelimiterConfig, LatexDelimitersConfig
 from docvortex.render import RenderFormat, render
 from docvortex.render.markdown import render_markdown
@@ -46,15 +45,6 @@ def test_all_renderers_are_independent_and_do_not_mutate(target: RenderFormat) -
     before = middle.to_dict(skip_defaults=False)
     assert render(middle, target)
     assert middle.to_dict(skip_defaults=False) == before
-
-
-def test_mineru_envelope_roundtrip() -> None:
-    """旧 JSON 经过中性对象后保持产品字段和页面语义不变。"""
-    payload = document().to_dict(skip_defaults=False)
-    for key in ("schema", "schema_version", "producer", "extensions"):
-        payload.pop(key, None)
-    payload.update(schema_version="2.0", effort="flash", parse_mode="txt", mineru_version="3.4.5")
-    assert to_mineru_middle(from_mineru_middle(payload), skip_defaults=False) == payload
 
 
 def test_render_options_are_per_call() -> None:

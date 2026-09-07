@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import ast
+from importlib.util import find_spec
 from pathlib import Path
 import subprocess
 import sys
 
 import docvortex
+
+
+def test_engine_does_not_ship_host_protocol_adapters() -> None:
+    """宿主产品封装和旧结果迁移不再作为引擎模块发布。"""
+    assert find_spec("docvortex.compat") is None
+    assert not (Path(docvortex.__file__).parent / "compat").exists()
 
 
 def test_source_has_no_host_or_pdftext_imports() -> None:

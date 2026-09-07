@@ -20,8 +20,11 @@ are owned by DocVortex. Content List V1/V2 are owned by MinerU. They do not open
 - `api`, `result` and `cli` compose these stages without creating a second engine.
 
 MinerU owns tier selection, OCR/VLM/Hybrid inference, LLM clients and enhancements,
-service configuration, jobs, Doclib and UI. Its compatibility facades pass explicit
-options and translate neutral metadata to the existing schema 2.0 envelope.
+service configuration, jobs, Doclib and UI. Its integration layer passes explicit
+options and translates neutral metadata to the existing schema 2.0 envelope.
+MinerU also owns supported historical result conversion. Both current product
+protocol adapters and legacy page adapters live in MinerU; DocVortex only owns
+its native protocol and generic producer/extension fields.
 
 There is one PDFium lock and one rendering pool per process. Native handles are
 created, used and closed under their owning runtime. Cross-process work transfers

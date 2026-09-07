@@ -17,7 +17,6 @@ PREFIXES = {
     "mineru.backend.postprocess": "docvortex.postprocess",
     "mineru.backend.postprocess.inline": "docvortex.content.inline",
     "mineru.backend.postprocess.table_merge": "docvortex.content.table",
-    "mineru.backend.postprocess.legacy_schema_adapter": "docvortex.compat.legacy_schema_adapter",
     "mineru.render": "docvortex.render",
     "mineru.types": "docvortex.schema",
     "mineru.utils": "docvortex.foundation",
@@ -90,7 +89,11 @@ def main() -> None:
         files.add(SOURCE / path)
     for name in ("images", "visuals", "geometry", "constants"):
         files.add(SOURCE / f"mineru/backend/analysis/pdf/{name}.py")
-    excluded = {"llm_aided.py", "llm_client.py", "title_leveling.py", "llm_cell_merge.py", "pdftext_adapter.py"}
+    # 历史结果转换归宿主所有，不能通过后处理的通用映射重新抽取。
+    excluded = {
+        "llm_aided.py", "llm_client.py", "title_leveling.py", "llm_cell_merge.py",
+        "pdftext_adapter.py", "legacy_schema_adapter.py",
+    }
     mapping = {}
     for path in sorted(files):
         if path.name in excluded:
