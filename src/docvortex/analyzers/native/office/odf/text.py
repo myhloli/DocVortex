@@ -20,8 +20,8 @@ from .....content.spans import (
     inline_span_plain_text,
     strip_span_dicts,
 )
-from ..._shared.mathml import mathml_to_latex
-from ..._shared.image import image_to_b64str
+from docvortex.content.mathml import mathml_to_latex
+from docvortex.foundation.image_encoding import image_to_b64str
 from ..image import create_text_placeholder, serialize_office_image
 from ..rich_text import OfficeRichTextSegment, build_rich_text_from_segments
 from .chart import parse_chart_block

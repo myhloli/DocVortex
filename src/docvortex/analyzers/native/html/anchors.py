@@ -7,8 +7,8 @@ from copy import deepcopy
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
-from .._shared.markup import MarkupAnchorDocument, MarkupAnchorRegistry, MarkupStylesheet, TextStyle, element_id
-from .._shared.markup.projector import BLOCK_TAGS, SKIPPED_TAGS, local_name, visible_raw_text_with_style
+from docvortex.content.markup import MarkupAnchorDocument, MarkupAnchorRegistry, MarkupStylesheet, TextStyle, element_id
+from docvortex.content.markup.projector import BLOCK_TAGS, SKIPPED_TAGS, local_name, visible_raw_text_with_style
 
 
 _NOTE_TYPES = frozenset({"footnote", "endnote", "rearnote"})

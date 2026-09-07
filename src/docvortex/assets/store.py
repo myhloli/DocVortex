@@ -42,7 +42,10 @@ class AssetStore(Mapping[str, bytes]):
 
     def copy(self) -> AssetStore:
         """建立独立索引并复用不可变字节。"""
-        return AssetStore(self._files)
+        copied = AssetStore()
+        copied._files = self._files.copy()
+        copied._content = self._content.copy()
+        return copied
 
 
 __all__ = ["AssetStore"]

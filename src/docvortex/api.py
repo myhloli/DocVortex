@@ -16,6 +16,7 @@ from .schema import FileSuffix, MiddleJson, ModelJson, PageInfo
 from .render.contracts import DocxRenderOptions, EpubRenderOptions, PdfRenderOptions, RenderFormat, RenderOptions
 
 if TYPE_CHECKING:
+    from .analyzers.native.contracts import NativeBinaryAnalyzer
     from .document.pdf.document import PDFDocument
 
 
@@ -34,17 +35,27 @@ def analyze(
     try:
         if prepared.file_suffix == "pdf":
             from .document.pdf.images import load_images_from_pdf_bytes_range
-            from .document.pdf.visuals import _attach_visual_block_images
+            from .document.pdf.raster import estimate_page_image_bytes
+            from .document.pdf.visuals import (
+                _attach_prepared_visual_block_images,
+                _prepare_page_visual_blocks,
+                _visual_page_ranges,
+            )
 
             assert prepared.document is not None
             pages = models.PdfModel().predict(prepared.document)
-            for start in range(0, len(pages), 64):
-                end = min(start + 63, len(pages) - 1)
+            prepared_visuals = [_prepare_page_visual_blocks(page) for page in pages]
+            image_bytes = {
+                index: estimate_page_image_bytes(prepared.document.page_size(index))
+                for index, blocks in enumerate(prepared_visuals)
+                if blocks
+            }
+            for start, end in _visual_page_ranges(prepared_visuals, image_bytes):
                 images = load_images_from_pdf_bytes_range(
                     prepared.data, start_page_id=start, end_page_id=end, image_type="pil_img"
                 )
                 try:
-                    _attach_visual_block_images(pages[start : end + 1], images, page_start_index=start)
+                    _attach_prepared_visual_block_images(prepared_visuals[start : end + 1], images, page_start_index=start)
                 finally:
                     for item in images:
                         if item.get("img_pil") is not None:
@@ -52,7 +63,7 @@ def analyze(
         elif prepared.file_suffix == "html":
             pages = models.HtmlModel().predict(BytesIO(prepared.data), source_context=prepared.source_context)
         else:
-            model_types = {
+            model_types: dict[FileSuffix, type[NativeBinaryAnalyzer]] = {
                 "csv": models.CsvModel,
                 "epub": models.EpubModel,
                 "ofd": models.OfdModel,
@@ -127,6 +138,7 @@ def render(
 ) -> RenderArtifact:
     """把同一语义文档编码为目标文件，返回值不产生文件系统副作用。"""
     from .render.api import render as render_value
+    from .render._internal.common.context import owned_render_document
     from .export.files import materialize_middle
 
     target = RenderFormat(output_format)
@@ -141,7 +153,8 @@ def render(
             options = resolver_options[target](asset_resolver=resolved_assets.__getitem__)
         elif isinstance(options, resolver_options[target]) and options.asset_resolver is None:
             options = replace(options, asset_resolver=resolved_assets.__getitem__)
-    value = render_value(middle, target, options=options)
+    with owned_render_document(middle):
+        value = render_value(middle, target, options=options)
     if isinstance(value, bytes):
         content = value
     elif isinstance(value, str):

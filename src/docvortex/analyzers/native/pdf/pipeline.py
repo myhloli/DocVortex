@@ -6,9 +6,11 @@ from collections import deque
 from dataclasses import dataclass, replace
 from typing import Any
 
+from ..contracts import NativePdfSource, RawBlock
+
 from ....schema import BBox
 from .._shared.xycut import sort_entries
-from ....document.pdf.document import PDFDocument, PDFImageInfo, PDFPageTextGeometry, get_lines_from_chars
+from ....document.pdf.document import PDFDocument as PDFDocument, PDFImageInfo, PDFPageTextGeometry, get_lines_from_chars
 from .inline.detection import detect_pdf_text_link_lines, detect_pdf_text_style_lines
 from .inline.matching import _realign_repaired_text_evidence
 from .inline.materialize import (
@@ -287,7 +289,7 @@ class _DocumentSources:
     page_link_lines: list[list[PDFTextLinkLine]]
 
 
-def _collect_document_sources(pdf_doc: PDFDocument) -> _DocumentSources:
+def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
     """逐页收集原生证据，局部快照与字符引用在收集阶段退出时释放。"""
 
     page_sizes: list[tuple[float, float]] = []
@@ -470,7 +472,7 @@ def _materialize_document_inline(
 
 
 def _analyze_native_document(
-    pdf_doc: PDFDocument,
+    pdf_doc: NativePdfSource,
     *,
     script_diagnostics: list[dict[str, Any]] | None = None,
     geometry_diagnostics: list[dict[str, Any]] | None = None,
@@ -1337,7 +1339,7 @@ def _normalize_output_block(
     if normalized_type not in {"image", "equation", "header", "footer"} and not content.strip():
         return None
     normalized_bbox = _normalize_bbox_to_unit(bbox, page_size)
-    output_block = {
+    output_block: RawBlock = {
         "type": normalized_type,
         "bbox": normalized_bbox,
         "angle": 0 if normalized_type == "image" else int(block.get("angle", 0) or 0) % 360,

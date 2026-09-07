@@ -14,6 +14,7 @@ from typing import Any, Literal, Sequence, TypeAlias
 from ....schema import BBox
 from ....document.pdf.document import PDFPageTextGeometry
 from .geometry import (
+    _clip_validated_bbox,
     _bbox_axis_overlap_ratio,
     _bbox_union_many,
     _clip_bbox,
@@ -464,8 +465,8 @@ def _document_requires_full_geometry(
                 char_idx = char.get("char_idx")
                 if not _is_anchor_text(text) or isinstance(char_idx, bool) or not isinstance(char_idx, int):
                     continue
-                source = _clip_bbox(_source_bbox(char, geometry, char_idx), page_size)
-                tight = _clip_bbox(_coerce_bbox(geometry.tight_bboxes.get(char_idx)), page_size)
+                source = _clip_validated_bbox(_source_bbox(char, geometry, char_idx), page_size)
+                tight = _clip_validated_bbox(_coerce_bbox(geometry.tight_bboxes.get(char_idx)), page_size)
                 origin = _coerce_origin(geometry.origins.get(char_idx))
                 if source is None or tight is None or origin is None:
                     continue
@@ -601,8 +602,8 @@ def _collect_samples(
                     or not isinstance(char_idx, int)
                 ):
                     continue
-                source_bbox = _clip_bbox(_source_bbox(char, geometry, char_idx), page_size)
-                tight_bbox = _clip_bbox(_coerce_bbox(geometry.tight_bboxes.get(char_idx)), page_size)
+                source_bbox = _clip_validated_bbox(_source_bbox(char, geometry, char_idx), page_size)
+                tight_bbox = _clip_validated_bbox(_coerce_bbox(geometry.tight_bboxes.get(char_idx)), page_size)
                 origin = _coerce_origin(geometry.origins.get(char_idx))
                 if source_bbox is None or tight_bbox is None or origin is None:
                     continue
@@ -802,7 +803,7 @@ def _restore_stable_legacy_source_bboxes(
     for (page_index, _source_index), line_samples in by_line.items():
         page_size = page_sizes[page_index]
         for sample in line_samples:
-            raw_bbox = _clip_bbox(
+            raw_bbox = _clip_validated_bbox(
                 _coerce_bbox(sample.line.chars[sample.position].get("bbox")),
                 page_size,
             )

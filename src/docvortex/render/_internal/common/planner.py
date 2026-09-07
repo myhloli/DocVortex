@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .context import claim_owned_document
+
 from ....content.table import merge_table_content
 from ...contracts import RenderMode
 from ....schema import (
@@ -35,7 +37,8 @@ def build_render_plan(
     mode: RenderMode = RenderMode.DEFAULT,
 ) -> list[list[PlannedBlock]]:
     """深拷贝 MiddleJson，并按模式生成不污染输入的逐页逻辑块计划。"""
-    copied = middle_json.model_copy(deep=True)
+    owned = claim_owned_document(middle_json)
+    copied = middle_json if owned else middle_json.model_copy(deep=True)
     pages = [
         [
             PlannedBlock(
@@ -49,7 +52,7 @@ def build_render_plan(
     ]
     flattened = [planned for page in pages for planned in page]
     _merge_continued_text_blocks(flattened, mode)
-    _merge_continued_list_blocks(flattened, mode)
+    _merge_continued_list_blocks(flattened, mode, copy_on_merge=owned)
     if mode is RenderMode.DEFAULT:
         _merge_continued_table_blocks(flattened)
     return pages
@@ -57,119 +60,81 @@ def build_render_plan(
 
 def _merge_continued_text_blocks(blocks: list[PlannedBlock], mode: RenderMode) -> None:
     """把无独立正文锚点的 continues_prev 文本吸收到最近的前序文本逻辑块。"""
-    for current_index, current in enumerate(blocks):
+    previous_text: PlannedBlock | None = None
+    previous_reference: PlannedBlock | None = None
+    for current in blocks:
+        is_text = isinstance(current.block, TextBlock)
+        is_reference = isinstance(current.block, RefTextBlock)
+        previous = previous_text if is_text else previous_reference if is_reference else None
+        anchored = is_text and isinstance(current.block.anchor, str) and bool(current.block.anchor.strip())
         if (
-            current.removed
-            or not isinstance(current.block, ContinuableTextBlockBase)
-            or current.block.continues_prev is not True
-            or (
-                isinstance(current.block, TextBlock)
-                and isinstance(current.block.anchor, str)
-                and bool(current.block.anchor.strip())
-            )
+            not current.removed
+            and isinstance(current.block, ContinuableTextBlockBase)
+            and current.block.continues_prev is True
+            and not anchored
+            and previous is not None
+            and not (mode is RenderMode.FULL and previous.page_idx != current.page_idx)
         ):
-            continue
-        previous = _find_previous_planned_text(blocks, current_index)
-        if previous is None:
-            continue
-        is_cross_page = previous.page_idx != current.page_idx
-        if is_cross_page and mode is RenderMode.FULL:
-            continue
-        previous.text_contents.extend(current.text_contents)
-        current.removed = True
+            previous.text_contents.extend(current.text_contents)
+            current.removed = True
+        if is_text and not current.removed:
+            previous_text = current
+        if is_reference:
+            if not current.removed:
+                previous_reference = current
+        elif current.block.type not in MERGE_TRANSPARENT_BLOCK_TYPES:
+            previous_reference = None
 
 
-def _find_previous_planned_text(blocks: list[PlannedBlock], current_index: int) -> PlannedBlock | None:
-    """按 text/ref_text 各自的透明块规则查找仍参与输出的前序同类文本。"""
-    current = blocks[current_index]
-    if isinstance(current.block, RefTextBlock):
-        previous_index = current_index - 1
-        while previous_index >= 0:
-            candidate = blocks[previous_index]
-            if candidate.block.type in MERGE_TRANSPARENT_BLOCK_TYPES:
-                previous_index -= 1
-                continue
-            if not isinstance(candidate.block, RefTextBlock):
-                return None
-            if not candidate.removed:
-                return candidate
-            previous_index -= 1
-        return None
-    if not isinstance(current.block, TextBlock):
-        return None
-    for candidate in reversed(blocks[:current_index]):
-        if not candidate.removed and isinstance(candidate.block, TextBlock):
-            return candidate
-    return None
-
-
-def _merge_continued_list_blocks(blocks: list[PlannedBlock], mode: RenderMode) -> None:
+def _merge_continued_list_blocks(blocks: list[PlannedBlock], mode: RenderMode, *, copy_on_merge: bool = False) -> None:
     """把续接列表吸收到子类型一致的前序列表，参考文献可跨过合并透明块。"""
-    for current_index, current in enumerate(blocks):
-        if current.removed or not isinstance(current.block, ListBlock) or current.block.continues_prev is not True:
+    previous_list: PlannedBlock | None = None
+    previous_reference_list: PlannedBlock | None = None
+    copied: set[int] = set()
+    for current in blocks:
+        if not isinstance(current.block, ListBlock):
+            previous_list = None
+            if current.block.type not in MERGE_TRANSPARENT_BLOCK_TYPES:
+                previous_reference_list = None
             continue
-        previous = _find_previous_planned_list(blocks, current_index)
-        if previous is None or not isinstance(previous.block, ListBlock):
-            continue
-        if previous.block.sub_type != current.block.sub_type:
-            continue
-        is_cross_page = previous.page_idx != current.page_idx
-        if is_cross_page and mode is RenderMode.FULL:
-            continue
-        previous.block.content.extend(current.block.content)
-        current.removed = True
-
-
-def _find_previous_planned_list(
-    blocks: list[PlannedBlock],
-    current_index: int,
-) -> PlannedBlock | None:
-    """查找前序有效列表，仅允许参考文献跳过合并透明块。"""
-    current = blocks[current_index]
-    if not isinstance(current.block, ListBlock):
-        return None
-    can_skip_page_auxiliary = current.block.sub_type == BlockType.REF_TEXT
-    previous_index = current_index - 1
-    while previous_index >= 0:
-        candidate = blocks[previous_index]
-        if can_skip_page_auxiliary and candidate.block.type in MERGE_TRANSPARENT_BLOCK_TYPES:
-            previous_index -= 1
-            continue
-        if not isinstance(candidate.block, ListBlock):
-            return None
-        if not candidate.removed:
-            return candidate
-        previous_index -= 1
-    return None
+        previous = previous_reference_list if current.block.sub_type == BlockType.REF_TEXT else previous_list
+        if (
+            not current.removed
+            and current.block.continues_prev is True
+            and previous is not None
+            and previous.block.sub_type == current.block.sub_type
+            and not (mode is RenderMode.FULL and previous.page_idx != current.page_idx)
+        ):
+            # EPUB 等渲染器仍读取原文档；只有实际修改的列表需要另建副本。
+            if copy_on_merge and id(previous) not in copied:
+                previous.block = previous.block.model_copy(deep=True)
+                copied.add(id(previous))
+            previous.block.content.extend(current.block.content)
+            current.removed = True
+        if not current.removed:
+            previous_list = previous_reference_list = current
 
 
 def _merge_continued_table_blocks(blocks: list[PlannedBlock]) -> None:
     """在默认模式中把跨页续表合并到最近的前序表格。"""
-    for current_index, current in enumerate(blocks):
-        if current.removed or not isinstance(current.block, TableBlock) or current.block.continues_prev is not True:
+    previous: PlannedBlock | None = None
+    for current in blocks:
+        if current.removed or not isinstance(current.block, TableBlock):
             continue
-        previous = _find_previous_planned_table(blocks, current_index)
-        if previous is None or previous.page_idx == current.page_idx:
-            continue
-        merged = merge_table_content(
-            previous.block.model_dump(mode="python", exclude_none=True),
-            current.block.model_dump(mode="python", exclude_none=True),
-        )
-        if merged is None:
-            continue
-        try:
-            previous.block = TableBlock.model_validate(merged)
-        except (TypeError, ValueError):
-            continue
-        current.removed = True
-
-
-def _find_previous_planned_table(blocks: list[PlannedBlock], current_index: int) -> PlannedBlock | None:
-    """查找最近且仍参与输出的前序表格。"""
-    for candidate in reversed(blocks[:current_index]):
-        if not candidate.removed and isinstance(candidate.block, TableBlock):
-            return candidate
-    return None
+        if current.block.continues_prev is True and previous is not None and previous.page_idx != current.page_idx:
+            merged = merge_table_content(
+                previous.block.model_dump(mode="python", exclude_none=True),
+                current.block.model_dump(mode="python", exclude_none=True),
+            )
+            if merged is not None:
+                try:
+                    previous.block = TableBlock.model_validate(merged)
+                except (TypeError, ValueError):
+                    pass
+                else:
+                    current.removed = True
+        if not current.removed:
+            previous = current
 
 
 __all__ = ["PlannedBlock", "build_render_plan"]

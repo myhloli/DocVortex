@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from ..analyzers.native.html.contracts import HtmlSourceContext
+from docvortex.document.contracts import HtmlSourceContext
 from ..errors import InvalidRequestError
 from ..schema import FILE_SUFFIXES, FileSuffix
 
@@ -35,7 +35,6 @@ def prepare_source(
     source_context: HtmlSourceContext | None = None,
 ) -> PreparedSource:
     """准备原生解析输入，调用者持有的 PDFDocument 不由引擎关闭。"""
-    from .detection import guess_suffix_by_bytes
     from .page_range import normalize_page_range_input, parse_page_range
 
     document = None
@@ -50,7 +49,12 @@ def prepare_source(
         if not isinstance(source, PDFDocument):
             raise TypeError("source must be a path, bytes, or PDFDocument")
         document, data, file_suffix = source, source.bytes, "pdf"
-    suffix = file_suffix or guess_suffix_by_bytes(data, str(path) if path else None)
+    if file_suffix:
+        suffix = file_suffix
+    else:
+        from .detection import guess_suffix_by_bytes
+
+        suffix = guess_suffix_by_bytes(data, str(path) if path else None)
     if suffix not in FILE_SUFFIXES:
         raise InvalidRequestError("file_type_unsupported", f"Unsupported native input format: {suffix}", "file_suffix")
     page_range = normalize_page_range_input(page_range)

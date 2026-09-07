@@ -8,10 +8,10 @@ import html
 from lxml import etree  # type: ignore[reportMissingImports]
 
 from ...schema import RAW_ALGORITHM, BlockType
-from ...analyzers.native._shared.markup import MarkupProjector, MarkupStylesheet, extract_formula
-from ...analyzers.native._shared.markup.projector import BLOCK_TAGS, local_name
+from docvortex.content.markup import MarkupProjector, MarkupStylesheet, extract_formula
+from docvortex.content.markup.projector import BLOCK_TAGS, local_name
 from ...content.spans import text_spans
-from ...analyzers.native.html.resources import HtmlResourceContext
+from .resources import WireResourceContext
 from .contracts import (
     AnnotationWireSpec,
     CodeBodyWireSpec,
@@ -76,7 +76,7 @@ class ExactAnchorResolver:
 
 def materialize_docvortex_html_wire(
     plan: DocVortexHtmlWirePlan,
-    resources: HtmlResourceContext,
+    resources: WireResourceContext,
 ) -> list[dict[str, object]]:
     """在整棵 canonical 树验证成功后一次性解析资源并生成 raw blocks。"""
     resources.bind_anchors(ExactAnchorResolver(plan))
@@ -114,7 +114,7 @@ def _materialize_text(spec: TextWireSpec, projector: MarkupProjector) -> dict[st
     return block
 
 
-def _materialize_equation(spec: EquationWireSpec, resources: HtmlResourceContext) -> dict[str, object]:
+def _materialize_equation(spec: EquationWireSpec, resources: WireResourceContext) -> dict[str, object]:
     """恢复行间公式裸 LaTeX 或 renderer-owned 公式图片。"""
     formula = extract_formula(spec.content_root)
     block: dict[str, object] = {
@@ -128,7 +128,7 @@ def _materialize_equation(spec: EquationWireSpec, resources: HtmlResourceContext
 
 def _materialize_visual(
     spec: VisualWireSpec,
-    resources: HtmlResourceContext,
+    resources: WireResourceContext,
     projector: MarkupProjector,
 ) -> list[dict[str, object]]:
     """按 renderer DOM 顺序恢复 visual body 与 annotations。"""
@@ -153,7 +153,7 @@ def _materialize_visual(
 
 def _materialize_visual_body(
     spec: RichVisualBodyWireSpec | FlowchartBodyWireSpec | TableBodyWireSpec | CodeBodyWireSpec,
-    resources: HtmlResourceContext,
+    resources: WireResourceContext,
     projector: MarkupProjector,
 ) -> dict[str, object]:
     """从 typed body spec 恢复唯一载荷，不重新判断 DOM 形状。"""
@@ -180,7 +180,7 @@ def _materialize_visual_body(
 
 def _materialize_table(
     spec: TableBodyWireSpec,
-    resources: HtmlResourceContext,
+    resources: WireResourceContext,
     projector: MarkupProjector,
 ) -> dict[str, object]:
     """恢复已判别的结构表格、文本、图片或空载荷。"""
@@ -316,7 +316,7 @@ def _flowchart_content(source_element: etree._Element) -> str:
     return f"```mermaid\n{value}\n```" if value else ""
 
 
-def _resolve_image_payload(element: etree._Element, resources: HtmlResourceContext) -> dict[str, object]:
+def _resolve_image_payload(element: etree._Element, resources: WireResourceContext) -> dict[str, object]:
     """解析已由 canonical parser 选定的单个 renderer-owned 图片。"""
     resolved = resources.resolve_image(element.get("src") or "", alt=element.get("alt") or "")
     if resolved is None:

@@ -201,12 +201,51 @@ def _attach_visual_block_images(
         raise ValueError(f"Hybrid visual crop page count mismatch: model_list={len(model_list)}, images={len(images_list)}")
 
     for page_offset, (page_model_list, image_dict) in enumerate(zip(model_list, images_list)):
-        _collapse_image_blocks(page_model_list)
-        visual_blocks = [
-            (block_idx, block)
-            for block_idx, block in enumerate(page_model_list)
-            if block.get("type") in MODEL_JSON_VISUAL_BLOCK_TYPES
-        ]
+        _attach_prepared_visual_block_images(
+            [_prepare_page_visual_blocks(page_model_list)], [image_dict], page_start_index + page_offset
+        )
+
+
+def _prepare_page_visual_blocks(page_model_list: list[dict[str, Any]]) -> list[tuple[int, dict[str, Any]]]:
+    """先折叠视觉容器，再记录原始块索引，供按需页图任务复用。"""
+    _collapse_image_blocks(page_model_list)
+    return [(index, block) for index, block in enumerate(page_model_list) if block.get("type") in MODEL_JSON_VISUAL_BLOCK_TYPES]
+
+
+def _visual_page_ranges(
+    prepared_pages: list[list[tuple[int, dict[str, Any]]]],
+    image_bytes_by_page: dict[int, int] | None = None,
+) -> list[tuple[int, int]]:
+    """在原有 64 页窗口和 32MiB 像素预算内合并需裁图页，不改变单页清晰度。"""
+    ranges: list[tuple[int, int]] = []
+    batch_bytes = 0
+    for page_index, blocks in enumerate(prepared_pages):
+        if not blocks:
+            continue
+        page_bytes = (image_bytes_by_page or {}).get(page_index, 0)
+        if (
+            ranges
+            and page_index == ranges[-1][1] + 1
+            and page_index // 64 == ranges[-1][0] // 64
+            and batch_bytes + page_bytes <= 32 * 1024 * 1024
+        ):
+            ranges[-1] = (ranges[-1][0], page_index)
+            batch_bytes += page_bytes
+        else:
+            ranges.append((page_index, page_index))
+            batch_bytes = page_bytes
+    return ranges
+
+
+def _attach_prepared_visual_block_images(
+    prepared_pages: list[list[tuple[int, dict[str, Any]]]],
+    images_list: list[dict[str, Any]],
+    page_start_index: int = 0,
+) -> None:
+    """按所选 PDF 的物理页索引裁图，输入块已经整理且无需再次折叠。"""
+    if len(prepared_pages) != len(images_list):
+        raise ValueError(f"Hybrid visual crop page count mismatch: model_list={len(prepared_pages)}, images={len(images_list)}")
+    for page_offset, (visual_blocks, image_dict) in enumerate(zip(prepared_pages, images_list)):
         if not visual_blocks:
             continue
 

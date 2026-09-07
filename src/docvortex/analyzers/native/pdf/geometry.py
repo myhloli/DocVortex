@@ -171,6 +171,20 @@ def _clip_bbox(
     )
 
 
+def _clip_validated_bbox(bbox: BBox | None, page_size: tuple[float, float]) -> BBox | None:
+    """复用本阶段已校验的有限正向框；不再次转换、排序或校验同一组坐标。"""
+    if bbox is None:
+        return None
+    page_width, page_height = page_size
+    left = float(max(0.0, min(page_width, bbox[0])))
+    top = float(max(0.0, min(page_height, bbox[1])))
+    right = float(max(0.0, min(page_width, bbox[2])))
+    bottom = float(max(0.0, min(page_height, bbox[3])))
+    if right <= left or bottom <= top:
+        return None
+    return left, top, right, bottom
+
+
 def _bbox_union(first: BBox, second: BBox) -> BBox:
     """返回两个 bbox 的外接并集框。"""
 

@@ -9,7 +9,7 @@ from loguru import logger
 from PIL import Image, UnidentifiedImageError
 from lxml import etree  # type: ignore[reportMissingImports]
 
-from .._shared.image import image_to_b64str
+from docvortex.foundation.image_encoding import image_to_b64str
 from ....schema import BBox
 from ....foundation.image_payload import validate_decoded_raster_size
 from .errors import OfdParseError

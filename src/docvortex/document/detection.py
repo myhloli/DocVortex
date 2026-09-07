@@ -1,5 +1,7 @@
 """根据文件内容和容器结构识别 DocVortex 支持的输入后缀。"""
 
+from __future__ import annotations
+
 from io import BytesIO
 from functools import lru_cache
 from pathlib import Path
@@ -7,7 +9,10 @@ from xml.etree import ElementTree
 from zipfile import BadZipFile, ZipFile
 
 from loguru import logger
-from magika import Magika
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from magika import Magika
 
 from .filetypes import CSV_EXTENSIONS, HTML_EXTENSIONS, IMAGE_EXTENSIONS, rtf_header_offset
 
@@ -61,6 +66,8 @@ _STRONG_CONTENT_SUFFIXES = frozenset(
 @lru_cache(maxsize=1)
 def _magika() -> Magika:
     """惰性创建文件类型识别器，避免导入 parser 时加载模型。"""
+    from magika import Magika
+
     return Magika()
 
 

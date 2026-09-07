@@ -8,8 +8,8 @@ import re
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
-from .._shared.markup import MarkupStylesheet, TextStyle
-from .._shared.markup.projector import local_name
+from docvortex.content.markup import MarkupStylesheet, TextStyle
+from docvortex.content.markup.projector import local_name
 
 
 _CANDIDATE_TAGS = frozenset({"article", "div", "main", "section"})

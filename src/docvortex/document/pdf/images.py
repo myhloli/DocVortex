@@ -16,7 +16,7 @@ from loguru import logger
 from PIL import Image
 
 from .pdfium import close_pdfium_child, close_pdfium_document, initialize_pdfium_runtime, pdfium_guard
-from ...analyzers.native._shared.image import image_to_b64str
+from docvortex.foundation.image_encoding import image_to_b64str
 from .raster import page_to_image
 from ...schema import BBox, IntBBox
 from ...foundation.geometry import normalize_to_int_bbox
@@ -230,6 +230,13 @@ def _is_pdf_render_pool_still_spawning_workers(executor: ProcessPoolExecutor) ->
     """判断渲染进程池是否还可能因为 submit 而继续创建新的 worker。"""
     max_workers = getattr(executor, "_max_workers", None)
     if max_workers is None or max_workers <= 1:
+        return False
+
+    # ProcessPoolExecutor 优先复用空闲 worker；未达到容量不等于本次会创建进程。
+    # 只探测并立即归还信号量，避免小批量任务永久重复支付冷启动的 100ms 等待。
+    idle_workers = getattr(executor, "_idle_worker_semaphore", None)
+    if idle_workers is not None and idle_workers.acquire(blocking=False):
+        idle_workers.release()
         return False
 
     processes = getattr(executor, "_processes", None)

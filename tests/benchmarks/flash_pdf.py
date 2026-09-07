@@ -13,7 +13,6 @@ import importlib.metadata
 import json
 import platform
 import pstats
-import resource
 import statistics
 import subprocess
 import sys
@@ -63,6 +62,7 @@ def _predict(payload: bytes) -> list[list[dict[str, Any]]]:
 
 def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
     """隔离一份文档的计时、完整输出和进程峰值内存，避免其它文档污染 RSS。"""
+    import resource
     from loguru import logger
 
     logger.disable("docvortex")
@@ -153,6 +153,12 @@ def _compare(output: Path, baseline: Path, results: list[dict[str, Any]]) -> lis
 
 def main() -> None:
     """执行完整回归或指定样本基准；每份文档单独启动子进程。"""
+    if "--pipeline" in sys.argv:
+        from pipeline import main as pipeline_main
+
+        sys.argv.remove("--pipeline")
+        pipeline_main()
+        return
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--baseline", type=Path)

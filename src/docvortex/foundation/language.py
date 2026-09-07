@@ -1,7 +1,9 @@
 import os
+import re
 import unicodedata
 
 DEFAULT_CODE_LANGUAGE = "txt"
+_INVALID_SURROGATES = re.compile("[\ud800-\udfff]")
 
 
 def _detect_language(text: str) -> object:
@@ -12,8 +14,8 @@ def _detect_language(text: str) -> object:
 
 
 def remove_invalid_surrogates(text: str) -> str:
-    # 移除无效的 UTF-16 代理对
-    return "".join(c for c in text if not (0xD800 <= ord(c) <= 0xDFFF))
+    """等价移除代理码点；常见合法 Unicode 文本无需逐字符 Python 扫描。"""
+    return _INVALID_SURROGATES.sub("", text)
 
 
 def detect_lang(text: str) -> str:
