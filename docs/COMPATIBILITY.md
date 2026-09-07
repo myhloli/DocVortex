@@ -42,7 +42,7 @@ Saved results and Doclib caches are not rewritten automatically. After upgrading
 restart running services and use the existing `mineru parse ... --force` option
 to regenerate results with the current font and text policies.
 
-MinerU declares `docvortex>=0.2.1,<0.3.0`. DocVortex declares
+MinerU declares `docvortex>=0.2.2,<1.0.0` to use the shared PDF layout renderer. DocVortex declares
 `pypdfium2>=5.10.1,<6`; this constraint also applies when MinerU installs its own
 direct PDFium dependency. Other shared dependency floors remain aligned, including
 `pydantic>=2.12.5,<3` and `numpy>=1.21.6`.

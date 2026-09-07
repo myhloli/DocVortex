@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
-import os
 import time
+from collections.abc import Sequence
 from contextlib import contextmanager
 from io import BytesIO
+from pathlib import Path
 from typing import Iterator, Literal, cast
 
 import pypdfium2 as pdfium
@@ -544,12 +545,14 @@ class PDFDocument:
     #  Visualization
     # ------------------------------------------------------------------ #
 
-    def draw_layout_bbox(self, pages: list[PageInfo], output_path: str) -> None:
-        from .diagnostics import draw_layout_bbox
+    def draw_layout_bbox(self, pages: list[PageInfo], output_path: str, *, page_indices: Sequence[int] | None = None) -> None:
+        """写出带类型与原始编号标签的布局预览；抽页后的文档需传入原始页号映射。"""
+        from ...visualization import render_layout_pdf
 
-        out_dir = os.path.dirname(output_path) or "."
-        filename = os.path.basename(output_path)
-        draw_layout_bbox(pages, self._pdf_bytes, out_dir, filename)
+        pdf_bytes = render_layout_pdf(self._pdf_bytes, pages, page_indices=page_indices)
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(pdf_bytes)
 
     # ------------------------------------------------------------------ #
     #  Internal

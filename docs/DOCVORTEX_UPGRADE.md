@@ -5,6 +5,56 @@ DocGale. The GitHub repository is `myhloli/DocVortex`; the Python distribution,
 import and command are all `docvortex`. The existing repository history and release
 draft are retained. Version 0.1.0 remains a draft, not a PyPI publication.
 
+## Shared PDF layout visualization in 0.2.2
+
+`docvortex.visualization.render_layout_pdf(pdf_bytes, pages, *, page_indices=None)`
+returns PDF bytes with colored layout outlines and `block_type: index` labels. Pass current `MiddleJson.pages`;
+the renderer uses normalized `blocks/content` geometry without changing the input
+document. It preserves page dimensions, CropBox offsets and right-angle rotations.
+This overlays the source PDF; it does not reflow semantic content like `render_pdf`.
+
+```python
+from pathlib import Path
+import docvortex
+from docvortex.visualization import render_layout_pdf
+
+source = Path("report.pdf")
+result = docvortex.parse(source)
+Path("layout.pdf").write_bytes(render_layout_pdf(source.read_bytes(), result.middle_json.pages))
+```
+
+For a cropped or reordered PDF, `page_indices[i]` must name the original zero-based
+page index of its i-th page. Omit the mapping only for an original full PDF. A
+mapping with the wrong length raises `ValueError`; missing result pages remain
+unmarked rather than borrowing another page's boxes. For example, a PDF containing
+only original pages 2 and 5 requires `page_indices=(1, 4)`.
+
+Page footnotes use teal (`#008080`); headers, footers, page numbers and aside text
+use gray (`#9E9E9E`). Other block colors retain the current palette. All layout
+rectangles use 1 pt outlines without interior fill. Each outlined block has a
+matching 7 pt Helvetica label on a small white background above its top-left corner.
+Labels show the block's own zero-based `index`, including gaps and duplicate
+parent/child values; a missing child index is shown as `-`. Visual parent containers
+are not outlined or labeled separately. Code and algorithm parents still share
+`type="code"`, distinguished by `sub_type`; algorithm children retain
+`algorithm_body` and the same purple as `code_body`.
+
+Labels stay upright after page rotation, shift left at the right edge and move
+inside the box when there is no room above it. Overlapping labels move up by rows
+first, then down from the box top; if no non-overlapping row remains on the page,
+the renderer chooses the row with the least label overlap. Labels add extractable
+text to the output PDF; the input PDF and Middle JSON are not modified.
+Label avoidance checks other labels, not source text. Where adjacent blocks have
+little vertical spacing, a label's white background can cover nearby source text
+visually; that text remains in the PDF content stream.
+
+MinerU's Gradio preview delegates to this renderer and retains its artifact names.
+`PDFDocument.draw_layout_bbox(pages, output_path,
+page_indices=None)` remains a file-writing wrapper (the mapping is keyword-only),
+now using current `PageInfo` rather than removed legacy layout fields. Legacy
+filled boxes and separately renumbered red reading-order markers are not retained. Private helpers from
+`docvortex.document.pdf.diagnostics` have been removed.
+
 ## On-demand PDF crops in 0.2.1
 
 `docvortex.document.pdf.visuals.attach_visual_block_images_from_pdf(document,
@@ -59,7 +109,7 @@ Markdown embedded HTML share the new namespace. PDF, DOCX and LaTeX generated
 titles, metadata, styles and macros use DocVortex. Supported explicit user titles
 and authors retain their existing precedence.
 
-MinerU requires `docvortex>=0.2.1,<0.3.0`. Both projects share the new envelope,
+MinerU requires `docvortex>=0.2.2,<1.0.0`. Both projects share the new envelope,
 with `metadata.file_suffix`, `metadata.producer`, and optional `extensions.mineru`
 containing actual tier and resolved parse mode. Old JSON adapters and historical
 page conversion are removed. Python top-level metadata attributes have no aliases.
