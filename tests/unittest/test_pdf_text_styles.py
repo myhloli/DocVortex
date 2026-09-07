@@ -2174,7 +2174,7 @@ def test_flash_native_pdf_styles_reach_model_middle_and_renderers() -> None:
     assert '<text style="strikethrough">underlined</text>' not in joined_model_content
     assert '<text style="strikethrough">x</text>' not in joined_model_content
     assert '<text style="strikethrough">separator' not in joined_model_content
-    assert '<text style="bold">bold sample</text>' in joined_model_content
+    assert '<text style="bold">bold sample</text>' in joined_model_content, model_list
     assert "italic sample" in joined_model_content
     assert '<text style="italic">' not in joined_model_content
     assert '<text style="bold">bold italic sample</text>' in joined_model_content

@@ -653,6 +653,8 @@ def test_mermaid_flowchart_without_raster_opens_source_fallback() -> None:
         _mermaid_fence("graph LR\n  A --> B", language="python"),
         _mermaid_fence(f"graph LR\n  A[{'x' * 50_001}]"),
     ],
+    # 使用简短 ID，避免 pytest 将超长源码写入 Windows 环境变量。
+    ids=["unsupported-diagram", "init-directive", "frontmatter", "wrong-language", "oversized-source"],
 )
 def test_invalid_or_out_of_scope_mermaid_keeps_existing_image_path(content: str) -> None:
     """验证非流程图、配置注入、错误 fence 和超限源码不触发 Mermaid 依赖。"""

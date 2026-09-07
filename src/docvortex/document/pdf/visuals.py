@@ -257,15 +257,11 @@ def attach_visual_block_images_from_pdf(
     if isinstance(window_size, bool) or not isinstance(window_size, int) or window_size <= 0:
         raise ValueError("window_size must be a positive integer")
     if len(model_list) != document.page_count:
-        raise ValueError(
-            f"PDF visual crop page count mismatch: model_list={len(model_list)}, document={document.page_count}"
-        )
+        raise ValueError(f"PDF visual crop page count mismatch: model_list={len(model_list)}, document={document.page_count}")
 
     prepared_visuals = [_prepare_page_visual_blocks(page) for page in model_list]
     image_bytes = {
-        index: estimate_page_image_bytes(document.page_size(index))
-        for index, blocks in enumerate(prepared_visuals)
-        if blocks
+        index: estimate_page_image_bytes(document.page_size(index)) for index, blocks in enumerate(prepared_visuals) if blocks
     }
     for start, end in _visual_page_ranges(prepared_visuals, image_bytes, window_size=window_size):
         images = load_images_from_pdf_bytes_range(
