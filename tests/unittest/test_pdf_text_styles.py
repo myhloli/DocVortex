@@ -98,6 +98,7 @@ def _model_json(pages: list[list[dict[str, Any]]]) -> ModelJson:
 def _build_native_text_style_pdf() -> bytes:
     """构造包含字体、删除线、下划线及其反例的单页原生 PDF。"""
 
+    # 字体样例放在普通正文行内，避免未嵌入字体的跨平台几何差异触发标题识别。
     content = b"""0.8 w
 BT /F1 12 Tf 50 250 Td (strike: alpha ) Tj (deleted) Tj ( omega) Tj ET
 150.8 254 m 201.2 254 l S
@@ -109,9 +110,9 @@ BT /F1 12 Tf 50 130 Td (short: alpha ) Tj (x) Tj ( omega) Tj ET
 143.6 134 m 150.8 134 l S
 BT /F1 12 Tf 50 90 Td (filled: alpha ) Tj (filled strike) Tj ( omega) Tj ET
 150.8 93.4 93.6 1.2 re f
-BT /F2 12 Tf 50 50 Td (bold sample) Tj ET
-BT /F3 12 Tf 50 30 Td (italic sample) Tj ET
-BT /F4 12 Tf 50 10 Td (bold italic sample) Tj ET
+BT /F1 12 Tf 50 50 Td (font: alpha ) Tj /F2 12 Tf (bold sample) Tj /F1 12 Tf ( omega) Tj ET
+BT /F1 12 Tf 50 30 Td (font: alpha ) Tj /F3 12 Tf (italic sample) Tj /F1 12 Tf ( omega) Tj ET
+BT /F1 12 Tf 50 10 Td (font: alpha ) Tj /F4 12 Tf (bold italic sample) Tj /F1 12 Tf ( omega) Tj ET
 """
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
@@ -2158,24 +2159,12 @@ def test_never_styles_equations_or_excluded_blocks() -> None:
     assert _span_snapshot(blocks[1]["content"]) == "deleted"
 
 
-def test_flash_native_pdf_styles_reach_model_middle_and_renderers(monkeypatch) -> None:
+def test_flash_native_pdf_styles_reach_model_middle_and_renderers() -> None:
     """验证真实 PDF 字体和 drawing 样式贯穿 model、MiddleJson 与 renderer。"""
 
-    from docvortex.analyzers.native.pdf import pipeline
-
-    style_inputs = []
-    original_apply = pipeline.apply_pdf_text_styles
-
-    def capture_style_inputs(blocks, lines, page_size):
-        """在断言失败时输出物化前证据，定位跨平台样式丢失的阶段。"""
-        style_inputs.extend(lines)
-        original_apply(blocks, lines, page_size)
-
-    monkeypatch.setattr(pipeline, "apply_pdf_text_styles", capture_style_inputs)
     document = PDFDocument(_build_native_text_style_pdf())
     try:
         model_list = PdfModel().predict(document)
-        font_inputs = {str(char.get("font")) for char in document.get_page_chars(0)}
     finally:
         document.close()
     model_contents = [_span_snapshot(block.get("content")) for page in model_list for block in page]
@@ -2186,13 +2175,6 @@ def test_flash_native_pdf_styles_reach_model_middle_and_renderers(monkeypatch) -
     assert '<text style="strikethrough">underlined</text>' not in joined_model_content
     assert '<text style="strikethrough">x</text>' not in joined_model_content
     assert '<text style="strikethrough">separator' not in joined_model_content
-    if '<text style="bold">bold sample</text>' not in joined_model_content:
-        print("Native fonts:", sorted(font_inputs))
-        for line in style_inputs:
-            print("Style evidence:", line)
-        for page in model_list:
-            for block in page:
-                print("Model block:", block)
     assert '<text style="bold">bold sample</text>' in joined_model_content
     assert "italic sample" in joined_model_content
     assert '<text style="italic">' not in joined_model_content
