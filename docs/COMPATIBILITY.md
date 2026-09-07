@@ -33,11 +33,16 @@ construction and host metadata cleanup. Flash, Hybrid and OCR/VLM therefore use
 the same PDF text cleanup; repeated Flash cleanup is idempotent. Host tests cover
 delegation and routing, while DocVortex maintains the native text and geometry tests.
 
+Doclib has a dedicated persisted-result reader for MinerU 3.4.5/1.0 and old
+MinerU schema 2.0 Middle JSON. Conversion is in memory, and only new protocol JSON
+is written by subsequent saves or compaction. Generic APIs and DocVortex's own
+codecs do not provide this legacy compatibility.
+
 Saved results and Doclib caches are not rewritten automatically. After upgrading,
 restart running services and use the existing `mineru parse ... --force` option
 to regenerate results with the current font and text policies.
 
-MinerU declares `docvortex>=0.1.0,<1.0.0`. DocVortex declares
+MinerU declares `docvortex>=0.2.1,<0.3.0`. DocVortex declares
 `pypdfium2>=5.10.1,<6`; this constraint also applies when MinerU installs its own
 direct PDFium dependency. Other shared dependency floors remain aligned, including
 `pydantic>=2.12.5,<3` and `numpy>=1.21.6`.

@@ -5,6 +5,24 @@ DocGale. The GitHub repository is `myhloli/DocVortex`; the Python distribution,
 import and command are all `docvortex`. The existing repository history and release
 draft are retained. Version 0.1.0 remains a draft, not a PyPI publication.
 
+## On-demand PDF crops in 0.2.1
+
+`docvortex.document.pdf.visuals.attach_visual_block_images_from_pdf(document,
+model_list, *, window_size=64, timeout=None, threads=None)` adds visual crops in
+place. The model list must cover every physical page of the supplied PDF, including
+pages without visual blocks. The function does not select pages, classify the PDF,
+or close the caller's document.
+
+Only pages containing image, chart, table, or equation blocks are rendered, after
+image containers are collapsed. Consecutive pages are batched within the supplied
+window boundary and a 32 MiB pixel budget, preserving the existing rendering
+resolution and crop encoding. Returned page images are closed even when cropping
+fails. Explicit timeout and worker settings override the engine defaults; `None`
+uses the existing `DOCVORTEX_PDF_RENDER_*` configuration.
+
+The native `analyze()` API uses this same implementation. MinerU passes its own
+window, timeout, and worker settings when running Flash native text parsing.
+
 ## Package and protocol names
 
 Stop old services/interpreters before switching packages. Remove the old package
@@ -41,7 +59,7 @@ Markdown embedded HTML share the new namespace. PDF, DOCX and LaTeX generated
 titles, metadata, styles and macros use DocVortex. Supported explicit user titles
 and authors retain their existing precedence.
 
-MinerU requires `docvortex>=0.2.0,<0.3.0`. Both projects share the new envelope,
+MinerU requires `docvortex>=0.2.1,<0.3.0`. Both projects share the new envelope,
 with `metadata.file_suffix`, `metadata.producer`, and optional `extensions.mineru`
 containing actual tier and resolved parse mode. Old JSON adapters and historical
 page conversion are removed. Python top-level metadata attributes have no aliases.

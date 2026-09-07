@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from loguru import logger
@@ -25,6 +25,9 @@ from .visual_geometry import (
     _normalize_page_size,
     _normalize_visual_block_angle,
 )
+
+if TYPE_CHECKING:
+    from .document import PDFDocument
 
 
 def _normalize_model_bbox_for_containment(raw_bbox: Any) -> BBox | None:
@@ -215,8 +218,10 @@ def _prepare_page_visual_blocks(page_model_list: list[dict[str, Any]]) -> list[t
 def _visual_page_ranges(
     prepared_pages: list[list[tuple[int, dict[str, Any]]]],
     image_bytes_by_page: dict[int, int] | None = None,
+    *,
+    window_size: int = 64,
 ) -> list[tuple[int, int]]:
-    """在原有 64 页窗口和 32MiB 像素预算内合并需裁图页，不改变单页清晰度。"""
+    """在指定窗口和 32MiB 像素预算内合并需裁图页，不改变单页清晰度。"""
     ranges: list[tuple[int, int]] = []
     batch_bytes = 0
     for page_index, blocks in enumerate(prepared_pages):
@@ -226,7 +231,7 @@ def _visual_page_ranges(
         if (
             ranges
             and page_index == ranges[-1][1] + 1
-            and page_index // 64 == ranges[-1][0] // 64
+            and page_index // window_size == ranges[-1][0] // window_size
             and batch_bytes + page_bytes <= 32 * 1024 * 1024
         ):
             ranges[-1] = (ranges[-1][0], page_index)
@@ -235,6 +240,48 @@ def _visual_page_ranges(
             ranges.append((page_index, page_index))
             batch_bytes = page_bytes
     return ranges
+
+
+def attach_visual_block_images_from_pdf(
+    document: PDFDocument,
+    model_list: list[list[dict[str, Any]]],
+    *,
+    window_size: int = 64,
+    timeout: int | None = None,
+    threads: int | None = None,
+) -> None:
+    """按当前 PDF 全部物理页的视觉块需求原地补图；页图由本函数释放，文档仍归调用方。"""
+    from .images import load_images_from_pdf_bytes_range
+    from .raster import estimate_page_image_bytes
+
+    if isinstance(window_size, bool) or not isinstance(window_size, int) or window_size <= 0:
+        raise ValueError("window_size must be a positive integer")
+    if len(model_list) != document.page_count:
+        raise ValueError(
+            f"PDF visual crop page count mismatch: model_list={len(model_list)}, document={document.page_count}"
+        )
+
+    prepared_visuals = [_prepare_page_visual_blocks(page) for page in model_list]
+    image_bytes = {
+        index: estimate_page_image_bytes(document.page_size(index))
+        for index, blocks in enumerate(prepared_visuals)
+        if blocks
+    }
+    for start, end in _visual_page_ranges(prepared_visuals, image_bytes, window_size=window_size):
+        images = load_images_from_pdf_bytes_range(
+            document.bytes,
+            start_page_id=start,
+            end_page_id=end,
+            image_type="pil_img",
+            timeout=timeout,
+            threads=threads,
+        )
+        try:
+            _attach_prepared_visual_block_images(prepared_visuals[start : end + 1], images, page_start_index=start)
+        finally:
+            for item in images:
+                if item.get("img_pil") is not None:
+                    item["img_pil"].close()
 
 
 def _attach_prepared_visual_block_images(
@@ -293,4 +340,8 @@ def _attach_prepared_visual_block_images(
 attach_visual_block_images = _attach_visual_block_images
 supplement_missing_image_block_containers = _supplement_missing_image_block_containers
 
-__all__ = ["attach_visual_block_images", "supplement_missing_image_block_containers"]
+__all__ = [
+    "attach_visual_block_images",
+    "attach_visual_block_images_from_pdf",
+    "supplement_missing_image_block_containers",
+]

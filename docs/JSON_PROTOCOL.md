@@ -73,7 +73,10 @@ and carries no Model/Middle schema identity. Content List V1/V2 remain MinerU ou
 Bundle manifests now use `docvortex.bundle` version `2.0`, with current document
 JSON and the existing asset paths, sizes and hashes. Old bundles are rejected.
 
-MinerU HTTP output filenames and request parameters are unchanged. Doclib only
-counts valid current batches as cached. Old batches require source reparse;
-compaction skips invalid inputs or conflicting metadata/extensions/full-document
-flags without deleting their files.
+MinerU HTTP output filenames and request parameters are unchanged. Only Doclib's
+persisted Middle JSON reader additionally accepts recognizable MinerU 3.4.5/1.0
+pages and the former MinerU schema 2.0 envelope, converting them in memory to the
+current document. Generic ParseResult, HTTP/ZIP, Gradio and DocVortex codecs remain
+strict. Successfully converted batches can be cached and compacted when their
+metadata/extensions/full-document flags agree; ordinary reads never rewrite files.
+Unknown or damaged formats still require source reparse.
