@@ -1,3 +1,6 @@
+
+![DocVortex overview: native document inputs flow through a unified document model to Markdown, HTML, LaTeX, DOCX, EPUB, PDF and structured content.](docs/images/docvortex-overview.jpg)
+
 # DocVortex
 
 A fast, multi-format document parsing and conversion engine.
