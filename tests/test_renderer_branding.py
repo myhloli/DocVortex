@@ -17,7 +17,7 @@ def test_non_html_renderers_use_new_owned_identifiers() -> None:
     """PDF 元数据、DOCX 样式和 LaTeX 宏统一新品牌，用户标题则保持原文。"""
     document = MiddleJson(
         pages=[PageInfo(page_idx=0, blocks=[TextBlock(type="text", index=0, content=[TextSpan(type="text", content="Body")])])],
-        file_suffix="html",
+        metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
         is_full_document=True,
     )
     metadata = PdfReader(BytesIO(render_pdf(document))).metadata

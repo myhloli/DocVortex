@@ -90,8 +90,7 @@ def _model_json(pages: list[list[dict[str, Any]]]) -> ModelJson:
     return ModelJson(
         pages=pages,
         page_index_map=[],
-        file_suffix="pdf",
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="test")},
         extensions={},
     )
 
@@ -2183,8 +2182,7 @@ def test_flash_native_pdf_styles_reach_model_middle_and_renderers() -> None:
     middle = MiddleJson(
         pages=model_json_to_pages(_model_json(model_list)),
         is_full_document=True,
-        file_suffix="pdf",
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="test")},
         extensions={},
     )
     markdown = render_markdown(middle)

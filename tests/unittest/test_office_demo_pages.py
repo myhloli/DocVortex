@@ -37,7 +37,7 @@ def test_native_office_real_samples(file_suffix: str, expected_page_count: int) 
     assert len(model_json.pages) == expected_page_count
     assert all(isinstance(page, list) for page in model_json.pages)
     assert model_json.page_index_map == []
-    assert model_json.file_suffix == file_suffix
+    assert model_json.metadata.file_suffix == file_suffix
     if file_suffix == "docx":
         model_equations = [
             block

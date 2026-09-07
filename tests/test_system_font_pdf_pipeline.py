@@ -30,6 +30,6 @@ def test_system_font_pdf_converts_and_restores_offline(file_name: str, page_coun
     assert restored.to_dict() == before
     assert restored.model_json is not None
     # 结果包会将 raw 图片载荷外置为素材引用，模型字典不要求逐字节等于原始内嵌载荷。
-    assert restored.model_json.file_suffix == "pdf"
+    assert restored.model_json.metadata.file_suffix == "pdf"
     assert restored.model_json.resolved_page_indices == list(range(page_count))
     assert restored.export(tmp_path / "restored.html", output_format="html").path.is_file()

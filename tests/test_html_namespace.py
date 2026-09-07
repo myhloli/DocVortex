@@ -57,7 +57,9 @@ def _document() -> MiddleJson:
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
 
@@ -99,7 +101,14 @@ def test_decode_keeps_absence_invalid_and_empty_distinct(case: str) -> None:
     elif case == "damaged":
         markup = markup.replace("</article>", "unexpected text</article>")
     else:
-        markup = render_html(MiddleJson(pages=[], is_full_document=True, file_suffix="html"), standalone=False)
+        markup = render_html(
+            MiddleJson(
+                pages=[],
+                is_full_document=True,
+                metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            ),
+            standalone=False,
+        )
     document = parse_html_document(markup.encode())
     result = codec.decode_docvortex_html_wire(document.body, HtmlResourceContext(document.source_context))
     if case == "empty":

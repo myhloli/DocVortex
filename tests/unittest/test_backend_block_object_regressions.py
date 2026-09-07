@@ -11,8 +11,7 @@ def _model_json(pages: list[list[dict[str, Any]]]) -> ModelJson:
     return ModelJson(
         pages=pages,
         page_index_map=[],
-        file_suffix="pdf",
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="test")},
         extensions={},
     )
 

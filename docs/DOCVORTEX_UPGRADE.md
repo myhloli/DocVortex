@@ -26,7 +26,8 @@ result.save_bundle("output/report.bundle")
 ```
 
 Native JSON uses `docvortex.model`, `docvortex.middle` and `docvortex.bundle`, all
-at schema version `1.0`. The default producer is `docvortex` version `0.1.0`.
+at schema version `2.0`. Native parsing records `metadata.producer` as
+`docvortex` version `0.2.0`; constructors require explicit metadata.
 Only these native schema identities are accepted. Old DocGale JSON and bundles
 are rejected explicitly, with no automatic migration or legacy import/CLI aliases.
 Files are not rewritten on load. A producer explicitly supplied in an otherwise
@@ -40,13 +41,12 @@ Markdown embedded HTML share the new namespace. PDF, DOCX and LaTeX generated
 titles, metadata, styles and macros use DocVortex. Supported explicit user titles
 and authors retain their existing precedence.
 
-MinerU now depends on `docvortex>=0.1.0,<1.0.0`. Its product fields, schema 2.0,
-supported historical results, OCR/VLM/Hybrid routing and UI identity remain intact.
-Current JSON adapters live in `mineru.integrations.docvortex`; historical page
-conversion lives in `mineru.backend.postprocess.legacy_schema_adapter`.
-Update adapter imports to these MinerU modules. DocVortex no longer ships the
-`compat` package or aliases for its former adapter imports. Its generic `producer`
-and `extensions` fields remain available to applications.
+MinerU requires `docvortex>=0.2.0,<0.3.0`. Both projects share the new envelope,
+with `metadata.file_suffix`, `metadata.producer`, and optional `extensions.mineru`
+containing actual tier and resolved parse mode. Old JSON adapters and historical
+page conversion are removed. Python top-level metadata attributes have no aliases.
+See [JSON_PROTOCOL.md](JSON_PROTOCOL.md) for migration and cache behavior.
+OCR/VLM/Hybrid routing and UI identity remain unchanged.
 
 ## PDF text and font policies
 

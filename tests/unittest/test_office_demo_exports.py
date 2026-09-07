@@ -77,7 +77,7 @@ def test_real_ppt_recovers_table_notes_images_and_exports(tmp_path: Path) -> Non
     middle_json, model_json = _analyze_sample("ppt")
 
     assert len(model_json.pages) == len(middle_json.pages) == 6
-    assert model_json.file_suffix == middle_json.file_suffix == "ppt"
+    assert model_json.metadata.file_suffix == middle_json.metadata.file_suffix == "ppt"
     table = next(block for block in middle_json.pages[0].blocks if isinstance(block, TableBlock))
     table_html = table.content[0].content
     soup = BeautifulSoup(table_html, "html.parser")
@@ -146,7 +146,7 @@ def test_real_xls_recovers_tables_charts_image_link_and_exports(tmp_path: Path) 
     middle_json, model_json = _analyze_sample("xls")
 
     assert len(model_json.pages) == len(middle_json.pages) == 3
-    assert model_json.file_suffix == middle_json.file_suffix == "xls"
+    assert model_json.metadata.file_suffix == middle_json.metadata.file_suffix == "xls"
     assert [[block.get("type") for block in page] for page in model_json.pages] == [
         [BlockType.PARAGRAPH_TITLE, BlockType.TABLE],
         [

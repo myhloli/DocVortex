@@ -83,7 +83,12 @@ def test_invalid_bundle_asset_is_rejected(tmp_path: Path) -> None:
     from docvortex.schema import MiddleJson
 
     result = DocumentResult(
-        MiddleJson(pages=[], file_suffix="html", is_full_document=True), AssetStore({"images/a.png": b"image"})
+        MiddleJson(
+            pages=[],
+            metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            is_full_document=True,
+        ),
+        AssetStore({"images/a.png": b"image"}),
     )
     result.save_bundle(tmp_path)
     (tmp_path / "images/a.png").write_bytes(b"changed")
@@ -117,7 +122,7 @@ def test_bundle_rejects_unmaterialized_asset_before_writing(tmp_path: Path) -> N
                 ],
             )
         ],
-        file_suffix="html",
+        metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
         is_full_document=True,
     )
     target = tmp_path / "bundle"
@@ -142,7 +147,7 @@ def test_materialized_image_does_not_keep_external_render_dependency(tmp_path: P
     )
     middle = MiddleJson(
         pages=[PageInfo(page_idx=0, blocks=[ImageBlock(type="image", index=0, content=[body])])],
-        file_suffix="html",
+        metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
         is_full_document=True,
     )
     DocumentResult(middle).save_bundle(tmp_path / "bundle")

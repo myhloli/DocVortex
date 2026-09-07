@@ -311,8 +311,7 @@ def main() -> None:
                     ModelJson(
                         pages=deepcopy(pages),
                         page_index_map=[],
-                        file_suffix="pdf",
-                        producer=Producer(name="docvortex", version="refactor-baseline"),
+                        metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="refactor-baseline")},
                     )
                 ).model_dump(mode="json")
                 output = {"model_list": pages, "middle_json": middle}

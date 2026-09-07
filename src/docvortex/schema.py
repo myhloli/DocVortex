@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import math
+from copy import deepcopy
 from enum import Enum
-from typing import Annotated, Any, ClassVar, Literal, TypeAlias, Union, cast, get_args
+from typing import Annotated, Any, ClassVar, Literal, TypeAlias, TypeVar, Union, cast, get_args
 
 from pydantic import (
     BaseModel,
@@ -12,10 +13,12 @@ from pydantic import (
     TypeAdapter,
     field_validator,
     model_validator,
+    model_serializer,
     JsonValue,
+    SerializationInfo,
+    SerializerFunctionWrapHandler,
 )
 
-from .version import __version__ as engine_version
 from .foundation.hyperlink import OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
 
 # 这些字符串不能作为公开 Block.type discriminator，只用于 raw 阶段或 Block 内部枚举值。
@@ -886,39 +889,90 @@ def _validate_raw_block_inline_content(block: dict[str, Any], *, location: str) 
 class Producer(_StrictMiddleModel):
     """记录语言无关的文档生产者，避免绑定宿主产品元数据。"""
 
-    name: str = Field(default="docvortex", min_length=1)
-    version: str = Field(default=engine_version, min_length=1)
+    name: str = Field(min_length=1)
+    version: str = Field(min_length=1)
+
+
+class DocumentMetadata(_StrictMiddleModel):
+    """承载文档格式和真实生产者，读取时不补造来源信息。"""
+
+    file_suffix: FileSuffix
+    producer: Producer
+
+
+def _require_document_wire_identity(schema: dict[str, Any]) -> None:
+    """JSON 文档必须显式携带协议身份；构造器的常量默认值仅便利 Python 调用。"""
+    identity = "schema" if "schema" in schema["properties"] else "schema_id"
+    schema["required"] = list(dict.fromkeys([identity, "schema_version", *schema.get("required", [])]))
+
+
+_DocumentT = TypeVar("_DocumentT", bound="DocumentModel")
 
 
 class DocumentModel(_StrictMiddleModel):
     """公共文档封装，只持有生产者及可序列化扩展信息。"""
 
-    producer: Producer = Field(default_factory=Producer)
+    model_config = ConfigDict(serialize_by_alias=True, json_schema_extra=_require_document_wire_identity)
+
+    metadata: DocumentMetadata
     extensions: dict[str, JsonValue] = Field(default_factory=dict)
-    schema_name: ClassVar[str]
+    schema_version: Literal["2.0"] = "2.0"
+    schema_id: str = Field(alias="schema")
 
     def to_dict(
-        self, *, skip_defaults: bool = True, exclude_none: bool = False, exclude_block_fields: set[str] | None = None
+        self,
+        *,
+        skip_defaults: bool = True,
+        exclude_none: bool = False,
+        exclude_block_fields: set[str] | None = None,
     ) -> dict[str, Any]:
-        """始终输出协议标识和生产者，保证默认值省略后的数据仍可识别。"""
-        payload = super().to_dict(
-            skip_defaults=skip_defaults, exclude_none=exclude_none, exclude_block_fields=exclude_block_fields
-        )
-        return {
-            "schema": self.schema_name,
-            "schema_version": "1.0",
-            **payload,
-            "producer": self.producer.model_dump(mode="json"),
-        }
+        """只对页面树省略块字段，保护具有同名键的来源和应用扩展。"""
+        payload = super().to_dict(skip_defaults=skip_defaults, exclude_none=exclude_none)
+        if exclude_block_fields and "pages" in payload:
+            payload["pages"] = _remove_block_fields(payload["pages"], exclude_block_fields)
+        return payload
+
+    @model_serializer(mode="wrap")
+    def _serialize_document(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo):
+        """保留已声明的协议默认字段，同时尊重调用方显式的字段筛选。"""
+        # 不声明通用 dict 返回类型，避免 Pydantic 将序列化 Schema 降为任意对象。
+        payload = handler(self)
+        use_alias = info.by_alias is not False
+        for field_name in ("schema_id", "schema_version", "extensions"):
+            if info.exclude and field_name in info.exclude:
+                continue
+            if info.include is not None and field_name not in info.include:
+                continue
+            key = "schema" if field_name == "schema_id" and use_alias else field_name
+            if key not in payload:
+                payload[key] = deepcopy(getattr(self, field_name))
+        return payload
+
+    @classmethod
+    def from_dict(cls: type[_DocumentT], value: dict[str, Any]) -> _DocumentT:
+        """联合校验协议身份及版本后读取文档，不猜测或迁移历史格式。"""
+        expected_schema = cls.model_fields["schema_id"].default
+        expected_version = cls.model_fields["schema_version"].default
+        if (
+            not isinstance(value, dict)
+            or value.get("schema") != expected_schema
+            or value.get("schema_version") != expected_version
+        ):
+            raise ValueError(f"Expected {expected_schema} schema version {expected_version}; reparse the source document")
+        return cls.model_validate(value)
+
+    @classmethod
+    def from_json(cls: type[_DocumentT], value: str | bytes) -> _DocumentT:
+        """从 JSON 文本恢复共享文档，并复用唯一的协议校验入口。"""
+        return cls.from_dict(json.loads(value))
 
 
 class ModelJson(DocumentModel):
     """Analyze 返回的完整严格 Model JSON 对象。"""
 
-    schema_name: ClassVar[str] = "docvortex.model"
+    schema_id: Literal["docvortex.model"] = Field(default="docvortex.model", alias="schema")
     pages: list[list[dict[str, Any]]]
     page_index_map: list[int]
-    file_suffix: FileSuffix
 
     @model_validator(mode="after")
     def _validate_page_index_map(self) -> ModelJson:
@@ -982,10 +1036,9 @@ class PageInfo(_StrictMiddleModel):
 class MiddleJson(DocumentModel):
     """Analyze 返回的完整严格 Middle JSON 对象。"""
 
-    schema_name: ClassVar[str] = "docvortex.middle"
+    schema_id: Literal["docvortex.middle"] = Field(default="docvortex.middle", alias="schema")
     pages: list[PageInfo]
     is_full_document: bool
-    file_suffix: FileSuffix
 
     @model_validator(mode="after")
     def _validate_document(self) -> MiddleJson:
@@ -995,18 +1048,19 @@ class MiddleJson(DocumentModel):
             raise ValueError("page_idx values must be unique")
         if any(current <= previous for previous, current in zip(page_indices, page_indices[1:])):
             raise ValueError("page_idx values must be strictly increasing")
-        if self.file_suffix in {"pdf", "ofd"}:
+        if self.metadata.file_suffix in {"pdf", "ofd"}:
             for page in self.pages:
                 for block in page.blocks:
                     if block.bbox is None:
                         raise ValueError(
                             f"Fixed-layout top-level block requires bbox: "
-                            f"file_suffix={self.file_suffix}, page_idx={page.page_idx}, index={block.index}"
+                            f"file_suffix={self.metadata.file_suffix}, page_idx={page.page_idx}, index={block.index}"
                         )
         return self
 
 
 __all__ = [
+    "DocumentMetadata",
     "RawBlockType",
     "RAW_ALGORITHM",
     "RAW_CAPTION",

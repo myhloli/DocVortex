@@ -166,7 +166,7 @@ def source_case(name: str) -> tuple[object, dict[str, object], str]:
                     ],
                 )
             ],
-            file_suffix="html",
+            metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
             is_full_document=True,
         )
         return middle, {}, digest(middle.to_json().encode())

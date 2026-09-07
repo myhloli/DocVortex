@@ -16,8 +16,7 @@ def _model_json(
     return ModelJson(
         pages=pages if pages is not None else [[{"type": "text", "content": inline("正文")}]],
         page_index_map=page_index_map if page_index_map is not None else [],
-        file_suffix="docx",
-        producer=Producer(name="docvortex", version="3.4.0"),
+        metadata={"file_suffix": "docx", "producer": Producer(name="docvortex", version="3.4.0")},
         extensions={},
     )
 
@@ -64,7 +63,6 @@ def test_model_json_rejects_invalid_page_structure(pages: object) -> None:
         ModelJson(
             pages=pages,
             page_index_map=[],
-            file_suffix="pdf",
-            producer=Producer(name="docvortex", version="3.4.0"),
+            metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="3.4.0")},
             extensions={},
         )

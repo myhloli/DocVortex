@@ -145,7 +145,9 @@ def _wire_contract_middle() -> MiddleJson:
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
 
@@ -979,7 +981,7 @@ def test_html_local_base_images_styles_and_escape_are_bounded(tmp_path: Path) ->
 
     result = parse(source)
 
-    assert result.middle_json.file_suffix == "html"
+    assert result.middle_json.metadata.file_suffix == "html"
     image_key = _image_body(result.middle_json).image_path
     assert image_key is not None
     assert result.assets[image_key] == image_path.read_bytes()
@@ -1149,7 +1151,9 @@ def test_html_versioned_wire_roundtrips_empty_code_body() -> None:
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
 
@@ -1203,7 +1207,13 @@ def test_html_versioned_wire_roundtrips_all_semantic_types() -> None:
 def test_html_wire_decode_distinguishes_absent_empty_and_noncanonical() -> None:
     """验证单一 decode 入口区分普通 HTML、合法空 wire 与非 canonical v1。"""
     source = MiddleJson.model_validate(
-        {"pages": [{"page_idx": 0, "blocks": []}], "is_full_document": True, "file_suffix": "html"}
+        {
+            "pages": [{"page_idx": 0, "blocks": []}],
+            "is_full_document": True,
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
+        }
     )
     ordinary = html_document_module.parse_html_document(b"<html><body><p>ordinary</p></body></html>")
     empty = html_document_module.parse_html_document(render_html(source, standalone=False).encode())
@@ -1245,7 +1255,9 @@ def test_html_versioned_wire_preserves_visual_rich_content(
         {
             "pages": [{"page_idx": 0, "blocks": [{"type": parent_type, "index": 0, "sub_type": "diagram", "content": [body]}]}],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     rendered = render_html(source, standalone=False)
@@ -1308,7 +1320,9 @@ def test_html_versioned_wire_roundtrips_canonical_visual_body_variants() -> None
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     rendered = render_html(source, standalone=False)
@@ -1343,7 +1357,9 @@ def test_html_versioned_wire_distinguishes_index_carrier_from_inline_link() -> N
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     rendered = render_html(source, standalone=False)
@@ -1390,7 +1406,9 @@ def test_html_noncanonical_wire_structural_edits_use_generic_fallback(edit_kind:
                     }
                 ],
                 "is_full_document": True,
-                "file_suffix": "html",
+                "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+                "schema": "docvortex.middle",
+                "schema_version": "2.0",
             }
         )
         soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")
@@ -1429,7 +1447,9 @@ def test_html_versioned_list_content_outside_carrier_falls_back_without_loss(out
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")
@@ -1474,7 +1494,9 @@ def test_html_invalid_versioned_markers_fallback_without_partial_results() -> No
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     base = render_html(source, standalone=False)
@@ -1551,7 +1573,9 @@ def test_html_versioned_wire_multiple_owned_images_fall_back_without_loss(
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")
@@ -1573,7 +1597,9 @@ def test_html_versioned_wire_visible_structural_text_falls_back_without_loss() -
         {
             "pages": [{"page_idx": 0, "blocks": [{"type": "text", "index": 0, "content": inline("Original wire text")}]}],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     default_html = render_html(source, standalone=False)
@@ -1609,7 +1635,9 @@ def test_html_versioned_wire_visible_sibling_falls_back_without_loss(position: s
         {
             "pages": [{"page_idx": 0, "blocks": [{"type": "text", "index": 0, "content": inline("Original wire text")}]}],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")
@@ -1638,7 +1666,9 @@ def test_html_versioned_wire_markerless_block_child_falls_back_without_crash() -
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")
@@ -1671,7 +1701,9 @@ def test_html_versioned_wire_edited_code_body_falls_back_without_loss() -> None:
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")
@@ -1705,7 +1737,9 @@ def test_html_versioned_wire_edited_algorithm_body_falls_back_without_loss() -> 
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")
@@ -1736,7 +1770,9 @@ def test_html_versioned_wire_edited_table_body_falls_back_without_loss() -> None
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")
@@ -1768,7 +1804,9 @@ def test_html_versioned_wire_edited_flowchart_body_falls_back_without_loss() -> 
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")
@@ -1802,7 +1840,9 @@ def test_html_marker_fallback_does_not_double_resolve_images(monkeypatch: pytest
                 }
             ],
             "is_full_document": True,
-            "file_suffix": "html",
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
         }
     )
     soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")

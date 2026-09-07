@@ -41,8 +41,7 @@ def _middle_with_text_anchor() -> MiddleJson:
             ),
         ],
         is_full_document=True,
-        file_suffix="docx",
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": "docx", "producer": Producer(name="docvortex", version="test")},
         extensions={},
     )
 
@@ -62,8 +61,7 @@ def test_text_anchor_is_strict_and_blocks_continuation_merge() -> None:
             PageInfo(page_idx=1, blocks=[anchored.model_copy(update={"index": 0})]),
         ],
         is_full_document=True,
-        file_suffix="docx",
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": "docx", "producer": Producer(name="docvortex", version="test")},
         extensions={},
     )
 
@@ -88,8 +86,7 @@ def test_duplicate_and_empty_text_anchors_emit_only_the_first_visible_target() -
             )
         ],
         is_full_document=True,
-        file_suffix="docx",
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": "docx", "producer": Producer(name="docvortex", version="test")},
         extensions={},
     )
 

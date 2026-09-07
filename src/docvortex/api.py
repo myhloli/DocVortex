@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING
 from .assets import AssetStore
 from .document.source import HtmlSourceContext, prepare_source
 from .result import AnalysisResult, Diagnostic, DocumentResult, ExportResult, RenderArtifact
-from .schema import FileSuffix, MiddleJson, ModelJson, PageInfo
+from .schema import DocumentMetadata, FileSuffix, MiddleJson, ModelJson, PageInfo, Producer
+from .version import __version__
 from .render.contracts import DocxRenderOptions, EpubRenderOptions, PdfRenderOptions, RenderFormat, RenderOptions
 
 if TYPE_CHECKING:
@@ -79,7 +80,13 @@ def analyze(
                 "odp": models.OdpModel,
             }
             pages = model_types[prepared.file_suffix]().predict(BytesIO(prepared.data))
-        model = ModelJson(pages=pages, page_index_map=prepared.page_index_map or [], file_suffix=prepared.file_suffix)
+        model = ModelJson(
+            pages=pages,
+            page_index_map=prepared.page_index_map or [],
+            metadata=DocumentMetadata(
+                file_suffix=prepared.file_suffix, producer=Producer(name="docvortex", version=__version__)
+            ),
+        )
         diagnostics = tuple(
             Diagnostic("broken_page", "The selected PDF page could not be loaded", index)
             for index in prepared.broken_page_indices

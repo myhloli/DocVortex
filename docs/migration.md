@@ -1,3 +1,9 @@
+# Current JSON migration
+
+DocVortex 0.2.0 directly switches shared Model/Middle and bundle JSON to version 2.0.
+See [JSON_PROTOCOL.md](JSON_PROTOCOL.md) for required metadata, Python interfaces,
+product extensions and rejection of historical results.
+
 # DocGale extraction baseline
 
 Source: MinerU `23d6e51185b1aa8868965fb45d644ccc0071ce68`.

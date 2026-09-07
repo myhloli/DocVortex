@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "DocumentMetadata": {
+      "additionalProperties": false,
+      "description": "承载文档格式和真实生产者，读取时不补造来源信息。",
+      "properties": {
+        "file_suffix": {
+          "enum": [
+            "pdf",
+            "doc",
+            "docx",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "rtf",
+            "csv",
+            "epub",
+            "html",
+            "ofd",
+            "odt",
+            "ods",
+            "odp"
+          ],
+          "title": "File Suffix",
+          "type": "string"
+        },
+        "producer": {
+          "$ref": "#/$defs/Producer"
+        }
+      },
+      "required": [
+        "file_suffix",
+        "producer"
+      ],
+      "title": "DocumentMetadata",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Producer": {
+      "additionalProperties": false,
+      "description": "记录语言无关的文档生产者，避免绑定宿主产品元数据。",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "Producer",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Analyze 返回的完整严格 Model JSON 对象。",
+  "properties": {
+    "metadata": {
+      "$ref": "#/$defs/DocumentMetadata"
+    },
+    "extensions": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Extensions",
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "schema": {
+      "const": "docvortex.model",
+      "default": "docvortex.model",
+      "title": "Schema",
+      "type": "string"
+    },
+    "pages": {
+      "items": {
+        "items": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "title": "Pages",
+      "type": "array"
+    },
+    "page_index_map": {
+      "items": {
+        "type": "integer"
+      },
+      "title": "Page Index Map",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "schema_version",
+    "metadata",
+    "pages",
+    "page_index_map"
+  ],
+  "title": "ModelJson",
+  "type": "object"
+}

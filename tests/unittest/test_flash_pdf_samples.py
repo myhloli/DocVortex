@@ -84,8 +84,7 @@ def _model_json(
     return ModelJson(
         pages=pages,
         page_index_map=page_index_map or [],
-        file_suffix="pdf",
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="test")},
     )
 
 
@@ -701,8 +700,7 @@ def test_demo2_page1_forms_sixteen_blocks_and_keeps_figure_caption_separate() ->
         MiddleJson(
             pages=model_json_to_pages(_model_json([page], page_index_map=[0])),
             is_full_document=False,
-            file_suffix="pdf",
-            producer=Producer(name="docvortex", version="test"),
+            metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="test")},
         )
     )
     abstract_markdown = next(
@@ -1144,8 +1142,7 @@ def test_demo3_pages6_7_and10_fix_caption_inline_titles_and_reference_tail() -> 
         MiddleJson(
             pages=model_json_to_pages(_model_json([page7], page_index_map=[6])),
             is_full_document=False,
-            file_suffix="pdf",
-            producer=Producer(name="docvortex", version="test"),
+            metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="test")},
         )
     )
     assert "**Attention Bias Scaling.** Unlike" in page7_markdown

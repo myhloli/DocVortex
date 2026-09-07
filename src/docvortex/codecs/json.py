@@ -1,29 +1,17 @@
-"""版本化 DocVortex JSON 的独立读取接口。"""
-
-from __future__ import annotations
+"""共享文档协议的显式读取入口。"""
 
 from typing import Any
-
 from ..schema import MiddleJson, ModelJson
 
 
-def _payload(value: dict[str, Any], expected_schema: str) -> dict[str, Any]:
-    """先验证协议身份和版本，再交给严格类型校验内容。"""
-    if value.get("schema") != expected_schema or value.get("schema_version") != "1.0":
-        raise ValueError(f"Expected {expected_schema} schema version 1.0")
-    if "producer" not in value:
-        raise ValueError("Missing document producer")
-    return {key: item for key, item in value.items() if key not in {"schema", "schema_version"}}
-
-
 def load_model(value: dict[str, Any]) -> ModelJson:
-    """读取原生分析协议，不执行解析或后处理。"""
-    return ModelJson.model_validate(_payload(value, "docvortex.model"))
+    """读取新版分析文档，不执行解析、补写来源或历史迁移。"""
+    return ModelJson.from_dict(value)
 
 
 def load_middle(value: dict[str, Any]) -> MiddleJson:
-    """读取语义文档协议，不访问源文件或素材。"""
-    return MiddleJson.model_validate(_payload(value, "docvortex.middle"))
+    """读取新版语义文档，不访问源文件和外部素材。"""
+    return MiddleJson.from_dict(value)
 
 
 __all__ = ["load_model", "load_middle"]

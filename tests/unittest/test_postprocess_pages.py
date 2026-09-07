@@ -68,8 +68,7 @@ def _model_json(
     return ModelJson(
         pages=[_spanize_blocks(deepcopy(page)) for page in pages],
         page_index_map=page_index_map or [],
-        file_suffix="pdf",
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="test")},
         extensions={},
     )
 

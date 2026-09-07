@@ -35,7 +35,7 @@ def test_reference_barriers_anchors_and_page_modes() -> None:
                 ],
             ),
         ],
-        file_suffix="html",
+        metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
         is_full_document=True,
     )
     before = middle.model_dump()
@@ -63,7 +63,7 @@ def test_merged_lists_do_not_change_epub_identity_or_input() -> None:
             )
             for i in range(3)
         ],
-        file_suffix="html",
+        metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
         is_full_document=True,
     )
     before = middle.model_dump()
@@ -78,7 +78,9 @@ def test_owned_context_is_consumed_and_recovers_after_exception() -> None:
     from docvortex.render._internal.common.context import owned_render_document
 
     middle = MiddleJson(
-        pages=[PageInfo(page_idx=0, blocks=[text_block(0, "original")])], file_suffix="html", is_full_document=True
+        pages=[PageInfo(page_idx=0, blocks=[text_block(0, "original")])],
+        metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+        is_full_document=True,
     )
     with pytest.raises(RuntimeError), owned_render_document(middle):
         first = build_render_plan(middle)
@@ -122,7 +124,7 @@ def test_callback_failure_and_repeated_exports_leave_source_untouched() -> None:
     body = ImageBodyBlock(type="image_body", content="", index=0, image_path="images/a.png")
     middle = MiddleJson(
         pages=[PageInfo(page_idx=0, blocks=[ImageBlock(type="image", index=0, content=[body])])],
-        file_suffix="html",
+        metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
         is_full_document=True,
     )
     before = middle.model_dump()

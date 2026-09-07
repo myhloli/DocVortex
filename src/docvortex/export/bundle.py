@@ -47,7 +47,7 @@ def save_bundle(result: DocumentResult, path: Path, *, overwrite: bool = False) 
     files: dict[str, bytes] = {"middle.json": middle.to_json(skip_defaults=False).encode("utf-8")}
     manifest: dict[str, Any] = {
         "schema": "docvortex.bundle",
-        "schema_version": "1.0",
+        "schema_version": "2.0",
         "middle": "middle.json",
         "diagnostics": [asdict(item) for item in result.diagnostics],
     }
@@ -72,7 +72,7 @@ def load_bundle(path: str | Path) -> DocumentResult:
     """校验结果包版本、路径及素材摘要后恢复可渲染结果。"""
     root = Path(path).absolute()
     manifest = json.loads(_resolve_export_target(root, "manifest.json").read_text(encoding="utf-8"))
-    if manifest.get("schema") != "docvortex.bundle" or manifest.get("schema_version") != "1.0":
+    if manifest.get("schema") != "docvortex.bundle" or manifest.get("schema_version") != "2.0":
         raise ValueError("Unsupported DocVortex bundle schema")
     if manifest.get("middle") != "middle.json" or manifest.get("model") not in {None, "model.json"}:
         raise ValueError("Invalid bundle document paths")

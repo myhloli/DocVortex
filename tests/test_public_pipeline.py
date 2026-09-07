@@ -24,7 +24,7 @@ def document() -> MiddleJson:
             )
         ],
         is_full_document=True,
-        file_suffix="html",
+        metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
     )
 
 
@@ -33,7 +33,7 @@ def test_neutral_roundtrip() -> None:
     middle = document()
     payload = middle.to_dict()
     assert payload["schema"] == "docvortex.middle"
-    assert payload["producer"] == {"name": "docvortex", "version": "0.1.0"}
+    assert payload["metadata"]["producer"] == {"name": "docvortex", "version": "0.2.0"}
     assert "mineru_version" not in payload
     assert load_middle(payload) == middle
 

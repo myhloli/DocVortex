@@ -21,7 +21,9 @@ def test_host_formats_are_not_available(target: str, tmp_path: Path) -> None:
     assert util.find_spec(f"docvortex.render.{target}") is None
     with pytest.raises(ValueError):
         RenderFormat(target)
-    document = MiddleJson(pages=[], file_suffix="html", is_full_document=True)
+    document = MiddleJson(
+        pages=[], metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}}, is_full_document=True
+    )
     with pytest.raises(ValueError):
         render(document, target)
     source = tmp_path / "input.html"

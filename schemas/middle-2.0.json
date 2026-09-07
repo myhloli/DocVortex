@@ -747,6 +747,42 @@
       "title": "DocTitleBlock",
       "type": "object"
     },
+    "DocumentMetadata": {
+      "additionalProperties": false,
+      "description": "承载文档格式和真实生产者，读取时不补造来源信息。",
+      "properties": {
+        "file_suffix": {
+          "enum": [
+            "pdf",
+            "doc",
+            "docx",
+            "ppt",
+            "pptx",
+            "xls",
+            "xlsx",
+            "rtf",
+            "csv",
+            "epub",
+            "html",
+            "ofd",
+            "odt",
+            "ods",
+            "odp"
+          ],
+          "title": "File Suffix",
+          "type": "string"
+        },
+        "producer": {
+          "$ref": "#/$defs/Producer"
+        }
+      },
+      "required": [
+        "file_suffix",
+        "producer"
+      ],
+      "title": "DocumentMetadata",
+      "type": "object"
+    },
     "EquationBlock": {
       "additionalProperties": false,
       "properties": {
@@ -1775,18 +1811,20 @@
       "description": "记录语言无关的文档生产者，避免绑定宿主产品元数据。",
       "properties": {
         "name": {
-          "default": "docvortex",
           "minLength": 1,
           "title": "Name",
           "type": "string"
         },
         "version": {
-          "default": "0.1.0",
           "minLength": 1,
           "title": "Version",
           "type": "string"
         }
       },
+      "required": [
+        "name",
+        "version"
+      ],
       "title": "Producer",
       "type": "object"
     },
@@ -2337,8 +2375,8 @@
   "additionalProperties": false,
   "description": "Analyze 返回的完整严格 Middle JSON 对象。",
   "properties": {
-    "producer": {
-      "$ref": "#/$defs/Producer"
+    "metadata": {
+      "$ref": "#/$defs/DocumentMetadata"
     },
     "extensions": {
       "additionalProperties": {
@@ -2346,6 +2384,18 @@
       },
       "title": "Extensions",
       "type": "object"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "schema": {
+      "const": "docvortex.middle",
+      "default": "docvortex.middle",
+      "title": "Schema",
+      "type": "string"
     },
     "pages": {
       "items": {
@@ -2357,44 +2407,15 @@
     "is_full_document": {
       "title": "Is Full Document",
       "type": "boolean"
-    },
-    "file_suffix": {
-      "enum": [
-        "pdf",
-        "doc",
-        "docx",
-        "ppt",
-        "pptx",
-        "xls",
-        "xlsx",
-        "rtf",
-        "csv",
-        "epub",
-        "html",
-        "ofd",
-        "odt",
-        "ods",
-        "odp"
-      ],
-      "title": "File Suffix",
-      "type": "string"
-    },
-    "schema": {
-      "const": "docvortex.middle"
-    },
-    "schema_version": {
-      "const": "1.0"
     }
   },
   "required": [
-    "pages",
-    "is_full_document",
-    "file_suffix",
     "schema",
     "schema_version",
-    "producer"
+    "metadata",
+    "pages",
+    "is_full_document"
   ],
   "title": "MiddleJson",
-  "type": "object",
-  "$schema": "https://json-schema.org/draft/2020-12/schema"
+  "type": "object"
 }

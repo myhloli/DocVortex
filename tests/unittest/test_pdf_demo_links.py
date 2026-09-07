@@ -26,9 +26,15 @@ def test_demo1_pdf_link_reaches_model_middle_and_all_renderers() -> None:
     )
 
     middle = MiddleJson(
-        pages=model_json_to_pages(ModelJson(pages=model_list, page_index_map=[], file_suffix="pdf")),
+        pages=model_json_to_pages(
+            ModelJson(
+                pages=model_list,
+                page_index_map=[],
+                metadata={"file_suffix": "pdf", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            )
+        ),
         is_full_document=True,
-        file_suffix="pdf",
+        metadata={"file_suffix": "pdf", "producer": {"name": "docvortex", "version": "0.2.0"}},
     )
     link_block = next(
         block
@@ -38,7 +44,7 @@ def test_demo1_pdf_link_reaches_model_middle_and_all_renderers() -> None:
     link_middle = MiddleJson(
         pages=[PageInfo(page_idx=0, blocks=[link_block])],
         is_full_document=True,
-        file_suffix="pdf",
+        metadata={"file_suffix": "pdf", "producer": {"name": "docvortex", "version": "0.2.0"}},
     )
     assert f"[{label}]({target})" in render_markdown(link_middle)
     assert f'href="{target}"' in render_html(link_middle, standalone=False)

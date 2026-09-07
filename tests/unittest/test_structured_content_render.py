@@ -36,8 +36,7 @@ def _middle(*pages: PageInfo, file_suffix: str = "docx") -> MiddleJson:
     return MiddleJson(
         pages=list(pages),
         is_full_document=True,
-        file_suffix=file_suffix,
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": file_suffix, "producer": Producer(name="docvortex", version="test")},
         extensions={},
     )
 
@@ -99,9 +98,9 @@ def test_structured_content_preserves_document_tree_without_merging_or_mutation(
     result = render_structured_content(middle)
 
     assert json.loads(json.dumps(result, ensure_ascii=False)) == result
-    assert result["file_suffix"] == "docx"
-    assert set(result) == {"file_suffix", "pages", "is_full_document", "producer"}
-    assert result["producer"] == {"version": "test"}
+    assert result["metadata"]["file_suffix"] == "docx"
+    assert set(result) == {"metadata", "extensions", "pages", "is_full_document"}
+    assert result["metadata"]["producer"] == {"name": "docvortex", "version": "test"}
     assert result["is_full_document"] is True
     assert [page["page_idx"] for page in result["pages"]] == [0, 1]
     assert [block["type"] for block in result["pages"][0]["blocks"]] == [

@@ -85,8 +85,9 @@ Applications can use the classification result to select their own OCR or
 inference service when a document requires it.
 
 DocVortex JSON uses schema identity `docvortex.model` or `docvortex.middle`, schema
-version `1.0`, and neutral producer metadata. Definitions are in `schemas/`.
+version `2.0`, and required `metadata.file_suffix` / `metadata.producer`. Definitions are in `schemas/`.
 Application-specific metadata belongs in `extensions`. See the
+[shared JSON protocol and migration guide](docs/JSON_PROTOCOL.md) and the
 [compatibility guide](docs/COMPATIBILITY.md) for existing application integrations
 and historical data formats. The [HTML protocol](docs/HTML_PROTOCOL.md) describes
 DocVortex markers and semantic round trips.

@@ -23,8 +23,7 @@ def _middle_json_with_table(body: TableBodyBlock) -> MiddleJson:
     return MiddleJson(
         pages=[PageInfo(page_idx=3, blocks=[table])],
         is_full_document=True,
-        file_suffix="docx",
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": "docx", "producer": Producer(name="docvortex", version="test")},
         extensions={},
     )
 
@@ -56,8 +55,7 @@ def test_equation_export_uses_canonical_sidecar_name(tmp_path: Path) -> None:
     middle_json = MiddleJson(
         pages=[PageInfo(page_idx=3, blocks=[equation])],
         is_full_document=True,
-        file_suffix="docx",
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": "docx", "producer": Producer(name="docvortex", version="test")},
         extensions={},
     )
 

@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov", "markdown"]
+test = ["pytest", "pytest-cov", "markdown", "jsonschema>=4,<5"]
 dev = ["ruff==0.14.2", "build", "twine"]
 
 [project.urls]

@@ -185,8 +185,7 @@ def test_model_json_rejects_legacy_inline_string_with_page_and_block_location() 
         ModelJson(
             pages=[[{"type": BlockType.TEXT, "content": "legacy string"}]],
             page_index_map=[],
-            file_suffix="docx",
-            producer=Producer(name="docvortex", version="test"),
+            metadata={"file_suffix": "docx", "producer": Producer(name="docvortex", version="test")},
             extensions={},
         )
 
@@ -289,8 +288,7 @@ def test_formula_number_is_rejected_by_middle_json_boundary_and_schema() -> None
             ModelJson(
                 pages=[[{"type": RAW_FORMULA_NUMBER, "bbox": [0.7, 0.3, 0.8, 0.4], "content": "(1)"}]],
                 page_index_map=[],
-                file_suffix="pdf",
-                producer=Producer(name="docvortex", version="test"),
+                metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="test")},
                 extensions={},
             )
         )
@@ -555,8 +553,7 @@ def test_middle_json_pdf_requires_top_level_bbox_and_round_trips() -> None:
         MiddleJson(
             pages=[PageInfo(page_idx=0, blocks=[TextBlock(type="text", index=0, content=_inline("x"))])],
             is_full_document=True,
-            file_suffix="pdf",
-            producer=Producer(name="docvortex", version="test"),
+            metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="test")},
             extensions={},
         )
     middle_json = MiddleJson(
@@ -567,8 +564,7 @@ def test_middle_json_pdf_requires_top_level_bbox_and_round_trips() -> None:
             )
         ],
         is_full_document=True,
-        file_suffix="pdf",
-        producer=Producer(name="docvortex", version="test"),
+        metadata={"file_suffix": "pdf", "producer": Producer(name="docvortex", version="test")},
         extensions={},
     )
     restored = load_middle(json.loads(middle_json.to_json()))

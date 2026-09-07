@@ -69,7 +69,7 @@ def render_structured_content(
     delimiters = latex_delimiters or LatexDelimitersConfig()
     document_fields = middle_json.model_dump(
         mode="json",
-        exclude={"pages"},
+        exclude={"pages", "schema_id", "schema_version"},
         exclude_defaults=True,
     )
     pages = [

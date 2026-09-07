@@ -118,7 +118,7 @@ def test_non_pdf_public_analysis_does_not_normalize(suffix: str, source: str, mo
 def test_model_loading_and_rendering_do_not_rewrite_old_pdf_results(tmp_path: Path) -> None:
     """旧 ModelJson、结果包和显式后处理不会因为升级包而隐式转换文本。"""
     model = ModelJson(
-        file_suffix="pdf",
+        metadata={"file_suffix": "pdf", "producer": {"name": "docvortex", "version": "0.2.0"}},
         page_index_map=[],
         pages=[
             [
