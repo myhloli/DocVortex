@@ -101,6 +101,12 @@ class OfdPackage:
         self._asset_bytes = 0
         self._root: etree._Element | None = None
 
+    def charge_generated_asset(self, size: int) -> None:
+        """将生成的 PNG 与包内读取素材累计到同一文档资产预算。"""
+        if self._asset_bytes + size > MAX_ASSET_TOTAL_BYTES:
+            raise OfdResourceLimitError(f"OFD resource limit exceeded: max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}")
+        self._asset_bytes += size
+
     @staticmethod
     def _is_safe_member_name(name: str) -> bool:
         """判断 ZIP 成员是否为包内安全 POSIX 路径。"""

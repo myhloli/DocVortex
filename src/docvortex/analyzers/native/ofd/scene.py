@@ -15,7 +15,8 @@ from .images import build_image_item
 from .models import OfdPageScene, PageBuildContext, PageRef, ResourceRegistry, TemplateRef
 from .package import OfdPackage, element_text, first_child, first_descendant, local_name, namespace_name, parse_int
 from .path import OfdPathBudget, build_axis_lines
-from .resources import merge_registries, parse_resource_part, resolve_draw_param
+from .resources import merge_registries, parse_resource_part, resolve_draw_param, drawing_attributes, merge_drawing_attributes
+from .vector import build_vector_path, UnsupportedVector, parse_clip_groups
 from .text import FontMetricResolver, OfdTextBudget, build_text_lines
 
 
@@ -200,7 +201,7 @@ class OfdSceneBuilder:
         """为 PageBlock 或 CompositeObject 计算子级变换和裁剪。"""
         boundary = parse_st_box(element.get("Boundary"))
         if boundary is None:
-            return context
+            return replace(context, transform=context.transform.compose(parse_affine(element.get("CTM"))))
         boundary_page = transform_bbox(boundary, context.transform)
         if boundary_page is None:
             return None
@@ -221,13 +222,25 @@ class OfdSceneBuilder:
         """按父上下文、DrawParam 和对象直接属性解析最终样式。"""
         style = dict(context.draw_style)
         try:
-            style.update(resolve_draw_param(resources, parse_int(element.get("DrawParam"))))
+            style = merge_drawing_attributes(style, resolve_draw_param(resources, parse_int(element.get("DrawParam"))))
         except OfdResourceLimitError:
             raise
         except ValueError as exc:
             raise OfdParseError(str(exc)) from exc
-        style.update({str(key): str(value) for key, value in element.attrib.items()})
+        style = merge_drawing_attributes(style, drawing_attributes(element))
         return style
+
+    def _vector_clip_context(self, element: etree._Element, context: PageBuildContext, scene: OfdPageScene) -> PageBuildContext:
+        """传递祖先裁剪，无法解释时只禁用整页回退并保留明确诊断。"""
+        try:
+            clips = parse_clip_groups(element, context.transform, self.path_budget)
+        except OfdResourceLimitError:
+            raise
+        except ValueError as exc:
+            scene.vector_unsupported = True
+            scene.diagnostics.append({"code": "ofd_vector_unsupported", "message": str(exc)})
+            return context
+        return replace(context, vector_clips=context.vector_clips + clips)
 
     def _walk(
         self,
@@ -261,7 +274,10 @@ class OfdSceneBuilder:
                     resolved_context,
                     draw_style=self._resolved_style(child, context, resources),
                 )
+            if name in {"Layer", "PageBlock"}:
+                child_context = self._vector_clip_context(child, child_context, scene)
             if name == "TextObject":
+                scene.text_object_count += 1
                 lines = build_text_lines(
                     child,
                     parent_transform=context.transform,
@@ -279,20 +295,40 @@ class OfdSceneBuilder:
                 self._paint_order += max(1, len(lines))
                 continue
             if name == "PathObject":
-                scene.axis_lines.extend(
-                    build_axis_lines(
+                style = self._resolved_style(child, context, resources)
+                try:
+                    vector = build_vector_path(
                         child,
                         parent_transform=context.transform,
                         parent_clip=context.clip_bbox,
-                        paint_order=self._paint_order,
-                        template_id=context.template_id,
+                        style=style,
                         budget=self.path_budget,
-                        resolved_style=self._resolved_style(child, context, resources),
+                        parent_clips=context.vector_clips,
                     )
-                )
+                except OfdResourceLimitError:
+                    raise
+                except (UnsupportedVector, ValueError) as exc:
+                    scene.vector_unsupported = True
+                    scene.diagnostics.append({"code": "ofd_vector_unsupported", "message": str(exc)})
+                    vector = None
+                if vector is not None:
+                    scene.vector_paths.append(vector)
+                    scene.axis_lines.extend(
+                        build_axis_lines(
+                            child,
+                            parent_transform=context.transform,
+                            parent_clip=context.clip_bbox,
+                            paint_order=self._paint_order,
+                            template_id=context.template_id,
+                            budget=self.path_budget,
+                            resolved_style=style,
+                            commands=vector.commands,
+                        )
+                    )
                 self._paint_order += 1
                 continue
             if name == "ImageObject":
+                scene.image_object_count += 1
                 image = build_image_item(
                     child,
                     parent_transform=context.transform,
@@ -323,6 +359,7 @@ class OfdSceneBuilder:
                     resolved_context,
                     draw_style=self._resolved_style(child, context, resources),
                 )
+                resolved_context = self._vector_clip_context(child, resolved_context, scene)
                 content = first_descendant(composite.element, "Content")
                 if content is not None:
                     self._walk(

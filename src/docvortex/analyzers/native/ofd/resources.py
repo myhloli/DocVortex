@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from loguru import logger
+from lxml import etree
 
 from .constants import MAX_DRAW_PARAM_INHERITANCE, OFD_NAMESPACES
 from .errors import OfdParseError, OfdResourceLimitError
@@ -28,6 +29,30 @@ def _resource_asset_part(package: OfdPackage, resource_part: str, base_loc: str,
 def posix_parent(part_name: str) -> str:
     """返回包成员的 POSIX 父目录。"""
     return part_name.rsplit("/", 1)[0] if "/" in part_name else ""
+
+
+def merge_drawing_attributes(base: dict[str, str], overlay: dict[str, str]) -> dict[str, str]:
+    """颜色子元素按整体覆盖，避免新颜色继承旧渐变或色空间标记。"""
+    result = dict(base)
+    for prefix in ("FillColor.", "StrokeColor."):
+        if any(key.startswith(prefix) for key in overlay):
+            result = {key: value for key, value in result.items() if not key.startswith(prefix)}
+    result.update(overlay)
+    return result
+
+
+def drawing_attributes(element: etree._Element) -> dict[str, str]:
+    """保留绘制属性及直接颜色子元素，使资源继承不会丢失背景与描边颜色。"""
+    attributes = {str(key): str(value) for key, value in element.attrib.items()}
+    for child in element:
+        name = local_name(child.tag)
+        if name not in {"FillColor", "StrokeColor"}:
+            continue
+        if child.get("Value") is None or len(child):
+            attributes[name + ".Unsupported"] = "true"
+        for key, value in child.attrib.items():
+            attributes[name + "." + key] = value
+    return attributes
 
 
 def parse_resource_part(package: OfdPackage, resource_part: str | None) -> ResourceRegistry:
@@ -76,7 +101,7 @@ def parse_resource_part(package: OfdPackage, resource_part: str | None) -> Resou
                 element=element,
             )
         elif name == "DrawParam":
-            registry.draw_params[resource_id] = {str(key): str(value) for key, value in element.attrib.items()}
+            registry.draw_params[resource_id] = drawing_attributes(element)
     return registry
 
 
@@ -115,7 +140,9 @@ def resolve_draw_param(registry: ResourceRegistry, resource_id: int | None) -> d
 
     result: dict[str, str] = {}
     for current in reversed(inheritance_chain):
-        result.update({key: value for key, value in current.items() if key not in {"ID", "Relative"}})
+        result = merge_drawing_attributes(
+            result, {key: value for key, value in current.items() if key not in {"ID", "Relative"}}
+        )
     return result
 
 

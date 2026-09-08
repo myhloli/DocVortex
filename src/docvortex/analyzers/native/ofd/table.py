@@ -19,6 +19,16 @@ _MAX_TABLE_AXIS_LINES = 2_000
 
 
 @dataclass(frozen=True, slots=True)
+class OfdTableCell:
+    """记录逻辑单元格占据的基础格范围，结束索引不包含在内。"""
+
+    row: int
+    column: int
+    end_row: int
+    end_column: int
+
+
+@dataclass(frozen=True, slots=True)
 class OfdTableRegion:
     """保存一个已物化 OFD 表格及其消耗的文字行。"""
 
@@ -30,6 +40,7 @@ class OfdTableRegion:
     xs: tuple[float, ...] = ()
     ys: tuple[float, ...] = ()
     text_lines: tuple[TextLine, ...] = ()
+    cells: tuple[OfdTableCell, ...] = ()
 
 
 @dataclass(slots=True)
@@ -77,6 +88,38 @@ def _touches(first: AxisLine, second: AxisLine) -> bool:
         horizontal.bbox[0] - _INTERSECTION_TOLERANCE <= x <= horizontal.bbox[2] + _INTERSECTION_TOLERANCE
         and vertical.bbox[1] - _INTERSECTION_TOLERANCE <= y <= vertical.bbox[3] + _INTERSECTION_TOLERANCE
     )
+
+
+def _normalize_axis_lines(lines: list[AxisLine]) -> list[AxisLine]:
+    """按轴向和近邻轨道合并重复及相接片段，在线性扫描前先排序。"""
+    tracks: list[list[AxisLine]] = []
+    for line in sorted(lines, key=lambda item: (item.orientation, _line_coord(item), _line_interval(item))):
+        if (
+            tracks
+            and line.orientation == tracks[-1][0].orientation
+            and abs(_line_coord(line) - _line_coord(tracks[-1][0])) <= _COORD_TOLERANCE
+        ):
+            tracks[-1].append(line)
+        else:
+            tracks.append([line])
+    output = []
+    for track in tracks:
+        coordinate = sum(_line_coord(line) for line in track) / len(track)
+        merged: list[tuple[float, float]] = []
+        for start, end in sorted(_line_interval(line) for line in track):
+            if merged and start <= merged[-1][1] + _INTERSECTION_TOLERANCE:
+                merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+            else:
+                merged.append((start, end))
+        width = max(line.width for line in track)
+        for start, end in merged:
+            box = (
+                (start, coordinate - width / 2, end, coordinate + width / 2)
+                if track[0].orientation == "horizontal"
+                else (coordinate - width / 2, start, coordinate + width / 2, end)
+            )
+            output.append(replace(track[0], bbox=box, width=width, paint_order=min(line.paint_order for line in track)))
+    return output
 
 
 def _components(lines: list[AxisLine], budget: OfdTableBudget) -> list[list[AxisLine]]:
@@ -179,29 +222,99 @@ def _cell_index(values: list[float], coordinate: float) -> int | None:
     return None
 
 
-def _image_cell(xs: tuple[float, ...], ys: tuple[float, ...], image: ImageItem) -> tuple[int, int] | None:
-    """仅认领完整落入唯一网格单元格的可解码图片。"""
+def _logical_cells(
+    xs: list[float], ys: list[float], lines: list[AxisLine], budget: OfdTableBudget
+) -> tuple[OfdTableCell, ...] | None:
+    """按真实分隔边连通基础格，拒绝局部断边和非矩形合并区域。"""
+    rows, columns = len(ys) - 1, len(xs) - 1
+    parents = list(range(rows * columns))
+
+    def root(index: int) -> int:
+        """查找并压缩基础格所属连通区域。"""
+        while parents[index] != index:
+            parents[index] = parents[parents[index]]
+            index = parents[index]
+        return index
+
+    def boundary_state(orientation: str, coordinate: float, start: float, end: float) -> int:
+        """返回完整边、缺失边或不确定的局部边，并累计比较预算。"""
+        aligned = []
+        for line in lines:
+            budget.charge_intersection_check()
+            if line.orientation == orientation and abs(_line_coord(line) - coordinate) <= _COORD_TOLERANCE:
+                aligned.append(line)
+        if _covers_interval(aligned, start, end):
+            return 1
+        if any(
+            min(_line_interval(line)[1], end) - max(_line_interval(line)[0], start) > _INTERSECTION_TOLERANCE
+            for line in aligned
+        ):
+            return -1
+        return 0
+
+    present_edges: list[tuple[int, int]] = []
+    for row in range(rows):
+        for column in range(columns):
+            current = row * columns + column
+            neighbors = []
+            if column + 1 < columns:
+                neighbors.append((current + 1, "vertical", xs[column + 1], ys[row], ys[row + 1]))
+            if row + 1 < rows:
+                neighbors.append((current + columns, "horizontal", ys[row + 1], xs[column], xs[column + 1]))
+            for neighbor, orientation, coordinate, start, end in neighbors:
+                state = boundary_state(orientation, coordinate, start, end)
+                if state < 0:
+                    return None
+                if state == 0:
+                    parents[root(neighbor)] = root(current)
+                else:
+                    present_edges.append((current, neighbor))
+    if any(root(first) == root(second) for first, second in present_edges):
+        return None
+    groups: dict[int, list[tuple[int, int]]] = {}
+    for index in range(rows * columns):
+        groups.setdefault(root(index), []).append(divmod(index, columns))
+    cells = []
+    for members in groups.values():
+        top, left = min(r for r, c in members), min(c for r, c in members)
+        bottom, right = max(r for r, c in members) + 1, max(c for r, c in members) + 1
+        if (bottom - top) * (right - left) != len(members):
+            return None
+        cells.append(OfdTableCell(top, left, bottom, right))
+    return tuple(sorted(cells, key=lambda cell: (cell.row, cell.column)))
+
+
+def _image_cell(table: OfdTableRegion, image: ImageItem) -> tuple[int, int] | None:
+    """仅认领完整落入唯一逻辑单元格的可解码图片，允许跨过该格内部的虚拟轨道。"""
     if image.image_base64 is None:
         return None
     x0, y0, x1, y1 = image.bbox
-    columns = [
-        index for index in range(len(xs) - 1) if xs[index] - _COORD_TOLERANCE <= x0 and x1 <= xs[index + 1] + _COORD_TOLERANCE
+    matches = [
+        cell
+        for cell in table.cells
+        if table.xs[cell.column] - _COORD_TOLERANCE <= x0
+        and x1 <= table.xs[cell.end_column] + _COORD_TOLERANCE
+        and table.ys[cell.row] - _COORD_TOLERANCE <= y0
+        and y1 <= table.ys[cell.end_row] + _COORD_TOLERANCE
     ]
-    rows = [
-        index for index in range(len(ys) - 1) if ys[index] - _COORD_TOLERANCE <= y0 and y1 <= ys[index + 1] + _COORD_TOLERANCE
-    ]
-    return (rows[0], columns[0]) if len(rows) == len(columns) == 1 else None
+    return (matches[0].row, matches[0].column) if len(matches) == 1 else None
 
 
 def _cell_lines(table: OfdTableRegion) -> dict[tuple[int, int], list[TextLine]]:
     """先按单元格分配原始文字片段，避免跨越表格边界拼接。"""
     cells: dict[tuple[int, int], list[TextLine]] = {}
+    occupancy = {
+        (r, c): (cell.row, cell.column)
+        for cell in table.cells
+        for r in range(cell.row, cell.end_row)
+        for c in range(cell.column, cell.end_column)
+    }
     for line in table.text_lines:
         center_x, center_y = bbox_center(line.bbox)
         column = _cell_index(list(table.xs), center_x)
         row = _cell_index(list(table.ys), center_y)
         if row is not None and column is not None:
-            cells.setdefault((row, column), []).append(line)
+            cells.setdefault(occupancy[(row, column)], []).append(line)
     return {key: merge_same_baseline_lines(lines) for key, lines in cells.items()}
 
 
@@ -212,7 +325,7 @@ def _serialize_grid(table: OfdTableRegion, images: list[ImageItem]) -> OfdTableR
         cells[key] = [(line.bbox, line.paint_order, line_html(line)) for line in lines if line.text.strip()]
     consumed_images: set[int] = set()
     for image in images:
-        key = _image_cell(table.xs, table.ys, image)
+        key = _image_cell(table, image)
         if key is None:
             continue
         source = html.escape(image.image_base64 or "", quote=True)
@@ -220,13 +333,22 @@ def _serialize_grid(table: OfdTableRegion, images: list[ImageItem]) -> OfdTableR
         markup = f'<img src="{source}" width="{width}">'
         cells.setdefault(key, []).append((image.bbox, image.paint_order, markup))
         consumed_images.add(id(image))
+    anchors = {(cell.row, cell.column): cell for cell in table.cells}
     output = ["<table>"]
     for row in range(len(table.ys) - 1):
         output.append("<tr>")
         for column in range(len(table.xs) - 1):
+            cell = anchors.get((row, column))
+            if cell is None:
+                continue
+            attributes = ""
+            if cell.end_row - row > 1:
+                attributes += f' rowspan="{cell.end_row - row}"'
+            if cell.end_column - column > 1:
+                attributes += f' colspan="{cell.end_column - column}"'
             items = sorted(cells.get((row, column), []), key=lambda item: (item[0][1], item[0][0], item[1]))
             content = "<br>".join(item[2] for item in items)
-            output.append(f"<td>{content}</td>")
+            output.append(f"<td{attributes}>{content}</td>")
         output.append("</tr>")
     output.append("</table>")
     return replace(table, html="".join(output), consumed_image_ids=frozenset(consumed_images))
@@ -240,6 +362,7 @@ def recover_tables(
     images: list[ImageItem] | None = None,
 ) -> list[OfdTableRegion]:
     """从页面轴向线段中恢复互不重叠的高置信表格。"""
+    axis_lines = _normalize_axis_lines(axis_lines)
     if len(axis_lines) < 4 or len(text_lines) < 2 or len(axis_lines) > _MAX_TABLE_AXIS_LINES:
         return []
     candidates: list[OfdTableRegion] = []
@@ -248,6 +371,9 @@ def recover_tables(
         if grid is None:
             continue
         xs, ys, bbox = grid
+        logical_cells = _logical_cells(xs, ys, component, budget)
+        if logical_cells is None:
+            continue
         contained: list[TextLine] = []
         for line in text_lines:
             center_x, center_y = bbox_center(line.bbox)
@@ -263,6 +389,7 @@ def recover_tables(
             OfdTableRegion(
                 bbox=bbox,
                 html="",
+                cells=logical_cells,
                 xs=tuple(xs),
                 ys=tuple(ys),
                 text_lines=tuple(contained),

@@ -32,6 +32,7 @@ def analyze(
     from .analyzers.native import models
 
     started = time.perf_counter()
+    native_diagnostics: tuple[Diagnostic, ...] = ()
     prepared = prepare_source(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context)
     try:
         if prepared.file_suffix == "pdf":
@@ -40,13 +41,18 @@ def analyze(
             assert prepared.document is not None
             pages = models.PdfModel().predict(prepared.document)
             attach_visual_block_images_from_pdf(prepared.document, pages)
+        elif prepared.file_suffix == "ofd":
+            ofd_model = models.OfdModel()
+            pages = ofd_model.predict(BytesIO(prepared.data))
+            native_diagnostics = tuple(
+                Diagnostic(str(item["code"]), str(item["message"]), item.get("page_index")) for item in ofd_model.diagnostics
+            )
         elif prepared.file_suffix == "html":
             pages = models.HtmlModel().predict(BytesIO(prepared.data), source_context=prepared.source_context)
         else:
             model_types: dict[FileSuffix, type[NativeBinaryAnalyzer]] = {
                 "csv": models.CsvModel,
                 "epub": models.EpubModel,
-                "ofd": models.OfdModel,
                 "doc": models.DocModel,
                 "docx": models.DocxModel,
                 "ppt": models.PptModel,
@@ -66,7 +72,7 @@ def analyze(
                 file_suffix=prepared.file_suffix, producer=Producer(name="docvortex", version=__version__)
             ),
         )
-        diagnostics = tuple(
+        diagnostics = native_diagnostics + tuple(
             Diagnostic("broken_page", "The selected PDF page could not be loaded", index)
             for index in prepared.broken_page_indices
         )

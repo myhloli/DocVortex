@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
 from ....schema import BBox
 from .geometry import Affine, Point, Quad
+
+if TYPE_CHECKING:
+    from .vector import VectorPath, ClipPath
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +119,10 @@ class OfdPageScene:
     axis_lines: list[AxisLine] = field(default_factory=list)
     images: list[ImageItem] = field(default_factory=list)
     diagnostics: list[dict[str, Any]] = field(default_factory=list)
+    vector_paths: list[VectorPath] = field(default_factory=list)
+    text_object_count: int = 0
+    image_object_count: int = 0
+    vector_unsupported: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,6 +159,7 @@ class PageBuildContext:
     layer_type: str
     template_id: int | None
     draw_style: dict[str, str] = field(default_factory=dict)
+    vector_clips: tuple[tuple[ClipPath, ...], ...] = ()
 
 
 __all__ = [

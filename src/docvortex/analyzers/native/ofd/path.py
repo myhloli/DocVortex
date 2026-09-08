@@ -80,49 +80,75 @@ def _line_bbox(first: tuple[float, float], second: tuple[float, float], width: f
     return None
 
 
-def _segments(value: str, transform: Affine, budget: OfdPathBudget) -> list[tuple[tuple[float, float], tuple[float, float]]]:
-    """流式提取 S/M/L/CM 直线段，曲线命令只推进当前位置。"""
-    result: list[tuple[tuple[float, float], tuple[float, float]]] = []
-    current: tuple[float, float] | None = None
-    subpath_start: tuple[float, float] | None = None
-    command: str | None = None
+PathCommand = tuple[str, tuple[float, ...]]
+
+
+def parse_path_commands(value: str, budget: OfdPathBudget) -> tuple[PathCommand, ...]:
+    """只扫描一次完整路径命令，绘制与表格检测共用同一份受限数值结果。"""
+    commands: list[PathCommand] = []
+    operator: str | None = None
     parameters: list[float] = []
-    commands = {"S", "M", "L", "Q", "B", "A", "C", "CM"}
     arity = {"S": 2, "M": 2, "L": 2, "Q": 4, "B": 6, "A": 7, "CM": 2}
+    cursor = 0
+    pending = False
     for match in _TOKEN_RE.finditer(value):
         budget.charge_token()
+        if value[cursor : match.start()].strip(" \t\r\n,"):
+            return ()
+        cursor = match.end()
         token = match.group()
-        if token in commands:
+        if token in {*arity, "C"}:
             if parameters:
-                return []
+                return ()
             budget.charge_command()
-            command = token
-            if command == "C":
-                if current is not None and subpath_start is not None and current != subpath_start:
-                    result.append((transform.apply(current), transform.apply(subpath_start)))
-                current = subpath_start
-                command = None
+            operator = token
+            pending = operator != "C"
+            if operator == "C":
+                commands.append((operator, ()))
+                operator = None
             continue
-        if command is None or command == "C":
-            return []
-        parsed = _finite_float(token)
-        if parsed is None:
-            return []
-        parameters.append(parsed)
-        if len(parameters) < arity[command]:
+        if operator is None:
+            return ()
+        number = _finite_float(token)
+        if number is None:
+            return ()
+        parameters.append(number)
+        if len(parameters) == arity[operator]:
+            if operator == "A" and (
+                parameters[0] < 0 or parameters[1] < 0 or parameters[3] not in (0, 1) or parameters[4] not in (0, 1)
+            ):
+                return ()
+            commands.append((operator, tuple(parameters)))
+            parameters.clear()
+            pending = False
+    return () if pending or parameters or value[cursor:].strip() else tuple(commands)
+
+
+def command_segments(
+    commands: tuple[PathCommand, ...], transform: Affine
+) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    """从已解析路径读取直线段，曲线只更新端点而不把控制线当表格边框。"""
+    result = []
+    current = start = None
+    for operator, values in commands:
+        if operator == "C":
+            if current is not None and start is not None and current != start:
+                result.append((transform.apply(current), transform.apply(start)))
+            current = start
             continue
-        endpoint = (parameters[-2], parameters[-1])
-        if command in {"S", "M"}:
-            current = endpoint
-            subpath_start = endpoint
-        elif command in {"L", "CM"}:
-            if current is not None:
+        endpoint = values[-2:]
+        if operator in {"S", "M"}:
+            current = start = endpoint
+        else:
+            if operator in {"L", "CM"} and current is not None:
                 result.append((transform.apply(current), transform.apply(endpoint)))
             current = endpoint
-        else:
-            current = endpoint
-        parameters.clear()
-    return [] if parameters else result
+    return result
+
+
+def _segments(value: str, transform: Affine, budget: OfdPathBudget) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+    """保留既有内部入口，复用完整命令解析提取直线段。"""
+    return command_segments(parse_path_commands(value, budget), transform)
 
 
 def build_axis_lines(
@@ -134,6 +160,7 @@ def build_axis_lines(
     template_id: int | None,
     budget: OfdPathBudget,
     resolved_style: dict[str, str] | None = None,
+    commands: tuple[PathCommand, ...] | None = None,
 ) -> list[AxisLine]:
     """从一个 PathObject 提取可见轴向线段。"""
     style = resolved_style or {}
@@ -157,42 +184,41 @@ def build_axis_lines(
     object_transform = parent_transform.compose(Affine.translation(boundary[0], boundary[1])).compose(
         parse_affine(path_object.get("CTM"))
     )
-    extracted: list[AxisLine] = []
     data = first_descendant(path_object, "AbbreviatedData")
-    segments = _segments(element_text(data), object_transform, budget) if data is not None else []
+    if commands is None:
+        commands = parse_path_commands(element_text(data), budget) if data is not None else ()
+    if any(operator in {"Q", "B", "A"} for operator, _ in commands):
+        return []
+    segments = command_segments(commands, object_transform)
+    stroke = style.get("Stroke", path_object.get("Stroke", "true")).casefold() not in {"false", "0"}
+    fill = style.get("Fill", path_object.get("Fill", "false")).casefold() in {"true", "1"}
+    extracted: list[AxisLine] = []
+    if fill and not stroke:
+        # 只把单个细长矩形归约为中心线，字形轮廓、背景和角点填充均不能提供边框证据。
+        if len(segments) != 4 or not commands or commands[-1][0] != "C":
+            return []
+        points = {point for segment in segments for point in segment}
+        xs, ys = sorted({p[0] for p in points}), sorted({p[1] for p in points})
+        if len(points) != 4 or len(xs) != 2 or len(ys) != 2:
+            return []
+        if any(first[0] != second[0] and first[1] != second[1] for first, second in segments):
+            return []
+        dx, dy = xs[-1] - xs[0], ys[-1] - ys[0]
+        if min(dx, dy) <= 0 or max(dx, dy) < 5 * min(dx, dy):
+            return []
+        orientation = "horizontal" if dx >= dy else "vertical"
+        clipped = bbox_intersection((xs[0], ys[0], xs[-1], ys[-1]), object_clip)
+        return [AxisLine(clipped, orientation, min(dx, dy), paint_order, template_id)] if clipped else []
+    if not stroke:
+        return []
+    width *= max(math.hypot(object_transform.a, object_transform.b), math.hypot(object_transform.c, object_transform.d))
     for first, second in segments:
         line = _line_bbox(first, second, width)
-        if line is None:
-            continue
-        line_bbox, orientation = line
-        clipped = bbox_intersection(line_bbox, object_clip)
-        if clipped is not None:
-            extracted.append(
-                AxisLine(
-                    bbox=clipped,
-                    orientation=orientation,
-                    width=width,
-                    paint_order=paint_order,
-                    template_id=template_id,
-                )
-            )
-    boundary_width = boundary_page[2] - boundary_page[0]
-    boundary_height = boundary_page[3] - boundary_page[1]
-    if (
-        not extracted
-        and not segments
-        and max(boundary_width, boundary_height) >= 5 * max(min(boundary_width, boundary_height), 0.01)
-    ):
-        orientation = "horizontal" if boundary_width >= boundary_height else "vertical"
-        extracted.append(
-            AxisLine(
-                bbox=object_clip,
-                orientation=orientation,
-                width=width,
-                paint_order=paint_order,
-                template_id=template_id,
-            )
-        )
+        if line is not None:
+            line_bbox, orientation = line
+            clipped = bbox_intersection(line_bbox, object_clip)
+            if clipped is not None:
+                extracted.append(AxisLine(clipped, orientation, width, paint_order, template_id))
     if not extracted and parse_int(path_object.get("ID")) is None:
         logger.debug("OFD_PATH_SKIPPED: path without stable ID produced no axis lines")
     return extracted

@@ -66,14 +66,20 @@ class HtmlModel:
 
 
 class OfdModel:
-    """将 OFD 固定版式文档包装为无状态 Flash 模型。"""
+    """包装 OFD 固定版式解析，保留最近一次调用的非致命诊断。"""
+
+    def __init__(self) -> None:
+        """初始化实例级诊断，避免不同文档间串用结果。"""
+        self.diagnostics: list[dict[str, Any]] = []
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
         """转换调用方持有的整份 OFD 流，并返回逐物理页 model-list。"""
         from .ofd.converter import OfdConverter
 
+        self.diagnostics = []
         converter = OfdConverter()
         converter.convert(file_binary)
+        self.diagnostics = converter.diagnostics
         return converter.pages
 
 
