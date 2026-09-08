@@ -71,6 +71,33 @@ PDF page selections use `1-5`, `r1` and `all`; other native formats are parsed a
 whole documents. A caller-owned `PDFDocument` can be passed to `analyze` or `parse`
 and remains open afterward.
 
+## Page images and embedded assets
+
+```python
+from docvortex.assets import parse_image_data_uri_strict, transcode_image
+from docvortex.content.tree import iter_image_payloads
+from docvortex.document.pdf import PDFDocument
+
+with PDFDocument("report.pdf") as document:
+    image = document.render_image(0, bbox=(0.1, 0.2, 0.8, 0.7), image_format="png")
+# image.data, image.width, image.height, image.mime_type and image.extension
+# remain available after the document closes.
+```
+
+`render_image` accepts zero-based page indices, optional normalized bounding boxes
+and `jpeg` (default), `png` or `webp` output. Omitting `bbox` renders the whole page.
+Crops are encoded directly to the requested format. `crop_image` continues to
+return JPEG bytes. Image sources opened with `PDFDocument.from_image` retain the
+existing image-to-PDF conversion behavior.
+
+`docvortex.assets` exposes immutable `ImageArtifact` and `ImageFormat` contracts.
+`parse_image_data_uri_strict(uri)` validates embedded image bytes and returns
+`(data, extension)`; `transcode_image(data, image_format="png")` returns an
+`ImageArtifact`. These operations do not fetch URLs or resolve filesystem paths,
+and transcoding does not add SVG rasterization support.
+`iter_image_payloads(block)` yields the current node, if it carries an image,
+then traverses its children depth first without modifying the document tree.
+
 ## Explicit PDF classification
 
 ```python

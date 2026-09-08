@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from collections.abc import Sequence
 from contextlib import contextmanager
@@ -16,7 +17,7 @@ from PIL import Image, ImageOps
 
 from ...schema import BBox, PageInfo
 from ...foundation.image import crop_pil_image
-from docvortex.foundation.image_encoding import image_to_bytes
+from ...foundation.image_encoding import ImageArtifact, ImageFormat, encode_image
 from .classify import classify
 from .pdfium import _pdfium_lock, pdfium_guard
 from .text import get_lines_from_chars as get_lines_from_chars
@@ -369,17 +370,35 @@ class PDFDocument:
         with self._open_page(page_idx) as page:
             return _page_to_image(page, scale, self.render_max_edge)
 
-    # TODO: move
-    def crop_image(self, bbox: BBox, page_idx: int) -> bytes:
-        image = self.render_page(page_idx)
+    def render_image(
+        self,
+        page_idx: int,
+        *,
+        bbox: BBox | None = None,
+        image_format: ImageFormat = "jpeg",
+        scale: float | None = None,
+    ) -> ImageArtifact:
+        """渲染整页或归一化区域并直接编码，内部图像在所有退出路径释放。"""
+        if bbox is not None and (
+            len(bbox) != 4 or not all(math.isfinite(value) for value in bbox) or bbox[0] >= bbox[2] or bbox[1] >= bbox[3]
+        ):
+            raise ValueError("bbox must be a finite, non-empty normalized rectangle")
+        image = self.render_page(page_idx, scale=scale)
         crop = None
         try:
-            crop = crop_pil_image(bbox, image.pil_image)
-            return image_to_bytes(crop, image_format="JPEG")
+            if bbox is not None:
+                crop = crop_pil_image(bbox, image.pil_image)
+                if crop.width <= 0 or crop.height <= 0:
+                    raise ValueError("bbox does not intersect the rendered page")
+            return encode_image(crop if crop is not None else image.pil_image, image_format=image_format)
         finally:
             if crop is not None:
                 crop.close()
             image.pil_image.close()
+
+    def crop_image(self, bbox: BBox, page_idx: int) -> bytes:
+        """保留已有 JPEG 字节返回契约，复用公共区域图像输出。"""
+        return self.render_image(page_idx, bbox=bbox, image_format="jpeg").data
 
     # ------------------------------------------------------------------ #
     #  Text
