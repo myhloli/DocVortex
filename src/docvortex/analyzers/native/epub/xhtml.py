@@ -54,13 +54,25 @@ _NOTE_NON_TEXT_SUBTREES = frozenset(
 )
 
 
+def _unwrap_epub_type_quotes(value: str) -> str:
+    """移除单层成对外围引号，避免把多个各自带引号的 token 当作一个整体。"""
+    normalized = value.strip()
+    quote_pairs = {'"': '"', "'": "'", "“": "”", "‘": "’"}
+    if len(normalized) < 2 or quote_pairs.get(normalized[0]) != normalized[-1]:
+        return normalized
+    inner = normalized[1:-1]
+    if normalized[0] in inner or normalized[-1] in inner:
+        return normalized
+    return inner.strip()
+
+
 def _epub_types(element: etree._Element) -> frozenset[str]:
     """读取 EPUB 命名空间或未命名 type 属性中的结构语义 token。"""
     values: list[str] = []
     for name, value in element.attrib.items():
         local_name = etree.QName(name).localname if name.startswith("{") else name.split(":", 1)[-1]
         if local_name == "type":
-            values.extend(value.casefold().split())
+            values.extend(_unwrap_epub_type_quotes(token) for token in _unwrap_epub_type_quotes(value).casefold().split())
     return frozenset(values)
 
 
