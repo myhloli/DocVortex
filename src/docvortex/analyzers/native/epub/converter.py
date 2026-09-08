@@ -72,6 +72,7 @@ class EpubConverter:
                     logger.warning("Skipping unusable EPUB spine item index={} path={!r}: {}", index, path, exc)
                     blocks = []
                 pages.append(blocks)
+            anchors.finalize_links(pages)
             self.pages = pages
         finally:
             package.close()

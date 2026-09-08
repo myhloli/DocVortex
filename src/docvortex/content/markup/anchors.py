@@ -154,6 +154,29 @@ class MarkupAnchorRegistry:
             return None
         return self._heading_anchors.get(descendant) or self._note_anchors.get(descendant)
 
+    def register_text_targets(
+        self,
+        document_key: str,
+        root: etree._Element,
+        sources: list[tuple[etree._Element, dict[str, object]]],
+    ) -> None:
+        """按源顺序把实际物化正文的多个 ID 别名绑定到一个块级 anchor。"""
+        blocks_by_source = {source: block for source, block in reversed(sources)}
+        for element in root.iter():
+            if not isinstance(element.tag, str) or not (fragment := element_id(element)):
+                continue
+            block = blocks_by_source.get(element)
+            if block is None:
+                continue
+            target_key = (document_key, fragment)
+            if target_key in self._targets:
+                continue
+            anchor = block.get("anchor")
+            if not isinstance(anchor, str):
+                anchor = canonical_anchor(self._policy.anchor_prefix, document_key, f"text-{fragment}")
+                block["anchor"] = anchor
+            self._targets[target_key] = anchor
+
     def heading_anchor(self, heading: etree._Element) -> str | None:
         """返回一个已登记标题的规范 anchor。"""
         return self._heading_anchors.get(heading)

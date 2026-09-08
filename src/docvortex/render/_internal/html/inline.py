@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+from urllib.parse import quote, unquote
 import ipaddress
 import re
 from dataclasses import dataclass
@@ -82,19 +83,22 @@ class HtmlInlineResult:
     has_math: bool = False
 
 
-def render_inline_content_html(content: list[InlineSpan]) -> HtmlInlineResult:
+def render_inline_content_html(content: list[InlineSpan], *, anchor_targets: dict[str, str] | None = None) -> HtmlInlineResult:
     """把一段 MiddleJson 行内内容渲染为安全 HTML。"""
-    return render_inline_spans_html(content)
+    return render_inline_spans_html(content, anchor_targets=anchor_targets)
 
 
-def render_joined_inline_contents_html(contents: list[list[InlineSpan]]) -> HtmlInlineResult:
+def render_joined_inline_contents_html(
+    contents: list[list[InlineSpan]], *, anchor_targets: dict[str, str] | None = None
+) -> HtmlInlineResult:
     """按共享物理段落边界规则合并多段内容后渲染 HTML。"""
-    return render_inline_spans_html(join_inline_spans(contents))
+    return render_inline_spans_html(join_inline_spans(contents), anchor_targets=anchor_targets)
 
 
 def render_inline_spans_html(
     spans: list[InlineSpan],
     *,
+    anchor_targets: dict[str, str] | None = None,
     linkify_text: bool = True,
     separate_adjacent_math: bool = False,
     preserve_newlines: bool = False,
@@ -108,6 +112,7 @@ def render_inline_spans_html(
             span,
             linkify_text=linkify_text,
             preserve_newlines=preserve_newlines,
+            anchor_targets=anchor_targets,
         )
         if not rendered.html:
             continue
@@ -146,6 +151,7 @@ def _render_inline_span_html(
     *,
     linkify_text: bool,
     preserve_newlines: bool,
+    anchor_targets: dict[str, str] | None,
 ) -> HtmlInlineResult:
     """把一个结构化行内 Span 映射为 HTML。"""
     if isinstance(span, TextSpan):
@@ -173,6 +179,11 @@ def _render_inline_span_html(
         safe_url = sanitize_link_url(span.url)
         if not safe_url or safe_url == ".":
             return children
+        if safe_url.startswith("#") and anchor_targets is not None:
+            target = anchor_targets.get(unquote(safe_url[1:]).strip())
+            if target is None:
+                return children
+            safe_url = f"#{quote(target, safe='-._~')}"
         href = html.escape(safe_url, quote=True)
         return HtmlInlineResult(
             f'<a href="{href}" rel="noopener noreferrer">{children.html}</a>',

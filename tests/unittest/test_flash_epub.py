@@ -63,7 +63,8 @@ def test_epub_notes_use_page_footnote_and_document_wide_anchors() -> None:
     assert f"#{endnote.anchor}" in inline_urls(body_text.content)  # type: ignore[union-attr]
     assert f"#{duplicate_first.anchor}" in inline_urls(body_text.content)  # type: ignore[union-attr]
     assert "empty [4]" in inline_text(body_text.content)  # type: ignore[union-attr]
-    assert not inline_urls(first.content)  # type: ignore[union-attr]
+    assert body_text.anchor
+    assert inline_urls(first.content) == [f"#{body_text.anchor}"]  # type: ignore[union-attr]
 
     assert any(block.type == BlockType.TEXT and inline_text(block.content) == "Ordinary aside." for block in blocks)  # type: ignore[union-attr]
     assert any(block.type == BlockType.TEXT and inline_text(block.content) == "Footnotes collection label." for block in blocks)  # type: ignore[union-attr]
@@ -96,7 +97,7 @@ def test_epub_notes_use_page_footnote_and_document_wide_anchors() -> None:
     structured_blocks = [block for page in structured["pages"] for block in page["blocks"]]
     structured_footnote = next(block for block in structured_blocks if block.get("anchor") == first.anchor)
     assert structured_footnote["type"] == BlockType.PAGE_FOOTNOTE
-    assert structured_footnote["content"] == "First footnote paragraph back."
+    assert structured_footnote["content"] == f"First footnote paragraph [back](#{body_text.anchor})."
     assert any(f"](#{first.anchor})" in str(block.get("content", "")) for block in structured_blocks)
 
 
@@ -225,6 +226,7 @@ def test_epub_anchor_registry_excludes_hidden_notes(attribute: str, value: str) 
             for block in EpubChapterConverter(package, chapter_path, root, anchors).convert()
         ]
 
+        anchors.finalize_links([blocks])
         assert anchors.resolve_link("#fn-one", base_part=note_path) is None
         assert "First footnote paragraph" not in str(blocks)
         assert "Same-page [1]" in str(blocks)

@@ -195,7 +195,9 @@ class _HtmlRenderer:
         """按严格 PageBlock 具体类型返回对应语义 HTML。"""
         block = planned.block
         if isinstance(block, TextBlock):
-            rendered = render_joined_inline_contents_html(planned.text_contents or [block.content])
+            rendered = render_joined_inline_contents_html(
+                planned.text_contents or [block.content], anchor_targets=self.anchor_targets
+            )
             self._observe_inline(rendered)
             if not rendered.html:
                 return ""
@@ -203,13 +205,15 @@ class _HtmlRenderer:
             self._append_anchor_attribute(attrs, block.anchor, block_type=str(block.type))
             return f"<p {' '.join(attrs)}>{rendered.html}</p>"
         if isinstance(block, RefTextBlock):
-            rendered = render_joined_inline_contents_html(planned.text_contents or [block.content])
+            rendered = render_joined_inline_contents_html(
+                planned.text_contents or [block.content], anchor_targets=self.anchor_targets
+            )
             self._observe_inline(rendered)
             return f'<p class="docvortex-ref-text">{rendered.html}</p>' if rendered.html else ""
         if isinstance(block, (DocTitleBlock, ParagraphTitleBlock)):
             return self._render_title(block)
         if isinstance(block, PageFootnoteBlock):
-            rendered = render_inline_content_html(block.content)
+            rendered = render_inline_content_html(block.content, anchor_targets=self.anchor_targets)
             self._observe_inline(rendered)
             if not rendered.html:
                 return ""
@@ -217,7 +221,7 @@ class _HtmlRenderer:
             self._append_anchor_attribute(attrs, block.anchor, block_type=str(block.type))
             return f"<div {' '.join(attrs)}>{rendered.html}</div>"
         if isinstance(block, PageAuxTextBlock):
-            rendered = render_inline_content_html(block.content)
+            rendered = render_inline_content_html(block.content, anchor_targets=self.anchor_targets)
             self._observe_inline(rendered)
             if not rendered.html:
                 return ""
@@ -242,7 +246,7 @@ class _HtmlRenderer:
 
     def _render_title(self, block: DocTitleBlock | ParagraphTitleBlock) -> str:
         """渲染标题，并保证正文 anchor 只在首次出现时生成 id。"""
-        rendered = render_inline_content_html(block.content)
+        rendered = render_inline_content_html(block.content, anchor_targets=self.anchor_targets)
         self._observe_inline(rendered)
         if not rendered.html:
             return ""
@@ -309,7 +313,7 @@ class _HtmlRenderer:
                 add_reference_bullets,
                 explicit_markers=class_name == "docvortex-list--explicit",
             )
-            rendered = render_inline_content_html(item_content)
+            rendered = render_inline_content_html(item_content, anchor_targets=self.anchor_targets)
             self._observe_inline(rendered)
             if not rendered.html and not marker:
                 items.append(
@@ -408,7 +412,7 @@ class _HtmlRenderer:
     def _render_index_leaf(self, block: TextBlock | TitleBlockBase) -> tuple[str, list[str]]:
         """渲染目录叶子，并在 anchor 命中正文标题时生成内部链接。"""
         content = strip_index_page_tail(block.content)
-        rendered = render_inline_content_html(content)
+        rendered = render_inline_content_html(content, anchor_targets=self.anchor_targets)
         self._observe_inline(rendered)
         if not rendered.html:
             return "", _wire_block_attributes(block)
@@ -543,7 +547,7 @@ class _HtmlRenderer:
                 return HtmlInlineResult(_render_raw_fallback(content))
             self._observe_inline(rendered)
             return rendered
-        rendered = render_inline_content_html([TextSpan(type="text", content=content)])
+        rendered = render_inline_content_html([TextSpan(type="text", content=content)], anchor_targets=self.anchor_targets)
         self._observe_inline(rendered)
         return rendered
 
@@ -581,6 +585,7 @@ class _HtmlRenderer:
             rendered = render_inline_spans_html(
                 block.content,
                 linkify_text=False,
+                anchor_targets=self.anchor_targets,
                 separate_adjacent_math=True,
                 preserve_newlines=True,
             )
@@ -594,7 +599,7 @@ class _HtmlRenderer:
         block: ImageAnnotationBlock | TableAnnotationBlock | ChartAnnotationBlock | CodeAnnotationBlock,
     ) -> str:
         """把视觉说明渲染为保持原类型的独立段落。"""
-        rendered = render_inline_content_html(block.content)
+        rendered = render_inline_content_html(block.content, anchor_targets=self.anchor_targets)
         self._observe_inline(rendered)
         if not rendered.html:
             return ""

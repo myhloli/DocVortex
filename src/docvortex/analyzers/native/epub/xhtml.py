@@ -5,8 +5,10 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass
 
+from lxml import html as lxml_html
 from lxml import etree  # type: ignore[reportMissingImports]
 
+from ....content.spans import normalize_span_dicts
 from ....foundation.image_payload import parse_image_data_uri_strict
 from .._shared.hyperlink import sanitize_hyperlink_target
 from docvortex.content.markup import (
@@ -149,11 +151,12 @@ class _EpubAnchorPolicy:
 
 
 class EpubAnchorRegistry:
-    """建立章节路径、标题与 note fragment 到实际 canonical anchor 的别名表。"""
+    """建立章节路径、正文、标题与 note fragment 到实际 canonical anchor 的别名表。"""
 
     def __init__(self, chapters: list[tuple[str, etree._Element]], package: EpubPackage) -> None:
         """预扫描全部选中 XHTML 章节，建立标题、note 与章节起点映射。"""
         self._package = package
+        self._pending_links: dict[str, tuple[str, str | None]] = {}
         documents = [
             MarkupAnchorDocument(
                 key=chapter_path,
@@ -165,6 +168,35 @@ class EpubAnchorRegistry:
             for chapter_path, root in chapters
         ]
         self._registry = MarkupAnchorRegistry(documents, _EpubAnchorPolicy())
+
+    def register_text_targets(
+        self,
+        chapter_path: str,
+        root: etree._Element,
+        sources: list[tuple[etree._Element, dict[str, object]]],
+    ) -> None:
+        """在章节投影完成后登记真实正文目标，不修改已有标题和脚注身份。"""
+        self._registry.register_text_targets(chapter_path, root, sources)
+
+    def defer_link(self, href: str, *, base_part: str) -> str | None:
+        """暂存尚未物化的包内目标，跨章节投影完成后统一兑现或降级。"""
+        normalized = sanitize_hyperlink_target(href, allowed_schemes=(), allow_relative=True, allow_fragment=True)
+        target = self._package.resolve_reference(normalized, base_part=base_part) if normalized is not None else None
+        if target is None:
+            return None
+        placeholder = f"#epub-pending-{len(self._pending_links)}"
+        self._pending_links[placeholder] = (target.path, target.fragment)
+        return placeholder
+
+    def finalize_links(self, pages: list[list[dict[str, object]]]) -> None:
+        """消除所有解析期链接占位，保留无效链接的文字与样式。"""
+        targets = {
+            placeholder: (f"#{anchor}" if (anchor := self._registry.resolve_target(path, fragment)) else None)
+            for placeholder, (path, fragment) in self._pending_links.items()
+        }
+        for page in pages:
+            _finalize_pending_content(page, targets)
+        self._pending_links.clear()
 
     def heading_anchor(self, heading: etree._Element) -> str | None:
         """返回一个已预扫描 EPUB 标题的规范 anchor。"""
@@ -179,7 +211,7 @@ class EpubAnchorRegistry:
         return self._registry.note_anchor(note)
 
     def resolve_anchor(self, href: str, *, base_part: str) -> str | None:
-        """解析指向正文标题或 note 的 EPUB 包内链接，并返回不带井号的 anchor。"""
+        """解析指向已登记正文、标题或 note 的包内链接，返回不带井号的 anchor。"""
         normalized = sanitize_hyperlink_target(
             href,
             allowed_schemes=(),
@@ -194,7 +226,7 @@ class EpubAnchorRegistry:
         return self._registry.resolve_target(target.path, target.fragment)
 
     def resolve_link(self, href: str, *, base_part: str) -> str | None:
-        """解析安全外部链接或指向已输出标题/note 的 EPUB 内部链接。"""
+        """解析安全外部链接或指向已登记输出块的 EPUB 内部链接。"""
         external = sanitize_hyperlink_target(href)
         if external is not None:
             return external
@@ -217,7 +249,9 @@ class _EpubMarkupContext:
 
     def resolve_link(self, href: str) -> str | None:
         """解析安全外部链接或实际存在的 EPUB 包内 anchor。"""
-        return self.anchors.resolve_link(href, base_part=self.chapter_path)
+        return self.anchors.resolve_link(href, base_part=self.chapter_path) or self.anchors.defer_link(
+            href, base_part=self.chapter_path
+        )
 
     def resolve_image(self, source: str, *, alt: str = "") -> ResolvedMarkupImage | None:
         """读取并严格校验一个 EPUB 包内栅格图片引用。"""
@@ -278,12 +312,50 @@ class EpubChapterConverter:
         if body is None:
             return []
         context = _EpubMarkupContext(self.package, self.chapter_path, self.anchors)
-        return MarkupProjector(
+        projector = MarkupProjector(
             body,
             context,
             self.stylesheet,
             single_document_title=False,
-        ).convert()
+            track_text_sources=True,
+        )
+        blocks = projector.convert()
+        self.anchors.register_text_targets(self.chapter_path, self.root, projector.text_sources)
+        return blocks
+
+
+def _finalize_pending_content(items: list[dict[str, object]], targets: dict[str, str | None]) -> None:
+    """递归处理 raw block 和行内 Span，表格 HTML 同步替换或解包失效链接。"""
+    output: list[dict[str, object]] = []
+    flattened = False
+    for item in items:
+        content = item.get("content")
+        if isinstance(content, list):
+            _finalize_pending_content(content, targets)
+        elif item.get("type") == "table" and isinstance(content, str) and "#epub-pending-" in content:
+            root = lxml_html.fragment_fromstring(content, create_parent="div")
+            for link in root.iter("a"):
+                href = link.get("href")
+                if href in targets:
+                    if target := targets[href]:
+                        link.set("href", target)
+                    else:
+                        link.drop_tag()
+            item["content"] = (root.text or "") + "".join(lxml_html.tostring(child, encoding="unicode") for child in root)
+        url = item.get("url")
+        if item.get("type") == "hyperlink" and isinstance(url, str) and url in targets:
+            if target := targets[url]:
+                item["url"] = target
+            else:
+                if isinstance(content, list):
+                    output.extend(content)
+                flattened = True
+                continue
+        output.append(item)
+    if flattened:
+        # 只有失效链接被解包的 Span 列表需要重新合并，避免重复校验整本正文。
+        output = normalize_span_dicts(output)
+    items[:] = output
 
 
 def convert_svg_spine(
