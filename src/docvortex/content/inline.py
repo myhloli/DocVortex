@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import re
 from copy import deepcopy
 from typing import Callable, Iterable
 
 from ..schema import CodeInlineSpan, EquationInlineSpan, HyperlinkSpan, InlineSpan, TextSpan, parse_inline_spans
-from ..foundation.language import detect_lang
-from ..foundation.text import CJK_LANGS, resolve_text_line_boundary
-
-_CJK_RE = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]")
+from ..foundation.text import resolve_text_line_boundary
+from ..foundation.language import remove_invalid_surrogates
 
 
 def normalize_inline_spans(spans: Iterable[InlineSpan | dict[str, object]]) -> list[InlineSpan]:
@@ -63,7 +60,7 @@ def join_inline_spans(contents: Iterable[Iterable[InlineSpan]]) -> list[InlineSp
     """按物理段落边界规则合并多组 Span，并保持结构化语义。"""
     merged: list[InlineSpan] = []
     for content in contents:
-        current = normalize_inline_spans(list(content))
+        current = map_text_span_content(list(content), remove_invalid_surrogates)
         if not current:
             continue
         # 边界裁剪最多清空最后一个根节点；保留其前驱以重新合并新相邻的 Span。
@@ -138,7 +135,7 @@ def map_text_span_content(spans: Iterable[InlineSpan], transform: Callable[[str]
 
 
 def _join_inline_span_sequences(previous: list[InlineSpan], current: list[InlineSpan]) -> None:
-    """在两组 Span 之间应用语言相关的换行拼接规则。"""
+    """按两组 Span 的可见边界拼接，只修改可写文本叶子，保留公式和代码。"""
     previous_visible = inline_plain_text(previous).rstrip()
     current_visible = inline_plain_text(current).lstrip()
     if not previous_visible or not current_visible:
@@ -151,28 +148,13 @@ def _join_inline_span_sequences(previous: list[InlineSpan], current: list[Inline
     if first_text is not None:
         object.__setattr__(first_text, "content", first_text.content.lstrip())
 
-    language = _detect_boundary_language(f"{previous_visible}{current_visible}")
+    processed, separator = resolve_text_line_boundary(previous_visible, next_content=current_visible)
     if last_text is not None:
-        processed, separator = resolve_text_line_boundary(
-            last_text.content,
-            block_language=language,
-            next_content=current_visible,
-        )
-        object.__setattr__(last_text, "content", processed)
-    else:
-        separator = "" if language in CJK_LANGS else " "
+        # 共享规则最多删除一个行末断词符；不能把整个可见投影写回单一叶子。
+        if processed == previous_visible[:-1] and last_text.content.endswith(previous_visible[-1]):
+            object.__setattr__(last_text, "content", last_text.content[:-1])
     if separator:
         previous.append(TextSpan(type="text", content=separator))
-
-
-def _detect_boundary_language(content: str) -> str:
-    """检测段落边界语言，短 CJK 文本优先使用字符范围兜底。"""
-    if _CJK_RE.search(content):
-        return "zh"
-    try:
-        return detect_lang(content)
-    except Exception:
-        return ""
 
 
 def _first_text_span(spans: list[InlineSpan]) -> TextSpan | None:

@@ -1,10 +1,33 @@
 """跨模型共享的文本字符规范化与换行连接规则。"""
 
 import re
+import unicodedata
 from collections.abc import Sequence
 
-# 中日韩文本的物理换行通常不需要插入额外空格，集中定义以供各后端和渲染器共享。
-CJK_LANGS = frozenset({"zh", "ja", "ko"})
+from .language import remove_invalid_surrogates
+
+# 使用固定码点区间覆盖扩展汉字、假名和中日标点，避免不同 Python 的 Unicode 版本改变结果。
+_UNSPACED_RANGES = (
+    (0x3000, 0x303F),
+    (0x3040, 0x30FF),
+    (0x31F0, 0x31FF),
+    (0x3400, 0x4DBF),
+    (0x4E00, 0x9FFF),
+    (0xF900, 0xFAFF),
+    (0xFF61, 0xFF9F),
+    (0x1AFF0, 0x1AFFF),
+    (0x1B000, 0x1B16F),
+    (0x20000, 0x2EE5F),
+    (0x2F800, 0x2FA1F),
+    (0x30000, 0x323AF),
+)
+_CJK_PUNCTUATION = frozenset("，。！？；：、（）【】《》〈〉「」『』〔〕［］｛｝")
+_CLOSING_PUNCTUATION = frozenset(",.;:!?%")
+# 明确的复合词前缀与连接词只用于保守保留硬连字符，不承担语言识别或词典分词。
+_COMPOUND_PREFIXES = frozenset({"open", "non", "self", "cross", "anti", "pre", "post", "co", "semi", "multi", "quasi"})
+_COMPOUND_CONNECTORS = frozenset({"of", "the", "to", "and", "in", "for", "on", "by", "with"})
+# 只投影已有的行内样式标记，不把任意 HTML 或公式解析为可改写内容。
+_INLINE_STYLE_TAG_RE = re.compile(r"</?(?:sup|sub|b|strong|i|em|u|s|del|strike)\b[^>]*>", re.IGNORECASE)
 
 # PDF 文本抽取时，英文跨行断词可能被编码为多种 hyphen 字符。
 # 这里只用于判断“行末英文断词符”，不要扩展到 en/em dash 等普通破折号。
@@ -45,48 +68,82 @@ def _url_spans_line_boundary(previous_content: str, next_content: str) -> bool:
 def resolve_text_line_boundary(
     previous_content: str,
     *,
-    block_language: str,
     next_content: str,
 ) -> tuple[str, str]:
     """返回处理后的上一行内容和本次物理行边界分隔符。
 
     严格横跨边界的 URL 候选直接连接，但下一行自身为完整 URL 时保留空格。
-    其余 CJK 文本直接连接物理行，普通西文行插入一个空格。西文行末如果是
-    合法的 hyphen，则始终直接连接下一行，并仅在下一行以小写字母开头时删除
-    hyphen。
+    按当前可见边界判断空格，不检测整段语言。汉字和假名直接连接，韩文与
+    西文保留词间空格；既定 URL 和英文断词规则优先，且只改写真实的行末断词符。
     """
-    processed_content = previous_content.rstrip()
+    processed_content = remove_invalid_surrogates(previous_content).rstrip()
     if not processed_content:
         return "", ""
-    stripped_next = next_content.lstrip()
+    stripped_next = remove_invalid_surrogates(next_content).lstrip()
+    if not stripped_next:
+        return processed_content, ""
     if _url_spans_line_boundary(processed_content, stripped_next):
         if _URL_AT_LINE_START_RE.match(stripped_next):
             return processed_content, " "
         return processed_content, ""
-    if block_language in CJK_LANGS:
+    if is_hyphen_at_line_end(processed_content):
+        previous_word = re.search(r"([A-Za-z]+)[-\u00ad\u2010\u2011\u2043]$", processed_content)
+        # GLGE-difficult 等缩写复合词的连接符有语义，不能当作普通断词符删除。
+        acronym = previous_word is not None and len(previous_word[1]) > 1 and previous_word[1].isupper()
+        hard_compound = (
+            previous_word is not None
+            and processed_content.endswith("-")
+            and (
+                previous_word[1].lower() in _COMPOUND_PREFIXES
+                or (
+                    previous_word[1].lower() in _COMPOUND_CONNECTORS
+                    and previous_word.start() > 0
+                    and processed_content[previous_word.start() - 1] == "-"
+                )
+            )
+        )
+        if stripped_next[0].islower() and not acronym and not hard_compound:
+            return processed_content[:-1], ""
         return processed_content, ""
-    if not is_hyphen_at_line_end(processed_content):
-        return processed_content, " "
-    if stripped_next and stripped_next[0].islower():
-        return processed_content[:-1], ""
-    return processed_content, ""
+    if re.search(r"\d[-–]$", processed_content) and stripped_next[0].isdigit():
+        return processed_content, ""
+    previous_char = _boundary_character(processed_content, from_end=True)
+    next_char = _boundary_character(stripped_next, from_end=False)
+    if not previous_char or not next_char:
+        return processed_content, ""
+    if _is_unspaced_character(previous_char) or _is_unspaced_character(next_char):
+        return processed_content, ""
+    if unicodedata.category(previous_char) in {"Ps", "Pi"}:
+        return processed_content, ""
+    if unicodedata.category(next_char) in {"Pe", "Pf"} or next_char in _CLOSING_PUNCTUATION:
+        return processed_content, ""
+    return processed_content, " "
+
+
+def _boundary_character(content: str, *, from_end: bool) -> str:
+    """读取可见边界字符，忽略样式标记及附着的组合字符，不改写原始正文。"""
+    visible = _INLINE_STYLE_TAG_RE.sub("", content).strip()
+    characters = reversed(visible) if from_end else iter(visible)
+    return next((char for char in characters if unicodedata.category(char)[0] not in {"M", "C"}), "")
+
+
+def _is_unspaced_character(char: str) -> bool:
+    """判断汉字、假名及中日标点，韩文字母不属于无空格文字。"""
+    return char in _CJK_PUNCTUATION or any(start <= ord(char) <= end for start, end in _UNSPACED_RANGES)
 
 
 def merge_text_line_contents(
     line_contents: Sequence[str],
-    *,
-    block_language: str,
 ) -> str:
     """按累计文本上下文折叠物理行，支持跨越三行以上的 URL 连续拼接。"""
 
-    normalized_lines = [str(content) for content in line_contents if str(content)]
+    normalized_lines = [cleaned for content in line_contents if (cleaned := remove_invalid_surrogates(str(content)).strip())]
     if not normalized_lines:
         return ""
     merged_content = normalized_lines[0]
     for current_line in normalized_lines[1:]:
         merged_content, separator = resolve_text_line_boundary(
             merged_content,
-            block_language=block_language,
             next_content=current_line,
         )
         merged_content = f"{merged_content}{separator}{current_line}"

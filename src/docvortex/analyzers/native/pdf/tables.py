@@ -107,9 +107,6 @@ from ....schema import (
 from ....document.pdf.document import (
     PDFPathInfo as PDFPathInfo,
 )
-from ....foundation.language import (
-    detect_lang as detect_lang,
-)
 from .models import (
     _Fragment as _Fragment,
     _LineItem as _LineItem,

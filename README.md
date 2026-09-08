@@ -155,3 +155,10 @@ print(inspection.metadata.document.authors)
 All 15 native document formats support this API. Normal parsing also carries these properties in
 `metadata.document`, preserving the original PDF properties across page selections. See the
 [field definitions, format matrix, and compatibility notes](docs/METADATA.md).
+
+
+### Python 3.14 and text joining (0.3.0)
+
+DocVortex supports ordinary CPython 3.10–3.14. Physical text lines are joined by deterministic Unicode boundary rules, with URL and dehyphenation safeguards. Language detection models and the fast-langdetect / fasttext-predict dependencies are no longer required.
+
+The shared `resolve_text_line_boundary` and `merge_text_line_contents` helpers no longer accept `block_language`; `detect_lang` has been removed. Hosts should call the shared boundary helpers directly. OCR language selection and Magika code-language recognition are unchanged.

@@ -1,41 +1,12 @@
-import os
 import re
-import unicodedata
 
 DEFAULT_CODE_LANGUAGE = "txt"
 _INVALID_SURROGATES = re.compile("[\ud800-\udfff]")
 
 
-def _detect_language(text: str) -> object:
-    """首次检测时配置本地模型缓存并惰性加载语言识别器。"""
-    from fast_langdetect import detect_language
-
-    return detect_language(text, low_memory=True)
-
-
 def remove_invalid_surrogates(text: str) -> str:
     """等价移除代理码点；常见合法 Unicode 文本无需逐字符 Python 扫描。"""
     return _INVALID_SURROGATES.sub("", text)
-
-
-def detect_lang(text: str) -> str:
-    if len(text) == 0:
-        return ""
-
-    text = text.replace("\n", "")
-    text = remove_invalid_surrogates(text)
-
-    try:
-        lang_upper = _detect_language(text)
-    except Exception:
-        html_no_ctrl_chars = "".join([c for c in text if unicodedata.category(c)[0] not in ["C"]])
-        lang_upper = _detect_language(html_no_ctrl_chars)
-
-    try:
-        lang = lang_upper.lower()
-    except Exception:
-        lang = ""
-    return lang
 
 
 def _normalize_text_for_language_guess(code: str) -> str:
@@ -80,13 +51,4 @@ def guess_code_language(code: str) -> str:
     return lang if lang != "unknown" else DEFAULT_CODE_LANGUAGE
 
 
-if __name__ == "__main__":
-    print(os.getenv("FTLANG_CACHE"))
-    print(detect_lang("This is a test."))
-    print(detect_lang("<html>This is a test</html>"))
-    print(detect_lang("这个是中文测试。"))
-    print(detect_lang("<html>这个是中文测试。</html>"))
-    print(detect_lang("〖\ud835\udc46\ud835〗这是个包含utf-16的中文测试"))
-
-
-__all__ = ["DEFAULT_CODE_LANGUAGE", "detect_lang", "guess_code_language", "remove_invalid_surrogates"]
+__all__ = ["DEFAULT_CODE_LANGUAGE", "guess_code_language", "remove_invalid_surrogates"]

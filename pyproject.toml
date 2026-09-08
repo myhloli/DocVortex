@@ -27,7 +27,7 @@ dependencies = [
     "mammoth>=1.11.0,<2", "openpyxl>=3.1.5,<4", "olefile>=0.47,<1",
     "pylatexenc>=2.10,<3", "latex2mathml>=3.81.0,<4", "mathml2omml==0.0.2",
     "resvg_py>=0.5.0,<0.6",
-    "reportlab", "ziamath>=0.13,<0.14", "fast-langdetect>=0.2.3,<0.3.0",
+    "reportlab", "ziamath>=0.13,<0.14",
     "magika>=0.6.2,<1.1.0", "opencv-python>=4.11.0.86",
 ]
 

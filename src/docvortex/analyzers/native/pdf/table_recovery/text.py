@@ -234,7 +234,6 @@ def _cell_row_separator(
 
     _processed_previous, separator = resolve_text_line_boundary(
         accumulated_content,
-        block_language="en",
         next_content=next_line,
     )
     if separator != " ":

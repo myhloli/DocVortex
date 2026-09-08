@@ -16,7 +16,6 @@ from .table_text_styles import render_native_table_html_with_scripts
 from ....foundation.text import merge_text_line_contents
 from .spatial_text import project_pdf_table_text
 from ....schema import BBox
-from ....foundation.language import detect_lang
 from .models import _LineItem, _PageSource, _TableAnnotation, _TableCandidate
 from .geometry import (
     _bbox_axis_overlap_ratio,
@@ -320,14 +319,7 @@ def _merge_table_annotation_content(line_texts: list[str]) -> str:
     normalized_lines = [normalized for text in line_texts if (normalized := _normalize_native_run_text(str(text or "")))]
     if not normalized_lines:
         return ""
-    try:
-        block_language = detect_lang("".join(normalized_lines))
-    except Exception:
-        block_language = ""
-    return merge_text_line_contents(
-        normalized_lines,
-        block_language=block_language,
-    )
+    return merge_text_line_contents(normalized_lines)
 
 
 def _table_body_materialization_bbox(

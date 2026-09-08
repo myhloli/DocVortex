@@ -91,8 +91,8 @@ def test_owned_context_is_consumed_and_recovers_after_exception() -> None:
     assert build_render_plan(middle)[0][0].block is not middle.pages[0].blocks[0]
 
 
-def test_inline_join_preserves_language_inputs_links_and_empty_leaves(monkeypatch: pytest.MonkeyPatch) -> None:
-    """逐边界语言输入保持不变，空白、同目标链接和公式的语义边界可复核。"""
+def test_inline_join_preserves_links_and_empty_leaves() -> None:
+    """逐边界使用字符规则，空白、同目标链接和公式的语义边界可复核。"""
     from docvortex.content import inline
     from docvortex.schema import HyperlinkSpan, EquationInlineSpan
 
@@ -103,17 +103,8 @@ def test_inline_join_preserves_language_inputs_links_and_empty_leaves(monkeypatc
         [TextSpan(type="text", content="gamma")],
     ]
     before = deepcopy(contents)
-    detected = []
-
-    def language(value: str) -> str:
-        """记录原边界收到的全文前缀，防止优化偷换识别范围。"""
-        detected.append(value)
-        return "en"
-
-    monkeypatch.setattr(inline, "_detect_boundary_language", language)
     joined = join_inline_spans(contents)
-    assert detected == ["alphabeta ", "alpha betax^2 ", "alpha beta x^2gamma"]
-    assert inline.inline_plain_text(joined) == "alpha beta x^2gamma"
+    assert inline.inline_plain_text(joined) == "alpha beta x^2 gamma"
     assert contents == before
 
 

@@ -27,11 +27,13 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: uv venv
       - run: uv pip install ".[test]" "pypdfium2==5.10.1"
+      - name: Verify dependency-free line joining
+        run: uv run --no-project python -m pytest tests/unittest/test_text_boundary_rules.py tests/unittest/test_text_utils.py -q
       - name: Verify native vector raster dependency
         run: uv run --no-project python -m pytest tests/unittest/test_ofd_vector_tables.py::test_resvg_dependency_smoke -q
       - run: uv run --no-project python -m pytest -q --deselect tests/unittest/test_native_pdf_table_demo_manifest.py::test_demo_sparse_table_confidence_manifest
       - name: Verify independent installation
-        run: uv run --no-project python -c "import importlib.util, docvortex; assert importlib.util.find_spec('docgale') is None; assert importlib.util.find_spec('mineru') is None; assert importlib.util.find_spec('pdftext') is None"
+        run: uv run --no-project python -c "import importlib.util, docvortex; assert importlib.util.find_spec('docgale') is None; assert importlib.util.find_spec('mineru') is None; assert importlib.util.find_spec('pdftext') is None; assert importlib.util.find_spec('fast_langdetect') is None; assert importlib.util.find_spec('fasttext') is None"
 
   pdfium-current:
     runs-on: ubuntu-latest

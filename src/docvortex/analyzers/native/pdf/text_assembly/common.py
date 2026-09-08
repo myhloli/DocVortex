@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from typing import Any, Sequence
 
-from .....foundation.language import detect_lang
 from .....foundation.text import merge_text_line_contents
 from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_y, _bbox_union_many
 from ..native_text import _normalize_native_run_text
@@ -437,14 +436,7 @@ def _merge_text_line_content(line_texts: Sequence[str]) -> str:
     normalized_lines = [text for text in normalized_lines if text]
     if not normalized_lines:
         return ""
-    try:
-        block_language = detect_lang("".join(normalized_lines))
-    except Exception:
-        block_language = ""
-    return merge_text_line_contents(
-        normalized_lines,
-        block_language=block_language,
-    )
+    return merge_text_line_contents(normalized_lines)
 
 
 __all__ = [
