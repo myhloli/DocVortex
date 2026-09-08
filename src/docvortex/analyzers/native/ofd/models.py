@@ -78,6 +78,7 @@ class TextLine:
     layer_type: str
     template_id: int | None
     styles: tuple[str, ...] = ()
+    runs: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -4,90 +4,16 @@ from __future__ import annotations
 
 import re
 import statistics
-from dataclasses import replace
 from typing import Any
 
 from .._shared.xycut import sort_entries
 from ....schema import BlockType
-from .geometry import bbox_center, bbox_union, normalize_bbox
+from .geometry import bbox_center, normalize_bbox
 from .models import OfdPageScene, TextLine
 from .table import OfdTableBudget, OfdTableRegion, recover_tables
-from .text import format_line_spans
+from .assembly import line_baseline, line_spans, merge_paragraph_blocks, merge_same_baseline_lines
 
 _PAGE_NUMBER_RE = re.compile(r"^(?:\d+|[IVXLCDM]+)$", re.IGNORECASE)
-_ASCII_WORD_GAP_RATIO = 0.2
-
-
-def _same_baseline(first: TextLine, second: TextLine) -> bool:
-    """判断两个文字片段是否可在同一视觉基线上拼接。"""
-    if first.angle != second.angle or first.styles != second.styles:
-        return False
-    if (
-        min(first.font_size, second.font_size) <= 0
-        or max(first.font_size, second.font_size) / min(first.font_size, second.font_size) > 1.35
-    ):
-        return False
-    first_height = first.bbox[3] - first.bbox[1]
-    second_height = second.bbox[3] - second.bbox[1]
-    tolerance = 0.4 * max(first_height, second_height, 0.5)
-    if second.bbox[0] + tolerance < first.bbox[0]:
-        return False
-    center_delta = abs(bbox_center(first.bbox)[1] - bbox_center(second.bbox)[1])
-    gap = max(0.0, second.bbox[0] - first.bbox[2])
-    return center_delta <= tolerance and gap <= 2.0 * max(first_height, second_height, 0.5)
-
-
-def _join_text(first: TextLine, second: TextLine) -> str:
-    """按语言字符边界和实际字形间距决定同行片段间是否补空格。"""
-    if not first.text or not second.text:
-        return first.text + second.text
-    ascii_word_boundary = (
-        first.text[-1].isascii() and second.text[0].isascii() and first.text[-1].isalnum() and second.text[0].isalnum()
-    )
-    if not ascii_word_boundary:
-        return first.text + second.text
-    first_glyph = first.glyphs[-1] if first.glyphs else None
-    second_glyph = second.glyphs[0] if second.glyphs else None
-    first_right = first_glyph.bbox[2] if first_glyph is not None else first.bbox[2]
-    second_left = second_glyph.bbox[0] if second_glyph is not None else second.bbox[0]
-    gap = second_left - first_right
-    glyph_widths = [
-        glyph.bbox[2] - glyph.bbox[0]
-        for glyph in (first_glyph, second_glyph)
-        if glyph is not None and glyph.bbox[2] > glyph.bbox[0]
-    ]
-    reference_width = statistics.median(glyph_widths) if glyph_widths else 0.0
-    spacing_threshold = _ASCII_WORD_GAP_RATIO * max(min(first.font_size, second.font_size), reference_width, 0.5)
-    needs_space = gap >= spacing_threshold
-    return f"{first.text}{' ' if needs_space else ''}{second.text}"
-
-
-def merge_same_baseline_lines(lines: list[TextLine]) -> list[TextLine]:
-    """保守合并相邻 TextObject 形成的同基线文字片段。"""
-
-    def sort_key(item: TextLine) -> tuple[int, int, float, float, int]:
-        """按自适应基线带和横向位置排列候选片段。"""
-        height = max(item.bbox[3] - item.bbox[1], 0.5)
-        baseline_bucket = round(bbox_center(item.bbox)[1] / max(0.4 * height, 0.5))
-        return item.angle, baseline_bucket, item.bbox[0], item.bbox[1], item.paint_order
-
-    ordered = sorted(lines, key=sort_key)
-    output: list[TextLine] = []
-    for line in ordered:
-        if output and _same_baseline(output[-1], line):
-            previous = output[-1]
-            merged_bbox = bbox_union((previous.bbox, line.bbox))
-            if merged_bbox is not None:
-                output[-1] = replace(
-                    previous,
-                    text=_join_text(previous, line),
-                    bbox=merged_bbox,
-                    glyphs=previous.glyphs + line.glyphs,
-                    paint_order=min(previous.paint_order, line.paint_order),
-                )
-                continue
-        output.append(line)
-    return output
 
 
 def _normalized_signature(line: TextLine, scene: OfdPageScene) -> tuple[str, int, int]:
@@ -195,7 +121,11 @@ class OfdReadingOrderProjector:
             level = 2
         block: dict[str, Any] = {
             "type": block_type,
-            "content": format_line_spans(line.text, line.styles),
+            "content": line_spans(line),
+            "text_line": line.text,
+            "text_scope": (line.layer_type, line.template_id),
+            "font_size_mm": line.font_size,
+            "baseline_mm": line_baseline(line),
             "bbox_mm": line.bbox,
             "angle": line.angle,
             "paint_order": line.paint_order,
@@ -232,12 +162,13 @@ class OfdReadingOrderProjector:
 
     def project_page(self, scene: OfdPageScene) -> list[dict[str, Any]]:
         """把一页场景投影为最终阅读顺序 raw model-list。"""
-        merged_lines = merge_same_baseline_lines(scene.text_lines)
-        tables = recover_tables(scene.axis_lines, merged_lines, self.table_budget)
+        tables = recover_tables(scene.axis_lines, scene.text_lines, self.table_budget, images=scene.images)
         consumed = {line_id for table in tables for line_id in table.consumed_line_ids}
-        blocks = [self._text_block(line, scene) for line in merged_lines if id(line) not in consumed]
+        consumed_images = {image_id for table in tables for image_id in table.consumed_image_ids}
+        merged_lines = merge_same_baseline_lines([line for line in scene.text_lines if id(line) not in consumed])
+        blocks = [self._text_block(line, scene) for line in merged_lines]
         blocks.extend(self._table_block(table) for table in tables)
-        blocks.extend(self._image_block(image) for image in scene.images)
+        blocks.extend(self._image_block(image) for image in scene.images if id(image) not in consumed_images)
         page_center_y = bbox_center(scene.physical_box)[1]
         top = [
             block
@@ -259,7 +190,7 @@ class OfdReadingOrderProjector:
             sortable.append({"bbox": [value * 72.0 / 25.4 for value in upright], "payload": block})
         ordered_body = [entry["payload"] for entry in sort_entries(sortable)]
         ordered = sorted(top, key=lambda block: (block["bbox_mm"][1], block["bbox_mm"][0], block["paint_order"]))
-        ordered.extend(ordered_body)
+        ordered.extend(merge_paragraph_blocks(ordered_body))
         ordered.extend(sorted(bottom, key=lambda block: (block["bbox_mm"][1], block["bbox_mm"][0], block["paint_order"])))
         output: list[dict[str, Any]] = []
         for block in ordered:

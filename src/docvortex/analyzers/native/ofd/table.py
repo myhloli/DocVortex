@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import html
+from dataclasses import dataclass, replace
 
 from ....schema import BBox
 from .constants import MAX_TABLE_INTERSECTION_CHECKS
 from .errors import OfdResourceLimitError
 from .geometry import bbox_area, bbox_center, bbox_intersection
-from .models import AxisLine, TextLine
-from .text import format_line_html
+from .models import AxisLine, ImageItem, TextLine
+from .assembly import line_html, merge_same_baseline_lines
 
 _COORD_TOLERANCE = 0.6
 _INTERSECTION_TOLERANCE = 0.8
@@ -25,6 +26,10 @@ class OfdTableRegion:
     html: str
     paint_order: int
     consumed_line_ids: frozenset[int]
+    consumed_image_ids: frozenset[int] = frozenset()
+    xs: tuple[float, ...] = ()
+    ys: tuple[float, ...] = ()
+    text_lines: tuple[TextLine, ...] = ()
 
 
 @dataclass(slots=True)
@@ -168,38 +173,71 @@ def _component_grid(component: list[AxisLine]) -> tuple[list[float], list[float]
 
 def _cell_index(values: list[float], coordinate: float) -> int | None:
     """返回坐标所在的相邻轨道区间索引。"""
-    for index, (start, end) in enumerate(zip(values, values[1:], strict=True)):
+    for index, (start, end) in enumerate(zip(values[:-1], values[1:], strict=True)):
         if start - _COORD_TOLERANCE <= coordinate <= end + _COORD_TOLERANCE:
             return index
     return None
 
 
-def _serialize_grid(xs: list[float], ys: list[float], lines: list[TextLine]) -> str:
-    """把网格内文字按单元格序列化为安全 HTML。"""
+def _image_cell(xs: tuple[float, ...], ys: tuple[float, ...], image: ImageItem) -> tuple[int, int] | None:
+    """仅认领完整落入唯一网格单元格的可解码图片。"""
+    if image.image_base64 is None:
+        return None
+    x0, y0, x1, y1 = image.bbox
+    columns = [
+        index for index in range(len(xs) - 1) if xs[index] - _COORD_TOLERANCE <= x0 and x1 <= xs[index + 1] + _COORD_TOLERANCE
+    ]
+    rows = [
+        index for index in range(len(ys) - 1) if ys[index] - _COORD_TOLERANCE <= y0 and y1 <= ys[index + 1] + _COORD_TOLERANCE
+    ]
+    return (rows[0], columns[0]) if len(rows) == len(columns) == 1 else None
+
+
+def _cell_lines(table: OfdTableRegion) -> dict[tuple[int, int], list[TextLine]]:
+    """先按单元格分配原始文字片段，避免跨越表格边界拼接。"""
     cells: dict[tuple[int, int], list[TextLine]] = {}
-    for line in lines:
+    for line in table.text_lines:
         center_x, center_y = bbox_center(line.bbox)
-        column = _cell_index(xs, center_x)
-        row = _cell_index(ys, center_y)
-        if row is None or column is None:
+        column = _cell_index(list(table.xs), center_x)
+        row = _cell_index(list(table.ys), center_y)
+        if row is not None and column is not None:
+            cells.setdefault((row, column), []).append(line)
+    return {key: merge_same_baseline_lines(lines) for key, lines in cells.items()}
+
+
+def _serialize_grid(table: OfdTableRegion, images: list[ImageItem]) -> OfdTableRegion:
+    """按单元格内空间顺序输出文字及图片，并返回成功认领的图片集合。"""
+    cells: dict[tuple[int, int], list[tuple[BBox, int, str]]] = {}
+    for key, lines in _cell_lines(table).items():
+        cells[key] = [(line.bbox, line.paint_order, line_html(line)) for line in lines if line.text.strip()]
+    consumed_images: set[int] = set()
+    for image in images:
+        key = _image_cell(table.xs, table.ys, image)
+        if key is None:
             continue
-        cells.setdefault((row, column), []).append(line)
+        source = html.escape(image.image_base64 or "", quote=True)
+        width = max(1, round((image.bbox[2] - image.bbox[0]) * 96 / 25.4))
+        markup = f'<img src="{source}" width="{width}">'
+        cells.setdefault(key, []).append((image.bbox, image.paint_order, markup))
+        consumed_images.add(id(image))
     output = ["<table>"]
-    for row in range(len(ys) - 1):
+    for row in range(len(table.ys) - 1):
         output.append("<tr>")
-        for column in range(len(xs) - 1):
-            items = sorted(cells.get((row, column), []), key=lambda item: (item.bbox[1], item.bbox[0], item.paint_order))
-            content = "<br>".join(format_line_html(item.text, item.styles) for item in items if item.text.strip())
+        for column in range(len(table.xs) - 1):
+            items = sorted(cells.get((row, column), []), key=lambda item: (item[0][1], item[0][0], item[1]))
+            content = "<br>".join(item[2] for item in items)
             output.append(f"<td>{content}</td>")
         output.append("</tr>")
     output.append("</table>")
-    return "".join(output)
+    return replace(table, html="".join(output), consumed_image_ids=frozenset(consumed_images))
 
 
 def recover_tables(
     axis_lines: list[AxisLine],
     text_lines: list[TextLine],
     budget: OfdTableBudget,
+    *,
+    images: list[ImageItem] | None = None,
 ) -> list[OfdTableRegion]:
     """从页面轴向线段中恢复互不重叠的高置信表格。"""
     if len(axis_lines) < 4 or len(text_lines) < 2 or len(axis_lines) > _MAX_TABLE_AXIS_LINES:
@@ -224,7 +262,10 @@ def recover_tables(
         candidates.append(
             OfdTableRegion(
                 bbox=bbox,
-                html=_serialize_grid(xs, ys, contained),
+                html="",
+                xs=tuple(xs),
+                ys=tuple(ys),
+                text_lines=tuple(contained),
                 paint_order=min((line.paint_order for line in component), default=0),
                 consumed_line_ids=frozenset(id(line) for line in contained),
             )
@@ -233,8 +274,12 @@ def recover_tables(
     for candidate in sorted(candidates, key=lambda item: (-bbox_area(item.bbox), item.bbox[1], item.bbox[0])):
         if any(bbox_intersection(candidate.bbox, existing.bbox) is not None for existing in selected):
             continue
-        selected.append(candidate)
-    return sorted(selected, key=lambda item: (item.bbox[1], item.bbox[0], item.paint_order))
+        if sum(len(lines) for lines in _cell_lines(candidate).values()) >= 2:
+            selected.append(candidate)
+    return [
+        _serialize_grid(table, images or [])
+        for table in sorted(selected, key=lambda item: (item.bbox[1], item.bbox[0], item.paint_order))
+    ]
 
 
 __all__ = ["OfdTableBudget", "OfdTableRegion", "recover_tables"]
