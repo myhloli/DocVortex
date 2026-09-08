@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from .assets import AssetStore
 from .document.source import HtmlSourceContext, prepare_source
-from .result import AnalysisResult, Diagnostic, DocumentResult, ExportResult, RenderArtifact
+from .result import AnalysisResult, Diagnostic, DocumentResult, ExportResult, MetadataResult, RenderArtifact
 from .schema import DocumentMetadata, FileSuffix, MiddleJson, ModelJson, PageInfo, Producer
 from .version import __version__
 from .render.contracts import DocxRenderOptions, EpubRenderOptions, PdfRenderOptions, RenderFormat, RenderOptions
@@ -19,6 +19,18 @@ from .render.contracts import DocxRenderOptions, EpubRenderOptions, PdfRenderOpt
 if TYPE_CHECKING:
     from .analyzers.native.contracts import NativeBinaryAnalyzer
     from .document.pdf.document import PDFDocument
+
+
+def extract_metadata(
+    source: str | Path | bytes | PDFDocument,
+    *,
+    file_suffix: FileSuffix | None = None,
+    source_context: HtmlSourceContext | None = None,
+) -> MetadataResult:
+    """读取完整源文档的声明属性，不运行正文分析或 PDF 分类。"""
+    from .metadata import extract_metadata as extract
+
+    return extract(source, file_suffix=file_suffix, source_context=source_context)
 
 
 def analyze(
@@ -35,6 +47,20 @@ def analyze(
     native_diagnostics: tuple[Diagnostic, ...] = ()
     prepared = prepare_source(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context)
     try:
+        properties = prepared.source_properties
+        metadata_diagnostics = tuple(Diagnostic("read_metadata_failed", message) for message in prepared.metadata_warnings)
+        if prepared.file_suffix != "pdf":
+            from .errors import DocumentError
+
+            try:
+                extracted = extract_metadata(
+                    prepared.data, file_suffix=prepared.file_suffix, source_context=prepared.source_context
+                )
+                properties = extracted.metadata.document
+                metadata_diagnostics = extracted.diagnostics
+            except DocumentError as exc:
+                # 正文读取器仍负责输入有效性；可选属性提取失败不能阻断正文解析。
+                metadata_diagnostics = (Diagnostic(exc.code, str(exc)),)
         if prepared.file_suffix == "pdf":
             from .document.pdf.visuals import attach_visual_block_images_from_pdf
 
@@ -69,12 +95,16 @@ def analyze(
             pages=pages,
             page_index_map=prepared.page_index_map or [],
             metadata=DocumentMetadata(
-                file_suffix=prepared.file_suffix, producer=Producer(name="docvortex", version=__version__)
+                file_suffix=prepared.file_suffix, producer=Producer(name="docvortex", version=__version__), document=properties
             ),
         )
-        diagnostics = native_diagnostics + tuple(
-            Diagnostic("broken_page", "The selected PDF page could not be loaded", index)
-            for index in prepared.broken_page_indices
+        diagnostics = (
+            metadata_diagnostics
+            + native_diagnostics
+            + tuple(
+                Diagnostic("broken_page", "The selected PDF page could not be loaded", index)
+                for index in prepared.broken_page_indices
+            )
         )
         return AnalysisResult(model, diagnostics=diagnostics, elapsed_seconds=time.perf_counter() - started)
     finally:
@@ -183,4 +213,4 @@ def convert(
     return result.export(output_path, output_format=output_format, options=options, overwrite=overwrite)
 
 
-__all__ = ["analyze", "postprocess", "parse", "render", "convert"]
+__all__ = ["extract_metadata", "analyze", "postprocess", "parse", "render", "convert"]

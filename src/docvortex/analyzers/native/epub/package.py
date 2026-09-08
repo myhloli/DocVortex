@@ -144,6 +144,10 @@ class EpubPackage:
             self.spine = self._read_spine()
             self.navigation_path = self._read_navigation_path()
             self.ncx_path = self._read_ncx_path()
+            from .properties import properties_from_opf
+
+            self.metadata_warnings: list[str] = []
+            self.document_properties = properties_from_opf(self.opf_root, len(self.spine), warnings=self.metadata_warnings)
             self.metadata = self._read_metadata()
         except Exception:
             self._zip.close()
@@ -554,29 +558,22 @@ class EpubPackage:
 
     def _read_metadata(self) -> EpubMetadata:
         """提取 OPF 的首个标题、作者、主题、关键词和布局模式。"""
-        title = author = subject = None
-        keywords: list[str] = []
+        properties = self.document_properties
         layout = "reflowable"
         for element in self.opf_root.iter():
-            if not isinstance(element.tag, str):
+            if not isinstance(element.tag, str) or _local_name(element) != "meta":
                 continue
-            name = _local_name(element)
-            value = _element_text(element)
-            if name == "title" and title is None:
-                title = value
-            elif name == "creator" and author is None:
-                author = value
-            elif name == "subject" and value:
-                subject = subject or value
-                keywords.append(value)
-            elif name == "meta":
-                property_name = (element.get("property") or element.get("name") or "").casefold()
-                content = value or (element.get("content") or "").strip() or None
-                if property_name in {"rendition:layout", "fixed-layout"} and content:
-                    layout = "pre-paginated" if content in {"pre-paginated", "true"} else content
-                if property_name in {"keywords", "keyword"} and content:
-                    keywords.append(content)
-        return EpubMetadata(title, author, subject, ", ".join(dict.fromkeys(keywords)) or None, layout)
+            name = (element.get("property") or element.get("name") or "").casefold()
+            content = _element_text(element) or (element.get("content") or "").strip() or None
+            if name in {"rendition:layout", "fixed-layout"} and content:
+                layout = "pre-paginated" if content in {"pre-paginated", "true"} else content
+        return EpubMetadata(
+            properties.title,
+            properties.authors[0] if properties.authors else None,
+            properties.subject,
+            ", ".join(properties.keywords) or None,
+            layout,
+        )
 
     def content_type_for(self, part_name: str) -> str | None:
         """返回 manifest 为指定成员声明的媒体类型。"""

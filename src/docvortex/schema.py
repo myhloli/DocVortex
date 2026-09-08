@@ -893,11 +893,37 @@ class Producer(_StrictMiddleModel):
     version: str = Field(min_length=1)
 
 
+class DocumentProperties(_StrictMiddleModel):
+    """保存源文件声明的属性；计数属于完整源文件而非当前解析选页。"""
+
+    title: str | None = None
+    authors: list[str] = Field(default_factory=list)
+    subject: str | None = None
+    keywords: list[str] = Field(default_factory=list)
+    description: str | None = None
+    languages: list[str] = Field(default_factory=list)
+    identifiers: list[str] = Field(default_factory=list)
+    publisher: str | None = None
+    created_at: str | None = None
+    modified_at: str | None = None
+    creator_application: str | None = None
+    producer_application: str | None = None
+    page_count: int | None = Field(default=None, ge=0)
+    page_count_kind: Literal["physical", "declared", "slide", "sheet", "spine", "logical"] | None = None
+
+    @field_validator("authors", "keywords", "languages", "identifiers")
+    @classmethod
+    def _normalize_values(cls, values: list[str]) -> list[str]:
+        """去除空白项并稳定去重，不猜测单个字符串中的分隔符。"""
+        return list(dict.fromkeys(value.strip() for value in values if value.strip()))
+
+
 class DocumentMetadata(_StrictMiddleModel):
     """承载文档格式和真实生产者，读取时不补造来源信息。"""
 
     file_suffix: FileSuffix
     producer: Producer
+    document: DocumentProperties | None = None
 
 
 def _require_document_wire_identity(schema: dict[str, Any]) -> None:
@@ -1061,6 +1087,7 @@ class MiddleJson(DocumentModel):
 
 __all__ = [
     "DocumentMetadata",
+    "DocumentProperties",
     "RawBlockType",
     "RAW_ALGORITHM",
     "RAW_CAPTION",

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .assets import AssetStore
-from .schema import MiddleJson, ModelJson
+from .schema import DocumentMetadata, MiddleJson, ModelJson
 from .render.contracts import RenderFormat, RenderOptions
 
 
@@ -18,6 +18,14 @@ class Diagnostic:
     code: str
     message: str
     page_index: int | None = None
+
+
+@dataclass(slots=True)
+class MetadataResult:
+    """返回独立读取的源文档属性和不影响正文解析的诊断。"""
+
+    metadata: DocumentMetadata
+    diagnostics: tuple[Diagnostic, ...] = ()
 
 
 @dataclass(slots=True)
@@ -88,4 +96,4 @@ class DocumentResult:
         return self.middle_json.to_dict()
 
 
-__all__ = ["Diagnostic", "AnalysisResult", "DocumentResult", "RenderArtifact", "ExportResult"]
+__all__ = ["Diagnostic", "MetadataResult", "AnalysisResult", "DocumentResult", "RenderArtifact", "ExportResult"]

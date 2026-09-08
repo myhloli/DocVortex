@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, cast
 
 from docvortex.document.contracts import HtmlSourceContext
 from ..errors import InvalidRequestError
-from ..schema import FILE_SUFFIXES, FileSuffix
+from ..schema import FILE_SUFFIXES, DocumentProperties, FileSuffix
 
 if TYPE_CHECKING:
     from .pdf.document import PDFDocument
@@ -25,6 +25,8 @@ class PreparedSource:
     broken_page_indices: tuple[int, ...] = ()
     document: PDFDocument | None = None
     owns_document: bool = False
+    source_properties: DocumentProperties | None = None
+    metadata_warnings: tuple[str, ...] = ()
 
 
 def prepare_source(
@@ -72,6 +74,10 @@ def prepare_source(
             document = PDFDocument(data)
             prepared.document, prepared.owns_document = document, True
         try:
+            from .pdf.metadata import read_pdf_properties
+
+            prepared.source_properties, warnings = read_pdf_properties(document)
+            prepared.metadata_warnings = tuple(warnings)
             indices = parse_page_range(page_range, document.page_count)
             if indices != list(range(document.page_count)):
                 rewrite = safe_rewrite_pdf_bytes_with_pdfium_result(data, page_indices=indices)

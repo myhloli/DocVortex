@@ -80,3 +80,14 @@ current document. Generic ParseResult, HTTP/ZIP, Gradio and DocVortex codecs rem
 strict. Successfully converted batches can be cached and compacted when their
 metadata/extensions/full-document flags agree; ordinary reads never rewrite files.
 Unknown or damaged formats still require source reparse.
+
+## Optional source properties (DocVortex 0.2.5)
+
+`metadata.document` optionally carries a typed `DocumentProperties` object. Its descriptive,
+publication, date, authoring-software, and qualified count fields are shared by the lightweight
+`extract_metadata()` API and native analysis. It is distinct from the parser identity in
+`metadata.producer` and application data in `extensions`.
+
+The schema version remains 2.0. New readers accept absent source properties in existing documents;
+old strict readers require an upgrade to accept this addition. No legacy data is rewritten or
+silently enriched. See [source metadata](METADATA.md) for field and format semantics.

@@ -114,3 +114,17 @@ DocVortex project code is licensed under the [MIT License](LICENSE.md).
 
 See [rendering ownership](docs/RENDER_OWNERSHIP.md) for the seven engine targets,
 MinerU Content List integration and public fragment helpers.
+
+## Read source metadata without parsing the body
+
+```python
+from docvortex import extract_metadata
+
+inspection = extract_metadata("report.pdf")
+print(inspection.metadata.document.title)
+print(inspection.metadata.document.authors)
+```
+
+All 15 native document formats support this API. Normal parsing also carries these properties in
+`metadata.document`, preserving the original PDF properties across page selections. See the
+[field definitions, format matrix, and compatibility notes](docs/METADATA.md).

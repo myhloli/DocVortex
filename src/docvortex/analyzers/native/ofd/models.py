@@ -132,6 +132,7 @@ class OfdDocumentRef:
     document_part: str
     signatures_part: str | None
     metadata: dict[str, str]
+    keywords: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

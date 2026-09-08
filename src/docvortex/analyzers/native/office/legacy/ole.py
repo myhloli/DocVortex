@@ -86,10 +86,16 @@ class BoundedOleReader:
     def metadata(self) -> Any | None:
         """尽力读取 SummaryInformation，失败时不影响正文解析。"""
 
+        metadata, _ = self.metadata_with_diagnostics()
+        return metadata
+
+    def metadata_with_diagnostics(self) -> tuple[Any | None, list[str]]:
+        """可选属性流损坏时保留 olefile 已读取的字段，并返回具体诊断。"""
+
         try:
-            return self._ole.get_metadata()
-        except Exception:
-            return None
+            return self._ole.get_metadata(), []
+        except Exception as exc:
+            return getattr(self._ole, "metadata", None), [f"OLE property streams: {exc}"]
 
     def close(self) -> None:
         """关闭底层 olefile 句柄。"""

@@ -277,13 +277,38 @@ class OfdPackage:
             signatures = first_child(body, "Signatures")
             signatures_part = self.resolve_reference("OFD.xml", element_text(signatures)) if signatures is not None else None
             metadata: dict[str, str] = {}
+            keywords: tuple[str, ...] = ()
             doc_info = first_child(body, "DocInfo")
             if doc_info is not None:
-                for key in ("Title", "Author", "Subject", "Keywords", "DocUsage", "Creator", "CreatorVersion"):
+                for key in (
+                    "Title",
+                    "Author",
+                    "Subject",
+                    "Keywords",
+                    "DocUsage",
+                    "Creator",
+                    "CreatorVersion",
+                    "DocID",
+                    "CreationDate",
+                    "ModDate",
+                    "Abstract",
+                ):
                     value = element_text(first_child(doc_info, key))
                     if value:
                         metadata[key] = value
-            refs.append(OfdDocumentRef(document_part=document_part, signatures_part=signatures_part, metadata=metadata))
+                keyword_root = first_child(doc_info, "Keywords")
+                if keyword_root is not None:
+                    keywords = tuple(
+                        value for child in keyword_root if local_name(child.tag) == "Keyword" and (value := element_text(child))
+                    )
+            refs.append(
+                OfdDocumentRef(
+                    document_part=document_part,
+                    signatures_part=signatures_part,
+                    metadata=metadata,
+                    keywords=keywords,
+                )
+            )
         return refs
 
     def close(self) -> None:

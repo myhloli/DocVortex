@@ -71,7 +71,12 @@ class HtmlDocument:
     source_context: HtmlSourceContext
 
 
-def parse_html_document(file_bytes: bytes, source_context: HtmlSourceContext | None = None) -> HtmlDocument:
+def parse_html_document(
+    file_bytes: bytes,
+    source_context: HtmlSourceContext | None = None,
+    *,
+    metadata_only: bool = False,
+) -> HtmlDocument:
     """从受限字节输入构造不执行脚本且资源引用尚未加载的 HTML DOM。"""
     if len(file_bytes) > MAX_HTML_BYTES:
         raise HtmlResourceLimitError(f"HTML resource limit exceeded: max_html_bytes={MAX_HTML_BYTES}")
@@ -97,6 +102,9 @@ def parse_html_document(file_bytes: bytes, source_context: HtmlSourceContext | N
     except (etree.ParserError, etree.XMLSyntaxError, UnicodeError, ValueError) as exc:
         raise HtmlParseError(f"Malformed HTML document: {exc}") from exc
     _validate_dom_shape(root)
+
+    if metadata_only:
+        return HtmlDocument(root, root, (), None, None, None, None, context)
 
     stylesheets: list[HtmlStylesheetSource] = []
     for element in root.iter():

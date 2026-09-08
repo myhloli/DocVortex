@@ -6,6 +6,9 @@ from typing import BinaryIO, Final
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
+from .....schema import DocumentProperties
+from .....document.properties import legacy_properties, property_date
+
 from .constants import OdfSuffix, qname
 from .package import OdfPackage
 from .styles import OdfStyles
@@ -25,6 +28,13 @@ def _first_text(root: etree._Element | None, *tags: str) -> str | None:
             if value:
                 return value
     return None
+
+
+def _all_text(root: etree._Element | None, tag: str) -> list[str]:
+    """保留文档内重复声明的多值属性，顺序和去重由共享类型维护。"""
+    if root is None:
+        return []
+    return [value for element in root.iter(tag) if (value := "".join(element.itertext()).strip())]
 
 
 def _odt_page_count(meta_root: etree._Element | None) -> int | None:
@@ -54,15 +64,24 @@ def _visible_sheet_count(body: etree._Element, styles: OdfStyles) -> int:
     return count
 
 
-def extract_odf_metadata(file_binary: BinaryIO, suffix: OdfSuffix) -> dict[str, object | None]:
+def read_odf_properties(data: bytes, suffix: OdfSuffix) -> tuple[DocumentProperties, list[str]]:
     """提取 ODF 标题作者等元数据及稳定文档页数。"""
-    package = OdfPackage(file_binary.read())
+    package = OdfPackage(data)
+    warnings: list[str] = []
     try:
         content_root = package.validate_document(suffix)
         styles_root = package.xml_part("styles.xml")
         styles = OdfStyles(styles_root, content_root)
         body = package.body_element(content_root, suffix)
-        meta_root = package.xml_part("meta.xml")
+        try:
+            meta_root = package.xml_part("meta.xml", required=package.has_part("meta.xml"))
+        except Exception as exc:
+            from .errors import OdfResourceLimitError
+
+            if isinstance(exc, OdfResourceLimitError):
+                raise
+            meta_root = None
+            warnings.append(f"ODF meta.xml: {exc}")
         keywords = []
         if meta_root is not None:
             for keyword in meta_root.iter(qname("meta", "keyword")):
@@ -77,15 +96,33 @@ def extract_odf_metadata(file_binary: BinaryIO, suffix: OdfSuffix) -> dict[str, 
             )
         else:
             page_count = _visible_sheet_count(body, styles)
-        return {
-            "page_count": page_count or 1,
-            "title": _first_text(meta_root, qname("dc", "title")),
-            "author": _first_text(meta_root, qname("dc", "creator"), qname("meta", "initial-creator")),
-            "subject": _first_text(meta_root, qname("dc", "subject")),
-            "keywords": ", ".join(keywords) or None,
-        }
+        return DocumentProperties(
+            page_count=page_count,
+            page_count_kind=("declared" if suffix == "odt" else "slide" if suffix == "odp" else "sheet")
+            if page_count is not None
+            else None,
+            title=_first_text(meta_root, qname("dc", "title")),
+            authors=_all_text(meta_root, qname("dc", "creator")) or _all_text(meta_root, qname("meta", "initial-creator")),
+            subject=_first_text(meta_root, qname("dc", "subject")),
+            keywords=keywords,
+            description=_first_text(meta_root, qname("dc", "description")),
+            languages=_all_text(meta_root, qname("dc", "language")),
+            identifiers=_all_text(meta_root, qname("dc", "identifier")),
+            publisher=_first_text(meta_root, qname("dc", "publisher")),
+            created_at=property_date(_first_text(meta_root, qname("meta", "creation-date")), warnings=warnings),
+            modified_at=property_date(_first_text(meta_root, qname("dc", "date")), warnings=warnings),
+            creator_application=_first_text(meta_root, qname("meta", "generator")),
+        ), warnings
     finally:
         package.close()
 
 
-__all__ = ["extract_odf_metadata"]
+def extract_odf_metadata(file_binary: BinaryIO, suffix: OdfSuffix) -> dict[str, object | None]:
+    """保留既有基础属性接口的分页回退，源属性本身不补造页数。"""
+    properties, _ = read_odf_properties(file_binary.read(), suffix)
+    values = legacy_properties(properties)
+    values["page_count"] = properties.page_count or 1
+    return values
+
+
+__all__ = ["extract_odf_metadata", "read_odf_properties"]

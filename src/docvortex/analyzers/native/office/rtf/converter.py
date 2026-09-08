@@ -26,7 +26,7 @@ from .models import (
     RtfTableCell,
     RtfTextRun,
 )
-from .parser import MAX_RTF_LIST_DEPTH, parse_rtf, parse_rtf_prelude, read_rtf_bytes
+from .parser import MAX_RTF_LIST_DEPTH, parse_rtf, read_rtf_bytes
 
 
 @dataclass(slots=True)
@@ -695,14 +695,11 @@ class RtfConverter:
 
 def extract_rtf_metadata(file_binary: BinaryIO) -> dict[str, str | None]:
     """有界读取 RTF，仅解析 info destination 并返回 doclib 字段。"""
-    data = read_rtf_bytes(file_binary)
-    metadata = parse_rtf_prelude(data).metadata
-    return {
-        "title": metadata.title,
-        "author": metadata.author,
-        "subject": metadata.subject,
-        "keywords": metadata.keywords,
-    }
+    from .metadata import read_rtf_properties
+    from .....document.properties import legacy_properties
+
+    properties, _ = read_rtf_properties(read_rtf_bytes(file_binary))
+    return {key: value for key, value in legacy_properties(properties).items() if key != "page_count"}
 
 
 __all__ = ["RtfConverter", "extract_rtf_metadata"]
