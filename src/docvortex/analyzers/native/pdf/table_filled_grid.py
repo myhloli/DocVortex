@@ -1,14 +1,14 @@
 """PDF 填充单元格候选；保留原有认领顺序与判定规则。"""
 
 from __future__ import annotations
+
+from ....document.pdf._document import PDFPathInfo
 from ....schema import BBox
-from ....document.pdf.document import PDFPathInfo
-from .models import _TableCandidate
 from .geometry import (
     _bbox_area,
     _bbox_overlap_in_smaller,
 )
-
+from .models import _TableCandidate
 from .table_constants import (
     _FILLED_GRID_MAX_PAGE_AREA_RATIO,
     _FILLED_GRID_MIN_PAGE_AREA_RATIO,

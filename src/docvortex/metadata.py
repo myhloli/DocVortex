@@ -12,7 +12,7 @@ from .version import __version__
 
 if TYPE_CHECKING:
     from .document.contracts import HtmlSourceContext
-    from .document.pdf.document import PDFDocument
+    from .document.pdf._document import PDFDocument
 
 
 def extract_metadata(
@@ -31,7 +31,7 @@ def extract_metadata(
         elif isinstance(source, bytes):
             data = source
         else:
-            from .document.pdf.document import PDFDocument
+            from .document.pdf._document import PDFDocument
 
             if not isinstance(source, PDFDocument):
                 raise TypeError("source must be a path, bytes, or PDFDocument")
@@ -72,7 +72,7 @@ def _read_properties(
 ) -> tuple[DocumentProperties, list[str]]:
     """按格式惰性加载读取器，不加载其他格式正文解析或推理模型。"""
     if suffix == "pdf":
-        from .document.pdf.document import PDFDocument
+        from .document.pdf._document import PDFDocument
         from .document.pdf.metadata import read_pdf_properties
 
         if document is not None:
@@ -88,8 +88,8 @@ def _read_properties(
 
         return read_ole_properties(data, suffix)
     if suffix in {"odt", "ods", "odp"}:
-        from .analyzers.native.office.odf.metadata import read_odf_properties
         from .analyzers.native.office.odf.constants import OdfSuffix
+        from .analyzers.native.office.odf.metadata import read_odf_properties
 
         return read_odf_properties(data, cast(OdfSuffix, suffix))
     if suffix == "epub":

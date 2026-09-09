@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
 import re
+from collections.abc import Iterator, Sequence
 from typing import Any
 
-from ..foundation.text import full_to_half_exclude_marks
-from ..schema import BlockType, RAW_CAPTION, RAW_FOOTNOTE, RAW_PHONETIC
+from ..foundation._text import full_to_half_exclude_marks
+from ..schema import RAW_CAPTION, RAW_FOOTNOTE, RAW_PHONETIC, BlockType
 
 _FULLWIDTH_MODEL_TEXT = re.compile("[Ａ-Ｚａ-ｚ０-９：．／＼－＿％＋＝＠＃＆＊]")
 _PDF_SYMBOL_TRANSLATION = str.maketrans(

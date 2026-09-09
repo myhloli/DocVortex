@@ -8,29 +8,29 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from docvortex.document.pdf.text.contracts import Bbox
-from docvortex.document.pdf.text.contracts import Char
 
+from docvortex.analyzers.native.pdf._script_geometry import ScriptRole
 from docvortex.analyzers.native.pdf.geometry import _rotate_bbox_from_upright
-from docvortex.document.pdf.document import PDFDocument
-from docvortex.analyzers.native.pdf.models import _AxisLine
-from docvortex.analyzers.native.pdf.models import _LineItem
+from docvortex.analyzers.native.pdf.inline.materialize import (
+    apply_pdf_text_links,
+    apply_pdf_text_scripts,
+    apply_pdf_text_styles,
+    materialize_pdf_inline_spans,
+)
+from docvortex.analyzers.native.pdf.inline.scripts import _refine_math_script_tokens, detect_pdf_text_script_lines
+from docvortex.analyzers.native.pdf.inline.types import (
+    PDFTextLinkLine,
+    PDFTextLinkRange,
+    PDFTextScriptLine,
+    PDFTextScriptRange,
+    PDFTextStyleLine,
+    PDFTextStyleRange,
+)
+from docvortex.analyzers.native.pdf.models import _AxisLine, _LineItem
 from docvortex.analyzers.native.pdf.pipeline import _analyze_native_document
-from docvortex.analyzers.native.pdf.script_geometry import ScriptRole
-from docvortex.analyzers.native.pdf.text_styles import PDFTextLinkLine
-from docvortex.analyzers.native.pdf.text_styles import PDFTextLinkRange
-from docvortex.analyzers.native.pdf.text_styles import PDFTextScriptLine
-from docvortex.analyzers.native.pdf.text_styles import PDFTextScriptRange
-from docvortex.analyzers.native.pdf.text_styles import PDFTextStyleLine
-from docvortex.analyzers.native.pdf.text_styles import PDFTextStyleRange
-from docvortex.analyzers.native.pdf.text_styles import apply_pdf_text_links
-from docvortex.analyzers.native.pdf.text_styles import apply_pdf_text_scripts
-from docvortex.analyzers.native.pdf.text_styles import apply_pdf_text_styles
-from docvortex.analyzers.native.pdf.text_styles import detect_pdf_text_script_lines
-from docvortex.analyzers.native.pdf.text_styles import materialize_pdf_inline_spans
-from docvortex.analyzers.native.pdf.text_styles import _refine_math_script_tokens
+from docvortex.document.pdf._document import PDFDocument
+from docvortex.document.pdf.text._contracts import Bbox, Char
 from docvortex.schema import BBox
-
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEMO_PDF_DIR = _PROJECT_ROOT / "demo" / "pdfs"

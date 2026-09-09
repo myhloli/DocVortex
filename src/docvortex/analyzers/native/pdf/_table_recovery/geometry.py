@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from .....schema import BBox
-from ..table_geometry import normalize_bbox as normalize_bbox, rotate_local_bbox as rotate_local_bbox
+from ..table_geometry import normalize_bbox, rotate_local_bbox
 
 
 def normalize_angle(value: object) -> int:

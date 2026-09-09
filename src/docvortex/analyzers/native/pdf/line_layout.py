@@ -7,22 +7,19 @@ import re
 import statistics
 from typing import Sequence
 
-
-from ....foundation.text import is_hyphen_at_line_end
+from ....foundation._text import is_hyphen_at_line_end
 from ....schema import BBox
-
-from .typography import _normalized_font_family
-from .models import _LineItem, _LocalAxisLine, _TextLane
 from .geometry import (
     _bbox_axis_overlap_ratio,
     _bbox_center_x,
     _bbox_center_y,
+    _bbox_intersects,
     _bbox_union_many,
     _clip_bbox,
-    _bbox_intersects,
     _coerce_bbox,
 )
-
+from .models import _LineItem, _LocalAxisLine, _TextLane
+from .typography import _normalized_font_family
 
 _TIGHT_OUTPUT_PADDING = 1.0
 

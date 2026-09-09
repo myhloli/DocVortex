@@ -5,7 +5,7 @@ from copy import deepcopy
 import pytest
 
 from docvortex.content.inline import inline_plain_text, join_inline_spans
-from docvortex.foundation.text import merge_text_line_contents
+from docvortex.foundation._text import merge_text_line_contents
 from docvortex.schema import CodeInlineSpan, EquationInlineSpan, HyperlinkSpan, TextSpan
 
 

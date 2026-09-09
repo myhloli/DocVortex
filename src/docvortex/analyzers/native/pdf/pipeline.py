@@ -6,31 +6,31 @@ from collections import deque
 from dataclasses import dataclass, replace
 from typing import Any
 
-from ..contracts import NativePdfSource, RawBlock
-
+from ....document.pdf._document import PDFDocument as PDFDocument
+from ....document.pdf._document import PDFImageInfo, PDFPageTextGeometry, get_lines_from_chars
 from ....schema import BBox
 from .._shared.xycut import sort_entries
-from ....document.pdf.document import PDFDocument as PDFDocument, PDFImageInfo, PDFPageTextGeometry, get_lines_from_chars
-from .inline.detection import detect_pdf_text_link_lines, detect_pdf_text_style_lines
-from .inline.matching import _realign_repaired_text_evidence
-from .inline.materialize import (
-    apply_pdf_text_links,
-    apply_pdf_text_scripts,
-    apply_pdf_text_styles,
-    materialize_pdf_inline_spans,
+from ..contracts import NativePdfSource, RawBlock
+from .auxiliary_text import (
+    _build_marginal_candidate,
+    _classify_deferred_image_footnotes,
+    _classify_isolated_first_page_footer,
+    _classify_page_auxiliary_text,
+    _classify_page_footnote_trailing_footers,
+    _classify_page_number_outer_companions,
+    _classify_raw_page_marginals,
+    _classify_repeated_page_marginals,
+    _classify_repeated_visual_headers,
+    _classify_rule_delimited_footers,
+    _classify_rule_delimited_headers,
+    _classify_single_page_compound_headers,
+    _classify_split_marginal_row_companions,
+    _marginal_geometry_matches,
+    _marginal_text_matches,
 )
-from .inline.scripts import detect_pdf_text_script_lines
-from .inline.types import PDFTextLinkLine, PDFTextStyleLine
-
-from .models import (
-    _AxisLine,
-    _DocumentBodyProfile,
-    _DocumentTitleProfile,
-    _LineItem,
-    _MarginalCandidate,
-    _PageSource,
-    _PreparedPage,
-)
+from .char_geometry import DocumentGeometryPlan, apply_line_geometry_repairs, build_document_geometry_plan
+from .code_blocks import _build_code_blocks, _build_rule_delimited_code_blocks
+from .formulas import _build_formula_like_blocks, _build_vector_formula_blocks
 from .geometry import (
     _bbox_area,
     _bbox_axis_overlap_ratio,
@@ -43,24 +43,6 @@ from .geometry import (
     _rotate_bbox_from_upright,
     _rotate_bbox_to_upright,
 )
-from .native_text import (
-    _build_native_line_items,
-    _extract_decorative_text_rules,
-    _coerce_pdf_drawing_lines,
-    _median_native_glyph_width,
-    _sanitize_pdf_control_text,
-    _resplit_native_visual_runs,
-)
-from .char_geometry import DocumentGeometryPlan, apply_line_geometry_repairs, build_document_geometry_plan
-from .line_merging import (
-    _merge_overlapping_inline_text_clusters,
-    _merge_post_semantic_text_runs,
-    _merge_same_baseline_text_lines,
-    _merge_title_resolved_visual_rows,
-    _restore_dense_split_visual_rows,
-)
-from .index_blocks import _extract_index_blocks
-from .tables import _connected_horizontal_rule_bboxes, _detect_table_candidates, _materialize_table_blocks
 from .graphics import (
     _IMAGE_CONTAINER_OVERLAP_THRESHOLD,
     _build_form_image_blocks,
@@ -71,35 +53,40 @@ from .graphics import (
     _select_form_image_bboxes,
     _split_parallel_graphic_rule_rows,
 )
-from .formulas import _build_formula_like_blocks, _build_vector_formula_blocks
-from .code_blocks import _build_code_blocks, _build_rule_delimited_code_blocks
-from .auxiliary_text import (
-    _build_marginal_candidate,
-    _classify_deferred_image_footnotes,
-    _classify_isolated_first_page_footer,
-    _classify_page_footnote_trailing_footers,
-    _classify_page_number_outer_companions,
-    _classify_page_auxiliary_text,
-    _classify_raw_page_marginals,
-    _classify_rule_delimited_footers,
-    _classify_rule_delimited_headers,
-    _classify_split_marginal_row_companions,
-    _classify_repeated_page_marginals,
-    _classify_repeated_visual_headers,
-    _classify_single_page_compound_headers,
-    _marginal_geometry_matches,
-    _marginal_text_matches,
+from .index_blocks import _extract_index_blocks
+from .inline.detection import detect_pdf_text_link_lines, detect_pdf_text_style_lines
+from .inline.matching import _realign_repaired_text_evidence
+from .inline.materialize import (
+    apply_pdf_inline_evidence,
 )
-from .title_analysis.body_profile import _infer_document_body_profile
-from .title_analysis.document_profile import _infer_document_title_profile
-from .title_analysis.page_titles import _classify_page_titles
-from .title_analysis.structural import (
-    _classify_body_height_section_titles,
-    _classify_explicit_section_titles,
-    _classify_inline_typography_reset_titles,
-    _classify_document_structural_titles,
-    _promote_noninitial_document_title_band,
+from .inline.scripts import detect_pdf_text_script_lines
+from .inline.types import PDFTextLinkLine, PDFTextStyleLine
+from .line_merging import (
+    _merge_overlapping_inline_text_clusters,
+    _merge_post_semantic_text_runs,
+    _merge_same_baseline_text_lines,
+    _merge_title_resolved_visual_rows,
+    _restore_dense_split_visual_rows,
+    merge_text_line_clusters,
 )
+from .models import (
+    _AxisLine,
+    _DocumentBodyProfile,
+    _DocumentTitleProfile,
+    _LineItem,
+    _MarginalCandidate,
+    _PageSource,
+    _PreparedPage,
+)
+from .native_text import (
+    _build_native_line_items,
+    _coerce_pdf_drawing_lines,
+    _extract_decorative_text_rules,
+    _median_native_glyph_width,
+    _resplit_native_visual_runs,
+    _sanitize_pdf_control_text,
+)
+from .tables import _connected_horizontal_rule_bboxes, _detect_table_candidates, _materialize_table_blocks
 from .text_assembly.annotations import (
     _merge_fragmented_header_blocks,
     _merge_front_matter_column_blocks,
@@ -109,8 +96,17 @@ from .text_assembly.annotations import (
 )
 from .text_assembly.assembly import _build_text_blocks
 from .text_assembly.common import _merge_internal_text_block_group
+from .title_analysis.body_profile import _infer_document_body_profile
+from .title_analysis.document_profile import _infer_document_title_profile
+from .title_analysis.page_titles import _classify_page_titles
+from .title_analysis.structural import (
+    _classify_body_height_section_titles,
+    _classify_document_structural_titles,
+    _classify_explicit_section_titles,
+    _classify_inline_typography_reset_titles,
+    _promote_noninitial_document_title_band,
+)
 from .visual_annotations import _classify_and_bind_visual_annotations
-
 
 _TEXT_SEMANTIC_TYPES = {
     "doc_title",
@@ -456,19 +452,18 @@ def _materialize_document_inline(
             strict=True,
         )
     ):
-        apply_pdf_text_links(page_blocks, link_lines, page_size)
-        apply_pdf_text_styles(page_blocks, style_lines, page_size)
         materialized_diagnostics = None
         if script_diagnostics is not None:
             materialized_diagnostics = []
             script_diagnostics[page_index]["materialized_ranges"] = materialized_diagnostics
-        apply_pdf_text_scripts(
+        apply_pdf_inline_evidence(
             page_blocks,
+            link_lines,
+            style_lines,
             prepared.script_lines,
             page_size,
             materialized_diagnostics=materialized_diagnostics,
         )
-        materialize_pdf_inline_spans(page_blocks)
 
 
 def _analyze_native_document(
@@ -680,22 +675,7 @@ def _prepare_page_source(
         if geometry_plan is not None and geometry_plan.document_style_anomaly
         else []
     )
-    remaining_lines = _merge_same_baseline_text_lines(
-        remaining_lines,
-        source.page_size,
-        table_bboxes,
-    )
-    remaining_lines = _merge_overlapping_inline_text_clusters(
-        remaining_lines,
-        source.page_size,
-        table_bboxes,
-    )
-    # 首轮同行合并可能补齐宿主 bbox，使相邻 hard-split 尾段具备二次闭包条件。
-    remaining_lines = _merge_same_baseline_text_lines(
-        remaining_lines,
-        source.page_size,
-        table_bboxes,
-    )
+    remaining_lines = merge_text_line_clusters(remaining_lines, source.page_size, table_bboxes)
     formula_candidate_lines = [line for line in remaining_lines if line.formula_candidate_only]
     remaining_lines = [line for line in remaining_lines if not line.formula_candidate_only]
     script_lines = detect_pdf_text_script_lines(

@@ -7,7 +7,7 @@ import pytest
 
 from docvortex.analyzers.native import PdfModel
 from docvortex.analyzers.native.pdf import pipeline
-from docvortex.document.pdf.document import PDFDocument
+from docvortex.document.pdf._document import PDFDocument
 
 
 def test_pdf_model_predict_returns_native_model_list_without_owning_document(

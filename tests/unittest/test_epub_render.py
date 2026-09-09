@@ -15,8 +15,8 @@ from lxml import etree
 from PIL import Image
 
 from docvortex.analyzers.native.epub import EpubPackage
-from docvortex.foundation import image_payload as image_payload_utils
-from docvortex.foundation.image_payload import (
+from docvortex.foundation import _image_payload as image_payload_utils
+from docvortex.foundation._image_payload import (
     MAX_DECODED_RASTER_DIMENSION,
     MAX_DECODED_RASTER_PIXELS,
     validate_decoded_raster_size,

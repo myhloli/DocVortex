@@ -6,16 +6,11 @@ import html
 from collections import defaultdict
 from typing import Any
 
-from ....document.pdf.text.contracts import Char
-
+from ....document.pdf.text._contracts import Char
 from ....schema import BBox
-from .geometry import _bbox_union_many, _coerce_bbox
-from .line_merging import _merge_overlapping_inline_text_clusters
-from .models import _LineItem
-from .native_text import _fill_native_typography
-from .script_geometry import ScriptRole
-from .table_recovery.candidate import serialize_native_table_html
-from .table_recovery.contracts import (
+from ._script_geometry import ScriptRole
+from ._table_recovery.candidate import serialize_native_table_html
+from ._table_recovery.contracts import (
     NativeTableCell,
     NativeTableGlyph,
     NativeTableInput,
@@ -23,9 +18,13 @@ from .table_recovery.contracts import (
     NativeTableRule,
     NativeTableText,
 )
-from .table_recovery.geometry import page_bbox_to_table_local
-from .table_recovery.text import build_cell_text_parts
+from ._table_recovery.geometry import page_bbox_to_table_local
+from ._table_recovery.text import build_cell_text_parts
+from .geometry import _bbox_union_many, _coerce_bbox
 from .inline.scripts import _fraction_member_indices, _script_line_char_roles
+from .line_merging import _merge_overlapping_inline_text_clusters
+from .models import _LineItem
+from .native_text import _fill_native_typography
 
 
 def _table_char_map(chars: tuple[Char, ...]) -> dict[int, Char]:

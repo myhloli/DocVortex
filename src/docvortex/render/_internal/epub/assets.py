@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
+import re
+from dataclasses import dataclass
 from io import BytesIO
 from pathlib import PurePosixPath
-import re
 from urllib.parse import unquote, urlsplit
 
 from PIL import Image, UnidentifiedImageError
 
-from ...contracts import AssetResolver
-from ....schema import ImagePayloadBlock
-from ....foundation.image_payload import (
+from ....foundation._image_payload import (
     MAX_IMAGE_DATA_URI_BYTES,
     MAX_IMAGE_PAYLOAD_BYTES,
     extract_generated_svg_fallback,
@@ -22,6 +20,8 @@ from ....foundation.image_payload import (
     validate_decoded_raster_size,
     validate_image_sidecar_path,
 )
+from ....schema import ImagePayloadBlock
+from ...contracts import AssetResolver
 
 _SVG_START_RE = re.compile(rb"^(?:\xef\xbb\xbf)?\s*(?:<\?xml\b.*?\?>\s*)?<svg\b", re.IGNORECASE | re.DOTALL)
 _PASSTHROUGH_FORMATS = {"gif", "jpg", "png"}

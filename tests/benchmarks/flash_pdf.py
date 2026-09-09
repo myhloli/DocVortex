@@ -2,11 +2,9 @@
 """生成 Flash PDF 完整输出基线，并在独立进程中测量耗时和峰值内存。"""
 
 from __future__ import annotations
-from docvortex.schema import Producer
 
 import argparse
 import cProfile
-from dataclasses import asdict
 import gc
 import hashlib
 import importlib.metadata
@@ -18,8 +16,11 @@ import subprocess
 import sys
 import time
 from copy import deepcopy
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
+
+from docvortex.schema import Producer
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -27,10 +28,10 @@ sys.path.insert(0, str(ROOT / "tests" / "unittest"))
 
 from _flash_pdf_test_utils import _page_bbox_fingerprint, _page_fingerprint
 
-from docvortex.postprocess.document import model_json_to_middle_json
-from docvortex.document.pdf import initialize_pdfium_runtime
-from docvortex.document.pdf.document import PDFDocument
 from docvortex.analyzers.native import PdfModel
+from docvortex.document.pdf import initialize_pdfium_runtime
+from docvortex.document.pdf._document import PDFDocument
+from docvortex.postprocess.document import model_json_to_middle_json
 from docvortex.schema import ModelJson
 
 
@@ -63,6 +64,7 @@ def _predict(payload: bytes) -> list[list[dict[str, Any]]]:
 def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
     """隔离一份文档的计时、完整输出和进程峰值内存，避免其它文档污染 RSS。"""
     import resource
+
     from loguru import logger
 
     logger.disable("docvortex")

@@ -1,15 +1,17 @@
 """PDF Path、Image 与 Form 对象提取，保持原生提取算法与资源语义。"""
 
 from __future__ import annotations
+
 import ctypes
 import hashlib
 import logging
 import math
 from typing import Any, Iterator
+
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
-from ...schema import BBox
 
+from ...schema import BBox
 from .native_contracts import (
     DRAWING_FORM_MAX_DEPTH,
     DRAWING_LINE_AXIS_ABSOLUTE_TOLERANCE,
@@ -18,10 +20,10 @@ from .native_contracts import (
     DRAWING_LINE_MIN_LENGTH,
     DRAWING_THIN_RECT_MAX_THICKNESS,
     DRAWING_THIN_RECT_MIN_ASPECT_RATIO,
+    PDF_IMAGE_FINGERPRINT_MAX_RAW_BYTES,
     PDFDrawingLine,
     PDFImageInfo,
     PDFPathInfo,
-    PDF_IMAGE_FINGERPRINT_MAX_RAW_BYTES,
     _PathSubpath,
 )
 from .native_coordinates import (
@@ -32,7 +34,7 @@ from .native_coordinates import (
     _transform_drawing_point,
 )
 
-logger = logging.getLogger("docvortex.document.pdf.document")
+logger = logging.getLogger("docvortex.document.pdf._document")
 
 
 def _walk_raw_page_objects_with_depth(

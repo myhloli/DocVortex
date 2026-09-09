@@ -9,18 +9,18 @@ from urllib.parse import SplitResult, unquote, urljoin, urlsplit, urlunsplit
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
-from ....foundation.image_payload import parse_image_data_uri_strict, validate_remote_image_url
-from .._shared.hyperlink import sanitize_hyperlink_target
 from docvortex.content.markup import ResolvedMarkupImage
+from docvortex.document.contracts import HtmlSourceContext
+
+from ....foundation._image_payload import parse_image_data_uri_strict, validate_remote_image_url
+from .._shared.hyperlink import sanitize_hyperlink_target
 from .constants import (
     MAX_HTML_IMAGE_BYTES,
     MAX_HTML_IMAGE_TOTAL_BYTES,
     MAX_HTML_STYLESHEET_BYTES,
     MAX_HTML_STYLESHEET_TOTAL_BYTES,
 )
-from docvortex.document.contracts import HtmlSourceContext
 from .errors import HtmlResourceLimitError
-
 
 _IMAGE_MIME_SIGNATURES: tuple[tuple[str, tuple[bytes, ...]], ...] = (
     ("image/jpeg", (b"\xff\xd8\xff",)),

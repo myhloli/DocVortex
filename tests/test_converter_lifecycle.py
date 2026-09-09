@@ -13,6 +13,7 @@ def test_converter_reuse_after_failure_matches_fresh_instance(suffix: str) -> No
     """不同文档及失败重试使用独立状态，不修改之前交付的页面列表。"""
     if suffix == "docx":
         from docx import Document
+
         from docvortex.analyzers.native.office.docx.docx_converter import DocxConverter as Converter
 
         def payload(text: str) -> bytes:
@@ -24,6 +25,7 @@ def test_converter_reuse_after_failure_matches_fresh_instance(suffix: str) -> No
             return stream.getvalue()
     else:
         from pptx import Presentation
+
         from docvortex.analyzers.native.office.pptx.pptx_converter import PptxConverter as Converter
 
         def payload(text: str) -> bytes:
@@ -53,7 +55,9 @@ def test_converter_reuse_after_failure_matches_fresh_instance(suffix: str) -> No
 def test_pdf_contract_identity_survives_module_split() -> None:
     """原 PDF 模块的类型仍是唯一对象，已存在的 pickle 数据可以继续读取。"""
     import pickle
-    from docvortex.document.pdf import document, native_contracts
+
+    from docvortex.document.pdf import _document as document
+    from docvortex.document.pdf import native_contracts
 
     assert document.PDFDrawingLine is native_contracts.PDFDrawingLine
     value = document.PDFDrawingLine((0, 0), (10, 0), (0, 0, 10, 0), 1, "horizontal")

@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..schema import RAW_ALGORITHM, RAW_CAPTION, RAW_FOOTNOTE, BlockType, VISUAL_MAIN_TYPES
+from ..foundation._text import clean_isolated_formula
 from ..foundation.language import guess_code_language
-
-from ..foundation.text import clean_isolated_formula
-
+from ..schema import RAW_ALGORITHM, RAW_CAPTION, RAW_FOOTNOTE, VISUAL_MAIN_TYPES, BlockType
 from .content import clean_inline_content, code_content_clean, collapse_inline_newlines
 from .lists import fix_office_index_blocks, fix_office_list_blocks, fix_pdf_index_blocks, fix_pdf_list_blocks
 from .visual import (

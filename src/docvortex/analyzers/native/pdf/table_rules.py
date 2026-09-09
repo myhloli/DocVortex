@@ -1,11 +1,12 @@
 """PDF 规则线与文本行候选；保留原有认领顺序与判定规则。"""
 
 from __future__ import annotations
+
 import statistics
 from typing import Any
+
+from ....document.pdf._document import PDFPathInfo
 from ....schema import BBox
-from ....document.pdf.document import PDFPathInfo
-from .models import _Fragment, _LineItem, _LocalAxisLine, _PageSource, _TableCandidate, _VisualRow
 from .geometry import (
     _bbox_area,
     _bbox_axis_overlap_ratio,
@@ -19,7 +20,7 @@ from .geometry import (
     _rotate_bbox_to_upright,
     _transform_axis_lines,
 )
-
+from .models import _Fragment, _LineItem, _LocalAxisLine, _PageSource, _TableCandidate, _VisualRow
 from .table_annotations import (
     _build_table_annotation,
     _collect_caption_rows,

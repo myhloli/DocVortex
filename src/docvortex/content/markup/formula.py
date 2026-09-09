@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
 from docvortex.content.mathml import mathml_to_latex
-from docvortex.foundation.xml_names import local_name
-from docvortex.foundation.type_identity import preserve_type_module
 
+from ...foundation.type_identity import preserve_type_module
+from ...foundation.xml_names import local_name
 
 FormulaDisplay: TypeAlias = Literal["inline", "block"]
 FormulaSourceKind: TypeAlias = Literal[

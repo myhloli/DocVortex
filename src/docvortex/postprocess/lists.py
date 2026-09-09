@@ -5,11 +5,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from ..content.spans import inline_span_plain_text, text_spans
-from ..schema import BlockType, parse_inline_spans
-from ..foundation.geometry import calculate_overlap_area_in_bbox1_area_ratio
-
 from ..content.inline import inline_plain_text, slice_inline_spans
+from ..content.spans import inline_span_plain_text, text_spans
+from ..foundation._geometry import calculate_overlap_area_in_bbox1_area_ratio
+from ..schema import BlockType, parse_inline_spans
 from .visual import _bbox_for_calculation
 
 

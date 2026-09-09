@@ -10,11 +10,11 @@ from xml.etree import ElementTree as ET
 from lxml import etree
 from PIL import Image, ImageChops
 
-from ....foundation.image_payload import MAX_DECODED_RASTER_DIMENSION, MAX_DECODED_RASTER_PIXELS
+from ....foundation._image_payload import MAX_DECODED_RASTER_DIMENSION, MAX_DECODED_RASTER_PIXELS
 from ....schema import BBox
 from .constants import MAX_ENTRY_BYTES
 from .errors import OfdResourceLimitError
-from .geometry import Affine, bbox_intersection, parse_affine, parse_st_box, transform_bbox, parse_numbers
+from .geometry import Affine, bbox_intersection, parse_affine, parse_numbers, parse_st_box, transform_bbox
 from .models import OfdPageScene
 from .package import OfdPackage, element_text, first_child, local_name
 from .path import OfdPathBudget, PathCommand, parse_path_commands

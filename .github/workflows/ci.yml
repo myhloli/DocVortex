@@ -29,6 +29,8 @@ jobs:
       - run: uv pip install ".[test]" "pypdfium2==5.10.1"
       - name: Verify dependency-free line joining
         run: uv run --no-project python -m pytest tests/unittest/test_text_boundary_rules.py tests/unittest/test_text_utils.py -q
+      - name: Verify public SDK boundaries
+        run: uv run --no-project python -m pytest tests/test_pdf_analysis_api.py tests/test_geometry_api.py tests/test_shared_boundaries.py -q
       - name: Verify native vector raster dependency
         run: uv run --no-project python -m pytest tests/unittest/test_ofd_vector_tables.py::test_resvg_dependency_smoke -q
       - run: uv run --no-project python -m pytest -q --deselect tests/unittest/test_native_pdf_table_demo_manifest.py::test_demo_sparse_table_confidence_manifest

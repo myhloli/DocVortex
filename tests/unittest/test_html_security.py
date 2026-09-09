@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 from bs4 import BeautifulSoup, Tag
 
-from docvortex.foundation import image_payload
+from docvortex.foundation import _image_payload as image_payload
 from docvortex.render._internal.html.sanitizer import (
     is_supported_html_markup,
     sanitize_html_fragment,

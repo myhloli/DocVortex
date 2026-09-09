@@ -6,7 +6,6 @@ from collections.abc import Collection
 from typing import Any, Final
 from urllib.parse import urlsplit
 
-
 DEFAULT_EXTERNAL_HYPERLINK_SCHEMES: Final = frozenset({"http", "https", "mailto", "tel"})
 OFFICE_EXTERNAL_HYPERLINK_SCHEMES: Final = DEFAULT_EXTERNAL_HYPERLINK_SCHEMES | {"ftp"}
 

@@ -6,8 +6,8 @@ import re
 import statistics
 from typing import Sequence
 
+from .....foundation._text import is_hyphen_at_line_end
 from .....schema import BBox
-from .....foundation.text import is_hyphen_at_line_end
 from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _rotate_bbox_to_upright
 from ..line_layout import (
     _connection_crosses_table,

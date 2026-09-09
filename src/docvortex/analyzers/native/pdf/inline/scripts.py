@@ -7,8 +7,8 @@ import unicodedata
 from typing import Any, Literal, Sequence
 
 from .....schema import BBox
+from .._script_geometry import ScriptRole, classify_char_script_roles
 from ..geometry import _rotate_bbox_to_upright
-from ..script_geometry import ScriptRole, classify_char_script_roles
 from .common import _coerce_bbox, _normalize_match_fragment, _ordered_line_chars
 from .types import (
     _PDF_SCRIPT_AUTHOR_MARKS,

@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 import math
 import re
 import statistics
+from dataclasses import replace
 from typing import Any
 
-
+from ....document.pdf._document import PDFPathInfo
 from ....schema import BBox
-from ....document.pdf.document import PDFPathInfo
-
-from .models import _AxisLine, _GraphicCandidate, _LineItem, _PageSource, _TextLane
 from .geometry import (
     _bbox_area,
     _bbox_axis_overlap_ratio,
@@ -29,10 +26,10 @@ from .geometry import (
     _point_in_bbox,
     _rotate_bbox_to_upright,
 )
-from .native_text import _fill_native_typography, _normalize_native_run_text, _sanitize_pdf_control_text
 from .line_layout import _infer_text_lanes, _line_effective_height
 from .line_merging import _join_formula_visual_row
-
+from .models import _AxisLine, _GraphicCandidate, _LineItem, _PageSource, _TextLane
+from .native_text import _fill_native_typography, _normalize_native_run_text, _sanitize_pdf_control_text
 
 _MIN_RASTER_IMAGE_PAGE_AREA_RATIO = 0.0038
 

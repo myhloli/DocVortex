@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import atexit
+import math
 import multiprocessing
 import os
+import platform
 import threading
 import time
 from concurrent.futures import ALL_COMPLETED, Future, ProcessPoolExecutor, wait
 from concurrent.futures.process import BrokenProcessPool
-import math
 from typing import Any, Callable, Literal
 
 import numpy as np
@@ -15,12 +16,11 @@ import pypdfium2 as pdfium
 from loguru import logger
 from PIL import Image
 
-from .pdfium import close_pdfium_child, close_pdfium_document, initialize_pdfium_runtime, pdfium_guard
-from docvortex.foundation.image_encoding import image_to_b64str
-from .raster import page_to_image
+from ...foundation._geometry import normalize_to_int_bbox
+from ...foundation.image_encoding import image_to_b64str
 from ...schema import BBox, IntBBox
-from ...foundation.geometry import normalize_to_int_bbox
-from ...foundation.platform import is_windows_environment
+from .pdfium import close_pdfium_child, close_pdfium_document, initialize_pdfium_runtime, pdfium_guard
+from .raster import page_to_image
 
 
 class ImageType:
@@ -211,7 +211,7 @@ def _initialize_pdf_render_worker() -> None:
 
 def _create_pdf_render_executor(max_workers: int) -> ProcessPoolExecutor:
     """使用安全 multiprocessing 上下文创建 PDF 渲染进程池。"""
-    if is_windows_environment():
+    if platform.system() == "Windows":
         return ProcessPoolExecutor(max_workers=max_workers, initializer=_initialize_pdf_render_worker)
 
     start_method = multiprocessing.get_start_method()

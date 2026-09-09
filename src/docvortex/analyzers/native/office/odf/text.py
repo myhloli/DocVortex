@@ -11,8 +11,8 @@ from typing import Any
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
-from .....schema import BlockType
-from ..._shared.hyperlink import sanitize_hyperlink_target
+from docvortex.content.mathml import mathml_to_latex
+
 from .....content.spans import (
     append_equation_span,
     append_text_span,
@@ -20,8 +20,9 @@ from .....content.spans import (
     inline_span_plain_text,
     strip_span_dicts,
 )
-from docvortex.content.mathml import mathml_to_latex
-from docvortex.foundation.image_encoding import image_to_b64str
+from .....foundation.image_encoding import image_to_b64str
+from .....schema import BlockType
+from ..._shared.hyperlink import sanitize_hyperlink_target
 from ..image import create_text_placeholder, serialize_office_image
 from ..rich_text import OfficeRichTextSegment, build_rich_text_from_segments
 from .chart import parse_chart_block
@@ -31,7 +32,6 @@ from .models import InlineAtom, InlineBlockGroup, InlineBreak, InlineImage, Inli
 from .package import OdfPackage
 from .styles import OdfStyles
 from .table import OdfTableExpansionBudget, parse_table_grid, table_grid_to_html
-
 
 _WHITESPACE_RE = re.compile(r"[\t\r\n ]+")
 _MAX_EXPLICIT_SPACE_COUNT = 10_000

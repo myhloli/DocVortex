@@ -8,7 +8,7 @@ from _flash_pdf_test_utils import (
 )
 
 from docvortex.analyzers.native.pdf import graphics, models, pipeline
-from docvortex.document.pdf.document import PDFPathInfo
+from docvortex.document.pdf._document import PDFPathInfo
 
 
 def _drawing_axis_line(

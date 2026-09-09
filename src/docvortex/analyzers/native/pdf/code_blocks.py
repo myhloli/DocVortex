@@ -7,10 +7,8 @@ import statistics
 import unicodedata
 from typing import Any
 
-from .spatial_text import project_pdf_spatial_text
+from ....document.pdf._document import PDFPathInfo
 from ....schema import BBox
-from ....document.pdf.document import PDFPathInfo
-
 from .geometry import (
     _bbox_area,
     _bbox_center_x,
@@ -21,7 +19,7 @@ from .geometry import (
 )
 from .models import _CodeCandidate, _LineItem, _PageSource
 from .native_text import _sanitize_pdf_control_text
-
+from .spatial_text import project_pdf_spatial_text
 
 _MONOSPACE_FONT_HINTS = (
     "mono",

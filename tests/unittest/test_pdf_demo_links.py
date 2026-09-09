@@ -4,12 +4,13 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
 
+from _span_test_utils import inline_text, inline_urls
+
 from docvortex.analyzers.native import PdfModel
-from docvortex.document.pdf.document import PDFDocument
+from docvortex.document.pdf._document import PDFDocument
 from docvortex.postprocess.pages import model_json_to_pages
 from docvortex.render import render_docx, render_html, render_markdown, render_structured_content
 from docvortex.schema import MiddleJson, ModelJson, PageInfo
-from _span_test_utils import inline_text, inline_urls
 
 
 def test_demo1_pdf_link_reaches_model_middle_and_all_renderers() -> None:

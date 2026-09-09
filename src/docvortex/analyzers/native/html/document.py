@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import codecs
+import re
 from copy import deepcopy
 from dataclasses import dataclass
-import re
 from typing import Literal
 
-from lxml import etree, html as lxml_html  # type: ignore[reportMissingImports]
+from lxml import etree  # type: ignore[reportMissingImports]
+from lxml import html as lxml_html
 
 from docvortex.content.markup.formula import FormulaExtraction, extract_formula, is_tex_script
 from docvortex.content.markup.projector import local_name
-from .constants import MAX_HTML_BYTES, MAX_HTML_DEPTH, MAX_HTML_NODES
 from docvortex.document.contracts import HtmlSourceContext
-from .errors import HtmlParseError, HtmlResourceLimitError
 
+from .constants import MAX_HTML_BYTES, MAX_HTML_DEPTH, MAX_HTML_NODES
+from .errors import HtmlParseError, HtmlResourceLimitError
 
 _ACTIVE_TAGS = frozenset(
     {

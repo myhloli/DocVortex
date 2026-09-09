@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError
-from io import BytesIO
 import subprocess
 import sys
+from dataclasses import FrozenInstanceError
+from io import BytesIO
 from unittest.mock import Mock
 
-from PIL import Image
 import pytest
+from PIL import Image
 from reportlab.pdfgen.canvas import Canvas
 
 from docvortex.assets import ImageArtifact, ImageFormat, parse_image_data_uri_strict, transcode_image
 from docvortex.content.tree import iter_image_payloads
 from docvortex.document.pdf import PDFDocument
 from docvortex.document.pdf.native_contracts import PDFPageImage
-from docvortex.foundation.image import crop_pil_image
+from docvortex.foundation._image import crop_pil_image
 from docvortex.foundation.image_encoding import encode_image
 from docvortex.schema import ChartBlock, ChartBodyBlock, EquationBlock, ImageBlock, ImageBodyBlock, TableBlock, TableBodyBlock
 
@@ -80,7 +80,7 @@ def test_invalid_region_rejected(bbox: tuple) -> None:
 @pytest.mark.parametrize("with_crop", [False, True])
 def test_render_closes_owned_images(monkeypatch: pytest.MonkeyPatch, failure: bool, with_crop: bool) -> None:
     """真实图像在编码成功和异常时均关闭，区域副本也不泄漏。"""
-    import docvortex.document.pdf.document as implementation
+    import docvortex.document.pdf._document as implementation
 
     page = Image.new("RGB", (20, 20))
     crop = Image.new("RGB", (10, 10))

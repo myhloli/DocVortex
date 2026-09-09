@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from .....document.pdf.text.contracts import Char
-
+from .....document.pdf.text._contracts import Char
 from .....schema import BBox
 
 NativeTableCandidateSource = Literal[
@@ -17,6 +16,10 @@ NativeTableCandidateSource = Literal[
     "text_grid",
     "key_value",
 ]
+
+
+class PDFTableRecoveryError(RuntimeError):
+    """标记结构恢复阶段的失败，供宿主区分可回退错误与 HTML 物化异常。"""
 
 
 @dataclass(frozen=True, slots=True)

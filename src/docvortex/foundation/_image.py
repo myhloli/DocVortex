@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 
 from ..schema import BBox
-from .geometry import normalize_to_int_bbox
+from ._geometry import normalize_to_int_bbox
 
 
 def calculate_contrast(img: np.ndarray, img_mode: str) -> float:

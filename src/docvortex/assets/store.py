@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from hashlib import sha256
 
-from ..foundation.image_payload import validate_image_sidecar_path
+from ..foundation._image_payload import validate_image_sidecar_path
 
 
 class AssetStore(Mapping[str, bytes]):

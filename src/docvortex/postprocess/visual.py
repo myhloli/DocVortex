@@ -6,10 +6,17 @@ from copy import deepcopy
 from typing import Any
 
 from ..content.spans import inline_span_plain_text
-from ..schema import BBox, BlockType, VISUAL_MAIN_TYPES, VISUAL_RELATION_IGNORED_TYPES, VISUAL_TYPE_MAPPING
-from ..foundation.geometry import bbox_center_distance, bbox_distance
-from ..schema import RAW_CAPTION, RAW_FOOTNOTE
 from ..content.table.rules import is_table_continuation_text
+from ..foundation._geometry import bbox_center_distance, bbox_distance
+from ..schema import (
+    RAW_CAPTION,
+    RAW_FOOTNOTE,
+    VISUAL_MAIN_TYPES,
+    VISUAL_RELATION_IGNORED_TYPES,
+    VISUAL_TYPE_MAPPING,
+    BBox,
+    BlockType,
+)
 
 INLINE_CAPTION_FRAGMENT_TYPES = {BlockType.TEXT, RAW_FOOTNOTE}
 STACKED_TABLE_CAPTION_CLUSTER_TYPES = {

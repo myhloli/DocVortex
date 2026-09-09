@@ -11,7 +11,7 @@ from loguru import logger
 from metafile_render import MetafileError, MetafileResourceLimitError, render_metafile
 from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 
-from docvortex.foundation.image_encoding import image_to_b64str
+from ....foundation.image_encoding import image_to_b64str
 
 VECTOR_IMAGE_FORMATS = frozenset({"WMF", "EMF"})
 VECTOR_IMAGE_EXTENSIONS = frozenset({".wmf", ".emf"})

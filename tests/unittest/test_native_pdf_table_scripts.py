@@ -6,21 +6,18 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-from bs4 import BeautifulSoup
-from docvortex.document.pdf.text.contracts import Bbox, Char
 import pytest
+from bs4 import BeautifulSoup
 
 from docvortex.analyzers.native.pdf import table_text_styles as pdf_table_text_styles
-from docvortex.analyzers.native.pdf.geometry import _rotate_bbox_from_upright
-from docvortex.document.pdf.document import PDFDocument
-from docvortex.analyzers.native.pdf.table_recovery import (
+from docvortex.analyzers.native.pdf._table_recovery import (
     NativeTableInput,
     coerce_native_table_rectangles,
     coerce_native_table_rules,
     recover_native_pdf_table,
 )
-from docvortex.analyzers.native.pdf.table_recovery.candidate import serialize_native_table_html
-from docvortex.analyzers.native.pdf.table_recovery.contracts import (
+from docvortex.analyzers.native.pdf._table_recovery.candidate import serialize_native_table_html
+from docvortex.analyzers.native.pdf._table_recovery.contracts import (
     NativeTableCell,
     NativeTableGlyph,
     NativeTableResult,
@@ -28,11 +25,13 @@ from docvortex.analyzers.native.pdf.table_recovery.contracts import (
     NativeTableText,
     NativeTableTextRow,
 )
+from docvortex.analyzers.native.pdf.geometry import _rotate_bbox_from_upright
 from docvortex.analyzers.native.pdf.table_text_styles import (
     _non_grid_fraction_rules,
     render_native_table_html_with_scripts,
 )
-
+from docvortex.document.pdf._document import PDFDocument
+from docvortex.document.pdf.text._contracts import Bbox, Char
 
 _PROJECT_ROOT = Path(__file__).parents[2]
 _SCRIPT_TRUTH_PATH = _PROJECT_ROOT / "tests" / "fixtures" / "native_pdf_table_script_truth.json"

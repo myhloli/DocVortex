@@ -10,25 +10,22 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping, Sequence
 
-from ....document.pdf.text.contracts import Char
-
+from ....document.pdf._document import PDFDocument, PDFDrawingLine
+from ....document.pdf.text._contracts import Char
 from ....schema import BBox
-from ....document.pdf.document import PDFDocument, PDFDrawingLine
-
-from .typography import _normalized_font_family
-from .models import _AxisLine, _LineItem
 from .geometry import (
-    _clip_validated_bbox,
     _bbox_center_y,
     _bbox_union,
     _bbox_union_many,
     _clip_bbox,
+    _clip_validated_bbox,
     _coerce_bbox,
     _horizontal_bbox_gap,
     _rotate_bbox_from_upright,
     _rotate_bbox_to_upright,
 )
-
+from .models import _AxisLine, _LineItem
+from .typography import _normalized_font_family
 
 _PDF_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
 _PDF_LINE_END_SOFT_HYPHEN_RE = re.compile(r"(?<=[A-Za-z])[\x02\u00ad](?=[\t ]*(?:\n|$))")

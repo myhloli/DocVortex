@@ -6,10 +6,7 @@ import re
 import statistics
 import unicodedata
 
-
 from ....schema import BBox
-
-from .models import _LineItem, _TextLane
 from .geometry import (
     _bbox_axis_overlap_ratio,
     _bbox_center_y,
@@ -18,8 +15,9 @@ from .geometry import (
     _horizontal_bbox_gap,
     _rotate_bbox_to_upright,
 )
-from .native_text import _fill_native_typography, _median_native_glyph_width
 from .line_layout import _connection_crosses_table, _font_signatures_share_family, _infer_text_lanes, _line_effective_height
+from .models import _LineItem, _TextLane
+from .native_text import _fill_native_typography, _median_native_glyph_width
 
 
 def _merge_same_baseline_text_lines(
@@ -1221,3 +1219,12 @@ def _merge_dense_split_visual_row(
     if merged.chars:
         _fill_native_typography(merged, page_size)
     return merged
+
+
+def merge_text_line_clusters(
+    lines: list[_LineItem], page_size: tuple[float, float], table_bboxes: list[BBox]
+) -> list[_LineItem]:
+    """共享同基线、重叠簇和第二次同基线合并的确定性闭包。"""
+    lines = _merge_same_baseline_text_lines(lines, page_size, table_bboxes)
+    lines = _merge_overlapping_inline_text_clusters(lines, page_size, table_bboxes)
+    return _merge_same_baseline_text_lines(lines, page_size, table_bboxes)

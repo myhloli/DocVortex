@@ -8,17 +8,18 @@ from typing import Any, BinaryIO
 
 from loguru import logger
 
-from ....schema import BlockType
 from docvortex.content.markup import MarkupProjector, MarkupStylesheet
+from docvortex.document.contracts import HtmlSourceContext
+
+from ....codecs.html import decode_docvortex_html_wire
 from ....content.spans import text_spans
+from ....schema import BlockType
 from .anchors import HtmlAnchorRegistry, append_referenced_notes
 from .constants import MAX_HTML_BYTES, MAX_HTML_RENDERED_BYTES
-from docvortex.document.contracts import HtmlSourceContext
 from .document import HtmlDocument, parse_html_document
 from .errors import HtmlResourceLimitError
 from .resources import HtmlResourceContext
 from .selector import select_auto_content
-from ....codecs.html import decode_docvortex_html_wire
 
 
 class HtmlConverter:

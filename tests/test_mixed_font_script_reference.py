@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 import hashlib
 import json
+from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from bs4 import BeautifulSoup
 import pytest
+from bs4 import BeautifulSoup
 
+from docvortex.analyzers.native.pdf._script_geometry import classify_char_script_roles
 from docvortex.analyzers.native.pdf.geometry import _rotate_bbox_from_upright
-from docvortex.analyzers.native.pdf.inline.scripts import _script_line_char_roles, _refine_math_script_tokens
-from docvortex.analyzers.native.pdf.script_geometry import classify_char_script_roles
+from docvortex.analyzers.native.pdf.inline.scripts import _refine_math_script_tokens, _script_line_char_roles
 from docvortex.api import parse
 
 _ROOT = Path(__file__).parents[1]

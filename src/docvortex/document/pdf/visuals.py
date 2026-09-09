@@ -1,197 +1,26 @@
-"""视觉块容器补全、方向归一化与页面裁图。"""
+"""原生视觉块折叠、方向归一化与页面裁图。"""
 
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from loguru import logger
 
+from ...assets import image_size as _normalize_page_size
+from ...foundation._coordinates import convert_bbox
+from ...foundation._coordinates import normalize_bbox as _normalize_model_bbox_for_containment
+from ...foundation._coordinates import normalize_quarter_turn_angle as _normalize_visual_block_angle
+from ...foundation._geometry import calculate_overlap_area_in_bbox1_area_ratio
+from ...foundation._image_operations import encode_crop_as_jpeg_data_uri as _encode_page_crop_as_jpeg_data_uri
 from ...schema import BBox, BlockType
-from ...foundation.geometry import calculate_overlap_area_2_minbox_area_ratio, calculate_overlap_area_in_bbox1_area_ratio
-
 from .constants import (
     IMAGE_BLOCK_CONTAINMENT_THRESHOLD,
-    IMAGE_BLOCK_LAYOUT_COVERAGE_THRESHOLD,
-    IMAGE_BLOCK_LAYOUT_MIN_VISUAL_COUNT,
-    LOCAL_LAYOUT_IMAGE_BLOCK_AREA_TYPES,
-    LOCAL_LAYOUT_IMAGE_BLOCK_BODY_TYPES,
     MODEL_JSON_VISUAL_BLOCK_TYPES,
-)
-from .visual_geometry import (
-    _bbox_to_pixel_bbox,
-    _encode_page_crop_as_jpeg_data_uri,
-    _normalize_page_size,
-    _normalize_visual_block_angle,
 )
 
 if TYPE_CHECKING:
-    from .document import PDFDocument
-
-
-def _normalize_model_bbox_for_containment(raw_bbox: Any) -> BBox | None:
-    """校验模型 block 的四点框，返回可用于面积包含判断的浮点坐标。"""
-    try:
-        if raw_bbox is None or len(raw_bbox) != 4:
-            return None
-        bbox = tuple(float(value) for value in raw_bbox)
-    except (TypeError, ValueError):
-        return None
-
-    if not all(math.isfinite(value) for value in bbox):
-        return None
-    if bbox[2] <= bbox[0] or bbox[3] <= bbox[1]:
-        return None
-    return bbox
-
-
-def _collapse_image_blocks(
-    page_model_list: list[dict[str, Any]],
-    containment_threshold: float = IMAGE_BLOCK_CONTAINMENT_THRESHOLD,
-) -> None:
-    """将 image_block 折叠为单个图片，并删除面积上被其包裹的非容器子块。"""
-    image_blocks = [block for block in page_model_list if block.get("type") == "image_block"]
-    if not image_blocks:
-        return
-
-    image_block_ids = {id(block) for block in image_blocks}
-    image_block_bboxes = [
-        bbox for block in image_blocks if (bbox := _normalize_model_bbox_for_containment(block.get("bbox"))) is not None
-    ]
-
-    retained_blocks: list[dict[str, Any]] = []
-    for block in page_model_list:
-        if id(block) in image_block_ids:
-            block["type"] = BlockType.IMAGE
-            retained_blocks.append(block)
-            continue
-
-        block_bbox = _normalize_model_bbox_for_containment(block.get("bbox"))
-        is_contained = block_bbox is not None and any(
-            calculate_overlap_area_in_bbox1_area_ratio(block_bbox, image_block_bbox) >= containment_threshold
-            for image_block_bbox in image_block_bboxes
-        )
-        if not is_contained:
-            retained_blocks.append(block)
-
-    page_model_list[:] = retained_blocks
-
-
-def _supplement_missing_image_block_containers(
-    model_list: list[list[dict[str, Any]]],
-    layout_blocks_list: list[list[dict[str, Any]]],
-    containment_threshold: float = IMAGE_BLOCK_CONTAINMENT_THRESHOLD,
-    coverage_threshold: float = IMAGE_BLOCK_LAYOUT_COVERAGE_THRESHOLD,
-    min_visual_count: int = IMAGE_BLOCK_LAYOUT_MIN_VISUAL_COUNT,
-) -> None:
-    """用本地 layout 整图框为 xhigh 结果补充缺失的 image_block 容器。"""
-    if len(model_list) != len(layout_blocks_list):
-        raise ValueError(
-            "Hybrid image-block fallback page count mismatch: "
-            f"model_list={len(model_list)}, layout_blocks={len(layout_blocks_list)}"
-        )
-
-    for page_model_list, page_layout_blocks in zip(model_list, layout_blocks_list):
-        existing_image_block_bboxes = [
-            bbox
-            for block in page_model_list
-            if block.get("type") == "image_block"
-            if (bbox := _normalize_model_bbox_for_containment(block.get("bbox"))) is not None
-        ]
-
-        existing_claimed_block_ids: set[int] = set()
-        if existing_image_block_bboxes:
-            for block in page_model_list:
-                if block.get("type") == "image_block":
-                    continue
-                block_bbox = _normalize_model_bbox_for_containment(block.get("bbox"))
-                if block_bbox is not None and any(
-                    calculate_overlap_area_in_bbox1_area_ratio(block_bbox, image_block_bbox) >= containment_threshold
-                    for image_block_bbox in existing_image_block_bboxes
-                ):
-                    existing_claimed_block_ids.add(id(block))
-
-        candidates: list[tuple[int, float, int, int, dict[str, Any], set[int]]] = []
-        for layout_order, layout_block in enumerate(page_layout_blocks):
-            if layout_block.get("type") != BlockType.IMAGE or layout_block.get("sub_type") == "seal":
-                continue
-
-            layout_bbox = _normalize_model_bbox_for_containment(layout_block.get("bbox"))
-            if layout_bbox is None:
-                continue
-            if any(
-                calculate_overlap_area_2_minbox_area_ratio(layout_bbox, image_block_bbox) >= containment_threshold
-                for image_block_bbox in existing_image_block_bboxes
-            ):
-                continue
-
-            contained_blocks: list[tuple[int, dict[str, Any], BBox]] = []
-            for block_index, block in enumerate(page_model_list):
-                if block.get("type") == "image_block" or id(block) in existing_claimed_block_ids:
-                    continue
-                block_bbox = _normalize_model_bbox_for_containment(block.get("bbox"))
-                if block_bbox is None:
-                    continue
-                if calculate_overlap_area_in_bbox1_area_ratio(block_bbox, layout_bbox) >= containment_threshold:
-                    contained_blocks.append((block_index, block, block_bbox))
-
-            contained_visuals = [
-                (block_index, block)
-                for block_index, block, _ in contained_blocks
-                if block.get("type") in LOCAL_LAYOUT_IMAGE_BLOCK_BODY_TYPES
-            ]
-            if len(contained_visuals) < min_visual_count:
-                continue
-
-            layout_area = (layout_bbox[2] - layout_bbox[0]) * (layout_bbox[3] - layout_bbox[1])
-            contained_area = sum(
-                (block_bbox[2] - block_bbox[0]) * (block_bbox[3] - block_bbox[1])
-                for _, block, block_bbox in contained_blocks
-                if block.get("type") in LOCAL_LAYOUT_IMAGE_BLOCK_AREA_TYPES
-            )
-            coverage_ratio = contained_area / layout_area
-            if coverage_ratio < coverage_threshold and not math.isclose(
-                coverage_ratio,
-                coverage_threshold,
-                rel_tol=0.0,
-                abs_tol=1e-12,
-            ):
-                continue
-
-            contained_block_ids = {id(block) for _, block, _ in contained_blocks}
-            first_block_index = min(block_index for block_index, _, _ in contained_blocks)
-            candidates.append(
-                (
-                    -len(contained_visuals),
-                    layout_area,
-                    layout_order,
-                    first_block_index,
-                    layout_block,
-                    contained_block_ids,
-                )
-            )
-
-        claimed_block_ids: set[int] = set()
-        selected_containers: list[tuple[int, dict[str, Any]]] = []
-        for _, _, _, first_block_index, layout_block, block_ids in sorted(candidates):
-            if claimed_block_ids.intersection(block_ids):
-                continue
-            claimed_block_ids.update(block_ids)
-            selected_containers.append(
-                (
-                    first_block_index,
-                    {
-                        "type": "image_block",
-                        "bbox": list(layout_block["bbox"]),
-                        "angle": layout_block.get("angle", 0),
-                        "content": None,
-                    },
-                )
-            )
-
-        for insert_index, image_block in sorted(selected_containers, reverse=True):
-            page_model_list.insert(insert_index, image_block)
+    from ._document import PDFDocument
 
 
 def _attach_visual_block_images(
@@ -334,10 +163,52 @@ def _attach_prepared_visual_block_images(
 
 
 attach_visual_block_images = _attach_visual_block_images
-supplement_missing_image_block_containers = _supplement_missing_image_block_containers
 
 __all__ = [
     "attach_visual_block_images",
     "attach_visual_block_images_from_pdf",
-    "supplement_missing_image_block_containers",
 ]
+
+
+def _bbox_to_pixel_bbox(bbox: BBox | None, page_size: tuple[int, int]) -> BBox | None:
+    """在 DocVortex 原生 ModelJson 边界解释归一化或像素框，再调用共享的显式坐标转换。"""
+    if bbox is None or len(bbox) != 4:
+        return None
+    try:
+        coordinates = tuple(float(value) for value in bbox)
+    except (TypeError, ValueError):
+        return None
+    space = "unit" if all(0.0 <= value <= 1.0 for value in coordinates) else "pixel"
+    return convert_bbox(coordinates, source_space=space, target_space="pixel", page_size=page_size)
+
+
+def _collapse_image_blocks(
+    page_model_list: list[dict[str, Any]],
+    containment_threshold: float = IMAGE_BLOCK_CONTAINMENT_THRESHOLD,
+) -> None:
+    """将 image_block 折叠为单个图片，并删除面积上被其包裹的非容器子块。"""
+    image_blocks = [block for block in page_model_list if block.get("type") == "image_block"]
+    if not image_blocks:
+        return
+
+    image_block_ids = {id(block) for block in image_blocks}
+    image_block_bboxes = [
+        bbox for block in image_blocks if (bbox := _normalize_model_bbox_for_containment(block.get("bbox"))) is not None
+    ]
+
+    retained_blocks: list[dict[str, Any]] = []
+    for block in page_model_list:
+        if id(block) in image_block_ids:
+            block["type"] = BlockType.IMAGE
+            retained_blocks.append(block)
+            continue
+
+        block_bbox = _normalize_model_bbox_for_containment(block.get("bbox"))
+        is_contained = block_bbox is not None and any(
+            calculate_overlap_area_in_bbox1_area_ratio(block_bbox, image_block_bbox) >= containment_threshold
+            for image_block_bbox in image_block_bboxes
+        )
+        if not is_contained:
+            retained_blocks.append(block)
+
+    page_model_list[:] = retained_blocks

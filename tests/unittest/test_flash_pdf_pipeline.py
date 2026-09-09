@@ -25,11 +25,12 @@ from docvortex.analyzers.native.pdf import (
     pipeline,
     tables,
     text_blocks,
-    text_styles,
     titles,
     visual_annotations,
 )
-from docvortex.document.pdf.document import PDFImageInfo, PDFPageTextGeometry
+from docvortex.analyzers.native.pdf.inline import matching as inline_matching
+from docvortex.analyzers.native.pdf.inline import types as text_styles
+from docvortex.document.pdf._document import PDFImageInfo, PDFPageTextGeometry
 
 
 def _image_info(
@@ -313,7 +314,7 @@ def test_prepare_page_resplits_repaired_cross_column_row_before_text_classificat
     ]
     assert {
         block_index: [line.source_index for line in lines]
-        for block_index, lines in text_styles._assign_lines_to_blocks(
+        for block_index, lines in inline_matching._assign_lines_to_blocks(
             split_blocks,
             style_lines[1:],
             source.page_size,
@@ -321,7 +322,7 @@ def test_prepare_page_resplits_repaired_cross_column_row_before_text_classificat
     } == {0: [5], 1: [6]}
     assert {
         block_index: [line.source_index for line in lines]
-        for block_index, lines in text_styles._assign_lines_to_blocks(
+        for block_index, lines in inline_matching._assign_lines_to_blocks(
             split_blocks,
             link_lines,
             source.page_size,
@@ -381,8 +382,8 @@ def test_prepare_page_realigns_unsplit_repaired_text_evidence() -> None:
     assert [item.bbox for item in style_lines] == [repaired_bbox]
     assert [item.bbox for item in link_lines] == [repaired_bbox]
     block = {"type": "text", "bbox": repaired_bbox, "content": line.text}
-    assert text_styles._assign_lines_to_blocks([block], style_lines, source.page_size)
-    assert text_styles._assign_lines_to_blocks([block], link_lines, source.page_size)
+    assert inline_matching._assign_lines_to_blocks([block], style_lines, source.page_size)
+    assert inline_matching._assign_lines_to_blocks([block], link_lines, source.page_size)
 
 
 def _repeated_separator_source(

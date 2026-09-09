@@ -1,5 +1,4 @@
 from __future__ import annotations
-from docvortex.schema import Producer
 
 import re
 import sys
@@ -12,26 +11,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from _span_test_utils import inline_text, inline_urls, visible_content
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
 
+from docvortex.analyzers.native import PdfModel
+from docvortex.analyzers.native.pdf import formulas, geometry, graphics, line_merging, models, native_text, tables
+from docvortex.document.pdf._document import PDFDocument, get_lines_from_chars
 from docvortex.postprocess.page_blocks import process_page_blocks
 from docvortex.postprocess.pages import model_json_to_pages
-from docvortex.analyzers.native import PdfModel
-from docvortex.analyzers.native.pdf import formulas
-from docvortex.analyzers.native.pdf import geometry
-from docvortex.analyzers.native.pdf import graphics
-from docvortex.analyzers.native.pdf import line_merging
-from docvortex.analyzers.native.pdf import models
-from docvortex.analyzers.native.pdf import native_text
-from docvortex.analyzers.native.pdf import tables
 from docvortex.render import render_markdown
-from docvortex.schema import MiddleJson, ModelJson
-from docvortex.document.pdf.document import PDFDocument
-from docvortex.document.pdf.document import get_lines_from_chars
-
-from _span_test_utils import inline_text, inline_urls, visible_content
-
+from docvortex.schema import MiddleJson, ModelJson, Producer
 
 _PROJECT_ROOT = Path(__file__).parents[2]
 _DEMO_PDF_DIR = _PROJECT_ROOT / "demo" / "pdfs"

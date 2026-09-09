@@ -162,3 +162,7 @@ All 15 native document formats support this API. Normal parsing also carries the
 DocVortex supports ordinary CPython 3.10–3.14. Physical text lines are joined by deterministic Unicode boundary rules, with URL and dehyphenation safeguards. Language detection models and the fast-langdetect / fasttext-predict dependencies are no longer required.
 
 The shared `resolve_text_line_boundary` and `merge_text_line_contents` helpers no longer accept `block_language`; `detect_lang` has been removed. Hosts should call the shared boundary helpers directly. OCR language selection and Magika code-language recognition are unchanged.
+
+## Public SDK and 0.4 migration
+
+Geometry, document access, assets and regional PDF analysis have explicit public contracts. See [the SDK migration guide](docs/sdk-0.4.md). `docvortex.public_api.PUBLIC_API` lists supported cross-package modules and symbols. Replaced Python paths are removed in 0.4; document JSON and Bundle semantics are unchanged. Upgrade MinerU together, or constrain older hosts to `docvortex<0.4.0`.

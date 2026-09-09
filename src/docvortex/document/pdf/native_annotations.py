@@ -1,19 +1,21 @@
 """PDF 链接与签名注解提取，保持原生提取算法与资源语义。"""
 
 from __future__ import annotations
+
 import ctypes
 import logging
 import math
 from typing import Any
+
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
-from ...schema import BBox
-from ...foundation.hyperlink import sanitize_hyperlink_target
 
-from .native_contracts import PDFLinkAnnotation, _PDF_EXTERNAL_LINK_SCHEMES
+from ...foundation._hyperlink import sanitize_hyperlink_target
+from ...schema import BBox
+from .native_contracts import _PDF_EXTERNAL_LINK_SCHEMES, PDFLinkAnnotation
 from .native_coordinates import _drawing_page_size, _normalize_pdf_page_bbox, _transform_drawing_point
 
-logger = logging.getLogger("docvortex.document.pdf.document")
+logger = logging.getLogger("docvortex.document.pdf._document")
 
 
 def _validate_pdf_external_link_target(value: str) -> str | None:

@@ -48,7 +48,7 @@ from docvortex.analyzers.native.office import image as office_image
 from docvortex.analyzers.native.office.legacy.officeart import OfficeArtRecord, decode_blip
 from docvortex.analyzers.native.office.pptx.pptx_converter import PptxConverter
 from docvortex.analyzers.native.office.xlsx.xlsx_converter import XlsxConverter
-from docvortex.foundation.image_payload import extract_generated_svg_fallback
+from docvortex.foundation._image_payload import extract_generated_svg_fallback
 
 
 def _open_result(payload: bytes) -> Image.Image:

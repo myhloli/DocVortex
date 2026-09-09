@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from docvortex.analyzers.native.pdf import geometry, models, table_materialization, tables
-from docvortex.document.pdf.document import PDFPathInfo
+from docvortex.document.pdf._document import PDFPathInfo
 
 
 def _axis_line(

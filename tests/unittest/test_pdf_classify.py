@@ -16,7 +16,7 @@ from pypdf.generic import (
 )
 
 from docvortex.document.pdf import classify as pdf_classify
-from docvortex.document.pdf.document import PDFDocument
+from docvortex.document.pdf._document import PDFDocument
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MIXED_ELEMENTS_PDF = REPO_ROOT / "demo" / "pdfs" / "mixed_elements_pages_07_10.pdf"

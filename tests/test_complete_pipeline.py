@@ -6,8 +6,8 @@ import base64
 from io import BytesIO
 from pathlib import Path
 
-from PIL import Image
 import pytest
+from PIL import Image
 from reportlab.pdfgen.canvas import Canvas
 
 import docvortex
@@ -39,7 +39,7 @@ def test_native_parse_never_classifies(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_classification_is_cached_in_document(monkeypatch: pytest.MonkeyPatch) -> None:
     """调用方可以先分类再解析，同一文档不会重复执行分类。"""
-    from docvortex.document.pdf import document as module
+    from docvortex.document.pdf import _document as module
 
     calls: list[bytes] = []
 

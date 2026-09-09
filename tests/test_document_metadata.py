@@ -8,13 +8,13 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
 from pypdf import PdfWriter
+from test_format_matrix import source_payload
 
 import docvortex
-from docvortex.document.pdf.document import PDFDocument
+from docvortex.document.pdf._document import PDFDocument
 from docvortex.document.properties import property_date
 from docvortex.errors import DocumentError
 from docvortex.schema import FILE_SUFFIXES, DocumentMetadata, DocumentProperties, MiddleJson, Producer
-from test_format_matrix import source_payload
 
 
 def pdf_payload() -> bytes:

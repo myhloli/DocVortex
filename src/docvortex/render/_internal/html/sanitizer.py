@@ -9,8 +9,7 @@ from urllib.parse import quote, unquote, urlsplit
 import nh3
 from bs4 import BeautifulSoup, NavigableString, Tag
 
-from ....foundation.image_payload import extract_generated_svg_fallback, parse_image_data_uri_strict
-
+from ....foundation._image_payload import extract_generated_svg_fallback, parse_image_data_uri_strict
 
 _ALLOWED_TAGS = {
     "a",

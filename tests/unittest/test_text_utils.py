@@ -1,6 +1,6 @@
 import pytest
 
-from docvortex.foundation.text import merge_text_line_contents, resolve_text_line_boundary
+from docvortex.foundation._text import merge_text_line_contents, resolve_text_line_boundary
 
 
 @pytest.mark.parametrize(

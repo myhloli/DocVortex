@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .contracts import Bbox, Char, Line, Span
+from ._contracts import Bbox, Char, Line, Span
 from .groups import assign_scripts, get_lines
 
 

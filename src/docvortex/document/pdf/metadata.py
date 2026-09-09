@@ -9,7 +9,7 @@ from ...schema import DocumentProperties
 from ..properties import property_date, property_text, property_values
 
 if TYPE_CHECKING:
-    from .document import PDFDocument
+    from ._document import PDFDocument
 
 
 def read_pdf_properties(document: PDFDocument) -> tuple[DocumentProperties, list[str]]:

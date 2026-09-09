@@ -1,22 +1,24 @@
 """PDF 表格与注释输出物化；保留原有认领顺序与判定规则。"""
 
 from __future__ import annotations
+
 from typing import Any
+
 from loguru import logger
-from ....document.pdf.text.contracts import Char
-from .table_recovery import (
+
+from ....document.pdf.text._contracts import Char
+from ....foundation._text import merge_text_line_contents
+from ....schema import BBox
+from ._table_recovery import (
     NativeTableInput,
     NativeTableRectangle,
+    NativeTableResult,
     NativeTableRule,
     coerce_native_table_rectangles,
     coerce_native_table_rules,
     recover_native_pdf_table,
 )
-from .table_text_styles import render_native_table_html_with_scripts
-from ....foundation.text import merge_text_line_contents
-from .spatial_text import project_pdf_table_text
-from ....schema import BBox
-from .models import _LineItem, _PageSource, _TableAnnotation, _TableCandidate
+from ._table_recovery.contracts import PDFTableRecoveryError
 from .geometry import (
     _bbox_axis_overlap_ratio,
     _bbox_center_x,
@@ -29,7 +31,10 @@ from .geometry import (
 )
 from .line_layout import _font_signatures_share_family, _line_effective_height, _line_tight_output_bbox
 from .line_merging import _same_baseline_geometry
+from .models import _LineItem, _PageSource, _TableAnnotation, _TableCandidate
 from .native_text import _normalize_native_run_text
+from .spatial_text import project_pdf_table_text
+from .table_text_styles import render_native_table_html_with_scripts
 
 
 def _recover_native_table_html(
@@ -52,15 +57,8 @@ def _recover_native_table_html(
         drawing_lines=(drawing_lines if drawing_lines is not None else coerce_native_table_rules(source.drawing_lines)),
         rectangles=(rectangles if rectangles is not None else coerce_native_table_rectangles(source.path_infos)),
     )
-    result = recover_native_pdf_table(table_input)
-    if result is None:
-        return ""
-    return render_native_table_html_with_scripts(
-        result,
-        table_input,
-        tight_bboxes or {},
-        origins or {},
-    )
+    recovered = recover_table_result(table_input, tight_bboxes or {}, origins or {})
+    return recovered[0] if recovered is not None else ""
 
 
 def _materialize_table_blocks(
@@ -434,3 +432,19 @@ def _expand_candidate_same_baseline_members(
                 line_indices.add(line.source_index)
                 changed = True
                 break
+
+
+def recover_table_result(
+    table_input: NativeTableInput,
+    tight_bboxes: dict[int, BBox],
+    origins: dict[int, tuple[float, float]],
+) -> tuple[str, NativeTableResult] | None:
+    """统一表格恢复和上下标物化，保留调用方接受或回退的决策权。"""
+    try:
+        result = recover_native_pdf_table(table_input)
+    except Exception as error:
+        raise PDFTableRecoveryError(str(error)) from error
+    if result is None:
+        return None
+    content = render_native_table_html_with_scripts(result, table_input, tight_bboxes, origins)
+    return content, result

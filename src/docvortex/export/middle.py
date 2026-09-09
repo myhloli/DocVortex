@@ -1,12 +1,14 @@
 """语义文档与图片旁文件的原子导出。"""
 
 from __future__ import annotations
+
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any, Sequence
-from ..schema import MiddleJson, BlockBase, _iter_child_blocks
+
+from ..schema import BlockBase, MiddleJson, _iter_child_blocks
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,10 +41,7 @@ def _register_export_file(files: dict[str, bytes], relative_path: str, payload: 
 
 def _prepare_export_copy(middle_json: MiddleJson) -> tuple[MiddleJson, dict[str, bytes]]:
     """复制对象、解析直接及 HTML 图片，并回填副本中的相对路径。"""
-    from ..foundation.image_payload import (
-        INLINE_IMAGE_DATA_URI_RE,
-        parse_image_data_uri_strict,
-    )
+    from ..foundation._image_payload import INLINE_IMAGE_DATA_URI_RE, parse_image_data_uri_strict
 
     exported = middle_json.model_copy(deep=True)
     image_files: dict[str, bytes] = {}
@@ -80,7 +79,7 @@ def _prepare_export_copy(middle_json: MiddleJson) -> tuple[MiddleJson, dict[str,
 
 def _resolve_export_target(output_root: Path, relative_path: str) -> Path:
     """校验导出相对路径并确保解析后的目标仍位于文档输出目录内。"""
-    from ..foundation.image_payload import validate_image_sidecar_path
+    from ..foundation._image_payload import validate_image_sidecar_path
 
     safe_path = validate_image_sidecar_path(relative_path)
     if output_root.is_symlink():
@@ -170,7 +169,7 @@ def _export_middle_json(
     overwrite: bool,
 ) -> MiddleJsonExportResult:
     """构造完整导出事务，保证 JSON 与图片使用同一份规范化对象副本。"""
-    from ..foundation.image_payload import validate_image_sidecar_path
+    from ..foundation._image_payload import validate_image_sidecar_path
 
     exported, image_files = _prepare_export_copy(middle_json)
     json_text = exported.to_json(

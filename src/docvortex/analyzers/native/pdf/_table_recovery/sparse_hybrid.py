@@ -8,10 +8,10 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
-from .sparse_common import _LocalRule, _local_rules, cluster_members
 from .candidate import GridCellSpec, build_candidate
 from .contracts import NativeTableCandidate, NativeTableInput, NativeTableText, NativeTableTextRow
 from .geometry import covered_interval_ratio, normalize_angle, normalize_bbox, page_bbox_to_table_local, table_local_size
+from .sparse_common import _local_rules, _LocalRule, cluster_members
 
 MIN_COLUMN_SUPPORT = 0.60
 MIN_OVERALL_ANCHOR_SUPPORT = 0.80

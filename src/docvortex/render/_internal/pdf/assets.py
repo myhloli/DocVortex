@@ -2,23 +2,23 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import PurePosixPath
-import re
 from urllib.parse import urlsplit
 
 from PIL import Image, UnidentifiedImageError
 
-from ...contracts import AssetResolver
-from ....schema import ImagePayloadBlock
-from ....foundation.image_payload import (
+from ....foundation._image_payload import (
     MAX_IMAGE_PAYLOAD_BYTES,
     extract_generated_svg_fallback,
     parse_image_data_uri_strict,
     validate_decoded_raster_size,
     validate_image_sidecar_path,
 )
+from ....schema import ImagePayloadBlock
+from ...contracts import AssetResolver
 
 _PIL_FORMAT_EXTENSIONS = {
     "BMP": "bmp",

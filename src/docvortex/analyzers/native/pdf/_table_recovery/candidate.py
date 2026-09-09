@@ -8,7 +8,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .....schema import BBox
-
 from .contracts import NativeTableCandidate, NativeTableCandidateSource, NativeTableCell, NativeTableGlyph, NativeTableText
 from .geometry import bbox_center
 from .text import build_cell_text, glyph_overlap_ratio

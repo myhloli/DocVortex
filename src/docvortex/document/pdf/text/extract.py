@@ -4,14 +4,14 @@
 
 from __future__ import annotations
 
-from ctypes import byref, c_double, c_int, create_string_buffer
 import math
+from ctypes import byref, c_double, c_int, create_string_buffer
 from typing import Any
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as raw
 
-from .contracts import Bbox, Char
+from ._contracts import Bbox, Char
 
 
 def transform_point(

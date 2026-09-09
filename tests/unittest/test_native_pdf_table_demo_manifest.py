@@ -11,13 +11,14 @@ from typing import Any
 from bs4 import BeautifulSoup
 
 from docvortex.analyzers.native import PdfModel
-from docvortex.analyzers.native.pdf.table_recovery import NativeTableInput
-from docvortex.analyzers.native.pdf.table_recovery import coerce_native_table_rectangles
-from docvortex.analyzers.native.pdf.table_recovery import coerce_native_table_rules
-from docvortex.analyzers.native.pdf.table_recovery import recover_native_pdf_table
-from docvortex.analyzers.native.pdf.table_recovery.engine import diagnose_native_pdf_table
-from docvortex.document.pdf.document import PDFDocument
-
+from docvortex.analyzers.native.pdf._table_recovery import (
+    NativeTableInput,
+    coerce_native_table_rectangles,
+    coerce_native_table_rules,
+    recover_native_pdf_table,
+)
+from docvortex.analyzers.native.pdf._table_recovery.engine import diagnose_native_pdf_table
+from docvortex.document.pdf._document import PDFDocument
 
 _PROJECT_ROOT = Path(__file__).parents[2]
 _MANIFEST_PATH = _PROJECT_ROOT / "tests" / "fixtures" / "native_pdf_table_demo_manifest.json"

@@ -5,13 +5,14 @@ import json
 from pathlib import Path
 
 from docvortex.analyzers.native.pdf import pipeline
-from docvortex.analyzers.native.pdf.char_geometry import _line_loose_tier_offsets
-from docvortex.analyzers.native.pdf.char_geometry import apply_line_geometry_repairs
-from docvortex.analyzers.native.pdf.char_geometry import build_document_geometry_plan
-from docvortex.document.pdf.document import PDFPageTextGeometry
+from docvortex.analyzers.native.pdf.char_geometry import (
+    _line_loose_tier_offsets,
+    apply_line_geometry_repairs,
+    build_document_geometry_plan,
+)
 from docvortex.analyzers.native.pdf.models import _LineItem
 from docvortex.analyzers.native.pdf.native_text import _resplit_native_visual_runs
-
+from docvortex.document.pdf._document import PDFPageTextGeometry
 
 _PDF_FIXTURE_XOR_KEY = b"MinerU flash layout fixture"
 

@@ -8,7 +8,7 @@ from _flash_pdf_test_utils import (
 )
 
 from docvortex.analyzers.native.pdf import formulas, geometry, line_merging, models
-from docvortex.document.pdf.document import PDFPathInfo
+from docvortex.document.pdf._document import PDFPathInfo
 
 
 def _formula_member(

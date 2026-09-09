@@ -8,12 +8,9 @@ import unicodedata
 from dataclasses import dataclass, replace
 from typing import Any
 
-
+from ....document.pdf._document import PDFPathInfo
+from ....foundation._text import build_tagged_formula_content
 from ....schema import BBox
-from ....document.pdf.document import PDFPathInfo
-from ....foundation.text import build_tagged_formula_content
-
-from .models import _AxisLine, _FormulaAnchor, _LineItem, _PageSource, _TextLane
 from .geometry import (
     _bbox_axis_overlap_ratio,
     _bbox_center_x,
@@ -30,7 +27,6 @@ from .geometry import (
     _rotate_bbox_to_upright,
     _transform_axis_lines,
 )
-from .native_text import _sanitize_pdf_control_text
 from .line_layout import (
     _connection_crosses_table,
     _infer_text_lanes,
@@ -40,7 +36,8 @@ from .line_layout import (
     _lines_tight_output_bbox,
 )
 from .line_merging import _join_formula_visual_row, _merge_overlapping_inline_cluster
-
+from .models import _AxisLine, _FormulaAnchor, _LineItem, _PageSource, _TextLane
+from .native_text import _sanitize_pdf_control_text
 
 _FORMULA_NUMBER_SUFFIX_RE = re.compile(r"^(?P<prefix>.*?)(?P<marker>[(（﹙][^()（）﹙﹚\r\n]+[)）﹚])\s*$")
 _FORMULA_NUMBER_MARKER_RE = re.compile(

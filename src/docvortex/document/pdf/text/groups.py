@@ -3,9 +3,11 @@
 """基础文本行与上下标分组；保留已验证的几何判断。"""
 
 from __future__ import annotations
+
 import math
 import unicodedata
-from .contracts import Line, Lines, Spans
+
+from ._contracts import Line, Lines, Spans
 
 
 def is_math_symbol(char: str) -> bool:

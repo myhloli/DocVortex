@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 from urllib.parse import urlsplit
 
+from ....foundation._image_payload import validate_image_sidecar_path
 from ....schema import ImagePayloadBlock
-from ....foundation.image_payload import validate_image_sidecar_path
 
 _SUPPORTED_IMAGE_EXTENSIONS = {".jpeg", ".jpg", ".pdf", ".png"}
 _FORBIDDEN_TEX_PATH_CHARACTERS = {"%", "{", "}"}

@@ -7,10 +7,8 @@ import statistics
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from ....document.pdf.text.contracts import Char
-
+from ....document.pdf.text._contracts import Char
 from ....schema import BBox
-
 
 SCRIPT_BODY_COMPARABLE_HEIGHT_RATIO = 0.9
 SCRIPT_BASELINE_ABSOLUTE_TOLERANCE = 0.35

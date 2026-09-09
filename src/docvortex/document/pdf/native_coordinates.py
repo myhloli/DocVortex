@@ -1,17 +1,19 @@
 """PDF 页面坐标、矩阵与扩展字符几何，保持原生提取算法与资源语义。"""
 
 from __future__ import annotations
+
 import ctypes
 import logging
 import math
 from typing import Any
+
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
-from .text.contracts import Char
+
 from ...schema import BBox
+from .text._contracts import Char
 
-
-logger = logging.getLogger("docvortex.document.pdf.document")
+logger = logging.getLogger("docvortex.document.pdf._document")
 
 
 def _normalize_pdf_page_bbox(bbox: tuple[float, float, float, float]) -> BBox:

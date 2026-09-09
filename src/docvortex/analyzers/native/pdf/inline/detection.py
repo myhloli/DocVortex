@@ -6,8 +6,8 @@ import math
 import statistics
 from typing import Any, Sequence
 
+from .....document.pdf._document import PDFLinkAnnotation
 from .....schema import BBox
-from .....document.pdf.document import PDFLinkAnnotation
 from .common import (
     _bbox_intersection_area,
     _canonical_styles,

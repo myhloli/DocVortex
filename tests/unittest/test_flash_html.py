@@ -15,13 +15,14 @@ from PIL import Image
 
 from docvortex.analyzers.native import HtmlModel
 from docvortex.analyzers.native._shared.markup import MarkupProjector
-from docvortex.analyzers.native.html import HtmlResourceLimitError, HtmlSourceContext
+from docvortex.analyzers.native.html import HtmlResourceLimitError
 from docvortex.analyzers.native.html import document as html_document_module
 from docvortex.analyzers.native.html import resources as html_resources_module
 from docvortex.analyzers.native.html import selector as html_selector_module
 from docvortex.analyzers.native.html.resources import HtmlResourceContext
 from docvortex.api import parse
 from docvortex.codecs.html import decode_docvortex_html_wire
+from docvortex.document.contracts import HtmlSourceContext
 from docvortex.render import RenderMode
 from docvortex.render.html import render_html
 from docvortex.render.markdown import render_markdown

@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, Sequence
 
 from loguru import logger
 
+from .....foundation._text import is_hyphen_at_line_end
 from .....schema import BBox
-from .....foundation.text import is_hyphen_at_line_end
 
 if TYPE_CHECKING:
     from ..models import _LineItem

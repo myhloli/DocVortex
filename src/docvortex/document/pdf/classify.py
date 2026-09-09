@@ -1130,7 +1130,7 @@ def get_high_image_coverage_ratio_pdfium(pdf_doc: pdfium.PdfDocument, page_indic
 
 
 if __name__ == "__main__":
-    from .document import PDFDocument
+    from ._document import PDFDocument
 
     with open("/Users/myhloli/pdf/luanma2x10.pdf", "rb") as f:
         p_bytes = f.read()

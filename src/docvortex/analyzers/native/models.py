@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO
 from docvortex.document.contracts import HtmlSourceContext
 
 if TYPE_CHECKING:
-    from ...document.pdf.document import PDFDocument
+    from ...document.pdf._document import PDFDocument
 
 
 class PdfModel:
@@ -15,8 +15,8 @@ class PdfModel:
 
     def predict(self, pdf_doc: PDFDocument) -> list[list[dict[str, Any]]]:
         """分析调用方持有的 PDFDocument，在所有文字匹配结束后统一输出可见英数。"""
-        from .pdf import pipeline
         from ...content import normalize_pdf_model_text
+        from .pdf import pipeline
 
         pages = pipeline._analyze_native_document(pdf_doc)
         normalize_pdf_model_text(pages)

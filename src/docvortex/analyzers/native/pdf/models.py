@@ -5,10 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
-from ....document.pdf.text.contracts import Char
-
+from ....document.pdf._document import PDFPathInfo
+from ....document.pdf.text._contracts import Char
 from ....schema import BBox
-from ....document.pdf.document import PDFPathInfo
 
 if TYPE_CHECKING:
     from .inline.types import PDFTextScriptLine

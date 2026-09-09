@@ -8,14 +8,16 @@ from bs4 import NavigableString, Tag
 from pydantic import ValidationError
 from reportlab.platypus import Flowable, LongTable, Paragraph, Table, TableStyle
 
+from ....foundation._hyperlink import OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
 from ....schema import CodeInlineSpan, EquationInlineSpan, HyperlinkSpan, InlineSpan, InlineStyle, TextSpan, parse_inline_spans
-from ....foundation.hyperlink import OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
 from ..common.html_table import (
+    MAX_NESTED_TABLE_DEPTH,
     HtmlTableCell,
     HtmlTableError,
     HtmlTableGrid,
     HtmlTableSource,
-    MAX_NESTED_TABLE_DEPTH,
+)
+from ..common.html_table import (
     parse_html_tables as _parse_common_html_tables,
 )
 from .styles import BORDER_COLOR, SURFACE_COLOR, PdfStyleSet

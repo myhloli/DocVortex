@@ -5,12 +5,9 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass
 
-from lxml import html as lxml_html
 from lxml import etree  # type: ignore[reportMissingImports]
+from lxml import html as lxml_html
 
-from ....content.spans import normalize_span_dicts
-from ....foundation.image_payload import parse_image_data_uri_strict
-from .._shared.hyperlink import sanitize_hyperlink_target
 from docvortex.content.markup import (
     MarkupAnchorDocument,
     MarkupAnchorRegistry,
@@ -22,11 +19,23 @@ from docvortex.content.markup import (
 )
 from docvortex.content.markup.projector import (
     BLOCK_TAGS as _BLOCK_TAGS,
+)
+from docvortex.content.markup.projector import (
     SKIPPED_TAGS as _SKIPPED_TAGS,
+)
+from docvortex.content.markup.projector import (
     clean_text_node as _clean_text_node,
+)
+from docvortex.content.markup.projector import (
     entity_text as _entity_text,
+)
+from docvortex.content.markup.projector import (
     local_name as _local_name,
 )
+
+from ....content.spans import normalize_span_dicts
+from ....foundation._image_payload import parse_image_data_uri_strict
+from .._shared.hyperlink import sanitize_hyperlink_target
 from .constants import IMAGE_MEDIA_BY_EXTENSION, SVG_MEDIA_TYPE
 from .package import EpubPackage
 

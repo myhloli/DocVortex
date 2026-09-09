@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from copy import deepcopy
 
-from bs4 import BeautifulSoup
 import pytest
+from bs4 import BeautifulSoup
 
 from docvortex.content import normalize_pdf_model_text
-from docvortex.foundation.text import full_to_half_exclude_marks
+from docvortex.foundation._text import full_to_half_exclude_marks
 
 _SYMBOLS = "：．／＼－＿％＋＝＠＃＆＊"
 _ASCII = ":./\\-_%+=@#&*"

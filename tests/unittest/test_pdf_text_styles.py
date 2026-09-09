@@ -13,9 +13,14 @@ from _span_test_utils import inline_text
 
 from docvortex.analyzers.native import PdfModel
 from docvortex.analyzers.native.pdf import models, native_text
-from docvortex.analyzers.native.pdf import text_styles as flash_text_styles
+from docvortex.analyzers.native.pdf.inline import matching as flash_text_styles
 from docvortex.analyzers.native.pdf.inline import matching as inline_matching
-from docvortex.analyzers.native.pdf.text_styles import (
+from docvortex.analyzers.native.pdf.inline.detection import detect_pdf_text_link_lines, detect_pdf_text_style_lines
+from docvortex.analyzers.native.pdf.inline.matching import _partition_resplit_text_evidence, _realign_repaired_text_evidence
+from docvortex.analyzers.native.pdf.inline.materialize import apply_pdf_text_links as _apply_pdf_text_links
+from docvortex.analyzers.native.pdf.inline.materialize import apply_pdf_text_styles as _apply_pdf_text_styles
+from docvortex.analyzers.native.pdf.inline.materialize import materialize_pdf_inline_spans
+from docvortex.analyzers.native.pdf.inline.types import (
     PDF_FONT_FORCE_BOLD_FLAG,
     PDF_FONT_ITALIC_FLAG,
     PDF_NATIVE_SCRIPT_MARKUP_KEY,
@@ -23,15 +28,8 @@ from docvortex.analyzers.native.pdf.text_styles import (
     PDFTextLinkRange,
     PDFTextStyleLine,
     PDFTextStyleRange,
-    _partition_resplit_text_evidence,
-    _realign_repaired_text_evidence,
-    detect_pdf_text_link_lines,
-    detect_pdf_text_style_lines,
-    materialize_pdf_inline_spans,
 )
-from docvortex.analyzers.native.pdf.text_styles import apply_pdf_text_links as _apply_pdf_text_links
-from docvortex.analyzers.native.pdf.text_styles import apply_pdf_text_styles as _apply_pdf_text_styles
-from docvortex.document.pdf.document import PDFDocument, PDFLinkAnnotation
+from docvortex.document.pdf._document import PDFDocument, PDFLinkAnnotation
 from docvortex.postprocess.pages import model_json_to_pages
 from docvortex.render import render_docx, render_html, render_markdown
 from docvortex.schema import RAW_CAPTION, RAW_FOOTNOTE, BlockType, MiddleJson, ModelJson, Producer

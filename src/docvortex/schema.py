@@ -10,16 +10,16 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    TypeAdapter,
-    field_validator,
-    model_validator,
-    model_serializer,
     JsonValue,
     SerializationInfo,
     SerializerFunctionWrapHandler,
+    TypeAdapter,
+    field_validator,
+    model_serializer,
+    model_validator,
 )
 
-from .foundation.hyperlink import OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
+from .foundation._hyperlink import OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
 
 # 这些字符串不能作为公开 Block.type discriminator，只用于 raw 阶段或 Block 内部枚举值。
 RawBlockType: TypeAlias = Literal[
@@ -565,7 +565,7 @@ class ImagePayloadBlock(BlockBase):
         """校验已记录的图片路径只能是安全的 POSIX 相对路径。"""
         if value is None:
             return None
-        from .foundation.image_payload import validate_image_sidecar_path
+        from .foundation._image_payload import validate_image_sidecar_path
 
         return validate_image_sidecar_path(value)
 
@@ -575,7 +575,7 @@ class ImagePayloadBlock(BlockBase):
         """校验远程图片 URL，禁止活动协议、相对地址与内嵌凭据。"""
         if value is None:
             return None
-        from .foundation.image_payload import validate_remote_image_url
+        from .foundation._image_payload import validate_remote_image_url
 
         return validate_remote_image_url(value)
 

@@ -1,16 +1,18 @@
 """PDF 原生页面快照、数据类型与固定常量，保持原生提取算法与资源语义。"""
 
 from __future__ import annotations
+
 import logging
 from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
-from .text.contracts import Char
+
 from PIL import Image
+
+from ...foundation.type_identity import preserve_type_module
 from ...schema import BBox
-from docvortex.foundation.type_identity import preserve_type_module
+from .text._contracts import Char
 
-
-logger = logging.getLogger("docvortex.document.pdf.document")
+logger = logging.getLogger("docvortex.document.pdf._document")
 
 POINTS_PER_INCH: int = 72
 
@@ -159,11 +161,11 @@ class _PathSubpath:
     closed: bool = False
 
 
-preserve_type_module(PDFPageImage, "docvortex.document.pdf.document")
-preserve_type_module(PDFPageTextGeometry, "docvortex.document.pdf.document")
-preserve_type_module(PDFDrawingLine, "docvortex.document.pdf.document")
-preserve_type_module(PDFLinkAnnotation, "docvortex.document.pdf.document")
-preserve_type_module(PDFPathInfo, "docvortex.document.pdf.document")
-preserve_type_module(PDFImageInfo, "docvortex.document.pdf.document")
-preserve_type_module(_PDFPageSnapshot, "docvortex.document.pdf.document")
-preserve_type_module(_PathSubpath, "docvortex.document.pdf.document")
+preserve_type_module(PDFPageImage, "docvortex.document.pdf._document")
+preserve_type_module(PDFPageTextGeometry, "docvortex.document.pdf._document")
+preserve_type_module(PDFDrawingLine, "docvortex.document.pdf._document")
+preserve_type_module(PDFLinkAnnotation, "docvortex.document.pdf._document")
+preserve_type_module(PDFPathInfo, "docvortex.document.pdf._document")
+preserve_type_module(PDFImageInfo, "docvortex.document.pdf._document")
+preserve_type_module(_PDFPageSnapshot, "docvortex.document.pdf._document")
+preserve_type_module(_PathSubpath, "docvortex.document.pdf._document")

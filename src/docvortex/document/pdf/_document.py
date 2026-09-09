@@ -10,70 +10,143 @@ from pathlib import Path
 from typing import Iterator, Literal, cast
 
 import pypdfium2 as pdfium
-from .native_annotations import pdfium_c as pdfium_c
-from .text import extract as _text_extract
-from .text.contracts import Char, Line
 from PIL import Image, ImageOps
 
-from ...schema import BBox, PageInfo
-from ...foundation.image import crop_pil_image
+from ...foundation._image import crop_pil_image
 from ...foundation.image_encoding import ImageArtifact, ImageFormat, encode_image
+from ...schema import BBox, PageInfo
 from .classify import classify
-from .pdfium import _pdfium_lock, pdfium_guard
-from .text import get_lines_from_chars as get_lines_from_chars
-
 
 # See: pdfium.PdfDocument.METADATA_KEYS
-
-
 # 原有符号由单一实现显式重导出，宿主导入路径与类型身份保持不变。
 from .native_annotations import (
     _extract_page_link_annotations as _extract_page_link_annotations,
+)
+from .native_annotations import (
     _extract_page_signature_bboxes as _extract_page_signature_bboxes,
+)
+from .native_annotations import (
     _get_annotation_string as _get_annotation_string,
+)
+from .native_annotations import (
     _get_pdfium_uri_path as _get_pdfium_uri_path,
+)
+from .native_annotations import (
     _pdf_link_annotation_is_visible as _pdf_link_annotation_is_visible,
+)
+from .native_annotations import (
     _pdf_link_region_bboxes as _pdf_link_region_bboxes,
+)
+from .native_annotations import (
     _signature_bbox_from_annotation as _signature_bbox_from_annotation,
+)
+from .native_annotations import (
     _validate_pdf_external_link_target as _validate_pdf_external_link_target,
+)
+from .native_annotations import (
     _visual_bbox_from_pdf_points as _visual_bbox_from_pdf_points,
+)
+from .native_annotations import pdfium_c as pdfium_c
+from .native_contracts import (
+    _PDF_EXTERNAL_LINK_SCHEMES as _PDF_EXTERNAL_LINK_SCHEMES,
 )
 from .native_contracts import (
     DEFAULT_RENDER_DPI as DEFAULT_RENDER_DPI,
+)
+from .native_contracts import (
     DEFAULT_RENDER_MAX_EDGE as DEFAULT_RENDER_MAX_EDGE,
+)
+from .native_contracts import (
     DEFAULT_RENDER_SCALE as DEFAULT_RENDER_SCALE,
+)
+from .native_contracts import (
     DRAWING_FORM_MAX_DEPTH as DRAWING_FORM_MAX_DEPTH,
+)
+from .native_contracts import (
     DRAWING_LINE_AXIS_ABSOLUTE_TOLERANCE as DRAWING_LINE_AXIS_ABSOLUTE_TOLERANCE,
+)
+from .native_contracts import (
     DRAWING_LINE_AXIS_RATIO_TOLERANCE as DRAWING_LINE_AXIS_RATIO_TOLERANCE,
+)
+from .native_contracts import (
     DRAWING_LINE_MERGE_TOLERANCE as DRAWING_LINE_MERGE_TOLERANCE,
+)
+from .native_contracts import (
     DRAWING_LINE_MIN_LENGTH as DRAWING_LINE_MIN_LENGTH,
+)
+from .native_contracts import (
     DRAWING_THIN_RECT_MAX_THICKNESS as DRAWING_THIN_RECT_MAX_THICKNESS,
+)
+from .native_contracts import (
     DRAWING_THIN_RECT_MIN_ASPECT_RATIO as DRAWING_THIN_RECT_MIN_ASPECT_RATIO,
+)
+from .native_contracts import (
     NEAR_IDENTICAL_CHAR_BBOX_TOLERANCE as NEAR_IDENTICAL_CHAR_BBOX_TOLERANCE,
+)
+from .native_contracts import (
     OFFSET_DUPLICATE_CHAR_BBOX_TOLERANCE as OFFSET_DUPLICATE_CHAR_BBOX_TOLERANCE,
+)
+from .native_contracts import (
     OFFSET_DUPLICATE_MIN_BBOX_OVERLAP_RATIO as OFFSET_DUPLICATE_MIN_BBOX_OVERLAP_RATIO,
+)
+from .native_contracts import (
     OFFSET_DUPLICATE_TRANSLATION_TOLERANCE as OFFSET_DUPLICATE_TRANSLATION_TOLERANCE,
-    PDFDrawingLine as PDFDrawingLine,
-    PDFImageInfo as PDFImageInfo,
-    PDFLinkAnnotation as PDFLinkAnnotation,
-    PDFMetadataKey as PDFMetadataKey,
-    PDFPageImage as PDFPageImage,
-    PDFPageTextGeometry as PDFPageTextGeometry,
-    PDFPathInfo as PDFPathInfo,
+)
+from .native_contracts import (
     PDF_IMAGE_FINGERPRINT_MAX_RAW_BYTES as PDF_IMAGE_FINGERPRINT_MAX_RAW_BYTES,
+)
+from .native_contracts import (
     POINTS_PER_INCH as POINTS_PER_INCH,
-    _PDFPageSnapshot as _PDFPageSnapshot,
-    _PDF_EXTERNAL_LINK_SCHEMES as _PDF_EXTERNAL_LINK_SCHEMES,
+)
+from .native_contracts import (
+    PDFDrawingLine as PDFDrawingLine,
+)
+from .native_contracts import (
+    PDFImageInfo as PDFImageInfo,
+)
+from .native_contracts import (
+    PDFLinkAnnotation as PDFLinkAnnotation,
+)
+from .native_contracts import (
+    PDFMetadataKey as PDFMetadataKey,
+)
+from .native_contracts import (
+    PDFPageImage as PDFPageImage,
+)
+from .native_contracts import (
+    PDFPageTextGeometry as PDFPageTextGeometry,
+)
+from .native_contracts import (
+    PDFPathInfo as PDFPathInfo,
+)
+from .native_contracts import (
     _PathSubpath as _PathSubpath,
+)
+from .native_contracts import (
+    _PDFPageSnapshot as _PDFPageSnapshot,
 )
 from .native_coordinates import (
     _apply_pdf_matrix as _apply_pdf_matrix,
+)
+from .native_coordinates import (
     _char_visual_bbox_from_pdfium as _char_visual_bbox_from_pdfium,
+)
+from .native_coordinates import (
     _drawing_page_size as _drawing_page_size,
+)
+from .native_coordinates import (
     _extract_page_char_extended_geometry as _extract_page_char_extended_geometry,
+)
+from .native_coordinates import (
     _get_raw_object_matrix as _get_raw_object_matrix,
+)
+from .native_coordinates import (
     _multiply_pdf_matrices as _multiply_pdf_matrices,
+)
+from .native_coordinates import (
     _normalize_pdf_page_bbox as _normalize_pdf_page_bbox,
+)
+from .native_coordinates import (
     _transform_drawing_point as _transform_drawing_point,
 )
 from .native_lifecycle import (
@@ -81,51 +154,134 @@ from .native_lifecycle import (
 )
 from .native_objects import (
     _combine_collinear_line_group as _combine_collinear_line_group,
+)
+from .native_objects import (
     _extract_page_drawing_lines as _extract_page_drawing_lines,
+)
+from .native_objects import (
     _extract_page_form_bboxes as _extract_page_form_bboxes,
+)
+from .native_objects import (
     _extract_page_image_bboxes as _extract_page_image_bboxes,
+)
+from .native_objects import (
     _extract_page_image_infos as _extract_page_image_infos,
+)
+from .native_objects import (
     _extract_page_path_infos as _extract_page_path_infos,
+)
+from .native_objects import (
     _extract_page_paths_and_lines as _extract_page_paths_and_lines,
+)
+from .native_objects import (
     _extract_path_drawing_lines as _extract_path_drawing_lines,
+)
+from .native_objects import (
     _form_bbox_from_object as _form_bbox_from_object,
+)
+from .native_objects import (
     _get_path_visibility as _get_path_visibility,
+)
+from .native_objects import (
     _get_raw_image_fingerprint as _get_raw_image_fingerprint,
+)
+from .native_objects import (
     _get_raw_object_alpha as _get_raw_object_alpha,
+)
+from .native_objects import (
     _get_raw_object_rgba as _get_raw_object_rgba,
+)
+from .native_objects import (
     _get_raw_stroke_width as _get_raw_stroke_width,
+)
+from .native_objects import (
     _get_segment_stroke_width as _get_segment_stroke_width,
+)
+from .native_objects import (
     _get_thin_filled_subpath_line as _get_thin_filled_subpath_line,
+)
+from .native_objects import (
     _image_bbox_from_matrix as _image_bbox_from_matrix,
+)
+from .native_objects import (
     _iter_raw_image_objects as _iter_raw_image_objects,
+)
+from .native_objects import (
     _iter_raw_path_objects as _iter_raw_path_objects,
+)
+from .native_objects import (
     _iter_raw_path_objects_with_depth as _iter_raw_path_objects_with_depth,
+)
+from .native_objects import (
     _iter_raw_root_form_objects as _iter_raw_root_form_objects,
+)
+from .native_objects import (
     _line_axis_coordinate as _line_axis_coordinate,
+)
+from .native_objects import (
     _line_main_interval as _line_main_interval,
+)
+from .native_objects import (
     _make_axis_drawing_line as _make_axis_drawing_line,
+)
+from .native_objects import (
     _merge_collinear_drawing_lines as _merge_collinear_drawing_lines,
+)
+from .native_objects import (
     _merge_orientation_lines as _merge_orientation_lines,
+)
+from .native_objects import (
     _path_info_from_object as _path_info_from_object,
+)
+from .native_objects import (
     _read_raw_path_subpaths as _read_raw_path_subpaths,
+)
+from .native_objects import (
     _transform_path_subpath as _transform_path_subpath,
+)
+from .native_objects import (
     _walk_raw_page_objects as _walk_raw_page_objects,
+)
+from .native_objects import (
     _walk_raw_page_objects_with_depth as _walk_raw_page_objects_with_depth,
+)
+from .native_objects import (
     _walk_raw_path_objects as _walk_raw_path_objects,
 )
 from .native_text_geometry import (
     _calculate_bbox_overlap_in_smaller_area as _calculate_bbox_overlap_in_smaller_area,
+)
+from .native_text_geometry import (
     _deduplicate_near_identical_chars as _deduplicate_near_identical_chars,
+)
+from .native_text_geometry import (
     _extract_page_text_geometry as _extract_page_text_geometry,
+)
+from .native_text_geometry import (
     _get_near_identical_bbox_bucket_key as _get_near_identical_bbox_bucket_key,
+)
+from .native_text_geometry import (
     _get_visible_char_signature as _get_visible_char_signature,
+)
+from .native_text_geometry import (
     _is_adjacent_offset_duplicate_char as _is_adjacent_offset_duplicate_char,
+)
+from .native_text_geometry import (
     _is_near_identical_bbox as _is_near_identical_bbox,
+)
+from .native_text_geometry import (
     _iter_neighbor_bbox_bucket_keys as _iter_neighbor_bbox_bucket_keys,
+)
+from .native_text_geometry import (
     _page_to_image as _page_to_image,
+)
+from .native_text_geometry import (
     _restore_pdfium_surrogate_pairs as _restore_pdfium_surrogate_pairs,
 )
-
+from .pdfium import _pdfium_lock, pdfium_guard
+from .text import extract as _text_extract
+from .text import get_lines_from_chars as get_lines_from_chars
+from .text._contracts import Char, Line
 
 logger = logging.getLogger(__name__)
 get_chars = _text_extract.get_chars

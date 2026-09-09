@@ -6,8 +6,7 @@ import re
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
-from docvortex.foundation.xml_names import local_name
-
+from ..foundation.xml_names import local_name
 
 _OPERATOR_MAP = {
     "−": "-",

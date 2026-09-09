@@ -6,12 +6,12 @@ import math
 from io import BytesIO
 
 from loguru import logger
-from PIL import Image, UnidentifiedImageError
 from lxml import etree  # type: ignore[reportMissingImports]
+from PIL import Image, UnidentifiedImageError
 
-from docvortex.foundation.image_encoding import image_to_b64str
+from ....foundation._image_payload import validate_decoded_raster_size
+from ....foundation.image_encoding import image_to_b64str
 from ....schema import BBox
-from ....foundation.image_payload import validate_decoded_raster_size
 from .errors import OfdParseError
 from .geometry import Affine, bbox_intersection, canonical_angle, parse_affine, parse_st_box, transform_angle, transform_bbox
 from .models import ImageItem, ResourceRegistry

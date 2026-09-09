@@ -11,20 +11,19 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, Literal, Sequence, TypeAlias
 
+from ....document.pdf._document import PDFPageTextGeometry
 from ....schema import BBox
-from ....document.pdf.document import PDFPageTextGeometry
 from .geometry import (
-    _clip_validated_bbox,
     _bbox_axis_overlap_ratio,
     _bbox_union_many,
     _clip_bbox,
+    _clip_validated_bbox,
     _coerce_bbox,
     _rotate_bbox_from_upright,
     _rotate_bbox_to_upright,
     _rotate_origin_to_upright,
 )
 from .models import _LineItem
-
 
 X_RELIABLE_PAIR_MIN = 30
 X_STRONG_MEDIAN_RATIO = 1.30

@@ -5,8 +5,8 @@ from __future__ import annotations
 import statistics
 from typing import Any, Sequence
 
+from .....foundation._text import is_hyphen_at_line_end
 from .....schema import BBox
-from .....foundation.text import is_hyphen_at_line_end
 from ..geometry import _bbox_union_many, _rotate_bbox_to_upright, _transform_axis_lines
 from ..line_layout import (
     _estimate_lane_gap,

@@ -6,8 +6,7 @@ from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 
-from ...foundation.text import full_to_half
-
+from ...foundation._text import full_to_half
 from .models import MAX_HEADER_ROWS, RenderedCellSegment, RowMetrics, RowScanResult, RowSignature, TableMergeState
 
 

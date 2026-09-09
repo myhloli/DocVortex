@@ -7,11 +7,11 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-from ....document.pdf.text.contracts import Char
 
+from ....document.pdf.text._contracts import Char
 from ....schema import BBox
-from .table_geometry import normalize_bbox as _coerce_bbox, rotate_local_bbox as _rotate_local_bbox
-
+from .table_geometry import normalize_bbox as _coerce_bbox
+from .table_geometry import rotate_local_bbox as _rotate_local_bbox
 
 # 空间投影思路参考 LiteParse v2.6.0 的字符分段和网格投影；
 # 本模块只针对已有 table bbox 重新实现，不引入 LiteParse 运行时依赖。

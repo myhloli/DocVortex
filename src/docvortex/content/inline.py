@@ -5,9 +5,9 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Callable, Iterable
 
-from ..schema import CodeInlineSpan, EquationInlineSpan, HyperlinkSpan, InlineSpan, TextSpan, parse_inline_spans
-from ..foundation.text import resolve_text_line_boundary
+from ..foundation._text import resolve_text_line_boundary
 from ..foundation.language import remove_invalid_surrogates
+from ..schema import CodeInlineSpan, EquationInlineSpan, HyperlinkSpan, InlineSpan, TextSpan, parse_inline_spans
 
 
 def normalize_inline_spans(spans: Iterable[InlineSpan | dict[str, object]]) -> list[InlineSpan]:

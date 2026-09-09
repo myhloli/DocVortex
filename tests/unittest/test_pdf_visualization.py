@@ -14,7 +14,7 @@ from pypdf.annotations import Link
 from pypdf.generic import RectangleObject
 from reportlab.pdfgen import canvas
 
-from docvortex.document.pdf.document import PDFDocument
+from docvortex.document.pdf._document import PDFDocument
 from docvortex.schema import PageInfo
 from docvortex.visualization import render_layout_pdf
 

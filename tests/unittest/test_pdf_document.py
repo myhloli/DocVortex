@@ -7,6 +7,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from PIL import Image
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import (
     ArrayObject,
@@ -17,13 +18,12 @@ from pypdf.generic import (
     NumberObject,
     TextStringObject,
 )
-from docvortex.document.pdf.text.contracts import Bbox
-from docvortex.document.pdf import native_text_geometry, native_objects, native_annotations
-from PIL import Image
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen.canvas import Canvas
 
-from docvortex.document.pdf import document as pdf_document
+from docvortex.document.pdf import _document as pdf_document
+from docvortex.document.pdf import native_annotations, native_objects, native_text_geometry
+from docvortex.document.pdf.text._contracts import Bbox
 
 
 def test_pdf_document_does_not_expose_span_bbox_visualization() -> None:

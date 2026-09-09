@@ -2,23 +2,23 @@
 
 from __future__ import annotations
 
+import json
+import time
 from dataclasses import replace
 from io import BytesIO
-import json
 from pathlib import Path
-import time
 from typing import TYPE_CHECKING
 
 from .assets import AssetStore
 from .document.source import HtmlSourceContext, prepare_source
+from .render.contracts import DocxRenderOptions, EpubRenderOptions, PdfRenderOptions, RenderFormat, RenderOptions
 from .result import AnalysisResult, Diagnostic, DocumentResult, ExportResult, MetadataResult, RenderArtifact
 from .schema import DocumentMetadata, FileSuffix, MiddleJson, ModelJson, PageInfo, Producer
 from .version import __version__
-from .render.contracts import DocxRenderOptions, EpubRenderOptions, PdfRenderOptions, RenderFormat, RenderOptions
 
 if TYPE_CHECKING:
     from .analyzers.native.contracts import NativeBinaryAnalyzer
-    from .document.pdf.document import PDFDocument
+    from .document.pdf._document import PDFDocument
 
 
 def extract_metadata(
@@ -116,8 +116,8 @@ def postprocess(
     analysis: AnalysisResult | ModelJson, *, assets: AssetStore | None = None, keep_model_json: bool = False
 ) -> DocumentResult:
     """执行确定性后处理并物化结果素材，智能增强由上层显式调用。"""
-    from .postprocess.document import model_json_to_middle_json
     from .export.files import materialize_middle
+    from .postprocess.document import model_json_to_middle_json
 
     if isinstance(analysis, AnalysisResult):
         model, diagnostics = analysis.model_json, analysis.diagnostics
@@ -159,9 +159,9 @@ def render(
     options: RenderOptions | None = None,
 ) -> RenderArtifact:
     """把同一语义文档编码为目标文件，返回值不产生文件系统副作用。"""
-    from .render.api import render as render_value
-    from .render._internal.common.context import owned_render_document
     from .export.files import materialize_middle
+    from .render._internal.common.context import owned_render_document
+    from .render.api import render as render_value
 
     target = RenderFormat(output_format)
     middle, resolved_assets = materialize_middle(middle_json, assets)

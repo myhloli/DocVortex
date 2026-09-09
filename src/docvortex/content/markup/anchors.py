@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import html
 import re
+from dataclasses import dataclass
 from typing import Literal, Protocol, TypeAlias
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
 from docvortex.content.markup.projector import local_name, visible_raw_text_with_style
 from docvortex.content.markup.styles import MarkupStylesheet, TextStyle
-from docvortex.foundation.type_identity import preserve_type_module
 
+from ...foundation.type_identity import preserve_type_module
 
 AnchorVisibilityScope: TypeAlias = Literal["all_ancestors", "nearest_body"]
 AnchorTextNormalization: TypeAlias = Literal["unicode_whitespace", "xhtml_whitespace"]

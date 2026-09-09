@@ -7,9 +7,8 @@ from dataclasses import dataclass, field
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
-from docvortex.foundation.xml_names import local_name
-from docvortex.foundation.type_identity import preserve_type_module
-
+from ...foundation.type_identity import preserve_type_module
+from ...foundation.xml_names import local_name
 
 _CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 _CSS_IMPORTANT_RE = re.compile(r"!\s*important\s*$", re.IGNORECASE)

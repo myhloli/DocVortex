@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Sequence
 
-from .....foundation.text import merge_text_line_contents
+from .....foundation._text import merge_text_line_contents
 from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_y, _bbox_union_many
 from ..native_text import _normalize_native_run_text
 

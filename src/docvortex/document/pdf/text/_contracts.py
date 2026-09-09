@@ -3,6 +3,7 @@
 """DocVortex 自有 PDF 字符与几何数据，不携带 PDFium 句柄。"""
 
 from __future__ import annotations
+
 from typing import Any, TypedDict
 
 

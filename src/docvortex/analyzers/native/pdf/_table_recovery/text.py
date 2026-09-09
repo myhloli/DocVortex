@@ -6,12 +6,10 @@ import statistics
 import unicodedata
 from dataclasses import dataclass
 
-from .....document.pdf.text.contracts import Char
-
+from .....document.pdf.text._contracts import Char
+from .....foundation._text import resolve_text_line_boundary
 from .....schema import BBox
-from .....foundation.text import resolve_text_line_boundary
 from ..spatial_text import _normalize_table_text
-
 from .contracts import NativeTableGlyph, NativeTableInput, NativeTableText, NativeTableTextRow, NativeTableToken
 from .geometry import bbox_center, bbox_intersection, bbox_union, normalize_angle, normalize_bbox, page_bbox_to_table_local
 

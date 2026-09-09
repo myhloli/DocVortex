@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import base64
 import binascii
-from pathlib import Path, PureWindowsPath
 import re
 import xml.etree.ElementTree as ElementTree
+from pathlib import Path, PureWindowsPath
 from typing import Final
 from urllib.parse import urlsplit
 

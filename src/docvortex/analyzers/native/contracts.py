@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO, Protocol, TypedDict
 from ...schema import BBox
 
 if TYPE_CHECKING:
-    from ...document.pdf.document import _PDFPageSnapshot
+    from ...document.pdf._document import _PDFPageSnapshot
 
 
 class RawBlock(TypedDict, total=False):

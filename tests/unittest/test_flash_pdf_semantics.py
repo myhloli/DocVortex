@@ -9,14 +9,14 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from docvortex.document.pdf.document import PDFDocument
-from docvortex.analyzers.native.pdf.pipeline import _analyze_native_document
 from _flash_pdf_test_utils import (
     _geometry_summary_mismatch,
     _page_bbox_fingerprint,
     _page_fingerprint,
 )
 
+from docvortex.analyzers.native.pdf.pipeline import _analyze_native_document
+from docvortex.document.pdf._document import PDFDocument
 
 _PROJECT_ROOT = Path(__file__).parents[2]
 _EXPECTATION_PATH = _PROJECT_ROOT / "tests" / "fixtures" / "flash_layout_semantic_expectations.json"

@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from typing import Any, Sequence
 
-from .....schema import BBox
 from .....content.spans import (
     append_equation_span,
     append_hyperlink_span,
@@ -13,6 +12,7 @@ from .....content.spans import (
     extend_inline_spans,
     normalize_span_dicts,
 )
+from .....schema import BBox
 from .common import _canonical_styles
 from .matching import (
     _assign_lines_to_blocks,
@@ -455,3 +455,19 @@ __all__ = [
     "_parse_native_script_markup",
     "materialize_pdf_inline_spans",
 ]
+
+
+def apply_pdf_inline_evidence(
+    blocks: list[dict[str, Any]],
+    link_lines: list[PDFTextLinkLine],
+    style_lines: list[PDFTextStyleLine],
+    script_lines: list[PDFTextScriptLine],
+    page_size: tuple[float, float],
+    *,
+    materialized_diagnostics: list[dict[str, Any]] | None = None,
+) -> None:
+    """在调用方已有页面准备之后统一执行行内语义物化顺序。"""
+    apply_pdf_text_links(blocks, link_lines, page_size)
+    apply_pdf_text_styles(blocks, style_lines, page_size)
+    apply_pdf_text_scripts(blocks, script_lines, page_size, materialized_diagnostics=materialized_diagnostics)
+    materialize_pdf_inline_spans(blocks)

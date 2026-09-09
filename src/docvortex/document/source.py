@@ -7,11 +7,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from docvortex.document.contracts import HtmlSourceContext
+
 from ..errors import InvalidRequestError
 from ..schema import FILE_SUFFIXES, DocumentProperties, FileSuffix
 
 if TYPE_CHECKING:
-    from .pdf.document import PDFDocument
+    from .pdf._document import PDFDocument
 
 
 @dataclass(slots=True)
@@ -46,7 +47,7 @@ def prepare_source(
     elif isinstance(source, bytes):
         data = source
     else:
-        from .pdf.document import PDFDocument
+        from .pdf._document import PDFDocument
 
         if not isinstance(source, PDFDocument):
             raise TypeError("source must be a path, bytes, or PDFDocument")
@@ -67,7 +68,7 @@ def prepare_source(
         source_context = HtmlSourceContext(source_uri=absolute.as_uri(), local_resource_root=absolute.parent)
     prepared = PreparedSource(data, cast(FileSuffix, suffix), source_context=source_context, document=document)
     if suffix == "pdf":
-        from .pdf.document import PDFDocument
+        from .pdf._document import PDFDocument
         from .pdf.pdfium import safe_rewrite_pdf_bytes_with_pdfium_result
 
         if document is None:

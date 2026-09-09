@@ -1,7 +1,8 @@
 """几何载荷与独立矩形类型之间的纯值转换。"""
 
 from __future__ import annotations
-from .contracts import Bbox
+
+from ._contracts import Bbox
 
 
 def char_bbox_values(bbox: object) -> tuple[float, float, float, float] | None:

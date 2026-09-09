@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import ast
+import pickle
 from importlib.util import resolve_name
 from pathlib import Path
-import pickle
 
 import docvortex
 
@@ -35,12 +35,12 @@ def test_shared_layers_do_not_import_native_implementations() -> None:
 
 def test_existing_shared_imports_keep_type_and_function_identity() -> None:
     """所有历史入口仍重导出同一实现，类型的 pickle 路径能够往返。"""
-    from docvortex.analyzers.native.html.contracts import HtmlSourceContext as original_context
-    from docvortex.document.contracts import HtmlSourceContext
     from docvortex.analyzers.native._shared.image import image_to_bytes as original_image
-    from docvortex.foundation.image_encoding import image_to_bytes
     from docvortex.analyzers.native._shared.markup import TextStyle as original_style
     from docvortex.content.markup import TextStyle
+    from docvortex.document.contracts import HtmlSourceContext
+    from docvortex.document.contracts import HtmlSourceContext as original_context
+    from docvortex.foundation.image_encoding import image_to_bytes
 
     assert original_context is HtmlSourceContext
     assert original_image is image_to_bytes

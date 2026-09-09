@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from docvortex.document.pdf import PDFDocument
-from docvortex.document.pdf.document import get_lines_from_chars
+from docvortex.document.pdf._document import get_lines_from_chars
 
 _PDF_ROOT = Path(__file__).parent / "pdfs"
 _SOURCE_HASHES = {

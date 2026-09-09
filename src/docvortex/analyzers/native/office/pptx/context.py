@@ -2,9 +2,10 @@
 
 from dataclasses import dataclass
 from typing import Any, Final, Optional
-from pptx.enum.shapes import PP_PLACEHOLDER
-from docvortex.foundation.type_identity import preserve_type_module
 
+from pptx.enum.shapes import PP_PLACEHOLDER
+
+from .....foundation.type_identity import preserve_type_module
 
 IGNORED_NOTES_PLACEHOLDER_TYPES: Final = {
     PP_PLACEHOLDER.SLIDE_IMAGE,

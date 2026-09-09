@@ -9,7 +9,8 @@ from typing import Protocol, TypeAlias
 
 from lxml import etree  # type: ignore[reportMissingImports]
 
-from docvortex.schema import RAW_ALGORITHM, BlockType, VISUAL_TYPE_MAPPING
+from docvortex.content.markup.formula import FormulaExtraction, extract_formula
+from docvortex.content.markup.styles import MarkupStylesheet, TextStyle
 from docvortex.content.spans import (
     append_code_span,
     append_equation_span,
@@ -20,11 +21,10 @@ from docvortex.content.spans import (
     strip_span_dicts,
     text_spans,
 )
-from docvortex.foundation.xml_names import local_name
-from docvortex.content.markup.formula import FormulaExtraction, extract_formula
-from docvortex.content.markup.styles import MarkupStylesheet, TextStyle
-from docvortex.foundation.type_identity import preserve_type_module
+from docvortex.schema import RAW_ALGORITHM, VISUAL_TYPE_MAPPING, BlockType
 
+from ...foundation.type_identity import preserve_type_module
+from ...foundation.xml_names import local_name
 
 BLOCK_TAGS = frozenset(
     {

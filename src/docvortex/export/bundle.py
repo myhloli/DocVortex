@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
 from hashlib import sha256
-import json
 from pathlib import Path
 from typing import Any
 
 from ..assets import AssetStore
 from ..codecs.json import load_middle, load_model
-from ..foundation.image_payload import INLINE_IMAGE_DATA_URI_RE, parse_image_data_uri_strict
+from ..foundation._image_payload import INLINE_IMAGE_DATA_URI_RE, parse_image_data_uri_strict
 from ..result import Diagnostic, DocumentResult, ExportResult
 from .files import materialize_middle, validate_materialized_assets
 from .middle import _commit_export_files, _resolve_export_target, _validate_export_path_relationships

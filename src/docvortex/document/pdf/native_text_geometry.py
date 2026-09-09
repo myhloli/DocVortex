@@ -1,14 +1,13 @@
 """PDF 字符去重及原始文字几何提取，保持原生提取算法与资源语义。"""
 
 from __future__ import annotations
+
 import logging
 import math
 from typing import Any, Iterator, cast
+
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
-from .text.extract import get_chars, deduplicate_chars
-from .text.contracts import Char
-from .text.geometry import char_bbox_values as _char_bbox_values
 
 from .native_contracts import (
     NEAR_IDENTICAL_CHAR_BBOX_TOLERANCE,
@@ -19,8 +18,11 @@ from .native_contracts import (
     PDFPageTextGeometry,
 )
 from .native_lifecycle import _try_close
+from .text._contracts import Char
+from .text.extract import deduplicate_chars, get_chars
+from .text.geometry import char_bbox_values as _char_bbox_values
 
-logger = logging.getLogger("docvortex.document.pdf.document")
+logger = logging.getLogger("docvortex.document.pdf._document")
 
 
 def _get_visible_char_signature(

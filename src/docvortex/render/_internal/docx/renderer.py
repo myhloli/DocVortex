@@ -2,27 +2,65 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from io import BytesIO
-import re
 
 from bs4 import BeautifulSoup, NavigableString, Tag
 from docx import Document
 from docx.document import Document as DocumentType
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.opc.part import Part
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.shared import Emu, Mm, Pt, Twips
 from docx.table import _Cell
 from docx.text.paragraph import Paragraph
-from lxml import etree
 from loguru import logger
+from lxml import etree
 
-from ..common.index import strip_index_page_tail
 from ....content.inline import normalize_inline_spans
+from ....foundation._image_payload import validate_remote_image_url
+from ....schema import (
+    PAGE_AUXILIARY_BLOCK_TYPES,
+    RAW_ALGORITHM,
+    AlgorithmBodyBlock,
+    BBox,
+    BlockBase,
+    BlockType,
+    ChartAnnotationBlock,
+    ChartBlock,
+    ChartBodyBlock,
+    CodeAnnotationBlock,
+    CodeBlock,
+    CodeBodyBlock,
+    DocTitleBlock,
+    EquationBlock,
+    EquationInlineSpan,
+    HyperlinkSpan,
+    ImageAnnotationBlock,
+    ImageBlock,
+    ImageBodyBlock,
+    ImagePayloadBlock,
+    IndexBlock,
+    InlineSpan,
+    ListBlock,
+    MiddleJson,
+    PageFootnoteBlock,
+    ParagraphTitleBlock,
+    RefTextBlock,
+    TableAnnotationBlock,
+    TableBlock,
+    TableBodyBlock,
+    TextBlock,
+    TextSpan,
+    TitleBlockBase,
+)
+from ...contracts import AssetResolver
+from ...docx import DocxRenderError
+from ..common.index import strip_index_page_tail
 from ..common.list_items import parse_list_item_marker
 from ..common.planner import PlannedBlock, build_render_plan
 from .assets import DocxAssetError, PreparedImage, prepare_block_image, prepare_html_image
@@ -48,44 +86,6 @@ from .styles import (
     usable_width_twips,
 )
 from .table import DocxTableError, NestedTableWriter, materialize_docx_tables
-from ...contracts import AssetResolver
-from ...docx import DocxRenderError
-from ....schema import (
-    PAGE_AUXILIARY_BLOCK_TYPES,
-    RAW_ALGORITHM,
-    AlgorithmBodyBlock,
-    BlockBase,
-    BlockType,
-    BBox,
-    ChartAnnotationBlock,
-    ChartBlock,
-    ChartBodyBlock,
-    CodeAnnotationBlock,
-    CodeBlock,
-    CodeBodyBlock,
-    DocTitleBlock,
-    EquationBlock,
-    ImageAnnotationBlock,
-    ImageBlock,
-    ImageBodyBlock,
-    ImagePayloadBlock,
-    IndexBlock,
-    InlineSpan,
-    ListBlock,
-    MiddleJson,
-    PageFootnoteBlock,
-    ParagraphTitleBlock,
-    RefTextBlock,
-    TableAnnotationBlock,
-    TableBlock,
-    TableBodyBlock,
-    TextBlock,
-    TextSpan,
-    EquationInlineSpan,
-    HyperlinkSpan,
-    TitleBlockBase,
-)
-from ....foundation.image_payload import validate_remote_image_url
 
 _SVG_BLIP_NAMESPACE = "http://schemas.microsoft.com/office/drawing/2016/SVG/main"
 _SVG_BLIP_EXTENSION_URI = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}"
