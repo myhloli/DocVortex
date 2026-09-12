@@ -15,10 +15,12 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import (
+    BaseDocTemplate,
     Flowable,
+    Frame,
     Image as ReportLabImage,
     Paragraph,
-    SimpleDocTemplate,
+    PageTemplate,
     Spacer,
     Table,
     TableStyle,
@@ -73,7 +75,8 @@ from .formula import (
     split_formula_tag,
 )
 from .inline import PdfAnchorRegistry, PdfInlineContext, build_pdf_paragraph, render_plain_text_markup
-from .styles import BORDER_COLOR, PAGE_MARGIN, SURFACE_COLOR, build_pdf_styles
+from .pagination import protect_images, protect_paragraphs, protect_tables
+from .styles import BORDER_COLOR, FRAME_PADDING, PAGE_MARGIN, SURFACE_COLOR, build_pdf_styles
 from .table import PdfTableError, build_pdf_tables
 
 _HTML_TABLE_RE = re.compile(r"<table\b", re.IGNORECASE)
@@ -166,8 +169,8 @@ class _PdfRenderer:
         self.asset_resolver = asset_resolver
         self.document_title = _resolve_document_title(middle_json, document_title)
         self.styles = build_pdf_styles()
-        self.available_width = A4[0] - 2 * PAGE_MARGIN
-        self.available_height = A4[1] - 2 * PAGE_MARGIN
+        self.available_width = A4[0] - 2 * (PAGE_MARGIN + FRAME_PADDING)
+        self.available_height = A4[1] - 2 * (PAGE_MARGIN + FRAME_PADDING)
         self.inline_context = PdfInlineContext(
             formulas=FormulaRenderer(),
             anchors=PdfAnchorRegistry(_iter_document_anchors(middle_json)),
@@ -176,6 +179,12 @@ class _PdfRenderer:
     def render(self) -> bytes:
         """构造逐页 story，并将确定性 ReportLab 文档序列化为 bytes。"""
         story: list[Flowable] = []
+        measure_canvas = Canvas(BytesIO())
+        pagination_options = {
+            "width": self.available_width,
+            "height": self.available_height,
+            "canvas": measure_canvas,
+        }
         planned_pages = build_render_plan(self.middle_json)
         for planned_blocks in planned_pages:
             for planned in planned_blocks:
@@ -184,12 +193,25 @@ class _PdfRenderer:
                 if planned.block.type in PAGE_AUXILIARY_BLOCK_TYPES:
                     continue
                 rendered = self._render_planned_block(planned)
+                if isinstance(planned.block, (ImageBlock, TableBlock, ChartBlock)):
+                    # 标题计入图表的首段预算，避免满页图片或长表把标题单独留在前页。
+                    while story and isinstance(story[-1], Paragraph) and story[-1].getKeepWithNext():
+                        rendered.insert(0, story.pop())
+                if isinstance(planned.block, (TextBlock, RefTextBlock, ListBlock)):
+                    rendered = protect_paragraphs(rendered, **pagination_options)
+                elif isinstance(planned.block, ImageBlock):
+                    rendered = protect_images(rendered, **pagination_options)
+                elif isinstance(planned.block, (TableBlock, ChartBlock)):
+                    if any(isinstance(item, ReportLabImage) for item in rendered):
+                        rendered = protect_images(rendered, **pagination_options)
+                    else:
+                        rendered = protect_tables(rendered, **pagination_options)
                 story.extend(rendered)
         if not story:
             story.append(Spacer(1, 1))
 
         output = BytesIO()
-        document = SimpleDocTemplate(
+        document = BaseDocTemplate(
             output,
             pagesize=A4,
             leftMargin=PAGE_MARGIN,
@@ -203,6 +225,24 @@ class _PdfRenderer:
             keywords="DocVortex, MiddleJson, PDF",
             invariant=1,
             pageCompression=1,
+        )
+        document.addPageTemplates(
+            PageTemplate(
+                id="normal",
+                frames=[
+                    Frame(
+                        PAGE_MARGIN,
+                        PAGE_MARGIN,
+                        A4[0] - 2 * PAGE_MARGIN,
+                        A4[1] - 2 * PAGE_MARGIN,
+                        leftPadding=FRAME_PADDING,
+                        rightPadding=FRAME_PADDING,
+                        topPadding=FRAME_PADDING,
+                        bottomPadding=FRAME_PADDING,
+                        id="normal",
+                    )
+                ],
+            )
         )
         document.build(
             story,
@@ -598,7 +638,7 @@ class _PdfRenderer:
             desired_width = available_width * (block.bbox[2] - block.bbox[0])
         desired_width = max(min(_MIN_IMAGE_WIDTH, available_width), min(desired_width, available_width))
         desired_height = desired_width * prepared.height_px / max(prepared.width_px, 1)
-        max_height = self.available_height
+        max_height = self.available_height - 10
         if desired_height > max_height:
             scale = max_height / desired_height
             desired_width *= scale

@@ -14,6 +14,7 @@ from reportlab.pdfbase import cidfonts, pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
 PAGE_MARGIN = 20 * mm
+FRAME_PADDING = 6.0
 BODY_FONT = "Helvetica"
 BODY_BOLD_FONT = "Helvetica-Bold"
 MONO_FONT = "Courier"
@@ -66,8 +67,8 @@ def build_pdf_styles() -> PdfStyleSet:
         spaceBefore=0,
         spaceAfter=7,
         splitLongWords=True,
-        allowWidows=1,
-        allowOrphans=1,
+        allowWidows=0,
+        allowOrphans=0,
     )
     headings = tuple(
         ParagraphStyle(
@@ -147,6 +148,8 @@ def build_pdf_styles() -> PdfStyleSet:
         leading=11,
         spaceBefore=0,
         spaceAfter=0,
+        allowWidows=1,
+        allowOrphans=1,
     )
     table_header = ParagraphStyle(
         "DocVortex PDF Table Header",
@@ -192,6 +195,7 @@ __all__ = [
     "BODY_BOLD_FONT",
     "BODY_FONT",
     "BORDER_COLOR",
+    "FRAME_PADDING",
     "HAN_FONT",
     "JAPANESE_FONT",
     "KOREAN_FONT",

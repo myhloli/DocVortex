@@ -30,6 +30,25 @@ class PdfTableError(HtmlTableError):
     """表示 HTML 表格结构或 PDF 表格几何无法安全物化。"""
 
 
+class _PdfLongTable(LongTable):
+    """优先按整行分页，仅在新页也放不下时拆分超高行。"""
+
+    def split(self, availWidth: float, availHeight: float) -> list[Flowable]:
+        """先禁用行内拆分尝试分页，页首失败后再启用原有兜底能力。"""
+        split_in_row = self.splitInRow
+        self.splitInRow = 0
+        try:
+            parts = super().split(availWidth, availHeight)
+        finally:
+            self.splitInRow = split_in_row
+        for part in parts:
+            part.splitInRow = split_in_row
+        frame = getattr(self, "_frame", None)
+        if not parts and (frame is None or frame._atTop):
+            parts = super().split(availWidth, availHeight)
+        return parts
+
+
 class ParagraphBuilder(Protocol):
     """定义表格单元格创建富文本 Paragraph 的回调。"""
 
@@ -127,7 +146,7 @@ def _build_pdf_table(
     repeat_rows = 0
     while repeat_rows in grid.header_rows:
         repeat_rows += 1
-    table_class = LongTable if depth == 1 else Table
+    table_class = _PdfLongTable if depth == 1 else Table
     table = table_class(
         data,
         colWidths=column_widths,

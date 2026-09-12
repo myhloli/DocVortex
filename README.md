@@ -124,7 +124,11 @@ DocVortex markers and semantic round trips.
 ## Scope and development
 
 PDF output is a semantic reflow of the document, not a lossless reproduction of
-the original page drawing instructions. Input support for PPTX/XLSX does not imply
+the original page drawing instructions. Short paragraphs (up to a quarter of the
+content area height) and short tables including annotations (up to half) stay
+together when possible. Longer content can paginate; tables repeat existing
+headers, and images scale to fit while keeping short captions on the same page.
+Input support for PPTX/XLSX does not imply
 PPTX/XLSX output support. Rust implementation work is a future stage behind these
 public data and processing boundaries.
 
