@@ -1,136 +1,149 @@
+<div align="center">
 
-![DocVortex overview: native document inputs flow through a unified document model to Markdown, HTML, LaTeX, DOCX, EPUB, PDF and structured content.](https://gcore.jsdelivr.net/gh/myhloli/DocVortex@main/docs/images/docvortex-overview.jpg)
+<img src="https://raw.githubusercontent.com/myhloli/DocVortex/main/docs/images/docvortex-logo.jpg" alt="DocVortex logo" width="200">
 
 # DocVortex
 
-A fast, multi-format document parsing and conversion engine.
+**Native document parsing. One structure, many outputs.**
 
-DocVortex provides a complete, standalone document pipeline:
+[![PyPI](https://img.shields.io/pypi/v/docvortex?color=008cff)](https://pypi.org/project/docvortex/)
+[![Python](https://img.shields.io/pypi/pyversions/docvortex)](https://pypi.org/project/docvortex/)
+[![CI](https://github.com/myhloli/DocVortex/actions/workflows/ci.yml/badge.svg)](https://github.com/myhloli/DocVortex/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/myhloli/DocVortex/blob/main/LICENSE.md)
 
-```text
-Document -> Unified Intermediate Representation -> Render / Export
-```
+**English** · [简体中文](https://github.com/myhloli/DocVortex/blob/main/README_zh-CN.md)
 
-Native inputs include text PDFs, DOC/DOCX, PPT/PPTX, XLS/XLSX, RTF, ODT/ODS/ODP,
-EPUB, HTML, OFD and CSV. Output formats include Markdown, HTML, LaTeX, DOCX,
-EPUB, PDF and structured content. 
+[Quick start](#quick-start) · [Formats](#supported-formats) · [Documentation](#documentation)
 
-Native parsing runs without OCR or VLM inference services.
-PDF classification is an explicit document operation; native analysis does not
-silently classify the document or select another inference backend.
+</div>
 
-## Install
+## Documents in. Possibilities out.
+
+DocVortex is a standalone Python engine for parsing and converting documents.
+It reads native text and document structure into a unified representation,
+then exports the result in the formats your workflow needs.
+
+- **Multi-format input** — read text PDFs, Office files, OpenDocument files, EPUB, HTML, OFD and CSV.
+- **Parse once, export many times** — reuse the same result for Markdown, HTML, LaTeX, DOCX, EPUB, PDF and structured JSON.
+- **Portable results** — save document structure and image assets in a Bundle, then export again without the source file.
+- **Composable APIs** — use the complete pipeline or integrate analysis, postprocessing and rendering separately.
+
+Native parsing works without an OCR or VLM inference service. Use DocVortex
+directly through its CLI or Python SDK, independently of MinerU.
+
+![DocVortex pipeline: native documents become a unified representation, then Markdown, HTML, LaTeX, DOCX, EPUB, PDF or structured JSON.](https://raw.githubusercontent.com/myhloli/DocVortex/main/docs/images/docvortex-overview.jpg)
+
+## Quick start
+
+Requires **Python 3.10–3.14**.
+
+### Install
 
 ```bash
 pip install docvortex
-docvortex convert report.pdf --format markdown --output output/report.md
-docvortex classify report.pdf
 ```
 
-Python 3.10–3.14 is supported. Native parsing does not require OCR/VLM inference
-services. 
+### Command line
 
-## Parse once, export many times
+Convert a text PDF to Markdown:
+
+```bash
+docvortex convert report.pdf --format markdown --output output/report.md
+```
+
+Replace `report.pdf` with a local file in any supported input format.
+Use `--format` to choose the output; run `docvortex convert --help` for options.
+
+### Python
+
+Parse a document once and export it twice:
 
 ```python
 import docvortex
 
-result = docvortex.parse("report.pdf", keep_model_json=True)
+result = docvortex.parse("report.pdf")
 result.export("output/report.md", output_format="markdown")
 result.export("output/report.docx", output_format="docx")
-result.export("output/report.epub", output_format="epub")
+```
+
+The result owns its document structure and assets, so further exports do not
+reopen or reparse the source. Existing output files are protected by default;
+use `overwrite=True` in Python or `--overwrite` in the CLI to replace them.
+
+## Supported formats
+
+### Native inputs · 15 formats
+
+| Document family | Formats |
+| --- | --- |
+| PDF with native text | PDF |
+| Word & rich text | DOC, DOCX, RTF |
+| Presentations | PPT, PPTX |
+| Spreadsheets | XLS, XLSX, CSV |
+| OpenDocument | ODT, ODS, ODP |
+| E-books & web documents | EPUB, HTML |
+| Open Fixed-layout Document | OFD |
+
+### Outputs · 7 formats
+
+| Output | `--format` / `output_format` |
+| --- | --- |
+| Markdown | `markdown` |
+| HTML | `html` |
+| LaTeX | `latex` |
+| Word document | `docx` |
+| EPUB e-book | `epub` |
+| PDF | `pdf` |
+| Structured JSON | `structured_content` |
+
+PPT/PPTX and XLS/XLSX are input formats only. Structured JSON is an export
+format; the [document JSON protocol](https://github.com/myhloli/DocVortex/blob/main/docs/JSON_PROTOCOL.md)
+separately defines the analysis and intermediate representations.
+
+## Save now, export later
+
+A Bundle packages the parsed document and its image assets for reuse across
+processes or machines. Load it whenever you need another output format:
+
+```python
+import docvortex
+
+result = docvortex.parse("report.pdf")
 result.save_bundle("output/report.bundle")
 
-# This works after the source document and its parsing process are gone.
 restored = docvortex.load_bundle("output/report.bundle")
-restored.export("output/report.pdf", output_format="pdf")
+restored.export("output/report.epub", output_format="epub")
 ```
 
-Bundles contain `manifest.json`, `middle.json`, optional `model.json`, and image
-assets. The loader verifies asset hashes. Missing external assets must be supplied
-before saving a portable bundle. Existing files are protected unless the caller
-explicitly sets `overwrite=True`.
+The restored result works without the original file. See the
+[usage guide](https://github.com/myhloli/DocVortex/blob/main/docs/USAGE.md#portable-bundles)
+for Bundle contents, asset handling and overwrite rules.
 
-## Stage APIs
+Need only the title, authors or other source properties?
+[`docvortex.extract_metadata()`](https://github.com/myhloli/DocVortex/blob/main/docs/METADATA.md)
+reads metadata without parsing the document body.
 
-```python
-from docvortex.api import analyze, postprocess, render
+## Choose the right workflow
 
-analysis = analyze("report.pdf", page_range="1-5")
-result = postprocess(analysis)
-artifact = render(result.middle_json, "docx", assets=result.assets)
-artifact.write("output/report.docx")
-```
+- **Text PDFs:** native parsing uses the document's existing text and structure. Scanned pages requiring OCR need an external OCR or inference service.
+- **PDF classification:** `docvortex classify report.pdf` returns `txt` or `ocr`. Classification is explicit and does not start inference; parsing does not automatically switch backends.
+- **PDF export:** output is a semantic reflow of the content. Original page layout and drawing instructions are not reproduced losslessly.
 
-The stage API lives in `docvortex.api`. Root-level conveniences include `parse`,
-`analyze`, `convert`, `postprocess_document`, and `render_artifact`. The
-`docvortex.render` package also exposes the low-level renderers and their original
-string, bytes, dictionary, or list return values.
+## Documentation
 
-PDF page selections use `1-5`, `r1` and `all`; other native formats are parsed as
-whole documents. A caller-owned `PDFDocument` can be passed to `analyze` or `parse`
-and remains open afterward.
+| Guide | What you will find |
+| --- | --- |
+| [Usage](https://github.com/myhloli/DocVortex/blob/main/docs/USAGE.md) | Stage APIs, PDF pages, classification, images and Bundles |
+| [Examples](https://github.com/myhloli/DocVortex/blob/main/demo/README.md) | Local PDF and Office samples with a runnable demo |
+| [Metadata](https://github.com/myhloli/DocVortex/blob/main/docs/METADATA.md) | Source properties and per-format coverage |
+| [JSON protocol](https://github.com/myhloli/DocVortex/blob/main/docs/JSON_PROTOCOL.md) | Document schemas, extensions and protocol migration |
+| [HTML protocol](https://github.com/myhloli/DocVortex/blob/main/docs/HTML_PROTOCOL.md) | Semantic markers and round trips |
+| [Public SDK & migration](https://github.com/myhloli/DocVortex/blob/main/docs/sdk-0.4.md) | Supported integration boundaries and the 0.4 upgrade |
+| [Rendering ownership](https://github.com/myhloli/DocVortex/blob/main/docs/RENDER_OWNERSHIP.md) | DocVortex exports and MinerU-specific renderers |
 
-## Page images and embedded assets
+## Development
 
-```python
-from docvortex.assets import parse_image_data_uri_strict, transcode_image
-from docvortex.content.tree import iter_image_payloads
-from docvortex.document.pdf import PDFDocument
-
-with PDFDocument("report.pdf") as document:
-    image = document.render_image(0, bbox=(0.1, 0.2, 0.8, 0.7), image_format="png")
-# image.data, image.width, image.height, image.mime_type and image.extension
-# remain available after the document closes.
-```
-
-`render_image` accepts zero-based page indices, optional normalized bounding boxes
-and `jpeg` (default), `png` or `webp` output. Omitting `bbox` renders the whole page.
-Crops are encoded directly to the requested format. `crop_image` continues to
-return JPEG bytes. Image sources opened with `PDFDocument.from_image` retain the
-existing image-to-PDF conversion behavior.
-
-`docvortex.assets` exposes immutable `ImageArtifact` and `ImageFormat` contracts.
-`parse_image_data_uri_strict(uri)` validates embedded image bytes and returns
-`(data, extension)`; `transcode_image(data, image_format="png")` returns an
-`ImageArtifact`. These operations do not fetch URLs or resolve filesystem paths,
-and transcoding does not add SVG rasterization support.
-`iter_image_payloads(block)` yields the current node, if it carries an image,
-then traverses its children depth first without modifying the document tree.
-
-## Explicit PDF classification
-
-```python
-from docvortex.document.pdf import PDFDocument
-
-with PDFDocument("report.pdf") as document:
-    mode = document.classify()  # "txt" or "ocr"; no inference is started
-    if mode == "txt":
-        result = docvortex.parse(document)
-```
-
-Native analysis trusts the caller's choice and does not classify automatically.
-Applications can use the classification result to select their own OCR or
-inference service when a document requires it.
-
-DocVortex JSON uses schema identity `docvortex.model` or `docvortex.middle`, schema
-version `2.0`, and required `metadata.file_suffix` / `metadata.producer`. Definitions are in `schemas/`.
-Application-specific metadata belongs in `extensions`. See the
-[shared JSON protocol and migration guide](docs/JSON_PROTOCOL.md) and the
-[compatibility guide](docs/COMPATIBILITY.md) for existing application integrations
-and historical data formats. The [HTML protocol](docs/HTML_PROTOCOL.md) describes
-DocVortex markers and semantic round trips.
-
-## Scope and development
-
-PDF output is a semantic reflow of the document, not a lossless reproduction of
-the original page drawing instructions. Short paragraphs (up to a quarter of the
-content area height) and short tables including annotations (up to half) stay
-together when possible. Longer content can paginate; tables repeat existing
-headers, and images scale to fit while keeping short captions on the same page.
-Input support for PPTX/XLSX does not imply
-PPTX/XLSX output support. Rust implementation work is a future stage behind these
-public data and processing boundaries.
+From a local checkout:
 
 ```bash
 uv venv
@@ -141,32 +154,11 @@ uv run --no-project ruff format --check src
 uv build
 ```
 
-DocVortex project code is licensed under the [MIT License](LICENSE.md).
+Bug reports and contributions are welcome. When reporting a parsing issue,
+include a reproducible command and a sample document you can share in
+[GitHub Issues](https://github.com/myhloli/DocVortex/issues).
 
-See [rendering ownership](docs/RENDER_OWNERSHIP.md) for the seven engine targets,
-MinerU Content List integration and public fragment helpers.
+## License
 
-## Read source metadata without parsing the body
-
-```python
-from docvortex import extract_metadata
-
-inspection = extract_metadata("report.pdf")
-print(inspection.metadata.document.title)
-print(inspection.metadata.document.authors)
-```
-
-All 15 native document formats support this API. Normal parsing also carries these properties in
-`metadata.document`, preserving the original PDF properties across page selections. See the
-[field definitions, format matrix, and compatibility notes](docs/METADATA.md).
-
-
-### Python 3.14 and text joining (0.3.0)
-
-DocVortex supports ordinary CPython 3.10–3.14. Physical text lines are joined by deterministic Unicode boundary rules, with URL and dehyphenation safeguards. Language detection models and the fast-langdetect / fasttext-predict dependencies are no longer required.
-
-The shared `resolve_text_line_boundary` and `merge_text_line_contents` helpers no longer accept `block_language`; `detect_lang` has been removed. Hosts should call the shared boundary helpers directly. OCR language selection and Magika code-language recognition are unchanged.
-
-## Public SDK and 0.4 migration
-
-Geometry, document access, assets and regional PDF analysis have explicit public contracts. See [the SDK migration guide](docs/sdk-0.4.md). `docvortex.public_api.PUBLIC_API` lists supported cross-package modules and symbols. Replaced Python paths are removed in 0.4; document JSON and Bundle semantics are unchanged. Upgrade MinerU together, or constrain older hosts to `docvortex<0.4.0`.
+DocVortex project code is released under the
+[MIT License](https://github.com/myhloli/DocVortex/blob/main/LICENSE.md).
