@@ -134,6 +134,7 @@ reads metadata without parsing the document body.
 | Guide | What you will find |
 | --- | --- |
 | [Usage](https://github.com/myhloli/DocVortex/blob/main/docs/USAGE.md) | Stage APIs, PDF pages, classification, images and Bundles |
+| [Agent skill](skills/docvortex/SKILL.md) | CLI and Python SDK workflows for agents; copy the entire `skills/docvortex` folder to reuse |
 | [Examples](https://github.com/myhloli/DocVortex/blob/main/demo/README.md) | Local PDF and Office samples with a runnable demo |
 | [Metadata](https://github.com/myhloli/DocVortex/blob/main/docs/METADATA.md) | Source properties and per-format coverage |
 | [JSON protocol](https://github.com/myhloli/DocVortex/blob/main/docs/JSON_PROTOCOL.md) | Document schemas, extensions and protocol migration |

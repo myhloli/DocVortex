@@ -133,6 +133,7 @@ restored.export("output/report.epub", output_format="epub")
 | 指南 | 内容 |
 | --- | --- |
 | [进阶使用](https://github.com/myhloli/DocVortex/blob/main/docs/USAGE.md) | 分阶段 API、PDF 选页、分类、图像与 Bundle |
+| [Agent skill](skills/docvortex/SKILL.md) | 面向 agent 的 CLI 与 Python SDK 工作流；复制整个 `skills/docvortex` 目录即可复用 |
 | [示例](https://github.com/myhloli/DocVortex/blob/main/demo/README.md) | 本地 PDF、Office 样本与可运行示例 |
 | [元数据](https://github.com/myhloli/DocVortex/blob/main/docs/METADATA.md) | 源文档属性与各格式支持范围 |
 | [JSON 协议](https://github.com/myhloli/DocVortex/blob/main/docs/JSON_PROTOCOL.md) | 文档结构、扩展字段与协议迁移 |
