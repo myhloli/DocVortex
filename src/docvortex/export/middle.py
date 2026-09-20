@@ -6,9 +6,9 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any, Sequence
 
-from ..schema import BlockBase, MiddleJson, _iter_child_blocks
+from ..schema import MiddleJson
+from ._images import _materialize_images
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,65 +20,10 @@ class MiddleJsonExportResult:
     image_paths: tuple[Path, ...]
 
 
-def _iter_page_blocks(blocks: Sequence[BlockBase]) -> list[BlockBase]:
-    """按深度优先顺序展开页面 block 树，供图片外置统一遍历。"""
-    result: list[BlockBase] = []
-    pending: list[BlockBase] = list(reversed(blocks))
-    while pending:
-        block = pending.pop()
-        result.append(block)
-        pending.extend(reversed(_iter_child_blocks(block)))
-    return result
-
-
-def _register_export_file(files: dict[str, bytes], relative_path: str, payload: bytes) -> None:
-    """登记待写文件，并在同名内容冲突时立即终止导出。"""
-    existing = files.get(relative_path)
-    if existing is not None and existing != payload:
-        raise ValueError(f"Conflicting image payload for path: {relative_path}")
-    files[relative_path] = payload
-
-
 def _prepare_export_copy(middle_json: MiddleJson) -> tuple[MiddleJson, dict[str, bytes]]:
-    """复制对象、解析直接及 HTML 图片，并回填副本中的相对路径。"""
-    from ..foundation._image_payload import INLINE_IMAGE_DATA_URI_RE, parse_image_data_uri_strict
-
-    exported = middle_json.model_copy(deep=True)
-    image_files: dict[str, bytes] = {}
-    for page in exported.pages:
-        for block in _iter_page_blocks(page.blocks):
-            data_uri = getattr(block, "image_base64", None)
-            if data_uri is not None:
-                if block.index is None:
-                    raise ValueError(f"Image carrier requires index: page_idx={page.page_idx}, type={block.type}")
-                image_bytes, extension = parse_image_data_uri_strict(data_uri)
-                relative_path = f"images/page_{page.page_idx}_{block.type}_{block.index}.{extension}"
-                _register_export_file(image_files, relative_path, image_bytes)
-                block.image_path = relative_path  # type: ignore[attr-defined]
-                block.image_base64 = None  # type: ignore[attr-defined]
-
-            content = getattr(block, "content", None)
-            if (
-                str(block.type) not in {"table_body", "chart_body", "image_body"}
-                or not isinstance(content, str)
-                or "data:image/" not in content
-            ):
-                continue
-            if block.index is None:
-                raise ValueError(f"HTML image carrier requires index: page_idx={page.page_idx}, type={block.type}")
-            ordinal = 0
-
-            def _replace_data_uri(match: Any) -> str:
-                """将当前 HTML data URI 登记为 sidecar，并返回确定性相对路径。"""
-                nonlocal ordinal
-                ordinal += 1
-                image_bytes, extension = parse_image_data_uri_strict(match.group(0))
-                relative_path = f"images/page_{page.page_idx}_{block.type}_{block.index}_{ordinal}.{extension}"
-                _register_export_file(image_files, relative_path, image_bytes)
-                return relative_path
-
-            block.content = INLINE_IMAGE_DATA_URI_RE.sub(_replace_data_uri, content)  # type: ignore[assignment]
-    return exported, image_files
+    """复用统一物化流程，为原子文件导出提供文档副本及图片字节。"""
+    document, assets = _materialize_images(middle_json)
+    return document, dict(assets)
 
 
 def _resolve_export_target(output_root: Path, relative_path: str) -> Path:

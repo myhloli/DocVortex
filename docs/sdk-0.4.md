@@ -1,6 +1,6 @@
 # DocVortex 0.4 公共 SDK 与宿主迁移
 
-本文记录 0.4 系列的公共模块边界。MinerU 的页面原语复用需要 `docvortex>=0.4.15,<1`，文档协议、解析路由、模型回退与渲染语义保持不变。
+本文记录 0.4 系列的公共模块边界。MinerU 的共享图片导出需要 `docvortex>=0.4.19,<1`，文档协议、解析路由、模型回退与渲染语义保持不变。
 
 ## 公开入口
 
@@ -21,6 +21,29 @@
 ## 结果包素材导出（0.4.3）
 
 跨库调用方可通过 `docvortex.export.materialize_middle(middle_json, assets=None)` 获取图片外置后的文档副本与 `AssetStore`，再通过 `validate_materialized_assets(document, assets)` 验证所有图片引用。直接图片和视觉 HTML 内嵌图片使用安全相对路径，原始图片字节及布局方向扩展保持不变；代码字面量不作为 HTML 素材处理。
+
+### 0.4.19 图片命名与宿主回调
+
+新物化图片统一沿用 MinerU Gradio 的命名：直接载荷为
+`images/page_{page_idx}_{owner.type}_{owner.index}.{ext}`，其中 owner 是所属
+image/table/chart 父块，独立公式使用 equation。视觉正文内的图片分别使用
+`image_{index}_{ordinal}`、`table_image_{index}_{ordinal}`、`chart_image_{index}_{ordinal}`。
+页号为从 0 开始的原始页索引；序号按每个正文的所有 `<img src=...>` 从 1 计数，外链也占序号。
+扩展名转小写，缺省 jpg；图片字节不重新编码。同名同字节复用，同名异字节追加
+`_duplicate_n`，最多检查 10000 个候选名称；不同语义名称不因字节相同而合并。
+
+`materialize_middle` 新增两个可选的仅限关键字参数：
+
+- `image_resolver: Callable[[ImagePayloadBlock, int], tuple[bytes, str] | None]`：接收副本中的载荷块和原始页号，返回字节及扩展名；返回 None 时保留载荷，不再触发默认解析。
+- `asset_resolver: Callable[[str], bytes]`：接收经过实体/URL 解码及安全校验的 HTML 图片相对路径，返回字节；扩展名从引用路径取得。仅在明确传入回调时读取宿主资源，回调负责自身根目录限制。
+
+不提供回调时保持内嵌图片的严格解析，不自动读文件或裁 PDF；已有相对路径保持原样。
+输入 `assets` 保留为独立副本并参与冲突检查，重复物化不改变路径或字节。
+新命名同步更新直接引用和 HTML src，保留 HTML 的属性、引号及其他正文。
+
+此变更会改变新生成的 CLI/API ZIP 及 DocVortex 导出图片名称，消费者应读取文档实际引用，
+不再自行拼接旧的 `*_body_*` 名称。历史结果包仍按已有引用读取，不自动迁移、不生成旧名别名；
+MiddleJson 仍为 2.0，文件写出层的 overwrite 语义不变。
 
 调用方负责将该副本及素材写入自己的结果包，不应先省略图片再从源 PDF 重裁。缺失引用、未物化网络图片或同名素材冲突会显式失败。物化不修改输入对象、不读取源 PDF、不下载网络资源；已有外部素材须通过 `AssetStore` 显式提供。
 

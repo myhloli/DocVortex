@@ -56,7 +56,7 @@ def test_public_export_preserves_payloads_geometry_and_code() -> None:
     before = middle.to_json()
     exported, assets = materialize_middle(middle)
     validate_materialized_assets(exported, assets)
-    assert set(assets) == {"images/page_4_table_body_2.jpg", "images/page_4_table_body_2_1.jpg"}
+    assert set(assets) == {"images/page_4_table_2.jpg", "images/page_4_table_image_2_1.jpg"}
     assert all(payload == image for payload in assets.values())
     assert exported.extensions == middle.extensions
     assert exported.pages[0].blocks[1].content[0].content == markup

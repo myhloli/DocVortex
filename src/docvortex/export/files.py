@@ -2,30 +2,32 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from ..assets import AssetStore
 from ..content.tree import iter_child_blocks
-from ..schema import MiddleJson
 from ..result import ExportResult, RenderArtifact
-from .middle import _commit_export_files, _prepare_export_copy, _resolve_export_target, _validate_export_path_relationships
+from ..schema import ImagePayloadBlock, MiddleJson
+from ._images import _materialize_images
+from .middle import _commit_export_files, _resolve_export_target, _validate_export_path_relationships
 
 
-def materialize_middle(middle_json: MiddleJson, assets: AssetStore | None = None) -> tuple[MiddleJson, AssetStore]:
-    """在文档副本上外置所有内嵌图片，保留调用者提供的外部素材。"""
-    document, embedded = _prepare_export_copy(middle_json)
-    result = assets.copy() if assets is not None else AssetStore()
-    for path, payload in embedded.items():
-        result.add(path, payload)
-    pending = [block for page in document.pages for block in page.blocks]
-    while pending:
-        block = pending.pop()
-        pending.extend(iter_child_blocks(block))
-        image_path = getattr(block, "image_path", None)
-        if image_path and image_path in result and getattr(block, "image_url", None):
-            block.image_url = None
-    return document, result
+def materialize_middle(
+    middle_json: MiddleJson,
+    assets: AssetStore | None = None,
+    *,
+    image_resolver: Callable[[ImagePayloadBlock, int], tuple[bytes, str] | None] | None = None,
+    asset_resolver: Callable[[str], bytes] | None = None,
+) -> tuple[MiddleJson, AssetStore]:
+    """在副本上按视觉父块外置图片；仅通过显式回调获取宿主文件或裁图。
+
+    image_resolver 接收载荷块和原始页索引，返回字节与扩展名；返回 None
+    表示保留当前载荷，不触发默认解析。asset_resolver 仅接收经过校验的
+    HTML 图片相对路径。不提供回调时，只解析内嵌图片并保留已有素材引用。
+    """
+    return _materialize_images(middle_json, assets, image_resolver=image_resolver, asset_resolver=asset_resolver)
 
 
 def validate_materialized_assets(middle_json: MiddleJson, assets: AssetStore) -> None:

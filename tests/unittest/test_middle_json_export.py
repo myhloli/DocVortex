@@ -85,17 +85,17 @@ def test_export_writes_direct_and_multiple_html_images_without_mutating_source(t
     exported_body = result.middle_json.pages[0].blocks[0].content[0]
 
     assert {path.name for path in result.image_paths} == {
-        "page_3_table_body_4.jpg",
-        "page_3_table_body_4_1.gif",
-        "page_3_table_body_4_2.png",
+        "page_3_table_4.jpg",
+        "page_3_table_image_4_1.gif",
+        "page_3_table_image_4_2.png",
     }
-    assert (tmp_path / "images/page_3_table_body_4.jpg").read_bytes() == jpeg_payload
-    assert (tmp_path / "images/page_3_table_body_4_1.gif").read_bytes() == gif_payload
-    assert (tmp_path / "images/page_3_table_body_4_2.png").read_bytes() == png_payload
-    assert exported_body.image_path == "images/page_3_table_body_4.jpg"
+    assert (tmp_path / "images/page_3_table_4.jpg").read_bytes() == jpeg_payload
+    assert (tmp_path / "images/page_3_table_image_4_1.gif").read_bytes() == gif_payload
+    assert (tmp_path / "images/page_3_table_image_4_2.png").read_bytes() == png_payload
+    assert exported_body.image_path == "images/page_3_table_4.jpg"
     assert exported_body.image_base64 is None
-    assert "images/page_3_table_body_4_1.gif" in exported_body.content
-    assert "images/page_3_table_body_4_2.png" in exported_body.content
+    assert "images/page_3_table_image_4_1.gif" in exported_body.content
+    assert "images/page_3_table_image_4_2.png" in exported_body.content
     assert "image_base64" not in exported_json
     assert "data:image/" not in exported_json
     assert middle_json.pages[0].blocks[0].content[0].image_base64 == jpeg_uri
@@ -116,7 +116,7 @@ def test_export_supports_strict_svg_payload(tmp_path: Path) -> None:
 
     result = export_middle_json(middle_json, tmp_path)
 
-    assert (tmp_path / "images/page_3_table_body_2.svg").read_bytes() == svg_payload
+    assert (tmp_path / "images/page_3_table_2.svg").read_bytes() == svg_payload
     assert result.middle_json.pages[0].blocks[0].content[0].image_path.endswith(".svg")
 
 
@@ -136,9 +136,9 @@ def test_export_supports_direct_png_and_html_jpeg(tmp_path: Path) -> None:
 
     result = export_middle_json(middle_json, tmp_path)
 
-    assert (tmp_path / "images/page_3_table_body_5.png").read_bytes() == png_payload
-    assert (tmp_path / "images/page_3_table_body_5_1.jpg").read_bytes() == jpeg_payload
-    assert "images/page_3_table_body_5_1.jpg" in result.middle_json.pages[0].blocks[0].content[0].content
+    assert (tmp_path / "images/page_3_table_5.png").read_bytes() == png_payload
+    assert (tmp_path / "images/page_3_table_image_5_1.jpg").read_bytes() == jpeg_payload
+    assert "images/page_3_table_image_5_1.jpg" in result.middle_json.pages[0].blocks[0].content[0].content
 
 
 @pytest.mark.parametrize(
@@ -174,7 +174,7 @@ def test_export_rejects_unparsed_inline_data_uri_before_writing(tmp_path: Path) 
         )
     )
 
-    with pytest.raises(ValueError, match="inline image data URI"):
+    with pytest.raises(ValueError, match="Invalid image data URI"):
         export_middle_json(middle_json, output_dir)
 
     assert not output_dir.exists()
@@ -203,7 +203,7 @@ def test_export_preflights_conflicts_and_supports_explicit_overwrite(tmp_path: P
 
     export_middle_json(first, tmp_path)
     export_middle_json(first, tmp_path)
-    image_path = tmp_path / "images/page_3_table_body_0.jpg"
+    image_path = tmp_path / "images/page_3_table_0.jpg"
     with pytest.raises(FileExistsError):
         export_middle_json(second, tmp_path)
     assert image_path.read_bytes() == first_payload
@@ -227,7 +227,7 @@ def test_export_conflicting_json_rolls_back_before_any_image_write(tmp_path: Pat
     with pytest.raises(FileExistsError):
         export_middle_json(middle_json, tmp_path)
 
-    assert not (tmp_path / "images/page_3_table_body_9.jpg").exists()
+    assert not (tmp_path / "images/page_3_table_9.jpg").exists()
     assert (tmp_path / "middle_json.json").read_text() == "occupied"
 
 
@@ -236,7 +236,7 @@ def test_export_restores_existing_files_after_commit_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """验证提交中途失败时会恢复已覆盖文件，并清理全部临时文件。"""
-    image_path = tmp_path / "images/page_3_table_body_0.jpg"
+    image_path = tmp_path / "images/page_3_table_0.jpg"
     image_path.parent.mkdir()
     image_path.write_bytes(b"old-image")
     json_path = tmp_path / "middle_json.json"
