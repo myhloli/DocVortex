@@ -1,0 +1,33 @@
+{
+  "accepted": [
+    {
+      "case": "klee-numeric-footnote",
+      "source": "demo/pdfs/mixed_elements_pages_07_10.pdf",
+      "source_sha256": "89076ee9cce2168ab894ee7e280872f8a3c09053b9dcdeda9c1da76d111adc1e",
+      "page": 3,
+      "anchor": "symbolic execution tool KLEE 1",
+      "before_code_sha256": "be87727e75b972fd5c409c6d6792fb8094443daa5e8a69f8044080d435f261f5",
+      "after_code_sha256": "22c18d95daf883ed457012463d5616d209e4c4c6e632815225cc116189f395f5",
+      "old_fingerprint": "223f8dc3618805a8688095824d638d00348540403923ffddb74ba95a3a1961df",
+      "new_fingerprint": "0dfc82cf2795f0ed939b1c77e7c53c59f0788c28c5f1bef1ae4bd4e8fff8b8c7",
+      "decision": "accept_improvement",
+      "reason": "原页右栏 KLEE 后的 1 明显抬高且缩小；补为上标，字符、顺序、块型和 bbox 均不变。",
+      "baseline_update": "flash_reviewed_history.json: mixed_elements_pages_07_10 page_index=2 fingerprint",
+      "evidence": [
+        "output/pdf/intro-superscripts-20260920/klee-source.png",
+        "output/pdf/intro-superscripts-20260920/klee-public.html",
+        "output/pdf/intro-superscripts-20260920/history-final/comparison.html"
+      ]
+    }
+  ],
+  "rejected": [
+    {
+      "source": "mixed_elements_pages_03_06.pdf",
+      "pages": [
+        2,
+        3
+      ],
+      "reason": "拒绝只提升分式指数分子的候选；保留原数学过滤及原基线。"
+    }
+  ]
+}

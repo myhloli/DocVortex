@@ -30,6 +30,7 @@ SCRIPT_COMPONENT_SEED_MAX_POSITION_DISTANCE = 4
 SCRIPT_COMPONENT_MIN_OFFSET_RATIO = 0.08
 SCRIPT_COMPONENT_MAX_HEIGHT_RATIO = 1.1
 CONTROL_LINE_BREAK_CHARS = {"\r", "\n"}
+_NUMERIC_SCRIPT_SEPARATORS = frozenset({",", "，", "-", "–", "—"})
 
 ScriptRole = Literal["body", "sup", "sub"]
 ScriptMarkRole = Literal["sup", "sub"]
@@ -675,6 +676,91 @@ def paired_script_roles(
     return paired
 
 
+def _numeric_superscript_indices(
+    features: list[ScriptCharFeature],
+    roles: list[ScriptRole],
+    protected_body_indices: set[int],
+) -> set[int]:
+    """用左侧同一视觉行的稳定正文确认完整数字上标，允许中间有排版空白。"""
+    accepted: set[int] = set()
+    start = 0
+    while start < len(features):
+        if not features[start].text.isdecimal():
+            start += 1
+            continue
+        end = start + 1
+        while end < len(features) and (features[end].text.isdecimal() or features[end].text in _NUMERIC_SCRIPT_SEPARATORS):
+            end += 1
+        # 尾随标点属于正文，只有数字之间且共享上标基线的分隔符才随引用提升。
+        while end > start and not features[end - 1].text.isdecimal():
+            end -= 1
+        candidate = features[start:end]
+        if any(0 <= neighbor < len(features) and features[neighbor].text in {"/", "⁄"} for neighbor in (start - 1, end)):
+            # 不能把分式的分子或分母独立当成引用，否则会制造仅半个指数带上标的结果。
+            start = end
+            continue
+        previous = start - 1
+        while previous >= 0 and features[previous].text.isspace():
+            if features[previous].text in CONTROL_LINE_BREAK_CHARS:
+                break
+            previous -= 1
+        reference_end = previous + 1
+        while previous >= 0 and features[previous].is_valid and roles[previous] == "body":
+            if previous in protected_body_indices:
+                break
+            previous -= 1
+        reference = list(range(previous + 1, reference_end))
+        start = end
+        if not reference or any(
+            not item.is_valid or item.index in protected_body_indices or roles[item.index] == "sub" for item in candidate
+        ):
+            continue
+        clusters, _ = _cluster_baselines(features, reference)
+        body_result = _choose_body_band(features, clusters)
+        if body_result is None:
+            continue
+        band, body_cluster = body_result
+        if len(band.member_indices) < 2 or band.tight_height <= 0 or band.loose_height <= 0:
+            continue
+        edge = features[reference[-1]]
+        first = candidate[0]
+        assert first.tight_bbox is not None and edge.tight_bbox is not None
+        gap = first.tight_bbox[0] - edge.tight_bbox[2]
+        if not -0.15 * band.tight_height <= gap <= max(2.5, 1.2 * band.tight_height):
+            continue
+        digits = [item for item in candidate if item.text.isdecimal()]
+        baseline = statistics.median(item.origin[1] for item in digits if item.origin is not None)
+        shift = band.baseline - baseline
+        if (
+            not max(SCRIPT_ORIGIN_MIN_SHIFT_ABSOLUTE, SCRIPT_CONSENSUS_ORIGIN_SHIFT_RATIO * band.tight_height)
+            <= shift
+            <= (0.8 * band.tight_height)
+        ):
+            continue
+        tolerance = max(SCRIPT_BASELINE_ABSOLUTE_TOLERANCE, SCRIPT_BASELINE_LOOSE_HEIGHT_RATIO * band.loose_height)
+        if any(item.origin is None or abs(item.origin[1] - baseline) > tolerance for item in candidate):
+            continue
+        tight_ratio = max(item.tight_height for item in digits) / band.tight_height
+        if tight_ratio > SCRIPT_CONSENSUS_TIGHT_HEIGHT_RATIO:
+            # 纯小写词的 x-height 可接近缩小数字；强基线位移还须有 loose 缩小证据，不能仅放宽 tight 阈值。
+            loose_ratio = max(item.loose_height for item in digits) / band.loose_height
+            if not (
+                shift >= SCRIPT_STRONG_SHIFT_RATIO * band.tight_height
+                and tight_ratio <= SCRIPT_STRONG_MAX_HEIGHT_RATIO
+                and loose_ratio <= SCRIPT_CONSENSUS_TIGHT_HEIGHT_RATIO
+            ):
+                continue
+        digit_cluster = ScriptBaselineCluster(baseline, tuple(item.index for item in digits))
+        if (
+            _cluster_tight_center(features, digit_cluster) >= _cluster_tight_center(features, body_cluster) - 0.05
+            or _cluster_loose_center(features, digit_cluster) >= _cluster_loose_center(features, body_cluster) - 0.05
+        ):
+            continue
+        # 只补样式，不合并组件或移动字符；下一候选也不能把本次提升结果当作正文。
+        accepted.update(item.index for item in candidate)
+    return accepted
+
+
 def classify_char_script_roles(
     chars: list[Char],
     *,
@@ -689,6 +775,8 @@ def classify_char_script_roles(
     roles: list[ScriptRole] = ["body"] * len(features)
     for component_indices in split_script_visual_components(features):
         _assign_component(features, component_indices, protected, roles, font_keys)
+    for index in _numeric_superscript_indices(features, roles, protected):
+        roles[index] = "sup"
     return roles
 
 

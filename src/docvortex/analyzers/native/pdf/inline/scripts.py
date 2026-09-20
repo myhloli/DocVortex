@@ -7,7 +7,13 @@ import unicodedata
 from typing import Any, Literal, Sequence
 
 from .....schema import BBox
-from .._script_geometry import ScriptRole, classify_char_script_roles, paired_script_roles
+from .._script_geometry import (
+    ScriptRole,
+    _numeric_superscript_indices,
+    build_script_features,
+    classify_char_script_roles,
+    paired_script_roles,
+)
 from ..geometry import _rotate_bbox_to_upright
 from .common import _coerce_bbox, _normalize_match_fragment, _ordered_line_chars
 from .types import (
@@ -411,6 +417,11 @@ def _refine_math_script_tokens(
     """以最左稳定簇保护 base，并对弱单字符和复杂未分段 token 保守拒识。"""
     refined = list(roles)
     citation_indices = _citation_script_indices(chars, refined)
+    numeric_indices: set[int] = set()
+    if any(role == "sup" and _script_char_text(char).isdecimal() for char, role in zip(chars, roles)):
+        # 数字引用的基字符在 token 外；保护双 bbox/origin 已确认的整串，不能重置首位数字。
+        candidates = _numeric_superscript_indices(build_script_features(chars, tight_bboxes, origins, set()), roles, set())
+        numeric_indices = {index for index in candidates if roles[index] == "sup"}
     complex_unsegmented_token = False
     tokens = _iter_math_script_tokens(chars)
     token_alnum_positions = {
@@ -442,6 +453,9 @@ def _refine_math_script_tokens(
     }
     for token in tokens:
         if any(index in citation_indices for index in token):
+            continue
+        if all(index in numeric_indices for index in token):
+            # 只跳过纯数字引用的 base 重选，后续分式及复杂数学过滤仍按原规则执行。
             continue
         token_key = tuple(token)
         alnum_positions = token_alnum_positions[token_key]
