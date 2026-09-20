@@ -16,7 +16,7 @@ from reportlab.platypus.paraparser import ParaParser
 from ....schema import CodeInlineSpan, EquationInlineSpan, HyperlinkSpan, InlineSpan, TextSpan
 from .formula import FormulaRenderer, InlineFormulaImage, PdfFormulaError
 from .diagnostics import report_pdf_diagnostic
-from .paragraph import MeasuredCJKParagraph, MeasuredParagraph, PlainCJKParagraph
+from .paragraph import CJKParagraph, MeasuredCJKParagraph, MeasuredParagraph, PlainCJKParagraph
 from .styles import ACCENT_COLOR, HAN_FONT, JAPANESE_FONT, KOREAN_FONT, MONO_FONT, UNICODE_FALLBACK_FONT
 
 _BOOKMARK_SAFE_RE = re.compile(r"[^A-Za-z0-9_]+")
@@ -160,6 +160,14 @@ def build_pdf_paragraph(
         getattr(fragment, "text", "") and fragment.fontName in (HAN_FONT, JAPANESE_FONT, KOREAN_FONT) for fragment in fragments
     ):
         parsed_style = parsed_style.clone(parsed_style.name + " CJK", wordWrap="CJK")
+    if parsed_style.wordWrap == "CJK" and context.formula_images:
+        for fragment in fragments:
+            if isinstance(getattr(getattr(fragment, "cbDefn", None), "image", None), InlineFormulaImage):
+                fragment._pdf_location = context.location(page_idx, block_index, block_type)
+                fragment._pdf_page_idx = page_idx
+                # 公式的上下界参与实际行高，避免高分数与前后行重叠；不修改共享样式。
+                if getattr(parsed_style, "autoLeading", "") in ("", "off"):
+                    parsed_style = parsed_style.clone(parsed_style.name + " Formula", autoLeading="max")
     bullet_text = None
     if bullet_fragments:
         bullet_text = "".join(getattr(fragment, "text", "") for fragment in bullet_fragments)
@@ -169,7 +177,9 @@ def build_pdf_paragraph(
         and not getattr(style, "keepWithNext", False)
         and (parsed_style.wordWrap == "CJK" or sum(len(getattr(fragment, "text", "")) for fragment in fragments) >= 256)
     )
-    paragraph_class = MeasuredParagraph if cache_measurement else Paragraph
+    paragraph_class = (
+        MeasuredParagraph if cache_measurement else (CJKParagraph if parsed_style.wordWrap == "CJK" else Paragraph)
+    )
     if (
         parsed_style.wordWrap == "CJK"
         and not anchor
