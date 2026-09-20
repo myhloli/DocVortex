@@ -679,78 +679,65 @@ def _reattach_span_lane_continuations(
             span_lane.lines.sort(key=lambda item: (item[1][1], item[1][0], item[0].source_index))
 
 
+def _lane_accepts_short_tail(
+    candidate: tuple[_LineItem, BBox],
+    lane: _TextLane,
+    median_height: float,
+) -> bool:
+    """用同一组前序行证据判断当前栏或其他栏是否能够接纳正文短尾。"""
+
+    candidate_line, candidate_bbox = candidate
+    preceding = [
+        item for item in lane.lines if item[0].semantic_type == candidate_line.semantic_type and item[1][1] < candidate_bbox[1]
+    ]
+    if not preceding:
+        return False
+    # 同位置前序行按栏内稳定排序取 source_index 较小者，避免后续插入触发排序后改变已用证据。
+    previous = max(preceding, key=lambda item: (item[1][1], item[1][0], -item[0].source_index))
+    previous_line, previous_bbox = previous
+    pair_height = max(
+        _line_effective_height(*previous),
+        _line_effective_height(*candidate),
+        median_height,
+    )
+    lane_width = max(0.1, lane.right - lane.left)
+    if (
+        previous_bbox[2] - previous_bbox[0] < 0.65 * lane_width
+        or candidate_bbox[2] - candidate_bbox[0] > 0.85 * lane_width
+        or candidate_bbox[0] < lane.left - 0.75 * pair_height
+        or candidate_bbox[2] > lane.right + 0.75 * pair_height
+        or abs(candidate_bbox[0] - previous_bbox[0]) > 0.75 * pair_height
+        or not _title_fonts_compatible(previous_line, candidate_line)
+    ):
+        return False
+    gap = _effective_body_text_row_gap(previous, candidate)
+    if not -0.25 * pair_height <= gap <= 0.9 * pair_height:
+        return False
+    if (
+        previous_line.visual_row_id is not None
+        and candidate_line.visual_row_id is not None
+        and not 0 < candidate_line.visual_row_id - previous_line.visual_row_id <= 2
+    ):
+        return False
+    return True
+
+
 def _reattach_cross_lane_short_tails(
     lanes: list[_TextLane],
     median_height: float,
 ) -> None:
-    """把误入另一栏带、但完整落在唯一前序栏内的正文短尾迁回原栏。"""
+    """按前序依赖顺序，把具有唯一栏归属的正文短尾迁回对应栏。"""
 
-    while True:
-        moves: list[
-            tuple[
-                float,
-                _TextLane,
-                _TextLane,
-                tuple[_LineItem, BBox],
-            ]
-        ] = []
-        for source_lane in lanes:
-            for candidate in source_lane.lines:
-                candidate_line, candidate_bbox = candidate
-                if candidate_line.semantic_type is not None:
-                    continue
-                matches: list[tuple[float, _TextLane]] = []
-                for target_lane in lanes:
-                    if target_lane is source_lane or not target_lane.lines:
-                        continue
-                    preceding = [
-                        item
-                        for item in target_lane.lines
-                        if item[0].semantic_type == candidate_line.semantic_type and item[1][1] < candidate_bbox[1]
-                    ]
-                    if not preceding:
-                        continue
-                    previous = max(
-                        preceding,
-                        key=lambda item: (item[1][1], item[1][0]),
-                    )
-                    previous_line, previous_bbox = previous
-                    pair_height = max(
-                        _line_effective_height(*previous),
-                        _line_effective_height(*candidate),
-                        median_height,
-                    )
-                    lane_width = max(0.1, target_lane.right - target_lane.left)
-                    if (
-                        previous_bbox[2] - previous_bbox[0] < 0.65 * lane_width
-                        or candidate_bbox[2] - candidate_bbox[0] > 0.85 * lane_width
-                        or candidate_bbox[0] < target_lane.left - 0.75 * pair_height
-                        or candidate_bbox[2] > target_lane.right + 0.75 * pair_height
-                        or abs(candidate_bbox[0] - previous_bbox[0]) > 0.75 * pair_height
-                        or not _title_fonts_compatible(previous_line, candidate_line)
-                    ):
-                        continue
-                    gap = _effective_body_text_row_gap(previous, candidate)
-                    if not -0.25 * pair_height <= gap <= 0.9 * pair_height:
-                        continue
-                    if (
-                        previous_line.visual_row_id is not None
-                        and candidate_line.visual_row_id is not None
-                        and not 0 < candidate_line.visual_row_id - previous_line.visual_row_id <= 2
-                    ):
-                        continue
-                    matches.append((max(0.0, gap), target_lane))
-                if len(matches) == 1:
-                    gap, target_lane = matches[0]
-                    moves.append((candidate_bbox[1] + gap, source_lane, target_lane, candidate))
-        if not moves:
-            return
-        _score, source_lane, target_lane, candidate = min(
-            moves,
-            key=lambda item: item[0],
-        )
-        if candidate not in source_lane.lines:
+    # 栏边界固定，且匹配只依赖 y0 严格更小的行；先确定上方行后，每行至多迁移一次。
+    # 保留原始对象及其来源栏，不能用 source_index 合并或跳过不同的文本行。
+    pending = [(lane, candidate) for lane in lanes for candidate in lane.lines if candidate[0].semantic_type is None]
+    pending.sort(key=lambda item: (item[1][1][1], item[1][1][0], item[1][0].source_index))
+    for source_lane, candidate in pending:
+        # 当前栏也必须参与唯一性判断；多个栏均能接纳时保留原位，避免双向迁移。
+        matches = [lane for lane in lanes if _lane_accepts_short_tail(candidate, lane, median_height)]
+        if len(matches) != 1 or matches[0] is source_lane:
             continue
+        target_lane = matches[0]
         source_lane.lines.remove(candidate)
         target_lane.lines.append(candidate)
         target_lane.lines.sort(

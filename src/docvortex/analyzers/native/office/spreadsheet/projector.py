@@ -708,10 +708,11 @@ class SpreadsheetProjector:
             if cell.alignment.vertical:
                 style["vertical-align"] = cell.alignment.vertical
 
-        if cell.fill and cell.fill.patternType == "solid" and cell.fill.fgColor:
-            # handle bg color
-            color = cell.fill.fgColor.rgb
-            if hasattr(cell.fill.fgColor, "type") and cell.fill.fgColor.type == "rgb" and color:
+        # 渐变填充没有 patternType；只提取既有纯色背景，其他填充仍保留内容及其余样式。
+        fill = cell.fill
+        if getattr(fill, "patternType", None) == "solid" and fill.fgColor:
+            color = fill.fgColor.rgb
+            if hasattr(fill.fgColor, "type") and fill.fgColor.type == "rgb" and color:
                 if isinstance(color, str) and len(color) == 8:
                     style["background-color"] = "#" + color[2:]
         return style

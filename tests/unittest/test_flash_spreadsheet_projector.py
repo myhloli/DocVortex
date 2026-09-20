@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from io import BytesIO
+
 import pytest
 from _span_test_utils import inline
 from bs4 import BeautifulSoup
 from openpyxl import Workbook
 from openpyxl.cell.rich_text import CellRichText, TextBlock
 from openpyxl.cell.text import InlineFont
+from openpyxl.styles import Alignment, Font, GradientFill, PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
+from docvortex.analyzers.native import XlsxModel
 from docvortex.analyzers.native.office.spreadsheet.html import render_spreadsheet_table
 from docvortex.analyzers.native.office.spreadsheet.models import AnchoredBlock, ExcelCell, ExcelTable, SheetImage
 from docvortex.analyzers.native.office.spreadsheet.projector import SpreadsheetProjector
@@ -15,6 +19,72 @@ from docvortex.analyzers.native.office.xls.xls_converter import _XlsPageBuilder
 from docvortex.analyzers.native.office.xlsx import xlsx_converter as xlsx_converter_module
 from docvortex.analyzers.native.office.xlsx.xlsx_converter import XlsxConverter
 from docvortex.schema import BlockType
+
+
+@pytest.mark.parametrize(
+    ("fill", "background"),
+    [
+        (PatternFill(), None),
+        (PatternFill(patternType="solid", fgColor="FF99CCFF"), "#99CCFF"),
+        (PatternFill(patternType="darkGrid", fgColor="FF99CCFF"), None),
+        (GradientFill(stop=("FFFFFF", "99CCFF")), None),
+        (GradientFill(type="path", stop=("FFFFFF", "99CCFF")), None),
+    ],
+    ids=["none", "solid", "pattern", "linear-gradient", "path-gradient"],
+)
+def test_cell_fill_preserves_content_and_supported_styles(fill: PatternFill | GradientFill, background: str | None) -> None:
+    """验证不同填充经过 StyleProxy 后均能提取内容，渐变不影响字体、对齐或纯色支持。"""
+    workbook = Workbook()
+    sheet = workbook.active
+    assert sheet is not None
+    sheet["A1"] = 240
+    sheet["A1"].fill = fill
+    sheet["A1"].font = Font(b=True, i=True, color="FF112233")
+    sheet["A1"].alignment = Alignment(horizontal="center", vertical="top")
+    styles = SpreadsheetProjector()._extract_cell_style(sheet["A1"])
+    expected = {
+        "font-weight": "bold",
+        "font-style": "italic",
+        "color": "#112233",
+        "text-align": "center",
+        "vertical-align": "top",
+    }
+    if background is not None:
+        expected["background-color"] = background
+    assert styles == expected
+
+    # 单格也会经过样式提取；通过公共入口锁定 issue 中的最小失败路径。
+    stream = BytesIO()
+    workbook.save(stream)
+    pages = XlsxModel().predict(BytesIO(stream.getvalue()))
+    assert pages == [[{"type": BlockType.TEXT, "content": inline("240")}]]
+
+
+def test_xlsx_mixed_fills_preserve_all_sheets_and_merged_cells() -> None:
+    """验证两类渐变与纯色混用时仍输出全部工作表、单元格内容和合并跨度。"""
+    workbook = Workbook()
+    sheet = workbook.active
+    assert sheet is not None
+    sheet.title = "Mixed"
+    sheet.append(["linear", "path", "solid"])
+    sheet.append(["merged", None, "plain"])
+    sheet.merge_cells("A2:B2")
+    sheet["A1"].fill = GradientFill(stop=("FFFFFF", "99CCFF"))
+    sheet["B1"].fill = GradientFill(type="path", stop=("FFFFFF", "99CCFF"))
+    sheet["C1"].fill = PatternFill(patternType="solid", fgColor="FF99CCFF")
+    sheet["A2"].fill = GradientFill(stop=("FFFFFF", "99CCFF"))
+    workbook.create_sheet("Following")["A1"] = "still parsed"
+    stream = BytesIO()
+    workbook.save(stream)
+
+    pages = XlsxModel().predict(BytesIO(stream.getvalue()))
+    assert len(pages) == 2
+    table = next(block for block in pages[0] if block["type"] == BlockType.TABLE)
+    soup = BeautifulSoup(table["content"], "html.parser")
+    cells = soup.find_all(["th", "td"])
+    assert [cell.get_text() for cell in cells] == ["linear", "path", "solid", "merged", "plain"]
+    assert cells[3]["colspan"] == "2"
+    assert pages[1][-1] == {"type": BlockType.TEXT, "content": inline("still parsed")}
 
 
 def _cell(
