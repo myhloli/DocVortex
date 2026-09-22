@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from bisect import bisect_right
 import statistics
 from typing import Any
 
@@ -26,6 +27,7 @@ from .table_annotations import (
     _collect_caption_rows,
     _collect_footnote_rows,
     _find_table_caption,
+    _has_possible_table_note_rows,
     _merge_table_candidate_annotations,
 )
 from .table_rows import _clip_visual_row_to_corridor
@@ -119,15 +121,28 @@ def _build_rule_table_candidates(
     *,
     path_infos: list[PDFPathInfo] | None = None,
     excluded_bboxes: list[BBox] | None = None,
+    caption_candidates: list[tuple[_LineItem, BBox]] | None = None,
 ) -> list[_TableCandidate]:
     """枚举同跨度横线边界区间，再以连续多列文本分布确认表格。"""
 
     candidates: list[_TableCandidate] = []
     path_infos = path_infos or []
     excluded_bboxes = excluded_bboxes or []
+    stable_column_cache: dict[tuple[Any, ...], tuple[int, float]] = {}
+    prepared_path_infos = _prepare_fill_band_infos(path_infos, page_size, angle)
+    vertical_axis_lines = [line for line in axis_lines if line.orientation == "vertical"]
+    row_interval_index = _build_row_interval_index(rows)
+    has_possible_table_notes = _has_possible_table_note_rows(rows)
+    marker_cache: dict[tuple[int, str], bool] = {}
     for rule_group in _group_long_horizontal_rules(axis_lines, median_height):
-        for first_index, top_rule in enumerate(rule_group[:-1]):
-            for bottom_index in range(first_index + 1, len(rule_group)):
+        accepted_rule_spans: list[tuple[int, int]] = []
+        # 优先验证大区间。若一个区间已经确认成表格，它内部的子区间最终只会
+        # 合并回同一候选，因此无需继续重复执行昂贵的列稳定性和注释分析。
+        for first_index, bottom_index in _iter_uncovered_rule_spans(
+            len(rule_group),
+            accepted_rule_spans,
+        ):
+                top_rule = rule_group[first_index]
                 bottom_rule = rule_group[bottom_index]
                 interval_rules = rule_group[first_index : bottom_index + 1]
                 boundary_rules = [top_rule, bottom_rule]
@@ -136,6 +151,7 @@ def _build_rule_table_candidates(
                     rows,
                     rule_bbox,
                     excluded_bboxes,
+                    row_interval_index,
                 )
                 caption_line = _find_table_caption(
                     lines,
@@ -143,6 +159,7 @@ def _build_rule_table_candidates(
                     page_size,
                     angle,
                     median_height,
+                    caption_candidates,
                 )
                 caption_anchored_compact_grid = (
                     caption_line is not None
@@ -163,6 +180,7 @@ def _build_rule_table_candidates(
                         core_rows,
                         interval_rules,
                         median_height,
+                        stable_column_cache,
                     )
                     and not caption_anchored_compact_grid
                 ):
@@ -174,11 +192,13 @@ def _build_rule_table_candidates(
                     page_size,
                     angle,
                     median_height,
+                    prepared_path_infos,
                 )
                 aligned_vertical_count = _count_aligned_vertical_rules(
                     axis_lines,
                     rule_bbox,
                     median_height,
+                    vertical_axis_lines,
                 )
 
                 row_segments = _continuous_table_row_segments(core_rows, median_height)
@@ -200,6 +220,7 @@ def _build_rule_table_candidates(
                     stable_columns, column_coverage = _count_stable_columns(
                         dense_rows,
                         median_height,
+                        stable_column_cache,
                     )
                     if compact_grid_columns > 0:
                         # 两行样本容易把左右/中心锚点误算成不同稳定列，使用物理网格列数。
@@ -270,9 +291,12 @@ def _build_rule_table_candidates(
                     angle,
                     median_height,
                     caption_line,
+                    has_possible_table_notes,
+                    marker_cache,
                 )
                 candidate.score = float(2 + len(dense_rows) + stable_columns + min(fill_band_count, 8))
                 candidates.append(candidate)
+                accepted_rule_spans.append((first_index, bottom_index))
     return _expand_candidates_to_connected_rule_grids(
         candidates,
         rows,
@@ -372,10 +396,12 @@ def _build_closed_rule_grid_candidates(
     median_height: float,
     axis_lines: list[_LocalAxisLine],
     excluded_bboxes: list[BBox],
+    caption_candidates: list[tuple[_LineItem, BBox]] | None = None,
 ) -> list[_TableCandidate]:
     """用闭合物理网格接纳含空行或仅有表头文本的稀疏表格。"""
 
     candidates: list[_TableCandidate] = []
+    row_interval_index = _build_row_interval_index(rows)
     for component in _connected_rule_grid_components(axis_lines, median_height):
         grid_bbox = _bbox_union_many([rule.bbox for rule in component])
         if any(_bbox_overlap_in_smaller(grid_bbox, excluded_bbox) >= 0.5 for excluded_bbox in excluded_bboxes):
@@ -384,6 +410,7 @@ def _build_closed_rule_grid_candidates(
             rows,
             grid_bbox,
             excluded_bboxes,
+            row_interval_index,
         )
         if not core_rows:
             continue
@@ -418,6 +445,7 @@ def _build_closed_rule_grid_candidates(
             page_size,
             angle,
             median_height,
+            caption_candidates,
         )
         candidate = _expand_rule_table_candidate(
             [component[0], component[-1]],
@@ -600,6 +628,23 @@ def _rule_bands_share_grid_tracks(
     return has_outer_tracks or len(interior_tracks) >= 2
 
 
+def _iter_uncovered_rule_spans(
+    rule_count: int,
+    accepted_spans: list[tuple[int, int]],
+):
+    """按跨度从大到小枚举尚未被已确认表格完全覆盖的横线区间。"""
+
+    for span_size in range(rule_count, 1, -1):
+        for first_index in range(0, rule_count - span_size + 1):
+            bottom_index = first_index + span_size - 1
+            if any(
+                accepted_start <= first_index and bottom_index <= accepted_end
+                for accepted_start, accepted_end in accepted_spans
+            ):
+                continue
+            yield first_index, bottom_index
+
+
 def _group_long_horizontal_rules(
     axis_lines: list[_LocalAxisLine],
     median_height: float,
@@ -643,11 +688,23 @@ def _rows_inside_rule_interval(
     rows: list[_VisualRow],
     rule_bbox: BBox,
     excluded_bboxes: list[BBox],
+    row_interval_index: tuple[list[tuple[int, _VisualRow]], list[float]] | None = None,
 ) -> list[_VisualRow]:
     """截取边界走廊内文本行，并移除已由强图形核心覆盖的片段。"""
 
     output: list[_VisualRow] = []
-    for row in rows:
+    if row_interval_index is None:
+        indexed_rows = list(enumerate(rows))
+    else:
+        records, starts = row_interval_index
+        upper = bisect_right(starts, rule_bbox[3])
+        indexed_rows = [
+            (index, row)
+            for index, row in records[:upper]
+            if row.bbox[3] >= rule_bbox[1]
+        ]
+        indexed_rows.sort(key=lambda item: item[0])
+    for _index, row in indexed_rows:
         clipped_row = _clip_visual_row_to_corridor(row, rule_bbox, margin=0.0)
         if clipped_row is None or not rule_bbox[1] <= clipped_row.center_y <= rule_bbox[3]:
             continue
@@ -678,6 +735,17 @@ def _rows_inside_rule_interval(
     return output
 
 
+def _build_row_interval_index(
+    rows: list[_VisualRow],
+) -> tuple[list[tuple[int, _VisualRow]], list[float]]:
+    """建立按行上边界排序的安全超集索引，保留原始行顺序供后续处理。"""
+    records = sorted(
+        enumerate(rows),
+        key=lambda item: (item[1].bbox[1], item[1].bbox[3], item[0]),
+    )
+    return records, [row.bbox[1] for _index, row in records]
+
+
 def _every_rule_interval_has_multi_cell_row(
     rows: list[_VisualRow],
     rule_group: list[_LocalAxisLine],
@@ -705,6 +773,7 @@ def _rule_intervals_are_column_compatible(
     rows: list[_VisualRow],
     rule_group: list[_LocalAxisLine],
     median_height: float,
+    stable_column_cache: dict[tuple[Any, ...], tuple[int, float]] | None = None,
 ) -> bool:
     """拒绝跨过长篇栏式正文、导致稳定列数明显塌缩的多表合并区间。"""
 
@@ -720,6 +789,7 @@ def _rule_intervals_are_column_compatible(
         stable_columns, column_coverage = _count_stable_columns(
             interval_rows,
             median_height,
+            stable_column_cache,
         )
         profiles.append(
             (
@@ -820,16 +890,18 @@ def _count_aligned_vertical_rules(
     axis_lines: list[_LocalAxisLine],
     rule_bbox: BBox,
     median_height: float,
+    vertical_axis_lines: list[_LocalAxisLine] | None = None,
 ) -> int:
     """统计贯穿候选主要高度且位于横线跨度内的竖向分隔线。"""
 
     required_height = max(4.0 * median_height, 0.5 * (rule_bbox[3] - rule_bbox[1]))
+    candidates = vertical_axis_lines if vertical_axis_lines is not None else axis_lines
     return sum(
         line.orientation == "vertical"
         and rule_bbox[0] - median_height <= _bbox_center_x(line.bbox) <= rule_bbox[2] + median_height
         and line.bbox[3] - line.bbox[1] >= required_height
         and _bbox_axis_overlap_ratio(line.bbox, rule_bbox, axis="y") >= 0.8
-        for line in axis_lines
+        for line in candidates
     )
 
 
@@ -951,21 +1023,35 @@ def _looks_like_page_column_prose(
     return statistics.median(occupied_ratios) >= 0.75
 
 
+def _prepare_fill_band_infos(
+    path_infos: list[PDFPathInfo],
+    page_size: tuple[float, float],
+    angle: int,
+) -> list[tuple[PDFPathInfo, BBox]]:
+    """预先转换可见填充 Path 的坐标，避免每个横线区间重复旋转。"""
+    return [
+        (path_info, _rotate_bbox_to_upright(path_info.bbox, page_size, angle))
+        for path_info in path_infos
+        if path_info.form_depth == 0 and path_info.fill_visible
+    ]
+
+
 def _count_repeated_fill_bands(
     path_infos: list[PDFPathInfo],
     rule_bbox: BBox,
     page_size: tuple[float, float],
     angle: int,
     median_height: float,
+    prepared_path_infos: list[tuple[PDFPathInfo, BBox]] | None = None,
 ) -> int:
     """统计区间内左右端点和高度重复的填充行带，并对重叠 Path 去重。"""
 
     minimum_width = max(8.0 * median_height, 0.3 * (rule_bbox[2] - rule_bbox[0]))
     candidates: list[BBox] = []
-    for path_info in path_infos:
-        if path_info.form_depth != 0 or not path_info.fill_visible:
-            continue
-        bbox = _rotate_bbox_to_upright(path_info.bbox, page_size, angle)
+    prepared = prepared_path_infos
+    if prepared is None:
+        prepared = _prepare_fill_band_infos(path_infos, page_size, angle)
+    for _path_info, bbox in prepared:
         width = bbox[2] - bbox[0]
         height = bbox[3] - bbox[1]
         if (
@@ -1024,20 +1110,27 @@ def _expand_rule_table_candidate(
     angle: int,
     median_height: float,
     caption_line: _LineItem | None,
+    has_possible_table_notes: bool = True,
+    marker_cache: dict[tuple[int, str], bool] | None = None,
 ) -> _TableCandidate:
     """合并横线核心与上下注释，并保留注释的独立行身份。"""
 
     rule_bbox = _bbox_union_many([line.bbox for line in rule_group])
     core_line_indices = {fragment.line_index for row in core_rows for fragment in row.fragments}
     caption_rows = _collect_caption_rows(all_rows, caption_line, rule_bbox, median_height)
-    footnote_rows = _collect_footnote_rows(
-        all_rows,
-        all_lines,
-        rule_bbox,
-        median_height,
-        core_line_indices,
-        page_size,
-        angle,
+    footnote_rows = (
+        _collect_footnote_rows(
+            all_rows,
+            all_lines,
+            rule_bbox,
+            median_height,
+            core_line_indices,
+            page_size,
+            angle,
+            marker_cache,
+        )
+        if has_possible_table_notes
+        else []
     )
     core_local_bbox = _bbox_union(rule_bbox, _bbox_union_many([row.bbox for row in core_rows]))
     caption_annotation = _build_table_annotation(
@@ -1076,8 +1169,20 @@ def _expand_rule_table_candidate(
 def _count_stable_columns(
     rows: list[_VisualRow],
     median_height: float,
+    cache: dict[tuple[Any, ...], tuple[int, float]] | None = None,
 ) -> tuple[int, float]:
     """分别聚类片段左边界、中心和右边界，返回最稳定的列分布。"""
+
+    cache_key: tuple[Any, ...] | None = None
+    if cache is not None:
+        # 缓存键包含完整的片段几何和行顺序，避免近似 rule group 之间错误复用结果。
+        cache_key = (
+            median_height,
+            tuple(tuple(fragment.local_bbox for fragment in row.fragments) for row in rows),
+        )
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
 
     tolerance = max(3.0, median_height * 0.75)
     best_result = (0, 0.0)
@@ -1111,6 +1216,8 @@ def _count_stable_columns(
         # 仅在结果严格更优时更新，平局时保留既有的左对齐优先级。
         if result > best_result:
             best_result = result
+    if cache is not None and cache_key is not None:
+        cache[cache_key] = best_result
     return best_result
 
 

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from docvortex.analyzers.native.pdf import geometry, models, table_materialization, tables
+from docvortex.analyzers.native.pdf import geometry, models, table_materialization, table_rules, tables
 from docvortex.document.pdf._document import PDFPathInfo
 
 
@@ -1101,6 +1101,17 @@ def test_duplicate_horizontal_paths_count_as_one_boundary() -> None:
     assert len(groups[0]) == 2
     assert [line.bbox[1] for line in groups[0]] == [10.0, 30.0]
     assert tables._group_long_horizontal_rules(axis_lines[:2], 5.0) == []
+
+
+def test_confirmed_long_rule_span_skips_all_contained_subspans() -> None:
+    """验证长规则表确认最大区间后，不再枚举其 O(n²) 子区间。"""
+
+    accepted_spans: list[tuple[int, int]] = []
+    spans = table_rules._iter_uncovered_rule_spans(122, accepted_spans)
+
+    assert next(spans) == (0, 121)
+    accepted_spans.append((0, 121))
+    assert list(spans) == []
 
 
 def test_nearest_rule_pair_excludes_header_line_from_table_bbox() -> None:

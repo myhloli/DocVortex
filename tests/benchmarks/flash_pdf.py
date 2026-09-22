@@ -44,6 +44,15 @@ def _read_pdf(path: Path) -> bytes:
     return payload
 
 
+def _path_label(path: Path) -> str:
+    """为仓库内外的语料生成稳定标签，避免绝对路径无法 relative_to。"""
+    resolved = path.resolve()
+    try:
+        return str(resolved.relative_to(ROOT.resolve()))
+    except ValueError:
+        return str(resolved)
+
+
 def _digest(value: Any) -> str:
     """对完整 JSON 值计算稳定摘要，不忽略几何、空格或任何字段。"""
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
@@ -59,6 +68,43 @@ def _predict(payload: bytes) -> list[list[dict[str, Any]]]:
     """在单次文档生命周期内执行原生分析，确保计时包含页面打开和关闭。"""
     with PDFDocument(payload) as document:
         return PdfModel().predict(document)
+
+
+def _predict_with_timings(payload: bytes) -> tuple[list[list[dict[str, Any]]], dict[str, float]]:
+    """在不改动生产接口的前提下记录表格检测两个主要阶段的耗时。"""
+    from unittest.mock import patch
+
+    from docvortex.analyzers.native.pdf import pipeline, table_detection, table_rules
+
+    timings = {"detect_table_candidates_seconds": 0.0, "build_rule_table_candidates_seconds": 0.0}
+    original_build = table_rules._build_rule_table_candidates
+    original_detect = table_detection._detect_table_candidates
+
+    def timed_build(*args: Any, **kwargs: Any) -> Any:
+        started = time.perf_counter()
+        try:
+            return original_build(*args, **kwargs)
+        finally:
+            timings["build_rule_table_candidates_seconds"] += time.perf_counter() - started
+
+    def timed_detect(*args: Any, **kwargs: Any) -> Any:
+        started = time.perf_counter()
+        try:
+            return original_detect(*args, **kwargs)
+        finally:
+            timings["detect_table_candidates_seconds"] += time.perf_counter() - started
+
+    with patch.object(table_rules, "_build_rule_table_candidates", timed_build), patch.object(
+        table_detection,
+        "_build_rule_table_candidates",
+        timed_build,
+    ), patch.object(table_detection, "_detect_table_candidates", timed_detect), patch.object(
+        pipeline,
+        "_detect_table_candidates",
+        timed_detect,
+    ):
+        pages = _predict(payload)
+    return pages, timings
 
 
 def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
@@ -84,7 +130,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
         expected_digest = digest
         del pages
     peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    pages = _predict(payload)
+    pages, stage_timings = _predict_with_timings(payload)
     middle = model_json_to_middle_json(
         ModelJson(
             pages=deepcopy(pages),
@@ -95,7 +141,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
     output = {"model_list": pages, "middle_json": middle}
     _write_json(destination / "output.json", output)
     result = {
-        "path": str(path.relative_to(ROOT)),
+        "path": _path_label(path),
         "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         "runtime": asdict(initialize_pdfium_runtime()),
         "pages": len(pages),
@@ -105,6 +151,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
         "seconds": durations,
         "median_seconds": statistics.median(durations),
         "peak_rss_bytes": peak_rss * (1024 if sys.platform != "darwin" else 1),
+        **stage_timings,
     }
     del pages, middle, output
     if profile:
@@ -183,11 +230,14 @@ def main() -> None:
     results = []
     for index, relative in enumerate(dict.fromkeys(paths)):
         destination = args.output.resolve() / f"{index:02d}-{Path(relative).stem}"
+        input_path = Path(relative).expanduser()
+        if not input_path.is_absolute():
+            input_path = ROOT / input_path
         command = [
             sys.executable,
             str(Path(__file__).resolve()),
             "--worker",
-            str(ROOT / relative),
+            str(input_path),
             "--output",
             str(destination),
             "--runs",

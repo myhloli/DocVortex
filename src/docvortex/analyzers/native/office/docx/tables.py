@@ -185,7 +185,8 @@ class _DocxTables:
         """提取与 Mammoth 渲染规则一致的 XML 表格轻量签名。
 
         按文档顺序收集 w:t 及特殊字符元素，并且只处理 WordprocessingML
-        命名空间，以排除 Mammoth 不渲染的 OMML m:t 公式文本。
+        命名空间，以排除 Mammoth 不渲染的 OMML m:t 公式文本。纵向合并的
+        continuation 单元格会被 Mammoth 折叠掉，因此其整个子树也不参与文本签名。
         """
         w_ns = _DocxConstants._BLIP_NAMESPACES["w"]
         char_tags = (
@@ -194,7 +195,22 @@ class _DocxTables:
             f"{{{w_ns}}}softHyphen",
             f"{{{w_ns}}}sym",
         )
-        text = "".join(_DocxTables._xml_table_char_fragment(node) for node in xml_table.iter() if node.tag in char_tags)
+        continuation_nodes = set()
+        for cell in xml_table.iter(f"{{{w_ns}}}tc"):
+            properties = cell.find(f"{{{w_ns}}}tcPr")
+            vmerge = properties.find(f"{{{w_ns}}}vMerge") if properties is not None else None
+            if vmerge is None:
+                continue
+            # Mammoth 将缺少 val 或 val=continue 的单元格视为 continuation，
+            # 并在计算 rowspan 时丢弃该单元格的全部内容。
+            if vmerge.get(f"{{{w_ns}}}val") in (None, "continue"):
+                continuation_nodes.update(cell.iter())
+
+        text = "".join(
+            _DocxTables._xml_table_char_fragment(node)
+            for node in xml_table.iter()
+            if node not in continuation_nodes and node.tag in char_tags
+        )
         return {
             "row_count": len(xml_table.xpath('.//*[local-name()="tr"]')),
             "cell_count": len(xml_table.xpath('.//*[local-name()="tc"]')),

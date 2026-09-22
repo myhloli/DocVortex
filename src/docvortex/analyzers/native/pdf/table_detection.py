@@ -18,6 +18,7 @@ from .geometry import (
 )
 
 from .table_constants import _TABLE_CONTINUATION_RE
+from .table_annotations import _table_caption_candidates
 from .table_filled_grid import _detect_filled_grid_table_candidates
 from .table_rules import (
     _build_closed_rule_grid_candidates,
@@ -59,6 +60,12 @@ def _detect_table_candidates(
             source.page_size,
             angle,
         )
+        caption_candidates = _table_caption_candidates(
+            angle_lines,
+            source.page_size,
+            angle,
+            median_height,
+        )
         local_excluded_bboxes = [
             _expand_bbox(
                 _rotate_bbox_to_upright(bbox, source.page_size, angle),
@@ -80,6 +87,7 @@ def _detect_table_candidates(
                 local_axis_lines,
                 path_infos=source.path_infos,
                 excluded_bboxes=local_excluded_bboxes,
+                caption_candidates=caption_candidates,
             )
         )
         rule_candidates.extend(
@@ -91,6 +99,7 @@ def _detect_table_candidates(
                 median_height,
                 local_axis_lines,
                 local_closed_grid_excluded_bboxes,
+                caption_candidates,
             )
         )
     merged_rule_candidates = [

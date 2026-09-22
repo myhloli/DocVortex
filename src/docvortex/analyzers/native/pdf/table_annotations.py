@@ -20,6 +20,30 @@ from .table_constants import _AUXILIARY_TABLE_NOTE_RE, _TABLE_CAPTION_RE, _TABLE
 from .table_rows import _clip_visual_row_to_corridor
 
 
+def _table_caption_candidates(
+    lines: list[_LineItem],
+    page_size: tuple[float, float],
+    angle: int,
+    median_height: float,
+) -> list[tuple[_LineItem, BBox]]:
+    """预先筛出当前文本方向可能成为表题的行，保留原有文本判定顺序。"""
+    candidates: list[tuple[_LineItem, BBox]] = []
+    for line in lines:
+        text = line.text.strip()
+        caption_match = _TABLE_CAPTION_RE.match(text)
+        is_split_label = text.lower().rstrip(".") in {"table", "tab", "表", "表格"}
+        if caption_match is None and not is_split_label:
+            continue
+        if caption_match is not None:
+            suffix = caption_match.group("suffix").strip(" .:–—-")
+            if suffix and suffix[0].islower():
+                continue
+        if is_split_label and not _find_caption_number_peers(line, lines, page_size, angle, median_height):
+            continue
+        candidates.append((line, _rotate_bbox_to_upright(line.bbox, page_size, angle)))
+    return candidates
+
+
 def _build_table_annotation(
     kind: Literal["caption", "footnote"],
     rows: list[_VisualRow],
@@ -108,6 +132,7 @@ def _collect_footnote_rows(
     core_line_indices: set[int],
     page_size: tuple[float, float],
     angle: int,
+    marker_cache: dict[tuple[int, str], bool] | None = None,
 ) -> list[_VisualRow]:
     """从表格下边界吸收具有表内引用和版面证据的表注连续行。"""
 
@@ -160,6 +185,7 @@ def _collect_footnote_rows(
             core_lines,
             page_size,
             angle,
+            marker_cache,
         )
         first_gap_limit = 0.75 if auxiliary_note and not explicit_note else 1.25
         if row_gap > (first_gap_limit if not note_chain_started else 1.0) * median_height:
@@ -219,13 +245,25 @@ def _table_core_references_marker(
     core_lines: list[_LineItem],
     page_size: tuple[float, float],
     angle: int,
+    marker_cache: dict[tuple[int, str], bool] | None = None,
 ) -> bool:
     """要求通用短标记在表格核心中具有上标或紧凑单元格引用。"""
 
-    return any(
-        _line_has_superscript_marker(line, marker, page_size, angle) or _line_has_compact_marker_token(line.text, marker)
-        for line in core_lines
-    )
+    for line in core_lines:
+        key = (line.source_index, marker)
+        if marker_cache is not None and key in marker_cache:
+            if marker_cache[key]:
+                return True
+            continue
+        result = _line_has_superscript_marker(line, marker, page_size, angle) or _line_has_compact_marker_token(
+            line.text,
+            marker,
+        )
+        if marker_cache is not None:
+            marker_cache[key] = result
+        if result:
+            return True
+    return False
 
 
 def _line_has_compact_marker_token(text: str, marker: str) -> bool:
@@ -326,6 +364,14 @@ def _visual_row_text(row: _VisualRow) -> str:
     return " ".join(fragment.text.strip() for fragment in row.fragments if fragment.text.strip())
 
 
+def _has_possible_table_note_rows(rows: list[_VisualRow]) -> bool:
+    """预判页面是否存在可能成为表注的行，避免对无表注页面重复扫描。"""
+    return any(
+        _is_table_note_text(text := _visual_row_text(row)) or _extract_auxiliary_table_note_marker(text) is not None
+        for row in rows
+    )
+
+
 def _is_table_note_text(text: str) -> bool:
     """判断表后首行是否具有明确的注释、来源或脚注标记。"""
 
@@ -338,36 +384,17 @@ def _find_table_caption(
     page_size: tuple[float, float],
     angle: int,
     median_height: float,
+    caption_candidates: list[tuple[_LineItem, BBox]] | None = None,
 ) -> _LineItem | None:
     """在核心表格上方最多十二倍行高内查找显式 Table/表标题。"""
 
     candidates: list[tuple[float, _LineItem]] = []
-    for line in lines:
-        text = line.text.strip()
-        caption_match = _TABLE_CAPTION_RE.match(text)
-        is_split_label = text.lower().rstrip(".") in {"table", "tab", "表", "表格"}
-        if caption_match is None and not is_split_label:
-            continue
-        if caption_match is not None:
-            suffix = caption_match.group("suffix").strip(" .:–—-")
-            # 小写连续句通常是“Table 5 also ...”这类正文，不应作为标题。
-            if suffix and suffix[0].islower():
-                continue
-        local_bbox = _rotate_bbox_to_upright(line.bbox, page_size, angle)
+    candidate_rows = caption_candidates
+    if candidate_rows is None:
+        candidate_rows = _table_caption_candidates(lines, page_size, angle, median_height)
+    for line, local_bbox in candidate_rows:
         if _bbox_axis_overlap_ratio(local_bbox, core_bbox, axis="x") < 0.05:
             continue
-        if is_split_label:
-            has_number_peer = bool(
-                _find_caption_number_peers(
-                    line,
-                    lines,
-                    page_size,
-                    angle,
-                    median_height,
-                )
-            )
-            if not has_number_peer:
-                continue
         gap = core_bbox[1] - local_bbox[3]
         if -median_height <= gap <= 12.0 * median_height:
             candidates.append((abs(gap), line))

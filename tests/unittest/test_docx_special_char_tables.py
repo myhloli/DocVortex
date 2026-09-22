@@ -4,6 +4,7 @@ from io import BytesIO
 from docx import Document
 from docx.oxml.ns import qn
 from lxml import etree
+import pytest
 
 from docvortex.analyzers.native.office.docx.docx_converter import DocxConverter
 
@@ -96,6 +97,27 @@ def _build_nested_merged_docx_table() -> bytes:
     return _save_docx_bytes(doc)
 
 
+def _build_docx_with_residual_vmerge_text(*, explicit_continue: bool) -> bytes:
+    """构造 continuation 单元格含残留文本且相邻单元格含编号列表的表格。"""
+    doc = Document()
+    table = doc.add_table(rows=2, cols=2)
+    merged = table.cell(0, 0).merge(table.cell(1, 0))
+    merged.paragraphs[0].add_run("职责")
+    continuation = table._tbl.tr_lst[1].tc_lst[0]
+    vmerge = continuation.tcPr.vMerge
+    if explicit_continue:
+        vmerge.set(qn("w:val"), "continue")
+    else:
+        vmerge.attrib.pop(qn("w:val"), None)
+    residual_run = etree.SubElement(continuation.p_lst[0], qn("w:r"))
+    etree.SubElement(residual_run, qn("w:t")).text = "残留"
+    numbered = table.cell(0, 1).paragraphs[0]
+    numbered.style = doc.styles["List Number"]
+    numbered.add_run("编号内容")
+    table.cell(1, 1).paragraphs[0].add_run("尾部内容")
+    return _save_docx_bytes(doc)
+
+
 def test_no_break_hyphen_table_not_lost() -> None:
     """验证不间断连字符与编号列表并存时整表不会丢失。"""
     tables = _table_blocks(_convert_docx_bytes(_build_docx_with_no_break_hyphen_table()))
@@ -147,6 +169,23 @@ def test_nested_merged_table_uses_recursive_row_signature_and_full_context() -> 
     assert "嵌套首行" in tables[0]["content"]
     assert "嵌套编号行" in tables[0]["content"]
     assert "外层尾行" in tables[0]["content"]
+
+
+@pytest.mark.parametrize("explicit_continue", (True, False))
+def test_vmerge_continuation_text_is_ignored_by_table_signature(explicit_continue: bool) -> None:
+    """验证两种 OOXML continuation 写法都与 Mammoth 表格文本签名一致。"""
+    file_bytes = _build_docx_with_residual_vmerge_text(explicit_continue=explicit_continue)
+    converter = DocxConverter()
+    preparsed = converter._preparse_tables_with_mammoth(file_bytes)
+
+    assert len(preparsed) == 1
+    assert preparsed[0] is not None
+    assert "编号内容" in preparsed[0]
+    assert "残留" not in preparsed[0]
+    tables = _table_blocks(_convert_docx_bytes(file_bytes))
+    assert len(tables) == 1
+    assert "rowspan=\"2\"" in tables[0]["content"]
+    assert "编号内容" in tables[0]["content"]
 
 
 def test_xml_table_signature_renders_special_chars() -> None:

@@ -6,6 +6,7 @@ import math
 import re
 import statistics
 import unicodedata
+from bisect import bisect_left, bisect_right
 from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Literal, Mapping, Sequence
@@ -818,12 +819,62 @@ def _merge_native_inline_scripts(
     reference_markers = [_INLINE_REFERENCE_MARKER_RE.fullmatch(text) is not None for text in compact_texts]
     local_bboxes = [_rotate_bbox_to_upright(line.bbox, page_size, line.angle) for line in lines]
     canonical_scales = [_native_typographic_scale(line) for line in lines]
+
+    # 上下标只能贴近主体行的左右边缘。按文本方向分别建立左右边缘索引，
+    # 先取可能相邻的安全超集，再复用下面完整判定，避免密集表格页做 O(n²) 全配对。
+    left_edge_index: dict[int, list[tuple[float, int]]] = {}
+    right_edge_index: dict[int, list[tuple[float, int]]] = {}
+    maximum_scale_by_angle: dict[int, float] = {}
+    for line_index, line in enumerate(lines):
+        left_edge_index.setdefault(line.angle, []).append((local_bboxes[line_index][0], line_index))
+        right_edge_index.setdefault(line.angle, []).append((local_bboxes[line_index][2], line_index))
+        maximum_scale_by_angle[line.angle] = max(
+            maximum_scale_by_angle.get(line.angle, 0.1),
+            canonical_scales[line_index],
+            max(0.1, line.effective_height),
+        )
+    for index in (left_edge_index, right_edge_index):
+        for values in index.values():
+            values.sort(key=lambda item: (item[0], item[1]))
+    left_edge_positions = {
+        angle: [value for value, _index in values]
+        for angle, values in left_edge_index.items()
+    }
+    right_edge_positions = {
+        angle: [value for value, _index in values]
+        for angle, values in right_edge_index.items()
+    }
+
     for small_index, small in enumerate(lines):
         compact_text = compact_texts[small_index]
         if not compact_text:
             continue
         small_local_bbox = local_bboxes[small_index]
-        for base_index, base in enumerate(lines):
+        maximum_base_scale = maximum_scale_by_angle.get(small.angle, 0.1)
+        overlap_padding = 0.35 * maximum_base_scale
+        gap_padding = max(1.5, 0.35 * maximum_base_scale)
+
+        left_values = left_edge_index.get(small.angle, [])
+        left_positions = left_edge_positions.get(small.angle, [])
+        right_values = right_edge_index.get(small.angle, [])
+        right_positions = right_edge_positions.get(small.angle, [])
+        candidate_base_indices = {
+            index
+            for _value, index in left_values[
+                bisect_left(left_positions, small_local_bbox[2] - overlap_padding) :
+                bisect_right(left_positions, small_local_bbox[2] + gap_padding)
+            ]
+        }
+        candidate_base_indices.update(
+            index
+            for _value, index in right_values[
+                bisect_left(right_positions, small_local_bbox[0] - gap_padding) :
+                bisect_right(right_positions, small_local_bbox[0] + overlap_padding)
+            ]
+        )
+
+        for base_index in sorted(candidate_base_indices):
+            base = lines[base_index]
             if small_index == base_index or small.angle != base.angle or small.visual_row_id == base.visual_row_id:
                 continue
             if small.effective_height <= 0 or base.effective_height <= 0:
