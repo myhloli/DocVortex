@@ -5,6 +5,7 @@ from __future__ import annotations
 from io import BytesIO
 from datetime import datetime, timezone
 import posixpath
+from pathlib import Path
 from zipfile import ZipFile
 
 import lxml.etree as etree
@@ -12,7 +13,7 @@ import lxml.etree as etree
 from ....document.properties import property_count, property_date, property_text, property_values
 from ....errors import DocumentError
 from ....schema import DocumentProperties
-from .limits import MAX_ENTRY_BYTES, MAX_TOTAL_BYTES
+from .limits import MAX_ENTRY_BYTES
 
 _DC = "{http://purl.org/dc/elements/1.1/}"
 _DCT = "{http://purl.org/dc/terms/}"
@@ -43,14 +44,15 @@ def _element_value(root: etree._Element | None, tag: str) -> str | None:
     return None
 
 
-def read_ooxml_properties(data: bytes, suffix: str) -> tuple[DocumentProperties, list[str]]:
+def read_ooxml_properties(data: bytes | str | Path, suffix: str) -> tuple[DocumentProperties, list[str]]:
     """读取 OOXML 核心属性和结构计数，坏的可选属性不阻止其他读取。"""
     properties = DocumentProperties()
     warnings: list[str] = []
-    with ZipFile(BytesIO(data)) as package:
+    package_source = BytesIO(data) if isinstance(data, bytes) else data
+    with ZipFile(package_source) as package:
         infos = package.infolist()
-        if len(infos) > 100_000 or sum(info.file_size for info in infos) > MAX_TOTAL_BYTES:
-            raise DocumentError("resource_limit", "OOXML metadata package exceeds resource limits")
+        if len(infos) > 100_000:
+            raise DocumentError("resource_limit", "OOXML metadata package has too many members")
         if len({info.filename for info in infos}) != len(infos):
             raise DocumentError("open_failed", "Duplicate OOXML package members")
         if _xml_part(package, "[Content_Types].xml") is None:

@@ -112,6 +112,35 @@ def test_ooxml_fields_and_counts(suffix: str, count: int, kind: str) -> None:
     assert (props.page_count, props.page_count_kind) == (count, kind)
 
 
+def test_ooxml_path_metadata_reads_only_selected_parts(tmp_path: Path) -> None:
+    """验证大媒体成员不会阻断从 OOXML 路径读取核心属性。"""
+
+    source = ooxml_payload("pptx")
+    package_path = tmp_path / "large-media.pptx"
+    with ZipFile(BytesIO(source)) as original, ZipFile(package_path, "w", ZIP_DEFLATED) as package:
+        for name in original.namelist():
+            package.writestr(name, original.read(name))
+        package.writestr("ppt/media/large.bin", b"image-payload" * 1024)
+
+    result = docvortex.extract_metadata(package_path)
+
+    assert result.metadata.document is not None
+    assert result.metadata.document.title == "中文标题"
+    assert result.metadata.document.page_count == 2
+
+
+def test_ooxml_bytes_metadata_does_not_use_global_input_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证 OOXML 元数据按选定成员读取，不受通用输入阈值影响。"""
+
+    import docvortex.metadata as metadata_module
+
+    monkeypatch.setattr(metadata_module, "_METADATA_INPUT_LIMIT", 1)
+    result = docvortex.extract_metadata(ooxml_payload("pptx"), file_suffix="pptx")
+
+    assert result.metadata.document is not None
+    assert result.metadata.document.page_count == 2
+
+
 def test_bad_optional_xml_preserves_count_and_application() -> None:
     """坏的核心属性 XML 只生成诊断，不丢失其他属性与结构计数。"""
     result = docvortex.extract_metadata(ooxml_payload("pptx", bad_core=True), file_suffix="pptx")

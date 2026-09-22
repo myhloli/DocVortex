@@ -146,6 +146,20 @@ def gif_mtef_extension(
     )
 
 
+def gif_baseline_extension(
+    payload: bytes,
+    *,
+    chunk_size: int = 255,
+) -> bytes:
+    """构造可组合到同一 GIF 中、不会产生公式 candidate 的 baseline extension。"""
+
+    return _gif_application_extension(
+        payload,
+        authentication=b"002",
+        chunk_size=chunk_size,
+    )
+
+
 def build_gif_with_mtef(
     mtef: bytes,
     *,

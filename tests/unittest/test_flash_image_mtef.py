@@ -9,6 +9,7 @@ from _image_mtef_test_utils import (
     build_gif_with_extensions,
     build_gif_with_mtef,
     build_wmf,
+    gif_baseline_extension,
     gif_mtef_extension,
     pre6_wmf_comment,
 )
@@ -206,7 +207,7 @@ def test_reordered_apps_chunks_and_strict_image_prefixes_fail_closed() -> None:
 def test_image_equation_decoder_cache_and_total_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证相同图片缓存不重复计费，唯一图片受累计预算限制。"""
+    """验证相同图片缓存不重复计费，唯一公式 candidate 受累计预算限制。"""
 
     first_mtef = v5_formula_corpus()[0][1]
     second_mtef = v5_formula_corpus()[1][1]
@@ -214,15 +215,27 @@ def test_image_equation_decoder_cache_and_total_budget(
     second = build_gif_with_mtef(second_mtef)
     monkeypatch.setattr(
         image_equation_module,
-        "MAX_ASSET_TOTAL_BYTES",
-        len(first) + 1,
+        "MAX_EQUATION_CANDIDATE_TOTAL_BYTES",
+        len(first_mtef) + len(second_mtef) - 1,
     )
     decoder = OfficeImageEquationDecoder()
 
     assert decoder.decode(first) == v5_formula_corpus()[0][2]
     assert decoder.decode(first) == v5_formula_corpus()[0][2]
-    with pytest.raises(LegacyOfficeResourceLimitError, match="max_asset_total_bytes"):
+    with pytest.raises(LegacyOfficeResourceLimitError, match="max_equation_candidate_total_bytes"):
         decoder.decode(second)
+
+
+def test_ordinary_gif_does_not_consume_equation_candidate_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """验证 baseline/普通 GIF 不会占用 MTEF candidate 累计预算。"""
+
+    monkeypatch.setattr(image_equation_module, "MAX_EQUATION_CANDIDATE_TOTAL_BYTES", 1)
+    decoder = OfficeImageEquationDecoder()
+
+    assert decoder.decode(build_baseline_only_gif()) is None
+    assert decoder.candidate_total_bytes == 0
 
 
 def test_image_equation_record_limit_raises_stable_error(
@@ -234,4 +247,41 @@ def test_image_equation_record_limit_raises_stable_error(
     image = build_gif_with_mtef(v5_formula_corpus()[0][1], chunk_size=1)
 
     with pytest.raises(LegacyOfficeResourceLimitError, match="max_picture_records"):
+        decode_image_embedded_equation(image)
+
+
+def test_gif_subblocks_do_not_consume_picture_record_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """验证大量 GIF sub-block 只计为一个 extension record。"""
+
+    monkeypatch.setattr(image_equation_module, "MAX_PICTURE_RECORDS", 4)
+    image = build_gif_with_mtef(v5_formula_corpus()[0][1], chunk_size=1)
+
+    assert decode_image_embedded_equation(image) == v5_formula_corpus()[0][2]
+
+
+def test_non_equation_gif_subblocks_do_not_consume_candidate_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """验证普通 GIF application extension 的 sub-block 不计入公式预算。"""
+
+    monkeypatch.setattr(image_equation_module, "MAX_PICTURE_RECORDS", 4)
+    monkeypatch.setattr(image_equation_module, "MAX_EQUATION_CANDIDATE_TOTAL_BYTES", 1)
+    image = build_gif_with_extensions([gif_baseline_extension(b"baseline" * 32, chunk_size=1)])
+
+    decoder = OfficeImageEquationDecoder()
+    assert decoder.decode(image) is None
+    assert decoder.candidate_total_bytes == 0
+
+
+def test_gif_subblocks_have_an_independent_structural_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """验证 GIF sub-block 使用独立结构上限，不复用 picture record 配额。"""
+
+    monkeypatch.setattr(image_equation_module, "MAX_RECORDS", 1)
+    image = build_gif_with_mtef(v5_formula_corpus()[0][1], chunk_size=1)
+
+    with pytest.raises(LegacyOfficeResourceLimitError, match="GIF sub-block count"):
         decode_image_embedded_equation(image)

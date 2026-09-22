@@ -10,6 +10,9 @@ from .result import Diagnostic, MetadataResult
 from .schema import FILE_SUFFIXES, DocumentMetadata, DocumentProperties, FileSuffix, Producer
 from .version import __version__
 
+_OOXML_SUFFIXES = frozenset({"docx", "pptx", "xlsx"})
+_METADATA_INPUT_LIMIT = 512 * 1024 * 1024
+
 if TYPE_CHECKING:
     from .document.contracts import HtmlSourceContext
     from .document.pdf._document import PDFDocument
@@ -24,10 +27,15 @@ def extract_metadata(
     """仅读取文档属性；未知格式和打不开的输入使用稳定错误码。"""
     document = None
     path = Path(source) if isinstance(source, (str, Path)) else None
+    data: bytes | None = None
     try:
         if path is not None:
-            with path.open("rb") as stream:
-                data = stream.read(512 * 1024 * 1024 + 1)
+            suffix_hint = file_suffix or path.suffix.lower().lstrip(".")
+            if suffix_hint in _OOXML_SUFFIXES:
+                suffix = suffix_hint
+            else:
+                with path.open("rb") as stream:
+                    data = stream.read(_METADATA_INPUT_LIMIT + 1)
         elif isinstance(source, bytes):
             data = source
         else:
@@ -37,19 +45,27 @@ def extract_metadata(
                 raise TypeError("source must be a path, bytes, or PDFDocument")
             document = source
             data = document.bytes
-        if len(data) > 512 * 1024 * 1024:
-            raise DocumentError("resource_limit", "Metadata input exceeds 512 MiB")
         if document is not None:
             suffix = "pdf"
-        elif file_suffix is not None:
-            suffix = file_suffix
-        else:
-            from .document.detection import guess_suffix_by_bytes
+        elif path is None or data is not None:
+            if data is None:
+                raise AssertionError("metadata source bytes are missing")
+            if file_suffix is not None:
+                suffix = file_suffix
+            else:
+                from .document.detection import guess_suffix_by_bytes
 
-            suffix = guess_suffix_by_bytes(data, str(path) if path else None)
+                suffix = guess_suffix_by_bytes(data, str(path) if path else None)
         if suffix not in FILE_SUFFIXES:
             raise InvalidRequestError("file_type_unsupported", f"Unsupported native input format: {suffix}", "file_suffix")
-        properties, messages = _read_properties(data, cast(FileSuffix, suffix), document, source_context)
+        if data is not None and len(data) > _METADATA_INPUT_LIMIT and suffix not in _OOXML_SUFFIXES:
+            raise DocumentError("resource_limit", "Metadata input exceeds 512 MiB")
+        if path is not None and suffix in _OOXML_SUFFIXES and data is None:
+            properties, messages = _read_properties(path, cast(FileSuffix, suffix), document, source_context)
+        else:
+            if data is None:
+                raise AssertionError("metadata source bytes are missing")
+            properties, messages = _read_properties(data, cast(FileSuffix, suffix), document, source_context)
     except (DocumentError, TypeError):
         raise
     except Exception as exc:
@@ -65,7 +81,7 @@ def extract_metadata(
 
 
 def _read_properties(
-    data: bytes,
+    data: bytes | Path,
     suffix: FileSuffix,
     document: PDFDocument | None,
     source_context: HtmlSourceContext | None,
