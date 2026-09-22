@@ -1,6 +1,9 @@
 """PDF 表题和表注认领；保留原有认领顺序与判定规则。"""
 
 from __future__ import annotations
+
+from bisect import bisect_left, bisect_right
+from dataclasses import dataclass
 import statistics
 import unicodedata
 from typing import Literal
@@ -18,6 +21,26 @@ from .line_layout import _line_effective_height
 
 from .table_constants import _AUXILIARY_TABLE_NOTE_RE, _TABLE_CAPTION_RE, _TABLE_NOTE_RE, _TABLE_SPLIT_NUMBER_RE
 from .table_rows import _clip_visual_row_to_corridor
+
+
+@dataclass(slots=True)
+class _PreparedTableNoteRow:
+    """保存表注走廊中与候选上下边界无关的预计算行信息。"""
+
+    row: _VisualRow
+    line_indices: frozenset[int]
+    row_height: float
+    row_fonts: frozenset[tuple[str, int]]
+    explicit_note: bool
+    auxiliary_marker: str | None
+
+
+@dataclass(slots=True)
+class _PreparedTableNoteBodyMetrics:
+    """保存同一文本方向的正文高度样本，供候选按纵向排除区间精确筛选。"""
+
+    items: tuple[tuple[int, float, float], ...]
+    centers: tuple[float, ...]
 
 
 def _table_caption_candidates(
@@ -124,45 +147,24 @@ def _collect_caption_rows(
     return output
 
 
-def _collect_footnote_rows(
+def _prepare_table_note_rows(
     rows: list[_VisualRow],
     lines: list[_LineItem],
     rule_bbox: BBox,
     median_height: float,
-    core_line_indices: set[int],
     page_size: tuple[float, float],
     angle: int,
-    marker_cache: dict[tuple[int, str], bool] | None = None,
-) -> list[_VisualRow]:
-    """从表格下边界吸收具有表内引用和版面证据的表注连续行。"""
+) -> list[_PreparedTableNoteRow]:
+    """按精确横向走廊预计算表注行的候选无关属性，供多个表格候选复用。"""
 
-    output: list[_VisualRow] = []
-    bottom = rule_bbox[3]
-    note_chain_started = False
     margin = 2.0 * median_height
-    selected_line_indices = set(core_line_indices)
     line_by_index = {line.source_index: line for line in lines}
-    core_lines = [line for line in lines if line.source_index in core_line_indices]
-    body_reference_height = _table_note_body_reference_height(
-        lines,
-        rule_bbox,
-        median_height,
-        core_line_indices,
-        page_size,
-        angle,
-    )
-    note_left: float | None = None
-    note_height: float | None = None
-    note_fonts: set[tuple[str, int]] = set()
+    output: list[_PreparedTableNoteRow] = []
     for row in rows:
         clipped_row = _clip_visual_row_to_corridor(row, rule_bbox, margin=margin)
-        if clipped_row is None or clipped_row.bbox[3] <= bottom:
+        if clipped_row is None:
             continue
-        line_indices = {fragment.line_index for fragment in clipped_row.fragments}
-        if line_indices.issubset(selected_line_indices):
-            bottom = max(bottom, clipped_row.bbox[3])
-            continue
-        row_gap = max(0.0, clipped_row.bbox[1] - bottom)
+        line_indices = frozenset(fragment.line_index for fragment in clipped_row.fragments)
         row_lines = [line_by_index[line_index] for line_index in line_indices if line_index in line_by_index]
         row_heights = [
             _line_effective_height(
@@ -172,14 +174,98 @@ def _collect_footnote_rows(
             for line in row_lines
         ]
         row_height = statistics.median(row_heights) if row_heights else clipped_row.bbox[3] - clipped_row.bbox[1]
-        row_fonts = {
+        row_fonts = frozenset(
             line.font_signature for line in row_lines if line.font_signature is not None and line.font_coverage >= 0.75
-        }
+        )
+        row_text = _visual_row_text(clipped_row)
+        output.append(
+            _PreparedTableNoteRow(
+                row=clipped_row,
+                line_indices=line_indices,
+                row_height=row_height,
+                row_fonts=row_fonts,
+                explicit_note=_is_table_note_text(row_text),
+                auxiliary_marker=_extract_auxiliary_table_note_marker(row_text),
+            )
+        )
+    return output
+
+
+def _prepare_table_note_body_metrics(
+    lines: list[_LineItem],
+    page_size: tuple[float, float],
+    angle: int,
+) -> _PreparedTableNoteBodyMetrics:
+    """预先计算同方向文本行的局部中心和有效高度，避免候选重复旋转与测量。"""
+
+    items: list[tuple[int, float, float]] = []
+    for line in lines:
+        if line.angle != angle:
+            continue
+        local_bbox = _rotate_bbox_to_upright(line.bbox, page_size, angle)
+        items.append(
+            (
+                line.source_index,
+                _bbox_center_y(local_bbox),
+                _line_effective_height(line, local_bbox),
+            )
+        )
+    items.sort(key=lambda item: item[1])
+    frozen_items = tuple(items)
+    return _PreparedTableNoteBodyMetrics(
+        items=frozen_items,
+        centers=tuple(item[1] for item in frozen_items),
+    )
+
+
+def _collect_footnote_rows(
+    rows: list[_VisualRow],
+    lines: list[_LineItem],
+    rule_bbox: BBox,
+    median_height: float,
+    core_line_indices: set[int],
+    page_size: tuple[float, float],
+    angle: int,
+    marker_cache: dict[tuple[int, str], bool] | None = None,
+    prepared_rows: list[_PreparedTableNoteRow] | None = None,
+    prepared_body_metrics: _PreparedTableNoteBodyMetrics | None = None,
+) -> list[_VisualRow]:
+    """从表格下边界吸收具有表内引用和版面证据的表注连续行。"""
+
+    output: list[_VisualRow] = []
+    bottom = rule_bbox[3]
+    note_chain_started = False
+    selected_line_indices = set(core_line_indices)
+    core_lines = [line for line in lines if line.source_index in core_line_indices]
+    body_reference_height: float | None = None
+    note_left: float | None = None
+    note_height: float | None = None
+    note_fonts: set[tuple[str, int]] | frozenset[tuple[str, int]] = set()
+    prepared = prepared_rows
+    if prepared is None:
+        prepared = _prepare_table_note_rows(
+            rows,
+            lines,
+            rule_bbox,
+            median_height,
+            page_size,
+            angle,
+        )
+    for prepared_row in prepared:
+        clipped_row = prepared_row.row
+        if clipped_row.bbox[3] <= bottom:
+            continue
+        line_indices = prepared_row.line_indices
+        if line_indices.issubset(selected_line_indices):
+            bottom = max(bottom, clipped_row.bbox[3])
+            continue
+        row_gap = max(0.0, clipped_row.bbox[1] - bottom)
+        row_height = prepared_row.row_height
+        row_fonts = prepared_row.row_fonts
         if note_chain_started and clipped_row.bbox[3] - rule_bbox[3] > 10.0 * median_height:
             break
-        row_text = _visual_row_text(clipped_row)
-        explicit_note = _is_table_note_text(row_text)
-        auxiliary_marker = _extract_auxiliary_table_note_marker(row_text)
+        explicit_note = prepared_row.explicit_note
+        auxiliary_marker = prepared_row.auxiliary_marker
         auxiliary_note = auxiliary_marker is not None and _table_core_references_marker(
             auxiliary_marker,
             core_lines,
@@ -200,6 +286,17 @@ def _collect_footnote_rows(
                     and row_height <= 1.15 * median_height
                 )
             else:
+                if body_reference_height is None:
+                    # 仅辅助标记表注需要正文高度参照；显式 Note/Source 不再提前扫描整页。
+                    body_reference_height = _table_note_body_reference_height(
+                        lines,
+                        rule_bbox,
+                        median_height,
+                        core_line_indices,
+                        page_size,
+                        angle,
+                        prepared_body_metrics,
+                    )
                 spatially_compatible = (
                     _bbox_axis_overlap_ratio(clipped_row.bbox, rule_bbox, axis="x") >= 0.50
                     and abs(clipped_row.bbox[0] - rule_bbox[0]) <= 3.0 * median_height
@@ -338,19 +435,32 @@ def _table_note_body_reference_height(
     core_line_indices: set[int],
     page_size: tuple[float, float],
     angle: int,
+    prepared_metrics: _PreparedTableNoteBodyMetrics | None = None,
 ) -> float:
     """以同方向非表格行的最高四分位估计正文高度，样本不足时稳健回退。"""
 
     exclusion_top = rule_bbox[1] - 3.0 * median_height
     exclusion_bottom = rule_bbox[3] + 10.0 * median_height
     heights: list[float] = []
-    for line in lines:
-        if line.angle != angle or line.source_index in core_line_indices:
-            continue
-        local_bbox = _rotate_bbox_to_upright(line.bbox, page_size, angle)
-        if exclusion_top <= _bbox_center_y(local_bbox) <= exclusion_bottom:
-            continue
-        heights.append(_line_effective_height(line, local_bbox))
+    if prepared_metrics is None:
+        for line in lines:
+            if line.angle != angle or line.source_index in core_line_indices:
+                continue
+            local_bbox = _rotate_bbox_to_upright(line.bbox, page_size, angle)
+            if exclusion_top <= _bbox_center_y(local_bbox) <= exclusion_bottom:
+                continue
+            heights.append(_line_effective_height(line, local_bbox))
+    else:
+        left_end = bisect_left(prepared_metrics.centers, exclusion_top)
+        right_start = bisect_right(prepared_metrics.centers, exclusion_bottom)
+        for item_index in range(left_end):
+            source_index, _center_y, height = prepared_metrics.items[item_index]
+            if source_index not in core_line_indices:
+                heights.append(height)
+        for item_index in range(right_start, len(prepared_metrics.items)):
+            source_index, _center_y, height = prepared_metrics.items[item_index]
+            if source_index not in core_line_indices:
+                heights.append(height)
     if len(heights) < 4:
         return 1.25 * median_height
     heights.sort()
@@ -365,11 +475,26 @@ def _visual_row_text(row: _VisualRow) -> str:
 
 
 def _has_possible_table_note_rows(rows: list[_VisualRow]) -> bool:
-    """预判页面是否存在可能成为表注的行，避免对无表注页面重复扫描。"""
+    """判断给定视觉行集合中是否存在显式或辅助表注起始行。"""
+
     return any(
         _is_table_note_text(text := _visual_row_text(row)) or _extract_auxiliary_table_note_marker(text) is not None
         for row in rows
     )
+
+
+def _has_possible_table_note_rows_in_corridor(
+    rows: list[_VisualRow],
+    rule_bbox: BBox,
+    median_height: float,
+) -> bool:
+    """按与真实表注收集一致的横向走廊裁剪后，再执行安全的负向预筛。"""
+
+    margin = 2.0 * median_height
+    clipped_rows = [
+        clipped_row for row in rows if (clipped_row := _clip_visual_row_to_corridor(row, rule_bbox, margin=margin)) is not None
+    ]
+    return _has_possible_table_note_rows(clipped_rows)
 
 
 def _is_table_note_text(text: str) -> bool:
@@ -459,7 +584,10 @@ def _merge_table_candidate_annotations(
     # 重复候选发生角色冲突时以任一候选确认的表体成员为准，避免表头被并入 caption。
     retained_annotations: list[_TableAnnotation] = []
     for annotation in target.annotations:
-        annotation.line_indices.difference_update(target.line_indices)
+        # 注释成员通常很少，逐个查询大型共享表体集合比反向遍历表体成员更省时。
+        annotation.line_indices = {
+            line_index for line_index in annotation.line_indices if line_index not in target.line_indices
+        }
         annotation.line_bboxes = {
             line_index: bbox for line_index, bbox in annotation.line_bboxes.items() if line_index in annotation.line_indices
         }

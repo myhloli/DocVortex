@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator, MutableSet
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -11,6 +12,102 @@ from ....schema import BBox
 
 if TYPE_CHECKING:
     from .inline.types import PDFTextScriptLine
+
+
+class _SharedLineIndexSet(MutableSet[int]):
+    """共享只读基底，仅为单个候选记录增删差集，避免复制大型行号集合。"""
+
+    __slots__ = ("base", "added", "removed")
+
+    def __init__(
+        self,
+        base: frozenset[int],
+        values: Iterable[int] = (),
+    ) -> None:
+        """以共享基底和候选已有成员初始化集合。"""
+
+        self.base = base
+        self.removed: set[int] = set()
+        if isinstance(values, _SharedLineIndexSet) and values.base is base:
+            # 与共享基底求并集时，基底成员天然全部可见，只需保留额外成员。
+            self.added = set(values.added)
+        elif isinstance(values, (set, frozenset)):
+            self.added = values.difference(base)
+        else:
+            self.added = {value for value in values if value not in base}
+
+    @classmethod
+    def from_exact_values(
+        cls,
+        base: frozenset[int],
+        values: Iterable[int],
+    ) -> _SharedLineIndexSet:
+        """以共享基底精确表示给定集合，而不是默认并入全部基底成员。"""
+
+        visible = set(values)
+        instance = cls.__new__(cls)
+        instance.base = base
+        instance.added = visible.difference(base)
+        instance.removed = set(base.difference(visible))
+        return instance
+
+    def __contains__(self, value: object) -> bool:
+        """按基底、删除集和新增集判断成员是否可见。"""
+
+        if value in self.added:
+            return True
+        return value in self.base and value not in self.removed
+
+    def __iter__(self) -> Iterator[int]:
+        """迭代当前可见成员，不展开持久化副本。"""
+
+        for value in self.base:
+            if value not in self.removed:
+                yield value
+        yield from self.added
+
+    def __len__(self) -> int:
+        """返回当前可见成员数量。"""
+
+        return len(self.base) - len(self.removed) + len(self.added)
+
+    def add(self, value: int) -> None:
+        """加入成员；基底已有成员只需撤销删除标记。"""
+
+        if value in self.base:
+            self.removed.discard(value)
+            return
+        self.added.add(value)
+
+    def discard(self, value: int) -> None:
+        """删除成员；基底成员以差集标记表示。"""
+
+        if value in self.added:
+            self.added.discard(value)
+            return
+        if value in self.base:
+            self.removed.add(value)
+
+    def update(self, values: Iterable[int]) -> None:
+        """并入成员；同共享基底的候选直接合并差集。"""
+
+        if isinstance(values, _SharedLineIndexSet) and values.base is self.base:
+            self.removed.intersection_update(values.removed)
+            for value in values.added:
+                self.add(value)
+            return
+        for value in values:
+            self.add(value)
+
+    def difference_update(self, values: Iterable[int]) -> None:
+        """移除给定成员，并保持共享基底不变。"""
+
+        if isinstance(values, (set, frozenset)):
+            self.added.difference_update(values)
+            self.removed.update(self.base.intersection(values))
+            return
+        for value in values:
+            self.discard(value)
 
 
 @dataclass(slots=True)
@@ -122,7 +219,7 @@ class _TableCandidate:
     angle: int
     score: float
     core_bbox: BBox | None = None
-    line_indices: set[int] = field(default_factory=set)
+    line_indices: MutableSet[int] = field(default_factory=set)
     annotations: list[_TableAnnotation] = field(default_factory=list)
 
 
