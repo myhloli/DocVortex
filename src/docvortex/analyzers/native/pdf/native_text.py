@@ -836,14 +836,8 @@ def _merge_native_inline_scripts(
     for index in (left_edge_index, right_edge_index):
         for values in index.values():
             values.sort(key=lambda item: (item[0], item[1]))
-    left_edge_positions = {
-        angle: [value for value, _index in values]
-        for angle, values in left_edge_index.items()
-    }
-    right_edge_positions = {
-        angle: [value for value, _index in values]
-        for angle, values in right_edge_index.items()
-    }
+    left_edge_positions = {angle: [value for value, _index in values] for angle, values in left_edge_index.items()}
+    right_edge_positions = {angle: [value for value, _index in values] for angle, values in right_edge_index.items()}
 
     for small_index, small in enumerate(lines):
         compact_text = compact_texts[small_index]
@@ -861,15 +855,17 @@ def _merge_native_inline_scripts(
         candidate_base_indices = {
             index
             for _value, index in left_values[
-                bisect_left(left_positions, small_local_bbox[2] - overlap_padding) :
-                bisect_right(left_positions, small_local_bbox[2] + gap_padding)
+                bisect_left(left_positions, small_local_bbox[2] - overlap_padding) : bisect_right(
+                    left_positions, small_local_bbox[2] + gap_padding
+                )
             ]
         }
         candidate_base_indices.update(
             index
             for _value, index in right_values[
-                bisect_left(right_positions, small_local_bbox[0] - gap_padding) :
-                bisect_right(right_positions, small_local_bbox[0] + overlap_padding)
+                bisect_left(right_positions, small_local_bbox[0] - gap_padding) : bisect_right(
+                    right_positions, small_local_bbox[0] + overlap_padding
+                )
             ]
         )
 

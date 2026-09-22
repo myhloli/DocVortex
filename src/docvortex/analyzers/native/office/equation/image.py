@@ -469,8 +469,7 @@ class OfficeImageEquationDecoder:
             candidate_bytes = sum(len(candidate) for candidate in candidates)
             if self.total_bytes + candidate_bytes > MAX_EQUATION_CANDIDATE_TOTAL_BYTES:
                 raise LegacyOfficeResourceLimitError(
-                    "image equation candidates exceed "
-                    f"max_equation_candidate_total_bytes={MAX_EQUATION_CANDIDATE_TOTAL_BYTES}"
+                    f"image equation candidates exceed max_equation_candidate_total_bytes={MAX_EQUATION_CANDIDATE_TOTAL_BYTES}"
                 )
             self.total_bytes += candidate_bytes
             latex = _select_candidate_latex(candidates)
