@@ -12,7 +12,7 @@ from loguru import logger
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from magika import Magika
+    from ..foundation.magika import Magika
 
 from .filetypes import CSV_EXTENSIONS, HTML_EXTENSIONS, IMAGE_EXTENSIONS, has_mhtml_header, rtf_header_offset
 
@@ -67,7 +67,7 @@ _STRONG_CONTENT_SUFFIXES = frozenset(
 @lru_cache(maxsize=1)
 def _magika() -> Magika:
     """惰性创建文件类型识别器，避免导入 parser 时加载模型。"""
-    from magika import Magika
+    from ..foundation.magika import Magika
 
     return Magika()
 

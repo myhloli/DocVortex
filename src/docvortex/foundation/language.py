@@ -43,7 +43,7 @@ def guess_code_language(code: str) -> str:
     if not normalized_code:
         return DEFAULT_CODE_LANGUAGE
     try:
-        from magika import Magika
+        from .magika import Magika
 
         lang = Magika().identify_bytes(normalized_code.encode("utf-8", errors="replace")).prediction.output.label
     except Exception:
