@@ -125,7 +125,7 @@ def _read_properties(
 
         return read_html_properties(data, source_context)
     if suffix == "mhtml":
-        from .analyzers.native.mhtml.archive import MhtmlArchive
+        from .document.mhtml import MhtmlArchive
         from .analyzers.native.mhtml.converter import read_archive_properties
 
         return read_archive_properties(MhtmlArchive(data, source_context))
