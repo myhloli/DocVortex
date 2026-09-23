@@ -73,7 +73,7 @@ result.export("output/report.docx", output_format="docx")
 
 ## 格式支持
 
-### 原生输入 · 17 种格式
+### 原生输入 · 20 种格式
 
 | 文档类别 | 文件后缀 |
 | --- | --- |

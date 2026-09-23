@@ -73,7 +73,7 @@ use `overwrite=True` in Python or `--overwrite` in the CLI to replace them.
 
 ## Supported formats
 
-### Native inputs · 17 formats
+### Native inputs · 20 formats
 
 | Document family | File extensions |
 | --- | --- |
