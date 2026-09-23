@@ -4,6 +4,6 @@ recursive-include schemas *.json
 recursive-include docs *.md *.json
 include tools/__init__.py tools/build_html_css.py tools/capture_baseline.py tools/capture_platform_layout.py tools/font_geometry.py tools/compare_font_platforms.py tools/calibrate_pdf_geometry.py
 recursive-include tests *.py *.json *.pdf *.xor *.rtf
-recursive-include demo *.py *.md *.pdf *.doc *.docx *.ppt *.pptx *.xls *.xlsx *.rtf
+recursive-include demo *.py *.md *.pdf *.doc *.docx *.ppt *.pptx *.xls *.xlsx *.rtf *.odt *.odp *.ods *.epub *.html *.mhtml *.ofd
 recursive-include src/docvortex/resources *
 global-exclude __pycache__ *.py[cod] .DS_Store

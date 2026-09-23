@@ -26,7 +26,7 @@ from _span_test_utils import inline_text
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
-_OFFICE_SAMPLE_DIR = _PROJECT_ROOT / "demo" / "office_docs"
+_OFFICE_SAMPLE_DIR = _PROJECT_ROOT / "demo" / "ms_office_docs"
 
 
 def _predict_sample(model: Any, suffix: str) -> list[list[dict[str, Any]]]:

@@ -11,7 +11,7 @@ from docvortex.postprocess.document import model_json_to_middle_json
 from docvortex.schema import BlockType, ChartBlock, ImageBlock, MiddleJson, ModelJson, TableBlock
 from _span_test_utils import inline_text, visible_content
 
-_OFFICE_SAMPLE_DIR = Path(__file__).parents[2] / "demo" / "office_docs"
+_OFFICE_SAMPLE_DIR = Path(__file__).parents[2] / "demo" / "ms_office_docs"
 
 
 def _analyze_sample(file_suffix: str) -> tuple[MiddleJson, ModelJson]:

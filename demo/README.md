@@ -5,7 +5,11 @@ Install DocVortex, then run from the repository root:
 ```bash
 uv pip install .
 python demo/demo.py --page-range 1 --output-dir output/demo
-python demo/demo.py demo/office_docs/docx_01.docx --output-dir output/office
+python demo/demo.py demo/ms_office_docs/docx_01.docx --output-dir output/office
+python demo/demo.py demo/open_office_docs/docx_01.odt --output-dir output/open-office
+python demo/demo.py demo/ebook/epub_01.epub --output-dir output/ebook
+python demo/demo.py demo/web_docs/html_01.html --output-dir output/web
+python demo/demo.py demo/ofd/ofd_01.ofd --output-dir output/ofd
 ```
 
 The example parses once, exports Markdown and saves a portable result bundle.
@@ -13,9 +17,10 @@ PDF input is expected to contain native text; DocVortex does not perform OCR.
 `small_ocr.pdf` is retained for classification and low-level PDF regression tests.
 Use `PDFDocument.classify()` explicitly when a caller needs to route scanned PDFs.
 
-The complete PDF/Office corpus, native regression manifests and benchmark are
-available in this repository. Historical sample provenance is recorded in the
-[compatibility and migration guide](../docs/COMPATIBILITY.md).
+The samples are grouped in `pdfs/`, `ms_office_docs/`, `open_office_docs/`,
+`ebook/`, `web_docs/` and `ofd/`. The complete sample corpus, native regression
+manifests and benchmark are available in this repository. Historical sample
+provenance is recorded in the [compatibility and migration guide](../docs/COMPATIBILITY.md).
 
 Run the native performance baseline with `python tests/benchmarks/flash_pdf.py --help`.
 The benchmark uses POSIX process resource accounting. Examples and regression

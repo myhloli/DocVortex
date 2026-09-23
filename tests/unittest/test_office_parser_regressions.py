@@ -54,7 +54,7 @@ def test_vector_image_emu_size_uses_200_dpi() -> None:
 
 def test_docx_nested_ordered_lists_render_with_local_markers() -> None:
     """验证真实 DOCX 的多级有序列表使用当前层编号，并由 Markdown 缩进表达层级。"""
-    file_bytes = (_PROJECT_ROOT / "demo" / "office_docs" / "docx_01.docx").read_bytes()
+    file_bytes = (_PROJECT_ROOT / "demo" / "ms_office_docs" / "docx_01.docx").read_bytes()
 
     middle_json = parse(file_bytes, file_suffix="docx").middle_json
     markdown = render_markdown(middle_json)

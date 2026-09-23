@@ -938,7 +938,7 @@ def test_ods_singleton_regions_downgrade_to_text_blocks() -> None:
 
 def test_ods_demo_workbook_splits_regions_like_excel_workbook() -> None:
     """验证真实 ODS 工作簿的区域拆分与 Excel 投影一致且无前导空行。"""
-    demo_path = Path(__file__).resolve().parents[2] / "demo" / "office_docs" / "xlsx_01.ods"
+    demo_path = Path(__file__).resolve().parents[2] / "demo" / "open_office_docs" / "xlsx_01.ods"
     with demo_path.open("rb") as handle:
         pages = OdsModel().predict(handle)
 

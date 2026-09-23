@@ -35,7 +35,7 @@ def source_payload(suffix: str) -> bytes:
         return b"<html><h1>Title</h1><p>Native conversion</p></html>"
     if suffix == "pdf":
         return (root / "demo/pdfs/mixed_elements_pages_39_40.pdf").read_bytes()
-    return next((root / "demo/office_docs").glob(f"*.{suffix}")).read_bytes()
+    return next((root / "demo/ms_office_docs").glob(f"*.{suffix}")).read_bytes()
 
 
 @pytest.mark.parametrize(

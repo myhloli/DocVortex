@@ -39,7 +39,7 @@ from docvortex.analyzers.native.office.xlsx import xlsx_converter as xlsx_conver
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
-_OFFICE_SAMPLE_DIR = _PROJECT_ROOT / "demo" / "office_docs"
+_OFFICE_SAMPLE_DIR = _PROJECT_ROOT / "demo" / "ms_office_docs"
 
 
 @pytest.mark.parametrize(
