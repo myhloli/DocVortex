@@ -331,6 +331,7 @@ def _is_containment_equivalent(first: _ScoredCandidate, second: _ScoredCandidate
 
 def _soft_prune(root: etree._Element) -> None:
     """在候选副本中删除确定的导航/表单和高噪声 token 子树。"""
+    _prune_article_comments(root)
     metrics_by_element = _collect_soft_prune_metrics(root)
     for element in list(root.iterdescendants()):
         if not isinstance(element.tag, str):
@@ -347,6 +348,36 @@ def _soft_prune(root: etree._Element) -> None:
         )
         if should_remove:
             _drop_tree_preserve_tail(element)
+
+
+def _is_comment_region(element: etree._Element) -> bool:
+    """按完整词与驼峰边界识别评论容器，不匹配正文文本或任意子串。"""
+    value = f"{element.get('id') or ''} {element.get('class') or ''}"
+    value = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", value).casefold()
+    return bool(frozenset(_TOKEN_RE.split(value)) & {"comment", "comments"})
+
+
+def _prune_article_comments(root: etree._Element) -> None:
+    """仅在单篇独立文章明确存在时移除附属评论，保留论坛及讨论型正文。"""
+    articles = [
+        element
+        for element in root.iter()
+        if isinstance(element.tag, str)
+        and (local_name(element) == "article" or "articlebody" in (element.get("itemprop") or "").casefold().split())
+        and not any(_is_comment_region(parent) for parent in (element, *element.iterancestors()))
+        and len(_normalized_text(" ".join(element.itertext()))) >= _MIN_TEXT_CHARS
+    ]
+    # 嵌套 articleBody 与 article 属于同一正文；多个独立 article 按论坛处理。
+    outer_articles = [element for element in articles if not any(parent in articles for parent in element.iterancestors())]
+    if len(outer_articles) != 1:
+        return
+    article = outer_articles[0]
+    for element in list(root.iterdescendants()):
+        if not isinstance(element.tag, str) or not _is_comment_region(element):
+            continue
+        if element is article or element in article.iterancestors():
+            continue
+        _drop_tree_preserve_tail(element)
 
 
 def _collect_soft_prune_metrics(root: etree._Element) -> dict[etree._Element, _SoftPruneMetrics]:

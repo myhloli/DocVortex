@@ -59,6 +59,7 @@ FileSuffix: TypeAlias = Literal[
     "tsv",
     "epub",
     "html",
+    "mhtml",
     "ofd",
     "odt",
     "ods",

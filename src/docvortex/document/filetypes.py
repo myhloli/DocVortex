@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+from email import policy
+from email.parser import BytesHeaderParser
 from pathlib import Path
 from typing import Final
 
@@ -37,6 +39,7 @@ OFD_EXTENSIONS: frozenset[str] = frozenset({"ofd"})
 OFFICE_EXTENSIONS: frozenset[str] = frozenset({"doc", "docx", "ppt", "pptx", "xls", "xlsx", "rtf"}) | ODF_EXTENSIONS
 
 HTML_EXTENSIONS: frozenset[str] = frozenset({"html", "htm", "shtml"})
+MHTML_EXTENSIONS: frozenset[str] = frozenset({"mhtml", "mht"})
 
 CSV_EXTENSIONS: frozenset[str] = frozenset({"csv", "tsv"})
 
@@ -49,7 +52,7 @@ TIERED_PARSE_EXTENSIONS: frozenset[str] = PDF_EXTENSIONS | IMAGE_EXTENSIONS
 PAGE_RANGE_PARSE_EXTENSIONS: frozenset[str] = PDF_EXTENSIONS
 
 FLASH_ONLY_PARSE_EXTENSIONS: frozenset[str] = (
-    OFFICE_EXTENSIONS | HTML_EXTENSIONS | CSV_EXTENSIONS | EPUB_EXTENSIONS | OFD_EXTENSIONS
+    OFFICE_EXTENSIONS | HTML_EXTENSIONS | MHTML_EXTENSIONS | CSV_EXTENSIONS | EPUB_EXTENSIONS | OFD_EXTENSIONS
 )
 
 PARSEABLE_EXTENSIONS: frozenset[str] = TIERED_PARSE_EXTENSIONS | FLASH_ONLY_PARSE_EXTENSIONS
@@ -65,6 +68,7 @@ FILE_TYPE_BY_EXTENSION: dict[str, str] = {
     **dict.fromkeys(IMAGE_EXTENSIONS, "image"),
     **{ext: ext for ext in OFFICE_EXTENSIONS},
     **dict.fromkeys(HTML_EXTENSIONS, "html"),
+    **dict.fromkeys(MHTML_EXTENSIONS, "mhtml"),
     "csv": "csv",
     "tsv": "tsv",
     **dict.fromkeys(EPUB_EXTENSIONS, "epub"),
@@ -104,6 +108,8 @@ MIME_TYPE_BY_EXTENSION: dict[str, str] = {
     "html": "text/html",
     "htm": "text/html",
     "shtml": "text/html",
+    "mhtml": "multipart/related",
+    "mht": "multipart/related",
     "png": "image/png",
     "jpg": "image/jpeg",
     "jpeg": "image/jpeg",
@@ -129,6 +135,18 @@ _RTF_HEADER_RE: Final = re.compile(
     rb"\A(?:\xef\xbb\xbf)?[ \t\r\n]{0,64}\{\\rtf(?=[0-9])",
     re.IGNORECASE,
 )
+
+
+def has_mhtml_header(file_bytes: bytes) -> bool:
+    """识别有界 MIME 头中的 related 容器，避免仅靠后缀误判普通邮件或 HTML。"""
+    prefix = file_bytes[:65536]
+    if b"multipart/related" not in prefix.lower():
+        return False
+    try:
+        message = BytesHeaderParser(policy=policy.default).parsebytes(prefix)
+        return message.get_content_type() == "multipart/related" and bool(message.get_boundary())
+    except ValueError:
+        return False
 
 
 def rtf_header_offset(file_bytes: bytes) -> int | None:

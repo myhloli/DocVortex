@@ -124,6 +124,11 @@ def _read_properties(
         from .analyzers.native.html.metadata import read_html_properties
 
         return read_html_properties(data, source_context)
+    if suffix == "mhtml":
+        from .analyzers.native.mhtml.archive import MhtmlArchive
+        from .analyzers.native.mhtml.converter import read_archive_properties
+
+        return read_archive_properties(MhtmlArchive(data, source_context))
     return DocumentProperties(page_count=1, page_count_kind="logical"), []
 
 

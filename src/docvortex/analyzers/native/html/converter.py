@@ -41,6 +41,10 @@ class HtmlConverter:
             raise HtmlResourceLimitError(f"HTML resource limit exceeded: max_html_bytes={MAX_HTML_BYTES}")
         document = parse_html_document(file_bytes, source_context)
         resources = HtmlResourceContext(document.source_context, base_href=document.base_href)
+        self._convert_document(document, resources)
+
+    def _convert_document(self, document: HtmlDocument, resources: HtmlResourceContext) -> None:
+        """复用已解析 DOM 和资源适配器，供 HTML 与网页归档共享正文投影。"""
         wire_result = decode_docvortex_html_wire(document.body, resources)
         if wire_result.blocks is not None:
             blocks = wire_result.blocks

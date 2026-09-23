@@ -50,7 +50,7 @@ def analyze(
     try:
         properties = prepared.source_properties
         metadata_diagnostics = tuple(Diagnostic("read_metadata_failed", message) for message in prepared.metadata_warnings)
-        if prepared.file_suffix != "pdf":
+        if prepared.file_suffix not in {"pdf", "mhtml"}:
             from .errors import DocumentError
 
             try:
@@ -81,6 +81,14 @@ def analyze(
             )
         elif prepared.file_suffix == "html":
             pages = models.HtmlModel().predict(BytesIO(prepared.data), source_context=prepared.source_context)
+        elif prepared.file_suffix == "mhtml":
+            from .analyzers.native.mhtml.converter import MhtmlConverter
+
+            converter = MhtmlConverter()
+            converter.convert(BytesIO(prepared.data), source_context=prepared.source_context)
+            pages = converter.pages
+            properties = converter.properties
+            native_diagnostics = converter.diagnostics
         else:
             model_types: dict[FileSuffix, type[NativeBinaryAnalyzer]] = {
                 "csv": models.CsvModel,

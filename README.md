@@ -73,17 +73,19 @@ use `overwrite=True` in Python or `--overwrite` in the CLI to replace them.
 
 ## Supported formats
 
-### Native inputs · 15 formats
+### Native inputs · 17 formats
 
-| Document family | Formats |
+| Document family | File extensions |
 | --- | --- |
-| PDF with native text | PDF |
-| Word & rich text | DOC, DOCX, RTF |
-| Presentations | PPT, PPTX |
-| Spreadsheets | XLS, XLSX, CSV, TSV |
-| OpenDocument | ODT, ODS, ODP |
-| E-books & web documents | EPUB, HTML |
-| Open Fixed-layout Document | OFD |
+| PDF with native text | `.pdf` |
+| Word & rich text | `.doc`, `.docx`, `.rtf` |
+| Presentations | `.ppt`, `.pptx` |
+| Spreadsheets | `.xls`, `.xlsx`, `.csv`, `.tsv` |
+| OpenDocument | `.odt`, `.ods`, `.odp` |
+| E-books | `.epub` |
+| Web documents | `.html`, `.htm`, `.shtml` |
+| Web archives | `.mhtml`, `.mht` |
+| Open Fixed-layout Document | `.ofd` |
 
 ### Outputs · 7 formats
 

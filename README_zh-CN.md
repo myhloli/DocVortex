@@ -73,17 +73,19 @@ result.export("output/report.docx", output_format="docx")
 
 ## 格式支持
 
-### 原生输入 · 15 种格式
+### 原生输入 · 17 种格式
 
-| 文档类别 | 格式 |
+| 文档类别 | 文件后缀 |
 | --- | --- |
-| 含原生文字的 PDF | PDF |
-| Word 与富文本 | DOC, DOCX, RTF |
-| 演示文稿 | PPT, PPTX |
-| 电子表格 | XLS, XLSX, CSV, TSV |
-| OpenDocument | ODT, ODS, ODP |
-| 电子书与网页文档 | EPUB, HTML |
-| 开放版式文档 | OFD |
+| 含原生文字的 PDF | `.pdf` |
+| Word 与富文本 | `.doc`, `.docx`, `.rtf` |
+| 演示文稿 | `.ppt`, `.pptx` |
+| 电子表格 | `.xls`, `.xlsx`, `.csv`, `.tsv` |
+| OpenDocument | `.odt`, `.ods`, `.odp` |
+| 电子书 | `.epub` |
+| 网页文档 | `.html`, `.htm`, `.shtml` |
+| 网页归档 | `.mhtml`, `.mht` |
+| 开放版式文档 | `.ofd` |
 
 ### 输出 · 7 种格式
 

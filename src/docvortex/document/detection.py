@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from magika import Magika
 
-from .filetypes import CSV_EXTENSIONS, HTML_EXTENSIONS, IMAGE_EXTENSIONS, rtf_header_offset
+from .filetypes import CSV_EXTENSIONS, HTML_EXTENSIONS, IMAGE_EXTENSIONS, has_mhtml_header, rtf_header_offset
 
 PDF_SIG_BYTES = b"%PDF"
 OLE2_SIG_BYTES = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
@@ -54,6 +54,7 @@ _STRONG_CONTENT_SUFFIXES = frozenset(
         "xlsx",
         "rtf",
         "epub",
+        "mhtml",
         "ofd",
         "odt",
         "ods",
@@ -307,10 +308,13 @@ def _reject_unverified_package_suffix(detected_suffix: str) -> str:
 
 
 def guess_suffix_by_bytes(file_bytes: bytes, file_path: str | None = None) -> str:
+    """优先依据强签名与容器头识别格式，再使用通用识别器。"""
     if file_bytes[: len(PDF_SIG_BYTES)] == PDF_SIG_BYTES:
         return "pdf"
     if rtf_header_offset(file_bytes[:128]) is not None:
         return "rtf"
+    if has_mhtml_header(file_bytes):
+        return "mhtml"
 
     ofd_suffix = _guess_ofd_suffix_by_bytes(file_bytes)
     if ofd_suffix:
@@ -345,6 +349,7 @@ def guess_suffix_by_bytes(file_bytes: bytes, file_path: str | None = None) -> st
 
 
 def guess_suffix_by_path(file_path: str | Path) -> str:
+    """读取文件签名和有界 MIME 头，保持路径与字节入口一致。"""
     if not isinstance(file_path, Path):
         file_path = Path(file_path)
 
@@ -373,6 +378,10 @@ def guess_suffix_by_path(file_path: str | Path) -> str:
 
     if _has_pdf_signature_by_path(file_path):
         return "pdf"
+
+    with file_path.open("rb") as source:
+        if has_mhtml_header(source.read(65536)):
+            return "mhtml"
 
     suffix = _magika().identify_path(file_path).prediction.output.label
     if suffix in ["ai", "html"] and file_path.suffix.lower() in [".pdf"]:

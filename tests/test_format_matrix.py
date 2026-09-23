@@ -1,4 +1,4 @@
-"""覆盖全部十六种原生文档输入与七种输出的独立端到端矩阵。"""
+"""覆盖全部十七种原生文档输入与七种输出的独立端到端矩阵。"""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from docvortex.render.contracts import RenderFormat
 from _epub_test_utils import build_epub_fixture
 from _odf_test_utils import build_odt_fixture, build_odp_fixture, build_ods_fixture
 from _ofd_test_utils import build_multi_document_ofd
+from _mhtml_test_utils import build_mhtml_fixture
 
 
 def source_payload(suffix: str) -> bytes:
@@ -18,6 +19,7 @@ def source_payload(suffix: str) -> bytes:
     root = Path(__file__).resolve().parents[1]
     builders = {
         "epub": build_epub_fixture,
+        "mhtml": build_mhtml_fixture,
         "ofd": build_multi_document_ofd,
         "odt": build_odt_fixture,
         "odp": build_odp_fixture,
@@ -37,7 +39,26 @@ def source_payload(suffix: str) -> bytes:
 
 
 @pytest.mark.parametrize(
-    "suffix", ["pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "rtf", "csv", "tsv", "html", "epub", "ofd", "odt", "ods", "odp"]
+    "suffix",
+    [
+        "pdf",
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "rtf",
+        "csv",
+        "tsv",
+        "html",
+        "mhtml",
+        "epub",
+        "ofd",
+        "odt",
+        "ods",
+        "odp",
+    ],
 )
 def test_all_native_formats_render_all_targets(suffix: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """每种原生格式完成分析、后处理和七种目标编码，不导入宿主。"""
