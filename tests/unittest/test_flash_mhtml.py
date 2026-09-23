@@ -47,7 +47,7 @@ def test_detection_public_api_cli_and_schema(extension: str, tmp_path: Path) -> 
     output = tmp_path / "result.md"
     invoked = CliRunner().invoke(main, ["convert", str(source), "-o", str(output)])
     assert invoked.exit_code == 0, invoked.output
-    assert "中文正文" in output.read_text()
+    assert "中文正文" in output.read_text(encoding="utf-8")
     with pytest.raises(InvalidRequestError, match="only for PDF"):
         docvortex.parse(source, page_range="1")
 
