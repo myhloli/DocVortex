@@ -1,13 +1,17 @@
 """DOCX 表格处理；共享当前 Converter 的单文档状态。"""
 
 import re
+from contextlib import ExitStack
 from io import BytesIO
 from typing import Any, Optional
 from docx import Document
 from docx.oxml.xmlchemy import BaseOxmlElement
 from loguru import logger
+from mammoth import docx as mammoth_docx
+from mammoth import read_embedded_style_map
 from mammoth.conversion import convert_document_element_to_html
-from mammoth.docx import body_xml
+from mammoth.options import read_options
+from mammoth.zips import open_zip
 from .office_xml import read_str
 from .....schema import BlockType
 
@@ -43,7 +47,7 @@ class _DocxTables:
 
         Returns:
             list[str | None]: 与正文顶层表格对齐的 HTML 列表；None 表示该表格
-                未找到可靠 Mammoth 结果，后续走孤立 XML 回退解析
+                未找到可靠 Mammoth 结果，后续走完整文档上下文回退解析
         """
         try:
             import mammoth as _mammoth
@@ -206,10 +210,41 @@ class _DocxTables:
             if vmerge.get(f"{{{w_ns}}}val") in (None, "continue"):
                 continuation_nodes.update(cell.iter())
 
+        ignored_nodes = set(continuation_nodes)
+        mc_ns = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+        for alternate in xml_table.iter(f"{{{mc_ns}}}AlternateContent"):
+            # Mammoth 的 Office XML 读取器仅展开 Fallback 分支。
+            for branch in alternate:
+                if branch.tag != f"{{{mc_ns}}}Fallback":
+                    ignored_nodes.update(branch.iter())
+        for simple_field in xml_table.iter(f"{{{w_ns}}}fldSimple"):
+            # Mammoth 不解析简单域，其内部的缓存文字也不参与匹配。
+            ignored_nodes.update(simple_field.iter())
+
+        wordml_ns = "http://schemas.microsoft.com/office/word/2010/wordml"
+        for content_control in xml_table.iter(f"{{{w_ns}}}sdt"):
+            properties = content_control.find(f"{{{w_ns}}}sdtPr")
+            if properties is None or properties.find(f"{{{wordml_ns}}}checkbox") is None:
+                continue
+            content = content_control.find(f"{{{w_ns}}}sdtContent")
+            if content is None:
+                continue
+            # Mammoth 以复选框替换内容控件里的首个非空 Text 节点。
+            first_text = next(
+                (
+                    node
+                    for node in content.iter()
+                    if node not in ignored_nodes and node.tag in char_tags and _DocxTables._xml_table_char_fragment(node)
+                ),
+                None,
+            )
+            if first_text is not None:
+                ignored_nodes.add(first_text)
+
         text = "".join(
             _DocxTables._xml_table_char_fragment(node)
             for node in xml_table.iter()
-            if node not in continuation_nodes and node.tag in char_tags
+            if node not in ignored_nodes and node.tag in char_tags
         )
         return {
             "row_count": len(xml_table.xpath('.//*[local-name()="tr"]')),
@@ -221,11 +256,20 @@ class _DocxTables:
     @staticmethod
     def _html_table_signature(html_table) -> dict:
         """提取 HTML 表格的轻量签名，用于过滤 Mammoth 额外生成的表格。"""
+        text_fragments = []
+        for fragment in html_table.strings:
+            anchor = fragment.find_parent("a")
+            if anchor is not None and anchor.parent.name == "sup":
+                marker = re.fullmatch(r"(footnote|endnote)-ref-(\d+)", anchor.get("id", ""))
+                if marker and anchor.get("href") == f"#{marker.group(1)}-{marker.group(2)}":
+                    # 只忽略 Mammoth 生成的脚注引用，保留正文中的普通 [1]。
+                    continue
+            text_fragments.append(fragment.strip())
         return {
             "row_count": len(html_table.find_all("tr")),
             "cell_count": len(html_table.find_all(["td", "th"])),
             "image_count": len(html_table.find_all("img")),
-            "text": _DocxTables._normalize_table_match_text(html_table.get_text("", strip=True)),
+            "text": _DocxTables._normalize_table_match_text("".join(text_fragments)),
         }
 
     @staticmethod
@@ -396,47 +440,64 @@ class _DocxTables:
             return None
         return f"<p>{''.join(items)}</p>"
 
-    def _handle_tables(self, element: BaseOxmlElement):
-        """
-        处理表格。
+    def _close_mammoth_fallback_context(self) -> None:
+        """关闭当前文档回退解析持有的 ZIP 资源，并清除其缓存。"""
+        context = getattr(self, "_mammoth_fallback_context", None)
+        self._mammoth_fallback_context = None
+        if context is not None:
+            context[0].close()
 
-        优先使用完整文档 mammoth 转换的预解析结果（支持列表、图片、样式等
-        复杂单元格内容），若预解析结果耗尽则回退到孤立 XML 解析模式。
+    def _mammoth_fallback_html(self, element: BaseOxmlElement) -> str:
+        """在原 DOCX 的样式、编号、关系和图片上下文中转换当前表格。"""
+        context = self._mammoth_fallback_context
+        if context is None:
+            file_bytes = self._fallback_docx_bytes
+            if file_bytes is None:
+                raise ValueError("DOCX fallback source is unavailable")
+            resources = ExitStack()
+            try:
+                package = resources.enter_context(open_zip(BytesIO(file_bytes), "r"))
+                paths = mammoth_docx._find_part_paths(package)
+                read_part = mammoth_docx._part_with_body_reader(None, package, paths, False)
+                embedded_style_map = read_embedded_style_map(BytesIO(file_bytes))
+                conversion_options = read_options({"embedded_style_map": embedded_style_map}).value
+                context = (resources, read_part, paths.main_document, conversion_options)
+                self._mammoth_fallback_context = context
+            except Exception:
+                resources.close()
+                raise
 
-        Args:
-            element: 元素对象
-        Returns:
-            list[RefItem]: 元素引用列表
-        """
-        # 优先使用预解析表格（完整文档上下文，能正确处理列表/图片等）
-        if self._mammoth_table_idx < len(self._mammoth_tables_html):
-            html = self._mammoth_tables_html[self._mammoth_table_idx]
-            self._mammoth_table_idx += 1
-            if html is not None:
-                html = self._normalize_table_colspans(html)
-                table_block = {
-                    "type": BlockType.TABLE,
-                    "content": html,
-                }
-                self.cur_page.append(table_block)
-                return
-
-        # 回退：孤立 XML 解析模式（原始方案，不含文档上下文）
+        _, read_part, main_part, conversion_options = context
         table = read_str(element.xml)
-        body_reader = body_xml.reader()
-        t = body_reader.read_all([table])
-        res = convert_document_element_to_html(t.value[0])
-        html = self._normalize_table_colspans(res.value)
-        html = self._inject_equations_into_table_html(
-            html,
-            element,
-            self._require_document_part(),
-        )
-        table_block = {
-            "type": BlockType.TABLE,
-            "content": html,
-        }
-        self.cur_page.append(table_block)
+
+        def read_selected_table(_root: Any, body_reader: Any) -> Any:
+            """每次获取独立 reader，只解析当前 XML 表格并沿用主文档关系。"""
+            return body_reader.read_all([table])
+
+        result = read_part(main_part, read_selected_table)
+        return convert_document_element_to_html(result.value[0], **conversion_options).value
+
+    def _handle_tables(self, element: BaseOxmlElement) -> None:
+        """按正文顺序输出表格；预匹配失败时使用完整 DOCX 上下文回退。"""
+        table_index = self._mammoth_table_idx
+        self._mammoth_table_idx += 1
+        html = self._mammoth_tables_html[table_index] if table_index < len(self._mammoth_tables_html) else None
+        stage = "full-context fallback"
+        try:
+            if html is None:
+                html = self._mammoth_fallback_html(element)
+            stage = "colspan normalization"
+            html = self._normalize_table_colspans(html)
+            if table_index >= len(self._mammoth_tables_html) or self._mammoth_tables_html[table_index] is None:
+                stage = "equation injection"
+                html = self._inject_equations_into_table_html(
+                    html,
+                    element,
+                    self._require_document_part(),
+                )
+        except Exception as exc:
+            raise RuntimeError(f"table #{table_index + 1}, {stage}: {exc}") from exc
+        self.cur_page.append({"type": BlockType.TABLE, "content": html})
 
     def _normalize_table_colspans(self, html: str) -> str:
         """
