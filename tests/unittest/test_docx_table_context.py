@@ -295,7 +295,7 @@ def test_fallback_converter_reuse_and_error_release(monkeypatch: pytest.MonkeyPa
 @pytest.mark.parametrize(
     ("path", "expected_count", "expected_rows"),
     [
-        ("tmp/issues/issue9-merged-cells.docx", 1, 37),
+        ("tests/fixtures/docx/issue9-merged-cells.docx", 1, 37),
         ("demo/ms_office_docs/docx_01.docx", 8, None),
     ],
 )
