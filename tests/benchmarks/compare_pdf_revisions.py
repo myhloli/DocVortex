@@ -40,6 +40,22 @@ def measure(path, folder, source, backend, args):
     assert record["compute"]["backend"] == backend
     assert record["source_code_sha256"] == source_identity(package)["source_code_sha256"]
     assert all(len(values) == args.runs for values in record["seconds"].values())
+    if record.get("memory_method") != "isolated-entry-after-one-warmup":
+        # 已完成的耗时与输出不重写；用同一源码单独审计 RSS，并保留原校验进程的内存值。
+        from pdf_memory import measure as measure_memory
+
+        memory = measure_memory(
+            {
+                **record,
+                "suite": args.suite,
+                "flash_baseline": str(args.flash_baseline.resolve()) if args.flash_baseline else None,
+            },
+            folder / "memory-audit",
+        )
+        record["validation_inclusive_memory"] = record["memory"]
+        record["memory"] = memory["memory"]
+        record["memory_method"] = memory["method"]
+        record["memory_audit_artifact"] = str(folder / "memory-audit/result.json")
     return record
 
 

@@ -139,7 +139,6 @@ def worker(args: argparse.Namespace) -> None:
     from docvortex._compute_backend import backend_info
     from docvortex.version import __version__
     import docvortex
-    from pipeline import MemorySampler
 
     logger.disable("docvortex")
     identity = source_identity(Path(docvortex.__file__))
@@ -190,15 +189,8 @@ def worker(args: argparse.Namespace) -> None:
     write_json(args.output / "output.json", output)
     del output
     gc.collect()
-    progress["status"] = "memory"
+    progress["status"] = "timing_complete"
     write_json(args.output / "progress.json", progress)
-    sampler = MemorySampler()
-    sampler.thread.start()
-    try:
-        memory_times, memory_output = public_once(payload) if args.suite == "public" else shared_once(payload, model)
-    finally:
-        memory = sampler.finish()
-    assert digest(memory_output) == expected
     record = {
         "path": str(path.resolve()),
         "source_sha256": source_hash,
@@ -207,7 +199,6 @@ def worker(args: argparse.Namespace) -> None:
         "first_seconds": first,
         "seconds": dict(times),
         "median_seconds": {key: statistics.median(values) for key, values in times.items()},
-        "memory": memory,
         "onnxruntime_telemetry": "disabled_before_import",
         "onnxruntime_version": onnxruntime.__version__,
         "source_version": __version__,
@@ -215,9 +206,7 @@ def worker(args: argparse.Namespace) -> None:
         "compute": backend_info(),
         **identity,
     }
-    write_json(args.output / "result.json", record)
-    progress["status"] = "complete"
-    write_json(args.output / "progress.json", progress)
+    write_json(args.output / "timing-result.json", record)
     print(path.name, record["median_seconds"], flush=True)
 
 
@@ -265,7 +254,35 @@ def main() -> None:
         if args.flash_baseline:
             command += ["--flash-baseline", str(args.flash_baseline.resolve())]
         subprocess.run(command, cwd=ROOT, check=True)
-        record = json.loads((folder / "result.json").read_text())
+        record = json.loads((folder / "timing-result.json").read_text())
+        config = {
+            **record,
+            "suite": args.suite,
+            "flash_baseline": str(args.flash_baseline.resolve()) if args.flash_baseline else None,
+        }
+        write_json(folder / "memory-input.json", config)
+        progress = json.loads((folder / "progress.json").read_text())
+        progress["status"] = "memory"
+        write_json(folder / "progress.json", progress)
+        subprocess.run(
+            [
+                sys.executable,
+                str(ROOT / "tests/benchmarks/pdf_memory.py"),
+                "--worker",
+                str((folder / "memory-input.json").resolve()),
+                "--output",
+                str((folder / "isolated-memory").resolve()),
+            ],
+            cwd=ROOT,
+            check=True,
+        )
+        memory = json.loads((folder / "isolated-memory/result.json").read_text())
+        assert memory["equal"] and memory["full_output_sha256"] == record["full_output_sha256"]
+        record["memory"] = memory["memory"]
+        record["memory_method"] = memory["method"]
+        write_json(folder / "result.json", record)
+        progress["status"] = "complete"
+        write_json(folder / "progress.json", progress)
         record["artifact"] = folder.name
         records.append(record)
     report = {

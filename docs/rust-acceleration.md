@@ -101,6 +101,7 @@ there. The Rust change does not alter those existing dependency requirements.
 
 Use `PYTHONPATH=src` for a source checkout; omit it when validating an installed wheel.
 Every output directory must be new. Run CPU benchmarks without concurrent tests/builds.
+The independent process-tree memory auditor additionally requires `psutil`.
 
 ```sh
 python tests/benchmarks/flash_pdf.py --backend python --runs 5 --profile --output output/rust/reference
@@ -174,3 +175,14 @@ This prevents a telemetry SDK shutdown race observed on the
 local macOS stack from masking completed PDF results; production runtime settings are
 unchanged. Failed runs remain excluded, and formal comparisons use the same telemetry
 setting for both revisions and backends. Regression retests reverse only affected pairs.
+
+RSS is collected in a separate process after one entrypoint warmup. Public parsing is
+sampled before model serialization; shared sampling retains the evidence snapshots but
+does not encode or hash JSON. Output equality is checked after sampling. The complete
+descendant tree includes rendering workers and multiprocessing helpers. This avoids
+mistaking allocator retention from full-output JSON validation for parser memory use.
+Existing timing runs can be audited without discarding their original memory records:
+
+```sh
+python tests/benchmarks/pdf_memory.py --timing-report output/rust/revisions/report.json --output output/rust/memory-audit
+```
