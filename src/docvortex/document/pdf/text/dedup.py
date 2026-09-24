@@ -165,7 +165,13 @@ def _paint_pairs(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], list[tupl
         for glyph in glyphs:
             head = glyph.head
             obj, origin = head.get("text_object_id"), head.get("origin")
-            eligible = glyph.box is not None and bool(glyph.text.strip()) and obj is not None and origin is not None and head.get("text_render_mode") in (0, 1, 2, 3, 4, 5, 6)
+            eligible = (
+                glyph.box is not None
+                and bool(glyph.text.strip())
+                and obj is not None
+                and origin is not None
+                and head.get("text_render_mode") in (0, 1, 2, 3, 4, 5, 6)
+            )
             if eligible:
                 if len(origin) != 2:
                     return _paint_pairs_python(glyphs)
@@ -470,7 +476,20 @@ def _suppress_hidden(glyphs: list[_Glyph]) -> list[_Glyph]:
         mode = head.get("text_render_mode")
         mode = int(mode) if mode in (0, 1, 2, 3, 4, 5, 6) else -1
         angle = glyph.angle if math.isfinite(glyph.angle) else 0.0
-        records.append((glyph.box, origin, obj, mode, bool(head.get("text_is_visible", True)), bool(glyph.text.strip()), angle, math.cos(angle), math.sin(angle), ranks[index]))
+        records.append(
+            (
+                glyph.box,
+                origin,
+                obj,
+                mode,
+                bool(head.get("text_is_visible", True)),
+                bool(glyph.text.strip()),
+                angle,
+                math.cos(angle),
+                math.sin(angle),
+                ranks[index],
+            )
+        )
     candidates = native.hidden_candidates(records)
     if candidates is None:
         return _suppress_hidden_python(glyphs)
@@ -485,7 +504,9 @@ def _suppress_hidden(glyphs: list[_Glyph]) -> list[_Glyph]:
         else:
             representative = glyphs[matches[0]]
             representative.chars = [c.copy() for c in representative.chars]
-            representative.chars[0]["source_indices"] = _source_indices(representative.chars + [c for i in run for c in glyphs[i].chars])
+            representative.chars[0]["source_indices"] = _source_indices(
+                representative.chars + [c for i in run for c in glyphs[i].chars]
+            )
     return _retained_glyphs(glyphs, removed)
 
 

@@ -2,7 +2,7 @@ name: Native wheels
 
 on:
   push:
-    branches: [main, codex/rust-pdf-acceleration]
+    branches: [main]
   pull_request:
   workflow_dispatch:
   workflow_call:
@@ -20,11 +20,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-24.04, arch: x86_64, name: linux-x86_64, deployment: ''}
-          - {os: ubuntu-24.04-arm, arch: aarch64, name: linux-aarch64, deployment: ''}
-          - {os: windows-latest, arch: AMD64, name: windows-x86_64, deployment: ''}
-          - {os: macos-15, arch: arm64, name: macos-arm64, deployment: '11.0'}
-          - {os: macos-15-intel, arch: x86_64, name: macos-x86_64, deployment: '10.13'}
+          - {os: ubuntu-24.04, arch: x86_64, name: linux-x86_64, deployment: '', smoke: '3.14'}
+          - {os: ubuntu-24.04-arm, arch: aarch64, name: linux-aarch64, deployment: '', smoke: '3.14'}
+          - {os: windows-latest, arch: AMD64, name: windows-x86_64, deployment: '', smoke: '3.14'}
+          - {os: macos-15, arch: arm64, name: macos-arm64, deployment: '11.0', smoke: '3.14'}
+          # 现有 magika/onnxruntime 依赖尚无 Intel macOS 的 cp314 包；另做 3.14 ABI 检查。
+          - {os: macos-15-intel, arch: x86_64, name: macos-x86_64, deployment: '10.13', smoke: '3.13'}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -37,6 +38,7 @@ jobs:
       - name: Build and test ABI3 wheel on Python 3.10
         env:
           CIBW_BUILD: cp310-*
+          CIBW_SKIP: '*-musllinux_*'
           CIBW_ARCHS: ${{ matrix.arch }}
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
@@ -47,15 +49,28 @@ jobs:
           CIBW_TEST_REQUIRES: pytest
           CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q
         run: uvx --from "cibuildwheel>=3.1,<4" cibuildwheel --output-dir wheelhouse
-      - name: Install the exact built artifact on Python 3.14
+      - name: Verify binary ABI on Python 3.14 without optional application dependencies
+        run: python tools/verify_native_abi.py wheelhouse
+      - name: Install the exact built artifact on the current supported dependency stack
         shell: bash
         run: |
-          uv venv --seed --python 3.14
+          uv venv --seed --python ${{ matrix.smoke }}
           uv run --no-project python -c "import pathlib, subprocess, sys; wheels=list(pathlib.Path('wheelhouse').glob('*.whl')); assert len(wheels)==1, wheels; subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0]), 'pytest'])"
-      - name: Verify ABI3 and real parsing on Python 3.14
+      - name: Verify installed wheel and real parsing
         env:
           DOCVORTEX_COMPUTE_BACKEND: rust
         run: uv run --no-project python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
+      - name: Compare public parsing performance and full outputs
+        run: |
+          uv run --no-project python tests/benchmarks/rust_pdf.py --backend python --suite public --output bench-python
+          uv run --no-project python tests/benchmarks/rust_pdf.py --backend rust --suite public --output bench-rust --baseline bench-python
+      - uses: actions/upload-artifact@v6
+        if: ${{ !cancelled() }}
+        with:
+          name: benchmark-${{ matrix.name }}
+          path: |
+            bench-python/report.json
+            bench-rust/report.json
       - uses: actions/upload-artifact@v6
         with:
           name: dist-${{ matrix.name }}

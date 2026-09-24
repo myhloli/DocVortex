@@ -69,6 +69,12 @@ Rust backends on Python 3.10–3.14. The release workflow retains the main-CI/ta
 then builds/tests every artifact before publishing all platform wheels, the pure wheel
 and the source distribution. A local build is not evidence that remote matrix jobs passed.
 
+On Intel macOS, the existing Magika/ONNX Runtime dependency stack currently prevents
+full application installation on Python 3.14. That wheel is tested with full parsing
+on Python 3.10 and 3.13, and its binary kernels are loaded and executed separately on
+Python 3.14. This ABI check is not a claim that the complete dependency stack installs
+there. The Rust change does not alter those existing dependency requirements.
+
 ## Benchmarks and regression gates
 
 Use `PYTHONPATH=src` for a source checkout; omit it when validating an installed wheel.

@@ -9,5 +9,5 @@ recursive-include src/docvortex/resources *
 global-exclude __pycache__ *.py[cod] .DS_Store
 include Cargo.toml Cargo.lock rust-toolchain.toml
 recursive-include rust *.toml *.rs
-include tools/verify_native_wheel.py
+include tools/verify_native_wheel.py tools/verify_native_abi.py
 global-exclude *.so *.pyd

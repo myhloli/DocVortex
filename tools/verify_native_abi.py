@@ -1,0 +1,37 @@
+"""不导入应用依赖，直接在当前 CPython 上检查实际 wheel 中的原生 ABI。"""
+
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+import sys
+import tempfile
+import zipfile
+
+
+def verify(directory: Path) -> None:
+    """加载本次唯一构建产物，验证协议与真实批量内核调用。"""
+    assert sys.version_info[:2] == (3, 14), sys.version
+    wheels = list(directory.glob("*.whl"))
+    assert len(wheels) == 1, wheels
+    with tempfile.TemporaryDirectory(prefix="docvortex-abi-") as temporary:
+        with zipfile.ZipFile(wheels[0]) as archive:
+            members = [
+                name for name in archive.namelist() if name.startswith("docvortex/_native.") and name.endswith((".so", ".pyd"))
+            ]
+            assert len(members) == 1, members
+            binary = Path(temporary) / Path(members[0]).name
+            binary.write_bytes(archive.read(members[0]))
+        spec = importlib.util.spec_from_file_location("_native", binary)
+        assert spec is not None and spec.loader is not None
+        native = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(native)
+        assert native.PROTOCOL_VERSION == 2
+        assert list(native.script_roles([((0, 0, 5, 10), (0, 1, 5, 9), (0, 9), 4 | 256, 0)])) == [0]
+        assert native.grid_parents(4, [(0, 1)]) == [0, 0, 2, 3]
+        assert native.coverage_batch([(0, 1, 0, 10)], [(0, [1], 0, 10, 0)]) == [1.0]
+    print(f"CPython {sys.version_info.major}.{sys.version_info.minor} ABI and native kernels verified: {wheels[0].name}")
+
+
+if __name__ == "__main__":
+    verify(Path(sys.argv[1]))
