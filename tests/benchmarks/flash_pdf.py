@@ -21,6 +21,11 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+import onnxruntime
+
+# 基准进程关闭与 PDF 计算无关的后台遥测，生产包的运行设置保持不变。
+onnxruntime.disable_telemetry_events()
+
 from docvortex.schema import Producer
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -183,6 +188,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
         "bbox_fingerprints": [_page_bbox_fingerprint(page) for page in pages],
         "seconds": durations,
         "first_seconds": first_seconds,
+        "onnxruntime_telemetry": "disabled",
         "median_seconds": statistics.median(durations),
         "peak_rss_bytes": peak_rss * (1024 if sys.platform != "darwin" else 1),
         **stage_timings,

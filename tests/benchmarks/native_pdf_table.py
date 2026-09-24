@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """对两组真实表格分别测量结构与样式，并比较完整结果及候选诊断。"""
 
 from __future__ import annotations
@@ -15,6 +16,10 @@ from dataclasses import asdict
 from pathlib import Path
 
 from loguru import logger
+import onnxruntime
+
+# 不让外部 SDK 的后台上传参与结构/样式基准或进程退出。
+onnxruntime.disable_telemetry_events()
 
 from docvortex.analyzers.native.pdf._table_recovery import (
     NativeTableInput,
@@ -166,7 +171,13 @@ def main() -> None:
     if args.external_pdf and not args.flash_baseline:
         parser.error("external PDF requires frozen Flash baseline")
     logger.disable("docvortex")
-    report = {"python": sys.version, "platform": platform.platform(), "runs": args.runs, "groups": {}}
+    report = {
+        "python": sys.version,
+        "platform": platform.platform(),
+        "runs": args.runs,
+        "onnxruntime_telemetry": "disabled",
+        "groups": {},
+    }
     outputs = {}
     groups = {"cross_page": None, "demo": None}
     if args.external_pdf:

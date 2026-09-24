@@ -13,6 +13,10 @@ import tempfile
 
 def capture(pdf: Path, output: Path, expected: str) -> None:
     """要求加载安装包而非 checkout，并捕获模型、后处理、素材和诊断。"""
+    import onnxruntime
+
+    # 安装验证不依赖遥测，关闭后台上传以免 SDK 的退出异常掩盖解析结果。
+    onnxruntime.disable_telemetry_events()
     from dataclasses import asdict
     from importlib.metadata import version
     import docvortex

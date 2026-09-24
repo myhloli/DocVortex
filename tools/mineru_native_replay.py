@@ -16,6 +16,10 @@ from unittest.mock import patch
 
 def capture(args: argparse.Namespace) -> dict:
     """回放实际宿主的表格优先与文本回填阶段，并冻结回退模型输入及调用计数。"""
+    import onnxruntime
+
+    # 回放不运行模型推理，禁用无关后台遥测以稳定独立进程的正常退出。
+    onnxruntime.disable_telemetry_events()
     sys.path.insert(0, str(args.mineru_source.resolve()))
     from loguru import logger
     from docvortex._compute_backend import backend_info

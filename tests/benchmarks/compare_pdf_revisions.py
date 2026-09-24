@@ -98,17 +98,27 @@ def main():
         folder = args.output / f"{index:02d}-{path.stem}"
         measurements = {label: measure(path, folder / label, source, backend, args) for label, source, backend in order}
         record = {"path": str(path), "measurements": measurements, **compare(measurements)}
-        if any(
-            value["rss_ratio"] > 1.05
+        repeat_pairs = [
+            label
+            for label, value in record["ratios"].items()
+            if value["rss_ratio"] > 1.05
             or any(ratio > 1.05 for stage, ratio in value["time_ratios"].items() if stage in gate_stages)
-            for value in record["ratios"].values()
-        ):
+        ]
+        if repeat_pairs:
+            pair_labels = {
+                "backends": ("python-current", "rust-current"),
+                "rust-revision": ("rust-reference", "rust-current"),
+                "python-revision": ("python-reference", "python-current"),
+            }
+            required = {label for pair in repeat_pairs for label in pair_labels[pair]}
             repeated = {
                 label: measure(path, folder / f"repeat-{label}", source, backend, args)
                 for label, source, backend in reversed(order)
+                if label in required
             }
+            record["repeat_pairs"] = repeat_pairs
             record["repeat_measurements"] = repeated
-            record["repeat_comparison"] = compare(repeated)
+            record["repeat_comparison"] = compare({**measurements, **repeated})
             record["persistent_regression"] = any(
                 value["rss_ratio"] > 1.05
                 and record["repeat_comparison"]["ratios"][label]["rss_ratio"] > 1.05
@@ -118,6 +128,7 @@ def main():
                     if stage in gate_stages
                 )
                 for label, value in record["ratios"].items()
+                if label in repeat_pairs
             )
         report["documents"].append(record)
         write_json(args.output / "progress.json", report)

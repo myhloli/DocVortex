@@ -129,6 +129,10 @@ def shared_once(payload: bytes, model: list) -> tuple[dict, dict]:
 
 def worker(args: argparse.Namespace) -> None:
     """先预热再计时，在计时外验证重复输出，并另跑一轮独立采样内存。"""
+    import onnxruntime
+
+    # 关闭与解析无关的后台联网，避免 ORT 遥测线程干扰计时及解释器退出。
+    onnxruntime.disable_telemetry_events()
     from loguru import logger
     from docvortex._compute_backend import backend_info
     from docvortex.version import __version__
@@ -162,6 +166,8 @@ def worker(args: argparse.Namespace) -> None:
         "compute": backend_info(),
         **identity,
         "status": "timing",
+        "onnxruntime_telemetry": "disabled",
+        "onnxruntime_version": onnxruntime.__version__,
         "completed_runs": 0,
     }
     write_json(args.output / "progress.json", progress)
@@ -200,6 +206,8 @@ def worker(args: argparse.Namespace) -> None:
         "seconds": dict(times),
         "median_seconds": {key: statistics.median(values) for key, values in times.items()},
         "memory": memory,
+        "onnxruntime_telemetry": "disabled",
+        "onnxruntime_version": onnxruntime.__version__,
         "source_version": __version__,
         "source_package": str(Path(docvortex.__file__).resolve()),
         "compute": backend_info(),
