@@ -7,7 +7,7 @@ use docvortex_core::extraction;
 use docvortex_core::geometry::{self, Box4, Size};
 use docvortex_core::tables;
 use pyo3::prelude::*;
-use pyo3::types::PyList;
+use pyo3::types::{PyFloat, PyList, PyTuple};
 
 /// 在 PDFium 读取结束后批量转换数值，不接触句柄或同步锁。
 #[pyfunction]
@@ -264,55 +264,112 @@ fn local_boxes(
     }))
 }
 
-/// 准备 canonical 样本与风险筛选共享的批量几何，返回独立数值。
+/// 为未改变的坐标复用已有 Python 浮点对象，避免 canonical 样本复制整本坐标。
+fn shared_coordinates<'py, const N: usize>(
+    py: Python<'py>,
+    values: [f64; N],
+    candidates: &[Bound<'py, PyAny>],
+) -> PyResult<Bound<'py, PyAny>> {
+    let mut output = Vec::with_capacity(N);
+    for (index, value) in values.into_iter().enumerate() {
+        let mut shared = None;
+        for candidate in candidates {
+            // 只读取普通传输容器；特殊输入已由原校验器处理，不再次触发用户方法。
+            if !candidate.is_exact_instance_of::<PyList>()
+                && !candidate.is_exact_instance_of::<PyTuple>()
+            {
+                continue;
+            }
+            if let Ok(item) = candidate.get_item(index) {
+                if item.is_exact_instance_of::<PyFloat>()
+                    && item.extract::<f64>()?.to_bits() == value.to_bits()
+                {
+                    shared = Some(item);
+                    break;
+                }
+            }
+        }
+        output.push(shared.unwrap_or_else(|| PyFloat::new(py, value).into_any()));
+    }
+    Ok(PyTuple::new(py, output)?.into_any())
+}
+
+/// 数值仍批量计算，但未旋转的局部框复用 source/tight tuple，不复制长期存活的坐标。
 #[pyfunction]
-fn source_rows(
-    py: Python<'_>,
-    raw: &Bound<'_, PyList>,
-    side: &Bound<'_, PyList>,
-    tight: &Bound<'_, PyList>,
-    origins: Vec<Option<Size>>,
+fn source_rows<'py>(
+    py: Python<'py>,
+    raw: &Bound<'py, PyList>,
+    side: &Bound<'py, PyList>,
+    tight: &Bound<'py, PyList>,
+    origins: &Bound<'py, PyList>,
     rotations: Vec<f64>,
     size: Size,
     angle: i32,
-    fallback: &Bound<'_, PyAny>,
-) -> PyResult<Vec<Option<(BoxTuple, BoxTuple, Size, BoxTuple, BoxTuple, Size)>>> {
-    let raw = read_boxes(raw, fallback)?;
-    let side = read_boxes(side, fallback)?;
-    let tight = read_boxes(tight, fallback)?;
-    if [side.len(), tight.len(), origins.len(), rotations.len()]
-        .iter()
-        .any(|n| *n != raw.len())
+    fallback: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyList>> {
+    let raw_values = read_boxes(raw, fallback)?;
+    let side_values = read_boxes(side, fallback)?;
+    let tight_values = read_boxes(tight, fallback)?;
+    let origin_values = origins.extract::<Vec<Option<Size>>>()?;
+    if [
+        side_values.len(),
+        tight_values.len(),
+        origin_values.len(),
+        rotations.len(),
+    ]
+    .iter()
+    .any(|n| *n != raw_values.len())
     {
         return Err(pyo3::exceptions::PyValueError::new_err(
             "geometry batch lengths differ",
         ));
     }
-    let rows = raw
+    let rows = raw_values
         .into_iter()
-        .zip(side)
-        .zip(tight)
-        .zip(origins)
+        .zip(side_values)
+        .zip(tight_values)
+        .zip(origin_values)
         .zip(rotations)
         .map(|((((r, s), t), o), a)| (r, s, t, o, a))
         .collect();
-    Ok(py.detach(move || {
-        geometry::source_rows(rows, size, angle)
-            .into_iter()
-            .map(|v| {
-                v.map(|(s, t, o, ls, lt, lo)| {
-                    (
-                        box_tuple(s),
-                        box_tuple(t),
-                        o,
-                        box_tuple(ls),
-                        box_tuple(lt),
-                        lo,
-                    )
-                })
-            })
-            .collect()
-    }))
+    let prepared = py.detach(move || geometry::source_rows(rows, size, angle));
+    let output = PyList::empty(py);
+    for (index, row) in prepared.into_iter().enumerate() {
+        if let Some((s, t, o, ls, lt, lo)) = row {
+            let source = shared_coordinates(py, s, &[raw.get_item(index)?, side.get_item(index)?])?;
+            let tight_box = shared_coordinates(py, t, &[tight.get_item(index)?])?;
+            let origin = shared_coordinates(py, o, &[origins.get_item(index)?])?;
+            let local_source = if angle == 0 {
+                source.clone()
+            } else {
+                shared_coordinates(py, ls, &[])?
+            };
+            let local_tight = if angle == 0 {
+                tight_box.clone()
+            } else {
+                shared_coordinates(py, lt, &[])?
+            };
+            let local_origin = if angle == 0 {
+                origin.clone()
+            } else {
+                shared_coordinates(py, lo, &[])?
+            };
+            output.append(PyTuple::new(
+                py,
+                [
+                    source,
+                    tight_box,
+                    origin,
+                    local_source,
+                    local_tight,
+                    local_origin,
+                ],
+            )?)?;
+        } else {
+            output.append(py.None())?;
+        }
+    }
+    Ok(output)
 }
 
 /// 一次提取已物化的数值特征，释放 GIL 后计算整段字符角色。

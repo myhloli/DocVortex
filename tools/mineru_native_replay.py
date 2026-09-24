@@ -25,7 +25,7 @@ def capture(args: argparse.Namespace) -> dict:
 
     logger.disable("docvortex")
     logger.disable("mineru")
-    root = Path(__file__).resolve().parents[2]
+    root = Path(__file__).resolve().parents[1]
     frozen = json.loads((args.flash_baseline / "report.json").read_text())
     output = {}
     original_geometry = PDFDocument.get_page_chars_with_geometry

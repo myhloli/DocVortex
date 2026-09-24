@@ -23,7 +23,8 @@ iteration. These paths do not weaken any parsing decision or output comparison.
 
 Python owns Unicode classification, normalization, font equality, version-dependent
 rounding/cluster means, HTML generation and public object construction. Rust owns
-numeric batches and returns source ranges or indices. Original `Char` references and
+numeric batches and returns source ranges or indices. Canonical geometry reuses
+unchanged Python float objects and zero-rotation tuples to bound retained memory. Original `Char` references and
 copy-on-merge source-index behavior are retained. Small bounded caches contain only
 immutable Unicode features; they do not retain documents or use object addresses.
 
@@ -105,3 +106,15 @@ and primitive-reuse tests, and installed-wheel verification. Target a 30% reduct
 each demo's public parse and shared-entry timing. Investigate sustained regressions
 above 5% in time or RSS. Never refresh a gold file or remove fields to achieve parity;
 record any remaining performance gap explicitly.
+
+
+Optional host replay lives outside the independent engine test tree:
+
+```sh
+python tools/mineru_native_replay.py --mineru-source ../Magic-PDF --backend python --flash-baseline output/rust/reference --output output/rust/host-python
+python tools/mineru_native_replay.py --mineru-source ../Magic-PDF --backend rust --flash-baseline output/rust/reference --output output/rust/host-rust --baseline output/rust/host-python
+python tests/benchmarks/compare_native_corpus.py --runs 5 --output output/rust/corpus
+```
+
+Host replay compares actual medium/high native stages with frozen model inputs and
+records fallback inputs and per-page extraction counts; it does not measure live inference.

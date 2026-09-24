@@ -193,3 +193,26 @@ def test_invalid_parent_cycle_is_rejected(native):
     """损坏的私有数组不能让 Rust 陷入无限循环。"""
     with pytest.raises(ValueError, match="cyclic"):
         native.component_specs([1, 0], 1, 2)
+
+
+@pytest.mark.parametrize("angle", [0, 90, 180, 270])
+def test_canonical_coordinate_sharing(native, angle):
+    """长期存活的 canonical 样本复用未变坐标，旋转输出仍逐值匹配 Python。"""
+    from docvortex.analyzers.native.pdf import char_geometry as geometry
+
+    raw = tuple(float(str(v)) for v in (1.25, 2.5, 6.75, 8.5))
+    tight = tuple(float(str(v)) for v in (1.5, 3.0, 6.25, 8.0))
+    origin = (float("1.75"), float("7.25"))
+    before = pickle.dumps((raw, tight, origin))
+    source, ink, point, local_source, local_ink, local_point = native.source_rows(
+        [raw], [None], [tight], [origin], [0.0], (20.0, 30.0), angle, geometry._coerce_bbox
+    )[0]
+    assert (source, ink, tuple(point)) == (raw, tight, origin)
+    assert local_source == geometry._rotate_bbox_to_upright(raw, (20.0, 30.0), angle)
+    assert local_ink == geometry._rotate_bbox_to_upright(tight, (20.0, 30.0), angle)
+    assert tuple(local_point) == geometry._rotate_origin_to_upright(origin, (20.0, 30.0), angle)
+    assert all(a is b for a, b in zip(source, raw))
+    assert all(a is b for a, b in zip(ink, tight))
+    if angle == 0:
+        assert source is local_source and ink is local_ink and point is local_point
+    assert pickle.dumps((raw, tight, origin)) == before
