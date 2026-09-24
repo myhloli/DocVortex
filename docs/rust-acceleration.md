@@ -30,6 +30,12 @@ immutable Unicode features; they do not retain documents or use object addresses
 
 ## Kernels
 
+- Ordered statistics: exact median clustering for baseline and body-height groups;
+  stable first/last-cluster decisions return only source indices.
+- Typography and lanes: bounded font metadata reuse and batched numeric statistics;
+  original lane-member sorting and Python text/font-family classification remain.
+- Table text: stable visual rows and lazy per-recovery occupancy reuse without changing
+  candidates, interval boundary ownership or diagnostics.
 - Shared script geometry: baseline clusters, component membership and script roles.
 - Character geometry: clipping, rotation, visual run boundaries and canonical samples.
 - Extracted-value geometry: PDFium reading stays in Python; coordinate conversion is
@@ -118,3 +124,11 @@ python tests/benchmarks/compare_native_corpus.py --runs 5 --output output/rust/c
 
 Host replay compares actual medium/high native stages with frozen model inputs and
 records fallback inputs and per-page extraction counts; it does not measure live inference.
+
+
+Second-round kernels require private protocol 3. Rebuild editable native installs after
+updating Python sources; an older extension is rejected by forced Rust selection.
+Statistics preserve even-median arithmetic and stable tie order. Non-finite inputs use
+explicit reference paths. Occupancy caches are local to one table recovery and do not
+retain documents. Font metadata reuse is limited to one typography call and primitive
+dictionary values.

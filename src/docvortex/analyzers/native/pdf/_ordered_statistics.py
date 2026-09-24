@@ -8,7 +8,7 @@ from ...._compute_backend import get_native
 def ordered_clusters(values, tolerance, *, relative=0.0, last_only=False):
     """返回稳定簇索引；特殊数值继续使用 Python 的排序与中位数语义。"""
     native = get_native()
-    if native is not None:
+    if native is not None and all(type(value) is float for value in values):
         result = native.ordered_clusters(values, tolerance, relative, last_only)
         if result is not None:
             return result

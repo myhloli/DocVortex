@@ -18,6 +18,10 @@ def verify_binary(binary: Path) -> None:
     spec.loader.exec_module(native)
     assert native.PROTOCOL_VERSION == 3
     assert list(native.script_roles([((0, 0, 5, 10), (0, 1, 5, 9), (0, 9), 4 | 256, 0)])) == [0]
+    assert native.ordered_clusters([0.0, 0.5, 2.0], 0.5, 0.0, False) == [[0, 1], [2]]
+    assert native.table_row_occupancy([[10.0]], [0.0, 10.0, 20.0]) == [[0]]
+    assert native.typography_metrics([(0.0, 0.0, 5.0, 10.0)], [0], [400.0], [0], 1.0)[:5] == (10.0, 5.0, 0, 1.0, 400.0)
+    assert native.lane_gap([], [], [], []) == (0.35, 0.0)
     assert native.grid_parents(4, [(0, 1)]) == [0, 0, 2, 3]
     assert native.coverage_batch([(0, 1, 0, 10)], [(0, [1], 0, 10, 0)]) == [1.0]
 
