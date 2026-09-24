@@ -9,6 +9,20 @@ use docvortex_core::tables;
 use pyo3::prelude::*;
 use pyo3::types::{PyFloat, PyList, PyTuple};
 
+/// 批量聚类仅返回索引，避免为簇成员复制坐标与公开对象。
+#[pyfunction]
+fn ordered_clusters(
+    py: Python<'_>,
+    values: Vec<f64>,
+    tolerance: f64,
+    relative: f64,
+    last_only: bool,
+) -> Option<Vec<Vec<usize>>> {
+    py.detach(move || {
+        docvortex_core::statistics::ordered_clusters(values, tolerance, relative, last_only)
+    })
+}
+
 /// 在 PDFium 读取结束后批量转换数值，不接触句柄或同步锁。
 #[pyfunction]
 fn materialize_geometry(
@@ -423,6 +437,7 @@ fn script_roles_raw(
 /// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(ordered_clusters, module)?)?;
     module.add("PROTOCOL_VERSION", docvortex_core::PROTOCOL_VERSION)?;
     module.add_function(wrap_pyfunction!(script_roles, module)?)?;
     module.add_function(wrap_pyfunction!(normalize_boxes, module)?)?;

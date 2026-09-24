@@ -1,6 +1,6 @@
 //! 不访问 Python 对象或 PDFium 的单线程批量计算内核。
 
-pub const PROTOCOL_VERSION: u32 = 2;
+pub const PROTOCOL_VERSION: u32 = 3;
 
 pub mod dedup;
 pub mod extraction;
@@ -30,3 +30,5 @@ pub fn quantile(mut values: Vec<f64>, fraction: f64) -> f64 {
     values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     values[((values.len() - 1) as f64 * fraction).round_ties_even() as usize]
 }
+
+pub mod statistics;

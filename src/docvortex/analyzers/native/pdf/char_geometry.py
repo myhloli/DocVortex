@@ -572,14 +572,11 @@ def _document_requires_full_geometry(
                 continue
             if line.angle != 0 or line.formula_candidate_only or line.restored_inline_cluster or line.compact_formula_cluster:
                 continue
-            baseline_entries = sorted(anchors, key=lambda entry: entry[4][1])
+            from ._ordered_statistics import ordered_clusters
+
             tolerance = max(0.5, 0.25 * height_q75)
-            clusters: list[list[tuple[int, str, BBox, BBox, tuple[float, float], RunKey, float]]] = []
-            for entry in baseline_entries:
-                if not clusters or abs(entry[4][1] - statistics.median(item[4][1] for item in clusters[-1])) > tolerance:
-                    clusters.append([entry])
-                else:
-                    clusters[-1].append(entry)
+            groups = ordered_clusters([entry[4][1] for entry in anchors], tolerance, last_only=True)
+            clusters = [[anchors[index] for index in group] for group in groups]
             supported = [cluster for cluster in clusters if len(cluster) >= 3 and len(cluster) / len(anchors) >= 0.20]
             if len(supported) >= 2:
                 return _DocumentGeometryRisk(layout=True)
@@ -1137,20 +1134,10 @@ def _baseline_clusters(samples: list[_CharSample]) -> tuple[list[list[_CharSampl
 
     tight_heights = [sample.local_tight_bbox[3] - sample.local_tight_bbox[1] for sample in samples]
     tolerance = max(0.5, 0.25 * _quantile(tight_heights, 0.75))
-    clusters: list[list[_CharSample]] = []
-    for sample in sorted(samples, key=lambda item: item.local_origin[1]):
-        target = next(
-            (
-                cluster
-                for cluster in clusters
-                if abs(sample.local_origin[1] - statistics.median(item.local_origin[1] for item in cluster)) <= tolerance
-            ),
-            None,
-        )
-        if target is None:
-            clusters.append([sample])
-        else:
-            target.append(sample)
+    from ._ordered_statistics import ordered_clusters
+
+    groups = ordered_clusters([sample.local_origin[1] for sample in samples], tolerance)
+    clusters = [[samples[index] for index in group] for group in groups]
     return clusters, tolerance
 
 

@@ -59,24 +59,10 @@ def _infer_document_body_profile(
     if not samples:
         return None
 
-    height_clusters: list[list[tuple[float, int, float]]] = []
-    for height, page_index, normalized_width, _font, _weight in sorted(
-        samples,
-        key=lambda item: item[0],
-    ):
-        target = next(
-            (
-                cluster
-                for cluster in height_clusters
-                if abs(height - statistics.median(item[0] for item in cluster))
-                <= 0.1 * statistics.median(item[0] for item in cluster)
-            ),
-            None,
-        )
-        if target is None:
-            height_clusters.append([(height, page_index, normalized_width)])
-        else:
-            target.append((height, page_index, normalized_width))
+    from .._ordered_statistics import ordered_clusters
+
+    groups = ordered_clusters([sample[0] for sample in samples], 0.0, relative=0.1)
+    height_clusters = [[samples[index][:3] for index in group] for group in groups]
     cross_page_clusters = [cluster for cluster in height_clusters if len({item[1] for item in cluster}) >= 2]
     eligible_clusters = cross_page_clusters or height_clusters
     body_cluster = max(
