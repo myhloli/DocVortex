@@ -9,6 +9,57 @@ use docvortex_core::tables;
 use pyo3::prelude::*;
 use pyo3::types::{PyFloat, PyList, PyTuple};
 
+/// 调用内持有只读区间树，不缓存 Python 行对象。
+#[pyclass(frozen)]
+struct BaselineCandidates {
+    index: docvortex_core::spatial::IntervalIndex,
+}
+
+/// 为整页候选复用排序后的正文高度，查询仅传入区间及核心来源。
+#[pyclass(frozen)]
+struct TableNoteMetrics {
+    metrics: docvortex_core::statistics::NoteMetrics,
+}
+
+#[pymethods]
+impl TableNoteMetrics {
+    /// 拒绝非有限数值，确保参考实现负责特殊排序语义。
+    #[new]
+    fn new(py: Python<'_>, items: Vec<(i64, f64, f64)>) -> PyResult<Self> {
+        py.detach(move || docvortex_core::statistics::NoteMetrics::new(items))
+            .map(|metrics| Self { metrics })
+            .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("invalid note metrics"))
+    }
+
+    /// 数值筛选时释放 GIL，有限输入溢出返回参考路径标志。
+    fn height(
+        &self,
+        py: Python<'_>,
+        top: f64,
+        bottom: f64,
+        core: Vec<i64>,
+        fallback: f64,
+    ) -> Option<f64> {
+        py.detach(|| self.metrics.height(top, bottom, &core, fallback))
+    }
+}
+
+#[pymethods]
+impl BaselineCandidates {
+    /// 验证区间后建立纯数值索引，拒绝不完整的分组参数。
+    #[new]
+    fn new(py: Python<'_>, bounds: Vec<(f64, f64)>, groups: Vec<usize>) -> PyResult<Self> {
+        py.detach(move || docvortex_core::spatial::IntervalIndex::new(bounds, groups))
+            .map(|index| Self { index })
+            .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("invalid interval index"))
+    }
+
+    /// 按固定容量查询连续行，最密的一行也不会造成全页平方内存。
+    fn rows(&self, py: Python<'_>, start: usize, count: usize, budget: usize) -> Vec<Vec<usize>> {
+        py.detach(|| self.index.rows(start, count.min(64), budget.min(8192)))
+    }
+}
+
 /// 批量聚类仅返回索引，避免为簇成员复制坐标与公开对象。
 #[pyfunction]
 fn ordered_clusters(
@@ -485,6 +536,8 @@ fn script_roles_raw(
 /// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<BaselineCandidates>()?;
+    module.add_class::<TableNoteMetrics>()?;
     module.add_function(wrap_pyfunction!(ordered_clusters, module)?)?;
     module.add_function(wrap_pyfunction!(typography_metrics, module)?)?;
     module.add_function(wrap_pyfunction!(lane_gap, module)?)?;

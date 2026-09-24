@@ -23,6 +23,7 @@ from .line_layout import _connection_crosses_table, _font_signatures_share_famil
 from .models import _LineItem, _TextLane
 from .native_text import _fill_native_typography, _median_native_glyph_width
 from ._script_geometry import classify_char_script_roles, paired_script_roles
+from ._interval_candidates import IntervalCandidates
 
 
 def _caption_crosses_left_text(members: list[_LineItem]) -> bool:
@@ -41,8 +42,8 @@ def _same_baseline_candidate_pairs(
     lines: list[_LineItem],
     local_bboxes: list[BBox],
     compatible_indices: dict[tuple[int, bool, str | None], list[int]],
-) -> list[list[int]] | None:
-    """仅筛除原规则不可能接受的纵向远距行对；异常或密集页面回退原遍历。"""
+) -> list[list[int]] | IntervalCandidates | None:
+    """筛除纵向远距行对，密集页面流式查询，异常几何保留原遍历。"""
     bounds: list[tuple[float, float]] = []
     for line, box in zip(lines, local_bboxes, strict=True):
         try:
@@ -79,7 +80,7 @@ def _same_baseline_candidate_pairs(
                 active.remove(expired)
             pair_count += len(active)
             if pair_count > pair_limit:
-                return None
+                return IntervalCandidates(bounds, compatible_indices)
             for previous in active:
                 left, right = (previous, index) if previous < index else (index, previous)
                 candidates[left].append(right)

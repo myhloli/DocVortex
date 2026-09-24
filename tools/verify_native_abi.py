@@ -16,7 +16,7 @@ def verify_binary(binary: Path) -> None:
     assert spec is not None and spec.loader is not None
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
-    assert native.PROTOCOL_VERSION == 3
+    assert native.PROTOCOL_VERSION == 4
     assert list(native.script_roles([((0, 0, 5, 10), (0, 1, 5, 9), (0, 9), 4 | 256, 0)])) == [0]
     assert native.ordered_clusters([0.0, 0.5, 2.0], 0.5, 0.0, False) == [[0, 1], [2]]
     assert native.table_row_occupancy([[10.0]], [0.0, 10.0, 20.0]) == [[0]]

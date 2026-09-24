@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-_PROTOCOL_VERSION = 3
+_PROTOCOL_VERSION = 4
 _SELECTED_MODE = None
 _LOAD_FAILURE = None
 

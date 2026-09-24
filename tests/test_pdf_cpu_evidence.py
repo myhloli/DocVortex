@@ -132,9 +132,13 @@ def test_invalid_geometry_uses_exhaustive_fallback(invalid: float) -> None:
 
 
 def test_dense_page_bounds_candidate_storage() -> None:
-    """候选数量超过线性预算时回退，不分配整个平方级行对集合。"""
+    """密集页面改用有界查询，仍返回穷举同款成员而不分配全页配对。"""
     lines = [_LineItem("a", (0, 0, 20, 10), 0, index) for index in range(128)]
-    assert merging._same_baseline_candidate_pairs(lines, [line.bbox for line in lines], _groups(lines)) is None
+    candidates = merging._same_baseline_candidate_pairs(lines, [line.bbox for line in lines], _groups(lines))
+    assert candidates is not None
+    assert not isinstance(candidates, list)
+    assert candidates[0] == list(range(1, 128))
+    assert candidates[127] == []
 
 
 def test_bottom_edge_tolerance_is_included() -> None:

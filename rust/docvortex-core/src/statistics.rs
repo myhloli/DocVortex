@@ -265,3 +265,68 @@ pub fn lane_gap(
     }
     Some((regular, mad))
 }
+/// 只在一次表格候选构建期间保存排序后的正文高度与来源中心范围。
+pub struct NoteMetrics {
+    items: Vec<(i64, f64, f64)>,
+    extents: std::collections::HashMap<i64, (f64, f64)>,
+}
+
+impl NoteMetrics {
+    /// 将高度稳定排序一次，后续区间过滤保持 Python 排序后的平局顺序。
+    pub fn new(mut items: Vec<(i64, f64, f64)>) -> Option<Self> {
+        if items
+            .iter()
+            .any(|(_, y, h)| !y.is_finite() || !h.is_finite())
+        {
+            return None;
+        }
+        let mut extents = std::collections::HashMap::<i64, (f64, f64)>::new();
+        for &(id, y, _) in &items {
+            extents
+                .entry(id)
+                .and_modify(|p| {
+                    p.0 = p.0.min(y);
+                    p.1 = p.1.max(y);
+                })
+                .or_insert((y, y));
+        }
+        items.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
+        Some(Self { items, extents })
+    }
+
+    /// 过滤纵向排除区间和明确核心成员，直接读取最高四分位的中位位置。
+    pub fn height(&self, top: f64, bottom: f64, core: &[i64], fallback: f64) -> Option<f64> {
+        if !top.is_finite() || !bottom.is_finite() || !fallback.is_finite() {
+            return None;
+        }
+        // 处于排除区间内部的成员无需再次建哈希集合，重复来源仍按其全部中心范围检查。
+        let excluded: std::collections::HashSet<i64> = core
+            .iter()
+            .copied()
+            .filter(|id| {
+                self.extents
+                    .get(id)
+                    .is_some_and(|(a, b)| *a < top || *b > bottom)
+            })
+            .collect();
+        let heights: Vec<f64> = self
+            .items
+            .iter()
+            .filter_map(|(id, y, h)| {
+                ((*y < top || *y > bottom) && !excluded.contains(id)).then_some(*h)
+            })
+            .collect();
+        let n = heights.len();
+        if n < 4 {
+            return Some(fallback);
+        }
+        let count = n.div_ceil(4);
+        let start = n - count;
+        let value = if count % 2 == 1 {
+            heights[start + count / 2]
+        } else {
+            (heights[start + count / 2 - 1] + heights[start + count / 2]) / 2.0
+        };
+        value.is_finite().then_some(value)
+    }
+}
