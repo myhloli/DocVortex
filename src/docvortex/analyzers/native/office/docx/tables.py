@@ -1,5 +1,6 @@
 """DOCX 表格处理；共享当前 Converter 的单文档状态。"""
 
+import base64
 import re
 from contextlib import ExitStack
 from io import BytesIO
@@ -7,7 +8,7 @@ from typing import Any, Optional
 from docx import Document
 from docx.oxml.xmlchemy import BaseOxmlElement
 from loguru import logger
-from mammoth import docx as mammoth_docx
+from mammoth import docx as mammoth_docx, images as mammoth_images
 from mammoth import read_embedded_style_map
 from mammoth.conversion import convert_document_element_to_html
 from mammoth.options import read_options
@@ -16,6 +17,19 @@ from .office_xml import read_str
 from .....schema import BlockType
 
 from .context import _DocxConstants
+from ..image import is_valid_vector_image_payload, is_vector_image_part, serialize_office_image
+
+
+@mammoth_images.img_element
+def _convert_mammoth_table_image(image: Any) -> dict[str, str]:
+    """把表格内 WMF/EMF 转为可导出的图片，普通位图保持原始载荷。"""
+    with image.open() as stream:
+        payload = stream.read()
+    if is_vector_image_part(content_type=image.content_type) or is_valid_vector_image_payload(payload):
+        source = serialize_office_image(payload, content_type=image.content_type)
+    else:
+        source = f"data:{image.content_type};base64,{base64.b64encode(payload).decode('ascii')}"
+    return {"src": source}
 
 
 class _DocxTables:
@@ -56,6 +70,7 @@ class _DocxTables:
             result = _mammoth.convert_to_html(
                 BytesIO(file_bytes),
                 transform_document=self._mammoth_top_level_table_document,
+                convert_image=_convert_mammoth_table_image,
             )
             soup = _BeautifulSoup(result.value, "html.parser")
 
@@ -460,7 +475,9 @@ class _DocxTables:
                 paths = mammoth_docx._find_part_paths(package)
                 read_part = mammoth_docx._part_with_body_reader(None, package, paths, False)
                 embedded_style_map = read_embedded_style_map(BytesIO(file_bytes))
-                conversion_options = read_options({"embedded_style_map": embedded_style_map}).value
+                conversion_options = read_options(
+                    {"embedded_style_map": embedded_style_map, "convert_image": _convert_mammoth_table_image}
+                ).value
                 context = (resources, read_part, paths.main_document, conversion_options)
                 self._mammoth_fallback_context = context
             except Exception:
