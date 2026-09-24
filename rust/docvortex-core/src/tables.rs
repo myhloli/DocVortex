@@ -5,6 +5,8 @@ use std::collections::HashMap;
 pub type Rule = (u8, f64, f64, f64);
 pub type Query = (u8, Vec<f64>, f64, f64, f64);
 pub type GridIndex = (Vec<f64>, Vec<f64>, Vec<Vec<usize>>);
+type CoverageCache = HashMap<(u8, Vec<u64>, u64), Vec<(f64, f64)>>;
+pub type ComponentSpecs = (Vec<usize>, Option<Vec<(usize, usize, usize, usize)>>);
 
 /// 取得矩形交集，边界相接仍视为无面积。
 fn intersection(a: Box4, b: Box4) -> Option<Box4> {
@@ -102,7 +104,7 @@ pub fn coverage_batch(rules: Vec<Rule>, queries: Vec<Query>) -> Option<Vec<f64>>
     {
         return None;
     }
-    let mut cache: HashMap<(u8, Vec<u64>, u64), Vec<(f64, f64)>> = HashMap::new();
+    let mut cache = CoverageCache::new();
     Some(
         queries
             .into_iter()
@@ -320,11 +322,7 @@ pub fn grid_parents(count: usize, pairs: Vec<(usize, usize)>) -> Vec<usize> {
 }
 
 /// 将连通格转换为矩形范围；不完整矩形仍拒绝整份候选。
-pub fn component_specs(
-    mut parents: Vec<usize>,
-    rows: usize,
-    cols: usize,
-) -> (Vec<usize>, Option<Vec<(usize, usize, usize, usize)>>) {
+pub fn component_specs(mut parents: Vec<usize>, rows: usize, cols: usize) -> ComponentSpecs {
     let mut groups: HashMap<usize, (usize, usize, usize, usize, usize)> = HashMap::new();
     for r in 0..rows {
         for c in 0..cols {

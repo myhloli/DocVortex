@@ -1,8 +1,9 @@
 //! 不访问 Python 对象或 PDFium 的单线程批量计算内核。
 
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 pub mod dedup;
+pub mod extraction;
 pub mod geometry;
 pub mod scripts;
 pub mod tables;

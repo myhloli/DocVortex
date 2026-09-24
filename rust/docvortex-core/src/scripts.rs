@@ -92,12 +92,11 @@ fn components(f: &[Feature]) -> Vec<Vec<usize>> {
         }
         if item.has(VALID) {
             if let Some(p) = previous {
-                if f[p].loose[0] - item.loose[0] > scale * 0.5
-                    || item.loose[0] - f[p].loose[2] > scale * 1.5
+                if (f[p].loose[0] - item.loose[0] > scale * 0.5
+                    || item.loose[0] - f[p].loose[2] > scale * 1.5)
+                    && !current.is_empty()
                 {
-                    if !current.is_empty() {
-                        result.push(std::mem::take(&mut current));
-                    }
+                    result.push(std::mem::take(&mut current));
                 }
             }
         }

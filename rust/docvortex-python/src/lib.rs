@@ -1,10 +1,37 @@
 //! 将 Python 批量参数转换为自有记录，再交给纯 Rust 核心计算。
+// 绑定使用列式数组和原四元组输出，不为私有传输引入新的公开对象类型。
+#![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
 use docvortex_core::dedup;
+use docvortex_core::extraction;
 use docvortex_core::geometry::{self, Box4, Size};
 use docvortex_core::tables;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+
+/// 在 PDFium 读取结束后批量转换数值，不接触句柄或同步锁。
+#[pyfunction]
+fn materialize_geometry(
+    py: Python<'_>,
+    rows: Vec<extraction::RawGeometry>,
+    frame: Box4,
+    rounded: Size,
+    angle: i32,
+) -> Vec<(Box4, Option<BoxTuple>, Option<BoxTuple>, Option<(f64, f64)>)> {
+    py.detach(move || {
+        extraction::materialize(rows, frame, rounded, angle)
+            .into_iter()
+            .map(|(layout, loose, tight, origin)| {
+                (
+                    layout,
+                    loose.map(box_tuple),
+                    tight.map(box_tuple),
+                    origin.map(|p| (p[0], p[1])),
+                )
+            })
+            .collect()
+    })
+}
 
 /// 表格区域一次筛选整页字符，特殊输入继续沿 Python 的原验证入口处理。
 #[pyfunction]
@@ -294,6 +321,48 @@ fn script_roles(py: Python<'_>, records: Vec<docvortex_core::scripts::Record>) -
     py.detach(move || docvortex_core::scripts::classify(records))
 }
 
+/// 合并校验与分类边界，避免为每个字符创建两份中间 Python 坐标对象。
+#[pyfunction]
+fn script_roles_raw(
+    py: Python<'_>,
+    loose: &Bound<'_, PyList>,
+    tight: &Bound<'_, PyList>,
+    origins: Vec<Option<Size>>,
+    flags: Vec<u32>,
+    fonts: Vec<i64>,
+    fallback: &Bound<'_, PyAny>,
+) -> PyResult<Option<Vec<u8>>> {
+    let loose = read_boxes(loose, fallback)?;
+    let tight = read_boxes(tight, fallback)?;
+    if [tight.len(), origins.len(), flags.len(), fonts.len()]
+        .iter()
+        .any(|n| *n != loose.len())
+    {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "script batch lengths differ",
+        ));
+    }
+    Ok(py.detach(move || {
+        let records = loose
+            .into_iter()
+            .zip(tight)
+            .zip(origins)
+            .zip(flags)
+            .zip(fonts)
+            .map(|((((l, t), o), mut flag), font)| {
+                let l = geometry::normalize(l, true).unwrap_or([0.0; 4]);
+                let t = geometry::normalize(t, true);
+                let o = o.filter(|p| p.iter().all(|v| v.is_finite()));
+                if flag & 3 == 0 && t.is_some() && o.is_some() {
+                    flag |= 256;
+                }
+                (l, t, o, flag, font)
+            })
+            .collect();
+        docvortex_core::scripts::classify(records)
+    }))
+}
+
 /// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -313,5 +382,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(assign_cells, module)?)?;
     module.add_function(wrap_pyfunction!(grid_parents, module)?)?;
     module.add_function(wrap_pyfunction!(component_specs, module)?)?;
+    module.add_function(wrap_pyfunction!(materialize_geometry, module)?)?;
+    module.add_function(wrap_pyfunction!(script_roles_raw, module)?)?;
     Ok(())
 }

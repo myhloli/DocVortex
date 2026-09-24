@@ -799,9 +799,17 @@ def _script_line_char_roles(
     local_chars: list[dict[str, Any]] = []
     local_tight_bboxes: dict[int, BBox] = {}
     local_origins: dict[int, tuple[float, float]] = {}
-    for char in chars:
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    prepared = (
+        native.normalize_boxes([getattr(char.get("bbox"), "bbox", char.get("bbox")) for char in chars], True, _coerce_bbox)
+        if native is not None
+        else None
+    )
+    for position, char in enumerate(chars):
         local_char = dict(char)
-        bbox = _coerce_bbox(char.get("bbox"))
+        bbox = prepared[position] if prepared is not None else _coerce_bbox(char.get("bbox"))
         if bbox is not None:
             local_char["bbox"] = _rotate_bbox_to_upright(bbox, page_size, angle)
         local_chars.append(local_char)

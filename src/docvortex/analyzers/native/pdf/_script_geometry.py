@@ -780,21 +780,16 @@ def _native_text_flags(text: str) -> int:
     )
 
 
-def _native_script_records(chars, tight_bboxes, origins, protected):
+def _native_script_inputs(chars, tight_bboxes, origins, protected):
     """打包一次调用的几何与 Python 字体等价类，保留异常输入的原校验语义。"""
-    records = []
+    loose_boxes, tight_boxes, points, flags_list, font_ids = [], [], [], [], []
     fonts = {}
-    boxes = []
-    for char in chars:
-        key = _char_geometry_key(char)
-        bbox = char.get("bbox")
-        boxes.extend((getattr(bbox, "bbox", bbox), tight_bboxes.get(key) if key is not None else None))
-    boxes = get_native().normalize_boxes(boxes, True, _coerce_finite_bbox)
     for index, char in enumerate(chars):
         text = str(char.get("char", ""))
         char_idx = _char_geometry_key(char)
-        loose = boxes[index * 2] or (0.0, 0.0, 0.0, 0.0)
-        tight = boxes[index * 2 + 1]
+        loose = char.get("bbox")
+        loose_boxes.append(getattr(loose, "bbox", loose))
+        tight_boxes.append(tight_bboxes.get(char_idx) if char_idx is not None else None)
         raw_origin = origins.get(char_idx) if char_idx is not None else None
         origin = None
         if raw_origin is not None:
@@ -802,15 +797,15 @@ def _native_script_records(chars, tight_bboxes, origins, protected):
                 candidate = (float(raw_origin[0]), float(raw_origin[1]))
             except (IndexError, TypeError, ValueError):
                 candidate = None
-            if candidate is not None and all(math.isfinite(v) for v in candidate):
-                origin = candidate
+            origin = candidate
         flags = _native_text_flags(text)
-        valid = not flags & 3 and tight is not None and origin is not None
-        flags |= (int(index in protected) << 7) | (int(valid) << 8)
+        flags |= int(index in protected) << 7
         font = _script_font_key(char)
         font_id = -1 if font is None else fonts.setdefault(font, len(fonts))
-        records.append((loose, tight, origin, flags, font_id))
-    return records
+        points.append(origin)
+        flags_list.append(flags)
+        font_ids.append(font_id)
+    return loose_boxes, tight_boxes, points, flags_list, font_ids
 
 
 def classify_char_script_roles(
@@ -823,7 +818,9 @@ def classify_char_script_roles(
     """按视觉组件、origin 基线簇和双 bbox 一致性识别上下标。"""
     native = get_native()
     if native is not None:
-        roles = native.script_roles(_native_script_records(chars, tight_bboxes, origins, protected_body_indices or set()))
+        roles = native.script_roles_raw(
+            *_native_script_inputs(chars, tight_bboxes, origins, protected_body_indices or set()), _coerce_finite_bbox
+        )
         if roles is not None:
             names = ("body", "sup", "sub")
             return [names[role] for role in roles]

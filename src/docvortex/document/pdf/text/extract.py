@@ -12,6 +12,7 @@ import pypdfium2 as pdfium
 import pypdfium2.raw as raw
 
 from ._contracts import Bbox, Char
+from ...._compute_backend import get_native
 
 
 def transform_point(
@@ -129,6 +130,9 @@ def get_chars(
     fonts: dict[tuple[Any, ...], dict[str, Any]] = {}
     objects: dict[int, tuple[int, int]] = {}
     chars: list[Char] = []
+    native = get_native() if page_rotation in (0, 90, 180, 270) else None
+    raw_geometry = []
+    pending_clips = []
     for index in range(textpage.count_chars()):
         code = int(raw.FPDFText_GetUnicode(handle, index))
         rotation = float(raw.FPDFText_GetCharAngle(handle, index))
@@ -151,12 +155,14 @@ def get_chars(
         selected = loose if rotation == 0 else tight
         if selected is None:
             raise pdfium.PdfiumError("Failed to get charbox.")
-        x0, y0, x1, y1 = selected
-        # 布局框保留基线的整数页面高度，原始扩展几何另用浮点页面框。
-        ys = (height - (y0 - bottom), height - (y1 - bottom))
-        box = Bbox([min(x0, x1) - left, min(ys), max(x0, x1) - left, max(ys)])
-        if page_rotation:
-            box = box.rotate(width, height, page_rotation)
+        box = None
+        if native is None:
+            x0, y0, x1, y1 = selected
+            # 布局框保留基线的整数页面高度，原始扩展几何另用浮点页面框。
+            ys = (height - (y0 - bottom), height - (y1 - bottom))
+            box = Bbox([min(x0, x1) - left, min(ys), max(x0, x1) - left, max(ys)])
+            if page_rotation:
+                box = box.rotate(width, height, page_rotation)
         name, flags = _font_name(handle, index, font_buffer, font_flags)
         size, weight = raw.FPDFText_GetFontSize(handle, index), raw.FPDFText_GetFontWeight(handle, index)
         font = fonts.setdefault((name, flags, size, weight), {"name": name, "flags": flags, "size": size, "weight": weight})
@@ -185,23 +191,45 @@ def get_chars(
         except Exception:
             pass
         # 两种提取入口都需要原点来区分一字形多码值与独立重复绘制。
+        raw_origin = None
         try:
             if raw.FPDFText_GetCharOrigin(handle, index, origin_x, origin_y):
-                origin = transform_point((origin_x.value, origin_y.value), tuple(page_bbox), page_rotation)
-                if all(math.isfinite(v) for v in origin):
-                    char["origin"] = origin
+                raw_origin = (origin_x.value, origin_y.value)
+                if native is None:
+                    origin = transform_point(raw_origin, tuple(page_bbox), page_rotation)
+                    if all(math.isfinite(v) for v in origin):
+                        char["origin"] = origin
         except Exception:
             pass
-        if include_geometry:
+        if include_geometry and native is None:
             char["loose_bbox"] = visual_bbox(loose, tuple(page_bbox), page_rotation) if loose else None
             char["tight_bbox"] = visual_bbox(tight, tuple(page_bbox), page_rotation) if tight else None
+        clip = None
         if visibility_by_object is not None and address in visibility_by_object:
             visible, clip = visibility_by_object[address]
             if not visible:
                 continue
-            if clip is not None and not _clip_visible_character(char, clip):
+            if native is None and clip is not None and not _clip_visible_character(char, clip):
                 continue
+        if native is not None:
+            # 只暂存数值；仍在原 textpage 和锁作用域内完成物化及裁剪。
+            raw_geometry.append(
+                (selected, loose if include_geometry else None, tight if include_geometry else None, raw_origin)
+            )
+            pending_clips.append(clip)
         chars.append(char)
+    if native is not None:
+        prepared = native.materialize_geometry(raw_geometry, page_bbox, (width, height), page_rotation)
+        del raw_geometry
+        retained = []
+        for char, (layout, loose, tight, origin), clip in zip(chars, prepared, pending_clips, strict=True):
+            char["bbox"] = Bbox(layout)
+            char["origin"] = origin
+            if include_geometry:
+                char["loose_bbox"], char["tight_bbox"] = loose, tight
+            if clip is None or _clip_visible_character(char, clip):
+                retained.append(char)
+        chars = retained
     _assign_writing_angles(chars)
     _mark_visible_objects(chars, handle)
     return chars
