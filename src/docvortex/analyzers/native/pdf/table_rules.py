@@ -62,6 +62,72 @@ class _StableColumnCache:
     prefixes: dict[tuple[float, int], _StableColumnPrefixState] = field(default_factory=dict)
 
 
+@dataclass(slots=True)
+class _RuleCandidateContext:
+    """同一候选组共享只读输入和网格索引，避免每个区间复制页面成员。"""
+
+    rows: list
+    lines: list
+    page_size: tuple
+    angle: int
+    median_height: float
+    axis_lines: list
+    excluded_bboxes: list
+    marker_cache: dict
+    body_metrics: _PreparedTableNoteBodyMetrics
+    grids: list | None = None
+    grid_members: dict = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class _RuleCandidateDraft:
+    """保存轻量候选描述，评分排序之后再创建注释及成员集合。"""
+
+    context: _RuleCandidateContext
+    boundaries: list
+    rows: list
+    caption: _LineItem | None
+    note_rows: list
+    has_notes: bool
+    score: float
+
+    def materialize(self) -> _TableCandidate:
+        """按参考规则物化当前候选，并复用本组网格成员后立即交给合并器。"""
+        context = self.context
+        candidate = _expand_rule_table_candidate(
+            self.boundaries,
+            self.rows,
+            context.rows,
+            context.lines,
+            context.page_size,
+            context.angle,
+            context.median_height,
+            self.caption,
+            self.has_notes,
+            context.marker_cache,
+            self.note_rows,
+            context.body_metrics,
+        )
+        candidate.score = self.score
+        if context.grids is None:
+            context.grids = [
+                box
+                for box in _connected_rule_grid_bboxes(context.axis_lines, context.median_height)
+                if not any(_bbox_overlap_in_smaller(box, excluded) >= 0.5 for excluded in context.excluded_bboxes)
+            ]
+        return _expand_candidates_to_connected_rule_grids(
+            [candidate],
+            context.rows,
+            context.page_size,
+            context.angle,
+            context.median_height,
+            context.axis_lines,
+            context.excluded_bboxes,
+            prepared_grid_bboxes=context.grids,
+            grid_member_cache=context.grid_members,
+        )[0]
+
+
 def _build_fragments(
     lines: list[_LineItem],
     page_size: tuple[float, float],
@@ -157,7 +223,8 @@ def _build_rule_table_candidates(
     path_infos: list[PDFPathInfo] | None = None,
     excluded_bboxes: list[BBox] | None = None,
     caption_candidates: list[tuple[_LineItem, BBox]] | None = None,
-) -> list[_TableCandidate]:
+    defer_materialization: bool = False,
+) -> list[_TableCandidate] | list[_RuleCandidateDraft]:
     """枚举同跨度横线边界区间，再以连续多列文本分布确认表格。"""
 
     candidates: list[_TableCandidate] = []
@@ -174,6 +241,18 @@ def _build_rule_table_candidates(
         angle,
     )
     marker_cache: dict[tuple[int, str], bool] = {}
+    drafts: list[_RuleCandidateDraft] = []
+    context = _RuleCandidateContext(
+        rows,
+        lines,
+        page_size,
+        angle,
+        median_height,
+        axis_lines,
+        excluded_bboxes,
+        marker_cache,
+        prepared_note_body_metrics,
+    )
     for rule_group in _group_long_horizontal_rules(axis_lines, median_height):
         active_first_index = -1
         # 保留历史算法的候选集合与枚举顺序；性能优化只复用候选内部的纯计算结果。
@@ -342,6 +421,20 @@ def _build_rule_table_candidates(
                 )
                 note_corridor_cache[corridor_key] = note_context
             prepared_note_rows, has_possible_table_notes = note_context
+            score = float(2 + len(dense_rows) + stable_columns + min(fill_band_count, 8))
+            if defer_materialization:
+                drafts.append(
+                    _RuleCandidateDraft(
+                        context,
+                        boundary_rules,
+                        accepted_rows,
+                        caption_line,
+                        prepared_note_rows,
+                        has_possible_table_notes,
+                        score,
+                    )
+                )
+                continue
             candidate = _expand_rule_table_candidate(
                 boundary_rules,
                 accepted_rows,
@@ -356,8 +449,10 @@ def _build_rule_table_candidates(
                 prepared_note_rows,
                 prepared_note_body_metrics,
             )
-            candidate.score = float(2 + len(dense_rows) + stable_columns + min(fill_band_count, 8))
+            candidate.score = score
             candidates.append(candidate)
+    if defer_materialization:
+        return drafts
     return _expand_candidates_to_connected_rule_grids(
         candidates,
         rows,
@@ -377,19 +472,27 @@ def _expand_candidates_to_connected_rule_grids(
     median_height: float,
     axis_lines: list[_LocalAxisLine],
     excluded_bboxes: list[BBox],
+    *,
+    prepared_grid_bboxes: list[BBox] | None = None,
+    grid_member_cache: dict[BBox, frozenset[int]] | None = None,
 ) -> list[_TableCandidate]:
     """把已确认候选沿连续横边界和贯穿竖轨扩展到完整物理网格。"""
 
-    grid_bboxes = [
-        grid_bbox
-        for grid_bbox in _connected_rule_grid_bboxes(axis_lines, median_height)
-        if not any(_bbox_overlap_in_smaller(grid_bbox, excluded_bbox) >= 0.5 for excluded_bbox in excluded_bboxes)
-    ]
+    grid_bboxes = (
+        prepared_grid_bboxes
+        if prepared_grid_bboxes is not None
+        else [
+            grid_bbox
+            for grid_bbox in _connected_rule_grid_bboxes(axis_lines, median_height)
+            if not any(_bbox_overlap_in_smaller(grid_bbox, excluded_bbox) >= 0.5 for excluded_bbox in excluded_bboxes)
+        ]
+    )
     if not grid_bboxes:
         return candidates
 
     tolerance = max(2.0, median_height)
-    grid_member_cache: dict[BBox, frozenset[int]] = {}
+    if grid_member_cache is None:
+        grid_member_cache = {}
     for candidate in candidates:
         if candidate.core_bbox is None:
             continue
@@ -1455,6 +1558,8 @@ def _merge_table_candidates(candidates: list[_TableCandidate]) -> list[_TableCan
 
     merged: list[_TableCandidate] = []
     for candidate in sorted(candidates, key=lambda item: item.score, reverse=True):
+        if isinstance(candidate, _RuleCandidateDraft):
+            candidate = candidate.materialize()
         target = next(
             (
                 item

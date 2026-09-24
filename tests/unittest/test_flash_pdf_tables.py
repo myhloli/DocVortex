@@ -891,6 +891,31 @@ def test_rule_table_candidate_accepts_captionless_regular_text_distribution() ->
     assert candidates[0].line_indices == set(range(9))
 
 
+@pytest.mark.parametrize("centered", (False, True))
+def test_deferred_rule_candidates_match_eager_merge(monkeypatch, centered):
+    """确认排序前没有物化候选，最终合并的框、成员、评分和注释完全相同。"""
+    import pickle
+
+    rows, lines, rules = _rule_table_fixture(centered_columns=centered)
+    before = pickle.dumps((rows, lines, rules))
+    args = (rows, lines, (150.0, 100.0), 0, 5.0, rules)
+    expected = table_rules._merge_table_candidates(table_rules._build_rule_table_candidates(*args))
+    original = table_rules._expand_rule_table_candidate
+    calls = []
+
+    def materialize(*args, **kwargs):
+        """只记录真正候选物化时机，不修改构造参数。"""
+        calls.append(1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(table_rules, "_expand_rule_table_candidate", materialize)
+    drafts = table_rules._build_rule_table_candidates(*args, defer_materialization=True)
+    assert drafts and not calls
+    assert table_rules._merge_table_candidates(drafts) == expected
+    assert len(calls) == len(drafts)
+    assert pickle.dumps((rows, lines, rules)) == before
+
+
 def test_rule_table_candidate_accepts_center_aligned_columns_with_varying_widths() -> None:
     """验证左右边界变化但中心稳定的两列表格仍可形成候选。"""
 

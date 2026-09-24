@@ -5,8 +5,9 @@ from __future__ import annotations
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
 import statistics
+import math
 import unicodedata
-from typing import Literal
+from typing import Any, Literal
 from ....schema import BBox
 from .models import _LineItem, _TableAnnotation, _TableCandidate, _VisualRow
 from .geometry import (
@@ -41,6 +42,7 @@ class _PreparedTableNoteBodyMetrics:
 
     items: tuple[tuple[int, float, float], ...]
     centers: tuple[float, ...]
+    native: Any = None
 
 
 def _table_caption_candidates(
@@ -212,9 +214,24 @@ def _prepare_table_note_body_metrics(
         )
     items.sort(key=lambda item: item[1])
     frozen_items = tuple(items)
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    prepared_native = None
+    if native is not None and all(
+        type(index) is int
+        and -(2**63) <= index < 2**63
+        and type(center) is float
+        and type(height) is float
+        and math.isfinite(center)
+        and math.isfinite(height)
+        for index, center, height in frozen_items
+    ):
+        prepared_native = native.TableNoteMetrics(frozen_items)
     return _PreparedTableNoteBodyMetrics(
         items=frozen_items,
         centers=tuple(item[1] for item in frozen_items),
+        native=prepared_native,
     )
 
 
@@ -441,6 +458,14 @@ def _table_note_body_reference_height(
 
     exclusion_top = rule_bbox[1] - 3.0 * median_height
     exclusion_bottom = rule_bbox[3] + 10.0 * median_height
+    if (
+        prepared_metrics is not None
+        and prepared_metrics.native is not None
+        and all(type(index) is int and -(2**63) <= index < 2**63 for index in core_line_indices)
+    ):
+        result = prepared_metrics.native.height(exclusion_top, exclusion_bottom, list(core_line_indices), 1.25 * median_height)
+        if result is not None:
+            return result
     heights: list[float] = []
     if prepared_metrics is None:
         for line in lines:

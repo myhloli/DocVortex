@@ -88,6 +88,7 @@ def _detect_table_candidates(
                 path_infos=source.path_infos,
                 excluded_bboxes=local_excluded_bboxes,
                 caption_candidates=caption_candidates,
+                defer_materialization=True,
             )
         )
         rule_candidates.extend(
