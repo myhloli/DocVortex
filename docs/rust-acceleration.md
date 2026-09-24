@@ -38,13 +38,24 @@ immutable Unicode features; they do not retain documents or use object addresses
   candidates, interval boundary ownership or diagnostics.
 - Shared script geometry: baseline clusters, component membership and script roles.
 - Character geometry: clipping, rotation, visual run boundaries and canonical samples.
-- Extracted-value geometry: PDFium reading stays in Python; coordinate conversion is
-  batched after the same reads, within the existing resource scope.
+- Character extraction: the private bridge borrows function pointers from the active
+  pypdfium2 instance and reads characters in one synchronous call under the original
+  lock and GIL. It owns no PDFium handles or callbacks and loads no second library.
+  Unsupported ctypes ABI/inputs use the reference reader with a recorded reason;
+  errors after entering the bridge propagate. Coordinate conversion can then release
+  the GIL. Wheel smoke checks require an actually completed bridge call.
 - Deduplication: paint buckets, translated-run evidence, source components and hidden
   OCR geometry. Unicode matching and final copies remain in Python.
 - Tables: region selection, batched rule coverage and merging, grid connectivity,
   rectangular component checks and glyph-to-cell assignment. Candidate ordering,
   confidence thresholds, diagnostics, primitive limits and HTML remain unchanged.
+- Dense pages: bounded interval queries replace the quadratic candidate-list fallback;
+  candidate consumption preserves original line indices. Rule-table candidates retain
+  compact interval drafts and share note statistics before stable score materialization.
+  Short-tail attachment sweeps preceding rows without repeatedly scanning whole lanes.
+- Visual assets: the existing rendering workers crop, orient and JPEG-encode images,
+  returning indexed encoded blocks instead of full-page pixels. Scheduling limits,
+  timeout/recovery, crop/encoding parameters and public asset bytes are preserved.
 
 ## Development and distribution
 
@@ -126,9 +137,28 @@ Host replay compares actual medium/high native stages with frozen model inputs a
 records fallback inputs and per-page extraction counts; it does not measure live inference.
 
 
-Second-round kernels require private protocol 3. Rebuild editable native installs after
+Third-round kernels require private protocol 4. Rebuild editable native installs after
 updating Python sources; an older extension is rejected by forced Rust selection.
 Statistics preserve even-median arithmetic and stable tie order. Non-finite inputs use
 explicit reference paths. Occupancy caches are local to one table recovery and do not
 retain documents. Font metadata reuse is limited to one typography call and primitive
 dictionary values.
+
+The experimental native mapping pre-grouping kernel remains disabled in production:
+whole-entry measurements showed its packing cost exceeded its calculation benefit.
+It is retained for differential coverage. No additional environment switch is exposed.
+
+For four-way revision acceptance, freeze the old checkout with its matching binary and
+write `benchmark-revision.json` containing its `commit`. Then run:
+
+```sh
+python tests/benchmarks/compare_pdf_revisions.py --reference-source OLD_CHECKOUT --extra-path LOCAL_EXTERNAL.pdf --output output/rust/revisions
+python tools/generate_dense_pdf.py output/dense-table.pdf
+python tools/verify_native_wheel.py output/dense-table.pdf
+```
+
+The revision benchmark compares complete ModelJson, MiddleJson, diagnostics and asset
+hashes, records real source fingerprints, checkpoints every timing run, samples process
+tree RSS separately, and reverses order for regressions above 5%. Local external PDFs
+are identified by SHA256 and are not uploaded to CI. The wheel matrix instead generates
+a deterministic 120-row synthetic table and exercises both pypdfium2 5.10.1 and 5.13.0.

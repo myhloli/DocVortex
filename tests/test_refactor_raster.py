@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from concurrent.futures import Future
+from concurrent.futures.process import BrokenProcessPool
+from unittest.mock import Mock
+
 from copy import deepcopy
 from io import BytesIO
 from typing import Any
@@ -58,7 +62,7 @@ def test_sparse_visual_pages_keep_physical_identity(
 ) -> None:
     """抽页后按所选 PDF 的物理索引裁图，保留对外页号映射且及时释放图片。"""
     from docvortex.analyzers.native.models import PdfModel
-    from docvortex.document.pdf import images, visuals
+    from docvortex.document.pdf import visuals
 
     raw_pages = [
         [
@@ -145,7 +149,7 @@ def test_visual_windows_and_container_preparation() -> None:
 def test_crop_failure_releases_all_images(monkeypatch: pytest.MonkeyPatch) -> None:
     """整批裁图异常时也关闭已返回页图，并保留调用者持有的 PDFDocument。"""
     from docvortex.analyzers.native.models import PdfModel
-    from docvortex.document.pdf import images, visuals
+    from docvortex.document.pdf import visuals
 
     image = Image.new("RGB", (8, 8))
 
@@ -205,7 +209,7 @@ def test_public_visual_raster_matches_eager_crops(
     threads: int | None,
 ) -> None:
     """以旧全页裁图为参考，验证稀疏筛页、容器、旋转、边界和显式配置透传。"""
-    from docvortex.document.pdf import images, visuals
+    from docvortex.document.pdf import visuals
 
     pages = [
         [{"type": "text", "content": [{"type": "text", "content": "body"}]}],
@@ -258,7 +262,7 @@ def test_public_visual_raster_failure_releases_completed_batches(
     failure: str,
 ) -> None:
     """后续批次失败时既不泄漏前批页图，也不接管外部文档生命周期。"""
-    from docvortex.document.pdf import images, visuals
+    from docvortex.document.pdf import visuals
 
     created: list[Image.Image] = []
 
@@ -279,3 +283,57 @@ def test_public_visual_raster_failure_releases_completed_batches(
     for image in created:
         with pytest.raises(ValueError):
             image.getpixel((0, 0))
+
+
+@pytest.mark.parametrize("failure", (TimeoutError, BrokenProcessPool, ValueError))
+def test_encoded_crop_failure_preserves_pool_recovery(monkeypatch, failure):
+    """编码素材任务复用原超时和损坏池回收规则，普通计算异常保持原样传播。"""
+    from docvortex.document.pdf import images
+
+    executor = object()
+    future = Future()
+    if failure is not TimeoutError:
+        future.set_exception(failure("worker failure"))
+    monkeypatch.setattr(images, "_get_render_process_plan", lambda *args: (1, [(0, 0)]))
+    monkeypatch.setattr(images, "_get_pdf_render_executor", lambda: executor)
+    monkeypatch.setattr(images, "_submit_pdf_render_task", lambda *args: future)
+    if failure is TimeoutError:
+        monkeypatch.setattr(images, "wait", lambda *args, **kwargs: (set(), {future}))
+    recycle = Mock()
+    monkeypatch.setattr(images, "_recycle_pdf_render_executor", recycle)
+    with pytest.raises(failure):
+        images._load_visual_crops_from_pdf_bytes_range(b"pdf", [[]], 0, 0, 1, 1)
+    if failure in (TimeoutError, BrokenProcessPool):
+        recycle.assert_called_once_with(executor, terminate_processes=True)
+    else:
+        recycle.assert_not_called()
+
+
+def test_encoded_crop_results_keep_page_order_and_pool(monkeypatch):
+    """逆序提交并重复请求时仍按页回填，已编码数据不经过 PIL 清理或重新编码。"""
+    from docvortex.document.pdf import images
+
+    executor = object()
+    submitted = []
+
+    def submit(pool, worker, payload, dpi, start, end, prepared):
+        """返回独立完成的 Future，记录实际传入的 worker 和切片索引。"""
+        assert pool is executor and worker is images._load_visual_crops_worker
+        submitted.append((start, prepared))
+        future = Future()
+        future.set_result([[(0, f"page-{start}")]])
+        return future
+
+    monkeypatch.setattr(images, "_get_render_process_plan", lambda *args: (2, [(1, 1), (0, 0)]))
+    monkeypatch.setattr(images, "_get_pdf_render_executor", lambda: executor)
+    monkeypatch.setattr(images, "_submit_pdf_render_task", submit)
+    recycle = Mock()
+    monkeypatch.setattr(images, "_recycle_pdf_render_executor", recycle)
+    prepared = [[{"bbox": [0, 0, 1, 1]}], []]
+    for _ in range(2):
+        assert images._load_visual_crops_from_pdf_bytes_range(b"pdf", prepared, 0, 1, 1, 2) == [
+            [(0, "page-0")],
+            [(0, "page-1")],
+        ]
+    assert submitted == [(1, [[]]), (0, [prepared[0]])] * 2
+    recycle.assert_not_called()

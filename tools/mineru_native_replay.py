@@ -30,8 +30,10 @@ def capture(args: argparse.Namespace) -> dict:
     output = {}
     original_geometry = PDFDocument.get_page_chars_with_geometry
 
-    for name in ("caibao1", "demo1", "demo2"):
-        payload = (root / "demo/pdfs" / f"{name}.pdf").read_bytes()
+    paths = args.path or [root / "demo/pdfs" / f"{name}.pdf" for name in ("caibao1", "demo1", "demo2")]
+    for path in paths:
+        name = path.stem
+        payload = path.read_bytes()
         source_hash = hashlib.sha256(payload).hexdigest()
         entry = next(item for item in frozen["documents"] if item["source_sha256"] == source_hash)
         baseline = json.loads((args.flash_baseline / entry["artifact"] / "output.json").read_text())["model_list"]
@@ -152,6 +154,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mineru-source", type=Path, required=True)
     parser.add_argument("--flash-baseline", type=Path, required=True)
+    parser.add_argument("--path", type=Path, action="append", help="额外或指定 PDF，必须存在于冻结区域基线")
     parser.add_argument("--backend", choices=("python", "rust"), required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--baseline", type=Path)

@@ -31,6 +31,30 @@ def digest(value: object) -> str:
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
+def source_identity(package: Path) -> dict:
+    """记录真正导入的源码指纹，冻结副本不能借用父目录仓库的 HEAD。"""
+    package = package.resolve()
+    source_root = package.parents[2]
+    marker = source_root / "benchmark-revision.json"
+    commit = None
+    if marker.is_file():
+        commit = json.loads(marker.read_text())["commit"]
+    elif (source_root / ".git").exists():
+        commit = subprocess.check_output(["git", "-C", str(source_root), "rev-parse", "HEAD"], text=True).strip()
+    files = list(package.parent.rglob("*.py"))
+    if (source_root / "Cargo.toml").is_file():
+        files += list((source_root / "rust").rglob("*.rs"))
+        files += list((source_root / "rust").rglob("*.toml"))
+        files += [
+            source_root / name for name in ("Cargo.toml", "Cargo.lock", "setup.py", "pyproject.toml", "rust-toolchain.toml")
+        ]
+    fingerprint = hashlib.sha256()
+    for path in sorted(files):
+        fingerprint.update(path.relative_to(source_root).as_posix().encode())
+        fingerprint.update(path.read_bytes())
+    return {"source_commit": commit, "source_code_sha256": fingerprint.hexdigest()}
+
+
 def public_once(payload: bytes) -> tuple[dict, dict]:
     """测量完整公开 parse，结果序列化和素材摘要不计入解析耗时。"""
     from docvortex import parse
@@ -112,9 +136,13 @@ def worker(args: argparse.Namespace) -> None:
     from pipeline import MemorySampler
 
     logger.disable("docvortex")
+    identity = source_identity(Path(docvortex.__file__))
     path = Path(args.worker)
     payload = path.read_bytes()
     source_hash = hashlib.sha256(payload).hexdigest()
+    if path.suffix == ".xor":
+        key = b"MinerU flash layout fixture"
+        payload = bytes(value ^ key[index % len(key)] for index, value in enumerate(payload))
     model = None
     regions_hash = None
     if args.suite == "shared":
@@ -132,6 +160,7 @@ def worker(args: argparse.Namespace) -> None:
         "source_sha256": source_hash,
         "source_package": str(Path(docvortex.__file__).resolve()),
         "compute": backend_info(),
+        **identity,
         "status": "timing",
         "completed_runs": 0,
     }
@@ -148,7 +177,7 @@ def worker(args: argparse.Namespace) -> None:
         else:
             for stage, value in durations.items():
                 times[stage].append(value)
-        progress.update(completed_runs=run, seconds=dict(times), full_output_sha256=expected)
+        progress.update(completed_runs=run, first_seconds=first, seconds=dict(times), full_output_sha256=expected)
         write_json(args.output / "progress.json", progress)
     write_json(args.output / "output.json", output)
     del output
@@ -174,6 +203,7 @@ def worker(args: argparse.Namespace) -> None:
         "source_version": __version__,
         "source_package": str(Path(docvortex.__file__).resolve()),
         "compute": backend_info(),
+        **identity,
     }
     write_json(args.output / "result.json", record)
     progress["status"] = "complete"

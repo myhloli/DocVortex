@@ -4,6 +4,8 @@ from io import BytesIO
 from contextlib import closing
 from pathlib import Path
 from unittest.mock import Mock
+import ctypes
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 import pypdfium2 as pdfium
@@ -102,3 +104,72 @@ def test_bridge_rejects_null_arguments_before_ffi(native):
         native.read_pdfium_chars([0] * 10, 1, 1, True)
     with pytest.raises(ValueError, match="invalid PDFium"):
         native.read_pdfium_chars([1] * 10, 0, 1, True)
+
+
+def test_bridge_long_font_callback_and_surrogates(native, monkeypatch):
+    """真实句柄复用同一 ctypes 回调，覆盖长字体重读、非法 UTF8 和代理对码值。"""
+    factory = ctypes.WINFUNCTYPE if hasattr(ctypes, "WINFUNCTYPE") else ctypes.CFUNCTYPE
+    font_reader = bridge.raw.FPDFText_GetFontInfo
+    unicode_reader = bridge.raw.FPDFText_GetUnicode
+    font_name = b"Synthetic-" + b"A" * 300 + b"\xff\0"
+
+    def font_info(handle, index, buffer, capacity, flags):
+        """按 PDFium 长度协议填写缓冲区，确保第二次读取路径真正执行。"""
+        flags[0] = 32
+        if capacity >= len(font_name):
+            ctypes.memmove(buffer, font_name, len(font_name))
+        return len(font_name)
+
+    def unicode_value(handle, index):
+        """分别注入高低代理项和缺失字形标记，其他码值使用实际 PDFium。"""
+        return {0: 0xD83D, 1: 0xDE00, 2: 0}.get(index, unicode_reader(handle, index))
+
+    monkeypatch.setattr(bridge.raw, "FPDFText_GetFontInfo", factory(font_reader.restype, *font_reader.argtypes)(font_info))
+    monkeypatch.setattr(
+        bridge.raw, "FPDFText_GetUnicode", factory(unicode_reader.restype, *unicode_reader.argtypes)(unicode_value)
+    )
+    with pdfium_guard(), pdfium.PdfDocument(sample_pdf(0)) as document:
+        with closing(document[0]) as page, closing(page.get_textpage()) as textpage:
+            box = list(page.get_bbox())
+            expected = extract._get_chars_python(textpage, box, 0, include_geometry=True)
+            before = bridge.bridge_info()["pdfium_bridge_calls"]
+            actual = extract.get_chars(textpage, box, 0, include_geometry=True)
+            assert bridge.bridge_info()["pdfium_bridge_calls"] == before + 1
+            assert character_state(actual) == character_state(expected)
+            assert any("\ufffd" in char["font"]["name"] for char in actual)
+
+
+def test_bridge_charbox_failure_propagates(native, monkeypatch):
+    """已进入桥接的 PDFium 读取失败保持同一异常，不悄悄重试或返回半页字符。"""
+    factory = ctypes.WINFUNCTYPE if hasattr(ctypes, "WINFUNCTYPE") else ctypes.CFUNCTYPE
+    reader = bridge.raw.FPDFText_GetLooseCharBox
+
+    def failed_box(handle, index, rectangle):
+        """模拟合法 ABI 下的 PDFium 失败返回值。"""
+        return 0
+
+    monkeypatch.setattr(bridge.raw, "FPDFText_GetLooseCharBox", factory(reader.restype, *reader.argtypes)(failed_box))
+    with pdfium_guard(), pdfium.PdfDocument(sample_pdf(0)) as document:
+        with closing(document[0]) as page, closing(page.get_textpage()) as textpage:
+            for reader in (extract._get_chars_python, extract.get_chars):
+                with pytest.raises(pdfium.PdfiumError, match="Failed to get charbox"):
+                    reader(textpage, list(page.get_bbox()), 0, include_geometry=True)
+
+
+def test_bridge_concurrent_requests_keep_existing_guard(native):
+    """多个请求使用原有可重入锁串行读取，每次请求都独立拥有和关闭句柄。"""
+    payload = sample_pdf(0)
+
+    def capture(_index):
+        """在锁内完成打开、两条路径读取和关闭，并返回独立的可比较数据。"""
+        with pdfium_guard(), pdfium.PdfDocument(payload) as document:
+            with closing(document[0]) as page, closing(page.get_textpage()) as textpage:
+                box = list(page.get_bbox())
+                expected = extract._get_chars_python(textpage, box, 0, include_geometry=True)
+                actual = extract.get_chars(textpage, box, 0, include_geometry=True)
+                assert character_state(actual) == character_state(expected)
+                return character_state(actual)
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        results = list(executor.map(capture, range(6)))
+    assert all(result == results[0] for result in results)

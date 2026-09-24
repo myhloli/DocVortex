@@ -138,7 +138,31 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
             raise AssertionError(f"Non-deterministic model-list: {path}")
         expected_digest = digest
         del pages
+        _write_json(
+            destination / "progress.json",
+            {
+                "path": str(path.resolve()),
+                "source_sha256": hashlib.sha256(payload).hexdigest(),
+                "status": "timing",
+                "first_seconds": first_seconds,
+                "seconds": durations,
+                "completed_runs": len(durations),
+                "model_list_sha256": expected_digest,
+            },
+        )
     peak_rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    _write_json(
+        destination / "progress.json",
+        {
+            "path": str(path.resolve()),
+            "source_sha256": hashlib.sha256(payload).hexdigest(),
+            "status": "stage_diagnostics",
+            "first_seconds": first_seconds,
+            "seconds": durations,
+            "completed_runs": len(durations),
+            "model_list_sha256": expected_digest,
+        },
+    )
     pages, stage_timings = _predict_with_timings(payload)
     middle = model_json_to_middle_json(
         ModelJson(
