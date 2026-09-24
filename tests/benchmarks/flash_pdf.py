@@ -9,6 +9,7 @@ import gc
 import hashlib
 import importlib.metadata
 import json
+import os
 import platform
 import pstats
 import statistics
@@ -94,14 +95,19 @@ def _predict_with_timings(payload: bytes) -> tuple[list[list[dict[str, Any]]], d
         finally:
             timings["detect_table_candidates_seconds"] += time.perf_counter() - started
 
-    with patch.object(table_rules, "_build_rule_table_candidates", timed_build), patch.object(
-        table_detection,
-        "_build_rule_table_candidates",
-        timed_build,
-    ), patch.object(table_detection, "_detect_table_candidates", timed_detect), patch.object(
-        pipeline,
-        "_detect_table_candidates",
-        timed_detect,
+    with (
+        patch.object(table_rules, "_build_rule_table_candidates", timed_build),
+        patch.object(
+            table_detection,
+            "_build_rule_table_candidates",
+            timed_build,
+        ),
+        patch.object(table_detection, "_detect_table_candidates", timed_detect),
+        patch.object(
+            pipeline,
+            "_detect_table_candidates",
+            timed_detect,
+        ),
     ):
         pages = _predict(payload)
     return pages, timings
@@ -115,8 +121,11 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
 
     logger.disable("docvortex")
     payload = _read_pdf(path)
+    first_seconds = None
     if runs:
+        started = time.perf_counter()
         _predict(payload)
+        first_seconds = time.perf_counter() - started
     durations = []
     expected_digest = None
     for _ in range(max(1, runs)):
@@ -149,6 +158,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
         "page_fingerprints": [_page_fingerprint(page) for page in pages],
         "bbox_fingerprints": [_page_bbox_fingerprint(page) for page in pages],
         "seconds": durations,
+        "first_seconds": first_seconds,
         "median_seconds": statistics.median(durations),
         "peak_rss_bytes": peak_rss * (1024 if sys.platform != "darwin" else 1),
         **stage_timings,
@@ -171,8 +181,13 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
                 "cumulative_seconds": values[3],
             }
             for (filename, line, name), values in stats.stats.items()
-            if "/docvortex/analyzers/native/pdf/" in filename
+            if "/docvortex/analyzers/native/pdf/" in filename or "/docvortex/document/pdf/" in filename
         ]
+    from docvortex._compute_backend import backend_info
+    from docvortex.version import __version__
+
+    result["compute"] = backend_info()
+    result["source_version"] = __version__
     _write_json(destination / "result.json", result)
 
 
@@ -213,8 +228,12 @@ def main() -> None:
     parser.add_argument("--runs", type=int, default=5, help="预热一次后计时次数；0 只运行功能校验")
     parser.add_argument("--path", action="append", default=[])
     parser.add_argument("--profile", action="store_true", help="额外运行剖析；不计入耗时或 RSS 指标")
+    parser.add_argument(
+        "--backend", choices=("auto", "python", "rust"), default=os.environ.get("DOCVORTEX_COMPUTE_BACKEND", "auto")
+    )
     parser.add_argument("--worker", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    os.environ["DOCVORTEX_COMPUTE_BACKEND"] = args.backend
     if args.runs < 0:
         parser.error("--runs must be non-negative")
     if args.worker:
@@ -270,6 +289,7 @@ def main() -> None:
         "platform": platform.platform(),
         "dependencies": {name: importlib.metadata.version(name) for name in ("docvortex", "pypdfium2", "numpy", "pydantic")},
         "runs": args.runs,
+        "requested_backend": args.backend,
         "historical_baseline_sha": manifest["baseline_git_sha"],
         "historical_differences": history_differences,
         "documents": results,

@@ -7,5 +7,7 @@ recursive-include tests *.py *.json *.pdf *.xor *.rtf
 recursive-include demo *.py *.md *.pdf *.doc *.docx *.ppt *.pptx *.xls *.xlsx *.rtf *.odt *.odp *.ods *.epub *.html *.mhtml *.ofd
 recursive-include src/docvortex/resources *
 global-exclude __pycache__ *.py[cod] .DS_Store
-include Cargo.toml Cargo.lock
+include Cargo.toml Cargo.lock rust-toolchain.toml
 recursive-include rust *.toml *.rs
+include tools/verify_native_wheel.py
+global-exclude *.so *.pyd

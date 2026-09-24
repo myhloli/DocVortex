@@ -38,7 +38,11 @@ def test_native_benchmark_generates_report_and_portable_profile(tmp_path: Path) 
     record = report["documents"][0]
     assert record["pages"] == 1
     assert record["profile"]
-    assert all(item["file"].startswith("docvortex/analyzers/native/pdf/") for item in record["profile"])
+    assert all(
+        item["file"].startswith(("docvortex/analyzers/native/pdf/", "docvortex/document/pdf/")) for item in record["profile"]
+    )
+    assert record["compute"]["backend"] in {"python", "rust"}
+    assert record["source_version"]
     assert (tmp_path / record["artifact"] / "output.json").is_file()
 
 

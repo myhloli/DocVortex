@@ -9,7 +9,7 @@ permissions:
   actions: read
 
 jobs:
-  build:
+  gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -36,45 +36,12 @@ jobs:
           if os.environ['RELEASE_TAG'] != f'v{version}':
               raise SystemExit('Release tag does not match package version')
           PY
-      - run: uv build
-      - run: uvx twine check dist/*
-      - uses: actions/upload-artifact@v6
-        with:
-          name: distributions
-          path: dist/*
-          retention-days: 7
-
-  smoke:
-    needs: build
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: '3.13'
-      - uses: actions/download-artifact@v7
-        with:
-          name: distributions
-          path: dist/
-      - run: uv venv
-      - name: Install built wheel
-        shell: bash
-        run: |
-          wheel="$(find dist -maxdepth 1 -type f -name 'docvortex-*.whl' -print -quit)"
-          test -n "$wheel"
-          uv pip install "$wheel"
-      - run: uv run --no-project docvortex --version
-      - name: Verify installed package
-        env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: uv run --no-project python tools/verify_release_package.py tests/unittest/pdfs/test.pdf
+  distributions:
+    needs: gate
+    uses: ./.github/workflows/native-wheels.yml
 
   publish:
-    needs: [build, smoke]
+    needs: distributions
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -84,6 +51,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v7
         with:
-          name: distributions
+          pattern: dist-*
+          merge-multiple: true
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1

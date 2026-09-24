@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import statistics
 import sys
@@ -121,7 +122,11 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--runs", type=int, default=5)
+    parser.add_argument(
+        "--backend", choices=("auto", "python", "rust"), default=os.environ.get("DOCVORTEX_COMPUTE_BACKEND", "auto")
+    )
     args = parser.parse_args()
+    os.environ["DOCVORTEX_COMPUTE_BACKEND"] = args.backend
     if args.runs < 1 or args.output.exists():
         parser.error("runs must be positive and output must not already exist")
     logger.disable("docvortex")
@@ -136,6 +141,11 @@ def main() -> None:
     payload = json.dumps(outputs, ensure_ascii=False, sort_keys=True)
     (args.output / "output.json").write_text(payload, encoding="utf-8")
     report["output_sha256"] = hashlib.sha256(payload.encode()).hexdigest()
+    from docvortex._compute_backend import backend_info
+    from docvortex.version import __version__
+
+    report["compute"] = backend_info()
+    report["source_version"] = __version__
     if args.baseline:
         previous = json.loads((args.baseline / "output.json").read_text())
         current = json.loads(payload)
