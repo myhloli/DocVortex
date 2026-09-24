@@ -2,6 +2,7 @@
 
 pub const PROTOCOL_VERSION: u32 = 1;
 
+pub mod geometry;
 pub mod scripts;
 
 /// 对有限数值稳定排序并计算与 statistics.median 相同的中位数。

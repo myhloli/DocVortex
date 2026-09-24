@@ -441,6 +441,62 @@ def _style_line_is_inflated(
     )
 
 
+def _prepared_line_geometry(line, geometry, page_size, *, anchors_only):
+    """批量准备风险判断与 canonical 样本共用的独立几何，保持源成员顺序。"""
+    from ...._compute_backend import get_native
+    from ._native_geometry import raw_bbox
+
+    selected = []
+    for position, char in enumerate(line.chars):
+        text = str(char.get("char") or "")
+        index = char.get("char_idx")
+        if not _is_anchor_text(text) if anchors_only else not text or not text.isprintable() or text.isspace():
+            continue
+        if isinstance(index, bool) or not isinstance(index, int):
+            continue
+        selected.append((position, text, index, char))
+    native = get_native()
+    if native is None:
+        for position, text, index, char in selected:
+            source = _clip_validated_bbox(_source_bbox(char, geometry, index), page_size)
+            tight = _clip_validated_bbox(_coerce_bbox(geometry.tight_bboxes.get(index)), page_size)
+            origin = _coerce_origin(geometry.origins.get(index))
+            if source is not None and tight is not None and origin is not None:
+                yield (
+                    position,
+                    text,
+                    index,
+                    char,
+                    (
+                        source,
+                        tight,
+                        origin,
+                        _rotate_bbox_to_upright(source, page_size, line.angle),
+                        _rotate_bbox_to_upright(tight, page_size, line.angle),
+                        _rotate_origin_to_upright(origin, page_size, line.angle),
+                    ),
+                )
+        return
+    sources, sides, tights, origins, rotations = [], [], [], [], []
+    for _position, _text, index, char in selected:
+        try:
+            rotation = float(char.get("rotation") or 0.0)
+        except (TypeError, ValueError):
+            rotation = math.nan
+        sources.append(raw_bbox(char.get("bbox")))
+        sides.append(
+            raw_bbox(geometry.loose_bboxes.get(index)) if not math.isfinite(rotation) or abs(rotation) > 1e-9 else None
+        )
+        tights.append(raw_bbox(geometry.tight_bboxes.get(index)))
+        origins.append(_coerce_origin(geometry.origins.get(index)))
+        rotations.append(rotation)
+    prepared = native.source_rows(sources, sides, tights, origins, rotations, page_size, line.angle, _coerce_bbox)
+    for (position, text, index, char), values in zip(selected, prepared, strict=True):
+        if values is not None:
+            source, tight, origin, local_source, local_tight, local_origin = values
+            yield position, text, index, char, (source, tight, tuple(origin), local_source, local_tight, tuple(local_origin))
+
+
 def _document_requires_full_geometry(
     lines_by_page: list[list[_LineItem]],
     geometries: list[PDFPageTextGeometry],
@@ -459,24 +515,18 @@ def _document_requires_full_geometry(
     ):
         for line in lines:
             entries: list[tuple[int, str, BBox, BBox, tuple[float, float], RunKey, float]] = []
-            for position, char in enumerate(line.chars):
-                text = str(char.get("char") or "")
-                char_idx = char.get("char_idx")
-                if not _is_anchor_text(text) or isinstance(char_idx, bool) or not isinstance(char_idx, int):
-                    continue
-                source = _clip_validated_bbox(_source_bbox(char, geometry, char_idx), page_size)
-                tight = _clip_validated_bbox(_coerce_bbox(geometry.tight_bboxes.get(char_idx)), page_size)
-                origin = _coerce_origin(geometry.origins.get(char_idx))
-                if source is None or tight is None or origin is None:
-                    continue
+            for position, text, _char_idx, char, prepared in _prepared_line_geometry(
+                line, geometry, page_size, anchors_only=True
+            ):
                 run_key, font_size = _font_run_key(char, line.angle, text)
+                _source, _tight, _origin, local_source, local_tight, local_origin = prepared
                 entries.append(
                     (
                         position,
                         text,
-                        _rotate_bbox_to_upright(source, page_size, line.angle),
-                        _rotate_bbox_to_upright(tight, page_size, line.angle),
-                        _rotate_origin_to_upright(origin, page_size, line.angle),
+                        local_source,
+                        local_tight,
+                        local_origin,
                         run_key,
                         font_size,
                     )
@@ -590,22 +640,10 @@ def _collect_samples(
     by_line: dict[LineKey, list[_CharSample]] = defaultdict(list)
     for page_index, (lines, geometry, page_size) in enumerate(zip(lines_by_page, geometries, page_sizes, strict=True)):
         for line in lines:
-            for position, char in enumerate(line.chars):
-                text = str(char.get("char") or "")
-                char_idx = char.get("char_idx")
-                if (
-                    not text
-                    or not text.isprintable()
-                    or text.isspace()
-                    or isinstance(char_idx, bool)
-                    or not isinstance(char_idx, int)
-                ):
-                    continue
-                source_bbox = _clip_validated_bbox(_source_bbox(char, geometry, char_idx), page_size)
-                tight_bbox = _clip_validated_bbox(_coerce_bbox(geometry.tight_bboxes.get(char_idx)), page_size)
-                origin = _coerce_origin(geometry.origins.get(char_idx))
-                if source_bbox is None or tight_bbox is None or origin is None:
-                    continue
+            for position, text, char_idx, char, prepared in _prepared_line_geometry(
+                line, geometry, page_size, anchors_only=False
+            ):
+                source_bbox, tight_bbox, origin, local_source, local_tight, local_origin = prepared
                 run_key, font_size = _font_run_key(char, line.angle, text)
                 sample = _CharSample(
                     page_index=page_index,
@@ -616,9 +654,9 @@ def _collect_samples(
                     source_bbox=source_bbox,
                     tight_bbox=tight_bbox,
                     origin=origin,
-                    local_source_bbox=_rotate_bbox_to_upright(source_bbox, page_size, line.angle),
-                    local_tight_bbox=_rotate_bbox_to_upright(tight_bbox, page_size, line.angle),
-                    local_origin=_rotate_origin_to_upright(origin, page_size, line.angle),
+                    local_source_bbox=local_source,
+                    local_tight_bbox=local_tight,
+                    local_origin=local_origin,
                     run_key=run_key,
                     font_size=font_size,
                 )

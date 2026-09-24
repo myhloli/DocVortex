@@ -2,6 +2,7 @@
 
 import pickle
 import random
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -82,3 +83,34 @@ def test_native_script_path_is_exercised(native, monkeypatch):
 
     monkeypatch.setattr(scripts, "_classify_char_script_roles_python", reject)
     assert scripts.classify_char_script_roles(chars, tight_bboxes={0: (0, 0, 5, 9)}, origins={0: (0, 9)}) == ["body"]
+
+
+@pytest.mark.parametrize("angle", [0, 90, 180, 270])
+def test_visual_runs_and_typography_parity(native, monkeypatch, angle):
+    """随机字距、空白、反向框及字体权重下比较完整行对象和引用关系。"""
+    from docvortex import _compute_backend
+    from docvortex.analyzers.native.pdf import native_text
+    from docvortex.analyzers.native.pdf.models import _LineItem
+
+    rng = random.Random(angle + 7)
+    for _ in range(60):
+        chars = []
+        x = 0
+        for i in range(rng.randrange(1, 90)):
+            x += rng.choice([2, 5, 8, 20])
+            char = {
+                "char": rng.choice("中文aA12 ,\t\n"),
+                "char_idx": i,
+                "bbox": Bbox([x, 20, x + 4, 30]),
+                "font": {"name": rng.choice(["Abc", "Def", ""]), "flags": 0, "weight": rng.choice([0, 400, 700])},
+            }
+            chars.append(char)
+        line = _LineItem("".join(c["char"] for c in chars), (0, 20, x + 5, 30), angle, 0, chars=chars)
+        before = pickle.dumps(line)
+        with monkeypatch.context() as context:
+            context.setattr(_compute_backend, "get_native", lambda: None)
+            expected = native_text._split_native_visual_runs_python(deepcopy(line), (1000, 1000))
+        actual = native_text._split_native_visual_runs(line, (1000, 1000))
+        assert pickle.dumps(actual) == pickle.dumps(expected)
+        assert all(any(c is source for source in chars) for item in actual for c in item.chars)
+        assert pickle.dumps(line) == before

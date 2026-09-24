@@ -362,6 +362,63 @@ def _split_native_visual_runs(
     visual_bboxes: Mapping[int, BBox] | None = None,
     preserve_vertical_bbox: BBox | None = None,
 ) -> list[_LineItem]:
+    """批量处理视觉 run 几何，Python 保留文字清洗及原对象物化。"""
+    from ...._compute_backend import get_native
+    from ._native_geometry import glyph_flags, raw_bbox
+
+    native = get_native()
+    if native is None:
+        return _split_native_visual_runs_python(
+            line, page_size, visual_bboxes=visual_bboxes, preserve_vertical_bbox=preserve_vertical_bbox
+        )
+    tokens = [(char, str(char.get("char") or "")) for char in line.chars]
+    tokens = [(char, text) for char, text in tokens if text not in {"\r", "\n"}]
+    flags = [glyph_flags(text) for _char, text in tokens]
+    boxes = [raw_bbox(char.get("bbox")) for char, _text in tokens]
+    overrides = [
+        raw_bbox(visual_bboxes.get(char.get("char_idx")))
+        if visual_bboxes is not None and isinstance(char.get("char_idx"), int) and flag & 1
+        else None
+        for (char, _text), flag in zip(tokens, flags)
+    ]
+    ranges = native.visual_runs(boxes, overrides, flags, page_size, line.angle, _coerce_bbox)
+    if not ranges:
+        return _split_native_visual_runs_python(
+            line, page_size, visual_bboxes=visual_bboxes, preserve_vertical_bbox=preserve_vertical_bbox
+        )
+    output = []
+    for run_index, (start, end, run_bbox) in enumerate(ranges):
+        run_tokens = tokens[start:end]
+        text = _normalize_native_run_text("".join(text for _char, text in run_tokens))
+        if not text or run_bbox is None:
+            continue
+        if preserve_vertical_bbox is not None:
+            local = _rotate_bbox_to_upright(run_bbox, page_size, line.angle)
+            vertical = _rotate_bbox_to_upright(preserve_vertical_bbox, page_size, line.angle)
+            run_bbox = _rotate_bbox_from_upright((local[0], vertical[1], local[2], vertical[3]), page_size, line.angle)
+        item = _LineItem(
+            text=text,
+            bbox=run_bbox,
+            angle=line.angle,
+            source_index=-1,
+            chars=[char for char, _text in run_tokens],
+            visual_row_id=line.visual_row_id,
+            run_index=run_index,
+            split_from_row=len(ranges) > 1,
+            formula_candidate_only=line.formula_candidate_only,
+        )
+        _fill_native_typography(item, page_size)
+        output.append(item)
+    return output
+
+
+def _split_native_visual_runs_python(
+    line: _LineItem,
+    page_size: tuple[float, float],
+    *,
+    visual_bboxes: Mapping[int, BBox] | None = None,
+    preserve_vertical_bbox: BBox | None = None,
+) -> list[_LineItem]:
     """保留字符源顺序与空白信息，并按 canonical 字符框拆分远距视觉 run。"""
 
     tokens: list[tuple[Char, str, BBox | None, BBox | None]] = []
@@ -681,6 +738,18 @@ def _detect_leading_typography_width(
 def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> None:
     """使用原始 bbox、PDF 字号和 dominant font 填充两套排版特征。"""
 
+    from ...._compute_backend import get_native
+    from ._native_geometry import glyph_flags, raw_bbox
+
+    native = get_native()
+    prepared_boxes = None
+    if native is not None:
+        prepared_boxes = native.local_boxes(
+            [raw_bbox(char.get("bbox")) if glyph_flags(str(char.get("char") or "")) & 1 else None for char in line.chars],
+            page_size,
+            line.angle,
+            _coerce_bbox,
+        )
     canonical_em_height = line.em_height
     heights: list[float] = []
     glyph_widths: list[float] = []
@@ -688,14 +757,19 @@ def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> 
     font_weights: dict[tuple[str, int], list[float]] = {}
     glyph_typography: list[tuple[BBox, tuple[str, int] | None, float | None]] = []
     valid_font_chars = 0
-    for char in line.chars:
+    for char_position, char in enumerate(line.chars):
         raw_char = str(char.get("char") or "")
         if not raw_char.isprintable() or raw_char.isspace():
             continue
-        bbox = _clip_validated_bbox(_coerce_bbox(char.get("bbox")), page_size)
-        if bbox is None:
-            continue
-        local_bbox = _rotate_bbox_to_upright(bbox, page_size, line.angle)
+        if prepared_boxes is not None:
+            local_bbox = prepared_boxes[char_position]
+            if local_bbox is None:
+                continue
+        else:
+            bbox = _clip_validated_bbox(_coerce_bbox(char.get("bbox")), page_size)
+            if bbox is None:
+                continue
+            local_bbox = _rotate_bbox_to_upright(bbox, page_size, line.angle)
         heights.append(max(0.1, local_bbox[3] - local_bbox[1]))
         glyph_widths.append(max(0.1, local_bbox[2] - local_bbox[0]))
         font = char.get("font") or {}
