@@ -8,6 +8,7 @@ use docvortex_core::geometry::{self, Box4, Size};
 use docvortex_core::tables;
 use pyo3::prelude::*;
 use pyo3::types::{PyFloat, PyList, PyTuple};
+mod pdfium;
 
 /// 调用内持有只读区间树，不缓存 Python 行对象。
 #[pyclass(frozen)]
@@ -536,6 +537,11 @@ fn script_roles_raw(
 /// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(pdfium::read_pdfium_chars, module)?)?;
+    module.add(
+        "PdfiumReadError",
+        module.py().get_type::<pdfium::PdfiumReadError>(),
+    )?;
     module.add_class::<BaselineCandidates>()?;
     module.add_class::<TableNoteMetrics>()?;
     module.add_function(wrap_pyfunction!(ordered_clusters, module)?)?;

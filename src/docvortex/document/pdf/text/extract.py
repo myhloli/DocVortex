@@ -119,6 +119,97 @@ def get_chars(
     include_geometry: bool = False,
     visibility_by_object: dict[int, tuple[bool, tuple[float, float, float, float] | None]] | None = None,
 ) -> list[Char]:
+    """普通页面使用同库字符批量读取，特殊运行时保留完整 ctypes 参考路径。"""
+    if (
+        type(page_rotation) is int
+        and page_rotation in (0, 90, 180, 270)
+        and type(page_bbox) is list
+        and len(page_bbox) == 4
+        and all(type(value) in (float, int) and math.isfinite(value) for value in page_bbox)
+        and get_native() is not None
+    ):
+        result = _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visibility_by_object)
+        if result is not None:
+            return result
+    return _get_chars_python(
+        textpage,
+        page_bbox,
+        page_rotation,
+        include_geometry=include_geometry,
+        visibility_by_object=visibility_by_object,
+    )
+
+
+def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visibility_by_object):
+    """物化已批量读取的记录，保持字体共享、页内对象编号、裁剪和写入方向语义。"""
+    from ._pdfium_bridge import read_native_chars
+
+    left, bottom, right, top = page_bbox
+    width, height = math.ceil(abs(right - left)), math.ceil(abs(top - bottom))
+    batch = read_native_chars(textpage, include_geometry)
+    if batch is None:
+        return None
+    records, raw_fonts = batch
+    decoded_fonts = [(bytes(name).decode("utf-8", errors="replace"), flags) for name, flags in raw_fonts]
+    fonts, objects = {}, {}
+    chars, raw_geometry, pending_clips = [], [], []
+    for index, (code, rotation, loose, tight, font_index, size, weight, address, mode, origin) in enumerate(records):
+        name, flags = decoded_fonts[font_index]
+        key = (name, flags, size, weight)
+        font = fonts.get(key)
+        if font is None:
+            font = fonts[key] = {"name": name, "flags": flags, "size": size, "weight": weight}
+        object_id = None
+        if address:
+            if address not in objects:
+                objects[address] = len(objects)
+            object_id = objects[address]
+        clip = None
+        if visibility_by_object is not None and (address or None) in visibility_by_object:
+            visible, clip = visibility_by_object[address or None]
+            if not visible:
+                continue
+        char = {
+            "bbox": None,
+            "char": chr(code) if not 0xD800 <= code <= 0xDFFF else "\ufffd",
+            "rotation": rotation,
+            "font": font,
+            "char_idx": index,
+            "source_indices": (index,),
+            "raw_code": code,
+            "text_object_id": object_id,
+            "text_render_mode": mode,
+            "writing_angle": math.radians(page_rotation) - rotation,
+            "origin": None,
+        }
+        selected = loose if rotation == 0 else tight
+        raw_geometry.append((selected, loose if include_geometry else None, tight if include_geometry else None, origin))
+        pending_clips.append(clip)
+        chars.append(char)
+    del batch, records, raw_fonts
+    prepared = get_native().materialize_geometry(raw_geometry, page_bbox, (width, height), page_rotation)
+    del raw_geometry
+    retained = []
+    for char, (layout, loose, tight, origin), clip in zip(chars, prepared, pending_clips, strict=True):
+        char["bbox"] = Bbox(layout)
+        char["origin"] = origin
+        if include_geometry:
+            char["loose_bbox"], char["tight_bbox"] = loose, tight
+        if clip is None or _clip_visible_character(char, clip):
+            retained.append(char)
+    _assign_writing_angles(retained)
+    _mark_visible_objects(retained, textpage.raw)
+    return retained
+
+
+def _get_chars_python(
+    textpage: pdfium.PdfTextPage,
+    page_bbox: list[float],
+    page_rotation: int,
+    *,
+    include_geometry: bool = False,
+    visibility_by_object: dict[int, tuple[bool, tuple[float, float, float, float] | None]] | None = None,
+) -> list[Char]:
     """读取原始字符记录；原始码值始终保留，随后统一解码和去重。"""
     handle = textpage.raw
     left, bottom, right, top = page_bbox
@@ -165,7 +256,10 @@ def get_chars(
                 box = box.rotate(width, height, page_rotation)
         name, flags = _font_name(handle, index, font_buffer, font_flags)
         size, weight = raw.FPDFText_GetFontSize(handle, index), raw.FPDFText_GetFontWeight(handle, index)
-        font = fonts.setdefault((name, flags, size, weight), {"name": name, "flags": flags, "size": size, "weight": weight})
+        key = (name, flags, size, weight)
+        font = fonts.get(key)
+        if font is None:
+            font = fonts[key] = {"name": name, "flags": flags, "size": size, "weight": weight}
         char: Char = {
             "bbox": box,
             "char": chr(code) if not 0xD800 <= code <= 0xDFFF else "\ufffd",

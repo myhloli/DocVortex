@@ -27,6 +27,10 @@ def capture(pdf: Path, output: Path, expected: str) -> None:
     if expected == "rust":
         assert Path(info["extension"]).is_relative_to(package.parent), info
     result = docvortex.parse(pdf, keep_model_json=True)
+    if expected == "rust":
+        actual = backend_info()
+        assert actual["pdfium_bridge_calls"] > 0, actual
+        assert actual["pdfium_bridge_unavailable_reason"] is None, actual
     data = {
         "model": result.model_json.model_dump(mode="json"),
         "middle": result.middle_json.model_dump(mode="json"),
