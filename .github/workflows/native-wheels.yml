@@ -42,28 +42,28 @@ jobs:
           CIBW_ARCHS: ${{ matrix.arch }}
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
-          CIBW_BEFORE_ALL_LINUX: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.98.1
+          CIBW_BEFORE_ALL_LINUX: export CARGO_HOME=/opt/docvortex-cargo RUSTUP_HOME=/opt/docvortex-rustup; curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.98.1
           CIBW_ENVIRONMENT: DOCVORTEX_BUILD_NATIVE=1 DOCVORTEX_COMPUTE_BACKEND=rust
-          CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH" DOCVORTEX_BUILD_NATIVE=1 DOCVORTEX_COMPUTE_BACKEND=rust'
+          CIBW_ENVIRONMENT_LINUX: 'PATH="/opt/docvortex-cargo/bin:$PATH" CARGO_HOME=/opt/docvortex-cargo RUSTUP_HOME=/opt/docvortex-rustup DOCVORTEX_BUILD_NATIVE=1 DOCVORTEX_COMPUTE_BACKEND=rust'
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment }}
           CIBW_TEST_REQUIRES: pytest
           CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q
         run: uvx --from "cibuildwheel>=3.1,<4" cibuildwheel --output-dir wheelhouse
       - name: Verify binary ABI on Python 3.14 without optional application dependencies
-        run: python tools/verify_native_abi.py wheelhouse
+        run: uv run --no-project --python 3.14 python tools/verify_native_abi.py wheelhouse
       - name: Install the exact built artifact on the current supported dependency stack
         shell: bash
         run: |
           uv venv --seed --python ${{ matrix.smoke }}
-          uv run --no-project python -c "import pathlib, subprocess, sys; wheels=list(pathlib.Path('wheelhouse').glob('*.whl')); assert len(wheels)==1, wheels; subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0]), 'pytest'])"
+          uv run --no-project --python ${{ matrix.smoke }} python -c "import pathlib, subprocess, sys; wheels=list(pathlib.Path('wheelhouse').glob('*.whl')); assert len(wheels)==1, wheels; subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0]), 'pytest'])"
       - name: Verify installed wheel and real parsing
         env:
           DOCVORTEX_COMPUTE_BACKEND: rust
-        run: uv run --no-project python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
+        run: uv run --no-project --python ${{ matrix.smoke }} python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
       - name: Compare public parsing performance and full outputs
         run: |
-          uv run --no-project python tests/benchmarks/rust_pdf.py --backend python --suite public --output bench-python
-          uv run --no-project python tests/benchmarks/rust_pdf.py --backend rust --suite public --output bench-rust --baseline bench-python
+          uv run --no-project --python ${{ matrix.smoke }} python tests/benchmarks/rust_pdf.py --backend python --suite public --output bench-python
+          uv run --no-project --python ${{ matrix.smoke }} python tests/benchmarks/rust_pdf.py --backend rust --suite public --output bench-rust --baseline bench-python
       - uses: actions/upload-artifact@v6
         if: ${{ !cancelled() }}
         with:
