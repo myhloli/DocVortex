@@ -134,25 +134,26 @@ def _document_font_is_regular(
 def _infer_lane_body_profile(lane: _TextLane) -> _LaneBodyProfile:
     """从栏带的长行主体估计正文行高、主字体、字重、常规行距和样式占比。"""
 
-    available = [item for item in lane.lines if item[0].semantic_type is None]
+    # 快照只覆盖本次分析，后续行成员或几何变化时由调用方重新进入。
+    available = [(line, bbox, _line_effective_height(line, bbox)) for line, bbox in lane.lines if line.semantic_type is None]
     if not available:
         return _LaneBodyProfile(1.0, None, None, 0.35, {})
     lane_width = max(0.1, lane.right - lane.left)
     long_lines = [item for item in available if item[1][2] - item[1][0] >= 0.45 * lane_width]
     body_rows = long_lines or available
-    body_line_ids = {id(line) for line, _bbox in body_rows}
-    body_height = statistics.median(_line_effective_height(line, bbox) for line, bbox in body_rows)
+    body_line_ids = {id(line) for line, _bbox, _height in body_rows}
+    body_height = statistics.median(height for _line, _bbox, height in body_rows)
 
     font_support: dict[tuple[str, int], float] = {}
     style_support: dict[tuple[str, int], float] = {}
     total_style_width = 0.0
-    for line, bbox in available:
+    for line, bbox, height in available:
         if line.font_signature is None or line.font_coverage < 0.75:
             continue
         line_width = max(0.1, bbox[2] - bbox[0])
         style_support[line.font_signature] = style_support.get(line.font_signature, 0.0) + line_width
         total_style_width += line_width
-        if id(line) in body_line_ids and 0.75 <= _line_effective_height(line, bbox) / body_height <= 1.35:
+        if id(line) in body_line_ids and 0.75 <= height / body_height <= 1.35:
             font_support[line.font_signature] = font_support.get(line.font_signature, 0.0) + line_width
     body_font = max(font_support, key=font_support.get) if font_support else None
     if total_style_width > 0:
@@ -160,10 +161,10 @@ def _infer_lane_body_profile(lane: _TextLane) -> _LaneBodyProfile:
 
     body_weights = [
         line.dominant_font_weight
-        for line, bbox in body_rows
+        for line, bbox, height in body_rows
         if line.dominant_font_weight is not None
         and (body_font is None or line.font_signature == body_font)
-        and 0.75 <= _line_effective_height(line, bbox) / body_height <= 1.35
+        and 0.75 <= height / body_height <= 1.35
     ]
     regular_gap, _gap_mad = _estimate_lane_gap(lane)
     return _LaneBodyProfile(

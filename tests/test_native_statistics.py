@@ -1,4 +1,5 @@
 """验证批量统计的阈值、稳定排序和来源成员，不以近似误差放行。"""
+
 import math
 import random
 import statistics
@@ -54,3 +55,73 @@ def test_ordered_clusters_exact_parity(native, seed, relative, last_only):
 def test_nonfinite_clusters_reference_path(native, value):
     """原生拒绝不适合稳定数值排序的输入，由 Python 参考路径决定行为。"""
     assert native.ordered_clusters([value], 0.5, 0.0, False) is None
+
+
+@pytest.mark.parametrize("seed", range(16))
+def test_typography_full_state_parity(native, seed):
+    """整行比较所有字段，覆盖字体平局、旋转、无效框、缺字重及共享字体字典。"""
+    from copy import deepcopy
+    from dataclasses import asdict
+    from docvortex.analyzers.native.pdf import native_text as text
+    from docvortex.analyzers.native.pdf.models import _LineItem
+    from docvortex.document.pdf.text import Bbox
+
+    rng = random.Random(seed)
+    fonts = [
+        {"name": n, "flags": f, "weight": w}
+        for n, f, w in [("ABC+Times-Bold", 0, 700), ("Times-Roman", 0, 400), ("Arial", "invalid", None), ("", 0, 0)]
+    ]
+    chars = []
+    for i in range(120):
+        y = rng.choice([10.0, 10.5, 13.0])
+        chars.append(
+            {
+                "char": rng.choice(["a", "中", " ", "\n", "x"]),
+                "bbox": Bbox([i, y, i + rng.choice([0.0, 3.0, 6.0]), y + 9.0]),
+                "font": rng.choice(fonts),
+            }
+        )
+    line = _LineItem(
+        "Text.", (0.0, 0.0, 180.0, 40.0), rng.choice([0, 90, 180, 270]), 0, chars=chars, em_height=rng.choice([0.0, 12.0])
+    )
+    expected = deepcopy(line)
+    before = deepcopy(chars)
+    text._fill_native_typography_python(expected, (200.0, 300.0))
+    text._fill_native_typography(line, (200.0, 300.0))
+    # Bbox 容器没有值相等运算，字符部分单独按协议比较。
+    left, right = asdict(line), asdict(expected)
+    left.pop("chars")
+    right.pop("chars")
+    assert left == right
+    assert [(c["char"], list(c["bbox"]), c["font"]) for c in chars] == [(c["char"], list(c["bbox"]), c["font"]) for c in before]
+
+
+@pytest.mark.parametrize("seed", range(16))
+def test_lane_gap_snapshot_parity(native, seed):
+    """数值输出和原列表排序副作用均须匹配，并保留成员引用。"""
+    from copy import deepcopy
+    from docvortex.analyzers.native.pdf import line_layout as layout
+    from docvortex.analyzers.native.pdf.models import _LineItem, _TextLane
+
+    rng = random.Random(seed)
+    items = []
+    for i in range(70):
+        b = (rng.choice([0.0, 5.0, 30.0]), rng.choice([0.0, 10.0, 15.0, 25.0]), 100.0, 40.0)
+        line = _LineItem(
+            "a",
+            b,
+            0,
+            i,
+            effective_height=rng.choice([0.0, 9.0, 12.0, 16.0]),
+            visual_row_id=rng.choice([None, 1, 2]),
+            split_from_row=rng.choice([False, True]),
+            restored_inline_cluster=rng.choice([False, True]),
+        )
+        items.append((line, b))
+    lane = _TextLane(0.0, 100.0, items)
+    expected = deepcopy(lane)
+    original_list = lane.lines
+    references = set(map(id, lane.lines))
+    assert layout._estimate_lane_gap(lane) == layout._estimate_lane_gap_python(expected)
+    assert lane.lines is original_list and set(map(id, lane.lines)) == references
+    assert [item[0].source_index for item in lane.lines] == [item[0].source_index for item in expected.lines]

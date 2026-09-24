@@ -736,20 +736,78 @@ def _detect_leading_typography_width(
 
 
 def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> None:
-    """使用原始 bbox、PDF 字号和 dominant font 填充两套排版特征。"""
-
+    """按行聚合数值统计；字体类别仍由 Python 编码，缓存只存在于本次调用。"""
     from ...._compute_backend import get_native
     from ._native_geometry import glyph_flags, raw_bbox
 
     native = get_native()
-    prepared_boxes = None
-    if native is not None:
-        prepared_boxes = native.local_boxes(
-            [raw_bbox(char.get("bbox")) if glyph_flags(str(char.get("char") or "")) & 1 else None for char in line.chars],
-            page_size,
-            line.angle,
-            _coerce_bbox,
-        )
+    if native is None:
+        return _fill_native_typography_python(line, page_size)
+    boxes = native.local_boxes(
+        [raw_bbox(char.get("bbox")) if glyph_flags(str(char.get("char") or "")) & 1 else None for char in line.chars],
+        page_size,
+        line.angle,
+        _coerce_bbox,
+    )
+    signatures, signature_ids, families, family_ids = [], {}, [], {}
+    font_ids, weights = [], []
+    # 字体字典由提取层复用；保留强引用避免本次调用内对象地址重用。
+    font_cache = {}
+    for char, box in zip(line.chars, boxes, strict=True):
+        if box is None:
+            font_ids.append(None)
+            weights.append(None)
+            continue
+        font = char.get("font") or {}
+        cached = font_cache.get(id(font)) if type(font) is dict else None
+        if cached is None:
+            name = str(font.get("name") or "")
+            identifier = weight = None
+            if name:
+                try:
+                    flags = int(font.get("flags") or 0)
+                except (TypeError, ValueError):
+                    flags = 0
+                signature = (name, flags)
+                identifier = signature_ids.get(signature)
+                if identifier is None:
+                    identifier = len(signatures)
+                    signature_ids[signature] = identifier
+                    signatures.append(signature)
+                    family = _normalized_font_family(signature)
+                    families.append(None if family is None else family_ids.setdefault(family, len(family_ids)))
+                try:
+                    value = float(font.get("weight"))
+                except (TypeError, ValueError):
+                    value = math.nan
+                if math.isfinite(value) and value > 0:
+                    weight = value
+            cached = (font, identifier, weight)
+            if type(font) is dict and all(
+                type(font.get(key)) in (str, int, float, bool, type(None)) for key in ("name", "flags", "weight")
+            ):
+                font_cache[id(font)] = cached
+        font_ids.append(cached[1])
+        weights.append(cached[2])
+    local = _rotate_bbox_to_upright(line.bbox, page_size, line.angle)
+    result = native.typography_metrics(boxes, font_ids, weights, families, max(0.1, local[3] - local[1]))
+    if result is None:
+        return _fill_native_typography_python(line, page_size)
+    height, width, winner, coverage, weight, emphasis, typography = result
+    line.effective_height = height
+    line.em_height = line.em_height if line.em_height > 0 else height
+    line.median_glyph_width = width
+    line.font_signature = signatures[winner] if winner is not None else None
+    line.font_coverage = coverage
+    line.dominant_font_weight = weight
+    line.leading_emphasis_width = emphasis
+    line.leading_typography_width = typography
+    line.paragraph_terminal = _native_sentence_terminal(line)
+
+
+def _fill_native_typography_python(line: _LineItem, page_size: tuple[float, float]) -> None:
+    """使用原始 bbox、PDF 字号和 dominant font 填充两套排版特征。"""
+
     canonical_em_height = line.em_height
     heights: list[float] = []
     glyph_widths: list[float] = []
@@ -761,15 +819,10 @@ def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> 
         raw_char = str(char.get("char") or "")
         if not raw_char.isprintable() or raw_char.isspace():
             continue
-        if prepared_boxes is not None:
-            local_bbox = prepared_boxes[char_position]
-            if local_bbox is None:
-                continue
-        else:
-            bbox = _clip_validated_bbox(_coerce_bbox(char.get("bbox")), page_size)
-            if bbox is None:
-                continue
-            local_bbox = _rotate_bbox_to_upright(bbox, page_size, line.angle)
+        bbox = _clip_validated_bbox(_coerce_bbox(char.get("bbox")), page_size)
+        if bbox is None:
+            continue
+        local_bbox = _rotate_bbox_to_upright(bbox, page_size, line.angle)
         heights.append(max(0.1, local_bbox[3] - local_bbox[1]))
         glyph_widths.append(max(0.1, local_bbox[2] - local_bbox[0]))
         font = char.get("font") or {}

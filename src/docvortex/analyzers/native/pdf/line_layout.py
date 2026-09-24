@@ -803,6 +803,26 @@ def _reattach_repeated_indented_span_tails(
 
 
 def _estimate_lane_gap(lane: _TextLane) -> tuple[float, float]:
+    """仅为本次行距估计提取一次行高，排序仍作用于原栏带成员列表。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is None:
+        return _estimate_lane_gap_python(lane)
+    lane.lines.sort(key=lambda item: (item[1][1], item[1][0], item[0].source_index))
+    result = native.lane_gap(
+        [bbox for _line, bbox in lane.lines],
+        [_line_effective_height(line, bbox) for line, bbox in lane.lines],
+        [line.restored_inline_cluster for line, _bbox in lane.lines],
+        [
+            previous[0].visual_row_id == current[0].visual_row_id and (previous[0].split_from_row or current[0].split_from_row)
+            for previous, current in zip(lane.lines, lane.lines[1:])
+        ],
+    )
+    return result if result is not None else _estimate_lane_gap_python(lane)
+
+
+def _estimate_lane_gap_python(lane: _TextLane) -> tuple[float, float]:
     """从栏带内兼容相邻行的较小间隙簇估计常规净空和 MAD。"""
 
     lane.lines.sort(key=lambda item: (item[1][1], item[1][0], item[0].source_index))

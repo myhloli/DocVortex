@@ -23,6 +23,33 @@ fn ordered_clusters(
     })
 }
 
+/// 聚合已验证的局部框，返回字号、主字体索引和行首特征，不返回重复字符记录。
+#[pyfunction]
+fn typography_metrics(
+    py: Python<'_>,
+    boxes: Vec<Option<Box4>>,
+    fonts: Vec<Option<usize>>,
+    weights: Vec<Option<f64>>,
+    families: Vec<Option<usize>>,
+    fallback_height: f64,
+) -> Option<docvortex_core::statistics::Typography> {
+    py.detach(move || {
+        docvortex_core::statistics::typography(boxes, fonts, weights, families, fallback_height)
+    })
+}
+
+/// 栏带调用内一次消费稳定快照，保留 Python 成员排序的副作用。
+#[pyfunction]
+fn lane_gap(
+    py: Python<'_>,
+    boxes: Vec<Box4>,
+    heights: Vec<f64>,
+    restored: Vec<bool>,
+    skip: Vec<bool>,
+) -> Option<(f64, f64)> {
+    py.detach(move || docvortex_core::statistics::lane_gap(boxes, heights, restored, skip))
+}
+
 /// 在 PDFium 读取结束后批量转换数值，不接触句柄或同步锁。
 #[pyfunction]
 fn materialize_geometry(
@@ -438,6 +465,8 @@ fn script_roles_raw(
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ordered_clusters, module)?)?;
+    module.add_function(wrap_pyfunction!(typography_metrics, module)?)?;
+    module.add_function(wrap_pyfunction!(lane_gap, module)?)?;
     module.add("PROTOCOL_VERSION", docvortex_core::PROTOCOL_VERSION)?;
     module.add_function(wrap_pyfunction!(script_roles, module)?)?;
     module.add_function(wrap_pyfunction!(normalize_boxes, module)?)?;
