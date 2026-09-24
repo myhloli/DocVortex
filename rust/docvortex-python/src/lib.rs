@@ -2,8 +2,105 @@
 
 use docvortex_core::dedup;
 use docvortex_core::geometry::{self, Box4, Size};
+use docvortex_core::tables;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
+
+/// 表格区域一次筛选整页字符，特殊输入继续沿 Python 的原验证入口处理。
+#[pyfunction]
+fn table_boxes(
+    py: Python<'_>,
+    values: &Bound<'_, PyList>,
+    table: Box4,
+    angle: i32,
+    fallback: &Bound<'_, PyAny>,
+) -> PyResult<Option<Vec<(usize, BoxTuple, Option<BoxTuple>)>>> {
+    if table.iter().any(|v| !v.is_finite()) {
+        return Ok(None);
+    }
+    let values = read_boxes(values, fallback)?;
+    Ok(Some(py.detach(move || {
+        tables::select_boxes(values, table, angle)
+            .into_iter()
+            .map(|(i, b, l)| (i, box_tuple(b), l.map(box_tuple)))
+            .collect()
+    })))
+}
+
+/// 对整批轨道查询计算覆盖率，避免逐线段绑定调用。
+#[pyfunction]
+fn coverage_batch(
+    py: Python<'_>,
+    rules: Vec<tables::Rule>,
+    queries: Vec<tables::Query>,
+) -> Option<Vec<f64>> {
+    py.detach(move || tables::coverage_batch(rules, queries))
+}
+
+/// 按 Python 簇坐标批量合并相邻线段。
+#[pyfunction]
+fn merge_rules(
+    py: Python<'_>,
+    rules: Vec<tables::Rule>,
+    coordinates: Vec<(u8, Vec<f64>)>,
+    tolerance: f64,
+    join: f64,
+) -> Option<Vec<tables::Rule>> {
+    py.detach(move || tables::merge_rules(rules, coordinates, tolerance, join))
+}
+
+/// 批量完成所有字符的单元格分配，保留索引和歧义位。
+#[pyfunction]
+fn assign_cells(
+    py: Python<'_>,
+    glyphs: Vec<Box4>,
+    specs: Vec<Box4>,
+    index: Option<tables::GridIndex>,
+) -> Option<Vec<(Option<usize>, bool)>> {
+    py.detach(move || tables::assign_cells(glyphs, specs, index))
+}
+
+/// 验证原子格索引后一次执行网格连接。
+#[pyfunction]
+fn grid_parents(py: Python<'_>, count: usize, pairs: Vec<(usize, usize)>) -> PyResult<Vec<usize>> {
+    if pairs.iter().any(|(a, b)| *a >= count || *b >= count) {
+        return Err(pyo3::exceptions::PyIndexError::new_err(
+            "cell index out of range",
+        ));
+    }
+    Ok(py.detach(move || tables::grid_parents(count, pairs)))
+}
+
+/// 将合法并查集转为矩形单元格，同时返回路径压缩后的父节点。
+#[pyfunction]
+fn component_specs(
+    py: Python<'_>,
+    parents: Vec<usize>,
+    rows: usize,
+    cols: usize,
+) -> PyResult<(Vec<usize>, Option<Vec<(usize, usize, usize, usize)>>)> {
+    if rows.checked_mul(cols) != Some(parents.len()) || parents.iter().any(|i| *i >= parents.len())
+    {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "invalid table parents",
+        ));
+    }
+    // 来源是私有 Python 并查集；在绑定边界阻止异常环导致原生死循环。
+    for start in 0..parents.len() {
+        let mut i = start;
+        let mut steps = 0;
+        while parents[i] != i {
+            i = parents[i];
+            steps += 1;
+            if steps >= parents.len() {
+                return Err(pyo3::exceptions::PyValueError::new_err(
+                    "cyclic table parents",
+                ));
+            }
+        }
+    }
+    Ok(py.detach(move || tables::component_specs(parents, rows, cols)))
+}
 
 /// 批量生成重复绘制候选，不在内层循环回调 Python。
 #[pyfunction]
@@ -210,5 +307,11 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(dedup_components, module)?)?;
     module.add_function(wrap_pyfunction!(hidden_candidates, module)?)?;
     module.add_function(wrap_pyfunction!(confirmed_offsets, module)?)?;
+    module.add_function(wrap_pyfunction!(table_boxes, module)?)?;
+    module.add_function(wrap_pyfunction!(coverage_batch, module)?)?;
+    module.add_function(wrap_pyfunction!(merge_rules, module)?)?;
+    module.add_function(wrap_pyfunction!(assign_cells, module)?)?;
+    module.add_function(wrap_pyfunction!(grid_parents, module)?)?;
+    module.add_function(wrap_pyfunction!(component_specs, module)?)?;
     Ok(())
 }

@@ -247,11 +247,25 @@ def build_candidate(
     cell_glyphs: list[list[NativeTableGlyph]] = [[] for _ in specs]
     ambiguous_count = 0
     grid_index = _build_grid_spec_index(rows, cols, specs) if use_grid_index else None
-    for glyph in text.glyphs:
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    prepared_assignments = None
+    if native is not None:
+        prepared_assignments = native.assign_cells(
+            [glyph.bbox for glyph in text.glyphs],
+            [spec.bbox for spec in specs],
+            (grid_index.x_tracks, grid_index.y_tracks, grid_index.owners) if grid_index is not None else None,
+        )
+    for position, glyph in enumerate(text.glyphs):
         cell_index, ambiguous = (
-            _choose_cell_for_glyph_indexed(glyph, specs, grid_index)
-            if grid_index is not None
-            else _choose_cell_for_glyph(glyph, specs)
+            prepared_assignments[position]
+            if prepared_assignments is not None
+            else (
+                _choose_cell_for_glyph_indexed(glyph, specs, grid_index)
+                if grid_index is not None
+                else _choose_cell_for_glyph(glyph, specs)
+            )
         )
         if cell_index is None:
             continue

@@ -137,3 +137,59 @@ def test_dedup_layers_and_hidden_parity(native, monkeypatch, seed):
     actual = dedup.deduplicate_chars(chars)
     assert pickle.dumps(actual) == pickle.dumps(expected)
     assert pickle.dumps(chars) == before
+
+
+def test_table_coverage_batch_parity(native):
+    """区间乱序、反向端点、重复线和精确相接端点的覆盖率必须逐值一致。"""
+    from docvortex.analyzers.native.pdf._table_recovery.geometry import covered_interval_ratio
+
+    rng = random.Random(93)
+    rules = [(rng.randrange(2), float(rng.randrange(5)), rng.uniform(-5, 15), rng.uniform(-5, 15)) for _ in range(80)]
+    queries = [
+        (rng.randrange(2), (float(rng.randrange(5)),), float(rng.randrange(-2, 3)), float(rng.randrange(5, 12)), 0.5)
+        for _ in range(90)
+    ]
+    expected = [
+        covered_interval_ratio(
+            [(a, b) for o, c, a, b in rules if o == orientation and any(abs(c - v) <= tolerance for v in aliases)], start, end
+        )
+        for orientation, aliases, start, end, tolerance in queries
+    ]
+    assert native.coverage_batch(rules, queries) == expected
+
+
+@pytest.mark.parametrize("indexed", [False, True])
+def test_cell_assignment_batch_parity(native, indexed):
+    """覆盖边界平局、出界和跨格字符，保持现有索引路径的选择与歧义位。"""
+    from docvortex.analyzers.native.pdf._table_recovery import candidate as c
+    from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableGlyph
+
+    specs = tuple(
+        c.GridCellSpec(r, col, 1, 1, (col * 10.0, r * 10.0, col * 10.0 + 10.0, r * 10.0 + 10.0))
+        for r in range(3)
+        for col in range(4)
+    )
+    index = c._build_grid_spec_index(3, 4, specs) if indexed else None
+    rng = random.Random(12)
+    glyphs = []
+    for i in range(300):
+        x, y = rng.uniform(-5, 45), rng.uniform(-5, 35)
+        glyphs.append(NativeTableGlyph(i, i, "a", (x, y, x + rng.choice([0.0, 5.0, 10.0, 20.0]), y + 5.0), 0))
+    expected = [
+        c._choose_cell_for_glyph_indexed(g, specs, index) if index is not None else c._choose_cell_for_glyph(g, specs)
+        for g in glyphs
+    ]
+    assert (
+        native.assign_cells(
+            [g.bbox for g in glyphs],
+            [s.bbox for s in specs],
+            (index.x_tracks, index.y_tracks, index.owners) if index is not None else None,
+        )
+        == expected
+    )
+
+
+def test_invalid_parent_cycle_is_rejected(native):
+    """损坏的私有数组不能让 Rust 陷入无限循环。"""
+    with pytest.raises(ValueError, match="cyclic"):
+        native.component_specs([1, 0], 1, 2)

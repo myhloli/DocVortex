@@ -28,6 +28,55 @@ class _PendingGlyph:
 
 
 def _select_pending_glyphs(table_input: NativeTableInput) -> list[_PendingGlyph]:
+    """批量筛选区域字符，保留 Python 的源索引排序、空白及文本规范化。"""
+    from ....._compute_backend import get_native
+    from .._native_geometry import raw_bbox
+
+    native = get_native()
+    if native is None:
+        return _select_pending_glyphs_python(table_input)
+    table_bbox = normalize_bbox(table_input.table_bbox)
+    if table_bbox is None:
+        return []
+    prepared = native.table_boxes(
+        [raw_bbox(char.get("bbox")) for char in table_input.chars],
+        table_bbox,
+        normalize_angle(table_input.angle),
+        normalize_bbox,
+    )
+    if prepared is None:
+        return _select_pending_glyphs_python(table_input)
+    selected = []
+    for index, _absolute, local in prepared:
+        char = table_input.chars[index]
+        try:
+            source_index = int(char.get("char_idx", index))
+        except (TypeError, ValueError):
+            source_index = index
+        selected.append((source_index, index, char, local))
+    selected.sort(key=lambda item: (item[0], item[1]))
+    output = []
+    pending_space = pending_break = False
+    for source_index, _index, char, local in selected:
+        raw_text = str(char.get("char") or "")
+        if not raw_text:
+            continue
+        if raw_text in {"\r", "\n"}:
+            pending_break, pending_space = True, False
+            continue
+        if raw_text.isspace():
+            if not pending_break:
+                pending_space = True
+            continue
+        text = _normalize_table_text(raw_text)
+        if not text or text.isspace() or local is None or local[3] - local[1] < 0.5:
+            continue
+        output.append(_PendingGlyph(len(output), source_index, text, local, pending_space, pending_break))
+        pending_space = pending_break = False
+    return output
+
+
+def _select_pending_glyphs_python(table_input: NativeTableInput) -> list[_PendingGlyph]:
     """按字符中心选择表格内可见字符，并转换到正向局部坐标。"""
 
     table_bbox = normalize_bbox(table_input.table_bbox)

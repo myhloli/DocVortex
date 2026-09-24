@@ -784,12 +784,11 @@ def _native_script_records(chars, tight_bboxes, origins, protected):
     """打包一次调用的几何与 Python 字体等价类，保留异常输入的原校验语义。"""
     records = []
     fonts = {}
-    from ._native_geometry import raw_bbox
-
     boxes = []
     for char in chars:
         key = _char_geometry_key(char)
-        boxes.extend((raw_bbox(char.get("bbox")), tight_bboxes.get(key) if key is not None else None))
+        bbox = char.get("bbox")
+        boxes.extend((getattr(bbox, "bbox", bbox), tight_bboxes.get(key) if key is not None else None))
     boxes = get_native().normalize_boxes(boxes, True, _coerce_finite_bbox)
     for index, char in enumerate(chars):
         text = str(char.get("char", ""))

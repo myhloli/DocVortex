@@ -60,6 +60,28 @@ class _IndexedRules(list[_MergedRule]):
         self._intervals: dict[tuple[str, tuple[float, ...], float], list[tuple[float, float]]] = {}
         self._coverages: dict[tuple[str, tuple[float, ...], float, float, float], float] = {}
 
+    def prime_coverages(self, queries: list[tuple[str, tuple[float, ...], float, float, float]]) -> None:
+        """一次预计算整张网格的覆盖查询，后续原判断代码直接读取缓存。"""
+        from ....._compute_backend import get_native
+
+        native = get_native()
+        if native is None:
+            return
+        queries = list(dict.fromkeys(queries))
+        queries = [q for q in queries if (q[0], q[1], q[4], q[2], q[3]) not in self._coverages]
+        if not queries:
+            return
+        result = native.coverage_batch(
+            [(int(rule.orientation == "vertical"), rule.coordinate, rule.start, rule.end) for rule in self],
+            [
+                (int(orientation == "vertical"), aliases, start, end, tolerance)
+                for orientation, aliases, start, end, tolerance in queries
+            ],
+        )
+        if result is not None:
+            for (orientation, aliases, start, end, tolerance), value in zip(queries, result, strict=True):
+                self._coverages[(orientation, aliases, tolerance, start, end)] = value
+
     def coverage(self, orientation: str, aliases: tuple[float, ...], start: float, end: float, tolerance: float) -> float:
         """复用轨道匹配和相同查询，区间覆盖仍执行原有裁剪与浮点累加。"""
         key = orientation, aliases, tolerance
@@ -372,6 +394,25 @@ def _merge_rule_fragments(
 ) -> list[_MergedRule]:
     """按方向和轴坐标吸附线段，再连接小间隙共线片段。"""
 
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    if native is not None:
+        coordinates = [
+            (
+                int(orientation == "vertical"),
+                cluster_positions((f.coordinate for f in fragments if f.orientation == orientation), snap_tolerance),
+            )
+            for orientation in ("horizontal", "vertical")
+        ]
+        result = native.merge_rules(
+            [(int(f.orientation == "vertical"), f.coordinate, f.start, f.end) for f in fragments],
+            coordinates,
+            snap_tolerance,
+            join_gap,
+        )
+        if result is not None:
+            return [_MergedRule("vertical" if o else "horizontal", c, s, e) for o, c, s, e in result]
     output: list[_MergedRule] = []
     for orientation in ("horizontal", "vertical"):
         oriented = [fragment for fragment in fragments if fragment.orientation == orientation]
@@ -886,6 +927,18 @@ def _build_component_specs(
 ) -> tuple[GridCellSpec, ...] | None:
     """把原子格连通分量转成矩形逻辑单元格，非矩形分量整体拒绝。"""
 
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    if native is not None:
+        parents, components = native.component_specs(union_find._parents, rows, cols)
+        union_find._parents = parents
+        if components is None:
+            return None
+        return tuple(
+            GridCellSpec(r, c, rs, cs, (x_tracks[c], y_tracks[r], x_tracks[c + cs], y_tracks[r + rs]))
+            for r, c, rs, cs in components
+        )
     components: dict[int, list[tuple[int, int]]] = {}
     for row in range(rows):
         for col in range(cols):
@@ -1569,7 +1622,22 @@ def _build_vector_topology(
     rows = tracks.rows
     cols = tracks.cols
 
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    if native is not None and isinstance(rules, _IndexedRules):
+        queries = []
+        for row in range(rows):
+            for track in canonical_x_tracks[1:-1]:
+                for aliases in ((track.coordinate,), track.aliases):
+                    queries.append(("vertical", aliases, y_tracks[row], y_tracks[row + 1], snap_tolerance))
+        for track in canonical_y_tracks[1:-1]:
+            for col in range(cols):
+                for aliases in ((track.coordinate,), track.aliases):
+                    queries.append(("horizontal", aliases, x_tracks[col], x_tracks[col + 1], snap_tolerance))
+        rules.prime_coverages(queries)
     union_find = _UnionFind(rows * cols)
+    connections = []
     separator_decisions: list[float] = []
     ambiguous_separator_count = 0
     alias_separator_recoveries = 0
@@ -1603,9 +1671,11 @@ def _build_vector_topology(
                 alias_affected_rows.add(row)
             separator_decisions.append(max(coverage, 1.0 - coverage))
             if coverage <= 1.0 - SEPARATOR_COVERAGE_THRESHOLD:
-                union_find.union(
-                    _grid_index(row, boundary_index - 1, cols),
-                    _grid_index(row, boundary_index, cols),
+                connections.append(
+                    (
+                        _grid_index(row, boundary_index - 1, cols),
+                        _grid_index(row, boundary_index, cols),
+                    )
                 )
             elif coverage < SEPARATOR_COVERAGE_THRESHOLD:
                 ambiguous_separator_count += 1
@@ -1640,13 +1710,20 @@ def _build_vector_topology(
                     alias_affected_rows.add(boundary_index)
             separator_decisions.append(max(coverage, 1.0 - coverage))
             if coverage <= 1.0 - SEPARATOR_COVERAGE_THRESHOLD:
-                union_find.union(
-                    _grid_index(boundary_index - 1, col, cols),
-                    _grid_index(boundary_index, col, cols),
+                connections.append(
+                    (
+                        _grid_index(boundary_index - 1, col, cols),
+                        _grid_index(boundary_index, col, cols),
+                    )
                 )
             elif coverage < SEPARATOR_COVERAGE_THRESHOLD:
                 ambiguous_separator_count += 1
 
+    if native is not None:
+        union_find._parents = native.grid_parents(rows * cols, connections)
+    else:
+        for first, second in connections:
+            union_find.union(first, second)
     ambiguous_ratio = ambiguous_separator_count / len(separator_decisions) if separator_decisions else 0.0
     if diagnostics is not None:
         diagnostics["grid"] = {"rows": rows, "cols": cols}
