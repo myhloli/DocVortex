@@ -125,3 +125,40 @@ def test_lane_gap_snapshot_parity(native, seed):
     assert layout._estimate_lane_gap(lane) == layout._estimate_lane_gap_python(expected)
     assert lane.lines is original_list and set(map(id, lane.lines)) == references
     assert [item[0].source_index for item in lane.lines] == [item[0].source_index for item in expected.lines]
+
+
+@pytest.mark.parametrize("seed", range(24))
+def test_table_visual_rows_member_parity(native, seed):
+    """逐项核对反向遍历的平局、阈值边界和原对象身份，输入不排序改写。"""
+    from docvortex.analyzers.native.pdf._table_recovery import text
+
+    rng = random.Random(seed)
+    pending = []
+    for i in range(120):
+        x, y = rng.choice([0.0, 5.0, 10.0, 20.0]), rng.choice([0.0, 4.0, 8.0, 10.0, 14.0])
+        pending.append(text._PendingGlyph(i, i, "x", (x, y, x + 5.0, y + rng.choice([0.5, 4.0, 10.0]))))
+    original = list(pending)
+    expected = text._assign_visual_rows_python(pending, 10.0)
+    actual = text._assign_visual_rows(pending, 10.0)
+    assert [[g.glyph_id for g in row] for row in actual] == [[g.glyph_id for g in row] for row in expected]
+    assert all(g is pending[g.glyph_id] for row in actual for g in row)
+    assert pending == original
+
+
+def test_occupancy_boundary_and_cache_contract(native):
+    """公共边界优先左列；恢复调用缓存不暴露可变集合，且不修改文本字形。"""
+    from types import SimpleNamespace
+    from docvortex.analyzers.native.pdf._table_recovery.sparse_hybrid import _RowOccupancy
+
+    rows = [[-1.0, 0.0, 10.0, 20.0, 21.0], [], [5.0, 10.0, 15.0]]
+    assert native.table_row_occupancy(rows, [0.0, 10.0, 20.0]) == [[0, 1], [], [0, 1]]
+    assert native.table_row_occupancy([[math.nan]], [0.0, 10.0]) is None
+    text = SimpleNamespace(
+        glyphs=tuple(SimpleNamespace(glyph_id=i, bbox=(x, 0.0, x, 1.0)) for i, x in enumerate(rows[0])),
+        rows=(SimpleNamespace(glyph_ids=tuple(range(5))),),
+    )
+    context = _RowOccupancy(text, native)
+    first = context.columns((0.0, 10.0, 20.0))
+    assert first == (frozenset({0, 1}),)
+    assert context.columns((0.0, 10.0, 20.0)) is first
+    assert len(context.cache) == 1

@@ -50,6 +50,27 @@ fn lane_gap(
     py.detach(move || docvortex_core::statistics::lane_gap(boxes, heights, restored, skip))
 }
 
+/// 表格组行只返回成员索引，由 Python 复用原字形对象。
+#[pyfunction]
+fn table_visual_rows(
+    py: Python<'_>,
+    boxes: Vec<Box4>,
+    ids: Vec<usize>,
+    median_height: f64,
+) -> Option<Vec<Vec<usize>>> {
+    py.detach(move || tables::visual_rows(boxes, ids, median_height))
+}
+
+/// 已物化的字符中心按整表轨道批量统计，不改变候选数量。
+#[pyfunction]
+fn table_row_occupancy(
+    py: Python<'_>,
+    rows: Vec<Vec<f64>>,
+    tracks: Vec<f64>,
+) -> Option<Vec<Vec<usize>>> {
+    py.detach(move || tables::row_occupancy(rows, tracks))
+}
+
 /// 在 PDFium 读取结束后批量转换数值，不接触句柄或同步锁。
 #[pyfunction]
 fn materialize_geometry(
@@ -467,6 +488,8 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(ordered_clusters, module)?)?;
     module.add_function(wrap_pyfunction!(typography_metrics, module)?)?;
     module.add_function(wrap_pyfunction!(lane_gap, module)?)?;
+    module.add_function(wrap_pyfunction!(table_visual_rows, module)?)?;
+    module.add_function(wrap_pyfunction!(table_row_occupancy, module)?)?;
     module.add("PROTOCOL_VERSION", docvortex_core::PROTOCOL_VERSION)?;
     module.add_function(wrap_pyfunction!(script_roles, module)?)?;
     module.add_function(wrap_pyfunction!(normalize_boxes, module)?)?;

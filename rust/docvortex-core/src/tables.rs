@@ -345,3 +345,135 @@ pub fn component_specs(mut parents: Vec<usize>, rows: usize, cols: usize) -> Com
     specs.sort_unstable();
     (parents, Some(specs))
 }
+
+/// 保持反向候选遍历、严格距离平局与前缀下界提前停止的视觉组行。
+pub fn visual_rows(
+    boxes: Vec<Box4>,
+    ids: Vec<usize>,
+    median_height: f64,
+) -> Option<Vec<Vec<usize>>> {
+    if boxes.len() != ids.len()
+        || !median_height.is_finite()
+        || boxes
+            .iter()
+            .flatten()
+            .any(|v| !v.is_finite() || v.abs() > 1e150)
+    {
+        return None;
+    }
+    let mut order: Vec<_> = (0..boxes.len()).collect();
+    order.sort_by(|&a, &b| {
+        let aa = boxes[a];
+        let bb = boxes[b];
+        ((aa[1] + aa[3]) / 2.0)
+            .partial_cmp(&((bb[1] + bb[3]) / 2.0))
+            .unwrap()
+            .then_with(|| aa[0].partial_cmp(&bb[0]).unwrap())
+            .then_with(|| ids[a].cmp(&ids[b]))
+    });
+    let mut rows: Vec<Vec<usize>> = Vec::new();
+    let mut bounds: Vec<Box4> = Vec::new();
+    let mut prefix: Vec<f64> = Vec::new();
+    let tolerance = 0.75_f64.max(median_height * 0.40);
+    for index in order {
+        let g = boxes[index];
+        let cy = (g[1] + g[3]) / 2.0;
+        let mut best = None;
+        let mut best_distance = f64::INFINITY;
+        for i in (0..bounds.len()).rev() {
+            let r = bounds[i];
+            let ry = (r[1] + r[3]) / 2.0;
+            let distance = (cy - ry).abs();
+            let overlap = g[3].min(r[3]) - g[1].max(r[1]);
+            let height = (g[3] - g[1]).min(r[3] - r[1]);
+            let ratio = if overlap <= 0.0 || height <= 0.0 {
+                0.0
+            } else {
+                1.0_f64.min(overlap / height)
+            };
+            if (ratio >= 0.45 || distance <= tolerance) && distance < best_distance {
+                best = Some(i);
+                best_distance = distance;
+            }
+            if cy >= ry && cy - ry > tolerance && g[1] > prefix[i] {
+                break;
+            }
+        }
+        if let Some(i) = best {
+            rows[i].push(index);
+            let r = bounds[i];
+            bounds[i] = [
+                r[0].min(g[0]),
+                r[1].min(g[1]),
+                r[2].max(g[2]),
+                r[3].max(g[3]),
+            ];
+            for j in i..bounds.len() {
+                prefix[j] = if j == 0 {
+                    bounds[j][3]
+                } else {
+                    prefix[j - 1].max(bounds[j][3])
+                };
+            }
+        } else {
+            rows.push(vec![index]);
+            bounds.push(g);
+            prefix.push(prefix.last().copied().unwrap_or(g[3]).max(g[3]));
+        }
+    }
+    let mut row_order: Vec<_> = (0..rows.len()).collect();
+    row_order.sort_by(|&a, &b| {
+        bounds[a][1]
+            .partial_cmp(&bounds[b][1])
+            .unwrap()
+            .then_with(|| bounds[a][0].partial_cmp(&bounds[b][0]).unwrap())
+    });
+    Some(
+        row_order
+            .into_iter()
+            .map(|i| {
+                let mut row = std::mem::take(&mut rows[i]);
+                row.sort_by(|&a, &b| {
+                    boxes[a][0]
+                        .partial_cmp(&boxes[b][0])
+                        .unwrap()
+                        .then_with(|| boxes[a][1].partial_cmp(&boxes[b][1]).unwrap())
+                        .then_with(|| ids[a].cmp(&ids[b]))
+                });
+                row
+            })
+            .collect(),
+    )
+}
+
+/// 整表计算列占用；公共边界仍归属从左到右第一个符合区间的列。
+pub fn row_occupancy(rows: Vec<Vec<f64>>, tracks: Vec<f64>) -> Option<Vec<Vec<usize>>> {
+    if rows
+        .iter()
+        .flatten()
+        .chain(tracks.iter())
+        .any(|v| !v.is_finite())
+    {
+        return None;
+    }
+    Some(
+        rows.into_iter()
+            .map(|row| {
+                let mut occupied = vec![false; tracks.len().saturating_sub(1)];
+                for center in row {
+                    if let Some(i) = tracks
+                        .windows(2)
+                        .position(|t| t[0] <= center && center <= t[1])
+                    {
+                        occupied[i] = true;
+                    }
+                }
+                occupied
+                    .into_iter()
+                    .enumerate()
+                    .filter_map(|(i, yes)| yes.then_some(i))
+                    .collect()
+            })
+            .collect(),
+    )
+}

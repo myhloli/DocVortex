@@ -148,7 +148,19 @@ def _vertical_overlap_ratio(first: BBox, second: BBox) -> float:
     return min(1.0, overlap / minimum_height)
 
 
-def _assign_visual_rows(
+def _assign_visual_rows(pending: list[_PendingGlyph], median_height: float) -> list[list[_PendingGlyph]]:
+    """整表批量返回成员索引，原 Python 字形和其来源记录保持共享。"""
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    if native is not None and all(type(glyph.glyph_id) is int and 0 <= glyph.glyph_id <= (1 << 63) - 1 for glyph in pending):
+        rows = native.table_visual_rows([glyph.bbox for glyph in pending], [glyph.glyph_id for glyph in pending], median_height)
+        if rows is not None:
+            return [[pending[index] for index in row] for row in rows]
+    return _assign_visual_rows_python(pending, median_height)
+
+
+def _assign_visual_rows_python(
     pending: list[_PendingGlyph],
     median_height: float,
 ) -> list[list[_PendingGlyph]]:
