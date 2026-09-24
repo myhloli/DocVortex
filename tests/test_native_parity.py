@@ -114,3 +114,26 @@ def test_visual_runs_and_typography_parity(native, monkeypatch, angle):
         assert pickle.dumps(actual) == pickle.dumps(expected)
         assert all(any(c is source for source in chars) for item in actual for c in item.chars)
         assert pickle.dumps(line) == before
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_dedup_layers_and_hidden_parity(native, monkeypatch, seed):
+    """对混合重复绘制、平移阴影和隐藏副本逐值比较，并检查来源引用不被改写。"""
+    from docvortex.document.pdf.text import dedup
+    from test_pdf_text_dedup import _char, _indexed
+
+    rng = random.Random(seed)
+    chars = []
+    text = "ABCD 中文123 ab"
+    for layer in range(rng.randrange(1, 5)):
+        dx, dy = rng.choice([(0, 0), (0.08, 0.08), (1.0, 1.0), (8, 0)])
+        for i, c in enumerate(text):
+            chars.append(_char(c, i * 10 + dx, 20 + dy, obj=layer, mode=3 if layer == 2 else 0))
+    chars = _indexed(chars)
+    before = pickle.dumps(chars)
+    with monkeypatch.context() as context:
+        context.setattr(dedup, "get_native", lambda: None)
+        expected = dedup.deduplicate_chars(chars)
+    actual = dedup.deduplicate_chars(chars)
+    assert pickle.dumps(actual) == pickle.dumps(expected)
+    assert pickle.dumps(chars) == before

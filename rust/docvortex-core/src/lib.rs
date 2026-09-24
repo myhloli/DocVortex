@@ -2,6 +2,7 @@
 
 pub const PROTOCOL_VERSION: u32 = 1;
 
+pub mod dedup;
 pub mod geometry;
 pub mod scripts;
 

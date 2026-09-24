@@ -13,6 +13,7 @@ from typing import Any
 
 from ._contracts import Char
 from .geometry import char_bbox_values
+from ...._compute_backend import get_native
 
 _GEOMETRY_EPSILON = 0.001
 _MAX_OFFSET = 2.5
@@ -157,6 +158,32 @@ def _bucket(box: Box, size: float) -> tuple[int, int]:
 
 
 def _paint_pairs(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], list[tuple[int, int, float, float]]]:
+    """批量筛选重复绘制，异常来源类型与巨大坐标保留参考路径。"""
+    native = get_native()
+    if native is not None:
+        signatures, objects, records = {}, {}, []
+        for glyph in glyphs:
+            head = glyph.head
+            obj, origin = head.get("text_object_id"), head.get("origin")
+            eligible = glyph.box is not None and bool(glyph.text.strip()) and obj is not None and origin is not None and head.get("text_render_mode") in (0, 1, 2, 3, 4, 5, 6)
+            if eligible:
+                if len(origin) != 2:
+                    return _paint_pairs_python(glyphs)
+                try:
+                    object_id = objects.setdefault(obj, len(objects))
+                except TypeError:
+                    return _paint_pairs_python(glyphs)
+                signature = signatures.setdefault(glyph.signature, len(signatures))
+                records.append((glyph.box, origin, signature, object_id, True))
+            else:
+                records.append((None, None, 0, 0, False))
+        result = native.paint_pairs(records)
+        if result is not None:
+            return result
+    return _paint_pairs_python(glyphs)
+
+
+def _paint_pairs_python(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], list[tuple[int, int, float, float]]]:
     """只比较不同文本对象，生成精确重复及待连续证据确认的平移候选。"""
     buckets: dict[tuple[Any, ...], list[int]] = defaultdict(list)
     exact: list[tuple[int, int]] = []
@@ -208,6 +235,14 @@ def _paint_pairs(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], list[tupl
 
 def _components(count: int, pairs: list[tuple[int, int]]) -> list[int]:
     """把候选或已确认的绘制关联归入最早来源，避免把多层副本计作多个字形。"""
+    native = get_native()
+    if native is not None:
+        return native.dedup_components(count, pairs)
+    return _components_python(count, pairs)
+
+
+def _components_python(count: int, pairs: list[tuple[int, int]]) -> list[int]:
+    """保留最早来源并查集的 Python 参考实现。"""
     parents = list(range(count))
     for a, b in pairs:
         while parents[a] != a:
@@ -231,6 +266,31 @@ def _only_endpoint_copies(glyphs: list[_Glyph], roots: list[int], start: int, en
 
 
 def _confirmed_offsets(
+    glyphs: list[_Glyph], pairs: list[tuple[int, int, float, float]], exact: list[tuple[int, int]]
+) -> list[tuple[int, int]]:
+    """以 Python 数学函数预计算方向，再批量确认原顺序的平移证据。"""
+    native = get_native()
+    if not pairs:
+        return []
+    if native is not None:
+        active = {p[0] for p in pairs}
+        texts, angles, records = {}, {}, []
+        for index, glyph in enumerate(glyphs):
+            text_id = texts.setdefault(glyph.text, len(texts))
+            projected, normal, angle_id = None, 0.0, 0
+            if index in active:
+                origin = glyph.head["origin"]
+                normal = -math.sin(glyph.angle) * origin[0] + math.cos(glyph.angle) * origin[1]
+                if not math.isfinite(normal) or abs(normal) > 1e15:
+                    return _confirmed_offsets_python(glyphs, pairs, exact)
+                angle_id = angles.setdefault(round(glyph.angle * 1000), len(angles))
+                projected = _project(glyph.box, glyph.angle)
+            records.append((projected, normal, angle_id, text_id, glyph.text.isspace()))
+        return native.confirmed_offsets(records, pairs, exact)
+    return _confirmed_offsets_python(glyphs, pairs, exact)
+
+
+def _confirmed_offsets_python(
     glyphs: list[_Glyph], pairs: list[tuple[int, int, float, float]], exact: list[tuple[int, int]]
 ) -> list[tuple[int, int]]:
     """以同基线、同平移且连续的多字形证据确认阴影，拒绝孤立近重合字符。"""
@@ -387,6 +447,49 @@ def _visible_candidates(grid: dict[tuple[int, int], list[int]], box: Box, margin
 
 
 def _suppress_hidden(glyphs: list[_Glyph]) -> list[_Glyph]:
+    """在 Rust 中筛选隐藏文本几何，Python 保持原 Unicode 匹配与复制规则。"""
+    native = get_native()
+    if not any(g.head.get("text_render_mode") == 3 for g in glyphs):
+        return glyphs
+    if native is None:
+        return _suppress_hidden_python(glyphs)
+    objects, records = {}, []
+    indices = [glyph.head.get("char_idx") for glyph in glyphs]
+    if not all(isinstance(index, int) for index in indices):
+        return _suppress_hidden_python(glyphs)
+    ranks = {index: rank for rank, index in enumerate(sorted(set(indices)))}
+    for glyph, index in zip(glyphs, indices):
+        head = glyph.head
+        origin = head.get("origin")
+        if origin is not None and len(origin) != 2:
+            return _suppress_hidden_python(glyphs)
+        try:
+            obj = objects.setdefault(head.get("text_object_id"), len(objects))
+        except TypeError:
+            return _suppress_hidden_python(glyphs)
+        mode = head.get("text_render_mode")
+        mode = int(mode) if mode in (0, 1, 2, 3, 4, 5, 6) else -1
+        angle = glyph.angle if math.isfinite(glyph.angle) else 0.0
+        records.append((glyph.box, origin, obj, mode, bool(head.get("text_is_visible", True)), bool(glyph.text.strip()), angle, math.cos(angle), math.sin(angle), ranks[index]))
+    candidates = native.hidden_candidates(records)
+    if candidates is None:
+        return _suppress_hidden_python(glyphs)
+    removed = set()
+    for run, matches in candidates:
+        if not _matches_hidden("".join(glyphs[i].text for i in run), "".join(glyphs[i].text for i in matches)):
+            continue
+        removed.update(run)
+        if len(run) == len(matches) and all(len(glyphs[a].chars) == len(glyphs[b].chars) for a, b in zip(run, matches)):
+            for a, b in zip(run, matches):
+                _merge_sources(glyphs[b], glyphs[a])
+        else:
+            representative = glyphs[matches[0]]
+            representative.chars = [c.copy() for c in representative.chars]
+            representative.chars[0]["source_indices"] = _source_indices(representative.chars + [c for i in run for c in glyphs[i].chars])
+    return _retained_glyphs(glyphs, removed)
+
+
+def _suppress_hidden_python(glyphs: list[_Glyph]) -> list[_Glyph]:
     """只在同位置存在明确可见原文时抑制隐藏 OCR，保留扫描页唯一文本层。"""
     if not any(g.head.get("text_render_mode") == 3 for g in glyphs):
         return glyphs
