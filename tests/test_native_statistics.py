@@ -162,3 +162,37 @@ def test_occupancy_boundary_and_cache_contract(native):
     assert first == (frozenset({0, 1}),)
     assert context.columns((0.0, 10.0, 20.0)) is first
     assert len(context.cache) == 1
+
+
+def test_finite_weights_overflow_preserves_python_comparison(native):
+    """有限字重的中位数可溢出；Inf-Inf 的 NaN 必须保留原否定比较语义。"""
+    from copy import deepcopy
+    from docvortex.analyzers.native.pdf import native_text as text
+    from docvortex.analyzers.native.pdf.models import _LineItem
+    from docvortex.document.pdf.text import Bbox
+
+    chars = [
+        {
+            "char": "a",
+            "bbox": Bbox([i * 5.0, 0.0, i * 5.0 + 4.0, 10.0]),
+            "font": {"name": "Arial" if i < 2 else "Times", "flags": 0, "weight": 1e308},
+        }
+        for i in range(4)
+    ]
+    line = _LineItem("aaaa", (0.0, 0.0, 20.0, 10.0), 0, 0, chars=chars)
+    expected = deepcopy(line)
+    text._fill_native_typography_python(expected, (100.0, 100.0))
+    text._fill_native_typography(line, (100.0, 100.0))
+    assert line.leading_emphasis_width == expected.leading_emphasis_width == 9.0
+    assert line.dominant_font_weight == expected.dominant_font_weight == math.inf
+
+
+def test_lane_intermediate_overflow_uses_reference(native):
+    """中间运算溢出时不在 Rust 中排序 NaN，回到原 Python 行距结果。"""
+    from docvortex.analyzers.native.pdf import line_layout as layout
+    from docvortex.analyzers.native.pdf.models import _LineItem, _TextLane
+
+    boxes = [(0.0, 0.0, 20.0, 20.0), (0.0, 30.0, 20.0, 50.0)]
+    assert native.lane_gap(boxes, [1e308, 1e308], [False, False], [False]) is None
+    lane = _TextLane(0.0, 20.0, [(_LineItem("a", box, 0, i, effective_height=1e308), box) for i, box in enumerate(boxes)])
+    assert layout._estimate_lane_gap(lane) == layout._estimate_lane_gap_python(lane) == (math.inf, 0.0)

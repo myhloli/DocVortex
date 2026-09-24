@@ -149,7 +149,8 @@ pub fn typography(
                 if !prefix.is_empty() && !body.is_empty() {
                     let p = median(prefix);
                     let b = median(body);
-                    if p - b >= 100.0 && p >= 1.15 * 1.0_f64.max(b) {
+                    // 中位数相加可能溢出，保留 Python 两个小于判断的否定，不能改写为大于等于。
+                    if !(p - b < 100.0 || p < 1.15 * 1.0_f64.max(b)) {
                         emphasis = Some(prefix_width);
                     }
                 }
@@ -209,6 +210,9 @@ pub fn lane_gap(
         return None;
     }
     let mh = if n == 0 { 1.0 } else { median(heights.clone()) };
+    if !mh.is_finite() {
+        return None;
+    }
     let mut gaps = Vec::new();
     for i in 1..n {
         if skip[i - 1] {
@@ -240,6 +244,9 @@ pub fn lane_gap(
         if ratio < 0.5 && (a[0] - b[0]).abs() > 1.5 * mh {
             continue;
         }
+        if !gap.is_finite() {
+            return None;
+        }
         gaps.push(0.0_f64.max(gap));
     }
     if gaps.is_empty() {
@@ -249,6 +256,12 @@ pub fn lane_gap(
     let count = 1usize.max((gaps.len() as f64 * 0.6).ceil() as usize);
     let lower = gaps[..count].to_vec();
     let regular = median(lower.clone());
+    if !regular.is_finite() {
+        return None;
+    }
     let mad = median(lower.into_iter().map(|g| (g - regular).abs()).collect());
+    if !mad.is_finite() {
+        return None;
+    }
     Some((regular, mad))
 }
