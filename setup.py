@@ -19,7 +19,9 @@ setup(
             debug=False,
             cargo_manifest_args=["--locked"],
         )
-    ] if enabled else [],
+    ]
+    if enabled
+    else [],
     options={"bdist_wheel": {"py_limited_api": "cp310"}} if enabled else {},
     zip_safe=False,
 )

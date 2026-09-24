@@ -5,10 +5,12 @@ from __future__ import annotations
 import math
 import statistics
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, Literal
 
 from ....document.pdf.text._contracts import Char
 from ....schema import BBox
+from ...._compute_backend import get_native
 
 SCRIPT_BODY_COMPARABLE_HEIGHT_RATIO = 0.9
 SCRIPT_BASELINE_ABSOLUTE_TOLERANCE = 0.35
@@ -761,6 +763,50 @@ def _numeric_superscript_indices(
     return accepted
 
 
+@lru_cache(maxsize=4096)
+def _native_text_flags(text: str) -> int:
+    """缓存 Unicode 字符类别值，不缓存文档对象或可变几何。"""
+    local = len(text) == 1 and (
+        (text.isascii() and text.isalnum()) or "０" <= text <= "９" or "Ａ" <= text <= "Ｚ" or "ａ" <= text <= "ｚ"
+    )
+    return (
+        int(text.isspace())
+        | (int(text in CONTROL_LINE_BREAK_CHARS) << 1)
+        | (int(text.isalnum()) << 2)
+        | (int(text.isdecimal()) << 3)
+        | (int(local) << 4)
+        | (int(text in {"/", "⁄"}) << 5)
+        | (int(text in _NUMERIC_SCRIPT_SEPARATORS) << 6)
+    )
+
+
+def _native_script_records(chars, tight_bboxes, origins, protected):
+    """打包一次调用的几何与 Python 字体等价类，保留异常输入的原校验语义。"""
+    records = []
+    fonts = {}
+    for index, char in enumerate(chars):
+        text = str(char.get("char", ""))
+        char_idx = _char_geometry_key(char)
+        loose = _coerce_finite_bbox(char.get("bbox")) or (0.0, 0.0, 0.0, 0.0)
+        tight = _coerce_finite_bbox(tight_bboxes.get(char_idx)) if char_idx is not None else None
+        raw_origin = origins.get(char_idx) if char_idx is not None else None
+        origin = None
+        if raw_origin is not None:
+            try:
+                candidate = (float(raw_origin[0]), float(raw_origin[1]))
+            except (IndexError, TypeError, ValueError):
+                candidate = None
+            if candidate is not None and all(math.isfinite(v) for v in candidate):
+                origin = candidate
+        flags = _native_text_flags(text)
+        valid = not flags & 3 and tight is not None and origin is not None
+        flags |= (int(index in protected) << 7) | (int(valid) << 8)
+        font = _script_font_key(char)
+        font_id = -1 if font is None else fonts.setdefault(font, len(fonts))
+        records.append((loose, tight, origin, flags, font_id))
+    return records
+
+
 def classify_char_script_roles(
     chars: list[Char],
     *,
@@ -769,6 +815,25 @@ def classify_char_script_roles(
     protected_body_indices: set[int] | None = None,
 ) -> list[ScriptRole]:
     """按视觉组件、origin 基线簇和双 bbox 一致性识别上下标。"""
+    native = get_native()
+    if native is not None:
+        roles = native.script_roles(_native_script_records(chars, tight_bboxes, origins, protected_body_indices or set()))
+        if roles is not None:
+            names = ("body", "sup", "sub")
+            return [names[role] for role in roles]
+    return _classify_char_script_roles_python(
+        chars, tight_bboxes=tight_bboxes, origins=origins, protected_body_indices=protected_body_indices
+    )
+
+
+def _classify_char_script_roles_python(
+    chars: list[Char],
+    *,
+    tight_bboxes: dict[int, BBox],
+    origins: dict[int, tuple[float, float]],
+    protected_body_indices: set[int] | None = None,
+) -> list[ScriptRole]:
+    """保留原逐字符算法作为差分参考及集合平局的精确处理路径。"""
     protected = protected_body_indices or set()
     features = build_script_features(chars, tight_bboxes, origins, protected)
     font_keys = [_script_font_key(char) for char in chars]
