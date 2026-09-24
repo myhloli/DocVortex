@@ -154,6 +154,8 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
     fonts, objects = {}, {}
     chars, raw_geometry, pending_clips = [], [], []
     for index, (code, rotation, loose, tight, font_index, size, weight, address, mode, origin) in enumerate(records):
+        # 已解包记录立即释放，避免它与最终字符字典同时保留整页临时元组和字体数值。
+        records[index] = None
         name, flags = decoded_fonts[font_index]
         key = (name, flags, size, weight)
         font = fonts.get(key)
