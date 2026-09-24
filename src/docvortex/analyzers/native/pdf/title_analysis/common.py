@@ -6,7 +6,7 @@ import re
 
 from .....schema import BBox
 from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y
-from ..line_layout import _effective_text_row_gap
+from ..line_layout import _effective_text_row_gap, _line_effective_height
 from ..models import _LineItem
 
 _NUMBERED_SECTION_TITLE_RE = re.compile(
@@ -31,6 +31,42 @@ _UNNUMBERED_SECTION_HEADING_RE = re.compile(
 
 
 def _build_physical_title_gap_map(
+    line_geometry: list[tuple[_LineItem, BBox]],
+) -> dict[int, tuple[float | None, float | None]]:
+    """按本次只读行快照批量计算净空，特殊数值与自定义对象保留参考实现。"""
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    if native is not None and all(
+        type(line) is _LineItem
+        and type(box) in (tuple, list)
+        and len(box) == 4
+        and all(type(value) is float for value in box)
+        and type(line.effective_height) is float
+        and type(line.em_height) is float
+        and type(line.style_scale_repaired) is bool
+        and type(line.restored_inline_cluster) is bool
+        and (line.visual_row_id is None or type(line.visual_row_id) is int)
+        for line, box in line_geometry
+    ):
+        row_ids = {}
+        records = [
+            (
+                id(line),
+                None if line.visual_row_id is None else row_ids.setdefault(line.visual_row_id, len(row_ids)),
+                box,
+                _line_effective_height(line, box),
+                line.restored_inline_cluster,
+            )
+            for line, box in line_geometry
+        ]
+        values = native.title_gaps(records)
+        if values is not None:
+            return {line.source_index: value for (line, _box), value in zip(line_geometry, values, strict=True)}
+    return _build_physical_title_gap_map_python(line_geometry)
+
+
+def _build_physical_title_gap_map_python(
     line_geometry: list[tuple[_LineItem, BBox]],
 ) -> dict[int, tuple[float | None, float | None]]:
     """为每行记录同方向且水平投影相交的最近上、下物理行净空。"""

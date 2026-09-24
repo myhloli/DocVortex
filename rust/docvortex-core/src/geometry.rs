@@ -4,6 +4,63 @@ use crate::median;
 pub type Box4 = [f64; 4];
 pub type Size = [f64; 2];
 
+/// 共享风险筛查和完整样本的相邻锚点统计，保留两条路径的正宽度准入差异。
+pub fn anchor_pairs(
+    records: Vec<(usize, Box4, Box4, Size, f64)>,
+    positive_source: bool,
+) -> Option<Vec<(usize, f64, f64, bool)>> {
+    if records.iter().any(|r| {
+        r.1.iter()
+            .chain(r.2.iter())
+            .chain(r.3.iter())
+            .any(|v| !v.is_finite())
+            || !r.4.is_finite()
+    }) {
+        return None;
+    }
+    let mut result = Vec::new();
+    for (index, pair) in records.windows(2).enumerate() {
+        let (a, b) = (&pair[0], &pair[1]);
+        if a.0 != b.0 {
+            continue;
+        }
+        let height = (a.2[3] - a.2[1]).max(b.2[3] - b.2[1]);
+        let width = (a.2[2] - a.2[0]).max(b.2[2] - b.2[0]);
+        let shift = (a.3[1] - b.3[1]).abs();
+        let advance = b.3[0] - a.3[0];
+        let limit = (5.0 * a.4.max(1.0)).max(8.0 * width);
+        if [height, width, shift, advance, limit]
+            .iter()
+            .any(|v| !v.is_finite())
+        {
+            return None;
+        }
+        if shift > 0.5_f64.max(0.25 * height) || !(0.1 < advance && advance <= limit) {
+            continue;
+        }
+        let source_width = a.1[2] - a.1[0];
+        if positive_source && source_width <= 0.0 {
+            continue;
+        }
+        let ratio = source_width / advance;
+        let overlap = a.1[2] - b.2[0];
+        let following_width = b.2[2] - b.2[0];
+        if [ratio, overlap, following_width]
+            .iter()
+            .any(|v| !v.is_finite())
+        {
+            return None;
+        }
+        result.push((
+            index,
+            advance,
+            ratio,
+            overlap >= 0.05 * following_width.max(0.1),
+        ));
+    }
+    Some(result)
+}
+
 /// 规范并验证矩形；strict 模式不交换端点，与脚本几何契约一致。
 pub fn normalize(raw: Option<Box4>, strict: bool) -> Option<Box4> {
     let mut b = raw?;

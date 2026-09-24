@@ -295,6 +295,37 @@ fn confirmed_offsets(
 }
 
 type BoxTuple = (f64, f64, f64, f64);
+/// 一次消费整行锚点，不回传重复坐标，只返回合格相邻对的统计量。
+#[pyfunction]
+fn anchor_pairs(
+    py: Python<'_>,
+    records: Vec<(usize, Box4, Box4, Size, f64)>,
+    positive_source: bool,
+) -> Option<Vec<(usize, f64, f64, bool)>> {
+    py.detach(move || geometry::anchor_pairs(records, positive_source))
+}
+/// 冻结一页行级数值后批量计算上下物理净空。
+#[pyfunction]
+fn title_gaps(
+    py: Python<'_>,
+    records: Vec<(usize, Option<usize>, Box4, f64, bool)>,
+) -> Option<Vec<(Option<f64>, Option<f64>)>> {
+    py.detach(move || docvortex_core::spatial::title_gaps(records))
+}
+
+/// 返回邻行索引，供 Python 按原顺序追加原始分析对象。
+#[pyfunction]
+fn line_neighbors(
+    py: Python<'_>,
+    records: Vec<(usize, Box4, f64, f64)>,
+) -> Option<Vec<(Option<usize>, Option<usize>)>> {
+    py.detach(move || docvortex_core::spatial::line_neighbors(records))
+}
+/// 只传递一次每字符数值，返回分组范围以复用原有字符对象。
+#[pyfunction]
+fn mapping_runs(py: Python<'_>, records: Vec<dedup::MappingRecord>) -> Option<Vec<(usize, usize)>> {
+    py.detach(move || dedup::mapping_runs(records))
+}
 /// 在 Python 绑定层将框数组物化为原有不可变四元组。
 fn box_tuple(b: Box4) -> BoxTuple {
     (b[0], b[1], b[2], b[3])
@@ -537,6 +568,10 @@ fn script_roles_raw(
 /// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(anchor_pairs, module)?)?;
+    module.add_function(wrap_pyfunction!(title_gaps, module)?)?;
+    module.add_function(wrap_pyfunction!(line_neighbors, module)?)?;
+    module.add_function(wrap_pyfunction!(mapping_runs, module)?)?;
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_chars, module)?)?;
     module.add(
         "PdfiumReadError",

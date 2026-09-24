@@ -11,7 +11,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from ._contracts import Char
+from ._contracts import Bbox, Char
 from .geometry import char_bbox_values
 from ...._compute_backend import get_native
 
@@ -111,14 +111,68 @@ def _source_indices(chars: list[Char]) -> tuple[int, ...]:
     return tuple(sorted({i for char in chars for i in char.get("source_indices", (char["char_idx"],))}))
 
 
-def _mapping_groups(chars: list[Char]) -> list[_Glyph]:
-    """先建立保护组，仅合并不同编码指向同一个汉字的异常映射。"""
-    groups: list[list[Char]] = []
+def _mapping_char_groups_python(chars):
+    """完整保留原迭代协议、短路检查和异常顺序。"""
+    groups = []
     for char in chars:
         if groups and _same_mapping(groups[-1][-1], char):
             groups[-1].append(char)
         else:
             groups.append([char])
+    return groups
+
+
+def _native_mapping_ranges(chars, native):
+    """仅打包自有常规字符；字体强引用和等价类只存在于本次去重调用。"""
+    records, font_cache, font_ids = [], {}, {}
+    for char in chars:
+        if type(char) is not dict or not {"bbox", "font", "char", "rotation", "char_idx"} <= char.keys():
+            return None
+        index, text, rotation = char["char_idx"], char["char"], char["rotation"]
+        obj, source = char.get("text_object_id"), char.get("source_indices", (index,))
+        if (
+            type(index) is not int
+            or not -(2**63) <= index < 2**63
+            or (obj is not None and (type(obj) is not int or not -(2**63) <= obj < 2**63))
+            or type(text) is not str
+            or type(rotation) is not float
+            or type(source) is not tuple
+            or not source
+            or any(type(value) is not int or not -(2**63) <= value < 2**63 for value in source)
+        ):
+            return None
+        box = char["bbox"]
+        if (
+            type(box) is not Bbox
+            or type(box.bbox) is not list
+            or len(box.bbox) != 4
+            or any(type(v) is not float for v in box.bbox)
+        ):
+            return None
+        origin = char.get("origin")
+        if origin is not None and (type(origin) is not tuple or len(origin) != 2 or any(type(v) is not float for v in origin)):
+            return None
+        font = char["font"]
+        cached = font_cache.get(id(font))
+        if cached is None:
+            if type(font) is not dict or font.keys() != {"name", "flags", "size", "weight"}:
+                return None
+            values = tuple(font[key] for key in ("name", "flags", "size", "weight"))
+            if any(
+                type(value) not in (str, int, float, bool, type(None)) or (type(value) is float and not math.isfinite(value))
+                for value in values
+            ):
+                return None
+            cached = (font, font_ids.setdefault(values, len(font_ids)))
+            font_cache[id(font)] = cached
+        records.append((obj, index, max(source), cached[1], rotation, origin, box.bbox, bool(text.strip())))
+    return native.mapping_runs(records)
+
+
+def _mapping_groups(chars: list[Char]) -> list[_Glyph]:
+    """先建立保护组，仅合并不同编码指向同一个汉字的异常映射。"""
+    # 整页入口实测中，原生前置分组的输入打包成本超过计算收益；保留内核差分但不默认启用。
+    groups = _mapping_char_groups_python(chars)
     result: list[_Glyph] = []
     for group in groups:
         if len(group) > 1 and len({c["char"] for c in group}) > 1:

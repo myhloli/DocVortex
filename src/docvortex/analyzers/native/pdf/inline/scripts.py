@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import statistics
+import math
 import unicodedata
 from typing import Any, Literal, Sequence
 
 from .....schema import BBox
+from .....document.pdf.text._contracts import Bbox as CharBox
 from .._script_geometry import (
     ScriptRole,
     _numeric_superscript_indices,
@@ -734,11 +736,22 @@ def _classify_script_runs(
         while end < len(chars) and memberships[end] == membership:
             end += 1
         run_chars = chars[start:end]
-        run_indices = {int(char["char_idx"]) for char in run_chars if isinstance(char.get("char_idx"), int)}
+        ordinary_maps = (
+            type(local_tight_bboxes) is dict
+            and type(local_origins) is dict
+            and all(type(char) is dict and type(char.get("char_idx")) is int for char in run_chars)
+        )
+        run_indices = (
+            set() if ordinary_maps else {int(char["char_idx"]) for char in run_chars if isinstance(char.get("char_idx"), int)}
+        )
         run_roles = classify_char_script_roles(
             run_chars,
-            tight_bboxes={index: local_tight_bboxes[index] for index in run_indices if index in local_tight_bboxes},
-            origins={index: local_origins[index] for index in run_indices if index in local_origins},
+            tight_bboxes=local_tight_bboxes
+            if ordinary_maps
+            else {index: local_tight_bboxes[index] for index in run_indices if index in local_tight_bboxes},
+            origins=local_origins
+            if ordinary_maps
+            else {index: local_origins[index] for index in run_indices if index in local_origins},
         )
         run_roles = _refine_math_script_tokens(
             run_chars,
@@ -783,6 +796,25 @@ def _classify_script_runs(
     return roles, body_counts, formula_flags
 
 
+def _plain_script_geometry(chars, tight_bboxes, origins):
+    """只有无自定义读取行为的普通几何才能直接借用，特殊值保留原逐字符物化。"""
+    if type(tight_bboxes) is not dict or type(origins) is not dict:
+        return False
+    for char in chars:
+        if type(char) is not dict or type(char.get("char")) is not str or type(char.get("char_idx")) is not int:
+            return False
+        box = char.get("bbox")
+        raw = box.bbox if type(box) is CharBox else box
+        for value, size in ((raw, 4), (tight_bboxes.get(char["char_idx"]), 4), (origins.get(char["char_idx"]), 2)):
+            if value is not None and (
+                type(value) not in (tuple, list)
+                or len(value) != size
+                or any(type(v) is not float or not math.isfinite(v) for v in value)
+            ):
+                return False
+    return True
+
+
 def _script_line_char_roles(
     line: Any,
     page_size: tuple[float, float],
@@ -802,12 +834,15 @@ def _script_line_char_roles(
     from ....._compute_backend import get_native
 
     native = get_native()
+    reuse_geometry = angle == 0 and _plain_script_geometry(chars, tight_bboxes, origins)
     prepared = (
         native.normalize_boxes([getattr(char.get("bbox"), "bbox", char.get("bbox")) for char in chars], True, _coerce_bbox)
-        if native is not None
+        if native is not None and not reuse_geometry
         else None
     )
-    for position, char in enumerate(chars):
+    if reuse_geometry:
+        local_chars, local_tight_bboxes, local_origins = chars, tight_bboxes, origins
+    for position, char in enumerate(() if reuse_geometry else chars):
         local_char = dict(char)
         bbox = prepared[position] if prepared is not None else _coerce_bbox(char.get("bbox"))
         if bbox is not None:

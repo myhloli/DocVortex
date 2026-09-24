@@ -6,6 +6,41 @@ use std::collections::HashMap;
 pub type PaintRecord = (Option<Box4>, Option<Size>, usize, usize, bool);
 pub type Pair = (usize, usize);
 pub type Offset = (usize, usize, f64, f64);
+pub type MappingRecord = (Option<i64>, i64, i64, usize, f64, Option<Size>, Box4, bool);
+
+/// 批量识别连续的一对多来源映射，只返回范围，Unicode 合并仍由 Python 执行。
+pub fn mapping_runs(records: Vec<MappingRecord>) -> Option<Vec<(usize, usize)>> {
+    if records.iter().any(|r| {
+        !r.4.is_finite()
+            || r.6.iter().any(|v| !v.is_finite())
+            || r.5.is_some_and(|p| p.iter().any(|v| !v.is_finite()))
+    }) {
+        return None;
+    }
+    let mut groups = Vec::new();
+    let mut start = 0;
+    for i in 1..records.len() {
+        let a = &records[i - 1];
+        let b = &records[i];
+        let same = a.0.is_some()
+            && a.0 == b.0
+            && a.2.checked_add(1) == Some(b.1)
+            && a.3 == b.3
+            && a.4 == b.4
+            && a.7
+            && b.7
+            && matches!((a.5, b.5), (Some(x), Some(y)) if close(x, y, 0.001))
+            && close(a.6, b.6, 0.001);
+        if !same {
+            groups.push((start, i));
+            start = i;
+        }
+    }
+    if !records.is_empty() {
+        groups.push((start, records.len()));
+    }
+    Some(groups)
+}
 
 /// 数值缺失、非有限或超出容差时不得作为相同位置的证据。
 fn close<const N: usize>(a: [f64; N], b: [f64; N], epsilon: f64) -> bool {
