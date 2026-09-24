@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import Mock
 import ctypes
 from concurrent.futures import ThreadPoolExecutor
+from collections import UserDict
 
 import pytest
 import pypdfium2 as pdfium
@@ -92,7 +93,8 @@ def test_bridge_unavailable_and_error_are_distinct(native, monkeypatch):
                 assert bridge.read_native_chars(textpage, True) is None
                 assert "FPDFText_GetFontInfo" in bridge.bridge_info()["pdfium_bridge_unavailable_reason"]
             with monkeypatch.context() as context:
-                context.setattr(native, "read_pdfium_chars", Mock(side_effect=ValueError("calculation failure")))
+                reader_name = "read_pdfium_char_batches" if hasattr(native, "read_pdfium_char_batches") else "read_pdfium_chars"
+                context.setattr(native, reader_name, Mock(side_effect=ValueError("calculation failure")))
                 with pytest.raises(ValueError, match="calculation failure"):
                     bridge.read_native_chars(textpage, True)
         assert bridge.read_native_chars(textpage, True) is None
@@ -104,6 +106,38 @@ def test_bridge_rejects_null_arguments_before_ffi(native):
         native.read_pdfium_chars([0] * 10, 1, 1, True)
     with pytest.raises(ValueError, match="invalid PDFium"):
         native.read_pdfium_chars([1] * 10, 0, 1, True)
+    with pytest.raises(ValueError, match="invalid PDFium"):
+        native.read_pdfium_char_batches([0] * 10, 1, 1, True)
+
+
+def test_batched_records_preserve_boundary_indices_and_legacy_reader(native, monkeypatch):
+    """跨物化批次的代理对和来源序号保持不变，协议 4 的旧列表读取仍可兼容。"""
+    stream = BytesIO()
+    canvas = Canvas(stream)
+    for row in range(24):
+        canvas.drawString(30, 780 - row * 14, "boundary 1234567890 " * 3)
+    canvas.save()
+    factory = ctypes.WINFUNCTYPE if hasattr(ctypes, "WINFUNCTYPE") else ctypes.CFUNCTYPE
+    unicode_reader = bridge.raw.FPDFText_GetUnicode
+
+    def unicode_value(handle, index):
+        """将成对代理项放在数值批次边界，检查全页索引不会在新批次重置。"""
+        return {1023: 0xD83D, 1024: 0xDE00}.get(index, unicode_reader(handle, index))
+
+    monkeypatch.setattr(
+        bridge.raw, "FPDFText_GetUnicode", factory(unicode_reader.restype, *unicode_reader.argtypes)(unicode_value)
+    )
+    with pdfium_guard(), pdfium.PdfDocument(stream.getvalue()) as document:
+        with closing(document[0]) as page, closing(page.get_textpage()) as textpage:
+            assert textpage.count_chars() > 1024
+            box = list(page.get_bbox())
+            expected = character_state(extract._get_chars_python(textpage, box, 0, include_geometry=True))
+            assert character_state(extract.get_chars(textpage, box, 0, include_geometry=True)) == expected
+            assert bridge.bridge_info()["pdfium_record_batch_size"] == 1024
+            with monkeypatch.context() as context:
+                context.delattr(native, "read_pdfium_char_batches")
+                assert character_state(extract.get_chars(textpage, box, 0, include_geometry=True)) == expected
+                assert bridge.bridge_info()["pdfium_record_batch_size"] is None
 
 
 def test_bridge_long_font_callback_and_surrogates(native, monkeypatch):
@@ -173,3 +207,22 @@ def test_bridge_concurrent_requests_keep_existing_guard(native):
     with ThreadPoolExecutor(max_workers=3) as executor:
         results = list(executor.map(capture, range(6)))
     assert all(result == results[0] for result in results)
+
+
+def test_special_visibility_mapping_preserves_reference_access(native, monkeypatch):
+    """自定义映射与非常规页框保持原读取入口，避免提前批读改变 Python 访问副作用。"""
+    blocked = Mock(side_effect=AssertionError("special input entered native reader"))
+    monkeypatch.setattr(extract, "_get_chars_native", blocked)
+    with pdfium_guard(), pdfium.PdfDocument(sample_pdf(0)) as document:
+        with closing(document[0]) as page, closing(page.get_textpage()) as textpage:
+            box = list(page.get_bbox())
+            visibility = UserDict()
+            expected = extract._get_chars_python(textpage, box, 0, include_geometry=True, visibility_by_object=visibility)
+            actual = extract.get_chars(textpage, box, 0, include_geometry=True, visibility_by_object=visibility)
+            assert character_state(actual) == character_state(expected)
+            integer_box = [int(value) for value in box]
+            expected = extract._get_chars_python(textpage, integer_box, 0, include_geometry=True)
+            assert character_state(extract.get_chars(textpage, integer_box, 0, include_geometry=True)) == character_state(
+                expected
+            )
+    blocked.assert_not_called()

@@ -111,6 +111,29 @@ def _mark_visible_objects(chars: list[Char], handle: Any) -> None:
         char["text_is_visible"] = visibility[object_id]
 
 
+def _native_visibility_supported(visibility):
+    """只重排普通不可执行的可见性数据，特殊映射及数值保留参考路径的访问时序。"""
+    if visibility is None:
+        return True
+    if type(visibility) is not dict:
+        return False
+    return all(
+        (key is None or type(key) is int)
+        and type(value) is tuple
+        and len(value) == 2
+        and type(value[0]) is bool
+        and (
+            value[1] is None
+            or (
+                type(value[1]) is tuple
+                and len(value[1]) == 4
+                and all(type(coordinate) is float and math.isfinite(coordinate) for coordinate in value[1])
+            )
+        )
+        for key, value in visibility.items()
+    )
+
+
 def get_chars(
     textpage: pdfium.PdfTextPage,
     page_bbox: list[float],
@@ -125,8 +148,9 @@ def get_chars(
         and page_rotation in (0, 90, 180, 270)
         and type(page_bbox) is list
         and len(page_bbox) == 4
-        and all(type(value) in (float, int) and math.isfinite(value) for value in page_bbox)
+        and all(type(value) is float and math.isfinite(value) for value in page_bbox)
         and get_native() is not None
+        and _native_visibility_supported(visibility_by_object)
     ):
         result = _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visibility_by_object)
         if result is not None:
@@ -152,10 +176,9 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
     records, raw_fonts = batch
     decoded_fonts = [(bytes(name).decode("utf-8", errors="replace"), flags) for name, flags in raw_fonts]
     fonts, objects = {}, {}
-    chars, raw_geometry, pending_clips = [], [], []
+    chars, raw_geometry, pending_clips, retained = [], [], [], []
     for index, (code, rotation, loose, tight, font_index, size, weight, address, mode, origin) in enumerate(records):
-        # 已解包记录立即释放，避免它与最终字符字典同时保留整页临时元组和字体数值。
-        records[index] = None
+        # 读取桥按固定上限逐批物化记录，已消费批次不与整页最终字符长期重叠。
         name, flags = decoded_fonts[font_index]
         key = (name, flags, size, weight)
         font = fonts.get(key)
@@ -188,9 +211,29 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
         raw_geometry.append((selected, loose if include_geometry else None, tight if include_geometry else None, origin))
         pending_clips.append(clip)
         chars.append(char)
+        if len(chars) >= 1024:
+            retained.extend(
+                _materialize_native_char_batch(
+                    chars, raw_geometry, pending_clips, page_bbox, (width, height), page_rotation, include_geometry
+                )
+            )
+            chars.clear()
+            raw_geometry.clear()
+            pending_clips.clear()
     del batch, records, raw_fonts
-    prepared = get_native().materialize_geometry(raw_geometry, page_bbox, (width, height), page_rotation)
-    del raw_geometry
+    retained.extend(
+        _materialize_native_char_batch(
+            chars, raw_geometry, pending_clips, page_bbox, (width, height), page_rotation, include_geometry
+        )
+    )
+    _assign_writing_angles(retained)
+    _mark_visible_objects(retained, textpage.raw)
+    return retained
+
+
+def _materialize_native_char_batch(chars, raw_geometry, pending_clips, page_bbox, page_size, page_rotation, include_geometry):
+    """有界批次完成独立坐标变换和裁剪；字体、来源编号与书写方向仍在整页范围处理。"""
+    prepared = get_native().materialize_geometry(raw_geometry, page_bbox, page_size, page_rotation)
     retained = []
     for char, (layout, loose, tight, origin), clip in zip(chars, prepared, pending_clips, strict=True):
         char["bbox"] = Bbox(layout)
@@ -199,8 +242,6 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
             char["loose_bbox"], char["tight_bbox"] = loose, tight
         if clip is None or _clip_visible_character(char, clip):
             retained.append(char)
-    _assign_writing_angles(retained)
-    _mark_visible_objects(retained, textpage.raw)
     return retained
 
 

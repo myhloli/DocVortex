@@ -1,6 +1,7 @@
 """核验当前 ctypes ABI 后借用函数地址；不重载运行库，不缓存文档或原生地址。"""
 
 import ctypes as ct
+from itertools import chain
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as raw
@@ -10,16 +11,21 @@ from ..pdfium import pdfium_guard
 
 _CALLS = 0
 _UNAVAILABLE_REASON = "not probed"
+_RECORD_BATCH_SIZE = None
 
 
 def bridge_info():
     """报告真实完成的桥接次数和最近的能力探测结果。"""
-    return {"pdfium_bridge_calls": _CALLS, "pdfium_bridge_unavailable_reason": _UNAVAILABLE_REASON}
+    return {
+        "pdfium_bridge_calls": _CALLS,
+        "pdfium_bridge_unavailable_reason": _UNAVAILABLE_REASON,
+        "pdfium_record_batch_size": _RECORD_BATCH_SIZE,
+    }
 
 
 def read_native_chars(textpage, extended):
     """在同一 textpage 和锁内完成原始读取，特殊输入及非标准函数留给参考实现。"""
-    global _CALLS, _UNAVAILABLE_REASON
+    global _CALLS, _UNAVAILABLE_REASON, _RECORD_BATCH_SIZE
     native = get_native()
     if native is None:
         _UNAVAILABLE_REASON = "python backend"
@@ -69,9 +75,16 @@ def read_native_chars(textpage, extended):
             _UNAVAILABLE_REASON = "negative character count"
             return None
         try:
-            result = native.read_pdfium_chars(addresses, ct.cast(textpage.raw, ct.c_void_p).value, count, extended)
+            reader = getattr(native, "read_pdfium_char_batches", native.read_pdfium_chars)
+            result = reader(addresses, ct.cast(textpage.raw, ct.c_void_p).value, count, extended)
         except native.PdfiumReadError as exc:
             raise pdfium.PdfiumError(str(exc)) from exc
     _CALLS += 1
     _UNAVAILABLE_REASON = None
+    records, fonts = result
+    batches_type = getattr(native, "PdfiumCharacterBatches", None)
+    if batches_type is not None and isinstance(records, batches_type):
+        _RECORD_BATCH_SIZE = native.PDFIUM_RECORD_BATCH_SIZE
+        return chain.from_iterable(records), fonts
+    _RECORD_BATCH_SIZE = None
     return result

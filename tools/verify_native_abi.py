@@ -17,6 +17,7 @@ def verify_binary(binary: Path) -> None:
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
     assert native.PROTOCOL_VERSION == 4
+    assert native.PDFIUM_RECORD_BATCH_SIZE == 1024
     assert native.BaselineCandidates([(0, 1), (1, 2), (3, 4)], [0, 0, 0]).rows(0, 3, 8192) == [[1], [], []]
     assert native.TableNoteMetrics([(0, 0, 1), (1, 1, 2), (2, 2, 3), (3, 3, 4)]).height(100, 200, [], 1.25) == 4.0
     assert native.mapping_runs([]) == []

@@ -573,6 +573,9 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(line_neighbors, module)?)?;
     module.add_function(wrap_pyfunction!(mapping_runs, module)?)?;
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_chars, module)?)?;
+    module.add_function(wrap_pyfunction!(pdfium::read_pdfium_char_batches, module)?)?;
+    module.add_class::<pdfium::PdfiumCharacterBatches>()?;
+    module.add("PDFIUM_RECORD_BATCH_SIZE", pdfium::RECORD_BATCH_SIZE)?;
     module.add(
         "PdfiumReadError",
         module.py().get_type::<pdfium::PdfiumReadError>(),

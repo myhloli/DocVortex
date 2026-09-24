@@ -43,7 +43,11 @@ immutable Unicode features; they do not retain documents or use object addresses
   lock and GIL. It owns no PDFium handles or callbacks and loads no second library.
   Unsupported ctypes ABI/inputs use the reference reader with a recorded reason;
   errors after entering the bridge propagate. Coordinate conversion can then release
-  the GIL. Wheel smoke checks require an actually completed bridge call.
+  the GIL. Raw numerical records stay within the call; Python records and coordinate
+  results are materialized in batches of at most 1,024. Font sharing, object/source IDs
+  and writing-direction assignment retain whole-page scope. The original protocol-4
+  list reader remains compatible. Wheel smoke checks require an actually completed
+  bridge call using bounded batches.
 - Deduplication: paint buckets, translated-run evidence, source components and hidden
   OCR geometry. Unicode matching and final copies remain in Python.
 - Tables: region selection, batched rule coverage and merging, grid connectivity,

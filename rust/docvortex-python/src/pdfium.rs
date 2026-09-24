@@ -32,9 +32,66 @@ type Record = (
 );
 type Fonts = Vec<(Vec<u8>, i32)>;
 
-/// ABI 与地址由 Python 适配器核验；本函数始终持有 GIL，字体回调和外层 RLock 保持原生命周期。
+pub const RECORD_BATCH_SIZE: usize = 1024;
+
+/// 持有本次读取的纯数值，逐批构造 Python 元组，避免整页临时对象与最终字符同时常驻。
+#[pyclass(module = "docvortex._native")]
+pub struct PdfiumCharacterBatches {
+    records: std::vec::IntoIter<Record>,
+}
+
+#[pymethods]
+impl PdfiumCharacterBatches {
+    /// 迭代器仅拥有数值，不拥有 PDFium 句柄或回调。
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
+    }
+
+    /// 每批只构造上限内的 Python 记录，调用方消费后即可释放这一批临时元组。
+    fn __next__(&mut self) -> Option<Vec<Record>> {
+        let chunk: Vec<_> = self.records.by_ref().take(RECORD_BATCH_SIZE).collect();
+        if chunk.is_empty() {
+            None
+        } else {
+            Some(chunk)
+        }
+    }
+}
+
+/// 保留协议 4 最初的完整列表入口，旧绑定调用方无需改变返回值处理。
 #[pyfunction]
 pub fn read_pdfium_chars(
+    addresses: Vec<usize>,
+    handle: usize,
+    count: usize,
+    extended: bool,
+) -> PyResult<(Vec<Record>, Fonts)> {
+    read_pdfium_data(addresses, handle, count, extended)
+}
+
+/// 同一次 PDFium 调用的结果按数值缓冲保存，随后有界地交给 Python 物化。
+#[pyfunction]
+pub fn read_pdfium_char_batches(
+    py: Python<'_>,
+    addresses: Vec<usize>,
+    handle: usize,
+    count: usize,
+    extended: bool,
+) -> PyResult<(Py<PdfiumCharacterBatches>, Fonts)> {
+    let (records, fonts) = read_pdfium_data(addresses, handle, count, extended)?;
+    Ok((
+        Py::new(
+            py,
+            PdfiumCharacterBatches {
+                records: records.into_iter(),
+            },
+        )?,
+        fonts,
+    ))
+}
+
+/// ABI 与地址由 Python 核验；两个入口始终持有 GIL，字体回调和外层 RLock 生命周期相同。
+fn read_pdfium_data(
     addresses: Vec<usize>,
     handle: usize,
     count: usize,
