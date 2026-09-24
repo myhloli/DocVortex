@@ -25,6 +25,33 @@ def make_pdf(pages: int) -> bytes:
     return output.getvalue()
 
 
+def use_local_crop_worker(monkeypatch, raster):
+    """在当前进程执行真实裁图 worker，仅替换底层页图，继续检查图片关闭语义。"""
+    from docvortex.document.pdf import images
+
+    def load(data, prepared_pages, **options):
+        """将原测试页图源接到 worker 内部，模拟进程传输前的全部裁图处理。"""
+
+        def core(pdf_bytes, dpi, start, end, image_type):
+            """传递公开调度参数，供原有断言检查实际页面和配置。"""
+            return raster(
+                pdf_bytes,
+                start_page_id=start,
+                end_page_id=end,
+                image_type=image_type,
+                timeout=options.get("timeout"),
+                threads=options.get("threads"),
+            )
+
+        with monkeypatch.context() as context:
+            context.setattr(images, "load_images_from_pdf_core", core)
+            return images._load_visual_crops_worker(
+                data, 200, options["start_page_id"], options["end_page_id"], deepcopy(prepared_pages)
+            )
+
+    monkeypatch.setattr(images, "_load_visual_crops_from_pdf_bytes_range", load)
+
+
 @pytest.mark.parametrize("page_range, expected_count", [("", 5), ("2-5", 4), ("r1", 1)])
 def test_sparse_visual_pages_keep_physical_identity(
     monkeypatch: pytest.MonkeyPatch, page_range: str, expected_count: int
@@ -73,7 +100,7 @@ def test_sparse_visual_pages_keep_physical_identity(
         return [{"img_pil": image} for image in batch]
 
     monkeypatch.setattr(PdfModel, "predict", predict)
-    monkeypatch.setattr(images, "load_images_from_pdf_bytes_range", raster)
+    use_local_crop_worker(monkeypatch, raster)
     with PDFDocument(make_pdf(5)) as source:
         result = api.analyze(source, page_range=page_range)
         assert source.page_count == 5
@@ -95,6 +122,7 @@ def test_text_only_pdf_does_not_start_raster_pool(monkeypatch: pytest.MonkeyPatc
         raise AssertionError("Text-only PDF must not rasterize")
 
     monkeypatch.setattr(images, "load_images_from_pdf_bytes_range", forbidden)
+    monkeypatch.setattr(images, "_load_visual_crops_from_pdf_bytes_range", forbidden)
     assert api.parse(make_pdf(1)).middle_json.pages
 
 
@@ -134,7 +162,7 @@ def test_crop_failure_releases_all_images(monkeypatch: pytest.MonkeyPatch) -> No
         raise RuntimeError("crop failed")
 
     monkeypatch.setattr(PdfModel, "predict", predict)
-    monkeypatch.setattr(images, "load_images_from_pdf_bytes_range", raster)
+    use_local_crop_worker(monkeypatch, raster)
     monkeypatch.setattr(visuals, "_attach_prepared_visual_block_images", failure)
     with PDFDocument(make_pdf(1)) as document:
         with pytest.raises(RuntimeError, match="crop failed"):
@@ -213,7 +241,7 @@ def test_public_visual_raster_matches_eager_crops(
         created.extend(batch)
         return [{"img_pil": image} for image in batch]
 
-    monkeypatch.setattr(images, "load_images_from_pdf_bytes_range", raster)
+    use_local_crop_worker(monkeypatch, raster)
     with PDFDocument(make_pdf(len(pages))) as document:
         visuals.attach_visual_block_images_from_pdf(document, pages, window_size=2, timeout=timeout, threads=threads)
         assert document.page_count == len(pages)
@@ -242,7 +270,7 @@ def test_public_visual_raster_failure_releases_completed_batches(
         created.extend(batch)
         return [{"img_pil": image} for image in batch]
 
-    monkeypatch.setattr(images, "load_images_from_pdf_bytes_range", raster)
+    use_local_crop_worker(monkeypatch, raster)
     pages = [[{"type": "image", "bbox": [0, 0, 1, 1]}] for _ in range(2)]
     with PDFDocument(make_pdf(2)) as document:
         with pytest.raises((RuntimeError, ValueError), match="render failed|page count mismatch"):
