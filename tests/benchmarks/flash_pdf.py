@@ -173,7 +173,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
         stats = pstats.Stats(profiler)
         result["profile"] = [
             {
-                "file": "docvortex/" + Path(filename).relative_to(package_root).as_posix(),
+                "file": "docvortex/" + Path(filename).resolve().relative_to(package_root).as_posix(),
                 "line": line,
                 "function": name,
                 "calls": values[1],

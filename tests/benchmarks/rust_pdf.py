@@ -126,6 +126,16 @@ def worker(args: argparse.Namespace) -> None:
         regions_hash = digest(model)
     times = defaultdict(list)
     expected = None
+    args.output.mkdir(parents=True, exist_ok=False)
+    progress = {
+        "path": str(path.resolve()),
+        "source_sha256": source_hash,
+        "source_package": str(Path(docvortex.__file__).resolve()),
+        "compute": backend_info(),
+        "status": "timing",
+        "completed_runs": 0,
+    }
+    write_json(args.output / "progress.json", progress)
     for run in range(args.runs + 1):
         gc.collect()
         durations, output = public_once(payload) if args.suite == "public" else shared_once(payload, model)
@@ -138,10 +148,13 @@ def worker(args: argparse.Namespace) -> None:
         else:
             for stage, value in durations.items():
                 times[stage].append(value)
-    args.output.mkdir(parents=True, exist_ok=False)
+        progress.update(completed_runs=run, seconds=dict(times), full_output_sha256=expected)
+        write_json(args.output / "progress.json", progress)
     write_json(args.output / "output.json", output)
     del output
     gc.collect()
+    progress["status"] = "memory"
+    write_json(args.output / "progress.json", progress)
     sampler = MemorySampler()
     sampler.thread.start()
     try:
@@ -163,6 +176,8 @@ def worker(args: argparse.Namespace) -> None:
         "compute": backend_info(),
     }
     write_json(args.output / "result.json", record)
+    progress["status"] = "complete"
+    write_json(args.output / "progress.json", progress)
     print(path.name, record["median_seconds"], flush=True)
 
 
