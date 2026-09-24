@@ -108,6 +108,7 @@ def worker(args: argparse.Namespace) -> None:
     from loguru import logger
     from docvortex._compute_backend import backend_info
     from docvortex.version import __version__
+    import docvortex
     from pipeline import MemorySampler
 
     logger.disable("docvortex")
@@ -158,6 +159,7 @@ def worker(args: argparse.Namespace) -> None:
         "median_seconds": {key: statistics.median(values) for key, values in times.items()},
         "memory": memory,
         "source_version": __version__,
+        "source_package": str(Path(docvortex.__file__).resolve()),
         "compute": backend_info(),
     }
     write_json(args.output / "result.json", record)
