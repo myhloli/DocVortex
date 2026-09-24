@@ -129,6 +129,8 @@ def shared_once(payload: bytes, model: list) -> tuple[dict, dict]:
 
 def worker(args: argparse.Namespace) -> None:
     """先预热再计时，在计时外验证重复输出，并另跑一轮独立采样内存。"""
+    # API 不能撤回初始化事件，必须在导入前禁用上传器；渲染子进程也继承此设置。
+    os.environ["ORT_DISABLE_TELEMETRY"] = "1"
     import onnxruntime
 
     # 关闭与解析无关的后台联网，避免 ORT 遥测线程干扰计时及解释器退出。
@@ -166,7 +168,7 @@ def worker(args: argparse.Namespace) -> None:
         "compute": backend_info(),
         **identity,
         "status": "timing",
-        "onnxruntime_telemetry": "disabled",
+        "onnxruntime_telemetry": "disabled_before_import",
         "onnxruntime_version": onnxruntime.__version__,
         "completed_runs": 0,
     }
@@ -206,7 +208,7 @@ def worker(args: argparse.Namespace) -> None:
         "seconds": dict(times),
         "median_seconds": {key: statistics.median(values) for key, values in times.items()},
         "memory": memory,
-        "onnxruntime_telemetry": "disabled",
+        "onnxruntime_telemetry": "disabled_before_import",
         "onnxruntime_version": onnxruntime.__version__,
         "source_version": __version__,
         "source_package": str(Path(docvortex.__file__).resolve()),

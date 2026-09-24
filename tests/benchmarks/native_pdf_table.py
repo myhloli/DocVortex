@@ -16,6 +16,8 @@ from dataclasses import asdict
 from pathlib import Path
 
 from loguru import logger
+
+os.environ["ORT_DISABLE_TELEMETRY"] = "1"
 import onnxruntime
 
 # 不让外部 SDK 的后台上传参与结构/样式基准或进程退出。
@@ -175,7 +177,7 @@ def main() -> None:
         "python": sys.version,
         "platform": platform.platform(),
         "runs": args.runs,
-        "onnxruntime_telemetry": "disabled",
+        "onnxruntime_telemetry": "disabled_before_import",
         "groups": {},
     }
     outputs = {}

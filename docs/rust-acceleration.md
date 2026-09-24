@@ -167,8 +167,10 @@ tree RSS separately, and reverses order for regressions above 5%. Local external
 are identified by SHA256 and are not uploaded to CI. The wheel matrix instead generates
 a deterministic 120-row synthetic table and exercises both pypdfium2 5.10.1 and 5.13.0.
 
-Validation tools disable ONNX Runtime's unrelated background telemetry before imports
-and record the setting. This prevents a telemetry SDK shutdown race observed on the
+Validation tools set the upstream `ORT_DISABLE_TELEMETRY=1` before importing ONNX Runtime
+and record the setting. API suppression alone cannot retract its initialization event
+([upstream details](https://github.com/microsoft/onnxruntime/blob/main/docs/Privacy.md)).
+This prevents a telemetry SDK shutdown race observed on the
 local macOS stack from masking completed PDF results; production runtime settings are
 unchanged. Failed runs remain excluded, and formal comparisons use the same telemetry
 setting for both revisions and backends. Regression retests reverse only affected pairs.

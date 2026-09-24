@@ -13,6 +13,7 @@ import tempfile
 
 def capture(pdf: Path, output: Path, expected: str) -> None:
     """要求加载安装包而非 checkout，并捕获模型、后处理、素材和诊断。"""
+    os.environ["ORT_DISABLE_TELEMETRY"] = "1"
     import onnxruntime
 
     # 安装验证不依赖遥测，关闭后台上传以免 SDK 的退出异常掩盖解析结果。
