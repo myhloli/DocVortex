@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 import statistics
 import math
 import unicodedata
+from itertools import islice
 from typing import Any, Literal
 from ....schema import BBox
 from .models import _LineItem, _TableAnnotation, _TableCandidate, _VisualRow
@@ -55,6 +56,14 @@ class _PreparedTableCoreRows:
     native: Any
     marker_positions: dict[str, list[int]] = field(default_factory=dict)
     marker_safe: bool = False
+    geometry: Any = None
+
+    def bbox(self, start, end):
+        """按极值来源复用原始坐标对象，避免新建大量 Python 浮点值。"""
+        if self.geometry is None:
+            return None
+        indices = self.geometry.union_indices(start, end)
+        return tuple(self.rows[index].bbox[axis] for axis, index in enumerate(indices)) if indices is not None else None
 
     def interval(self, rows: list[_VisualRow]) -> tuple[int, int] | None:
         """只有完全相同、连续且顺序一致的行引用才能使用区间描述。"""
@@ -122,13 +131,50 @@ def _prepare_table_core_rows(rows, lines, metrics):
         )
         for line in lines
     )
+    from ...._compute_backend import get_native
+
+    geometry = None
+    if all(
+        type(row.bbox) in (tuple, list)
+        and len(row.bbox) == 4
+        and all(type(value) is float and math.isfinite(value) for value in row.bbox)
+        for row in rows
+    ):
+        geometry = get_native().TableRowGeometry([row.bbox for row in rows])
     return _PreparedTableCoreRows(
         rows,
         {id(row): index for index, row in enumerate(rows)},
         source_rows,
         metrics.native.prepare_rows(members),
         marker_safe=marker_safe,
+        geometry=geometry,
     )
+
+
+class _PreparedTableNoteRows(list):
+    """保留列表协议并附加本次表注走廊的保序下边界索引。"""
+
+    def __init__(self, rows):
+        """只为普通有限行框建立索引，特殊几何保持原遍历行为。"""
+        super().__init__(rows)
+        from ...._compute_backend import get_native
+
+        native = get_native()
+        self.geometry = None
+        if native is not None and all(
+            type(row.row.bbox) in (tuple, list)
+            and len(row.row.bbox) == 4
+            and all(type(value) is float and math.isfinite(value) for value in row.row.bbox)
+            for row in rows
+        ):
+            self.geometry = native.TableRowGeometry([row.row.bbox for row in rows])
+
+    def first_after(self, bottom):
+        """查找可以跳过的前缀，非有限表底仍从原始首行开始。"""
+        if self.geometry is None or type(bottom) is not float:
+            return 0
+        result = self.geometry.first_after(bottom)
+        return 0 if result is None else result
 
 
 def _table_caption_candidates(
@@ -276,7 +322,7 @@ def _prepare_table_note_rows(
                 auxiliary_marker=_extract_auxiliary_table_note_marker(row_text),
             )
         )
-    return output
+    return _PreparedTableNoteRows(output)
 
 
 def _prepare_table_note_body_metrics(
@@ -340,7 +386,11 @@ def _collect_footnote_rows(
     bottom = rule_bbox[3]
     note_chain_started = False
     selected_line_indices = set(core_line_indices)
-    core_lines = None
+    core_lines = (
+        None
+        if prepared_core is not None and prepared_core[0].marker_safe
+        else [line for line in lines if line.source_index in core_line_indices]
+    )
     body_reference_height: float | None = None
     note_left: float | None = None
     note_height: float | None = None
@@ -355,7 +405,8 @@ def _collect_footnote_rows(
             page_size,
             angle,
         )
-    for prepared_row in prepared:
+    start = prepared.first_after(bottom) if isinstance(prepared, _PreparedTableNoteRows) else 0
+    for prepared_row in islice(prepared, start, None):
         clipped_row = prepared_row.row
         if clipped_row.bbox[3] <= bottom:
             continue

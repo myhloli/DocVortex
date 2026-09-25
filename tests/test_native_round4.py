@@ -51,6 +51,7 @@ def test_stable_columns_every_prefix(native, seed):
         rules._extend_stable_column_clusters(reference, [row], start_row_index=i, tolerance=3.0)
         assert result == rules._stable_column_result(reference, i + 1)
         assert rules._count_stable_columns(rows[: i + 1], 4.0, cache, allow_prefix_reuse=True) == result
+        assert isinstance(cache.prefixes[(4.0, id(rows[0]))].clusters_by_alignment, native.StableColumnClusters)
         for expected, actual in zip(reference.values(), state.snapshot()):
             assert len(expected) == len(actual)
             for cluster, (mean, total, count, row_count) in zip(expected, actual):
@@ -131,7 +132,9 @@ def test_core_interval_reference_and_marker_index(native):
         _LineItem(text, (0.0, float(i), 10.0, float(i + 1)), 0, i, chars=[])
         for i, text in enumerate(["1", "body text long", "a", "b", "a"])
     ]
-    rows = [SimpleNamespace(fragments=[SimpleNamespace(line_index=i)]) for i in range(5)]
+    rows = [
+        SimpleNamespace(fragments=[SimpleNamespace(line_index=i)], bbox=(0.0, float(i), 10.0, float(i + 1))) for i in range(5)
+    ]
     metrics = notes._prepare_table_note_body_metrics(lines, (100.0, 100.0), 0)
     context = notes._prepare_table_core_rows(rows, lines, metrics)
     assert context.marker_safe
@@ -143,3 +146,55 @@ def test_core_interval_reference_and_marker_index(native):
             for end in range(start + 1, 6):
                 expected = notes._table_core_references_marker(marker, lines[start:end], (100.0, 100.0), 0)
                 assert context.references(marker, start, end, lines, (100.0, 100.0), 0, cache) == expected
+
+
+@pytest.mark.parametrize("seed", range(12))
+def test_row_geometry_order_and_coordinate_identity(native, seed):
+    """穷举区间极值与非单调下边界，负零及坐标来源引用必须与左折叠一致。"""
+    from docvortex.analyzers.native.pdf.geometry import _bbox_union_many
+    from docvortex.analyzers.native.pdf import table_annotations as notes
+
+    rng = random.Random(seed)
+    boxes = [tuple(rng.choice([0.0, -0.0, 1.0, 5.0, rng.uniform(-20, 20)]) for _ in range(4)) for _ in range(32)]
+    index = native.TableRowGeometry(boxes)
+    rows = [SimpleNamespace(bbox=b) for b in boxes]
+    context = notes._PreparedTableCoreRows(rows, {}, {}, None, geometry=index)
+    for start in range(len(boxes)):
+        for end in range(start + 1, len(boxes) + 1):
+            expected = _bbox_union_many(boxes[start:end])
+            actual = context.bbox(start, end)
+            assert list(map(bits, actual)) == list(map(bits, expected))
+            assert all(a is b for a, b in zip(actual, expected))
+    for bottom in [-100.0, -0.0, 0.0, 1.0, 5.0, 100.0]:
+        expected = next((i for i, b in enumerate(boxes) if b[3] > bottom), len(boxes))
+        assert index.first_after(bottom) == expected
+    assert index.first_after(math.nan) is None
+    assert index.union_indices(0, 0) is None
+    with pytest.raises(ValueError):
+        native.TableRowGeometry([(0.0, 0.0, math.nan, 1.0)])
+
+
+def test_note_prefix_skip_preserves_chain(native):
+    """只有确定不参与的前缀可以跳过，后续表注的间距和字体停止规则保持原样。"""
+    from docvortex.analyzers.native.pdf import table_annotations as notes
+    from docvortex.analyzers.native.pdf.models import _LineItem, _VisualRow, _Fragment
+
+    lines = [
+        _LineItem(text, (0.0, y, 80.0, y + 4.0), 0, i, chars=[], effective_height=4.0)
+        for i, (y, text) in enumerate(
+            [(5.0, "body"), (0.0, "body"), (12.0, "Note: source"), (16.5, "continued"), (30.0, "far")]
+        )
+    ]
+    rows = [
+        _VisualRow(
+            [_Fragment(line.text, line.bbox, line.bbox, line.source_index)], (line.bbox[1] + line.bbox[3]) / 2, line.bbox
+        )
+        for line in lines
+    ]
+    box = (0.0, 0.0, 80.0, 10.0)
+    prepared = notes._prepare_table_note_rows(rows, lines, box, 5.0, (100.0, 100.0), 0)
+    args = (rows, lines, box, 5.0, {0, 1}, (100.0, 100.0), 0)
+    expected = notes._collect_footnote_rows(*args, prepared_rows=list(prepared))
+    actual = notes._collect_footnote_rows(*args, prepared_rows=prepared)
+    assert actual == expected
+    assert all(a is b for a, b in zip(actual, expected))

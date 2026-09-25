@@ -10,6 +10,36 @@ use pyo3::prelude::*;
 use pyo3::types::{PyFloat, PyList, PyTuple};
 mod pdfium;
 
+/// 行范围极值索引，不向 Python 返回重复浮点坐标。
+#[pyclass(frozen)]
+struct TableRowGeometry {
+    index: docvortex_core::row_geometry::RowGeometry,
+}
+
+#[pymethods]
+impl TableRowGeometry {
+    /// 构建时一次验证全部有限框，非法输入必须交回参考实现。
+    #[new]
+    fn new(py: Python<'_>, boxes: Vec<[f64; 4]>) -> PyResult<Self> {
+        py.detach(|| docvortex_core::row_geometry::RowGeometry::new(boxes))
+            .map(|index| Self { index })
+            .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("nonfinite row geometry"))
+    }
+
+    /// 返回四个坐标分别来自哪一行，Python 复用已有坐标对象。
+    fn union_indices(&self, py: Python<'_>, start: usize, end: usize) -> Option<[usize; 4]> {
+        py.detach(|| self.index.union_indices(start, end))
+    }
+
+    /// 保留原行顺序，只跳过下边界一定不超过表底的前缀。
+    fn first_after(&self, py: Python<'_>, bottom: f64) -> Option<usize> {
+        if !bottom.is_finite() {
+            return None;
+        }
+        Some(py.detach(|| self.index.first_after(bottom)))
+    }
+}
+
 /// 调用内的稳定列累计状态，均值读取不折叠补偿量。
 #[pyclass]
 struct StableColumnClusters {
@@ -667,6 +697,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<BaselineCandidates>()?;
     module.add_class::<TableNoteMetrics>()?;
     module.add_class::<StableColumnClusters>()?;
+    module.add_class::<TableRowGeometry>()?;
     module.add_function(wrap_pyfunction!(ordered_clusters, module)?)?;
     module.add_function(wrap_pyfunction!(typography_metrics, module)?)?;
     module.add_function(wrap_pyfunction!(lane_gap, module)?)?;

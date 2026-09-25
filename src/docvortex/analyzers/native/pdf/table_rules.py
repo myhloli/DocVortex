@@ -1412,7 +1412,11 @@ def _expand_rule_table_candidate(
         if has_possible_table_notes
         else []
     )
-    core_local_bbox = _bbox_union(rule_bbox, _bbox_union_many([row.bbox for row in core_rows]))
+    core_rows_bbox = prepared_core[0].bbox(prepared_core[1], prepared_core[2]) if prepared_core is not None else None
+    indexed_bbox = core_rows_bbox is not None
+    if core_rows_bbox is None:
+        core_rows_bbox = _bbox_union_many([row.bbox for row in core_rows])
+    core_local_bbox = _bbox_union(rule_bbox, core_rows_bbox)
     caption_annotation = _build_table_annotation(
         "caption",
         caption_rows,
@@ -1432,8 +1436,16 @@ def _expand_rule_table_candidate(
         if annotations
         else set()
     )
-    included_rows = [*caption_rows, *core_rows, *footnote_rows]
-    local_bbox = _bbox_union(core_local_bbox, _bbox_union_many([row.bbox for row in included_rows]))
+    if indexed_bbox and all(
+        type(value) is float and math.isfinite(value) for row in (*caption_rows, *footnote_rows) for value in row.bbox
+    ):
+        # 有限极值并集幂等，外层核心始终先参与比较，保留相等坐标的原对象。
+        local_bbox = core_local_bbox
+        for row in (*caption_rows, *footnote_rows):
+            local_bbox = _bbox_union(local_bbox, row.bbox)
+    else:
+        included_rows = [*caption_rows, *core_rows, *footnote_rows]
+        local_bbox = _bbox_union(core_local_bbox, _bbox_union_many([row.bbox for row in included_rows]))
     return _TableCandidate(
         bbox=_rotate_bbox_from_upright(local_bbox, page_size, angle),
         local_bbox=local_bbox,
