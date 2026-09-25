@@ -951,7 +951,7 @@ def _native_inline_script_matches(lines, page_size):
             box = local_bboxes[i]
             values = (*box, line.effective_height, canonical_scales[i])
             if (
-                any(type(v) not in (int, float) or abs(v) > 1e100 or not math.isfinite(v) for v in values)
+                any(type(v) is not float or abs(v) > 1e100 or not math.isfinite(v) for v in values)
                 or box[2] <= box[0]
                 or box[3] <= box[1]
                 or type(line.angle) is not int

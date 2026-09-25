@@ -39,11 +39,11 @@ def _caption_crosses_left_text(members: list[_LineItem]) -> bool:
 
 
 def _safe_candidate_box(box) -> bool:
-    """仅让有限普通坐标进入几何预筛选，特殊数值保留参考遍历。"""
+    """仅让内置浮点坐标进入预筛，整数算术和其他类型保留参考遍历。"""
     return (
         type(box) in (tuple, list)
         and len(box) == 4
-        and all(type(v) in (int, float) and abs(v) <= 1e100 and math.isfinite(v) for v in box)
+        and all(type(v) is float and abs(v) <= 1e100 and math.isfinite(v) for v in box)
         and box[2] > box[0]
         and box[3] > box[1]
     )
@@ -95,7 +95,7 @@ def _same_baseline_candidate_pairs(
         if (
             all(_safe_candidate_box(box) for box in local_bboxes)
             and all(box is None or _safe_candidate_box(box) for box in sources)
-            and all(type(h) in (int, float) and math.isfinite(h) and abs(h) <= 1e100 for h in heights)
+            and all(type(h) is float and math.isfinite(h) and abs(h) <= 1e100 for h in heights)
         ):
             return IntervalCandidates(bounds, compatible_indices, geometry=(local_bboxes, heights, sources))
 

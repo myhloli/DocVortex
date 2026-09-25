@@ -263,3 +263,26 @@ def test_annotation_cache_is_bounded_and_not_mutated_by_consumers():
     assert len(prepared.selections) <= 128 and len(prepared.results) <= 128
     assert prepared.selection_weight <= 16384 and prepared.result_weight <= 16384
     assert prepared.build("footnote", rows, set(), None).line_bboxes == expected
+
+
+@pytest.mark.parametrize("value", [0, 2**53 + 1, -(2**53) - 1])
+def test_integer_arithmetic_is_not_coerced_to_native_float(value, monkeypatch):
+    """整数坐标保留 Python 精确减法，不能因传入 f64 改变边缘判定。"""
+    from docvortex.analyzers.native.pdf import native_text
+
+    lines = make_lines(4)
+    lines[0].bbox = (value, 0.0, value + 10, 10.0)
+    assert merging._overlapping_candidate_pairs([(line, line.bbox) for line in lines]) is None
+    calls = []
+    original = native_text._inline_script_matches_python
+
+    def reference(*args):
+        """记录确实沿用原数值语义，不通过静默转换绕过回退。"""
+        calls.append(True)
+        return original(*args)
+
+    monkeypatch.setattr(native_text, "_inline_script_matches_python", reference)
+    # 显式用零方向保留坐标类型，不在旋转阶段先发生合法的浮点转换。
+    lines[0].angle = 0
+    native_text._native_inline_script_matches(lines, (100.0, 100.0))
+    assert calls == [True]
