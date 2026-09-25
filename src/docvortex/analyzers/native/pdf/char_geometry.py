@@ -459,11 +459,34 @@ def _style_line_is_inflated(
 
 
 def _prepared_line_geometry(line, geometry, page_size, *, anchors_only):
-    """批量准备风险判断与 canonical 样本共用的独立几何，保持源成员顺序。"""
+    """一次筛选并打包原生字符几何，保持风险与 canonical 样本的源顺序。"""
     from ...._compute_backend import get_native
     from ._native_geometry import raw_bbox
 
+    native = get_native()
+    plain = (
+        native is not None
+        and type(line) is _LineItem
+        and type(line.chars) is list
+        and type(geometry.tight_bboxes) is dict
+        and type(geometry.origins) is dict
+        and type(geometry.loose_bboxes) is dict
+        and all(
+            type(char) is dict
+            and type(char.get("char")) is str
+            and type(char.get("char_idx")) is int
+            and type(char.get("rotation")) in (float, type(None))
+            and (
+                (origin := geometry.origins.get(char["char_idx"])) is None
+                or type(origin) in (tuple, list)
+                and len(origin) == 2
+                and all(type(value) is float for value in origin)
+            )
+            for char in line.chars
+        )
+    )
     selected = []
+    sources, sides, tights, origins, rotations = [], [], [], [], []
     for position, char in enumerate(line.chars):
         text = str(char.get("char") or "")
         index = char.get("char_idx")
@@ -472,7 +495,18 @@ def _prepared_line_geometry(line, geometry, page_size, *, anchors_only):
         if isinstance(index, bool) or not isinstance(index, int):
             continue
         selected.append((position, text, index, char))
-    native = get_native()
+        if plain:
+            try:
+                rotation = float(char.get("rotation") or 0.0)
+            except (TypeError, ValueError):
+                rotation = math.nan
+            sources.append(raw_bbox(char.get("bbox")))
+            sides.append(
+                raw_bbox(geometry.loose_bboxes.get(index)) if not math.isfinite(rotation) or abs(rotation) > 1e-9 else None
+            )
+            tights.append(raw_bbox(geometry.tight_bboxes.get(index)))
+            origins.append(_coerce_origin(geometry.origins.get(index)))
+            rotations.append(rotation)
     if native is None:
         for position, text, index, char in selected:
             source = _clip_validated_bbox(_source_bbox(char, geometry, index), page_size)
@@ -494,19 +528,19 @@ def _prepared_line_geometry(line, geometry, page_size, *, anchors_only):
                     ),
                 )
         return
-    sources, sides, tights, origins, rotations = [], [], [], [], []
-    for _position, _text, index, char in selected:
-        try:
-            rotation = float(char.get("rotation") or 0.0)
-        except (TypeError, ValueError):
-            rotation = math.nan
-        sources.append(raw_bbox(char.get("bbox")))
-        sides.append(
-            raw_bbox(geometry.loose_bboxes.get(index)) if not math.isfinite(rotation) or abs(rotation) > 1e-9 else None
-        )
-        tights.append(raw_bbox(geometry.tight_bboxes.get(index)))
-        origins.append(_coerce_origin(geometry.origins.get(index)))
-        rotations.append(rotation)
+    if not plain:
+        for _position, _text, index, char in selected:
+            try:
+                rotation = float(char.get("rotation") or 0.0)
+            except (TypeError, ValueError):
+                rotation = math.nan
+            sources.append(raw_bbox(char.get("bbox")))
+            sides.append(
+                raw_bbox(geometry.loose_bboxes.get(index)) if not math.isfinite(rotation) or abs(rotation) > 1e-9 else None
+            )
+            tights.append(raw_bbox(geometry.tight_bboxes.get(index)))
+            origins.append(_coerce_origin(geometry.origins.get(index)))
+            rotations.append(rotation)
     prepared = native.source_rows(sources, sides, tights, origins, rotations, page_size, line.angle, _coerce_bbox)
     for (position, text, index, char), values in zip(selected, prepared, strict=True):
         if values is not None:

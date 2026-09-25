@@ -9,6 +9,7 @@ import pytest
 from docvortex._compute_backend import get_native
 from docvortex.analyzers.native.pdf import _script_geometry
 from docvortex.analyzers.native.pdf.inline import scripts
+from docvortex.analyzers.native.pdf import line_merging
 from docvortex.analyzers.native.pdf.models import _LineItem
 
 
@@ -121,3 +122,38 @@ def test_script_batches_preserve_line_order_across_chunk_boundary(monkeypatch):
         expected = scripts.detect_pdf_text_script_lines(lines, (100.0, 100.0), tight, origins)
     assert actual == expected
     assert [line.source_index for line in actual] == list(range(130))
+
+
+@pytest.mark.parametrize("seed", range(20))
+def test_post_semantic_candidates_match_exhaustive_merge(seed, monkeypatch):
+    """旋转、共享视觉行与正文续行的合并闭包保持原穷举结果。"""
+
+    rng = random.Random(seed)
+    lines = []
+    for index in range(80):
+        x = float(rng.randrange(0, 12) * 25)
+        y = float(rng.randrange(0, 18) * 12)
+        angle = rng.choice([0, 0, 90, 180, 270])
+        line = _LineItem("Sample words", (x, y, x + 12.0, y + 10.0), angle, index, chars=[])
+        line.effective_height = 10.0
+        line.font_signature = ("A", 0)
+        line.paragraph_group = rng.randrange(0, 6)
+        line.visual_row_id = rng.choice([None, 0, 1, 2, 3])
+        line.formula_candidate_only = rng.choice([False, False, True])
+        lines.append(line)
+    actual = line_merging._merge_post_semantic_text_runs(deepcopy(lines), (400.0, 400.0), [(60.0, 40.0, 110.0, 80.0)])
+    with monkeypatch.context() as context:
+        context.setattr(line_merging, "_post_semantic_candidate_pairs", lambda *_args: None)
+        expected = line_merging._merge_post_semantic_text_runs(deepcopy(lines), (400.0, 400.0), [(60.0, 40.0, 110.0, 80.0)])
+    assert actual == expected
+
+
+def test_post_semantic_special_geometry_uses_reference_pairs():
+    """非有限框和整数输入不得进入新的后处理行索引。"""
+
+    lines = [_LineItem("x", (float(i), 0.0, float(i + 1), 10.0), 0, i, chars=[]) for i in range(40)]
+    boxes = [line.bbox for line in lines]
+    boxes[0] = (0, math.nan, 1.0, 10.0)
+    assert line_merging._post_semantic_candidate_pairs(lines, boxes) is None
+    boxes[0] = (0, 0.0, 1.0, 10.0)
+    assert line_merging._post_semantic_candidate_pairs(lines, boxes) is None
