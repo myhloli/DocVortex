@@ -165,6 +165,42 @@ def test_marker_index_duplicate_sources_and_existing_cache(native):
         assert cache == before
 
 
+def test_marker_queries_are_lazy_and_bounded(native, monkeypatch):
+    """小候选只检查自身所需来源，重复查询复用位图，标记淘汰不影响判定。"""
+    from docvortex.analyzers.native.pdf import table_annotations as notes
+    from docvortex.analyzers.native.pdf.models import _LineItem
+
+    ids = [10, 10**12, -5]
+    lines = [
+        _LineItem(text, (0.0, float(i), 10.0, float(i + 1)), 0, index, chars=[])
+        for i, (index, text) in enumerate(zip(ids, ["a", "body", "a"]))
+    ]
+    rows = [SimpleNamespace(fragments=[SimpleNamespace(line_index=index)], bbox=line.bbox) for index, line in zip(ids, lines)]
+    metrics = notes._prepare_table_note_body_metrics(lines, (100.0, 100.0), 0)
+    context = notes._prepare_table_core_rows(rows, lines, metrics)
+    original = notes._table_core_references_marker
+    calls = []
+
+    def record(marker, selected, *args, **kwargs):
+        """记录实际执行的来源而不替换判定语义，避免全走廊预计算回归。"""
+        calls.extend(line.source_index for line in selected)
+        return original(marker, selected, *args, **kwargs)
+
+    monkeypatch.setattr(notes, "_table_core_references_marker", record)
+    assert context.references("a", 0, 1, lines, (100.0, 100.0), 0, {})
+    assert calls == [10]
+    assert context.references("a", 0, 3, lines, (100.0, 100.0), 0, {})
+    assert calls == [10]
+    assert not context.references("a", 1, 2, lines, (100.0, 100.0), 0, {})
+    assert calls == [10, 10**12]
+    for index in range(200):
+        assert not context.references(chr(0x4E00 + index), 1, 2, lines, (100.0, 100.0), 0, {})
+    assert len(context.marker_states) == 128
+    assert all(known.bit_length() <= 3 and hits.bit_length() <= 3 for known, hits in context.marker_states.values())
+    assert not context.references("a", 1, 2, lines, (100.0, 100.0), 0, {})
+    assert context.references("a", 2, 3, lines, (100.0, 100.0), 0, {})
+
+
 @pytest.mark.parametrize("seed", range(12))
 def test_row_geometry_order_and_coordinate_identity(native, seed):
     """穷举区间极值与非单调下边界，负零及坐标来源引用必须与左折叠一致。"""

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
+from collections import OrderedDict
 from dataclasses import dataclass, field
 import statistics
 import math
@@ -54,9 +55,10 @@ class _PreparedTableCoreRows:
     positions: dict[int, int]
     source_rows: dict[int, list[int]]
     native: Any
-    marker_positions: dict[str, list[int]] = field(default_factory=dict)
+    marker_states: OrderedDict[str, tuple[int, int]] = field(default_factory=OrderedDict)
     marker_safe: bool = False
     geometry: Any = None
+    source_lines: dict[int, list[_LineItem]] = field(default_factory=dict)
 
     def bbox(self, start, end):
         """按极值来源复用原始坐标对象，避免新建大量 Python 浮点值。"""
@@ -77,29 +79,48 @@ class _PreparedTableCoreRows:
         return start, start + len(rows)
 
     def references(self, marker, start, end, lines, page_size, angle, marker_cache):
-        """Python 语义只算一次，再用来源对应行的有序位置查询精确候选范围。"""
-        positions = self.marker_positions.get(marker)
-        if positions is None:
-            matches = set()
-            seen = set()
-            for line in lines:
-                rows = self.source_rows.get(line.source_index)
-                if not rows or (marker_cache is not None and line.source_index in seen):
+        """只检查当前区间的未知行，命中即停；小候选不再预先扫描整个走廊。"""
+        known, hits = self.marker_states.get(marker, (0, 0))
+        selected = ((1 << (end - start)) - 1) << start
+        if hits & selected:
+            self.marker_states.move_to_end(marker)
+            return True
+        pending = selected & ~known
+        seen = set()
+        while pending:
+            bit = pending & -pending
+            row_index = bit.bit_length() - 1
+            for fragment in self.rows[row_index].fragments:
+                source = fragment.line_index
+                if source in seen:
                     continue
-                seen.add(line.source_index)
-                key = (line.source_index, marker)
+                seen.add(source)
+                source_lines = self.source_lines.get(source)
+                if not source_lines:
+                    continue
+                key = (source, marker)
                 if marker_cache is not None and key in marker_cache:
                     matched = marker_cache[key]
                 else:
-                    # 全走廊预计算不能向旧逐行缓存写入平方规模的 False。
-                    # 非空缓存模式保留同一来源首行裁决，但仅保存稀疏命中位置。
-                    matched = _table_core_references_marker(marker, [line], page_size, angle)
+                    # 缓存模式遵循同来源首行裁决；不向旧缓存写入稠密 False。
+                    selected_lines = source_lines if marker_cache is None else source_lines[:1]
+                    matched = _table_core_references_marker(marker, selected_lines, page_size, angle)
                 if matched:
-                    matches.update(rows)
-            positions = sorted(matches)
-            self.marker_positions[marker] = positions
-        offset = bisect_left(positions, start)
-        return offset < len(positions) and positions[offset] < end
+                    for position in self.source_rows[source]:
+                        hits |= 1 << position
+                    self._remember_marker(marker, known | hits, hits)
+                    return True
+            known |= bit
+            pending ^= bit
+        self._remember_marker(marker, known, hits)
+        return False
+
+    def _remember_marker(self, marker, known, hits):
+        """用两个压缩行位图记录结果，最多保留 128 个标记；淘汰只重算，不删候选。"""
+        self.marker_states[marker] = (known, hits)
+        self.marker_states.move_to_end(marker)
+        if len(self.marker_states) > 128:
+            self.marker_states.popitem(last=False)
 
 
 def _prepare_table_core_rows(rows, lines, metrics):
@@ -144,6 +165,11 @@ def _prepare_table_core_rows(rows, lines, metrics):
     )
     from ...._compute_backend import get_native
 
+    source_lines = {}
+    if marker_safe:
+        for line in lines:
+            if line.source_index in source_rows:
+                source_lines.setdefault(line.source_index, []).append(line)
     geometry = None
     if all(
         type(row.bbox) in (tuple, list)
@@ -159,6 +185,7 @@ def _prepare_table_core_rows(rows, lines, metrics):
         metrics.native.prepare_rows(members),
         marker_safe=marker_safe,
         geometry=geometry,
+        source_lines=source_lines,
     )
 
 

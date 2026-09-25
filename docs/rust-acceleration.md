@@ -171,9 +171,11 @@ Table-note body heights use persistent counts indexed by vertical prefixes and s
 height ranks. A core-row range may skip extra exclusion only when all occurrences of
 every source ID lie inside the exclusion band; other ranges use exact member filtering.
 Marker interpretation remains Python-owned and cached within one candidate build.
-The corridor index stores matching row positions only; it does not populate a dense
-source-by-marker matrix of false results. Existing first-source cache decisions are
-respected, including duplicate source IDs.
+Marker queries visit only untested rows in the current core range and stop on the
+first match. Two compact row bitmaps record tested and matching positions, with at
+most 128 recently used markers per corridor. Eviction recomputes evidence; it never
+removes candidates. No dense source-by-marker matrix of false results is populated.
+Existing first-source cache decisions are respected, including duplicate source IDs.
 Non-contiguous row selections retain the reference path.
 
 Row geometry indices preserve original ordering, including non-monotonic bottoms.
