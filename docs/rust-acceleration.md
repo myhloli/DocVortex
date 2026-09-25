@@ -22,7 +22,10 @@ unusual Python inputs, and script-reference ties whose choice depends on Python 
 iteration. These paths do not weaken any parsing decision or output comparison.
 
 Python owns Unicode classification, normalization, font equality, version-dependent
-rounding/cluster means, HTML generation and public object construction. Rust owns
+rounding, HTML generation and public object construction. Stable table-column means
+use an incremental accumulator matching the running CPython version's float-only
+`sum`: sequential for 3.10–3.11 and compensated for 3.12–3.14. Integer/mixed/custom
+inputs, other runtimes and intermediate overflow retain Python computation. Rust owns
 numeric batches and returns source ranges or indices. Canonical geometry reuses
 unchanged Python float objects and zero-rotation tuples to bound retained memory. Original `Char` references and
 copy-on-merge source-index behavior are retained. Small bounded caches contain only
@@ -142,12 +145,32 @@ Host replay compares actual medium/high native stages with frozen model inputs a
 records fallback inputs and per-page extraction counts; it does not measure live inference.
 
 
-Third-round kernels require private protocol 4. Rebuild editable native installs after
+Fourth-round kernels require private protocol 5. Rebuild editable native installs after
 updating Python sources; an older extension is rejected by forced Rust selection.
 Statistics preserve even-median arithmetic and stable tie order. Non-finite inputs use
 explicit reference paths. Occupancy caches are local to one table recovery and do not
 retain documents. Font metadata reuse is limited to one typography call and primitive
 dictionary values.
+
+Dense table-column clustering preserves first-match decisions and strict-prefix reuse,
+but no longer re-sums each cluster's complete history. Each corridor's anchors are
+prepared once; repeated row appearances still count as separate query positions.
+Table-note body heights use persistent counts indexed by vertical prefixes and stable
+height ranks. A core-row range may skip extra exclusion only when all occurrences of
+every source ID lie inside the exclusion band; other ranges use exact member filtering.
+Marker interpretation remains Python-owned and cached within one candidate build.
+Non-contiguous row selections retain the reference path.
+
+Row geometry indices preserve original ordering, including non-monotonic bottoms.
+They return coordinate source indices so Python reuses the original float objects;
+ties retain the earlier value, including signed zero. Candidate scoring, all interval
+candidates, annotation stopping rules and merge ordering are unchanged. Contexts keep
+strong row references only within the active call and are never global caches.
+
+Installed-wheel checks include `tests/test_native_round4.py`: every prefix's float bits,
+coverage, first-match clustering, quantile ranks, repeated sources, coordinate identity
+and indexed annotation chains are checked against the independent reference. The tests
+assert native state is actually used, not merely that an extension can be imported.
 
 The experimental native mapping pre-grouping kernel remains disabled in production:
 whole-entry measurements showed its packing cost exceeded its calculation benefit.
