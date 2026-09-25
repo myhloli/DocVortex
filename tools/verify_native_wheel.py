@@ -34,9 +34,10 @@ def capture(pdf: Path, output: Path, expected: str) -> None:
     result = docvortex.parse(pdf, keep_model_json=True)
     if expected == "rust":
         actual = backend_info()
-        assert actual["pdfium_bridge_calls"] > 0, actual
+        assert actual["pdfium_bridge_calls"] > 0 or actual["pdfium_empty_pages"] > 0, actual
         assert actual["pdfium_bridge_unavailable_reason"] is None, actual
-        assert actual["pdfium_record_batch_size"] == 1024, actual
+        if actual["pdfium_bridge_calls"] > 0:
+            assert actual["pdfium_record_batch_size"] == 1024, actual
     data = {
         "model": result.model_json.model_dump(mode="json"),
         "middle": result.middle_json.model_dump(mode="json"),

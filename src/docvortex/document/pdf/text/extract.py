@@ -174,6 +174,9 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
     if batch is None:
         return None
     records, raw_fonts = batch
+    # 空快照不再构造字体映射或调用空几何批次，仍保持普通列表返回契约。
+    if type(records) in (tuple, list) and not records and type(raw_fonts) in (tuple, list) and not raw_fonts:
+        return []
     decoded_fonts = [(bytes(name).decode("utf-8", errors="replace"), flags) for name, flags in raw_fonts]
     fonts, objects = {}, {}
     chars, raw_geometry, pending_clips, retained = [], [], [], []

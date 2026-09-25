@@ -1129,15 +1129,15 @@ def _merge_native_inline_scripts(
     consumed_small_indices = {small_index for positions in matches.values() for small_index in positions.values()}
     merged_base_indices: set[int] = set()
 
-    def merge_children(base_index: int, visiting: set[int]) -> None:
-        """先合并更小的依赖标记，再把当前完整节点递归合入更大的主体行。"""
+    def merge_children(base_index: int, visiting: set[int], recurse) -> None:
+        """显式传递递归函数，避免自引用闭包滞留已消费行；先合并更小标记。"""
 
         if base_index in merged_base_indices or base_index in visiting:
             return
         visiting.add(base_index)
         positions = matches.get(base_index, {})
         for child_index in positions.values():
-            merge_children(child_index, visiting)
+            recurse(child_index, visiting, recurse)
         base = lines[base_index]
         stable_source_indices = [
             source_index
@@ -1182,9 +1182,9 @@ def _merge_native_inline_scripts(
     # 从最终不会被消费的根主体开始，确保 small -> medium -> large 链不会丢失最小节点。
     root_base_indices = [base_index for base_index in matches if base_index not in consumed_small_indices]
     for base_index in root_base_indices:
-        merge_children(base_index, set())
+        merge_children(base_index, set(), merge_children)
     for base_index in matches:
-        merge_children(base_index, set())
+        merge_children(base_index, set(), merge_children)
 
     output = [line for index, line in enumerate(lines) if index not in consumed_small_indices]
     output.sort(key=lambda item: (item.visual_row_id if item.visual_row_id is not None else math.inf, item.run_index))

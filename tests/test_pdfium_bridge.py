@@ -63,12 +63,15 @@ def test_raw_character_bridge_parity(native, rotation, extended):
     with pdfium_guard(), pdfium.PdfDocument(sample_pdf(rotation)) as document:
         for page_index in range(len(document)):
             with closing(document[page_index]) as page, closing(page.get_textpage()) as textpage:
-                before = bridge.bridge_info()["pdfium_bridge_calls"]
+                before = bridge.bridge_info()
+                count = textpage.count_chars()
                 expected = extract._get_chars_python(
                     textpage, list(page.get_bbox()), page.get_rotation(), include_geometry=extended
                 )
                 actual = extract.get_chars(textpage, list(page.get_bbox()), page.get_rotation(), include_geometry=extended)
-                assert bridge.bridge_info()["pdfium_bridge_calls"] == before + 1
+                after = bridge.bridge_info()
+                assert after["pdfium_bridge_calls"] == before["pdfium_bridge_calls"] + int(count > 0)
+                assert after["pdfium_empty_pages"] == before["pdfium_empty_pages"] + int(count == 0)
                 assert character_state(actual) == character_state(expected)
 
 
@@ -226,3 +229,22 @@ def test_special_visibility_mapping_preserves_reference_access(native, monkeypat
                 expected
             )
     blocked.assert_not_called()
+
+
+def test_empty_page_skips_character_ffi(native, monkeypatch):
+    """空页不打包字符函数地址，也不把空快照谎报为实际 Rust 读取。"""
+
+    def forbidden(*args):
+        """空页若进入字符读取或坐标内核则明确失败。"""
+        raise AssertionError("empty page entered character kernel")
+
+    monkeypatch.setattr(native, "read_pdfium_char_batches", forbidden)
+    monkeypatch.setattr(native, "read_pdfium_chars", forbidden)
+    monkeypatch.setattr(native, "materialize_geometry", forbidden)
+    with pdfium_guard(), pdfium.PdfDocument(sample_pdf(0)) as document:
+        with closing(document[1]) as page, closing(page.get_textpage()) as textpage:
+            before = bridge.bridge_info()
+            assert extract.get_chars(textpage, list(page.get_bbox()), 0, include_geometry=True) == []
+            after = bridge.bridge_info()
+            assert after["pdfium_bridge_calls"] == before["pdfium_bridge_calls"]
+            assert after["pdfium_empty_pages"] == before["pdfium_empty_pages"] + 1

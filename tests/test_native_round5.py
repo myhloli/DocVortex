@@ -286,3 +286,34 @@ def test_integer_arithmetic_is_not_coerced_to_native_float(value, monkeypatch):
     lines[0].angle = 0
     native_text._native_inline_script_matches(lines, (100.0, 100.0))
     assert calls == [True]
+
+
+@pytest.mark.parametrize("count", [2, 18])
+def test_inline_merge_releases_consumed_lines_without_gc(count):
+    """递归闭包必须及时释放已消费行，不能把前一阶段对象留给后续 GC。"""
+    import gc
+    import weakref
+    from docvortex.analyzers.native.pdf import native_text
+
+    class ObservableLine(_LineItem):
+        """用弱引用观察内部消费对象，不改变行的合并规则。"""
+
+    lines = [
+        ObservableLine("body", (0.0, 2.0, 10.0, 12.0), 0, 0, visual_row_id=0, effective_height=10.0),
+        ObservableLine("2", (10.0, 0.0, 12.0, 4.0), 0, 1, visual_row_id=1, effective_height=4.0),
+    ]
+    for i in range(2, count):
+        lines.append(
+            ObservableLine("far", (100.0 * i, 2.0, 100.0 * i + 10.0, 12.0), 0, i, visual_row_id=i, effective_height=10.0)
+        )
+    consumed = weakref.ref(lines[1])
+    enabled = gc.isenabled()
+    gc.disable()
+    try:
+        output = native_text._merge_native_inline_scripts(lines, (3000.0, 100.0))
+        assert output[0].text == "body2"
+        del lines
+        assert consumed() is None
+    finally:
+        if enabled:
+            gc.enable()

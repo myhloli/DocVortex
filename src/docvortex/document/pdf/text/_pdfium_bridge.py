@@ -10,6 +10,7 @@ from ...._compute_backend import get_native
 from ..pdfium import pdfium_guard
 
 _CALLS = 0
+_EMPTY_PAGES = 0
 _UNAVAILABLE_REASON = "not probed"
 _RECORD_BATCH_SIZE = None
 
@@ -18,6 +19,7 @@ def bridge_info():
     """报告真实完成的桥接次数和最近的能力探测结果。"""
     return {
         "pdfium_bridge_calls": _CALLS,
+        "pdfium_empty_pages": _EMPTY_PAGES,
         "pdfium_bridge_unavailable_reason": _UNAVAILABLE_REASON,
         "pdfium_record_batch_size": _RECORD_BATCH_SIZE,
     }
@@ -25,7 +27,7 @@ def bridge_info():
 
 def read_native_chars(textpage, extended):
     """在同一 textpage 和锁内完成原始读取，特殊输入及非标准函数留给参考实现。"""
-    global _CALLS, _UNAVAILABLE_REASON, _RECORD_BATCH_SIZE
+    global _CALLS, _EMPTY_PAGES, _UNAVAILABLE_REASON, _RECORD_BATCH_SIZE
     native = get_native()
     if native is None:
         _UNAVAILABLE_REASON = "python backend"
@@ -36,6 +38,13 @@ def read_native_chars(textpage, extended):
     if type(textpage) is not pdfium.PdfTextPage or not textpage.raw or type(extended) is not bool:
         _UNAVAILABLE_REASON = "nonstandard or closed text page"
         return None
+    # 零字符页没有需要借用的字符函数地址；在原锁内确认后直接返回空快照，
+    # 单独计数，不能把未执行的 Rust FFI 调用记为桥接成功。
+    with pdfium_guard():
+        if textpage.count_chars() == 0:
+            _EMPTY_PAGES += 1
+            _UNAVAILABLE_REASON = None
+            return (), ()
     args = (raw.FPDF_TEXTPAGE, ct.c_int)
     double_pointer = ct.POINTER(ct.c_double)
     specs = (
