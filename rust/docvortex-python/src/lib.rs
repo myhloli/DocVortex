@@ -58,5 +58,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(tables::component_specs, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::materialize_geometry, module)?)?;
     module.add_function(wrap_pyfunction!(scripts::script_roles_raw, module)?)?;
+    module.add_function(wrap_pyfunction!(scripts::script_roles_raw_batch, module)?)?;
+    module.add_function(wrap_pyfunction!(scripts::script_roles_plain_batch, module)?)?;
     Ok(())
 }

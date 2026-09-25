@@ -178,6 +178,7 @@ def test_zero_rotation_script_snapshot_preserves_inputs(monkeypatch):
     actual = scripts._script_line_char_roles(line, (100.0, 100.0), tight, origins, set())
     with monkeypatch.context() as context:
         context.setattr(scripts, "_plain_script_geometry", lambda *_args: False)
+        context.setattr(scripts, "_prepare_plain_script_input", lambda *_args: None)
         expected = scripts._script_line_char_roles(line, (100.0, 100.0), tight, origins, set())
     assert actual == expected
     assert pickle.dumps((line, tight, origins)) == before

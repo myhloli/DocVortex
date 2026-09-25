@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import statistics
+from functools import lru_cache
 from typing import Any, Sequence
 
 from .....document.pdf._document import PDFLinkAnnotation
@@ -72,6 +73,13 @@ def _char_font_styles(char: dict[str, Any]) -> frozenset[PDFTextStyle]:
     """只依据直接字体证据返回 PDF 字符粗体样式。"""
 
     font_name, font_flags, font_weight = _pdf_font_metadata(char)
+    return _font_styles_from_metadata(font_name, font_flags, font_weight)
+
+
+@lru_cache(maxsize=4096)
+def _font_styles_from_metadata(font_name: str, font_flags: int, font_weight: float | None) -> frozenset[PDFTextStyle]:
+    """仅按不可变字体值复用粗体判断，字段变化仍重新计算。"""
+
     styles: set[PDFTextStyle] = set()
     if (
         font_flags & PDF_FONT_FORCE_BOLD_FLAG
@@ -285,6 +293,9 @@ def _merge_source_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]
 def _line_style_payload(line: _LineCandidate) -> PDFTextStyleLine | None:
     """把来源字符的字体与装饰线证据转换为紧凑文本样式区间。"""
 
+    if not any(line.font_styles) and not any(line.decoration_ranges.values()):
+        text = "".join(fragment for char in line.chars if (fragment := _normalize_match_fragment(char.get("char"))))
+        return PDFTextStyleLine(line.bbox, text, (), line.source_index) if text else None
     decoration_styles: list[set[PDFTextStyle]] = [set() for _char in line.chars]
     for style in _PDF_TEXT_DECORATION_ORDER:
         for start, end in _merge_source_ranges(line.decoration_ranges[style]):

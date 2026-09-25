@@ -47,6 +47,8 @@ def test_native_registration_contract(native):
         "read_pdfium_chars": "(addresses, handle, count, extended)",
         "script_roles": "(records)",
         "script_roles_raw": "(loose, tight, origins, flags, fonts, fallback)",
+        "script_roles_raw_batch": "(loose, tight, origins, flags, fonts, offsets, fallback)",
+        "script_roles_plain_batch": "(loose, tight, origins, flags, fonts, offsets, fallback)",
         "source_rows": "(raw, side, tight, origins, rotations, size, angle, fallback)",
         "table_boxes": "(values, table, angle, fallback)",
         "table_row_occupancy": "(rows, tracks)",
@@ -65,7 +67,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 6, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 7, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)

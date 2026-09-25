@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+from importlib.metadata import version
 import json
 import os
 from pathlib import Path
+import platform
 import subprocess
 import sys
 
 from rust_pdf import source_identity, write_json
-from pdf_corpus import corpus_paths
+from pdf_corpus import corpus_manifest, corpus_paths
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -75,8 +78,13 @@ def compare(measurements):
         results[label] = {
             "time_ratios": {
                 stage: value / old["median_seconds"][stage] if old["median_seconds"][stage] else 1.0
+                if value == 0
+                else None
                 for stage, value in new["median_seconds"].items()
             },
+            "zero_stage_new_work": [
+                stage for stage, value in new["median_seconds"].items() if old["median_seconds"][stage] == 0 and value > 0
+            ],
             "rss_ratio": new["memory"]["sampled_tree_peak_rss_bytes"] / old["memory"]["sampled_tree_peak_rss_bytes"],
         }
     return {"equal": len({item["full_output_sha256"] for item in measurements.values()}) == 1, "ratios": results}
@@ -99,6 +107,8 @@ def main():
     paths = args.path or corpus_paths(args.corpus)
     paths = list(dict.fromkeys(path.resolve() for path in paths + args.extra_path))
     args.output.mkdir(parents=True, exist_ok=True)
+    inputs = corpus_manifest(paths)
+    write_json(args.output / "corpus.json", inputs)
     old = args.reference_source.resolve()
     variants = [
         ("python-reference", old, "python"),
@@ -106,9 +116,20 @@ def main():
         ("python-current", ROOT, "python"),
         ("rust-current", ROOT, "rust"),
     ]
-    report = {"suite": args.suite, "runs": args.runs, "corpus": args.corpus if not args.path else "explicit", "documents": []}
+    report = {
+        "suite": args.suite,
+        "runs": args.runs,
+        "corpus": args.corpus if not args.path else "explicit",
+        "corpus_manifest": inputs,
+        "python": sys.version,
+        "platform": platform.platform(),
+        "dependencies": {name: version(name) for name in ("docvortex", "pypdfium2", "pydantic", "numpy")},
+        "documents": [],
+    }
     gate_stages = {"parse"} if args.suite == "public" else {"text_extraction", "text_total", "table_total"}
     for index, path in enumerate(paths):
+        if hashlib.sha256(path.read_bytes()).hexdigest() != inputs[index]["sha256"]:
+            raise AssertionError(f"PDF input changed during benchmark: {path}")
         order = variants[index % 4 :] + variants[: index % 4]
         folder = args.output / f"{index:02d}-{path.stem}"
         measurements = {label: measure(path, folder / label, source, backend, args) for label, source, backend in order}
@@ -117,7 +138,7 @@ def main():
             label
             for label, value in record["ratios"].items()
             if value["rss_ratio"] > 1.05
-            or any(ratio > 1.05 for stage, ratio in value["time_ratios"].items() if stage in gate_stages)
+            or any(ratio is None or ratio > 1.05 for stage, ratio in value["time_ratios"].items() if stage in gate_stages)
         ]
         if repeat_pairs:
             pair_labels = {
@@ -138,7 +159,11 @@ def main():
                 value["rss_ratio"] > 1.05
                 and record["repeat_comparison"]["ratios"][label]["rss_ratio"] > 1.05
                 or any(
-                    ratio > 1.05 and record["repeat_comparison"]["ratios"][label]["time_ratios"][stage] > 1.05
+                    (ratio is None or ratio > 1.05)
+                    and (
+                        record["repeat_comparison"]["ratios"][label]["time_ratios"][stage] is None
+                        or record["repeat_comparison"]["ratios"][label]["time_ratios"][stage] > 1.05
+                    )
                     for stage, ratio in value["time_ratios"].items()
                     if stage in gate_stages
                 )

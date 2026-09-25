@@ -21,7 +21,7 @@ from ._table_recovery.contracts import (
 from ._table_recovery.geometry import page_bbox_to_table_local
 from ._table_recovery.text import build_cell_text_parts
 from .geometry import _bbox_union_many, _coerce_bbox
-from .inline.scripts import _fraction_member_indices, _script_line_char_roles
+from .inline.scripts import _fraction_member_indices, _prepare_fraction_rules, _script_line_char_roles
 from .line_merging import _merge_overlapping_inline_text_clusters
 from .models import _LineItem
 from .native_text import _fill_native_typography
@@ -243,6 +243,7 @@ def render_native_table_html_with_scripts(
         return result.html
     chars_by_source = _table_char_map(table_input.chars)
     fraction_rules = _non_grid_fraction_rules(table_input, result)
+    prepared_fraction_rules = _prepare_fraction_rules(fraction_rules, table_input.page_size, table_input.angle)
     # 一张表只建立一次来源索引；保持原字典推导式的后项覆盖语义。
     glyph_by_source = {glyph.source_index: glyph for glyph in result.text.glyphs}
     cell_glyphs = {(cell.row, cell.col): _cell_glyphs(result, cell, glyph_by_source) for cell in result.cells}
@@ -257,6 +258,7 @@ def render_native_table_html_with_scripts(
             tight_bboxes,
             fraction_rules,
             table_input.angle,
+            prepared_fraction_rules,
         )
         roles = _cell_script_roles(
             glyphs,
