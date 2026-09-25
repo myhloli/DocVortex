@@ -3,6 +3,7 @@
 import random
 import math
 from copy import deepcopy
+from types import SimpleNamespace
 
 import pytest
 
@@ -10,6 +11,7 @@ from docvortex._compute_backend import get_native
 from docvortex.analyzers.native.pdf import _script_geometry
 from docvortex.analyzers.native.pdf.inline import scripts
 from docvortex.analyzers.native.pdf import line_merging
+from docvortex.analyzers.native.pdf import table_annotations, table_rules
 from docvortex.analyzers.native.pdf.models import _LineItem
 
 
@@ -157,3 +159,80 @@ def test_post_semantic_special_geometry_uses_reference_pairs():
     assert line_merging._post_semantic_candidate_pairs(lines, boxes) is None
     boxes[0] = (0, 0.0, 1.0, 10.0)
     assert line_merging._post_semantic_candidate_pairs(lines, boxes) is None
+
+
+def test_rule_interval_prefix_keeps_duplicate_boundary_assignment():
+    """递增横线复用前缀；重复边界、交换行顺序仍与原二分分配一致。"""
+
+    rows = [SimpleNamespace(center_y=value) for value in (10.0, 15.0, 20.0, 20.0, 25.0, 30.0)]
+    rules = [SimpleNamespace(bbox=(0.0, value, 10.0, value)) for value in (10.0, 20.0, 30.0, 40.0)]
+    previous = None
+    for count in range(2, len(rules) + 1):
+        groups, previous = table_rules._partition_rows_by_rule_intervals_cached(rows, rules[:count], previous)
+        assert groups == table_rules._partition_rows_by_rule_intervals(rows, rules[:count])
+    duplicate = [*rules, SimpleNamespace(bbox=(0.0, 40.0, 10.0, 40.0))]
+    groups, previous = table_rules._partition_rows_by_rule_intervals_cached(rows, duplicate, previous)
+    assert groups == table_rules._partition_rows_by_rule_intervals(rows, duplicate)
+    reordered = rows[::-1]
+    groups, _state = table_rules._partition_rows_by_rule_intervals_cached(reordered, duplicate, previous)
+    assert groups == table_rules._partition_rows_by_rule_intervals(reordered, duplicate)
+
+
+def test_prepared_rule_bands_match_every_contiguous_interval():
+    """完整横线组首区间在所有连续行切片和闭边界上复现原二分规则。"""
+
+    rules = [SimpleNamespace(bbox=(0.0, value, 10.0, value)) for value in (0.0, 10.0, 20.0, 30.0, 40.0, 50.0)]
+    rows = [SimpleNamespace(center_y=value) for value in (-5.0, 0.0, 5.0, 10.0, 10.0, 19.9, 20.0, 25.0, 40.0, 50.0, 55.0)]
+    index = table_rules._prepare_rule_band_index(rows, rules)
+    assert index is not None
+    for first in range(len(rules) - 1):
+        for last in range(first + 1, len(rules)):
+            selected_rules = rules[first : last + 1]
+            for start in range(len(rows)):
+                for end in range(start + 1, len(rows) + 1):
+                    selected_rows = rows[start:end]
+                    assert table_rules._partition_rows_by_prepared_bands(
+                        selected_rows, selected_rules, first, index
+                    ) == table_rules._partition_rows_by_rule_intervals(selected_rows, selected_rules)
+    assert table_rules._partition_rows_by_prepared_bands(rows[::-1], rules, 0, index) is None
+
+
+@pytest.mark.parametrize("angle", [0, 90, 180, 270])
+def test_prepared_marker_glyphs_match_reference(angle):
+    """同来源多标记复用字形时保持完整 Unicode、字号和位置判断。"""
+
+    chars = [
+        {"char": text, "bbox": box}
+        for text, box in zip(
+            ("A", "a", "1"),
+            ((0.0, 4.0, 8.0, 16.0), (9.0, 1.0, 13.0, 7.0), (14.0, 2.0, 18.0, 8.0)),
+        )
+    ]
+    line = _LineItem("Aa1", (0.0, 1.0, 18.0, 16.0), angle, 1, chars=chars)
+    prepared = table_annotations._prepare_marker_line(line, (100.0, 100.0), angle)
+    assert prepared is not None
+    for marker in ("a", "1", "A", "missing"):
+        assert table_annotations._line_has_superscript_marker(
+            line, marker, (100.0, 100.0), angle, prepared[0]
+        ) == table_annotations._line_has_superscript_marker(line, marker, (100.0, 100.0), angle)
+        assert table_annotations._line_has_compact_marker_token(
+            line.text, marker, prepared[1]
+        ) == table_annotations._line_has_compact_marker_token(line.text, marker)
+
+
+def test_marker_preparation_cache_is_bounded_and_rejects_special_values():
+    """超过容量只淘汰只读结果，异常整数坐标留给原标记规则。"""
+
+    context = table_annotations._PreparedTableCoreRows([], {}, {}, None)
+    for index in range(9000):
+        line = _LineItem(
+            "a", (0.0, 0.0, 1.0, 1.0), 0, index, chars=[{"char": "a", "bbox": (0.0, 0.0, 1.0, 1.0)}]
+        )
+        result = context.prepared_marker_line(line, (100.0, 100.0), 0)
+        assert result is not None
+        if index == 8999:
+            assert context.prepared_marker_line(line, (100.0, 100.0), 0)[0] is result[0]
+    assert len(context.marker_prepared.values) == 8192
+    assert context.marker_prepared.glyph_count == 8192
+    special = _LineItem("a", (0.0, 0.0, 1.0, 1.0), 0, 10000, chars=[{"char": "a", "bbox": (0, 0.0, 1.0, 1.0)}])
+    assert context.prepared_marker_line(special, (100.0, 100.0), 0) is None
