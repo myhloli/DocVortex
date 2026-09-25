@@ -17,6 +17,13 @@ def verify_binary(binary: Path) -> None:
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
     assert native.PROTOCOL_VERSION == 5
+    columns = native.StableColumnClusters(sys.version_info >= (3, 12))
+    assert columns.extend([[(0.0, 1.0)], [(0.0, 1.0)]], 3.0) == (1, 1.0)
+    metrics = native.TableNoteMetrics([(0, 0.0, 1.0), (1, 1.0, 2.0), (2, 2.0, 3.0), (3, 3.0, 4.0)])
+    assert metrics.height_for_rows(metrics.prepare_rows([[]]), 0, 1, 100.0, 200.0, 1.25) == 4.0
+    rows = native.TableRowGeometry([(0.0, 0.0, 2.0, 2.0), (1.0, 1.0, 3.0, 4.0)])
+    assert list(rows.union_indices(0, 2)) == [0, 0, 1, 1]
+    assert rows.first_after(2.0) == 1
     assert native.PDFIUM_RECORD_BATCH_SIZE == 1024
     assert native.BaselineCandidates([(0, 1), (1, 2), (3, 4)], [0, 0, 0]).rows(0, 3, 8192) == [[1], [], []]
     assert native.TableNoteMetrics([(0, 0, 1), (1, 1, 2), (2, 2, 3), (3, 3, 4)]).height(100, 200, [], 1.25) == 4.0
