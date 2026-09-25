@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from email import policy
 from email.message import EmailMessage
+import importlib
 from pathlib import Path
 import socket
 
@@ -92,6 +93,9 @@ def test_invalid_root_boundary_and_decode() -> None:
 @pytest.mark.parametrize("limit", ["MAX_ARCHIVE_BYTES", "MAX_DECODED_BYTES", "MAX_PARTS", "MAX_DEPTH"])
 def test_archive_limits(limit: str, monkeypatch: pytest.MonkeyPatch) -> None:
     """原始字节、累计解码、部件数和嵌套深度都有独立预算。"""
+    # 转换器在导入时保存读取预算；先加载，避免 xdist 的冷进程把临时值
+    # 固化到另一个模块，导致 monkeypatch 恢复后仍把后续归档截成两字节。
+    importlib.import_module("docvortex.analyzers.native.mhtml.converter")
     monkeypatch.setattr(archive_module, limit, 1)
     with pytest.raises(MhtmlResourceLimitError):
         docvortex.parse(build_mhtml_fixture())

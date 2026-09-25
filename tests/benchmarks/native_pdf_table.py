@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """对两组真实表格分别测量结构与样式，并比较完整结果及候选诊断。"""
 
 from __future__ import annotations
@@ -5,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import statistics
 import sys
@@ -14,6 +16,12 @@ from dataclasses import asdict
 from pathlib import Path
 
 from loguru import logger
+
+os.environ["ORT_DISABLE_TELEMETRY"] = "1"
+import onnxruntime
+
+# 不让外部 SDK 的后台上传参与结构/样式基准或进程退出。
+onnxruntime.disable_telemetry_events()
 
 from docvortex.analyzers.native.pdf._table_recovery import (
     NativeTableInput,
@@ -75,9 +83,40 @@ def _cases(group: str) -> list[tuple[dict, NativeTableInput, dict, dict]]:
     return cases
 
 
-def _run_group(group: str, runs: int) -> tuple[dict, list[dict]]:
+def _external_cases(path: Path, baseline: Path) -> list:
+    """以带指纹的本地 PDF 和冻结 Flash 区域构造外部表格，不写入版本化语料。"""
+    source_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+    report = json.loads((baseline / "report.json").read_text())
+    entry = next(item for item in report["documents"] if item["source_sha256"] == source_hash)
+    pages = json.loads((baseline / entry["artifact"] / "output.json").read_text())["model_list"]
+    cases = []
+    with PDFDocument(str(path)) as document:
+        for page_index, blocks in enumerate(pages):
+            page = document[page_index]
+            size = page.size
+            geometry = page.get_chars_with_geometry()
+            rules = coerce_native_table_rules(page.get_drawing_lines())
+            rectangles = coerce_native_table_rectangles(page.get_path_infos())
+            for table_index, block in enumerate(blocks):
+                if block["type"] != "table":
+                    continue
+                bbox = tuple(value * size[index % 2] for index, value in enumerate(block["bbox"]))
+                table = NativeTableInput(bbox, size, int(block.get("angle", 0) or 0), tuple(geometry.chars), rules, rectangles)
+                identity = {
+                    "file": path.name,
+                    "page_index": page_index,
+                    "table_index": table_index,
+                    "bbox": bbox,
+                    "angle": table.angle,
+                    "source_sha256": source_hash,
+                }
+                cases.append((identity, table, geometry.tight_bboxes, geometry.origins))
+    return cases
+
+
+def _run_group(group: str, runs: int, cases: list | None = None) -> tuple[dict, list[dict]]:
     """预热后分阶段计时，完整诊断与序列化均在计时之外执行。"""
-    cases = _cases(group)
+    cases = _cases(group) if cases is None else cases
     core_times = [[] for _ in cases]
     style_times = [[] for _ in cases]
     records = []
@@ -107,7 +146,8 @@ def _run_group(group: str, runs: int) -> tuple[dict, list[dict]]:
     return {
         "tables": len(cases),
         "core_seconds": sum(core_medians),
-        "core_p95_ms": statistics.quantiles(core_medians, n=20)[18] * 1000,
+        "core_p95_ms": (statistics.quantiles(core_medians, n=20)[18] if len(core_medians) > 1 else max(core_medians, default=0))
+        * 1000,
         "style_seconds": sum(style_medians),
         "caibao_style_seconds": sum(caibao_styles),
         "per_table_core_seconds": core_times,
@@ -121,14 +161,31 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--runs", type=int, default=5)
+    parser.add_argument("--external-pdf", type=Path)
+    parser.add_argument("--flash-baseline", type=Path)
+    parser.add_argument(
+        "--backend", choices=("auto", "python", "rust"), default=os.environ.get("DOCVORTEX_COMPUTE_BACKEND", "auto")
+    )
     args = parser.parse_args()
+    os.environ["DOCVORTEX_COMPUTE_BACKEND"] = args.backend
     if args.runs < 1 or args.output.exists():
         parser.error("runs must be positive and output must not already exist")
+    if args.external_pdf and not args.flash_baseline:
+        parser.error("external PDF requires frozen Flash baseline")
     logger.disable("docvortex")
-    report = {"python": sys.version, "platform": platform.platform(), "runs": args.runs, "groups": {}}
+    report = {
+        "python": sys.version,
+        "platform": platform.platform(),
+        "runs": args.runs,
+        "onnxruntime_telemetry": "disabled_before_import",
+        "groups": {},
+    }
     outputs = {}
-    for group in ("cross_page", "demo"):
-        summary, records = _run_group(group, args.runs)
+    groups = {"cross_page": None, "demo": None}
+    if args.external_pdf:
+        groups["external"] = _external_cases(args.external_pdf, args.flash_baseline)
+    for group, cases in groups.items():
+        summary, records = _run_group(group, args.runs, cases)
         report["groups"][group] = summary
         outputs[group] = records
         print(group, {key: value for key, value in summary.items() if not key.startswith("per_table")}, flush=True)
@@ -136,6 +193,11 @@ def main() -> None:
     payload = json.dumps(outputs, ensure_ascii=False, sort_keys=True)
     (args.output / "output.json").write_text(payload, encoding="utf-8")
     report["output_sha256"] = hashlib.sha256(payload.encode()).hexdigest()
+    from docvortex._compute_backend import backend_info
+    from docvortex.version import __version__
+
+    report["compute"] = backend_info()
+    report["source_version"] = __version__
     if args.baseline:
         previous = json.loads((args.baseline / "output.json").read_text())
         current = json.loads(payload)

@@ -1,0 +1,12 @@
+[workspace]
+members = ["rust/docvortex-core", "rust/docvortex-python"]
+resolver = "2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"

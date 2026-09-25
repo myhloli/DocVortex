@@ -141,6 +141,7 @@ def instrument(stack: ExitStack, timings: dict[str, float]) -> None:
         (api, "prepare_source", "prepare_source"),
         (PdfModel, "predict", "native_pdf"),
         (images, "load_images_from_pdf_bytes_range", "raster"),
+        (images, "_load_visual_crops_from_pdf_bytes_range", "raster"),
         (document, "model_json_to_middle_json", "postprocess_core"),
         (files, "materialize_middle", "materialize"),
     ):

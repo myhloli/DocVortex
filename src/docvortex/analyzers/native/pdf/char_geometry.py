@@ -334,10 +334,8 @@ def _script_group(text: str) -> str:
     return "other"
 
 
-def _font_run_key(char: dict[str, Any], angle: int, text: str) -> tuple[RunKey, float]:
-    """构造字体族、字号、字重、方向和文字类别组成的 run key。"""
-
-    font = char.get("font") or {}
+def _font_run_metadata(font):
+    """按既有顺序转换字体字段，特殊 Python 值保留原异常行为。"""
     font_name = str(font.get("name") or "<unknown>")
     try:
         font_size = float(font.get("size") or 0.0)
@@ -351,6 +349,25 @@ def _font_run_key(char: dict[str, Any], angle: int, text: str) -> tuple[RunKey, 
         weight = int(round(float(font.get("weight") or 0.0) / 100.0) * 100)
     except (TypeError, ValueError):
         weight = 0
+    return font_name, font_size, flags, weight
+
+
+def _font_run_key(char: dict[str, Any], angle: int, text: str, metadata_cache=None) -> tuple[RunKey, float]:
+    """构造 run key；调用内缓存以字段值作键，字体发生变化时不会复用旧元数据。"""
+    font = char.get("font") or {}
+    key = None
+    if metadata_cache is not None and type(font) is dict:
+        values = tuple(font.get(name) for name in ("name", "size", "flags", "weight"))
+        if type(values[0]) in (str, type(None)) and all(
+            type(value) in (str, int, float, bool, type(None)) for value in values[1:]
+        ):
+            key = values
+    metadata = metadata_cache.get(key) if key is not None else None
+    if metadata is None:
+        metadata = _font_run_metadata(font)
+        if key is not None:
+            metadata_cache[key] = metadata
+    font_name, font_size, flags, weight = metadata
     return _cached_run_key(
         font_name,
         font_size,
@@ -441,6 +458,111 @@ def _style_line_is_inflated(
     )
 
 
+def _prepared_line_geometry(line, geometry, page_size, *, anchors_only):
+    """批量准备风险判断与 canonical 样本共用的独立几何，保持源成员顺序。"""
+    from ...._compute_backend import get_native
+    from ._native_geometry import raw_bbox
+
+    selected = []
+    for position, char in enumerate(line.chars):
+        text = str(char.get("char") or "")
+        index = char.get("char_idx")
+        if not _is_anchor_text(text) if anchors_only else not text or not text.isprintable() or text.isspace():
+            continue
+        if isinstance(index, bool) or not isinstance(index, int):
+            continue
+        selected.append((position, text, index, char))
+    native = get_native()
+    if native is None:
+        for position, text, index, char in selected:
+            source = _clip_validated_bbox(_source_bbox(char, geometry, index), page_size)
+            tight = _clip_validated_bbox(_coerce_bbox(geometry.tight_bboxes.get(index)), page_size)
+            origin = _coerce_origin(geometry.origins.get(index))
+            if source is not None and tight is not None and origin is not None:
+                yield (
+                    position,
+                    text,
+                    index,
+                    char,
+                    (
+                        source,
+                        tight,
+                        origin,
+                        _rotate_bbox_to_upright(source, page_size, line.angle),
+                        _rotate_bbox_to_upright(tight, page_size, line.angle),
+                        _rotate_origin_to_upright(origin, page_size, line.angle),
+                    ),
+                )
+        return
+    sources, sides, tights, origins, rotations = [], [], [], [], []
+    for _position, _text, index, char in selected:
+        try:
+            rotation = float(char.get("rotation") or 0.0)
+        except (TypeError, ValueError):
+            rotation = math.nan
+        sources.append(raw_bbox(char.get("bbox")))
+        sides.append(
+            raw_bbox(geometry.loose_bboxes.get(index)) if not math.isfinite(rotation) or abs(rotation) > 1e-9 else None
+        )
+        tights.append(raw_bbox(geometry.tight_bboxes.get(index)))
+        origins.append(_coerce_origin(geometry.origins.get(index)))
+        rotations.append(rotation)
+    prepared = native.source_rows(sources, sides, tights, origins, rotations, page_size, line.angle, _coerce_bbox)
+    for (position, text, index, char), values in zip(selected, prepared, strict=True):
+        if values is not None:
+            source, tight, origin, local_source, local_tight, local_origin = values
+            yield position, text, index, char, (source, tight, tuple(origin), local_source, local_tight, tuple(local_origin))
+
+
+def _anchor_pair_statistics_python(rows, positive_source):
+    """保留风险筛查和完整样本原来的相邻锚点公式与比较次序。"""
+    output = []
+    for index, (current, following) in enumerate(zip(rows, rows[1:])):
+        source, tight, origin, key, size = current
+        next_source, next_tight, next_origin, next_key, next_size = following
+        if key != next_key:
+            continue
+        height = max(tight[3] - tight[1], next_tight[3] - next_tight[1])
+        if abs(origin[1] - next_origin[1]) > max(0.5, 0.25 * height):
+            continue
+        advance = next_origin[0] - origin[0]
+        width = max(tight[2] - tight[0], next_tight[2] - next_tight[0])
+        if not 0.1 < advance <= max(5.0 * max(size, 1.0), 8.0 * width):
+            continue
+        source_width = source[2] - source[0]
+        if positive_source and source_width <= 0:
+            continue
+        ratio = source_width / advance
+        overlap = source[2] - next_tight[0] >= 0.05 * max(next_tight[2] - next_tight[0], 0.1)
+        output.append((index, advance, ratio, overlap))
+    return output
+
+
+def _anchor_pair_statistics(rows, positive_source=False):
+    """同一批数值同时服务风险筛查与 canonical 样本，返回索引及统计量。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is not None and all(
+        type(size) is float
+        and type(key) is tuple
+        and all(type(v) in (str, int, float, bool, type(None)) for v in key)
+        and all(
+            type(box) in (tuple, list) and len(box) == length and all(type(v) is float for v in box)
+            for box, length in ((source, 4), (tight, 4), (origin, 2))
+        )
+        for source, tight, origin, key, size in rows
+    ):
+        run_ids = {}
+        result = native.anchor_pairs(
+            [(run_ids.setdefault(key, len(run_ids)), source, tight, origin, size) for source, tight, origin, key, size in rows],
+            positive_source,
+        )
+        if result is not None:
+            return result
+    return _anchor_pair_statistics_python(rows, positive_source)
+
+
 def _document_requires_full_geometry(
     lines_by_page: list[list[_LineItem]],
     geometries: list[PDFPageTextGeometry],
@@ -454,29 +576,24 @@ def _document_requires_full_geometry(
     y_extreme_runs: Counter[RunKey] = Counter()
     style_line_counts: Counter[RunKey] = Counter()
     style_inflated_lines: dict[RunKey, set[LineKey]] = defaultdict(set)
+    font_metadata = {}
     for page_index, (lines, geometry, page_size) in enumerate(
         zip(lines_by_page, geometries, page_sizes, strict=True),
     ):
         for line in lines:
             entries: list[tuple[int, str, BBox, BBox, tuple[float, float], RunKey, float]] = []
-            for position, char in enumerate(line.chars):
-                text = str(char.get("char") or "")
-                char_idx = char.get("char_idx")
-                if not _is_anchor_text(text) or isinstance(char_idx, bool) or not isinstance(char_idx, int):
-                    continue
-                source = _clip_validated_bbox(_source_bbox(char, geometry, char_idx), page_size)
-                tight = _clip_validated_bbox(_coerce_bbox(geometry.tight_bboxes.get(char_idx)), page_size)
-                origin = _coerce_origin(geometry.origins.get(char_idx))
-                if source is None or tight is None or origin is None:
-                    continue
-                run_key, font_size = _font_run_key(char, line.angle, text)
+            for position, text, _char_idx, char, prepared in _prepared_line_geometry(
+                line, geometry, page_size, anchors_only=True
+            ):
+                run_key, font_size = _font_run_key(char, line.angle, text, font_metadata)
+                _source, _tight, _origin, local_source, local_tight, local_origin = prepared
                 entries.append(
                     (
                         position,
                         text,
-                        _rotate_bbox_to_upright(source, page_size, line.angle),
-                        _rotate_bbox_to_upright(tight, page_size, line.angle),
-                        _rotate_origin_to_upright(origin, page_size, line.angle),
+                        local_source,
+                        local_tight,
+                        local_origin,
                         run_key,
                         font_size,
                     )
@@ -485,21 +602,13 @@ def _document_requires_full_geometry(
                 continue
             height_q75 = _quantile([entry[3][3] - entry[3][1] for entry in entries], 0.75)
             anchors = [entry for entry in entries if entry[3][3] - entry[3][1] >= ANCHOR_MIN_TIGHT_HEIGHT_RATIO * height_q75]
-            for current, following in zip(anchors, anchors[1:]):
-                if current[5] != following[5]:
-                    continue
-                tight_height = max(current[3][3] - current[3][1], following[3][3] - following[3][1])
-                if abs(current[4][1] - following[4][1]) > max(0.5, 0.25 * tight_height):
-                    continue
-                advance = following[4][0] - current[4][0]
-                tight_width = max(current[3][2] - current[3][0], following[3][2] - following[3][0])
-                if not 0.1 < advance <= max(5.0 * max(current[6], 1.0), 8.0 * tight_width):
-                    continue
-                ratio = (current[2][2] - current[2][0]) / advance
-                x_ratios[current[5]].append(ratio)
-                following_width = following[3][2] - following[3][0]
-                if current[2][2] - following[3][0] >= 0.05 * max(following_width, 0.1):
-                    x_overlaps[current[5]] += 1
+            for index, _advance, ratio, overlap in _anchor_pair_statistics(
+                [(entry[2], entry[3], entry[4], entry[5], entry[6]) for entry in anchors]
+            ):
+                key = anchors[index][5]
+                x_ratios[key].append(ratio)
+                if overlap:
+                    x_overlaps[key] += 1
 
             anchors_by_run: dict[RunKey, list[tuple[int, str, BBox, BBox, tuple[float, float], RunKey, float]]] = defaultdict(
                 list
@@ -522,14 +631,11 @@ def _document_requires_full_geometry(
                 continue
             if line.angle != 0 or line.formula_candidate_only or line.restored_inline_cluster or line.compact_formula_cluster:
                 continue
-            baseline_entries = sorted(anchors, key=lambda entry: entry[4][1])
+            from ._ordered_statistics import ordered_clusters
+
             tolerance = max(0.5, 0.25 * height_q75)
-            clusters: list[list[tuple[int, str, BBox, BBox, tuple[float, float], RunKey, float]]] = []
-            for entry in baseline_entries:
-                if not clusters or abs(entry[4][1] - statistics.median(item[4][1] for item in clusters[-1])) > tolerance:
-                    clusters.append([entry])
-                else:
-                    clusters[-1].append(entry)
+            groups = ordered_clusters([entry[4][1] for entry in anchors], tolerance, last_only=True)
+            clusters = [[anchors[index] for index in group] for group in groups]
             supported = [cluster for cluster in clusters if len(cluster) >= 3 and len(cluster) / len(anchors) >= 0.20]
             if len(supported) >= 2:
                 return _DocumentGeometryRisk(layout=True)
@@ -588,25 +694,14 @@ def _collect_samples(
 
     samples: list[_CharSample] = []
     by_line: dict[LineKey, list[_CharSample]] = defaultdict(list)
+    font_metadata = {}
     for page_index, (lines, geometry, page_size) in enumerate(zip(lines_by_page, geometries, page_sizes, strict=True)):
         for line in lines:
-            for position, char in enumerate(line.chars):
-                text = str(char.get("char") or "")
-                char_idx = char.get("char_idx")
-                if (
-                    not text
-                    or not text.isprintable()
-                    or text.isspace()
-                    or isinstance(char_idx, bool)
-                    or not isinstance(char_idx, int)
-                ):
-                    continue
-                source_bbox = _clip_validated_bbox(_source_bbox(char, geometry, char_idx), page_size)
-                tight_bbox = _clip_validated_bbox(_coerce_bbox(geometry.tight_bboxes.get(char_idx)), page_size)
-                origin = _coerce_origin(geometry.origins.get(char_idx))
-                if source_bbox is None or tight_bbox is None or origin is None:
-                    continue
-                run_key, font_size = _font_run_key(char, line.angle, text)
+            for position, text, char_idx, char, prepared in _prepared_line_geometry(
+                line, geometry, page_size, anchors_only=False
+            ):
+                source_bbox, tight_bbox, origin, local_source, local_tight, local_origin = prepared
+                run_key, font_size = _font_run_key(char, line.angle, text, font_metadata)
                 sample = _CharSample(
                     page_index=page_index,
                     line=line,
@@ -616,9 +711,9 @@ def _collect_samples(
                     source_bbox=source_bbox,
                     tight_bbox=tight_bbox,
                     origin=origin,
-                    local_source_bbox=_rotate_bbox_to_upright(source_bbox, page_size, line.angle),
-                    local_tight_bbox=_rotate_bbox_to_upright(tight_bbox, page_size, line.angle),
-                    local_origin=_rotate_origin_to_upright(origin, page_size, line.angle),
+                    local_source_bbox=local_source,
+                    local_tight_bbox=local_tight,
+                    local_origin=local_origin,
                     run_key=run_key,
                     font_size=font_size,
                 )
@@ -656,31 +751,16 @@ def _build_run_stats(
     for line_samples in by_line.values():
         anchors = [sample for sample in line_samples if sample.is_anchor]
         anchors.sort(key=lambda sample: sample.position)
-        for current, following in zip(anchors, anchors[1:]):
-            if current.run_key != following.run_key:
-                continue
-            tight_height = max(
-                current.local_tight_bbox[3] - current.local_tight_bbox[1],
-                following.local_tight_bbox[3] - following.local_tight_bbox[1],
-            )
-            if abs(current.local_origin[1] - following.local_origin[1]) > max(0.5, 0.25 * tight_height):
-                continue
-            advance = following.local_origin[0] - current.local_origin[0]
-            tight_width = max(
-                current.local_tight_bbox[2] - current.local_tight_bbox[0],
-                following.local_tight_bbox[2] - following.local_tight_bbox[0],
-            )
-            limit = max(5.0 * max(current.font_size, 1.0), 8.0 * tight_width)
-            if not 0.1 < advance <= limit:
-                continue
-            source_width = current.local_source_bbox[2] - current.local_source_bbox[0]
-            if source_width <= 0:
-                continue
-            overlap = current.local_source_bbox[2] - following.local_tight_bbox[0]
-            following_width = following.local_tight_bbox[2] - following.local_tight_bbox[0]
-            run = runs[current.run_key]
-            run.pair_ratios.append(source_width / advance)
-            run.pair_overlaps.append(overlap >= 0.05 * max(following_width, 0.1))
+        for index, advance, ratio, overlap in _anchor_pair_statistics(
+            [
+                (sample.local_source_bbox, sample.local_tight_bbox, sample.local_origin, sample.run_key, sample.font_size)
+                for sample in anchors
+            ],
+            positive_source=True,
+        ):
+            run = runs[anchors[index].run_key]
+            run.pair_ratios.append(ratio)
+            run.pair_overlaps.append(overlap)
             run.advances.append(advance)
 
     for run in runs.values():
@@ -1099,20 +1179,10 @@ def _baseline_clusters(samples: list[_CharSample]) -> tuple[list[list[_CharSampl
 
     tight_heights = [sample.local_tight_bbox[3] - sample.local_tight_bbox[1] for sample in samples]
     tolerance = max(0.5, 0.25 * _quantile(tight_heights, 0.75))
-    clusters: list[list[_CharSample]] = []
-    for sample in sorted(samples, key=lambda item: item.local_origin[1]):
-        target = next(
-            (
-                cluster
-                for cluster in clusters
-                if abs(sample.local_origin[1] - statistics.median(item.local_origin[1] for item in cluster)) <= tolerance
-            ),
-            None,
-        )
-        if target is None:
-            clusters.append([sample])
-        else:
-            target.append(sample)
+    from ._ordered_statistics import ordered_clusters
+
+    groups = ordered_clusters([sample.local_origin[1] for sample in samples], tolerance)
+    clusters = [[samples[index] for index in group] for group in groups]
     return clusters, tolerance
 
 
@@ -1265,6 +1335,30 @@ def _assign_neighbors(analyses: dict[LineKey, _LineAnalysis]) -> None:
     for analysis in analyses.values():
         by_page[analysis.key[0]].append(analysis)
     for page_analyses in by_page.values():
+        from ...._compute_backend import get_native
+
+        native = get_native()
+        if native is not None and all(
+            type(item) is _LineAnalysis
+            and type(item.local_source_bbox) in (tuple, list)
+            and len(item.local_source_bbox) == 4
+            and all(type(v) is float for v in item.local_source_bbox)
+            and type(item.tight_core) in (tuple, list)
+            and len(item.tight_core) == 4
+            and all(type(v) is float for v in item.tight_core)
+            and type(item.baseline) is float
+            for item in page_analyses
+        ):
+            neighbors = native.line_neighbors(
+                [
+                    (id(item), item.local_source_bbox, item.tight_core[3] - item.tight_core[1], item.baseline)
+                    for item in page_analyses
+                ]
+            )
+            if neighbors is not None:
+                for item, pair in zip(page_analyses, neighbors, strict=True):
+                    item.neighbors.extend(page_analyses[index] for index in pair if index is not None)
+                continue
         for current in page_analyses:
             candidates = [
                 other

@@ -154,10 +154,18 @@ def _build_line_candidate(line: Any) -> _LineCandidate | None:
     if line_bbox is None:
         return None
     chars = _ordered_line_chars(line)
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    prepared = (
+        native.normalize_boxes([getattr(char.get("bbox"), "bbox", char.get("bbox")) for char in chars], True, _coerce_bbox)
+        if native is not None
+        else None
+    )
     visible_chars: list[_VisibleChar] = []
     for char_index, char in enumerate(chars):
         text = str(char.get("char") or "")
-        bbox = _coerce_bbox(char.get("bbox"))
+        bbox = prepared[char_index] if prepared is not None else _coerce_bbox(char.get("bbox"))
         if bbox is None or not text.isprintable() or text.isspace():
             continue
         visible_chars.append(_VisibleChar(source_index=char_index, bbox=bbox))

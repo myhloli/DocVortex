@@ -191,13 +191,52 @@ def _infer_text_tracks(
     return tracks
 
 
+class _RowOccupancy:
+    """在一次候选恢复调用内复用字符中心与轨道结果，不挂到公开对象。"""
+
+    def __init__(self, text, native):
+        """只建立一次 glyph 索引；缓存随本次恢复结束释放。"""
+        self.text = text
+        self.rows = None
+        self.positions = {}
+        self.cache = {}
+        self.native = native
+
+    def columns(self, tracks):
+        """相同轨道复用整表结果，非有限坐标采用原区间遍历，非有限轨道不存缓存。"""
+        if self.rows is None:
+            centers = {glyph.glyph_id: (glyph.bbox[0] + glyph.bbox[2]) / 2.0 for glyph in self.text.glyphs}
+            self.rows = [[centers[index] for index in row.glyph_ids] for row in self.text.rows]
+            self.positions = {id(row): index for index, row in enumerate(self.text.rows)}
+        cacheable = all(math.isfinite(value) for value in tracks)
+        if cacheable and tracks in self.cache:
+            return self.cache[tracks]
+        result = self.native.table_row_occupancy(self.rows, tracks)
+        if result is None:
+            result = []
+            for row in self.rows:
+                columns = set()
+                for center in row:
+                    col = next((i for i, (left, right) in enumerate(zip(tracks, tracks[1:])) if left <= center <= right), None)
+                    if col is not None:
+                        columns.add(col)
+                result.append(columns)
+        result = tuple(frozenset(row) for row in result)
+        if cacheable:
+            self.cache[tracks] = result
+        return result
+
+
 def _row_glyph_occupancy(
     row: NativeTableTextRow,
     text: NativeTableText,
     x_tracks: tuple[float, ...],
+    occupancy: _RowOccupancy | None = None,
 ) -> set[int]:
     """按字符中心统计一条视觉行实际占用的叶子列。"""
 
+    if occupancy is not None:
+        return set(occupancy.columns(x_tracks)[occupancy.positions[id(row)]])
     glyph_by_id = {glyph.glyph_id: glyph for glyph in text.glyphs}
     occupied: set[int] = set()
     for glyph_id in row.glyph_ids:
@@ -216,6 +255,7 @@ def _track_support(
     text: NativeTableText,
     x_tracks: tuple[float, ...],
     body_start: int,
+    occupancy: _RowOccupancy | None = None,
 ) -> tuple[float, float, tuple[set[int], ...]] | None:
     """校验正文行、关键列和各叶子列的重复占用支持。"""
 
@@ -223,7 +263,7 @@ def _track_support(
     cols = len(x_tracks) - 1
     if len(body_rows) < 2 or cols < 2:
         return None
-    occupancies = tuple(_row_glyph_occupancy(row, text, x_tracks) for row in body_rows)
+    occupancies = tuple(_row_glyph_occupancy(row, text, x_tracks, occupancy) for row in body_rows)
     minimum_dense_cols = max(2, math.ceil(MIN_COLUMN_SUPPORT * cols))
     if any(len(occupancy) < minimum_dense_cols for occupancy in occupancies):
         return None
@@ -322,6 +362,7 @@ def _two_level_header_specs(
     y_tracks: tuple[float, ...],
     rules: tuple[_LocalRule, ...],
     tolerance: float,
+    occupancy: _RowOccupancy | None = None,
 ) -> tuple[GridCellSpec, ...] | None:
     """用局部横线和上下层文本恢复两层表头的 rowspan/colspan。"""
 
@@ -352,7 +393,7 @@ def _two_level_header_specs(
         for col in sorted(absent_cols)
     ]
 
-    child_occupied = _row_glyph_occupancy(text.rows[1], text, x_tracks).intersection(present_cols)
+    child_occupied = _row_glyph_occupancy(text.rows[1], text, x_tracks, occupancy).intersection(present_cols)
     top_tokens = [
         (token, col)
         for token, col in zip(
@@ -422,6 +463,7 @@ def _build_sparse_specs(
     body_start: int,
     rules: tuple[_LocalRule, ...],
     tolerance: float,
+    occupancy: _RowOccupancy | None = None,
 ) -> tuple[GridCellSpec, ...] | None:
     """构造完整少线网格，并仅在两层表头中推断合并格。"""
 
@@ -437,6 +479,7 @@ def _build_sparse_specs(
             y_tracks,
             rules,
             tolerance,
+            occupancy,
         )
         if header_specs is None:
             return None
@@ -521,6 +564,7 @@ def _build_hypothesis_candidate(
     hypothesis: _TrackHypothesis,
     height: float,
     diagnostics: dict[str, Any] | None,
+    occupancy: _RowOccupancy | None = None,
 ) -> NativeTableCandidate | None:
     """把一组少线轨道恢复为候选并执行全部高置信硬门。"""
 
@@ -530,7 +574,7 @@ def _build_hypothesis_candidate(
         if diagnostics is not None:
             diagnostics["first_rejection_gate"] = "row_tracks"
         return None
-    support = _track_support(text, x_tracks, hypothesis.body_start)
+    support = _track_support(text, x_tracks, hypothesis.body_start, occupancy)
     if support is None:
         if diagnostics is not None:
             diagnostics["first_rejection_gate"] = "anchor_support"
@@ -544,6 +588,7 @@ def _build_hypothesis_candidate(
         hypothesis.body_start,
         rules,
         tolerance,
+        occupancy,
     )
     if specs is None:
         if diagnostics is not None:
@@ -622,6 +667,7 @@ def _build_track_hypotheses(
     rules: tuple[_LocalRule, ...],
     width: float,
     height: float,
+    occupancy: _RowOccupancy | None = None,
 ) -> tuple[_TrackHypothesis, ...]:
     """构造有限的文本轨和强竖线轨假设并消除同拓扑重复。"""
 
@@ -651,7 +697,7 @@ def _build_track_hypotheses(
     if (
         physical_cols >= 2
         and physical_cols in {layout.target_cols, layout.target_cols + 1}
-        and _track_support(text, vertical_tracks, layout.body_start) is not None
+        and _track_support(text, vertical_tracks, layout.body_start, occupancy) is not None
     ):
         internal_coverages = [
             coverage for coordinate, coverage in vertical_coverages.items() if tolerance < coordinate < width - tolerance
@@ -670,7 +716,11 @@ def _build_track_hypotheses(
         )
 
     rect_cols = len(rect_tracks) - 1
-    if rect_cols == layout.target_cols and rect_cols >= 2 and _track_support(text, rect_tracks, layout.body_start) is not None:
+    if (
+        rect_cols == layout.target_cols
+        and rect_cols >= 2
+        and _track_support(text, rect_tracks, layout.body_start, occupancy) is not None
+    ):
         hypotheses.append(
             _TrackHypothesis(
                 evidence="rect_text",
@@ -741,12 +791,17 @@ def build_sparse_hybrid_candidates(
             )
         return []
 
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    occupancy = _RowOccupancy(text, native) if native is not None else None
     hypotheses = _build_track_hypotheses(
         table_input,
         text,
         rules,
         width,
         height,
+        occupancy,
     )
     candidates: list[NativeTableCandidate] = []
     for hypothesis in hypotheses:
@@ -766,6 +821,7 @@ def build_sparse_hybrid_candidates(
             hypothesis,
             height,
             record,
+            occupancy,
         )
         if diagnostics is not None and record is not None:
             diagnostics.append(record)

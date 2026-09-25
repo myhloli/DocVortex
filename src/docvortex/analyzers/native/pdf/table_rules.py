@@ -5,6 +5,8 @@ from __future__ import annotations
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass, field
 import statistics
+import math
+import sys
 from typing import Any
 
 from ....document.pdf._document import PDFPathInfo
@@ -27,12 +29,14 @@ from .table_annotations import (
     _PreparedTableNoteBodyMetrics,
     _PreparedTableNoteRow,
     _build_table_annotation,
+    _prepare_annotation_geometry,
     _collect_caption_rows,
     _collect_footnote_rows,
     _find_table_caption,
     _merge_table_candidate_annotations,
     _prepare_table_note_body_metrics,
     _prepare_table_note_rows,
+    _prepare_table_core_rows,
 )
 from .table_rows import _clip_visual_row_to_corridor
 
@@ -51,7 +55,7 @@ class _StableColumnPrefixState:
     """保存稳定列聚类的完整前缀状态，供严格前缀输入继续计算。"""
 
     row_ids: tuple[int, ...]
-    clusters_by_alignment: dict[str, list[dict[str, Any]]]
+    clusters_by_alignment: Any
 
 
 @dataclass(slots=True)
@@ -60,6 +64,81 @@ class _StableColumnCache:
 
     results: dict[tuple[float, tuple[int, ...]], tuple[int, float]] = field(default_factory=dict)
     prefixes: dict[tuple[float, int], _StableColumnPrefixState] = field(default_factory=dict)
+    prepared_rows: dict[int, tuple[_VisualRow, Any]] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class _RuleCandidateContext:
+    """同一候选组共享只读输入和网格索引，避免每个区间复制页面成员。"""
+
+    rows: list
+    lines: list
+    page_size: tuple
+    angle: int
+    median_height: float
+    axis_lines: list
+    excluded_bboxes: list
+    marker_cache: dict
+    body_metrics: _PreparedTableNoteBodyMetrics
+    grids: list | None = None
+    grid_members: dict = field(default_factory=dict)
+    core_indexes: dict = field(default_factory=dict)
+    row_bounds: dict = field(default_factory=dict)
+    annotation_geometry: Any = None
+
+
+@dataclass(slots=True)
+class _RuleCandidateDraft:
+    """保存轻量候选描述，评分排序之后再创建注释及成员集合。"""
+
+    context: _RuleCandidateContext
+    boundaries: list
+    rows: list
+    caption: _LineItem | None
+    note_rows: list
+    has_notes: bool
+    score: float
+    core_query: Any = None
+
+    def materialize(self) -> _TableCandidate:
+        """按参考规则物化当前候选，并复用本组网格成员后立即交给合并器。"""
+        context = self.context
+        if context.annotation_geometry is None:
+            context.annotation_geometry = _prepare_annotation_geometry(context.rows) or False
+        candidate = _expand_rule_table_candidate(
+            self.boundaries,
+            self.rows,
+            context.rows,
+            context.lines,
+            context.page_size,
+            context.angle,
+            context.median_height,
+            self.caption,
+            self.has_notes,
+            context.marker_cache,
+            self.note_rows,
+            context.body_metrics,
+            self.core_query,
+            context.annotation_geometry or None,
+        )
+        candidate.score = self.score
+        if context.grids is None:
+            context.grids = [
+                box
+                for box in _connected_rule_grid_bboxes(context.axis_lines, context.median_height)
+                if not any(_bbox_overlap_in_smaller(box, excluded) >= 0.5 for excluded in context.excluded_bboxes)
+            ]
+        return _expand_candidates_to_connected_rule_grids(
+            [candidate],
+            context.rows,
+            context.page_size,
+            context.angle,
+            context.median_height,
+            context.axis_lines,
+            context.excluded_bboxes,
+            prepared_grid_bboxes=context.grids,
+            grid_member_cache=context.grid_members,
+        )[0]
 
 
 def _build_fragments(
@@ -157,7 +236,8 @@ def _build_rule_table_candidates(
     path_infos: list[PDFPathInfo] | None = None,
     excluded_bboxes: list[BBox] | None = None,
     caption_candidates: list[tuple[_LineItem, BBox]] | None = None,
-) -> list[_TableCandidate]:
+    defer_materialization: bool = False,
+) -> list[_TableCandidate] | list[_RuleCandidateDraft]:
     """枚举同跨度横线边界区间，再以连续多列文本分布确认表格。"""
 
     candidates: list[_TableCandidate] = []
@@ -174,6 +254,18 @@ def _build_rule_table_candidates(
         angle,
     )
     marker_cache: dict[tuple[int, str], bool] = {}
+    drafts: list[_RuleCandidateDraft] = []
+    context = _RuleCandidateContext(
+        rows,
+        lines,
+        page_size,
+        angle,
+        median_height,
+        axis_lines,
+        excluded_bboxes,
+        marker_cache,
+        prepared_note_body_metrics,
+    )
     for rule_group in _group_long_horizontal_rules(axis_lines, median_height):
         active_first_index = -1
         # 保留历史算法的候选集合与枚举顺序；性能优化只复用候选内部的纯计算结果。
@@ -297,10 +389,14 @@ def _build_rule_table_candidates(
                     median_height,
                 ):
                     continue
+                corridor_key = (rule_bbox[0], rule_bbox[2])
+                if corridor_key not in context.row_bounds:
+                    context.row_bounds[corridor_key] = _RuleRowBounds([item.row for item in corridor_cache[corridor_key]])
                 if not _table_rows_align_with_rule_span(
                     row_segment,
                     rule_bbox,
                     median_height,
+                    context.row_bounds[corridor_key],
                 ):
                     continue
                 result = (
@@ -342,6 +438,29 @@ def _build_rule_table_candidates(
                 )
                 note_corridor_cache[corridor_key] = note_context
             prepared_note_rows, has_possible_table_notes = note_context
+            score = float(2 + len(dense_rows) + stable_columns + min(fill_band_count, 8))
+            if defer_materialization:
+                if corridor_key not in context.core_indexes:
+                    context.core_indexes[corridor_key] = _prepare_table_core_rows(
+                        [item.row for item in corridor_cache[corridor_key]],
+                        lines,
+                        prepared_note_body_metrics,
+                    )
+                core_index = context.core_indexes[corridor_key]
+                interval = core_index.interval(accepted_rows) if core_index is not None else None
+                drafts.append(
+                    _RuleCandidateDraft(
+                        context,
+                        boundary_rules,
+                        accepted_rows,
+                        caption_line,
+                        prepared_note_rows,
+                        has_possible_table_notes,
+                        score,
+                        (core_index, *interval) if interval is not None else None,
+                    )
+                )
+                continue
             candidate = _expand_rule_table_candidate(
                 boundary_rules,
                 accepted_rows,
@@ -356,8 +475,10 @@ def _build_rule_table_candidates(
                 prepared_note_rows,
                 prepared_note_body_metrics,
             )
-            candidate.score = float(2 + len(dense_rows) + stable_columns + min(fill_band_count, 8))
+            candidate.score = score
             candidates.append(candidate)
+    if defer_materialization:
+        return drafts
     return _expand_candidates_to_connected_rule_grids(
         candidates,
         rows,
@@ -377,19 +498,27 @@ def _expand_candidates_to_connected_rule_grids(
     median_height: float,
     axis_lines: list[_LocalAxisLine],
     excluded_bboxes: list[BBox],
+    *,
+    prepared_grid_bboxes: list[BBox] | None = None,
+    grid_member_cache: dict[BBox, frozenset[int]] | None = None,
 ) -> list[_TableCandidate]:
     """把已确认候选沿连续横边界和贯穿竖轨扩展到完整物理网格。"""
 
-    grid_bboxes = [
-        grid_bbox
-        for grid_bbox in _connected_rule_grid_bboxes(axis_lines, median_height)
-        if not any(_bbox_overlap_in_smaller(grid_bbox, excluded_bbox) >= 0.5 for excluded_bbox in excluded_bboxes)
-    ]
+    grid_bboxes = (
+        prepared_grid_bboxes
+        if prepared_grid_bboxes is not None
+        else [
+            grid_bbox
+            for grid_bbox in _connected_rule_grid_bboxes(axis_lines, median_height)
+            if not any(_bbox_overlap_in_smaller(grid_bbox, excluded_bbox) >= 0.5 for excluded_bbox in excluded_bboxes)
+        ]
+    )
     if not grid_bboxes:
         return candidates
 
     tolerance = max(2.0, median_height)
-    grid_member_cache: dict[BBox, frozenset[int]] = {}
+    if grid_member_cache is None:
+        grid_member_cache = {}
     for candidate in candidates:
         if candidate.core_bbox is None:
             continue
@@ -1022,16 +1151,58 @@ def _table_segment_reaches_boundaries(
     return top_gap <= maximum_gap and bottom_gap <= maximum_gap
 
 
+class _RuleRowBounds:
+    """保存走廊行框索引，只接受身份与顺序完全连续的查询。"""
+
+    def __init__(self, rows):
+        """一次构建有限行框极值树，特殊值和小页面不建立索引。"""
+        from ...._compute_backend import get_native
+
+        self.rows = rows
+        self.positions = {id(row): i for i, row in enumerate(rows)}
+        self.native = None
+        native = get_native()
+        if (
+            native is not None
+            and len(rows) >= 32
+            and len(self.positions) == len(rows)
+            and all(
+                type(row.bbox) in (tuple, list)
+                and len(row.bbox) == 4
+                and all(type(v) is float and math.isfinite(v) for v in row.bbox)
+                for row in rows
+            )
+        ):
+            self.native = native.TableRowGeometry([row.bbox for row in rows])
+
+    def bbox(self, rows):
+        """保持重复和非连续行的原遍历；极值来源仍引用原坐标对象。"""
+        if self.native is None or not rows:
+            return None
+        start = self.positions.get(id(rows[0]))
+        if (
+            start is None
+            or start + len(rows) > len(self.rows)
+            or any(row is not self.rows[start + offset] for offset, row in enumerate(rows))
+        ):
+            return None
+        indices = self.native.union_indices(start, start + len(rows))
+        return tuple(self.rows[index].bbox[axis] for axis, index in enumerate(indices))
+
+
 def _table_rows_align_with_rule_span(
     rows: list[_VisualRow],
     rule_bbox: BBox,
     median_height: float,
+    prepared_bounds: _RuleRowBounds | None = None,
 ) -> bool:
     """校验数据行总体跨度与横线走廊重叠，拒绝仅在边缘偶遇的多列文本。"""
 
     if not rows:
         return False
-    rows_bbox = _bbox_union_many([row.bbox for row in rows])
+    rows_bbox = prepared_bounds.bbox(rows) if prepared_bounds is not None else None
+    if rows_bbox is None:
+        rows_bbox = _bbox_union_many([row.bbox for row in rows])
     rule_width = max(0.1, rule_bbox[2] - rule_bbox[0])
     rows_width = max(0.1, rows_bbox[2] - rows_bbox[0])
     overlap = max(
@@ -1269,6 +1440,8 @@ def _expand_rule_table_candidate(
     marker_cache: dict[tuple[int, str], bool] | None = None,
     prepared_note_rows: list[_PreparedTableNoteRow] | None = None,
     prepared_note_body_metrics: _PreparedTableNoteBodyMetrics | None = None,
+    prepared_core: Any = None,
+    prepared_annotation_geometry: Any = None,
 ) -> _TableCandidate:
     """合并横线核心与上下注释，并保留注释的独立行身份。"""
 
@@ -1287,21 +1460,28 @@ def _expand_rule_table_candidate(
             marker_cache,
             prepared_note_rows,
             prepared_note_body_metrics,
+            prepared_core,
         )
         if has_possible_table_notes
         else []
     )
-    core_local_bbox = _bbox_union(rule_bbox, _bbox_union_many([row.bbox for row in core_rows]))
+    core_rows_bbox = prepared_core[0].bbox(prepared_core[1], prepared_core[2]) if prepared_core is not None else None
+    indexed_bbox = core_rows_bbox is not None
+    if core_rows_bbox is None:
+        core_rows_bbox = _bbox_union_many([row.bbox for row in core_rows])
+    core_local_bbox = _bbox_union(rule_bbox, core_rows_bbox)
     caption_annotation = _build_table_annotation(
         "caption",
         caption_rows,
         excluded_line_indices=core_line_indices,
         excluded_local_bbox=core_local_bbox,
+        prepared_geometry=prepared_annotation_geometry,
     )
     footnote_annotation = _build_table_annotation(
         "footnote",
         footnote_rows,
         excluded_line_indices=core_line_indices,
+        prepared_geometry=prepared_annotation_geometry,
     )
     annotations = [annotation for annotation in (caption_annotation, footnote_annotation) if annotation is not None]
     annotation_line_indices = (
@@ -1311,8 +1491,16 @@ def _expand_rule_table_candidate(
         if annotations
         else set()
     )
-    included_rows = [*caption_rows, *core_rows, *footnote_rows]
-    local_bbox = _bbox_union(core_local_bbox, _bbox_union_many([row.bbox for row in included_rows]))
+    if indexed_bbox and all(
+        type(value) is float and math.isfinite(value) for row in (*caption_rows, *footnote_rows) for value in row.bbox
+    ):
+        # 有限极值并集幂等，外层核心始终先参与比较，保留相等坐标的原对象。
+        local_bbox = core_local_bbox
+        for row in (*caption_rows, *footnote_rows):
+            local_bbox = _bbox_union(local_bbox, row.bbox)
+    else:
+        included_rows = [*caption_rows, *core_rows, *footnote_rows]
+        local_bbox = _bbox_union(core_local_bbox, _bbox_union_many([row.bbox for row in included_rows]))
     return _TableCandidate(
         bbox=_rotate_bbox_from_upright(local_bbox, page_size, angle),
         local_bbox=local_bbox,
@@ -1399,6 +1587,66 @@ def _count_stable_columns(
     *,
     allow_prefix_reuse: bool = False,
 ) -> tuple[int, float]:
+    """复用走廊锚点与严格前缀的原生累计状态，特殊数值保留 Python 求和行为。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is None or sys.implementation.name != "cpython" or not (3, 10) <= sys.version_info[:2] <= (3, 14):
+        return _count_stable_columns_python(rows, median_height, cache, allow_prefix_reuse=allow_prefix_reuse)
+    if type(median_height) is not float or not math.isfinite(median_height):
+        return _count_stable_columns_python(rows, median_height)
+    row_ids = tuple(id(row) for row in rows)
+    key = (median_height, row_ids)
+    if cache is not None and key in cache.results:
+        return cache.results[key]
+    prefix_key = (median_height, row_ids[0]) if row_ids and allow_prefix_reuse else None
+    prefix = cache.prefixes.get(prefix_key) if cache is not None and prefix_key is not None else None
+    reuse = (
+        prefix is not None
+        and isinstance(prefix.clusters_by_alignment, native.StableColumnClusters)
+        and len(prefix.row_ids) < len(row_ids)
+        and row_ids[: len(prefix.row_ids)] == prefix.row_ids
+    )
+    start = len(prefix.row_ids) if reuse else 0
+    packed = []
+    for row in rows[start:]:
+        existing = cache.prepared_rows.get(id(row)) if cache is not None else None
+        if existing is None:
+            values = []
+            for fragment in row.fragments:
+                left, _top, right, _bottom = fragment.local_bbox
+                if type(left) is not float or type(right) is not float or not math.isfinite(left) or not math.isfinite(right):
+                    values = None
+                    break
+                values.append((left, right))
+            if cache is not None:
+                # 强引用限定于本次构建，避免行对象销毁后地址被另一个对象复用。
+                cache.prepared_rows[id(row)] = (row, values)
+        else:
+            values = existing[1]
+        if values is None:
+            return _count_stable_columns_python(rows, median_height)
+        packed.append(values)
+    state = prefix.clusters_by_alignment if reuse else native.StableColumnClusters(sys.version_info >= (3, 12))
+    result = state.extend(packed, max(3.0, median_height * 0.75))
+    if result is None:
+        if cache is not None and prefix_key is not None:
+            cache.prefixes.pop(prefix_key, None)
+        return _count_stable_columns_python(rows, median_height)
+    if cache is not None:
+        cache.results[key] = result
+        if prefix_key is not None and (prefix is None or reuse):
+            cache.prefixes[prefix_key] = _StableColumnPrefixState(row_ids, state)
+    return result
+
+
+def _count_stable_columns_python(
+    rows: list[_VisualRow],
+    median_height: float,
+    cache: _StableColumnCache | None = None,
+    *,
+    allow_prefix_reuse: bool = False,
+) -> tuple[int, float]:
     """分别聚类片段左边界、中心和右边界，并对严格前缀输入续算已有状态。"""
 
     row_ids = tuple(id(row) for row in rows)
@@ -1455,6 +1703,8 @@ def _merge_table_candidates(candidates: list[_TableCandidate]) -> list[_TableCan
 
     merged: list[_TableCandidate] = []
     for candidate in sorted(candidates, key=lambda item: item.score, reverse=True):
+        if isinstance(candidate, _RuleCandidateDraft):
+            candidate = candidate.materialize()
         target = next(
             (
                 item

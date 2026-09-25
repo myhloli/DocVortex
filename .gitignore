@@ -21,3 +21,8 @@ build/
 /tmp/ofd_samples/ofdrw_issues_20260828/ofd/
 
 .zcode/
+
+# Optional Rust extension and compiler artifacts
+/target/
+*.so
+*.pyd

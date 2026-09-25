@@ -1,0 +1,13 @@
+[package]
+name = "docvortex-python"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+docvortex-core = { path = "../docvortex-core" }
+pyo3 = { version = "=0.28.2", features = ["abi3-py310"] }

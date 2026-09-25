@@ -362,6 +362,63 @@ def _split_native_visual_runs(
     visual_bboxes: Mapping[int, BBox] | None = None,
     preserve_vertical_bbox: BBox | None = None,
 ) -> list[_LineItem]:
+    """批量处理视觉 run 几何，Python 保留文字清洗及原对象物化。"""
+    from ...._compute_backend import get_native
+    from ._native_geometry import glyph_flags, raw_bbox
+
+    native = get_native()
+    if native is None:
+        return _split_native_visual_runs_python(
+            line, page_size, visual_bboxes=visual_bboxes, preserve_vertical_bbox=preserve_vertical_bbox
+        )
+    tokens = [(char, str(char.get("char") or "")) for char in line.chars]
+    tokens = [(char, text) for char, text in tokens if text not in {"\r", "\n"}]
+    flags = [glyph_flags(text) for _char, text in tokens]
+    boxes = [raw_bbox(char.get("bbox")) for char, _text in tokens]
+    overrides = [
+        raw_bbox(visual_bboxes.get(char.get("char_idx")))
+        if visual_bboxes is not None and isinstance(char.get("char_idx"), int) and flag & 1
+        else None
+        for (char, _text), flag in zip(tokens, flags)
+    ]
+    ranges = native.visual_runs(boxes, overrides, flags, page_size, line.angle, _coerce_bbox)
+    if not ranges:
+        return _split_native_visual_runs_python(
+            line, page_size, visual_bboxes=visual_bboxes, preserve_vertical_bbox=preserve_vertical_bbox
+        )
+    output = []
+    for run_index, (start, end, run_bbox) in enumerate(ranges):
+        run_tokens = tokens[start:end]
+        text = _normalize_native_run_text("".join(text for _char, text in run_tokens))
+        if not text or run_bbox is None:
+            continue
+        if preserve_vertical_bbox is not None:
+            local = _rotate_bbox_to_upright(run_bbox, page_size, line.angle)
+            vertical = _rotate_bbox_to_upright(preserve_vertical_bbox, page_size, line.angle)
+            run_bbox = _rotate_bbox_from_upright((local[0], vertical[1], local[2], vertical[3]), page_size, line.angle)
+        item = _LineItem(
+            text=text,
+            bbox=run_bbox,
+            angle=line.angle,
+            source_index=-1,
+            chars=[char for char, _text in run_tokens],
+            visual_row_id=line.visual_row_id,
+            run_index=run_index,
+            split_from_row=len(ranges) > 1,
+            formula_candidate_only=line.formula_candidate_only,
+        )
+        _fill_native_typography(item, page_size)
+        output.append(item)
+    return output
+
+
+def _split_native_visual_runs_python(
+    line: _LineItem,
+    page_size: tuple[float, float],
+    *,
+    visual_bboxes: Mapping[int, BBox] | None = None,
+    preserve_vertical_bbox: BBox | None = None,
+) -> list[_LineItem]:
     """保留字符源顺序与空白信息，并按 canonical 字符框拆分远距视觉 run。"""
 
     tokens: list[tuple[Char, str, BBox | None, BBox | None]] = []
@@ -679,6 +736,76 @@ def _detect_leading_typography_width(
 
 
 def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> None:
+    """按行聚合数值统计；字体类别仍由 Python 编码，缓存只存在于本次调用。"""
+    from ...._compute_backend import get_native
+    from ._native_geometry import glyph_flags, raw_bbox
+
+    native = get_native()
+    if native is None:
+        return _fill_native_typography_python(line, page_size)
+    boxes = native.local_boxes(
+        [raw_bbox(char.get("bbox")) if glyph_flags(str(char.get("char") or "")) & 1 else None for char in line.chars],
+        page_size,
+        line.angle,
+        _coerce_bbox,
+    )
+    signatures, signature_ids, families, family_ids = [], {}, [], {}
+    font_ids, weights = [], []
+    # 字体字典由提取层复用；保留强引用避免本次调用内对象地址重用。
+    font_cache = {}
+    for char, box in zip(line.chars, boxes, strict=True):
+        if box is None:
+            font_ids.append(None)
+            weights.append(None)
+            continue
+        font = char.get("font") or {}
+        cached = font_cache.get(id(font)) if type(font) is dict else None
+        if cached is None:
+            name = str(font.get("name") or "")
+            identifier = weight = None
+            if name:
+                try:
+                    flags = int(font.get("flags") or 0)
+                except (TypeError, ValueError):
+                    flags = 0
+                signature = (name, flags)
+                identifier = signature_ids.get(signature)
+                if identifier is None:
+                    identifier = len(signatures)
+                    signature_ids[signature] = identifier
+                    signatures.append(signature)
+                    family = _normalized_font_family(signature)
+                    families.append(None if family is None else family_ids.setdefault(family, len(family_ids)))
+                try:
+                    value = float(font.get("weight"))
+                except (TypeError, ValueError):
+                    value = math.nan
+                if math.isfinite(value) and value > 0:
+                    weight = value
+            cached = (font, identifier, weight)
+            if type(font) is dict and all(
+                type(font.get(key)) in (str, int, float, bool, type(None)) for key in ("name", "flags", "weight")
+            ):
+                font_cache[id(font)] = cached
+        font_ids.append(cached[1])
+        weights.append(cached[2])
+    local = _rotate_bbox_to_upright(line.bbox, page_size, line.angle)
+    result = native.typography_metrics(boxes, font_ids, weights, families, max(0.1, local[3] - local[1]))
+    if result is None:
+        return _fill_native_typography_python(line, page_size)
+    height, width, winner, coverage, weight, emphasis, typography = result
+    line.effective_height = height
+    line.em_height = line.em_height if line.em_height > 0 else height
+    line.median_glyph_width = width
+    line.font_signature = signatures[winner] if winner is not None else None
+    line.font_coverage = coverage
+    line.dominant_font_weight = weight
+    line.leading_emphasis_width = emphasis
+    line.leading_typography_width = typography
+    line.paragraph_terminal = _native_sentence_terminal(line)
+
+
+def _fill_native_typography_python(line: _LineItem, page_size: tuple[float, float]) -> None:
     """使用原始 bbox、PDF 字号和 dominant font 填充两套排版特征。"""
 
     canonical_em_height = line.em_height
@@ -688,7 +815,7 @@ def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> 
     font_weights: dict[tuple[str, int], list[float]] = {}
     glyph_typography: list[tuple[BBox, tuple[str, int] | None, float | None]] = []
     valid_font_chars = 0
-    for char in line.chars:
+    for char_position, char in enumerate(line.chars):
         raw_char = str(char.get("char") or "")
         if not raw_char.isprintable() or raw_char.isspace():
             continue
@@ -806,20 +933,59 @@ def _native_typographic_scale(line: _LineItem) -> float:
     )
 
 
-def _merge_native_inline_scripts(
-    lines: list[_LineItem],
-    page_size: tuple[float, float],
-) -> list[_LineItem]:
-    """以 mutual-nearest 规则把跨粗行的小字号前后置标记合入主体视觉行。"""
-
-    candidates: list[tuple[float, int, int, Literal["prefix", "suffix"]]] = []
-    detached_candidate_pairs: set[tuple[int, int, Literal["prefix", "suffix"]]] = set()
+def _native_inline_script_matches(lines, page_size):
+    """每次配对重新准备只读输入，特殊对象和值仍交给原 Python 规则。"""
     # 候选生成期间行不会修改，按本轮索引缓存字符统计，避免每对行重算字号中位数。
     compact_texts = ["".join(char for char in line.text if not char.isspace()) for line in lines]
     reference_markers = [_INLINE_REFERENCE_MARKER_RE.fullmatch(text) is not None for text in compact_texts]
     local_bboxes = [_rotate_bbox_to_upright(line.bbox, page_size, line.angle) for line in lines]
     canonical_scales = [_native_typographic_scale(line) for line in lines]
 
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is not None and len(lines) >= 16:
+        records = []
+        row_ids, angles = {}, {}
+        for i, line in enumerate(lines):
+            box = local_bboxes[i]
+            values = (*box, line.effective_height, canonical_scales[i])
+            if (
+                any(type(v) is not float or abs(v) > 1e100 or not math.isfinite(v) for v in values)
+                or box[2] <= box[0]
+                or box[3] <= box[1]
+                or type(line.angle) is not int
+                or (line.visual_row_id is not None and type(line.visual_row_id) is not int)
+            ):
+                break
+            records.append(
+                (
+                    box,
+                    line.effective_height,
+                    canonical_scales[i],
+                    len(compact_texts[i]),
+                    reference_markers[i],
+                    row_ids.setdefault(line.visual_row_id, len(row_ids)),
+                    angles.setdefault(line.angle, len(angles)),
+                )
+            )
+        else:
+            result = native.inline_script_matches(records)
+            if result is not None:
+                matches, detached_pairs = {}, set()
+                for small, base, prefix, detached in result:
+                    position = "prefix" if prefix else "suffix"
+                    matches.setdefault(base, {})[position] = small
+                    if detached:
+                        detached_pairs.add((small, base, position))
+                return matches, detached_pairs
+    return _inline_script_matches_python(lines, compact_texts, reference_markers, local_bboxes, canonical_scales)
+
+
+def _inline_script_matches_python(lines, compact_texts, reference_markers, local_bboxes, canonical_scales):
+    """保留原逐对打分和首命中规则，作为回退及独立差分参考。"""
+    candidates: list[tuple[float, int, int, Literal["prefix", "suffix"]]] = []
+    detached_candidate_pairs: set[tuple[int, int, Literal["prefix", "suffix"]]] = set()
     # 上下标只能贴近主体行的左右边缘。按文本方向分别建立左右边缘索引，
     # 先取可能相邻的安全超集，再复用下面完整判定，避免密集表格页做 O(n²) 全配对。
     left_edge_index: dict[int, list[tuple[float, int]]] = {}
@@ -949,18 +1115,29 @@ def _merge_native_inline_scripts(
         if best_small_for_base.get((base_index, position), (math.inf, -1))[1] == small_index:
             matches.setdefault(base_index, {})[position] = small_index
 
+    return matches, detached_candidate_pairs
+
+
+def _merge_native_inline_scripts(
+    lines: list[_LineItem],
+    page_size: tuple[float, float],
+) -> list[_LineItem]:
+    """以 mutual-nearest 规则把跨粗行的小字号前后置标记合入主体视觉行。"""
+
+    matches, detached_candidate_pairs = _native_inline_script_matches(lines, page_size)
+
     consumed_small_indices = {small_index for positions in matches.values() for small_index in positions.values()}
     merged_base_indices: set[int] = set()
 
-    def merge_children(base_index: int, visiting: set[int]) -> None:
-        """先合并更小的依赖标记，再把当前完整节点递归合入更大的主体行。"""
+    def merge_children(base_index: int, visiting: set[int], recurse) -> None:
+        """显式传递递归函数，避免自引用闭包滞留已消费行；先合并更小标记。"""
 
         if base_index in merged_base_indices or base_index in visiting:
             return
         visiting.add(base_index)
         positions = matches.get(base_index, {})
         for child_index in positions.values():
-            merge_children(child_index, visiting)
+            recurse(child_index, visiting, recurse)
         base = lines[base_index]
         stable_source_indices = [
             source_index
@@ -1005,9 +1182,9 @@ def _merge_native_inline_scripts(
     # 从最终不会被消费的根主体开始，确保 small -> medium -> large 链不会丢失最小节点。
     root_base_indices = [base_index for base_index in matches if base_index not in consumed_small_indices]
     for base_index in root_base_indices:
-        merge_children(base_index, set())
+        merge_children(base_index, set(), merge_children)
     for base_index in matches:
-        merge_children(base_index, set())
+        merge_children(base_index, set(), merge_children)
 
     output = [line for index, line in enumerate(lines) if index not in consumed_small_indices]
     output.sort(key=lambda item: (item.visual_row_id if item.visual_row_id is not None else math.inf, item.run_index))

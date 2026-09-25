@@ -1,0 +1,121 @@
+name: Native wheels
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-wheels-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wheels:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, arch: x86_64, name: linux-x86_64, deployment: '', smoke: '3.14'}
+          - {os: ubuntu-24.04-arm, arch: aarch64, name: linux-aarch64, deployment: '', smoke: '3.14'}
+          - {os: windows-latest, arch: AMD64, name: windows-x86_64, deployment: '', smoke: '3.14'}
+          - {os: macos-15, arch: arm64, name: macos-arm64, deployment: '11.0', smoke: '3.14'}
+          # 现有 magika/onnxruntime 依赖尚无 Intel macOS 的 cp314 包；另做 3.14 ABI 检查。
+          - {os: macos-15-intel, arch: x86_64, name: macos-x86_64, deployment: '10.13', smoke: '3.13'}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.14'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
+      - name: Build and test ABI3 wheel on Python 3.10
+        env:
+          CIBW_BUILD: cp310-*
+          CIBW_SKIP: '*-musllinux_*'
+          CIBW_ARCHS: ${{ matrix.arch }}
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
+          CIBW_BEFORE_ALL_LINUX: export CARGO_HOME=/opt/docvortex-cargo RUSTUP_HOME=/opt/docvortex-rustup; curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.98.1
+          CIBW_ENVIRONMENT: DOCVORTEX_BUILD_NATIVE=1 DOCVORTEX_COMPUTE_BACKEND=rust
+          CIBW_ENVIRONMENT_LINUX: 'PATH="/opt/docvortex-cargo/bin:$PATH" CARGO_HOME=/opt/docvortex-cargo RUSTUP_HOME=/opt/docvortex-rustup DOCVORTEX_BUILD_NATIVE=1 DOCVORTEX_COMPUTE_BACKEND=rust'
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment }}
+          CIBW_TEST_REQUIRES: pytest psutil
+          CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_native_statistics.py {project}/tests/test_native_round3.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py {project}/tests/test_pdfium_bridge.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q && python -m pip install pypdfium2==5.10.1 && python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo2.pdf && python -m pytest {project}/tests/test_pdfium_bridge.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py -q
+        run: uvx --from "cibuildwheel>=3.1,<4" cibuildwheel --output-dir wheelhouse
+      - name: Verify binary ABI on Python 3.14 without optional application dependencies
+        run: uv run --no-project --python 3.14 python tools/verify_native_abi.py wheelhouse
+      - name: Install the exact built artifact on the current supported dependency stack
+        shell: bash
+        run: |
+          uv venv --seed --python ${{ matrix.smoke }}
+          uv run --no-project --python ${{ matrix.smoke }} python -c "import pathlib, subprocess, sys; wheels=list(pathlib.Path('wheelhouse').glob('*.whl')); assert len(wheels)==1, wheels; subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0]), 'pytest', 'psutil', 'pypdfium2==5.13.0'])"
+      - name: Verify installed wheel and real parsing
+        env:
+          DOCVORTEX_COMPUTE_BACKEND: rust
+        run: uv run --no-project --python ${{ matrix.smoke }} python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
+      - name: Verify generated dense table with the installed wheel
+        env:
+          DOCVORTEX_COMPUTE_BACKEND: rust
+        run: |
+          uv run --no-project --python ${{ matrix.smoke }} python tools/generate_dense_pdf.py dense-table.pdf
+          uv run --no-project --python ${{ matrix.smoke }} python tools/verify_native_wheel.py dense-table.pdf
+          uv run --no-project --python ${{ matrix.smoke }} python -m pytest tests/test_pdfium_bridge.py tests/test_native_round3.py tests/test_native_round4.py tests/test_native_round5.py -q
+      - name: Compare public parsing performance and full outputs
+        run: |
+          uv run --no-project --python ${{ matrix.smoke }} python tests/benchmarks/rust_pdf.py --backend python --suite public --output bench-python
+          uv run --no-project --python ${{ matrix.smoke }} python tests/benchmarks/rust_pdf.py --backend rust --suite public --output bench-rust --baseline bench-python
+      - uses: actions/upload-artifact@v6
+        if: ${{ !cancelled() }}
+        with:
+          name: benchmark-${{ matrix.name }}
+          path: |
+            bench-python/report.json
+            bench-rust/report.json
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dist-${{ matrix.name }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  python-dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.14'
+      - name: Build pure Python wheel and complete sdist
+        env:
+          DOCVORTEX_BUILD_NATIVE: '0'
+        run: uv build
+      - run: uvx twine check dist/*
+      - name: Verify pure installation without native artifacts
+        shell: bash
+        run: |
+          uv venv --seed
+          uv run --no-project python -c "import pathlib, subprocess, sys; wheels=list(pathlib.Path('dist').glob('*-py3-none-any.whl')); assert len(wheels)==1; subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0])])"
+          uv run --no-project python tools/verify_native_wheel.py demo/pdfs/demo2.pdf python
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dist-python
+          path: dist/*
+          if-no-files-found: error
+
+  rust-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
+          components: rustfmt, clippy
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test -p docvortex-core --locked

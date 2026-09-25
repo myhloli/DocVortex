@@ -694,6 +694,12 @@ def _lane_accepts_short_tail(
         return False
     # 同位置前序行按栏内稳定排序取 source_index 较小者，避免后续插入触发排序后改变已用证据。
     previous = max(preceding, key=lambda item: (item[1][1], item[1][0], -item[0].source_index))
+    return _short_tail_accepts_previous(candidate, lane, median_height, previous)
+
+
+def _short_tail_accepts_previous(candidate, lane, median_height, previous) -> bool:
+    """复用已确定的原规则前序行，保持字体、间距和视觉行门槛不变。"""
+    candidate_line, candidate_bbox = candidate
     previous_line, previous_bbox = previous
     pair_height = max(
         _line_effective_height(*previous),
@@ -723,6 +729,64 @@ def _lane_accepts_short_tail(
 
 
 def _reattach_cross_lane_short_tails(
+    lanes: list[_TextLane],
+    median_height: float,
+) -> None:
+    """按纵向事件复用各栏最近前序行；特殊输入交给原逐次扫描实现。"""
+    pending = []
+    seen_lines, seen_indices = set(), set()
+    for lane_index, lane in enumerate(lanes):
+        for ordinal, row in enumerate(lane.lines):
+            line, bbox = row
+            if (
+                type(line) is not _LineItem
+                or type(line.source_index) is not int
+                or id(line) in seen_lines
+                or line.source_index in seen_indices
+                or type(bbox) not in (tuple, list)
+                or len(bbox) != 4
+                or (line.semantic_type is not None and type(line.semantic_type) is not str)
+                or any(type(value) not in (int, float) or not math.isfinite(value) for value in bbox)
+            ):
+                return _reattach_cross_lane_short_tails_python(lanes, median_height)
+            seen_lines.add(id(line))
+            seen_indices.add(line.source_index)
+            if line.semantic_type is None:
+                pending.append((lane_index, row, ordinal))
+    pending.sort(key=lambda item: (item[1][1][1], item[1][1][0], item[1][0].source_index))
+    previous = [None] * len(lanes)
+    previous_keys = [None] * len(lanes)
+    append_ordinal = sum(len(lane.lines) for lane in lanes)
+    position = 0
+    while position < len(pending):
+        end = position + 1
+        top = pending[position][1][1][1]
+        while end < len(pending) and pending[end][1][1][1] == top:
+            end += 1
+        settled = []
+        for source, candidate, ordinal in pending[position:end]:
+            matches = [
+                index
+                for index, lane in enumerate(lanes)
+                if previous[index] is not None and _short_tail_accepts_previous(candidate, lane, median_height, previous[index])
+            ]
+            target = matches[0] if len(matches) == 1 else source
+            if target != source:
+                lanes[source].lines.remove(candidate)
+                lanes[target].lines.append(candidate)
+                lanes[target].lines.sort(key=lambda item: (item[1][1], item[1][0], item[0].source_index))
+                ordinal = append_ordinal
+                append_ordinal += 1
+            settled.append((target, candidate, ordinal))
+        # 严格较低 y 才能成为下一组的前序行，同高候选不互相影响。
+        for target, row, ordinal in settled:
+            key = (row[1][1], row[1][0], -row[0].source_index, -ordinal)
+            if previous_keys[target] is None or key > previous_keys[target]:
+                previous_keys[target], previous[target] = key, row
+        position = end
+
+
+def _reattach_cross_lane_short_tails_python(
     lanes: list[_TextLane],
     median_height: float,
 ) -> None:
@@ -803,6 +867,26 @@ def _reattach_repeated_indented_span_tails(
 
 
 def _estimate_lane_gap(lane: _TextLane) -> tuple[float, float]:
+    """仅为本次行距估计提取一次行高，排序仍作用于原栏带成员列表。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is None:
+        return _estimate_lane_gap_python(lane)
+    lane.lines.sort(key=lambda item: (item[1][1], item[1][0], item[0].source_index))
+    result = native.lane_gap(
+        [bbox for _line, bbox in lane.lines],
+        [_line_effective_height(line, bbox) for line, bbox in lane.lines],
+        [line.restored_inline_cluster for line, _bbox in lane.lines],
+        [
+            previous[0].visual_row_id == current[0].visual_row_id and (previous[0].split_from_row or current[0].split_from_row)
+            for previous, current in zip(lane.lines, lane.lines[1:])
+        ],
+    )
+    return result if result is not None else _estimate_lane_gap_python(lane)
+
+
+def _estimate_lane_gap_python(lane: _TextLane) -> tuple[float, float]:
     """从栏带内兼容相邻行的较小间隙簇估计常规净空和 MAD。"""
 
     lane.lines.sort(key=lambda item: (item[1][1], item[1][0], item[0].source_index))

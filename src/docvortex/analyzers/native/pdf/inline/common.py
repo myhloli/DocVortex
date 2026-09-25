@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import math
+from functools import lru_cache
 from typing import Any, Iterable, cast
 
 from .....schema import BBox
+from ....._compute_backend import get_native
 from .types import (
     _LIGATURE_REPLACEMENTS,
     _PDF_CONTROL_CHAR_RE,
@@ -58,9 +60,23 @@ def _ordered_line_chars(line: Any) -> list[dict[str, Any]]:
 
 def _normalize_match_fragment(value: Any) -> str:
     """把单个字符片段规范为忽略排版空白的确定性匹配文本。"""
+    text = str(value or "")
+    if get_native() is not None and len(text) <= 8:
+        return _cached_match_fragment(text)
+    return _normalize_match_text(text)
+
+
+@lru_cache(maxsize=4096)
+def _cached_match_fragment(text: str) -> str:
+    """缓存原生批处理边界的短 Unicode 特征，不缓存整行、页面或对象地址。"""
+    return _normalize_match_text(text)
+
+
+def _normalize_match_text(text: str) -> str:
+    """使用既有 Python Unicode 规则计算匹配文本，供参考和缓存路径共同复用。"""
 
     output: list[str] = []
-    for char in str(value or ""):
+    for char in text:
         if char in _PDF_ZERO_WIDTH_CHARS or char == "\u00ad":
             continue
         if char == "\x02":

@@ -11,8 +11,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from ._contracts import Char
+from ._contracts import Bbox, Char
 from .geometry import char_bbox_values
+from ...._compute_backend import get_native
 
 _GEOMETRY_EPSILON = 0.001
 _MAX_OFFSET = 2.5
@@ -110,14 +111,68 @@ def _source_indices(chars: list[Char]) -> tuple[int, ...]:
     return tuple(sorted({i for char in chars for i in char.get("source_indices", (char["char_idx"],))}))
 
 
-def _mapping_groups(chars: list[Char]) -> list[_Glyph]:
-    """先建立保护组，仅合并不同编码指向同一个汉字的异常映射。"""
-    groups: list[list[Char]] = []
+def _mapping_char_groups_python(chars):
+    """完整保留原迭代协议、短路检查和异常顺序。"""
+    groups = []
     for char in chars:
         if groups and _same_mapping(groups[-1][-1], char):
             groups[-1].append(char)
         else:
             groups.append([char])
+    return groups
+
+
+def _native_mapping_ranges(chars, native):
+    """仅打包自有常规字符；字体强引用和等价类只存在于本次去重调用。"""
+    records, font_cache, font_ids = [], {}, {}
+    for char in chars:
+        if type(char) is not dict or not {"bbox", "font", "char", "rotation", "char_idx"} <= char.keys():
+            return None
+        index, text, rotation = char["char_idx"], char["char"], char["rotation"]
+        obj, source = char.get("text_object_id"), char.get("source_indices", (index,))
+        if (
+            type(index) is not int
+            or not -(2**63) <= index < 2**63
+            or (obj is not None and (type(obj) is not int or not -(2**63) <= obj < 2**63))
+            or type(text) is not str
+            or type(rotation) is not float
+            or type(source) is not tuple
+            or not source
+            or any(type(value) is not int or not -(2**63) <= value < 2**63 for value in source)
+        ):
+            return None
+        box = char["bbox"]
+        if (
+            type(box) is not Bbox
+            or type(box.bbox) is not list
+            or len(box.bbox) != 4
+            or any(type(v) is not float for v in box.bbox)
+        ):
+            return None
+        origin = char.get("origin")
+        if origin is not None and (type(origin) is not tuple or len(origin) != 2 or any(type(v) is not float for v in origin)):
+            return None
+        font = char["font"]
+        cached = font_cache.get(id(font))
+        if cached is None:
+            if type(font) is not dict or font.keys() != {"name", "flags", "size", "weight"}:
+                return None
+            values = tuple(font[key] for key in ("name", "flags", "size", "weight"))
+            if any(
+                type(value) not in (str, int, float, bool, type(None)) or (type(value) is float and not math.isfinite(value))
+                for value in values
+            ):
+                return None
+            cached = (font, font_ids.setdefault(values, len(font_ids)))
+            font_cache[id(font)] = cached
+        records.append((obj, index, max(source), cached[1], rotation, origin, box.bbox, bool(text.strip())))
+    return native.mapping_runs(records)
+
+
+def _mapping_groups(chars: list[Char]) -> list[_Glyph]:
+    """先建立保护组，仅合并不同编码指向同一个汉字的异常映射。"""
+    # 整页入口实测中，原生前置分组的输入打包成本超过计算收益；保留内核差分但不默认启用。
+    groups = _mapping_char_groups_python(chars)
     result: list[_Glyph] = []
     for group in groups:
         if len(group) > 1 and len({c["char"] for c in group}) > 1:
@@ -157,6 +212,38 @@ def _bucket(box: Box, size: float) -> tuple[int, int]:
 
 
 def _paint_pairs(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], list[tuple[int, int, float, float]]]:
+    """批量筛选重复绘制，异常来源类型与巨大坐标保留参考路径。"""
+    native = get_native()
+    if native is not None:
+        signatures, objects, records = {}, {}, []
+        for glyph in glyphs:
+            head = glyph.head
+            obj, origin = head.get("text_object_id"), head.get("origin")
+            eligible = (
+                glyph.box is not None
+                and bool(glyph.text.strip())
+                and obj is not None
+                and origin is not None
+                and head.get("text_render_mode") in (0, 1, 2, 3, 4, 5, 6)
+            )
+            if eligible:
+                if len(origin) != 2:
+                    return _paint_pairs_python(glyphs)
+                try:
+                    object_id = objects.setdefault(obj, len(objects))
+                except TypeError:
+                    return _paint_pairs_python(glyphs)
+                signature = signatures.setdefault(glyph.signature, len(signatures))
+                records.append((glyph.box, origin, signature, object_id, True))
+            else:
+                records.append((None, None, 0, 0, False))
+        result = native.paint_pairs(records)
+        if result is not None:
+            return result
+    return _paint_pairs_python(glyphs)
+
+
+def _paint_pairs_python(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], list[tuple[int, int, float, float]]]:
     """只比较不同文本对象，生成精确重复及待连续证据确认的平移候选。"""
     buckets: dict[tuple[Any, ...], list[int]] = defaultdict(list)
     exact: list[tuple[int, int]] = []
@@ -208,6 +295,14 @@ def _paint_pairs(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], list[tupl
 
 def _components(count: int, pairs: list[tuple[int, int]]) -> list[int]:
     """把候选或已确认的绘制关联归入最早来源，避免把多层副本计作多个字形。"""
+    native = get_native()
+    if native is not None:
+        return native.dedup_components(count, pairs)
+    return _components_python(count, pairs)
+
+
+def _components_python(count: int, pairs: list[tuple[int, int]]) -> list[int]:
+    """保留最早来源并查集的 Python 参考实现。"""
     parents = list(range(count))
     for a, b in pairs:
         while parents[a] != a:
@@ -231,6 +326,31 @@ def _only_endpoint_copies(glyphs: list[_Glyph], roots: list[int], start: int, en
 
 
 def _confirmed_offsets(
+    glyphs: list[_Glyph], pairs: list[tuple[int, int, float, float]], exact: list[tuple[int, int]]
+) -> list[tuple[int, int]]:
+    """以 Python 数学函数预计算方向，再批量确认原顺序的平移证据。"""
+    native = get_native()
+    if not pairs:
+        return []
+    if native is not None:
+        active = {p[0] for p in pairs}
+        texts, angles, records = {}, {}, []
+        for index, glyph in enumerate(glyphs):
+            text_id = texts.setdefault(glyph.text, len(texts))
+            projected, normal, angle_id = None, 0.0, 0
+            if index in active:
+                origin = glyph.head["origin"]
+                normal = -math.sin(glyph.angle) * origin[0] + math.cos(glyph.angle) * origin[1]
+                if not math.isfinite(normal) or abs(normal) > 1e15:
+                    return _confirmed_offsets_python(glyphs, pairs, exact)
+                angle_id = angles.setdefault(round(glyph.angle * 1000), len(angles))
+                projected = _project(glyph.box, glyph.angle)
+            records.append((projected, normal, angle_id, text_id, glyph.text.isspace()))
+        return native.confirmed_offsets(records, pairs, exact)
+    return _confirmed_offsets_python(glyphs, pairs, exact)
+
+
+def _confirmed_offsets_python(
     glyphs: list[_Glyph], pairs: list[tuple[int, int, float, float]], exact: list[tuple[int, int]]
 ) -> list[tuple[int, int]]:
     """以同基线、同平移且连续的多字形证据确认阴影，拒绝孤立近重合字符。"""
@@ -387,6 +507,64 @@ def _visible_candidates(grid: dict[tuple[int, int], list[int]], box: Box, margin
 
 
 def _suppress_hidden(glyphs: list[_Glyph]) -> list[_Glyph]:
+    """在 Rust 中筛选隐藏文本几何，Python 保持原 Unicode 匹配与复制规则。"""
+    native = get_native()
+    if not any(g.head.get("text_render_mode") == 3 for g in glyphs):
+        return glyphs
+    if native is None:
+        return _suppress_hidden_python(glyphs)
+    objects, records = {}, []
+    indices = [glyph.head.get("char_idx") for glyph in glyphs]
+    if not all(isinstance(index, int) for index in indices):
+        return _suppress_hidden_python(glyphs)
+    ranks = {index: rank for rank, index in enumerate(sorted(set(indices)))}
+    for glyph, index in zip(glyphs, indices):
+        head = glyph.head
+        origin = head.get("origin")
+        if origin is not None and len(origin) != 2:
+            return _suppress_hidden_python(glyphs)
+        try:
+            obj = objects.setdefault(head.get("text_object_id"), len(objects))
+        except TypeError:
+            return _suppress_hidden_python(glyphs)
+        mode = head.get("text_render_mode")
+        mode = int(mode) if mode in (0, 1, 2, 3, 4, 5, 6) else -1
+        angle = glyph.angle if math.isfinite(glyph.angle) else 0.0
+        records.append(
+            (
+                glyph.box,
+                origin,
+                obj,
+                mode,
+                bool(head.get("text_is_visible", True)),
+                bool(glyph.text.strip()),
+                angle,
+                math.cos(angle),
+                math.sin(angle),
+                ranks[index],
+            )
+        )
+    candidates = native.hidden_candidates(records)
+    if candidates is None:
+        return _suppress_hidden_python(glyphs)
+    removed = set()
+    for run, matches in candidates:
+        if not _matches_hidden("".join(glyphs[i].text for i in run), "".join(glyphs[i].text for i in matches)):
+            continue
+        removed.update(run)
+        if len(run) == len(matches) and all(len(glyphs[a].chars) == len(glyphs[b].chars) for a, b in zip(run, matches)):
+            for a, b in zip(run, matches):
+                _merge_sources(glyphs[b], glyphs[a])
+        else:
+            representative = glyphs[matches[0]]
+            representative.chars = [c.copy() for c in representative.chars]
+            representative.chars[0]["source_indices"] = _source_indices(
+                representative.chars + [c for i in run for c in glyphs[i].chars]
+            )
+    return _retained_glyphs(glyphs, removed)
+
+
+def _suppress_hidden_python(glyphs: list[_Glyph]) -> list[_Glyph]:
     """只在同位置存在明确可见原文时抑制隐藏 OCR，保留扫描页唯一文本层。"""
     if not any(g.head.get("text_render_mode") == 3 for g in glyphs):
         return glyphs

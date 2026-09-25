@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import atexit
+import gc
 import math
 import multiprocessing
 import os
@@ -126,6 +127,36 @@ def _close_image_dicts(images_list: list[dict[str, Any]] | None) -> None:
             pil_img.close()
         except Exception:
             pass
+
+
+def _load_visual_crops_worker(pdf_bytes, dpi, start_page_id, end_page_id, prepared_pages):
+    """在渲染进程内裁剪并编码视觉素材，只向父进程传递原块索引和 JPEG。"""
+    from .visuals import _attach_prepared_visual_block_images
+
+    images = None
+    try:
+        images = load_images_from_pdf_core(pdf_bytes, dpi, start_page_id, end_page_id, ImageType.PIL)
+        _attach_prepared_visual_block_images(prepared_pages, images, start_page_id)
+        return [[(index, block.get("image_base64")) for index, block in page] for page in prepared_pages]
+    finally:
+        _close_image_dicts(images)
+        # PDFium 句柄已关闭，但 PdfDocument/PdfPage 的近期循环引用仍可持有整份
+        # PDF 输入。每个 worker 任务回收年轻代，避免依赖自动 GC 时机累积大载荷。
+        gc.collect(0)
+
+
+def _load_visual_crops_from_pdf_bytes_range(pdf_bytes, prepared_pages, start_page_id, end_page_id, timeout, threads):
+    """沿原进程池、窗口预算和超时路径获取已编码素材，不更改公共页图接口。"""
+    return _load_pdf_render_tasks(
+        pdf_bytes,
+        DEFAULT_PDF_IMAGE_DPI,
+        start_page_id,
+        end_page_id,
+        ImageType.PIL,
+        timeout,
+        threads,
+        prepared_pages,
+    )
 
 
 def _calculate_render_process_count(total_pages: int, threads: int, cpu_count: int | None = None) -> int:
@@ -395,6 +426,11 @@ def load_images_from_pdf_bytes_range(
     threads: int | None = None,
 ) -> list[dict[str, Any]]:
     """在持久进程池中批量渲染指定闭区间页面。"""
+    return _load_pdf_render_tasks(pdf_bytes, dpi, start_page_id, end_page_id, image_type, timeout, threads)
+
+
+def _load_pdf_render_tasks(pdf_bytes, dpi, start_page_id, end_page_id, image_type, timeout, threads, prepared_crops=None):
+    """共享任务提交、结果顺序和异常回收，裁图任务使用相同的进程数与超时规则。"""
     if end_page_id < start_page_id:
         return []
 
@@ -429,14 +465,20 @@ def load_images_from_pdf_bytes_range(
                 f"Submitting PDF render task: parent_pid={parent_pid}, thread={parent_thread}, "
                 f"executor={executor_id}, pages={page_range}"
             )
+            if prepared_crops is None:
+                worker = _load_images_from_pdf_worker
+                last_argument = image_type
+            else:
+                worker = _load_visual_crops_worker
+                last_argument = prepared_crops[range_start - start_page_id : range_end - start_page_id + 1]
             future = _submit_pdf_render_task(
                 executor,
-                _load_images_from_pdf_worker,
+                worker,
                 pdf_bytes,
                 dpi,
                 range_start,
                 range_end,
-                image_type,
+                last_argument,
             )
             futures.append(future)
             future_to_range[future] = (range_start, range_end)
@@ -480,8 +522,9 @@ def load_images_from_pdf_bytes_range(
         recycle_executor = True
         raise
     except Exception:
-        for images_list in collected_image_lists:
-            _close_image_dicts(images_list)
+        if prepared_crops is None:
+            for images_list in collected_image_lists:
+                _close_image_dicts(images_list)
         raise
     finally:
         if recycle_executor:

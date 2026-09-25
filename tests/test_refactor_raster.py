@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from concurrent.futures import Future
+from concurrent.futures.process import BrokenProcessPool
+from unittest.mock import Mock
+
 from copy import deepcopy
 from io import BytesIO
 from typing import Any
@@ -25,13 +29,40 @@ def make_pdf(pages: int) -> bytes:
     return output.getvalue()
 
 
+def use_local_crop_worker(monkeypatch, raster):
+    """在当前进程执行真实裁图 worker，仅替换底层页图，继续检查图片关闭语义。"""
+    from docvortex.document.pdf import images
+
+    def load(data, prepared_pages, **options):
+        """将原测试页图源接到 worker 内部，模拟进程传输前的全部裁图处理。"""
+
+        def core(pdf_bytes, dpi, start, end, image_type):
+            """传递公开调度参数，供原有断言检查实际页面和配置。"""
+            return raster(
+                pdf_bytes,
+                start_page_id=start,
+                end_page_id=end,
+                image_type=image_type,
+                timeout=options.get("timeout"),
+                threads=options.get("threads"),
+            )
+
+        with monkeypatch.context() as context:
+            context.setattr(images, "load_images_from_pdf_core", core)
+            return images._load_visual_crops_worker(
+                data, 200, options["start_page_id"], options["end_page_id"], deepcopy(prepared_pages)
+            )
+
+    monkeypatch.setattr(images, "_load_visual_crops_from_pdf_bytes_range", load)
+
+
 @pytest.mark.parametrize("page_range, expected_count", [("", 5), ("2-5", 4), ("r1", 1)])
 def test_sparse_visual_pages_keep_physical_identity(
     monkeypatch: pytest.MonkeyPatch, page_range: str, expected_count: int
 ) -> None:
     """抽页后按所选 PDF 的物理索引裁图，保留对外页号映射且及时释放图片。"""
     from docvortex.analyzers.native.models import PdfModel
-    from docvortex.document.pdf import images, visuals
+    from docvortex.document.pdf import visuals
 
     raw_pages = [
         [
@@ -73,7 +104,7 @@ def test_sparse_visual_pages_keep_physical_identity(
         return [{"img_pil": image} for image in batch]
 
     monkeypatch.setattr(PdfModel, "predict", predict)
-    monkeypatch.setattr(images, "load_images_from_pdf_bytes_range", raster)
+    use_local_crop_worker(monkeypatch, raster)
     with PDFDocument(make_pdf(5)) as source:
         result = api.analyze(source, page_range=page_range)
         assert source.page_count == 5
@@ -95,6 +126,7 @@ def test_text_only_pdf_does_not_start_raster_pool(monkeypatch: pytest.MonkeyPatc
         raise AssertionError("Text-only PDF must not rasterize")
 
     monkeypatch.setattr(images, "load_images_from_pdf_bytes_range", forbidden)
+    monkeypatch.setattr(images, "_load_visual_crops_from_pdf_bytes_range", forbidden)
     assert api.parse(make_pdf(1)).middle_json.pages
 
 
@@ -117,7 +149,7 @@ def test_visual_windows_and_container_preparation() -> None:
 def test_crop_failure_releases_all_images(monkeypatch: pytest.MonkeyPatch) -> None:
     """整批裁图异常时也关闭已返回页图，并保留调用者持有的 PDFDocument。"""
     from docvortex.analyzers.native.models import PdfModel
-    from docvortex.document.pdf import images, visuals
+    from docvortex.document.pdf import visuals
 
     image = Image.new("RGB", (8, 8))
 
@@ -134,7 +166,7 @@ def test_crop_failure_releases_all_images(monkeypatch: pytest.MonkeyPatch) -> No
         raise RuntimeError("crop failed")
 
     monkeypatch.setattr(PdfModel, "predict", predict)
-    monkeypatch.setattr(images, "load_images_from_pdf_bytes_range", raster)
+    use_local_crop_worker(monkeypatch, raster)
     monkeypatch.setattr(visuals, "_attach_prepared_visual_block_images", failure)
     with PDFDocument(make_pdf(1)) as document:
         with pytest.raises(RuntimeError, match="crop failed"):
@@ -177,7 +209,7 @@ def test_public_visual_raster_matches_eager_crops(
     threads: int | None,
 ) -> None:
     """以旧全页裁图为参考，验证稀疏筛页、容器、旋转、边界和显式配置透传。"""
-    from docvortex.document.pdf import images, visuals
+    from docvortex.document.pdf import visuals
 
     pages = [
         [{"type": "text", "content": [{"type": "text", "content": "body"}]}],
@@ -213,7 +245,7 @@ def test_public_visual_raster_matches_eager_crops(
         created.extend(batch)
         return [{"img_pil": image} for image in batch]
 
-    monkeypatch.setattr(images, "load_images_from_pdf_bytes_range", raster)
+    use_local_crop_worker(monkeypatch, raster)
     with PDFDocument(make_pdf(len(pages))) as document:
         visuals.attach_visual_block_images_from_pdf(document, pages, window_size=2, timeout=timeout, threads=threads)
         assert document.page_count == len(pages)
@@ -230,7 +262,7 @@ def test_public_visual_raster_failure_releases_completed_batches(
     failure: str,
 ) -> None:
     """后续批次失败时既不泄漏前批页图，也不接管外部文档生命周期。"""
-    from docvortex.document.pdf import images, visuals
+    from docvortex.document.pdf import visuals
 
     created: list[Image.Image] = []
 
@@ -242,7 +274,7 @@ def test_public_visual_raster_failure_releases_completed_batches(
         created.extend(batch)
         return [{"img_pil": image} for image in batch]
 
-    monkeypatch.setattr(images, "load_images_from_pdf_bytes_range", raster)
+    use_local_crop_worker(monkeypatch, raster)
     pages = [[{"type": "image", "bbox": [0, 0, 1, 1]}] for _ in range(2)]
     with PDFDocument(make_pdf(2)) as document:
         with pytest.raises((RuntimeError, ValueError), match="render failed|page count mismatch"):
@@ -251,3 +283,57 @@ def test_public_visual_raster_failure_releases_completed_batches(
     for image in created:
         with pytest.raises(ValueError):
             image.getpixel((0, 0))
+
+
+@pytest.mark.parametrize("failure", (TimeoutError, BrokenProcessPool, ValueError))
+def test_encoded_crop_failure_preserves_pool_recovery(monkeypatch, failure):
+    """编码素材任务复用原超时和损坏池回收规则，普通计算异常保持原样传播。"""
+    from docvortex.document.pdf import images
+
+    executor = object()
+    future = Future()
+    if failure is not TimeoutError:
+        future.set_exception(failure("worker failure"))
+    monkeypatch.setattr(images, "_get_render_process_plan", lambda *args: (1, [(0, 0)]))
+    monkeypatch.setattr(images, "_get_pdf_render_executor", lambda: executor)
+    monkeypatch.setattr(images, "_submit_pdf_render_task", lambda *args: future)
+    if failure is TimeoutError:
+        monkeypatch.setattr(images, "wait", lambda *args, **kwargs: (set(), {future}))
+    recycle = Mock()
+    monkeypatch.setattr(images, "_recycle_pdf_render_executor", recycle)
+    with pytest.raises(failure):
+        images._load_visual_crops_from_pdf_bytes_range(b"pdf", [[]], 0, 0, 1, 1)
+    if failure in (TimeoutError, BrokenProcessPool):
+        recycle.assert_called_once_with(executor, terminate_processes=True)
+    else:
+        recycle.assert_not_called()
+
+
+def test_encoded_crop_results_keep_page_order_and_pool(monkeypatch):
+    """逆序提交并重复请求时仍按页回填，已编码数据不经过 PIL 清理或重新编码。"""
+    from docvortex.document.pdf import images
+
+    executor = object()
+    submitted = []
+
+    def submit(pool, worker, payload, dpi, start, end, prepared):
+        """返回独立完成的 Future，记录实际传入的 worker 和切片索引。"""
+        assert pool is executor and worker is images._load_visual_crops_worker
+        submitted.append((start, prepared))
+        future = Future()
+        future.set_result([[(0, f"page-{start}")]])
+        return future
+
+    monkeypatch.setattr(images, "_get_render_process_plan", lambda *args: (2, [(1, 1), (0, 0)]))
+    monkeypatch.setattr(images, "_get_pdf_render_executor", lambda: executor)
+    monkeypatch.setattr(images, "_submit_pdf_render_task", submit)
+    recycle = Mock()
+    monkeypatch.setattr(images, "_recycle_pdf_render_executor", recycle)
+    prepared = [[{"bbox": [0, 0, 1, 1]}], []]
+    for _ in range(2):
+        assert images._load_visual_crops_from_pdf_bytes_range(b"pdf", prepared, 0, 1, 1, 2) == [
+            [(0, "page-0")],
+            [(0, "page-1")],
+        ]
+    assert submitted == [(1, [[]]), (0, [prepared[0]])] * 2
+    recycle.assert_not_called()

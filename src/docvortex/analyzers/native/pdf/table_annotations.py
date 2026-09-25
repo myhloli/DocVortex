@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
-from dataclasses import dataclass
+from collections import OrderedDict
+from dataclasses import dataclass, field
 import statistics
+import math
 import unicodedata
-from typing import Literal
+from itertools import islice
+from typing import Any, Literal
 from ....schema import BBox
 from .models import _LineItem, _TableAnnotation, _TableCandidate, _VisualRow
 from .geometry import (
@@ -41,6 +44,175 @@ class _PreparedTableNoteBodyMetrics:
 
     items: tuple[tuple[int, float, float], ...]
     centers: tuple[float, ...]
+    native: Any = None
+
+
+@dataclass(slots=True)
+class _PreparedTableCoreRows:
+    """保存一个走廊的原始行引用和来源倒排索引，不跨候选构建缓存。"""
+
+    rows: list[_VisualRow]
+    positions: dict[int, int]
+    source_rows: dict[int, list[int]]
+    native: Any
+    marker_states: OrderedDict[str, tuple[int, int]] = field(default_factory=OrderedDict)
+    marker_safe: bool = False
+    geometry: Any = None
+    source_lines: dict[int, list[_LineItem]] = field(default_factory=dict)
+
+    def bbox(self, start, end):
+        """按极值来源复用原始坐标对象，避免新建大量 Python 浮点值。"""
+        if self.geometry is None:
+            return None
+        indices = self.geometry.union_indices(start, end)
+        return tuple(self.rows[index].bbox[axis] for axis, index in enumerate(indices)) if indices is not None else None
+
+    def interval(self, rows: list[_VisualRow]) -> tuple[int, int] | None:
+        """只有完全相同、连续且顺序一致的行引用才能使用区间描述。"""
+        if not rows:
+            return None
+        start = self.positions.get(id(rows[0]))
+        if start is None or start + len(rows) > len(self.rows):
+            return None
+        if any(row is not self.rows[start + offset] for offset, row in enumerate(rows)):
+            return None
+        return start, start + len(rows)
+
+    def references(self, marker, start, end, lines, page_size, angle, marker_cache):
+        """只检查当前区间的未知行，命中即停；小候选不再预先扫描整个走廊。"""
+        known, hits = self.marker_states.get(marker, (0, 0))
+        selected = ((1 << (end - start)) - 1) << start
+        if hits & selected:
+            self.marker_states.move_to_end(marker)
+            return True
+        pending = selected & ~known
+        seen = set()
+        while pending:
+            bit = pending & -pending
+            row_index = bit.bit_length() - 1
+            for fragment in self.rows[row_index].fragments:
+                source = fragment.line_index
+                if source in seen:
+                    continue
+                seen.add(source)
+                source_lines = self.source_lines.get(source)
+                if not source_lines:
+                    continue
+                key = (source, marker)
+                if marker_cache is not None and key in marker_cache:
+                    matched = marker_cache[key]
+                else:
+                    # 缓存模式遵循同来源首行裁决；不向旧缓存写入稠密 False。
+                    selected_lines = source_lines if marker_cache is None else source_lines[:1]
+                    matched = _table_core_references_marker(marker, selected_lines, page_size, angle)
+                if matched:
+                    for position in self.source_rows[source]:
+                        hits |= 1 << position
+                    self._remember_marker(marker, known | hits, hits)
+                    return True
+            known |= bit
+            pending ^= bit
+        self._remember_marker(marker, known, hits)
+        return False
+
+    def _remember_marker(self, marker, known, hits):
+        """用两个压缩行位图记录结果，最多保留 128 个标记；淘汰只重算，不删候选。"""
+        self.marker_states[marker] = (known, hits)
+        self.marker_states.move_to_end(marker)
+        if len(self.marker_states) > 128:
+            self.marker_states.popitem(last=False)
+
+
+def _prepare_table_core_rows(rows, lines, metrics):
+    """一次校验并打包走廊成员；特殊来源和对象仍交给原集合路径。"""
+    if metrics.native is None or len({id(row) for row in rows}) != len(rows):
+        return None
+    members = []
+    source_rows = {}
+    for position, row in enumerate(rows):
+        indices = []
+        for fragment in row.fragments:
+            index = fragment.line_index
+            if type(index) is not int or not -(2**63) <= index < 2**63:
+                return None
+            indices.append(index)
+            source_rows.setdefault(index, []).append(position)
+        members.append(indices)
+    from ....document.pdf.text import Bbox
+
+    marker_safe = all(
+        type(line) is _LineItem
+        and type(line.source_index) is int
+        and type(line.text) is str
+        and type(line.chars) is list
+        and all(
+            type(char) is dict
+            and (char.get("char") is None or type(char.get("char")) is str)
+            and (
+                char.get("bbox") is None
+                or (
+                    type(char.get("bbox")) in (tuple, list, Bbox)
+                    and len(char["bbox"].bbox if type(char["bbox"]) is Bbox else char["bbox"]) == 4
+                    and all(
+                        (type(value) is float and math.isfinite(value)) or (type(value) is int and -(2**53) <= value <= 2**53)
+                        for value in char["bbox"]
+                    )
+                )
+            )
+            for char in line.chars
+        )
+        for line in lines
+    )
+    from ...._compute_backend import get_native
+
+    source_lines = {}
+    if marker_safe:
+        for line in lines:
+            if line.source_index in source_rows:
+                source_lines.setdefault(line.source_index, []).append(line)
+    geometry = None
+    if all(
+        type(row.bbox) in (tuple, list)
+        and len(row.bbox) == 4
+        and all(type(value) is float and math.isfinite(value) for value in row.bbox)
+        for row in rows
+    ):
+        geometry = get_native().TableRowGeometry([row.bbox for row in rows])
+    return _PreparedTableCoreRows(
+        rows,
+        {id(row): index for index, row in enumerate(rows)},
+        source_rows,
+        metrics.native.prepare_rows(members),
+        marker_safe=marker_safe,
+        geometry=geometry,
+        source_lines=source_lines,
+    )
+
+
+class _PreparedTableNoteRows(list):
+    """保留列表协议并附加本次表注走廊的保序下边界索引。"""
+
+    def __init__(self, rows):
+        """只为普通有限行框建立索引，特殊几何保持原遍历行为。"""
+        super().__init__(rows)
+        from ...._compute_backend import get_native
+
+        native = get_native()
+        self.geometry = None
+        if native is not None and all(
+            type(row.row.bbox) in (tuple, list)
+            and len(row.row.bbox) == 4
+            and all(type(value) is float and math.isfinite(value) for value in row.row.bbox)
+            for row in rows
+        ):
+            self.geometry = native.TableRowGeometry([row.row.bbox for row in rows])
+
+    def first_after(self, bottom):
+        """查找可以跳过的前缀，非有限表底仍从原始首行开始。"""
+        if self.geometry is None or type(bottom) is not float:
+            return 0
+        result = self.geometry.first_after(bottom)
+        return 0 if result is None else result
 
 
 def _table_caption_candidates(
@@ -67,16 +239,152 @@ def _table_caption_candidates(
     return candidates
 
 
+class _PreparedAnnotationGeometry:
+    """为候选组共享原片段及坐标引用，查询不缓存候选结果。"""
+
+    def __init__(self, rows, native):
+        """仅记录首次出现的片段，重复选择在查询阶段保留原顺序。"""
+        self.selections = OrderedDict()
+        self.results = OrderedDict()
+        self.selection_weight = 0
+        self.result_weight = 0
+        self.fragments = []
+        self.positions = {}
+        self.sources = {}
+        records = []
+        self.native = None
+        for row in rows:
+            for fragment in row.fragments:
+                if id(fragment) in self.positions:
+                    continue
+                if type(fragment.line_index) is not int or any(
+                    type(box) not in (tuple, list)
+                    or len(box) != 4
+                    or any(type(v) is not float or not math.isfinite(v) or abs(v) > 1e100 for v in box)
+                    for box in (fragment.bbox, fragment.local_bbox)
+                ):
+                    return
+                self.positions[id(fragment)] = len(self.fragments)
+                self.fragments.append(fragment)
+                source = self.sources.setdefault(fragment.line_index, len(self.sources))
+                records.append((source, fragment.bbox, fragment.local_bbox))
+        self.source_values = list(self.sources)
+        self.native = native.AnnotationGeometry(records)
+
+    def build(self, kind, rows, excluded, local):
+        """按原顺序构造注释，未知片段或特殊输入明确交回参考路径。"""
+        if self.native is None or (
+            local is not None
+            and (
+                type(local) not in (tuple, list)
+                or len(local) != 4
+                or any(type(v) is not float or not math.isfinite(v) or abs(v) > 1e100 for v in local)
+            )
+        ):
+            return NotImplemented
+        if not rows:
+            return None
+        row_key = tuple(id(row) for row in rows)
+        selection = self.selections.get(row_key)
+        if selection is None:
+            selected = []
+            sources = set()
+            for row in rows:
+                for fragment in row.fragments:
+                    index = self.positions.get(id(fragment))
+                    if index is None or self.fragments[index] is not fragment:
+                        return NotImplemented
+                    selected.append(index)
+                    sources.add(fragment.line_index)
+            if len(selected) < 16:
+                return NotImplemented
+            selection = (tuple(rows), selected, frozenset(sources))
+            if len(selected) <= 16384:
+                self.selections[row_key] = selection
+                self.selection_weight += len(selected)
+                while len(self.selections) > 128 or self.selection_weight > 16384:
+                    _, previous = self.selections.popitem(last=False)
+                    self.selection_weight -= len(previous[1])
+        else:
+            self.selections.move_to_end(row_key)
+        selected = selection[1]
+        relevant_excluded = frozenset(excluded.intersection(selection[2]))
+        key = (kind, row_key, relevant_excluded, tuple(local) if local is not None else None)
+        cached = self.results.get(key)
+        if cached is not None:
+            self.results.move_to_end(key)
+            return self._clone(cached[1])
+        excluded_ids = [self.sources[value] for value in relevant_excluded]
+        lines, union = self.native.aggregate(selected, excluded_ids, local)
+        if union is None:
+            self._remember(key, selection[0], None)
+            return None
+        line_bboxes = {}
+        for source, indices, count in lines:
+            line_bboxes[self.source_values[source]] = (
+                self.fragments[indices[0]].bbox
+                if count == 1
+                else tuple(self.fragments[index].bbox[axis] for axis, index in enumerate(indices))
+            )
+        bbox = (
+            next(iter(line_bboxes.values()))
+            if len(lines) == 1
+            else tuple(self.fragments[index].bbox[axis] for axis, index in enumerate(union))
+        )
+        result = _TableAnnotation(kind=kind, bbox=bbox, line_indices=set(line_bboxes), line_bboxes=line_bboxes)
+        self._remember(key, selection[0], result)
+        return self._clone(result)
+
+    @staticmethod
+    def _clone(annotation):
+        """每个候选持有独立可变成员，合并器不能写入缓存快照。"""
+        if annotation is None:
+            return None
+        return _TableAnnotation(
+            kind=annotation.kind,
+            bbox=annotation.bbox,
+            line_indices=set(annotation.line_indices),
+            line_bboxes=dict(annotation.line_bboxes),
+        )
+
+    def _remember(self, key, rows, result):
+        """按来源总数和条目数双重限制缓存，淘汰只导致等价重算。"""
+        weight = max(1, len(result.line_bboxes)) if result is not None else 1
+        if weight > 16384:
+            return
+        self.results[key] = (rows, result, weight)
+        self.result_weight += weight
+        while len(self.results) > 128 or self.result_weight > 16384:
+            _, previous = self.results.popitem(last=False)
+            self.result_weight -= previous[2]
+
+
+def _prepare_annotation_geometry(rows):
+    """只为较大候选组准备一次数值快照，小页面保留原物化开销。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is None or len(rows) < 32:
+        return None
+    prepared = _PreparedAnnotationGeometry(rows, native)
+    return prepared if prepared.native is not None else None
+
+
 def _build_table_annotation(
     kind: Literal["caption", "footnote"],
     rows: list[_VisualRow],
     *,
     excluded_line_indices: set[int] | None = None,
     excluded_local_bbox: BBox | None = None,
+    prepared_geometry: _PreparedAnnotationGeometry | None = None,
 ) -> _TableAnnotation | None:
     """把已确认视觉行压缩成一个带精确来源行集合的表格注释记录。"""
 
     excluded_line_indices = excluded_line_indices or set()
+    if prepared_geometry is not None:
+        result = prepared_geometry.build(kind, rows, excluded_line_indices, excluded_local_bbox)
+        if result is not NotImplemented:
+            return result
     fragments = [
         fragment
         for row in rows
@@ -188,7 +496,7 @@ def _prepare_table_note_rows(
                 auxiliary_marker=_extract_auxiliary_table_note_marker(row_text),
             )
         )
-    return output
+    return _PreparedTableNoteRows(output)
 
 
 def _prepare_table_note_body_metrics(
@@ -212,9 +520,24 @@ def _prepare_table_note_body_metrics(
         )
     items.sort(key=lambda item: item[1])
     frozen_items = tuple(items)
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    prepared_native = None
+    if native is not None and all(
+        type(index) is int
+        and -(2**63) <= index < 2**63
+        and type(center) is float
+        and type(height) is float
+        and math.isfinite(center)
+        and math.isfinite(height)
+        for index, center, height in frozen_items
+    ):
+        prepared_native = native.TableNoteMetrics(frozen_items)
     return _PreparedTableNoteBodyMetrics(
         items=frozen_items,
         centers=tuple(item[1] for item in frozen_items),
+        native=prepared_native,
     )
 
 
@@ -229,6 +552,7 @@ def _collect_footnote_rows(
     marker_cache: dict[tuple[int, str], bool] | None = None,
     prepared_rows: list[_PreparedTableNoteRow] | None = None,
     prepared_body_metrics: _PreparedTableNoteBodyMetrics | None = None,
+    prepared_core: tuple[_PreparedTableCoreRows, int, int] | None = None,
 ) -> list[_VisualRow]:
     """从表格下边界吸收具有表内引用和版面证据的表注连续行。"""
 
@@ -236,7 +560,11 @@ def _collect_footnote_rows(
     bottom = rule_bbox[3]
     note_chain_started = False
     selected_line_indices = set(core_line_indices)
-    core_lines = [line for line in lines if line.source_index in core_line_indices]
+    core_lines = (
+        None
+        if prepared_core is not None and prepared_core[0].marker_safe
+        else [line for line in lines if line.source_index in core_line_indices]
+    )
     body_reference_height: float | None = None
     note_left: float | None = None
     note_height: float | None = None
@@ -251,7 +579,8 @@ def _collect_footnote_rows(
             page_size,
             angle,
         )
-    for prepared_row in prepared:
+    start = prepared.first_after(bottom) if isinstance(prepared, _PreparedTableNoteRows) else 0
+    for prepared_row in islice(prepared, start, None):
         clipped_row = prepared_row.row
         if clipped_row.bbox[3] <= bottom:
             continue
@@ -266,13 +595,15 @@ def _collect_footnote_rows(
             break
         explicit_note = prepared_row.explicit_note
         auxiliary_marker = prepared_row.auxiliary_marker
-        auxiliary_note = auxiliary_marker is not None and _table_core_references_marker(
-            auxiliary_marker,
-            core_lines,
-            page_size,
-            angle,
-            marker_cache,
-        )
+        auxiliary_note = False
+        if auxiliary_marker is not None:
+            if prepared_core is not None and prepared_core[0].marker_safe:
+                context, start, end = prepared_core
+                auxiliary_note = context.references(auxiliary_marker, start, end, lines, page_size, angle, marker_cache)
+            else:
+                if core_lines is None:
+                    core_lines = [line for line in lines if line.source_index in core_line_indices]
+                auxiliary_note = _table_core_references_marker(auxiliary_marker, core_lines, page_size, angle, marker_cache)
         first_gap_limit = 0.75 if auxiliary_note and not explicit_note else 1.25
         if row_gap > (first_gap_limit if not note_chain_started else 1.0) * median_height:
             break
@@ -296,6 +627,7 @@ def _collect_footnote_rows(
                         page_size,
                         angle,
                         prepared_body_metrics,
+                        prepared_core,
                     )
                 spatially_compatible = (
                     _bbox_axis_overlap_ratio(clipped_row.bbox, rule_bbox, axis="x") >= 0.50
@@ -436,11 +768,32 @@ def _table_note_body_reference_height(
     page_size: tuple[float, float],
     angle: int,
     prepared_metrics: _PreparedTableNoteBodyMetrics | None = None,
+    prepared_core: tuple[_PreparedTableCoreRows, int, int] | None = None,
 ) -> float:
     """以同方向非表格行的最高四分位估计正文高度，样本不足时稳健回退。"""
 
     exclusion_top = rule_bbox[1] - 3.0 * median_height
     exclusion_bottom = rule_bbox[3] + 10.0 * median_height
+    if prepared_core is not None and prepared_metrics is not None and prepared_metrics.native is not None:
+        context, start, end = prepared_core
+        result = prepared_metrics.native.height_for_rows(
+            context.native,
+            start,
+            end,
+            exclusion_top,
+            exclusion_bottom,
+            1.25 * median_height,
+        )
+        if result is not None:
+            return result
+    if (
+        prepared_metrics is not None
+        and prepared_metrics.native is not None
+        and all(type(index) is int and -(2**63) <= index < 2**63 for index in core_line_indices)
+    ):
+        result = prepared_metrics.native.height(exclusion_top, exclusion_bottom, list(core_line_indices), 1.25 * median_height)
+        if result is not None:
+            return result
     heights: list[float] = []
     if prepared_metrics is None:
         for line in lines:

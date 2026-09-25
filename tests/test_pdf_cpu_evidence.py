@@ -132,9 +132,30 @@ def test_invalid_geometry_uses_exhaustive_fallback(invalid: float) -> None:
 
 
 def test_dense_page_bounds_candidate_storage() -> None:
-    """候选数量超过线性预算时回退，不分配整个平方级行对集合。"""
+    """区间查询不截断成员；附加几何预筛只允许删除原规则拒绝的行对。"""
+    from docvortex.analyzers.native.pdf._interval_candidates import IntervalCandidates
+
     lines = [_LineItem("a", (0, 0, 20, 10), 0, index) for index in range(128)]
-    assert merging._same_baseline_candidate_pairs(lines, [line.bbox for line in lines], _groups(lines)) is None
+    intervals = IntervalCandidates([(0, 10)] * len(lines), _groups(lines))
+    assert intervals[0] == list(range(1, 128))
+    assert intervals[127] == []
+    candidates = merging._same_baseline_candidate_pairs(lines, [line.bbox for line in lines], _groups(lines))
+    assert candidates is not None
+    assert not isinstance(candidates, list)
+    for first, line in enumerate(lines):
+        partners = candidates[first]
+        assert partners == sorted(set(partners))
+        assert all(second > first for second in partners)
+        assert [
+            second
+            for second in partners
+            if merging._can_merge_same_baseline_pair(line, line.bbox, lines[second], lines[second].bbox, [])
+        ] == [
+            second
+            for second in range(first + 1, len(lines))
+            if merging._can_merge_same_baseline_pair(line, line.bbox, lines[second], lines[second].bbox, [])
+        ]
+    assert candidates[127] == []
 
 
 def test_bottom_edge_tolerance_is_included() -> None:

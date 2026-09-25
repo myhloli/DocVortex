@@ -23,6 +23,7 @@ from .line_layout import _connection_crosses_table, _font_signatures_share_famil
 from .models import _LineItem, _TextLane
 from .native_text import _fill_native_typography, _median_native_glyph_width
 from ._script_geometry import classify_char_script_roles, paired_script_roles
+from ._interval_candidates import IntervalCandidates
 
 
 def _caption_crosses_left_text(members: list[_LineItem]) -> bool:
@@ -37,12 +38,33 @@ def _caption_crosses_left_text(members: list[_LineItem]) -> bool:
     )
 
 
+def _safe_candidate_box(box) -> bool:
+    """仅让内置浮点坐标进入预筛，整数算术和其他类型保留参考遍历。"""
+    return (
+        type(box) in (tuple, list)
+        and len(box) == 4
+        and all(type(v) is float and abs(v) <= 1e100 and math.isfinite(v) for v in box)
+        and box[2] > box[0]
+        and box[3] > box[1]
+    )
+
+
+def _overlapping_candidate_pairs(members):
+    """纵向区间是重叠连接的必要条件，原行序及最终判断保持不变。"""
+    if len(members) <= 16 or any(not _safe_candidate_box(box) for _, box in members):
+        return None
+    groups = {}
+    for i, (line, _) in enumerate(members):
+        groups.setdefault((line.angle, line.formula_candidate_only, line.semantic_type), []).append(i)
+    return IntervalCandidates([(box[1], box[3]) for _, box in members], groups)
+
+
 def _same_baseline_candidate_pairs(
     lines: list[_LineItem],
     local_bboxes: list[BBox],
     compatible_indices: dict[tuple[int, bool, str | None], list[int]],
-) -> list[list[int]] | None:
-    """仅筛除原规则不可能接受的纵向远距行对；异常或密集页面回退原遍历。"""
+) -> list[list[int]] | IntervalCandidates | None:
+    """筛除纵向远距行对，密集页面流式查询，异常几何保留原遍历。"""
     bounds: list[tuple[float, float]] = []
     for line, box in zip(lines, local_bboxes, strict=True):
         try:
@@ -65,6 +87,18 @@ def _same_baseline_candidate_pairs(
             return None
         bounds.append((low, high))
 
+    from ...._compute_backend import get_native
+
+    if len(lines) >= 32 and get_native() is not None:
+        heights = [_line_effective_height(line, box) for line, box in zip(lines, local_bboxes)]
+        sources = [line.source_bbox if line.angle == 0 and line.baseline is not None else None for line in lines]
+        if (
+            all(_safe_candidate_box(box) for box in local_bboxes)
+            and all(box is None or _safe_candidate_box(box) for box in sources)
+            and all(type(h) is float and math.isfinite(h) and abs(h) <= 1e100 for h in heights)
+        ):
+            return IntervalCandidates(bounds, compatible_indices, geometry=(local_bboxes, heights, sources))
+
     candidates: list[list[int]] = [[] for _ in lines]
     pair_count = 0
     pair_limit = max(4096, 32 * len(lines))
@@ -79,7 +113,7 @@ def _same_baseline_candidate_pairs(
                 active.remove(expired)
             pair_count += len(active)
             if pair_count > pair_limit:
-                return None
+                return IntervalCandidates(bounds, compatible_indices)
             for previous in active:
                 left, right = (previous, index) if previous < index else (index, previous)
                 candidates[left].append(right)
@@ -210,8 +244,12 @@ def _merge_overlapping_inline_text_clusters(
                 if first_root != second_root:
                     parents[second_root] = first_root
 
+            candidate_pairs = _overlapping_candidate_pairs(lane.lines)
             for first_index, first in enumerate(lane.lines):
-                for second_index in range(first_index + 1, len(lane.lines)):
+                partners = (
+                    candidate_pairs[first_index] if candidate_pairs is not None else range(first_index + 1, len(lane.lines))
+                )
+                for second_index in partners:
                     second = lane.lines[second_index]
                     if _overlapping_inline_cluster_pair_is_connected(
                         first,
