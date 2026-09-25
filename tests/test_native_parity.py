@@ -22,6 +22,71 @@ def native():
     return extension
 
 
+def test_native_registration_contract(native):
+    """约束重构前的平面扩展接口、签名和类型身份，防止拆分模块时漏注册或改名。"""
+    functions = {
+        "anchor_pairs": "(records, positive_source)",
+        "assign_cells": "(glyphs, specs, index)",
+        "component_specs": "(parents, rows, cols)",
+        "confirmed_offsets": "(records, pairs, exact)",
+        "coverage_batch": "(rules, queries)",
+        "dedup_components": "(count, pairs)",
+        "grid_parents": "(count, pairs)",
+        "hidden_candidates": "(records)",
+        "inline_script_matches": "(records)",
+        "lane_gap": "(boxes, heights, restored, skip)",
+        "line_neighbors": "(records)",
+        "local_boxes": "(values, size, angle, fallback)",
+        "mapping_runs": "(records)",
+        "materialize_geometry": "(rows, frame, rounded, angle)",
+        "merge_rules": "(rules, coordinates, tolerance, join)",
+        "normalize_boxes": "(values, strict, fallback)",
+        "ordered_clusters": "(values, tolerance, relative, last_only)",
+        "paint_pairs": "(records)",
+        "read_pdfium_char_batches": "(addresses, handle, count, extended)",
+        "read_pdfium_chars": "(addresses, handle, count, extended)",
+        "script_roles": "(records)",
+        "script_roles_raw": "(loose, tight, origins, flags, fonts, fallback)",
+        "source_rows": "(raw, side, tight, origins, rotations, size, angle, fallback)",
+        "table_boxes": "(values, table, angle, fallback)",
+        "table_row_occupancy": "(rows, tracks)",
+        "table_visual_rows": "(boxes, ids, median_height)",
+        "title_gaps": "(records)",
+        "typography_metrics": "(boxes, fonts, weights, families, fallback_height)",
+        "visual_runs": "(raw, overrides, flags, size, angle, fallback)",
+    }
+    classes = {
+        "AnnotationGeometry": ("builtins", "(fragments)"),
+        "BaselineCandidates": ("builtins", "(bounds, groups)"),
+        "BaselineGeometryCandidates": ("builtins", "(bounds, groups, boxes, heights, sources)"),
+        "PdfiumCharacterBatches": ("docvortex._native", None),
+        "PdfiumReadError": ("_native", None),
+        "StableColumnClusters": ("builtins", "(compensated)"),
+        "TableNoteMetrics": ("builtins", "(items)"),
+        "TableRowGeometry": ("builtins", "(boxes)"),
+    }
+    constants = {"PROTOCOL_VERSION": 6, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
+    for name, signature in functions.items():
+        function = getattr(native, name)
+        assert callable(function)
+        assert function.__name__ == name
+        assert function.__module__ == "docvortex._native"
+        assert function.__text_signature__ == signature
+    for name, (module, signature) in classes.items():
+        cls = getattr(native, name)
+        assert isinstance(cls, type)
+        assert cls.__name__ == name
+        assert cls.__module__ == module
+        assert cls.__text_signature__ == signature
+    for name, value in constants.items():
+        assert getattr(native, name) == value
+    assert issubclass(native.PdfiumReadError, Exception)
+    rows = native.TableNoteMetrics([(0, 0.0, 1.0)]).prepare_rows([[]])
+    assert type(rows).__name__ == "TableNoteCore"
+    assert type(rows).__module__ == "builtins"
+
+
 @pytest.mark.parametrize("seed", range(40))
 def test_script_geometry_random_parity(native, seed):
     """随机改变字体、尺寸、基线和字符类别，覆盖组件分组及角色精炼。"""

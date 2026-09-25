@@ -1,5 +1,11 @@
 # Optional Rust PDF kernels
 
+See [Repository architecture](ARCHITECTURE.md) for the Python/Rust ownership boundary
+and binding-module layout. The current private extension protocol is **6**, shared by
+the Python loader and Rust core. Protocol 4 and 5 references below describe historical
+interfaces or rollout stages, not the current loader requirement. Rebuild editable
+native installs and restart existing processes after updating native sources.
+
 DocVortex keeps its Python API, document types, parsing decisions and PDFium runtime.
 The private `docvortex._native` extension accelerates batches of already materialized
 numbers and indices. It does not bundle or call a second PDFium library and does not

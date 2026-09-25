@@ -147,6 +147,9 @@ reads metadata without parsing the document body.
 
 ## Development
 
+See [Repository architecture](docs/ARCHITECTURE.md) for directory responsibilities,
+the Python/Rust boundary, and pure Python or native development commands.
+
 From a local checkout:
 
 ```bash

@@ -146,6 +146,8 @@ restored.export("output/report.epub", output_format="epub")
 
 ## 开发
 
+请先阅读[仓库架构](docs/ARCHITECTURE.md)，了解目录职责、Python/Rust 边界，以及纯 Python 和原生扩展的开发与验证命令。
+
 在本地仓库目录中运行：
 
 ```bash
