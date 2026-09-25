@@ -239,16 +239,152 @@ def _table_caption_candidates(
     return candidates
 
 
+class _PreparedAnnotationGeometry:
+    """为候选组共享原片段及坐标引用，查询不缓存候选结果。"""
+
+    def __init__(self, rows, native):
+        """仅记录首次出现的片段，重复选择在查询阶段保留原顺序。"""
+        self.selections = OrderedDict()
+        self.results = OrderedDict()
+        self.selection_weight = 0
+        self.result_weight = 0
+        self.fragments = []
+        self.positions = {}
+        self.sources = {}
+        records = []
+        self.native = None
+        for row in rows:
+            for fragment in row.fragments:
+                if id(fragment) in self.positions:
+                    continue
+                if type(fragment.line_index) is not int or any(
+                    type(box) not in (tuple, list)
+                    or len(box) != 4
+                    or any(type(v) is not float or not math.isfinite(v) or abs(v) > 1e100 for v in box)
+                    for box in (fragment.bbox, fragment.local_bbox)
+                ):
+                    return
+                self.positions[id(fragment)] = len(self.fragments)
+                self.fragments.append(fragment)
+                source = self.sources.setdefault(fragment.line_index, len(self.sources))
+                records.append((source, fragment.bbox, fragment.local_bbox))
+        self.source_values = list(self.sources)
+        self.native = native.AnnotationGeometry(records)
+
+    def build(self, kind, rows, excluded, local):
+        """按原顺序构造注释，未知片段或特殊输入明确交回参考路径。"""
+        if self.native is None or (
+            local is not None
+            and (
+                type(local) not in (tuple, list)
+                or len(local) != 4
+                or any(type(v) is not float or not math.isfinite(v) or abs(v) > 1e100 for v in local)
+            )
+        ):
+            return NotImplemented
+        if not rows:
+            return None
+        row_key = tuple(id(row) for row in rows)
+        selection = self.selections.get(row_key)
+        if selection is None:
+            selected = []
+            sources = set()
+            for row in rows:
+                for fragment in row.fragments:
+                    index = self.positions.get(id(fragment))
+                    if index is None or self.fragments[index] is not fragment:
+                        return NotImplemented
+                    selected.append(index)
+                    sources.add(fragment.line_index)
+            if len(selected) < 16:
+                return NotImplemented
+            selection = (tuple(rows), selected, frozenset(sources))
+            if len(selected) <= 16384:
+                self.selections[row_key] = selection
+                self.selection_weight += len(selected)
+                while len(self.selections) > 128 or self.selection_weight > 16384:
+                    _, previous = self.selections.popitem(last=False)
+                    self.selection_weight -= len(previous[1])
+        else:
+            self.selections.move_to_end(row_key)
+        selected = selection[1]
+        relevant_excluded = frozenset(excluded.intersection(selection[2]))
+        key = (kind, row_key, relevant_excluded, tuple(local) if local is not None else None)
+        cached = self.results.get(key)
+        if cached is not None:
+            self.results.move_to_end(key)
+            return self._clone(cached[1])
+        excluded_ids = [self.sources[value] for value in relevant_excluded]
+        lines, union = self.native.aggregate(selected, excluded_ids, local)
+        if union is None:
+            self._remember(key, selection[0], None)
+            return None
+        line_bboxes = {}
+        for source, indices, count in lines:
+            line_bboxes[self.source_values[source]] = (
+                self.fragments[indices[0]].bbox
+                if count == 1
+                else tuple(self.fragments[index].bbox[axis] for axis, index in enumerate(indices))
+            )
+        bbox = (
+            next(iter(line_bboxes.values()))
+            if len(lines) == 1
+            else tuple(self.fragments[index].bbox[axis] for axis, index in enumerate(union))
+        )
+        result = _TableAnnotation(kind=kind, bbox=bbox, line_indices=set(line_bboxes), line_bboxes=line_bboxes)
+        self._remember(key, selection[0], result)
+        return self._clone(result)
+
+    @staticmethod
+    def _clone(annotation):
+        """每个候选持有独立可变成员，合并器不能写入缓存快照。"""
+        if annotation is None:
+            return None
+        return _TableAnnotation(
+            kind=annotation.kind,
+            bbox=annotation.bbox,
+            line_indices=set(annotation.line_indices),
+            line_bboxes=dict(annotation.line_bboxes),
+        )
+
+    def _remember(self, key, rows, result):
+        """按来源总数和条目数双重限制缓存，淘汰只导致等价重算。"""
+        weight = max(1, len(result.line_bboxes)) if result is not None else 1
+        if weight > 16384:
+            return
+        self.results[key] = (rows, result, weight)
+        self.result_weight += weight
+        while len(self.results) > 128 or self.result_weight > 16384:
+            _, previous = self.results.popitem(last=False)
+            self.result_weight -= previous[2]
+
+
+def _prepare_annotation_geometry(rows):
+    """只为较大候选组准备一次数值快照，小页面保留原物化开销。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is None or len(rows) < 32:
+        return None
+    prepared = _PreparedAnnotationGeometry(rows, native)
+    return prepared if prepared.native is not None else None
+
+
 def _build_table_annotation(
     kind: Literal["caption", "footnote"],
     rows: list[_VisualRow],
     *,
     excluded_line_indices: set[int] | None = None,
     excluded_local_bbox: BBox | None = None,
+    prepared_geometry: _PreparedAnnotationGeometry | None = None,
 ) -> _TableAnnotation | None:
     """把已确认视觉行压缩成一个带精确来源行集合的表格注释记录。"""
 
     excluded_line_indices = excluded_line_indices or set()
+    if prepared_geometry is not None:
+        result = prepared_geometry.build(kind, rows, excluded_line_indices, excluded_local_bbox)
+        if result is not NotImplemented:
+            return result
     fragments = [
         fragment
         for row in rows

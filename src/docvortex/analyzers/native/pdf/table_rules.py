@@ -29,6 +29,7 @@ from .table_annotations import (
     _PreparedTableNoteBodyMetrics,
     _PreparedTableNoteRow,
     _build_table_annotation,
+    _prepare_annotation_geometry,
     _collect_caption_rows,
     _collect_footnote_rows,
     _find_table_caption,
@@ -82,6 +83,8 @@ class _RuleCandidateContext:
     grids: list | None = None
     grid_members: dict = field(default_factory=dict)
     core_indexes: dict = field(default_factory=dict)
+    row_bounds: dict = field(default_factory=dict)
+    annotation_geometry: Any = None
 
 
 @dataclass(slots=True)
@@ -100,6 +103,8 @@ class _RuleCandidateDraft:
     def materialize(self) -> _TableCandidate:
         """按参考规则物化当前候选，并复用本组网格成员后立即交给合并器。"""
         context = self.context
+        if context.annotation_geometry is None:
+            context.annotation_geometry = _prepare_annotation_geometry(context.rows) or False
         candidate = _expand_rule_table_candidate(
             self.boundaries,
             self.rows,
@@ -114,6 +119,7 @@ class _RuleCandidateDraft:
             self.note_rows,
             context.body_metrics,
             self.core_query,
+            context.annotation_geometry or None,
         )
         candidate.score = self.score
         if context.grids is None:
@@ -383,10 +389,14 @@ def _build_rule_table_candidates(
                     median_height,
                 ):
                     continue
+                corridor_key = (rule_bbox[0], rule_bbox[2])
+                if corridor_key not in context.row_bounds:
+                    context.row_bounds[corridor_key] = _RuleRowBounds([item.row for item in corridor_cache[corridor_key]])
                 if not _table_rows_align_with_rule_span(
                     row_segment,
                     rule_bbox,
                     median_height,
+                    context.row_bounds[corridor_key],
                 ):
                     continue
                 result = (
@@ -1141,16 +1151,58 @@ def _table_segment_reaches_boundaries(
     return top_gap <= maximum_gap and bottom_gap <= maximum_gap
 
 
+class _RuleRowBounds:
+    """保存走廊行框索引，只接受身份与顺序完全连续的查询。"""
+
+    def __init__(self, rows):
+        """一次构建有限行框极值树，特殊值和小页面不建立索引。"""
+        from ...._compute_backend import get_native
+
+        self.rows = rows
+        self.positions = {id(row): i for i, row in enumerate(rows)}
+        self.native = None
+        native = get_native()
+        if (
+            native is not None
+            and len(rows) >= 32
+            and len(self.positions) == len(rows)
+            and all(
+                type(row.bbox) in (tuple, list)
+                and len(row.bbox) == 4
+                and all(type(v) is float and math.isfinite(v) for v in row.bbox)
+                for row in rows
+            )
+        ):
+            self.native = native.TableRowGeometry([row.bbox for row in rows])
+
+    def bbox(self, rows):
+        """保持重复和非连续行的原遍历；极值来源仍引用原坐标对象。"""
+        if self.native is None or not rows:
+            return None
+        start = self.positions.get(id(rows[0]))
+        if (
+            start is None
+            or start + len(rows) > len(self.rows)
+            or any(row is not self.rows[start + offset] for offset, row in enumerate(rows))
+        ):
+            return None
+        indices = self.native.union_indices(start, start + len(rows))
+        return tuple(self.rows[index].bbox[axis] for axis, index in enumerate(indices))
+
+
 def _table_rows_align_with_rule_span(
     rows: list[_VisualRow],
     rule_bbox: BBox,
     median_height: float,
+    prepared_bounds: _RuleRowBounds | None = None,
 ) -> bool:
     """校验数据行总体跨度与横线走廊重叠，拒绝仅在边缘偶遇的多列文本。"""
 
     if not rows:
         return False
-    rows_bbox = _bbox_union_many([row.bbox for row in rows])
+    rows_bbox = prepared_bounds.bbox(rows) if prepared_bounds is not None else None
+    if rows_bbox is None:
+        rows_bbox = _bbox_union_many([row.bbox for row in rows])
     rule_width = max(0.1, rule_bbox[2] - rule_bbox[0])
     rows_width = max(0.1, rows_bbox[2] - rows_bbox[0])
     overlap = max(
@@ -1389,6 +1441,7 @@ def _expand_rule_table_candidate(
     prepared_note_rows: list[_PreparedTableNoteRow] | None = None,
     prepared_note_body_metrics: _PreparedTableNoteBodyMetrics | None = None,
     prepared_core: Any = None,
+    prepared_annotation_geometry: Any = None,
 ) -> _TableCandidate:
     """合并横线核心与上下注释，并保留注释的独立行身份。"""
 
@@ -1422,11 +1475,13 @@ def _expand_rule_table_candidate(
         caption_rows,
         excluded_line_indices=core_line_indices,
         excluded_local_bbox=core_local_bbox,
+        prepared_geometry=prepared_annotation_geometry,
     )
     footnote_annotation = _build_table_annotation(
         "footnote",
         footnote_rows,
         excluded_line_indices=core_line_indices,
+        prepared_geometry=prepared_annotation_geometry,
     )
     annotations = [annotation for annotation in (caption_annotation, footnote_annotation) if annotation is not None]
     annotation_line_indices = (

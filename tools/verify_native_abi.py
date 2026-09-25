@@ -17,6 +17,15 @@ def verify_binary(binary: Path) -> None:
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
     assert native.PROTOCOL_VERSION == 6
+    baseline = native.BaselineGeometryCandidates(
+        [(0, 10), (0, 10)], [0, 0], [(0, 0, 10, 10), (11, 0, 20, 10)], [10, 10], [None, None]
+    )
+    assert baseline.rows(0, 64, 8192) == [[1], []]
+    assert native.inline_script_matches([((10, 0, 12, 4), 4, 4, 1, False, 0, 0), ((0, 2, 10, 12), 10, 10, 1, False, 1, 0)]) == [
+        (0, 1, False, False)
+    ]
+    annotations = native.AnnotationGeometry([(0, (0, 0, 2, 2), (0, 0, 2, 2))])
+    assert annotations.aggregate([0], [], None) == ([(0, [0, 0, 0, 0], 1)], [0, 0, 0, 0])
     columns = native.StableColumnClusters(sys.version_info >= (3, 12))
     assert columns.extend([[(0.0, 1.0)], [(0.0, 1.0)]], 3.0) == (1, 1.0)
     metrics = native.TableNoteMetrics([(0, 0.0, 1.0), (1, 1.0, 2.0), (2, 2.0, 3.0), (3, 3.0, 4.0)])

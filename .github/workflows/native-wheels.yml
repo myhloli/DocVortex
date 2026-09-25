@@ -47,7 +47,7 @@ jobs:
           CIBW_ENVIRONMENT_LINUX: 'PATH="/opt/docvortex-cargo/bin:$PATH" CARGO_HOME=/opt/docvortex-cargo RUSTUP_HOME=/opt/docvortex-rustup DOCVORTEX_BUILD_NATIVE=1 DOCVORTEX_COMPUTE_BACKEND=rust'
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment }}
           CIBW_TEST_REQUIRES: pytest psutil
-          CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_native_statistics.py {project}/tests/test_native_round3.py {project}/tests/test_native_round4.py {project}/tests/test_pdfium_bridge.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q && python -m pip install pypdfium2==5.10.1 && python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo2.pdf && python -m pytest {project}/tests/test_pdfium_bridge.py {project}/tests/test_native_round4.py -q
+          CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_native_statistics.py {project}/tests/test_native_round3.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py {project}/tests/test_pdfium_bridge.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q && python -m pip install pypdfium2==5.10.1 && python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo2.pdf && python -m pytest {project}/tests/test_pdfium_bridge.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py -q
         run: uvx --from "cibuildwheel>=3.1,<4" cibuildwheel --output-dir wheelhouse
       - name: Verify binary ABI on Python 3.14 without optional application dependencies
         run: uv run --no-project --python 3.14 python tools/verify_native_abi.py wheelhouse
@@ -66,7 +66,7 @@ jobs:
         run: |
           uv run --no-project --python ${{ matrix.smoke }} python tools/generate_dense_pdf.py dense-table.pdf
           uv run --no-project --python ${{ matrix.smoke }} python tools/verify_native_wheel.py dense-table.pdf
-          uv run --no-project --python ${{ matrix.smoke }} python -m pytest tests/test_pdfium_bridge.py tests/test_native_round3.py tests/test_native_round4.py -q
+          uv run --no-project --python ${{ matrix.smoke }} python -m pytest tests/test_pdfium_bridge.py tests/test_native_round3.py tests/test_native_round4.py tests/test_native_round5.py -q
       - name: Compare public parsing performance and full outputs
         run: |
           uv run --no-project --python ${{ matrix.smoke }} python tests/benchmarks/rust_pdf.py --backend python --suite public --output bench-python

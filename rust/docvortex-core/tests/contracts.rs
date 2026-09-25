@@ -70,3 +70,43 @@ fn raised_digit_follows_body_baseline() {
     ];
     assert_eq!(scripts::classify(records), Some(vec![0, 0, 1]));
 }
+
+/// 普通框不相邻时，原始行框仍可保留连续字符路径。
+#[test]
+fn baseline_keeps_original_source_branch() {
+    let index = docvortex_core::spatial::BaselineGeometry::new(
+        vec![(0.0, 12.5), (0.0, 12.5)],
+        vec![0, 0],
+        vec![[0.0, 0.0, 1.0, 1.0], [50.0, 0.0, 51.0, 1.0]],
+        vec![1.0, 1.0],
+        vec![Some([0.0, 0.0, 10.0, 10.0]), Some([10.0, 0.0, 20.0, 10.0])],
+    )
+    .unwrap();
+    assert_eq!(index.rows(0, 64, 8192), vec![vec![1], vec![]]);
+}
+
+/// 同分竞争必须选首个小行与首个主体，不随排序实现改变。
+#[test]
+fn inline_ties_are_stable() {
+    let a = ([10.0, 0.0, 12.0, 4.0], 4.0, 4.0, 1, false, 0, 0);
+    let b = ([0.0, 2.0, 10.0, 12.0], 10.0, 10.0, 1, false, 1, 0);
+    assert_eq!(
+        docvortex_core::inline_pairs::matches(vec![a, b, a, b]),
+        Some(vec![(0, 1, false, false)])
+    );
+}
+
+/// 聚合平局选择首坐标来源，重复来源不改变输出成员顺序。
+#[test]
+fn annotation_union_preserves_first_coordinate() {
+    let index = docvortex_core::annotation_geometry::AnnotationGeometry::new(vec![
+        (8, [-0.0, 0.0, 1.0, 1.0], [-0.0, 0.0, 1.0, 1.0]),
+        (8, [0.0, 0.0, 2.0, 1.0], [0.0, 0.0, 2.0, 1.0]),
+        (3, [0.0, 0.0, 2.0, 1.0], [0.0, 0.0, 2.0, 1.0]),
+    ])
+    .unwrap();
+    let (lines, bbox) = index.aggregate(vec![0, 1, 2], vec![], None).unwrap();
+    assert_eq!(lines, vec![(8, [0, 0, 1, 0], 2), (3, [2, 2, 2, 2], 1)]);
+    assert_eq!(bbox, Some([0, 0, 1, 0]));
+    assert!(index.aggregate(vec![3], vec![], None).is_none());
+}

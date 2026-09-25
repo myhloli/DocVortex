@@ -213,6 +213,38 @@ fn inline_script_matches(
     py.detach(|| docvortex_core::inline_pairs::matches(records))
 }
 
+/// 持有走廊片段的纯数值快照，不保留 Python 或 PDF 句柄。
+#[pyclass(frozen)]
+struct AnnotationGeometry {
+    index: docvortex_core::annotation_geometry::AnnotationGeometry,
+}
+#[pymethods]
+impl AnnotationGeometry {
+    /// 一次验证并打包片段几何，未知输入由 Python 参考实现处理。
+    #[new]
+    fn new(
+        py: Python<'_>,
+        fragments: Vec<docvortex_core::annotation_geometry::Fragment>,
+    ) -> PyResult<Self> {
+        py.detach(|| docvortex_core::annotation_geometry::AnnotationGeometry::new(fragments))
+            .map(|index| Self { index })
+            .ok_or_else(|| {
+                pyo3::exceptions::PyValueError::new_err("unsupported annotation geometry")
+            })
+    }
+    /// 返回保序来源和坐标索引；非法查询不会静默产生部分结果。
+    fn aggregate(
+        &self,
+        py: Python<'_>,
+        selected: Vec<usize>,
+        excluded: Vec<usize>,
+        local: Option<Box4>,
+    ) -> PyResult<docvortex_core::annotation_geometry::Output> {
+        py.detach(|| self.index.aggregate(selected, excluded, local))
+            .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("invalid annotation query"))
+    }
+}
+
 /// 批量聚类仅返回索引，避免为簇成员复制坐标与公开对象。
 #[pyfunction]
 fn ordered_clusters(
@@ -737,6 +769,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<StableColumnClusters>()?;
     module.add_class::<TableRowGeometry>()?;
     module.add_class::<BaselineGeometryCandidates>()?;
+    module.add_class::<AnnotationGeometry>()?;
     module.add_function(wrap_pyfunction!(inline_script_matches, module)?)?;
     module.add_function(wrap_pyfunction!(ordered_clusters, module)?)?;
     module.add_function(wrap_pyfunction!(typography_metrics, module)?)?;

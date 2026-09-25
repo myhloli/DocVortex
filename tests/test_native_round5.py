@@ -144,3 +144,122 @@ def test_inline_ties_keep_first_source(size):
     base = ((0.0, 2.0, 10.0, 12.0), 10.0, 10.0, 1, False, 1, 0)
     records = [small, base] * size
     assert native.inline_script_matches(records) == ([(0, 1, False, False)] if size else [])
+
+
+@pytest.mark.parametrize("seed", range(24))
+def test_annotation_geometry_matches_ordered_reference(seed):
+    """覆盖重复来源、片段重排、排除和正负零，逐位保留原坐标。"""
+    import struct
+    from types import SimpleNamespace
+    from docvortex.analyzers.native.pdf import table_annotations as notes
+
+    native = get_native()
+    if native is None:
+        pytest.skip("native backend is not selected")
+    rng = random.Random(seed)
+    rows = []
+    for i in range(48):
+        fragments = []
+        for j in range(4):
+            box = tuple(rng.choice([-0.0, 0.0, 1.0, 2.0, 5.0, 10.0]) for _ in range(4))
+            fragments.append(SimpleNamespace(line_index=rng.choice([-5, 10**30, 0, 2, 4, 9]), bbox=box, local_bbox=box))
+        rows.append(SimpleNamespace(fragments=fragments))
+    prepared = notes._PreparedAnnotationGeometry(rows, native)
+    for selected in (rows, rows[::-1], rows[::2], rows[:8] + rows[:8]):
+        for local in (None, (-0.0, 1.0, 3.0, 5.0)):
+            kwargs = dict(excluded_line_indices={2, 10**30}, excluded_local_bbox=local)
+            expected = notes._build_table_annotation("footnote", selected, **kwargs)
+            actual = notes._build_table_annotation("footnote", selected, prepared_geometry=prepared, **kwargs)
+            assert actual == expected
+            if actual is not None:
+                assert list(actual.line_bboxes) == list(expected.line_bboxes)
+                assert struct.pack("4d", *actual.bbox) == struct.pack("4d", *expected.bbox)
+                for key in actual.line_bboxes:
+                    assert struct.pack("4d", *actual.line_bboxes[key]) == struct.pack("4d", *expected.line_bboxes[key])
+                    assert all(a is b for a, b in zip(actual.line_bboxes[key], expected.line_bboxes[key]))
+
+
+def test_annotation_keeps_single_fragment_bbox_identity():
+    """单片段来源保留框对象，重复选中的来源则保留原来的坐标引用。"""
+    from types import SimpleNamespace
+    from docvortex.analyzers.native.pdf import table_annotations as notes
+
+    native = get_native()
+    if native is None:
+        pytest.skip("native backend is not selected")
+    fragments = [
+        SimpleNamespace(line_index=i, bbox=(float(i), 0.0, float(i + 1), 1.0), local_bbox=(float(i), 0.0, float(i + 1), 1.0))
+        for i in range(32)
+    ]
+    rows = [SimpleNamespace(fragments=fragments)]
+    prepared = notes._PreparedAnnotationGeometry(rows, native)
+    result = notes._build_table_annotation("caption", rows, prepared_geometry=prepared)
+    assert all(result.line_bboxes[i] is fragment.bbox for i, fragment in enumerate(fragments))
+    unknown = [
+        SimpleNamespace(fragments=[SimpleNamespace(line_index=0, bbox=(0.0, 0.0, 1.0, 1.0), local_bbox=(0.0, 0.0, 1.0, 1.0))])
+    ]
+    assert prepared.build("caption", unknown, set(), None) is NotImplemented
+
+
+def test_rule_bounds_noncontiguous_and_repeated_rows():
+    """只允许完全连续的原行身份查询，其余输入不借用区间极值。"""
+    from types import SimpleNamespace
+    from docvortex.analyzers.native.pdf.table_rules import _RuleRowBounds
+
+    rows = [SimpleNamespace(bbox=(float(i), -0.0, float(i + 2), 3.0)) for i in range(40)]
+    index = _RuleRowBounds(rows)
+    if get_native() is not None:
+        box = index.bbox(rows[2:8])
+        assert box == (2.0, -0.0, 9.0, 3.0)
+        assert box[1] is rows[2].bbox[1]
+    for selected in (rows[::-1], rows[::2], [rows[0], rows[0]]):
+        assert index.bbox(selected) is None
+
+
+def test_original_source_geometry_survives_ordinary_rejection():
+    """原始字符连续分支可跨修复后的 ink 间距，普通框不能提前否决。"""
+    lines = make_lines(0, 32)
+    first = _LineItem("a", (0.0, 0.0, 1.0, 1.0), 0, 0, chars=[{"source_indices": (0,)}])
+    second = _LineItem("b", (50.0, 0.0, 51.0, 1.0), 0, 1, chars=[{"source_indices": (1,)}])
+    first.source_bbox, second.source_bbox = (0.0, 0.0, 10.0, 10.0), (10.0, 0.0, 20.0, 10.0)
+    first.baseline = second.baseline = 10.0
+    first.effective_height = second.effective_height = 1.0
+    first.visual_row_id, second.visual_row_id = 0, 1
+    lines[:2] = [first, second]
+    boxes = [line.bbox for line in lines]
+    candidates = merging._same_baseline_candidate_pairs(lines, boxes, {0: list(range(32))})
+    assert merging._can_merge_same_baseline_pair(first, boxes[0], second, boxes[1], [])
+    assert 1 in candidates[0]
+
+
+def test_annotation_cache_is_bounded_and_not_mutated_by_consumers():
+    """缓存只读快照，单个候选修改不能污染重用结果，淘汰不能删候选。"""
+    from types import SimpleNamespace
+    from docvortex.analyzers.native.pdf import table_annotations as notes
+
+    native = get_native()
+    if native is None:
+        pytest.skip("native backend is not selected")
+    rows = [
+        SimpleNamespace(
+            fragments=[
+                SimpleNamespace(
+                    line_index=i, bbox=(float(i), 0.0, float(i + 1), 1.0), local_bbox=(float(i), 0.0, float(i + 1), 1.0)
+                )
+            ]
+        )
+        for i in range(180)
+    ]
+    prepared = notes._PreparedAnnotationGeometry(rows, native)
+    first = prepared.build("footnote", rows, set(), None)
+    expected = dict(first.line_bboxes)
+    first.line_bboxes.clear()
+    first.line_indices.clear()
+    assert prepared.build("footnote", rows, set(), None).line_bboxes == expected
+    for i in range(150):
+        selected = rows[i:]
+        actual = notes._build_table_annotation("footnote", selected, prepared_geometry=prepared)
+        assert actual == notes._build_table_annotation("footnote", selected)
+    assert len(prepared.selections) <= 128 and len(prepared.results) <= 128
+    assert prepared.selection_weight <= 16384 and prepared.result_weight <= 16384
+    assert prepared.build("footnote", rows, set(), None).line_bboxes == expected
