@@ -175,6 +175,35 @@ impl BaselineCandidates {
     }
 }
 
+/// 在一次调用内过滤同行几何，保留原始行框的独立准入路径。
+#[pyclass(frozen)]
+struct BaselineGeometryCandidates {
+    index: docvortex_core::spatial::BaselineGeometry,
+}
+#[pymethods]
+impl BaselineGeometryCandidates {
+    /// 创建验证后的只读索引，拒绝不支持的传输记录。
+    #[new]
+    fn new(
+        py: Python<'_>,
+        bounds: Vec<(f64, f64)>,
+        groups: Vec<usize>,
+        boxes: Vec<Box4>,
+        heights: Vec<f64>,
+        sources: Vec<Option<Box4>>,
+    ) -> PyResult<Self> {
+        py.detach(|| {
+            docvortex_core::spatial::BaselineGeometry::new(bounds, groups, boxes, heights, sources)
+        })
+        .map(|index| Self { index })
+        .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("unsupported baseline geometry"))
+    }
+    /// 返回当前原始行序的有限批次，不保存整页行对。
+    fn rows(&self, py: Python<'_>, start: usize, count: usize, budget: usize) -> Vec<Vec<usize>> {
+        py.detach(|| self.index.rows(start, count, budget))
+    }
+}
+
 /// 批量聚类仅返回索引，避免为簇成员复制坐标与公开对象。
 #[pyfunction]
 fn ordered_clusters(
@@ -698,6 +727,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<TableNoteMetrics>()?;
     module.add_class::<StableColumnClusters>()?;
     module.add_class::<TableRowGeometry>()?;
+    module.add_class::<BaselineGeometryCandidates>()?;
     module.add_function(wrap_pyfunction!(ordered_clusters, module)?)?;
     module.add_function(wrap_pyfunction!(typography_metrics, module)?)?;
     module.add_function(wrap_pyfunction!(lane_gap, module)?)?;

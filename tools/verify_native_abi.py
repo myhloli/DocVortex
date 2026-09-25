@@ -16,7 +16,7 @@ def verify_binary(binary: Path) -> None:
     assert spec is not None and spec.loader is not None
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
-    assert native.PROTOCOL_VERSION == 5
+    assert native.PROTOCOL_VERSION == 6
     columns = native.StableColumnClusters(sys.version_info >= (3, 12))
     assert columns.extend([[(0.0, 1.0)], [(0.0, 1.0)]], 3.0) == (1, 1.0)
     metrics = native.TableNoteMetrics([(0, 0.0, 1.0), (1, 1.0, 2.0), (2, 2.0, 3.0), (3, 3.0, 4.0)])

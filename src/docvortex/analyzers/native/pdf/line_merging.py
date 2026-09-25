@@ -38,6 +38,27 @@ def _caption_crosses_left_text(members: list[_LineItem]) -> bool:
     )
 
 
+def _safe_candidate_box(box) -> bool:
+    """仅让有限普通坐标进入几何预筛选，特殊数值保留参考遍历。"""
+    return (
+        type(box) in (tuple, list)
+        and len(box) == 4
+        and all(type(v) in (int, float) and math.isfinite(v) and abs(v) <= 1e100 for v in box)
+        and box[2] > box[0]
+        and box[3] > box[1]
+    )
+
+
+def _overlapping_candidate_pairs(members):
+    """纵向区间是重叠连接的必要条件，原行序及最终判断保持不变。"""
+    if len(members) <= 16 or any(not _safe_candidate_box(box) for _, box in members):
+        return None
+    groups = {}
+    for i, (line, _) in enumerate(members):
+        groups.setdefault((line.angle, line.formula_candidate_only, line.semantic_type), []).append(i)
+    return IntervalCandidates([(box[1], box[3]) for _, box in members], groups)
+
+
 def _same_baseline_candidate_pairs(
     lines: list[_LineItem],
     local_bboxes: list[BBox],
@@ -65,6 +86,18 @@ def _same_baseline_candidate_pairs(
         except (TypeError, ValueError, IndexError):
             return None
         bounds.append((low, high))
+
+    from ...._compute_backend import get_native
+
+    if len(lines) >= 32 and get_native() is not None:
+        heights = [_line_effective_height(line, box) for line, box in zip(lines, local_bboxes)]
+        sources = [line.source_bbox if line.angle == 0 and line.baseline is not None else None for line in lines]
+        if (
+            all(_safe_candidate_box(box) for box in local_bboxes)
+            and all(box is None or _safe_candidate_box(box) for box in sources)
+            and all(type(h) in (int, float) and math.isfinite(h) and abs(h) <= 1e100 for h in heights)
+        ):
+            return IntervalCandidates(bounds, compatible_indices, geometry=(local_bboxes, heights, sources))
 
     candidates: list[list[int]] = [[] for _ in lines]
     pair_count = 0
@@ -211,8 +244,12 @@ def _merge_overlapping_inline_text_clusters(
                 if first_root != second_root:
                     parents[second_root] = first_root
 
+            candidate_pairs = _overlapping_candidate_pairs(lane.lines)
             for first_index, first in enumerate(lane.lines):
-                for second_index in range(first_index + 1, len(lane.lines)):
+                partners = (
+                    candidate_pairs[first_index] if candidate_pairs is not None else range(first_index + 1, len(lane.lines))
+                )
+                for second_index in partners:
                     second = lane.lines[second_index]
                     if _overlapping_inline_cluster_pair_is_connected(
                         first,
