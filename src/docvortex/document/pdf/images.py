@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import atexit
+import gc
 import math
 import multiprocessing
 import os
@@ -132,12 +133,16 @@ def _load_visual_crops_worker(pdf_bytes, dpi, start_page_id, end_page_id, prepar
     """在渲染进程内裁剪并编码视觉素材，只向父进程传递原块索引和 JPEG。"""
     from .visuals import _attach_prepared_visual_block_images
 
-    images = load_images_from_pdf_core(pdf_bytes, dpi, start_page_id, end_page_id, ImageType.PIL)
+    images = None
     try:
+        images = load_images_from_pdf_core(pdf_bytes, dpi, start_page_id, end_page_id, ImageType.PIL)
         _attach_prepared_visual_block_images(prepared_pages, images, start_page_id)
         return [[(index, block.get("image_base64")) for index, block in page] for page in prepared_pages]
     finally:
         _close_image_dicts(images)
+        # PDFium 句柄已关闭，但 PdfDocument/PdfPage 的近期循环引用仍可持有整份
+        # PDF 输入。每个 worker 任务回收年轻代，避免依赖自动 GC 时机累积大载荷。
+        gc.collect(0)
 
 
 def _load_visual_crops_from_pdf_bytes_range(pdf_bytes, prepared_pages, start_page_id, end_page_id, timeout, threads):

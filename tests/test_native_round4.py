@@ -198,3 +198,57 @@ def test_note_prefix_skip_preserves_chain(native):
     actual = notes._collect_footnote_rows(*args, prepared_rows=prepared)
     assert actual == expected
     assert all(a is b for a, b in zip(actual, expected))
+
+
+@pytest.mark.parametrize("fail", [False, True])
+def test_visual_worker_releases_recent_cycles(monkeypatch, fail):
+    """成功和异常任务均回收近期闭环载荷，不依赖自动 GC 计数或改变编码结果。"""
+    import gc
+    import weakref
+    from docvortex.document.pdf import images, visuals
+
+    references = []
+    closed = []
+    generations = []
+    collect = gc.collect
+
+    def record_collection(generation=2):
+        """确认异常清理也到达回收边界，成功路径另外验证载荷确实已释放。"""
+        generations.append(generation)
+        return collect(generation)
+
+    class Payload:
+        """模拟已关闭 PDF 包装对象仍持有输入数据的循环引用。"""
+
+        def __init__(self):
+            """创建仅循环 GC 可回收的载荷，不保留测试侧强引用。"""
+            self.self_ref = self
+            self.data = b"x" * 100_000
+
+    def load(*args):
+        """模拟渲染期间产生的近期环，异常时也不得在 worker 中一直积累。"""
+        payload = Payload()
+        references.append(weakref.ref(payload))
+        if fail:
+            raise ValueError("render failure")
+        return []
+
+    monkeypatch.setattr(images, "load_images_from_pdf_core", load)
+    monkeypatch.setattr(images.gc, "collect", record_collection)
+    monkeypatch.setattr(images, "_close_image_dicts", lambda value: closed.append(value))
+    monkeypatch.setattr(visuals, "_attach_prepared_visual_block_images", lambda *args: None)
+    enabled = gc.isenabled()
+    gc.disable()
+    try:
+        if fail:
+            with pytest.raises(ValueError, match="render failure"):
+                images._load_visual_crops_worker(b"pdf", 200, 0, 0, [])
+        else:
+            assert images._load_visual_crops_worker(b"pdf", 200, 0, 0, []) == []
+            assert references[0]() is None
+        assert len(closed) == 1
+        assert generations == [0]
+    finally:
+        if enabled:
+            gc.enable()
+        collect()

@@ -63,6 +63,10 @@ immutable Unicode features; they do not retain documents or use object addresses
 - Visual assets: the existing rendering workers crop, orient and JPEG-encode images,
   returning indexed encoded blocks instead of full-page pixels. Scheduling limits,
   timeout/recovery, crop/encoding parameters and public asset bytes are preserved.
+  After a crop task closes its images, the worker collects the youngest Python GC
+  generation: closed pypdfium2 document/page reference cycles can otherwise retain
+  whole PDF inputs across tasks. This does not change PDFium handle ownership or
+  require allocator-specific memory trimming.
 
 ## Development and distribution
 
