@@ -933,20 +933,59 @@ def _native_typographic_scale(line: _LineItem) -> float:
     )
 
 
-def _merge_native_inline_scripts(
-    lines: list[_LineItem],
-    page_size: tuple[float, float],
-) -> list[_LineItem]:
-    """以 mutual-nearest 规则把跨粗行的小字号前后置标记合入主体视觉行。"""
-
-    candidates: list[tuple[float, int, int, Literal["prefix", "suffix"]]] = []
-    detached_candidate_pairs: set[tuple[int, int, Literal["prefix", "suffix"]]] = set()
+def _native_inline_script_matches(lines, page_size):
+    """每次配对重新准备只读输入，特殊对象和值仍交给原 Python 规则。"""
     # 候选生成期间行不会修改，按本轮索引缓存字符统计，避免每对行重算字号中位数。
     compact_texts = ["".join(char for char in line.text if not char.isspace()) for line in lines]
     reference_markers = [_INLINE_REFERENCE_MARKER_RE.fullmatch(text) is not None for text in compact_texts]
     local_bboxes = [_rotate_bbox_to_upright(line.bbox, page_size, line.angle) for line in lines]
     canonical_scales = [_native_typographic_scale(line) for line in lines]
 
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is not None and len(lines) >= 16:
+        records = []
+        row_ids, angles = {}, {}
+        for i, line in enumerate(lines):
+            box = local_bboxes[i]
+            values = (*box, line.effective_height, canonical_scales[i])
+            if (
+                any(type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 1e100 for v in values)
+                or box[2] <= box[0]
+                or box[3] <= box[1]
+                or type(line.angle) is not int
+                or (line.visual_row_id is not None and type(line.visual_row_id) is not int)
+            ):
+                break
+            records.append(
+                (
+                    box,
+                    line.effective_height,
+                    canonical_scales[i],
+                    len(compact_texts[i]),
+                    reference_markers[i],
+                    row_ids.setdefault(line.visual_row_id, len(row_ids)),
+                    angles.setdefault(line.angle, len(angles)),
+                )
+            )
+        else:
+            result = native.inline_script_matches(records)
+            if result is not None:
+                matches, detached_pairs = {}, set()
+                for small, base, prefix, detached in result:
+                    position = "prefix" if prefix else "suffix"
+                    matches.setdefault(base, {})[position] = small
+                    if detached:
+                        detached_pairs.add((small, base, position))
+                return matches, detached_pairs
+    return _inline_script_matches_python(lines, compact_texts, reference_markers, local_bboxes, canonical_scales)
+
+
+def _inline_script_matches_python(lines, compact_texts, reference_markers, local_bboxes, canonical_scales):
+    """保留原逐对打分和首命中规则，作为回退及独立差分参考。"""
+    candidates: list[tuple[float, int, int, Literal["prefix", "suffix"]]] = []
+    detached_candidate_pairs: set[tuple[int, int, Literal["prefix", "suffix"]]] = set()
     # 上下标只能贴近主体行的左右边缘。按文本方向分别建立左右边缘索引，
     # 先取可能相邻的安全超集，再复用下面完整判定，避免密集表格页做 O(n²) 全配对。
     left_edge_index: dict[int, list[tuple[float, int]]] = {}
@@ -1075,6 +1114,17 @@ def _merge_native_inline_scripts(
     for small_index, (_metric, base_index, position) in best_base_for_small.items():
         if best_small_for_base.get((base_index, position), (math.inf, -1))[1] == small_index:
             matches.setdefault(base_index, {})[position] = small_index
+
+    return matches, detached_candidate_pairs
+
+
+def _merge_native_inline_scripts(
+    lines: list[_LineItem],
+    page_size: tuple[float, float],
+) -> list[_LineItem]:
+    """以 mutual-nearest 规则把跨粗行的小字号前后置标记合入主体视觉行。"""
+
+    matches, detached_candidate_pairs = _native_inline_script_matches(lines, page_size)
 
     consumed_small_indices = {small_index for positions in matches.values() for small_index in positions.values()}
     merged_base_indices: set[int] = set()

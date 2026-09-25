@@ -36,3 +36,5 @@ pub fn quantile(mut values: Vec<f64>, fraction: f64) -> f64 {
 }
 
 pub mod statistics;
+
+pub mod inline_pairs;

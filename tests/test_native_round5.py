@@ -98,3 +98,49 @@ def test_native_baseline_geometry_is_used():
     groups = {0: list(range(len(lines)))}
     candidates = merging._same_baseline_candidate_pairs(lines, boxes, groups)
     assert type(candidates.native).__name__ == "BaselineGeometryCandidates"
+
+
+@pytest.mark.parametrize("seed", range(40))
+def test_inline_matches_and_materialization_match_python(seed, monkeypatch):
+    """对同分候选、前后缀及多级标记比较完整物化结果与原实现。"""
+    from docvortex import _compute_backend
+    from docvortex.analyzers.native.pdf import native_text
+
+    rng = random.Random(seed)
+    lines = make_lines(seed, 100)
+    for i, line in enumerate(lines):
+        line.text = rng.choice(["a", "１２", "12", "中文", "x2", "", "long reference"])
+        line.effective_height = rng.choice([3.0, 4.0, 6.0, 10.0, 15.0])
+        line.chars = [{"char": line.text, "bbox": line.bbox, "font": {"name": "A", "size": rng.choice([4.0, 6.0, 10.0, 15.0])}}]
+    actual = native_text._merge_native_inline_scripts(deepcopy(lines), (100.0, 100.0))
+    monkeypatch.setattr(_compute_backend, "get_native", lambda: None)
+    expected = native_text._merge_native_inline_scripts(deepcopy(lines), (100.0, 100.0))
+    assert actual == expected
+
+
+def test_inline_kernel_is_used(monkeypatch):
+    """普通批次不得绕过已加载内核，匹配列表空也需要真正执行原生函数。"""
+    from docvortex.analyzers.native.pdf import native_text
+
+    if get_native() is None:
+        pytest.skip("native backend is not selected")
+
+    def forbidden(*args):
+        """使错误的静默 Python 回退明确失败。"""
+        raise AssertionError("reference path executed")
+
+    monkeypatch.setattr(native_text, "_inline_script_matches_python", forbidden)
+    native_text._merge_native_inline_scripts(make_lines(3), (100.0, 100.0))
+
+
+@pytest.mark.parametrize("size", [0, 1, 16, 200])
+def test_inline_ties_keep_first_source(size):
+    """完全重合的候选不能因 Rust 排序平局而改选后面的来源。"""
+    native = get_native()
+    if native is None:
+        pytest.skip("native backend is not selected")
+    # 前一个小行及主体应赢得所有相同度量的竞争。
+    small = ((10.0, 0.0, 12.0, 4.0), 4.0, 4.0, 1, False, 0, 0)
+    base = ((0.0, 2.0, 10.0, 12.0), 10.0, 10.0, 1, False, 1, 0)
+    records = [small, base] * size
+    assert native.inline_script_matches(records) == ([(0, 1, False, False)] if size else [])

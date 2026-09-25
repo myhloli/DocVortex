@@ -204,6 +204,15 @@ impl BaselineGeometryCandidates {
     }
 }
 
+/// 批量计算行内上下标双向最近配对，Python 继续负责递归物化。
+#[pyfunction]
+fn inline_script_matches(
+    py: Python<'_>,
+    records: Vec<docvortex_core::inline_pairs::Record>,
+) -> Option<Vec<(usize, usize, bool, bool)>> {
+    py.detach(|| docvortex_core::inline_pairs::matches(records))
+}
+
 /// 批量聚类仅返回索引，避免为簇成员复制坐标与公开对象。
 #[pyfunction]
 fn ordered_clusters(
@@ -728,6 +737,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<StableColumnClusters>()?;
     module.add_class::<TableRowGeometry>()?;
     module.add_class::<BaselineGeometryCandidates>()?;
+    module.add_function(wrap_pyfunction!(inline_script_matches, module)?)?;
     module.add_function(wrap_pyfunction!(ordered_clusters, module)?)?;
     module.add_function(wrap_pyfunction!(typography_metrics, module)?)?;
     module.add_function(wrap_pyfunction!(lane_gap, module)?)?;
