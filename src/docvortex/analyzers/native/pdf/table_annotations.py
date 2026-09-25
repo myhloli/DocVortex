@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import statistics
 import math
 import unicodedata
@@ -43,6 +43,92 @@ class _PreparedTableNoteBodyMetrics:
     items: tuple[tuple[int, float, float], ...]
     centers: tuple[float, ...]
     native: Any = None
+
+
+@dataclass(slots=True)
+class _PreparedTableCoreRows:
+    """保存一个走廊的原始行引用和来源倒排索引，不跨候选构建缓存。"""
+
+    rows: list[_VisualRow]
+    positions: dict[int, int]
+    source_rows: dict[int, list[int]]
+    native: Any
+    marker_positions: dict[str, list[int]] = field(default_factory=dict)
+    marker_safe: bool = False
+
+    def interval(self, rows: list[_VisualRow]) -> tuple[int, int] | None:
+        """只有完全相同、连续且顺序一致的行引用才能使用区间描述。"""
+        if not rows:
+            return None
+        start = self.positions.get(id(rows[0]))
+        if start is None or start + len(rows) > len(self.rows):
+            return None
+        if any(row is not self.rows[start + offset] for offset, row in enumerate(rows)):
+            return None
+        return start, start + len(rows)
+
+    def references(self, marker, start, end, lines, page_size, angle, marker_cache):
+        """Python 语义只算一次，再用来源对应行的有序位置查询精确候选范围。"""
+        positions = self.marker_positions.get(marker)
+        if positions is None:
+            matches = set()
+            for line in lines:
+                rows = self.source_rows.get(line.source_index)
+                if rows and _table_core_references_marker(marker, [line], page_size, angle, marker_cache):
+                    matches.update(rows)
+            positions = sorted(matches)
+            self.marker_positions[marker] = positions
+        offset = bisect_left(positions, start)
+        return offset < len(positions) and positions[offset] < end
+
+
+def _prepare_table_core_rows(rows, lines, metrics):
+    """一次校验并打包走廊成员；特殊来源和对象仍交给原集合路径。"""
+    if metrics.native is None or len({id(row) for row in rows}) != len(rows):
+        return None
+    members = []
+    source_rows = {}
+    for position, row in enumerate(rows):
+        indices = []
+        for fragment in row.fragments:
+            index = fragment.line_index
+            if type(index) is not int or not -(2**63) <= index < 2**63:
+                return None
+            indices.append(index)
+            source_rows.setdefault(index, []).append(position)
+        members.append(indices)
+    from ....document.pdf.text import Bbox
+
+    marker_safe = all(
+        type(line) is _LineItem
+        and type(line.source_index) is int
+        and type(line.text) is str
+        and type(line.chars) is list
+        and all(
+            type(char) is dict
+            and (char.get("char") is None or type(char.get("char")) is str)
+            and (
+                char.get("bbox") is None
+                or (
+                    type(char.get("bbox")) in (tuple, list, Bbox)
+                    and len(char["bbox"].bbox if type(char["bbox"]) is Bbox else char["bbox"]) == 4
+                    and all(
+                        (type(value) is float and math.isfinite(value)) or (type(value) is int and -(2**53) <= value <= 2**53)
+                        for value in char["bbox"]
+                    )
+                )
+            )
+            for char in line.chars
+        )
+        for line in lines
+    )
+    return _PreparedTableCoreRows(
+        rows,
+        {id(row): index for index, row in enumerate(rows)},
+        source_rows,
+        metrics.native.prepare_rows(members),
+        marker_safe=marker_safe,
+    )
 
 
 def _table_caption_candidates(
@@ -246,6 +332,7 @@ def _collect_footnote_rows(
     marker_cache: dict[tuple[int, str], bool] | None = None,
     prepared_rows: list[_PreparedTableNoteRow] | None = None,
     prepared_body_metrics: _PreparedTableNoteBodyMetrics | None = None,
+    prepared_core: tuple[_PreparedTableCoreRows, int, int] | None = None,
 ) -> list[_VisualRow]:
     """从表格下边界吸收具有表内引用和版面证据的表注连续行。"""
 
@@ -253,7 +340,7 @@ def _collect_footnote_rows(
     bottom = rule_bbox[3]
     note_chain_started = False
     selected_line_indices = set(core_line_indices)
-    core_lines = [line for line in lines if line.source_index in core_line_indices]
+    core_lines = None
     body_reference_height: float | None = None
     note_left: float | None = None
     note_height: float | None = None
@@ -283,13 +370,15 @@ def _collect_footnote_rows(
             break
         explicit_note = prepared_row.explicit_note
         auxiliary_marker = prepared_row.auxiliary_marker
-        auxiliary_note = auxiliary_marker is not None and _table_core_references_marker(
-            auxiliary_marker,
-            core_lines,
-            page_size,
-            angle,
-            marker_cache,
-        )
+        auxiliary_note = False
+        if auxiliary_marker is not None:
+            if prepared_core is not None and prepared_core[0].marker_safe:
+                context, start, end = prepared_core
+                auxiliary_note = context.references(auxiliary_marker, start, end, lines, page_size, angle, marker_cache)
+            else:
+                if core_lines is None:
+                    core_lines = [line for line in lines if line.source_index in core_line_indices]
+                auxiliary_note = _table_core_references_marker(auxiliary_marker, core_lines, page_size, angle, marker_cache)
         first_gap_limit = 0.75 if auxiliary_note and not explicit_note else 1.25
         if row_gap > (first_gap_limit if not note_chain_started else 1.0) * median_height:
             break
@@ -313,6 +402,7 @@ def _collect_footnote_rows(
                         page_size,
                         angle,
                         prepared_body_metrics,
+                        prepared_core,
                     )
                 spatially_compatible = (
                     _bbox_axis_overlap_ratio(clipped_row.bbox, rule_bbox, axis="x") >= 0.50
@@ -453,11 +543,24 @@ def _table_note_body_reference_height(
     page_size: tuple[float, float],
     angle: int,
     prepared_metrics: _PreparedTableNoteBodyMetrics | None = None,
+    prepared_core: tuple[_PreparedTableCoreRows, int, int] | None = None,
 ) -> float:
     """以同方向非表格行的最高四分位估计正文高度，样本不足时稳健回退。"""
 
     exclusion_top = rule_bbox[1] - 3.0 * median_height
     exclusion_bottom = rule_bbox[3] + 10.0 * median_height
+    if prepared_core is not None and prepared_metrics is not None and prepared_metrics.native is not None:
+        context, start, end = prepared_core
+        result = prepared_metrics.native.height_for_rows(
+            context.native,
+            start,
+            end,
+            exclusion_top,
+            exclusion_bottom,
+            1.25 * median_height,
+        )
+        if result is not None:
+            return result
     if (
         prepared_metrics is not None
         and prepared_metrics.native is not None

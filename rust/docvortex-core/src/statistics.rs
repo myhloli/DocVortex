@@ -269,6 +269,7 @@ pub fn lane_gap(
 pub struct NoteMetrics {
     items: Vec<(i64, f64, f64)>,
     extents: std::collections::HashMap<i64, (f64, f64)>,
+    index: crate::note_index::HeightIndex,
 }
 
 impl NoteMetrics {
@@ -290,8 +291,38 @@ impl NoteMetrics {
                 })
                 .or_insert((y, y));
         }
+        let index = crate::note_index::HeightIndex::new(&items);
         items.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
-        Some(Self { items, extents })
+        Some(Self {
+            items,
+            extents,
+            index,
+        })
+    }
+
+    /// 建立来源中心的行范围索引，整个走廊只传输一次成员。
+    pub fn rows(&self, members: Vec<Vec<i64>>) -> crate::note_index::CoreRows {
+        crate::note_index::CoreRows::new(members, &self.extents)
+    }
+
+    /// 已证明核心全在排除区间时查询秩树，否则保留原生精确成员筛选。
+    pub fn height_for_rows(
+        &self,
+        rows: &crate::note_index::CoreRows,
+        start: usize,
+        end: usize,
+        top: f64,
+        bottom: f64,
+        fallback: f64,
+    ) -> Option<f64> {
+        if start > end || end > rows.members.len() {
+            return None;
+        }
+        if rows.contained(start, end, top, bottom) {
+            return self.index.height(top, bottom, fallback);
+        }
+        let core: Vec<i64> = rows.members[start..end].iter().flatten().copied().collect();
+        self.height(top, bottom, &core, fallback)
     }
 
     /// 过滤纵向排除区间和明确核心成员，直接读取最高四分位的中位位置。

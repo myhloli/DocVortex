@@ -2,6 +2,7 @@
 
 pub const PROTOCOL_VERSION: u32 = 5;
 pub mod columns;
+pub mod note_index;
 pub mod spatial;
 
 pub mod dedup;

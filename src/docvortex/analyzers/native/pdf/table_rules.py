@@ -35,6 +35,7 @@ from .table_annotations import (
     _merge_table_candidate_annotations,
     _prepare_table_note_body_metrics,
     _prepare_table_note_rows,
+    _prepare_table_core_rows,
 )
 from .table_rows import _clip_visual_row_to_corridor
 
@@ -80,6 +81,7 @@ class _RuleCandidateContext:
     body_metrics: _PreparedTableNoteBodyMetrics
     grids: list | None = None
     grid_members: dict = field(default_factory=dict)
+    core_indexes: dict = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -93,6 +95,7 @@ class _RuleCandidateDraft:
     note_rows: list
     has_notes: bool
     score: float
+    core_query: Any = None
 
     def materialize(self) -> _TableCandidate:
         """按参考规则物化当前候选，并复用本组网格成员后立即交给合并器。"""
@@ -110,6 +113,7 @@ class _RuleCandidateDraft:
             context.marker_cache,
             self.note_rows,
             context.body_metrics,
+            self.core_query,
         )
         candidate.score = self.score
         if context.grids is None:
@@ -426,6 +430,14 @@ def _build_rule_table_candidates(
             prepared_note_rows, has_possible_table_notes = note_context
             score = float(2 + len(dense_rows) + stable_columns + min(fill_band_count, 8))
             if defer_materialization:
+                if corridor_key not in context.core_indexes:
+                    context.core_indexes[corridor_key] = _prepare_table_core_rows(
+                        [item.row for item in corridor_cache[corridor_key]],
+                        lines,
+                        prepared_note_body_metrics,
+                    )
+                core_index = context.core_indexes[corridor_key]
+                interval = core_index.interval(accepted_rows) if core_index is not None else None
                 drafts.append(
                     _RuleCandidateDraft(
                         context,
@@ -435,6 +447,7 @@ def _build_rule_table_candidates(
                         prepared_note_rows,
                         has_possible_table_notes,
                         score,
+                        (core_index, *interval) if interval is not None else None,
                     )
                 )
                 continue
@@ -1375,6 +1388,7 @@ def _expand_rule_table_candidate(
     marker_cache: dict[tuple[int, str], bool] | None = None,
     prepared_note_rows: list[_PreparedTableNoteRow] | None = None,
     prepared_note_body_metrics: _PreparedTableNoteBodyMetrics | None = None,
+    prepared_core: Any = None,
 ) -> _TableCandidate:
     """合并横线核心与上下注释，并保留注释的独立行身份。"""
 
@@ -1393,6 +1407,7 @@ def _expand_rule_table_candidate(
             marker_cache,
             prepared_note_rows,
             prepared_note_body_metrics,
+            prepared_core,
         )
         if has_possible_table_notes
         else []

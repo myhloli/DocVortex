@@ -67,16 +67,52 @@ struct BaselineCandidates {
 /// 为整页候选复用排序后的正文高度，查询仅传入区间及核心来源。
 #[pyclass(frozen)]
 struct TableNoteMetrics {
-    metrics: docvortex_core::statistics::NoteMetrics,
+    metrics: std::sync::Arc<docvortex_core::statistics::NoteMetrics>,
+}
+
+/// 已验证走廊行的来源成员及其中心范围，只在当前候选组复用。
+#[pyclass(frozen)]
+struct TableNoteCore {
+    rows: docvortex_core::note_index::CoreRows,
+    owner: std::sync::Arc<docvortex_core::statistics::NoteMetrics>,
 }
 
 #[pymethods]
 impl TableNoteMetrics {
+    /// 一次性接收全部走廊行成员，后续候选仅传入行区间。
+    fn prepare_rows(&self, py: Python<'_>, members: Vec<Vec<i64>>) -> TableNoteCore {
+        TableNoteCore {
+            rows: py.detach(|| self.metrics.rows(members)),
+            owner: self.metrics.clone(),
+        }
+    }
+
+    /// 跳过 Python 成员校验与打包，索引不适用时仍由 Rust 精确排除来源。
+    fn height_for_rows(
+        &self,
+        py: Python<'_>,
+        rows: &TableNoteCore,
+        start: usize,
+        end: usize,
+        top: f64,
+        bottom: f64,
+        fallback: f64,
+    ) -> Option<f64> {
+        if !std::sync::Arc::ptr_eq(&self.metrics, &rows.owner) {
+            return None;
+        }
+        py.detach(|| {
+            self.metrics
+                .height_for_rows(&rows.rows, start, end, top, bottom, fallback)
+        })
+    }
     /// 拒绝非有限数值，确保参考实现负责特殊排序语义。
     #[new]
     fn new(py: Python<'_>, items: Vec<(i64, f64, f64)>) -> PyResult<Self> {
         py.detach(move || docvortex_core::statistics::NoteMetrics::new(items))
-            .map(|metrics| Self { metrics })
+            .map(|metrics| Self {
+                metrics: std::sync::Arc::new(metrics),
+            })
             .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("invalid note metrics"))
     }
 
