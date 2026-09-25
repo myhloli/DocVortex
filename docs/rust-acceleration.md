@@ -148,6 +148,14 @@ python tests/benchmarks/compare_native_corpus.py --runs 5 --output output/rust/c
 Host replay compares actual medium/high native stages with frozen model inputs and
 records fallback inputs and per-page extraction counts; it does not measure live inference.
 
+MinerU revisions whose scheduling tests mock the old full-page raster entry can use
+`python -m pytest -p tools.mineru_render_test_adapter -o addopts= HOST_TEST_PATH`.
+This explicit test-only plugin forwards that mock to the encoded-crop worker boundary;
+it retains page-selection, configuration, title-gating and image-closure assertions.
+The frozen third-round source reproduces the unadapted mock failures too. Real worker
+behavior is checked separately with engine tests and complete PDF/asset comparisons;
+the plugin does not change MinerU application code or production dispatch.
+
 
 Fourth-round kernels require private protocol 5. Rebuild editable native installs after
 updating Python sources; an older extension is rejected by forced Rust selection.
