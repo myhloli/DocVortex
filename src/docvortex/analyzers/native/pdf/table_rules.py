@@ -5,6 +5,8 @@ from __future__ import annotations
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass, field
 import statistics
+import math
+import sys
 from typing import Any
 
 from ....document.pdf._document import PDFPathInfo
@@ -51,7 +53,7 @@ class _StableColumnPrefixState:
     """保存稳定列聚类的完整前缀状态，供严格前缀输入继续计算。"""
 
     row_ids: tuple[int, ...]
-    clusters_by_alignment: dict[str, list[dict[str, Any]]]
+    clusters_by_alignment: Any
 
 
 @dataclass(slots=True)
@@ -60,6 +62,7 @@ class _StableColumnCache:
 
     results: dict[tuple[float, tuple[int, ...]], tuple[int, float]] = field(default_factory=dict)
     prefixes: dict[tuple[float, int], _StableColumnPrefixState] = field(default_factory=dict)
+    prepared_rows: dict[int, tuple[_VisualRow, Any]] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -1496,6 +1499,66 @@ def _stable_column_result(
 
 
 def _count_stable_columns(
+    rows: list[_VisualRow],
+    median_height: float,
+    cache: _StableColumnCache | None = None,
+    *,
+    allow_prefix_reuse: bool = False,
+) -> tuple[int, float]:
+    """复用走廊锚点与严格前缀的原生累计状态，特殊数值保留 Python 求和行为。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is None or sys.implementation.name != "cpython" or not (3, 10) <= sys.version_info[:2] <= (3, 14):
+        return _count_stable_columns_python(rows, median_height, cache, allow_prefix_reuse=allow_prefix_reuse)
+    if type(median_height) is not float or not math.isfinite(median_height):
+        return _count_stable_columns_python(rows, median_height)
+    row_ids = tuple(id(row) for row in rows)
+    key = (median_height, row_ids)
+    if cache is not None and key in cache.results:
+        return cache.results[key]
+    prefix_key = (median_height, row_ids[0]) if row_ids and allow_prefix_reuse else None
+    prefix = cache.prefixes.get(prefix_key) if cache is not None and prefix_key is not None else None
+    reuse = (
+        prefix is not None
+        and isinstance(prefix.clusters_by_alignment, native.StableColumnClusters)
+        and len(prefix.row_ids) < len(row_ids)
+        and row_ids[: len(prefix.row_ids)] == prefix.row_ids
+    )
+    start = len(prefix.row_ids) if reuse else 0
+    packed = []
+    for row in rows[start:]:
+        existing = cache.prepared_rows.get(id(row)) if cache is not None else None
+        if existing is None:
+            values = []
+            for fragment in row.fragments:
+                left, _top, right, _bottom = fragment.local_bbox
+                if type(left) is not float or type(right) is not float or not math.isfinite(left) or not math.isfinite(right):
+                    values = None
+                    break
+                values.append((left, right))
+            if cache is not None:
+                # 强引用限定于本次构建，避免行对象销毁后地址被另一个对象复用。
+                cache.prepared_rows[id(row)] = (row, values)
+        else:
+            values = existing[1]
+        if values is None:
+            return _count_stable_columns_python(rows, median_height)
+        packed.append(values)
+    state = prefix.clusters_by_alignment if reuse else native.StableColumnClusters(sys.version_info >= (3, 12))
+    result = state.extend(packed, max(3.0, median_height * 0.75))
+    if result is None:
+        if cache is not None and prefix_key is not None:
+            cache.prefixes.pop(prefix_key, None)
+        return _count_stable_columns_python(rows, median_height)
+    if cache is not None:
+        cache.results[key] = result
+        if prefix_key is not None and (prefix is None or reuse):
+            cache.prefixes[prefix_key] = _StableColumnPrefixState(row_ids, state)
+    return result
+
+
+def _count_stable_columns_python(
     rows: list[_VisualRow],
     median_height: float,
     cache: _StableColumnCache | None = None,

@@ -10,6 +10,54 @@ use pyo3::prelude::*;
 use pyo3::types::{PyFloat, PyList, PyTuple};
 mod pdfium;
 
+/// 调用内的稳定列累计状态，均值读取不折叠补偿量。
+#[pyclass]
+struct StableColumnClusters {
+    state: docvortex_core::columns::Columns,
+}
+
+#[pymethods]
+impl StableColumnClusters {
+    /// Python 边界依据解释器版本选择已验证的浮点求和模式。
+    #[new]
+    fn new(compensated: bool) -> Self {
+        Self {
+            state: docvortex_core::columns::Columns::new(compensated),
+        }
+    }
+
+    /// 只传入严格前缀之后的新增行，纯数值计算期间释放 GIL。
+    fn extend(
+        &mut self,
+        py: Python<'_>,
+        rows: Vec<Vec<(f64, f64)>>,
+        tolerance: f64,
+    ) -> Option<(usize, f64)> {
+        py.detach(|| self.state.extend(&rows, tolerance))
+    }
+
+    /// 为差分测试返回均值、累计结果、成员数和覆盖行数，不暴露 Python 对象。
+    fn snapshot(&self) -> Vec<Vec<(f64, f64, usize, usize)>> {
+        self.state
+            .groups
+            .iter()
+            .map(|group| {
+                group
+                    .iter()
+                    .map(|c| {
+                        let sum = if c.lo != 0.0 && c.lo.is_finite() {
+                            c.hi + c.lo
+                        } else {
+                            c.hi
+                        };
+                        (c.mean, sum, c.count, c.rows)
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+}
+
 /// 调用内持有只读区间树，不缓存 Python 行对象。
 #[pyclass(frozen)]
 struct BaselineCandidates {
@@ -582,6 +630,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
     module.add_class::<BaselineCandidates>()?;
     module.add_class::<TableNoteMetrics>()?;
+    module.add_class::<StableColumnClusters>()?;
     module.add_function(wrap_pyfunction!(ordered_clusters, module)?)?;
     module.add_function(wrap_pyfunction!(typography_metrics, module)?)?;
     module.add_function(wrap_pyfunction!(lane_gap, module)?)?;
