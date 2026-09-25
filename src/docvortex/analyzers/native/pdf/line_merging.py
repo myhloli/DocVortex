@@ -43,7 +43,7 @@ def _safe_candidate_box(box) -> bool:
     return (
         type(box) in (tuple, list)
         and len(box) == 4
-        and all(type(v) in (int, float) and math.isfinite(v) and abs(v) <= 1e100 for v in box)
+        and all(type(v) in (int, float) and abs(v) <= 1e100 and math.isfinite(v) for v in box)
         and box[2] > box[0]
         and box[3] > box[1]
     )

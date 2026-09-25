@@ -70,7 +70,7 @@ def test_overlap_closure_matches_exhaustive(monkeypatch):
     assert actual == expected
 
 
-@pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf, 1e200])
+@pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf, 1e200, 10**400])
 def test_overlap_special_geometry_falls_back(value):
     """异常几何不进入有限索引，不改变参考路径处理方式。"""
     lines = make_lines(2)
