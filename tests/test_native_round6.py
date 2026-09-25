@@ -79,9 +79,9 @@ def test_fraction_rules_are_reused_without_changing_cell_scale():
     for heights in ([4.0, 4.0], [10.0, 10.0]):
         chars = [{"char": "A", "char_idx": 0}, {"char": "1", "char_idx": 1}]
         tight = {i: (0.0, float(i * 8), 4.0, float(i * 8) + heights[i]) for i in range(2)}
-        assert scripts._fraction_member_indices((100.0, 100.0), chars, tight, rules, 90, prepared) == scripts._fraction_member_indices(
-            (100.0, 100.0), chars, tight, rules, 90
-        )
+        assert scripts._fraction_member_indices(
+            (100.0, 100.0), chars, tight, rules, 90, prepared
+        ) == scripts._fraction_member_indices((100.0, 100.0), chars, tight, rules, 90)
 
 
 @pytest.mark.parametrize("invalid", [0, math.nan, math.inf, 10**400])
@@ -94,9 +94,12 @@ def test_plain_script_batch_rejects_non_float_geometry(invalid):
     assert native.script_roles_plain_batch(
         [(0.0, 0.0, 5.0, 10.0)], [(0.0, 1.0, 5.0, 9.0)], [(0.0, 9.0)], [4], [0], [0, 1], lambda value: value
     ) == [b"\x00"]
-    assert native.script_roles_plain_batch(
-        [(0.0, 0.0, 5.0, invalid)], [(0.0, 1.0, 5.0, 9.0)], [(0.0, 9.0)], [4], [0], [0, 1], lambda value: value
-    ) is None
+    assert (
+        native.script_roles_plain_batch(
+            [(0.0, 0.0, 5.0, invalid)], [(0.0, 1.0, 5.0, 9.0)], [(0.0, 9.0)], [4], [0], [0, 1], lambda value: value
+        )
+        is None
+    )
 
 
 def test_script_batches_preserve_line_order_across_chunk_boundary(monkeypatch):
@@ -225,9 +228,7 @@ def test_marker_preparation_cache_is_bounded_and_rejects_special_values():
 
     context = table_annotations._PreparedTableCoreRows([], {}, {}, None)
     for index in range(9000):
-        line = _LineItem(
-            "a", (0.0, 0.0, 1.0, 1.0), 0, index, chars=[{"char": "a", "bbox": (0.0, 0.0, 1.0, 1.0)}]
-        )
+        line = _LineItem("a", (0.0, 0.0, 1.0, 1.0), 0, index, chars=[{"char": "a", "bbox": (0.0, 0.0, 1.0, 1.0)}])
         result = context.prepared_marker_line(line, (100.0, 100.0), 0)
         assert result is not None
         if index == 8999:

@@ -31,6 +31,7 @@ from docvortex.schema import Producer
 
 ROOT = Path(__file__).resolve().parents[2]
 from pdf_corpus import corpus_paths
+
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests" / "unittest"))
 

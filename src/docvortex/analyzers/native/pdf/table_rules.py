@@ -1081,7 +1081,11 @@ def _prepare_rule_band_index(rows: list[_VisualRow], rules: list[_LocalAxisLine]
     centers = []
     for rule in rules:
         box = rule.bbox
-        if type(box) not in (tuple, list) or len(box) != 4 or any(type(value) is not float or not math.isfinite(value) for value in box):
+        if (
+            type(box) not in (tuple, list)
+            or len(box) != 4
+            or any(type(value) is not float or not math.isfinite(value) for value in box)
+        ):
             return None
         center = _bbox_center_y(box)
         if not math.isfinite(center) or centers and center <= centers[-1]:

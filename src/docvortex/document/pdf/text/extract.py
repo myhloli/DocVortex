@@ -180,18 +180,42 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
     decoded_fonts = [(bytes(name).decode("utf-8", errors="replace"), flags) for name, flags in raw_fonts]
     fonts, objects = {}, {}
     chars, raw_geometry, pending_clips, retained = [], [], [], []
+    writing_rotation = math.radians(page_rotation)
+    last_font_index = last_size = last_weight = last_font = None
+    last_address = last_object_id = None
     for index, (code, rotation, loose, tight, font_index, size, weight, address, mode, origin) in enumerate(records):
         # 读取桥按固定上限逐批物化记录，已消费批次不与整页最终字符长期重叠。
-        name, flags = decoded_fonts[font_index]
-        key = (name, flags, size, weight)
-        font = fonts.get(key)
-        if font is None:
-            font = fonts[key] = {"name": name, "flags": flags, "size": size, "weight": weight}
+        if (
+            type(font_index) is int
+            and type(size) is float
+            and type(weight) is int
+            and font_index == last_font_index
+            and size == last_size
+            and weight == last_weight
+        ):
+            font = last_font
+        else:
+            name, flags = decoded_fonts[font_index]
+            key = (name, flags, size, weight)
+            font = fonts.get(key)
+            if font is None:
+                font = fonts[key] = {"name": name, "flags": flags, "size": size, "weight": weight}
+            if type(font_index) is int and type(size) is float and type(weight) is int:
+                last_font_index, last_size, last_weight, last_font = font_index, size, weight, font
+            else:
+                last_font_index = None
         object_id = None
         if address:
-            if address not in objects:
-                objects[address] = len(objects)
-            object_id = objects[address]
+            if type(address) is int and address == last_address:
+                object_id = last_object_id
+            else:
+                object_id = objects.get(address)
+                if object_id is None:
+                    object_id = objects[address] = len(objects)
+                if type(address) is int:
+                    last_address, last_object_id = address, object_id
+                else:
+                    last_address = None
         clip = None
         if visibility_by_object is not None and (address or None) in visibility_by_object:
             visible, clip = visibility_by_object[address or None]
@@ -207,7 +231,7 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
             "raw_code": code,
             "text_object_id": object_id,
             "text_render_mode": mode,
-            "writing_angle": math.radians(page_rotation) - rotation,
+            "writing_angle": writing_rotation - rotation,
             "origin": None,
         }
         selected = loose if rotation == 0 else tight
@@ -224,11 +248,12 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
             raw_geometry.clear()
             pending_clips.clear()
     del batch, records, raw_fonts
-    retained.extend(
-        _materialize_native_char_batch(
-            chars, raw_geometry, pending_clips, page_bbox, (width, height), page_rotation, include_geometry
+    if chars:
+        retained.extend(
+            _materialize_native_char_batch(
+                chars, raw_geometry, pending_clips, page_bbox, (width, height), page_rotation, include_geometry
+            )
         )
-    )
     _assign_writing_angles(retained)
     _mark_visible_objects(retained, textpage.raw)
     return retained

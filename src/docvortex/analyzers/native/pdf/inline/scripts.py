@@ -699,7 +699,9 @@ def _prepare_fraction_rules(drawing_lines: Sequence[Any], page_size: tuple[float
     """按原绘图顺序准备一次局部横线框，供同一表格的多个单元格复用。"""
 
     return [
-        _rotate_bbox_to_upright(raw, page_size, angle) if (raw := _coerce_bbox(getattr(drawing, "bbox", drawing))) is not None else None
+        _rotate_bbox_to_upright(raw, page_size, angle)
+        if (raw := _coerce_bbox(getattr(drawing, "bbox", drawing))) is not None
+        else None
         for drawing in drawing_lines
     ]
 
@@ -1004,8 +1006,14 @@ def _script_line_char_roles(
     from ....._compute_backend import get_native
 
     native = get_native()
-    packed = _prepare_plain_script_input(chars, tight_bboxes, origins) if native is not None and angle == 0 and prepared is None else None
-    reuse_geometry = angle == 0 and (prepared is not None or packed is not None or _plain_script_geometry(chars, tight_bboxes, origins))
+    packed = (
+        _prepare_plain_script_input(chars, tight_bboxes, origins)
+        if native is not None and angle == 0 and prepared is None
+        else None
+    )
+    reuse_geometry = angle == 0 and (
+        prepared is not None or packed is not None or _plain_script_geometry(chars, tight_bboxes, origins)
+    )
     normalized_boxes = (
         native.normalize_boxes([getattr(char.get("bbox"), "bbox", char.get("bbox")) for char in chars], True, _coerce_bbox)
         if native is not None and not reuse_geometry
@@ -1083,8 +1091,10 @@ def _script_line_payload(
     if not chars:
         return None
     angle = int(getattr(line, "angle", 0) or 0) % 360
-    if not any(role != "body" for role in roles) and type(tight_bboxes) is dict and all(
-        type(char) is dict and type(char.get("char_idx")) is int for char in chars
+    if (
+        not any(role != "body" for role in roles)
+        and type(tight_bboxes) is dict
+        and all(type(char) is dict and type(char.get("char_idx")) is int for char in chars)
     ):
         return _plain_script_payload(line, chars, angle)
     compact_parts: list[str] = []
@@ -1239,7 +1249,9 @@ def detect_pdf_text_script_lines(
             chars = _ordered_line_chars(line)
             packed = _pack_plain_script_input(chars, tight_bboxes, origins) if chars else None
             if packed is not None:
-                regions = [bbox for value in getattr(line, "inline_math_regions", []) if (bbox := _coerce_bbox(value)) is not None]
+                regions = [
+                    bbox for value in getattr(line, "inline_math_regions", []) if (bbox := _coerce_bbox(value)) is not None
+                ]
                 memberships = _script_region_memberships(chars, tight_bboxes, regions)
                 if pending and (len(pending) >= 64 or pending_chars + len(chars) > 8192):
                     flush_pending()

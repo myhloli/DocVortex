@@ -791,9 +791,7 @@ def _compact_marker_data(text: str) -> tuple[int, tuple[str, ...]]:
     return count, tuple(tokens)
 
 
-def _line_has_compact_marker_token(
-    text: str, marker: str, prepared: tuple[int, tuple[str, ...]] | None = None
-) -> bool:
+def _line_has_compact_marker_token(text: str, marker: str, prepared: tuple[int, tuple[str, ...]] | None = None) -> bool:
     """短小单元格只匹配独立标记 token，复用同来源的只读准备结果。"""
 
     count, tokens = prepared if prepared is not None else _compact_marker_data(text)

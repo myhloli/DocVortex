@@ -581,30 +581,35 @@ def _merge_post_semantic_text_runs(
             same_physical_row = first_line.visual_row_id is not None and first_line.visual_row_id == second_line.visual_row_id
             row_key = (first_line.angle, first_line.visual_row_id)
             if same_physical_row and candidates is not None and row_key not in physical_rows:
-                members = [index for index, member in enumerate(lines) if member.angle == row_key[0] and member.visual_row_id == row_key[1]]
+                members = [
+                    index
+                    for index, member in enumerate(lines)
+                    if member.angle == row_key[0] and member.visual_row_id == row_key[1]
+                ]
                 physical_rows[row_key] = (
                     all(any(char.isalpha() for char in lines[index].text) for index in members),
                     _bbox_union_many([local_bboxes[index] for index in members]),
                 )
-            shared_physical_row = (
-                same_physical_row
-                and (
-                    physical_rows[row_key][0]
-                    if candidates is not None
-                    else all(
-                        any(char.isalpha() for char in member.text)
-                        for member in lines
-                        if member.angle == first_line.angle and member.visual_row_id == first_line.visual_row_id
-                    )
+            shared_physical_row = same_physical_row and (
+                physical_rows[row_key][0]
+                if candidates is not None
+                else all(
+                    any(char.isalpha() for char in member.text)
+                    for member in lines
+                    if member.angle == first_line.angle and member.visual_row_id == first_line.visual_row_id
                 )
             )
             if shared_physical_row:
-                row_bounds = physical_rows[row_key][1] if candidates is not None else _bbox_union_many(
-                    [
-                        local_bboxes[index]
-                        for index, member in enumerate(lines)
-                        if member.angle == first_line.angle and member.visual_row_id == first_line.visual_row_id
-                    ]
+                row_bounds = (
+                    physical_rows[row_key][1]
+                    if candidates is not None
+                    else _bbox_union_many(
+                        [
+                            local_bboxes[index]
+                            for index, member in enumerate(lines)
+                            if member.angle == first_line.angle and member.visual_row_id == first_line.visual_row_id
+                        ]
+                    )
                 )
             else:
                 row_bounds = _bbox_union_many([first_bbox, second_bbox])

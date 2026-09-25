@@ -77,9 +77,7 @@ def compare(measurements):
         old, new = measurements[before], measurements[after]
         results[label] = {
             "time_ratios": {
-                stage: value / old["median_seconds"][stage] if old["median_seconds"][stage] else 1.0
-                if value == 0
-                else None
+                stage: value / old["median_seconds"][stage] if old["median_seconds"][stage] else 1.0 if value == 0 else None
                 for stage, value in new["median_seconds"].items()
             },
             "zero_stage_new_work": [
@@ -133,7 +131,12 @@ def main():
         order = variants[index % 4 :] + variants[: index % 4]
         folder = args.output / f"{index:02d}-{path.stem}"
         measurements = {label: measure(path, folder / label, source, backend, args) for label, source, backend in order}
-        record = {"path": str(path), "pages": next(iter(measurements.values()))["page_count"], "measurements": measurements, **compare(measurements)}
+        record = {
+            "path": str(path),
+            "pages": next(iter(measurements.values()))["page_count"],
+            "measurements": measurements,
+            **compare(measurements),
+        }
         repeat_pairs = [
             label
             for label, value in record["ratios"].items()

@@ -14,6 +14,7 @@ from pdf_corpus import corpus_paths
 
 ROOT = Path(__file__).resolve().parents[2]
 
+
 def code_digest() -> str:
     """冻结实际 Python/Rust 源码与构建输入，拒绝在测量中途混用版本。"""
     digest = hashlib.sha256()
