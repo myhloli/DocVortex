@@ -10,6 +10,7 @@ import subprocess
 import sys
 
 from rust_pdf import source_identity, write_json
+from pdf_corpus import corpus_paths
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -63,6 +64,7 @@ def compare(measurements):
     """输出摘要必须全等，分别计算同版本后端差异及跨版本时间和内存变化。"""
     assert len({item["source_sha256"] for item in measurements.values()}) == 1
     assert len({item["region_input_sha256"] for item in measurements.values()}) == 1
+    assert len({item["page_count"] for item in measurements.values()}) == 1
     results = {}
     for label, before, after in (
         ("backends", "python-current", "rust-current"),
@@ -90,14 +92,11 @@ def main():
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--path", type=Path, action="append")
     parser.add_argument("--extra-path", type=Path, action="append", default=[])
+    parser.add_argument("--corpus", choices=("demo", "all"), default="all")
     args = parser.parse_args()
     if args.runs < 1:
         parser.error("runs must be positive")
-    manifest = json.loads((ROOT / "tests/fixtures/flash_layout_geometry_manifest.json").read_text())
-    paths = args.path or [
-        *(ROOT / item["path"] for item in manifest["documents"]),
-        *sorted((ROOT / "tests/unittest/pdfs/native_pdf_tables").glob("*.pdf")),
-    ]
+    paths = args.path or corpus_paths(args.corpus)
     paths = list(dict.fromkeys(path.resolve() for path in paths + args.extra_path))
     args.output.mkdir(parents=True, exist_ok=True)
     old = args.reference_source.resolve()
@@ -107,13 +106,13 @@ def main():
         ("python-current", ROOT, "python"),
         ("rust-current", ROOT, "rust"),
     ]
-    report = {"suite": args.suite, "runs": args.runs, "documents": []}
+    report = {"suite": args.suite, "runs": args.runs, "corpus": args.corpus if not args.path else "explicit", "documents": []}
     gate_stages = {"parse"} if args.suite == "public" else {"text_extraction", "text_total", "table_total"}
     for index, path in enumerate(paths):
         order = variants[index % 4 :] + variants[: index % 4]
         folder = args.output / f"{index:02d}-{path.stem}"
         measurements = {label: measure(path, folder / label, source, backend, args) for label, source, backend in order}
-        record = {"path": str(path), "measurements": measurements, **compare(measurements)}
+        record = {"path": str(path), "pages": next(iter(measurements.values()))["page_count"], "measurements": measurements, **compare(measurements)}
         repeat_pairs = [
             label
             for label, value in record["ratios"].items()

@@ -18,8 +18,9 @@ import subprocess
 import sys
 import time
 
-ROOT = Path(__file__).resolve().parents[2]
+from pdf_corpus import corpus_manifest, corpus_paths
 
+ROOT = Path(__file__).resolve().parents[2]
 
 def write_json(path: Path, value: object) -> None:
     """将计时之外的完整结果保存为可复核 JSON。"""
@@ -187,6 +188,7 @@ def worker(args: argparse.Namespace) -> None:
         progress.update(completed_runs=run, first_seconds=first, seconds=dict(times), full_output_sha256=expected)
         write_json(args.output / "progress.json", progress)
     write_json(args.output / "output.json", output)
+    page_count = len(output["model"]["pages"] if args.suite == "public" else output["pages"])
     del output
     gc.collect()
     progress["status"] = "timing_complete"
@@ -194,6 +196,8 @@ def worker(args: argparse.Namespace) -> None:
     record = {
         "path": str(path.resolve()),
         "source_sha256": source_hash,
+        "page_count": page_count,
+        "source_bytes": len(path.read_bytes()),
         "region_input_sha256": regions_hash,
         "full_output_sha256": expected,
         "first_seconds": first,
@@ -220,6 +224,7 @@ def main() -> None:
     parser.add_argument("--backend", choices=("python", "rust", "auto"), required=True)
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--path", type=Path, action="append")
+    parser.add_argument("--corpus", choices=("demo", "all"), default="all")
     parser.add_argument("--worker", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.runs < 1 or args.output.exists():
@@ -232,10 +237,14 @@ def main() -> None:
     if args.worker:
         worker(args)
         return
-    paths = args.path or [ROOT / "demo/pdfs" / f"{name}.pdf" for name in ("caibao1", "demo1", "demo2")]
+    paths = [path.resolve() for path in args.path] if args.path else corpus_paths(args.corpus)
     args.output.mkdir(parents=True)
+    manifest = corpus_manifest(paths)
+    write_json(args.output / "corpus.json", manifest)
     records = []
     for index, path in enumerate(paths):
+        if manifest[index]["sha256"] != hashlib.sha256(path.read_bytes()).hexdigest():
+            raise AssertionError(f"PDF input changed during benchmark: {path}")
         folder = args.output / f"{index:02d}-{path.stem}"
         command = [
             sys.executable,
@@ -293,6 +302,8 @@ def main() -> None:
         "git_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "git_status": subprocess.check_output(["git", "status", "--short"], cwd=ROOT, text=True),
         "dependencies": {name: version(name) for name in ("docvortex", "pypdfium2", "pydantic", "numpy")},
+        "corpus": args.corpus if not args.path else "explicit",
+        "corpus_manifest": manifest,
         "documents": records,
     }
     if args.baseline:

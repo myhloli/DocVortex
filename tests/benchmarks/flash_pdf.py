@@ -30,6 +30,7 @@ onnxruntime.disable_telemetry_events()
 from docvortex.schema import Producer
 
 ROOT = Path(__file__).resolve().parents[2]
+from pdf_corpus import corpus_paths
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests" / "unittest"))
 
@@ -258,6 +259,7 @@ def main() -> None:
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--runs", type=int, default=5, help="预热一次后计时次数；0 只运行功能校验")
     parser.add_argument("--path", action="append", default=[])
+    parser.add_argument("--corpus", choices=("demo", "all"), default="all")
     parser.add_argument("--profile", action="store_true", help="额外运行剖析；不计入耗时或 RSS 指标")
     parser.add_argument(
         "--backend", choices=("auto", "python", "rust"), default=os.environ.get("DOCVORTEX_COMPUTE_BACKEND", "auto")
@@ -273,10 +275,7 @@ def main() -> None:
     if (args.output / "report.json").exists():
         parser.error("output already contains a report; choose a new directory")
     manifest = json.loads((ROOT / "tests/fixtures/flash_layout_geometry_manifest.json").read_text(encoding="utf-8"))
-    paths = args.path or [
-        *(item["path"] for item in manifest["documents"]),
-        *(str(path.relative_to(ROOT)) for path in sorted((ROOT / "tests/unittest/pdfs/native_pdf_tables").glob("*.pdf"))),
-    ]
+    paths = args.path or corpus_paths(args.corpus)
     results = []
     for index, relative in enumerate(dict.fromkeys(paths)):
         destination = args.output.resolve() / f"{index:02d}-{Path(relative).stem}"

@@ -9,6 +9,23 @@ import sys
 
 import pytest
 
+from benchmarks.pdf_corpus import corpus_paths, discover_demo_pdfs
+
+
+def test_demo_corpus_discovers_new_subdirectory_pdf(tmp_path: Path) -> None:
+    """新 demo PDF 自动进入 demo 与 all 集合，路径只出现一次。"""
+
+    (tmp_path / "demo/pdfs/nested").mkdir(parents=True)
+    sample = tmp_path / "demo/pdfs/nested/new.pdf"
+    sample.write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "tests/fixtures").mkdir(parents=True)
+    (tmp_path / "tests/fixtures/flash_layout_geometry_manifest.json").write_text(
+        json.dumps({"documents": [{"path": "demo/pdfs/nested/new.pdf"}]}), encoding="utf-8"
+    )
+    assert discover_demo_pdfs(tmp_path) == [sample]
+    assert corpus_paths("demo", tmp_path) == [sample.resolve()]
+    assert corpus_paths("all", tmp_path) == [sample.resolve()]
+
 
 @pytest.mark.skipif(sys.platform == "win32", reason="基线工具使用 POSIX resource 进程统计")
 def test_native_benchmark_generates_report_and_portable_profile(tmp_path: Path) -> None:
