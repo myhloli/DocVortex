@@ -40,7 +40,11 @@ def corpus_manifest(paths: list[Path]) -> list[dict[str, str | int]]:
     records = []
     for path in paths:
         data = path.read_bytes()
-        with PdfDocument(data) as document:
+        payload = data
+        if path.suffix == ".xor":
+            key = b"MinerU flash layout fixture"
+            payload = bytes(value ^ key[index % len(key)] for index, value in enumerate(data))
+        with PdfDocument(payload) as document:
             pages = len(document)
         records.append({"path": str(path.resolve()), "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data), "pages": pages})
     return records
