@@ -5,7 +5,16 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      skip_ci:
+        description: 'Build distributions without Rust checks or wheel tests/benchmarks'
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      skip_ci:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -47,20 +56,25 @@ jobs:
           CIBW_ENVIRONMENT_LINUX: 'PATH="/opt/docvortex-cargo/bin:$PATH" CARGO_HOME=/opt/docvortex-cargo RUSTUP_HOME=/opt/docvortex-rustup DOCVORTEX_BUILD_NATIVE=1 DOCVORTEX_COMPUTE_BACKEND=rust'
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment }}
           CIBW_TEST_REQUIRES: pytest psutil
+          CIBW_TEST_SKIP: ${{ inputs.skip_ci && '*' || '' }}
           CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_native_statistics.py {project}/tests/test_native_round3.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py {project}/tests/test_pdfium_bridge.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q && python -m pip install pypdfium2==5.10.1 && python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo2.pdf && python -m pytest {project}/tests/test_pdfium_bridge.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py -q
         run: uvx --from "cibuildwheel>=3.1,<4" cibuildwheel --output-dir wheelhouse
       - name: Verify binary ABI on Python 3.14 without optional application dependencies
+        if: ${{ !inputs.skip_ci }}
         run: uv run --no-project --python 3.14 python tools/verify_native_abi.py wheelhouse
       - name: Install the exact built artifact on the current supported dependency stack
+        if: ${{ !inputs.skip_ci }}
         shell: bash
         run: |
           uv venv --seed --python ${{ matrix.smoke }}
           uv run --no-project --python ${{ matrix.smoke }} python -c "import pathlib, subprocess, sys; wheels=list(pathlib.Path('wheelhouse').glob('*.whl')); assert len(wheels)==1, wheels; subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0]), 'pytest', 'psutil', 'pypdfium2==5.13.0'])"
       - name: Verify installed wheel and real parsing
+        if: ${{ !inputs.skip_ci }}
         env:
           DOCVORTEX_COMPUTE_BACKEND: rust
         run: uv run --no-project --python ${{ matrix.smoke }} python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
       - name: Verify generated dense table with the installed wheel
+        if: ${{ !inputs.skip_ci }}
         env:
           DOCVORTEX_COMPUTE_BACKEND: rust
         run: |
@@ -68,11 +82,12 @@ jobs:
           uv run --no-project --python ${{ matrix.smoke }} python tools/verify_native_wheel.py dense-table.pdf
           uv run --no-project --python ${{ matrix.smoke }} python -m pytest tests/test_pdfium_bridge.py tests/test_native_round3.py tests/test_native_round4.py tests/test_native_round5.py -q
       - name: Compare public parsing performance and full outputs
+        if: ${{ !inputs.skip_ci }}
         run: |
           uv run --no-project --python ${{ matrix.smoke }} python tests/benchmarks/rust_pdf.py --backend python --suite public --output bench-python
           uv run --no-project --python ${{ matrix.smoke }} python tests/benchmarks/rust_pdf.py --backend rust --suite public --output bench-rust --baseline bench-python
       - uses: actions/upload-artifact@v6
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && !inputs.skip_ci }}
         with:
           name: benchmark-${{ matrix.name }}
           path: |
@@ -97,6 +112,7 @@ jobs:
         run: uv build
       - run: uvx twine check dist/*
       - name: Verify pure installation without native artifacts
+        if: ${{ !inputs.skip_ci }}
         shell: bash
         run: |
           uv venv --seed
@@ -109,6 +125,7 @@ jobs:
           if-no-files-found: error
 
   rust-checks:
+    if: ${{ !inputs.skip_ci }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

@@ -3,6 +3,12 @@ name: Publish
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      skip_ci:
+        description: 'Skip main CI and wheel tests/benchmarks; still build all distributions'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -20,12 +26,13 @@ jobs:
         with:
           python-version: '3.13'
       - name: Verify successful main CI
+        if: ${{ !inputs.skip_ci }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python tools/verify_release_ci_gate.py
       - name: Verify release tag
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
         run: |
           python - <<'PY'
           import ast
@@ -39,6 +46,8 @@ jobs:
   distributions:
     needs: gate
     uses: ./.github/workflows/native-wheels.yml
+    with:
+      skip_ci: ${{ inputs.skip_ci || false }}
 
   publish:
     needs: distributions
@@ -48,6 +57,7 @@ jobs:
       url: https://pypi.org/project/docvortex/
     permissions:
       id-token: write
+      contents: write
     steps:
       - uses: actions/download-artifact@v7
         with:
@@ -55,3 +65,10 @@ jobs:
           merge-multiple: true
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+      # 使用工作流令牌发布草稿，避免再次触发 release 发布流程。
+      - name: Publish GitHub release after manual distribution
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release edit "$RELEASE_TAG" --draft=false --latest --repo "$GITHUB_REPOSITORY"
