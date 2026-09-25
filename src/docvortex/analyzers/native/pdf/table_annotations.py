@@ -81,9 +81,20 @@ class _PreparedTableCoreRows:
         positions = self.marker_positions.get(marker)
         if positions is None:
             matches = set()
+            seen = set()
             for line in lines:
                 rows = self.source_rows.get(line.source_index)
-                if rows and _table_core_references_marker(marker, [line], page_size, angle, marker_cache):
+                if not rows or (marker_cache is not None and line.source_index in seen):
+                    continue
+                seen.add(line.source_index)
+                key = (line.source_index, marker)
+                if marker_cache is not None and key in marker_cache:
+                    matched = marker_cache[key]
+                else:
+                    # 全走廊预计算不能向旧逐行缓存写入平方规模的 False。
+                    # 非空缓存模式保留同一来源首行裁决，但仅保存稀疏命中位置。
+                    matched = _table_core_references_marker(marker, [line], page_size, angle)
+                if matched:
                     matches.update(rows)
             positions = sorted(matches)
             self.marker_positions[marker] = positions

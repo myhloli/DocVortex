@@ -146,6 +146,23 @@ def test_core_interval_reference_and_marker_index(native):
             for end in range(start + 1, 6):
                 expected = notes._table_core_references_marker(marker, lines[start:end], (100.0, 100.0), 0)
                 assert context.references(marker, start, end, lines, (100.0, 100.0), 0, cache) == expected
+        assert not cache, "全走廊查询不得建立来源与标记的稠密 False 矩阵"
+
+
+def test_marker_index_duplicate_sources_and_existing_cache(native):
+    """来源重复时遵循首行缓存语义，已有缓存不能被预计算覆盖。"""
+    from docvortex.analyzers.native.pdf import table_annotations as notes
+    from docvortex.analyzers.native.pdf.models import _LineItem
+
+    lines = [_LineItem(text, (0.0, float(i), 10.0, float(i + 1)), 0, 1, chars=[]) for i, text in enumerate(["body", "a"])]
+    rows = [SimpleNamespace(fragments=[SimpleNamespace(line_index=1)], bbox=(0.0, 0.0, 10.0, 2.0))]
+    metrics = notes._prepare_table_note_body_metrics(lines, (100.0, 100.0), 0)
+    for cache in [None, {}, {(1, "a"): True}, {(1, "a"): False}]:
+        context = notes._prepare_table_core_rows(rows, lines, metrics)
+        before = None if cache is None else dict(cache)
+        expected = notes._table_core_references_marker("a", lines, (100.0, 100.0), 0, None if cache is None else dict(cache))
+        assert context.references("a", 0, 1, lines, (100.0, 100.0), 0, cache) == expected
+        assert cache == before
 
 
 @pytest.mark.parametrize("seed", range(12))
