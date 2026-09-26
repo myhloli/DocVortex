@@ -1,8 +1,8 @@
 # Optional Rust PDF kernels
 
 See [Repository architecture](ARCHITECTURE.md) for the Python/Rust ownership boundary
-and binding-module layout. The current private extension protocol is **7**, shared by
-the Python loader and Rust core. Protocol 4, 5 and 6 references below describe historical
+and binding-module layout. The current private extension protocol is **8**, shared by
+the Python loader and Rust core. Protocol 4, 5, 6 and 7 references below describe historical
 interfaces or rollout stages, not the current loader requirement. Rebuild editable
 native installs and restart existing processes after updating native sources.
 

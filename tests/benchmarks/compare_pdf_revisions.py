@@ -93,6 +93,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--reference-source", type=Path, required=True)
+    parser.add_argument("--candidate-source", type=Path, default=ROOT, help="冻结候选源码，隔离同工作区的其他任务修改")
     parser.add_argument("--suite", choices=("public", "shared"), default="public")
     parser.add_argument("--flash-baseline", type=Path)
     parser.add_argument("--runs", type=int, default=5)
@@ -111,8 +112,8 @@ def main():
     variants = [
         ("python-reference", old, "python"),
         ("rust-reference", old, "rust"),
-        ("python-current", ROOT, "python"),
-        ("rust-current", ROOT, "rust"),
+        ("python-current", args.candidate_source.resolve(), "python"),
+        ("rust-current", args.candidate_source.resolve(), "rust"),
     ]
     report = {
         "suite": args.suite,

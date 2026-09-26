@@ -46,6 +46,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(geometry::visual_runs, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::local_boxes, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::source_rows, module)?)?;
+    module.add_function(wrap_pyfunction!(geometry::source_rows_plain, module)?)?;
     module.add_function(wrap_pyfunction!(dedup::paint_pairs, module)?)?;
     module.add_function(wrap_pyfunction!(dedup::dedup_components, module)?)?;
     module.add_function(wrap_pyfunction!(dedup::hidden_candidates, module)?)?;
