@@ -16,7 +16,7 @@ from ..line_layout import (
     _title_fonts_compatible,
 )
 from ..models import _DocumentBodyProfile, _DocumentTitleProfile, _LineItem, _TextLane
-from .body_profile import _infer_lane_body_profile, _line_uses_document_regular_font
+from .body_profile import _LaneProfileContext, _infer_lane_body_profile, _line_uses_document_regular_font
 from .common import _build_physical_title_gap_map, _line_inside_visual_container, _line_near_visual_container
 from .lane_titles import _classify_paragraph_titles_in_lane
 
@@ -479,6 +479,7 @@ def _classify_cross_lane_centered_section_titles(
     stable_lanes = [
         lane for lane in lanes if not lane.is_span and len(lane.lines) >= 5 and lane.right - lane.left >= 0.2 * local_page_width
     ]
+    context = _LaneProfileContext(stable_lanes)
     for line, bbox in line_geometry:
         if line.semantic_type is not None:
             continue
@@ -491,10 +492,10 @@ def _classify_cross_lane_centered_section_titles(
             candidate_lanes,
             key=lambda candidate: abs(_bbox_center_x(bbox) - 0.5 * (candidate.left + candidate.right)),
         )
-        profile = _infer_lane_body_profile(lane)
+        profile = context.profile(lane)
         lane_width = max(0.1, lane.right - lane.left)
         line_width = bbox[2] - bbox[0]
-        line_height = _line_effective_height(line, bbox)
+        line_height = context.height(line, bbox)
         if not 0.08 * lane_width <= line_width <= 0.7 * lane_width:
             continue
         if abs(_bbox_center_x(bbox) - 0.5 * (lane.left + lane.right)) > 0.05 * lane_width:
@@ -535,7 +536,7 @@ def _classify_cross_lane_centered_section_titles(
             if item[0] is not line
             and item[0].semantic_type is None
             and item[1][2] - item[1][0] >= 0.5 * lane_width
-            and 0.75 <= _line_effective_height(*item) / max(0.1, profile.body_height) <= 1.3
+            and 0.75 <= context.height(*item) / max(0.1, profile.body_height) <= 1.3
         ]
         rows_above = [item for item in body_rows if _bbox_center_y(item[1]) < _bbox_center_y(bbox)]
         rows_below = [item for item in body_rows if _bbox_center_y(item[1]) > _bbox_center_y(bbox)]
@@ -564,6 +565,7 @@ def _classify_cross_lane_centered_section_titles(
         ):
             continue
         line.semantic_type = "paragraph_title"
+        context.invalidate(line)
 
 
 def _demote_cross_lane_body_continuation_titles(
@@ -573,10 +575,11 @@ def _demote_cross_lane_body_continuation_titles(
     """把紧接上一正文行、同字号同字体的短续行从标题降回正文。"""
 
     stable_lanes = [lane for lane in lanes if not lane.is_span and len(lane.lines) >= 4]
+    context = _LaneProfileContext(stable_lanes)
     for line, bbox in line_geometry:
         if line.semantic_type != "paragraph_title":
             continue
-        line_height = _line_effective_height(line, bbox)
+        line_height = context.height(line, bbox)
         global_preceding = [
             item
             for item in line_geometry
@@ -611,6 +614,7 @@ def _demote_cross_lane_body_continuation_titles(
                 and previous_bbox[2] - previous_bbox[0] >= 2.0 * (bbox[2] - bbox[0])
             ):
                 line.semantic_type = None
+                context.invalidate(line)
                 continue
         candidate_lanes = [lane for lane in stable_lanes if lane.left <= _bbox_center_x(bbox) <= lane.right]
         if not candidate_lanes:
@@ -620,7 +624,7 @@ def _demote_cross_lane_body_continuation_titles(
             key=lambda candidate: abs(_bbox_center_x(bbox) - 0.5 * (candidate.left + candidate.right)),
         )
         lane_width = max(0.1, lane.right - lane.left)
-        lane_profile = _infer_lane_body_profile(lane)
+        lane_profile = context.profile(lane)
         if bbox[2] - bbox[0] > 0.55 * lane_width:
             continue
         preceding = [
@@ -641,7 +645,7 @@ def _demote_cross_lane_body_continuation_titles(
             previous_line,
             previous_bbox,
         )
-        line_height = _line_effective_height(line, bbox)
+        line_height = context.height(line, bbox)
         if not 0.9 <= line_height / max(0.1, previous_height) <= 1.1:
             continue
         if (
@@ -672,6 +676,7 @@ def _demote_cross_lane_body_continuation_titles(
         if abs(bbox[0] - lane.left) > max(1.0, 0.75 * line_height):
             continue
         line.semantic_type = None
+        context.invalidate(line)
 
 
 def _classify_cross_lane_emphasized_section_titles(
@@ -689,6 +694,7 @@ def _classify_cross_lane_emphasized_section_titles(
     stable_lanes = [
         lane for lane in lanes if not lane.is_span and len(lane.lines) >= 5 and lane.right - lane.left >= 0.2 * local_page_width
     ]
+    context = _LaneProfileContext(stable_lanes)
     for line, bbox in line_geometry:
         if line.semantic_type is not None or line.font_signature is None:
             continue
@@ -705,11 +711,11 @@ def _classify_cross_lane_emphasized_section_titles(
             candidate_lanes,
             key=lambda candidate: abs(bbox[0] - candidate.left),
         )
-        profile = _infer_lane_body_profile(lane)
+        profile = context.profile(lane)
         if profile.body_font is None or line.font_signature == profile.body_font or line.font_coverage < 0.75:
             continue
         lane_width = max(0.1, lane.right - lane.left)
-        line_height = _line_effective_height(line, bbox)
+        line_height = context.height(line, bbox)
         if bbox[2] - bbox[0] > 0.9 * lane_width:
             continue
         if abs(bbox[0] - lane.left) > 2.0 * profile.body_height:
@@ -747,6 +753,7 @@ def _classify_cross_lane_emphasized_section_titles(
         ):
             continue
         line.semantic_type = "paragraph_title"
+        context.invalidate(line)
 
 
 def _is_wide_leading_title_continuation(
