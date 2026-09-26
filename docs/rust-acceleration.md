@@ -1,8 +1,8 @@
 # Optional Rust PDF kernels
 
 See [Repository architecture](ARCHITECTURE.md) for the Python/Rust ownership boundary
-and binding-module layout. The current private extension protocol is **6**, shared by
-the Python loader and Rust core. Protocol 4 and 5 references below describe historical
+and binding-module layout. The current private extension protocol is **7**, shared by
+the Python loader and Rust core. Protocol 4, 5 and 6 references below describe historical
 interfaces or rollout stages, not the current loader requirement. Rebuild editable
 native installs and restart existing processes after updating native sources.
 
@@ -34,8 +34,9 @@ use an incremental accumulator matching the running CPython version's float-only
 inputs, other runtimes and intermediate overflow retain Python computation. Rust owns
 numeric batches and returns source ranges or indices. Canonical geometry reuses
 unchanged Python float objects and zero-rotation tuples to bound retained memory. Original `Char` references and
-copy-on-merge source-index behavior are retained. Small bounded caches contain only
-immutable Unicode features; they do not retain documents or use object addresses.
+copy-on-merge source-index behavior are retained. Process-wide caches contain only
+immutable Unicode features. Geometry, font and table preparation caches retain input
+references only for the active analysis or candidate build, and never retain native handles.
 
 ## Kernels
 
@@ -204,6 +205,21 @@ assert native state is actually used, not merely that an extension can be import
 
 The experimental native mapping pre-grouping kernel remains disabled in production:
 whole-entry measurements showed its packing cost exceeded its calculation benefit.
+
+Sixth-round inline geometry uses private protocol 7. Ordinary script classification
+batches contain at most 64 independent lines or 8,192 characters; a longer individual
+line is processed alone without splitting its classification scope. Formula segments,
+citation protection, first-match ties and final Python token materialization remain.
+Fraction filtering uses directional character indices and each cell's own character
+set and median height. Post-semantic line candidates preserve both same-baseline and
+edge-alignment paths before the original business predicate runs.
+
+Rule-band reuse requires identical, ordered, contiguous row references and strictly
+ordered finite rules. Repeated rules and unsupported inputs retain the reference path.
+At most 16 corridor band indices and 8,192 prepared marker lines / 16,384 glyphs are
+retained within one candidate build. Eviction recomputes evidence. Candidate enumeration,
+scoring, boundary double ownership, first-source choices and final conflict resolution
+remain unchanged.
 It is retained for differential coverage. No additional environment switch is exposed.
 
 For four-way revision acceptance, freeze the old checkout with its matching binary and
