@@ -11,6 +11,9 @@ from docvortex.analyzers.native.pdf.title_analysis import body_profile, page_tit
 from docvortex.analyzers.native.pdf import char_geometry
 from docvortex._compute_backend import get_native
 from docvortex.document.pdf.native_contracts import PDFPageTextGeometry
+from docvortex.document.pdf.text import dedup
+from docvortex.document.pdf.text._contracts import Bbox
+from docvortex.analyzers.native.pdf.inline import detection, matching
 
 
 def _profile_lane(seed):
@@ -194,3 +197,87 @@ def test_font_cache_is_bounded_and_clears_before_special_conversion():
 
     cache.metadata({"name": "B", "size": ChangingSize()})
     assert cache.metadata(font)[1] == 12.0
+
+
+@pytest.mark.parametrize("seed", range(24))
+def test_stream_mapping_matches_exhaustive_sources(seed):
+    """普通映射流对照原完整分组，包含连字、重复来源和异常汉字映射。"""
+    rng = random.Random(seed)
+    font = {"name": "A", "size": 10.0, "flags": 0, "weight": 400.0}
+    chars = []
+    for index in range(80):
+        left = float(index // 3 * 5)
+        chars.append(
+            {
+                "char": rng.choice("AAff 人人⼈1 "),
+                "char_idx": index,
+                "source_indices": (index,),
+                "bbox": Bbox([left, 0.0, left + 4.0, 10.0]),
+                "origin": (left, 9.0),
+                "font": font,
+                "rotation": 0.0,
+                "writing_angle": 0.0,
+                "text_object_id": index // 7,
+            }
+        )
+    before = deepcopy([{**char, "bbox": tuple(char["bbox"].bbox)} for char in chars])
+    assert dedup._mapping_groups(chars) == dedup._mapping_groups_reference(chars)
+    assert [{**char, "bbox": tuple(char["bbox"].bbox)} for char in chars] == before
+    for glyph in dedup._mapping_groups(chars):
+        if len(glyph.chars) == 1 and glyph.chars[0] == chars[glyph.chars[0]["char_idx"]]:
+            assert glyph.chars[0] is chars[glyph.chars[0]["char_idx"]]
+
+
+def test_mapping_special_object_preserves_error_order():
+    """特殊来源先走原分组，不能提前物化框或吞掉原异常。"""
+    chars = [{"char": "A", "char_idx": 0, "bbox": None, "font": {}, "rotation": None}]
+    with pytest.raises(TypeError):
+        dedup._mapping_groups(chars)
+    with pytest.raises(TypeError):
+        dedup._mapping_groups_reference(chars)
+
+
+@pytest.mark.parametrize("seed", range(12))
+def test_style_preparation_matches_original_materialization(seed, monkeypatch):
+    """无绘图线的普通字体分类快路径与原几何、粗体过滤完整输出相同。"""
+    rng = random.Random(seed)
+    lines = []
+    for number in range(20):
+        chars = []
+        for index, text in enumerate("A1 • 中文f"):
+            left = float(index * 5)
+            chars.append(
+                {
+                    "char": text,
+                    "char_idx": index,
+                    "bbox": (left, 0.0, left + 4.0, 10.0),
+                    "font": {"name": "A", "flags": 0, "weight": rng.choice([400.0, 700.0])},
+                }
+            )
+        lines.append(_LineItem("text", (0.0, 0.0, 50.0, 10.0), 0, number, chars=chars))
+    before = deepcopy(lines)
+    actual = detection.detect_pdf_text_style_lines(lines, [])
+    with monkeypatch.context() as patch:
+        patch.setattr(detection, "_prepare_plain_style_line", lambda *_args: None)
+        expected = detection.detect_pdf_text_style_lines(lines, [])
+    assert actual == expected
+    assert lines == before
+
+
+def test_projection_cache_tracks_content_and_bounds():
+    """精确内容变化、重复身份、公式与超长文本均保持原投影且容量有界。"""
+    cache = matching._ContentProjectionCache()
+    block = {"content": "A\\(x\\)B"}
+    first = cache.project(block, block["content"])
+    assert first == matching._project_content_chars(block["content"])
+    assert cache.project(block, block["content"]) is first
+    block["content"] = "<b>A</b>1"
+    assert cache.project(block, block["content"]) == matching._project_content_chars(block["content"])
+    for index in range(300):
+        item = {"content": str(index) * 40}
+        assert cache.project(item, item["content"]) == matching._project_content_chars(item["content"])
+        assert len(cache.values) <= 256 and cache.characters <= 8192
+    long = {"content": "A" * 8193}
+    count = len(cache.values)
+    assert cache.project(long, long["content"]) == matching._project_content_chars(long["content"])
+    assert len(cache.values) == count and id(long) not in cache.values

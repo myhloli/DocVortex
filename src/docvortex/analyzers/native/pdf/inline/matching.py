@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Sequence
 
 from loguru import logger
@@ -31,6 +32,37 @@ from .types import (
     _ProjectedChar,
     _RawLinkInterval,
 )
+
+
+class _ContentProjectionCache:
+    """当前脚本物化调用内的只读投影缓存，按块身份及精确内容区分。"""
+
+    def __init__(self):
+        """容量同时受块数和投影字符数约束，不保留跨页面状态。"""
+        self.values = OrderedDict()
+        self.characters = 0
+
+    def project(self, block, content):
+        """特殊块或字符串沿用参考读取，普通缓存淘汰后重新计算。"""
+        if type(block) is not dict or type(content) is not str:
+            return _project_content_chars(content)
+        key = id(block)
+        cached = self.values.get(key)
+        if cached is not None:
+            if cached[0] is block and cached[1] == content:
+                self.values.move_to_end(key)
+                return cached[2]
+            self.characters -= len(cached[2])
+            del self.values[key]
+        result = _project_content_chars(content)
+        if len(result) > 8192:
+            return result
+        while self.values and (len(self.values) >= 256 or self.characters + len(result) > 8192):
+            _key, removed = self.values.popitem(last=False)
+            self.characters -= len(removed[2])
+        self.values[key] = (block, content, result)
+        self.characters += len(result)
+        return result
 
 
 def _resplit_evidence_segments(
@@ -295,6 +327,8 @@ def _assign_script_lines_to_blocks(
     blocks: list[dict[str, Any]],
     lines: Sequence[PDFTextScriptLine],
     page_size: tuple[float, float],
+    *,
+    projection_cache: _ContentProjectionCache | None = None,
 ) -> dict[int, list[PDFTextScriptLine]]:
     """保留整行主归属，并为无法投影的脚本区间补充 tight bbox 备用归属。"""
 
@@ -306,7 +340,12 @@ def _assign_script_lines_to_blocks(
         and (block_bbox := _block_bbox_to_page_bbox(block.get("bbox"), page_size)) is not None
     }
     target_projected = {
-        block_index: _project_content_chars(str(blocks[block_index]["content"])) for block_index in target_bboxes
+        block_index: (
+            projection_cache.project(blocks[block_index], str(blocks[block_index]["content"]))
+            if projection_cache is not None
+            else _project_content_chars(str(blocks[block_index]["content"]))
+        )
+        for block_index in target_bboxes
     }
     primary_assignments = _assign_lines_to_blocks(blocks, lines, page_size)
     assignments: dict[int, list[PDFTextScriptLine]] = {

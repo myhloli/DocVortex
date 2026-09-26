@@ -19,12 +19,17 @@ def _plain_profile_number(value) -> bool:
 class _LaneProfileContext:
     """在一次标题判定中复用只读行尺度；语义写入由调用方立即通知失效。"""
 
-    def __init__(self, lanes):
+    def __init__(self, lanes, line_geometry=None):
         """只接纳普通栏与行，记录所有身份归属以处理重复成员的失效。"""
         self.profiles = {}
         self.heights = {}
         self.memberships = {}
         self.plain = True
+        if line_geometry is not None:
+            if type(line_geometry) is not list:
+                self.plain = False
+                return
+            lanes = [*lanes, _TextLane(0.0, 0.0, line_geometry)]
         for lane in lanes:
             if (
                 type(lane) is not _TextLane
@@ -40,6 +45,8 @@ class _LaneProfileContext:
                 line, box = row
                 if (
                     type(line) is not _LineItem
+                    or type(line.text) is not str
+                    or type(line.angle) is not int
                     or type(box) not in (tuple, list)
                     or len(box) != 4
                     or not all(_plain_profile_number(value) for value in box)
@@ -97,6 +104,31 @@ class _LaneProfileContext:
         """语义变化后清除所有包含该行的栏统计，保留未变动的只读几何。"""
         for lane_id in self.memberships.get(id(line), ()):
             self.profiles.pop(lane_id, None)
+
+
+def _stage_profile_context(lanes, line_geometry, container_bboxes=(), document_body_profile=None):
+    """特殊容器或文档字体可能通过回调修改普通行，整阶段恢复原实时统计。"""
+    context = _LaneProfileContext(lanes, line_geometry)
+    boxes_plain = type(container_bboxes) in (tuple, list) and all(
+        type(box) in (tuple, list) and len(box) == 4 and all(_plain_profile_number(value) for value in box)
+        for box in container_bboxes
+    )
+    profile_plain = document_body_profile is None or (
+        type(document_body_profile) is _DocumentBodyProfile
+        and _plain_profile_number(document_body_profile.body_height)
+        and (document_body_profile.body_weight is None or _plain_profile_number(document_body_profile.body_weight))
+        and type(document_body_profile.regular_fonts) is frozenset
+        and all(
+            type(value) is tuple and len(value) == 2 and type(value[0]) is str and type(value[1]) is int
+            for value in document_body_profile.regular_fonts
+        )
+    )
+    if not boxes_plain or not profile_plain:
+        context.plain = False
+        context.profiles.clear()
+        context.heights.clear()
+        context.memberships.clear()
+    return context
 
 
 def _infer_document_body_profile(

@@ -378,7 +378,10 @@ class _ReadOnlyFontCache:
 
 def _font_run_key(char: dict[str, Any], angle: int, text: str, metadata_cache=None) -> tuple[RunKey, float]:
     """构造 run key；调用内缓存以字段值作键，字体发生变化时不会复用旧元数据。"""
-    font = char.get("font") or {}
+    font = char.get("font")
+    if type(metadata_cache) is _ReadOnlyFontCache and (type(char) is not dict or type(font) not in (dict, type(None))):
+        metadata_cache.values.clear()
+    font = font or {}
     if type(metadata_cache) is _ReadOnlyFontCache:
         if type(char) is not dict:
             metadata_cache.values.clear()
@@ -493,6 +496,7 @@ def _plain_source_records(line, geometry, anchors_only):
 
     if (
         type(line) is not _LineItem
+        or type(geometry) is not PDFPageTextGeometry
         or type(line.chars) is not list
         or any(type(values) is not dict for values in (geometry.tight_bboxes, geometry.loose_bboxes, geometry.origins))
     ):
@@ -528,7 +532,18 @@ def _prepared_line_geometry(line, geometry, page_size, *, anchors_only):
     from ._native_geometry import raw_bbox
 
     native = get_native()
-    if native is not None:
+    if (
+        native is not None
+        and type(page_size) in (tuple, list)
+        and len(page_size) == 2
+        and all(
+            type(value) is float and math.isfinite(value) or type(value) is int and -(2**53) <= value <= 2**53
+            for value in page_size
+        )
+        and type(line) is _LineItem
+        and type(line.angle) is int
+        and -(2**31) <= line.angle < 2**31
+    ):
         records = _plain_source_records(line, geometry, anchors_only)
         if records is not None:
             prepared = native.source_rows_plain(records, page_size, line.angle)

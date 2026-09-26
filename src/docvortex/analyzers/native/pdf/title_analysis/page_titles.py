@@ -16,7 +16,7 @@ from ..line_layout import (
     _title_fonts_compatible,
 )
 from ..models import _DocumentBodyProfile, _DocumentTitleProfile, _LineItem, _TextLane
-from .body_profile import _LaneProfileContext, _infer_lane_body_profile, _line_uses_document_regular_font
+from .body_profile import _infer_lane_body_profile, _line_uses_document_regular_font, _stage_profile_context
 from .common import _build_physical_title_gap_map, _line_inside_visual_container, _line_near_visual_container
 from .lane_titles import _classify_paragraph_titles_in_lane
 
@@ -479,7 +479,7 @@ def _classify_cross_lane_centered_section_titles(
     stable_lanes = [
         lane for lane in lanes if not lane.is_span and len(lane.lines) >= 5 and lane.right - lane.left >= 0.2 * local_page_width
     ]
-    context = _LaneProfileContext(stable_lanes)
+    context = _stage_profile_context(stable_lanes, line_geometry, container_bboxes)
     for line, bbox in line_geometry:
         if line.semantic_type is not None:
             continue
@@ -575,7 +575,7 @@ def _demote_cross_lane_body_continuation_titles(
     """把紧接上一正文行、同字号同字体的短续行从标题降回正文。"""
 
     stable_lanes = [lane for lane in lanes if not lane.is_span and len(lane.lines) >= 4]
-    context = _LaneProfileContext(stable_lanes)
+    context = _stage_profile_context(stable_lanes, line_geometry)
     for line, bbox in line_geometry:
         if line.semantic_type != "paragraph_title":
             continue
@@ -694,7 +694,7 @@ def _classify_cross_lane_emphasized_section_titles(
     stable_lanes = [
         lane for lane in lanes if not lane.is_span and len(lane.lines) >= 5 and lane.right - lane.left >= 0.2 * local_page_width
     ]
-    context = _LaneProfileContext(stable_lanes)
+    context = _stage_profile_context(stable_lanes, line_geometry, container_bboxes, document_body_profile)
     for line, bbox in line_geometry:
         if line.semantic_type is not None or line.font_signature is None:
             continue

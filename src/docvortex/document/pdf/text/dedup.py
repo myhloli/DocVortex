@@ -169,7 +169,91 @@ def _native_mapping_ranges(chars, native):
     return native.mapping_runs(records)
 
 
+def _mapping_groups_plain(chars):
+    """普通字符一次建立保护组及行框，特殊对象和汉字映射交给完整参考路径。"""
+    if type(chars) is not list:
+        return None
+    result, fonts = [], {}
+    group = []
+    previous = None
+    group_box = None
+    group_angle = 0.0
+    for char in chars:
+        if type(char) is not dict or type(char.get("char")) is not str or type(char.get("char_idx")) is not int:
+            return None
+        font = char.get("font")
+        if type(font) is not dict:
+            return None
+        if id(font) not in fonts:
+            if any(
+                type(key) is not str or type(value) not in (str, int, float, bool, type(None)) for key, value in font.items()
+            ):
+                return None
+            if len(fonts) >= 4096:
+                fonts.pop(next(iter(fonts)))
+            fonts[id(font)] = font
+        raw = char.get("bbox")
+        raw = raw.bbox if type(raw) is Bbox else raw
+        if type(raw) not in (tuple, list) or len(raw) != 4 or any(type(value) is not float for value in raw):
+            return None
+        origin, obj = char.get("origin"), char.get("text_object_id")
+        rotation = char.get("rotation")
+        angle = char.get("writing_angle", -rotation) if type(rotation) is float else None
+        source = char.get("source_indices", (char["char_idx"],))
+        if (
+            type(rotation) is not float
+            or type(angle) is not float
+            or obj is not None
+            and type(obj) is not int
+            or origin is not None
+            and (type(origin) is not tuple or len(origin) != 2 or any(type(value) is not float for value in origin))
+            or type(source) is not tuple
+            or not source
+            or any(type(index) is not int for index in source)
+        ):
+            return None
+        box = tuple(raw)
+        text = char["char"]
+        current = (obj, max(source), font, rotation, origin, box, text)
+        same = previous is not None and (
+            previous[0] is not None
+            and previous[0] == obj
+            and previous[1] + 1 == char["char_idx"]
+            and previous[2] == font
+            and previous[3] == rotation
+            and _close_values(previous[4], origin, _GEOMETRY_EPSILON)
+            and _close_values(previous[5], box, _GEOMETRY_EPSILON)
+            and bool(previous[6].strip())
+            and bool(text.strip())
+        )
+        if same:
+            # 不提前触发 Unicode 数据读取，异常汉字映射仍按原完整遍历顺序处理。
+            if text != group[0]["char"]:
+                return None
+            group.append(char)
+        else:
+            if group:
+                result.append(_Glyph(group, group_box, "".join(item["char"] for item in group), group_angle))
+            group = [char]
+            group_angle = angle
+            group_box = (
+                box
+                if math.isfinite(angle) and all(math.isfinite(value) for value in box) and box[2] > box[0] and box[3] > box[1]
+                else None
+            )
+        previous = current
+    if group:
+        result.append(_Glyph(group, group_box, "".join(item["char"] for item in group), group_angle))
+    return result
+
+
 def _mapping_groups(chars: list[Char]) -> list[_Glyph]:
+    """普通字符流直接建立原 Glyph，特殊字符保留原分组及异常顺序。"""
+    result = _mapping_groups_plain(chars)
+    return result if result is not None else _mapping_groups_reference(chars)
+
+
+def _mapping_groups_reference(chars: list[Char]) -> list[_Glyph]:
     """先建立保护组，仅合并不同编码指向同一个汉字的异常映射。"""
     # 整页入口实测中，原生前置分组的输入打包成本超过计算收益；保留内核差分但不默认启用。
     groups = _mapping_char_groups_python(chars)
