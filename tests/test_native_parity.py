@@ -84,7 +84,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 13, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 14, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)

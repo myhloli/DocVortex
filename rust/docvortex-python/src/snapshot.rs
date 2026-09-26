@@ -1,6 +1,6 @@
 //! 同库原始读取直接进入自有 canonical 快照，只在兼容边界构造 Python 字符。
 use docvortex_core::{
-    extraction, text_assignment,
+    extraction, text_assignment, text_content,
     text_pipeline::{self, TextChar},
     text_snapshot::{
         self as snapshot, Angle, Character, Font, InputCharacter, Properties, SnapshotError,
@@ -21,15 +21,17 @@ use std::{
     },
 };
 
+static SPAN_CONTENT_CALLS: AtomicU64 = AtomicU64::new(0);
 static SPAN_ASSIGNMENT_CALLS: AtomicU64 = AtomicU64::new(0);
 static SPAN_ASSIGNMENT_UNSUPPORTED: AtomicU64 = AtomicU64::new(0);
 
 /// 公开实际原生字符归属调用次数及显式不支持选择，避免把接口存在视为已执行。
 #[pyfunction]
-pub fn text_snapshot_stats() -> (u64, u64) {
+pub fn text_snapshot_stats() -> (u64, u64, u64) {
     (
         SPAN_ASSIGNMENT_CALLS.load(Ordering::Relaxed),
         SPAN_ASSIGNMENT_UNSUPPORTED.load(Ordering::Relaxed),
+        SPAN_CONTENT_CALLS.load(Ordering::Relaxed),
     )
 }
 
@@ -535,6 +537,7 @@ impl NativeTextSnapshot {
         })
     }
     /// 仅从自有快照读取字符；Python 只提供小型 span 框与现有标点配置，不重新打包字符字典。
+    #[pyo3(signature=(span_bboxes, median_height, stop_flags, start_flags, height_ratio, break_flags=None))]
     fn assign_spans(
         &self,
         py: Python<'_>,
@@ -543,6 +546,7 @@ impl NativeTextSnapshot {
         stop_flags: Vec<String>,
         start_flags: Vec<String>,
         height_ratio: f64,
+        break_flags: Option<Vec<String>>,
     ) -> PyResult<Option<Vec<Option<usize>>>> {
         if !self.supports_span_matching()
             || !median_height.is_finite()
@@ -587,7 +591,12 @@ impl NativeTextSnapshot {
                 {
                     flags |= text_assignment::PUNCTUATION;
                 }
-                if ch.text == "\r" || ch.text == "\n" {
+                if break_flags
+                    .as_ref()
+                    .map_or(ch.text == "\r" || ch.text == "\n", |flags| {
+                        flags.contains(&ch.text)
+                    })
+                {
                     flags |= text_assignment::BREAK;
                 }
                 if stop_flags.contains(&ch.text) {
@@ -609,6 +618,121 @@ impl NativeTextSnapshot {
             .detach(|| text_assignment::assign(&chars, &span_bboxes, median_height, height_ratio));
         SPAN_ASSIGNMENT_CALLS.fetch_add(1, Ordering::Relaxed);
         Ok(Some(result))
+    }
+    /// 正文已有共享上下标侧车时，字符归属及内容构造连续完成，仅输出每个 span 的文本和 PUA 计数。
+    fn prepare_span_texts<'py>(
+        &self,
+        py: Python<'py>,
+        span_bboxes: Vec<[f64; 4]>,
+        median_height: f64,
+        stop_flags: Vec<String>,
+        start_flags: Vec<String>,
+        height_ratio: f64,
+        break_flags: Vec<String>,
+        modifiers: HashMap<String, String>,
+        overlap_threshold: f64,
+        private_range: (u32, u32),
+    ) -> PyResult<Option<Bound<'py, PyList>>> {
+        if !overlap_threshold.is_finite()
+            || self
+                .data
+                .chars
+                .iter()
+                .any(|ch| !(ch.bbox[2] - ch.bbox[0]).is_finite())
+        {
+            return Ok(None);
+        }
+        let count = span_bboxes.len();
+        let Some(assigned) = self.assign_spans(
+            py,
+            span_bboxes,
+            median_height,
+            stop_flags,
+            start_flags,
+            height_ratio,
+            Some(break_flags.clone()),
+        )?
+        else {
+            return Ok(None);
+        };
+        let groups = text_content::groups(&assigned, count);
+        let unicode = py.import("unicodedata")?;
+        let category = unicode.getattr("category")?;
+        let normalize = unicode.getattr("normalize")?;
+        let mut spaces = HashSet::new();
+        let mut seen_chars = HashSet::new();
+        for ch in &self.data.chars {
+            for value in ch.text.chars() {
+                if seen_chars.insert(value)
+                    && pyo3::types::PyString::new(py, &value.to_string())
+                        .call_method0("isspace")?
+                        .extract::<bool>()?
+                {
+                    spaces.insert(value);
+                }
+            }
+        }
+        let mut compositions = HashMap::new();
+        let mut seen_pairs = HashSet::new();
+        for group in &groups {
+            let members = text_content::ordered(&self.data, group);
+            for pair in members.windows(2) {
+                if let Some((base, modifier)) = text_content::composition_pair(
+                    &self.data,
+                    pair[0],
+                    pair[1],
+                    &modifiers,
+                    overlap_threshold,
+                ) {
+                    let base = &self.data.chars[base].text;
+                    let modifier = &self.data.chars[modifier].text;
+                    let key = (base.clone(), modifier.clone());
+                    if seen_pairs.insert(key.clone())
+                        && category
+                            .call1((base,))?
+                            .extract::<String>()?
+                            .starts_with('L')
+                    {
+                        let composed: String = normalize
+                            .call1(("NFC", format!("{}{}", base, modifiers[modifier])))?
+                            .extract()?;
+                        if composed.chars().count() == 1 && &composed != base {
+                            compositions.insert(key, composed);
+                        }
+                    }
+                }
+            }
+        }
+        let breaks: HashSet<String> = break_flags.into_iter().collect();
+        let records = py.detach(|| {
+            text_content::build(
+                &self.data,
+                &groups,
+                &text_content::Rules {
+                    modifiers: &modifiers,
+                    threshold: overlap_threshold,
+                    compositions: &compositions,
+                    spaces: &spaces,
+                    breaks: &breaks,
+                    private_range,
+                },
+            )
+        });
+        let output = PyList::empty(py);
+        for record in records {
+            let text = match record.text {
+                Some(value) => Some(pyo3::types::PyString::new(py, &value).call_method0("strip")?),
+                None => None,
+            };
+            output.append((
+                text,
+                record.private_count,
+                record.text_count,
+                record.private_run,
+            ))?;
+        }
+        SPAN_CONTENT_CALLS.fetch_add(1, Ordering::Relaxed);
+        Ok(Some(output))
     }
     /// 报告实际所有权和策略，区分 Flash 可见文本与公开页面原始文本视图。
     fn info(&self) -> (usize, usize, bool, bool) {
