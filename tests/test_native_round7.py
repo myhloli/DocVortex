@@ -13,7 +13,7 @@ from docvortex._compute_backend import get_native
 from docvortex.document.pdf.native_contracts import PDFPageTextGeometry
 from docvortex.document.pdf.text import dedup
 from docvortex.document.pdf.text._contracts import Bbox
-from docvortex.analyzers.native.pdf.inline import detection, matching
+from docvortex.analyzers.native.pdf.inline import detection, matching, scripts
 
 
 def _profile_lane(seed):
@@ -321,3 +321,49 @@ def test_stage_profile_special_neighbors_disable_cache():
     assert not body_profile._stage_profile_context([lane], lane.lines, [(object(), 0.0, 1.0, 2.0)]).plain
     assert not body_profile._stage_profile_context([lane], lane.lines, scalars=(math.nan,)).plain
     assert not body_profile._stage_profile_context([lane], object()).plain
+
+
+def test_empty_script_analysis_preserves_backend_and_truth_callbacks(monkeypatch):
+    """空页省去分类准备，但原参数真值回调和强制后端错误仍需发生。"""
+    events = []
+
+    class Chars:
+        """模拟可观察的外部字符容器。"""
+
+        def __bool__(self):
+            """保留原调用顺序。"""
+            events.append("chars")
+            return False
+
+    def backend():
+        """模拟不兼容的强制扩展加载错误。"""
+        events.append("backend")
+        raise ImportError("incompatible backend")
+
+    monkeypatch.setattr("docvortex._compute_backend.get_native", backend)
+    with pytest.raises(ImportError):
+        scripts.detect_pdf_text_script_lines([], (100.0, 100.0), {}, {}, all_chars=Chars())
+    assert events == ["chars", "backend"]
+
+
+def test_native_mapping_keeps_mixed_glyph_groups():
+    """异字符保护组不触发全页二次准备，Unicode 及来源仍与穷举路径一致。"""
+    native = get_native()
+    if native is None:
+        pytest.skip("native backend is not selected")
+    chars = [
+        {
+            "char": text,
+            "char_idx": index,
+            "source_indices": (index,),
+            "font": {"name": "A"},
+            "bbox": Bbox([0.0, 0.0, 4.0, 10.0]),
+            "origin": (0.0, 9.0),
+            "rotation": 0.0,
+            "text_object_id": 1,
+        }
+        for index, text in enumerate("⼈人")
+    ]
+    assert native.mapping_glyph_rows(chars, Bbox) is not None
+    assert dedup._mapping_groups(chars) == dedup._mapping_groups_reference(chars)
+    assert dedup._mapping_groups(chars)[0].chars[0]["source_indices"] == (0, 1)

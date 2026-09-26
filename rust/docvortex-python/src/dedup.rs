@@ -32,7 +32,6 @@ pub(super) fn mapping_glyph_rows<'py>(
         [f64; 4],
         bool,
     )> = None;
-    let mut head_text: Option<Bound<'py, PyAny>> = None;
     for (position, item) in chars.iter().enumerate() {
         if !item.is_exact_instance_of::<PyDict>() {
             return Ok(None);
@@ -172,10 +171,7 @@ pub(super) fn mapping_glyph_rows<'py>(
             false
         };
         if same {
-            // 不提前物化异常汉字映射或连字，保留原 Unicode 转换及来源合并顺序。
-            if !head_text.as_ref().expect("mapping head exists").eq(&text)? {
-                return Ok(None);
-            }
+            // 异字符保护组也返回完整区间；Unicode 转换在全部准备完成后由 Python 执行。
             output.last_mut().expect("mapping group exists").1 = position + 1;
         } else {
             let box_tuple = if box4[2] > box4[0] && box4[3] > box4[1] {
@@ -189,7 +185,6 @@ pub(super) fn mapping_glyph_rows<'py>(
                 None
             };
             output.push((position, position + 1, box_tuple, angle));
-            head_text = Some(text);
         }
         previous = Some((object, last_source, font, rotation, origin, box4, has_text));
     }

@@ -1179,6 +1179,12 @@ def detect_pdf_text_script_lines(
     """检测 Flash 剩余自然文本行中的上下标候选。"""
     resolved_chars = all_chars or []
     resolved_drawings = drawing_lines or []
+    if type(lines) is list and not lines:
+        # 空页保留后端加载检查和参数真值读取，不创建不会被消费的分类闭包。
+        from ....._compute_backend import get_native
+
+        get_native()
+        return []
     fraction_members_by_angle = {
         angle: _fraction_member_indices(
             page_size,

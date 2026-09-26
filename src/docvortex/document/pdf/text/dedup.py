@@ -178,7 +178,14 @@ def _mapping_groups(chars: list[Char]) -> list[_Glyph]:
             result = []
             for first, last, box, angle in rows:
                 group = chars[first:last]
-                text = group[0]["char"] if last == first + 1 else "".join(char["char"] for char in group)
+                if last > first + 1 and len({char["char"] for char in group}) > 1:
+                    equivalents = {_canonical_han(char["char"]) for char in group}
+                    if len(equivalents) == 1 and _is_han(canonical := next(iter(equivalents))):
+                        replacement = group[0].copy()
+                        replacement["char"] = canonical
+                        replacement["source_indices"] = _source_indices(group)
+                        group = [replacement]
+                text = group[0]["char"] if len(group) == 1 else "".join(char["char"] for char in group)
                 result.append(_Glyph(group, box, text, angle))
             return result
     return _mapping_groups_reference(chars)

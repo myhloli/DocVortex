@@ -463,6 +463,8 @@ def detect_pdf_text_style_lines(
 ) -> list[PDFTextStyleLine]:
     """从视觉文本 run 与页面 drawing 中生成全部水平行样式证据。"""
 
+    if not lines:
+        return []
     no_horizontal_drawings = type(drawing_lines) in (list, tuple) and all(
         type(drawing) in (_AxisLine, PDFDrawingLine)
         and type(drawing.orientation) is str
