@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+import math
 from typing import Any
 
 from ..document.pdf import PDFPage, PDFPageSnapshot, PDFPageTextGeometry, PDFPageVectorGeometry
@@ -66,23 +67,41 @@ def prepare_text_evidence(
     from .native.pdf.inline.detection import detect_pdf_text_link_lines, detect_pdf_text_style_lines
     from .native.pdf.inline.scripts import detect_pdf_text_script_lines
     from .native.pdf.line_merging import merge_text_line_clusters
-    from .native.pdf.native_text import _build_native_line_items_from_chars
+    from .native.pdf.native_text import _build_native_line_items_from_chars, _build_native_line_items_from_records
 
+    native_records = None
     if snapshot is not None:
         if geometry is not None or vector_geometry is not None:
             raise ValueError("snapshot cannot be combined with explicit geometry")
         snapshot.validate_page(page)
-        geometry, vector_geometry = snapshot.text_geometry, snapshot.vector_geometry
+        ordinary_angles = (
+            type(supported_angles) in (list, tuple)
+            and bool(supported_angles)
+            and all(
+                (type(value) is float and math.isfinite(value)) or (type(value) is int and -(2**53) <= value <= 2**53)
+                for value in supported_angles
+            )
+        )
+        if snapshot._native_text is not None and ordinary_angles:
+            geometry, native_records = snapshot._native_text.prepare_visual_evidence(
+                snapshot.page_size, snapshot.rotation, supported_angles
+            )
+        else:
+            geometry = snapshot.text_geometry
+        vector_geometry = snapshot.vector_geometry
     geometry = geometry if geometry is not None else page.get_chars_with_geometry()
     page_size = tuple(float(value) for value in (snapshot.page_size if snapshot is not None else page.size))
     # 源字符只读；组行使用独立累加框，旋转等变换在消费处创建局部字符副本。
     chars = geometry.chars
-    lines = _build_native_line_items_from_chars(
-        chars,
-        page_size,
-        page_rotation=snapshot.rotation if snapshot is not None else page.rotation,
-        supported_angles=supported_angles,
-    )
+    if native_records is not None:
+        lines = _build_native_line_items_from_records(native_records, page_size)
+    else:
+        lines = _build_native_line_items_from_chars(
+            chars,
+            page_size,
+            page_rotation=snapshot.rotation if snapshot is not None else page.rotation,
+            supported_angles=supported_angles,
+        )
     drawing_lines = vector_geometry.drawing_lines if vector_geometry is not None else page.get_drawing_lines()
     styles = detect_pdf_text_style_lines(lines, drawing_lines)
     links = detect_pdf_text_link_lines(

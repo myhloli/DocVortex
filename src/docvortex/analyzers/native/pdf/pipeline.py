@@ -98,6 +98,7 @@ from .models import (
 )
 from .native_text import (
     _build_native_line_items_from_chars,
+    _build_native_line_items_from_records,
     _coerce_pdf_drawing_lines,
     _extract_decorative_text_rules,
     _median_native_glyph_width,
@@ -325,13 +326,18 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
         page_size = snapshot.page_size
         page_sizes.append(page_size)
         page_image_infos.append(snapshot.image_infos)
-        text_geometry = snapshot.text_geometry
+        native_text = getattr(snapshot, "native_text", None)
+        if native_text is not None:
+            text_geometry, records = native_text.prepare_visual_evidence(page_size, snapshot.rotation, (0.0, 90.0, 270.0))
+            lines = _build_native_line_items_from_records(records, page_size)
+        else:
+            text_geometry = snapshot.text_geometry
+            lines = _build_native_line_items_from_chars(
+                text_geometry.chars,
+                page_size,
+                page_rotation=snapshot.rotation,
+            )
         chars = text_geometry.chars
-        lines = _build_native_line_items_from_chars(
-            chars,
-            page_size,
-            page_rotation=snapshot.rotation,
-        )
         drawing_lines = _coerce_pdf_drawing_lines(snapshot.drawing_lines)
         lines, decorative_rules = _extract_decorative_text_rules(
             lines,

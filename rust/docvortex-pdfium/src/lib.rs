@@ -4,6 +4,7 @@ use std::ffi::{c_double, c_float, c_int, c_uint, c_ulong, c_void};
 pub mod fonts;
 pub mod objects;
 pub mod paths;
+pub mod text_colors;
 
 /// 保留原生错误分类，由绑定层映射到宿主异常。
 #[derive(Debug)]

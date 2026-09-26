@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 from .native_contracts import PDFLinkAnnotation, PDFPageTextGeometry, PDFPageVectorGeometry
 
@@ -16,15 +16,30 @@ class PDFPageSnapshot:
     page_index: int
     page_size: tuple[float, float]
     rotation: Literal[0, 90, 180, 270]
-    _geometry: PDFPageTextGeometry = field(repr=False, compare=False)
+    _geometry: PDFPageTextGeometry | None = field(repr=False, compare=False)
     _vectors: PDFPageVectorGeometry = field(repr=False, compare=False)
     _links: tuple[PDFLinkAnnotation, ...] = field(repr=False, compare=False)
     _owner: object = field(repr=False, compare=False)
+    _native_text: Any = field(default=None, repr=False, compare=False)
 
     @property
     def text_geometry(self) -> PDFPageTextGeometry:
         """兼容 Python 字符字典的可变约定，同时隔离消费者之间的修改。"""
+        if self._native_text is not None:
+            return self._native_text.materialize_geometry()
         return deepcopy(self._geometry)
+
+    def get_lines(self, superscript_height_threshold: float = 0.7, line_distance_threshold: float = 0.1):
+        """直接从原生快照生成基础文本行，特殊阈值保留原 Python 参数语义。"""
+        if (
+            self._native_text is not None
+            and type(superscript_height_threshold) is float
+            and type(line_distance_threshold) is float
+        ):
+            return self._native_text.prepare_grouped_evidence(superscript_height_threshold, line_distance_threshold)[1]
+        from .text import get_lines_from_chars
+
+        return get_lines_from_chars(self.text_geometry.chars, superscript_height_threshold, line_distance_threshold)
 
     @property
     def vector_geometry(self) -> PDFPageVectorGeometry:

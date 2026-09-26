@@ -10,6 +10,7 @@ mod fonts;
 mod geometry;
 mod pdfium;
 mod scripts;
+mod snapshot;
 mod spatial;
 mod statistics;
 mod table_candidates;
@@ -19,6 +20,11 @@ mod text_pipeline;
 /// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<snapshot::NativeTextSnapshot>()?;
+    module.add_function(wrap_pyfunction!(
+        snapshot::read_pdfium_text_snapshot,
+        module
+    )?)?;
     module.add_class::<fonts::NativeFontProvider>()?;
     module.add_class::<table_candidates::PreparedRuleCandidates>()?;
     module.add_function(wrap_pyfunction!(text_pipeline::group_text_lines, module)?)?;

@@ -8,7 +8,10 @@ use std::sync::{Mutex, OnceLock};
 static UNICODE_CACHE: OnceLock<Mutex<HashMap<char, u8>>> = OnceLock::new();
 
 /// 为页面中不同的非 ASCII 字符读取解释器版本对应的 Unicode 属性。
-fn unicode_properties(py: Python<'_>, chars: &[TextChar]) -> PyResult<UnicodeProperties> {
+pub(crate) fn unicode_properties(
+    py: Python<'_>,
+    chars: &[TextChar],
+) -> PyResult<UnicodeProperties> {
     let mut properties = UnicodeProperties::default();
     let cache = UNICODE_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     let mut missing = Vec::new();
@@ -186,6 +189,15 @@ pub fn group_text_lines<'py>(
     let unicode = unicode_properties(py, &records)?;
     let lines = py
         .detach(|| text_pipeline::group_text_lines(&records, height_threshold, distance, &unicode));
+    materialize_grouped_lines(py, chars, lines).map(Some)
+}
+
+/// 共用基础行输出物化逻辑，保证组行成员引用同次物化的字符与字体。
+pub(crate) fn materialize_grouped_lines<'py>(
+    py: Python<'py>,
+    chars: &Bound<'py, PyList>,
+    lines: Vec<text_pipeline::TextLine>,
+) -> PyResult<Bound<'py, PyList>> {
     let bbox_type = py
         .import("docvortex.document.pdf.text._contracts")?
         .getattr("Bbox")?;
@@ -216,7 +228,7 @@ pub fn group_text_lines<'py>(
         }
         output.append(line_value)?;
     }
-    Ok(Some(output))
+    Ok(output)
 }
 
 /// 连续完成基础组行和 Flash 视觉切分，只物化最终 run 与原字符引用。
@@ -248,6 +260,16 @@ pub fn prepare_visual_lines<'py>(
             &families,
         )
     });
+    materialize_visual_runs(py, chars, runs, &signatures).map(Some)
+}
+
+/// 仅在最终边界联合物化视觉 run，供普通列表入口及自有 Rust 快照共用。
+pub(crate) fn materialize_visual_runs<'py>(
+    py: Python<'py>,
+    chars: &Bound<'py, PyList>,
+    runs: Vec<text_pipeline::VisualTextRun>,
+    signatures: &[(String, i64)],
+) -> PyResult<Bound<'py, PyList>> {
     let output = PyList::empty(py);
     for run in runs {
         let members = PyList::empty(py);
@@ -281,7 +303,7 @@ pub fn prepare_visual_lines<'py>(
             run.paragraph_terminal,
         ))?;
     }
-    Ok(Some(output))
+    Ok(output)
 }
 
 /// 按字体对象去重读取签名，字体族归一化只在签名首次出现时调用既有规则。

@@ -48,6 +48,7 @@ def test_native_registration_contract(native):
         "group_text_lines": "(chars, height_threshold, distance)",
         "prepare_visual_lines": "(chars, size, page_rotation, supported_angles)",
         "read_pdfium_subpaths": "(addresses, handle)",
+        "read_pdfium_text_snapshot": "(addresses, color_addresses, handle, count, extended, frame, rotation, visibility)",
         "read_pdfium_chars": "(addresses, handle, count, extended)",
         "read_pdfium_objects": "(addresses, handle, kind, max_depth)",
         "read_pdfium_visual_batches": "(addresses, handle, count, extended, frame, angle)",
@@ -65,6 +66,7 @@ def test_native_registration_contract(native):
         "visual_runs": "(raw, overrides, flags, size, angle, fallback)",
     }
     classes = {
+        "NativeTextSnapshot": ("docvortex._native", None),
         "NativeFontProvider": (
             "docvortex._native",
             "(addresses, data, tables, cache_name, aliases, suffixes, classify_legacy)",
@@ -81,7 +83,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 11, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 12, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)

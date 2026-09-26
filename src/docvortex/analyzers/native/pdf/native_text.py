@@ -95,6 +95,11 @@ def _build_native_line_items_from_chars(
             page_rotation=page_rotation,
             supported_angles=supported_angles,
         )
+    return _build_native_line_items_from_records(records, page_size)
+
+
+def _build_native_line_items_from_records(records, page_size):
+    """把已完成原生计算的视觉记录物化为原有行对象，供字符列表和自有快照共用。"""
     normal_items: list[_LineItem] = []
     formula_items: list[_LineItem] = []
     for text, bbox, angle, members, row_id, run_index, split, formula, coarse, metrics, terminal in records:

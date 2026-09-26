@@ -36,8 +36,8 @@ def capture(pdf: Path, output: Path, expected: str) -> None:
         actual = backend_info()
         assert actual["pdfium_object_bridge_calls"] > 0, actual
         assert actual["pdfium_object_bridge_unavailable_reason"] is None, actual
-        assert actual["pdfium_bridge_calls"] > 0 or actual["pdfium_empty_pages"] > 0, actual
-        assert actual["pdfium_bridge_unavailable_reason"] is None, actual
+        assert actual["native_text_snapshot_calls"] > 0 or actual["native_text_snapshot_empty_pages"] > 0, actual
+        assert actual["native_text_snapshot_unavailable_reason"] is None, actual
         if actual["pdfium_bridge_calls"] > 0:
             assert actual["pdfium_record_batch_size"] == 1024, actual
     data = {

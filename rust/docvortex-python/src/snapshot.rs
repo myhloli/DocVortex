@@ -1,0 +1,587 @@
+//! 同库原始读取直接进入自有 canonical 快照，只在兼容边界构造 Python 字符。
+use docvortex_core::{
+    extraction,
+    text_pipeline::{self, TextChar},
+    text_snapshot::{
+        self as snapshot, Angle, Character, Font, InputCharacter, Properties, SnapshotError,
+        TextSnapshot,
+    },
+};
+use docvortex_pdfium::{ReadError, Record};
+use pyo3::{
+    exceptions::{PyKeyError, PyMemoryError, PyValueError},
+    prelude::*,
+    types::{PyBytes, PyDict, PyList, PyTuple},
+};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
+
+/// 保留读取错误类型，不把计算错误改写为参考路径选择。
+fn read_error(error: ReadError) -> PyErr {
+    match error {
+        ReadError::InvalidInput(message) => PyValueError::new_err(message),
+        ReadError::Pdfium(message) => super::pdfium::PdfiumReadError::new_err(message),
+        ReadError::Allocation(message) => PyMemoryError::new_err(message),
+    }
+}
+/// 保留缺失代理来源的 KeyError，其他已准入算法失败明确传播。
+fn snapshot_error(error: SnapshotError) -> PyErr {
+    match error {
+        SnapshotError::MissingSource(index) => PyKeyError::new_err(index),
+        SnapshotError::Invalid(message) => PyValueError::new_err(message),
+    }
+}
+/// 正负零属于相同字体值，但首个字体记录仍保存原始位型。
+fn number_key(value: f64) -> u64 {
+    if value == 0.0 {
+        0
+    } else {
+        value.to_bits()
+    }
+}
+/// 按不同字符串读取宿主 Unicode 语义，不为每个字符构造 Python 字典。
+fn prepare_properties(
+    py: Python<'_>,
+    values: impl IntoIterator<Item = String>,
+    output: &mut HashMap<String, Properties>,
+) -> PyResult<()> {
+    let han = py
+        .import("docvortex.document.pdf.text.dedup")?
+        .getattr("_is_han")?;
+    for value in values {
+        if output.contains_key(&value) {
+            continue;
+        }
+        let text = pyo3::types::PyString::new(py, &value);
+        let properties = Properties {
+            space: text.call_method0("isspace")?.extract()?,
+            canonical: value.clone(),
+            han: han.call1((&text,))?.extract()?,
+        };
+        output.insert(value, properties);
+    }
+    Ok(())
+}
+
+/// 只为实际映射组准备 canonical 值，保留普通页面不读取部首资源的惰性行为。
+fn prepare_mapping_properties(
+    py: Python<'_>,
+    chars: &[Character],
+    output: &mut HashMap<String, Properties>,
+) -> PyResult<()> {
+    let requested = snapshot::mapping_metadata(chars, output);
+    if requested.is_empty() {
+        return Ok(());
+    }
+    let canonical = py
+        .import("docvortex.document.pdf.text.dedup")?
+        .getattr("_canonical_han")?;
+    for text in requested {
+        let value: String = canonical.call1((&text,))?.extract()?;
+        prepare_properties(py, std::iter::once(value.clone()), output)?;
+        output
+            .get_mut(&text)
+            .expect("raw text properties prepared")
+            .canonical = value;
+    }
+    Ok(())
+}
+
+/// 按不同书写角保留 CPython round 的两种量化和 math.sin/cos 的平台结果。
+fn prepare_angles(py: Python<'_>, glyphs: &[snapshot::Glyph]) -> PyResult<HashMap<u64, Angle>> {
+    let math = py.import("math")?;
+    let round = py.import("builtins")?.getattr("round")?;
+    let mut output = HashMap::new();
+    for glyph in glyphs {
+        let key = glyph.angle.to_bits();
+        if output.contains_key(&key) {
+            continue;
+        }
+        let value = glyph.angle;
+        let rounded: f64 = round.call1((value, 3))?.extract()?;
+        output.insert(
+            key,
+            Angle {
+                cos: math.getattr("cos")?.call1((value,))?.extract()?,
+                sin: math.getattr("sin")?.call1((value,))?.extract()?,
+                rounded: number_key(rounded),
+                bucket: round.call1((value * 1000.0,))?.extract()?,
+            },
+        );
+    }
+    Ok(output)
+}
+/// 普通 PDF 数值准入在任何 canonical 算法前完成；异常量级必须明确选择参考实现。
+fn supported(records: &[Record], frame: [f64; 4]) -> bool {
+    let ordinary = |value: f64| value.is_finite() && value.abs() <= 1e12;
+    frame.into_iter().all(ordinary)
+        && records.iter().all(|record| {
+            ordinary(record.1)
+                && ordinary(record.5)
+                && record
+                    .2
+                    .into_iter()
+                    .flat_map(|b| [b.0, b.1, b.2, b.3])
+                    .all(ordinary)
+                && record
+                    .3
+                    .into_iter()
+                    .flat_map(|b| [b.0, b.1, b.2, b.3])
+                    .all(ordinary)
+                && record.9.into_iter().flat_map(|p| [p.0, p.1]).all(ordinary)
+        })
+}
+
+#[pyclass(frozen, weakref, module = "docvortex._native")]
+pub struct NativeTextSnapshot {
+    data: Arc<TextSnapshot>,
+}
+
+/// 同步借用 PDFium 读取原始字符；函数和句柄由已核验 ABI 的宿主 guard 保活。
+#[pyfunction]
+pub fn read_pdfium_text_snapshot(
+    py: Python<'_>,
+    addresses: Vec<usize>,
+    color_addresses: [usize; 2],
+    handle: usize,
+    count: usize,
+    extended: bool,
+    frame: [f64; 4],
+    rotation: i32,
+    visibility: Option<HashMap<usize, (bool, Option<[f64; 4]>)>>,
+) -> PyResult<Option<NativeTextSnapshot>> {
+    if color_addresses.contains(&0) || ![0, 90, 180, 270].contains(&rotation) {
+        return Err(PyValueError::new_err("invalid snapshot ABI or rotation"));
+    }
+    let (records, raw_fonts) =
+        unsafe { docvortex_pdfium::read_characters(addresses, handle, count, extended) }
+            .map_err(read_error)?;
+    if !supported(&records, frame)
+        || visibility.as_ref().is_some_and(|items| {
+            items.values().any(|(_, clip)| {
+                clip.is_some_and(|b| b.iter().any(|v| !v.is_finite() || v.abs() > 1e12))
+            })
+        })
+    {
+        return Ok(None);
+    }
+    let mut properties = HashMap::new();
+    let mut scalars: HashSet<String> = records
+        .iter()
+        .map(|r| char::from_u32(r.0).unwrap_or('\u{fffd}').to_string())
+        .collect();
+    for pair in records.windows(2) {
+        if (0xd800..=0xdbff).contains(&pair[0].0) && (0xdc00..=0xdfff).contains(&pair[1].0) {
+            scalars.insert(
+                char::from_u32(0x10000 + ((pair[0].0 - 0xd800) << 10) + pair[1].0 - 0xdc00)
+                    .unwrap()
+                    .to_string(),
+            );
+        }
+    }
+    prepare_properties(py, scalars, &mut properties)?;
+    let decoded: Vec<(String, i32)> = raw_fonts
+        .into_iter()
+        .map(|(name, flags)| {
+            PyBytes::new(py, &name)
+                .call_method1("decode", ("utf-8", "replace"))?
+                .extract::<String>()
+                .map(|name| (name, flags))
+        })
+        .collect::<PyResult<_>>()?;
+    let geometry = extraction::materialize(
+        records
+            .iter()
+            .map(|r| {
+                let selected = if r.1 == 0.0 { r.2 } else { r.3 };
+                (
+                    selected.expect("reader validated selected box").into(),
+                    if extended { r.2.map(Into::into) } else { None },
+                    if extended { r.3.map(Into::into) } else { None },
+                    r.9.map(Into::into),
+                )
+            })
+            .collect(),
+        frame,
+        [
+            (frame[2] - frame[0]).abs().ceil(),
+            (frame[3] - frame[1]).abs().ceil(),
+        ],
+        rotation,
+    );
+    let mut fonts = Vec::new();
+    let mut font_ids = HashMap::new();
+    let mut objects = HashMap::new();
+    let mut input = Vec::with_capacity(records.len());
+    for (index, (r, (bbox, loose, tight, origin))) in records.into_iter().zip(geometry).enumerate()
+    {
+        let (name, flags) = &decoded[r.4];
+        let key = (name.clone(), *flags, number_key(r.5), r.6);
+        let font = *font_ids.entry(key).or_insert_with(|| {
+            let id = fonts.len();
+            fonts.push(Font {
+                name: name.clone(),
+                name_id: r.4,
+                flags: *flags,
+                size: r.5,
+                weight: r.6,
+            });
+            id
+        });
+        let object = if r.7 == 0 {
+            None
+        } else {
+            let next = objects.len();
+            Some(*objects.entry(r.7).or_insert(next))
+        };
+        let (admitted, clip) = visibility
+            .as_ref()
+            .and_then(|v| v.get(&r.7))
+            .copied()
+            .unwrap_or((true, None));
+        input.push(InputCharacter {
+            admitted,
+            clip,
+            character: Character {
+                text: char::from_u32(r.0).unwrap_or('\u{fffd}').to_string(),
+                bbox,
+                rotation: r.1,
+                font,
+                index,
+                sources: vec![index],
+                code: r.0,
+                object,
+                mode: r.8,
+                writing_angle: (rotation as f64) * (std::f64::consts::PI / 180.0) - r.1,
+                origin,
+                loose,
+                tight,
+                visible: None,
+            },
+        });
+    }
+    let mut chars = snapshot::initialize(input, &properties);
+    let mut runs = snapshot::writing_runs(&chars);
+    let mut directions = HashMap::new();
+    let math = py.import("math")?;
+    let hypot = math.getattr("hypot")?;
+    let atan2 = math.getattr("atan2")?;
+    loop {
+        let requested = snapshot::advance_writing_angles(&mut chars, &mut runs, &directions);
+        if requested.is_empty() {
+            break;
+        }
+        for (dx, dy) in requested {
+            let (x, y) = (f64::from_bits(dx), f64::from_bits(dy));
+            let valid = hypot.call1((x, y))?.extract::<f64>()? > 0.001;
+            let angle = if valid {
+                atan2.call1((y, x))?.extract()?
+            } else {
+                0.0
+            };
+            directions.insert((dx, dy), (valid, angle));
+        }
+    }
+    if chars.iter().any(|ch| ch.mode == Some(3)) {
+        let mut objects = HashMap::new();
+        let mut queries = Vec::new();
+        for ch in &chars {
+            if let Some(object) = ch.object {
+                objects.entry(object).or_insert_with(|| {
+                    let id = queries.len();
+                    queries.push((ch.index, ch.mode));
+                    id
+                });
+            }
+        }
+        let visible = unsafe {
+            docvortex_pdfium::text_colors::read_visible(color_addresses, handle, &queries)
+        }
+        .map_err(read_error)?;
+        for ch in &mut chars {
+            ch.visible = Some(ch.object.is_some_and(|id| visible[objects[&id]]));
+        }
+    }
+    let chars = snapshot::restore_surrogates(chars, count).map_err(snapshot_error)?;
+    prepare_mapping_properties(py, &chars, &mut properties)?;
+    let glyphs = snapshot::mapping_groups(chars, &properties);
+    let angles = prepare_angles(py, &glyphs)?;
+    let glyphs = py
+        .detach(|| snapshot::collapse_paints(glyphs, &angles, &properties))
+        .map_err(snapshot_error)?;
+    let pairs = py
+        .detach(|| snapshot::hidden_pairs(&glyphs, &angles, &properties))
+        .map_err(snapshot_error)?;
+    let mut normalized = HashMap::new();
+    if !pairs.is_empty() {
+        let comparison = py
+            .import("docvortex.document.pdf.text.dedup")?
+            .getattr("_comparison_text")?;
+        for (a, b) in &pairs {
+            for indices in [a, b] {
+                let text: String = indices.iter().map(|&i| glyphs[i].text.as_str()).collect();
+                if let std::collections::hash_map::Entry::Vacant(entry) = normalized.entry(text) {
+                    let value: String = comparison.call1((entry.key(),))?.extract()?;
+                    prepare_properties(py, value.chars().map(|c| c.to_string()), &mut properties)?;
+                    entry.insert(value);
+                }
+            }
+        }
+    }
+    let chars = py.detach(|| snapshot::suppress_hidden(glyphs, pairs, &normalized, &properties));
+    Ok(Some(NativeTextSnapshot {
+        data: Arc::new(TextSnapshot {
+            chars,
+            fonts,
+            extended,
+            visible_only: visibility.is_some(),
+        }),
+    }))
+}
+
+impl NativeTextSnapshot {
+    /// 一次物化中的字体字典共享，字符和 Bbox 独立；不会在 Rust 快照缓存 Python 可变对象。
+    fn geometry<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyList>)> {
+        let bbox_type = py
+            .import("docvortex.document.pdf.text._contracts")?
+            .getattr("Bbox")?;
+        let chars = PyList::empty(py);
+        let tight = PyDict::new(py);
+        let loose = PyDict::new(py);
+        let origins = PyDict::new(py);
+        let mut fonts: HashMap<usize, Bound<'py, PyDict>> = HashMap::new();
+        let mut names: HashMap<usize, Bound<'py, pyo3::types::PyString>> = HashMap::new();
+        for ch in &self.data.chars {
+            if let std::collections::hash_map::Entry::Vacant(entry) = fonts.entry(ch.font) {
+                let font = &self.data.fonts[ch.font];
+                let value = PyDict::new(py);
+                let name = names
+                    .entry(font.name_id)
+                    .or_insert_with(|| pyo3::types::PyString::new(py, &font.name));
+                value.set_item(pyo3::intern!(py, "name"), &*name)?;
+                value.set_item(pyo3::intern!(py, "flags"), font.flags)?;
+                value.set_item(pyo3::intern!(py, "size"), font.size)?;
+                value.set_item(pyo3::intern!(py, "weight"), font.weight)?;
+                entry.insert(value);
+            }
+            let value = PyDict::new(py);
+            value.set_item(
+                pyo3::intern!(py, "bbox"),
+                bbox_type.call1((ch.bbox.to_vec(),))?,
+            )?;
+            value.set_item(pyo3::intern!(py, "char"), &ch.text)?;
+            value.set_item(pyo3::intern!(py, "rotation"), ch.rotation)?;
+            value.set_item(pyo3::intern!(py, "font"), &fonts[&ch.font])?;
+            value.set_item(pyo3::intern!(py, "char_idx"), ch.index)?;
+            value.set_item(
+                pyo3::intern!(py, "source_indices"),
+                PyTuple::new(py, ch.sources.iter().copied())?,
+            )?;
+            value.set_item(pyo3::intern!(py, "raw_code"), ch.code)?;
+            value.set_item(pyo3::intern!(py, "text_object_id"), ch.object)?;
+            value.set_item(pyo3::intern!(py, "text_render_mode"), ch.mode)?;
+            value.set_item(pyo3::intern!(py, "writing_angle"), ch.writing_angle)?;
+            value.set_item(pyo3::intern!(py, "origin"), ch.origin.map(|p| (p[0], p[1])))?;
+            if self.data.extended {
+                value.set_item(
+                    pyo3::intern!(py, "loose_bbox"),
+                    ch.loose.map(|b| (b[0], b[1], b[2], b[3])),
+                )?;
+                value.set_item(
+                    pyo3::intern!(py, "tight_bbox"),
+                    ch.tight.map(|b| (b[0], b[1], b[2], b[3])),
+                )?;
+                if ch.loose.is_some() && ch.rotation.abs() > 1e-9 {
+                    loose.set_item(ch.index, value.get_item("loose_bbox")?.unwrap())?;
+                }
+                if ch.tight.is_some() {
+                    tight.set_item(ch.index, value.get_item("tight_bbox")?.unwrap())?;
+                }
+                if ch.origin.is_some() {
+                    origins.set_item(ch.index, value.get_item("origin")?.unwrap())?;
+                }
+            }
+            if let Some(visible) = ch.visible {
+                value.set_item(pyo3::intern!(py, "text_is_visible"), visible)?;
+            }
+            chars.append(value)?;
+        }
+        let geometry = py
+            .import("docvortex.document.pdf.native_contracts")?
+            .getattr("PDFPageTextGeometry")?
+            .call1((&chars, tight, origins, loose))?;
+        Ok((geometry, chars))
+    }
+}
+
+#[pymethods]
+impl NativeTextSnapshot {
+    /// 兼容属性每次创建独立输出，快照在页面关闭后仍能使用。
+    fn materialize_geometry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.geometry(py).map(|(geometry, _)| geometry)
+    }
+    /// 不可变 Rust 数据可安全共享给 deepcopy，绝不缓存兼容 Python 字典。
+    fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> Self {
+        Self {
+            data: self.data.clone(),
+        }
+    }
+    /// 自有数据直接生成基础组行结果，供表格方向等早期消费者使用。
+    #[pyo3(signature=(height_threshold=0.7, distance=0.1))]
+    fn prepare_grouped_evidence<'py>(
+        &self,
+        py: Python<'py>,
+        height_threshold: f64,
+        distance: f64,
+    ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyList>)> {
+        let records: Vec<TextChar> = self
+            .data
+            .chars
+            .iter()
+            .map(|ch| TextChar {
+                bbox: ch.bbox,
+                text: ch.text.clone(),
+                rotation: ch.rotation,
+                font_id: ch.font,
+                font_size: Some(self.data.fonts[ch.font].size),
+                signature_id: None,
+                font_weight: None,
+            })
+            .collect();
+        let unicode = super::text_pipeline::unicode_properties(py, &records)?;
+        let lines = py.detach(|| {
+            text_pipeline::group_text_lines(&records, height_threshold, distance, &unicode)
+        });
+        let (geometry, chars) = self.geometry(py)?;
+        let lines = super::text_pipeline::materialize_grouped_lines(py, &chars, lines)?;
+        Ok((geometry, lines))
+    }
+    /// 方向判断只物化粗行的框、旋转和文本，不创建任何 Python Char、字体或 Bbox 对象。
+    #[pyo3(signature=(height_threshold=0.7, distance=0.1))]
+    fn get_line_summaries<'py>(
+        &self,
+        py: Python<'py>,
+        height_threshold: f64,
+        distance: f64,
+    ) -> PyResult<Bound<'py, PyList>> {
+        let records: Vec<TextChar> = self
+            .data
+            .chars
+            .iter()
+            .map(|ch| TextChar {
+                bbox: ch.bbox,
+                text: ch.text.clone(),
+                rotation: ch.rotation,
+                font_id: ch.font,
+                font_size: Some(self.data.fonts[ch.font].size),
+                signature_id: None,
+                font_weight: None,
+            })
+            .collect();
+        let unicode = super::text_pipeline::unicode_properties(py, &records)?;
+        let lines = py.detach(|| {
+            text_pipeline::group_text_lines(&records, height_threshold, distance, &unicode)
+        });
+        let output = PyList::empty(py);
+        for line in lines {
+            let row = PyDict::new(py);
+            let spans = PyList::empty(py);
+            row.set_item(
+                pyo3::intern!(py, "bbox"),
+                (line.bbox[0], line.bbox[1], line.bbox[2], line.bbox[3]),
+            )?;
+            row.set_item(pyo3::intern!(py, "rotation"), line.rotation)?;
+            for span in line.spans {
+                let value = PyDict::new(py);
+                value.set_item(pyo3::intern!(py, "text"), span.text)?;
+                spans.append(value)?;
+            }
+            row.set_item(pyo3::intern!(py, "spans"), spans)?;
+            output.append(row)?;
+        }
+        Ok(output)
+    }
+    /// 报告实际所有权和策略，区分 Flash 可见文本与公开页面原始文本视图。
+    fn info(&self) -> (usize, usize, bool, bool) {
+        (
+            self.data.chars.len(),
+            self.data.fonts.len(),
+            self.data.extended,
+            self.data.visible_only,
+        )
+    }
+    /// 自有 canonical 记录直接组行；完成纯计算后才联合物化字符与引用它们的视觉行。
+    fn prepare_visual_evidence<'py>(
+        &self,
+        py: Python<'py>,
+        size: [f64; 2],
+        rotation: i32,
+        supported_angles: Vec<f64>,
+    ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyList>)> {
+        if size.iter().chain(&supported_angles).any(|v| !v.is_finite()) {
+            return Err(PyValueError::new_err("nonfinite visual snapshot arguments"));
+        }
+        let normalize = py
+            .import("docvortex.analyzers.native.pdf.typography")?
+            .getattr("_normalized_font_family")?;
+        let mut signatures = Vec::new();
+        let mut signature_ids = HashMap::new();
+        let mut family_ids = HashMap::new();
+        let mut families = Vec::new();
+        let mut font_info = HashMap::new();
+        let mut records = Vec::with_capacity(self.data.chars.len());
+        for ch in &self.data.chars {
+            let font = &self.data.fonts[ch.font];
+            if let std::collections::hash_map::Entry::Vacant(entry) = font_info.entry(ch.font) {
+                let id = if font.name.is_empty() {
+                    None
+                } else {
+                    let signature = (font.name.clone(), font.flags as i64);
+                    let id = if let Some(&id) = signature_ids.get(&signature) {
+                        id
+                    } else {
+                        let id = signatures.len();
+                        let family: Option<String> =
+                            normalize.call1((signature.clone(),))?.extract()?;
+                        let next = family_ids.len();
+                        families.push(family.map(|name| *family_ids.entry(name).or_insert(next)));
+                        signature_ids.insert(signature.clone(), id);
+                        signatures.push(signature);
+                        id
+                    };
+                    Some(id)
+                };
+                entry.insert((
+                    id,
+                    (id.is_some() && font.weight > 0).then_some(font.weight as f64),
+                ));
+            }
+            let (signature_id, font_weight) = font_info[&ch.font];
+            records.push(TextChar {
+                bbox: ch.bbox,
+                text: ch.text.clone(),
+                rotation: ch.rotation,
+                font_id: ch.font,
+                font_size: Some(font.size),
+                signature_id,
+                font_weight,
+            });
+        }
+        let unicode = super::text_pipeline::unicode_properties(py, &records)?;
+        let runs = py.detach(|| {
+            text_pipeline::prepare_visual_lines(
+                &records,
+                size,
+                rotation,
+                &supported_angles,
+                &unicode,
+                &families,
+            )
+        });
+        let (geometry, chars) = self.geometry(py)?;
+        let lines = super::text_pipeline::materialize_visual_runs(py, &chars, runs, &signatures)?;
+        Ok((geometry, lines))
+    }
+}

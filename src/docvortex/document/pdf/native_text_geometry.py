@@ -130,7 +130,9 @@ def _extract_page_text_geometry(
     *,
     include_extended_geometry: bool,
     visible_only: bool = False,
-) -> PDFPageTextGeometry:
+    compact: bool = False,
+    compact_only: bool = False,
+) -> PDFPageTextGeometry | None:
     """在调用方持有的页面和锁内读取字符，使批量提取与独立接口共用实现。"""
     textpage = None
     try:
@@ -142,6 +144,14 @@ def _extract_page_text_geometry(
         except Exception:
             pass
         visibility = _text_object_visibility(page, tuple(raw_page_bbox), page_rotation) if visible_only else None
+        if compact:
+            from .snapshot_bridge import read_text_snapshot
+
+            snapshot = read_text_snapshot(textpage, raw_page_bbox, page_rotation, include_extended_geometry, visibility)
+            if snapshot is not None:
+                return snapshot
+            if compact_only:
+                return None
         options = {"visibility_by_object": visibility} if visible_only else {}
         chars = get_chars(textpage, raw_page_bbox, page_rotation, include_geometry=include_extended_geometry, **options)
         raw_codes = {char["char_idx"]: char["raw_code"] for char in chars}

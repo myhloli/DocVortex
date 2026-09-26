@@ -258,6 +258,9 @@ logger = logging.getLogger(__name__)
 get_chars = _text_extract.get_chars
 
 
+_STANDARD_TEXT_GEOMETRY_EXTRACTOR = _extract_page_text_geometry
+
+
 class PDFPage:
     def __init__(self, pdf_doc: "PDFDocument", idx: int) -> None:
         self.pdf_doc = pdf_doc
@@ -282,6 +285,16 @@ class PDFPage:
     def get_chars_with_geometry(self) -> PDFPageTextGeometry:
         """一次读取字符及 Hybrid TXT 匹配所需的额外几何。"""
         return self.pdf_doc.get_page_chars_with_geometry(self._idx)
+
+    def get_text_snapshot(self):
+        """仅获取独立原生文本证据，不提前解析路径或链接；参考后端返回None。"""
+        from ..._compute_backend import get_native
+
+        native = get_native()
+        if native is None or not hasattr(native, "NativeTextSnapshot"):
+            return None
+        text = self.pdf_doc._get_owned_text_snapshot(self._idx, visible_only=False)
+        return text if isinstance(text, native.NativeTextSnapshot) else None
 
     def get_snapshot(self) -> PDFPageSnapshot:
         """一次打开页面取得共享证据，快照可在文档关闭后继续使用。"""
@@ -333,6 +346,7 @@ class PDFDocument:
         self._classification: Literal["ocr", "txt"] | None = None
         self._snapshot_owner = object()
         self._page_snapshots: WeakValueDictionary[int, PDFPageSnapshot] = WeakValueDictionary()
+        self._owned_text_snapshots: WeakValueDictionary = WeakValueDictionary()
         if isinstance(pdf_bytes_or_path, bytes):
             self._pdf_bytes: bytes = pdf_bytes_or_path
         else:
@@ -600,6 +614,40 @@ class PDFDocument:
         """一次读取字符、tight bbox 和字符原点，避免 Hybrid 重复打开 textpage。"""
         return self._get_page_text_geometry(page_idx, include_extended_geometry=True)
 
+    def _extract_owned_text_snapshot(self, page_idx: int, page, *, visible_only: bool, reference: bool = True):
+        """只提取并弱缓存自有文本，完整页面快照复用它而不引入额外矢量或链接依赖。"""
+        key = (page_idx, visible_only)
+        cached = self._owned_text_snapshots.get(key)
+        if cached is not None:
+            return cached
+        if _extract_page_text_geometry is not _STANDARD_TEXT_GEOMETRY_EXTRACTOR:
+            # 非标准替换入口保留原签名与异常，不把新参数传给旧扩展或失败注入器。
+            return (
+                _extract_page_text_geometry(page, include_extended_geometry=True, visible_only=visible_only)
+                if reference
+                else None
+            )
+        text = _extract_page_text_geometry(
+            page, include_extended_geometry=True, visible_only=visible_only, compact=True, compact_only=not reference
+        )
+        if text is not None and not isinstance(text, PDFPageTextGeometry):
+            self._owned_text_snapshots[key] = text
+        return text
+
+    def _get_owned_text_snapshot(self, page_idx: int, *, visible_only: bool = False):
+        """能力缺失立即返回None；不支持的原始数值只报告参考选择，不提前物化回退字符。"""
+        from ..._compute_backend import get_native
+
+        native = get_native()
+        if native is None or not hasattr(native, "NativeTextSnapshot"):
+            return None
+        with pdfium_guard():
+            cached = self._owned_text_snapshots.get((page_idx, visible_only))
+            if cached is not None:
+                return cached
+            with self._open_page(page_idx) as page:
+                return self._extract_owned_text_snapshot(page_idx, page, visible_only=visible_only, reference=False)
+
     def get_page_snapshot(self, page_idx: int) -> PDFPageSnapshot:
         """同页显式快照在消费者存活期间复用，弱缓存不延长全文证据的驻留时间。"""
         with pdfium_guard():
@@ -614,14 +662,17 @@ class PDFDocument:
                     rotation = 0
                 rotation = rotation if rotation in {0, 90, 180, 270} else 0
                 drawings, paths = _extract_page_paths_and_lines(page, bbox, rotation)
+                text = self._extract_owned_text_snapshot(page_idx, page, visible_only=False)
+                native_text = None if isinstance(text, PDFPageTextGeometry) else text
                 snapshot = PDFPageSnapshot(
                     page_idx,
                     _drawing_page_size(bbox, rotation),
                     rotation,
-                    _extract_page_text_geometry(page, include_extended_geometry=True),
+                    text if native_text is None else None,
                     PDFPageVectorGeometry(tuple(drawings), tuple(paths)),
                     tuple(_extract_page_link_annotations(page, self._pdf_doc.raw, bbox, rotation)),
                     self._snapshot_owner,
+                    native_text,
                 )
             self._page_snapshots[page_idx] = snapshot
             return snapshot
@@ -637,10 +688,13 @@ class PDFDocument:
                 raw_rotation = 0
             rotation = raw_rotation if raw_rotation in {0, 90, 180, 270} else 0
             drawings, paths = _extract_page_paths_and_lines(page, page_bbox, raw_rotation)
+            text = self._extract_owned_text_snapshot(page_idx, page, visible_only=True)
+            native_text = None if isinstance(text, PDFPageTextGeometry) else text
             return _PDFPageSnapshot(
                 page_size=_drawing_page_size(page_bbox, raw_rotation),
                 rotation=cast(Literal[0, 90, 180, 270], rotation),
-                text_geometry=_extract_page_text_geometry(page, include_extended_geometry=True, visible_only=True),
+                text_geometry=text if native_text is None else None,
+                native_text=native_text,
                 drawing_lines=drawings,
                 path_infos=paths,
                 image_infos=_extract_page_image_infos(page, page_bbox, raw_rotation),
