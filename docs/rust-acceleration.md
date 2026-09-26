@@ -103,6 +103,10 @@ real parsing, both on Python 3.10 and 3.14. The regular CI matrix exercises Pyth
 Rust backends on Python 3.10–3.14. The release workflow retains the main-CI/tag gate,
 then builds/tests every artifact before publishing all platform wheels, the pure wheel
 and the source distribution. A local build is not evidence that remote matrix jobs passed.
+Performance comparisons run locally. CI retains cross-platform builds, ABI checks,
+installed-wheel parsing and Python/Rust correctness tests, without full-corpus timing
+or benchmark artifact uploads. Workflow-only changes do not require another local
+performance run when production source and extension fingerprints are unchanged.
 
 On Intel macOS, the existing Magika/ONNX Runtime dependency stack currently prevents
 full application installation on Python 3.14. That wheel is tested with full parsing
@@ -127,8 +131,11 @@ python tests/benchmarks/rust_pdf.py --backend python --suite shared --flash-base
 python tests/benchmarks/rust_pdf.py --backend rust --suite shared --flash-baseline output/rust/reference --output output/rust/shared-rust --baseline output/rust/shared-python
 ```
 
-The public/shared benchmark defaults to `caibao1`, `demo1` and `demo2`. Use repeatable
-`--path` arguments for other cases. Shared benchmarking consumes frozen baseline table
+The public/shared benchmark defaults to `--corpus all`: the layout manifest, recursively
+discovered `demo/pdfs` PDFs and native table fixtures, deduplicated by resolved path.
+Use `--corpus demo` for all demo PDFs, or repeatable `--path` arguments for explicit
+inputs. The revision comparison also accepts `--extra-path` for local external samples.
+Shared benchmarking consumes frozen baseline table
 regions, so a different candidate set cannot masquerade as acceleration. Timings include
 conversion into Rust and Python result construction. First invocation is separate from
 five warmed runs. Output comparison and memory sampling are outside timing. Public
@@ -137,8 +144,8 @@ an export. Shared timings separate extraction, reuse, evidence and table recover
 they do not include model inference or represent MinerU end-to-end latency.
 
 Acceptance requires unchanged full outputs, related historical/manual tests, host API
-and primitive-reuse tests, and installed-wheel verification. Target a 30% reduction in
-each demo's public parse and shared-entry timing. Investigate sustained regressions
+and primitive-reuse tests, and installed-wheel verification. Freeze the timing targets
+and aggregation method for each optimization round before measurement. Investigate sustained regressions
 above 5% in time or RSS. Never refresh a gold file or remove fields to achieve parity;
 record any remaining performance gap explicitly.
 
