@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
 from typing import Iterator, Literal, cast
+from weakref import WeakValueDictionary
 
 import pypdfium2 as pdfium
 from PIL import Image, ImageOps
@@ -16,6 +17,7 @@ from ...foundation._image import crop_pil_image
 from ...foundation.image_encoding import ImageArtifact, ImageFormat, encode_image
 from ...schema import BBox, PageInfo
 from .classify import classify
+from .snapshot import PDFPageSnapshot
 
 # See: pdfium.PdfDocument.METADATA_KEYS
 # 原有符号由单一实现显式重导出，宿主导入路径与类型身份保持不变。
@@ -280,6 +282,10 @@ class PDFPage:
         """一次读取字符及 Hybrid TXT 匹配所需的额外几何。"""
         return self.pdf_doc.get_page_chars_with_geometry(self._idx)
 
+    def get_snapshot(self) -> PDFPageSnapshot:
+        """一次打开页面取得共享证据，快照可在文档关闭后继续使用。"""
+        return self.pdf_doc.get_page_snapshot(self._idx)
+
     def get_drawing_lines(self) -> list[PDFDrawingLine]:
         """读取当前页已规范到视觉页面坐标的横竖 drawing。"""
 
@@ -322,6 +328,8 @@ class PDFDocument:
         render_max_edge: int = DEFAULT_RENDER_MAX_EDGE,
     ) -> None:
         self._classification: Literal["ocr", "txt"] | None = None
+        self._snapshot_owner = object()
+        self._page_snapshots: WeakValueDictionary[int, PDFPageSnapshot] = WeakValueDictionary()
         if isinstance(pdf_bytes_or_path, bytes):
             self._pdf_bytes: bytes = pdf_bytes_or_path
         else:
@@ -331,6 +339,8 @@ class PDFDocument:
 
         self._pdf_doc_opened: pdfium.PdfDocument | None = None
         self._page_count: int | None = None
+        self._page_sizes: dict[int, tuple[float, float]] = {}
+        self._page_rotations: dict[int, Literal[0, 90, 180, 270]] = {}
         self.render_scale = render_scale
         self.render_max_edge = render_max_edge
 
@@ -463,27 +473,42 @@ class PDFDocument:
     # ------------------------------------------------------------------ #
 
     def page_size(self, page_idx: int) -> tuple[float, float]:
+        """复用不可变源文档的页面尺寸，避免文本与图像阶段重复打开页面。"""
+        cached = self._page_sizes.get(page_idx)
+        if cached is not None:
+            return cached
         with self._open_page(page_idx) as page:
             # rect: (left, bottom, right, top)
             rect: tuple[float, float, float, float] = page.get_bbox()
+            rotation_read = True
             try:
                 page_rotation = int(page.get_rotation()) % 360
             except Exception:
                 page_rotation = 0
+                rotation_read = False
         width = abs(rect[2] - rect[0])
         height = abs(rect[1] - rect[3])
         # PDFium 文本与渲染坐标已经应用页面旋转，页面尺寸必须使用相同视觉方向。
-        return (height, width) if page_rotation in {90, 270} else (width, height)
+        size = (height, width) if page_rotation in {90, 270} else (width, height)
+        if rotation_read:
+            self._page_sizes[page_idx] = size
+            self._page_rotations[page_idx] = page_rotation if page_rotation in {0, 90, 180, 270} else 0
+        return size
 
     def page_rotation(self, page_idx: int) -> Literal[0, 90, 180, 270]:
         """在线程锁保护下返回 PDF 页面字典声明的标准旋转角度。"""
 
+        cached = self._page_rotations.get(page_idx)
+        if cached is not None:
+            return cached
         with self._open_page(page_idx) as page:
             try:
                 rotation = int(page.get_rotation()) % 360
             except Exception:
-                rotation = 0
-        return rotation if rotation in {0, 90, 180, 270} else 0
+                return 0
+        rotation = rotation if rotation in {0, 90, 180, 270} else 0
+        self._page_rotations[page_idx] = rotation
+        return rotation
 
     # ------------------------------------------------------------------ #
     #  Rendering
@@ -547,6 +572,32 @@ class PDFDocument:
     def get_page_chars_with_geometry(self, page_idx: int) -> PDFPageTextGeometry:
         """一次读取字符、tight bbox 和字符原点，避免 Hybrid 重复打开 textpage。"""
         return self._get_page_text_geometry(page_idx, include_extended_geometry=True)
+
+    def get_page_snapshot(self, page_idx: int) -> PDFPageSnapshot:
+        """同页显式快照在消费者存活期间复用，弱缓存不延长全文证据的驻留时间。"""
+        with pdfium_guard():
+            cached = self._page_snapshots.get(page_idx)
+            if cached is not None:
+                return cached
+            with self._open_page(page_idx) as page:
+                bbox = _normalize_pdf_page_bbox(page.get_bbox())
+                try:
+                    rotation = int(page.get_rotation()) % 360
+                except Exception:
+                    rotation = 0
+                rotation = rotation if rotation in {0, 90, 180, 270} else 0
+                drawings, paths = _extract_page_paths_and_lines(page, bbox, rotation)
+                snapshot = PDFPageSnapshot(
+                    page_idx,
+                    _drawing_page_size(bbox, rotation),
+                    rotation,
+                    _extract_page_text_geometry(page, include_extended_geometry=True),
+                    PDFPageVectorGeometry(tuple(drawings), tuple(paths)),
+                    tuple(_extract_page_link_annotations(page, self._pdf_doc.raw, bbox, rotation)),
+                    self._snapshot_owner,
+                )
+            self._page_snapshots[page_idx] = snapshot
+            return snapshot
 
     def _extract_native_page(self, page_idx: int) -> _PDFPageSnapshot:
         """在一次加锁打开中收集 Flash 页面证据，并共享 Path 子路径解码。"""
