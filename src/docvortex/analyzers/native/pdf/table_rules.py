@@ -28,6 +28,7 @@ from .geometry import (
 from .models import _Fragment, _LineItem, _LocalAxisLine, _PageSource, _SharedLineIndexSet, _TableCandidate, _VisualRow
 from .table_annotations import (
     _PreparedTableNoteBodyMetrics,
+    _PreparedTableCoreRows,
     _PreparedMarkerCache,
     _PreparedTableNoteRow,
     _build_table_annotation,
@@ -71,6 +72,7 @@ class _RuleBandIndex:
     on_rule: tuple[bool, ...]
     rule_count: int
     native: Any = None
+    shared_core_rows: Any = None
 
     def interval(self, rows: list[_VisualRow]) -> tuple[int, int] | None:
         """只准入与原走廊完全相同、连续且保序的行引用。"""
@@ -508,15 +510,21 @@ def _build_rule_table_candidates(
             prepared_note_rows, has_possible_table_notes = note_context
             score = float(2 + len(dense_rows) + stable_columns + min(fill_band_count, 8))
             if defer_materialization:
+                band_index = band_indexes[corridor_key]
                 if corridor_key not in context.core_indexes:
+                    # 构建阶段内部行序列冻结为 tuple，允许两个只读索引安全共享切片校验。
+                    corridor_rows = (
+                        band_index.rows if band_index is not None else tuple(item.row for item in corridor_cache[corridor_key])
+                    )
                     context.core_indexes[corridor_key] = _prepare_table_core_rows(
-                        [item.row for item in corridor_cache[corridor_key]],
+                        corridor_rows,
                         lines,
                         prepared_note_body_metrics,
                         context.marker_prepared,
                     )
                 core_index = context.core_indexes[corridor_key]
                 interval = core_index.interval(accepted_rows) if core_index is not None else None
+                core_query = (core_index, *interval) if interval is not None else None
                 drafts.append(
                     _RuleCandidateDraft(
                         context,
@@ -526,8 +534,8 @@ def _build_rule_table_candidates(
                         prepared_note_rows,
                         has_possible_table_notes,
                         score,
-                        (core_index, *interval) if interval is not None else None,
-                        _prepared_rule_candidate_query(band_indexes[corridor_key], accepted_rows),
+                        core_query,
+                        _prepared_rule_candidate_query(band_indexes[corridor_key], accepted_rows, core_query),
                     )
                 )
                 continue
@@ -1154,10 +1162,23 @@ def _prepare_native_rule_candidates(rows, centers, rules):
     return native.PreparedRuleCandidates(centers, packed)
 
 
-def _prepared_rule_candidate_query(index, rows):
-    """只有原走廊的非空连续保序切片才能复用候选核心数据。"""
+def _prepared_rule_candidate_query(index, rows, prepared_core=None):
+    """共享走廊身份只验证一次，后续复用已由 core.interval 验证的保序切片。"""
     if index is None or index.native is None:
         return None
+    if prepared_core is not None:
+        core, start, end = prepared_core
+        if type(core) is _PreparedTableCoreRows and type(core.rows) is tuple:
+            shared = index.shared_core_rows
+            if shared is None or shared[0] is not core or shared[1] is not core.rows:
+                # 仅缓存内部不可变 tuple；字段替换会因身份变化重新验证，外部可变列表不准入。
+                same_rows = core.rows is index.rows or (
+                    len(core.rows) == len(index.rows)
+                    and all(actual is expected for actual, expected in zip(core.rows, index.rows, strict=True))
+                )
+                shared = index.shared_core_rows = (core, core.rows, same_rows)
+            if shared[2]:
+                return (index, start, end) if start < end else None
     interval = index.interval(rows)
     return (index, *interval) if interval is not None and interval[0] < interval[1] else None
 

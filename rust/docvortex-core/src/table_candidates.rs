@@ -1,6 +1,6 @@
 //! 表格走廊的连续候选计算：闭区间分配、文本证据及核心几何共享一次准备。
 use crate::row_geometry::RowGeometry;
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 pub struct RuleCandidates {
     centers: Vec<f64>,
@@ -8,7 +8,9 @@ pub struct RuleCandidates {
     on_rule: Vec<bool>,
     fragment_counts: Vec<usize>,
     boxes: Vec<[f64; 4]>,
-    members: Vec<Vec<i64>>,
+    members: Vec<usize>,
+    member_offsets: Vec<usize>,
+    source_ids: Vec<i64>,
     geometry: RowGeometry,
 }
 
@@ -30,14 +32,27 @@ impl RuleCandidates {
         let mut on_rule = Vec::with_capacity(rows.len());
         let mut fragment_counts = Vec::with_capacity(rows.len());
         let mut boxes = Vec::with_capacity(rows.len());
-        let mut members = Vec::with_capacity(rows.len());
+        let mut members = Vec::new();
+        let mut member_offsets = Vec::with_capacity(rows.len() + 1);
+        let mut source_ids = Vec::new();
+        let mut interned = HashMap::new();
+        member_offsets.push(0);
         for (center, count, bbox, sources) in rows {
             let band = centers.partition_point(|value| *value < center);
             bands.push(band);
             on_rule.push(centers.get(band) == Some(&center));
             fragment_counts.push(count);
             boxes.push(bbox);
-            members.push(sources);
+            // 仅准备时散列原始来源；每个候选按紧凑 ID 位图去重，负数和稀疏 ID 不作下标。
+            for source in sources {
+                let id = *interned.entry(source).or_insert_with(|| {
+                    let id = source_ids.len();
+                    source_ids.push(source);
+                    id
+                });
+                members.push(id);
+            }
+            member_offsets.push(members.len());
         }
         let geometry = RowGeometry::new(boxes.clone()).ok_or("invalid row geometry")?;
         Ok(Self {
@@ -47,6 +62,8 @@ impl RuleCandidates {
             fragment_counts,
             boxes,
             members,
+            member_offsets,
+            source_ids,
             geometry,
         })
     }
@@ -109,13 +126,16 @@ impl RuleCandidates {
         {
             return Err("invalid rule candidate core");
         }
-        let mut seen = HashSet::new();
-        let mut members = Vec::new();
-        for row in &self.members[start..end] {
-            for &source in row {
-                if seen.insert(source) {
-                    members.push(source);
-                }
+        let selected = &self.members[self.member_offsets[start]..self.member_offsets[end]];
+        // 位图只属于本次查询；不可变快照无需共享标记或互斥，也不会污染并发查询。
+        let mut seen = vec![0_u64; self.source_ids.len().div_ceil(64)];
+        let mut members = Vec::with_capacity(selected.len().min(self.source_ids.len()));
+        for &id in selected {
+            let word = id / 64;
+            let bit = 1_u64 << (id % 64);
+            if seen[word] & bit == 0 {
+                seen[word] |= bit;
+                members.push(self.source_ids[id]);
             }
         }
         let mut sources = [0; 4];

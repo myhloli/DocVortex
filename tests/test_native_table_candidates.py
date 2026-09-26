@@ -160,3 +160,68 @@ def test_full_candidate_enumeration_and_deferred_merge_match_reference(monkeypat
     assert [draft.score for draft in drafts] == expected_scores
     assert rules_api._merge_table_candidates(drafts) == expected
     assert pickle.dumps(args) == before
+
+
+def test_compact_core_members_preserve_sparse_signed_ids_and_first_order():
+    """来源压缩及跨位图字去重保留区间内首次出现顺序，支持负数与完整 i64 边界。"""
+    native = _native()
+    original = [*range(-70, 70), -(2**63), 2**63 - 1]
+    sources = [original, [2**63 - 1, -70, 33, -(2**63), 2**63 - 1, 0, -1], [], list(reversed(original))]
+    packed = [(float(index), len(row), (0.0, float(index), 10.0, float(index + 1)), row) for index, row in enumerate(sources)]
+    state = native.PreparedRuleCandidates([0.0, 10.0], packed)
+    boundaries = [(0.0, 0.0, 10.0, 10.0)]
+    for _ in range(2):
+        for start in range(len(sources)):
+            for end in range(start + 1, len(sources) + 1):
+                expected = list(dict.fromkeys(source for row in sources[start:end] for source in row))
+                assert state.core(start, end, boundaries)[0] == expected
+
+
+def test_compact_core_member_queries_are_independent_across_threads():
+    """并发查询仅使用各自局部位图，不能复用另一查询的已见标记或返回顺序。"""
+    from concurrent.futures import ThreadPoolExecutor
+
+    native = _native()
+    sources = [[(index * 43 + offset) % 151 - 75 for offset in range(90)] for index in range(6)]
+    packed = [(float(index), len(row), (0.0, float(index), 10.0, float(index + 1)), row) for index, row in enumerate(sources)]
+    state = native.PreparedRuleCandidates([0.0, 10.0], packed)
+    intervals = [(start, end) for start in range(6) for end in range(start + 1, 7)] * 8
+
+    def query(interval):
+        """在释放 GIL 的原生查询中核对独立切片的首次来源顺序。"""
+        start, end = interval
+        expected = list(dict.fromkeys(source for row in sources[start:end] for source in row))
+        return state.core(start, end, [(0.0, 0.0, 10.0, 10.0)])[0] == expected
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        assert all(executor.map(query, intervals))
+
+
+def test_prevalidated_core_interval_reuses_only_identical_corridor_rows(monkeypatch):
+    """只在两个索引的完整走廊行身份一致时省去第二次线性切片校验。"""
+    _native()
+    rows = _rows([1.0, 5.0, 9.0], [2, 2, 2])
+    index = rules_api._prepare_rule_band_index(rows, _rules([0.0, 10.0, 20.0]))
+    assert index.native is not None
+    selected = rows[1:]
+    core = rules_api._PreparedTableCoreRows(tuple(rows), {}, {}, None)
+    expected = (index, 1, 3)
+    assert rules_api._prepared_rule_candidate_query(index, selected, (core, 1, 3)) == expected
+
+    def unexpected_scan(self, values):
+        """相同已验证走廊不得重复执行逐行身份扫描。"""
+        raise AssertionError("duplicate interval scan")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(rules_api._RuleBandIndex, "interval", unexpected_scan)
+        assert rules_api._prepared_rule_candidate_query(index, selected, (core, 1, 3)) == expected
+    # 同长度 tuple 字段替换仍必须使已缓存匹配失效，不能复用旧区间。
+    core.rows = tuple(reversed(rows))
+    assert rules_api._prepared_rule_candidate_query(index, selected, (core, 0, 2)) == expected
+    assert index.shared_core_rows[2] is False
+    assert rules_api._prepared_rule_candidate_query(index, rows[::-1], (core, 0, 3)) is None
+    # 外部可变列表和相似鸭子对象保持每次参考校验，不能建立可信来源缓存。
+    for foreign in (SimpleNamespace(rows=tuple(rows)), rules_api._PreparedTableCoreRows(list(rows), {}, {}, None)):
+        assert rules_api._prepared_rule_candidate_query(index, selected, (foreign, 0, 2)) == expected
+        foreign.rows = list(reversed(rows))
+        assert rules_api._prepared_rule_candidate_query(index, selected, (foreign, 0, 2)) == expected
