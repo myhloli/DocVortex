@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import atexit
 import ctypes
-import gc
 import mmap
 import multiprocessing
 import os
@@ -110,15 +109,57 @@ def _prepare_session_render_pool():
 atexit.register(shutdown_pdf_render_sessions)
 
 
+class _MappedPdfDocument:
+    """独占 PDFium 文档及 mmap 导出视图，关闭过程不依赖循环 GC 的代次。"""
+
+    def __init__(self, path):
+        """只把非拥有的地址视图传给 ctypes/PDFium，映射导出由本对象单独持有。"""
+        import pypdfium2 as pdfium
+        from .pdfium import pdfium_guard
+
+        self.document = None
+        self.mapping = None
+        self.source = None
+        self._export = None
+        try:
+            self.source = open(path, "rb")
+            self.mapping = mmap.mmap(self.source.fileno(), 0, access=mmap.ACCESS_COPY)
+            array_type = ctypes.c_char * len(self.mapping)
+            self._export = array_type.from_buffer(self.mapping)
+            # ctypes.cast/参数转换可能给输入数组建立循环引用，直接传 from_buffer
+            # 会让该循环持有 mmap 的导出指针。地址视图没有导出所有权，即便闭合的
+            # PdfDocument/PdfPage Python 包装仍被引用，也不阻止确定性解除映射。
+            borrowed = array_type.from_address(ctypes.addressof(self._export))
+            with pdfium_guard():
+                self.document = pdfium.PdfDocument(borrowed)
+        except BaseException:
+            self.close()
+            raise
+
+    def close(self):
+        """先关闭全部 PDFium 原生句柄，再释放唯一导出视图、映射及源文件。"""
+        from .pdfium import close_pdfium_document
+
+        if self.document is not None:
+            # 原生关闭失败时不得解除映射；让调用方报错并销毁整个 worker。
+            close_pdfium_document(self.document)
+            self.document = None
+        self._export = None
+        if self.mapping is not None:
+            self.mapping.close()
+            self.mapping = None
+        if self.source is not None:
+            self.source.close()
+            self.source = None
+
+
 def _render_session_worker(connection):
     """串行处理定向协议，文档与输入映射持续到显式关闭或连接断开。"""
-    import pypdfium2 as pdfium
-
     from .images import _initialize_pdf_render_worker, pdf_page_to_image
-    from .pdfium import close_pdfium_child, close_pdfium_document, pdfium_guard
+    from .pdfium import close_pdfium_child, pdfium_guard
     from .visuals import _attach_prepared_visual_block_images
 
-    document = mapped = source = buffer = None
+    document = mapped_document = None
     try:
         _initialize_pdf_render_worker()
         while True:
@@ -128,24 +169,16 @@ def _render_session_worker(connection):
                 if operation == "open":
                     if document is not None:
                         raise RuntimeError("Document already open")
-                    source = open(payload, "rb")
-                    mapped = mmap.mmap(source.fileno(), 0, access=mmap.ACCESS_COPY)
-                    buffer = (ctypes.c_char * len(mapped)).from_buffer(mapped)
+                    mapped_document = _MappedPdfDocument(payload)
+                    document = mapped_document.document
                     with pdfium_guard():
-                        document = pdfium.PdfDocument(buffer)
                         page_count = len(document)
                     result = {"page_count": page_count, "pid": os.getpid(), "document_opens": 1}
                 elif operation in ("close", "shutdown"):
-                    close_pdfium_document(document)
+                    if mapped_document is not None:
+                        mapped_document.close()
+                        mapped_document = None
                     document = None
-                    buffer = None
-                    gc.collect(0)
-                    if mapped is not None:
-                        mapped.close()
-                        mapped = None
-                    if source is not None:
-                        source.close()
-                        source = None
                     connection.send((request_id, "ack", {"input_released": True, "pid": os.getpid()}))
                     if operation == "shutdown":
                         break
@@ -184,15 +217,11 @@ def _render_session_worker(connection):
     except (EOFError, BrokenPipeError, OSError):
         pass
     finally:
-        close_pdfium_document(document)
-        document = None
-        buffer = None
-        gc.collect(0)
-        if mapped is not None:
-            mapped.close()
-        if source is not None:
-            source.close()
-        connection.close()
+        try:
+            if mapped_document is not None:
+                mapped_document.close()
+        finally:
+            connection.close()
 
 
 class PDFRenderSession:

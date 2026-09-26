@@ -369,3 +369,104 @@ def test_document_close_preserves_original_error_after_session_cleanup_failure(s
             raise KeyError("original parse failure")
     assert document._pdf_doc_opened is None
     assert not native.raw
+
+
+def test_mapped_document_releases_export_with_old_generation_wrappers(session_pdf, tmp_path, monkeypatch):
+    """旧代闭合包装与 ctypes 转换仍被引用时，映射也必须确定释放而不调用 GC。"""
+    import ctypes
+    import gc
+
+    from docvortex.document.pdf.pdfium import pdfium_guard
+    from docvortex.document.pdf.render_session import _MappedPdfDocument
+
+    source_path = tmp_path / "mapped.pdf"
+    source_path.write_bytes(session_pdf)
+    owner = _MappedPdfDocument(source_path)
+    mapping, source = owner.mapping, owner.source
+    native = owner.document
+    borrowed = native._input
+    retained_cast = ctypes.cast(borrowed, ctypes.c_void_p)
+    # 主动保留闭合包装及其自循环，覆盖自动 GC 已把它们提升到旧代的情形。
+    native._retained_cycle = (native, borrowed, retained_cast)
+    with pdfium_guard():
+        page = native[0]
+        assert page.get_size()[0] > 0
+    gc.collect(2)
+
+    def forbid_collection(*args, **kwargs):
+        """禁止用强制全代 GC 避开导出视图所有权缺陷。"""
+        raise AssertionError("mapped input cleanup must not depend on GC")
+
+    enabled = gc.isenabled()
+    gc.disable()
+    try:
+        with monkeypatch.context() as context:
+            context.setattr(gc, "collect", forbid_collection)
+            owner.close()
+            owner.close()
+        assert mapping.closed and source.closed
+        assert not native.raw and not page.raw
+        source_path.unlink()
+        assert not source_path.exists()
+    finally:
+        owner.close()
+        native._retained_cycle = None
+        if enabled:
+            gc.enable()
+
+
+def test_mapped_document_keeps_input_when_native_close_fails(session_pdf, tmp_path, monkeypatch):
+    """PDFium 尚未确认关闭时禁止提前解除映射，恢复关闭后才释放文件与导出。"""
+    from docvortex.document.pdf import pdfium as runtime
+    from docvortex.document.pdf.render_session import _MappedPdfDocument
+
+    source_path = tmp_path / "native-close-error.pdf"
+    source_path.write_bytes(session_pdf)
+    owner = _MappedPdfDocument(source_path)
+    mapping, source = owner.mapping, owner.source
+
+    def fail_close(document):
+        """模拟 native close 在句柄仍存活时抛错。"""
+        raise RuntimeError("native close failed")
+
+    try:
+        with monkeypatch.context() as context:
+            context.setattr(runtime, "close_pdfium_document", fail_close)
+            with pytest.raises(RuntimeError, match="native close failed"):
+                owner.close()
+            assert owner.document.raw and owner._export is not None
+            assert not mapping.closed and not source.closed
+    finally:
+        owner.close()
+    assert mapping.closed and source.closed
+
+
+def test_mapped_document_open_failure_releases_mapping(tmp_path, monkeypatch):
+    """构造 PDFium 文档失败也需释放映射和文件，不能遗留导出指针。"""
+    import pypdfium2
+    from docvortex.document.pdf import render_session as module
+
+    source_path = tmp_path / "rejected.pdf"
+    source_path.write_bytes(b"invalid pdf bytes")
+    observed = []
+    original_mapping = module.mmap.mmap
+
+    def capture_mapping(*args, **kwargs):
+        """保留 mmap 对象本身，确认失败清理已真正关闭底层映射。"""
+        mapped = original_mapping(*args, **kwargs)
+        observed.append(mapped)
+        return mapped
+
+    def reject_document(buffer):
+        """模拟参数转换保留闭环之后 PDFium 拒绝文档。"""
+        import ctypes
+
+        ctypes.cast(buffer, ctypes.c_void_p)
+        raise RuntimeError("document rejected")
+
+    monkeypatch.setattr(module.mmap, "mmap", capture_mapping)
+    monkeypatch.setattr(pypdfium2, "PdfDocument", reject_document)
+    with pytest.raises(RuntimeError, match="document rejected"):
+        module._MappedPdfDocument(source_path)
+    assert len(observed) == 1 and observed[0].closed
+    source_path.unlink()
