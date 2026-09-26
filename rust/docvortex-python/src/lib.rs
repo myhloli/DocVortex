@@ -21,6 +21,7 @@ mod text_pipeline;
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<snapshot::NativeTextSnapshot>()?;
+    module.add_function(wrap_pyfunction!(snapshot::text_snapshot_stats, module)?)?;
     module.add_function(wrap_pyfunction!(
         snapshot::read_pdfium_text_snapshot,
         module

@@ -109,3 +109,46 @@ def test_page_metadata_reuses_successful_reads():
             with pytest.raises(RuntimeError):
                 document.page_size(1)
         assert 1 not in document._page_sizes
+
+
+def test_raw_character_count_reuses_successful_read():
+    """重复读取原始计数不重建 textpage，零值也属于可缓存的成功结果。"""
+    from contextlib import nullcontext
+    from unittest.mock import Mock
+
+    with PDFDocument(pdf_bytes()) as document:
+        text = Mock()
+        text.count_chars.side_effect = [-1, 0]
+        page = Mock()
+        page.get_textpage.return_value = text
+        with patch.object(document, "_open_page", return_value=nullcontext(page)) as opened:
+            assert document.page_char_count(0) == -1
+            assert document.page_char_count(0) == 0
+            assert document.page_char_count(0) == 0
+            assert opened.call_count == 2
+            assert text.close.call_count == 2
+
+
+def test_visible_snapshot_keeps_raw_count_for_limits():
+    """可见性过滤后的快照长度不能替代原始计数，读取计数也不重新打开页面。"""
+    from docvortex._compute_backend import get_native
+
+    if get_native() is None:
+        pytest.skip("Native snapshot unavailable")
+    stream = BytesIO()
+    canvas = Canvas(stream, pagesize=(200, 100))
+    text = canvas.beginText(10, 50)
+    text.setTextRenderMode(3)
+    text.textLine("Hidden OCR still counts")
+    canvas.drawText(text)
+    canvas.save()
+    data = stream.getvalue()
+    with PDFDocument(data) as reference:
+        expected = reference.page_char_count(0)
+    with PDFDocument(data) as document:
+        owner = document._get_owned_text_snapshot(0, visible_only=True)
+        assert owner is not None
+        assert owner.raw_char_count() == expected > owner.info()[0]
+        with patch.object(document, "_open_page", side_effect=AssertionError("count must reuse snapshot metadata")):
+            assert document.page_char_count(0) == expected
+    assert owner.raw_char_count() == expected

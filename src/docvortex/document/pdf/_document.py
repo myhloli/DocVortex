@@ -356,6 +356,7 @@ class PDFDocument:
 
         self._pdf_doc_opened: pdfium.PdfDocument | None = None
         self._page_count: int | None = None
+        self._page_char_counts: dict[int, int] = {}
         self._page_sizes: dict[int, tuple[float, float]] = {}
         self._page_rotations: dict[int, Literal[0, 90, 180, 270]] = {}
         self.render_scale = render_scale
@@ -598,13 +599,23 @@ class PDFDocument:
     # ------------------------------------------------------------------ #
 
     def page_char_count(self, page_idx: int) -> int:
-        with self._open_page(page_idx) as page:
-            textpage = None
-            try:
-                textpage = page.get_textpage()
-                n_chars = textpage.count_chars()
-            finally:
-                _try_close(textpage)
+        """缓存成功读取的原始字符数，并优先复用快照提取时的计数，避免重建 textpage。"""
+        cached = self._page_char_counts.get(page_idx) if type(page_idx) is int else None
+        if cached is not None:
+            return cached
+        with pdfium_guard():
+            cached = self._page_char_counts.get(page_idx) if type(page_idx) is int else None
+            if cached is not None:
+                return cached
+            with self._open_page(page_idx) as page:
+                textpage = None
+                try:
+                    textpage = page.get_textpage()
+                    n_chars = textpage.count_chars()
+                finally:
+                    _try_close(textpage)
+            if type(page_idx) is int and type(n_chars) is int and n_chars >= 0:
+                self._page_char_counts[page_idx] = n_chars
         return cast(int, n_chars)
 
     def get_page_chars(self, page_idx: int) -> list[Char]:
@@ -632,6 +643,8 @@ class PDFDocument:
         )
         if text is not None and not isinstance(text, PDFPageTextGeometry):
             self._owned_text_snapshots[key] = text
+            if type(page_idx) is int and callable(getattr(text, "raw_char_count", None)):
+                self._page_char_counts[page_idx] = text.raw_char_count()
         return text
 
     def _get_owned_text_snapshot(self, page_idx: int, *, visible_only: bool = False):

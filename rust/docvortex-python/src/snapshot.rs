@@ -1,6 +1,6 @@
 //! 同库原始读取直接进入自有 canonical 快照，只在兼容边界构造 Python 字符。
 use docvortex_core::{
-    extraction,
+    extraction, text_assignment,
     text_pipeline::{self, TextChar},
     text_snapshot::{
         self as snapshot, Angle, Character, Font, InputCharacter, Properties, SnapshotError,
@@ -15,8 +15,23 @@ use pyo3::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
 };
+
+static SPAN_ASSIGNMENT_CALLS: AtomicU64 = AtomicU64::new(0);
+static SPAN_ASSIGNMENT_UNSUPPORTED: AtomicU64 = AtomicU64::new(0);
+
+/// 公开实际原生字符归属调用次数及显式不支持选择，避免把接口存在视为已执行。
+#[pyfunction]
+pub fn text_snapshot_stats() -> (u64, u64) {
+    (
+        SPAN_ASSIGNMENT_CALLS.load(Ordering::Relaxed),
+        SPAN_ASSIGNMENT_UNSUPPORTED.load(Ordering::Relaxed),
+    )
+}
 
 /// 保留读取错误类型，不把计算错误改写为参考路径选择。
 fn read_error(error: ReadError) -> PyErr {
@@ -137,6 +152,7 @@ fn supported(records: &[Record], frame: [f64; 4]) -> bool {
 #[pyclass(frozen, weakref, module = "docvortex._native")]
 pub struct NativeTextSnapshot {
     data: Arc<TextSnapshot>,
+    raw_count: usize,
 }
 
 /// 同步借用 PDFium 读取原始字符；函数和句柄由已核验 ABI 的宿主 guard 保活。
@@ -332,6 +348,7 @@ pub fn read_pdfium_text_snapshot(
     }
     let chars = py.detach(|| snapshot::suppress_hidden(glyphs, pairs, &normalized, &properties));
     Ok(Some(NativeTextSnapshot {
+        raw_count: count,
         data: Arc::new(TextSnapshot {
             chars,
             fonts,
@@ -426,6 +443,7 @@ impl NativeTextSnapshot {
     fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> Self {
         Self {
             data: self.data.clone(),
+            raw_count: self.raw_count,
         }
     }
     /// 自有数据直接生成基础组行结果，供表格方向等早期消费者使用。
@@ -502,6 +520,95 @@ impl NativeTextSnapshot {
             output.append(row)?;
         }
         Ok(output)
+    }
+    /// 返回 PDFium 原始字符数，绝不以去重/可见性过滤后的长度替代安全上限。
+    fn raw_char_count(&self) -> usize {
+        self.raw_count
+    }
+    /// 标准方向可直接使用完整自有字符；局部倾斜页保留现有整行水印判定路径。
+    fn supports_span_matching(&self) -> bool {
+        self.data.chars.iter().all(|ch| {
+            let degrees = ch.rotation * (180.0 / std::f64::consts::PI);
+            [0.0, 90.0, 180.0, 270.0]
+                .iter()
+                .any(|angle| (degrees - angle).abs() < 0.1)
+        })
+    }
+    /// 仅从自有快照读取字符；Python 只提供小型 span 框与现有标点配置，不重新打包字符字典。
+    fn assign_spans(
+        &self,
+        py: Python<'_>,
+        span_bboxes: Vec<[f64; 4]>,
+        median_height: f64,
+        stop_flags: Vec<String>,
+        start_flags: Vec<String>,
+        height_ratio: f64,
+    ) -> PyResult<Option<Vec<Option<usize>>>> {
+        if !self.supports_span_matching()
+            || !median_height.is_finite()
+            || !height_ratio.is_finite()
+            || span_bboxes.iter().flatten().any(|value| !value.is_finite())
+            || self.data.chars.iter().any(|ch| {
+                !(ch.bbox[0] + ch.bbox[2]).is_finite()
+                    || !(ch.bbox[1] + ch.bbox[3]).is_finite()
+                    || ch
+                        .tight
+                        .is_some_and(|b| !(b[0] + b[2]).is_finite() || !(b[1] + b[3]).is_finite())
+            })
+        {
+            SPAN_ASSIGNMENT_UNSUPPORTED.fetch_add(1, Ordering::Relaxed);
+            return Ok(None);
+        }
+        let category = py.import("unicodedata")?.getattr("category")?;
+        let mut properties: HashMap<String, u8> = HashMap::new();
+        let mut tight = HashMap::new();
+        if self.data.extended {
+            for ch in &self.data.chars {
+                if let Some(value) = ch.tight {
+                    tight.insert(ch.index, value);
+                }
+            }
+        }
+        let mut chars = Vec::with_capacity(self.data.chars.len());
+        for ch in &self.data.chars {
+            let flags = if let Some(&flags) = properties.get(&ch.text) {
+                flags
+            } else {
+                let text = pyo3::types::PyString::new(py, &ch.text);
+                let mut flags = 0;
+                if text.call_method0("isspace")?.extract::<bool>()? {
+                    flags |= text_assignment::SPACE;
+                }
+                if ch.text.chars().count() == 1
+                    && category
+                        .call1((&text,))?
+                        .extract::<String>()?
+                        .starts_with('P')
+                {
+                    flags |= text_assignment::PUNCTUATION;
+                }
+                if ch.text == "\r" || ch.text == "\n" {
+                    flags |= text_assignment::BREAK;
+                }
+                if stop_flags.contains(&ch.text) {
+                    flags |= text_assignment::STOP;
+                }
+                if start_flags.contains(&ch.text) {
+                    flags |= text_assignment::START;
+                }
+                properties.insert(ch.text.clone(), flags);
+                flags
+            };
+            chars.push(text_assignment::Character {
+                bbox: ch.bbox,
+                tight: tight.get(&ch.index).copied(),
+                flags,
+            });
+        }
+        let result = py
+            .detach(|| text_assignment::assign(&chars, &span_bboxes, median_height, height_ratio));
+        SPAN_ASSIGNMENT_CALLS.fetch_add(1, Ordering::Relaxed);
+        Ok(Some(result))
     }
     /// 报告实际所有权和策略，区分 Flash 可见文本与公开页面原始文本视图。
     fn info(&self) -> (usize, usize, bool, bool) {
