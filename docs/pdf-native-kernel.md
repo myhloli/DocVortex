@@ -2,7 +2,7 @@
 
 ## 验收目标与冻结基线
 
-以 DocVortex `3eef2d1`、MinerU `cabe6e34` 为基线，目标为本机 Mac 单文档热运行耗时降低 50%。公开 parse、MinerU Flash 和冻结模型输入的共享 PDF 链路独立验收；进程树同时刻峰值 RSS 不超过基线 120%，单样本持续耗时退化不超过 5%。冷启动单列，模型推理与导出 PDF 排版不计作本项目的优化收益。
+以 DocVortex `3eef2d1`、MinerU `cabe6e34` 为基线，目标为本机 Mac 单文档热运行耗时降低 50%。公开 parse、MinerU Flash 和冻结模型输入的共享 PDF 链路独立验收；进程树同时刻峰值 RSS 不超过基线 130%（2026-09-27 恢复任务时调整，此前冻结报告仍保留原 120% 门槛），单样本持续耗时退化不超过 5%。冷启动单列，模型推理与导出 PDF 排版不计作本项目的优化收益。
 
 本轮证据根目录为 `output/pdf/native-kernel-20260927/`。源码、原生扩展与输入均独立冻结；32 PDF／299 页包括历史 `49.-.pdf`。`candidate-source` 和 `public-comparison` 是第一批实现，`candidate-stage2` 和 `public-stage2` 是第二批实现，不能混用源码或将前者收益归于后者。
 

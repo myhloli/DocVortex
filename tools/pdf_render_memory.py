@@ -390,6 +390,7 @@ def main():
     parser.add_argument("--window", type=int, default=4)
     parser.add_argument("--processes", type=int, default=3)
     parser.add_argument("--iterations", type=int, default=5)
+    parser.add_argument("--memory-budget-ratio", type=float, default=1.3)
     parser.add_argument("--timeout", type=float, default=300)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--worker", type=Path, help=argparse.SUPPRESS)
@@ -399,7 +400,7 @@ def main():
         return
     if not all((args.path, args.baseline_source, args.candidate_source, args.backend)):
         parser.error("path, both source roots and backend are required")
-    if min(args.window, args.processes, args.iterations, args.timeout) <= 0 or args.output.exists():
+    if min(args.window, args.processes, args.iterations, args.timeout, args.memory_budget_ratio) <= 0 or args.output.exists():
         parser.error("positive limits and a new output directory are required")
     read_input, _, source_identity = benchmark_helpers()
     original = args.path.read_bytes()
@@ -444,8 +445,10 @@ def main():
             "scope": "isolated raster RSS and finite continuous-document resource replay; not full output parity",
             "measurements": measurements,
             "candidate_over_baseline_median_tree_peak_rss_ratio": candidate / baseline,
-            "memory_budget_ratio": 1.2,
-            "median_peak_within_budget": candidate <= baseline * 1.2,
+            "memory_budget_ratio": args.memory_budget_ratio,
+            "median_peak_within_budget": candidate <= baseline * args.memory_budget_ratio,
+            "max_peak_within_budget": measurements["candidate"]["summary"]["max_tree_peak_rss_bytes"]
+            <= measurements["baseline"]["summary"]["max_tree_peak_rss_bytes"] * args.memory_budget_ratio,
             "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         },
     )

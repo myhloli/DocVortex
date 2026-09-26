@@ -74,9 +74,18 @@ def test_session_multiple_crops_match_existing_encoder(session_pdf):
     assert actual == [[(index, block["image_base64"]) for index, block in expected[0]]]
 
 
-def test_session_timeout_releases_input_and_workers(session_pdf):
-    """极短截止时间在冷启动时触发超时并回收已创建进程和输入映射。"""
-    session = PDFRenderSession(session_pdf, timeout=1e-9)
+def test_session_timeout_releases_input_and_workers(session_pdf, monkeypatch):
+    """在真实 worker 已打开文档后注入过期截止时间，确定性验证超时及资源回收。"""
+    session = PDFRenderSession(session_pdf)
+    session.render(image_type="base64_img")
+    assert session._workers
+    receive = session._receive
+
+    def expired_response(worker, request_id, deadline, **kwargs):
+        """只改变响应等待截止时间，保留真实管道、超时检测和失败清理路径。"""
+        return receive(worker, request_id, float("-inf"), **kwargs)
+
+    monkeypatch.setattr(session, "_receive", expired_response)
     directory = Path(session._directory.name)
     with pytest.raises(TimeoutError):
         session.render()
@@ -371,23 +380,19 @@ def test_document_close_preserves_original_error_after_session_cleanup_failure(s
     assert not native.raw
 
 
-def test_mapped_document_releases_export_with_old_generation_wrappers(session_pdf, tmp_path, monkeypatch):
-    """旧代闭合包装与 ctypes 转换仍被引用时，映射也必须确定释放而不调用 GC。"""
-    import ctypes
+def test_render_document_closes_with_old_generation_wrappers(session_pdf, tmp_path, monkeypatch):
+    """旧代文档与页面包装仍被引用时，文件也必须确定释放而不调用 GC。"""
     import gc
 
     from docvortex.document.pdf.pdfium import pdfium_guard
-    from docvortex.document.pdf.render_session import _MappedPdfDocument
+    from docvortex.document.pdf.render_session import _RenderPdfDocument
 
     source_path = tmp_path / "mapped.pdf"
     source_path.write_bytes(session_pdf)
-    owner = _MappedPdfDocument(source_path)
-    mapping, source = owner.mapping, owner.source
+    owner = _RenderPdfDocument(source_path)
     native = owner.document
-    borrowed = native._input
-    retained_cast = ctypes.cast(borrowed, ctypes.c_void_p)
     # 主动保留闭合包装及其自循环，覆盖自动 GC 已把它们提升到旧代的情形。
-    native._retained_cycle = (native, borrowed, retained_cast)
+    native._retained_cycle = (native,)
     with pdfium_guard():
         page = native[0]
         assert page.get_size()[0] > 0
@@ -404,7 +409,6 @@ def test_mapped_document_releases_export_with_old_generation_wrappers(session_pd
             context.setattr(gc, "collect", forbid_collection)
             owner.close()
             owner.close()
-        assert mapping.closed and source.closed
         assert not native.raw and not page.raw
         source_path.unlink()
         assert not source_path.exists()
@@ -415,15 +419,14 @@ def test_mapped_document_releases_export_with_old_generation_wrappers(session_pd
             gc.enable()
 
 
-def test_mapped_document_keeps_input_when_native_close_fails(session_pdf, tmp_path, monkeypatch):
-    """PDFium 尚未确认关闭时禁止提前解除映射，恢复关闭后才释放文件与导出。"""
+def test_render_document_keeps_input_when_native_close_fails(session_pdf, tmp_path, monkeypatch):
+    """PDFium 尚未确认关闭时保留原生所有权，恢复关闭后才释放文件。"""
     from docvortex.document.pdf import pdfium as runtime
-    from docvortex.document.pdf.render_session import _MappedPdfDocument
+    from docvortex.document.pdf.render_session import _RenderPdfDocument
 
     source_path = tmp_path / "native-close-error.pdf"
     source_path.write_bytes(session_pdf)
-    owner = _MappedPdfDocument(source_path)
-    mapping, source = owner.mapping, owner.source
+    owner = _RenderPdfDocument(source_path)
 
     def fail_close(document):
         """模拟 native close 在句柄仍存活时抛错。"""
@@ -434,39 +437,59 @@ def test_mapped_document_keeps_input_when_native_close_fails(session_pdf, tmp_pa
             context.setattr(runtime, "close_pdfium_document", fail_close)
             with pytest.raises(RuntimeError, match="native close failed"):
                 owner.close()
-            assert owner.document.raw and owner._export is not None
-            assert not mapping.closed and not source.closed
+            assert owner.document.raw
+            assert source_path.exists()
     finally:
         owner.close()
-    assert mapping.closed and source.closed
+    assert owner.document is None
+    source_path.unlink()
 
 
-def test_mapped_document_open_failure_releases_mapping(tmp_path, monkeypatch):
-    """构造 PDFium 文档失败也需释放映射和文件，不能遗留导出指针。"""
+def test_render_document_open_failure_releases_file(tmp_path):
+    """真实 PDFium 拒绝输入后文件仍可删除，失败的加载不留下文件句柄。"""
     import pypdfium2
-    from docvortex.document.pdf import render_session as module
+    from docvortex.document.pdf.render_session import _RenderPdfDocument
 
     source_path = tmp_path / "rejected.pdf"
     source_path.write_bytes(b"invalid pdf bytes")
-    observed = []
-    original_mapping = module.mmap.mmap
-
-    def capture_mapping(*args, **kwargs):
-        """保留 mmap 对象本身，确认失败清理已真正关闭底层映射。"""
-        mapped = original_mapping(*args, **kwargs)
-        observed.append(mapped)
-        return mapped
-
-    def reject_document(buffer):
-        """模拟参数转换保留闭环之后 PDFium 拒绝文档。"""
-        import ctypes
-
-        ctypes.cast(buffer, ctypes.c_void_p)
-        raise RuntimeError("document rejected")
-
-    monkeypatch.setattr(module.mmap, "mmap", capture_mapping)
-    monkeypatch.setattr(pypdfium2, "PdfDocument", reject_document)
-    with pytest.raises(RuntimeError, match="document rejected"):
-        module._MappedPdfDocument(source_path)
-    assert len(observed) == 1 and observed[0].closed
+    with pytest.raises(pypdfium2.PdfiumError):
+        _RenderPdfDocument(source_path)
     source_path.unlink()
+
+
+@pytest.mark.parametrize("pixel_format", [1, 2, 3, 4])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_raw_pixel_transport_preserves_format_stride_and_ownership(session_pdf, tmp_path, monkeypatch, pixel_format, reverse):
+    """灰度、三通道及带透明通道的原始缓冲均保持像素、行跨度和关闭后所有权。"""
+    import mmap
+    import pypdfium2 as pdfium
+    from PIL import Image
+    from docvortex.document.pdf.raster import page_to_image, page_to_pixel_file
+
+    with pdfium.PdfDocument(session_pdf) as document:
+        page = document[0]
+        render = page.render
+
+        def selected_format(**kwargs):
+            """显式覆盖真实 PDFium 位图格式及旋转裁剪，验证传输不依赖默认三通道。"""
+            return render(**kwargs, force_bitmap_format=pixel_format, rev_byteorder=reverse, rotation=90, crop=(1, 2, 3, 4))
+
+        monkeypatch.setattr(page, "render", selected_format)
+        expected, scale = page_to_image(page, dpi=97)
+        path = tmp_path / "pixels.raw"
+        metadata = page_to_pixel_file(page, path, dpi=97)
+        with path.open("rb") as source, mmap.mmap(source.fileno(), 0, access=mmap.ACCESS_READ) as pixels:
+            actual = Image.frombytes(
+                metadata["mode"], metadata["size"], pixels, "raw", metadata["raw_mode"], metadata["stride"], 1
+            )
+        path.unlink()
+        page.close()
+    try:
+        assert metadata["scale"] == scale
+        assert actual.mode == expected.mode
+        assert actual.size == expected.size
+        assert actual.tobytes() == expected.tobytes()
+        actual.putpixel((0, 0), expected.getpixel((0, 0)))
+    finally:
+        actual.close()
+        expected.close()

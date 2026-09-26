@@ -1,10 +1,8 @@
-"""可选的定向 PDF 渲染会话；输入映射一次，页图通过临时文件传输。"""
+"""可选的定向 PDF 渲染会话；输入文件共享一次，页图直接传输原始位图。"""
 
 from __future__ import annotations
 
 import atexit
-import ctypes
-import mmap
 import multiprocessing
 import os
 import tempfile
@@ -37,7 +35,7 @@ def _get_worker_budget():
 
 
 def _dispose_worker(worker):
-    """终止故障或退出中的 worker，确保共享输入解除映射后再删除文件。"""
+    """终止故障或退出中的 worker，确保共享输入句柄关闭后再删除文件。"""
     process, connection = worker
     connection.close()
     process.join(timeout=0.1)
@@ -109,57 +107,35 @@ def _prepare_session_render_pool():
 atexit.register(shutdown_pdf_render_sessions)
 
 
-class _MappedPdfDocument:
-    """独占 PDFium 文档及 mmap 导出视图，关闭过程不依赖循环 GC 的代次。"""
+class _RenderPdfDocument:
+    """由 PDFium 持有共享输入文件，避免新文件跨进程 mmap 的同步开销。"""
 
     def __init__(self, path):
-        """只把非拥有的地址视图传给 ctypes/PDFium，映射导出由本对象单独持有。"""
+        """直接使用现有 PDFium 文件加载入口，所有权持续到显式关闭。"""
         import pypdfium2 as pdfium
         from .pdfium import pdfium_guard
 
         self.document = None
-        self.mapping = None
-        self.source = None
-        self._export = None
-        try:
-            self.source = open(path, "rb")
-            self.mapping = mmap.mmap(self.source.fileno(), 0, access=mmap.ACCESS_COPY)
-            array_type = ctypes.c_char * len(self.mapping)
-            self._export = array_type.from_buffer(self.mapping)
-            # ctypes.cast/参数转换可能给输入数组建立循环引用，直接传 from_buffer
-            # 会让该循环持有 mmap 的导出指针。地址视图没有导出所有权，即便闭合的
-            # PdfDocument/PdfPage Python 包装仍被引用，也不阻止确定性解除映射。
-            borrowed = array_type.from_address(ctypes.addressof(self._export))
-            with pdfium_guard():
-                self.document = pdfium.PdfDocument(borrowed)
-        except BaseException:
-            self.close()
-            raise
+        with pdfium_guard():
+            self.document = pdfium.PdfDocument(Path(path))
 
     def close(self):
-        """先关闭全部 PDFium 原生句柄，再释放唯一导出视图、映射及源文件。"""
+        """原生文档成功关闭后才清除引用；失败由会话终止 worker 并回收文件。"""
         from .pdfium import close_pdfium_document
 
         if self.document is not None:
-            # 原生关闭失败时不得解除映射；让调用方报错并销毁整个 worker。
             close_pdfium_document(self.document)
             self.document = None
-        self._export = None
-        if self.mapping is not None:
-            self.mapping.close()
-            self.mapping = None
-        if self.source is not None:
-            self.source.close()
-            self.source = None
 
 
 def _render_session_worker(connection):
-    """串行处理定向协议，文档与输入映射持续到显式关闭或连接断开。"""
+    """串行处理定向协议，文档与文件读取器持续到显式关闭或连接断开。"""
     from .images import _initialize_pdf_render_worker, pdf_page_to_image
     from .pdfium import close_pdfium_child, pdfium_guard
+    from .raster import page_to_pixel_file
     from .visuals import _attach_prepared_visual_block_images
 
-    document = mapped_document = None
+    document = input_document = None
     try:
         _initialize_pdf_render_worker()
         while True:
@@ -169,15 +145,15 @@ def _render_session_worker(connection):
                 if operation == "open":
                     if document is not None:
                         raise RuntimeError("Document already open")
-                    mapped_document = _MappedPdfDocument(payload)
-                    document = mapped_document.document
+                    input_document = _RenderPdfDocument(payload)
+                    document = input_document.document
                     with pdfium_guard():
                         page_count = len(document)
                     result = {"page_count": page_count, "pid": os.getpid(), "document_opens": 1}
                 elif operation in ("close", "shutdown"):
-                    if mapped_document is not None:
-                        mapped_document.close()
-                        mapped_document = None
+                    if input_document is not None:
+                        input_document.close()
+                        input_document = None
                     document = None
                     connection.send((request_id, "ack", {"input_released": True, "pid": os.getpid()}))
                     if operation == "shutdown":
@@ -192,16 +168,14 @@ def _render_session_worker(connection):
                         try:
                             with pdfium_guard():
                                 page = document[page_id]
+                                if crops is None and image_type == "pil_img":
+                                    result.append(page_to_pixel_file(page, output_path, dpi))
+                                    continue
                                 item = pdf_page_to_image(page, dpi, image_type)
                             image = item.get("img_pil")
                             if crops is not None:
                                 _attach_prepared_visual_block_images([crops], [item], page_id)
                                 result.append([(index, block.get("image_base64")) for index, block in crops])
-                            elif image is not None:
-                                Path(output_path).write_bytes(image.tobytes())
-                                result.append(
-                                    {"scale": item["scale"], "mode": image.mode, "size": image.size, "path": output_path}
-                                )
                             else:
                                 result.append(item)
                         finally:
@@ -218,8 +192,8 @@ def _render_session_worker(connection):
         pass
     finally:
         try:
-            if mapped_document is not None:
-                mapped_document.close()
+            if input_document is not None:
+                input_document.close()
         finally:
             connection.close()
 
@@ -294,7 +268,7 @@ class PDFRenderSession:
                 raise RuntimeError(f"PDF render worker exited: {process.exitcode}")
 
     def _ensure_workers(self, count, deadline):
-        """为文档惰性补充定向 worker，各进程只打开一次共享映射输入。"""
+        """为文档惰性补充定向 worker，各进程只打开一次共享文件输入。"""
         if time.monotonic() >= deadline:
             raise TimeoutError("PDF render session timed out")
         context = multiprocessing.get_context("spawn")
@@ -406,7 +380,9 @@ class PDFRenderSession:
                     for specification, value in zip(task, values):
                         if prepared_crops is None and "path" in value:
                             path = Path(value["path"])
-                            image = Image.frombytes(value["mode"], value["size"], path.read_bytes())
+                            image = Image.frombytes(
+                                value["mode"], value["size"], path.read_bytes(), "raw", value["raw_mode"], value["stride"], 1
+                            )
                             collected.append(image)
                             path.unlink()
                             value = {"scale": value["scale"], "img_pil": image}
