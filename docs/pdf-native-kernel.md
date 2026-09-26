@@ -34,7 +34,7 @@
 
 ### 可选渲染会话
 
-`PDFDocument.get_render_session(threads=..., timeout=...)` 惰性创建文档所有的会话。定向 worker 协议包含打开、任务、关闭、退出和确认。输入 PDF 写入一次，由各 worker 映射并复用文档句柄；关闭确认在映射释放之后返回。worker 可跨文档复用，共享并发预算；超时、取消和崩溃路径清理资源。像素通过受控临时文件返回，父进程持有独立 PIL 图像。
+`PDFDocument.get_render_session(threads=..., timeout=...)` 惰性创建文档所有的会话。定向 worker 协议包含打开、任务、关闭、退出和确认。输入 PDF 写入一次，由各 worker 的 PDFium 文件读取器复用文档句柄；关闭确认在句柄释放之后返回。worker 可跨文档复用，共享并发预算；超时、取消和崩溃路径清理资源。原始 PDFium 位图及 stride 通过受控临时文件返回，父进程只做一次必要解码并持有独立 PIL 图像。
 
 通过 `DOCVORTEX_PDF_RENDER_BACKEND=session` 选择新路径，默认仍为 `legacy`。旧按 bytes API 保留兼容，新调用可传 `session=`。MinerU 窗口和补图路径复用文档会话，纯文本 Flash 不提前创建输入文件。异步取消等待渲染任务清理完成。此实现尚不是零复制 NumPy/PIL 或 Rust 像素缓冲。
 
@@ -90,3 +90,7 @@ Mac arm64 ABI3 wheel 已构建并通过 CPython 3.14 ABI 检查；独立安装�
 `tests/benchmarks/pdf_input.py` 记录分类、字符/矢量读取及真正的输入栅格化，不等同于 `pdf_render.py` 的导出 PDF 排版，也不等同于 MinerU 端到端性能。报告冻结源码/扩展摘要、窗口/进程参数、导入、首次调用及热运行。摘要计算在阶段计时外；`process_wall_seconds` 包含全部运行、检查和退出，不能当作冷启动解析耗时。
 
 `tools/mineru_flash_benchmark.py` 在显式指定的双仓源码上调用实际 `analyze_pdf(effort="flash", parse_mode="auto")`，包括分类、分析、补图、页面几何及关闭。新进程首调用作为唯一预热，再测五次；导入时间单列。另起独立进程预热后采样一次入口 RSS，采样结束才序列化完整结果。自动分类为 OCR 的样本明确排除于 Flash 文本指标，不启动模型或强制改为文本。宿主集成工具放在 `tools`，避免引擎测试引入 MinerU 依赖。
+
+## 恢复执行：第五批渲染修复
+
+用户已要求单代理恢复执行，RSS 门槛为 130%。第五批 32 份输入栅格化耗时降低 **22.65%**，像素一致，原四份持续退化全部消除；八份独立内存样本通过新预算。实际安装双 wheel 联合检查 383 项通过；网络阻塞推送，尚未取得新跨平台 CI 结果。见 [第五批证据](rust-pdf-stage5-render.md)。此前暂停报告及协议 12 端到端数字保留为各自冻结版本的历史证据。
