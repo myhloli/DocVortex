@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from collections import deque
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from ....document.pdf._document import PDFDocument as PDFDocument
@@ -72,7 +72,7 @@ from .inline.matching import _realign_repaired_text_evidence
 from .inline.materialize import (
     apply_pdf_inline_evidence,
 )
-from .inline.scripts import detect_pdf_text_script_lines
+from .inline.scripts import _prepare_owned_script_evidence, detect_pdf_text_script_lines
 from .inline.types import PDFTextLinkLine, PDFTextStyleLine
 from .layout_evidence import build_layout_evidence
 from .annotation_bands import recover_image_annotation_bands
@@ -310,6 +310,7 @@ class _DocumentSources:
     page_sizes: list[tuple[float, float]]
     page_style_lines: list[list[PDFTextStyleLine]]
     page_link_lines: list[list[PDFTextLinkLine]]
+    page_owned_scripts: list[Any] = field(default_factory=list)
 
 
 def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
@@ -321,6 +322,7 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
     page_text_geometries = []
     page_style_lines: list[list[PDFTextStyleLine]] = []
     page_link_lines: list[list[PDFTextLinkLine]] = []
+    page_owned_scripts = []
     for page_idx in range(pdf_doc.page_count):
         snapshot = pdf_doc._extract_native_page(page_idx)
         page_size = snapshot.page_size
@@ -338,6 +340,8 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
                 page_rotation=snapshot.rotation,
             )
         chars = text_geometry.chars
+        # 只保留纯 Rust 脚本记录与本页身份映射，不延长 PDFium 页面或文档句柄生命周期。
+        page_owned_scripts.append(_prepare_owned_script_evidence(native_text, chars) if native_text is not None else None)
         drawing_lines = _coerce_pdf_drawing_lines(snapshot.drawing_lines)
         lines, decorative_rules = _extract_decorative_text_rules(
             lines,
@@ -372,7 +376,9 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
             watermark_fingerprints,
         )
 
-    return _DocumentSources(page_sources, page_text_geometries, page_sizes, page_style_lines, page_link_lines)
+    return _DocumentSources(
+        page_sources, page_text_geometries, page_sizes, page_style_lines, page_link_lines, page_owned_scripts
+    )
 
 
 def _prepare_document_sources(
@@ -398,13 +404,16 @@ def _prepare_document_sources(
     for (page_index, char_idx), repair in geometry_plan.char_repairs.items():
         repaired_chars_by_page.setdefault(page_index, {})[char_idx] = repair.layout_bbox
 
-    pending = deque(zip(sources.page_sources, sources.page_text_geometries, strict=True))
+    owned_scripts = sources.page_owned_scripts or [None] * len(sources.page_sources)
+    pending = deque(zip(sources.page_sources, sources.page_text_geometries, owned_scripts, strict=True))
+    sources.page_owned_scripts.clear()
+    del owned_scripts
     sources.page_sources.clear()
     sources.page_text_geometries.clear()
     prepared_pages: list[_PreparedPage] = []
     while pending:
         page_index = len(prepared_pages)
-        source, geometry = pending.popleft()
+        source, geometry, owned_script = pending.popleft()
         prepared_pages.append(
             _prepare_page_source(
                 source,
@@ -416,10 +425,11 @@ def _prepare_document_sources(
                 link_lines=sources.page_link_lines[page_index],
                 table_header_separator_bboxes=separators[page_index],
                 repaired_char_bboxes=repaired_chars_by_page.pop(page_index, {}),
+                _owned_script_inputs=owned_script,
             )
         )
         # 删除对象所有者引用，不清空共享字符容器，公式重建副本仍可安全使用。
-        del source, geometry
+        del source, geometry, owned_script
     return prepared_pages
 
 
@@ -597,6 +607,7 @@ def _prepare_page_source(
     link_lines: list[PDFTextLinkLine] | None = None,
     table_header_separator_bboxes: set[BBox] | None = None,
     repaired_char_bboxes: dict[int, BBox] | None = None,
+    _owned_script_inputs=None,
 ) -> _PreparedPage:
     """先认领视觉容器，再标注辅助文本并留下可跨页比较的轻量文本行。"""
 
@@ -802,6 +813,7 @@ def _prepare_page_source(
         origins or {},
         all_chars=source.chars,
         drawing_lines=source.drawing_lines,
+        _owned_inputs=_owned_script_inputs,
     )
     _compact_prepared_lines(remaining_lines, source.page_size)
     _compact_prepared_lines(formula_candidate_lines, source.page_size)

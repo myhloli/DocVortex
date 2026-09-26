@@ -416,3 +416,23 @@ def test_owned_script_copied_members_use_reference(native):
     )
     assert pickle.dumps(actual) == pickle.dumps(expected)
     assert native.script_snapshot_stats() > before
+
+
+def test_flash_consumes_and_releases_owned_script_pages(native, monkeypatch):
+    """Flash 保留全文几何先行依赖；脚本复用与参考结果一致，并逐页释放原生输入队列。"""
+    from docvortex.analyzers.native.pdf import pipeline
+
+    before = native.script_snapshot_stats()
+    with PDFDocument(_pdf()) as document:
+        actual = pipeline._analyze_native_document(document)
+    assert native.script_snapshot_stats() > before
+    with monkeypatch.context() as patcher:
+        patcher.setattr(pipeline, "_prepare_owned_script_evidence", lambda *args: None)
+        with PDFDocument(_pdf()) as document:
+            expected = pipeline._analyze_native_document(document)
+    assert pickle.dumps(actual) == pickle.dumps(expected)
+    with PDFDocument(_pdf()) as document:
+        sources = pipeline._collect_document_sources(document)
+    assert sources.page_owned_scripts and sources.page_owned_scripts[0] is not None
+    pipeline._prepare_document_sources(sources)
+    assert sources.page_owned_scripts == sources.page_sources == sources.page_text_geometries == []
