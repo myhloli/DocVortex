@@ -108,6 +108,8 @@ def main():
         }
 
     source = identities()
+    helper_paths = [Path(__file__), Path(__file__).with_name("mineru_model_tape.py")]
+    helpers = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in helper_paths}
     args.output.mkdir(parents=True)
     tape_sha = hashlib.sha256(args.tape.read_bytes()).hexdigest()
     observations = []
@@ -145,13 +147,15 @@ def main():
         )
         observations.append(record)
     assert identities() == source and hashlib.sha256(args.tape.read_bytes()).hexdigest() == tape_sha
+    assert helpers == {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in helper_paths}
     assert len({item["output_sha256"] for item in observations}) == 1
     assert len({item["compute"]["extension_sha256"] for item in observations}) == 1
     report = {
         "scope": "New interpreter through first analyze_pdf return; includes harness bootstrap, imports, input/tape loading, font and worker startup; excludes actual model inference, post-return validation and shutdown",
         "sources": source,
         "tape_sha256": tape_sha,
-        "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "harness_sha256": helpers[Path(__file__).name],
+        "model_tape_harness_sha256": helpers["mineru_model_tape.py"],
         "observations": observations,
         "median_seconds": statistics.median(item["seconds"] for item in observations),
         "warmup": "No in-process warmup; ordinary OS filesystem caches are not purged",
