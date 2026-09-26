@@ -46,6 +46,8 @@ from docvortex.analyzers.native.office.doc.models import (
     DocTableRow,
 )
 from docvortex.analyzers.native.office.docx.docx_converter import DocxConverter
+from docvortex.analyzers.native.office.equation import image as image_equation_module
+from docvortex.analyzers.native.office.image import serialize_office_image
 from docvortex.analyzers.native.office.pptx.pptx_converter import PptxConverter
 from docvortex.analyzers.native.office.xlsx.xlsx_converter import XlsxConverter
 from docvortex.export.middle import export_middle_json
@@ -290,6 +292,22 @@ def test_pptx_picture_comment_equation_keeps_shape_order(carrier: str) -> None:
 
     assert _equation_contents(pages) == [expected]
     assert not _has_image(pages)
+
+
+def test_pptx_ordinary_gif_over_formula_limit_keeps_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证普通 GIF 超出公式预算后，PPTX 仍保留与原序列化逻辑一致的静态图片。"""
+    image = build_baseline_only_gif()
+    expected = serialize_office_image(image, content_type="image/gif")
+    assert expected is not None
+    monkeypatch.setattr(image_equation_module, "MAX_ENTRY_BYTES", 1)
+    monkeypatch.setattr(image_equation_module, "MAX_EQUATION_CANDIDATE_TOTAL_BYTES", 0)
+
+    pages = PptxModel().predict(BytesIO(build_image_pptx(image)))
+
+    images = [block for page in pages for block in page if block.get("type") == BlockType.IMAGE]
+    assert len(pages) == 1
+    assert [block["image_base64"] for block in images] == [expected]
+    assert not _equation_contents(pages)
 
 
 @pytest.mark.parametrize("carrier", ["wmf", "gif"])

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from io import BytesIO
+
 import pytest
+from PIL import Image
 from _image_mtef_test_utils import (
     apps_mfcc_comment,
     apps_mfcc_comments,
@@ -284,4 +287,86 @@ def test_gif_subblocks_have_an_independent_structural_limit(
     image = build_gif_with_mtef(v5_formula_corpus()[0][1], chunk_size=1)
 
     with pytest.raises(LegacyOfficeResourceLimitError, match="GIF sub-block count"):
+        decode_image_embedded_equation(image)
+
+
+def test_large_ordinary_gif_frame_ignores_equation_byte_limits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证普通帧数据超过公式单候选预算时，仍可遍历且不消耗公式预算。"""
+    output = BytesIO()
+    Image.frombytes("L", (16, 16), bytes(range(256))).save(output, format="GIF")
+    image = output.getvalue()
+    monkeypatch.setattr(image_equation_module, "MAX_ENTRY_BYTES", 1)
+    monkeypatch.setattr(image_equation_module, "MAX_EQUATION_CANDIDATE_TOTAL_BYTES", 0)
+    decoder = OfficeImageEquationDecoder()
+
+    assert decoder.decode(image) is None
+    assert decoder.candidate_total_bytes == 0
+
+
+@pytest.mark.parametrize("with_equation", [False, True])
+def test_large_gif_extensions_preserve_small_equations(
+    monkeypatch: pytest.MonkeyPatch, with_equation: bool
+) -> None:
+    """验证超限非公式扩展不占预算，大 GIF 内的小公式仍可识别且缓存不重复计费。"""
+    _name, mtef, expected = v5_formula_corpus()[0]
+    monkeypatch.setattr(image_equation_module, "MAX_ENTRY_BYTES", len(mtef))
+    monkeypatch.setattr(image_equation_module, "MAX_EQUATION_CANDIDATE_TOTAL_BYTES", len(mtef))
+    extensions = [gif_baseline_extension(b"baseline" * len(mtef))]
+    if with_equation:
+        extensions.append(gif_mtef_extension(mtef))
+    image = build_gif_with_extensions(extensions)
+    decoder = OfficeImageEquationDecoder()
+
+    assert len(image) > image_equation_module.MAX_ENTRY_BYTES
+    assert decoder.decode(image) == (expected if with_equation else None)
+    assert decoder.decode(image) == (expected if with_equation else None)
+    assert decoder.candidate_total_bytes == (len(mtef) if with_equation else 0)
+
+
+@pytest.mark.parametrize("budget_scope", ["entry", "same_image", "previous_image"])
+def test_gif_equation_budget_checked_before_payload_copy(
+    monkeypatch: pytest.MonkeyPatch, budget_scope: str
+) -> None:
+    """验证单候选、同图和跨图累计超限都在复制公式子块之前失败。"""
+    _name, mtef, expected = v5_formula_corpus()[0]
+    assert len(mtef) <= 255
+    decoder = OfficeImageEquationDecoder()
+    extension = gif_mtef_extension(mtef)
+    extensions = [extension]
+    previous_bytes = 0
+    if budget_scope == "entry":
+        monkeypatch.setattr(image_equation_module, "MAX_ENTRY_BYTES", len(mtef) - 1)
+        message = "max_entry_bytes"
+    else:
+        monkeypatch.setattr(image_equation_module, "MAX_EQUATION_CANDIDATE_TOTAL_BYTES", 2 * len(mtef) - 1)
+        message = "max_equation_candidate_total_bytes"
+        if budget_scope == "same_image":
+            extensions.append(extension)
+        else:
+            assert decoder.decode(build_gif_with_extensions(extensions)) == expected
+            previous_bytes = len(mtef)
+            extensions.insert(0, gif_baseline_extension(b"different image"))
+    image = build_gif_with_extensions(extensions)
+    forbidden_start = image.rindex(mtef)
+
+    class GuardedBytes(bytes):
+        """禁止读取已超出预算的子块，证明检查发生于载荷复制之前。"""
+
+        def __getitem__(self, key: int | slice) -> int | bytes:
+            """拦截超限载荷切片，其他字节访问沿用原有行为。"""
+            if isinstance(key, slice) and key.start == forbidden_start and key.stop == forbidden_start + len(mtef):
+                pytest.fail("超限公式载荷不应被复制")
+            return super().__getitem__(key)
+
+    with pytest.raises(LegacyOfficeResourceLimitError, match=message) as caught:
+        decoder.decode(GuardedBytes(image))
+    assert caught.value.code == "resource_limit"
+    assert decoder.candidate_total_bytes == previous_bytes
+
+
+def test_wmf_whole_image_limit_is_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证 GIF 限制调整不会放宽 WMF 整图资源上限。"""
+    image = build_wmf([baseline_wmf_comment()])
+    monkeypatch.setattr(image_equation_module, "MAX_ENTRY_BYTES", len(image) - 1)
+    with pytest.raises(LegacyOfficeResourceLimitError, match="office image exceeds max_entry_bytes"):
         decode_image_embedded_equation(image)
