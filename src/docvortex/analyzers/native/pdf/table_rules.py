@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 import statistics
 import math
 import sys
+from collections import OrderedDict
 from typing import Any
 
 from ....document.pdf._document import PDFPathInfo
@@ -27,6 +28,7 @@ from .geometry import (
 from .models import _Fragment, _LineItem, _LocalAxisLine, _PageSource, _SharedLineIndexSet, _TableCandidate, _VisualRow
 from .table_annotations import (
     _PreparedTableNoteBodyMetrics,
+    _PreparedMarkerCache,
     _PreparedTableNoteRow,
     _build_table_annotation,
     _prepare_annotation_geometry,
@@ -48,6 +50,38 @@ class _RuleCorridorRow:
     source_bbox: BBox
     gate_center_y: float
     row: _VisualRow
+
+
+@dataclass(slots=True)
+class _RuleIntervalPrefix:
+    """仅保留当前横线起点下的一份精确行序列和相邻区间分配。"""
+
+    rows: tuple[_VisualRow, ...]
+    rules: tuple[_LocalAxisLine, ...]
+    groups: list[list[_VisualRow]]
+
+
+@dataclass(slots=True)
+class _RuleBandIndex:
+    """保存同走廊的原行身份及其在完整横线组中的首个相邻区间。"""
+
+    rows: tuple[_VisualRow, ...]
+    positions: dict[int, int]
+    bands: tuple[int, ...]
+    on_rule: tuple[bool, ...]
+    rule_count: int
+
+    def interval(self, rows: list[_VisualRow]) -> tuple[int, int] | None:
+        """只准入与原走廊完全相同、连续且保序的行引用。"""
+
+        if not rows:
+            return 0, 0
+        start = self.positions.get(id(rows[0]))
+        if start is None or start + len(rows) > len(self.rows):
+            return None
+        if any(row is not self.rows[start + offset] for offset, row in enumerate(rows)):
+            return None
+        return start, start + len(rows)
 
 
 @dataclass(slots=True)
@@ -80,6 +114,7 @@ class _RuleCandidateContext:
     excluded_bboxes: list
     marker_cache: dict
     body_metrics: _PreparedTableNoteBodyMetrics
+    marker_prepared: _PreparedMarkerCache = field(default_factory=_PreparedMarkerCache)
     grids: list | None = None
     grid_members: dict = field(default_factory=dict)
     core_indexes: dict = field(default_factory=dict)
@@ -268,10 +303,13 @@ def _build_rule_table_candidates(
     )
     for rule_group in _group_long_horizontal_rules(axis_lines, median_height):
         active_first_index = -1
+        interval_prefix: _RuleIntervalPrefix | None = None
+        band_indexes: OrderedDict[tuple[float, float], _RuleBandIndex | None] = OrderedDict()
         # 保留历史算法的候选集合与枚举顺序；性能优化只复用候选内部的纯计算结果。
         for first_index, bottom_index in _iter_rule_spans(len(rule_group)):
             if first_index != active_first_index:
                 stable_column_cache.prefixes.clear()
+                interval_prefix = None
                 active_first_index = first_index
             top_rule = rule_group[first_index]
             bottom_rule = rule_group[bottom_index]
@@ -297,10 +335,25 @@ def _build_rule_table_candidates(
                 and len(interval_rules) >= 3
                 and rule_bbox[3] - rule_bbox[1] <= 0.15 * (page_size[0] if angle in {90, 270} else page_size[1])
             )
-            interval_row_groups = _partition_rows_by_rule_intervals(
-                core_rows,
-                interval_rules,
+            corridor_key = (rule_bbox[0], rule_bbox[2])
+            if corridor_key not in band_indexes:
+                corridor_rows = [item.row for item in corridor_cache[corridor_key]]
+                band_indexes[corridor_key] = (
+                    _prepare_rule_band_index(corridor_rows, rule_group)
+                    if len(corridor_rows) >= 8 and len(rule_group) >= 4
+                    else None
+                )
+                if len(band_indexes) > 16:
+                    band_indexes.popitem(last=False)
+            else:
+                band_indexes.move_to_end(corridor_key)
+            interval_row_groups = _partition_rows_by_prepared_bands(
+                core_rows, interval_rules, first_index, band_indexes[corridor_key]
             )
+            if interval_row_groups is None:
+                interval_row_groups, interval_prefix = _partition_rows_by_rule_intervals_cached(
+                    core_rows, interval_rules, interval_prefix
+                )
             if (
                 not _every_rule_interval_has_multi_cell_row(
                     core_rows,
@@ -445,6 +498,7 @@ def _build_rule_table_candidates(
                         [item.row for item in corridor_cache[corridor_key]],
                         lines,
                         prepared_note_body_metrics,
+                        context.marker_prepared,
                     )
                 core_index = context.core_indexes[corridor_key]
                 interval = core_index.interval(accepted_rows) if core_index is not None else None
@@ -1015,6 +1069,95 @@ def _partition_rows_by_rule_intervals(
         if 0 <= interval_index < len(groups):
             groups[interval_index].append(row)
     return groups
+
+
+def _prepare_rule_band_index(rows: list[_VisualRow], rules: list[_LocalAxisLine]) -> _RuleBandIndex | None:
+    """为一条精确走廊计算完整横线组的首区间，异常和重复横线回退。"""
+
+    if len({id(row) for row in rows}) != len(rows) or any(
+        type(row.center_y) is not float or not math.isfinite(row.center_y) for row in rows
+    ):
+        return None
+    centers = []
+    for rule in rules:
+        box = rule.bbox
+        if (
+            type(box) not in (tuple, list)
+            or len(box) != 4
+            or any(type(value) is not float or not math.isfinite(value) for value in box)
+        ):
+            return None
+        center = _bbox_center_y(box)
+        if not math.isfinite(center) or centers and center <= centers[-1]:
+            return None
+        centers.append(center)
+    bands = [bisect_left(centers, row.center_y) for row in rows]
+    return _RuleBandIndex(
+        tuple(rows),
+        {id(row): index for index, row in enumerate(rows)},
+        tuple(bands),
+        tuple(position < len(centers) and centers[position] == row.center_y for position, row in zip(bands, rows, strict=True)),
+        len(centers),
+    )
+
+
+def _partition_rows_by_prepared_bands(
+    rows: list[_VisualRow],
+    rules: list[_LocalAxisLine],
+    first_index: int,
+    index: _RuleBandIndex | None,
+) -> list[list[_VisualRow]] | None:
+    """仅对连续且保序的走廊行复用首区间，仍让边界行双归属。"""
+
+    if index is None or first_index < 0 or first_index + len(rules) > index.rule_count:
+        return None
+    interval = index.interval(rows)
+    if interval is None:
+        return None
+    start, end = interval
+    groups: list[list[_VisualRow]] = [[] for _ in range(max(0, len(rules) - 1))]
+    for row, band, on_rule in zip(rows, index.bands[start:end], index.on_rule[start:end], strict=True):
+        local = band - first_index
+        if on_rule:
+            if 0 <= local - 1 < len(groups):
+                groups[local - 1].append(row)
+            if 0 <= local < len(groups):
+                groups[local].append(row)
+        elif 0 <= local - 1 < len(groups):
+            groups[local - 1].append(row)
+    return groups
+
+
+def _partition_rows_by_rule_intervals_cached(
+    rows: list[_VisualRow],
+    rule_group: list[_LocalAxisLine],
+    previous: _RuleIntervalPrefix | None,
+) -> tuple[list[list[_VisualRow]], _RuleIntervalPrefix]:
+    """严格同一行序列与递增横线前缀时只补末区间，其余执行原分配。"""
+
+    reusable = (
+        previous is not None
+        and len(rule_group) == len(previous.rules) + 1
+        and len(rows) == len(previous.rows)
+        and all(row is old for row, old in zip(rows, previous.rows, strict=True))
+        and all(rule is old for rule, old in zip(rule_group[:-1], previous.rules, strict=True))
+        and all(type(row.center_y) is float and math.isfinite(row.center_y) for row in rows)
+        and all(
+            type(rule.bbox) in (tuple, list)
+            and len(rule.bbox) == 4
+            and all(type(value) is float and math.isfinite(value) for value in rule.bbox)
+            for rule in rule_group
+        )
+    )
+    if reusable:
+        centers = [_bbox_center_y(rule.bbox) for rule in rule_group]
+        reusable = all(first < second for first, second in zip(centers, centers[1:]))
+    if reusable:
+        low, high = centers[-2:]
+        groups = [*previous.groups, [row for row in rows if low <= row.center_y <= high]]
+    else:
+        groups = _partition_rows_by_rule_intervals(rows, rule_group)
+    return groups, _RuleIntervalPrefix(tuple(rows), tuple(rule_group), groups)
 
 
 def _every_rule_interval_has_multi_cell_row(

@@ -15,6 +15,7 @@ from .....content.spans import (
 from .....schema import BBox
 from .common import _canonical_styles
 from .matching import (
+    _ContentProjectionCache,
     _assign_lines_to_blocks,
     _assign_script_lines_to_blocks,
     _block_bbox_to_page_bbox,
@@ -267,7 +268,9 @@ def apply_pdf_text_scripts(
     materialized_diagnostics: list[dict[str, Any]] | None = None,
 ) -> None:
     """把 Flash 上下标 sidecar 投影到最终自然语言 block，并清理公式私有区域。"""
-    assignments = _assign_script_lines_to_blocks(blocks, lines, page_size)
+    # 空证据仍执行原分配流程，避免为扫描页建立不会被再次消费的缓存。
+    projection_cache = _ContentProjectionCache() if lines else None
+    assignments = _assign_script_lines_to_blocks(blocks, lines, page_size, projection_cache=projection_cache)
     for block_index, block_lines in assignments.items():
         block = blocks[block_index]
         regions = [
@@ -304,7 +307,9 @@ def apply_pdf_text_scripts(
         content = block.get("content")
         if not isinstance(content, str) or not content:
             continue
-        projected = _project_content_chars(content)
+        projected = (
+            projection_cache.project(block, content) if projection_cache is not None else _project_content_chars(content)
+        )
         combined_ranges = _merge_style_ranges(
             [
                 *_match_style_ranges(projected, projected_lines),

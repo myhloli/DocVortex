@@ -7,6 +7,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 from ..equation.image import OfficeImageEquationDecoder
 from ..equation.ooxml import OoxmlEquationDecoder
+from ..errors import LegacyOfficeResourceLimitError
 from ..streams import read_stream_bytes_from_start, rewind_stream
 from .package_normalizer import normalize_pptx_package
 from ..._shared.xycut import sort_entries
@@ -63,10 +64,13 @@ class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _P
         self,
         file_stream: BinaryIO,
     ):
+        """解析 PPTX；资源异常直接传播，包兼容异常才进入规范化重试。"""
         if rewind_stream(file_stream):
             try:
                 self._convert_package_stream(file_stream)
                 return
+            except (LegacyOfficeResourceLimitError, MemoryError):
+                raise
             except Exception as exc:
                 file_bytes = read_stream_bytes_from_start(file_stream)
                 self._retry_convert_package_bytes_after_normalization(file_bytes, exc)
@@ -75,6 +79,8 @@ class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _P
         file_bytes = file_stream.read()
         try:
             self._convert_package_bytes(file_bytes)
+        except (LegacyOfficeResourceLimitError, MemoryError):
+            raise
         except Exception as exc:
             self._retry_convert_package_bytes_after_normalization(file_bytes, exc)
 

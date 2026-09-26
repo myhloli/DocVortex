@@ -3,7 +3,7 @@
 use docvortex_core::extraction;
 use docvortex_core::geometry::{self, Box4, Size};
 use pyo3::prelude::*;
-use pyo3::types::{PyFloat, PyList, PyTuple};
+use pyo3::types::{PyFloat, PyInt, PyList, PyTuple};
 
 use super::conversion::{box_tuple, read_boxes, BoxTuple};
 
@@ -211,4 +211,110 @@ pub(super) fn source_rows<'py>(
         }
     }
     Ok(output)
+}
+
+/// 只借用内置浮点序列，特殊类型及异常数值返回参考路径而不执行转换回调。
+pub(super) fn plain_coordinates<const N: usize>(
+    value: &Bound<'_, PyAny>,
+) -> Option<Option<[f64; N]>> {
+    if value.is_none() {
+        return Some(None);
+    }
+    if (!value.is_exact_instance_of::<PyList>() && !value.is_exact_instance_of::<PyTuple>())
+        || value.len().ok()? != N
+    {
+        return None;
+    }
+    let mut result = [0.0; N];
+    for (index, number) in result.iter_mut().enumerate() {
+        let item = value.get_item(index).ok()?;
+        if !item.is_exact_instance_of::<PyFloat>() {
+            return None;
+        }
+        *number = item.extract::<f64>().ok()?;
+        if !number.is_finite() {
+            return None;
+        }
+    }
+    Some(Some(result))
+}
+
+/// 每行只接收一份保序记录，融合普通数值校验及既有源框选择、裁剪和旋转。
+#[pyfunction]
+pub(super) fn source_rows_plain<'py>(
+    py: Python<'py>,
+    records: &Bound<'py, PyList>,
+    size: Size,
+    angle: i32,
+) -> PyResult<Option<Bound<'py, PyList>>> {
+    let mut rows = Vec::with_capacity(records.len());
+    let mut originals = Vec::with_capacity(records.len());
+    for record in records.iter() {
+        if !record.is_exact_instance_of::<PyTuple>() || record.len()? != 6 {
+            return Ok(None);
+        }
+        let position = record.get_item(0)?;
+        if !position.is_exact_instance_of::<PyInt>() || position.extract::<usize>().is_err() {
+            return Ok(None);
+        }
+        let raw = record.get_item(1)?;
+        let side = record.get_item(2)?;
+        let tight = record.get_item(3)?;
+        let origin = record.get_item(4)?;
+        let rotation = record.get_item(5)?;
+        let (Some(r), Some(s), Some(t), Some(o)) = (
+            plain_coordinates::<4>(&raw),
+            plain_coordinates::<4>(&side),
+            plain_coordinates::<4>(&tight),
+            plain_coordinates::<2>(&origin),
+        ) else {
+            return Ok(None);
+        };
+        if !rotation.is_exact_instance_of::<PyFloat>() {
+            return Ok(None);
+        }
+        let rotation = rotation.extract::<f64>()?;
+        if !rotation.is_finite() {
+            return Ok(None);
+        }
+        rows.push((r, s, t, o, rotation));
+        originals.push((position, raw, side, tight, origin));
+    }
+    let prepared = py.detach(move || geometry::source_rows(rows, size, angle));
+    let output = PyList::empty(py);
+    for ((position, raw, side, tight, origin), row) in originals.into_iter().zip(prepared) {
+        if let Some((s, t, o, ls, lt, lo)) = row {
+            let source = shared_coordinates(py, s, &[raw, side])?;
+            let tight = shared_coordinates(py, t, &[tight])?;
+            let origin = shared_coordinates(py, o, &[origin])?;
+            let local_source = if angle == 0 {
+                source.clone()
+            } else {
+                shared_coordinates(py, ls, &[])?
+            };
+            let local_tight = if angle == 0 {
+                tight.clone()
+            } else {
+                shared_coordinates(py, lt, &[])?
+            };
+            let local_origin = if angle == 0 {
+                origin.clone()
+            } else {
+                shared_coordinates(py, lo, &[])?
+            };
+            let values = PyTuple::new(
+                py,
+                [
+                    source,
+                    tight,
+                    origin,
+                    local_source,
+                    local_tight,
+                    local_origin,
+                ],
+            )?;
+            output.append(PyTuple::new(py, [position, values.into_any()])?)?;
+        }
+    }
+    Ok(Some(output))
 }

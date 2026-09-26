@@ -20,6 +20,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(spatial::title_gaps, module)?)?;
     module.add_function(wrap_pyfunction!(spatial::line_neighbors, module)?)?;
     module.add_function(wrap_pyfunction!(dedup::mapping_runs, module)?)?;
+    module.add_function(wrap_pyfunction!(dedup::mapping_glyph_rows, module)?)?;
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_chars, module)?)?;
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_char_batches, module)?)?;
     module.add_class::<pdfium::PdfiumCharacterBatches>()?;
@@ -46,6 +47,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(geometry::visual_runs, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::local_boxes, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::source_rows, module)?)?;
+    module.add_function(wrap_pyfunction!(geometry::source_rows_plain, module)?)?;
     module.add_function(wrap_pyfunction!(dedup::paint_pairs, module)?)?;
     module.add_function(wrap_pyfunction!(dedup::dedup_components, module)?)?;
     module.add_function(wrap_pyfunction!(dedup::hidden_candidates, module)?)?;
@@ -58,5 +60,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(tables::component_specs, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::materialize_geometry, module)?)?;
     module.add_function(wrap_pyfunction!(scripts::script_roles_raw, module)?)?;
+    module.add_function(wrap_pyfunction!(scripts::script_roles_raw_batch, module)?)?;
+    module.add_function(wrap_pyfunction!(scripts::script_roles_plain_batch, module)?)?;
     Ok(())
 }

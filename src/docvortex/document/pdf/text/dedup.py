@@ -170,6 +170,28 @@ def _native_mapping_ranges(chars, native):
 
 
 def _mapping_groups(chars: list[Char]) -> list[_Glyph]:
+    """Rust 直接借用普通字符完成保护组和框准备；特殊输入保留完整参考路径。"""
+    native = get_native()
+    if native is not None and type(chars) is list:
+        rows = native.mapping_glyph_rows(chars, Bbox)
+        if rows is not None:
+            result = []
+            for first, last, box, angle in rows:
+                group = chars[first:last]
+                if last > first + 1 and len({char["char"] for char in group}) > 1:
+                    equivalents = {_canonical_han(char["char"]) for char in group}
+                    if len(equivalents) == 1 and _is_han(canonical := next(iter(equivalents))):
+                        replacement = group[0].copy()
+                        replacement["char"] = canonical
+                        replacement["source_indices"] = _source_indices(group)
+                        group = [replacement]
+                text = group[0]["char"] if len(group) == 1 else "".join(char["char"] for char in group)
+                result.append(_Glyph(group, box, text, angle))
+            return result
+    return _mapping_groups_reference(chars)
+
+
+def _mapping_groups_reference(chars: list[Char]) -> list[_Glyph]:
     """先建立保护组，仅合并不同编码指向同一个汉字的异常映射。"""
     # 整页入口实测中，原生前置分组的输入打包成本超过计算收益；保留内核差分但不默认启用。
     groups = _mapping_char_groups_python(chars)

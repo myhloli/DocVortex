@@ -9,6 +9,38 @@ import sys
 
 import pytest
 
+from benchmarks.pdf_corpus import corpus_manifest, corpus_paths, discover_demo_pdfs
+
+
+def test_demo_corpus_discovers_new_subdirectory_pdf(tmp_path: Path) -> None:
+    """新 demo PDF 自动进入 demo 与 all 集合，路径只出现一次。"""
+
+    (tmp_path / "demo/pdfs/nested").mkdir(parents=True)
+    sample = tmp_path / "demo/pdfs/nested/new.pdf"
+    sample.write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "tests/fixtures").mkdir(parents=True)
+    (tmp_path / "tests/fixtures/flash_layout_geometry_manifest.json").write_text(
+        json.dumps({"documents": [{"path": "demo/pdfs/nested/new.pdf"}]}), encoding="utf-8"
+    )
+    assert discover_demo_pdfs(tmp_path) == [sample]
+    assert corpus_paths("demo", tmp_path) == [sample.resolve()]
+    assert corpus_paths("all", tmp_path) == [sample.resolve()]
+
+
+def test_corpus_manifest_counts_encoded_pdf_pages(tmp_path: Path) -> None:
+    """冻结 XOR 原始字节指纹，同时按解码后的真实 PDF 统计页数。"""
+
+    import hashlib
+
+    data = (Path(__file__).parents[1] / "demo/pdfs/2407.00079v4_origi-10.pdf").read_bytes()
+    key = b"MinerU flash layout fixture"
+    encoded = bytes(value ^ key[index % len(key)] for index, value in enumerate(data))
+    sample = tmp_path / "encoded.pdf.xor"
+    sample.write_bytes(encoded)
+    assert corpus_manifest([sample]) == [
+        {"path": str(sample.resolve()), "sha256": hashlib.sha256(encoded).hexdigest(), "bytes": len(encoded), "pages": 1}
+    ]
+
 
 @pytest.mark.skipif(sys.platform == "win32", reason="基线工具使用 POSIX resource 进程统计")
 def test_native_benchmark_generates_report_and_portable_profile(tmp_path: Path) -> None:

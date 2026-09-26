@@ -16,7 +16,20 @@ def verify_binary(binary: Path) -> None:
     assert spec is not None and spec.loader is not None
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
-    assert native.PROTOCOL_VERSION == 6
+    assert native.PROTOCOL_VERSION == 8
+    assert native.source_rows_plain([], (100.0, 100.0), 0) == []
+    assert native.script_roles_raw_batch(
+        [(0.0, 0.0, 5.0, 10.0), (0.0, 0.0, 5.0, 10.0)],
+        [(0.0, 1.0, 5.0, 9.0), (0.0, 1.0, 5.0, 9.0)],
+        [(0.0, 9.0), (0.0, 9.0)],
+        [4, 4],
+        [0, 0],
+        [0, 1, 2],
+        lambda value: value,
+    ) == [b"\x00", b"\x00"]
+    assert native.script_roles_plain_batch(
+        [(0.0, 0.0, 5.0, 10.0)], [(0.0, 1.0, 5.0, 9.0)], [(0.0, 9.0)], [4], [0], [0, 1], lambda value: value
+    ) == [b"\x00"]
     baseline = native.BaselineGeometryCandidates(
         [(0, 10), (0, 10)], [0, 0], [(0, 0, 10, 10), (11, 0, 20, 10)], [10, 10], [None, None]
     )
@@ -37,6 +50,7 @@ def verify_binary(binary: Path) -> None:
     assert native.BaselineCandidates([(0, 1), (1, 2), (3, 4)], [0, 0, 0]).rows(0, 3, 8192) == [[1], [], []]
     assert native.TableNoteMetrics([(0, 0, 1), (1, 1, 2), (2, 2, 3), (3, 3, 4)]).height(100, 200, [], 1.25) == 4.0
     assert native.mapping_runs([]) == []
+    assert native.mapping_glyph_rows([], list) == []
     assert native.anchor_pairs([], False) == []
     assert native.title_gaps([(0, None, (0, 0, 10, 10), 10, False)]) == [(None, None)]
     assert native.line_neighbors([(0, (0, 0, 10, 10), 10, 10)]) == [(None, None)]

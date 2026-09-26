@@ -48,6 +48,35 @@ class _PreparedTableNoteBodyMetrics:
 
 
 @dataclass(slots=True)
+class _PreparedMarkerCache:
+    """在同一横线候选构建过程复用字形，只保留有界来源行。"""
+
+    values: OrderedDict[int, tuple[_LineItem, list[tuple[str, BBox]], tuple[int, tuple[str, ...]]]] = field(
+        default_factory=OrderedDict
+    )
+    glyph_count: int = 0
+
+    def prepare(self, line: _LineItem, page_size: tuple[float, float], angle: int):
+        """命中时返回原字形；淘汰只触发重算，不影响标记裁决。"""
+
+        key = id(line)
+        cached = self.values.get(key)
+        if cached is not None and cached[0] is line:
+            self.values.move_to_end(key)
+            return cached[1], cached[2]
+        prepared = _prepare_marker_line(line, page_size, angle)
+        if prepared is None or len(prepared[0]) > 16384:
+            return prepared
+        self.values[key] = (line, *prepared)
+        self.values.move_to_end(key)
+        self.glyph_count += len(prepared[0])
+        while len(self.values) > 8192 or self.glyph_count > 16384:
+            _old, (_line, glyphs, _tokens) = self.values.popitem(last=False)
+            self.glyph_count -= len(glyphs)
+        return prepared
+
+
+@dataclass(slots=True)
 class _PreparedTableCoreRows:
     """保存一个走廊的原始行引用和来源倒排索引，不跨候选构建缓存。"""
 
@@ -59,6 +88,7 @@ class _PreparedTableCoreRows:
     marker_safe: bool = False
     geometry: Any = None
     source_lines: dict[int, list[_LineItem]] = field(default_factory=dict)
+    marker_prepared: _PreparedMarkerCache = field(default_factory=_PreparedMarkerCache)
 
     def bbox(self, start, end):
         """按极值来源复用原始坐标对象，避免新建大量 Python 浮点值。"""
@@ -104,7 +134,7 @@ class _PreparedTableCoreRows:
                 else:
                     # 缓存模式遵循同来源首行裁决；不向旧缓存写入稠密 False。
                     selected_lines = source_lines if marker_cache is None else source_lines[:1]
-                    matched = _table_core_references_marker(marker, selected_lines, page_size, angle)
+                    matched = _table_core_references_marker(marker, selected_lines, page_size, angle, prepared_core=self)
                 if matched:
                     for position in self.source_rows[source]:
                         hits |= 1 << position
@@ -122,8 +152,13 @@ class _PreparedTableCoreRows:
         if len(self.marker_states) > 128:
             self.marker_states.popitem(last=False)
 
+    def prepared_marker_line(self, line: _LineItem, page_size: tuple[float, float], angle: int):
+        """按当前走廊共享的有界缓存查询来源行字形。"""
 
-def _prepare_table_core_rows(rows, lines, metrics):
+        return self.marker_prepared.prepare(line, page_size, angle)
+
+
+def _prepare_table_core_rows(rows, lines, metrics, marker_prepared: _PreparedMarkerCache | None = None):
     """一次校验并打包走廊成员；特殊来源和对象仍交给原集合路径。"""
     if metrics.native is None or len({id(row) for row in rows}) != len(rows):
         return None
@@ -186,6 +221,7 @@ def _prepare_table_core_rows(rows, lines, metrics):
         marker_safe=marker_safe,
         geometry=geometry,
         source_lines=source_lines,
+        marker_prepared=marker_prepared or _PreparedMarkerCache(),
     )
 
 
@@ -669,12 +705,52 @@ def _extract_auxiliary_table_note_marker(text: str) -> str | None:
     return marker
 
 
+def _prepare_marker_line(
+    line: _LineItem, page_size: tuple[float, float], angle: int
+) -> tuple[list[tuple[str, BBox]], tuple[int, tuple[str, ...]]] | None:
+    """仅为普通来源行准备与具体标记无关的局部字形及紧凑 token。"""
+
+    from ....document.pdf.text import Bbox
+
+    if (
+        type(line) is not _LineItem
+        or type(line.text) is not str
+        or type(line.chars) is not list
+        or type(page_size) not in (tuple, list)
+        or len(page_size) != 2
+        or any(type(value) is not float or not math.isfinite(value) for value in page_size)
+        or type(angle) is not int
+    ):
+        return None
+    glyphs = []
+    for char in line.chars:
+        if type(char) is not dict or type(char.get("char")) not in (str, type(None)):
+            return None
+        value = char.get("bbox")
+        raw = value.bbox if type(value) is Bbox else value
+        if raw is not None and (
+            type(raw) not in (tuple, list)
+            or len(raw) != 4
+            or any(type(number) is not float or not math.isfinite(number) for number in raw)
+        ):
+            return None
+        raw_char = str(char.get("char") or "")
+        if not raw_char.isprintable() or raw_char.isspace():
+            continue
+        bbox = _coerce_bbox(value)
+        if bbox is None:
+            continue
+        glyphs.append((unicodedata.normalize("NFKC", raw_char).casefold(), _rotate_bbox_to_upright(bbox, page_size, angle)))
+    return glyphs, _compact_marker_data(line.text)
+
+
 def _table_core_references_marker(
     marker: str,
     core_lines: list[_LineItem],
     page_size: tuple[float, float],
     angle: int,
     marker_cache: dict[tuple[int, str], bool] | None = None,
+    prepared_core: _PreparedTableCoreRows | None = None,
 ) -> bool:
     """要求通用短标记在表格核心中具有上标或紧凑单元格引用。"""
 
@@ -684,10 +760,10 @@ def _table_core_references_marker(
             if marker_cache[key]:
                 return True
             continue
-        result = _line_has_superscript_marker(line, marker, page_size, angle) or _line_has_compact_marker_token(
-            line.text,
-            marker,
-        )
+        prepared = prepared_core.prepared_marker_line(line, page_size, angle) if prepared_core is not None else None
+        result = _line_has_superscript_marker(
+            line, marker, page_size, angle, prepared_glyphs=prepared[0] if prepared is not None else None
+        ) or _line_has_compact_marker_token(line.text, marker, prepared=prepared[1] if prepared is not None else None)
         if marker_cache is not None:
             marker_cache[key] = result
         if result:
@@ -695,12 +771,13 @@ def _table_core_references_marker(
     return False
 
 
-def _line_has_compact_marker_token(text: str, marker: str) -> bool:
-    """仅在短小单元格文本中确认独立标记 token，避免普通句子偶然命中。"""
+def _compact_marker_data(text: str) -> tuple[int, tuple[str, ...]]:
+    """按原 Unicode 规则准备短文本标记 token，超长正文不保留 token。"""
 
     normalized_text = unicodedata.normalize("NFKC", str(text or "")).casefold()
-    if sum(not char.isspace() for char in normalized_text) > 12:
-        return False
+    count = sum(not char.isspace() for char in normalized_text)
+    if count > 12:
+        return count, ()
     tokens: list[str] = []
     current: list[str] = []
     for char in normalized_text:
@@ -711,7 +788,14 @@ def _line_has_compact_marker_token(text: str, marker: str) -> bool:
             current = []
     if current:
         tokens.append("".join(current))
-    return len(tokens) <= 4 and marker in tokens
+    return count, tuple(tokens)
+
+
+def _line_has_compact_marker_token(text: str, marker: str, prepared: tuple[int, tuple[str, ...]] | None = None) -> bool:
+    """短小单元格只匹配独立标记 token，复用同来源的只读准备结果。"""
+
+    count, tokens = prepared if prepared is not None else _compact_marker_data(text)
+    return count <= 12 and len(tokens) <= 4 and marker in tokens
 
 
 def _line_has_superscript_marker(
@@ -719,19 +803,23 @@ def _line_has_superscript_marker(
     marker: str,
     page_size: tuple[float, float],
     angle: int,
+    prepared_glyphs: list[tuple[str, BBox]] | None = None,
 ) -> bool:
     """在正向局部坐标中检查标记字形是否同时更小并明显上移。"""
 
     glyphs: list[tuple[str, BBox]] = []
-    for char in line.chars:
-        raw_char = str(char.get("char") or "")
-        if not raw_char.isprintable() or raw_char.isspace():
-            continue
-        bbox = _coerce_bbox(char.get("bbox"))
-        if bbox is None:
-            continue
-        local_bbox = _rotate_bbox_to_upright(bbox, page_size, angle)
-        glyphs.append((unicodedata.normalize("NFKC", raw_char).casefold(), local_bbox))
+    if prepared_glyphs is None:
+        for char in line.chars:
+            raw_char = str(char.get("char") or "")
+            if not raw_char.isprintable() or raw_char.isspace():
+                continue
+            bbox = _coerce_bbox(char.get("bbox"))
+            if bbox is None:
+                continue
+            local_bbox = _rotate_bbox_to_upright(bbox, page_size, angle)
+            glyphs.append((unicodedata.normalize("NFKC", raw_char).casefold(), local_bbox))
+    else:
+        glyphs = prepared_glyphs
     if len(glyphs) < 2:
         return False
 

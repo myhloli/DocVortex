@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+from bisect import bisect_right
 import statistics
 import math
 import unicodedata
+from functools import lru_cache
 from typing import Any, Literal, Sequence
 
 from .....schema import BBox
 from .....document.pdf.text._contracts import Bbox as CharBox
 from .._script_geometry import (
     ScriptRole,
+    _native_text_flags,
     _numeric_superscript_indices,
+    _script_font_key,
+    _coerce_finite_bbox,
     build_script_features,
     classify_char_script_roles,
     paired_script_roles,
@@ -78,7 +83,8 @@ def _script_region_memberships(
 
 def _script_char_text(char: dict[str, Any]) -> str:
     """返回单字符脚本判定使用的稳定文本。"""
-    return str(char.get("char", ""))
+    value = char.get("char", "")
+    return value if type(value) is str else str(value)
 
 
 def _is_cjk_text(text: str) -> bool:
@@ -95,6 +101,7 @@ def _is_cjk_text(text: str) -> bool:
     )
 
 
+@lru_cache(maxsize=8192)
 def _is_math_identifier_char(text: str) -> bool:
     """识别可与拉丁 base/index 共同组成数学 token 的字母数字字符。"""
     if len(text) != 1 or _is_cjk_text(text):
@@ -415,9 +422,13 @@ def _refine_math_script_tokens(
     origins: dict[int, tuple[float, float]],
     *,
     formula_region: bool,
+    ordinary_native_roles: bool = False,
 ) -> list[ScriptRole]:
     """以最左稳定簇保护 base，并对弱单字符和复杂未分段 token 保守拒识。"""
     refined = list(roles)
+    # 原规则只有已标记种子才能闭合/精炼新脚本；普通原生批次的全 body 行无需重扫 token。
+    if ordinary_native_roles and all(role == "body" for role in refined):
+        return refined
     citation_indices = _citation_script_indices(chars, refined)
     numeric_indices: set[int] = set()
     if any(role == "sup" and _script_char_text(char).isdecimal() for char, role in zip(chars, roles)):
@@ -626,6 +637,7 @@ def _fraction_member_indices(
     tight_bboxes: dict[int, BBox],
     drawing_lines: Sequence[Any],
     angle: int,
+    prepared_rules: list[BBox | None] | None = None,
 ) -> set[int]:
     """按页面方向一次识别分数线两侧的上下叠字，供复杂分式整块拒识。"""
     if not all_chars or not drawing_lines:
@@ -643,19 +655,23 @@ def _fraction_member_indices(
         local_heights.append(local_bbox[3] - local_bbox[1])
     scale = statistics.median([height for height in local_heights if height > 0]) if local_heights else 8.0
     members: set[int] = set()
-    for drawing in drawing_lines:
-        raw_bbox = _coerce_bbox(getattr(drawing, "bbox", drawing))
-        if raw_bbox is None:
+    indexed = _FractionCharIndex(local_chars) if len(local_chars) >= 32 and len(drawing_lines) >= 4 else None
+    for rule_index, drawing in enumerate(drawing_lines):
+        if prepared_rules is None:
+            raw_bbox = _coerce_bbox(getattr(drawing, "bbox", drawing))
+            local_rule = _rotate_bbox_to_upright(raw_bbox, page_size, angle) if raw_bbox is not None else None
+        else:
+            local_rule = prepared_rules[rule_index]
+        if local_rule is None:
             continue
-        local_rule = _rotate_bbox_to_upright(raw_bbox, page_size, angle)
         width = local_rule[2] - local_rule[0]
         height = local_rule[3] - local_rule[1]
-        if width < max(2.0, 0.45 * scale) or width > 12.0 * scale or height > max(1.25, 0.25 * scale):
+        if width < max(2.0, 0.45 * scale) or width > 12.0 * scale or height > max(1.25, 0.25 * scale) or width > 8.0 * scale:
             continue
         rule_y = (local_rule[1] + local_rule[3]) / 2
         aligned = [
             (char_idx, bbox)
-            for char_idx, text, bbox in local_chars
+            for char_idx, text, bbox in (indexed.query(local_rule, scale) if indexed is not None else local_chars)
             if text.isalnum()
             and abs((bbox[1] + bbox[3]) / 2 - rule_y) <= 2.25 * scale
             and (
@@ -673,13 +689,64 @@ def _fraction_member_indices(
             for char_idx, bbox in aligned
             if bbox[1] >= rule_y - 0.2 * scale and bbox[1] - rule_y <= 1.75 * scale
         ]
-        # 超过局部公式尺度的长横线更像脚注/段落分隔线，不用于分式成员抑制。
-        if width > 8.0 * scale:
-            continue
         if above and below:
             members.update(char_idx for char_idx, _bbox in above)
             members.update(char_idx for char_idx, _bbox in below)
     return members
+
+
+def _prepare_fraction_rules(drawing_lines: Sequence[Any], page_size: tuple[float, float], angle: int) -> list[BBox | None]:
+    """按原绘图顺序准备一次局部横线框，供同一表格的多个单元格复用。"""
+
+    return [
+        _rotate_bbox_to_upright(raw, page_size, angle)
+        if (raw := _coerce_bbox(getattr(drawing, "bbox", drawing))) is not None
+        else None
+        for drawing in drawing_lines
+    ]
+
+
+class _FractionCharIndex:
+    """只保存本次分式检测的字符索引，查询返回原字符顺序的安全超集。"""
+
+    def __init__(self, chars: list[tuple[int, str, BBox]]):
+        """异常数值不建立索引，由查询回退原列表。"""
+
+        self.chars = chars
+        self.safe = all(type(value) is float and math.isfinite(value) for _index, _text, box in chars for value in box)
+        if not self.safe:
+            return
+        self.order = sorted(range(len(chars)), key=lambda index: (chars[index][2][0], index))
+        self.starts = [chars[index][2][0] for index in self.order]
+        self.width = 1 << max(0, (len(chars) - 1).bit_length())
+        self.maxima = [float("-inf")] * (2 * self.width)
+        for position, index in enumerate(self.order):
+            self.maxima[self.width + position] = chars[index][2][2]
+        for node in range(self.width - 1, 0, -1):
+            self.maxima[node] = max(self.maxima[node * 2], self.maxima[node * 2 + 1])
+
+    def query(self, rule: BBox, scale: float) -> list[tuple[int, str, BBox]]:
+        """按横向可能相交的闭区间返回字符，保留原顺序与边界相等值。"""
+
+        if not self.safe or not all(type(value) is float and math.isfinite(value) for value in (*rule, scale)):
+            return self.chars
+        lower, upper = rule[0] - 0.25 * scale, rule[2] + 0.25 * scale
+        if not math.isfinite(lower) or not math.isfinite(upper):
+            return self.chars
+        end = bisect_right(self.starts, upper)
+        stack = [(1, 0, self.width)]
+        matches = []
+        while stack:
+            node, left, right = stack.pop()
+            if left >= end or self.maxima[node] < lower:
+                continue
+            if right - left == 1:
+                matches.append(self.order[left])
+            else:
+                middle = (left + right) // 2
+                stack.append((node * 2 + 1, middle, right))
+                stack.append((node * 2, left, middle))
+        return [self.chars[index] for index in sorted(matches)]
 
 
 def _strong_structural_script_roles(
@@ -724,12 +791,27 @@ def _classify_script_runs(
     local_tight_bboxes: dict[int, BBox],
     local_origins: dict[int, tuple[float, float]],
     memberships: list[int | None],
+    prepared_native: tuple | None = None,
+    preclassified_native: list[bytes | None] | None = None,
 ) -> tuple[list[str], list[int], list[bool]]:
     """按公式区域边界分段分类，并要求公式段内部存在稳定 body。"""
     roles: list[ScriptRole] = ["body"] * len(chars)
     body_counts = [0] * len(chars)
     formula_flags = [False] * len(chars)
+    native_roles = preclassified_native
+    if native_roles is None and prepared_native is not None:
+        from ....._compute_backend import get_native
+
+        native = get_native()
+        if native is not None:
+            offsets = [0]
+            for index in range(1, len(chars)):
+                if memberships[index] != memberships[index - 1]:
+                    offsets.append(index)
+            offsets.append(len(chars))
+            native_roles = native.script_roles_raw_batch(*prepared_native, offsets, _coerce_finite_bbox)
     start = 0
+    native_index = 0
     while start < len(chars):
         membership = memberships[start]
         end = start + 1
@@ -744,22 +826,41 @@ def _classify_script_runs(
         run_indices = (
             set() if ordinary_maps else {int(char["char_idx"]) for char in run_chars if isinstance(char.get("char_idx"), int)}
         )
-        run_roles = classify_char_script_roles(
-            run_chars,
-            tight_bboxes=local_tight_bboxes
-            if ordinary_maps
-            else {index: local_tight_bboxes[index] for index in run_indices if index in local_tight_bboxes},
-            origins=local_origins
-            if ordinary_maps
-            else {index: local_origins[index] for index in run_indices if index in local_origins},
-        )
+        classified = native_roles[native_index] if native_roles is not None else None
+        native_index += 1
+        if classified is None:
+            run_roles = classify_char_script_roles(
+                run_chars,
+                tight_bboxes=local_tight_bboxes
+                if ordinary_maps
+                else {index: local_tight_bboxes[index] for index in run_indices if index in local_tight_bboxes},
+                origins=local_origins
+                if ordinary_maps
+                else {index: local_origins[index] for index in run_indices if index in local_origins},
+            )
+        else:
+            names = ("body", "sup", "sub")
+            run_roles = [names[role] for role in classified]
         run_roles = _refine_math_script_tokens(
             run_chars,
             run_roles,
             local_tight_bboxes,
             local_origins,
             formula_region=membership is not None,
+            ordinary_native_roles=classified is not None and (prepared_native is not None or preclassified_native is not None),
         )
+        if classified is not None and all(role == "body" for role in run_roles):
+            body_count = 0
+            for char in run_chars:
+                text = _script_char_text(char)
+                if text.isprintable() and not text.isspace() and text.isalnum():
+                    body_count += 1
+            for offset in range(start, end):
+                roles[offset] = "body"
+                body_counts[offset] = body_count
+                formula_flags[offset] = membership is not None
+            start = end
+            continue
         visible = [
             index
             for index, char in enumerate(run_chars)
@@ -815,16 +916,87 @@ def _plain_script_geometry(chars, tight_bboxes, origins):
     return True
 
 
+def _prepare_plain_script_input(chars, tight_bboxes, origins):
+    """在验证普通字符的同时打包一行只读脚本输入；特殊对象返回参考路径。"""
+
+    if type(tight_bboxes) is not dict or type(origins) is not dict:
+        return None
+    loose, tight, points, flags, font_ids = [], [], [], [], []
+    fonts = {}
+    for char in chars:
+        if type(char) is not dict or type(char.get("char")) is not str or type(char.get("char_idx")) is not int:
+            return None
+        index = char["char_idx"]
+        box = char.get("bbox")
+        raw = box.bbox if type(box) is CharBox else box
+        tight_box = tight_bboxes.get(index)
+        point = origins.get(index)
+        for value, size in ((raw, 4), (tight_box, 4), (point, 2)):
+            if value is not None and (
+                type(value) not in (tuple, list)
+                or len(value) != size
+                or any(type(item) is not float or not math.isfinite(item) for item in value)
+            ):
+                return None
+        font = char.get("font")
+        if font is not None and (
+            type(font) is not dict
+            or any(type(font.get(key)) not in (str, int, float, bool, type(None)) for key in ("name", "flags", "weight"))
+        ):
+            return None
+        font_key = _script_font_key(char)
+        loose.append(raw)
+        tight.append(tight_box)
+        points.append(point)
+        flags.append(_native_text_flags(char["char"]))
+        font_ids.append(-1 if font_key is None else fonts.setdefault(font_key, len(fonts)))
+    return loose, tight, points, flags, font_ids
+
+
+def _pack_plain_script_input(chars, tight_bboxes, origins):
+    """仅检查普通容器形状，坐标内置浮点验证交由批量 Rust 入口执行。"""
+
+    if type(tight_bboxes) is not dict or type(origins) is not dict:
+        return None
+    loose, tight, points, flags, font_ids = [], [], [], [], []
+    fonts = {}
+    for char in chars:
+        if type(char) is not dict or type(char.get("char")) is not str or type(char.get("char_idx")) is not int:
+            return None
+        box = char.get("bbox")
+        if type(box) is CharBox:
+            if type(box.bbox) is not list:
+                return None
+            box = box.bbox
+        elif box is not None and type(box) not in (tuple, list):
+            return None
+        font = char.get("font")
+        if font is not None and (
+            type(font) is not dict
+            or any(type(font.get(key)) not in (str, int, float, bool, type(None)) for key in ("name", "flags", "weight"))
+        ):
+            return None
+        key = _script_font_key(char)
+        index = char["char_idx"]
+        loose.append(box)
+        tight.append(tight_bboxes.get(index))
+        points.append(origins.get(index))
+        flags.append(_native_text_flags(char["char"]))
+        font_ids.append(-1 if key is None else fonts.setdefault(key, len(fonts)))
+    return loose, tight, points, flags, font_ids
+
+
 def _script_line_char_roles(
     line: Any,
     page_size: tuple[float, float],
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
     fraction_members: set[int],
+    prepared: tuple[list[dict[str, Any]], list[int | None], list[bytes | None]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[ScriptRole], list[int], list[bool]]:
     """按正文同款公式分段返回原字符及其上下标角色。"""
 
-    chars = _ordered_line_chars(line)
+    chars = prepared[0] if prepared is not None else _ordered_line_chars(line)
     if not chars:
         return [], [], [], []
     angle = int(getattr(line, "angle", 0) or 0) % 360
@@ -834,8 +1006,15 @@ def _script_line_char_roles(
     from ....._compute_backend import get_native
 
     native = get_native()
-    reuse_geometry = angle == 0 and _plain_script_geometry(chars, tight_bboxes, origins)
-    prepared = (
+    packed = (
+        _prepare_plain_script_input(chars, tight_bboxes, origins)
+        if native is not None and angle == 0 and prepared is None
+        else None
+    )
+    reuse_geometry = angle == 0 and (
+        prepared is not None or packed is not None or _plain_script_geometry(chars, tight_bboxes, origins)
+    )
+    normalized_boxes = (
         native.normalize_boxes([getattr(char.get("bbox"), "bbox", char.get("bbox")) for char in chars], True, _coerce_bbox)
         if native is not None and not reuse_geometry
         else None
@@ -844,7 +1023,7 @@ def _script_line_char_roles(
         local_chars, local_tight_bboxes, local_origins = chars, tight_bboxes, origins
     for position, char in enumerate(() if reuse_geometry else chars):
         local_char = dict(char)
-        bbox = prepared[position] if prepared is not None else _coerce_bbox(char.get("bbox"))
+        bbox = normalized_boxes[position] if normalized_boxes is not None else _coerce_bbox(char.get("bbox"))
         if bbox is not None:
             local_char["bbox"] = _rotate_bbox_to_upright(bbox, page_size, angle)
         local_chars.append(local_char)
@@ -866,12 +1045,14 @@ def _script_line_char_roles(
                 angle,
             )
     regions = [bbox for value in getattr(line, "inline_math_regions", []) if (bbox := _coerce_bbox(value)) is not None]
-    memberships = _script_region_memberships(chars, tight_bboxes, regions)
+    memberships = prepared[1] if prepared is not None else _script_region_memberships(chars, tight_bboxes, regions)
     roles, body_counts, formula_flags = _classify_script_runs(
         local_chars,
         local_tight_bboxes,
         local_origins,
         memberships,
+        packed,
+        prepared[2] if prepared is not None else None,
     )
     if bool(getattr(line, "compact_formula_cluster", False)) or (
         bool(getattr(line, "restored_inline_cluster", False)) and bool(regions)
@@ -895,6 +1076,7 @@ def _script_line_payload(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
     fraction_members: set[int],
+    prepared: tuple[list[dict[str, Any]], list[int | None], list[bytes | None]] | None = None,
 ) -> PDFTextScriptLine | None:
     """把 Flash 行转换为公式分段后的紧凑上下标 sidecar。"""
 
@@ -904,10 +1086,17 @@ def _script_line_payload(
         tight_bboxes,
         origins,
         fraction_members,
+        prepared,
     )
     if not chars:
         return None
     angle = int(getattr(line, "angle", 0) or 0) % 360
+    if (
+        not any(role != "body" for role in roles)
+        and type(tight_bboxes) is dict
+        and all(type(char) is dict and type(char.get("char_idx")) is int for char in chars)
+    ):
+        return _plain_script_payload(line, chars, angle)
     compact_parts: list[str] = []
     compact_roles: list[str] = []
     compact_bboxes: list[BBox | None] = []
@@ -963,6 +1152,21 @@ def _script_line_payload(
     )
 
 
+def _plain_script_payload(line: Any, chars: list[dict[str, Any]], angle: int) -> PDFTextScriptLine | None:
+    """全正文行只构造原文本 sidecar，不复制不会参与范围计算的框。"""
+
+    text = "".join(fragment for char in chars if (fragment := _normalize_match_fragment(char.get("char"))))
+    if not text:
+        return None
+    return PDFTextScriptLine(
+        bbox=getattr(line, "bbox"),
+        text=text,
+        script_ranges=(),
+        source_index=int(getattr(line, "source_index", 0) or 0),
+        angle=angle,
+    )
+
+
 def detect_pdf_text_script_lines(
     lines: list[Any],
     page_size: tuple[float, float],
@@ -975,6 +1179,12 @@ def detect_pdf_text_script_lines(
     """检测 Flash 剩余自然文本行中的上下标候选。"""
     resolved_chars = all_chars or []
     resolved_drawings = drawing_lines or []
+    if type(lines) is list and not lines:
+        # 空页保留后端加载检查和参数真值读取，不创建不会被消费的分类闭包。
+        from ....._compute_backend import get_native
+
+        get_native()
+        return []
     fraction_members_by_angle = {
         angle: _fraction_member_indices(
             page_size,
@@ -985,20 +1195,81 @@ def detect_pdf_text_script_lines(
         )
         for angle in {int(getattr(line, "angle", 0) or 0) % 360 for line in lines}
     }
-    return [
-        payload
-        for line in lines
-        if (
-            payload := _script_line_payload(
-                line,
-                page_size,
-                tight_bboxes,
-                origins,
-                fraction_members_by_angle[int(getattr(line, "angle", 0) or 0) % 360],
-            )
-        )
-        is not None
-    ]
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    output: list[PDFTextScriptLine] = []
+    pending = []
+    pending_chars = 0
+
+    def append_line(line: Any, prepared: tuple | None = None) -> None:
+        """按原行顺序物化一条证据，并释放本批字符引用。"""
+
+        angle = int(getattr(line, "angle", 0) or 0) % 360
+        payload = _script_line_payload(line, page_size, tight_bboxes, origins, fraction_members_by_angle[angle], prepared)
+        if payload is not None:
+            output.append(payload)
+
+    def flush_pending() -> None:
+        """每批独立行最多 64 条或 8192 字，超长行单独计算。"""
+
+        nonlocal pending_chars
+        if not pending:
+            return
+        loose, tight, points, flags, font_ids = [], [], [], [], []
+        offsets = [0]
+        records = []
+        for line, chars, memberships, packed in pending:
+            start = len(offsets) - 1
+            for source, target in zip((loose, tight, points, flags, font_ids), packed, strict=True):
+                source.extend(target)
+            for position in range(1, len(chars)):
+                if memberships[position] != memberships[position - 1]:
+                    offsets.append(len(loose) - len(chars) + position)
+            offsets.append(len(loose))
+            records.append((line, chars, memberships, start, len(offsets) - 1))
+        roles = native.script_roles_plain_batch(loose, tight, points, flags, font_ids, offsets, _coerce_finite_bbox)
+        if roles is None:
+            for line, _chars, _memberships, _first, _last in records:
+                append_line(line)
+            pending.clear()
+            pending_chars = 0
+            return
+        for line, chars, memberships, first, last in records:
+            classified = roles[first:last]
+            if (
+                all(item is not None and all(role == 0 for role in item) for item in classified)
+                and not bool(getattr(line, "compact_formula_cluster", False))
+                and not bool(getattr(line, "restored_inline_cluster", False))
+            ):
+                payload = _plain_script_payload(line, chars, 0)
+                if payload is not None:
+                    output.append(payload)
+            else:
+                append_line(line, (chars, memberships, classified))
+        pending.clear()
+        pending_chars = 0
+
+    for line in lines:
+        if native is not None and int(getattr(line, "angle", 0) or 0) % 360 == 0:
+            chars = _ordered_line_chars(line)
+            packed = _pack_plain_script_input(chars, tight_bboxes, origins) if chars else None
+            if packed is not None:
+                regions = [
+                    bbox for value in getattr(line, "inline_math_regions", []) if (bbox := _coerce_bbox(value)) is not None
+                ]
+                memberships = _script_region_memberships(chars, tight_bboxes, regions)
+                if pending and (len(pending) >= 64 or pending_chars + len(chars) > 8192):
+                    flush_pending()
+                pending.append((line, chars, memberships, packed))
+                pending_chars += len(chars)
+                if len(chars) > 8192:
+                    flush_pending()
+                continue
+        flush_pending()
+        append_line(line)
+    flush_pending()
+    return output
 
 
 __all__ = [

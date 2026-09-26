@@ -5,6 +5,7 @@ from __future__ import annotations
 from .layout_evidence import build_layout_evidence
 
 import re
+from bisect import bisect_right
 import statistics
 import unicodedata
 import heapq
@@ -531,6 +532,11 @@ def _merge_post_semantic_text_runs(
         return list(lines)
     local_bboxes = [_rotate_bbox_to_upright(line.bbox, page_size, line.angle) for line in lines]
     layout = build_layout_evidence(lines, page_size, barriers=table_bboxes)
+    candidate_index = _post_semantic_candidate_pairs(lines, local_bboxes)
+    candidates, heights = candidate_index if candidate_index is not None else (None, None)
+    physical_rows: dict[tuple[int, int], tuple[bool, BBox]] = {}
+    supporting_rows = sorted((line.bbox[1], index) for index, line in enumerate(lines)) if candidates is not None else []
+    supporting_tops = [top for top, _index in supporting_rows]
     parents = list(range(len(lines)))
 
     def find(index: int) -> int:
@@ -553,8 +559,8 @@ def _merge_post_semantic_text_runs(
         if first_line.semantic_type is not None:
             continue
         first_bbox = local_bboxes[first_index]
-        first_height = _line_effective_height(first_line, first_bbox)
-        for second_index in range(first_index + 1, len(lines)):
+        first_height = heights[first_index] if heights is not None else _line_effective_height(first_line, first_bbox)
+        for second_index in candidates[first_index] if candidates is not None else range(first_index + 1, len(lines)):
             second_line = lines[second_index]
             if _caption_crosses_left_text([first_line, second_line]):
                 continue
@@ -569,30 +575,44 @@ def _merge_post_semantic_text_runs(
             ):
                 continue
             second_bbox = local_bboxes[second_index]
-            second_height = _line_effective_height(second_line, second_bbox)
+            second_height = heights[second_index] if heights is not None else _line_effective_height(second_line, second_bbox)
             left, right = sorted((first_bbox, second_bbox), key=lambda bbox: bbox[0])
             pair_height = min(first_height, second_height)
-            shared_physical_row = (
-                first_line.visual_row_id is not None
-                and first_line.visual_row_id == second_line.visual_row_id
-                # 宽空格放宽只服务连续文字，数值列与标签列不能据此跨单元格连接。
-                and all(
+            same_physical_row = first_line.visual_row_id is not None and first_line.visual_row_id == second_line.visual_row_id
+            row_key = (first_line.angle, first_line.visual_row_id)
+            if same_physical_row and candidates is not None and row_key not in physical_rows:
+                members = [
+                    index
+                    for index, member in enumerate(lines)
+                    if member.angle == row_key[0] and member.visual_row_id == row_key[1]
+                ]
+                physical_rows[row_key] = (
+                    all(any(char.isalpha() for char in lines[index].text) for index in members),
+                    _bbox_union_many([local_bboxes[index] for index in members]),
+                )
+            shared_physical_row = same_physical_row and (
+                physical_rows[row_key][0]
+                if candidates is not None
+                else all(
                     any(char.isalpha() for char in member.text)
                     for member in lines
                     if member.angle == first_line.angle and member.visual_row_id == first_line.visual_row_id
                 )
             )
-            row_bounds = (
-                _bbox_union_many(
-                    [
-                        local_bboxes[index]
-                        for index, member in enumerate(lines)
-                        if member.angle == first_line.angle and member.visual_row_id == first_line.visual_row_id
-                    ]
+            if shared_physical_row:
+                row_bounds = (
+                    physical_rows[row_key][1]
+                    if candidates is not None
+                    else _bbox_union_many(
+                        [
+                            local_bboxes[index]
+                            for index, member in enumerate(lines)
+                            if member.angle == first_line.angle and member.visual_row_id == first_line.visual_row_id
+                        ]
+                    )
                 )
-                if shared_physical_row
-                else _bbox_union_many([first_bbox, second_bbox])
-            )
+            else:
+                row_bounds = _bbox_union_many([first_bbox, second_bbox])
             justified_row = (
                 first_line.font_signature == second_line.font_signature
                 and first_line.paragraph_group == second_line.paragraph_group
@@ -600,13 +620,17 @@ def _merge_post_semantic_text_runs(
                 and abs(_bbox_center_y(first_bbox) - _bbox_center_y(second_bbox)) < 0.2 * pair_height
                 and 0 <= right[0] - left[2] <= (3 if shared_physical_row else 2) * pair_height
                 and not layout.separated(first_bbox, second_bbox)
-                and any(
-                    other is not first_line
-                    and other is not second_line
-                    and 0 < other.bbox[1] - max(first_bbox[3], second_bbox[3]) <= pair_height
-                    and abs(other.bbox[0] - row_bounds[0]) < (1.5 if shared_physical_row else 1) * pair_height
-                    and other.bbox[2] >= row_bounds[2] - pair_height
-                    for other in lines
+                and _post_semantic_supports_row(
+                    lines,
+                    first_index,
+                    second_index,
+                    first_bbox,
+                    second_bbox,
+                    row_bounds,
+                    pair_height,
+                    shared_physical_row,
+                    supporting_rows if candidates is not None else None,
+                    supporting_tops,
                 )
             )
             if (
@@ -652,6 +676,74 @@ def _merge_post_semantic_text_runs(
         )
     )
     return output
+
+
+def _post_semantic_candidate_pairs(
+    lines: list[_LineItem], local_bboxes: list[BBox]
+) -> tuple[IntervalCandidates, list[float]] | None:
+    """两条后处理合并路径共用纵向安全超集，保留原始行对枚举顺序。"""
+
+    if len(lines) <= 32 or any(
+        type(line) is not _LineItem
+        or not _safe_candidate_box(box)
+        or not _safe_candidate_box(line.bbox)
+        or type(line.angle) is not int
+        or type(line.formula_candidate_only) is not bool
+        or (line.semantic_type is not None and type(line.semantic_type) is not str)
+        or (line.visual_row_id is not None and type(line.visual_row_id) is not int)
+        or type(line.text) is not str
+        for line, box in zip(lines, local_bboxes, strict=True)
+    ):
+        return None
+    bounds = []
+    heights = []
+    groups = {}
+    for index, (line, box) in enumerate(zip(lines, local_bboxes, strict=True)):
+        height = _line_effective_height(line, box)
+        if type(height) is not float or not math.isfinite(height) or height > 1e100:
+            return None
+        low, high = box[1] - 0.2 * height, box[3] + 0.2 * height
+        if not math.isfinite(low) or not math.isfinite(high):
+            return None
+        bounds.append((low, high))
+        heights.append(height)
+        groups.setdefault((line.angle, line.formula_candidate_only, line.semantic_type), []).append(index)
+    return IntervalCandidates(bounds, groups), heights
+
+
+def _post_semantic_supports_row(
+    lines: list[_LineItem],
+    first_index: int,
+    second_index: int,
+    first_bbox: BBox,
+    second_bbox: BBox,
+    row_bounds: BBox,
+    pair_height: float,
+    shared_physical_row: bool,
+    supporting_rows: list[tuple[float, int]] | None,
+    supporting_tops: list[float],
+) -> bool:
+    """按原条件检查后续正文行；普通几何只查询必要的纵向带。"""
+
+    bottom = max(first_bbox[3], second_bbox[3])
+    if supporting_rows is None:
+        indices = range(len(lines))
+    else:
+        start = bisect_right(supporting_tops, bottom)
+        end = bisect_right(supporting_tops, bottom + pair_height)
+        indices = sorted(index for _top, index in supporting_rows[start:end])
+    for index in indices:
+        other = lines[index]
+        if (
+            index not in (first_index, second_index)
+            and other is not lines[first_index]
+            and other is not lines[second_index]
+            and 0 < other.bbox[1] - bottom <= pair_height
+            and abs(other.bbox[0] - row_bounds[0]) < (1.5 if shared_physical_row else 1) * pair_height
+            and other.bbox[2] >= row_bounds[2] - pair_height
+        ):
+            return True
+    return False
 
 
 def _post_semantic_same_baseline_geometry(

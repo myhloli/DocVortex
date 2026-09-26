@@ -274,6 +274,7 @@ def _gif_subblocks(
     *,
     collect_payload: bool,
     subblock_counter: list[int],
+    candidate_bytes_remaining: int | None = None,
 ) -> tuple[bytes | None, int]:
     """读取 GIF sub-block 序列；仅对已识别的公式扩展保留 payload。"""
 
@@ -288,21 +289,28 @@ def _gif_subblocks(
         size = image_data[cursor]
         cursor += 1
         if size == 0:
-            return b"".join(chunks), cursor
+            return b"".join(chunks) if collect_payload else None, cursor
         end = cursor + size
         if end < cursor or end > len(image_data):
             raise _ImageEquationError("GIF sub-block data is truncated")
-        total += size
-        if total > MAX_ENTRY_BYTES:
-            raise LegacyOfficeResourceLimitError(f"GIF sub-block payload exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
         if collect_payload:
+            # 普通帧只遍历结构；公式载荷在复制、拼接前检查单候选和剩余累计预算。
+            total += size
+            if total > MAX_ENTRY_BYTES:
+                raise LegacyOfficeResourceLimitError(f"GIF sub-block payload exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
+            if candidate_bytes_remaining is not None and total > candidate_bytes_remaining:
+                raise LegacyOfficeResourceLimitError(
+                    f"image equation candidates exceed max_equation_candidate_total_bytes={MAX_EQUATION_CANDIDATE_TOTAL_BYTES}"
+                )
             chunks.append(image_data[cursor:end])
         cursor = end
 
 
-def _gif_mtef_candidates(image_data: bytes) -> tuple[list[bytes], bool]:
-    """完整遍历 GIF blocks 并提取 MathType/001 Application Extension。"""
+def _gif_mtef_candidates(image_data: bytes, *, candidate_bytes_remaining: int | None = None) -> tuple[list[bytes], bool]:
+    """完整遍历 GIF 结构，并在剩余累计预算内提取 MathType/001 载荷。"""
 
+    if candidate_bytes_remaining is None:
+        candidate_bytes_remaining = MAX_EQUATION_CANDIDATE_TOTAL_BYTES
     if len(image_data) < 13 or image_data[:6] not in _GIF_HEADERS:
         return [], False
     packed = image_data[10]
@@ -380,10 +388,12 @@ def _gif_mtef_candidates(image_data: bytes) -> tuple[list[bytes], bool]:
             cursor,
             collect_payload=is_mathtype,
             subblock_counter=subblock_counter,
+            candidate_bytes_remaining=candidate_bytes_remaining,
         )
         if is_mathtype and payload is not None:
             recognized = True
             candidates.append(payload)
+            candidate_bytes_remaining -= len(payload)
         # MathType/002 是 baseline，必须明确忽略。
 
     if not saw_trailer:
@@ -454,7 +464,7 @@ class OfficeImageEquationDecoder:
         image_format = _format_hint(image_data, part_name, content_type)
         if image_format is None:
             return None
-        if len(image_data) > MAX_ENTRY_BYTES:
+        if image_format == "wmf" and len(image_data) > MAX_ENTRY_BYTES:
             raise LegacyOfficeResourceLimitError(f"office image exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
         digest = hashlib.sha256(image_data).digest()
         cache_key = (image_format, digest)
@@ -465,7 +475,10 @@ class OfficeImageEquationDecoder:
             if image_format == "wmf":
                 candidates, recognized = _wmf_mtef_candidates(image_data)
             else:
-                candidates, recognized = _gif_mtef_candidates(image_data)
+                candidates, recognized = _gif_mtef_candidates(
+                    image_data,
+                    candidate_bytes_remaining=MAX_EQUATION_CANDIDATE_TOTAL_BYTES - self.total_bytes,
+                )
             candidate_bytes = sum(len(candidate) for candidate in candidates)
             if self.total_bytes + candidate_bytes > MAX_EQUATION_CANDIDATE_TOTAL_BYTES:
                 raise LegacyOfficeResourceLimitError(

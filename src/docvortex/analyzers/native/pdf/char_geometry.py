@@ -352,9 +352,41 @@ def _font_run_metadata(font):
     return font_name, font_size, flags, weight
 
 
+class _ReadOnlyFontCache:
+    """Rust 几何已准备完成后的单行只读字体缓存，不跨行保留可变字典。"""
+
+    def __init__(self):
+        """每行独立建立有界身份表，强引用防止字体对象地址复用。"""
+        self.values = {}
+
+    def metadata(self, font):
+        """普通字体首见时校验字段，特殊转换前清空身份表以保留回调行为。"""
+        cached = self.values.get(id(font))
+        if cached is not None and cached[0] is font:
+            return cached[1]
+        if type(font) is not dict or any(
+            type(font.get(name)) not in (str, int, float, bool, type(None)) for name in ("name", "size", "flags", "weight")
+        ):
+            self.values.clear()
+            return _font_run_metadata(font)
+        result = _font_run_metadata(font)
+        if len(self.values) >= 4096:
+            self.values.pop(next(iter(self.values)))
+        self.values[id(font)] = (font, result)
+        return result
+
+
 def _font_run_key(char: dict[str, Any], angle: int, text: str, metadata_cache=None) -> tuple[RunKey, float]:
     """构造 run key；调用内缓存以字段值作键，字体发生变化时不会复用旧元数据。"""
-    font = char.get("font") or {}
+    font = char.get("font")
+    if type(metadata_cache) is _ReadOnlyFontCache and (type(char) is not dict or type(font) not in (dict, type(None))):
+        metadata_cache.values.clear()
+    font = font or {}
+    if type(metadata_cache) is _ReadOnlyFontCache:
+        if type(char) is not dict:
+            metadata_cache.values.clear()
+        font_name, font_size, flags, weight = metadata_cache.metadata(font)
+        return _cached_run_key(font_name, font_size, flags, weight, angle, _script_group(text)), font_size
     key = None
     if metadata_cache is not None and type(font) is dict:
         values = tuple(font.get(name) for name in ("name", "size", "flags", "weight"))
@@ -458,12 +490,91 @@ def _style_line_is_inflated(
     )
 
 
+def _plain_source_records(line, geometry, anchors_only):
+    """普通行只按源顺序打包一次，坐标验证交给 Rust，特殊读取保留旧路径。"""
+    from ._native_geometry import raw_bbox
+
+    if (
+        type(line) is not _LineItem
+        or type(geometry) is not PDFPageTextGeometry
+        or type(line.chars) is not list
+        or any(type(values) is not dict for values in (geometry.tight_bboxes, geometry.loose_bboxes, geometry.origins))
+    ):
+        return None
+    records = []
+    for position, char in enumerate(line.chars):
+        if type(char) is not dict or type(char.get("char")) is not str or type(char.get("char_idx")) is not int:
+            return None
+        text = char["char"]
+        if not _is_anchor_text(text) if anchors_only else not text or not text.isprintable() or text.isspace():
+            continue
+        rotation = char.get("rotation")
+        if type(rotation) not in (float, type(None)):
+            return None
+        rotation = rotation or 0.0
+        index = char["char_idx"]
+        records.append(
+            (
+                position,
+                raw_bbox(char.get("bbox")),
+                raw_bbox(geometry.loose_bboxes.get(index)) if abs(rotation) > 1e-9 or not math.isfinite(rotation) else None,
+                raw_bbox(geometry.tight_bboxes.get(index)),
+                geometry.origins.get(index),
+                rotation,
+            )
+        )
+    return records
+
+
 def _prepared_line_geometry(line, geometry, page_size, *, anchors_only):
-    """批量准备风险判断与 canonical 样本共用的独立几何，保持源成员顺序。"""
+    """一次筛选并打包原生字符几何，保持风险与 canonical 样本的源顺序。"""
     from ...._compute_backend import get_native
     from ._native_geometry import raw_bbox
 
+    native = get_native()
+    if (
+        native is not None
+        and type(page_size) in (tuple, list)
+        and len(page_size) == 2
+        and all(
+            type(value) is float and math.isfinite(value) or type(value) is int and -(2**53) <= value <= 2**53
+            for value in page_size
+        )
+        and type(line) is _LineItem
+        and type(line.angle) is int
+        and -(2**31) <= line.angle < 2**31
+    ):
+        records = _plain_source_records(line, geometry, anchors_only)
+        if records is not None:
+            prepared = native.source_rows_plain(records, page_size, line.angle)
+            if prepared is not None:
+                for position, values in prepared:
+                    char = line.chars[position]
+                    yield position, char["char"], char["char_idx"], char, values
+                return
+    plain = (
+        native is not None
+        and type(line) is _LineItem
+        and type(line.chars) is list
+        and type(geometry.tight_bboxes) is dict
+        and type(geometry.origins) is dict
+        and type(geometry.loose_bboxes) is dict
+        and all(
+            type(char) is dict
+            and type(char.get("char")) is str
+            and type(char.get("char_idx")) is int
+            and type(char.get("rotation")) in (float, type(None))
+            and (
+                (origin := geometry.origins.get(char["char_idx"])) is None
+                or type(origin) in (tuple, list)
+                and len(origin) == 2
+                and all(type(value) is float for value in origin)
+            )
+            for char in line.chars
+        )
+    )
     selected = []
+    sources, sides, tights, origins, rotations = [], [], [], [], []
     for position, char in enumerate(line.chars):
         text = str(char.get("char") or "")
         index = char.get("char_idx")
@@ -472,7 +583,18 @@ def _prepared_line_geometry(line, geometry, page_size, *, anchors_only):
         if isinstance(index, bool) or not isinstance(index, int):
             continue
         selected.append((position, text, index, char))
-    native = get_native()
+        if plain:
+            try:
+                rotation = float(char.get("rotation") or 0.0)
+            except (TypeError, ValueError):
+                rotation = math.nan
+            sources.append(raw_bbox(char.get("bbox")))
+            sides.append(
+                raw_bbox(geometry.loose_bboxes.get(index)) if not math.isfinite(rotation) or abs(rotation) > 1e-9 else None
+            )
+            tights.append(raw_bbox(geometry.tight_bboxes.get(index)))
+            origins.append(_coerce_origin(geometry.origins.get(index)))
+            rotations.append(rotation)
     if native is None:
         for position, text, index, char in selected:
             source = _clip_validated_bbox(_source_bbox(char, geometry, index), page_size)
@@ -494,19 +616,19 @@ def _prepared_line_geometry(line, geometry, page_size, *, anchors_only):
                     ),
                 )
         return
-    sources, sides, tights, origins, rotations = [], [], [], [], []
-    for _position, _text, index, char in selected:
-        try:
-            rotation = float(char.get("rotation") or 0.0)
-        except (TypeError, ValueError):
-            rotation = math.nan
-        sources.append(raw_bbox(char.get("bbox")))
-        sides.append(
-            raw_bbox(geometry.loose_bboxes.get(index)) if not math.isfinite(rotation) or abs(rotation) > 1e-9 else None
-        )
-        tights.append(raw_bbox(geometry.tight_bboxes.get(index)))
-        origins.append(_coerce_origin(geometry.origins.get(index)))
-        rotations.append(rotation)
+    if not plain:
+        for _position, _text, index, char in selected:
+            try:
+                rotation = float(char.get("rotation") or 0.0)
+            except (TypeError, ValueError):
+                rotation = math.nan
+            sources.append(raw_bbox(char.get("bbox")))
+            sides.append(
+                raw_bbox(geometry.loose_bboxes.get(index)) if not math.isfinite(rotation) or abs(rotation) > 1e-9 else None
+            )
+            tights.append(raw_bbox(geometry.tight_bboxes.get(index)))
+            origins.append(_coerce_origin(geometry.origins.get(index)))
+            rotations.append(rotation)
     prepared = native.source_rows(sources, sides, tights, origins, rotations, page_size, line.angle, _coerce_bbox)
     for (position, text, index, char), values in zip(selected, prepared, strict=True):
         if values is not None:
@@ -577,10 +699,15 @@ def _document_requires_full_geometry(
     style_line_counts: Counter[RunKey] = Counter()
     style_inflated_lines: dict[RunKey, set[LineKey]] = defaultdict(set)
     font_metadata = {}
+    from ...._compute_backend import get_native
+
+    native_fonts = get_native() is not None
     for page_index, (lines, geometry, page_size) in enumerate(
         zip(lines_by_page, geometries, page_sizes, strict=True),
     ):
         for line in lines:
+            if native_fonts:
+                font_metadata = _ReadOnlyFontCache()
             entries: list[tuple[int, str, BBox, BBox, tuple[float, float], RunKey, float]] = []
             for position, text, _char_idx, char, prepared in _prepared_line_geometry(
                 line, geometry, page_size, anchors_only=True
@@ -695,8 +822,13 @@ def _collect_samples(
     samples: list[_CharSample] = []
     by_line: dict[LineKey, list[_CharSample]] = defaultdict(list)
     font_metadata = {}
+    from ...._compute_backend import get_native
+
+    native_fonts = get_native() is not None
     for page_index, (lines, geometry, page_size) in enumerate(zip(lines_by_page, geometries, page_sizes, strict=True)):
         for line in lines:
+            if native_fonts:
+                font_metadata = _ReadOnlyFontCache()
             for position, text, char_idx, char, prepared in _prepared_line_geometry(
                 line, geometry, page_size, anchors_only=False
             ):

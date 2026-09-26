@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import math
 import statistics
+from functools import lru_cache
 from typing import Any, Sequence
 
 from .....document.pdf._document import PDFLinkAnnotation
 from .....schema import BBox
+from ..models import _LineItem, _AxisLine
+from .....document.pdf.native_contracts import PDFDrawingLine
+from .....document.pdf.text._contracts import Bbox as CharBox
 from .common import (
     _bbox_intersection_area,
     _canonical_styles,
@@ -72,6 +76,13 @@ def _char_font_styles(char: dict[str, Any]) -> frozenset[PDFTextStyle]:
     """只依据直接字体证据返回 PDF 字符粗体样式。"""
 
     font_name, font_flags, font_weight = _pdf_font_metadata(char)
+    return _font_styles_from_metadata(font_name, font_flags, font_weight)
+
+
+@lru_cache(maxsize=4096)
+def _font_styles_from_metadata(font_name: str, font_flags: int, font_weight: float | None) -> frozenset[PDFTextStyle]:
+    """仅按不可变字体值复用粗体判断，字段变化仍重新计算。"""
+
     styles: set[PDFTextStyle] = set()
     if (
         font_flags & PDF_FONT_FORCE_BOLD_FLAG
@@ -145,7 +156,56 @@ def _filter_pdf_bold_runs(
     return output
 
 
-def _build_line_candidate(line: Any) -> _LineCandidate | None:
+def _prepare_plain_style_line(line, font_cache):
+    """普通行一次准备字符顺序和字体分类，特殊字段不提前执行转换。"""
+    if type(line) is not _LineItem or type(line.chars) is not list or type(line.angle) is not int or line.angle % 360:
+        return None
+    if (
+        type(line.source_index) is not int
+        or type(line.bbox) not in (tuple, list)
+        or len(line.bbox) != 4
+        or any(type(value) is not float or not math.isfinite(value) for value in line.bbox)
+    ):
+        return None
+    for char in line.chars:
+        if type(char) is not dict or type(char.get("char")) is not str or type(char.get("char_idx")) is not int:
+            return None
+        box = char.get("bbox")
+        box = box.bbox if type(box) is CharBox else box
+        if (
+            type(box) not in (tuple, list)
+            or len(box) != 4
+            or any(type(value) is not float or not math.isfinite(value) for value in box)
+        ):
+            return None
+        font = char.get("font")
+        if font is not None and type(font) is not dict:
+            return None
+        if font is not None and any(
+            type(value) not in (str, int, float, bool, type(None))
+            or type(value) is float
+            and not math.isfinite(value)
+            or type(value) is int
+            and not -(2**53) <= value <= 2**53
+            for value in (font.get("name"), font.get("flags"), font.get("weight"))
+        ):
+            return None
+    chars = _ordered_line_chars(line)
+    styles = []
+    for char in chars:
+        font = char.get("font") or {}
+        key = (font.get("name"), font.get("flags"), font.get("weight"))
+        value = font_cache.get(key)
+        if value is None:
+            value = _char_font_styles(char)
+            if len(font_cache) >= 4096:
+                font_cache.pop(next(iter(font_cache)))
+            font_cache[key] = value
+        styles.append(value)
+    return chars, styles
+
+
+def _build_line_candidate(line: Any, prepared_style=None) -> _LineCandidate | None:
     """从视觉水平 line 构造字符几何候选，旋转文字和退化行返回空。"""
 
     if int(getattr(line, "angle", 0) or 0) % 360 != 0:
@@ -153,7 +213,7 @@ def _build_line_candidate(line: Any) -> _LineCandidate | None:
     line_bbox = _coerce_bbox(getattr(line, "bbox", None))
     if line_bbox is None:
         return None
-    chars = _ordered_line_chars(line)
+    chars = prepared_style[0] if prepared_style is not None else _ordered_line_chars(line)
     from ....._compute_backend import get_native
 
     native = get_native()
@@ -179,7 +239,7 @@ def _build_line_candidate(line: Any) -> _LineCandidate | None:
     body_chars = [char for char, height in zip(visible_chars, heights) if height >= 0.8 * median_height]
     if not body_chars:
         return None
-    font_styles = [_char_font_styles(char) for char in chars]
+    font_styles = prepared_style[1] if prepared_style is not None else [_char_font_styles(char) for char in chars]
     return _LineCandidate(
         bbox=line_bbox,
         chars=chars,
@@ -285,6 +345,9 @@ def _merge_source_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]
 def _line_style_payload(line: _LineCandidate) -> PDFTextStyleLine | None:
     """把来源字符的字体与装饰线证据转换为紧凑文本样式区间。"""
 
+    if not any(line.font_styles) and not any(line.decoration_ranges.values()):
+        text = "".join(fragment for char in line.chars if (fragment := _normalize_match_fragment(char.get("char"))))
+        return PDFTextStyleLine(line.bbox, text, (), line.source_index) if text else None
     decoration_styles: list[set[PDFTextStyle]] = [set() for _char in line.chars]
     for style in _PDF_TEXT_DECORATION_ORDER:
         for start, end in _merge_source_ranges(line.decoration_ranges[style]):
@@ -400,7 +463,28 @@ def detect_pdf_text_style_lines(
 ) -> list[PDFTextStyleLine]:
     """从视觉文本 run 与页面 drawing 中生成全部水平行样式证据。"""
 
-    candidates = [candidate for line in lines if (candidate := _build_line_candidate(line)) is not None]
+    if not lines:
+        return []
+    no_horizontal_drawings = type(drawing_lines) in (list, tuple) and all(
+        type(drawing) in (_AxisLine, PDFDrawingLine)
+        and type(drawing.orientation) is str
+        and drawing.orientation != "horizontal"
+        for drawing in drawing_lines
+    )
+    font_cache = {}
+    prepared_styles = [_prepare_plain_style_line(line, font_cache) for line in lines] if no_horizontal_drawings else None
+    if prepared_styles is not None and any(value is None for value in prepared_styles):
+        # 一个特殊行的字体回调可能修改后续普通行，整次检测必须恢复原准备次序。
+        prepared_styles = None
+    # 页面全部普通字体无样式时才跳过几何；混合页面仍保留无样式物理行作为对齐证据。
+    if prepared_styles is not None and all(value is not None and not any(value[1]) for value in prepared_styles):
+        return []
+    candidates = []
+    for index, line in enumerate(lines):
+        prepared_style = prepared_styles[index] if prepared_styles is not None else None
+        candidate = _build_line_candidate(line, prepared_style)
+        if candidate is not None:
+            candidates.append(candidate)
     if not candidates:
         return []
     horizontal_drawings = [drawing for drawing in drawing_lines if getattr(drawing, "orientation", None) == "horizontal"]

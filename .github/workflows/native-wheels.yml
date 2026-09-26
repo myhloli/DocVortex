@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       skip_ci:
-        description: 'Build distributions without Rust checks or wheel tests/benchmarks'
+        description: 'Build distributions without Rust checks or wheel tests'
         type: boolean
         default: false
   workflow_call:
@@ -18,6 +18,10 @@ on:
 
 permissions:
   contents: read
+
+# 测试样本可能包含中文文件名；Windows 重定向日志也必须使用 UTF-8。
+env:
+  PYTHONUTF8: '1'
 
 concurrency:
   group: native-wheels-${{ github.workflow }}-${{ github.ref }}
@@ -57,7 +61,7 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment }}
           CIBW_TEST_REQUIRES: pytest psutil
           CIBW_TEST_SKIP: ${{ inputs.skip_ci && '*' || '' }}
-          CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_native_statistics.py {project}/tests/test_native_round3.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py {project}/tests/test_pdfium_bridge.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q && python -m pip install pypdfium2==5.10.1 && python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo2.pdf && python -m pytest {project}/tests/test_pdfium_bridge.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py -q
+          CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_native_statistics.py {project}/tests/test_native_round3.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py {project}/tests/test_native_round6.py {project}/tests/test_native_round7.py {project}/tests/test_pdfium_bridge.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q && python -m pip install pypdfium2==5.10.1 && python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo2.pdf && python -m pytest {project}/tests/test_pdfium_bridge.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py {project}/tests/test_native_round6.py {project}/tests/test_native_round7.py -q
         run: uvx --from "cibuildwheel>=3.1,<4" cibuildwheel --output-dir wheelhouse
       - name: Verify binary ABI on Python 3.14 without optional application dependencies
         if: ${{ !inputs.skip_ci }}
@@ -80,19 +84,8 @@ jobs:
         run: |
           uv run --no-project --python ${{ matrix.smoke }} python tools/generate_dense_pdf.py dense-table.pdf
           uv run --no-project --python ${{ matrix.smoke }} python tools/verify_native_wheel.py dense-table.pdf
-          uv run --no-project --python ${{ matrix.smoke }} python -m pytest tests/test_pdfium_bridge.py tests/test_native_round3.py tests/test_native_round4.py tests/test_native_round5.py -q
-      - name: Compare public parsing performance and full outputs
-        if: ${{ !inputs.skip_ci }}
-        run: |
-          uv run --no-project --python ${{ matrix.smoke }} python tests/benchmarks/rust_pdf.py --backend python --suite public --output bench-python
-          uv run --no-project --python ${{ matrix.smoke }} python tests/benchmarks/rust_pdf.py --backend rust --suite public --output bench-rust --baseline bench-python
-      - uses: actions/upload-artifact@v6
-        if: ${{ !cancelled() && !inputs.skip_ci }}
-        with:
-          name: benchmark-${{ matrix.name }}
-          path: |
-            bench-python/report.json
-            bench-rust/report.json
+          uv run --no-project --python ${{ matrix.smoke }} python -m pytest tests/test_pdfium_bridge.py tests/test_native_round3.py tests/test_native_round4.py tests/test_native_round5.py tests/test_native_round6.py tests/test_native_round7.py -q
+      # 性能对比仅在本机执行；平台矩阵保留构建、ABI、安装和正确性检查。
       - uses: actions/upload-artifact@v6
         with:
           name: dist-${{ matrix.name }}

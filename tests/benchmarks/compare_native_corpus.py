@@ -10,6 +10,8 @@ import platform
 import subprocess
 import sys
 
+from pdf_corpus import corpus_paths
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -62,15 +64,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--path", type=Path, action="append")
+    parser.add_argument("--corpus", choices=("demo", "all"), default="all")
     parser.add_argument("--runs", type=int, default=5)
     args = parser.parse_args()
     if args.output.exists() or args.runs < 1:
         parser.error("output must be new and runs must be positive")
-    manifest = json.loads((ROOT / "tests/fixtures/flash_layout_geometry_manifest.json").read_text())
-    paths = args.path or [
-        *(ROOT / item["path"] for item in manifest["documents"]),
-        *sorted((ROOT / "tests/unittest/pdfs/native_pdf_tables").glob("*.pdf")),
-    ]
+    paths = args.path or corpus_paths(args.corpus)
     paths = list(dict.fromkeys(paths))
     frozen_code = code_digest()
     args.output.mkdir(parents=True)
