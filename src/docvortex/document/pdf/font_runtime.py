@@ -394,8 +394,12 @@ def _native_font_bridge(raw: Any) -> Any:
     for index, (name, result, arguments) in enumerate(callbacks):
         field = fields.get(name)
         expected = callback_type(result, *arguments)
-        if (field is None or getattr(raw.FPDF_SYSFONTINFO, name).offset != start + index * ctypes.sizeof(void)
-                or field._restype_ is not result or field._argtypes_ != arguments):
+        if (
+            field is None
+            or getattr(raw.FPDF_SYSFONTINFO, name).offset != start + index * ctypes.sizeof(void)
+            or field._restype_ is not result
+            or field._argtypes_ != arguments
+        ):
             return _font_bridge_unavailable(f"FPDF_SYSFONTINFO.{name} signature/layout mismatch")
         if field._flags_ != expected._flags_:
             return _font_bridge_unavailable(f"FPDF_SYSFONTINFO.{name} calling convention mismatch")
@@ -407,8 +411,12 @@ def _native_font_bridge(raw: Any) -> Any:
     functions = []
     for name, result, arguments in specs:
         function = getattr(raw, name, None)
-        if (not isinstance(function, ctypes._CFuncPtr) or function.restype is not result
-                or tuple(function.argtypes or ()) != arguments or getattr(function, "errcheck", None) is not None):
+        if (
+            not isinstance(function, ctypes._CFuncPtr)
+            or function.restype is not result
+            or tuple(function.argtypes or ()) != arguments
+            or getattr(function, "errcheck", None) is not None
+        ):
             return _font_bridge_unavailable(f"{name} unsupported function signature or wrapper")
         if function._flags_ != callback_type(result, *arguments)._flags_:
             return _font_bridge_unavailable(f"{name} calling convention mismatch")
@@ -428,12 +436,18 @@ class _NativeFontProvider:
         self.info = PdfiumRuntimeInfo(pdfium_version, _POLICY, _FONT_NAME, _FONT_SHA256)
         self.failure: tuple[str, BaseException] | None = None
         self.functions = functions
-        self._legacy = callback_type(ctypes.c_int, ctypes.POINTER(ctypes.c_ubyte), ctypes.c_size_t, ctypes.c_int)(self._classify_legacy)
+        self._legacy = callback_type(ctypes.c_int, ctypes.POINTER(ctypes.c_ubyte), ctypes.c_size_t, ctypes.c_int)(
+            self._classify_legacy
+        )
         try:
             self.native = native.NativeFontProvider(
                 [ctypes.cast(function, ctypes.c_void_p).value for function in functions],
-                data, tables, f"DocVortex-{_POLICY}-{_FONT_SHA256}".encode("ascii"),
-                _FONT_ALIASES, _STYLE_SUFFIXES, ctypes.cast(self._legacy, ctypes.c_void_p).value,
+                data,
+                tables,
+                f"DocVortex-{_POLICY}-{_FONT_SHA256}".encode("ascii"),
+                _FONT_ALIASES,
+                _STYLE_SUFFIXES,
+                ctypes.cast(self._legacy, ctypes.c_void_p).value,
             )
         except Exception as exc:
             raise PdfiumFontError(f"Unable to create native PDFium font runtime: {exc}") from exc
