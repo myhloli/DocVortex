@@ -97,10 +97,7 @@ def _build_native_line_items_from_chars(
         )
     normal_items: list[_LineItem] = []
     formula_items: list[_LineItem] = []
-    for raw_text, bbox, angle, members, row_id, run_index, split, formula, coarse, metrics in records:
-        text = _normalize_native_run_text(raw_text)
-        if not text:
-            continue
+    for text, bbox, angle, members, row_id, run_index, split, formula, coarse, metrics, terminal in records:
         item = _LineItem(
             text=text,
             bbox=bbox,
@@ -124,7 +121,7 @@ def _build_native_line_items_from_chars(
             item.dominant_font_weight = weight
             item.leading_emphasis_width = emphasis
             item.leading_typography_width = typography
-            item.paragraph_terminal = _native_sentence_terminal(item)
+            item.paragraph_terminal = terminal
         else:
             _fill_native_typography(item, page_size)
         (formula_items if formula else normal_items).append(item)

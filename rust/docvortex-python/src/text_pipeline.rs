@@ -36,7 +36,8 @@ fn unicode_properties(py: Python<'_>, chars: &[TextChar]) -> PyResult<UnicodePro
                 | (u8::from(text.call_method0("isdigit")?.extract::<bool>()?) << 1)
                 | (u8::from(category.call1((&text,))?.extract::<String>()? == "Sm") << 2)
                 | (u8::from(text.call_method0("isspace")?.extract::<bool>()?) << 3)
-                | (u8::from(text.call_method0("isprintable")?.extract::<bool>()?) << 4);
+                | (u8::from(text.call_method0("isprintable")?.extract::<bool>()?) << 4)
+                | (u8::from(text.call_method0("isdecimal")?.extract::<bool>()?) << 5);
             properties.0.insert(ch, flags);
         }
         let mut cached = cache.lock().unwrap_or_else(|error| error.into_inner());
@@ -277,6 +278,7 @@ pub fn prepare_visual_lines<'py>(
             run.formula,
             run.coarse_fallback,
             metrics,
+            run.paragraph_terminal,
         ))?;
     }
     Ok(Some(output))

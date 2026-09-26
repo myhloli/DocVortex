@@ -1,7 +1,7 @@
 # Optional Rust PDF kernels
 
 See [Repository architecture](ARCHITECTURE.md) for the Python/Rust ownership boundary
-and binding-module layout. The current private extension protocol is **10**, shared by
+and binding-module layout. The current private extension protocol is **11**, shared by
 the Python loader and Rust core. Protocol 4, 5, 6, 7 and 8 references below describe historical
 interfaces or rollout stages, not the current loader requirement. Rebuild editable
 native installs and restart existing processes after updating native sources.
@@ -256,7 +256,7 @@ Existing timing runs can be audited without discarding their original memory rec
 python tests/benchmarks/pdf_memory.py --timing-report output/rust/revisions/report.json --output output/rust/memory-audit
 ```
 
-## Native kernel migration (protocol 10)
+## Native kernel migration (protocol 11)
 
 The same-library PDFium adapter is now a separate Python-independent crate. Object
 traversal, clipping and path decoding run there; character geometry stays in Rust

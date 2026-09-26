@@ -326,3 +326,221 @@ def test_line_rotation_comes_from_first_span_when_equal_values_have_different_ty
     assert actual[0]["spans"][0]["rotation"] is True
     assert actual[0]["spans"][1]["rotation"] is chars[1]["rotation"]
     assert json.dumps(_plain(actual)) == json.dumps(_plain(_get_lines_from_chars_python(chars)))
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "",
+        "\r\n",
+        "\x00\x02\x7f\x9f",
+        " \t\v\f ",
+        "  Alpha  beta  ",
+        "A\r\nB\rC\nD",
+        "A\u0085B\u2028C\u2029D",
+        "A\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000B",
+        "A\u200b\u2060\ufeffB",
+        "word\xad",
+        "word\xad \t\nnext",
+        "word\x02\t\nnext",
+        "1\xad\nnext",
+        "中\x02\nnext",
+        "word\xad\v\nnext",
+        "word\xad\x00\nnext",
+        "A\u200b\xad\u00a0\nB",
+        "a \x00  b",
+        "a\xad\xad",
+        "a\x02\xad",
+        "A.\u200b",
+        "A!）】》”’'\"",
+        "\u001cA\u001f",
+        "A\x02\r\nB",
+    ],
+)
+def test_run_normalization_matches_reference_order(raw):
+    """覆盖清洗步骤先后依赖、Unicode 空白和软断词的上下文断言。"""
+    native = pytest.importorskip("docvortex._native")
+    from docvortex.analyzers.native.pdf.native_text import (
+        _build_native_line_items,
+        _build_native_line_items_from_chars,
+        _normalize_native_run_text,
+    )
+
+    chars = [_char(raw, (0, 0, 100, 10), 0)]
+    records = native.prepare_visual_lines(chars, (200.0, 200.0), 0, [0.0, 90.0, 270.0])
+    assert records is not None
+    text = _normalize_native_run_text(raw)
+    assert [record[0] for record in records] == ([text] if text else [])
+    if raw == "A.\u200b":
+        assert records[0][8] is True and records[0][10] is False
+    expected = _build_native_line_items(_get_lines_from_chars_python(chars), (200, 200))
+    actual = _build_native_line_items_from_chars(chars, (200, 200))
+    assert _line_records(actual) == _line_records(expected)
+
+
+def _terminal_chars(text, reference_count, reference_height, angle):
+    """构造保持字符记录粒度的水平或竖排句尾引用样本。"""
+    chars = []
+    for index, ch in enumerate(text):
+        height = reference_height if reference_count and index >= len(text) - reference_count else 10.0
+        box = (index * 6.0, 10.0, index * 6.0 + 5.0, 10.0 + height)
+        if angle in {90, 270}:
+            box = (10.0, index * 6.0, 10.0 + height, index * 6.0 + 5.0)
+        chars.append(_char(ch, box, index, rotation=math.radians(angle)))
+    return chars
+
+
+@pytest.mark.parametrize(
+    "text,count,height,terminal",
+    [
+        ("End.", 0, 10.0, True),
+        ("End!）】》”’'\"", 0, 10.0, True),
+        ("End?]})", 0, 10.0, True),
+        ("正文。", 0, 10.0, True),
+        ("Not terminal", 0, 10.0, False),
+        ("End.12", 2, 8.0, True),
+        ("End.12", 2, 8.000001, False),
+        ("End.12", 2, 10.0, False),
+        ("End.1,2–3—4-", 8, 6.0, True),
+        ("End.-12", 2, 6.0, False),
+        ("End.١٢", 2, 6.0, True),
+        ("End.𝟙𝟚", 2, 6.0, True),
+        ("End.²³", 2, 6.0, False),
+        ("End.Ⅳ", 1, 6.0, False),
+        ("End.1)", 2, 6.0, False),
+        ("Value 1.23", 2, 10.0, False),
+    ],
+)
+@pytest.mark.parametrize("angle", [0, 90, 270])
+def test_native_sentence_terminal_parity(text, count, height, terminal, angle):
+    """保留十进制引用、字高阈值、闭合标点和竖排轴选择的精确判断。"""
+    native = pytest.importorskip("docvortex._native")
+    from docvortex.analyzers.native.pdf.native_text import (
+        _build_native_line_items,
+        _build_native_line_items_from_chars,
+    )
+
+    chars = _terminal_chars(text, count, height, angle)
+    records = native.prepare_visual_lines(chars, (1000.0, 1000.0), 0, [0.0, 90.0, 270.0])
+    assert records is not None and len(records) == 1
+    assert records[0][10] is terminal
+    expected = _build_native_line_items(_get_lines_from_chars_python(chars), (1000, 1000))
+    actual = _build_native_line_items_from_chars(chars, (1000, 1000))
+    assert _line_records(actual) == _line_records(expected)
+
+
+def test_sentence_reference_length_counts_records_not_text_codepoints():
+    """多码点字符记录不得被错误拆成多个引用字形。"""
+    native = pytest.importorskip("docvortex._native")
+    from docvortex.analyzers.native.pdf.native_text import (
+        _build_native_line_items,
+        _build_native_line_items_from_chars,
+    )
+
+    chars = [_char("A.", (0, 0, 12, 10), 0), _char("12", (12, 0, 24, 6), 1)]
+    records = native.prepare_visual_lines(chars, (100.0, 100.0), 0, [0.0, 90.0, 270.0])
+    assert records is not None and len(records) == 1 and records[0][10] is False
+    expected = _build_native_line_items(_get_lines_from_chars_python(chars), (100, 100))
+    actual = _build_native_line_items_from_chars(chars, (100, 100))
+    assert _line_records(actual) == _line_records(expected)
+
+
+def test_initial_native_run_finalization_does_not_call_python_reference(monkeypatch):
+    """原生初次物化无需再调用 Python 清洗和句尾规则，后继合并仍保留原入口。"""
+    native = pytest.importorskip("docvortex._native")
+    monkeypatch.setattr("docvortex._compute_backend.get_native", lambda: native)
+    from docvortex.analyzers.native.pdf import native_text
+
+    chars = _terminal_chars("End.12", 2, 6.0, 0)
+    expected = native_text._build_native_line_items(_get_lines_from_chars_python(chars), (100, 100))
+
+    def forbidden(*args, **kwargs):
+        """捕获本应在 Rust 完成的初次 run 规则回调。"""
+        raise AssertionError("initial native finalization called Python reference")
+
+    monkeypatch.setattr(native_text, "_normalize_native_run_text", forbidden)
+    monkeypatch.setattr(native_text, "_native_sentence_terminal", forbidden)
+    actual = native_text._build_native_line_items_from_chars(chars, (100, 100))
+    assert _line_records(actual) == _line_records(expected)
+
+
+def test_seeded_native_run_normalization_differential():
+    """组合随机控制字符验证删除、替换与空白折叠的顺序不变。"""
+    native = pytest.importorskip("docvortex._native")
+    from docvortex.analyzers.native.pdf.native_text import _normalize_native_run_text
+
+    rng = random.Random(927)
+    alphabet = [
+        "A",
+        "z",
+        "1",
+        "中",
+        ".",
+        " ",
+        "\t",
+        "\n",
+        "\r",
+        "\v",
+        "\f",
+        "\x00",
+        "\x02",
+        "\u0085",
+        "\u00ad",
+        "\u00a0",
+        "\u200b",
+        "\u2028",
+        "\u2029",
+        "\u2060",
+        "\ufeff",
+    ]
+    for _ in range(250):
+        raw = "".join(rng.choice(alphabet) for _ in range(rng.randrange(0, 60)))
+        chars = [_char(raw, (0, 0, 100, 10), 0)]
+        records = native.prepare_visual_lines(chars, (200.0, 200.0), 0, [0.0, 90.0, 270.0])
+        assert records is not None
+        expected = _normalize_native_run_text(raw)
+        assert [record[0] for record in records] == ([expected] if expected else [])
+
+
+def test_empty_coarse_run_filter_preserves_source_row_ids():
+    """粗行清洗后为空时只过滤该行，保留后续来源行号与 coarse 句尾默认值。"""
+    native = pytest.importorskip("docvortex._native")
+    from docvortex.analyzers.native.pdf.native_text import (
+        _build_native_line_items,
+        _build_native_line_items_from_chars,
+    )
+
+    raw_rows = [" \n", "A.\n", "\u200b\n", "B!\n"]
+    chars = [
+        _char(text, (0, index * 20, 30, index * 20 + 10), index, {"name": f"row-{index}", "size": 10})
+        for index, text in enumerate(raw_rows)
+    ]
+    records = native.prepare_visual_lines(chars, (200.0, 200.0), 0, [0.0, 90.0, 270.0])
+    assert records is not None
+    assert all(len(record) == 11 for record in records)
+    assert [(record[0], record[4], record[5], record[8], record[10]) for record in records] == [
+        ("A.", 1, 0, True, False),
+        ("B!", 3, 0, True, False),
+    ]
+    expected = _build_native_line_items(_get_lines_from_chars_python(chars), (200, 200))
+    actual = _build_native_line_items_from_chars(chars, (200, 200))
+    assert _line_records(actual) == _line_records(expected)
+
+
+def test_empty_split_run_filter_preserves_run_index_and_split_flag():
+    """已产生视觉分段后过滤空文本，不能重编号或抹去原拆分标记。"""
+    native = pytest.importorskip("docvortex._native")
+    from docvortex.analyzers.native.pdf.native_text import (
+        _build_native_line_items,
+        _build_native_line_items_from_chars,
+    )
+
+    chars = [_char("", (0, 0, 5, 10), 0), _char("A", (100, 0, 105, 10), 1)]
+    records = native.prepare_visual_lines(chars, (200.0, 200.0), 0, [0.0, 90.0, 270.0])
+    assert records is not None and len(records) == 1 and len(records[0]) == 11
+    record = records[0]
+    assert (record[0], record[4], record[5], record[6], record[8], record[10]) == ("A", 0, 1, True, False, False)
+    assert record[3][0] is chars[1]
+    expected = _build_native_line_items(_get_lines_from_chars_python(chars), (200, 200))
+    actual = _build_native_line_items_from_chars(chars, (200, 200))
+    assert _line_records(actual) == _line_records(expected)

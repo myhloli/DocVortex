@@ -73,7 +73,7 @@ Subsequent numeric geometry conversion can release the GIL after reading finishe
 `DOCVORTEX_COMPUTE_BACKEND=python|rust|auto` selects the backend once per process.
 `python` never imports the extension; `rust` requires a compatible extension; `auto`
 falls back on a missing or incompatible extension. Computation errors propagate.
-The current private protocol is **10**. Rebuild an editable extension after changing
+The current private protocol is **11**. Rebuild an editable extension after changing
 native sources and restart processes that cached the backend. Module-only refactors
 preserve the protocol and all Python-visible registrations.
 

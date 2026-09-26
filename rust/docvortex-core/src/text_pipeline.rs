@@ -10,6 +10,7 @@ impl UnicodeProperties {
         if ch.is_ascii() {
             (u8::from(ch.is_ascii_alphanumeric()))
                 | (u8::from(ch.is_ascii_digit()) << 1)
+                | (u8::from(ch.is_ascii_digit()) << 5)
                 | (u8::from(matches!(ch, '+' | '<' | '=' | '>' | '|' | '~')) << 2)
                 | (u8::from((' '..='~').contains(&ch)) << 4)
                 | (u8::from(matches!(ch, '\t'..='\r' | '\u{1c}'..='\u{1f}' | ' ')) << 3)
@@ -238,6 +239,7 @@ pub struct VisualTextRun {
     pub split: bool,
     pub formula: bool,
     pub coarse_fallback: bool,
+    pub paragraph_terminal: bool,
     pub typography: Option<crate::statistics::Typography>,
 }
 
@@ -441,6 +443,7 @@ pub fn prepare_visual_lines(
                     split: false,
                     formula,
                     coarse_fallback: true,
+                    paragraph_terminal: false,
                     typography: None,
                 });
                 continue;
@@ -461,15 +464,18 @@ pub fn prepare_visual_lines(
                     split,
                     formula,
                     coarse_fallback: false,
+                    paragraph_terminal: false,
                     typography: None,
                 });
             }
         }
     }
     for run in &mut output {
-        if run.coarse_fallback {
+        run.text = normalize_run_text(&run.text, unicode);
+        if run.coarse_fallback || run.text.is_empty() {
             continue;
         }
+        run.paragraph_terminal = sentence_terminal(run, chars, unicode);
         let boxes = run
             .indices
             .iter()
@@ -492,5 +498,132 @@ pub fn prepare_visual_lines(
             0.1_f64.max(local[3] - local[1]),
         );
     }
+    output.retain(|run| !run.text.is_empty());
     output
+}
+
+/// 按 Python 原规则顺序清洗 run 文本，不改变字符成员或视觉分段编号。
+fn normalize_run_text(text: &str, unicode: &UnicodeProperties) -> String {
+    let mut translated = Vec::with_capacity(text.len());
+    let mut source = text.chars().peekable();
+    while let Some(ch) = source.next() {
+        let ch = match ch {
+            '\r' => {
+                if source.peek() == Some(&'\n') {
+                    source.next();
+                }
+                '\n'
+            }
+            '\u{85}' | '\u{2028}' | '\u{2029}' => '\n',
+            '\u{a0}'
+            | '\u{1680}'
+            | '\u{2000}'..='\u{200a}'
+            | '\u{202f}'
+            | '\u{205f}'
+            | '\u{3000}' => ' ',
+            '\u{200b}' | '\u{2060}' | '\u{feff}' => continue,
+            _ => ch,
+        };
+        translated.push(ch);
+    }
+    let mut normalized = String::with_capacity(text.len());
+    let mut previous_space = false;
+    for (index, &original) in translated.iter().enumerate() {
+        let mut ch = original;
+        // 软断词的前后断言必须在删除控制字符、换行和软连字符之前计算。
+        if matches!(ch, '\u{2}' | '\u{ad}')
+            && index > 0
+            && translated[index - 1].is_ascii_alphabetic()
+        {
+            let mut after = index + 1;
+            while after < translated.len() && matches!(translated[after], '\t' | ' ') {
+                after += 1;
+            }
+            if after == translated.len() || translated[after] == '\n' {
+                ch = '-';
+            }
+        }
+        if matches!(ch, '\u{ad}' | '\n' | '\u{0}'..='\u{8}' | '\u{b}' | '\u{c}' | '\u{e}'..='\u{1f}' | '\u{7f}'..='\u{9f}')
+        {
+            continue;
+        }
+        if ch == '\t' {
+            ch = ' ';
+        }
+        if ch == ' ' {
+            if previous_space {
+                continue;
+            }
+            previous_space = true;
+        } else {
+            previous_space = false;
+        }
+        normalized.push(ch);
+    }
+    normalized
+        .trim_matches(|ch| unicode.is_space(ch))
+        .to_owned()
+}
+
+/// 基于规范化文本和原字符记录判断句尾，保留引用长度按记录切片的既有语义。
+fn sentence_terminal(run: &VisualTextRun, chars: &[TextChar], unicode: &UnicodeProperties) -> bool {
+    let text = run.text.trim_end_matches(|ch| unicode.is_space(ch));
+    let mut ending = text.chars().rev();
+    let last_body = ending.find(|&ch| {
+        !matches!(
+            ch,
+            ']' | ')' | '}' | '）' | '】' | '》' | '”' | '’' | '\'' | '"'
+        )
+    });
+    if last_body.is_some_and(|ch| matches!(ch, '.' | '!' | '?' | '。' | '！' | '？')) {
+        return true;
+    }
+    let mut references = 0;
+    let mut first_is_decimal = false;
+    let mut punctuation = false;
+    for ch in text.chars().rev() {
+        let decimal = unicode.flags(ch) & 32 != 0;
+        if decimal || matches!(ch, ',' | '–' | '—' | '-') {
+            references += 1;
+            first_is_decimal = decimal;
+        } else {
+            punctuation = matches!(ch, '.' | '!' | '?' | '。' | '！' | '？');
+            break;
+        }
+    }
+    if references == 0 || !first_is_decimal || !punctuation {
+        return false;
+    }
+    let axis = if matches!(run.angle, 90 | 270) { 0 } else { 1 };
+    let sizes: Vec<_> = run
+        .indices
+        .iter()
+        .filter_map(|&index| {
+            let ch = &chars[index];
+            if ch
+                .text
+                .trim_matches(|value| unicode.is_space(value))
+                .is_empty()
+            {
+                return None;
+            }
+            Some(ch.bbox[axis + 2] - ch.bbox[axis])
+        })
+        .collect();
+    if sizes.len() <= references {
+        return false;
+    }
+    let cut = sizes.len() - references;
+    let body: Vec<_> = sizes[..cut]
+        .iter()
+        .copied()
+        .filter(|size| *size > 0.0)
+        .collect();
+    if body.is_empty() {
+        return false;
+    }
+    let limit = 0.8 * crate::median(body);
+    sizes[cut..]
+        .iter()
+        .all(|size| *size > 0.0 && *size <= limit)
 }
