@@ -281,3 +281,43 @@ def test_projection_cache_tracks_content_and_bounds():
     count = len(cache.values)
     assert cache.project(long, long["content"]) == matching._project_content_chars(long["content"])
     assert len(cache.values) == count and id(long) not in cache.values
+
+
+def test_native_mapping_geometry_keeps_boundaries_and_float_sources():
+    """融合准备以原相邻成员比较共享阈值，极值框复用首字符浮点来源。"""
+    native = get_native()
+    if native is None:
+        pytest.skip("native backend is not selected")
+    chars = []
+    font = {"name": "A", "size": 10.0, "flags": 0}
+    for index, x in enumerate([-0.0, 0.001, 0.0021, 0.0031]):
+        chars.append(
+            {
+                "char": "A",
+                "char_idx": index,
+                "source_indices": (index,),
+                "font": font,
+                "bbox": Bbox([x, 0.0, x + 4.0, 10.0]),
+                "origin": (x, 9.0),
+                "rotation": 0.0,
+                "writing_angle": 0.0,
+                "text_object_id": 1,
+            }
+        )
+    rows = native.mapping_glyph_rows(chars, Bbox)
+    expected_ranges = []
+    cursor = 0
+    for group in dedup._mapping_char_groups_python(chars):
+        expected_ranges.append((cursor, cursor + len(group)))
+        cursor += len(group)
+    assert [(first, last) for first, last, _box, _angle in rows] == expected_ranges
+    assert rows[0][2][0] is chars[0]["bbox"].bbox[0]
+    assert dedup._mapping_groups(chars) == dedup._mapping_groups_reference(chars)
+
+
+def test_stage_profile_special_neighbors_disable_cache():
+    """外部特殊容器、标量及非普通行可能有回调时不能复用普通行状态。"""
+    lane = _profile_lane(0)
+    assert not body_profile._stage_profile_context([lane], lane.lines, [(object(), 0.0, 1.0, 2.0)]).plain
+    assert not body_profile._stage_profile_context([lane], lane.lines, scalars=(math.nan,)).plain
+    assert not body_profile._stage_profile_context([lane], object()).plain

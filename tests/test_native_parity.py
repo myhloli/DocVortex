@@ -38,6 +38,7 @@ def test_native_registration_contract(native):
         "line_neighbors": "(records)",
         "local_boxes": "(values, size, angle, fallback)",
         "mapping_runs": "(records)",
+        "mapping_glyph_rows": "(chars, bbox_type)",
         "materialize_geometry": "(rows, frame, rounded, angle)",
         "merge_rules": "(rules, coordinates, tolerance, join)",
         "normalize_boxes": "(values, strict, fallback)",

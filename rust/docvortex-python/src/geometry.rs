@@ -214,7 +214,9 @@ pub(super) fn source_rows<'py>(
 }
 
 /// 只借用内置浮点序列，特殊类型及异常数值返回参考路径而不执行转换回调。
-fn plain_coordinates<const N: usize>(value: &Bound<'_, PyAny>) -> Option<Option<[f64; N]>> {
+pub(super) fn plain_coordinates<const N: usize>(
+    value: &Bound<'_, PyAny>,
+) -> Option<Option<[f64; N]>> {
     if value.is_none() {
         return Some(None);
     }

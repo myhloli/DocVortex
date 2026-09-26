@@ -479,7 +479,9 @@ def _classify_cross_lane_centered_section_titles(
     stable_lanes = [
         lane for lane in lanes if not lane.is_span and len(lane.lines) >= 5 and lane.right - lane.left >= 0.2 * local_page_width
     ]
-    context = _stage_profile_context(stable_lanes, line_geometry, container_bboxes)
+    context = _stage_profile_context(
+        stable_lanes, line_geometry, container_bboxes, scalars=(local_page_width, local_page_height, document_title_bottom)
+    )
     for line, bbox in line_geometry:
         if line.semantic_type is not None:
             continue
@@ -694,7 +696,13 @@ def _classify_cross_lane_emphasized_section_titles(
     stable_lanes = [
         lane for lane in lanes if not lane.is_span and len(lane.lines) >= 5 and lane.right - lane.left >= 0.2 * local_page_width
     ]
-    context = _stage_profile_context(stable_lanes, line_geometry, container_bboxes, document_body_profile)
+    context = _stage_profile_context(
+        stable_lanes,
+        line_geometry,
+        container_bboxes,
+        document_body_profile,
+        (local_page_width, local_page_height, document_title_bottom),
+    )
     for line, bbox in line_geometry:
         if line.semantic_type is not None or line.font_signature is None:
             continue

@@ -50,6 +50,7 @@ def verify_binary(binary: Path) -> None:
     assert native.BaselineCandidates([(0, 1), (1, 2), (3, 4)], [0, 0, 0]).rows(0, 3, 8192) == [[1], [], []]
     assert native.TableNoteMetrics([(0, 0, 1), (1, 1, 2), (2, 2, 3), (3, 3, 4)]).height(100, 200, [], 1.25) == 4.0
     assert native.mapping_runs([]) == []
+    assert native.mapping_glyph_rows([], list) == []
     assert native.anchor_pairs([], False) == []
     assert native.title_gaps([(0, None, (0, 0, 10, 10), 10, False)]) == [(None, None)]
     assert native.line_neighbors([(0, (0, 0, 10, 10), 10, 10)]) == [(None, None)]

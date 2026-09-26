@@ -106,7 +106,7 @@ class _LaneProfileContext:
             self.profiles.pop(lane_id, None)
 
 
-def _stage_profile_context(lanes, line_geometry, container_bboxes=(), document_body_profile=None):
+def _stage_profile_context(lanes, line_geometry, container_bboxes=(), document_body_profile=None, scalars=()):
     """特殊容器或文档字体可能通过回调修改普通行，整阶段恢复原实时统计。"""
     context = _LaneProfileContext(lanes, line_geometry)
     boxes_plain = type(container_bboxes) in (tuple, list) and all(
@@ -118,12 +118,13 @@ def _stage_profile_context(lanes, line_geometry, container_bboxes=(), document_b
         and _plain_profile_number(document_body_profile.body_height)
         and (document_body_profile.body_weight is None or _plain_profile_number(document_body_profile.body_weight))
         and type(document_body_profile.regular_fonts) is frozenset
+        and type(document_body_profile.has_style_scale_repairs) is bool
         and all(
             type(value) is tuple and len(value) == 2 and type(value[0]) is str and type(value[1]) is int
             for value in document_body_profile.regular_fonts
         )
     )
-    if not boxes_plain or not profile_plain:
+    if not boxes_plain or not profile_plain or any(value is not None and not _plain_profile_number(value) for value in scalars):
         context.plain = False
         context.profiles.clear()
         context.heights.clear()
