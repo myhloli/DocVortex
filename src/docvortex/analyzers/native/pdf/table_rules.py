@@ -70,6 +70,7 @@ class _RuleBandIndex:
     bands: tuple[int, ...]
     on_rule: tuple[bool, ...]
     rule_count: int
+    native: Any = None
 
     def interval(self, rows: list[_VisualRow]) -> tuple[int, int] | None:
         """只准入与原走廊完全相同、连续且保序的行引用。"""
@@ -82,6 +83,18 @@ class _RuleBandIndex:
         if any(row is not self.rows[start + offset] for offset, row in enumerate(rows)):
             return None
         return start, start + len(rows)
+
+
+class _RuleIntervalGroups(list):
+    """保留普通分组列表行为，并携带同一次原生扫描产生的区间文本证据。"""
+
+    def __init__(self, groups, rows, rules, height, accepted):
+        """证据仅供原输入列表和同一行高查询复用，不缓存外部可变对象的跨调用状态。"""
+        super().__init__(groups)
+        self.source_rows = rows
+        self.source_rules = rules
+        self.height = height
+        self.accepted = accepted
 
 
 @dataclass(slots=True)
@@ -134,6 +147,7 @@ class _RuleCandidateDraft:
     has_notes: bool
     score: float
     core_query: Any = None
+    prepared_candidate: Any = None
 
     def materialize(self) -> _TableCandidate:
         """按参考规则物化当前候选，并复用本组网格成员后立即交给合并器。"""
@@ -155,6 +169,7 @@ class _RuleCandidateDraft:
             context.body_metrics,
             self.core_query,
             context.annotation_geometry or None,
+            self.prepared_candidate,
         )
         candidate.score = self.score
         if context.grids is None:
@@ -348,7 +363,7 @@ def _build_rule_table_candidates(
             else:
                 band_indexes.move_to_end(corridor_key)
             interval_row_groups = _partition_rows_by_prepared_bands(
-                core_rows, interval_rules, first_index, band_indexes[corridor_key]
+                core_rows, interval_rules, first_index, band_indexes[corridor_key], median_height
             )
             if interval_row_groups is None:
                 interval_row_groups, interval_prefix = _partition_rows_by_rule_intervals_cached(
@@ -512,6 +527,7 @@ def _build_rule_table_candidates(
                         has_possible_table_notes,
                         score,
                         (core_index, *interval) if interval is not None else None,
+                        _prepared_rule_candidate_query(band_indexes[corridor_key], accepted_rows),
                     )
                 )
                 continue
@@ -528,6 +544,7 @@ def _build_rule_table_candidates(
                 marker_cache,
                 prepared_note_rows,
                 prepared_note_body_metrics,
+                prepared_candidate=_prepared_rule_candidate_query(band_indexes[corridor_key], accepted_rows),
             )
             candidate.score = score
             candidates.append(candidate)
@@ -1091,14 +1108,79 @@ def _prepare_rule_band_index(rows: list[_VisualRow], rules: list[_LocalAxisLine]
         if not math.isfinite(center) or centers and center <= centers[-1]:
             return None
         centers.append(center)
-    bands = [bisect_left(centers, row.center_y) for row in rows]
+    native = _prepare_native_rule_candidates(rows, centers, rules)
+    bands = [bisect_left(centers, row.center_y) for row in rows] if native is None else []
     return _RuleBandIndex(
         tuple(rows),
         {id(row): index for index, row in enumerate(rows)},
         tuple(bands),
-        tuple(position < len(centers) and centers[position] == row.center_y for position, row in zip(bands, rows, strict=True)),
+        tuple(position < len(centers) and centers[position] == row.center_y for position, row in zip(bands, rows))
+        if native is None
+        else (),
         len(centers),
+        native,
     )
+
+
+def _prepare_native_rule_candidates(rows, centers, rules):
+    """仅为普通有限数据准备共享原生走廊，特殊对象在计算开始前留给参考路径。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is None or not hasattr(native, "PreparedRuleCandidates"):
+        return None
+    if any(type(rule) is not _LocalAxisLine for rule in rules):
+        return None
+    packed = []
+    for row in rows:
+        if (
+            type(row) is not _VisualRow
+            or type(row.fragments) is not list
+            or type(row.bbox) not in (tuple, list)
+            or len(row.bbox) != 4
+            or any(type(value) is not float or not math.isfinite(value) for value in row.bbox)
+        ):
+            return None
+        members = []
+        for fragment in row.fragments:
+            if (
+                type(fragment) is not _Fragment
+                or type(fragment.line_index) is not int
+                or not -(2**63) <= fragment.line_index < 2**63
+            ):
+                return None
+            members.append(fragment.line_index)
+        packed.append((row.center_y, len(row.fragments), row.bbox, members))
+    return native.PreparedRuleCandidates(centers, packed)
+
+
+def _prepared_rule_candidate_query(index, rows):
+    """只有原走廊的非空连续保序切片才能复用候选核心数据。"""
+    if index is None or index.native is None:
+        return None
+    interval = index.interval(rows)
+    return (index, *interval) if interval is not None and interval[0] < interval[1] else None
+
+
+def _prepared_rule_candidate_core(prepared, rules):
+    """原生一次归并核心成员与坐标来源，Python 保留原坐标身份及集合契约。"""
+    if prepared is None or not rules:
+        return None
+    boxes = [rule.bbox for rule in rules]
+    if any(
+        type(box) not in (tuple, list)
+        or len(box) != 4
+        or any(type(value) is not float or not math.isfinite(value) for value in box)
+        for box in boxes
+    ):
+        return None
+    index, start, end = prepared
+    members, sources = index.native.core(start, end, boxes)
+    bbox = tuple(
+        (boxes[source] if source < len(boxes) else index.rows[source - len(boxes)].bbox)[axis]
+        for axis, source in enumerate(sources)
+    )
+    return {member for member in members}, bbox
 
 
 def _partition_rows_by_prepared_bands(
@@ -1106,6 +1188,7 @@ def _partition_rows_by_prepared_bands(
     rules: list[_LocalAxisLine],
     first_index: int,
     index: _RuleBandIndex | None,
+    median_height: float | None = None,
 ) -> list[list[_VisualRow]] | None:
     """仅对连续且保序的走廊行复用首区间，仍让边界行双归属。"""
 
@@ -1115,6 +1198,13 @@ def _partition_rows_by_prepared_bands(
     if interval is None:
         return None
     start, end = interval
+    if index.native is not None:
+        evidence_safe = type(median_height) is float and math.isfinite(median_height)
+        packed_groups, accepted = index.native.partition(
+            start, end, first_index, len(rules), median_height if evidence_safe else 0.0
+        )
+        groups = [[index.rows[position] for position in group] for group in packed_groups]
+        return _RuleIntervalGroups(groups, rows, rules, median_height, accepted) if evidence_safe else groups
     groups: list[list[_VisualRow]] = [[] for _ in range(max(0, len(rules) - 1))]
     for row, band, on_rule in zip(rows, index.bands[start:end], index.on_rule[start:end], strict=True):
         local = band - first_index
@@ -1170,6 +1260,14 @@ def _every_rule_interval_has_multi_cell_row(
 
     if len(rule_group) < 2:
         return False
+    if (
+        type(median_height) is float
+        and type(interval_row_groups) is _RuleIntervalGroups
+        and interval_row_groups.source_rows is rows
+        and interval_row_groups.source_rules is rule_group
+        and interval_row_groups.height == median_height
+    ):
+        return interval_row_groups.accepted
     groups = interval_row_groups
     if groups is None:
         groups = _partition_rows_by_rule_intervals(rows, rule_group)
@@ -1585,11 +1683,15 @@ def _expand_rule_table_candidate(
     prepared_note_body_metrics: _PreparedTableNoteBodyMetrics | None = None,
     prepared_core: Any = None,
     prepared_annotation_geometry: Any = None,
+    prepared_candidate: Any = None,
 ) -> _TableCandidate:
     """合并横线核心与上下注释，并保留注释的独立行身份。"""
 
     rule_bbox = _bbox_union_many([line.bbox for line in rule_group])
-    core_line_indices = {fragment.line_index for row in core_rows for fragment in row.fragments}
+    native_core = _prepared_rule_candidate_core(prepared_candidate, rule_group)
+    core_line_indices = (
+        native_core[0] if native_core is not None else {fragment.line_index for row in core_rows for fragment in row.fragments}
+    )
     caption_rows = _collect_caption_rows(all_rows, caption_line, rule_bbox, median_height)
     footnote_rows = (
         _collect_footnote_rows(
@@ -1608,11 +1710,15 @@ def _expand_rule_table_candidate(
         if has_possible_table_notes
         else []
     )
-    core_rows_bbox = prepared_core[0].bbox(prepared_core[1], prepared_core[2]) if prepared_core is not None else None
-    indexed_bbox = core_rows_bbox is not None
-    if core_rows_bbox is None:
-        core_rows_bbox = _bbox_union_many([row.bbox for row in core_rows])
-    core_local_bbox = _bbox_union(rule_bbox, core_rows_bbox)
+    if native_core is not None:
+        core_local_bbox = native_core[1]
+        indexed_bbox = True
+    else:
+        core_rows_bbox = prepared_core[0].bbox(prepared_core[1], prepared_core[2]) if prepared_core is not None else None
+        indexed_bbox = core_rows_bbox is not None
+        if core_rows_bbox is None:
+            core_rows_bbox = _bbox_union_many([row.bbox for row in core_rows])
+        core_local_bbox = _bbox_union(rule_bbox, core_rows_bbox)
     caption_annotation = _build_table_annotation(
         "caption",
         caption_rows,

@@ -53,6 +53,25 @@ def get_lines_from_chars(
     chars: list[Char], superscript_height_threshold: float = 0.7, line_distance_threshold: float = 0.1
 ) -> list[Line]:
     """由已物化字符生成基础文本行，不访问 PDFium 或源文档。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is not None
+        and type(chars) is list
+        and type(superscript_height_threshold) is float
+        and type(line_distance_threshold) is float
+    ):
+        result = native.group_text_lines(chars, superscript_height_threshold, line_distance_threshold)
+        if result is not None:
+            return result
+    return _get_lines_from_chars_python(chars, superscript_height_threshold, line_distance_threshold)
+
+
+def _get_lines_from_chars_python(
+    chars: list[Char], superscript_height_threshold: float = 0.7, line_distance_threshold: float = 0.1
+) -> list[Line]:
+    """保留纯 Python 连续阶段，供后端差分和兼容环境使用。"""
     spans = get_spans(chars, superscript_height_threshold, line_distance_threshold)
     lines = get_lines(spans)
     assign_scripts(lines, superscript_height_threshold, line_distance_threshold)

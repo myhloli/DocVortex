@@ -2,37 +2,213 @@
 
 use pyo3::exceptions::{PyException, PyMemoryError, PyValueError};
 use pyo3::prelude::*;
-use std::collections::HashMap;
-use std::ffi::{c_double, c_float, c_int, c_uint, c_ulong, c_void};
-
 pyo3::create_exception!(_native, PdfiumReadError, PyException);
 
-#[repr(C)]
-#[derive(Default)]
-struct RectF {
-    left: c_float,
-    top: c_float,
-    right: c_float,
-    bottom: c_float,
+use docvortex_core::extraction;
+use docvortex_pdfium::{Fonts, ReadError, Record};
+
+pub const RECORD_BATCH_SIZE: usize = 1024;
+
+/// 仅在最终边界构造点和端点索引，Python 复用同一点对象建立直线记录。
+#[pyfunction]
+pub fn read_pdfium_subpaths(
+    addresses: Vec<usize>,
+    handle: usize,
+) -> PyResult<Vec<(Vec<(f64, f64)>, Vec<(usize, usize)>, bool)>> {
+    // Python 适配器验证 ABI 并持有运行库、页面和锁，本次读取不释放 GIL。
+    let records =
+        unsafe { docvortex_pdfium::paths::read_subpaths(addresses, handle) }.map_err(|error| {
+            match error {
+                ReadError::InvalidInput(message) => PyValueError::new_err(message),
+                ReadError::Pdfium(message) => PdfiumReadError::new_err(message),
+                ReadError::Allocation(message) => PyMemoryError::new_err(message),
+            }
+        })?;
+    Ok(records
+        .into_iter()
+        .map(|item| (item.points, item.lines, item.closed))
+        .collect())
 }
 
-type Box4 = (f64, f64, f64, f64);
-type Point = (f64, f64);
-type Record = (
+type ObjectRecord = (
+    usize,
+    (f64, f64, f64, f64, f64, f64),
+    (f64, f64, f64, f64, f64, f64),
+    usize,
+    Option<(f64, f64, f64, f64)>,
+);
+
+/// 对象记录按固定批次物化，防止整页 Python 元组与最终路径证据同时驻留。
+#[pyclass(module = "docvortex._native")]
+pub struct PdfiumObjectBatches {
+    records: std::vec::IntoIter<docvortex_pdfium::objects::Object>,
+}
+
+#[pymethods]
+impl PdfiumObjectBatches {
+    /// 迭代纯数值；借用地址仍须由调用方在页面作用域内消费。
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
+    }
+
+    /// 每批最多生成 1024 条对象记录，不持有或释放 PDFium 资源。
+    fn __next__(&mut self) -> Option<Vec<ObjectRecord>> {
+        let records: Vec<_> = self
+            .records
+            .by_ref()
+            .take(RECORD_BATCH_SIZE)
+            .map(|(handle, matrix, parent, depth, clip)| {
+                (
+                    handle,
+                    matrix.into(),
+                    parent.into(),
+                    depth,
+                    clip.map(Into::into),
+                )
+            })
+            .collect();
+        if records.is_empty() {
+            None
+        } else {
+            Some(records)
+        }
+    }
+}
+
+/// 同步消费对象遍历；返回地址只能由持有页面的适配器立即使用。
+#[pyfunction]
+pub fn read_pdfium_objects(
+    addresses: Vec<usize>,
+    handle: usize,
+    kind: i32,
+    max_depth: usize,
+) -> PyResult<PdfiumObjectBatches> {
+    // ABI、运行库和页面由适配器保持存活，全程保留 GIL 与既有运行时锁。
+    let records =
+        unsafe { docvortex_pdfium::objects::read_objects(addresses, handle, kind, max_depth) }
+            .map_err(|error| match error {
+                ReadError::InvalidInput(message) => PyValueError::new_err(message),
+                ReadError::Pdfium(message) => PdfiumReadError::new_err(message),
+                ReadError::Allocation(message) => PyMemoryError::new_err(message),
+            })?;
+    Ok(PdfiumObjectBatches {
+        records: records.into_iter(),
+    })
+}
+
+type VisualRecord = (
     u32,
     f64,
-    Option<Box4>,
-    Option<Box4>,
     usize,
     f64,
     i32,
     usize,
     Option<i32>,
-    Option<Point>,
+    [f64; 4],
+    Option<(f64, f64, f64, f64)>,
+    Option<(f64, f64, f64, f64)>,
+    Option<(f64, f64)>,
 );
-type Fonts = Vec<(Vec<u8>, i32)>;
 
-pub const RECORD_BATCH_SIZE: usize = 1024;
+/// 原始字符保留在 Rust，每批直接生成最终坐标，省去 Python 几何重打包。
+#[pyclass(module = "docvortex._native")]
+pub struct PdfiumVisualCharacterBatches {
+    records: std::vec::IntoIter<Record>,
+    frame: [f64; 4],
+    rounded: [f64; 2],
+    angle: i32,
+    extended: bool,
+}
+
+#[pymethods]
+impl PdfiumVisualCharacterBatches {
+    /// 数值记录不依赖已关闭的 PDFium 页面，允许延后消费。
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
+    }
+
+    /// 在固定批次内融合坐标转换，原始几何不会先物化为 Python 元组。
+    fn __next__(&mut self, py: Python<'_>) -> Option<Vec<VisualRecord>> {
+        let chunk: Vec<_> = self.records.by_ref().take(RECORD_BATCH_SIZE).collect();
+        if chunk.is_empty() {
+            return None;
+        }
+        let (frame, rounded, angle, extended) =
+            (self.frame, self.rounded, self.angle, self.extended);
+        Some(py.detach(move || {
+            let rows = chunk
+                .iter()
+                .map(|record| {
+                    let selected = if record.1 == 0.0 { record.2 } else { record.3 };
+                    // 读取阶段已验证每个字符的选定框，缺失框在 FFI 返回前报错。
+                    (
+                        selected.expect("validated character box").into(),
+                        if extended {
+                            record.2.map(Into::into)
+                        } else {
+                            None
+                        },
+                        if extended {
+                            record.3.map(Into::into)
+                        } else {
+                            None
+                        },
+                        record.9.map(Into::into),
+                    )
+                })
+                .collect();
+            let visual = extraction::materialize(rows, frame, rounded, angle);
+            chunk
+                .into_iter()
+                .zip(visual)
+                .map(|(record, (layout, loose, tight, origin))| {
+                    (
+                        record.0,
+                        record.1,
+                        record.4,
+                        record.5,
+                        record.6,
+                        record.7,
+                        record.8,
+                        layout,
+                        loose.map(Into::into),
+                        tight.map(Into::into),
+                        origin.map(Into::into),
+                    )
+                })
+                .collect()
+        }))
+    }
+}
+
+/// 借用当前运行库同步读取；之后的坐标转换只依赖自有 Rust 数据。
+#[pyfunction]
+pub fn read_pdfium_visual_batches(
+    addresses: Vec<usize>,
+    handle: usize,
+    count: usize,
+    extended: bool,
+    frame: [f64; 4],
+    angle: i32,
+) -> PyResult<(PdfiumVisualCharacterBatches, Fonts)> {
+    if !frame.iter().all(|value| value.is_finite()) || ![0, 90, 180, 270].contains(&angle) {
+        return Err(PyValueError::new_err("invalid PDFium visual frame"));
+    }
+    let (records, fonts) = read_pdfium_data(addresses, handle, count, extended)?;
+    Ok((
+        PdfiumVisualCharacterBatches {
+            records: records.into_iter(),
+            frame,
+            rounded: [
+                (frame[2] - frame[0]).abs().ceil(),
+                (frame[3] - frame[1]).abs().ceil(),
+            ],
+            angle,
+            extended,
+        },
+        fonts,
+    ))
+}
 
 /// 持有本次读取的纯数值，逐批构造 Python 元组，避免整页临时对象与最终字符同时常驻。
 #[pyclass(module = "docvortex._native")]
@@ -90,137 +266,19 @@ pub fn read_pdfium_char_batches(
     ))
 }
 
-/// ABI 与地址由 Python 核验；两个入口始终持有 GIL，字体回调和外层 RLock 生命周期相同。
+/// 保留持锁和持有 GIL 的同步边界，将纯 Rust 错误转换为已有 Python 异常。
 fn read_pdfium_data(
     addresses: Vec<usize>,
     handle: usize,
     count: usize,
     extended: bool,
 ) -> PyResult<(Vec<Record>, Fonts)> {
-    if addresses.len() != 10 || addresses.contains(&0) || handle == 0 || count > c_int::MAX as usize
-    {
-        return Err(PyValueError::new_err("invalid PDFium bridge arguments"));
-    }
-    // 安全边界：仅接受适配器持有强引用的 ctypes 函数，使用当前平台 FPDF_CALLCONV 对应的 system ABI。
-    unsafe {
-        let unicode: unsafe extern "system" fn(*mut c_void, c_int) -> c_uint =
-            std::mem::transmute(addresses[0]);
-        let angle: unsafe extern "system" fn(*mut c_void, c_int) -> c_float =
-            std::mem::transmute(addresses[1]);
-        let loose_box: unsafe extern "system" fn(*mut c_void, c_int, *mut RectF) -> c_int =
-            std::mem::transmute(addresses[2]);
-        let tight_box: unsafe extern "system" fn(
-            *mut c_void,
-            c_int,
-            *mut c_double,
-            *mut c_double,
-            *mut c_double,
-            *mut c_double,
-        ) -> c_int = std::mem::transmute(addresses[3]);
-        let font_info: unsafe extern "system" fn(
-            *mut c_void,
-            c_int,
-            *mut c_void,
-            c_ulong,
-            *mut c_int,
-        ) -> c_ulong = std::mem::transmute(addresses[4]);
-        let font_size: unsafe extern "system" fn(*mut c_void, c_int) -> c_double =
-            std::mem::transmute(addresses[5]);
-        let font_weight: unsafe extern "system" fn(*mut c_void, c_int) -> c_int =
-            std::mem::transmute(addresses[6]);
-        let text_object: unsafe extern "system" fn(*mut c_void, c_int) -> *mut c_void =
-            std::mem::transmute(addresses[7]);
-        let render_mode: unsafe extern "system" fn(*mut c_void) -> c_int =
-            std::mem::transmute(addresses[8]);
-        let char_origin: unsafe extern "system" fn(
-            *mut c_void,
-            c_int,
-            *mut c_double,
-            *mut c_double,
-        ) -> c_int = std::mem::transmute(addresses[9]);
-        let page = handle as *mut c_void;
-        let mut records = Vec::with_capacity(count);
-        let mut fonts: Fonts = Vec::new();
-        let mut font_ids: HashMap<Vec<u8>, HashMap<i32, usize>> = HashMap::new();
-        let mut modes = HashMap::<usize, i32>::new();
-        let mut rect = RectF::default();
-        let (mut left, mut right, mut bottom, mut top) = (0.0, 0.0, 0.0, 0.0);
-        let (mut x, mut y) = (0.0, 0.0);
-        let mut font_buffer = [0u8; 256];
-        let mut flags = 0;
-        for index in 0..count {
-            let i = index as c_int;
-            let code = unicode(page, i);
-            let rotation = angle(page, i) as f64;
-            let loose = if (rotation == 0.0 || extended) && loose_box(page, i, &mut rect) != 0 {
-                Some((
-                    rect.left as f64,
-                    rect.bottom as f64,
-                    rect.right as f64,
-                    rect.top as f64,
-                ))
-            } else {
-                None
-            };
-            let tight = if (rotation != 0.0 || extended)
-                && tight_box(page, i, &mut left, &mut right, &mut bottom, &mut top) != 0
-            {
-                Some((left, bottom, right, top))
-            } else {
-                None
-            };
-            if (rotation == 0.0 && loose.is_none()) || (rotation != 0.0 && tight.is_none()) {
-                return Err(PdfiumReadError::new_err("Failed to get charbox."));
-            }
-            let length = font_info(page, i, font_buffer.as_mut_ptr().cast(), 256, &mut flags);
-            let mut long_buffer = Vec::new();
-            let bytes: &[u8] = if length > 256 {
-                long_buffer
-                    .try_reserve_exact(length as usize)
-                    .map_err(|_| PyMemoryError::new_err("PDFium font buffer allocation failed"))?;
-                long_buffer.resize(length as usize, 0u8);
-                font_info(page, i, long_buffer.as_mut_ptr().cast(), length, &mut flags);
-                long_buffer.as_slice()
-            } else if length > 0 {
-                &font_buffer
-            } else {
-                &[]
-            };
-            let name = &bytes[..bytes.iter().position(|b| *b == 0).unwrap_or(bytes.len())];
-            let font_flags = if length > 0 { flags } else { 0 };
-            let font_id =
-                if let Some(id) = font_ids.get(name).and_then(|items| items.get(&font_flags)) {
-                    *id
-                } else {
-                    let id = fonts.len();
-                    fonts.push((name.to_vec(), font_flags));
-                    font_ids
-                        .entry(name.to_vec())
-                        .or_default()
-                        .insert(font_flags, id);
-                    id
-                };
-            let size = font_size(page, i);
-            let weight = font_weight(page, i);
-            if code > 0x10ffff {
-                return Err(PyValueError::new_err("chr() arg not in range(0x110000)"));
-            }
-            let object = text_object(page, i);
-            let address = object as usize;
-            let mode = if object.is_null() {
-                None
-            } else {
-                Some(*modes.entry(address).or_insert_with(|| render_mode(object)))
-            };
-            let origin = if char_origin(page, i, &mut x, &mut y) != 0 {
-                Some((x, y))
-            } else {
-                None
-            };
-            records.push((
-                code, rotation, loose, tight, font_id, size, weight, address, mode, origin,
-            ));
-        }
-        Ok((records, fonts))
-    }
+    // 安全条件由现有 Python ABI 探测和 pdfium_guard 保证，调用期间不释放 GIL。
+    unsafe { docvortex_pdfium::read_characters(addresses, handle, count, extended) }.map_err(
+        |error| match error {
+            ReadError::InvalidInput(message) => PyValueError::new_err(message),
+            ReadError::Pdfium(message) => PdfiumReadError::new_err(message),
+            ReadError::Allocation(message) => PyMemoryError::new_err(message),
+        },
+    )
 }

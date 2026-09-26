@@ -78,9 +78,10 @@ def attach_visual_block_images_from_pdf(
     window_size: int = 64,
     timeout: int | None = None,
     threads: int | None = None,
+    session=None,
 ) -> None:
     """按当前 PDF 全部物理页的视觉块需求原地补图；页图由本函数释放，文档仍归调用方。"""
-    from .images import _load_visual_crops_from_pdf_bytes_range
+    from .images import _load_visual_crops_from_pdf_bytes_range, get_pdf_render_backend
     from .raster import estimate_page_image_bytes
 
     if isinstance(window_size, bool) or not isinstance(window_size, int) or window_size <= 0:
@@ -92,7 +93,10 @@ def attach_visual_block_images_from_pdf(
     image_bytes = {
         index: estimate_page_image_bytes(document.page_size(index)) for index, blocks in enumerate(prepared_visuals) if blocks
     }
-    for start, end in _visual_page_ranges(prepared_visuals, image_bytes, window_size=window_size):
+    ranges = _visual_page_ranges(prepared_visuals, image_bytes, window_size=window_size)
+    if ranges and session is None and get_pdf_render_backend() == "session":
+        session = document.get_render_session(threads=threads, timeout=timeout)
+    for start, end in ranges:
         crop_specs = [
             [(index, {key: block.get(key) for key in ("bbox", "angle", "type")}) for index, block in page]
             for page in prepared_visuals[start : end + 1]
@@ -104,6 +108,7 @@ def attach_visual_block_images_from_pdf(
             end_page_id=end,
             timeout=timeout,
             threads=threads,
+            **({"session": session} if session is not None else {}),
         )
         if len(crops) != end - start + 1:
             raise ValueError("PDF visual crop page count mismatch")

@@ -9,5 +9,6 @@ name = "_native"
 crate-type = ["cdylib"]
 
 [dependencies]
+docvortex-pdfium = { path = "../docvortex-pdfium" }
 docvortex-core = { path = "../docvortex-core" }
 pyo3 = { version = "=0.28.2", features = ["abi3-py310"] }

@@ -140,6 +140,9 @@ def test_batched_records_preserve_boundary_indices_and_legacy_reader(native, mon
             with monkeypatch.context() as context:
                 context.delattr(native, "read_pdfium_char_batches")
                 assert character_state(extract.get_chars(textpage, box, 0, include_geometry=True)) == expected
+                # 新融合入口独立使用有界批次；旧原始读取入口仍能退回完整列表。
+                records, _fonts = bridge.read_native_chars(textpage, True)
+                assert len(records) == textpage.count_chars()
                 assert bridge.bridge_info()["pdfium_record_batch_size"] is None
 
 

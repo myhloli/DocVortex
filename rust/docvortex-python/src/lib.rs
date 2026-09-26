@@ -6,16 +6,26 @@ use pyo3::prelude::*;
 
 mod conversion;
 mod dedup;
+mod fonts;
 mod geometry;
 mod pdfium;
 mod scripts;
 mod spatial;
 mod statistics;
+mod table_candidates;
 mod tables;
+mod text_pipeline;
 
 /// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<fonts::NativeFontProvider>()?;
+    module.add_class::<table_candidates::PreparedRuleCandidates>()?;
+    module.add_function(wrap_pyfunction!(text_pipeline::group_text_lines, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        text_pipeline::prepare_visual_lines,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(geometry::anchor_pairs, module)?)?;
     module.add_function(wrap_pyfunction!(spatial::title_gaps, module)?)?;
     module.add_function(wrap_pyfunction!(spatial::line_neighbors, module)?)?;
@@ -24,6 +34,14 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_chars, module)?)?;
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_char_batches, module)?)?;
     module.add_class::<pdfium::PdfiumCharacterBatches>()?;
+    module.add_class::<pdfium::PdfiumVisualCharacterBatches>()?;
+    module.add_class::<pdfium::PdfiumObjectBatches>()?;
+    module.add_function(wrap_pyfunction!(pdfium::read_pdfium_subpaths, module)?)?;
+    module.add_function(wrap_pyfunction!(pdfium::read_pdfium_objects, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        pdfium::read_pdfium_visual_batches,
+        module
+    )?)?;
     module.add("PDFIUM_RECORD_BATCH_SIZE", pdfium::RECORD_BATCH_SIZE)?;
     module.add(
         "PdfiumReadError",

@@ -7,6 +7,7 @@ from .snapshot import PDFPageSnapshot
 
 __all__ = [
     "PDFDocument",
+    "PDFRenderSession",
     "PDFPage",
     "PDFPageSnapshot",
     "PDFPageTextGeometry",
@@ -20,3 +21,12 @@ __all__ = [
     "PdfiumRuntimeInfo",
     "PdfiumFontError",
 ]
+
+
+def __getattr__(name: str):
+    """仅显式请求渲染会话时加载进程编排模块，保持文档导入边界。"""
+    if name == "PDFRenderSession":
+        from .render_session import PDFRenderSession
+
+        return PDFRenderSession
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

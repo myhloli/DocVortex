@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-_PROTOCOL_VERSION = 8
+_PROTOCOL_VERSION = 10
 _SELECTED_MODE = None
 _LOAD_FAILURE = None
 
@@ -42,6 +42,8 @@ def backend_info() -> dict[str, str | int | None]:
     native = get_native()
     path = getattr(native, "__file__", None)
     bridge = sys.modules.get("docvortex.document.pdf.text._pdfium_bridge")
+    objects = sys.modules.get("docvortex.document.pdf._object_bridge")
+    fonts = sys.modules.get("docvortex.document.pdf.font_runtime")
     return {
         "backend": "rust" if native is not None else "python",
         "protocol": getattr(native, "PROTOCOL_VERSION", None),
@@ -49,6 +51,16 @@ def backend_info() -> dict[str, str | int | None]:
         "extension_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest() if path else None,
         "requested_backend": _SELECTED_MODE,
         "unavailable_reason": _LOAD_FAILURE,
+        **(
+            fonts.native_font_runtime_info()
+            if fonts is not None
+            else {"native_font_provider_installed": False, "native_font_provider_unavailable_reason": "not probed"}
+        ),
+        **(
+            objects.bridge_info()
+            if objects is not None
+            else {"pdfium_object_bridge_calls": 0, "pdfium_object_bridge_unavailable_reason": "not probed"}
+        ),
         **(
             bridge.bridge_info()
             if bridge is not None

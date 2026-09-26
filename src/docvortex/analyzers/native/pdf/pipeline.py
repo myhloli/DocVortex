@@ -9,7 +9,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from ....document.pdf._document import PDFDocument as PDFDocument
-from ....document.pdf._document import PDFImageInfo, PDFPageTextGeometry, get_lines_from_chars
+from ....document.pdf._document import PDFImageInfo, PDFPageTextGeometry
 from ....schema import BBox
 from .._shared.xycut import sort_entries
 from ..contracts import NativePdfSource, RawBlock
@@ -97,7 +97,7 @@ from .models import (
     _PreparedPage,
 )
 from .native_text import (
-    _build_native_line_items,
+    _build_native_line_items_from_chars,
     _coerce_pdf_drawing_lines,
     _extract_decorative_text_rules,
     _median_native_glyph_width,
@@ -327,8 +327,8 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
         page_image_infos.append(snapshot.image_infos)
         text_geometry = snapshot.text_geometry
         chars = text_geometry.chars
-        lines = _build_native_line_items(
-            get_lines_from_chars(chars),
+        lines = _build_native_line_items_from_chars(
+            chars,
             page_size,
             page_rotation=snapshot.rotation,
         )

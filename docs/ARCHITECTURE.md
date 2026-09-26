@@ -10,6 +10,7 @@ batch computations and their Python bindings. They are built and released togeth
 | --- | --- |
 | `src/docvortex/` | Importable Python package and runtime resources |
 | `rust/docvortex-core/` | Python-independent numeric kernels and Rust contract tests |
+| `rust/docvortex-pdfium/` | Same-library PDFium ABI, object/path reading and synchronized font callbacks |
 | `rust/docvortex-python/` | PyO3 argument validation, conversion, bindings and PDFium bridge |
 | Root `pyproject.toml`, `setup.py`, `MANIFEST.in` | Python metadata, optional extension build and source distribution |
 | Root `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` | Shared Rust workspace, dependencies and compiler |
@@ -58,8 +59,9 @@ Python document/PDF algorithms
         -> Python-owned objects and parsing decisions
 ```
 
-Python retains Unicode/text interpretation, public objects, algorithmic decisions and
-reference implementations. The core crate does not access Python objects or PDFium.
+Python retains the public objects, top-level document pipeline and reference implementations.
+Rust also owns continuous text grouping/visual preparation/typography and prepared table-corridor computations.
+Unicode classifications are prepared using the active Python version before detached Rust computation. The core crate does not access Python objects or PDFium.
 Bindings validate transport records and preserve Python error and object-reuse
 semantics. Numeric work releases the GIL only at the existing explicit boundaries.
 
@@ -71,7 +73,7 @@ Subsequent numeric geometry conversion can release the GIL after reading finishe
 `DOCVORTEX_COMPUTE_BACKEND=python|rust|auto` selects the backend once per process.
 `python` never imports the extension; `rust` requires a compatible extension; `auto`
 falls back on a missing or incompatible extension. Computation errors propagate.
-The current private protocol is **6**. Rebuild an editable extension after changing
+The current private protocol is **10**. Rebuild an editable extension after changing
 native sources and restart processes that cached the backend. Module-only refactors
 preserve the protocol and all Python-visible registrations.
 

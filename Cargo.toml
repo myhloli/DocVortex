@@ -1,5 +1,5 @@
 [workspace]
-members = ["rust/docvortex-core", "rust/docvortex-python"]
+members = ["rust/docvortex-core", "rust/docvortex-pdfium", "rust/docvortex-python"]
 resolver = "2"
 
 [profile.release]

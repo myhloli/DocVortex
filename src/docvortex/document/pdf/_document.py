@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import math
 import time
+import threading
 from collections.abc import Sequence
 from contextlib import contextmanager
 from io import BytesIO
@@ -327,6 +328,8 @@ class PDFDocument:
         render_scale: float = DEFAULT_RENDER_SCALE,
         render_max_edge: int = DEFAULT_RENDER_MAX_EDGE,
     ) -> None:
+        self._render_session = None
+        self._render_session_lock = threading.Lock()
         self._classification: Literal["ocr", "txt"] | None = None
         self._snapshot_owner = object()
         self._page_snapshots: WeakValueDictionary[int, PDFPageSnapshot] = WeakValueDictionary()
@@ -426,12 +429,35 @@ class PDFDocument:
     #  Lifecycle
     # ------------------------------------------------------------------ #
 
+    def get_render_session(self, *, threads: int | None = None, timeout: float | None = None):
+        """惰性创建文档拥有的渲染会话，后续窗口返回同一实例。
+
+        ``threads`` 和默认 ``timeout`` 只在首次创建时生效；后续调用即使
+        传入不同值也不修改现有会话。单次任务期限可用 ``session.render``
+        的 ``timeout`` 参数覆盖。文档 ``close()`` 负责释放该会话。
+        """
+        from .render_session import PDFRenderSession
+
+        with self._render_session_lock:
+            if self._render_session is None:
+                self._render_session = PDFRenderSession(self._pdf_bytes, threads=threads, timeout=timeout)
+            return self._render_session
+
     def close(self) -> None:
-        """关闭原生文档；清理路径不触发字体初始化。"""
-        if self._pdf_doc_opened is not None:
-            with _pdfium_lock:
-                _try_close(self._pdf_doc_opened)
-                self._pdf_doc_opened = None
+        """关闭渲染租约和原生文档；清理路径不触发字体初始化。"""
+        try:
+            lock = getattr(self, "_render_session_lock", None)
+            if lock is not None:
+                with lock:
+                    session = self._render_session
+                    self._render_session = None
+                    if session is not None:
+                        _try_close(session)
+        finally:
+            if getattr(self, "_pdf_doc_opened", None) is not None:
+                with _pdfium_lock:
+                    _try_close(self._pdf_doc_opened)
+                    self._pdf_doc_opened = None
 
     def __enter__(self) -> "PDFDocument":
         return self
@@ -474,7 +500,7 @@ class PDFDocument:
 
     def page_size(self, page_idx: int) -> tuple[float, float]:
         """复用不可变源文档的页面尺寸，避免文本与图像阶段重复打开页面。"""
-        cached = self._page_sizes.get(page_idx)
+        cached = self._page_sizes.get(page_idx) if type(page_idx) is int else None
         if cached is not None:
             return cached
         with self._open_page(page_idx) as page:
@@ -490,7 +516,7 @@ class PDFDocument:
         height = abs(rect[1] - rect[3])
         # PDFium 文本与渲染坐标已经应用页面旋转，页面尺寸必须使用相同视觉方向。
         size = (height, width) if page_rotation in {90, 270} else (width, height)
-        if rotation_read:
+        if rotation_read and type(page_idx) is int:
             self._page_sizes[page_idx] = size
             self._page_rotations[page_idx] = page_rotation if page_rotation in {0, 90, 180, 270} else 0
         return size
@@ -498,7 +524,7 @@ class PDFDocument:
     def page_rotation(self, page_idx: int) -> Literal[0, 90, 180, 270]:
         """在线程锁保护下返回 PDF 页面字典声明的标准旋转角度。"""
 
-        cached = self._page_rotations.get(page_idx)
+        cached = self._page_rotations.get(page_idx) if type(page_idx) is int else None
         if cached is not None:
             return cached
         with self._open_page(page_idx) as page:
@@ -507,7 +533,8 @@ class PDFDocument:
             except Exception:
                 return 0
         rotation = rotation if rotation in {0, 90, 180, 270} else 0
-        self._page_rotations[page_idx] = rotation
+        if type(page_idx) is int:
+            self._page_rotations[page_idx] = rotation
         return rotation
 
     # ------------------------------------------------------------------ #

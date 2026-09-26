@@ -63,11 +63,10 @@ def prepare_text_evidence(
     snapshot: PDFPageSnapshot | None = None,
 ) -> PDFTextEvidence:
     """读取一次字符及注释，按既定组行闭包生成页面文字证据。"""
-    from ..document.pdf import get_lines_from_chars
     from .native.pdf.inline.detection import detect_pdf_text_link_lines, detect_pdf_text_style_lines
     from .native.pdf.inline.scripts import detect_pdf_text_script_lines
     from .native.pdf.line_merging import merge_text_line_clusters
-    from .native.pdf.native_text import _build_native_line_items
+    from .native.pdf.native_text import _build_native_line_items_from_chars
 
     if snapshot is not None:
         if geometry is not None or vector_geometry is not None:
@@ -78,8 +77,8 @@ def prepare_text_evidence(
     page_size = tuple(float(value) for value in (snapshot.page_size if snapshot is not None else page.size))
     # 源字符只读；组行使用独立累加框，旋转等变换在消费处创建局部字符副本。
     chars = geometry.chars
-    lines = _build_native_line_items(
-        get_lines_from_chars(chars),
+    lines = _build_native_line_items_from_chars(
+        chars,
         page_size,
         page_rotation=snapshot.rotation if snapshot is not None else page.rotation,
         supported_angles=supported_angles,

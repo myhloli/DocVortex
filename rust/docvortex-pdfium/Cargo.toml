@@ -1,0 +1,8 @@
+[package]
+name = "docvortex-pdfium"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+parking_lot = "0.12"
