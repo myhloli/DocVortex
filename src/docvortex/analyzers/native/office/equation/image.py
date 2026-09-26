@@ -306,9 +306,7 @@ def _gif_subblocks(
         cursor = end
 
 
-def _gif_mtef_candidates(
-    image_data: bytes, *, candidate_bytes_remaining: int | None = None
-) -> tuple[list[bytes], bool]:
+def _gif_mtef_candidates(image_data: bytes, *, candidate_bytes_remaining: int | None = None) -> tuple[list[bytes], bool]:
     """完整遍历 GIF 结构，并在剩余累计预算内提取 MathType/001 载荷。"""
 
     if candidate_bytes_remaining is None:
