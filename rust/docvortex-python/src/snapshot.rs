@@ -734,6 +734,13 @@ impl NativeTextSnapshot {
         SPAN_CONTENT_CALLS.fetch_add(1, Ordering::Relaxed);
         Ok(Some(output))
     }
+    /// 为新鲜同源页面证据准备独立上下标记录，后续批次只传整数成员索引。
+    fn prepare_script_evidence(
+        &self,
+        flags: &Bound<'_, PyAny>,
+    ) -> PyResult<Option<super::script_snapshot::NativeScriptEvidence>> {
+        super::script_snapshot::prepare(&self.data, flags)
+    }
     /// 报告实际所有权和策略，区分 Flash 可见文本与公开页面原始文本视图。
     fn info(&self) -> (usize, usize, bool, bool) {
         (

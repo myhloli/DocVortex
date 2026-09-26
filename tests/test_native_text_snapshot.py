@@ -365,3 +365,54 @@ def test_owned_probe_does_not_materialize_reference_on_unsupported_metadata(nati
     ):
         assert document[0].get_text_snapshot() is None
         assert not document._owned_text_snapshots
+
+
+def test_owned_script_indices_match_plain_batches(native):
+    """关闭文档后以重复、乱序及分段索引对照原列式上下标入口，边界非法必须报错。"""
+    from docvortex.analyzers.native.pdf.inline import scripts
+    from docvortex.analyzers.native.pdf._script_geometry import _coerce_finite_bbox
+    import random
+
+    with PDFDocument(_pdf()) as document:
+        owner = document[0].get_text_snapshot()
+    geometry = owner.materialize_geometry()
+    prepared = owner.prepare_script_evidence(scripts._native_text_flags)
+    assert prepared is not None
+    before = native.script_snapshot_stats()
+    randomizer = random.Random(572)
+    for _ in range(24):
+        indices = [randomizer.randrange(len(geometry.chars)) for _ in range(25)]
+        chars = [geometry.chars[index] for index in indices]
+        packed = scripts._pack_plain_script_input(chars, geometry.tight_bboxes, geometry.origins)
+        offsets = [0, 6, 12, 25]
+        expected = native.script_roles_plain_batch(*packed, offsets, _coerce_finite_bbox)
+        assert prepared.classify_indices(indices, offsets) == expected
+    assert native.script_snapshot_stats() == before + 24
+    for indices, offsets in [([len(geometry.chars)], [0, 1]), ([0], [0, 0, 1]), ([0], [0, 2])]:
+        with pytest.raises(ValueError, match="indices or offsets"):
+            prepared.classify_indices(indices, offsets)
+
+
+def test_owned_script_copied_members_use_reference(native):
+    """行几何修复形成的字符副本不能凭相同 char_idx 复用旧快照；原成员仍按索引计算。"""
+    from copy import deepcopy
+    from docvortex.analyzers.native.pdf.inline import scripts
+    from docvortex.analyzers.native.pdf.native_text import _build_native_line_items_from_records
+
+    with PDFDocument(_pdf()) as document:
+        owner = document[0].get_text_snapshot()
+        size = document[0].size
+    geometry, records = owner.prepare_visual_evidence(size, 0, [0.0])
+    lines = _build_native_line_items_from_records(records, size)
+    owned = scripts._prepare_owned_script_evidence(owner, geometry.chars)
+    lines[0].chars = deepcopy(lines[0].chars)
+    lines[0].chars[0]["bbox"].bbox[1] -= 3.0
+    expected = scripts.detect_pdf_text_script_lines(
+        lines, size, geometry.tight_bboxes, geometry.origins, all_chars=geometry.chars
+    )
+    before = native.script_snapshot_stats()
+    actual = scripts.detect_pdf_text_script_lines(
+        lines, size, geometry.tight_bboxes, geometry.origins, all_chars=geometry.chars, _owned_inputs=owned
+    )
+    assert pickle.dumps(actual) == pickle.dumps(expected)
+    assert native.script_snapshot_stats() > before

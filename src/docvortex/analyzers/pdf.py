@@ -70,6 +70,7 @@ def prepare_text_evidence(
     from .native.pdf.native_text import _build_native_line_items_from_chars, _build_native_line_items_from_records
 
     native_records = None
+    native_owner = None
     if snapshot is not None:
         if geometry is not None or vector_geometry is not None:
             raise ValueError("snapshot cannot be combined with explicit geometry")
@@ -83,7 +84,8 @@ def prepare_text_evidence(
             )
         )
         if snapshot._native_text is not None and ordinary_angles:
-            geometry, native_records = snapshot._native_text.prepare_visual_evidence(
+            native_owner = snapshot._native_text
+            geometry, native_records = native_owner.prepare_visual_evidence(
                 snapshot.page_size, snapshot.rotation, supported_angles
             )
         else:
@@ -108,6 +110,12 @@ def prepare_text_evidence(
         lines, snapshot.link_annotations if snapshot is not None else page.get_link_annotations()
     )
     script_lines = merge_text_line_clusters(list(lines), page_size, list(table_regions))
+    # 仅本调用新鲜物化且未暴露给调用方的字符可按身份复用；旋转或修复副本不会命中。
+    owned_scripts = None
+    if native_owner is not None:
+        from .native.pdf.inline.scripts import _prepare_owned_script_evidence
+
+        owned_scripts = _prepare_owned_script_evidence(native_owner, chars)
     scripts = detect_pdf_text_script_lines(
         script_lines,
         page_size,
@@ -115,6 +123,7 @@ def prepare_text_evidence(
         geometry.origins,
         all_chars=chars,
         drawing_lines=drawing_lines,
+        _owned_inputs=owned_scripts,
     )
     if excluded_script_regions:
         scripts = [
