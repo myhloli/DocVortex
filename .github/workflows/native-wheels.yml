@@ -19,6 +19,10 @@ on:
 permissions:
   contents: read
 
+# 完整语料包含中文文件名；Windows 重定向日志也必须使用 UTF-8。
+env:
+  PYTHONUTF8: '1'
+
 concurrency:
   group: native-wheels-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
