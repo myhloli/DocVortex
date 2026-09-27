@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ._native_table_merge import _NativeCoreLineSet
+
 from bisect import bisect_left, bisect_right
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -595,7 +597,8 @@ def _collect_footnote_rows(
     output: list[_VisualRow] = []
     bottom = rule_bbox[3]
     note_chain_started = False
-    selected_line_indices = set(core_line_indices)
+    owned_selection = isinstance(core_line_indices, _NativeCoreLineSet)
+    selected_line_indices = core_line_indices.copy() if owned_selection else set(core_line_indices)
     core_lines = (
         None
         if prepared_core is not None and prepared_core[0].marker_safe
@@ -621,7 +624,7 @@ def _collect_footnote_rows(
         if clipped_row.bbox[3] <= bottom:
             continue
         line_indices = prepared_row.line_indices
-        if line_indices.issubset(selected_line_indices):
+        if selected_line_indices.issuperset(line_indices) if owned_selection else line_indices.issubset(selected_line_indices):
             bottom = max(bottom, clipped_row.bbox[3])
             continue
         row_gap = max(0.0, clipped_row.bbox[1] - bottom)

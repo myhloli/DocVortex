@@ -72,6 +72,9 @@ def test_native_registration_contract(native):
         "visual_runs": "(raw, overrides, flags, size, angle, fallback)",
     }
     classes = {
+        "OwnedRuleCore": ("docvortex._native", None),
+        "NativeTableGrid": ("docvortex._native", "(grids, rows, size, angle, height)"),
+        "NativeTableMerger": ("docvortex._native", "()"),
         "NativeStyleDocument": ("docvortex._native", "(with_samples=False)"),
         "NativeGeometryRisk": ("docvortex._native", "()"),
         "NativeTextSnapshot": ("docvortex._native", None),
@@ -93,7 +96,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 19, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 20, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)

@@ -21,6 +21,24 @@ impl PreparedRuleCandidates {
             .map(|state| Self { state })
             .map_err(PyValueError::new_err)
     }
+    /// 保留核心成员于 Rust，不为候选注释和合并提前创建 Python 集合。
+    fn owned_core(
+        &self,
+        py: Python<'_>,
+        start: usize,
+        end: usize,
+        rules: Vec<[f64; 4]>,
+    ) -> PyResult<(super::table_merge::OwnedRuleCore, [usize; 4])> {
+        let (members, sources) = py
+            .detach(|| self.state.core(start, end, &rules))
+            .map_err(PyValueError::new_err)?;
+        Ok((
+            super::table_merge::OwnedRuleCore {
+                members: std::sync::Arc::new(members.into_iter().collect()),
+            },
+            sources,
+        ))
+    }
     /// 一个原生调用同时完成闭区间分配与首区间表头例外判定。
     fn partition(
         &self,

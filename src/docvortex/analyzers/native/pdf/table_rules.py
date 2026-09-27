@@ -1183,7 +1183,7 @@ def _prepared_rule_candidate_query(index, rows, prepared_core=None):
     return (index, *interval) if interval is not None and interval[0] < interval[1] else None
 
 
-def _prepared_rule_candidate_core(prepared, rules):
+def _prepared_rule_candidate_core(prepared, rules, *, owned=False):
     """原生一次归并核心成员与坐标来源，Python 保留原坐标身份及集合契约。"""
     if prepared is None or not rules:
         return None
@@ -1196,11 +1196,15 @@ def _prepared_rule_candidate_core(prepared, rules):
     ):
         return None
     index, start, end = prepared
-    members, sources = index.native.core(start, end, boxes)
+    members, sources = (index.native.owned_core if owned else index.native.core)(start, end, boxes)
     bbox = tuple(
         (boxes[source] if source < len(boxes) else index.rows[source - len(boxes)].bbox)[axis]
         for axis, source in enumerate(sources)
     )
+    if owned:
+        from ._native_table_merge import _NativeCoreLineSet
+
+        return _NativeCoreLineSet(members), bbox
     return {member for member in members}, bbox
 
 
@@ -1705,11 +1709,19 @@ def _expand_rule_table_candidate(
     prepared_core: Any = None,
     prepared_annotation_geometry: Any = None,
     prepared_candidate: Any = None,
+    *,
+    owned: bool = False,
 ) -> _TableCandidate:
     """合并横线核心与上下注释，并保留注释的独立行身份。"""
 
     rule_bbox = _bbox_union_many([line.bbox for line in rule_group])
-    native_core = _prepared_rule_candidate_core(prepared_candidate, rule_group)
+    native_core = (
+        _prepared_rule_candidate_core(prepared_candidate, rule_group, owned=True)
+        if owned
+        else _prepared_rule_candidate_core(prepared_candidate, rule_group)
+    )
+    if owned and native_core is None:
+        raise ValueError("owned candidate requires a prepared core")
     core_line_indices = (
         native_core[0] if native_core is not None else {fragment.line_index for row in core_rows for fragment in row.fragments}
     )
@@ -1771,6 +1783,14 @@ def _expand_rule_table_candidate(
     else:
         included_rows = [*caption_rows, *core_rows, *footnote_rows]
         local_bbox = _bbox_union(core_local_bbox, _bbox_union_many([row.bbox for row in included_rows]))
+    if owned:
+        return (
+            _rotate_bbox_from_upright(local_bbox, page_size, angle),
+            local_bbox,
+            _rotate_bbox_from_upright(core_local_bbox, page_size, angle),
+            core_line_indices,
+            annotations,
+        )
     return _TableCandidate(
         bbox=_rotate_bbox_from_upright(local_bbox, page_size, angle),
         local_bbox=local_bbox,
@@ -2017,3 +2037,36 @@ def _median_fragment_height(fragments: list[_Fragment]) -> float:
         if fragment.local_bbox[3] > fragment.local_bbox[1]
     ]
     return max(0.1, float(statistics.median(heights)) if heights else 1.0)
+
+
+def _merge_owned_table_candidates(candidates):
+    """检测器独占候选先走自有原生流，特殊输入保持原有可变对象参考语义。"""
+    from ._native_table_merge import merge_owned
+
+    result = merge_owned(candidates)
+    return _merge_table_candidates(candidates) if result is None else result
+
+
+_NATIVE_DRAFT_MATERIALIZE = _RuleCandidateDraft.materialize
+_NATIVE_MERGE_RULES = {
+    function.__name__: function
+    for function in (
+        _merge_table_candidates,
+        _expand_rule_table_candidate,
+        _build_table_annotation,
+        _collect_footnote_rows,
+        _collect_caption_rows,
+        _merge_table_candidate_annotations,
+        _expand_candidates_to_connected_rule_grids,
+        _prepared_rule_candidate_core,
+        _bbox_area,
+        _bbox_axis_overlap_ratio,
+        _bbox_overlap_in_smaller,
+        _bbox_union,
+        _rotate_bbox_from_upright,
+        _rotate_bbox_to_upright,
+        _point_in_bbox,
+        _bbox_center_x,
+        _bbox_center_y,
+    )
+}
