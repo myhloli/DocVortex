@@ -13,7 +13,7 @@
 
 [English](https://github.com/myhloli/DocVortex/blob/main/README.md) · **简体中文**
 
-[快速开始](#快速开始) · [格式支持](#格式支持) · [文档导航](#文档导航)
+[性能提升](#pdf-性能) · [快速开始](#快速开始) · [格式支持](#格式支持) · [文档导航](#文档导航)
 
 </div>
 
@@ -31,6 +31,18 @@ DocVortex 是一个独立的 Python 文档解析与转换引擎。
 原生解析无需 OCR 或 VLM 推理服务。您可通过 CLI 或 Python SDK 便捷的使用 DocVortex。
 
 ![DocVortex 转换流程：原生文档经过统一中间表示，导出为 Markdown、HTML、LaTeX、DOCX、EPUB、PDF 或结构化 JSON。](https://gcore.jsdelivr.net/gh/myhloli/DocVortex@main/docs/images/docvortex-overview.jpg)
+
+## PDF 性能
+
+**0.5 系列通过 Rust 加速大幅提升 PDF 处理性能，在所测语料上，公开解析速度达到 0.4.25 的 2.76 倍。**
+
+| 处理链路 | 0.4.25 | 0.5.2（Rust＋session） | 加速倍数 | 耗时降低 | 峰值 RSS 降低 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| DocVortex 公开 `parse()` | 42.36 s | 15.35 s | **2.76×** | **63.77%** | **33.45%** |
+| MinerU Flash | 44.50 s | 15.78 s | **2.82×** | **64.53%** | **32.78%** |
+| MinerU 共享 PDF 处理 | 76.28 s | 14.91 s | **5.12×** | **80.45%** | **36.25%** |
+
+同机热运行对比，覆盖 32 份 PDF／299 页（Flash 为 31 份），耗时为逐文档中位数之和；RSS 降幅为逐文档进程树峰值 RSS 降幅的中位数。MinerU 数据包含双仓优化收益；共享路径不含模型计算，剔除极端密集表格样本后仍为 **2.46×**。
 
 ## 快速开始
 

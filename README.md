@@ -13,7 +13,7 @@
 
 **English** · [简体中文](https://github.com/myhloli/DocVortex/blob/main/README_zh-CN.md)
 
-[Quick start](#quick-start) · [Formats](#supported-formats) · [Documentation](#documentation)
+[Performance](#pdf-performance) · [Quick start](#quick-start) · [Formats](#supported-formats) · [Documentation](#documentation)
 
 </div>
 
@@ -31,6 +31,18 @@ then exports the result in the formats your workflow needs.
 Native parsing works without an OCR or VLM inference service. Use DocVortex directly through its CLI or Python SDK.
 
 ![DocVortex pipeline: native documents become a unified representation, then Markdown, HTML, LaTeX, DOCX, EPUB, PDF or structured JSON.](https://gcore.jsdelivr.net/gh/myhloli/DocVortex@main/docs/images/docvortex-overview.jpg)
+
+## PDF performance
+
+**The 0.5 series brings a major boost to PDF processing with Rust acceleration: public parsing is 2.76× as fast as 0.4.25 on the tested corpus.**
+
+| Pipeline | 0.4.25 | 0.5.2 (Rust + session) | Speedup | Time reduction | Peak RSS reduction |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| DocVortex public `parse()` | 42.36 s | 15.35 s | **2.76×** | **63.77%** | **33.45%** |
+| MinerU Flash | 44.50 s | 15.78 s | **2.82×** | **64.53%** | **32.78%** |
+| MinerU shared PDF processing | 76.28 s | 14.91 s | **5.12×** | **80.45%** | **36.25%** |
+
+Same-machine warm-run comparison on 32 PDFs / 299 pages (31 PDFs for Flash); times are sums of per-document medians. RSS reductions are medians of per-document process-tree peak RSS reductions. MinerU results include improvements in both projects. The shared pipeline excludes model computation; excluding the extreme dense-table sample, its speedup is **2.46×**.
 
 ## Quick start
 
