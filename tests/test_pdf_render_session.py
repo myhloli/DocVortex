@@ -537,3 +537,32 @@ def test_parallel_session_preserves_order_pixels_and_crop_budget(monkeypatch):
         for item in [*expected, *actual]:
             item["img_pil"].close()
         shutdown_pdf_render_sessions()
+
+
+def test_owned_bitmap_survives_pdfium_close_without_pil(session_pdf, monkeypatch):
+    """直接取图不经过 PIL，位图及文档关闭后独立字节仍可裁剪编码。"""
+    import pypdfium2 as pdfium
+    from docvortex._compute_backend import get_native
+    from docvortex.document.pdf.pdfium import pdfium_guard
+    from docvortex.document.pdf.raster import page_to_owned_bitmap
+    from docvortex.document.pdf.visuals import _attach_owned_bitmap_crops
+
+    native = get_native()
+    if native is None:
+        pytest.skip("Python reference backend")
+
+    def forbidden_pil(*args, **kwargs):
+        """新直裁路径若物化整页 PIL，立即使测试失败。"""
+        raise AssertionError("unexpected full-page PIL materialization")
+
+    monkeypatch.setattr(pdfium.PdfBitmap, "to_pil", forbidden_pil)
+    with pdfium_guard():
+        with pdfium.PdfDocument(session_pdf) as document:
+            page = document[0]
+            try:
+                bitmap = page_to_owned_bitmap(page)
+            finally:
+                page.close()
+    blocks = [(0, {"bbox": [0.1, 0.1, 0.8, 0.9], "angle": 270})]
+    _attach_owned_bitmap_crops(blocks, bitmap, native, 0)
+    assert blocks[0][1]["image_base64"].startswith("data:image/jpeg;base64,")

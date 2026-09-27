@@ -221,3 +221,33 @@ def _collapse_image_blocks(
             retained_blocks.append(block)
 
     page_model_list[:] = retained_blocks
+
+
+def _attach_owned_bitmap_crops(visual_blocks, bitmap, native, page_index):
+    """直接裁剪独立位图，复用原框归一化与 JPEG 编码；原生计算错误明确传播。"""
+    import base64
+    import cv2
+
+    from ...foundation._geometry import normalize_to_int_bbox
+
+    data, width, height, stride, mode = bitmap
+    for block_idx, block in visual_blocks:
+        try:
+            pixel_bbox = _bbox_to_pixel_bbox(block.get("bbox"), (width, height))
+            bbox = normalize_to_int_bbox(pixel_bbox, image_size=(height, width))
+            if bbox is None:
+                raise ValueError("invalid bbox")
+            angle = _normalize_visual_block_angle(block.get("angle", 0))
+        except Exception as exc:
+            logger.warning(f"Skipping invalid model visual block crop: page={page_index}, block={block_idx}, error={exc}")
+            continue
+        # 计算异常不能被无效输入的兼容跳过逻辑吞掉，也不能静默切回 Python。
+        pixels, crop_width, crop_height = native.crop_bitmap_bgr(data, width, height, stride, mode, bbox, angle)
+        crop_bgr = np.frombuffer(pixels, dtype=np.uint8).reshape(crop_height, crop_width, 3)
+        try:
+            success, encoded = cv2.imencode(".jpg", crop_bgr)
+            if not success:
+                raise ValueError("JPEG encoding failure")
+            block["image_base64"] = f"data:image/jpeg;base64,{base64.b64encode(encoded.tobytes()).decode('ascii')}"
+        except Exception as exc:
+            logger.warning(f"Skipping invalid model visual block crop: page={page_index}, block={block_idx}, error={exc}")

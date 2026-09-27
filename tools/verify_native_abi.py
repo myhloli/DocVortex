@@ -17,7 +17,8 @@ def verify_binary(binary: Path) -> None:
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
     assert native.NativeTableMerger().finish() == []
-    assert native.PROTOCOL_VERSION == 20
+    assert native.crop_bitmap_bgr(bytes([1, 2, 3]), 1, 1, 3, "RGB", (0, 0, 1, 1), 0) == (bytes([3, 2, 1]), 1, 1)
+    assert native.PROTOCOL_VERSION == 21
     assert native.source_rows_plain([], (100.0, 100.0), 0) == []
     assert native.script_roles_raw_batch(
         [(0.0, 0.0, 5.0, 10.0), (0.0, 0.0, 5.0, 10.0)],

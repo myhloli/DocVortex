@@ -70,3 +70,15 @@ def page_to_image(
 
 
 __all__ = ["page_to_image"]
+
+
+def page_to_owned_bitmap(page: PdfPage, dpi: int = DEFAULT_PDF_IMAGE_DPI):
+    """一次复制 PDFium 位图到不可变字节，关闭句柄后供 Rust 安全裁剪和旋转。"""
+    with pdfium_guard():
+        bitmap = None
+        try:
+            bitmap, _ = _render_page_bitmap(page, dpi, DEFAULT_MAX_RENDER_EDGE)
+            return bytes(bitmap.buffer), bitmap.width, bitmap.height, bitmap.stride, bitmap.mode
+        finally:
+            if bitmap is not None:
+                bitmap.close()

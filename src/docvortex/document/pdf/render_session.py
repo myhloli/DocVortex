@@ -132,12 +132,14 @@ def _render_session_worker(connection):
     """串行处理定向协议，文档与文件读取器持续到显式关闭或连接断开。"""
     from .images import _initialize_pdf_render_worker, pdf_page_to_image
     from .pdfium import close_pdfium_child, pdfium_guard
-    from .raster import page_to_pixel_file
-    from .visuals import _attach_prepared_visual_block_images
+    from ..._compute_backend import get_native
+    from .raster import page_to_pixel_file, page_to_owned_bitmap
+    from .visuals import _attach_prepared_visual_block_images, _attach_owned_bitmap_crops
 
     document = input_document = None
     try:
         _initialize_pdf_render_worker()
+        native = get_native()
         while True:
             message = connection.recv()
             request_id, operation, payload = message
@@ -171,7 +173,16 @@ def _render_session_worker(connection):
                                 if crops is None and image_type == "pil_img":
                                     result.append(page_to_pixel_file(page, output_path, dpi))
                                     continue
-                                item = pdf_page_to_image(page, dpi, image_type)
+                                if crops is not None and native is not None:
+                                    bitmap = page_to_owned_bitmap(page, dpi)
+                                else:
+                                    bitmap = None
+                                    item = pdf_page_to_image(page, dpi, image_type)
+                            if bitmap is not None:
+                                _attach_owned_bitmap_crops(crops, bitmap, native, page_id)
+                                result.append([(index, block.get("image_base64")) for index, block in crops])
+                                del bitmap
+                                continue
                             image = item.get("img_pil")
                             if crops is not None:
                                 _attach_prepared_visual_block_images([crops], [item], page_id)
