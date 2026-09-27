@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-_PROTOCOL_VERSION = 15
+_PROTOCOL_VERSION = 16
 _SELECTED_MODE = None
 _LOAD_FAILURE = None
 
@@ -45,10 +45,17 @@ def backend_info() -> dict[str, str | int | None]:
     objects = sys.modules.get("docvortex.document.pdf._object_bridge")
     fonts = sys.modules.get("docvortex.document.pdf.font_runtime")
     snapshots = sys.modules.get("docvortex.document.pdf.snapshot_bridge")
+    classification = sys.modules.get("docvortex.document.pdf.classification_bridge")
     snapshot_stats = getattr(native, "text_snapshot_stats", None)
     span_calls, span_unsupported, span_contents = snapshot_stats() if snapshot_stats is not None else (0, 0, 0)
     return {
         "native_span_content_calls": span_contents,
+        **(
+            classification.classification_bridge_info()
+            if classification is not None
+            else {"native_classification_unavailable_reason": "not probed"}
+        ),
+        "native_classification_snapshot_calls": native.classification_snapshot_stats() if native is not None else 0,
         "native_script_snapshot_batches": native.script_snapshot_stats() if native is not None else 0,
         "native_span_assignment_calls": span_calls,
         "native_span_assignment_unsupported": span_unsupported,

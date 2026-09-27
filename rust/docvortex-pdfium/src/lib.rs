@@ -1,6 +1,7 @@
 //! 同库 PDFium ABI 适配；不依赖 Python，不加载第二份运行库。
 use std::collections::HashMap;
 use std::ffi::{c_double, c_float, c_int, c_uint, c_ulong, c_void};
+pub mod classification;
 pub mod fonts;
 pub mod objects;
 pub mod paths;

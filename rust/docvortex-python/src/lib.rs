@@ -4,6 +4,7 @@
 
 use pyo3::prelude::*;
 
+mod classification;
 mod conversion;
 mod dedup;
 mod fonts;
@@ -22,6 +23,15 @@ mod text_pipeline;
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<snapshot::NativeTextSnapshot>()?;
+    module.add_class::<classification::NativeClassificationSnapshot>()?;
+    module.add_function(wrap_pyfunction!(
+        classification::read_pdfium_classification,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        classification::classification_snapshot_stats,
+        module
+    )?)?;
     module.add_class::<script_snapshot::NativeScriptEvidence>()?;
     module.add_function(wrap_pyfunction!(
         script_snapshot::script_snapshot_stats,

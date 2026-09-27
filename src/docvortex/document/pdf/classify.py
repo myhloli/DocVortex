@@ -13,6 +13,7 @@ from pypdf import PdfReader
 from pypdf.generic import ContentStream
 
 from .pdfium import PdfiumFontError, close_pdfium_child, pdfium_guard
+from .classification_bridge import NativeClassificationError
 
 MAX_SAMPLE_PAGES = 10
 CHARS_THRESHOLD = 50
@@ -216,7 +217,7 @@ def classify(pdf_doc: pdfium.PdfDocument, pdf_bytes: bytes) -> str:
             if get_high_image_coverage_ratio_pdfium(pdf_doc, page_indices) >= HIGH_IMAGE_COVERAGE_THRESHOLD:
                 return "ocr"
 
-    except PdfiumFontError:
+    except (PdfiumFontError, NativeClassificationError):
         raise
     except Exception as e:
         logger.error(f"Failed to classify PDF: {e}")
@@ -286,6 +287,33 @@ def _collect_pdfium_text_sample_from_page(page_index: int, page: Any) -> dict[st
         text_page = page.get_textpage()
         text = text_page.get_text_bounded()
         char_count = text_page.count_chars()
+        # 分类消费去重前原始字符，不用 canonical 字符数或字体名解码替代旧统计。
+        from .classification_bridge import read_classification_snapshot
+
+        functions = (_is_disallowed_control_unicode, _is_cjk_unicode_code, _get_pdfium_char_font_name, _normalize_pdf_font_name)
+        if all(value is original for value, original in zip(functions, _STANDARD_CLASSIFICATION_FUNCTIONS)):
+            try:
+                snapshot = read_classification_snapshot(
+                    text_page,
+                    char_count,
+                    CJK_TEXT_RANGES,
+                    _ALLOWED_CONTROL_CODES,
+                    (_PRIVATE_USE_AREA_START, _PRIVATE_USE_AREA_END),
+                    _normalize_pdf_font_name,
+                )
+                fields = snapshot.to_dict() if snapshot is not None else None
+            except PdfiumFontError:
+                raise
+            except Exception as exc:
+                raise NativeClassificationError("Native PDF classification statistics failed") from exc
+            if fields is not None:
+                return {
+                    "page_index": page_index,
+                    "text": text,
+                    "cleaned_text": re.sub(r"\s+", "", text),
+                    "char_count": char_count,
+                    **fields,
+                }
         null_char_count = 0
         replacement_char_count = 0
         control_char_count = 0
@@ -1136,3 +1164,11 @@ if __name__ == "__main__":
         p_bytes = f.read()
         pdf_doc = PDFDocument(p_bytes)
         logger.info(f"PDF classify result: {pdf_doc.classify()}")
+
+# 自定义统计规则保留原调用次序与异常语义，不由内核悄然覆盖。
+_STANDARD_CLASSIFICATION_FUNCTIONS = (
+    _is_disallowed_control_unicode,
+    _is_cjk_unicode_code,
+    _get_pdfium_char_font_name,
+    _normalize_pdf_font_name,
+)
