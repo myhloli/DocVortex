@@ -8,6 +8,8 @@
 
 [![PyPI](https://img.shields.io/pypi/v/docvortex?color=008cff)](https://pypi.org/project/docvortex/)
 [![Python](https://img.shields.io/pypi/pyversions/docvortex)](https://pypi.org/project/docvortex/)
+[![Downloads](https://static.pepy.tech/badge/docvortex)](https://pepy.tech/project/docvortex)
+[![Monthly Downloads](https://static.pepy.tech/badge/docvortex/month)](https://pepy.tech/project/docvortex)
 [![CI](https://github.com/myhloli/DocVortex/actions/workflows/ci.yml/badge.svg)](https://github.com/myhloli/DocVortex/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/myhloli/DocVortex/blob/main/LICENSE.md)
 
