@@ -6,13 +6,15 @@
 
 协议 15 的三链路热运行和 medium 冷启动已完成，详见 `rust-pdf-stage9-inline.md`。协议 16 已将分类原始统计迁入 Rust，299 页字段与字典顺序一致，32 份真实共享回放一致，完整测试 5165 passed / 1 skipped。整页渲染已采用较低的 worker 页数门槛，仍最多使用原有 3 进程预算，裁图调度不变；最终全量性能结果以第 11 批报告为准。
 
+协议 17（`a35a6f4`）继续将全文风险筛查与完整 run 统计迁入 Rust，32 份完整几何计划及公开输出一致，5171 项完整测试、实际双 wheel 安装及跨平台 CI 通过。性能与边界详见 [阶段 12 报告](rust-pdf-stage12-geometry.md)。
+
 这些是阶段结果。PDFium 文档/页面的完整 Rust 生命周期、矢量快照、Flash 全流程和旧后端退出尚未全部完成。
 
 ## 1. 整体迁移全文几何计划
 
 依据独立低干扰阶段计时，demo1 / 中文论文2 的 `build_document_geometry_plan()` 占公开解析约 27%；详细函数 profiler 仅用于定位调用，不将其放大的时间占比当作正式收益。
 
-优先迁移 `src/docvortex/analyzers/native/pdf/char_geometry.py` 的完整闭包：风险筛查、字符样本、run 统计、跨页样式异常、X 修复、Y 聚类/邻行/修复及诊断构造。Rust 内持有文档级样本和 run，不能每个子阶段重新转换字符字典。原始页与行来源 ID、stable tie、字段更新顺序和全文先后依赖必须保留。
+风险筛查和 run 统计已完成阶段迁移；下一步把 `src/docvortex/analyzers/native/pdf/char_geometry.py` 的字符样本、跨页样式异常、X 修复、Y 聚类/邻行/修复及诊断构造接入同一 Rust 文档数据。Rust 内持有文档级样本和 run，不能每个子阶段重新转换字符字典。原始页与行来源 ID、stable tie、字段更新顺序和全文先后依赖必须保留。
 
 需特别验证：线性插值分位数（该模块不是相邻取样分位数）、CPython 版本对应的浮点求和、字体族/Unicode 类别、source 与 loose side-map 的不同来源、稀疏相邻字符修复、跨页样式触发、split shadow、旋转及诊断顺序。配置或自定义输入不支持时明确选择参考路径，计算失败必须抛出。
 
