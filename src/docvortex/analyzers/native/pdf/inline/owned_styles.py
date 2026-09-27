@@ -12,8 +12,11 @@ from . import detection as reference
 def _snapshot_text_properties(text):
     """每个 Unicode 文本值只计算一次宿主解释器的匹配、可见和项目符号属性。"""
     fragment = reference._normalize_match_fragment(text)
-    return fragment, text.isprintable() and not text.isspace(), text.isspace(), bool(fragment) and all(
-        char in reference._PDF_LIST_MARKER_CHARS for char in fragment
+    return (
+        fragment,
+        text.isprintable() and not text.isspace(),
+        text.isspace(),
+        bool(fragment) and all(char in reference._PDF_LIST_MARKER_CHARS for char in fragment),
     )
 
 
@@ -25,8 +28,10 @@ def _snapshot_font_bold(name, flags, weight):
 
 def _plain_box(box):
     """私有同源数据只准入有限普通坐标，特殊对象保留参考转换与错误语义。"""
-    return type(box) in (tuple, list) and len(box) == 4 and all(
-        type(v) is float and math.isfinite(v) and abs(v) <= 1e100 for v in box
+    return (
+        type(box) in (tuple, list)
+        and len(box) == 4
+        and all(type(v) is float and math.isfinite(v) and abs(v) <= 1e100 for v in box)
     )
 
 
@@ -73,10 +78,16 @@ def detect_owned_style_lines(owner, lines, drawings, identities):
     )
     if result is None:
         return None
-    styles = {mask: tuple(style for bit, style in ((1, "bold"), (2, "underline"), (4, "strikethrough")) if mask & bit) for mask in range(8)}
+    styles = {
+        mask: tuple(style for bit, style in ((1, "bold"), (2, "underline"), (4, "strikethrough")) if mask & bit)
+        for mask in range(8)
+    }
     return [
         reference.PDFTextStyleLine(
-            tuple(box), text, tuple(reference.PDFTextStyleRange(start, end, styles[mask]) for start, end, mask in ranges), source
+            tuple(box),
+            text,
+            tuple(reference.PDFTextStyleRange(start, end, styles[mask]) for start, end, mask in ranges),
+            source,
         )
         for box, text, ranges, source in result
     ]
