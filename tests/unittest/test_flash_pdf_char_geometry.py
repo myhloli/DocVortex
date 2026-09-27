@@ -710,3 +710,119 @@ def test_flash_layout_manifest_uses_portable_repository_paths() -> None:
         assert not path.is_absolute()
         assert ".." not in path.parts
         assert hashlib.sha256((project_root / path).read_bytes()).hexdigest() == document["sha256"], path
+
+
+def test_native_document_risk_randomized_reference_parity() -> None:
+    """随机组合跨页字号、混合 run、拆行和公式标志，逐项比较风险结论。"""
+    import random
+    import pytest
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    if get_native() is None:
+        pytest.skip("需要原生扩展")
+    rng = random.Random(1729)
+    for _case in range(120):
+        pages, geometries, sizes = [], [], []
+        for page in range(rng.randint(1, 3)):
+            lines = []
+            geometry = PDFPageTextGeometry(chars=[], tight_bboxes={}, origins={}, loose_bboxes={})
+            for index in range(rng.randint(1, 5)):
+                baseline = 30.0 + index * 45
+                line, data = _line_fixture(
+                    source_index=index,
+                    baseline=baseline,
+                    count=rng.randint(1, 44),
+                    advance=rng.choice([4.0, 6.0, 9.0]),
+                    loose_width=rng.choice([5.0, 9.0, 14.0]),
+                    loose_top=baseline - rng.choice([8.0, 20.0, 35.0]),
+                    font_name=rng.choice(["FixtureA", "FixtureB"]),
+                    font_size=rng.choice([5.0, 10.0, 20.0]),
+                    start_char_idx=index * 100,
+                    split_baseline=baseline + 12 if rng.random() < 0.15 else None,
+                )
+                line.formula_candidate_only = rng.random() < 0.1
+                line.restored_inline_cluster = rng.random() < 0.1
+                line.compact_formula_cluster = rng.random() < 0.1
+                for char in line.chars:
+                    if rng.random() < 0.15:
+                        char["font"] = dict(char["font"], name="Other")
+                lines.append(line)
+                geometry.chars.extend(data.chars)
+                geometry.tight_bboxes.update(data.tight_bboxes)
+                geometry.origins.update(data.origins)
+                geometry.loose_bboxes.update(data.loose_bboxes)
+            pages.append(lines)
+            geometries.append(geometry)
+            sizes.append((600.0, 400.0))
+        assert rules._document_requires_full_geometry(pages, geometries, sizes) == (
+            rules._document_requires_full_geometry_python(pages, geometries, sizes)
+        )
+        samples, by_line = rules._collect_samples(pages, geometries, sizes)
+        actual_runs = rules._build_run_stats(samples, by_line)
+        expected_runs = rules._build_run_stats_python(samples, by_line)
+        assert list(actual_runs) == list(expected_runs)
+        for key, run in actual_runs.items():
+            assert run == expected_runs[key]
+
+
+def test_native_document_risk_custom_threshold_uses_reference(monkeypatch) -> None:
+    """自定义阈值必须命中参考实现，不能静默使用 Rust 固定配置。"""
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    expected = rules._DocumentGeometryRisk(style=True)
+    monkeypatch.setattr(rules, "X_RELIABLE_PAIR_MIN", 7)
+    monkeypatch.setattr(rules, "_document_requires_full_geometry_python", lambda *args: expected)
+    assert rules._document_requires_full_geometry([], [], []) is expected
+
+
+def test_native_document_risk_failure_is_not_silently_retried(monkeypatch) -> None:
+    """原生计算异常直接传播；只有明确不支持的输入允许参考计算。"""
+    import pytest
+    from docvortex import _compute_backend
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    class FailedNative:
+        """模拟原生构造失败，排除静默回退。"""
+
+        @staticmethod
+        def NativeGeometryRisk():
+            """抛出计算错误。"""
+            raise RuntimeError("risk failure")
+
+    monkeypatch.setattr(_compute_backend, "get_native", lambda: FailedNative)
+    with pytest.raises(RuntimeError, match="risk failure"):
+        rules._document_requires_full_geometry([], [], [])
+
+
+def test_native_run_statistics_consumes_standard_samples(monkeypatch) -> None:
+    """确认标准几何实际进入原生批次，并保持所有成员对象身份。"""
+    import pytest
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    if get_native() is None:
+        pytest.skip("需要原生扩展")
+    line, geometry = _line_fixture(source_index=0, baseline=30.0, loose_width=14.0)
+    samples, by_line = rules._collect_samples([[line]], [geometry], [(600.0, 100.0)])
+    expected = rules._build_run_stats_python(samples, by_line)
+
+    def rejected_reference(*args):
+        """标准样本若回退则测试失败，避免差分只覆盖同一参考实现。"""
+        raise AssertionError("unexpected reference fallback")
+
+    monkeypatch.setattr(rules, "_build_run_stats_python", rejected_reference)
+    actual = rules._build_run_stats(samples, by_line)
+    assert actual == expected
+    assert next(iter(actual.values())).strong_x_bad
+    assert all(a is b for a, b in zip(next(iter(actual.values())).samples, samples, strict=True))
+
+
+def test_native_run_statistics_duplicate_members_use_reference() -> None:
+    """别名样本不能按唯一索引表达时保留原成员重复次数与统计结果。"""
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    line, geometry = _line_fixture(source_index=0, baseline=30.0)
+    samples, by_line = rules._collect_samples([[line]], [geometry], [(600.0, 100.0)])
+    samples.append(samples[0])
+    assert rules._build_run_stats(samples, by_line) == rules._build_run_stats_python(samples, by_line)

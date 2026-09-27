@@ -9,6 +9,8 @@ mod conversion;
 mod dedup;
 mod fonts;
 mod geometry;
+mod geometry_risk;
+mod geometry_runs;
 mod pdfium;
 mod script_snapshot;
 mod scripts;
@@ -22,6 +24,11 @@ mod text_pipeline;
 /// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<geometry_risk::NativeGeometryRisk>()?;
+    module.add_function(wrap_pyfunction!(
+        geometry_runs::build_geometry_runs,
+        module
+    )?)?;
     module.add_class::<snapshot::NativeTextSnapshot>()?;
     module.add_class::<classification::NativeClassificationSnapshot>()?;
     module.add_function(wrap_pyfunction!(

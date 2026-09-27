@@ -685,7 +685,61 @@ def _anchor_pair_statistics(rows, positive_source=False):
     return _anchor_pair_statistics_python(rows, positive_source)
 
 
-def _document_requires_full_geometry(
+def _document_requires_full_geometry(lines_by_page, geometries, page_sizes):
+    """标准数值路径连续累积全文风险，自定义规则明确使用 Python 参考实现。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is None
+        or any(globals()[name] != value for name, value in _RISK_CONSTANTS.items())
+        or any(globals()[name] is not value for name, value in _RISK_FUNCTIONS.items())
+    ):
+        return _document_requires_full_geometry_python(lines_by_page, geometries, page_sizes)
+    state = native.NativeGeometryRisk()
+    run_ids = {}
+    for page_index, (lines, geometry, page_size) in enumerate(zip(lines_by_page, geometries, page_sizes, strict=True)):
+        for line in lines:
+            if (
+                type(line) is not _LineItem
+                or type(line.source_index) is not int
+                or not -(2**63) <= line.source_index < 2**63
+                or not (
+                    type(line.effective_height) is float
+                    and math.isfinite(line.effective_height)
+                    or type(line.effective_height) is int
+                    and -(2**53) <= line.effective_height <= 2**53
+                )
+            ):
+                return _document_requires_full_geometry_python(lines_by_page, geometries, page_sizes)
+            font_metadata = _ReadOnlyFontCache()
+            entries = []
+            for _position, text, _char_idx, char, prepared in _prepared_line_geometry(
+                line, geometry, page_size, anchors_only=True
+            ):
+                key, size = _font_run_key(char, line.angle, text, font_metadata)
+                entries.append((run_ids.setdefault(key, len(run_ids)), prepared[3], prepared[4], prepared[5], size))
+            early = state.add_line(
+                page_index,
+                line.source_index,
+                line.effective_height,
+                bool(
+                    line.angle != 0
+                    or line.formula_candidate_only
+                    or line.restored_inline_cluster
+                    or line.compact_formula_cluster
+                ),
+                entries,
+            )
+            if early is None:
+                return _document_requires_full_geometry_python(lines_by_page, geometries, page_sizes)
+            if early:
+                return _DocumentGeometryRisk(layout=True)
+    layout, style = state.finish()
+    return _DocumentGeometryRisk(layout=layout, style=style)
+
+
+def _document_requires_full_geometry_python(
     lines_by_page: list[list[_LineItem]],
     geometries: list[PDFPageTextGeometry],
     page_sizes: list[tuple[float, float]],
@@ -868,7 +922,26 @@ def _collect_samples(
     return samples, by_line
 
 
-def _build_run_stats(
+def _build_run_stats(samples, by_line):
+    """标准内部样本只读取一次，由 Rust 连续生成完整 run 统计与同族传播结论。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is not None
+        and all(globals()[name] == value for name, value in _RISK_CONSTANTS.items())
+        and all(globals()[name] is value for name, value in _RISK_FUNCTIONS.items())
+        and type(samples) is list
+        and type(by_line) in (dict, defaultdict)
+    ):
+        keys = list({sample.run_key for sample in samples})
+        result = native.build_geometry_runs(samples, by_line, keys, _CharSample, _RunStats)
+        if result is not None:
+            return result
+    return _build_run_stats_python(samples, by_line)
+
+
+def _build_run_stats_python(
     samples: list[_CharSample],
     by_line: dict[LineKey, list[_CharSample]],
 ) -> dict[RunKey, _RunStats]:
@@ -1876,6 +1949,24 @@ def apply_line_geometry_repairs(
         line.em_height = style_scale if style_scale is not None else repair.em_height
         if allow_y_trim and repair.state in {"trim_y", "repair_xy"}:
             line.effective_height = repair.em_height
+
+
+# 固定默认阈值与规则身份；调用方覆盖配置或辅助规则时保持参考语义。
+_RISK_CONSTANTS = {
+    name: value
+    for name, value in globals().copy().items()
+    if name.startswith(("X_", "Y_", "ANCHOR_", "STYLE_")) and isinstance(value, (int, float))
+}
+_RISK_FUNCTIONS = {
+    function.__name__: function
+    for function in (
+        _quantile,
+        _style_line_is_inflated,
+        _anchor_pair_statistics,
+        _prepared_line_geometry,
+        _font_run_key,
+    )
+}
 
 
 __all__ = [

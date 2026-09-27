@@ -16,7 +16,7 @@ def verify_binary(binary: Path) -> None:
     assert spec is not None and spec.loader is not None
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
-    assert native.PROTOCOL_VERSION == 16
+    assert native.PROTOCOL_VERSION == 17
     assert native.source_rows_plain([], (100.0, 100.0), 0) == []
     assert native.script_roles_raw_batch(
         [(0.0, 0.0, 5.0, 10.0), (0.0, 0.0, 5.0, 10.0)],
@@ -52,6 +52,10 @@ def verify_binary(binary: Path) -> None:
     assert native.mapping_runs([]) == []
     assert native.mapping_glyph_rows([], list) == []
     assert native.anchor_pairs([], False) == []
+    risk = native.NativeGeometryRisk()
+    assert risk.add_line(0, 0, 10.0, False, []) is False
+    assert risk.finish() == (False, False)
+    assert native.build_geometry_runs([], {}, [], object, object) == {}
     assert native.title_gaps([(0, None, (0, 0, 10, 10), 10, False)]) == [(None, None)]
     assert native.line_neighbors([(0, (0, 0, 10, 10), 10, 10)]) == [(None, None)]
     try:
