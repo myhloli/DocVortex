@@ -1167,6 +1167,16 @@ def _plain_script_payload(line: Any, chars: list[dict[str, Any]], angle: int) ->
     )
 
 
+def _prepare_owned_script_evidence(owner, chars):
+    """只供尚未公开的同源几何使用；不缓存跨调用的 Python 身份或可变字符内容。"""
+    if _native_text_flags is not _STANDARD_NATIVE_TEXT_FLAGS or _script_font_key is not _STANDARD_SCRIPT_FONT_KEY:
+        return None
+    prepared = owner.prepare_script_evidence(_native_text_flags)
+    if prepared is None:
+        return None
+    return prepared, {id(char): index for index, char in enumerate(chars)}
+
+
 def detect_pdf_text_script_lines(
     lines: list[Any],
     page_size: tuple[float, float],
@@ -1175,6 +1185,7 @@ def detect_pdf_text_script_lines(
     *,
     all_chars: list[dict[str, Any]] | None = None,
     drawing_lines: Sequence[Any] | None = None,
+    _owned_inputs=None,
 ) -> list[PDFTextScriptLine]:
     """检测 Flash 剩余自然文本行中的上下标候选。"""
     resolved_chars = all_chars or []
@@ -1219,16 +1230,24 @@ def detect_pdf_text_script_lines(
         loose, tight, points, flags, font_ids = [], [], [], [], []
         offsets = [0]
         records = []
+        owned = type(pending[0][3]) is list
         for line, chars, memberships, packed in pending:
             start = len(offsets) - 1
-            for source, target in zip((loose, tight, points, flags, font_ids), packed, strict=True):
-                source.extend(target)
+            if owned:
+                loose.extend(packed)
+            else:
+                for source, target in zip((loose, tight, points, flags, font_ids), packed, strict=True):
+                    source.extend(target)
             for position in range(1, len(chars)):
                 if memberships[position] != memberships[position - 1]:
                     offsets.append(len(loose) - len(chars) + position)
             offsets.append(len(loose))
             records.append((line, chars, memberships, start, len(offsets) - 1))
-        roles = native.script_roles_plain_batch(loose, tight, points, flags, font_ids, offsets, _coerce_finite_bbox)
+        roles = (
+            _owned_inputs[0].classify_indices(loose, offsets)
+            if owned
+            else native.script_roles_plain_batch(loose, tight, points, flags, font_ids, offsets, _coerce_finite_bbox)
+        )
         if roles is None:
             for line, _chars, _memberships, _first, _last in records:
                 append_line(line)
@@ -1253,13 +1272,23 @@ def detect_pdf_text_script_lines(
     for line in lines:
         if native is not None and int(getattr(line, "angle", 0) or 0) % 360 == 0:
             chars = _ordered_line_chars(line)
-            packed = _pack_plain_script_input(chars, tight_bboxes, origins) if chars else None
+            packed = None
+            if chars and _owned_inputs is not None:
+                indices = [_owned_inputs[1].get(id(char)) for char in chars]
+                if all(index is not None for index in indices):
+                    packed = indices
+            if packed is None:
+                packed = _pack_plain_script_input(chars, tight_bboxes, origins) if chars else None
             if packed is not None:
                 regions = [
                     bbox for value in getattr(line, "inline_math_regions", []) if (bbox := _coerce_bbox(value)) is not None
                 ]
                 memberships = _script_region_memberships(chars, tight_bboxes, regions)
-                if pending and (len(pending) >= 64 or pending_chars + len(chars) > 8192):
+                if pending and (
+                    len(pending) >= 64
+                    or pending_chars + len(chars) > 8192
+                    or (type(pending[0][3]) is list) != (type(packed) is list)
+                ):
                     flush_pending()
                 pending.append((line, chars, memberships, packed))
                 pending_chars += len(chars)
@@ -1301,3 +1330,7 @@ __all__ = [
     "_script_line_payload",
     "detect_pdf_text_script_lines",
 ]
+
+# 自定义字符分类规则仍走原参数准备，不使用固化的原生字体键语义。
+_STANDARD_NATIVE_TEXT_FLAGS = _native_text_flags
+_STANDARD_SCRIPT_FONT_KEY = _script_font_key

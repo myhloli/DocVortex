@@ -1,10 +1,11 @@
 //! 不访问 Python 对象或 PDFium 的单线程批量计算内核。
 
-pub const PROTOCOL_VERSION: u32 = 8;
+pub const PROTOCOL_VERSION: u32 = 22;
 pub mod columns;
 pub mod note_index;
 pub mod row_geometry;
 pub mod spatial;
+pub mod text_classification;
 
 pub mod dedup;
 pub mod extraction;
@@ -40,3 +41,21 @@ pub mod statistics;
 pub mod inline_pairs;
 
 pub mod annotation_geometry;
+pub mod table_candidates;
+pub mod text_pipeline;
+
+pub mod text_assignment;
+pub mod text_content;
+pub mod text_snapshot;
+
+pub mod geometry_risk;
+pub mod geometry_runs;
+pub mod geometry_style;
+
+pub mod geometry_lines;
+
+pub mod table_merge;
+
+pub mod pixels;
+
+pub mod inline_styles;

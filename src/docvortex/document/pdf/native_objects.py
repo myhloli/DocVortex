@@ -164,6 +164,13 @@ def _clipped_form_extent(raw: Any, page_bbox: BBox, rotation: int) -> BBox | Non
 
 def _clipped_objects_of_type(page: Any, object_type: int) -> Iterator[_ClippedObject]:
     """过滤已累计裁剪的对象类型，路径 source_index 保持既有遍历顺序。"""
+    from ._object_bridge import read_clipped_objects
+
+    records = read_clipped_objects(page, object_type, DRAWING_FORM_MAX_DEPTH)
+    if records is not None:
+        for address, matrix, parent, depth, clip in records:
+            yield _ClippedObject(ctypes.cast(address, pdfium_c.FPDF_PAGEOBJECT), matrix, parent, depth, clip)
+        return
     for member in _walk_clipped_objects(page):
         if int(pdfium_c.FPDFPageObj_GetType(member.raw)) == object_type:
             yield member
@@ -434,6 +441,19 @@ def _get_segment_stroke_width(
 
 def _read_raw_path_subpaths(raw_obj: Any) -> list[_PathSubpath]:
     """读取 Path 段并拆为子路径，只把 LINETO 与闭合边记录为直线段。"""
+    from ._object_bridge import read_path_subpaths
+
+    records = read_path_subpaths(raw_obj)
+    if records is not None:
+        return [
+            _PathSubpath(points, [(points[first], points[last]) for first, last in lines], closed)
+            for points, lines, closed in records
+        ]
+    return _read_raw_path_subpaths_python(raw_obj)
+
+
+def _read_raw_path_subpaths_python(raw_obj: Any) -> list[_PathSubpath]:
+    """保留逐段参考实现，用于非标准 ABI 与迁移差分。"""
     try:
         segment_count = int(pdfium_c.FPDFPath_CountSegments(raw_obj))
     except Exception:

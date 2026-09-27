@@ -1,8 +1,8 @@
 # Optional Rust PDF kernels
 
 See [Repository architecture](ARCHITECTURE.md) for the Python/Rust ownership boundary
-and binding-module layout. The current private extension protocol is **8**, shared by
-the Python loader and Rust core. Protocol 4, 5, 6 and 7 references below describe historical
+and binding-module layout. The current private extension protocol is **11**, shared by
+the Python loader and Rust core. Protocol 4, 5, 6, 7 and 8 references below describe historical
 interfaces or rollout stages, not the current loader requirement. Rebuild editable
 native installs and restart existing processes after updating native sources.
 
@@ -255,3 +255,21 @@ Existing timing runs can be audited without discarding their original memory rec
 ```sh
 python tests/benchmarks/pdf_memory.py --timing-report output/rust/revisions/report.json --output output/rust/memory-audit
 ```
+
+## Native kernel migration (protocol 11)
+
+The same-library PDFium adapter is now a separate Python-independent crate. Object
+traversal, clipping and path decoding run there; character geometry stays in Rust
+until bounded output batches. The synchronized font provider handles ASCII/CJK
+requests natively and preserves Python normalization for uncommon non-ASCII names.
+The full Flash document pipeline is not yet a standalone Rust engine.
+
+`PDFPage.get_snapshot()` explicitly shares detached page evidence; public mutable
+character access still materializes isolated Python data. `PDFDocument.get_render_session()`
+reuses mapped input and directed workers. `DOCVORTEX_PDF_RENDER_BACKEND=auto` is the default and selects `session` rendering
+in DocVortex and the matching MinerU checkout. Sessions use Rust when the compute
+backend provides it and support Python when it does not. Rendering errors propagate
+without retrying through the legacy renderer.
+Set `DOCVORTEX_PDF_RENDER_BACKEND=legacy` to explicitly use the previous renderer.
+For the Python reference configuration, also set `DOCVORTEX_COMPUTE_BACKEND=python`. See
+[pdf-native-kernel.md](pdf-native-kernel.md) for migration and evidence boundaries.

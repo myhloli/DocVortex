@@ -63,6 +63,84 @@ class _NativeVisualResplit:
     members: tuple[_LineItem, ...]
 
 
+def _build_native_line_items_from_chars(
+    chars: list[Char],
+    page_size: tuple[float, float],
+    *,
+    page_rotation: int = 0,
+    supported_angles: Sequence[float] = _SUPPORTED_PDFTEXT_LINE_ANGLES,
+) -> list[_LineItem]:
+    """连续消费字符到视觉 run，省去基础片段和粗行的 Python 中间物化。"""
+    from ...._compute_backend import get_native
+    from ....document.pdf.text import _get_lines_from_chars_python
+
+    native = get_native()
+    ordinary = (
+        type(chars) is list
+        and type(page_rotation) is int
+        and -(2**31) <= page_rotation < 2**31
+        and type(supported_angles) in {list, tuple}
+        and bool(supported_angles)
+        and all(type(angle) in {int, float} for angle in supported_angles)
+    )
+    records = (
+        native.prepare_visual_lines(chars, page_size, page_rotation, supported_angles)
+        if native is not None and ordinary
+        else None
+    )
+    if records is None:
+        return _build_native_line_items(
+            _get_lines_from_chars_python(chars),
+            page_size,
+            page_rotation=page_rotation,
+            supported_angles=supported_angles,
+        )
+    return _build_native_line_items_from_records(records, page_size)
+
+
+def _build_native_line_items_from_records(records, page_size):
+    """把已完成原生计算的视觉记录物化为原有行对象，供字符列表和自有快照共用。"""
+    normal_items: list[_LineItem] = []
+    formula_items: list[_LineItem] = []
+    for text, bbox, angle, members, row_id, run_index, split, formula, coarse, metrics, terminal in records:
+        item = _LineItem(
+            text=text,
+            bbox=bbox,
+            angle=angle,
+            source_index=-1,
+            chars=members,
+            visual_row_id=row_id,
+            run_index=run_index,
+            split_from_row=split,
+            formula_candidate_only=formula,
+        )
+        if coarse:
+            local = _rotate_bbox_to_upright(bbox, page_size, angle)
+            item.effective_height = max(0.1, local[3] - local[1])
+        elif metrics is not None:
+            height, width, signature, coverage, weight, emphasis, typography = metrics
+            item.effective_height = item.em_height = height
+            item.median_glyph_width = width
+            item.font_signature = signature
+            item.font_coverage = coverage
+            item.dominant_font_weight = weight
+            item.leading_emphasis_width = emphasis
+            item.leading_typography_width = typography
+            item.paragraph_terminal = terminal
+        else:
+            _fill_native_typography(item, page_size)
+        (formula_items if formula else normal_items).append(item)
+    stable_items = _merge_native_inline_scripts(normal_items, page_size)
+    for source_index, item in enumerate(stable_items):
+        item.source_index = source_index
+    formula_items = _merge_native_inline_scripts(formula_items, page_size)
+    for source_index, item in enumerate(formula_items, start=len(stable_items)):
+        item.source_index = source_index
+    output = [*stable_items, *formula_items]
+    output.sort(key=lambda item: (item.visual_row_id if item.visual_row_id is not None else math.inf, item.run_index))
+    return output
+
+
 def _build_native_line_items(
     pdf_lines: Sequence[dict[str, Any]],
     page_size: tuple[float, float],

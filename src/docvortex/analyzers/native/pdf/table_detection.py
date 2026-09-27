@@ -27,7 +27,7 @@ from .table_rules import (
     _cluster_fragment_rows,
     _connected_rule_grid_bboxes,
     _median_fragment_height,
-    _merge_table_candidates,
+    _merge_owned_table_candidates,
 )
 
 
@@ -105,7 +105,7 @@ def _detect_table_candidates(
         )
     merged_rule_candidates = [
         candidate
-        for candidate in _merge_table_candidates(rule_candidates)
+        for candidate in _merge_owned_table_candidates(rule_candidates)
         if not any(_bbox_overlap_in_smaller(candidate.bbox, filled_bbox) >= 0.2 for filled_bbox in filled_grid_bboxes)
     ]
     candidates = _join_caption_supported_table_groups(source, [*filled_grid_candidates, *merged_rule_candidates])

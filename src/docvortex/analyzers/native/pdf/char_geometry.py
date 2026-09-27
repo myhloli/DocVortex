@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 import statistics
+import sys
 import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -352,12 +353,17 @@ def _font_run_metadata(font):
     return font_name, font_size, flags, weight
 
 
+class _NativeFontUnsupported(Exception):
+    """表示字体含自定义转换，原生文档必须在转换之前选择参考路径。"""
+
+
 class _ReadOnlyFontCache:
     """Rust 几何已准备完成后的单行只读字体缓存，不跨行保留可变字典。"""
 
-    def __init__(self):
-        """每行独立建立有界身份表，强引用防止字体对象地址复用。"""
+    def __init__(self, *, native_only=False):
+        """每行建立有界身份表；原生文档只在首次见到字体时校验转换类型。"""
         self.values = {}
+        self.native_only = native_only
 
     def metadata(self, font):
         """普通字体首见时校验字段，特殊转换前清空身份表以保留回调行为。"""
@@ -368,6 +374,8 @@ class _ReadOnlyFontCache:
             type(font.get(name)) not in (str, int, float, bool, type(None)) for name in ("name", "size", "flags", "weight")
         ):
             self.values.clear()
+            if self.native_only:
+                raise _NativeFontUnsupported
             return _font_run_metadata(font)
         result = _font_run_metadata(font)
         if len(self.values) >= 4096:
@@ -685,7 +693,61 @@ def _anchor_pair_statistics(rows, positive_source=False):
     return _anchor_pair_statistics_python(rows, positive_source)
 
 
-def _document_requires_full_geometry(
+def _document_requires_full_geometry(lines_by_page, geometries, page_sizes):
+    """标准数值路径连续累积全文风险，自定义规则明确使用 Python 参考实现。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is None
+        or any(globals()[name] != value for name, value in _RISK_CONSTANTS.items())
+        or any(globals()[name] is not value for name, value in _RISK_FUNCTIONS.items())
+    ):
+        return _document_requires_full_geometry_python(lines_by_page, geometries, page_sizes)
+    state = native.NativeGeometryRisk()
+    run_ids = {}
+    for page_index, (lines, geometry, page_size) in enumerate(zip(lines_by_page, geometries, page_sizes, strict=True)):
+        for line in lines:
+            if (
+                type(line) is not _LineItem
+                or type(line.source_index) is not int
+                or not -(2**63) <= line.source_index < 2**63
+                or not (
+                    type(line.effective_height) is float
+                    and math.isfinite(line.effective_height)
+                    or type(line.effective_height) is int
+                    and -(2**53) <= line.effective_height <= 2**53
+                )
+            ):
+                return _document_requires_full_geometry_python(lines_by_page, geometries, page_sizes)
+            font_metadata = _ReadOnlyFontCache()
+            entries = []
+            for _position, text, _char_idx, char, prepared in _prepared_line_geometry(
+                line, geometry, page_size, anchors_only=True
+            ):
+                key, size = _font_run_key(char, line.angle, text, font_metadata)
+                entries.append((run_ids.setdefault(key, len(run_ids)), prepared[3], prepared[4], prepared[5], size))
+            early = state.add_line(
+                page_index,
+                line.source_index,
+                line.effective_height,
+                bool(
+                    line.angle != 0
+                    or line.formula_candidate_only
+                    or line.restored_inline_cluster
+                    or line.compact_formula_cluster
+                ),
+                entries,
+            )
+            if early is None:
+                return _document_requires_full_geometry_python(lines_by_page, geometries, page_sizes)
+            if early:
+                return _DocumentGeometryRisk(layout=True)
+    layout, style = state.finish()
+    return _DocumentGeometryRisk(layout=layout, style=style)
+
+
+def _document_requires_full_geometry_python(
     lines_by_page: list[list[_LineItem]],
     geometries: list[PDFPageTextGeometry],
     page_sizes: list[tuple[float, float]],
@@ -868,7 +930,26 @@ def _collect_samples(
     return samples, by_line
 
 
-def _build_run_stats(
+def _build_run_stats(samples, by_line):
+    """标准内部样本只读取一次，由 Rust 连续生成完整 run 统计与同族传播结论。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is not None
+        and all(globals()[name] == value for name, value in _RISK_CONSTANTS.items())
+        and all(globals()[name] is value for name, value in _RISK_FUNCTIONS.items())
+        and type(samples) is list
+        and type(by_line) in (dict, defaultdict)
+    ):
+        keys = list({sample.run_key for sample in samples})
+        result = native.build_geometry_runs(samples, by_line, keys, _CharSample, _RunStats)
+        if result is not None:
+            return result
+    return _build_run_stats_python(samples, by_line)
+
+
+def _build_run_stats_python(
     samples: list[_CharSample],
     by_line: dict[LineKey, list[_CharSample]],
 ) -> dict[RunKey, _RunStats]:
@@ -1770,6 +1851,201 @@ def _run_diagnostics(runs: dict[RunKey, _RunStats]) -> list[dict[str, Any]]:
     return output
 
 
+def _prepare_run_style(
+    plan: DocumentGeometryPlan,
+    samples: list[_CharSample],
+    by_line: dict[LineKey, list[_CharSample]],
+    *,
+    restore_pages: list[tuple[float, float]] | None = None,
+) -> tuple[dict[RunKey, _RunStats], set[RunKey], bool]:
+    """复用一次原生样本读取，连续计算 run 与全文样式；自定义规则保留原调用顺序。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is not None
+        and type(samples) is list
+        and type(by_line) in (dict, defaultdict)
+        and all(globals()[name] == value for name, value in _RISK_CONSTANTS.items())
+        and all(globals()[name] is value for name, value in _RISK_FUNCTIONS.items())
+        and all(globals()[name] is value for name, value in _STYLE_FUNCTIONS.items())
+        and (restore_pages is None or type(restore_pages) is list)
+    ):
+        keys = list({sample.run_key for sample in samples})
+        from ....document.pdf.text._contracts import Bbox as CharacterBbox
+
+        result = native.build_geometry_style(
+            samples, by_line, keys, _CharSample, _RunStats, _LineItem, restore_pages, CharacterBbox
+        )
+        if result is not None:
+            runs, inflated, scales, restored = result
+            plan.style_inflated_runs = inflated
+            plan.document_style_anomaly = bool(inflated)
+            plan.line_style_scales.update(scales)
+            return runs, inflated, restored
+    runs = _build_run_stats(samples, by_line)
+    inflated = _mark_style_inflated_runs(runs)
+    plan.style_inflated_runs = inflated
+    plan.document_style_anomaly = _document_uses_global_style_calibration(inflated)
+    _apply_style_scale_repairs(plan, inflated if plan.document_style_anomaly else set(), by_line)
+    return runs, inflated, False
+
+
+def _prepare_owned_document(lines_by_page, geometries, page_sizes, *, layout=False, with_metrics=False):
+    """自有 Rust 文档连续完成样本、锚点、run 和样式，仅为后续布局规则物化一次字符。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is None
+        or any(globals()[name] != value for name, value in _RISK_CONSTANTS.items())
+        or any(globals()[name] is not value for name, value in _RISK_FUNCTIONS.items())
+        or any(globals()[name] is not value for name, value in _STYLE_FUNCTIONS.items())
+        or any(globals()[name] is not value for name, value in _STYLE_ONLY_FUNCTIONS.items())
+    ):
+        return None
+    document = native.NativeStyleDocument(layout)
+    run_ids, run_keys = {}, []
+    for page_index, (lines, geometry, page_size) in enumerate(zip(lines_by_page, geometries, page_sizes, strict=True)):
+        if (
+            type(geometry) is not PDFPageTextGeometry
+            or any(type(values) is not dict for values in (geometry.tight_bboxes, geometry.origins, geometry.loose_bboxes))
+            or type(page_size) not in (tuple, list)
+            or len(page_size) != 2
+            or not all(type(v) is float and math.isfinite(v) or type(v) is int and -(2**53) <= v <= 2**53 for v in page_size)
+        ):
+            return None
+        for line in lines:
+            if (
+                type(line) is not _LineItem
+                or (
+                    with_metrics
+                    and any(
+                        type(value) is not bool
+                        for value in (line.formula_candidate_only, line.compact_formula_cluster, line.restored_inline_cluster)
+                    )
+                )
+                or type(line.angle) is not int
+                or not -(2**31) <= line.angle < 2**31
+                or type(line.source_index) is not int
+                or not -(2**63) <= line.source_index < 2**63
+                or not (
+                    type(line.effective_height) is float
+                    and math.isfinite(line.effective_height)
+                    or type(line.effective_height) is int
+                    and -(2**53) <= line.effective_height <= 2**53
+                )
+            ):
+                return None
+            records = _plain_source_records(line, geometry, anchors_only=False)
+            if records is None:
+                return None
+
+            def metadata(positions):
+                """只为坐标合法的字符编码字体和 Unicode 类别，与原样本准入顺序一致。"""
+                cache = _ReadOnlyFontCache(native_only=True)
+                output = []
+                for position in positions:
+                    char = line.chars[position]
+                    text = char["char"]
+                    font = char.get("font")
+                    if font is not None and type(font) is not dict:
+                        return None
+                    try:
+                        key, size = _font_run_key(char, line.angle, text, cache)
+                    except _NativeFontUnsupported:
+                        return None
+                    run_id = run_ids.get(key)
+                    if run_id is None:
+                        run_id = len(run_keys)
+                        run_ids[key] = run_id
+                        run_keys.append(key)
+                    if layout:
+                        output.append((run_id, size, _is_anchor_text(text), char["char_idx"], text))
+                    else:
+                        output.append((run_id, size, _is_anchor_text(text)))
+                return output
+
+            if not document.add_line(
+                records,
+                page_size,
+                line.angle,
+                page_index,
+                line.source_index,
+                line.effective_height,
+                metadata,
+                line if layout else None,
+            ):
+                return None
+    family_ids = {}
+    families = [family_ids.setdefault(key[0], len(family_ids)) for key in run_keys]
+    if layout:
+
+        def release_side_maps():
+            """原生阶段接受输入后，在最终字符物化之前释放已复制的 loose 侧表。"""
+            for geometry in geometries:
+                geometry.loose_bboxes.clear()
+
+        result = document.finish_layout(
+            families, run_keys, _CharSample, _RunStats, release_side_maps, with_metrics, sys.version_info >= (3, 12)
+        )
+        if result is None:
+            return None
+        samples, by_line, runs, inflated, scales = result[:5]
+        # 保留旧 set comprehension 的 run 顺序，避免同族 donor 并列时改变选择。
+        runs = {key: runs[key] for key in {key for key in run_keys} if key in runs}
+        if with_metrics:
+            metrics, reports = result[5]
+            return samples, by_line, runs, inflated, scales, (metrics, _native_run_diagnostics(run_keys, reports))
+        return samples, by_line, runs, inflated, scales
+    result = document.finish(families)
+    if result is None:
+        return None
+    inflated, scales, rows = result
+    plan = DocumentGeometryPlan(
+        style_inflated_runs={run_keys[index] for index in inflated},
+        document_style_anomaly=bool(inflated),
+        line_style_scales=dict(scales),
+    )
+    plan.run_diagnostics = _native_run_diagnostics(run_keys, rows)
+    # 只有整本文档成功消费后才清理侧表，拒绝输入时仍能完整执行参考路径。
+    for geometry in geometries:
+        geometry.loose_bboxes.clear()
+    return plan
+
+
+def _native_run_diagnostics(run_keys, rows):
+    """仅在输出边界将原生 run 数值转换为既有诊断字段与排序。"""
+    diagnostics = []
+    for row in sorted(rows, key=lambda row: run_keys[row[0]]):
+        index, count, pairs, median_ratio, p90, large_share, overlap_share, strong, sibling, style = row
+        diagnostics.append(
+            {
+                "run_key": list(run_keys[index]),
+                "sample_count": count,
+                "reliable_pair_count": pairs,
+                "median_ratio": median_ratio,
+                "p90_ratio": p90,
+                "ratio_gt_1_35_share": large_share,
+                "next_tight_overlap_share": overlap_share,
+                "strong_x_bad": strong,
+                "sibling_x_bad": sibling,
+                "style_y_bad": style,
+            }
+        )
+    return diagnostics
+
+
+def _prepare_style_only_document(lines_by_page, geometries, page_sizes):
+    """样式分支只生成最终计划，不构造逐字符 Python 对象。"""
+    return _prepare_owned_document(lines_by_page, geometries, page_sizes)
+
+
+def _prepare_layout_document(lines_by_page, geometries, page_sizes, *, with_metrics=False):
+    """布局分支只在 X/Y 规则边界物化一次已计算完统计的字符数据。"""
+    return _prepare_owned_document(lines_by_page, geometries, page_sizes, layout=True, with_metrics=with_metrics)
+
+
 def build_document_geometry_plan(
     lines_by_page: list[list[_LineItem]],
     geometries: list[PDFPageTextGeometry],
@@ -1789,34 +2065,46 @@ def build_document_geometry_plan(
         for geometry in geometries:
             geometry.loose_bboxes.clear()
         return plan
-    samples, by_line = _collect_samples(lines_by_page, geometries, page_sizes)
-    if risk.layout:
-        # 只有布局风险才记录公开输出候选；仅样式异常时只校准内部字号。
-        _record_line_canonical_metrics(plan, by_line)
-    runs = _build_run_stats(samples, by_line)
-    style_inflated_runs = _mark_style_inflated_runs(runs)
-    plan.style_inflated_runs = style_inflated_runs
-    plan.document_style_anomaly = _document_uses_global_style_calibration(
-        style_inflated_runs,
-    )
-    _apply_style_scale_repairs(
-        plan,
-        style_inflated_runs if plan.document_style_anomaly else set(),
-        by_line,
-    )
-    if plan.document_style_anomaly and risk.layout:
-        _restore_stable_legacy_source_bboxes(by_line, page_sizes)
-        runs = _build_run_stats(samples, by_line)
-        for run in runs.values():
-            run.style_y_bad = run.key in style_inflated_runs
-    plan.run_diagnostics = _run_diagnostics(runs)
+    if not risk.layout:
+        native_plan = _prepare_style_only_document(lines_by_page, geometries, page_sizes)
+        if native_plan is not None:
+            return native_plan
+    prepared = _prepare_layout_document(lines_by_page, geometries, page_sizes, with_metrics=True) if risk.layout else None
+    native_y_risk = None
+    if prepared is not None:
+        samples, by_line, runs, inflated, scales, (metrics, diagnostics) = prepared
+        plan.style_inflated_runs = inflated
+        plan.document_style_anomaly = bool(inflated)
+        plan.line_style_scales.update(scales)
+        inks, baselines, native_y_risk = metrics
+        plan.line_ink_bboxes.update((key, tuple(box)) for key, box in inks)
+        plan.line_baselines.update(baselines)
+        plan.run_diagnostics = diagnostics
+    else:
+        samples, by_line = _collect_samples(lines_by_page, geometries, page_sizes)
+        if risk.layout:
+            # 只有布局风险才记录公开输出候选；仅样式异常时只校准内部字号。
+            _record_line_canonical_metrics(plan, by_line)
+        runs, style_inflated_runs, restored = _prepare_run_style(
+            plan,
+            samples,
+            by_line,
+            restore_pages=page_sizes if risk.layout else None,
+        )
+        if plan.document_style_anomaly and risk.layout and not restored:
+            _restore_stable_legacy_source_bboxes(by_line, page_sizes)
+            runs = _build_run_stats(samples, by_line)
+            for run in runs.values():
+                run.style_y_bad = run.key in style_inflated_runs
+    if prepared is None:
+        plan.run_diagnostics = _run_diagnostics(runs)
     if not risk.layout:
         return plan
     x_bad_runs = {run.key for run in runs.values() if run.strong_x_bad or run.sibling_x_bad}
     if x_bad_runs:
         _repair_x_chars(plan, runs, by_line, page_sizes)
         _build_line_repairs_from_x(plan, lines_by_page, by_line, page_sizes)
-    if not _has_document_y_risk(by_line):
+    if not (native_y_risk if native_y_risk is not None else _has_document_y_risk(by_line)):
         return plan
     analyses = _analyze_lines(lines_by_page, by_line, page_sizes)
     confirmed_runs = _mark_y_candidates(analyses)
@@ -1876,6 +2164,57 @@ def apply_line_geometry_repairs(
         line.em_height = style_scale if style_scale is not None else repair.em_height
         if allow_y_trim and repair.state in {"trim_y", "repair_xy"}:
             line.effective_height = repair.em_height
+
+
+# 固定默认阈值与规则身份；调用方覆盖配置或辅助规则时保持参考语义。
+_RISK_CONSTANTS = {
+    name: value
+    for name, value in globals().copy().items()
+    if name.startswith(("X_", "Y_", "ANCHOR_", "STYLE_")) and isinstance(value, (int, float))
+}
+_RISK_FUNCTIONS = {
+    function.__name__: function
+    for function in (
+        _quantile,
+        _style_line_is_inflated,
+        _anchor_pair_statistics,
+        _prepared_line_geometry,
+        _font_run_key,
+    )
+}
+
+_STYLE_FUNCTIONS = {
+    function.__name__: function
+    for function in (
+        _build_run_stats,
+        _mark_style_inflated_runs,
+        _document_uses_global_style_calibration,
+        _apply_style_scale_repairs,
+        _restore_stable_legacy_source_bboxes,
+        _CharSample,
+        _RunStats,
+        _LineItem,
+    )
+}
+
+_STYLE_ONLY_FUNCTIONS = {
+    function.__name__: function
+    for function in (
+        _collect_samples,
+        _record_line_canonical_metrics,
+        _has_document_y_risk,
+        _baseline_clusters,
+        _bbox_union_many,
+        _plain_source_records,
+        _run_diagnostics,
+        _is_anchor_text,
+        _font_run_metadata,
+        _cached_run_key,
+        _script_group,
+        _normalized_font_family,
+        _ReadOnlyFontCache,
+    )
+}
 
 
 __all__ = [

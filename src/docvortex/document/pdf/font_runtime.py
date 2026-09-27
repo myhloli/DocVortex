@@ -166,6 +166,14 @@ class _FontHandle:
 class _FontProvider:
     """包装原生默认提供器，强制 CJK 映射并保持 ABI 回调及字节的进程级所有权。"""
 
+    def __new__(cls, raw: Any, pdfium_version: str) -> Any:
+        """标准同库 ABI 使用原生回调，测试替身与 Python 后端保留参考实现。"""
+        bridge = _native_font_bridge(raw)
+        if bridge is not None:
+            native, functions, callback_type = bridge
+            return _NativeFontProvider(raw, pdfium_version, native, functions, callback_type)
+        return super().__new__(cls)
+
     def __init__(self, raw: Any, pdfium_version: str) -> None:
         """先完整验证资源，再分配默认提供器及回调，避免半初始化状态。"""
         self.data, self.tables = _load_font()
@@ -330,6 +338,168 @@ class _FontProvider:
         font = self.handles.pop(handle)
         if font.kind == "system" and self.default and self.default.contents.DeleteFont:
             self.default.contents.DeleteFont(self.default, font.value)
+
+
+_NATIVE_KEEPALIVE: list[Any] = []
+_NATIVE_FONT_UNAVAILABLE_REASON: str | None = "not probed"
+_NATIVE_FONT_INSTALLED = False
+
+
+def native_font_runtime_info() -> dict[str, Any]:
+    """区分扩展可用、ABI 已匹配与接口已安装，不能将扩展存在当作原生回调已启用。"""
+    return {
+        "native_font_provider_installed": _NATIVE_FONT_INSTALLED,
+        "native_font_provider_unavailable_reason": _NATIVE_FONT_UNAVAILABLE_REASON,
+    }
+
+
+def _font_bridge_unavailable(reason: str) -> None:
+    """记录确切的参考路径原因，特别保留 Windows 调用约定不匹配信息。"""
+    global _NATIVE_FONT_UNAVAILABLE_REASON
+    _NATIVE_FONT_UNAVAILABLE_REASON = reason
+    return None
+
+
+def _native_font_bridge(raw: Any) -> Any:
+    """严格验证结构布局、每个回调和三个入口的 ABI 后才传递原生地址。"""
+    from ..._compute_backend import get_native
+
+    global _NATIVE_FONT_UNAVAILABLE_REASON
+    native = get_native()
+    if native is None:
+        return _font_bridge_unavailable("Python compute backend or native extension unavailable")
+    if not hasattr(native, "NativeFontProvider"):
+        return _font_bridge_unavailable("NativeFontProvider missing from extension")
+    pointer = ctypes.POINTER(raw.FPDF_SYSFONTINFO)
+    void, integer = ctypes.c_void_p, ctypes.c_int
+    char, byte = ctypes.POINTER(ctypes.c_char), ctypes.POINTER(ctypes.c_ubyte)
+    callbacks = (
+        ("Release", None, (pointer,)),
+        ("EnumFonts", None, (pointer, void)),
+        ("MapFont", void, (pointer, integer, integer, integer, integer, char, ctypes.POINTER(integer))),
+        ("GetFont", void, (pointer, char)),
+        ("GetFontData", ctypes.c_ulong, (pointer, void, ctypes.c_uint, byte, ctypes.c_ulong)),
+        ("GetFaceName", ctypes.c_ulong, (pointer, void, char, ctypes.c_ulong)),
+        ("GetFontCharset", integer, (pointer, void)),
+        ("DeleteFont", None, (pointer, void)),
+    )
+    callback_type = ctypes.WINFUNCTYPE if os.name == "nt" else ctypes.CFUNCTYPE
+    fields = dict(raw.FPDF_SYSFONTINFO._fields_)
+    alignment = ctypes.alignment(void)
+    start = (ctypes.sizeof(integer) + alignment - 1) // alignment * alignment
+    if fields.get("version") is not integer or raw.FPDF_SYSFONTINFO.version.offset != 0:
+        return _font_bridge_unavailable("FPDF_SYSFONTINFO version ABI mismatch")
+    if ctypes.sizeof(raw.FPDF_SYSFONTINFO) != start + 8 * ctypes.sizeof(void):
+        return _font_bridge_unavailable("FPDF_SYSFONTINFO size ABI mismatch")
+    for index, (name, result, arguments) in enumerate(callbacks):
+        field = fields.get(name)
+        expected = callback_type(result, *arguments)
+        if (
+            field is None
+            or getattr(raw.FPDF_SYSFONTINFO, name).offset != start + index * ctypes.sizeof(void)
+            or field._restype_ is not result
+            or field._argtypes_ != arguments
+        ):
+            return _font_bridge_unavailable(f"FPDF_SYSFONTINFO.{name} signature/layout mismatch")
+        if field._flags_ != expected._flags_:
+            return _font_bridge_unavailable(f"FPDF_SYSFONTINFO.{name} calling convention mismatch")
+    specs = (
+        ("FPDF_GetDefaultSystemFontInfo", pointer, ()),
+        ("FPDF_FreeDefaultSystemFontInfo", None, (pointer,)),
+        ("FPDF_SetSystemFontInfo", None, (pointer,)),
+    )
+    functions = []
+    for name, result, arguments in specs:
+        function = getattr(raw, name, None)
+        if (
+            not isinstance(function, ctypes._CFuncPtr)
+            or function.restype is not result
+            or tuple(function.argtypes or ()) != arguments
+            or getattr(function, "errcheck", None) is not None
+        ):
+            return _font_bridge_unavailable(f"{name} unsupported function signature or wrapper")
+        if function._flags_ != callback_type(result, *arguments)._flags_:
+            return _font_bridge_unavailable(f"{name} calling convention mismatch")
+        functions.append(function)
+    _NATIVE_FONT_UNAVAILABLE_REASON = None
+    return native, functions, callback_type
+
+
+class _NativeFontProvider:
+    """保留运行时公开身份；资源校验在 Python，句柄与常见回调在 Rust。"""
+
+    def __init__(self, raw: Any, pdfium_version: str, native: Any, functions: list[Any], callback_type: Any) -> None:
+        """在原生接口取得资源前完成哈希校验并保活低频 Unicode 规范化回调。"""
+        data, tables = _load_font()
+        self.raw = raw
+        self.pid = os.getpid()
+        self.info = PdfiumRuntimeInfo(pdfium_version, _POLICY, _FONT_NAME, _FONT_SHA256)
+        self.failure: tuple[str, BaseException] | None = None
+        self.functions = functions
+        self._legacy = callback_type(ctypes.c_int, ctypes.POINTER(ctypes.c_ubyte), ctypes.c_size_t, ctypes.c_int)(
+            self._classify_legacy
+        )
+        try:
+            self.native = native.NativeFontProvider(
+                [ctypes.cast(function, ctypes.c_void_p).value for function in functions],
+                data,
+                tables,
+                f"DocVortex-{_POLICY}-{_FONT_SHA256}".encode("ascii"),
+                _FONT_ALIASES,
+                _STYLE_SUFFIXES,
+                ctypes.cast(self._legacy, ctypes.c_void_p).value,
+            )
+        except Exception as exc:
+            raise PdfiumFontError(f"Unable to create native PDFium font runtime: {exc}") from exc
+
+    def _classify_legacy(self, face: Any, size: int, charset: int) -> int:
+        """少量非 ASCII 名称沿用精确 Python 编码语义，异常保留到退出 C 栈后处理。"""
+        try:
+            selected = _cjk_charset(ctypes.string_at(face, size), charset)
+            return -1 if selected is None else selected
+        except BaseException as exc:
+            if self.failure is None:
+                self.failure = ("_classify_legacy", exc)
+            return -1
+
+    def install(self) -> None:
+        """全进程保留函数与低频回调，防止宿主提前回收仍被 PDFium 引用的资源。"""
+        global _NATIVE_FONT_INSTALLED
+        if self not in _NATIVE_KEEPALIVE:
+            _NATIVE_KEEPALIVE.append(self)
+        try:
+            self.native.install()
+        except Exception as exc:
+            raise PdfiumFontError(str(exc)) from exc
+        self.raise_if_failed()
+        _NATIVE_FONT_INSTALLED = True
+
+    def raise_if_failed(self) -> None:
+        """将原生与低频规范化错误统一转换为现有永久故障契约。"""
+        if self.failure is not None:
+            name, error = self.failure
+            if not isinstance(error, Exception):
+                raise error
+            raise PdfiumFontError(f"PDFium font callback {name} failed: {error}") from error
+        try:
+            self.native.raise_if_failed()
+        except Exception as exc:
+            raise PdfiumFontError(str(exc)) from exc
+
+    @property
+    def released(self) -> bool:
+        """查询原生接口是否已由 PDFium 释放。"""
+        return self.native.stats()[0]
+
+    @property
+    def bundled_requests(self) -> int:
+        """返回真正发生的固定字库映射次数。"""
+        return self.native.stats()[1]
+
+    @property
+    def full_font_copies(self) -> int:
+        """返回完整字库复制次数，用于诊断 PDFium 缓存复用。"""
+        return self.native.stats()[2]
 
 
 __all__ = ["PdfiumFontError", "PdfiumRuntimeInfo"]

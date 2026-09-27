@@ -25,7 +25,7 @@ def bridge_info():
     }
 
 
-def read_native_chars(textpage, extended):
+def read_native_chars(textpage, extended, *, frame=None, rotation=0):
     """在同一 textpage 和锁内完成原始读取，特殊输入及非标准函数留给参考实现。"""
     global _CALLS, _EMPTY_PAGES, _UNAVAILABLE_REASON, _RECORD_BATCH_SIZE
     native = get_native()
@@ -84,15 +84,24 @@ def read_native_chars(textpage, extended):
             _UNAVAILABLE_REASON = "negative character count"
             return None
         try:
-            reader = getattr(native, "read_pdfium_char_batches", native.read_pdfium_chars)
-            result = reader(addresses, ct.cast(textpage.raw, ct.c_void_p).value, count, extended)
+            if frame is not None:
+                result = native.read_pdfium_visual_batches(
+                    addresses, ct.cast(textpage.raw, ct.c_void_p).value, count, extended, frame, rotation
+                )
+            else:
+                reader = getattr(native, "read_pdfium_char_batches", native.read_pdfium_chars)
+                result = reader(addresses, ct.cast(textpage.raw, ct.c_void_p).value, count, extended)
         except native.PdfiumReadError as exc:
             raise pdfium.PdfiumError(str(exc)) from exc
     _CALLS += 1
     _UNAVAILABLE_REASON = None
     records, fonts = result
-    batches_type = getattr(native, "PdfiumCharacterBatches", None)
-    if batches_type is not None and isinstance(records, batches_type):
+    batches_types = tuple(
+        kind
+        for name in ("PdfiumCharacterBatches", "PdfiumVisualCharacterBatches")
+        if (kind := getattr(native, name, None)) is not None
+    )
+    if isinstance(records, batches_types):
         _RECORD_BATCH_SIZE = native.PDFIUM_RECORD_BATCH_SIZE
         return chain.from_iterable(records), fonts
     _RECORD_BATCH_SIZE = None

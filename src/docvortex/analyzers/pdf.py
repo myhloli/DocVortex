@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+import math
 from typing import Any
 
-from ..document.pdf import PDFPage, PDFPageTextGeometry, PDFPageVectorGeometry
+from ..document.pdf import PDFPage, PDFPageSnapshot, PDFPageTextGeometry, PDFPageVectorGeometry
 from ..schema import BBox
 from .native.pdf._script_geometry import ScriptRole, classify_char_script_roles
 from .native.pdf._table_recovery.contracts import NativeTableRectangle, NativeTableRule, PDFTableRecoveryError
@@ -60,25 +61,61 @@ def prepare_text_evidence(
     supported_angles: Sequence[float] = (0.0,),
     table_regions: Sequence[BBox] = (),
     excluded_script_regions: Sequence[BBox] = (),
+    snapshot: PDFPageSnapshot | None = None,
 ) -> PDFTextEvidence:
     """读取一次字符及注释，按既定组行闭包生成页面文字证据。"""
-    from ..document.pdf import get_lines_from_chars
     from .native.pdf.inline.detection import detect_pdf_text_link_lines, detect_pdf_text_style_lines
     from .native.pdf.inline.scripts import detect_pdf_text_script_lines
     from .native.pdf.line_merging import merge_text_line_clusters
-    from .native.pdf.native_text import _build_native_line_items
+    from .native.pdf.native_text import _build_native_line_items_from_chars, _build_native_line_items_from_records
 
+    native_records = None
+    native_owner = None
+    if snapshot is not None:
+        if geometry is not None or vector_geometry is not None:
+            raise ValueError("snapshot cannot be combined with explicit geometry")
+        snapshot.validate_page(page)
+        ordinary_angles = (
+            type(supported_angles) in (list, tuple)
+            and bool(supported_angles)
+            and all(
+                (type(value) is float and math.isfinite(value)) or (type(value) is int and -(2**53) <= value <= 2**53)
+                for value in supported_angles
+            )
+        )
+        if snapshot._native_text is not None and ordinary_angles:
+            native_owner = snapshot._native_text
+            geometry, native_records = native_owner.prepare_visual_evidence(
+                snapshot.page_size, snapshot.rotation, supported_angles
+            )
+        else:
+            geometry = snapshot.text_geometry
+        vector_geometry = snapshot.vector_geometry
     geometry = geometry if geometry is not None else page.get_chars_with_geometry()
-    page_size = tuple(float(value) for value in page.size)
+    page_size = tuple(float(value) for value in (snapshot.page_size if snapshot is not None else page.size))
     # 源字符只读；组行使用独立累加框，旋转等变换在消费处创建局部字符副本。
     chars = geometry.chars
-    lines = _build_native_line_items(
-        get_lines_from_chars(chars), page_size, page_rotation=page.rotation, supported_angles=supported_angles
-    )
+    if native_records is not None:
+        lines = _build_native_line_items_from_records(native_records, page_size)
+    else:
+        lines = _build_native_line_items_from_chars(
+            chars,
+            page_size,
+            page_rotation=snapshot.rotation if snapshot is not None else page.rotation,
+            supported_angles=supported_angles,
+        )
     drawing_lines = vector_geometry.drawing_lines if vector_geometry is not None else page.get_drawing_lines()
     styles = detect_pdf_text_style_lines(lines, drawing_lines)
-    links = detect_pdf_text_link_lines(lines, page.get_link_annotations())
+    links = detect_pdf_text_link_lines(
+        lines, snapshot.link_annotations if snapshot is not None else page.get_link_annotations()
+    )
     script_lines = merge_text_line_clusters(list(lines), page_size, list(table_regions))
+    # 仅本调用新鲜物化且未暴露给调用方的字符可按身份复用；旋转或修复副本不会命中。
+    owned_scripts = None
+    if native_owner is not None:
+        from .native.pdf.inline.scripts import _prepare_owned_script_evidence
+
+        owned_scripts = _prepare_owned_script_evidence(native_owner, chars)
     scripts = detect_pdf_text_script_lines(
         script_lines,
         page_size,
@@ -86,6 +123,7 @@ def prepare_text_evidence(
         geometry.origins,
         all_chars=chars,
         drawing_lines=drawing_lines,
+        _owned_inputs=owned_scripts,
     )
     if excluded_script_regions:
         scripts = [
@@ -130,14 +168,20 @@ def prepare_table_page(
     *,
     geometry: PDFPageTextGeometry | None = None,
     vector_geometry: PDFPageVectorGeometry | None = None,
+    snapshot: PDFPageSnapshot | None = None,
 ) -> PDFTablePage:
     """在调用方确认存在候选表格后物化页面原语，复用已有字符几何。"""
     from .native.pdf._table_recovery.engine import coerce_native_table_rectangles, coerce_native_table_rules
 
+    if snapshot is not None:
+        if geometry is not None or vector_geometry is not None:
+            raise ValueError("snapshot cannot be combined with explicit geometry")
+        snapshot.validate_page(page)
+        geometry, vector_geometry = snapshot.text_geometry, snapshot.vector_geometry
     geometry = geometry if geometry is not None else page.get_chars_with_geometry()
     vector_geometry = vector_geometry if vector_geometry is not None else page.get_vector_geometry()
     return PDFTablePage(
-        tuple(float(value) for value in page.size),
+        tuple(float(value) for value in (snapshot.page_size if snapshot is not None else page.size)),
         geometry,
         coerce_native_table_rules(vector_geometry.drawing_lines),
         coerce_native_table_rectangles(vector_geometry.path_infos),

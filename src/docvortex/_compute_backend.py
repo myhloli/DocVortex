@@ -10,14 +10,14 @@ from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-_PROTOCOL_VERSION = 8
+_PROTOCOL_VERSION = 22
 _SELECTED_MODE = None
 _LOAD_FAILURE = None
 
 
 @lru_cache(maxsize=1)
 def get_native() -> ModuleType | None:
-    """首次使用时固定后端；仅加载失败允许 auto 回退，计算异常直接传播。"""
+    """默认 auto 优先 Rust，首次使用时固定后端；仅 auto 允许加载失败回退，计算异常直接传播。"""
     global _SELECTED_MODE, _LOAD_FAILURE
     mode = os.environ.get("DOCVORTEX_COMPUTE_BACKEND", "auto")
     _SELECTED_MODE, _LOAD_FAILURE = mode, None
@@ -42,13 +42,49 @@ def backend_info() -> dict[str, str | int | None]:
     native = get_native()
     path = getattr(native, "__file__", None)
     bridge = sys.modules.get("docvortex.document.pdf.text._pdfium_bridge")
+    objects = sys.modules.get("docvortex.document.pdf._object_bridge")
+    fonts = sys.modules.get("docvortex.document.pdf.font_runtime")
+    snapshots = sys.modules.get("docvortex.document.pdf.snapshot_bridge")
+    classification = sys.modules.get("docvortex.document.pdf.classification_bridge")
+    snapshot_stats = getattr(native, "text_snapshot_stats", None)
+    span_calls, span_unsupported, span_contents = snapshot_stats() if snapshot_stats is not None else (0, 0, 0)
     return {
+        "native_inline_style_batches": native.inline_style_stats() if native is not None else 0,
+        "native_span_content_calls": span_contents,
+        **(
+            classification.classification_bridge_info()
+            if classification is not None
+            else {"native_classification_unavailable_reason": "not probed"}
+        ),
+        "native_classification_snapshot_calls": native.classification_snapshot_stats() if native is not None else 0,
+        "native_script_snapshot_batches": native.script_snapshot_stats() if native is not None else 0,
+        "native_span_assignment_calls": span_calls,
+        "native_span_assignment_unsupported": span_unsupported,
         "backend": "rust" if native is not None else "python",
         "protocol": getattr(native, "PROTOCOL_VERSION", None),
         "extension": path,
         "extension_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest() if path else None,
         "requested_backend": _SELECTED_MODE,
         "unavailable_reason": _LOAD_FAILURE,
+        **(
+            snapshots.snapshot_bridge_info()
+            if snapshots is not None
+            else {
+                "native_text_snapshot_calls": 0,
+                "native_text_snapshot_empty_pages": 0,
+                "native_text_snapshot_unavailable_reason": "not probed",
+            }
+        ),
+        **(
+            fonts.native_font_runtime_info()
+            if fonts is not None
+            else {"native_font_provider_installed": False, "native_font_provider_unavailable_reason": "not probed"}
+        ),
+        **(
+            objects.bridge_info()
+            if objects is not None
+            else {"pdfium_object_bridge_calls": 0, "pdfium_object_bridge_unavailable_reason": "not probed"}
+        ),
         **(
             bridge.bridge_info()
             if bridge is not None

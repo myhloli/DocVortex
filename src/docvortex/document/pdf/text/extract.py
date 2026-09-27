@@ -168,9 +168,7 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
     """物化已批量读取的记录，保持字体共享、页内对象编号、裁剪和写入方向语义。"""
     from ._pdfium_bridge import read_native_chars
 
-    left, bottom, right, top = page_bbox
-    width, height = math.ceil(abs(right - left)), math.ceil(abs(top - bottom))
-    batch = read_native_chars(textpage, include_geometry)
+    batch = read_native_chars(textpage, include_geometry, frame=page_bbox, rotation=page_rotation)
     if batch is None:
         return None
     records, raw_fonts = batch
@@ -179,11 +177,11 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
         return []
     decoded_fonts = [(bytes(name).decode("utf-8", errors="replace"), flags) for name, flags in raw_fonts]
     fonts, objects = {}, {}
-    chars, raw_geometry, pending_clips, retained = [], [], [], []
+    retained = []
     writing_rotation = math.radians(page_rotation)
     last_font_index = last_size = last_weight = last_font = None
     last_address = last_object_id = None
-    for index, (code, rotation, loose, tight, font_index, size, weight, address, mode, origin) in enumerate(records):
+    for index, (code, rotation, font_index, size, weight, address, mode, layout, loose, tight, origin) in enumerate(records):
         # 读取桥按固定上限逐批物化记录，已消费批次不与整页最终字符长期重叠。
         if (
             type(font_index) is int
@@ -222,7 +220,7 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
             if not visible:
                 continue
         char = {
-            "bbox": None,
+            "bbox": Bbox(layout),
             "char": chr(code) if not 0xD800 <= code <= 0xDFFF else "\ufffd",
             "rotation": rotation,
             "font": font,
@@ -232,28 +230,13 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
             "text_object_id": object_id,
             "text_render_mode": mode,
             "writing_angle": writing_rotation - rotation,
-            "origin": None,
+            "origin": origin,
         }
-        selected = loose if rotation == 0 else tight
-        raw_geometry.append((selected, loose if include_geometry else None, tight if include_geometry else None, origin))
-        pending_clips.append(clip)
-        chars.append(char)
-        if len(chars) >= 1024:
-            retained.extend(
-                _materialize_native_char_batch(
-                    chars, raw_geometry, pending_clips, page_bbox, (width, height), page_rotation, include_geometry
-                )
-            )
-            chars.clear()
-            raw_geometry.clear()
-            pending_clips.clear()
+        if include_geometry:
+            char["loose_bbox"], char["tight_bbox"] = loose, tight
+        if clip is None or _clip_visible_character(char, clip):
+            retained.append(char)
     del batch, records, raw_fonts
-    if chars:
-        retained.extend(
-            _materialize_native_char_batch(
-                chars, raw_geometry, pending_clips, page_bbox, (width, height), page_rotation, include_geometry
-            )
-        )
     _assign_writing_angles(retained)
     _mark_visible_objects(retained, textpage.raw)
     return retained

@@ -40,6 +40,10 @@ def capture(args: argparse.Namespace) -> dict:
         name = path.stem
         payload = path.read_bytes()
         source_hash = hashlib.sha256(payload).hexdigest()
+        if path.suffix == ".xor":
+            # 与冻结语料的来源摘要保持一致，只在交给 PDFium 前解码载荷。
+            key = b"MinerU flash layout fixture"
+            payload = bytes(value ^ key[index % len(key)] for index, value in enumerate(payload))
         entry = next(item for item in frozen["documents"] if item["source_sha256"] == source_hash)
         baseline = json.loads((args.flash_baseline / entry["artifact"] / "output.json").read_text())["model_list"]
         for effort in ("medium", "high"):

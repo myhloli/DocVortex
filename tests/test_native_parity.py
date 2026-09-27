@@ -25,6 +25,14 @@ def native():
 def test_native_registration_contract(native):
     """约束重构前的平面扩展接口、签名和类型身份，防止拆分模块时漏注册或改名。"""
     functions = {
+        "inline_style_stats": "()",
+        "crop_bitmap_bgr": "(data, width, height, stride, mode, bbox, angle)",
+        "build_geometry_style": "(samples, by_line, keys, sample_type, run_type, line_type, page_sizes=None, bbox_type=None)",
+        "build_geometry_runs": "(samples, by_line, keys, sample_type, run_type)",
+        "text_snapshot_stats": "()",
+        "classification_snapshot_stats": "()",
+        "read_pdfium_classification": "(addresses, handle, count, cjk_ranges, allowed_controls, private_range, normalize_font)",
+        "script_snapshot_stats": "()",
         "anchor_pairs": "(records, positive_source)",
         "assign_cells": "(glyphs, specs, index)",
         "component_specs": "(parents, rows, cols)",
@@ -45,7 +53,13 @@ def test_native_registration_contract(native):
         "ordered_clusters": "(values, tolerance, relative, last_only)",
         "paint_pairs": "(records)",
         "read_pdfium_char_batches": "(addresses, handle, count, extended)",
+        "group_text_lines": "(chars, height_threshold, distance)",
+        "prepare_visual_lines": "(chars, size, page_rotation, supported_angles)",
+        "read_pdfium_subpaths": "(addresses, handle)",
+        "read_pdfium_text_snapshot": "(addresses, color_addresses, handle, count, extended, frame, rotation, visibility)",
         "read_pdfium_chars": "(addresses, handle, count, extended)",
+        "read_pdfium_objects": "(addresses, handle, kind, max_depth)",
+        "read_pdfium_visual_batches": "(addresses, handle, count, extended, frame, angle)",
         "script_roles": "(records)",
         "script_roles_raw": "(loose, tight, origins, flags, fonts, fallback)",
         "script_roles_raw_batch": "(loose, tight, origins, flags, fonts, offsets, fallback)",
@@ -60,16 +74,31 @@ def test_native_registration_contract(native):
         "visual_runs": "(raw, overrides, flags, size, angle, fallback)",
     }
     classes = {
+        "OwnedRuleCore": ("docvortex._native", None),
+        "NativeTableGrid": ("docvortex._native", "(grids, rows, size, angle, height)"),
+        "NativeTableMerger": ("docvortex._native", "()"),
+        "NativeStyleDocument": ("docvortex._native", "(with_samples=False)"),
+        "NativeGeometryRisk": ("docvortex._native", "()"),
+        "NativeTextSnapshot": ("docvortex._native", None),
+        "NativeClassificationSnapshot": ("docvortex._native", None),
+        "NativeScriptEvidence": ("docvortex._native", None),
+        "NativeFontProvider": (
+            "docvortex._native",
+            "(addresses, data, tables, cache_name, aliases, suffixes, classify_legacy)",
+        ),
         "AnnotationGeometry": ("builtins", "(fragments)"),
         "BaselineCandidates": ("builtins", "(bounds, groups)"),
         "BaselineGeometryCandidates": ("builtins", "(bounds, groups, boxes, heights, sources)"),
         "PdfiumCharacterBatches": ("docvortex._native", None),
+        "PdfiumVisualCharacterBatches": ("docvortex._native", None),
+        "PdfiumObjectBatches": ("docvortex._native", None),
+        "PreparedRuleCandidates": ("builtins", "(centers, rows)"),
         "PdfiumReadError": ("_native", None),
         "StableColumnClusters": ("builtins", "(compensated)"),
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 8, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 22, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)
