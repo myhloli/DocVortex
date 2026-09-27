@@ -3,6 +3,7 @@ use super::geometry::{plain_coordinates, shared_coordinates};
 use super::geometry_runs::materialize_runs;
 use docvortex_core::{
     geometry::{self, Box4, Size},
+    geometry_lines::{self, World},
     geometry_runs::Sample,
     geometry_style::{Document, Result},
 };
@@ -216,7 +217,7 @@ impl NativeStyleDocument {
     }
 
     /// 布局分支连续完成样式及来源恢复，再仅物化一次最终样本和 run。
-    #[pyo3(signature = (families, keys, sample_type, run_type, on_ready=None))]
+    #[pyo3(signature = (families, keys, sample_type, run_type, on_ready=None, with_metrics=false, compensated=false))]
     fn finish_layout<'py>(
         &mut self,
         py: Python<'py>,
@@ -225,15 +226,9 @@ impl NativeStyleDocument {
         sample_type: &Bound<'py, PyAny>,
         run_type: &Bound<'py, PyAny>,
         on_ready: Option<&Bound<'py, PyAny>>,
-    ) -> PyResult<
-        Option<(
-            Bound<'py, PyList>,
-            Bound<'py, PyDict>,
-            Bound<'py, PyDict>,
-            Bound<'py, PySet>,
-            Bound<'py, PyDict>,
-        )>,
-    > {
+        with_metrics: bool,
+        compensated: bool,
+    ) -> PyResult<Option<Bound<'py, PyAny>>> {
         let document = self
             .document
             .take()
@@ -241,12 +236,49 @@ impl NativeStyleDocument {
         let mut frames = std::mem::take(&mut self.frames);
         let lines = std::mem::take(&mut self.lines);
         let legacy = frames.iter().map(|f| (f.legacy, f.size, f.angle)).collect();
-        let Some(prepared) = py.detach(move || document.prepare(&families, Some(legacy))) else {
+        let world = if with_metrics {
+            let mut flags = Vec::with_capacity(lines.len());
+            for line in &lines {
+                let line = line.bind(py);
+                let canonical = !line.getattr("formula_candidate_only")?.extract::<bool>()?
+                    && !line.getattr("compact_formula_cluster")?.extract::<bool>()?;
+                let y_eligible = canonical
+                    && line.getattr("angle")?.extract::<i32>()? == 0
+                    && !line.getattr("restored_inline_cluster")?.extract::<bool>()?;
+                flags.push((canonical, y_eligible));
+            }
+            frames
+                .iter()
+                .map(|f| World {
+                    tight: f.tight,
+                    canonical: flags[f.line].0,
+                    y_eligible: flags[f.line].1,
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let result = py.detach(move || {
+            let prepared = document.prepare(&families, Some(legacy))?;
+            let summary = if with_metrics {
+                Some((
+                    geometry_lines::summarize(&prepared, &world, compensated)?,
+                    docvortex_core::geometry_style::reports(&prepared.runs, &prepared.style),
+                ))
+            } else {
+                None
+            };
+            Some((prepared, summary))
+        });
+        let Some((prepared, summary)) = result else {
             return Ok(None);
         };
         if frames.len() != prepared.samples.len() {
             return Ok(None);
         }
+        let needs_samples = summary.as_ref().is_none_or(|(metrics, _)| {
+            metrics.2 || prepared.runs.iter().any(|r| r.strong || r.sibling)
+        });
         for (frame, restored) in frames.iter_mut().zip(&prepared.restored) {
             if let Some(source) = restored {
                 frame.source = *source;
@@ -267,53 +299,76 @@ impl NativeStyleDocument {
             on_ready.call0()?;
         }
         let samples = PyList::empty(py);
-        for ((sample, metadata), frame) in
-            prepared.samples.iter().zip(&prepared.metadata).zip(frames)
-        {
-            let [raw, side, tight, origin] = frame.owners;
-            let source =
-                shared_coordinates(py, frame.source, &[raw.into_bound(py), side.into_bound(py)])?;
-            let tight = shared_coordinates(py, frame.tight, &[tight.into_bound(py)])?;
-            let origin = shared_coordinates(py, frame.origin, &[origin.into_bound(py)])?;
-            let (local_source, local_tight, local_origin) = if frame.angle == 0 {
-                (source.clone(), tight.clone(), origin.clone())
-            } else {
-                (
-                    shared_coordinates(py, sample.source, &[])?,
-                    shared_coordinates(py, sample.tight, &[])?,
-                    shared_coordinates(py, sample.origin, &[])?,
-                )
-            };
-            let fields = PyTuple::new(
-                py,
-                [
-                    metadata.page.into_pyobject(py)?.into_any(),
-                    lines[frame.line].bind(py).clone(),
-                    sample.position.into_pyobject(py)?.into_any(),
-                    frame.char_index.into_bound(py),
-                    frame.text.into_bound(py),
-                    source,
-                    tight,
-                    origin,
-                    local_source,
-                    local_tight,
-                    local_origin,
-                    keys.get_item(sample.run)?,
-                    frame.font_size.into_bound(py),
-                    PyBool::new(py, sample.anchor).to_owned().into_any(),
-                ],
-            )?;
-            samples.append(sample_type.call1(fields)?)?;
+        if needs_samples {
+            for ((sample, metadata), frame) in
+                prepared.samples.iter().zip(&prepared.metadata).zip(frames)
+            {
+                let [raw, side, tight, origin] = frame.owners;
+                let source = shared_coordinates(
+                    py,
+                    frame.source,
+                    &[raw.into_bound(py), side.into_bound(py)],
+                )?;
+                let tight = shared_coordinates(py, frame.tight, &[tight.into_bound(py)])?;
+                let origin = shared_coordinates(py, frame.origin, &[origin.into_bound(py)])?;
+                let (local_source, local_tight, local_origin) = if frame.angle == 0 {
+                    (source.clone(), tight.clone(), origin.clone())
+                } else {
+                    (
+                        shared_coordinates(py, sample.source, &[])?,
+                        shared_coordinates(py, sample.tight, &[])?,
+                        shared_coordinates(py, sample.origin, &[])?,
+                    )
+                };
+                let fields = PyTuple::new(
+                    py,
+                    [
+                        metadata.page.into_pyobject(py)?.into_any(),
+                        lines[frame.line].bind(py).clone(),
+                        sample.position.into_pyobject(py)?.into_any(),
+                        frame.char_index.into_bound(py),
+                        frame.text.into_bound(py),
+                        source,
+                        tight,
+                        origin,
+                        local_source,
+                        local_tight,
+                        local_origin,
+                        keys.get_item(sample.run)?,
+                        frame.font_size.into_bound(py),
+                        PyBool::new(py, sample.anchor).to_owned().into_any(),
+                    ],
+                )?;
+                samples.append(sample_type.call1(fields)?)?;
+            }
         }
         let by_line = PyDict::new(py);
-        for (key, indices) in prepared.line_keys.into_iter().zip(prepared.lines) {
-            let members = PyList::empty(py);
-            for index in indices {
-                members.append(samples.get_item(index)?)?;
+        if needs_samples {
+            for (key, indices) in prepared.line_keys.into_iter().zip(prepared.lines) {
+                let members = PyList::empty(py);
+                for index in indices {
+                    members.append(samples.get_item(index)?)?;
+                }
+                by_line.set_item(key, members)?;
             }
-            by_line.set_item(key, members)?;
         }
-        let runs = materialize_runs(py, &samples, keys, prepared.runs, &flags, run_type)?;
-        Ok(Some((samples, by_line, runs, inflated, scales)))
+        let runs = if needs_samples {
+            materialize_runs(py, &samples, keys, prepared.runs, &flags, run_type)?
+        } else {
+            PyDict::new(py)
+        };
+        if let Some(summary) = summary {
+            Ok(Some(
+                (samples, by_line, runs, inflated, scales, summary)
+                    .into_pyobject(py)?
+                    .into_any(),
+            ))
+        } else {
+            Ok(Some(
+                (samples, by_line, runs, inflated, scales)
+                    .into_pyobject(py)?
+                    .into_any(),
+            ))
+        }
     }
 }

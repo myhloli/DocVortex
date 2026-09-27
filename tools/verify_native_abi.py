@@ -16,7 +16,7 @@ def verify_binary(binary: Path) -> None:
     assert spec is not None and spec.loader is not None
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
-    assert native.PROTOCOL_VERSION == 18
+    assert native.PROTOCOL_VERSION == 19
     assert native.source_rows_plain([], (100.0, 100.0), 0) == []
     assert native.script_roles_raw_batch(
         [(0.0, 0.0, 5.0, 10.0), (0.0, 0.0, 5.0, 10.0)],
@@ -54,6 +54,9 @@ def verify_binary(binary: Path) -> None:
     assert native.anchor_pairs([], False) == []
     assert native.NativeStyleDocument().finish([]) == ([], [], [])
     assert native.NativeStyleDocument(True).finish_layout([], [], object, object) == ([], {}, {}, set(), {})
+    assert native.NativeStyleDocument(True).finish_layout([], [], object, object, with_metrics=True) == (
+        [], {}, {}, set(), {}, (([], [], False), [])
+    )
     risk = native.NativeGeometryRisk()
     assert risk.add_line(0, 0, 10.0, False, []) is False
     assert risk.finish() == (False, False)

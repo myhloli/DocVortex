@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 import statistics
+import sys
 import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -1890,7 +1891,7 @@ def _prepare_run_style(
     return runs, inflated, False
 
 
-def _prepare_owned_document(lines_by_page, geometries, page_sizes, *, layout=False):
+def _prepare_owned_document(lines_by_page, geometries, page_sizes, *, layout=False, with_metrics=False):
     """自有 Rust 文档连续完成样本、锚点、run 和样式，仅为后续布局规则物化一次字符。"""
     from ...._compute_backend import get_native
 
@@ -1917,6 +1918,13 @@ def _prepare_owned_document(lines_by_page, geometries, page_sizes, *, layout=Fal
         for line in lines:
             if (
                 type(line) is not _LineItem
+                or (
+                    with_metrics
+                    and any(
+                        type(value) is not bool
+                        for value in (line.formula_candidate_only, line.compact_formula_cluster, line.restored_inline_cluster)
+                    )
+                )
                 or type(line.angle) is not int
                 or not -(2**31) <= line.angle < 2**31
                 or type(line.source_index) is not int
@@ -1978,12 +1986,17 @@ def _prepare_owned_document(lines_by_page, geometries, page_sizes, *, layout=Fal
             for geometry in geometries:
                 geometry.loose_bboxes.clear()
 
-        result = document.finish_layout(families, run_keys, _CharSample, _RunStats, release_side_maps)
+        result = document.finish_layout(
+            families, run_keys, _CharSample, _RunStats, release_side_maps, with_metrics, sys.version_info >= (3, 12)
+        )
         if result is None:
             return None
-        samples, by_line, runs, inflated, scales = result
+        samples, by_line, runs, inflated, scales = result[:5]
         # 保留旧 set comprehension 的 run 顺序，避免同族 donor 并列时改变选择。
-        runs = {key: runs[key] for key in {key for key in run_keys}}
+        runs = {key: runs[key] for key in {key for key in run_keys} if key in runs}
+        if with_metrics:
+            metrics, reports = result[5]
+            return samples, by_line, runs, inflated, scales, (metrics, _native_run_diagnostics(run_keys, reports))
         return samples, by_line, runs, inflated, scales
     result = document.finish(families)
     if result is None:
@@ -1994,9 +2007,19 @@ def _prepare_owned_document(lines_by_page, geometries, page_sizes, *, layout=Fal
         document_style_anomaly=bool(inflated),
         line_style_scales=dict(scales),
     )
+    plan.run_diagnostics = _native_run_diagnostics(run_keys, rows)
+    # 只有整本文档成功消费后才清理侧表，拒绝输入时仍能完整执行参考路径。
+    for geometry in geometries:
+        geometry.loose_bboxes.clear()
+    return plan
+
+
+def _native_run_diagnostics(run_keys, rows):
+    """仅在输出边界将原生 run 数值转换为既有诊断字段与排序。"""
+    diagnostics = []
     for row in sorted(rows, key=lambda row: run_keys[row[0]]):
         index, count, pairs, median_ratio, p90, large_share, overlap_share, strong, sibling, style = row
-        plan.run_diagnostics.append(
+        diagnostics.append(
             {
                 "run_key": list(run_keys[index]),
                 "sample_count": count,
@@ -2010,10 +2033,7 @@ def _prepare_owned_document(lines_by_page, geometries, page_sizes, *, layout=Fal
                 "style_y_bad": style,
             }
         )
-    # 只有整本文档成功消费后才清理侧表，拒绝输入时仍能完整执行参考路径。
-    for geometry in geometries:
-        geometry.loose_bboxes.clear()
-    return plan
+    return diagnostics
 
 
 def _prepare_style_only_document(lines_by_page, geometries, page_sizes):
@@ -2021,9 +2041,9 @@ def _prepare_style_only_document(lines_by_page, geometries, page_sizes):
     return _prepare_owned_document(lines_by_page, geometries, page_sizes)
 
 
-def _prepare_layout_document(lines_by_page, geometries, page_sizes):
+def _prepare_layout_document(lines_by_page, geometries, page_sizes, *, with_metrics=False):
     """布局分支只在 X/Y 规则边界物化一次已计算完统计的字符数据。"""
-    return _prepare_owned_document(lines_by_page, geometries, page_sizes, layout=True)
+    return _prepare_owned_document(lines_by_page, geometries, page_sizes, layout=True, with_metrics=with_metrics)
 
 
 def build_document_geometry_plan(
@@ -2049,13 +2069,17 @@ def build_document_geometry_plan(
         native_plan = _prepare_style_only_document(lines_by_page, geometries, page_sizes)
         if native_plan is not None:
             return native_plan
-    prepared = _prepare_layout_document(lines_by_page, geometries, page_sizes) if risk.layout else None
+    prepared = _prepare_layout_document(lines_by_page, geometries, page_sizes, with_metrics=True) if risk.layout else None
+    native_y_risk = None
     if prepared is not None:
-        samples, by_line, runs, inflated, scales = prepared
+        samples, by_line, runs, inflated, scales, (metrics, diagnostics) = prepared
         plan.style_inflated_runs = inflated
         plan.document_style_anomaly = bool(inflated)
         plan.line_style_scales.update(scales)
-        _record_line_canonical_metrics(plan, by_line)
+        inks, baselines, native_y_risk = metrics
+        plan.line_ink_bboxes.update((key, tuple(box)) for key, box in inks)
+        plan.line_baselines.update(baselines)
+        plan.run_diagnostics = diagnostics
     else:
         samples, by_line = _collect_samples(lines_by_page, geometries, page_sizes)
         if risk.layout:
@@ -2072,14 +2096,15 @@ def build_document_geometry_plan(
             runs = _build_run_stats(samples, by_line)
             for run in runs.values():
                 run.style_y_bad = run.key in style_inflated_runs
-    plan.run_diagnostics = _run_diagnostics(runs)
+    if prepared is None:
+        plan.run_diagnostics = _run_diagnostics(runs)
     if not risk.layout:
         return plan
     x_bad_runs = {run.key for run in runs.values() if run.strong_x_bad or run.sibling_x_bad}
     if x_bad_runs:
         _repair_x_chars(plan, runs, by_line, page_sizes)
         _build_line_repairs_from_x(plan, lines_by_page, by_line, page_sizes)
-    if not _has_document_y_risk(by_line):
+    if not (native_y_risk if native_y_risk is not None else _has_document_y_risk(by_line)):
         return plan
     analyses = _analyze_lines(lines_by_page, by_line, page_sizes)
     confirmed_runs = _mark_y_candidates(analyses)
@@ -2177,6 +2202,7 @@ _STYLE_ONLY_FUNCTIONS = {
     for function in (
         _collect_samples,
         _record_line_canonical_metrics,
+        _has_document_y_risk,
         _baseline_clusters,
         _bbox_union_many,
         _plain_source_records,

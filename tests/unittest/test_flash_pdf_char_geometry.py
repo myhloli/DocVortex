@@ -1147,3 +1147,94 @@ def test_native_style_restoration_accepts_owned_bbox_container() -> None:
     plan = rules.DocumentGeometryPlan()
     _, inflated, restored = rules._prepare_run_style(plan, samples, by_line, restore_pages=[(600.0, 100.0)] * 2)
     assert inflated and restored
+
+
+def test_owned_line_metrics_match_reference_across_flags_and_baselines() -> None:
+    """共享聚类后仍保留宽度/人数的不同主基线规则、旋转与重复来源行语义。"""
+    import random
+    from copy import deepcopy
+    import pytest
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    if get_native() is None:
+        pytest.skip("需要原生扩展")
+    rng = random.Random(1419)
+    for case in range(120):
+        pages, geometries, sizes = _style_only_document_fixture()
+        for page, geometry in zip(pages, geometries):
+            for line in page:
+                line.angle = (0, 90, 180, 270)[case % 4]
+                line.formula_candidate_only = case % 13 == 0
+                line.compact_formula_cluster = case % 17 == 0
+                line.restored_inline_cluster = case % 11 == 0
+                if case % 7 == 0:
+                    line.source_index = 0
+                for position, char in enumerate(line.chars):
+                    idx = char["char_idx"]
+                    origin = geometry.origins[idx]
+                    offset = rng.choice((0.0, 0.0, 0.0, 1.0, 10.0))
+                    geometry.origins[idx] = (origin[0], origin[1] + offset)
+                    tight = geometry.tight_bboxes[idx]
+                    geometry.tight_bboxes[idx] = (
+                        tight[0],
+                        tight[1] + offset,
+                        tight[0] + rng.choice((0.5, 4.5, 20.0)),
+                        tight[3] + offset,
+                    )
+                    if case % 3 == 0:
+                        box = char["bbox"]
+                        char["bbox"] = (box[0], box[1] - 12.0, box[2], box[3] + 12.0)
+        reference = deepcopy((pages, geometries, sizes))
+        samples, by_line = rules._collect_samples(*reference)
+        runs = rules._build_run_stats_python(samples, by_line)
+        plan = rules.DocumentGeometryPlan()
+        rules._record_line_canonical_metrics(plan, by_line)
+        inflated = rules._mark_style_inflated_runs(runs)
+        if inflated:
+            rules._restore_stable_legacy_source_bboxes(by_line, sizes)
+            runs = rules._build_run_stats_python(samples, by_line)
+            for run in runs.values():
+                run.style_y_bad = run.key in inflated
+        risk = rules._has_document_y_risk(by_line)
+        result = rules._prepare_layout_document(pages, geometries, sizes, with_metrics=True)
+        assert result is not None
+        metrics, reports = result[5]
+        inks, baselines, actual_risk = metrics
+        assert {key: tuple(box) for key, box in inks} == plan.line_ink_bboxes
+        assert dict(baselines) == plan.line_baselines
+        assert actual_risk == risk
+        assert reports == rules._run_diagnostics(runs)
+        assert bool(result[0]) == bool(risk or any(run.strong_x_bad or run.sibling_x_bad for run in runs.values()))
+
+
+def test_owned_layout_without_repairs_avoids_character_materialization(monkeypatch) -> None:
+    """布局准入后没有实际 X/Y 修复时，仍返回完整 canonical 计划且不构造字符对象。"""
+    from copy import deepcopy
+    import pytest
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    if get_native() is None:
+        pytest.skip("需要原生扩展")
+    line, geometry = _line_fixture(source_index=0, baseline=30.0)
+    args = ([[line]], [geometry], [(600.0, 100.0)])
+
+    def full_layout(*args):
+        """固定准入，以检查二级风险排除后是否消除字符物化。"""
+        return rules._DocumentGeometryRisk(layout=True, style=False)
+
+    monkeypatch.setattr(rules, "_document_requires_full_geometry", full_layout)
+    with monkeypatch.context() as context:
+        context.setattr(rules, "_build_run_stats", rules._build_run_stats_python)
+        expected = rules.build_document_geometry_plan(*deepcopy(args))
+
+    def reject_sample(*args, **kwargs):
+        """此分支不应再调用 Python 字符构造器。"""
+        raise AssertionError("Unexpected character materialization")
+
+    monkeypatch.setattr(rules._CharSample, "__init__", reject_sample)
+    actual = rules.build_document_geometry_plan(*args)
+    assert actual == expected
+    assert actual.line_baselines and actual.line_ink_bboxes
+    assert not geometry.loose_bboxes

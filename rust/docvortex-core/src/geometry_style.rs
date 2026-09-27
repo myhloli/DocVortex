@@ -237,31 +237,7 @@ impl Document {
             line_keys,
             ..
         } = self.prepare(&families, None)?;
-        let inflated: HashSet<_> = style.inflated.iter().copied().collect();
-        let mut reports = Vec::with_capacity(runs.len());
-        for (id, run) in runs.into_iter().enumerate() {
-            let count = run.ratios.len();
-            reports.push((
-                id,
-                run.members.len(),
-                count,
-                (count > 0).then(|| median(run.ratios.clone())),
-                (count > 0).then(|| quantile(run.ratios.clone(), 0.9)),
-                if count > 0 {
-                    run.ratios.iter().filter(|v| **v > 1.35).count() as f64 / count as f64
-                } else {
-                    0.0
-                },
-                if count > 0 {
-                    run.overlaps.iter().filter(|v| **v).count() as f64 / count as f64
-                } else {
-                    0.0
-                },
-                run.strong,
-                run.sibling,
-                inflated.contains(&id),
-            ));
-        }
+        let reports = reports(&runs, &style);
         Some((
             style.inflated,
             style
@@ -272,4 +248,34 @@ impl Document {
             reports,
         ))
     }
+}
+
+/// 从已完成统计的自有 run 导出诊断数值，不构造 Python run 对象。
+pub fn reports(runs: &[Run], style: &Style) -> Vec<Report> {
+    let inflated: HashSet<_> = style.inflated.iter().copied().collect();
+    let mut reports = Vec::with_capacity(runs.len());
+    for (id, run) in runs.iter().enumerate() {
+        let count = run.ratios.len();
+        reports.push((
+            id,
+            run.members.len(),
+            count,
+            (count > 0).then(|| median(run.ratios.clone())),
+            (count > 0).then(|| quantile(run.ratios.clone(), 0.9)),
+            if count > 0 {
+                run.ratios.iter().filter(|v| **v > 1.35).count() as f64 / count as f64
+            } else {
+                0.0
+            },
+            if count > 0 {
+                run.overlaps.iter().filter(|v| **v).count() as f64 / count as f64
+            } else {
+                0.0
+            },
+            run.strong,
+            run.sibling,
+            inflated.contains(&id),
+        ));
+    }
+    reports
 }
