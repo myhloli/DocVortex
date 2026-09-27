@@ -32,6 +32,7 @@ pub fn prepare(
     }
     let mut properties = HashMap::new();
     let mut fonts = HashMap::new();
+    let mut prepared_fonts = vec![None; data.fonts.len()];
     let mut records = Vec::with_capacity(data.chars.len());
     for ch in &data.chars {
         let t = tight.get(&ch.index).copied();
@@ -53,14 +54,21 @@ pub fn prepare(
                 value
             }
         };
-        let font = &data.fonts[ch.font];
-        let next = fonts.len() as i64;
-        let font_id = if font.name.is_empty() {
-            -1
+        // canonical 字体 ID 可直接复用等价类，避免每个字符复制并重新哈希字体名。
+        let font_id = if let Some(id) = prepared_fonts[ch.font] {
+            id
         } else {
-            *fonts
-                .entry((font.name.clone(), font.flags, font.weight))
-                .or_insert(next)
+            let font = &data.fonts[ch.font];
+            let next = fonts.len() as i64;
+            let id = if font.name.is_empty() {
+                -1
+            } else {
+                *fonts
+                    .entry((font.name.clone(), font.flags, font.weight))
+                    .or_insert(next)
+            };
+            prepared_fonts[ch.font] = Some(id);
+            id
         };
         let t = geometry::normalize(t, true);
         if flag & 3 == 0 && t.is_some() && o.is_some() {
