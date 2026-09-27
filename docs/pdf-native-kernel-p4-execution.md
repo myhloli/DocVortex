@@ -10,13 +10,22 @@
 
 这些是阶段结果。PDFium 文档/页面的完整 Rust 生命周期、矢量快照、Flash 全流程和旧后端退出尚未全部完成。
 
+协议 18（`7481460`）进一步接通 Rust 自有文档的几何准备、锚点、run、跨页样式和来源恢复，样式路径不构造字符样本，布局路径仅在剩余 Python 规则前物化一次。完整几何计划及 32 份公开/medium 回放一致，5181 项全量测试和实际双 wheel 检查通过。当前正式性能与 CI 证据见 [阶段 13 报告](rust-pdf-stage13-owned-geometry.md)。
+
 ## 1. 整体迁移全文几何计划
 
 依据独立低干扰阶段计时，demo1 / 中文论文2 的 `build_document_geometry_plan()` 占公开解析约 27%；详细函数 profiler 仅用于定位调用，不将其放大的时间占比当作正式收益。
 
-风险筛查和 run 统计已完成阶段迁移；下一步把 `src/docvortex/analyzers/native/pdf/char_geometry.py` 的字符样本、跨页样式异常、X 修复、Y 聚类/邻行/修复及诊断构造接入同一 Rust 文档数据。Rust 内持有文档级样本和 run，不能每个子阶段重新转换字符字典。原始页与行来源 ID、stable tie、字段更新顺序和全文先后依赖必须保留。
+风险筛查、样本准备、run 统计、跨页样式校准及来源恢复已完成阶段迁移；下一步把 `src/docvortex/analyzers/native/pdf/char_geometry.py` 剩余的 canonical 行指标、X 修复、Y 聚类/邻行/修复及诊断构造接入同一 Rust 文档数据。延后布局路径最后一次 Python 字符样本物化，不能每个子阶段重新转换字符字典。原始页与行来源 ID、stable tie、字段更新顺序和全文先后依赖必须保留。
 
 需特别验证：线性插值分位数（该模块不是相邻取样分位数）、CPython 版本对应的浮点求和、字体族/Unicode 类别、source 与 loose side-map 的不同来源、稀疏相邻字符修复、跨页样式触发、split shadow、旋转及诊断顺序。配置或自定义输入不支持时明确选择参考路径，计算失败必须抛出。
+
+协议 18 之后的具体顺序：
+
+1. 在自有文档中保留各行 anchor ID 和基线聚类，连续产生 canonical tight 并集、基线及 Y 风险摘要。`_record_line_canonical_metrics()` / `_analyze_lines()` 按宽度和成员数选择 dominant，`_has_document_y_risk()` 按成员数选择；只能共享聚类，不能错误地统一三处裁决规则。
+2. 接入 X donor、稀疏修复、行修复汇总；先保留纯数值修复记录，按原插入顺序在绑定边界构造 `CharLayoutGeometry` / `LineGeometryRepair`。
+3. 接入 Y 邻行、侵入判定、trim 与 split shadow；复用已经准备好的行与 run，最终仅导出计划字段和诊断。保留 X 修复先于 Y、跨页样式先于来源恢复的依赖。
+4. 独立测量热点，再跑三链路正式验收。若几何阶段收益已明显受 PDFium 或表格阶段限制，按独占耗时调整下一批优先级，不为减少 Python 代码量而继续细碎迁移。
 
 交付：完整 `DocumentGeometryPlan` 字段及诊断差分、布局/原文/标框对照、32 份公开/Flash/共享入口回放，以及独立正式计时和进程树 RSS。
 
