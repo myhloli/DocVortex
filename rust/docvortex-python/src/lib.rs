@@ -12,6 +12,7 @@ mod geometry;
 mod geometry_document;
 mod geometry_risk;
 mod geometry_runs;
+mod inline_styles;
 mod pdfium;
 mod pixels;
 mod script_snapshot;
@@ -27,6 +28,7 @@ mod text_pipeline;
 /// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(inline_styles::inline_style_stats, module)?)?;
     module.add_function(wrap_pyfunction!(pixels::crop_bitmap_bgr, module)?)?;
     module.add_class::<table_merge::OwnedRuleCore>()?;
     module.add_class::<table_merge::NativeTableGrid>()?;

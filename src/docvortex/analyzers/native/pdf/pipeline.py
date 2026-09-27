@@ -301,6 +301,9 @@ def _repeated_header_evidence_pages(
     return supported_pages
 
 
+_STANDARD_STYLE_DETECTOR = detect_pdf_text_style_lines
+
+
 @dataclass(slots=True)
 class _DocumentSources:
     """持有跨页校准前的原始页面，以及最终物化仍需的紧凑样式证据。"""
@@ -348,7 +351,15 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
             page_size,
         )
         drawing_lines.extend(decorative_rules)
-        page_style_lines.append(detect_pdf_text_style_lines(lines, drawing_lines))
+        from .inline.owned_styles import detect_owned_style_lines
+
+        owned = page_owned_scripts[-1]
+        style_lines = (
+            detect_owned_style_lines(native_text, lines, drawing_lines, owned[1] if owned is not None else None)
+            if detect_pdf_text_style_lines is _STANDARD_STYLE_DETECTOR
+            else None
+        )
+        page_style_lines.append(style_lines if style_lines is not None else detect_pdf_text_style_lines(lines, drawing_lines))
         page_link_lines.append(
             detect_pdf_text_link_lines(
                 lines,

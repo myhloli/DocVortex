@@ -750,6 +750,28 @@ impl NativeTextSnapshot {
             self.data.visible_only,
         )
     }
+    /// 直接以快照字符及行成员 ID 生成粗体和装饰线证据，不逐字符往返 Python。
+    fn detect_style_lines(
+        &self,
+        py: Python<'_>,
+        rows: Vec<([f64; 4], i64, Vec<usize>)>,
+        drawings: Vec<([f64; 4], f64)>,
+        text_properties: &Bound<'_, PyAny>,
+        font_bold: &Bound<'_, PyAny>,
+        thresholds: [f64; 8],
+        min_bold: usize,
+    ) -> PyResult<Option<Vec<docvortex_core::inline_styles::Payload>>> {
+        super::inline_styles::detect(
+            py,
+            &self.data,
+            rows,
+            drawings,
+            text_properties,
+            font_bold,
+            thresholds,
+            min_bold,
+        )
+    }
     /// 自有 canonical 记录直接组行；完成纯计算后才联合物化字符与引用它们的视觉行。
     fn prepare_visual_evidence<'py>(
         &self,

@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-_PROTOCOL_VERSION = 21
+_PROTOCOL_VERSION = 22
 _SELECTED_MODE = None
 _LOAD_FAILURE = None
 
@@ -49,6 +49,7 @@ def backend_info() -> dict[str, str | int | None]:
     snapshot_stats = getattr(native, "text_snapshot_stats", None)
     span_calls, span_unsupported, span_contents = snapshot_stats() if snapshot_stats is not None else (0, 0, 0)
     return {
+        "native_inline_style_batches": native.inline_style_stats() if native is not None else 0,
         "native_span_content_calls": span_contents,
         **(
             classification.classification_bridge_info()
