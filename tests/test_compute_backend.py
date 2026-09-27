@@ -56,3 +56,16 @@ def test_unexpected_import_error_is_not_hidden(monkeypatch):
     monkeypatch.setattr(backend.importlib, "import_module", Mock(side_effect=ValueError("broken")))
     with pytest.raises(ValueError, match="broken"):
         backend.get_native()
+
+
+def test_default_auto_prefers_rust_and_allows_missing_extension(monkeypatch):
+    """默认 auto 优先选择兼容 Rust，扩展缺失时允许 Python 回退。"""
+    monkeypatch.delenv("DOCVORTEX_COMPUTE_BACKEND", raising=False)
+    native = SimpleNamespace(PROTOCOL_VERSION=backend._PROTOCOL_VERSION)
+    load = Mock(return_value=native)
+    monkeypatch.setattr(backend.importlib, "import_module", load)
+    assert backend.get_native() is native
+    assert backend._SELECTED_MODE == "auto"
+    backend.get_native.cache_clear()
+    load.side_effect = ImportError("missing")
+    assert backend.get_native() is None

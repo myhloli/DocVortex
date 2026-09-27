@@ -178,6 +178,7 @@ def test_pdf_render_worker_logs_exception(monkeypatch: pytest.MonkeyPatch) -> No
 
 def test_pdf_render_timeout_logs_future_and_worker_states(monkeypatch: pytest.MonkeyPatch) -> None:
     """超时时保留任务及工作进程状态并执行回收。"""
+    monkeypatch.setenv("DOCVORTEX_PDF_RENDER_BACKEND", "legacy")
     executor = cast(
         ProcessPoolExecutor,
         _FakeExecutor([_FakeProcess(314, alive=False, exit_code=9)]),

@@ -266,7 +266,10 @@ The full Flash document pipeline is not yet a standalone Rust engine.
 
 `PDFPage.get_snapshot()` explicitly shares detached page evidence; public mutable
 character access still materializes isolated Python data. `PDFDocument.get_render_session()`
-reuses mapped input and directed workers. Set `DOCVORTEX_PDF_RENDER_BACKEND=session`
-to opt into document-aware rendering in DocVortex and the matching MinerU checkout;
-`legacy` remains the default pending full performance acceptance. See
+reuses mapped input and directed workers. `DOCVORTEX_PDF_RENDER_BACKEND=auto` is the default and selects `session` rendering
+in DocVortex and the matching MinerU checkout. Sessions use Rust when the compute
+backend provides it and support Python when it does not. Rendering errors propagate
+without retrying through the legacy renderer.
+Set `DOCVORTEX_PDF_RENDER_BACKEND=legacy` to explicitly use the previous renderer.
+For the Python reference configuration, also set `DOCVORTEX_COMPUTE_BACKEND=python`. See
 [pdf-native-kernel.md](pdf-native-kernel.md) for migration and evidence boundaries.

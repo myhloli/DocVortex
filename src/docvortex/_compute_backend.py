@@ -17,7 +17,7 @@ _LOAD_FAILURE = None
 
 @lru_cache(maxsize=1)
 def get_native() -> ModuleType | None:
-    """首次使用时固定后端；仅加载失败允许 auto 回退，计算异常直接传播。"""
+    """默认 auto 优先 Rust，首次使用时固定后端；仅 auto 允许加载失败回退，计算异常直接传播。"""
     global _SELECTED_MODE, _LOAD_FAILURE
     mode = os.environ.get("DOCVORTEX_COMPUTE_BACKEND", "auto")
     _SELECTED_MODE, _LOAD_FAILURE = mode, None

@@ -288,6 +288,7 @@ def test_public_visual_raster_failure_releases_completed_batches(
 @pytest.mark.parametrize("failure", (TimeoutError, BrokenProcessPool, ValueError))
 def test_encoded_crop_failure_preserves_pool_recovery(monkeypatch, failure):
     """编码素材任务复用原超时和损坏池回收规则，普通计算异常保持原样传播。"""
+    monkeypatch.setenv("DOCVORTEX_PDF_RENDER_BACKEND", "legacy")
     from docvortex.document.pdf import images
 
     executor = object()
@@ -311,6 +312,7 @@ def test_encoded_crop_failure_preserves_pool_recovery(monkeypatch, failure):
 
 def test_encoded_crop_results_keep_page_order_and_pool(monkeypatch):
     """逆序提交并重复请求时仍按页回填，已编码数据不经过 PIL 清理或重新编码。"""
+    monkeypatch.setenv("DOCVORTEX_PDF_RENDER_BACKEND", "legacy")
     from docvortex.document.pdf import images
 
     executor = object()

@@ -44,11 +44,11 @@ def _positive_int_env(name: str, default: int) -> int:
 
 
 def get_pdf_render_backend() -> str:
-    """读取显式渲染后端配置，未知值直接报错而非静默降级。"""
-    backend = os.environ.get("DOCVORTEX_PDF_RENDER_BACKEND", "legacy").strip().lower()
-    if backend not in {"legacy", "session"}:
-        raise ValueError("DOCVORTEX_PDF_RENDER_BACKEND must be legacy or session")
-    return backend
+    """默认 auto 解析为 session；会话按计算后端优先使用 Rust，错误不触发旧渲染重试。"""
+    backend = os.environ.get("DOCVORTEX_PDF_RENDER_BACKEND", "auto").strip().lower()
+    if backend not in {"auto", "legacy", "session"}:
+        raise ValueError("DOCVORTEX_PDF_RENDER_BACKEND must be auto, legacy or session")
+    return "session" if backend == "auto" else backend
 
 
 def get_load_images_timeout() -> int:

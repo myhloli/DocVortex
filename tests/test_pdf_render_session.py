@@ -279,9 +279,11 @@ def test_two_workers_preserve_page_order_and_reuse_handles():
         assert len(session.worker_diagnostics) == 2
 
 
-def test_mode_switch_rejects_overlap_without_cancelling_active_task(session_pdf):
+def test_mode_switch_rejects_overlap_without_cancelling_active_task(session_pdf, monkeypatch):
     """新旧模式重叠只拒绝新请求，既有活动会话或旧窗口仍保持可用。"""
     from docvortex.document.pdf.render_session import legacy_render_scope
+
+    monkeypatch.setenv("DOCVORTEX_PDF_RENDER_BACKEND", "legacy")
 
     with PDFRenderSession(session_pdf) as active:
         active.render(image_type="base64_img")
@@ -566,3 +568,16 @@ def test_owned_bitmap_survives_pdfium_close_without_pil(session_pdf, monkeypatch
     blocks = [(0, {"bbox": [0.1, 0.1, 0.8, 0.9], "angle": 270})]
     _attach_owned_bitmap_crops(blocks, bitmap, native, 0)
     assert blocks[0][1]["image_base64"].startswith("data:image/jpeg;base64,")
+
+
+def test_default_auto_render_backend_and_explicit_modes(monkeypatch):
+    """默认及显式 auto 均启用会话，显式 session 和 legacy 保留选择能力。"""
+    from docvortex.document.pdf.images import get_pdf_render_backend
+
+    monkeypatch.delenv("DOCVORTEX_PDF_RENDER_BACKEND", raising=False)
+    assert get_pdf_render_backend() == "session"
+    for mode in ("auto", "session"):
+        monkeypatch.setenv("DOCVORTEX_PDF_RENDER_BACKEND", mode)
+        assert get_pdf_render_backend() == "session"
+    monkeypatch.setenv("DOCVORTEX_PDF_RENDER_BACKEND", "legacy")
+    assert get_pdf_render_backend() == "legacy"

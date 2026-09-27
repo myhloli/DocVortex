@@ -1,5 +1,7 @@
 # PDF 原生内核迁移
 
+> 2026-09-27 默认策略更新：用户认可当前性能并明确要求切换。默认计算和渲染配置均为 `auto`：计算优先兼容 Rust，扩展缺失或不兼容时回退 Python；渲染选择 `session`，会话内部沿用计算后端。计算或渲染运行错误直接传播，不自动重试旧实现。显式 `rust` 要求兼容扩展；`python` 及 `legacy` 渲染保留用于回退。下文“不切换默认”的记录属于此前阶段，不再代表当前策略；原 Rust 基线的两倍目标仍未达成，不据此宣称 P0–P5 全部完成。此默认调整不等于合并或发布。
+
 ## 验收目标与冻结基线
 
 以 DocVortex `3eef2d1`、MinerU `cabe6e34` 为基线，目标为本机 Mac 单文档热运行耗时降低 50%。公开 parse、MinerU Flash 和冻结模型输入的共享 PDF 链路独立验收；进程树同时刻峰值 RSS 不超过基线 130%（2026-09-27 恢复任务时调整，此前冻结报告仍保留原 120% 门槛），单样本持续耗时退化不超过 5%。冷启动单列，模型推理与导出 PDF 排版不计作本项目的优化收益。
@@ -36,7 +38,7 @@
 
 `PDFDocument.get_render_session(threads=..., timeout=...)` 惰性创建文档所有的会话。定向 worker 协议包含打开、任务、关闭、退出和确认。输入 PDF 写入一次，由各 worker 的 PDFium 文件读取器复用文档句柄；关闭确认在句柄释放之后返回。worker 可跨文档复用，共享并发预算；超时、取消和崩溃路径清理资源。原始 PDFium 位图及 stride 通过受控临时文件返回，父进程只做一次必要解码并持有独立 PIL 图像。
 
-通过 `DOCVORTEX_PDF_RENDER_BACKEND=session` 选择新路径，默认仍为 `legacy`。旧按 bytes API 保留兼容，新调用可传 `session=`。MinerU 窗口和补图路径复用文档会话，纯文本 Flash 不提前创建输入文件。异步取消等待渲染任务清理完成。此实现尚不是零复制 NumPy/PIL 或 Rust 像素缓冲。
+默认使用 `session` 新路径，通过 `DOCVORTEX_PDF_RENDER_BACKEND=legacy` 可显式回退。旧按 bytes API 保留兼容，新调用可传 `session=`。MinerU 窗口和补图路径复用文档会话，纯文本 Flash 不提前创建输入文件。异步取消等待渲染任务清理完成。此实现尚不是零复制 NumPy/PIL 或 Rust 像素缓冲。
 
 ## 已完成的正确性检查
 
