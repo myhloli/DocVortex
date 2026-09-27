@@ -338,7 +338,7 @@ class PDFRenderSession:
 
     def render(self, start_page_id=0, end_page_id=0, *, dpi=200, image_type="pil_img", timeout=None, prepared_crops=None):
         """按原顺序返回页图或裁图；整页像素不经过进程管道序列化。"""
-        from .images import _calculate_render_process_count
+        from .images import MAX_PDF_RENDER_PROCESSES, _calculate_render_process_count
 
         if end_page_id < start_page_id:
             return []
@@ -360,6 +360,14 @@ class PDFRenderSession:
             collected = []
             try:
                 count = _calculate_render_process_count(end_page_id - start_page_id + 1, self.threads)
+                # 完整页按至少四页分配轻量会话 worker，仍受全局预算约束；裁图保留既有策略。
+                if prepared_crops is None:
+                    count = min(
+                        MAX_PDF_RENDER_PROCESSES,
+                        max(1, self.threads),
+                        max(1, os.cpu_count() or 1),
+                        max(1, (end_page_id - start_page_id + 1) // 4),
+                    )
                 self._ensure_workers(count, deadline)
                 count = min(count, len(self._workers))
                 end = min(end_page_id, self._page_count - 1)

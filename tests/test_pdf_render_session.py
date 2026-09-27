@@ -493,3 +493,47 @@ def test_raw_pixel_transport_preserves_format_stride_and_ownership(session_pdf, 
     finally:
         actual.close()
         expected.close()
+
+
+def test_parallel_session_preserves_order_pixels_and_crop_budget(monkeypatch):
+    """真实多进程覆盖旋转与透明页：像素、页序和关闭后所有权不变，裁图不增加 worker。"""
+    import os
+    from docvortex.document.pdf import render_session
+
+    shutdown_pdf_render_sessions()
+    monkeypatch.setenv("DOCVORTEX_PDF_RENDER_THREADS", "3")
+    monkeypatch.setattr(render_session, "_worker_budget", threading.BoundedSemaphore(3))
+    buffer = BytesIO()
+    canvas = Canvas(buffer)
+    for index in range(12):
+        canvas.setPageSize((120 + index, 180))
+        canvas.setPageRotation((0, 90, 180, 270)[index % 4])
+        canvas.setFillAlpha(0.4)
+        canvas.setFillColorRGB(index / 12, 0.3, 0.7)
+        canvas.rect(10, 20, 40, 70, fill=1)
+        canvas.drawString(10, 110, f"Order {index}")
+        canvas.showPage()
+    canvas.save()
+    payload = buffer.getvalue()
+    expected = load_images_from_pdf_core(payload, dpi=97, start_page_id=0, end_page_id=11)
+    actual = []
+    try:
+        with PDFRenderSession(payload, threads=3) as session:
+            directory = Path(session._directory.name)
+            actual = session.render(0, 11, dpi=97)
+            assert len(session.worker_diagnostics) == min(3, max(1, os.cpu_count() or 1))
+            assert all(item["document_opens"] == 1 for item in session.worker_diagnostics)
+            assert not list(directory.glob("*.pixels"))
+        assert not directory.exists()
+        for first, second in zip(expected, actual, strict=True):
+            assert first["scale"] == second["scale"]
+            assert first["img_pil"].size == second["img_pil"].size
+            assert first["img_pil"].tobytes() == second["img_pil"].tobytes()
+            second["img_pil"].putpixel((0, 0), (1, 2, 3))
+        with PDFRenderSession(payload, threads=3) as crops:
+            assert crops.render(0, 11, prepared_crops=[[] for _ in range(12)]) == [[] for _ in range(12)]
+            assert len(crops.worker_diagnostics) == 1
+    finally:
+        for item in [*expected, *actual]:
+            item["img_pil"].close()
+        shutdown_pdf_render_sessions()
