@@ -9,6 +9,7 @@ mod conversion;
 mod dedup;
 mod fonts;
 mod geometry;
+mod geometry_document;
 mod geometry_risk;
 mod geometry_runs;
 mod pdfium;
@@ -25,6 +26,11 @@ mod text_pipeline;
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<geometry_risk::NativeGeometryRisk>()?;
+    module.add_class::<geometry_document::NativeStyleDocument>()?;
+    module.add_function(wrap_pyfunction!(
+        geometry_runs::build_geometry_style,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(
         geometry_runs::build_geometry_runs,
         module

@@ -106,7 +106,7 @@ pub(super) fn local_boxes(
 }
 
 /// 为未改变的坐标复用已有 Python 浮点对象，避免 canonical 样本复制整本坐标。
-fn shared_coordinates<'py, const N: usize>(
+pub(super) fn shared_coordinates<'py, const N: usize>(
     py: Python<'py>,
     values: [f64; N],
     candidates: &[Bound<'py, PyAny>],

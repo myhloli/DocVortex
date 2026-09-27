@@ -758,12 +758,43 @@ def test_native_document_risk_randomized_reference_parity() -> None:
         assert rules._document_requires_full_geometry(pages, geometries, sizes) == (
             rules._document_requires_full_geometry_python(pages, geometries, sizes)
         )
+        from copy import deepcopy
+
+        owned = rules._prepare_layout_document(*deepcopy((pages, geometries, sizes)))
         samples, by_line = rules._collect_samples(pages, geometries, sizes)
         actual_runs = rules._build_run_stats(samples, by_line)
         expected_runs = rules._build_run_stats_python(samples, by_line)
         assert list(actual_runs) == list(expected_runs)
+        if owned is not None:
+            owned_samples, owned_lines, owned_runs, owned_inflated, owned_scales = owned
+            reference_samples, reference_lines = deepcopy((samples, by_line))
+            reference_runs = rules._build_run_stats_python(reference_samples, reference_lines)
+            reference_inflated = rules._mark_style_inflated_runs(reference_runs)
+            reference_plan = rules.DocumentGeometryPlan()
+            rules._apply_style_scale_repairs(reference_plan, reference_inflated, reference_lines)
+            if reference_inflated:
+                rules._restore_stable_legacy_source_bboxes(reference_lines, sizes)
+                reference_runs = rules._build_run_stats_python(reference_samples, reference_lines)
+                for run in reference_runs.values():
+                    run.style_y_bad = run.key in reference_inflated
+            assert owned_samples == reference_samples
+            assert owned_lines == reference_lines
+            assert list(owned_runs) == list(reference_runs)
+            assert owned_runs == reference_runs
+            assert owned_inflated == reference_inflated
+            assert owned_scales == reference_plan.line_style_scales
         for key, run in actual_runs.items():
             assert run == expected_runs[key]
+        plan = rules.DocumentGeometryPlan()
+        styled_runs, inflated, restored = rules._prepare_run_style(plan, samples, by_line)
+        expected_inflated = rules._mark_style_inflated_runs(expected_runs)
+        expected_plan = rules.DocumentGeometryPlan(
+            style_inflated_runs=expected_inflated, document_style_anomaly=bool(expected_inflated)
+        )
+        rules._apply_style_scale_repairs(expected_plan, expected_inflated, by_line)
+        assert styled_runs == expected_runs
+        assert inflated == expected_inflated
+        assert plan == expected_plan
 
 
 def test_native_document_risk_custom_threshold_uses_reference(monkeypatch) -> None:
@@ -826,3 +857,293 @@ def test_native_run_statistics_duplicate_members_use_reference() -> None:
     samples, by_line = rules._collect_samples([[line]], [geometry], [(600.0, 100.0)])
     samples.append(samples[0])
     assert rules._build_run_stats(samples, by_line) == rules._build_run_stats_python(samples, by_line)
+
+
+def _cross_page_style_samples():
+    """构造跨页异常字体、健康行以及并列主字体，用于验证全文校准的传播。"""
+    from collections import defaultdict
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    samples, by_line = [], defaultdict(list)
+    for page in range(2):
+        for source in range(2):
+            line, geometry = _line_fixture(source_index=source, baseline=30.0, loose_top=1.0, loose_bottom=42.0, count=8)
+            part, _ = rules._collect_samples([[line]], [geometry], [(600.0, 100.0)])
+            for sample in part:
+                sample.page_index = page
+            samples.extend(part)
+            by_line[(page, source)].extend(part)
+    line, geometry = _line_fixture(source_index=9, baseline=30.0, count=4)
+    for index, char in enumerate(line.chars):
+        char["font"] = dict(char["font"], name="TieA" if index in (0, 3) else "TieB", size=10.0 if index in (0, 3) else 20.0)
+    part, _ = rules._collect_samples([[line]], [geometry], [(600.0, 100.0)])
+    samples.extend(part)
+    by_line[(0, 9)].extend(part)
+    return samples, by_line
+
+
+def test_native_style_propagates_globally_and_preserves_ties(monkeypatch) -> None:
+    """异常字体触发全文校准，健康行也校准，主字体并列仍选择首见者。"""
+    import pytest
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    if get_native() is None:
+        pytest.skip("需要原生扩展")
+    samples, by_line = _cross_page_style_samples()
+
+    def rejected_reference(*args):
+        """标准样本不允许退回原 run 统计路径。"""
+        raise AssertionError("unexpected reference fallback")
+
+    monkeypatch.setattr(rules, "_build_run_stats_python", rejected_reference)
+    plan = rules.DocumentGeometryPlan()
+    runs, inflated, restored = rules._prepare_run_style(plan, samples, by_line)
+    assert plan.document_style_anomaly and len(inflated) == 1
+    assert plan.line_style_scales[(0, 9)] == 10.0
+    assert len(plan.line_style_scales) == 5
+    assert {key for key, run in runs.items() if run.style_y_bad} == inflated
+
+
+def test_native_style_duplicate_sources_and_custom_rule(monkeypatch) -> None:
+    """重复来源行按原集合统计，自定义全文开关仍按原先顺序调用。"""
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    samples, by_line = _cross_page_style_samples()
+    for sample in samples:
+        sample.page_index = 0
+    plan = rules.DocumentGeometryPlan()
+    _, inflated, restored = rules._prepare_run_style(plan, samples, by_line)
+    assert not inflated and not plan.document_style_anomaly
+    samples, by_line = _cross_page_style_samples()
+    monkeypatch.setattr(rules, "_document_uses_global_style_calibration", lambda runs: False)
+    plan = rules.DocumentGeometryPlan()
+    _, inflated, restored = rules._prepare_run_style(plan, samples, by_line)
+    assert inflated and not plan.document_style_anomaly
+    assert plan.line_style_scales == {}
+
+
+def test_native_style_restores_source_before_single_run_statistics() -> None:
+    """全文样式恢复直接使用原始字符框，最终统计和所有回写样本与两遍参考计算相等。"""
+    from copy import deepcopy
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    samples, by_line = _cross_page_style_samples()
+    for sample in samples:
+        box = sample.local_source_bbox
+        sample.local_source_bbox = (box[0], box[1], box[2] + 40.0, box[3])
+    reference_samples, reference_lines = deepcopy((samples, by_line))
+    expected_runs = rules._build_run_stats_python(reference_samples, reference_lines)
+    expected_inflated = rules._mark_style_inflated_runs(expected_runs)
+    rules._restore_stable_legacy_source_bboxes(reference_lines, [(600.0, 100.0)] * 2)
+    expected_runs = rules._build_run_stats_python(reference_samples, reference_lines)
+    for run in expected_runs.values():
+        run.style_y_bad = run.key in expected_inflated
+    plan = rules.DocumentGeometryPlan()
+    actual_runs, inflated, restored = rules._prepare_run_style(plan, samples, by_line, restore_pages=[(600.0, 100.0)] * 2)
+    from docvortex._compute_backend import get_native
+
+    if get_native() is not None:
+        assert restored
+    if not restored:
+        # 无原生扩展的参考任务仍需验证原流程，不能把未恢复的中间态当作最终结果。
+        rules._restore_stable_legacy_source_bboxes(by_line, [(600.0, 100.0)] * 2)
+        actual_runs = rules._build_run_stats_python(samples, by_line)
+        for run in actual_runs.values():
+            run.style_y_bad = run.key in inflated
+    assert inflated == expected_inflated
+    assert actual_runs == expected_runs
+    assert samples == reference_samples
+
+
+def test_native_style_rejection_does_not_partially_restore_samples() -> None:
+    """后部字符包含不支持的来源框时，原生拒绝不得提前修改前部样本。"""
+    import pytest
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    native = get_native()
+    if native is None:
+        pytest.skip("需要原生扩展")
+    samples, by_line = _cross_page_style_samples()
+    for sample in samples:
+        box = sample.local_source_bbox
+        sample.local_source_bbox = (box[0], box[1], box[2] + 40.0, box[3])
+    samples[-1].line.chars[samples[-1].position]["bbox"] = [1.0, 2.0, 3.0]
+    before = [(s.source_bbox, s.local_source_bbox) for s in samples]
+    keys = list({sample.run_key for sample in samples})
+    assert (
+        native.build_geometry_style(
+            samples, by_line, keys, rules._CharSample, rules._RunStats, rules._LineItem, [(600.0, 100.0)] * 2
+        )
+        is None
+    )
+    assert [(s.source_bbox, s.local_source_bbox) for s in samples] == before
+
+
+def test_native_style_restore_respects_repeated_members_and_page_keys() -> None:
+    """同一样本跨来源键重复出现时，依次使用映射页尺寸并保留最后一次恢复结果。"""
+    import pytest
+    from copy import deepcopy
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    if get_native() is None:
+        pytest.skip("需要原生扩展")
+    samples, by_line = _cross_page_style_samples()
+    by_line[(1, 99)] = [samples[0]]
+    pages = [(600.0, 100.0), (15.0, 100.0)]
+    reference_samples, reference_lines = deepcopy((samples, by_line))
+    initial_runs = rules._build_run_stats_python(reference_samples, reference_lines)
+    inflated = rules._mark_style_inflated_runs(initial_runs)
+    rules._restore_stable_legacy_source_bboxes(reference_lines, pages)
+    expected_runs = rules._build_run_stats_python(reference_samples, reference_lines)
+    for run in expected_runs.values():
+        run.style_y_bad = run.key in inflated
+    plan = rules.DocumentGeometryPlan()
+    actual_runs, actual_inflated, restored = rules._prepare_run_style(plan, samples, by_line, restore_pages=pages)
+    assert restored and actual_inflated == inflated
+    assert samples == reference_samples
+    assert actual_runs == expected_runs
+
+
+def _style_only_document_fixture():
+    """构造仅触发样式风险的两页文档，正常源框不触发 X/Y 布局修复。"""
+    pages, geometries = [], []
+    for _page in range(2):
+        lines = []
+        geometry = PDFPageTextGeometry(chars=[], tight_bboxes={}, origins={}, loose_bboxes={})
+        for source in range(2):
+            baseline = 30.0 + source * 30.0
+            line, part = _line_fixture(
+                source_index=source,
+                baseline=baseline,
+                count=8,
+                font_size=8.0,
+                loose_top=baseline - 10.0,
+                loose_bottom=baseline + 4.0,
+                start_char_idx=source * 100,
+            )
+            lines.append(line)
+            geometry.chars.extend(part.chars)
+            geometry.tight_bboxes.update(part.tight_bboxes)
+            geometry.origins.update(part.origins)
+            geometry.loose_bboxes.update(part.loose_bboxes)
+        pages.append(lines)
+        geometries.append(geometry)
+    return pages, geometries, [(600.0, 100.0)] * 2
+
+
+def test_native_style_document_avoids_python_character_samples(monkeypatch) -> None:
+    """样式文档必须直接消费 Rust 数据，完整计划与参考一致且不构造字符 dataclass。"""
+    import pytest
+    from copy import deepcopy
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    if get_native() is None:
+        pytest.skip("需要原生扩展")
+    args = _style_only_document_fixture()
+    reference = deepcopy(args)
+    with monkeypatch.context() as context:
+        context.setattr(rules, "_build_run_stats", rules._build_run_stats_python)
+        expected = rules.build_document_geometry_plan(*reference)
+
+    def rejected_sample(*args, **kwargs):
+        """标准样式文档不得物化 Python 字符样本。"""
+        raise AssertionError("Python character sample materialized")
+
+    monkeypatch.setattr(rules._CharSample, "__init__", rejected_sample)
+    actual = rules.build_document_geometry_plan(*args)
+    assert actual == expected and actual.document_style_anomaly
+    assert all(not g.loose_bboxes for g in args[1])
+
+
+def test_native_style_document_consumes_once_and_rejects_partial_line() -> None:
+    """构造器错误不追加半行，结束后不能继续读取或追加自有文档。"""
+    import pytest
+    from docvortex._compute_backend import get_native
+
+    native = get_native()
+    if native is None:
+        pytest.skip("需要原生扩展")
+    document = native.NativeStyleDocument()
+    row = [(0, (1.0, 1.0, 8.0, 10.0), None, (1.0, 2.0, 7.0, 9.0), (1.0, 9.0), 0.0)]
+    with pytest.raises(ValueError, match="count differs"):
+        document.add_line(row, (100.0, 100.0), 0, 0, 0, 10.0, lambda positions: [])
+    assert document.add_line(row, (100.0, 100.0), 0, 0, 0, 10.0, lambda positions: None) is False
+    assert document.finish([]) == ([], [], [])
+    with pytest.raises(ValueError, match="consumed"):
+        document.finish([])
+    with pytest.raises(ValueError, match="consumed"):
+        document.add_line([], (100.0, 100.0), 0, 0, 0, 10.0, None)
+
+
+def test_owned_layout_document_preserves_rotations_and_complete_records() -> None:
+    """四种页面文字方向均保留完整字符和 run 字段，并只在最终边界物化一次。"""
+    import pytest
+    from copy import deepcopy
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    if get_native() is None:
+        pytest.skip("需要原生扩展")
+    for angle in (0, 90, 180, 270):
+        line, geometry = _line_fixture(source_index=0, baseline=30.0)
+        line.angle = angle
+        args = ([[line]], [geometry], [(600.0, 100.0)])
+        reference = deepcopy(args)
+        samples, by_line = rules._collect_samples(*reference)
+        runs = rules._build_run_stats_python(samples, by_line)
+        actual = rules._prepare_layout_document(*args)
+        assert actual is not None
+        assert actual == (samples, by_line, runs, set(), {})
+        assert list(actual[2]) == list(runs)
+        assert not geometry.loose_bboxes
+
+
+def test_owned_document_rejects_custom_font_before_conversion() -> None:
+    """拒绝含自定义字体转换的文档时不执行转换、不清理侧表，参考路径仍只执行原次数。"""
+    import pytest
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+
+    if get_native() is None:
+        pytest.skip("需要原生扩展")
+
+    class FontSize:
+        """记录自定义浮点转换是否被原生试探提前执行。"""
+
+        calls = 0
+
+        def __float__(self):
+            """统计实际转换次数。"""
+            self.calls += 1
+            return 10.0
+
+    value = FontSize()
+    line, geometry = _line_fixture(source_index=0, baseline=30.0)
+    for char in line.chars:
+        char["font"]["size"] = value
+    assert rules._prepare_layout_document([[line]], [geometry], [(600.0, 100.0)]) is None
+    assert value.calls == 0 and geometry.loose_bboxes
+    samples, _ = rules._collect_samples([[line]], [geometry], [(600.0, 100.0)])
+    assert value.calls == len(samples)
+
+
+def test_native_style_restoration_accepts_owned_bbox_container() -> None:
+    """真实字符 Bbox 包装不能导致原生恢复半途退回参考路径。"""
+    import pytest
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf import char_geometry as rules
+    from docvortex.document.pdf.text._contracts import Bbox
+
+    if get_native() is None:
+        pytest.skip("需要原生扩展")
+    samples, by_line = _cross_page_style_samples()
+    for sample in samples:
+        char = sample.line.chars[sample.position]
+        char["bbox"] = Bbox(list(char["bbox"]))
+    plan = rules.DocumentGeometryPlan()
+    _, inflated, restored = rules._prepare_run_style(plan, samples, by_line, restore_pages=[(600.0, 100.0)] * 2)
+    assert inflated and restored

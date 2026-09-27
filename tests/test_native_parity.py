@@ -25,6 +25,7 @@ def native():
 def test_native_registration_contract(native):
     """约束重构前的平面扩展接口、签名和类型身份，防止拆分模块时漏注册或改名。"""
     functions = {
+        "build_geometry_style": "(samples, by_line, keys, sample_type, run_type, line_type, page_sizes=None, bbox_type=None)",
         "build_geometry_runs": "(samples, by_line, keys, sample_type, run_type)",
         "text_snapshot_stats": "()",
         "classification_snapshot_stats": "()",
@@ -71,6 +72,7 @@ def test_native_registration_contract(native):
         "visual_runs": "(raw, overrides, flags, size, angle, fallback)",
     }
     classes = {
+        "NativeStyleDocument": ("docvortex._native", "(with_samples=False)"),
         "NativeGeometryRisk": ("docvortex._native", "()"),
         "NativeTextSnapshot": ("docvortex._native", None),
         "NativeClassificationSnapshot": ("docvortex._native", None),
@@ -91,7 +93,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 17, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 18, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)

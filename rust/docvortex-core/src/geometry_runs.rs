@@ -29,12 +29,8 @@ pub struct Run {
     pub sibling: bool,
 }
 
-/// 一次处理所有行的锚点和 run，返回最终统计；非有限或越界输入明确拒绝。
-pub fn build(
-    samples: Vec<Sample>,
-    lines: Vec<Vec<usize>>,
-    families: Vec<usize>,
-) -> Option<Vec<Run>> {
+/// 校验样本并保留成员和 bearing，供样式判断及后续 run 计算连续复用。
+pub fn group(samples: &[Sample], families: &[usize]) -> Option<Vec<Run>> {
     if samples.iter().any(|s| {
         s.run >= families.len()
             || !s.size.is_finite()
@@ -43,8 +39,7 @@ pub fn build(
                 .chain(&s.tight)
                 .chain(&s.origin)
                 .any(|v| !v.is_finite())
-    }) || lines.iter().flatten().any(|i| *i >= samples.len())
-    {
+    }) {
         return None;
     }
     let mut runs: Vec<Run> = (0..families.len()).map(|_| Run::default()).collect();
@@ -56,8 +51,30 @@ pub fn build(
         runs[sample.run].members.push(index);
         runs[sample.run].bearings.push(bearing);
     }
+    Some(runs)
+}
+
+/// 在最终 source 确定后计算相邻对与同族传播，避免样式恢复前后重复计算。
+pub fn complete(
+    samples: &[Sample],
+    lines: &[Vec<usize>],
+    families: &[usize],
+    runs: &mut [Run],
+) -> Option<()> {
+    if runs.len() != families.len()
+        || lines.iter().flatten().any(|i| *i >= samples.len())
+        || samples
+            .iter()
+            .any(|s| s.run >= runs.len() || s.source.iter().any(|v| !v.is_finite()))
+    {
+        return None;
+    }
     for line in lines {
-        let mut anchors: Vec<_> = line.into_iter().filter(|i| samples[*i].anchor).collect();
+        let mut anchors: Vec<_> = line
+            .iter()
+            .copied()
+            .filter(|i| samples[*i].anchor)
+            .collect();
         anchors.sort_by_key(|i| samples[*i].position);
         let rows = anchors
             .iter()
@@ -73,7 +90,7 @@ pub fn build(
             run.overlaps.push(overlap);
         }
     }
-    for run in &mut runs {
+    for run in runs.iter_mut() {
         run.median_advance = (!run.advances.is_empty()).then(|| median(run.advances.clone()));
         run.median_bearing = median(run.bearings.clone());
         let count = run.ratios.len();
@@ -98,5 +115,5 @@ pub fn build(
                 >= 0.50)
             || quantile(run.ratios.clone(), 0.9) >= 1.50;
     }
-    Some(runs)
+    Some(())
 }
