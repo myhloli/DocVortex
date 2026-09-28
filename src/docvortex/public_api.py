@@ -40,6 +40,8 @@ PUBLIC_API: dict[str, tuple[str, ...]] = {
         "ScriptRole",
         "apply_text_evidence",
         "classify_char_script_roles",
+        "join_tight_text",
+        "needs_tight_space",
         "prepare_table_page",
         "prepare_text_evidence",
         "project_table_text",
@@ -112,6 +114,12 @@ PUBLIC_API: dict[str, tuple[str, ...]] = {
     "docvortex.document.detection": (
         "guess_suffix_by_bytes",
         "guess_suffix_by_path",
+    ),
+    "docvortex.document.mhtml": (
+        "ArchivePart",
+        "MhtmlArchive",
+        "MhtmlParseError",
+        "MhtmlResourceLimitError",
     ),
     "docvortex.document.page_range": (
         "PAGE_RANGE_DESCRIPTION",
