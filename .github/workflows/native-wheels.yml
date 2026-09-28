@@ -1,9 +1,8 @@
 name: Native wheels
 
+# 仅由 Publish 工作流在发布时（workflow_call）或手动触发运行；
+# push/PR 的 Rust 构建与测试已由 ci.yml 覆盖，不再重复跑轮子矩阵。
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
     inputs:
       skip_ci:

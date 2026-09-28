@@ -74,6 +74,19 @@ jobs:
       - run: uvx ruff==0.14.2 check src
       - run: uvx ruff==0.14.2 format --check src
 
+  # native-wheels.yml 不再随 push/PR 触发后，Rust 静态检查与单元测试由本工作流把守。
+  rust-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
+          components: rustfmt, clippy
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test -p docvortex-core --locked
+
   baseline-diagnostic:
     name: Existing sparse-table gold difference (diagnostic)
     runs-on: ubuntu-latest
