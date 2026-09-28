@@ -5,6 +5,7 @@ from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
 import threading
+import time
 
 import pytest
 from reportlab.pdfgen.canvas import Canvas
@@ -137,7 +138,12 @@ def test_session_worker_crash_releases_resources(session_pdf, monkeypatch):
     with PDFRenderSession(session_pdf) as session:
         directory = session._input.parent
         with _blocked_render(session, monkeypatch) as errors:
-            process = session._workers[0][0]
+            process, connection = session._workers[0]
+            deadline = time.monotonic() + 5
+            while not connection.poll():
+                assert time.monotonic() < deadline, "PDF render worker did not queue acknowledgement"
+                assert process.is_alive(), "PDF render worker exited before acknowledgement"
+                time.sleep(0.01)
             process.terminate()
             process.join(5)
         assert len(errors) == 1 and isinstance(errors[0], (RuntimeError, OSError, EOFError))

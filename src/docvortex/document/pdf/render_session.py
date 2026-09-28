@@ -284,6 +284,9 @@ class PDFRenderSession:
             with _worker_budget_lock:
                 if _leased_workers.get(worker) is not self:
                     raise RuntimeError("PDF render worker lease was revoked")
+            # 先确认活动租约内的进程仍存活，避免消费崩溃前遗留的最后一个确认。
+            if not process.is_alive():
+                raise RuntimeError(f"PDF render worker exited: {process.exitcode}")
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError("PDF render session timed out")
@@ -296,9 +299,10 @@ class PDFRenderSession:
                     raise RuntimeError("PDF render protocol acknowledgement mismatch")
                 if status != "ack":
                     raise RuntimeError(f"PDF render worker {value[0]}: {value[1]}")
+                # 确认写入后进程也必须保持存活；worker 不应在响应后自行退出。
+                if not process.is_alive():
+                    raise RuntimeError(f"PDF render worker exited: {process.exitcode}")
                 return value
-            if not process.is_alive():
-                raise RuntimeError(f"PDF render worker exited: {process.exitcode}")
 
     def _ensure_workers(self, count, deadline):
         """按 FIFO 租用空闲进程，优先命中文档缓存，切换输入不占用池锁。"""

@@ -22,9 +22,7 @@ MARKUP_COMPATIBILITY_NS = "http://schemas.openxmlformats.org/markup-compatibilit
 PRESENTATIONML_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 PACKAGE_RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 
-PRESENTATION_MAIN_CONTENT_TYPE = (
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
-)
+PRESENTATION_MAIN_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
 # 关系类型尾段到 part 内容类型的映射，用于按关系图补全 [Content_Types].xml Override。
 PPTX_REL_CONTENT_TYPES = {
     "officeDocument": PRESENTATION_MAIN_CONTENT_TYPE,
