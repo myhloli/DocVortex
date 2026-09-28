@@ -314,10 +314,13 @@ class _DocumentSources:
     page_style_lines: list[list[PDFTextStyleLine]]
     page_link_lines: list[list[PDFTextLinkLine]]
     page_owned_scripts: list[Any] = field(default_factory=list)
+    page_spacing_lines: list[list[Any]] = field(default_factory=list)
 
 
 def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
     """逐页收集原生证据，局部快照与字符引用在收集阶段退出时释放。"""
+
+    from .inline.spacing import prepare_spacing_lines
 
     page_sizes: list[tuple[float, float]] = []
     page_image_infos: list[list[PDFImageInfo]] = []
@@ -326,6 +329,7 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
     page_style_lines: list[list[PDFTextStyleLine]] = []
     page_link_lines: list[list[PDFTextLinkLine]] = []
     page_owned_scripts = []
+    page_spacing_lines = []
     for page_idx in range(pdf_doc.page_count):
         snapshot = pdf_doc._extract_native_page(page_idx)
         page_size = snapshot.page_size
@@ -342,6 +346,8 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
                 page_size,
                 page_rotation=snapshot.rotation,
             )
+        space_before = set(native_text.tight_space_indices()) if native_text is not None else None
+        page_spacing_lines.append(prepare_spacing_lines(lines, space_before))
         chars = text_geometry.chars
         # 只保留纯 Rust 脚本记录与本页身份映射，不延长 PDFium 页面或文档句柄生命周期。
         page_owned_scripts.append(_prepare_owned_script_evidence(native_text, chars) if native_text is not None else None)
@@ -388,7 +394,13 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
         )
 
     return _DocumentSources(
-        page_sources, page_text_geometries, page_sizes, page_style_lines, page_link_lines, page_owned_scripts
+        page_sources,
+        page_text_geometries,
+        page_sizes,
+        page_style_lines,
+        page_link_lines,
+        page_owned_scripts,
+        page_spacing_lines,
     )
 
 
@@ -497,6 +509,8 @@ def _materialize_document_inline(
 ) -> None:
     """在页面归一化后按链接、样式、上下标顺序物化最终行内语义。"""
 
+    from .inline.spacing import apply_spacing_lines
+
     for page_index, (page_blocks, prepared, style_lines, link_lines, page_size) in enumerate(
         zip(
             finalized_pages,
@@ -511,6 +525,8 @@ def _materialize_document_inline(
         if script_diagnostics is not None:
             materialized_diagnostics = []
             script_diagnostics[page_index]["materialized_ranges"] = materialized_diagnostics
+        if sources.page_spacing_lines:
+            apply_spacing_lines(page_blocks, sources.page_spacing_lines[page_index], page_size)
         apply_pdf_inline_evidence(
             page_blocks,
             link_lines,

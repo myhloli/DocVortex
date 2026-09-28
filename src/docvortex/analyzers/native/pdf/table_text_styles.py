@@ -7,6 +7,7 @@ from collections import defaultdict
 from typing import Any
 
 from ....document.pdf.text._contracts import Char
+from ....document.pdf.text.spacing import needs_tight_space
 from ....schema import BBox
 from ._script_geometry import ScriptRole
 from ._table_recovery.candidate import serialize_native_table_html
@@ -193,6 +194,10 @@ def _render_styled_cell(
     glyphs: list[NativeTableGlyph],
     median_height: float,
     roles: dict[int, ScriptRole],
+    *,
+    chars_by_source: dict[int, Char] | None = None,
+    tight_bboxes: dict[int, BBox] | None = None,
+    origins: dict[int, tuple[float, float]] | None = None,
 ) -> str:
     """按旧文本重建规则安全插入平坦的 sup/sub 标签。"""
 
@@ -219,12 +224,27 @@ def _render_styled_cell(
             rendered.append(content)
         active_parts = []
 
+    previous_source = None
     for text, source_index in parts:
         role = roles.get(source_index, "body") if source_index is not None else "body"
+        if (
+            chars_by_source is not None
+            and role == active_role == "body"
+            and previous_source in chars_by_source
+            and source_index in chars_by_source
+            and needs_tight_space(
+                chars_by_source[previous_source],
+                chars_by_source[source_index],
+                tight_bboxes=tight_bboxes,
+                origins=origins,
+            )
+        ):
+            active_parts.append(" ")
         if role != active_role:
             flush()
             active_role = role
         active_parts.append(text)
+        previous_source = source_index
     flush()
     return "".join(rendered)
 
@@ -248,6 +268,7 @@ def render_native_table_html_with_scripts(
     glyph_by_source = {glyph.source_index: glyph for glyph in result.text.glyphs}
     cell_glyphs = {(cell.row, cell.col): _cell_glyphs(result, cell, glyph_by_source) for cell in result.cells}
     cell_roles: dict[tuple[int, int], dict[int, ScriptRole]] = {}
+    has_missing_space = False
     for cell in result.cells:
         key = (cell.row, cell.col)
         glyphs = cell_glyphs[key]
@@ -271,7 +292,21 @@ def render_native_table_html_with_scripts(
         )
         if roles:
             cell_roles[key] = roles
-    if not cell_roles:
+        if not has_missing_space:
+            has_missing_space = any(
+                left.visual_row == right.visual_row
+                and roles.get(left.source_index, "body") == roles.get(right.source_index, "body") == "body"
+                and left.source_index in chars_by_source
+                and right.source_index in chars_by_source
+                and needs_tight_space(
+                    chars_by_source[left.source_index],
+                    chars_by_source[right.source_index],
+                    tight_bboxes=tight_bboxes,
+                    origins=origins,
+                )
+                for left, right in zip(glyphs, glyphs[1:])
+            )
+    if not cell_roles and not has_missing_space:
         return result.html
     return serialize_native_table_html(
         result.rows,
@@ -281,6 +316,9 @@ def render_native_table_html_with_scripts(
             cell_glyphs[(cell.row, cell.col)],
             result.text.median_glyph_height,
             cell_roles.get((cell.row, cell.col), {}),
+            chars_by_source=chars_by_source,
+            tight_bboxes=tight_bboxes,
+            origins=origins,
         ),
     )
 

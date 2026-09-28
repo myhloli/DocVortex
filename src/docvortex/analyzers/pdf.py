@@ -9,6 +9,7 @@ from typing import Any
 
 from ..document.pdf import PDFPage, PDFPageSnapshot, PDFPageTextGeometry, PDFPageVectorGeometry
 from ..schema import BBox
+from ..document.pdf.text.spacing import join_tight_text, needs_tight_space
 from .native.pdf._script_geometry import ScriptRole, classify_char_script_roles
 from .native.pdf._table_recovery.contracts import NativeTableRectangle, NativeTableRule, PDFTableRecoveryError
 from .native.pdf.inline.types import (
@@ -216,6 +217,8 @@ def project_table_text(ocr_result: Any, table_size: tuple[int, int]) -> str:
 
 
 __all__ = [
+    "join_tight_text",
+    "needs_tight_space",
     "PDFTableRecoveryError",
     "PDFTextEvidence",
     "PDFTablePage",

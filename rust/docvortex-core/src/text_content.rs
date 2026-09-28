@@ -85,6 +85,9 @@ fn clean(text: &str) -> String {
 
 /// 连续执行 PUA 信号、重叠附加符合成、词间空格及正文组装；空组保留调用方原文本。
 pub struct Rules<'a> {
+    pub ordinary: &'a HashSet<char>,
+    pub decimals: &'a HashSet<char>,
+    pub tight_spacing: &'a [bool],
     pub modifiers: &'a HashMap<String, String>,
     pub threshold: f64,
     pub compositions: &'a HashMap<(String, String), String>,
@@ -96,6 +99,9 @@ pub struct Rules<'a> {
 /// 使用本次调用固定的字符规则构造所有片段，避免重新读取可变 Python 配置。
 pub fn build(data: &TextSnapshot, groups: &[Vec<usize>], rules: &Rules<'_>) -> Vec<Content> {
     let Rules {
+        ordinary,
+        decimals,
+        tight_spacing,
         modifiers,
         threshold,
         compositions,
@@ -105,7 +111,8 @@ pub fn build(data: &TextSnapshot, groups: &[Vec<usize>], rules: &Rules<'_>) -> V
     } = rules;
     groups
         .iter()
-        .map(|group| {
+        .enumerate()
+        .map(|(group_index, group)| {
             let mut result = Content {
                 text: None,
                 private_count: 0,
@@ -133,7 +140,7 @@ pub fn build(data: &TextSnapshot, groups: &[Vec<usize>], rules: &Rules<'_>) -> V
                 return result;
             }
             let members = ordered(data, group);
-            let mut chars: Vec<(&str, Box4)> = Vec::with_capacity(members.len());
+            let mut chars: Vec<(&str, Box4, usize)> = Vec::with_capacity(members.len());
             let mut cursor = 0;
             while cursor < members.len() {
                 if cursor + 1 < members.len() {
@@ -148,17 +155,17 @@ pub fn build(data: &TextSnapshot, groups: &[Vec<usize>], rules: &Rules<'_>) -> V
                         let b = &data.chars[modifier];
                         if let Some(composed) = compositions.get(&(a.text.clone(), b.text.clone()))
                         {
-                            chars.push((composed, a.bbox));
+                            chars.push((composed, a.bbox, base));
                             cursor += 2;
                             continue;
                         }
                     }
                 }
                 let ch = &data.chars[members[cursor]];
-                chars.push((&ch.text, ch.bbox));
+                chars.push((&ch.text, ch.bbox, members[cursor]));
                 cursor += 1;
             }
-            let mut widths: Vec<_> = chars.iter().map(|(_, b)| b[2] - b[0]).collect();
+            let mut widths: Vec<_> = chars.iter().map(|(_, b, _)| b[2] - b[0]).collect();
             widths.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let median = if widths.len() % 2 == 1 {
                 widths[widths.len() / 2]
@@ -166,13 +173,24 @@ pub fn build(data: &TextSnapshot, groups: &[Vec<usize>], rules: &Rules<'_>) -> V
                 (widths[widths.len() / 2 - 1] + widths[widths.len() / 2]) / 2.0
             };
             let mut text = String::new();
-            for (index, &(value, bbox)) in chars.iter().enumerate() {
+            for (index, &(value, bbox, source)) in chars.iter().enumerate() {
                 if breaks.contains(value) {
                     continue;
                 }
                 text.push_str(value);
-                if let Some(&(next, next_box)) = chars.get(index + 1) {
-                    if next_box[0] - bbox[2] > median * 0.25 && value != " " && next != " " {
+                if let Some(&(next, next_box, next_source)) = chars.get(index + 1) {
+                    if (next_box[0] - bbox[2] > median * 0.25
+                        || (tight_spacing.get(group_index).copied().unwrap_or(false)
+                            && crate::text_spacing::needs_space(
+                                data,
+                                source,
+                                next_source,
+                                ordinary,
+                                decimals,
+                            )))
+                        && value != " "
+                        && next != " "
+                    {
                         text.push(' ');
                     }
                 }

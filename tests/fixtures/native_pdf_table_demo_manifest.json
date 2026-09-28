@@ -25825,7 +25825,7 @@
       "angle": 0,
       "expected_output": "html",
       "review_status": "target_verified",
-      "content_sha256": "e572309d4f3045c68cf66d3d28b356723dd7edd0bcff680ed6c28e9b2b979c56",
+      "content_sha256": "4d136a33d95832a9e787f03e1067fd87178de6cb1dcccb6cdf6c508fbc807297",
       "expected_source": "vector_grid",
       "rows": 19,
       "cols": 6,
@@ -26382,7 +26382,7 @@
           "col": 0,
           "rowspan": 1,
           "colspan": 1,
-          "text": "ChatbotArena"
+          "text": "Chatbot Arena"
         },
         {
           "row": 13,

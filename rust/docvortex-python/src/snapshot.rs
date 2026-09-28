@@ -620,6 +620,7 @@ impl NativeTextSnapshot {
         Ok(Some(result))
     }
     /// 正文已有共享上下标侧车时，字符归属及内容构造连续完成，仅输出每个 span 的文本和 PUA 计数。
+    #[pyo3(signature = (span_bboxes, median_height, stop_flags, start_flags, height_ratio, break_flags, modifiers, overlap_threshold, private_range, tight_spacing=None))]
     fn prepare_span_texts<'py>(
         &self,
         py: Python<'py>,
@@ -632,6 +633,7 @@ impl NativeTextSnapshot {
         modifiers: HashMap<String, String>,
         overlap_threshold: f64,
         private_range: (u32, u32),
+        tight_spacing: Option<Vec<bool>>,
     ) -> PyResult<Option<Bound<'py, PyList>>> {
         if !overlap_threshold.is_finite()
             || self
@@ -643,6 +645,13 @@ impl NativeTextSnapshot {
             return Ok(None);
         }
         let count = span_bboxes.len();
+        // 旧宿主没有代码区域掩码，省略新增参数时保持历史文本组装行为。
+        let tight_spacing = tight_spacing.unwrap_or_else(|| vec![false; count]);
+        if tight_spacing.len() != count {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "Tight spacing mask must match span count",
+            ));
+        }
         let Some(assigned) = self.assign_spans(
             py,
             span_bboxes,
@@ -660,15 +669,28 @@ impl NativeTextSnapshot {
         let category = unicode.getattr("category")?;
         let normalize = unicode.getattr("normalize")?;
         let mut spaces = HashSet::new();
+        let mut ordinary = HashSet::new();
+        let mut decimals = HashSet::new();
         let mut seen_chars = HashSet::new();
         for ch in &self.data.chars {
             for value in ch.text.chars() {
-                if seen_chars.insert(value)
-                    && pyo3::types::PyString::new(py, &value.to_string())
-                        .call_method0("isspace")?
-                        .extract::<bool>()?
+                if !seen_chars.insert(value) {
+                    continue;
+                }
+                if pyo3::types::PyString::new(py, &value.to_string())
+                    .call_method0("isspace")?
+                    .extract::<bool>()?
                 {
                     spaces.insert(value);
+                }
+                if !value.is_ascii() && !docvortex_core::text_spacing::is_cjk(value) {
+                    let kind: String = category.call1((value.to_string(),))?.extract()?;
+                    if kind.starts_with('L') || kind == "Nd" {
+                        ordinary.insert(value);
+                    }
+                    if kind == "Nd" {
+                        decimals.insert(value);
+                    }
                 }
             }
         }
@@ -709,6 +731,9 @@ impl NativeTextSnapshot {
                 &self.data,
                 &groups,
                 &text_content::Rules {
+                    ordinary: &ordinary,
+                    decimals: &decimals,
+                    tight_spacing: &tight_spacing,
                     modifiers: &modifiers,
                     threshold: overlap_threshold,
                     compositions: &compositions,
@@ -734,6 +759,44 @@ impl NativeTextSnapshot {
         SPAN_CONTENT_CALLS.fetch_add(1, Ordering::Relaxed);
         Ok(Some(output))
     }
+    /// 在自有字符上计算可靠词界，仅返回源编号，避免 Flash 逐字符重复跨语言判定。
+    fn tight_space_indices(&self, py: Python<'_>) -> PyResult<Vec<usize>> {
+        let category = py.import("unicodedata")?.getattr("category")?;
+        let mut ordinary = HashSet::new();
+        let mut decimals = HashSet::new();
+        let mut seen = HashSet::new();
+        for ch in &self.data.chars {
+            for value in ch.text.chars() {
+                if !value.is_ascii()
+                    && !docvortex_core::text_spacing::is_cjk(value)
+                    && seen.insert(value)
+                {
+                    let kind: String = category.call1((value.to_string(),))?.extract()?;
+                    if kind.starts_with('L') || kind == "Nd" {
+                        ordinary.insert(value);
+                    }
+                    if kind == "Nd" {
+                        decimals.insert(value);
+                    }
+                }
+            }
+        }
+        Ok(py.detach(|| {
+            (1..self.data.chars.len())
+                .filter(|&index| {
+                    docvortex_core::text_spacing::needs_space(
+                        &self.data,
+                        index - 1,
+                        index,
+                        &ordinary,
+                        &decimals,
+                    )
+                })
+                .map(|index| self.data.chars[index].index)
+                .collect()
+        }))
+    }
+
     /// 为新鲜同源页面证据准备独立上下标记录，后续批次只传整数成员索引。
     fn prepare_script_evidence(
         &self,

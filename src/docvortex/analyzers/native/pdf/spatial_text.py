@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 
 from ....document.pdf.text._contracts import Char
+from ....document.pdf.text.spacing import needs_tight_space
 from ....schema import BBox
 from .table_geometry import normalize_bbox as _coerce_bbox
 from .table_geometry import rotate_local_bbox as _rotate_local_bbox
@@ -111,7 +112,9 @@ def _select_table_chars(chars: list[Char], table_bbox: BBox) -> list[Char]:
     return [item[2] for item in selected_chars]
 
 
-def _build_pdf_spatial_items(chars: list[Char], table_bbox: BBox, angle: int) -> list[_SpatialTextItem]:
+def _build_pdf_spatial_items(
+    chars: list[Char], table_bbox: BBox, angle: int, *, infer_tight_spaces: bool = False
+) -> list[_SpatialTextItem]:
     """按换行、字符间距和几何连续性把 PDF 字符流拆成空间文本项。"""
     table_x0, table_y0, table_x1, table_y1 = table_bbox
     table_width = table_x1 - table_x0
@@ -124,10 +127,11 @@ def _build_pdf_spatial_items(chars: list[Char], table_bbox: BBox, angle: int) ->
     last_char_bbox: BBox | None = None
     char_widths: list[float] = []
     pending_space = False
+    last_source_char = None
 
     def flush_segment() -> None:
         """提交当前 PDF 文本片段，并重置片段累计状态。"""
-        nonlocal segment_parts, segment_bbox, last_char_bbox, char_widths, pending_space
+        nonlocal segment_parts, segment_bbox, last_char_bbox, char_widths, pending_space, last_source_char
         text = _normalize_table_text("".join(segment_parts)).strip()
         if text and segment_bbox is not None:
             rotated_bbox = _rotate_local_bbox(
@@ -142,6 +146,7 @@ def _build_pdf_spatial_items(chars: list[Char], table_bbox: BBox, angle: int) ->
         last_char_bbox = None
         char_widths = []
         pending_space = False
+        last_source_char = None
 
     for char in _select_table_chars(chars, table_bbox):
         raw_char = str(char.get("char") or "")
@@ -195,7 +200,9 @@ def _build_pdf_spatial_items(chars: list[Char], table_bbox: BBox, angle: int) ->
             else:
                 previous_char = segment_parts[-1][-1] if segment_parts[-1] else ""
                 current_char = normalized_char[0]
-                if previous_char.isalnum() and current_char.isalnum() and gap > char_height * _MISSING_SPACE_HEIGHT_RATIO:
+                if (previous_char.isalnum() and current_char.isalnum() and gap > char_height * _MISSING_SPACE_HEIGHT_RATIO) or (
+                    infer_tight_spaces and last_source_char is not None and needs_tight_space(last_source_char, char)
+                ):
                     segment_parts.append(" ")
 
         if segment_bbox is None:
@@ -204,6 +211,7 @@ def _build_pdf_spatial_items(chars: list[Char], table_bbox: BBox, angle: int) ->
             segment_bbox = _bbox_union(segment_bbox, local_bbox)
         segment_parts.append(normalized_char)
         last_char_bbox = local_bbox
+        last_source_char = char
         char_widths.append(local_bbox[2] - local_bbox[0])
 
     flush_segment()
@@ -357,6 +365,7 @@ def project_pdf_spatial_text(
     angle: int = 0,
     *,
     preserve_blank_rows: bool = False,
+    infer_tight_spaces: bool = False,
 ) -> str:
     """从 PDF 指定区域提取字符，并返回可选保留空行的空间投影文本。"""
 
@@ -364,7 +373,7 @@ def project_pdf_spatial_text(
     if normalized_bbox is None:
         return ""
     return _project_spatial_items(
-        _build_pdf_spatial_items(chars, normalized_bbox, angle),
+        _build_pdf_spatial_items(chars, normalized_bbox, angle, infer_tight_spaces=infer_tight_spaces),
         preserve_blank_rows=preserve_blank_rows,
     )
 
@@ -372,7 +381,7 @@ def project_pdf_spatial_text(
 def project_pdf_table_text(chars: list[Char], table_bbox: BBox, angle: int = 0) -> str:
     """从 PDF 原生字符中提取指定表格，并返回空间投影纯文本。"""
 
-    return project_pdf_spatial_text(chars, table_bbox, angle)
+    return project_pdf_spatial_text(chars, table_bbox, angle, infer_tight_spaces=True)
 
 
 def project_ocr_table_text(ocr_result: Any, table_size: tuple[int, int]) -> str:

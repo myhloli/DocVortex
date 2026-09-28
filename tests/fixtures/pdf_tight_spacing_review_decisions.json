@@ -1,0 +1,216 @@
+{
+  "source": "demo/pdfs/中文论文2.pdf",
+  "source_sha256": "937cfb51e9e8abc6b3a2d8c46d38003cd2ad795a0692eab3f9e92ac604fcc9ad",
+  "baseline_revision": "eb07a4964f64e513a8f66ba515195a07ab21ad21",
+  "reviewed_source_pages": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23
+  ],
+  "decisions": [
+    {
+      "page": 1,
+      "decision": "accept_improvement",
+      "old_fingerprint": "4ab591e6f98e7aeed9a031dce73116dbb81b40576d8ee727bb6eee2a53c60e3e",
+      "new_fingerprint": "4fffa0c3dcf65e65cbdde37275752af66aa51727a5597b051b697ccc58e4ce6d",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-01.png"
+    },
+    {
+      "page": 2,
+      "decision": "accept_improvement",
+      "old_fingerprint": "f47fa30a125f5a4c46dd9a27c659d5f7a7e2d26c05943467a650e71f1c1ced84",
+      "new_fingerprint": "926017782518ce5b92fcc983aa1f25d6b95a59daac6835001b389b9f7c37fd75",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-02.png"
+    },
+    {
+      "page": 3,
+      "decision": "accept_improvement",
+      "old_fingerprint": "927a2a5119363aba1e4240cf22ab8f479ac51cf5f8ee9d412fc524940bb8b49f",
+      "new_fingerprint": "8365d1df340a2562f380525e3cbc2a0b14296ee3b5fa0d1f1a5b50bc27c8b483",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-03.png"
+    },
+    {
+      "page": 4,
+      "decision": "accept_improvement",
+      "old_fingerprint": "e8e9be5e955890ab6f0fa4bbefc4908c1c8d1b86bf6a28a796dc64d95a5b694b",
+      "new_fingerprint": "1d07f011b69a8a09b8c3e439f733af92af4b977486dd4d2fa4a61c552d91fed4",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-04.png"
+    },
+    {
+      "page": 5,
+      "decision": "accept_improvement",
+      "old_fingerprint": "f6e035e0b608d17cee4f95032c2d6a3378deaf55943ea09da21c25ba878856aa",
+      "new_fingerprint": "4406f3363a62e600b9623e8d6f57f8e6722ca711d4c01ca8ed074f60a47ca633",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-05.png"
+    },
+    {
+      "page": 6,
+      "decision": "accept_improvement",
+      "old_fingerprint": "ff4beb43e91d85677515f865d926c7ef9ca9acba0a7d23f03e44bfc7463fbfdd",
+      "new_fingerprint": "a704dbd0f6aae12ee11925d0e8a43eaca06f296aaf54962c046cdfcf00ff9f8f",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-06.png"
+    },
+    {
+      "page": 8,
+      "decision": "accept_improvement",
+      "old_fingerprint": "caaf491189bc67c90260327cbf8d92e66cf4dfbdb3511876c1cbbb86ab39ef77",
+      "new_fingerprint": "de772c5651761dc567982b8a8dfe63467a343a0cdb361b78b5d658e99bb4c57c",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-08.png"
+    },
+    {
+      "page": 9,
+      "decision": "accept_improvement",
+      "old_fingerprint": "0bf08fc3f2cd3e33b5175b7e127864c3c1ae06b0ac0674b6abde891e3402db12",
+      "new_fingerprint": "3152d96d231540722c7665aca8e56447c7d9178d65463d318446d2f8f3bfa089",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-09.png"
+    },
+    {
+      "page": 10,
+      "decision": "accept_improvement",
+      "old_fingerprint": "b3b98abe8634815d2d7148977045d98371ee69b268afcbc02e4d67e2604e66d8",
+      "new_fingerprint": "cc3aebf539cdd3e5e917fbf811e66f2cd67cd8c09fdf471810dfa9978c8f4c4e",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-10.png"
+    },
+    {
+      "page": 11,
+      "decision": "accept_improvement",
+      "old_fingerprint": "935b162f71ee530f402abef9d185812948d05a253b9ccb3a66aeeddccce7e4a4",
+      "new_fingerprint": "79b446b3f2f8792f82a010ef4832fbf69e0cb1ff9493d3a42e1b4db8e0e0e4dc",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-11.png"
+    },
+    {
+      "page": 12,
+      "decision": "accept_improvement",
+      "old_fingerprint": "e976b65fa39cd441c319c2d952afa6fd3cce908b5b47230bc4114f5b56c870e0",
+      "new_fingerprint": "79271756a7a452afd7109f18d03c43b90825499c6da93a41d253edc869a0fc49",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-12.png"
+    },
+    {
+      "page": 14,
+      "decision": "accept_improvement",
+      "old_fingerprint": "7a9bcba4f94aecc86bedb0441fcce0c6114d63923dd591bc84880552450873c2",
+      "new_fingerprint": "66811a5da09b480467b9353001e35bbc781e0bd7201c67cde52a1dc02cd41721",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-14.png"
+    },
+    {
+      "page": 15,
+      "decision": "accept_improvement",
+      "old_fingerprint": "8bf0a3dd1e4ddcdc7ee7ff066cc52792b48bb3c4e72d284ea423a58a6b945414",
+      "new_fingerprint": "3baac3d5779ae212c27834d40ceb4badf5a336e7b719383b811da4e5e012bfb2",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-15.png"
+    },
+    {
+      "page": 16,
+      "decision": "accept_improvement",
+      "old_fingerprint": "168ec82b72b08bf6b6ff8595fe49b727f8322cadce6481c014e6a757f3c445a9",
+      "new_fingerprint": "4f3538e6d8dacffb1a63bbeea39e43be6ec981c9ea5f613c46de7d007c01ac1a",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-16.png"
+    },
+    {
+      "page": 17,
+      "decision": "accept_improvement",
+      "old_fingerprint": "338443fa0e15930f44c82292463bf43c6ed910cbb62f90061b0488d7fe687796",
+      "new_fingerprint": "f632d12f91dc334cc0abd3aefe85342f6641a4ba7eadd8847b7266c2e597986d",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-17.png"
+    },
+    {
+      "page": 18,
+      "decision": "accept_improvement",
+      "old_fingerprint": "4da99528c7e852cbe743c2a8a411528ca150a9ede3bbe6d33b7a4926b662b40f",
+      "new_fingerprint": "7f85738f60a342a92236b4831cf14a29cacc928f7eb59c69b08db924d905d857",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-18.png"
+    },
+    {
+      "page": 19,
+      "decision": "accept_improvement",
+      "old_fingerprint": "f3f6bab5ee7f89c2f68672a0c98458d03a0e46492a29052638bd86df01185183",
+      "new_fingerprint": "893237f12b9f2b653abaed5e407b349c7006ee26171278bb02673130e7f9fcd7",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-19.png"
+    },
+    {
+      "page": 20,
+      "decision": "accept_improvement",
+      "old_fingerprint": "51882f9de7307ec46b4c6b1973576597212bbb2a46cf6e1485bc9bda41bc3bfc",
+      "new_fingerprint": "6cce657df8454093b1a9a82b766d72da65a3796ade2a02902fde27a2e7d0b997",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-20.png"
+    },
+    {
+      "page": 21,
+      "decision": "accept_improvement",
+      "old_fingerprint": "7d630de66940ff88dd01c0f5577428fa6e0621696e2a4ece9f4bede31d67069a",
+      "new_fingerprint": "92ac234f4c28e0826ae32bfe5f00e16422f0aef594e1cdd57cba8a26e9f672b3",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-21.png"
+    },
+    {
+      "page": 22,
+      "decision": "accept_improvement",
+      "old_fingerprint": "84abdfef05b02f2a799a6ec52317c315835178048247c8928e811717410baf60",
+      "new_fingerprint": "fa1a6324e5c6e5e38cdcfda8011a9ea7f431ec6c734f400fe95750981eef107f",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-22.png"
+    },
+    {
+      "page": 23,
+      "decision": "accept_improvement",
+      "old_fingerprint": "ca605f18b24fe71c39b75b71a03eae4d00eb22239a7a22389e612aa1c25c2931",
+      "new_fingerprint": "2411987d60b0a1cfd7459dff73b5eed2fcdb6622ec5f8749a359e31d94bba8d7",
+      "reason": "Restore geometry-supported non-CJK word boundaries; content changes are ASCII-space insertions only. Block types, order and coordinates unchanged.",
+      "visual_review": "output/pdf/tight-spacing-20260928/review-final/page-23.png"
+    }
+  ],
+  "table_change": {
+    "page": 2,
+    "before": "ChatbotArena",
+    "after": "Chatbot Arena",
+    "before_sha256": "e572309d4f3045c68cf66d3d28b356723dd7edd0bcff680ed6c28e9b2b979c56",
+    "after_sha256": "4d136a33d95832a9e787f03e1067fd87178de6cb1dcccb6cdf6c508fbc807297"
+  },
+  "rejected_candidates": [
+    "candidate-corpus-01: unscaled font-size metadata caused false spaces",
+    "candidate-corpus-02: narrow digits and monospace glyphs caused false spaces"
+  ],
+  "scope": "No new CJK spacing; no changes to non-space characters or block geometry.",
+  "baseline_source_snapshot": "789d8cd000b05fad4da72edf02a83da3b20fd53c78d0be2361584b93dfcb6b30",
+  "candidate_source_snapshot": "eb768b04e207b5ff468687895678e5a3a627b4a03790a501210136c11cfcdd3a",
+  "candidate_snapshot_scope": "src, rust, tests, pyproject.toml, Cargo.toml, Cargo.lock, setup.py; this review metadata is linked after capture",
+  "candidate_snapshot_path": "output/pdf/tight-spacing-20260928/delivery-code/snapshot.json"
+}
