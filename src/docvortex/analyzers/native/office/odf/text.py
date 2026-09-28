@@ -811,7 +811,11 @@ class OdfBlockParser:
             return None, [table_block]
         load_preview()
         if preview_uri:
-            return InlineImage(preview_uri, preview_alt), [{"type": BlockType.IMAGE, "image_base64": preview_uri}]
+            # svg:title/svg:desc 拼出的替代文本随图片块输出，作为图片识别内容。
+            image_block = {"type": BlockType.IMAGE, "image_base64": preview_uri}
+            if preview_alt:
+                image_block["content"] = preview_alt
+            return InlineImage(preview_uri, preview_alt), [image_block]
         if preview_alt:
             return InlineText(preview_alt), []
         return None, []
@@ -824,7 +828,10 @@ class OdfBlockParser:
         if isinstance(inline, InlineMath):
             return [{"type": BlockType.EQUATION, "content": inline.latex}]
         if isinstance(inline, InlineImage):
-            return [{"type": BlockType.IMAGE, "image_base64": inline.data_uri}]
+            image_block = {"type": BlockType.IMAGE, "image_base64": inline.data_uri}
+            if inline.alt:
+                image_block["content"] = inline.alt
+            return [image_block]
         if isinstance(inline, InlineText):
             content = render_atoms_to_model([inline], trim_edges=True)
             return [{"type": BlockType.TEXT, "content": content}] if content else []

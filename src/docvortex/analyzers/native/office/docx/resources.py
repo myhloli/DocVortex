@@ -286,7 +286,33 @@ class _DocxResources:
                 "type": BlockType.IMAGE,
                 "image_base64": img_base64,
             }
+            alt_text = self._docx_image_alt_text(image)
+            if alt_text:
+                image_block["content"] = alt_text
             self.cur_page.append(image_block)
+
+    @staticmethod
+    def _docx_image_alt_text(image: Any) -> str:
+        """读取 DrawingML wp:docPr 的 descr 或 VML v:shape 的 alt 替代文本。"""
+        element = image
+        while element is not None:
+            tag = str(getattr(element, "tag", ""))
+            local_name = tag.rsplit("}", 1)[-1]
+            if local_name in {"inline", "anchor"}:
+                for child in element:
+                    child_tag = str(getattr(child, "tag", ""))
+                    if child_tag.rsplit("}", 1)[-1] == "docPr":
+                        descr = (child.get("descr") or "").strip()
+                        if descr:
+                            return descr
+                return ""
+            if local_name == "shape" and "urn:schemas-microsoft-com:vml" in tag:
+                alt = (element.get("alt") or "").strip()
+                if alt:
+                    return alt
+                return ""
+            element = element.getparent()
+        return ""
 
     def _handle_drawingml(self, elements: list[BaseOxmlElement]):
         """

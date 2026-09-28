@@ -228,12 +228,7 @@ class _PptxResources:
                 if fallback_data is not None and fallback_data[1] != "image/svg+xml":
                     img_base64 = serialize_office_image(fallback_data[0], content_type=fallback_data[1])
             if img_base64 is not None:
-                self.cur_page.append(
-                    {
-                        "type": BlockType.IMAGE,
-                        "image_base64": img_base64,
-                    }
-                )
+                self.cur_page.append(self._build_image_block(img_base64, shape))
             return
 
         img_base64 = serialize_office_image(
@@ -243,12 +238,34 @@ class _PptxResources:
         if img_base64 is None:
             return
 
+        self.cur_page.append(self._build_image_block(img_base64, shape))
+
+    def _build_image_block(self, img_base64: str, shape) -> dict:
+        """构造图片块，形状 cNvPr 的 descr（替代文本）作为识别内容输出。"""
         image_block = {
             "type": BlockType.IMAGE,
             "image_base64": img_base64,
         }
-        self.cur_page.append(image_block)
-        return
+        alt_text = self._pptx_shape_alt_text(shape)
+        if alt_text:
+            image_block["content"] = alt_text
+        return image_block
+
+    @staticmethod
+    def _pptx_shape_alt_text(shape) -> str:
+        """读取形状非可视属性 cNvPr 上的 descr 替代文本，兼容各形状包装元素。"""
+        element = getattr(shape, "_element", None)
+        if element is None:
+            element = getattr(shape, "element", None)
+        if element is None:
+            return ""
+        for candidate in element.iter():
+            tag = str(candidate.tag)
+            if tag.endswith("}cNvPr") or tag == "cNvPr":
+                descr = (candidate.get("descr") or "").strip()
+                if descr:
+                    return descr
+        return ""
 
     def _decode_pptx_shape_image_equation(self, shape: Any) -> str | None:
         """从普通 picture 或 OLE preview 的 WMF/GIF comment 恢复公式。"""

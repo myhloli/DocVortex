@@ -6,14 +6,35 @@ from zipfile import BadZipFile, ZipFile, ZipInfo
 from loguru import logger
 from lxml import etree
 
-from ..opc import relationship_source_base_dir, write_zip_package
+from ..opc import (
+    CONTENT_TYPES_MEMBER,
+    STRICT_OOXML_COMMON_REPLACEMENTS,
+    WORDPROCESSINGML_NS,
+    relationship_source_base_dir,
+    repair_content_type_overrides,
+    translate_strict_ooxml_uris,
+    write_zip_package,
+)
 
 LEGACY_PPT_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
-WORDPROCESSINGML_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 MARKUP_COMPATIBILITY_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 PRESENTATIONML_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 PACKAGE_RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+
+PRESENTATION_MAIN_CONTENT_TYPE = (
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+)
+# 关系类型尾段到 part 内容类型的映射，用于按关系图补全 [Content_Types].xml Override。
+PPTX_REL_CONTENT_TYPES = {
+    "officeDocument": PRESENTATION_MAIN_CONTENT_TYPE,
+    "slide": "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
+    "slideMaster": "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml",
+    "slideLayout": "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml",
+    "notesSlide": "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml",
+    "notesMaster": "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml",
+    "theme": "application/vnd.openxmlformats-officedocument.theme+xml",
+}
 
 CONTENT_PART_TAG = f"{{{PRESENTATIONML_NS}}}contentPart"
 RELATIONSHIP_TAG = f"{{{PACKAGE_RELATIONSHIPS_NS}}}Relationship"
@@ -27,27 +48,7 @@ PPTX_SHAPE_TAGS = {
 
 ROOT_TAG_PATTERN = re.compile(rb"<(?![?!])(?:[A-Za-z_][\w.-]*:)?[A-Za-z_][\w.-]*(?=\s|/?>)")
 
-STRICT_OOXML_REPLACEMENTS = (
-    (
-        b"http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail",
-        b"http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail",
-    ),
-    (
-        b"http://purl.oclc.org/ooxml/officeDocument/relationships/customProperties",
-        b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties",
-    ),
-    (
-        b"http://purl.oclc.org/ooxml/officeDocument/relationships/extendedProperties",
-        b"http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
-    ),
-    (
-        b"http://purl.oclc.org/ooxml/officeDocument/relationships",
-        b"http://schemas.openxmlformats.org/officeDocument/2006/relationships",
-    ),
-    (
-        b"http://purl.oclc.org/ooxml/drawingml/main",
-        b"http://schemas.openxmlformats.org/drawingml/2006/main",
-    ),
+STRICT_OOXML_REPLACEMENTS = STRICT_OOXML_COMMON_REPLACEMENTS + (
     (
         b"http://purl.oclc.org/ooxml/drawingml/chart",
         b"http://schemas.openxmlformats.org/drawingml/2006/chart",
@@ -55,26 +56,6 @@ STRICT_OOXML_REPLACEMENTS = (
     (
         b"http://purl.oclc.org/ooxml/presentationml/main",
         b"http://schemas.openxmlformats.org/presentationml/2006/main",
-    ),
-    (
-        b"http://purl.oclc.org/ooxml/officeDocument/math",
-        b"http://schemas.openxmlformats.org/officeDocument/2006/math",
-    ),
-    (
-        b"http://purl.oclc.org/ooxml/officeDocument/customProperties",
-        b"http://schemas.openxmlformats.org/officeDocument/2006/custom-properties",
-    ),
-    (
-        b"http://purl.oclc.org/ooxml/officeDocument/extendedProperties",
-        b"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties",
-    ),
-    (
-        b"http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes",
-        b"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes",
-    ),
-    (
-        b"http://purl.oclc.org/ooxml/officeDocument/oleObject",
-        b"http://schemas.openxmlformats.org/officeDocument/2006/oleObject",
     ),
 )
 
@@ -112,6 +93,17 @@ def normalize_pptx_package(file_bytes: bytes) -> bytes:
                 if normalized_data != member_data:
                     changed = True
                 rewritten_members.append((info, normalized_data))
+
+        repaired_content_types = repair_content_type_overrides(
+            {info.filename: member_data for info, member_data in rewritten_members},
+            PPTX_REL_CONTENT_TYPES,
+        )
+        if repaired_content_types is not None:
+            rewritten_members = [
+                (info, repaired_content_types if info.filename == CONTENT_TYPES_MEMBER else member_data)
+                for info, member_data in rewritten_members
+            ]
+            changed = True
     except BadZipFile as exc:
         raise ValueError("Invalid PPTX package: file is not a ZIP archive.") from exc
 
@@ -234,10 +226,7 @@ def _relationship_source_base_dir(rels_filename: str) -> str:
 
 def _translate_strict_ooxml_uris(xml_bytes: bytes) -> bytes:
     """把 Strict OOXML URI 转为 python-pptx 能识别的 Transitional URI。"""
-    normalized = xml_bytes
-    for strict_uri, transitional_uri in STRICT_OOXML_REPLACEMENTS:
-        normalized = normalized.replace(strict_uri, transitional_uri)
-    return normalized
+    return translate_strict_ooxml_uris(xml_bytes, STRICT_OOXML_REPLACEMENTS)
 
 
 def _add_missing_known_namespaces(xml_bytes: bytes) -> bytes:

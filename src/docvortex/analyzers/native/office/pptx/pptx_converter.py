@@ -46,6 +46,10 @@ from .text_styles import _PptxTextStyles
 from .lists import _PptxLists
 from .titles import _PptxTitles
 
+# python-pptx 默认模板幻灯片尺寸（10 × 7.5 英寸，EMU），用于缺 p:sldSz 的包。
+DEFAULT_SLIDE_WIDTH_EMU = 9144000
+DEFAULT_SLIDE_HEIGHT_EMU = 6858000
+
 
 class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _PptxTitles):
     """编排 PPTX 包读取、逐页遍历、重试及职责处理。"""
@@ -125,8 +129,9 @@ class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _P
         self._convert_package_bytes(normalized_bytes)
 
     def _walk_linear(self, pptx_obj: presentation.Presentation):
-        slide_width = int(pptx_obj.slide_width)
-        slide_height = int(pptx_obj.slide_height)
+        # 缺 p:sldSz 的非标准包 slide_width/height 为 None，按 python-pptx 默认模板尺寸回退。
+        slide_width = int(pptx_obj.slide_width or DEFAULT_SLIDE_WIDTH_EMU)
+        slide_height = int(pptx_obj.slide_height or DEFAULT_SLIDE_HEIGHT_EMU)
         has_visible_content_slide = False
 
         # 遍历每一张幻灯片
