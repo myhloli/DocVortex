@@ -28,8 +28,13 @@ def test_visual_bodies_captions_and_footnotes_align_left() -> None:
         ".docvortex-document .docvortex-figure > img,\n"
         ".docvortex-document .docvortex-visual-body > img {\n  display: block;\n  margin-inline: 0;\n}"
     ) in source
-    assert ".docvortex-document .docvortex-flowchart {\n  margin: 1rem 0;" in source
+    assert ".docvortex-document .docvortex-flowchart {\n  margin: 1rem 0 0.5rem;" in source
     assert ".docvortex-document .docvortex-flowchart-canvas {\n  display: none;\n  min-width: 0;\n  text-align: left;" in source
+    assert (
+        '.docvortex-document .docvortex-flowchart-source[hidden],\n'
+        '.docvortex-document .docvortex-flowchart[data-mermaid-state="rendered"] + .docvortex-flowchart-source {\n'
+        '  display: none;\n}'
+    ) in source
     assert (
         ".docvortex-document .docvortex-caption {\n"
         "  color: var(--docvortex-muted);\n"

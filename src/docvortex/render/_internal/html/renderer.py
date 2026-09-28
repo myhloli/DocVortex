@@ -455,19 +455,20 @@ class _HtmlRenderer:
         return _wrap_visual_body("".join(parts), block, "image")
 
     def _render_flowchart_body(self, block: ImageBodyBlock, mermaid_source: str) -> str:
-        """输出 Mermaid canvas，并保留 raster 与源码两级失败回退。"""
+        """原图作为主视图，折叠区展示 Mermaid 图；无原图时保留失败源码回退。"""
         source = self._safe_block_image_source(block)
         escaped_source = html.escape(_replace_html_controls(mermaid_source), quote=False)
-        fallback = self._render_image(source, alt="flowchart", class_name="docvortex-flowchart-fallback") if source else ""
-        fallback_class = " docvortex-flowchart--has-raster" if fallback else ""
-        details_open = "" if fallback else " open"
+        image = self._render_image(source, alt="flowchart", class_name="docvortex-image") if source else ""
+        details_open = "" if image else " open"
+        source_hidden = " hidden" if image else ""
         return (
-            f'<div class="docvortex-flowchart{fallback_class}" data-mermaid-state="pending">'
-            '<div class="docvortex-flowchart-canvas" role="img" aria-label="flowchart"></div>'
-            f"{fallback}</div>"
+            f"{image}"
             f'<details class="docvortex-details docvortex-flowchart-details"{details_open}>'
-            "<summary>flowchart source</summary>"
-            f'<pre class="docvortex-flowchart-source"><code>{escaped_source}</code></pre>'
+            "<summary>flowchart</summary>"
+            '<div class="docvortex-flowchart" data-mermaid-state="pending">'
+            '<div class="docvortex-flowchart-canvas" role="img" aria-label="flowchart"></div>'
+            "</div>"
+            f'<pre class="docvortex-flowchart-source"{source_hidden}><code>{escaped_source}</code></pre>'
             "</details>"
         )
 
@@ -984,16 +985,14 @@ document.addEventListener('DOMContentLoaded', function () {{
 
 
 def _mermaid_head() -> str:
-    """返回固定 Mermaid 入口和逐图安全渲染、失败回退脚本。"""
+    """返回固定 Mermaid 入口和折叠展开后按需安全渲染脚本。"""
     return f"""<script defer src="{_MERMAID_URL}"
   integrity="{_MERMAID_INTEGRITY}" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
 function markDocVortexMermaidError(host) {{
   host.dataset.mermaidState = 'error';
-  if (!host.classList.contains('docvortex-flowchart--has-raster')) {{
-    var details = host.nextElementSibling;
-    if (details && details.classList.contains('docvortex-flowchart-details')) details.open = true;
-  }}
+  var canvas = host.querySelector('.docvortex-flowchart-canvas');
+  if (canvas) canvas.textContent = 'Flowchart unavailable';
 }}
 document.addEventListener('DOMContentLoaded', function () {{
   var root = document.querySelector('.docvortex-document');
@@ -1017,15 +1016,16 @@ document.addEventListener('DOMContentLoaded', function () {{
     hosts.forEach(markDocVortexMermaidError);
     return;
   }}
-  (async function () {{
-    for (var index = 0; index < hosts.length; index += 1) {{
-      var host = hosts[index];
-      var details = host.nextElementSibling;
-      var source = details && details.querySelector('.docvortex-flowchart-source code');
+  hosts.forEach(function (host, index) {{
+    var details = host.closest('details');
+    // 仅在详情展开后读取隐藏源码并渲染一次。
+    var render = async function () {{
+      if (host.dataset.mermaidState !== 'pending') return;
+      var source = details ? details.querySelector('.docvortex-flowchart-source code') : null;
       var canvas = host.querySelector('.docvortex-flowchart-canvas');
       if (!source || !canvas) {{
         markDocVortexMermaidError(host);
-        continue;
+        return;
       }}
       var renderId = 'docvortex-mermaid-' + index;
       while (document.getElementById(renderId)) renderId += '-x';
@@ -1037,8 +1037,13 @@ document.addEventListener('DOMContentLoaded', function () {{
       }} catch (_error) {{
         markDocVortexMermaidError(host);
       }}
+    }};
+    if (details && !details.open) {{
+      details.addEventListener('toggle', function () {{ if (details.open) render(); }});
+    }} else {{
+      render();
     }}
-  }})();
+  }});
 }});
 </script>"""
 

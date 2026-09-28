@@ -601,22 +601,27 @@ def test_visual_child_order_image_details_and_asset_precedence() -> None:
     assert len(soup.select(".docvortex-caption")) == 2
 
 
-def test_mermaid_flowchart_uses_live_canvas_raster_fallback_and_safe_config() -> None:
-    """验证受限 Mermaid 源生成 canvas，并保留 raster、源码和固定安全运行时。"""
+def test_mermaid_flowchart_keeps_raster_primary_and_lazy_details_render() -> None:
+    """验证原图为主视图，折叠区只显示图且隐藏源码供按需渲染。"""
     source_text = '%% comment\ngraph LR\n  A["<script>alert(1)</script>"] --> B'
     middle = _middle(_page(0, _flowchart(_mermaid_fence(source_text))))
     fragment = render_html(middle, standalone=False)
     standalone = render_html(middle)
     soup = BeautifulSoup(fragment, "html.parser")
 
-    host = soup.select_one(".docvortex-flowchart")
-    assert host["data-mermaid-state"] == "pending"
-    assert "docvortex-flowchart--has-raster" in host["class"]
-    assert host.select_one('.docvortex-flowchart-canvas[role="img"]') is not None
-    assert host.select_one(".docvortex-flowchart-fallback")["src"].startswith("data:image/png")
-    details = host.find_next_sibling("details")
+    image = soup.select_one("img.docvortex-image")
+    assert image is not None and image["src"].startswith("data:image/png")
+    assert image.find_parent("details") is None
+    details = soup.select_one("details.docvortex-flowchart-details")
     assert "open" not in details.attrs
-    assert details.select_one(".docvortex-flowchart-source code").get_text() == source_text
+    assert details.summary.get_text(strip=True) == "flowchart"
+    assert [child.name for child in details.find_all(recursive=False)] == ["summary", "div", "pre"]
+    host = details.select_one(".docvortex-flowchart")
+    assert host["data-mermaid-state"] == "pending"
+    assert host.select_one('.docvortex-flowchart-canvas[role="img"]') is not None
+    hidden_source = details.select_one(".docvortex-flowchart-source")
+    assert hidden_source.has_attr("hidden")
+    assert hidden_source.code.get_text() == source_text
     assert soup.find("script") is None
     assert "mermaid@" not in fragment
     assert "mermaid@11.16.1/dist/mermaid.min.js" in standalone
@@ -626,10 +631,13 @@ def test_mermaid_flowchart_uses_live_canvas_raster_fallback_and_safe_config() ->
     assert "maxTextSize: 50000" in standalone and "maxEdges: 500" in standalone
     assert "flowchart: {htmlLabels: false, useMaxWidth: true}" in standalone
     assert "bindFunctions" not in standalone
+    assert "addEventListener('toggle'" in standalone
+    assert "closest('details')" in standalone
+    assert "Flowchart unavailable" in standalone
 
 
-def test_mermaid_flowchart_without_raster_opens_source_fallback() -> None:
-    """验证无 raster 的有效 flowchart 默认展开源码，等待或替代浏览器渲染。"""
+def test_mermaid_flowchart_without_raster_opens_diagram() -> None:
+    """验证无原图时源码作为渲染失败回退，成功渲染后由 CSS 隐藏。"""
     soup = BeautifulSoup(
         render_html(
             _middle(_page(0, _flowchart(_mermaid_fence("flowchart TD\n  A --> B"), with_raster=False))),
@@ -639,9 +647,12 @@ def test_mermaid_flowchart_without_raster_opens_source_fallback() -> None:
     )
 
     host = soup.select_one(".docvortex-flowchart")
-    assert "docvortex-flowchart--has-raster" not in host.get("class", [])
-    assert host.select_one("img") is None
-    assert "open" in host.find_next_sibling("details").attrs
+    details = host.find_parent("details")
+    assert details is not None and "docvortex-flowchart-details" in details.get("class", [])
+    assert details.summary.get_text(strip=True) == "flowchart"
+    assert not details.select_one(".docvortex-flowchart-source").has_attr("hidden")
+    assert soup.select_one("img") is None
+    assert "open" in details.attrs
 
 
 @pytest.mark.parametrize(

@@ -65,11 +65,11 @@ class RichVisualBodyWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class FlowchartBodyWireSpec:
-    """保存 flowchart 源码与可选 raster fallback。"""
+    """保存 flowchart 源码与可选原图（旧外壳中为 raster 回退图）。"""
 
     element: etree._Element
     source_element: etree._Element
-    fallback_image: etree._Element | None
+    primary_image: etree._Element | None
 
 
 @dataclass(frozen=True, slots=True)

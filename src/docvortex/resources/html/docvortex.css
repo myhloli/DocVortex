@@ -277,9 +277,9 @@
   margin-inline: 0;
 }
 
-/* Mermaid 成功后替换 raster；无 JS、加载或语法失败时保留图片/源码回退。 */
+/* 原图恒为主视图；折叠 details 只展示按需渲染的 Mermaid 图。 */
 .docvortex-document .docvortex-flowchart {
-  margin: 1rem 0;
+  margin: 1rem 0 0.5rem;
   max-width: 100%;
   overflow-x: auto;
 }
@@ -297,21 +297,21 @@
   max-width: 100%;
 }
 
-.docvortex-document .docvortex-flowchart-fallback {
-  display: block;
-  margin-inline: 0;
-}
-
 .docvortex-document .docvortex-flowchart[data-mermaid-state="rendered"] .docvortex-flowchart-canvas {
   display: block;
 }
 
-.docvortex-document .docvortex-flowchart[data-mermaid-state="rendered"] .docvortex-flowchart-fallback {
-  display: none;
+.docvortex-document .docvortex-flowchart[data-mermaid-state="error"] .docvortex-flowchart-canvas {
+  display: block;
 }
 
 .docvortex-document .docvortex-flowchart-details {
   max-width: 100%;
+}
+
+.docvortex-document .docvortex-flowchart-source[hidden],
+.docvortex-document .docvortex-flowchart[data-mermaid-state="rendered"] + .docvortex-flowchart-source {
+  display: none;
 }
 
 .docvortex-document .docvortex-flowchart-source {

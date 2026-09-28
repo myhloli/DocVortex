@@ -170,8 +170,8 @@ def _materialize_visual_body(
             "type": BlockType.IMAGE,
             "content": _flowchart_content(spec.source_element),
         }
-        if spec.fallback_image is not None:
-            block.update(_resolve_image_payload(spec.fallback_image, resources))
+        if spec.primary_image is not None:
+            block.update(_resolve_image_payload(spec.primary_image, resources))
         return block
     if isinstance(spec, TableBodyWireSpec):
         return _materialize_table(spec, resources, projector)

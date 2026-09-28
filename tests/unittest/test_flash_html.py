@@ -1383,6 +1383,59 @@ def test_html_versioned_wire_roundtrips_canonical_visual_body_variants() -> None
     assert bodies[4].content == "" and bodies[4].image_url is None
 
 
+def test_html_versioned_wire_decodes_legacy_flowchart_shell_exactly() -> None:
+    """验证旧外壳（canvas 宿主在 details 外、raster 为回退图）仍走 exact 解码。"""
+    source = MiddleJson.model_validate(
+        {
+            "pages": [
+                {
+                    "page_idx": 0,
+                    "blocks": [
+                        {
+                            "type": "image",
+                            "index": 0,
+                            "sub_type": "flowchart",
+                            "content": [
+                                {
+                                    "type": "image_body",
+                                    "index": 0,
+                                    "content": "```mermaid\ngraph TD\nA-->B\n```",
+                                    "image_url": "https://example.com/flow.png",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "is_full_document": True,
+            "metadata": {"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},
+            "schema": "docvortex.middle",
+            "schema_version": "2.0",
+        }
+    )
+    soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")
+    # 把当前外壳重排回旧外壳：canvas 宿主移出 details，原图降级为宿主内回退图。
+    details = soup.select_one("details.docvortex-flowchart-details")
+    host = details.select_one(".docvortex-flowchart")
+    image = soup.select_one("img.docvortex-image")
+    host["class"] = ["docvortex-flowchart", "docvortex-flowchart--has-raster"]
+    image["class"] = ["docvortex-flowchart-fallback"]
+    host.append(image)
+    details.insert_before(host.extract())
+    details.summary.string = "flowchart source"
+    details.select_one(".docvortex-flowchart-source").attrs.pop("hidden")
+
+    document = html_document_module.parse_html_document(str(soup).encode())
+    decode_result = decode_docvortex_html_wire(document.body, HtmlResourceContext(document.source_context))
+    middle, _ = analyze_native_test_document(str(soup).encode(), file_suffix="html")
+    block = middle.pages[0].blocks[0]
+
+    assert decode_result.blocks is not None and decode_result.fallback_reason is None
+    assert str(block.type) == "image" and block.sub_type == "flowchart"
+    assert block.content[0].content == "```mermaid\ngraph TD\nA-->B\n```"
+    assert block.content[0].image_url == "https://example.com/flow.png"
+
+
 def test_html_versioned_wire_distinguishes_index_carrier_from_inline_link() -> None:
     """验证未链接目录项中的普通 anchor 不会被误认为 renderer 目录外壳。"""
     source = MiddleJson.model_validate(

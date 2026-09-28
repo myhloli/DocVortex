@@ -360,15 +360,60 @@ def _parse_table_body(body: etree._Element) -> TableBodyWireSpec:
 
 
 def _looks_like_flowchart_body(body: etree._Element) -> bool:
-    """判断 body 是否使用 renderer 的 flowchart 固定外壳。"""
+    """判断 body 是否使用 renderer 新旧两种 flowchart 固定外壳。"""
     children = _element_children(body)
-    return bool(children and local_name(children[0]) == "div" and "docvortex-flowchart" in _class_tokens(children[0]))
+    if children and local_name(children[0]) == "div" and "docvortex-flowchart" in _class_tokens(children[0]):
+        return True
+    return any(
+        local_name(child) == "details" and "docvortex-flowchart-details" in _class_tokens(child) for child in children
+    )
 
 
 def _parse_flowchart_body(body: etree._Element) -> FlowchartBodyWireSpec:
-    """解析 flowchart canvas、可选 raster 和源码 details。"""
+    """解析当前外壳的原图与源码 details；旧外壳（canvas 宿主在 details 外）只读兼容。"""
     _validate_structural_text(body)
     children = _element_children(body)
+    if children and local_name(children[0]) == "div" and "docvortex-flowchart" in _class_tokens(children[0]):
+        return _parse_legacy_flowchart_body(body, children)
+    return _parse_current_flowchart_body(body, children)
+
+
+def _parse_current_flowchart_body(body: etree._Element, children: list[etree._Element]) -> FlowchartBodyWireSpec:
+    """解析当前外壳：可选原图后跟 details（summary、canvas 宿主、源码）。"""
+    primary_image: etree._Element | None = None
+    if len(children) == 2:
+        primary_image, details = children
+        if local_name(primary_image) != "img" or _class_tokens(primary_image) != {"docvortex-image"}:
+            raise NonCanonicalWire
+    elif len(children) == 1:
+        details = children[0]
+    else:
+        raise NonCanonicalWire
+    if local_name(details) != "details" or _class_tokens(details) != {"docvortex-details", "docvortex-flowchart-details"}:
+        raise NonCanonicalWire
+    _validate_structural_text(details)
+    details_children = _element_children(details)
+    if len(details_children) != 3:
+        raise NonCanonicalWire
+    summary, host, source = details_children
+    _validate_flowchart_summary(summary)
+    if local_name(host) != "div" or _class_tokens(host) != {"docvortex-flowchart"}:
+        raise NonCanonicalWire
+    _validate_structural_text(host)
+    host_children = _element_children(host)
+    if len(host_children) != 1:
+        raise NonCanonicalWire
+    canvas = host_children[0]
+    if local_name(canvas) != "div" or _class_tokens(canvas) != {"docvortex-flowchart-canvas"}:
+        raise NonCanonicalWire
+    _validate_structural_text(canvas)
+    if _element_children(canvas):
+        raise NonCanonicalWire
+    return FlowchartBodyWireSpec(body, _validate_flowchart_source(source), primary_image)
+
+
+def _parse_legacy_flowchart_body(body: etree._Element, children: list[etree._Element]) -> FlowchartBodyWireSpec:
+    """兼容读取旧外壳：canvas 宿主在 details 之前，raster 为宿主内回退图。"""
     if len(children) != 2:
         raise NonCanonicalWire
     display, details = children
@@ -385,10 +430,10 @@ def _parse_flowchart_body(body: etree._Element) -> FlowchartBodyWireSpec:
     _validate_structural_text(canvas)
     if _element_children(canvas):
         raise NonCanonicalWire
-    fallback_image = None
+    primary_image: etree._Element | None = None
     if len(display_children) == 2:
-        fallback_image = display_children[1]
-        if local_name(fallback_image) != "img" or _class_tokens(fallback_image) != {"docvortex-flowchart-fallback"}:
+        primary_image = display_children[1]
+        if local_name(primary_image) != "img" or _class_tokens(primary_image) != {"docvortex-flowchart-fallback"}:
             raise NonCanonicalWire
     if local_name(details) != "details" or _class_tokens(details) != {"docvortex-details", "docvortex-flowchart-details"}:
         raise NonCanonicalWire
@@ -397,19 +442,29 @@ def _parse_flowchart_body(body: etree._Element) -> FlowchartBodyWireSpec:
     if len(details_children) != 2:
         raise NonCanonicalWire
     summary, source = details_children
+    _validate_flowchart_summary(summary)
+    return FlowchartBodyWireSpec(body, _validate_flowchart_source(source), primary_image)
+
+
+def _validate_flowchart_summary(summary: etree._Element) -> None:
+    """校验新标题与历史 source 标题，保持旧 HTML 可回读。"""
     if (
         local_name(summary) != "summary"
         or _element_children(summary)
-        or " ".join(summary.itertext()).strip() != "flowchart source"
+        or " ".join(summary.itertext()).strip() not in {"flowchart", "flowchart source"}
     ):
         raise NonCanonicalWire
+
+
+def _validate_flowchart_source(source: etree._Element) -> etree._Element:
+    """校验源码 pre 结构并返回其唯一 code 载荷。"""
     if local_name(source) != "pre" or _class_tokens(source) != {"docvortex-flowchart-source"}:
         raise NonCanonicalWire
     _validate_structural_text(source)
     code_children = _element_children(source)
     if len(code_children) != 1 or local_name(code_children[0]) != "code" or _element_children(code_children[0]):
         raise NonCanonicalWire
-    return FlowchartBodyWireSpec(body, code_children[0], fallback_image)
+    return code_children[0]
 
 
 def _parse_rich_visual_body(body: etree._Element, parent_type: BlockType, sub_type: str) -> RichVisualBodyWireSpec:
