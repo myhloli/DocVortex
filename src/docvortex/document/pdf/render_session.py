@@ -8,6 +8,7 @@ import os
 import tempfile
 import threading
 import time
+from collections import deque
 from concurrent.futures import CancelledError
 from contextlib import contextmanager
 from pathlib import Path
@@ -17,9 +18,12 @@ from PIL import Image
 
 _worker_budget = None
 _worker_budget_lock = threading.RLock()
+_worker_available = threading.Condition(_worker_budget_lock)
+_worker_waiters = deque()
 _idle_workers = []
 _all_workers = []
 _leased_workers = {}
+_cached_workers = {}
 _legacy_render_users = 0
 
 
@@ -48,9 +52,17 @@ def _dispose_worker(worker):
     process.close()
 
 
+def _release_cached_input(worker, acknowledgement):
+    """在池锁内记录输入释放；缓存归属与当前任务租约归属可以不同。"""
+    owner = _cached_workers.pop(worker, None)
+    if owner is not None:
+        owner.close_diagnostics.append(acknowledgement)
+    _worker_available.notify_all()
+
+
 def shutdown_pdf_render_sessions():
     """进程退出或显式重置时回收持久定向池；活动会话会检测断连并失败。"""
-    with _worker_budget_lock:
+    with _worker_available:
         workers = list(_all_workers)
         _all_workers.clear()
         _idle_workers.clear()
@@ -59,13 +71,20 @@ def shutdown_pdf_render_sessions():
             if owner is not None:
                 owner._cancelled.set()
                 owner._worker_budget.release()
-            try:
-                worker[1].send((0, "shutdown", None))
-                if worker[1].poll(0.1):
-                    worker[1].recv()
-            except (OSError, EOFError):
-                pass
+            result = {"input_released": True, "pid": worker[0].pid, "worker_terminated": True}
+            # 活动管道由租用者读取，强制关闭不能向其中插入另一条协议命令。
+            if owner is None:
+                try:
+                    worker[1].send((0, "shutdown", None))
+                    if worker[1].poll(0.1):
+                        _, status, value = worker[1].recv()
+                        if status == "ack" and value.get("input_released") is True:
+                            result = value
+                except (OSError, EOFError):
+                    pass
             _dispose_worker(worker)
+            _release_cached_input(worker, result)
+        _worker_available.notify_all()
 
 
 def prepare_legacy_render_pool():
@@ -210,7 +229,7 @@ def _render_session_worker(connection):
 
 
 class PDFRenderSession:
-    """显式持有文档级 worker；返回的 PIL 像素不依赖会话生命周期。"""
+    """持有文档输入，按任务租用 worker；空闲文档缓存可被其他会话立即替换。"""
 
     def __init__(self, pdf_bytes: bytes, *, threads: int | None = None, timeout: float | None = None):
         """保存一次 PDF 输入，惰性创建至多既有并发预算数量的 worker。"""
@@ -262,6 +281,9 @@ class PDFRenderSession:
         while True:
             if not closing and self._cancelled.is_set():
                 raise CancelledError("PDF render session cancelled")
+            with _worker_budget_lock:
+                if _leased_workers.get(worker) is not self:
+                    raise RuntimeError("PDF render worker lease was revoked")
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError("PDF render session timed out")
@@ -279,55 +301,109 @@ class PDFRenderSession:
                 raise RuntimeError(f"PDF render worker exited: {process.exitcode}")
 
     def _ensure_workers(self, count, deadline):
-        """为文档惰性补充定向 worker，各进程只打开一次共享文件输入。"""
-        if time.monotonic() >= deadline:
-            raise TimeoutError("PDF render session timed out")
+        """按 FIFO 租用空闲进程，优先命中文档缓存，切换输入不占用池锁。"""
         context = multiprocessing.get_context("spawn")
-        pending = []
-        while len(self._workers) < count:
-            if not self._worker_budget.acquire(blocking=False):
-                if self._workers:
-                    break
-                if self._cancelled.is_set():
-                    raise CancelledError("PDF render session cancelled")
-                if time.monotonic() >= deadline:
-                    raise TimeoutError("PDF render worker budget timed out")
-                self._cancelled.wait(min(0.05, max(0, deadline - time.monotonic())))
-                continue
+        with _worker_available:
+            _prepare_session_render_pool()
+            _worker_waiters.append(self)
             try:
-                worker = None
-                with _worker_budget_lock:
-                    _prepare_session_render_pool()
-                    while _idle_workers:
-                        candidate = _idle_workers.pop()
-                        if candidate[0].is_alive():
-                            worker = candidate
-                            break
-                        _all_workers.remove(candidate)
-                        _dispose_worker(candidate)
-                    if worker is None:
-                        parent, child = context.Pipe()
-                        process = context.Process(target=_render_session_worker, args=(child,), daemon=True)
-                        try:
-                            process.start()
-                        except BaseException:
-                            parent.close()
+                while True:
+                    if self._cancelled.is_set():
+                        raise CancelledError("PDF render session cancelled")
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError("PDF render worker budget timed out")
+                    if _worker_waiters[0] is self and self._worker_budget.acquire(blocking=False):
+                        break
+                    _worker_available.wait(remaining)
+                # 有其他排队请求时仅先取得一个槽位；任务不会持有部分槽位再等待更多。
+                limit = 1 if len(_worker_waiters) > 1 else count
+                for index in range(limit):
+                    if index and not self._worker_budget.acquire(blocking=False):
+                        break
+                    worker = None
+                    try:
+                        # 等待期间旧后端可能开始工作，取得额度后必须重新检查互斥边界。
+                        if index == 0:
+                            _prepare_session_render_pool()
+                        while _idle_workers:
+                            worker = next(
+                                (item for item in _idle_workers if _cached_workers.get(item) is self),
+                                next((item for item in _idle_workers if item not in _cached_workers), _idle_workers[0]),
+                            )
+                            _idle_workers.remove(worker)
+                            if worker[0].is_alive():
+                                break
+                            result = {"input_released": True, "pid": worker[0].pid, "worker_terminated": True}
+                            _all_workers.remove(worker)
+                            _dispose_worker(worker)
+                            _release_cached_input(worker, result)
+                            worker = None
+                        if worker is None:
+                            parent, child = context.Pipe()
+                            process = context.Process(target=_render_session_worker, args=(child,), daemon=True)
+                            try:
+                                process.start()
+                            except BaseException:
+                                parent.close()
+                                child.close()
+                                raise
                             child.close()
-                            raise
-                        child.close()
-                        worker = (process, parent)
-                        _all_workers.append(worker)
-                    self._workers.append(worker)
-                    _leased_workers[worker] = self
-                pending.append((worker, self._send(worker, "open", str(self._input))))
-            except BaseException:
-                if worker is None or worker not in self._workers:
-                    self._worker_budget.release()
-                raise
+                            worker = (process, parent)
+                            _all_workers.append(worker)
+                        self._workers.append(worker)
+                        _leased_workers[worker] = self
+                    except BaseException:
+                        if worker not in self._workers:
+                            self._worker_budget.release()
+                        raise
+            finally:
+                _worker_waiters.remove(self)
+                _worker_available.notify_all()
+
+        pending_close = []
+        pending_open = []
+        for worker in self._workers:
+            with _worker_budget_lock:
+                if _leased_workers.get(worker) is not self:
+                    raise RuntimeError("PDF render worker lease was revoked")
+                cached = _cached_workers.get(worker)
+            if cached is self:
+                continue
+            if cached is not None:
+                pending_close.append((worker, self._send(worker, "close", None)))
+            else:
+                pending_open.append(worker)
+        for worker, request_id in pending_close:
+            result = self._receive(worker, request_id, deadline)
+            if result.get("input_released") is not True:
+                raise RuntimeError("PDF render close acknowledgement lacks input release")
+            with _worker_available:
+                _release_cached_input(worker, result)
+            pending_open.append(worker)
+        pending = []
+        for worker in pending_open:
+            with _worker_budget_lock:
+                if _leased_workers.get(worker) is not self:
+                    raise RuntimeError("PDF render worker lease was revoked")
+                # 在发送前登记，打开失败也必须先回收输入句柄再删除临时文件。
+                _cached_workers[worker] = self
+            pending.append((worker, self._send(worker, "open", str(self._input))))
         for worker, request_id in pending:
             result = self._receive(worker, request_id, deadline)
             self._page_count = result["page_count"]
             self.worker_diagnostics.append(result)
+
+    def _release_workers(self):
+        """任务完成即归还使用权并唤醒等待者，保留可随时替换的单文档缓存。"""
+        with _worker_available:
+            for worker in self._workers:
+                if _leased_workers.get(worker) is self:
+                    del _leased_workers[worker]
+                    _idle_workers.append(worker)
+                    self._worker_budget.release()
+            self._workers.clear()
+            _worker_available.notify_all()
 
     @contextmanager
     def _task_lock(self, deadline):
@@ -410,6 +486,7 @@ class PDFRenderSession:
                         if time.monotonic() >= deadline:
                             raise TimeoutError("PDF render session timed out")
                         results.append((specification[0], value))
+                self._release_workers()
                 return [value for _, value in sorted(results)]
             except BaseException:
                 for image in collected:
@@ -423,15 +500,25 @@ class PDFRenderSession:
         self.close()
 
     def _shutdown(self, *, graceful):
-        """先尝试定向关闭确认，失败时终止进程，再删除所有共享文件。"""
+        """仅清理自己的租约和缓存；其他会话切换旧输入时等待其释放确认。"""
         if self._closed:
             return
         self._closed = True
+        with _worker_available:
+            # 空闲缓存先原子预留，避免关闭输入时又被其他任务借走。
+            for worker in list(_idle_workers):
+                if _cached_workers.get(worker) is self:
+                    if not self._worker_budget.acquire(blocking=False):
+                        raise RuntimeError("Idle PDF render worker lacks a budget token")
+                    _idle_workers.remove(worker)
+                    _leased_workers[worker] = self
+                    self._workers.append(worker)
+            workers = [worker for worker in self._workers if _leased_workers.get(worker) is self]
         deadline = time.monotonic() + 1.0
         pending = []
-        reusable = []
+        reusable = {}
         if graceful:
-            for worker in self._workers:
+            for worker in workers:
                 try:
                     pending.append((worker, self._send(worker, "close", None)))
                 except (OSError, EOFError):
@@ -441,28 +528,36 @@ class PDFRenderSession:
                     result = self._receive(worker, request_id, deadline, closing=True)
                     if result.get("input_released") is not True:
                         raise RuntimeError("PDF render close acknowledgement lacks input release")
-                    self.close_diagnostics.append(result)
-                    reusable.append(worker)
-                except (OSError, RuntimeError, TimeoutError):
+                    reusable[worker] = result
+                except (OSError, RuntimeError, TimeoutError, ValueError):
                     pass
-        with _worker_budget_lock:
-            for worker in self._workers:
-                if worker in _all_workers:
-                    if worker in reusable:
-                        _idle_workers.append(worker)
-                    else:
-                        _all_workers.remove(worker)
-                        _dispose_worker(worker)
-                owner = _leased_workers.pop(worker, None)
-                if owner is not None:
-                    owner._worker_budget.release()
-        self._workers.clear()
+        with _worker_available:
+            for worker in workers:
+                if _leased_workers.get(worker) is not self:
+                    continue
+                if worker in reusable:
+                    _idle_workers.append(worker)
+                    result = reusable[worker]
+                else:
+                    result = {"input_released": True, "pid": worker[0].pid, "worker_terminated": True}
+                    _all_workers.remove(worker)
+                    _dispose_worker(worker)
+                _release_cached_input(worker, result)
+                del _leased_workers[worker]
+                self._worker_budget.release()
+            self._workers.clear()
+            _worker_available.notify_all()
+            # 借用者先关闭旧输入再打开新文档，不获取旧会话锁；等待不会形成会话锁环。
+            while any(owner is self for owner in _cached_workers.values()):
+                _worker_available.wait()
         self._directory.cleanup()
         self._pdf_bytes = None
         atexit.unregister(self.close)
 
     def close(self):
-        """幂等关闭会话；活动任务先观察取消信号，不无限等待 PDFium 返回。"""
+        """取消自己的等待或任务，确认本输入不再被任何 worker 持有后删除文件。"""
         self._cancelled.set()
+        with _worker_available:
+            _worker_available.notify_all()
         with self._lock:
             self._shutdown(graceful=True)
