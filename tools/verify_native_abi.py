@@ -4,10 +4,19 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import re
 import sys
 import subprocess
 import tempfile
 import zipfile
+
+
+def _expected_protocol_version() -> int:
+    """以文本方式读取 Python 侧协议常量（本脚本不导入应用依赖），协议版本升级时无需同步修改本脚本。"""
+    source = Path(__file__).resolve().parents[1] / "src" / "docvortex" / "_compute_backend.py"
+    match = re.search(r"^_PROTOCOL_VERSION = (\d+)$", source.read_text(encoding="utf-8"), re.MULTILINE)
+    assert match is not None, f"protocol constant not found in {source}"
+    return int(match.group(1))
 
 
 def verify_binary(binary: Path) -> None:
@@ -19,7 +28,7 @@ def verify_binary(binary: Path) -> None:
     assert native.NativeTableMerger().finish() == []
     assert native.crop_bitmap_bgr(bytes([1, 2, 3]), 1, 1, 3, "RGB", (0, 0, 1, 1), 0) == (bytes([3, 2, 1]), 1, 1)
     assert native.inline_style_stats() == 0
-    assert native.PROTOCOL_VERSION == 22
+    assert native.PROTOCOL_VERSION == _expected_protocol_version()
     assert native.source_rows_plain([], (100.0, 100.0), 0) == []
     assert native.script_roles_raw_batch(
         [(0.0, 0.0, 5.0, 10.0), (0.0, 0.0, 5.0, 10.0)],

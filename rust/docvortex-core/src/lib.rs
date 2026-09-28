@@ -46,8 +46,8 @@ pub mod text_pipeline;
 
 pub mod text_assignment;
 pub mod text_content;
-pub mod text_spacing;
 pub mod text_snapshot;
+pub mod text_spacing;
 
 pub mod geometry_risk;
 pub mod geometry_runs;
