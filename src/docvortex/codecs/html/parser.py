@@ -364,9 +364,7 @@ def _looks_like_flowchart_body(body: etree._Element) -> bool:
     children = _element_children(body)
     if children and local_name(children[0]) == "div" and "docvortex-flowchart" in _class_tokens(children[0]):
         return True
-    return any(
-        local_name(child) == "details" and "docvortex-flowchart-details" in _class_tokens(child) for child in children
-    )
+    return any(local_name(child) == "details" and "docvortex-flowchart-details" in _class_tokens(child) for child in children)
 
 
 def _parse_flowchart_body(body: etree._Element) -> FlowchartBodyWireSpec:
