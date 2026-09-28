@@ -26,7 +26,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        # ABI3 轮子只需验证最低 cp310 与最新 3.14 两个端点。
+        python: ['3.10', '3.14']
         backend: [python, rust]
     runs-on: ${{ matrix.os }}
     env:
