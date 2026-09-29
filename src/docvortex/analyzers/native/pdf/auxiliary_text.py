@@ -38,6 +38,9 @@ _PAGE_NUMBER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# 页眉或页脚同伴块允许的最大高度占页面高度比例，近整页容器不允许仅凭与页码行重叠改判。
+_MARGINAL_ROW_MAX_HEIGHT_RATIO = 0.15
+
 
 def _classify_page_auxiliary_text(prepared: _PreparedPage) -> None:
     """在容器认领后仅按空间关系标注侧栏文字和页脚注。"""
@@ -1073,6 +1076,7 @@ def _classify_page_number_outer_companions(
                     angle,
                 )
                 is_outward = local_bbox[3] <= outward_limit if target_type == "header" else local_bbox[1] >= outward_limit
+                # 同一边缘行还要求候选自身是窄带对象；近整页的大容器只蹭到页码行边时不算同行。
                 same_marginal_row = (
                     _bbox_axis_overlap_ratio(
                         local_bbox,
@@ -1080,6 +1084,7 @@ def _classify_page_number_outer_companions(
                         axis="y",
                     )
                     >= 0.5
+                    and local_bbox[3] - local_bbox[1] <= _MARGINAL_ROW_MAX_HEIGHT_RATIO * local_page_height
                 )
                 if is_outward or same_marginal_row:
                     line.semantic_type = target_type
@@ -1101,6 +1106,7 @@ def _classify_page_number_outer_companions(
                     angle,
                 )
                 is_outward = local_bbox[3] <= outward_limit if target_type == "header" else local_bbox[1] >= outward_limit
+                # 同一边缘行还要求图片自身是窄带对象；近整页的大图只蹭到页码行边时不算同行。
                 same_marginal_row = (
                     _bbox_axis_overlap_ratio(
                         local_bbox,
@@ -1108,6 +1114,7 @@ def _classify_page_number_outer_companions(
                         axis="y",
                     )
                     >= 0.5
+                    and local_bbox[3] - local_bbox[1] <= _MARGINAL_ROW_MAX_HEIGHT_RATIO * local_page_height
                 )
                 if is_outward or same_marginal_row:
                     block["type"] = target_type

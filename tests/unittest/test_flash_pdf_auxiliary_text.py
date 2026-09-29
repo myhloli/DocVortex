@@ -1864,3 +1864,35 @@ def test_distant_same_row_text_inherits_top_page_number_header_type() -> None:
 
     assert page_number.semantic_type == "page_number"
     assert running_title.semantic_type == "header"
+
+
+def test_near_page_sized_image_overlapping_page_number_stays_image() -> None:
+    """验证与底部页码行轻微重叠的近整页大图不会被改判成页脚。"""
+
+    page = _prepared_text_page(
+        _text_line(
+            "3",
+            (90.0, 82.0, 95.0, 87.0),
+            0,
+            semantic_type="page_number",
+        ),
+        page_size=(100.0, 100.0),
+    )
+    full_page_image = {
+        "type": "image",
+        "bbox": (10.0, 8.0, 90.0, 85.0),
+        "angle": 0,
+        "content": "",
+    }
+    marginal_banner = {
+        "type": "image",
+        "bbox": (7.0, 92.0, 39.0, 97.0),
+        "angle": 0,
+        "content": "",
+    }
+    page.fixed_blocks = [full_page_image, marginal_banner]
+
+    auxiliary_text._classify_page_number_outer_companions([page])
+
+    assert full_page_image["type"] == "image"
+    assert marginal_banner["type"] == "footer"
