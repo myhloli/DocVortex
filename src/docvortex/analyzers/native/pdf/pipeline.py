@@ -314,7 +314,18 @@ class _DocumentSources:
     page_style_lines: list[list[PDFTextStyleLine]]
     page_link_lines: list[list[PDFTextLinkLine]]
     page_owned_scripts: list[Any] = field(default_factory=list)
+    page_geometry_evidence: list[Any] = field(default_factory=list)
     page_spacing_lines: list[list[Any]] = field(default_factory=list)
+
+
+def _prepare_owned_geometry_evidence(owner, chars):
+    """一次准备全文风险所需的页面级 Rust 几何记录和原字符身份表。"""
+    if not hasattr(owner, "prepare_geometry_evidence"):
+        return None
+    evidence = owner.prepare_geometry_evidence()
+    if evidence is None:
+        return None
+    return evidence, {id(char): index for index, char in enumerate(chars)}
 
 
 def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
@@ -329,6 +340,7 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
     page_style_lines: list[list[PDFTextStyleLine]] = []
     page_link_lines: list[list[PDFTextLinkLine]] = []
     page_owned_scripts = []
+    page_geometry_evidence = []
     page_spacing_lines = []
     for page_idx in range(pdf_doc.page_count):
         snapshot = pdf_doc._extract_native_page(page_idx)
@@ -349,8 +361,9 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
         space_before = set(native_text.tight_space_indices()) if native_text is not None else None
         page_spacing_lines.append(prepare_spacing_lines(lines, space_before))
         chars = text_geometry.chars
-        # 只保留纯 Rust 脚本记录与本页身份映射，不延长 PDFium 页面或文档句柄生命周期。
+        # 只保留纯 Rust 脚本/几何记录与本页身份映射，不延长 PDFium 页面或文档句柄生命周期。
         page_owned_scripts.append(_prepare_owned_script_evidence(native_text, chars) if native_text is not None else None)
+        page_geometry_evidence.append(_prepare_owned_geometry_evidence(native_text, chars) if native_text is not None else None)
         drawing_lines = _coerce_pdf_drawing_lines(snapshot.drawing_lines)
         lines, decorative_rules = _extract_decorative_text_rules(
             lines,
@@ -400,6 +413,7 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
         page_style_lines,
         page_link_lines,
         page_owned_scripts,
+        page_geometry_evidence,
         page_spacing_lines,
     )
 
@@ -415,6 +429,7 @@ def _prepare_document_sources(
         [source.lines for source in sources.page_sources],
         sources.page_text_geometries,
         sources.page_sizes,
+        owned_geometry_inputs=sources.page_geometry_evidence,
     )
     for page_index, source in enumerate(sources.page_sources):
         # 容器认领前只允许 X 修复，表格和图形认领后再启用 Y trim。
@@ -430,6 +445,7 @@ def _prepare_document_sources(
     owned_scripts = sources.page_owned_scripts or [None] * len(sources.page_sources)
     pending = deque(zip(sources.page_sources, sources.page_text_geometries, owned_scripts, strict=True))
     sources.page_owned_scripts.clear()
+    sources.page_geometry_evidence.clear()
     del owned_scripts
     sources.page_sources.clear()
     sources.page_text_geometries.clear()
@@ -681,6 +697,7 @@ def _prepare_page_source(
         candidates,
         tight_bboxes=tight_bboxes,
         origins=origins,
+        _owned_script_inputs=_owned_script_inputs,
     )
     claimed_line_indices.update(caption_graphic_claims)
     claimed_line_indices.update(claimed_rule_code_line_indices)

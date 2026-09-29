@@ -40,6 +40,7 @@ from .table_annotations import (
     _prepare_table_note_body_metrics,
     _prepare_table_note_rows,
     _prepare_table_core_rows,
+    _prepare_marker_line_context,
 )
 from .table_rows import _clip_visual_row_to_corridor
 
@@ -133,6 +134,7 @@ class _RuleCandidateContext:
     grids: list | None = None
     grid_members: dict = field(default_factory=dict)
     core_indexes: dict = field(default_factory=dict)
+    marker_line_context: tuple[bool, dict] | None = None
     row_bounds: dict = field(default_factory=dict)
     annotation_geometry: Any = None
 
@@ -512,6 +514,9 @@ def _build_rule_table_candidates(
             if defer_materialization:
                 band_index = band_indexes[corridor_key]
                 if corridor_key not in context.core_indexes:
+                    if context.marker_line_context is None:
+                        context.marker_line_context = _prepare_marker_line_context(lines)
+                    marker_safe, marker_source_lines = context.marker_line_context
                     # 构建阶段内部行序列冻结为 tuple，允许两个只读索引安全共享切片校验。
                     corridor_rows = (
                         band_index.rows if band_index is not None else tuple(item.row for item in corridor_cache[corridor_key])
@@ -521,6 +526,8 @@ def _build_rule_table_candidates(
                         lines,
                         prepared_note_body_metrics,
                         context.marker_prepared,
+                        marker_safe=marker_safe,
+                        source_lines=marker_source_lines,
                     )
                 core_index = context.core_indexes[corridor_key]
                 interval = core_index.interval(accepted_rows) if core_index is not None else None

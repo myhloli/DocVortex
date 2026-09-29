@@ -13,6 +13,8 @@ import unicodedata
 from itertools import islice
 from typing import Any, Literal
 from ....schema import BBox
+from ....document.pdf.text._contracts import Bbox as CharBbox
+from ...._compute_backend import get_native
 from .models import _LineItem, _TableAnnotation, _TableCandidate, _VisualRow
 from .geometry import (
     _bbox_axis_overlap_ratio,
@@ -160,7 +162,51 @@ class _PreparedTableCoreRows:
         return self.marker_prepared.prepare(line, page_size, angle)
 
 
-def _prepare_table_core_rows(rows, lines, metrics, marker_prepared: _PreparedMarkerCache | None = None):
+def _prepare_marker_line_context(lines):
+    """同一候选上下文只校验一次 marker 输入，并冻结来源行索引。"""
+    from ...._compute_backend import get_native
+
+    if get_native() is None:
+        return False, {}
+    source_lines: dict[int, list[_LineItem]] = {}
+    safe = all(
+        type(line) is _LineItem
+        and type(line.source_index) is int
+        and type(line.text) is str
+        and type(line.chars) is list
+        and all(
+            type(char) is dict
+            and (char.get("char") is None or type(char.get("char")) is str)
+            and (
+                char.get("bbox") is None
+                or (
+                    type(char.get("bbox")) in (tuple, list, CharBbox)
+                    and len(char["bbox"].bbox if type(char["bbox"]) is CharBbox else char["bbox"]) == 4
+                    and all(
+                        (type(value) is float and math.isfinite(value)) or (type(value) is int and -(2**53) <= value <= 2**53)
+                        for value in char["bbox"]
+                    )
+                )
+            )
+            for char in line.chars
+        )
+        for line in lines
+    )
+    if safe:
+        for line in lines:
+            source_lines.setdefault(line.source_index, []).append(line)
+    return safe, source_lines
+
+
+def _prepare_table_core_rows(
+    rows,
+    lines,
+    metrics,
+    marker_prepared: _PreparedMarkerCache | None = None,
+    *,
+    marker_safe: bool | None = None,
+    source_lines: dict[int, list[_LineItem]] | None = None,
+):
     """一次校验并打包走廊成员；特殊来源和对象仍交给原集合路径。"""
     if metrics.native is None or len({id(row) for row in rows}) != len(rows):
         return None
@@ -175,38 +221,8 @@ def _prepare_table_core_rows(rows, lines, metrics, marker_prepared: _PreparedMar
             indices.append(index)
             source_rows.setdefault(index, []).append(position)
         members.append(indices)
-    from ....document.pdf.text import Bbox
-
-    marker_safe = all(
-        type(line) is _LineItem
-        and type(line.source_index) is int
-        and type(line.text) is str
-        and type(line.chars) is list
-        and all(
-            type(char) is dict
-            and (char.get("char") is None or type(char.get("char")) is str)
-            and (
-                char.get("bbox") is None
-                or (
-                    type(char.get("bbox")) in (tuple, list, Bbox)
-                    and len(char["bbox"].bbox if type(char["bbox"]) is Bbox else char["bbox"]) == 4
-                    and all(
-                        (type(value) is float and math.isfinite(value)) or (type(value) is int and -(2**53) <= value <= 2**53)
-                        for value in char["bbox"]
-                    )
-                )
-            )
-            for char in line.chars
-        )
-        for line in lines
-    )
-    from ...._compute_backend import get_native
-
-    source_lines = {}
-    if marker_safe:
-        for line in lines:
-            if line.source_index in source_rows:
-                source_lines.setdefault(line.source_index, []).append(line)
+    if marker_safe is None or source_lines is None:
+        marker_safe, source_lines = _prepare_marker_line_context(lines)
     geometry = None
     if all(
         type(row.bbox) in (tuple, list)
@@ -713,8 +729,6 @@ def _prepare_marker_line(
 ) -> tuple[list[tuple[str, BBox]], tuple[int, tuple[str, ...]]] | None:
     """仅为普通来源行准备与具体标记无关的局部字形及紧凑 token。"""
 
-    from ....document.pdf.text import Bbox
-
     if (
         type(line) is not _LineItem
         or type(line.text) is not str
@@ -730,7 +744,7 @@ def _prepare_marker_line(
         if type(char) is not dict or type(char.get("char")) not in (str, type(None)):
             return None
         value = char.get("bbox")
-        raw = value.bbox if type(value) is Bbox else value
+        raw = value.bbox if type(value) is CharBbox else value
         if raw is not None and (
             type(raw) not in (tuple, list)
             or len(raw) != 4
