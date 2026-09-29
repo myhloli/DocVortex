@@ -255,3 +255,57 @@ def test_neighbor_indices_match_original_geometry():
             )
         )
     assert native.line_neighbors(records) == expected
+
+
+def test_coerce_bbox_owned_fast_path_matches_general_input():
+    """确认自有 Bbox 快路径与通用转换在正常和异常形状上逐值一致。"""
+    from docvortex.analyzers.native.pdf.geometry import _coerce_bbox
+    from docvortex.document.pdf.text._contracts import Bbox
+
+    cases = [
+        Bbox([1.0, 2.0, 3.0, 4.0]),
+        Bbox([3.0, 4.0, 1.0, 2.0]),
+        Bbox([1.0, math.nan, 3.0, 4.0]),
+        Bbox([1, 2, 3, 4]),
+        (1.0, 2.0, 3.0, 4.0),
+    ]
+    for value in cases:
+        raw = value.bbox if type(value) is Bbox else value
+        assert _coerce_bbox(value) == _coerce_bbox(raw)
+
+
+def test_marker_context_preserves_source_order_and_fallbacks(monkeypatch):
+    """覆盖 marker 上下文快路径的身份映射、空 bbox 和特殊输入回退。"""
+    import docvortex._compute_backend as compute_backend
+    from docvortex.analyzers.native.pdf import table_annotations as annotations
+    from docvortex.analyzers.native.pdf.models import _LineItem
+    from docvortex.document.pdf.text._contracts import Bbox
+
+    def line(source_index, chars):
+        """构造最小 marker 输入行，保持测试数据与生产 _LineItem 一致。"""
+        return _LineItem(str(source_index), (0, 0, 10, 10), 0, source_index, chars=chars)
+
+    first = line(3, [{"char": "A", "char_idx": 3, "bbox": Bbox([1.0, 2.0, 3.0, 4.0])}])
+    second = line(3, [{"char": "B", "char_idx": 4, "bbox": None}])
+    monkeypatch.setattr(compute_backend, "get_native", lambda: object())
+    safe, sources = annotations._prepare_marker_line_context([first, second])
+    assert safe is True
+    assert sources == {3: [first, second]}
+
+    for bad in (
+        [{"char": "A", "char_idx": 1, "bbox": Bbox([1.0, math.inf, 3.0, 4.0])}],
+        [{"char": 1, "char_idx": 1}],
+        [{"char": "A", "char_idx": 1, "bbox": [1.0, 2.0, 3.0]}],
+    ):
+        assert annotations._prepare_marker_line_context([line(1, bad)]) == (False, {})
+
+
+def test_single_lane_short_tail_reattachment_skips_validation():
+    """单栏没有跨栏目标时应保持成员原样并跳过特殊输入扫描。"""
+    from docvortex.analyzers.native.pdf import line_layout as layout
+    from docvortex.analyzers.native.pdf.models import _TextLane
+
+    lane = _TextLane(0.0, 100.0, lines=[("not-a-line", (0.0, 0.0, 10.0, 10.0))])
+    expected = list(lane.lines)
+    layout._reattach_cross_lane_short_tails([lane], 10.0)
+    assert lane.lines == expected

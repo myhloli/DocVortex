@@ -7,6 +7,7 @@ from typing import Any, Literal, Sequence
 
 
 from ....schema import BBox
+from ....document.pdf.text._contracts import Bbox as CharacterBbox
 
 from .models import _AxisLine, _LocalAxisLine
 
@@ -139,6 +140,18 @@ def _rotate_origin_to_upright(
 def _coerce_bbox(value: Any) -> BBox | None:
     """将任意四元 bbox 规范成非退化浮点坐标。"""
 
+    # 自有 Bbox 是热路径中的固定 slot 容器；先按原校验规则读取内部
+    # 四个 float，可避免通用迭代转换和重复下标调用，异常形状仍走旧路径。
+    if type(value) is CharacterBbox:
+        raw = value.bbox
+        if (
+            type(raw) is list
+            and len(raw) == 4
+            and raw[0] < raw[2]
+            and raw[1] < raw[3]
+            and all(type(item) is float and math.isfinite(item) for item in raw)
+        ):
+            return (raw[0], raw[1], raw[2], raw[3])
     try:
         x0, y0, x1, y1 = [float(item) for item in value]
     except (TypeError, ValueError):

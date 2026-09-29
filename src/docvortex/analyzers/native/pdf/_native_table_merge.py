@@ -164,10 +164,24 @@ def merge_owned(candidates):
             return None
     grids = {}
     for key, (context, rows) in contexts.items():
+        grid_components = context.grid_components
+        if grid_components is not None and not (
+            type(grid_components) is list
+            and all(
+                type(component) is list
+                and all(type(rule) is rules._LocalAxisLine and _plain_box(rule.bbox) for rule in component)
+                for component in grid_components
+            )
+        ):
+            grid_components = None
         if context.grids is None:
             context.grids = [
                 box
-                for box in rules._connected_rule_grid_bboxes(context.axis_lines, context.median_height)
+                for box in rules._connected_rule_grid_bboxes(
+                    context.axis_lines,
+                    context.median_height,
+                    components=grid_components,
+                )
                 if not any(rules._bbox_overlap_in_smaller(box, excluded) >= 0.5 for excluded in context.excluded_bboxes)
             ]
         if not all(_plain_box(box) for box in context.grids):

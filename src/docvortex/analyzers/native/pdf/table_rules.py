@@ -132,6 +132,7 @@ class _RuleCandidateContext:
     body_metrics: _PreparedTableNoteBodyMetrics
     marker_prepared: _PreparedMarkerCache = field(default_factory=_PreparedMarkerCache)
     grids: list | None = None
+    grid_components: list | None = None
     grid_members: dict = field(default_factory=dict)
     core_indexes: dict = field(default_factory=dict)
     marker_line_context: tuple[bool, dict] | None = None
@@ -179,7 +180,11 @@ class _RuleCandidateDraft:
         if context.grids is None:
             context.grids = [
                 box
-                for box in _connected_rule_grid_bboxes(context.axis_lines, context.median_height)
+                for box in _connected_rule_grid_bboxes(
+                    context.axis_lines,
+                    context.median_height,
+                    components=context.grid_components,
+                )
                 if not any(_bbox_overlap_in_smaller(box, excluded) >= 0.5 for excluded in context.excluded_bboxes)
             ]
         return _expand_candidates_to_connected_rule_grids(
@@ -564,6 +569,10 @@ def _build_rule_table_candidates(
             candidate.score = score
             candidates.append(candidate)
     if defer_materialization:
+        # 延迟物化时先冻结网格连通分量，供闭合网格检测和后续 owned
+        # 合并共用一次结果；没有候选的页面保持零额外扫描。
+        if drafts:
+            context.grid_components = _connected_rule_grid_components(axis_lines, median_height)
         return drafts
     return _expand_candidates_to_connected_rule_grids(
         candidates,
@@ -680,12 +689,16 @@ def _build_closed_rule_grid_candidates(
     axis_lines: list[_LocalAxisLine],
     excluded_bboxes: list[BBox],
     caption_candidates: list[tuple[_LineItem, BBox]] | None = None,
+    *,
+    grid_components: list[list[_LocalAxisLine]] | None = None,
 ) -> list[_TableCandidate]:
     """用闭合物理网格接纳含空行或仅有表头文本的稀疏表格。"""
 
     candidates: list[_TableCandidate] = []
     row_interval_index = _build_row_interval_index(rows)
-    for component in _connected_rule_grid_components(axis_lines, median_height):
+    components = grid_components if grid_components is not None else _connected_rule_grid_components(axis_lines, median_height)
+    # 复用方传入的分量仍由上面的调用/检测边界生成；这里只迭代，不重复扫描竖轨。
+    for component in components:
         grid_bbox = _bbox_union_many([rule.bbox for rule in component])
         if any(_bbox_overlap_in_smaller(grid_bbox, excluded_bbox) >= 0.5 for excluded_bbox in excluded_bboxes):
             continue
@@ -803,16 +816,16 @@ def _count_occupied_closed_grid_columns(
 def _connected_rule_grid_bboxes(
     axis_lines: list[_LocalAxisLine],
     median_height: float,
+    *,
+    components: list[list[_LocalAxisLine]] | None = None,
 ) -> list[BBox]:
     """把端点一致且由外轨或至少两条列轨贯穿的相邻横线组成网格框。"""
 
-    return [
-        _bbox_union_many([rule.bbox for rule in component])
-        for component in _connected_rule_grid_components(
-            axis_lines,
-            median_height,
-        )
-    ]
+    # components 是同一页面内已冻结的私有复用输入；未提供时保持原签名
+    # 和原计算，直接调用本函数的测试/旧调用路径不受影响。
+    if components is None:
+        components = _connected_rule_grid_components(axis_lines, median_height)
+    return [_bbox_union_many([rule.bbox for rule in component]) for component in components]
 
 
 def _connected_rule_grid_components(
