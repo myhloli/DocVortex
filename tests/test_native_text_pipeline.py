@@ -114,7 +114,7 @@ def _line_records(items):
     """展开视觉行全部字段，避免只比较文本掩盖排版差异。"""
     from dataclasses import fields
 
-    return [{field.name: _plain(getattr(item, field.name)) for field in fields(item)} for item in items]
+    return [{field.name: _plain(getattr(item, field.name)) for field in fields(item) if field.compare} for item in items]
 
 
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])

@@ -96,6 +96,33 @@ pub fn read_pdfium_objects(
     })
 }
 
+type TextVisibilityRecord = (usize, bool, Option<(f64, f64, f64, f64)>);
+
+/// 单次 TEXT 遍历返回绘制状态与页面视觉裁剪，供 Python 建立地址索引。
+#[pyfunction]
+pub fn read_pdfium_text_visibility(
+    addresses: Vec<usize>,
+    handle: usize,
+    frame: [f64; 4],
+    rotation: i32,
+    max_depth: usize,
+) -> PyResult<Vec<TextVisibilityRecord>> {
+    let records = unsafe {
+        docvortex_pdfium::objects::read_text_visibility(
+            addresses, handle, frame, rotation, max_depth,
+        )
+    }
+    .map_err(|error| match error {
+        ReadError::InvalidInput(message) => PyValueError::new_err(message),
+        ReadError::Pdfium(message) => PdfiumReadError::new_err(message),
+        ReadError::Allocation(message) => PyMemoryError::new_err(message),
+    })?;
+    Ok(records
+        .into_iter()
+        .map(|(address, visible, clip)| (address, visible, clip.map(Into::into)))
+        .collect())
+}
+
 /// 按固定批次向 Python 物化轴线数值记录，避免整页同时持有两份大列表。
 #[pyclass(module = "docvortex._native")]
 pub struct PdfiumDrawingLineBatches {

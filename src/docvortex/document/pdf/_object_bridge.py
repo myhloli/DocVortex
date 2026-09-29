@@ -13,6 +13,8 @@ _CALLS = 0
 _UNAVAILABLE_REASON = "not probed"
 _DRAWING_CALLS = 0
 _DRAWING_UNAVAILABLE_REASON = "not probed"
+_TEXT_VISIBILITY_CALLS = 0
+_TEXT_VISIBILITY_UNAVAILABLE_REASON = "not probed"
 
 
 def bridge_info():
@@ -22,6 +24,8 @@ def bridge_info():
         "pdfium_object_bridge_unavailable_reason": _UNAVAILABLE_REASON,
         "pdfium_drawing_line_bridge_calls": _DRAWING_CALLS,
         "pdfium_drawing_line_bridge_unavailable_reason": _DRAWING_UNAVAILABLE_REASON,
+        "pdfium_text_visibility_bridge_calls": _TEXT_VISIBILITY_CALLS,
+        "pdfium_text_visibility_bridge_unavailable_reason": _TEXT_VISIBILITY_UNAVAILABLE_REASON,
     }
 
 
@@ -69,6 +73,72 @@ def read_clipped_objects(page, kind, max_depth):
     _CALLS += 1
     _UNAVAILABLE_REASON = None
     return chain.from_iterable(batches)
+
+
+def read_text_visibility(page, page_bbox, rotation, max_depth):
+    """标准 ABI 下一次遍历 TEXT 对象并返回可见性与视觉裁剪。"""
+    global _TEXT_VISIBILITY_CALLS, _TEXT_VISIBILITY_UNAVAILABLE_REASON
+    native = get_native()
+    reader = getattr(native, "read_pdfium_text_visibility", None)
+    if native is None or reader is None or type(page) is not pdfium.PdfPage or not page.raw:
+        _TEXT_VISIBILITY_UNAVAILABLE_REASON = "python backend or unsupported native extension"
+        return None
+    if ct.sizeof(raw.FS_MATRIX) != 24 or any(
+        getattr(raw.FS_MATRIX, name).offset != offset * 4 for offset, name in enumerate("abcdef")
+    ):
+        _TEXT_VISIBILITY_UNAVAILABLE_REASON = "FS_MATRIX ABI mismatch"
+        return None
+    obj, clip, segment = raw.FPDF_PAGEOBJECT, raw.FPDF_CLIPPATH, raw.FPDF_PATHSEGMENT
+    specs = (
+        ("FPDFPage_CountObjects", ct.c_int, (raw.FPDF_PAGE,)),
+        ("FPDFPage_GetObject", obj, (raw.FPDF_PAGE, ct.c_int)),
+        ("FPDFFormObj_CountObjects", ct.c_int, (obj,)),
+        ("FPDFFormObj_GetObject", obj, (obj, ct.c_ulong)),
+        ("FPDFPageObj_GetMatrix", ct.c_int, (obj, ct.POINTER(raw.FS_MATRIX))),
+        ("FPDFPageObj_GetType", ct.c_int, (obj,)),
+        ("FPDFPageObj_GetClipPath", clip, (obj,)),
+        ("FPDFClipPath_CountPaths", ct.c_int, (clip,)),
+        ("FPDFClipPath_CountPathSegments", ct.c_int, (clip, ct.c_int)),
+        ("FPDFClipPath_GetPathSegment", segment, (clip, ct.c_int, ct.c_int)),
+        ("FPDFPathSegment_GetPoint", ct.c_int, (segment, ct.POINTER(ct.c_float), ct.POINTER(ct.c_float))),
+        ("FPDFTextObj_GetTextRenderMode", ct.c_int, (obj,)),
+        (
+            "FPDFPageObj_GetFillColor",
+            ct.c_int,
+            (obj, ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint)),
+        ),
+        (
+            "FPDFPageObj_GetStrokeColor",
+            ct.c_int,
+            (obj, ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint)),
+        ),
+    )
+    addresses = []
+    for name, result, arguments in specs:
+        function = getattr(raw, name, None)
+        if (
+            not isinstance(function, ct._CFuncPtr)
+            or function.restype is not result
+            or tuple(function.argtypes or ()) != arguments
+            or getattr(function, "errcheck", None) is not None
+        ):
+            _TEXT_VISIBILITY_UNAVAILABLE_REASON = f"unsupported symbol or ABI: {name}"
+            return None
+        addresses.append(ct.cast(function, ct.c_void_p).value)
+    try:
+        with pdfium_guard():
+            records = reader(
+                addresses,
+                ct.cast(page.raw, ct.c_void_p).value,
+                tuple(page_bbox),
+                rotation,
+                max_depth,
+            )
+    except native.PdfiumReadError as exc:
+        raise pdfium.PdfiumError(str(exc)) from exc
+    _TEXT_VISIBILITY_CALLS += 1
+    _TEXT_VISIBILITY_UNAVAILABLE_REASON = None
+    return records
 
 
 def read_drawing_lines(page, page_bbox, rotation):

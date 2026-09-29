@@ -241,6 +241,17 @@ pub struct VisualTextRun {
     pub coarse_fallback: bool,
     pub paragraph_terminal: bool,
     pub typography: Option<crate::statistics::Typography>,
+    pub typographic_scale: Option<f64>,
+}
+
+/// 按 Python 规则缓存正数字体尺寸中位数，缺失时留给调用方使用行高回退。
+fn typographic_scale(indices: &[usize], chars: &[TextChar]) -> Option<f64> {
+    let sizes: Vec<_> = indices
+        .iter()
+        .filter_map(|&index| chars[index].font_size)
+        .filter(|size| size.is_finite() && *size > 0.0)
+        .collect();
+    (!sizes.is_empty()).then(|| 0.1_f64.max(crate::median(sizes)))
 }
 
 /// 返回 Python 字符串语义下的可打印、全空白标志。
@@ -420,16 +431,22 @@ pub fn prepare_visual_lines(
             else {
                 continue;
             };
-            let indices: Vec<_> = spans
-                .iter()
-                .flat_map(|s| s.start..s.end)
-                .filter(|&i| !matches!(chars[i].text.as_str(), "\r" | "\n"))
-                .collect();
-            let raw: Vec<_> = indices.iter().map(|&i| Some(chars[i].bbox)).collect();
-            let flags: Vec<_> = indices
-                .iter()
-                .map(|&i| glyph_flags(&chars[i].text, unicode))
-                .collect();
+            let member_capacity = spans.iter().map(|s| s.end - s.start).sum();
+            let mut indices = Vec::with_capacity(member_capacity);
+            indices.extend(
+                spans
+                    .iter()
+                    .flat_map(|s| s.start..s.end)
+                    .filter(|&i| !matches!(chars[i].text.as_str(), "\r" | "\n")),
+            );
+            let mut raw = Vec::with_capacity(indices.len());
+            raw.extend(indices.iter().map(|&i| Some(chars[i].bbox)));
+            let mut flags = Vec::with_capacity(indices.len());
+            flags.extend(
+                indices
+                    .iter()
+                    .map(|&i| glyph_flags(&chars[i].text, unicode)),
+            );
             let ranges =
                 geometry::visual_runs(raw, vec![None; indices.len()], flags, size, visual_angle);
             if ranges.is_empty() {
@@ -445,6 +462,7 @@ pub fn prepare_visual_lines(
                     coarse_fallback: true,
                     paragraph_terminal: false,
                     typography: None,
+                    typographic_scale: None,
                 });
                 continue;
             }
@@ -453,7 +471,8 @@ pub fn prepare_visual_lines(
                 let Some(run_box) = run_box else {
                     continue;
                 };
-                let selected = indices[a..b].to_vec();
+                let mut selected = Vec::with_capacity(b - a);
+                selected.extend_from_slice(&indices[a..b]);
                 output.push(VisualTextRun {
                     text: selected.iter().map(|&i| chars[i].text.as_str()).collect(),
                     bbox: run_box,
@@ -466,6 +485,7 @@ pub fn prepare_visual_lines(
                     coarse_fallback: false,
                     paragraph_terminal: false,
                     typography: None,
+                    typographic_scale: None,
                 });
             }
         }
@@ -476,27 +496,27 @@ pub fn prepare_visual_lines(
             continue;
         }
         run.paragraph_terminal = sentence_terminal(run, chars, unicode);
-        let boxes = run
-            .indices
-            .iter()
-            .map(|&i| {
-                if glyph_flags(&chars[i].text, unicode) & 1 == 0 {
-                    return None;
-                }
-                geometry::clip(geometry::normalize(Some(chars[i].bbox), false), size)
-                    .map(|b| geometry::rotate(b, size, run.angle))
-            })
-            .collect();
-        let font_ids = run.indices.iter().map(|&i| chars[i].signature_id).collect();
-        let weights = run.indices.iter().map(|&i| chars[i].font_weight).collect();
+        let mut boxes = Vec::with_capacity(run.indices.len());
+        boxes.extend(run.indices.iter().map(|&i| {
+            if glyph_flags(&chars[i].text, unicode) & 1 == 0 {
+                return None;
+            }
+            geometry::clip(geometry::normalize(Some(chars[i].bbox), false), size)
+                .map(|b| geometry::rotate(b, size, run.angle))
+        }));
+        let mut font_ids = Vec::with_capacity(run.indices.len());
+        font_ids.extend(run.indices.iter().map(|&i| chars[i].signature_id));
+        let mut weights = Vec::with_capacity(run.indices.len());
+        weights.extend(run.indices.iter().map(|&i| chars[i].font_weight));
         let local = geometry::rotate(run.bbox, size, run.angle);
         run.typography = crate::statistics::typography(
             boxes,
             font_ids,
             weights,
-            families.to_vec(),
+            families,
             0.1_f64.max(local[3] - local[1]),
         );
+        run.typographic_scale = typographic_scale(&run.indices, chars);
     }
     output.retain(|run| !run.text.is_empty());
     output

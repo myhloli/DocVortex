@@ -149,6 +149,7 @@ class _LineItem:
     inline_math_regions: list[BBox] = field(default_factory=list)
     paragraph_group: int | None = None
     paragraph_terminal: bool = False
+    native_typographic_scale: float | None = field(compare=False, default=None)
     reference_start: bool | None = None
     title_band_id: int | None = None
     caption_start: bool = False

@@ -118,8 +118,9 @@ def _build_native_line_items_from_records(records, page_size):
             local = _rotate_bbox_to_upright(bbox, page_size, angle)
             item.effective_height = max(0.1, local[3] - local[1])
         elif metrics is not None:
-            height, width, signature, coverage, weight, emphasis, typography = metrics
+            height, width, signature, coverage, weight, emphasis, typography, scale = metrics
             item.effective_height = item.em_height = height
+            item.native_typographic_scale = scale
             item.median_glyph_width = width
             item.font_signature = signature
             item.font_coverage = coverage
@@ -997,6 +998,9 @@ def _is_detached_inline_script_candidate(
 def _native_typographic_scale(line: _LineItem) -> float:
     """返回原生行的字体尺度，禁止 loose 空间高度参与上下标字号比较。"""
 
+    cached = line.native_typographic_scale
+    if cached is not None and math.isfinite(cached) and cached > 0:
+        return cached
     font_sizes: list[float] = []
     for char in line.chars:
         try:

@@ -82,6 +82,17 @@ def test_inline_script_scale_cache_is_linear_and_local_to_each_pass(monkeypatch:
     assert observed == [12.0, *([10.0] * 19)]
 
 
+def test_native_typographic_cache_skips_python_character_scan() -> None:
+    """Rust 预计算的字号中位数优先复用，异常缓存仍回退原实现。"""
+
+    cached = models._LineItem("body", (0, 0, 10, 10), 0, 0, effective_height=10.0)
+    cached.native_typographic_scale = 7.0
+    assert native_text._native_typographic_scale(cached) == 7.0
+    invalid = models._LineItem("body", (0, 0, 10, 10), 0, 1, effective_height=6.0)
+    invalid.native_typographic_scale = float("nan")
+    assert native_text._native_typographic_scale(invalid) == 6.0
+
+
 def test_private_use_decorative_rule_becomes_axis_line() -> None:
     """验证页首宽幅私用区重复字形不再进入文本输出。"""
 

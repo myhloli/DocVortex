@@ -155,6 +155,26 @@ def test_drawing_lines_skip_path_info_construction(monkeypatch) -> None:
     assert path_infos
 
 
+def test_path_dual_consumption_reads_draw_state_once(monkeypatch) -> None:
+    """同一 Path 同时产出线与摘要时，绘制状态只允许读取一次。"""
+    original = native_objects._get_path_visibility
+    calls = 0
+
+    def counted(*args, **kwargs):
+        """包装参考实现，用于确认联合消费没有重复读取属性。"""
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(native_objects, "_get_path_visibility", counted)
+    with PDFDocument(_vector_page_pdf(5)) as document:
+        vector = document[0].get_vector_geometry()
+        lines, path_infos = vector.drawing_lines, vector.path_infos
+    assert lines
+    assert len(path_infos) == 5
+    assert calls == 5
+
+
 def test_drawing_lines_match_vector_and_snapshot_entries() -> None:
     """独立线接口、矢量几何和页面快照的绘图线逐字段且按顺序一致。"""
     data = _vector_page_pdf(600)
@@ -217,8 +237,7 @@ def test_rust_lines_match_reference_for_page_rotation_and_offset(rotation: int, 
         [
             b"<< /Type /Catalog /Pages 2 0 R >>",
             b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-            b"<< /Type /Page /Parent 2 0 R /MediaBox [10 20 300 400] /Rotate %d /Resources << >> /Contents 4 0 R >>"
-            % rotation,
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [10 20 300 400] /Rotate %d /Resources << >> /Contents 4 0 R >>" % rotation,
             b"<< /Length %d >>\nstream\n%s\nendstream" % (len(content), content),
         ]
     )

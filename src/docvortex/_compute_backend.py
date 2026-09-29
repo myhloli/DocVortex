@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-_PROTOCOL_VERSION = 24
+_PROTOCOL_VERSION = 25
 _SELECTED_MODE = None
 _LOAD_FAILURE = None
 
@@ -83,7 +83,12 @@ def backend_info() -> dict[str, str | int | None]:
         **(
             objects.bridge_info()
             if objects is not None
-            else {"pdfium_object_bridge_calls": 0, "pdfium_object_bridge_unavailable_reason": "not probed"}
+            else {
+                "pdfium_object_bridge_calls": 0,
+                "pdfium_object_bridge_unavailable_reason": "not probed",
+                "pdfium_text_visibility_bridge_calls": 0,
+                "pdfium_text_visibility_bridge_unavailable_reason": "not probed",
+            }
         ),
         **(
             bridge.bridge_info()

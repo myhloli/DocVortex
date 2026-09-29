@@ -28,7 +28,7 @@ pub(super) fn typography_metrics(
     fallback_height: f64,
 ) -> Option<docvortex_core::statistics::Typography> {
     py.detach(move || {
-        docvortex_core::statistics::typography(boxes, fonts, weights, families, fallback_height)
+        docvortex_core::statistics::typography(boxes, fonts, weights, &families, fallback_height)
     })
 }
 

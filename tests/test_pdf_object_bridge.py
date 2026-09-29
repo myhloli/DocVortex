@@ -12,7 +12,7 @@ from reportlab.pdfgen.canvas import Canvas
 
 from docvortex._compute_backend import get_native
 from docvortex.document.pdf import _object_bridge as bridge
-from docvortex.document.pdf.native_objects import _walk_clipped_objects
+from docvortex.document.pdf.native_objects import _text_object_visibility, _walk_clipped_objects
 from docvortex.document.pdf.native_objects import _read_raw_path_subpaths, _read_raw_path_subpaths_python
 from docvortex.document.pdf.pdfium import pdfium_guard
 
@@ -63,6 +63,66 @@ def test_object_bridge_matches_reference(native, kind):
                 if raw.FPDFPageObj_GetType(item.raw) == kind
             ]
             assert list(bridge.read_clipped_objects(page, kind, 15)) == expected
+
+
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_text_visibility_bridge_matches_reference(native, monkeypatch, rotation):
+    """Rust 同批读取 TEXT 状态/裁剪，并与 Python 属性读取逐字段一致。"""
+    with pdfium_guard(), pdfium.PdfDocument(nested_pdf()) as document:
+        with closing(document[0]) as page:
+            page.set_rotation(rotation)
+            before = bridge.bridge_info()["pdfium_text_visibility_bridge_calls"]
+            actual = bridge.read_text_visibility(page, page.get_bbox(), rotation, 15)
+            info = bridge.bridge_info()
+            assert actual is not None
+            assert info["pdfium_text_visibility_bridge_calls"] == before + 1
+            assert info["pdfium_text_visibility_bridge_unavailable_reason"] is None
+            with monkeypatch.context() as context:
+                context.setattr(bridge, "read_text_visibility", lambda *args, **kwargs: None)
+                expected = _text_object_visibility(page, page.get_bbox(), rotation)
+            assert {address: (visible, clip) for address, visible, clip in actual} == expected
+            assert any(visible for _, visible, _ in actual)
+            assert any(clip is not None for _, _, clip in actual)
+
+
+def test_text_visibility_bridge_fallback_and_compute_failure(native, monkeypatch):
+    """ABI 不兼容回退 Python；已进入 Rust 的异常必须原样传播。"""
+    assert hasattr(native, "read_pdfium_text_visibility")
+    with pdfium_guard(), pdfium.PdfDocument(nested_pdf()) as document:
+        with closing(document[0]) as page:
+            bbox, rotation = page.get_bbox(), 0
+            with monkeypatch.context() as context:
+                context.setattr(raw, "FPDFTextObj_GetTextRenderMode", Mock())
+                assert bridge.read_text_visibility(page, bbox, rotation, 15) is None
+                assert "ABI" in bridge.bridge_info()["pdfium_text_visibility_bridge_unavailable_reason"]
+            with monkeypatch.context() as context:
+                context.setattr(native, "read_pdfium_text_visibility", Mock(side_effect=ValueError("failed")))
+                with pytest.raises(ValueError, match="failed"):
+                    bridge.read_text_visibility(page, bbox, rotation, 15)
+
+
+def test_text_visibility_python_backend_reports_reference_choice(monkeypatch):
+    """纯 Python 后端只记录能力选择，不把扩展不存在伪装成执行成功。"""
+
+    before = bridge.bridge_info()["pdfium_text_visibility_bridge_calls"]
+    monkeypatch.setattr(bridge, "get_native", lambda: None)
+    assert bridge.read_text_visibility(object(), (0, 0, 10, 10), 0, 15) is None
+    info = bridge.bridge_info()
+    assert info["pdfium_text_visibility_bridge_calls"] == before
+    assert info["pdfium_text_visibility_bridge_unavailable_reason"] == "python backend or unsupported native extension"
+
+
+def test_text_visibility_bridge_rejects_invalid_addresses(native):
+    """无效地址或几何在 unsafe 前拒绝，防止借用悬挂页面对象。"""
+    for addresses, handle, rotation, frame in [
+        ([], 1, 0, (0.0, 0.0, 10.0, 10.0)),
+        ([0] * 14, 1, 0, (0.0, 0.0, 10.0, 10.0)),
+        ([1] * 14, 0, 0, (0.0, 0.0, 10.0, 10.0)),
+        ([1] * 14, 1, 45, (0.0, 0.0, 10.0, 10.0)),
+        ([1] * 14, 1, 0, (0.0, 0.0, 0.0, 10.0)),
+    ]:
+        with pytest.raises(ValueError, match="invalid PDFium text visibility"):
+            native.read_pdfium_text_visibility(addresses, handle, frame, rotation, 15)
 
 
 def test_object_bridge_abi_fallback_and_compute_failure(native, monkeypatch):
