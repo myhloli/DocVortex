@@ -157,6 +157,63 @@ pub struct NativeTextSnapshot {
     raw_count: usize,
 }
 
+/// 由 Rust 短暂持有并释放 textpage，字符规范化仍复用同一个自有快照构建入口。
+#[pyfunction]
+pub fn read_pdfium_page_text_snapshot(
+    py: Python<'_>,
+    page_addresses: [usize; 3],
+    page_handle: usize,
+    addresses: Vec<usize>,
+    color_addresses: [usize; 2],
+    extended: bool,
+    frame: [f64; 4],
+    rotation: i32,
+    visibility: Option<HashMap<usize, (bool, Option<[f64; 4]>)>>,
+) -> PyResult<Option<NativeTextSnapshot>> {
+    if page_addresses.contains(&0) || page_handle == 0 {
+        return Err(PyValueError::new_err("invalid PDFium page text handle"));
+    }
+    // 安全条件：页面句柄、三个 textpage 函数和后续字符函数均来自同一运行库，并由宿主锁串行化。
+    let (text_handle, count) = unsafe {
+        let load: unsafe extern "system" fn(usize) -> usize =
+            std::mem::transmute(page_addresses[0]);
+        let close: unsafe extern "system" fn(usize) = std::mem::transmute(page_addresses[1]);
+        let count_chars: unsafe extern "system" fn(usize) -> i32 =
+            std::mem::transmute(page_addresses[2]);
+        let text_handle = load(page_handle);
+        if text_handle == 0 {
+            return Err(read_error(ReadError::Pdfium(
+                "Failed to load PDFium text page.",
+            )));
+        }
+        let count = count_chars(text_handle);
+        if count < 0 {
+            close(text_handle);
+            return Err(read_error(ReadError::Pdfium(
+                "negative PDFium character count",
+            )));
+        }
+        (text_handle, count as usize)
+    };
+    let result = read_pdfium_text_snapshot(
+        py,
+        addresses,
+        color_addresses,
+        text_handle,
+        count,
+        extended,
+        frame,
+        rotation,
+        visibility,
+    );
+    // 构建成功或失败都先关闭本次 Rust 加载的 textpage，产物只保留纯数值。
+    unsafe {
+        let close: unsafe extern "system" fn(usize) = std::mem::transmute(page_addresses[1]);
+        close(text_handle);
+    }
+    result
+}
+
 /// 同步借用 PDFium 读取原始字符；函数和句柄由已核验 ABI 的宿主 guard 保活。
 #[pyfunction]
 pub fn read_pdfium_text_snapshot(
@@ -367,63 +424,100 @@ impl NativeTextSnapshot {
             .import("docvortex.document.pdf.text._contracts")?
             .getattr("Bbox")?;
         let chars = PyList::empty(py);
+        // 一次缓存字段名，避免每个字符重复走解释器 intern 查找。
+        let key_bbox = pyo3::intern!(py, "bbox");
+        let key_char = pyo3::intern!(py, "char");
+        let key_rotation = pyo3::intern!(py, "rotation");
+        let key_font = pyo3::intern!(py, "font");
+        let key_char_idx = pyo3::intern!(py, "char_idx");
+        let key_source_indices = pyo3::intern!(py, "source_indices");
+        let key_raw_code = pyo3::intern!(py, "raw_code");
+        let key_text_object_id = pyo3::intern!(py, "text_object_id");
+        let key_text_render_mode = pyo3::intern!(py, "text_render_mode");
+        let key_writing_angle = pyo3::intern!(py, "writing_angle");
+        let key_origin = pyo3::intern!(py, "origin");
+        let key_name = pyo3::intern!(py, "name");
+        let key_flags = pyo3::intern!(py, "flags");
+        let key_size = pyo3::intern!(py, "size");
+        let key_weight = pyo3::intern!(py, "weight");
+        let key_loose_bbox = pyo3::intern!(py, "loose_bbox");
+        let key_tight_bbox = pyo3::intern!(py, "tight_bbox");
+        let key_text_is_visible = pyo3::intern!(py, "text_is_visible");
         let tight = PyDict::new(py);
         let loose = PyDict::new(py);
         let origins = PyDict::new(py);
-        let mut fonts: HashMap<usize, Bound<'py, PyDict>> = HashMap::new();
+
+        // 字体表由 Rust 索引直接寻址，避免每个字符再做一次哈希查找。
+        let mut fonts: Vec<Option<Bound<'py, PyDict>>> = vec![None; self.data.fonts.len()];
         let mut names: HashMap<usize, Bound<'py, pyo3::types::PyString>> = HashMap::new();
-        for ch in &self.data.chars {
-            if let std::collections::hash_map::Entry::Vacant(entry) = fonts.entry(ch.font) {
-                let font = &self.data.fonts[ch.font];
-                let value = PyDict::new(py);
-                let name = names
-                    .entry(font.name_id)
-                    .or_insert_with(|| pyo3::types::PyString::new(py, &font.name));
-                value.set_item(pyo3::intern!(py, "name"), &*name)?;
-                value.set_item(pyo3::intern!(py, "flags"), font.flags)?;
-                value.set_item(pyo3::intern!(py, "size"), font.size)?;
-                value.set_item(pyo3::intern!(py, "weight"), font.weight)?;
-                entry.insert(value);
-            }
+        for (font_id, slot) in fonts.iter_mut().enumerate() {
+            let font = &self.data.fonts[font_id];
             let value = PyDict::new(py);
+            let name = names
+                .entry(font.name_id)
+                .or_insert_with(|| pyo3::types::PyString::new(py, &font.name));
+            value.set_item(key_name, &*name)?;
+            value.set_item(key_flags, font.flags)?;
+            value.set_item(key_size, font.size)?;
+            value.set_item(key_weight, font.weight)?;
+            *slot = Some(value);
+        }
+
+        for ch in &self.data.chars {
+            let value = PyDict::new(py);
+            let bbox = bbox_type.call1((PyList::new(py, ch.bbox)?,))?;
+            let text = pyo3::types::PyString::new(py, &ch.text);
+            // 先转换一次不可变坐标容器；字符字段和 loose/tight/origin 侧表必须共享同一对象。
+            let origin = ch
+                .origin
+                .map(|p| (p[0], p[1]))
+                .into_pyobject(py)?
+                .into_any()
+                .unbind();
+            let loose_bbox = ch
+                .loose
+                .map(|b| (b[0], b[1], b[2], b[3]))
+                .into_pyobject(py)?
+                .into_any()
+                .unbind();
+            let tight_bbox = ch
+                .tight
+                .map(|b| (b[0], b[1], b[2], b[3]))
+                .into_pyobject(py)?
+                .into_any()
+                .unbind();
+            value.set_item(key_bbox, bbox)?;
+            value.set_item(key_char, text)?;
+            value.set_item(key_rotation, ch.rotation)?;
             value.set_item(
-                pyo3::intern!(py, "bbox"),
-                bbox_type.call1((ch.bbox.to_vec(),))?,
+                key_font,
+                fonts[ch.font].as_ref().expect("font materialized"),
             )?;
-            value.set_item(pyo3::intern!(py, "char"), &ch.text)?;
-            value.set_item(pyo3::intern!(py, "rotation"), ch.rotation)?;
-            value.set_item(pyo3::intern!(py, "font"), &fonts[&ch.font])?;
-            value.set_item(pyo3::intern!(py, "char_idx"), ch.index)?;
+            value.set_item(key_char_idx, ch.index)?;
             value.set_item(
-                pyo3::intern!(py, "source_indices"),
+                key_source_indices,
                 PyTuple::new(py, ch.sources.iter().copied())?,
             )?;
-            value.set_item(pyo3::intern!(py, "raw_code"), ch.code)?;
-            value.set_item(pyo3::intern!(py, "text_object_id"), ch.object)?;
-            value.set_item(pyo3::intern!(py, "text_render_mode"), ch.mode)?;
-            value.set_item(pyo3::intern!(py, "writing_angle"), ch.writing_angle)?;
-            value.set_item(pyo3::intern!(py, "origin"), ch.origin.map(|p| (p[0], p[1])))?;
+            value.set_item(key_raw_code, ch.code)?;
+            value.set_item(key_text_object_id, ch.object)?;
+            value.set_item(key_text_render_mode, ch.mode)?;
+            value.set_item(key_writing_angle, ch.writing_angle)?;
+            value.set_item(key_origin, &origin)?;
             if self.data.extended {
-                value.set_item(
-                    pyo3::intern!(py, "loose_bbox"),
-                    ch.loose.map(|b| (b[0], b[1], b[2], b[3])),
-                )?;
-                value.set_item(
-                    pyo3::intern!(py, "tight_bbox"),
-                    ch.tight.map(|b| (b[0], b[1], b[2], b[3])),
-                )?;
+                value.set_item(key_loose_bbox, &loose_bbox)?;
+                value.set_item(key_tight_bbox, &tight_bbox)?;
                 if ch.loose.is_some() && ch.rotation.abs() > 1e-9 {
-                    loose.set_item(ch.index, value.get_item("loose_bbox")?.unwrap())?;
+                    loose.set_item(ch.index, loose_bbox.clone_ref(py))?;
                 }
                 if ch.tight.is_some() {
-                    tight.set_item(ch.index, value.get_item("tight_bbox")?.unwrap())?;
+                    tight.set_item(ch.index, tight_bbox.clone_ref(py))?;
                 }
                 if ch.origin.is_some() {
-                    origins.set_item(ch.index, value.get_item("origin")?.unwrap())?;
+                    origins.set_item(ch.index, origin.clone_ref(py))?;
                 }
             }
             if let Some(visible) = ch.visible {
-                value.set_item(pyo3::intern!(py, "text_is_visible"), visible)?;
+                value.set_item(key_text_is_visible, visible)?;
             }
             chars.append(value)?;
         }
