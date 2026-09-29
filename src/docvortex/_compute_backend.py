@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-_PROTOCOL_VERSION = 27
+_PROTOCOL_VERSION = 28
 _SELECTED_MODE = None
 _LOAD_FAILURE = None
 
@@ -59,6 +59,12 @@ def backend_info() -> dict[str, str | int | None]:
         "native_classification_snapshot_calls": native.classification_snapshot_stats() if native is not None else 0,
         "native_script_snapshot_batches": native.script_snapshot_stats() if native is not None else 0,
         "native_span_assignment_calls": span_calls,
+        "native_table_script_cell_batches": table_scripts.table_script_stats()
+        if (table_scripts := sys.modules.get("docvortex.analyzers.native.pdf.table_text_styles")) is not None
+        else (0, 0, 0),
+        "native_geometry_evidence_stats": native.geometry_evidence_stats()
+        if native is not None and hasattr(native, "geometry_evidence_stats")
+        else (0, 0, 0),
         "native_span_assignment_unsupported": span_unsupported,
         "backend": "rust" if native is not None else "python",
         "protocol": getattr(native, "PROTOCOL_VERSION", None),

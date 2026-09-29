@@ -8,6 +8,7 @@ use crate::{
 };
 
 pub type Entry = (usize, Box4, Box4, Size, f64);
+pub type RunKey = (String, u64, i32, i32, i32, String);
 
 /// 保留线性插值分位数，不复用其他模块的取整采样规则。
 pub(crate) fn quantile(mut values: Vec<f64>, fraction: f64) -> f64 {

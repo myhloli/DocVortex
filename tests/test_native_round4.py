@@ -165,6 +165,57 @@ def test_marker_index_duplicate_sources_and_existing_cache(native):
         assert cache == before
 
 
+def test_marker_line_context_is_reused_across_corridors(native, monkeypatch):
+    """同一候选上下文只做一次 marker 输入校验，多个走廊复用来源行索引。"""
+    from docvortex.analyzers.native.pdf import table_annotations as notes
+    from docvortex.analyzers.native.pdf.models import _LineItem
+
+    lines = [
+        _LineItem(
+            text,
+            (0.0, float(index), 10.0, float(index + 1)),
+            0,
+            index,
+            chars=[{"char": text, "char_idx": index, "bbox": (0.0, 0.0, 1.0, 1.0)}],
+        )
+        for index, text in enumerate(("body", "a1", "body"))
+    ]
+    calls = 0
+    original = notes._prepare_marker_line_context
+
+    def counted(values):
+        """仅统计上下文准备次数，不改变普通输入判定。"""
+        nonlocal calls
+        calls += 1
+        return original(values)
+
+    monkeypatch.setattr(notes, "_prepare_marker_line_context", counted)
+    context = rules._RuleCandidateContext(
+        [], lines, (100.0, 100.0), 0, 8.0, [], [], {}, notes._prepare_table_note_body_metrics(lines, (100.0, 100.0), 0)
+    )
+    prepared = []
+    for corridor in range(2):
+        if context.marker_line_context is None:
+            context.marker_line_context = notes._prepare_marker_line_context(lines)
+        marker_safe, source_lines = context.marker_line_context
+        row = SimpleNamespace(
+            fragments=[SimpleNamespace(line_index=1)],
+            bbox=(0.0, float(corridor), 10.0, float(corridor + 1)),
+        )
+        prepared.append(
+            notes._prepare_table_core_rows(
+                [row], lines, context.body_metrics, marker_safe=marker_safe, source_lines=source_lines
+            )
+        )
+    assert calls == 1
+    assert marker_safe is True
+    assert source_lines == {index: [line] for index, line in enumerate(lines)}
+    assert all(item.marker_safe and item.source_lines is source_lines for item in prepared)
+    unsafe = [{"char": "x", "char_idx": 0, "bbox": (0.0, 0.0, math.nan, 1.0)}]
+    lines[0].chars.append(unsafe)
+    assert notes._prepare_marker_line_context(lines) == (False, {})
+
+
 def test_marker_queries_are_lazy_and_bounded(native, monkeypatch):
     """小候选只检查自身所需来源，重复查询复用位图，标记淘汰不影响判定。"""
     from docvortex.analyzers.native.pdf import table_annotations as notes

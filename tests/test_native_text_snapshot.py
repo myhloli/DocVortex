@@ -3,6 +3,7 @@
 from contextlib import closing
 from dataclasses import fields, is_dataclass
 from io import BytesIO
+from pathlib import Path
 import ctypes
 import math
 import pickle
@@ -189,6 +190,86 @@ def test_snapshot_special_metadata_selects_reference_before_calculation(native):
         assert read_text_snapshot(textpage, list(page.get_bbox()), 0, True, UserDict()) is None
         assert snapshot_bridge_info()["native_text_snapshot_calls"] == before
         assert "nonstandard" in snapshot_bridge_info()["native_text_snapshot_unavailable_reason"]
+
+
+def test_owned_geometry_risk_matches_line_reference(native):
+    """页面级 geometry evidence 与逐行参考风险结论一致，身份副本强制回退。"""
+    from copy import deepcopy
+    from docvortex.analyzers.native.pdf import char_geometry, pipeline
+    from docvortex.analyzers.native.pdf.native_text import _build_native_line_items_from_records
+
+    with PDFDocument(_pdf(long=True)) as document:
+        private = document._extract_native_page(0)
+        geometry, records = private.native_text.prepare_visual_evidence(private.page_size, private.rotation, (0.0, 90.0, 270.0))
+        lines = _build_native_line_items_from_records(records, private.page_size)
+        owned = pipeline._prepare_owned_geometry_evidence(private.native_text, geometry.chars)
+    args = ([lines], [geometry], [private.page_size])
+    expected = char_geometry._document_requires_full_geometry(*args)
+    actual = char_geometry._document_requires_full_geometry(*args, owned_geometry_inputs=[owned])
+    assert actual == expected
+    broken = deepcopy(lines)
+    broken[0].chars = [dict(broken[0].chars[0])]
+    fallback = char_geometry._document_requires_full_geometry(
+        [broken], [geometry], [private.page_size], owned_geometry_inputs=[owned]
+    )
+    assert fallback == expected
+
+
+def test_owned_geometry_fallback_restarts_reference_run_namespace(native, monkeypatch):
+    """启用 owned 通道后任一行失配必须整体重启参考路径，禁止两个从 0 起的 run 编号空间混用。"""
+    from copy import deepcopy
+    from docvortex.analyzers.native.pdf import char_geometry, pipeline
+
+    with PDFDocument(_pdf(long=True)) as document:
+        private = document._extract_native_page(0)
+        geometry, records = private.native_text.prepare_visual_evidence(private.page_size, private.rotation, (0.0, 90.0, 270.0))
+        lines = _build_native_line_items_from_records(records, private.page_size)
+        owned = pipeline._prepare_owned_geometry_evidence(private.native_text, geometry.chars)
+    expected = char_geometry._document_requires_full_geometry([lines], [geometry], [private.page_size])
+
+    reference = char_geometry._document_requires_full_geometry_python
+    calls = []
+
+    def spy(*args, **kwargs):
+        calls.append(args)
+        return reference(*args, **kwargs)
+
+    monkeypatch.setattr(char_geometry, "_document_requires_full_geometry_python", spy)
+    broken = deepcopy(lines)
+    broken[0].chars = [dict(broken[0].chars[0])]
+    identity_miss = char_geometry._document_requires_full_geometry(
+        [broken], [geometry], [private.page_size], owned_geometry_inputs=[owned]
+    )
+    page_missing = char_geometry._document_requires_full_geometry(
+        [lines], [geometry], [private.page_size], owned_geometry_inputs=[None]
+    )
+    assert [call[0] for call in calls] == [[broken], [lines]]
+    assert identity_miss == expected and page_missing == expected
+
+
+def test_owned_table_and_geometry_evidence_match_reference(native, monkeypatch):
+    """表格脚本与全文几何 owned 输入必须与逐行参考输出完全一致。"""
+    from docvortex.analyzers.native.pdf import pipeline
+    from docvortex.analyzers.native.pdf.table_text_styles import table_script_stats
+    from docvortex._native import geometry_evidence_stats
+
+    sample = Path(__file__).parents[1] / "demo/pdfs/demo3.pdf"
+    before_table = table_script_stats()
+    before_geometry = geometry_evidence_stats()
+    with PDFDocument(str(sample)) as document:
+        actual = pipeline._analyze_native_document(document)
+    with PDFDocument(str(sample)) as document:
+        monkeypatch.setattr(pipeline, "_prepare_owned_script_evidence", lambda *args, **kwargs: None)
+        monkeypatch.setattr(pipeline, "_prepare_owned_geometry_evidence", lambda *args, **kwargs: None)
+        expected = pipeline._analyze_native_document(document)
+    assert actual == expected
+    after_table = table_script_stats()
+    after_geometry = geometry_evidence_stats()
+    assert after_table[0] > before_table[0]
+    assert after_table[1] > before_table[1]
+    assert after_geometry[0] > before_geometry[0]
+    assert after_geometry[1] > before_geometry[1]
+    assert after_geometry[2] == before_geometry[2]
 
 
 def test_page_snapshot_bridge_loads_and_closes_textpage(native):

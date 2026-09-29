@@ -34,6 +34,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<table_merge::NativeTableGrid>()?;
     module.add_class::<table_merge::NativeTableMerger>()?;
     module.add_class::<geometry_risk::NativeGeometryRisk>()?;
+    module.add_class::<geometry_risk::NativeGeometryRuns>()?;
     module.add_class::<geometry_document::NativeStyleDocument>()?;
     module.add_function(wrap_pyfunction!(
         geometry_runs::build_geometry_style,
@@ -44,6 +45,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_class::<snapshot::NativeTextSnapshot>()?;
+    module.add_class::<snapshot::NativeGeometryEvidence>()?;
     module.add_class::<classification::NativeClassificationSnapshot>()?;
     module.add_function(wrap_pyfunction!(
         classification::read_pdfium_classification,
@@ -59,6 +61,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(snapshot::text_snapshot_stats, module)?)?;
+    module.add_function(wrap_pyfunction!(snapshot::geometry_evidence_stats, module)?)?;
     module.add_function(wrap_pyfunction!(
         snapshot::read_pdfium_text_snapshot,
         module
