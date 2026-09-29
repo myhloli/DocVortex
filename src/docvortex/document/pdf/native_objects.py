@@ -188,6 +188,11 @@ def _clipped_objects_of_type(
 
 def _text_object_visibility(page: Any, page_bbox: BBox, rotation: int) -> dict[int, tuple[bool, BBox | None]]:
     """一次遍历建立文字对象的绘制状态与有效裁剪；地址只在本次页面提取内使用。"""
+    from ._object_bridge import read_text_visibility
+
+    records = read_text_visibility(page, page_bbox, rotation, DRAWING_FORM_MAX_DEPTH)
+    if records is not None:
+        return {address: (visible, clip) for address, visible, clip in records}
     output = {}
     for member in _clipped_objects_of_type(page, pdfium_c.FPDF_PAGEOBJ_TEXT):
         address = ctypes.cast(member.raw, ctypes.c_void_p).value
@@ -538,6 +543,80 @@ def _transform_path_subpath(
     )
 
 
+def _path_object_evidence(
+    raw_obj: Any,
+    matrix: tuple[float, float, float, float, float, float],
+    page_bbox: BBox,
+    page_rotation: int,
+    form_depth: int,
+    source_index: int,
+    *,
+    subpaths: list[_PathSubpath],
+    want_lines: bool,
+    want_path_infos: bool,
+) -> tuple[list[PDFDrawingLine], PDFPathInfo | None]:
+    """一次读取 Path 状态并转换子路径，同时供绘图线和路径摘要复用。"""
+
+    fill_visible, stroke_visible = _get_path_visibility(raw_obj)
+    raw_stroke_width = _get_raw_stroke_width(raw_obj) if stroke_visible else 0.0
+    prepared = [
+        (raw_subpath, _transform_path_subpath(raw_subpath, matrix, page_bbox, page_rotation)) for raw_subpath in subpaths
+    ]
+    drawing_lines: list[PDFDrawingLine] = []
+    if want_lines and (fill_visible or stroke_visible):
+        page_size = _drawing_page_size(page_bbox, page_rotation)
+        for raw_subpath, subpath in prepared:
+            if fill_visible:
+                filled_line = _get_thin_filled_subpath_line(subpath, page_size)
+                if filled_line is not None:
+                    drawing_lines.append(filled_line)
+                    continue
+            if not stroke_visible:
+                continue
+            for (raw_start, raw_end), (segment_start, segment_end) in zip(
+                raw_subpath.straight_segments,
+                subpath.straight_segments,
+            ):
+                stroke_width = _get_segment_stroke_width(raw_stroke_width, raw_start, raw_end, matrix)
+                drawing_line = _make_axis_drawing_line(segment_start, segment_end, stroke_width, page_size)
+                if drawing_line is not None:
+                    drawing_lines.append(drawing_line)
+
+    path_info: PDFPathInfo | None = None
+    if want_path_infos:
+        try:
+            segment_count = int(pdfium_c.FPDFPath_CountSegments(raw_obj))
+        except Exception:
+            segment_count = 0
+        points = [point for _, subpath in prepared for point in subpath.points]
+        if segment_count > 0 and points:
+            coordinates = [coordinate for point in points for coordinate in point]
+            if all(math.isfinite(value) for value in coordinates):
+                page_width, page_height = _drawing_page_size(page_bbox, page_rotation)
+                stroke_margin = 0.0
+                if stroke_visible:
+                    a, b, c, d, _, _ = matrix
+                    stroke_scale = max(math.hypot(a, b), math.hypot(c, d))
+                    stroke_margin = 0.5 * raw_stroke_width * stroke_scale
+                bbox = (
+                    max(0.0, min(point[0] for point in points) - stroke_margin),
+                    max(0.0, min(point[1] for point in points) - stroke_margin),
+                    min(page_width, max(point[0] for point in points) + stroke_margin),
+                    min(page_height, max(point[1] for point in points) + stroke_margin),
+                )
+                if bbox[2] > bbox[0] and bbox[3] > bbox[1]:
+                    path_info = PDFPathInfo(
+                        bbox=bbox,
+                        segment_count=segment_count,
+                        fill_visible=fill_visible,
+                        stroke_visible=stroke_visible,
+                        form_depth=form_depth,
+                        source_index=source_index,
+                        fill_rgba=(_get_raw_object_rgba(raw_obj, pdfium_c.FPDFPageObj_GetFillColor) if fill_visible else None),
+                    )
+    return drawing_lines, path_info
+
+
 def _path_info_from_object(
     raw_obj: Any,
     matrix: tuple[float, float, float, float, float, float],
@@ -548,62 +627,20 @@ def _path_info_from_object(
     *,
     subpaths: list[_PathSubpath] | None = None,
 ) -> PDFPathInfo | None:
-    """将一个原始 Path 转换为页面几何；贝塞尔控制点也纳入保守 bbox。"""
+    """保留独立路径摘要入口；缺省时读取并转换原始 Path 后复用联合证据。"""
 
-    try:
-        segment_count = int(pdfium_c.FPDFPath_CountSegments(raw_obj))
-    except Exception:
-        return None
-    if segment_count <= 0:
-        return None
-
-    fill_visible, stroke_visible = _get_path_visibility(raw_obj)
-    points = [
-        point
-        for raw_subpath in (_read_raw_path_subpaths(raw_obj) if subpaths is None else subpaths)
-        for point in _transform_path_subpath(
-            raw_subpath,
-            matrix,
-            page_bbox,
-            page_rotation,
-        ).points
-    ]
-    if not points:
-        return None
-    coordinates = [coordinate for point in points for coordinate in point]
-    if not all(math.isfinite(value) for value in coordinates):
-        return None
-
-    page_width, page_height = _drawing_page_size(page_bbox, page_rotation)
-    stroke_margin = 0.0
-    if stroke_visible:
-        a, b, c, d, _, _ = matrix
-        stroke_scale = max(math.hypot(a, b), math.hypot(c, d))
-        stroke_margin = 0.5 * _get_raw_stroke_width(raw_obj) * stroke_scale
-    bbox = (
-        max(0.0, min(point[0] for point in points) - stroke_margin),
-        max(0.0, min(point[1] for point in points) - stroke_margin),
-        min(page_width, max(point[0] for point in points) + stroke_margin),
-        min(page_height, max(point[1] for point in points) + stroke_margin),
-    )
-    if bbox[2] <= bbox[0] or bbox[3] <= bbox[1]:
-        return None
-    return PDFPathInfo(
-        bbox=bbox,
-        segment_count=segment_count,
-        fill_visible=fill_visible,
-        stroke_visible=stroke_visible,
-        form_depth=form_depth,
-        source_index=source_index,
-        fill_rgba=(
-            _get_raw_object_rgba(
-                raw_obj,
-                pdfium_c.FPDFPageObj_GetFillColor,
-            )
-            if fill_visible
-            else None
-        ),
-    )
+    resolved = _read_raw_path_subpaths(raw_obj) if subpaths is None else subpaths
+    return _path_object_evidence(
+        raw_obj,
+        matrix,
+        page_bbox,
+        page_rotation,
+        form_depth,
+        source_index,
+        subpaths=resolved,
+        want_lines=False,
+        want_path_infos=True,
+    )[1]
 
 
 def _get_thin_filled_subpath_line(
@@ -721,33 +758,24 @@ def _extract_path_drawing_lines(
     *,
     subpaths: list[_PathSubpath] | None = None,
 ) -> list[PDFDrawingLine]:
-    """从单个 Path 提取可见直线，坏 Path 返回空结果且不影响同页其他对象。"""
-    fill_visible, stroke_visible = _get_path_visibility(raw_obj)
-    if not fill_visible and not stroke_visible:
-        return []
+    """保留独立绘图线入口；缺省时读取并转换原始 Path 后复用联合证据。"""
 
-    page_size = _drawing_page_size(page_bbox, page_rotation)
-    raw_stroke_width = _get_raw_stroke_width(raw_obj) if stroke_visible else 0.0
-    drawing_lines: list[PDFDrawingLine] = []
-    for raw_subpath in _read_raw_path_subpaths(raw_obj) if subpaths is None else subpaths:
-        subpath = _transform_path_subpath(raw_subpath, matrix, page_bbox, page_rotation)
-        if fill_visible:
-            filled_line = _get_thin_filled_subpath_line(subpath, page_size)
-            if filled_line is not None:
-                drawing_lines.append(filled_line)
-                # 细长填充矩形已经折叠为中心线，不再输出其描边四条边。
-                continue
-        if not stroke_visible:
-            continue
-        for (raw_start, raw_end), (segment_start, segment_end) in zip(
-            raw_subpath.straight_segments,
-            subpath.straight_segments,
-        ):
-            stroke_width = _get_segment_stroke_width(raw_stroke_width, raw_start, raw_end, matrix)
-            drawing_line = _make_axis_drawing_line(segment_start, segment_end, stroke_width, page_size)
-            if drawing_line is not None:
-                drawing_lines.append(drawing_line)
-    return drawing_lines
+    resolved = _read_raw_path_subpaths(raw_obj) if subpaths is None else subpaths
+    return _path_object_evidence(
+        raw_obj,
+        matrix,
+        page_bbox,
+        page_rotation,
+        0,
+        0,
+        subpaths=resolved,
+        want_lines=True,
+        want_path_infos=False,
+    )[0]
+
+
+_STANDARD_PATH_INFO_EXTRACTOR = _path_info_from_object
+_STANDARD_PATH_LINE_EXTRACTOR = _extract_path_drawing_lines
 
 
 def _line_axis_coordinate(line: PDFDrawingLine) -> float:
@@ -1046,11 +1074,48 @@ def _extract_page_paths_and_lines(
 
     drawing_lines: list[PDFDrawingLine] = []
     path_infos: list[PDFPathInfo] = []
+    standard_path = (
+        _path_info_from_object is _STANDARD_PATH_INFO_EXTRACTOR and _extract_path_drawing_lines is _STANDARD_PATH_LINE_EXTRACTOR
+    )
     for source_index, member in enumerate(_clipped_objects_of_type(page, pdfium_c.FPDF_PAGEOBJ_PATH)):
         raw_obj, matrix, form_depth = member.raw, member.matrix, member.depth
         try:
             subpaths = _read_raw_path_subpaths(raw_obj)
         except Exception:
+            continue
+        if standard_path:
+            try:
+                candidates, info = _path_object_evidence(
+                    raw_obj,
+                    matrix,
+                    page_bbox,
+                    page_rotation,
+                    form_depth,
+                    source_index,
+                    subpaths=subpaths,
+                    want_lines=want_lines,
+                    want_path_infos=want_path_infos,
+                )
+            except Exception:
+                continue
+            if want_lines:
+                for line in candidates:
+                    clipped = _clip_object_visual_bbox(line.bbox, member.clip, page_bbox, page_rotation)
+                    if clipped is not None:
+                        if clipped == line.bbox:
+                            drawing_lines.append(line)
+                        else:
+                            if line.orientation == "horizontal":
+                                y = min(clipped[3], max(clipped[1], line.start[1]))
+                                start, end = (clipped[0], y), (clipped[2], y)
+                            else:
+                                x = min(clipped[2], max(clipped[0], line.start[0]))
+                                start, end = (x, clipped[1]), (x, clipped[3])
+                            drawing_lines.append(replace(line, bbox=clipped, start=start, end=end))
+            if want_path_infos and info is not None:
+                clipped = _clip_object_visual_bbox(info.bbox, member.clip, page_bbox, page_rotation)
+                if clipped is not None:
+                    path_infos.append(info if clipped == info.bbox else replace(info, bbox=clipped))
             continue
         if want_lines:
             try:

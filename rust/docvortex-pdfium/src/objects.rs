@@ -1,6 +1,6 @@
 //! 同库对象树与裁剪遍历；借用地址只允许在原页面作用域内消费。
 use crate::ReadError;
-use std::ffi::{c_float, c_int, c_ulong, c_void};
+use std::ffi::{c_float, c_int, c_uint, c_ulong, c_void};
 pub type Matrix = [f64; 6];
 pub type Bounds = [f64; 4];
 pub type Object = (usize, Matrix, Matrix, usize, Option<Bounds>);
@@ -155,10 +155,120 @@ impl Api {
         }
     }
 }
+/// TEXT 对象地址、最终可见性和页面视觉坐标中的有效裁剪框。
+pub type TextVisibility = (usize, bool, Option<Bounds>);
+
+/// 按 Python 页面坐标变换裁剪框，四个角点独立取保守外框。
+fn visual_bounds(bounds: Bounds, frame: [f64; 4], rotation: i32) -> Bounds {
+    let point = |x: f64, y: f64| match rotation {
+        90 => (y - frame[1], x - frame[0]),
+        180 => (frame[2] - x, y - frame[1]),
+        270 => (frame[3] - y, frame[2] - x),
+        _ => (x - frame[0], frame[3] - y),
+    };
+    let points = [
+        point(bounds[0], bounds[1]),
+        point(bounds[0], bounds[3]),
+        point(bounds[2], bounds[1]),
+        point(bounds[2], bounds[3]),
+    ];
+    let xs = [points[0].0, points[1].0, points[2].0, points[3].0];
+    let ys = [points[0].1, points[1].1, points[2].1, points[3].1];
+    [
+        xs.iter().copied().reduce(minimum).unwrap(),
+        ys.iter().copied().reduce(minimum).unwrap(),
+        xs.iter().copied().reduce(maximum).unwrap(),
+        ys.iter().copied().reduce(maximum).unwrap(),
+    ]
+}
+
+/// 一次 TEXT 对象遍历同时计算绘制状态和有效裁剪；不跨调用保存 PDFium 地址。
+///
+/// # Safety
+/// 调用方必须验证 14 个函数的 ABI，并持有同一 PDFium 页面、运行库和全局锁。
+pub unsafe fn read_text_visibility(
+    addresses: Vec<usize>,
+    handle: usize,
+    frame: [f64; 4],
+    rotation: i32,
+    max_depth: usize,
+) -> Result<Vec<TextVisibility>, ReadError> {
+    if addresses.len() != 14 || addresses.contains(&0) || handle == 0 {
+        return Err(ReadError::InvalidInput(
+            "invalid PDFium text visibility arguments",
+        ));
+    }
+    if !frame.iter().all(|value| value.is_finite())
+        || frame[2] <= frame[0]
+        || frame[3] <= frame[1]
+        || ![0, 90, 180, 270].contains(&rotation)
+    {
+        return Err(ReadError::InvalidInput(
+            "invalid PDFium text visibility geometry",
+        ));
+    }
+    let objects = read_objects(addresses[..11].to_vec(), handle, 1, max_depth)?;
+    let render_mode: unsafe extern "system" fn(*mut c_void) -> c_int =
+        std::mem::transmute(addresses[11]);
+    let color: unsafe extern "system" fn(
+        *mut c_void,
+        *mut c_uint,
+        *mut c_uint,
+        *mut c_uint,
+        *mut c_uint,
+    ) -> c_int = std::mem::transmute(addresses[12]);
+    let stroke_color: unsafe extern "system" fn(
+        *mut c_void,
+        *mut c_uint,
+        *mut c_uint,
+        *mut c_uint,
+        *mut c_uint,
+    ) -> c_int = std::mem::transmute(addresses[13]);
+    let alpha = |raw: *mut c_void,
+                 getter: unsafe extern "system" fn(
+        *mut c_void,
+        *mut c_uint,
+        *mut c_uint,
+        *mut c_uint,
+        *mut c_uint,
+    ) -> c_int|
+     -> u32 {
+        let (mut red, mut green, mut blue, mut alpha) = (0, 0, 0, 255);
+        if getter(raw, &mut red, &mut green, &mut blue, &mut alpha) == 0 {
+            return 255;
+        }
+        alpha
+    };
+    Ok(objects
+        .into_iter()
+        .map(|(address, _, _, _, clip)| {
+            let raw = address as *mut c_void;
+            let mode = render_mode(raw);
+            let mut visible = mode != 3 && mode != 7;
+            if (0..=2).contains(&mode) || (4..=6).contains(&mode) {
+                visible = ((mode == 0 || mode == 2 || mode == 4 || mode == 6)
+                    && alpha(raw, color) > 0)
+                    || ((mode == 1 || mode == 2 || mode == 5 || mode == 6)
+                        && alpha(raw, stroke_color) > 0);
+            }
+            let clip = clip.map(|value| {
+                if value[2] <= value[0] || value[3] <= value[1] {
+                    visible = false;
+                    value
+                } else {
+                    visual_bounds(value, frame, rotation)
+                }
+            });
+            (address, visible, clip)
+        })
+        .collect())
+}
+
 /// 借用有效页面同步读取指定类型叶子，不跨调用缓存原生地址。
 ///
 /// # Safety
-/// 调用方必须验证 11 个函数的 ABI 并持有同一 PDFium 锁、页面和运行库引用。
+///
+/// 调用方必须验证函数 ABI，并持有同一 PDFium 运行库、页面和全局锁。
 pub unsafe fn read_objects(
     addresses: Vec<usize>,
     handle: usize,

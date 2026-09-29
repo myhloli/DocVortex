@@ -68,7 +68,7 @@ def _plain(value):
     if isinstance(value, Bbox):
         return (value.bbox, value.ensure_nonzero_area)
     if is_dataclass(value):
-        return {field.name: _plain(getattr(value, field.name)) for field in fields(value)}
+        return {field.name: _plain(getattr(value, field.name)) for field in fields(value) if field.compare}
     if isinstance(value, dict):
         return {key: _plain(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):

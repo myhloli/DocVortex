@@ -286,6 +286,7 @@ pub(crate) fn materialize_visual_runs<'py>(
                     weight,
                     emphasis,
                     typography,
+                    run.typographic_scale,
                 )
             },
         );

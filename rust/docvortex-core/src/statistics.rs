@@ -50,6 +50,11 @@ pub fn ordered_clusters(
 use crate::geometry::Box4;
 use crate::median;
 
+/// 按调用方提供的值计算中位数，避免为了切片临时克隆整份向量。
+fn median_values<I: IntoIterator<Item = f64>>(values: I) -> f64 {
+    crate::median(values.into_iter().collect())
+}
+
 pub type Typography = (
     f64,
     Option<f64>,
@@ -65,7 +70,7 @@ pub fn typography(
     boxes: Vec<Option<Box4>>,
     fonts: Vec<Option<usize>>,
     weights: Vec<Option<f64>>,
-    families: Vec<Option<usize>>,
+    families: &[Option<usize>],
     fallback_height: f64,
 ) -> Option<Typography> {
     if boxes.len() != fonts.len()
@@ -77,12 +82,13 @@ pub fn typography(
     {
         return None;
     }
-    let mut heights = Vec::new();
-    let mut widths = Vec::new();
+    let glyph_count = boxes.len();
+    let mut heights = Vec::with_capacity(glyph_count);
+    let mut widths = Vec::with_capacity(glyph_count);
     let mut counts = vec![0usize; families.len()];
     let mut font_weights = vec![Vec::new(); families.len()];
     let mut seen = Vec::new();
-    let mut glyphs = Vec::new();
+    let mut glyphs = Vec::with_capacity(glyph_count);
     for ((raw, font), weight) in boxes.into_iter().zip(fonts).zip(weights) {
         let Some(b) = raw else {
             continue;
@@ -103,12 +109,12 @@ pub fn typography(
     let height = if heights.is_empty() {
         fallback_height
     } else {
-        median(heights)
+        median_values(heights)
     };
     let width = if widths.is_empty() {
         None
     } else {
-        Some(median(widths))
+        Some(median_values(widths))
     };
     let mut winner = None;
     for id in seen {
@@ -123,7 +129,7 @@ pub fn typography(
         if font_weights[id].is_empty() {
             None
         } else {
-            Some(median(font_weights[id].clone()))
+            Some(median_values(font_weights[id].iter().copied()))
         }
     });
     let mut emphasis = None;
@@ -147,8 +153,8 @@ pub fn typography(
                 let prefix: Vec<_> = glyphs[..split].iter().filter_map(|g| g.2).collect();
                 let body: Vec<_> = glyphs[split..].iter().filter_map(|g| g.2).collect();
                 if !prefix.is_empty() && !body.is_empty() {
-                    let p = median(prefix);
-                    let b = median(body);
+                    let p = median_values(prefix);
+                    let b = median_values(body);
                     // 中位数相加可能溢出，保留 Python 两个小于判断的否定，不能改写为大于等于。
                     if !(p - b < 100.0 || p < 1.15 * 1.0_f64.max(b)) {
                         emphasis = Some(prefix_width);
