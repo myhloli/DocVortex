@@ -333,14 +333,17 @@ fn open_thin_rectangle(subpath: &PreparedSubpath, x0: f64, x1: f64, y0: f64, y1:
         .into_iter()
         .map(|(x, y)| ((x * 1000.0).round() / 1000.0, (y * 1000.0).round() / 1000.0))
         .collect::<Vec<_>>();
-    if rounded.iter().any(|point| !expected.contains(point)) {
+    // 与参考实现的集合相等语义保持一致：四个角点必须全部出现，缺失角点的退化开放路径不能折叠。
+    if expected.iter().any(|point| !rounded.contains(point))
+        || rounded.iter().any(|point| !expected.contains(point))
+    {
         return false;
     }
-    subpath.raw.lines.iter().all(|&(first, last)| {
-        let a = subpath.raw.points[first];
-        let b = subpath.raw.points[last];
-        !((a.0 - b.0).abs() > 0.001 && (a.1 - b.1).abs() > 0.001)
-    })
+    // 轴对齐判断必须发生在对象/Form 矩阵与页面坐标转换之后，与 Python 参考实现一致。
+    subpath
+        .lines
+        .iter()
+        .all(|&(a, b)| !((a.0 - b.0).abs() > 0.001 && (a.1 - b.1).abs() > 0.001))
 }
 
 /// 生成单个 Path 的绘图线候选，不应用对象裁剪。

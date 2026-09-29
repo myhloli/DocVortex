@@ -201,6 +201,51 @@ def test_native_path_evidence_matches_python_reference(monkeypatch) -> None:
         assert backend_info()["pdfium_path_evidence_bridge_calls"] >= 1
 
 
+def _open_filled_path_pdf(path_commands: bytes) -> bytes:
+    """构造仅包含一个开放填充 Path 的最小 PDF，用于原生/参考差分。"""
+    content = b"0 0 0 rg\n" + path_commands
+    return _pdf(
+        [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 50] /Resources << >> /Contents 4 0 R >>",
+            b"<< /Length %d >>\nstream\n%s\nendstream" % (len(content), content),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ("path_commands", "expected_line_count"),
+    [
+        # 缺失左上角且重复右下角时，参考实现不接受该开放路径为细矩形。
+        (b"20 20 m 30 20 l 30 21 l 30 20 l f", 0),
+        # 对象矩阵会把两条局部斜边转换为轴对齐边，应按转换后的线段判定。
+        (b"q 1 0 -2 1 40 0 cm 20 20 m 30 20 l 32 21 l 22 21 l f Q", 1),
+    ],
+)
+def test_native_open_filled_path_edges_match_reference(monkeypatch, path_commands, expected_line_count) -> None:
+    """覆盖开放细矩形的角点完整性与矩阵后轴对齐两个后端分歧行为。"""
+    from docvortex.document.pdf import _object_bridge
+    from docvortex._compute_backend import backend_info, get_native
+    from docvortex.document.pdf.native_coordinates import _normalize_pdf_page_bbox
+
+    original_reader = _object_bridge.read_path_evidence
+    calls_before = backend_info()["pdfium_path_evidence_bridge_calls"]
+    with PDFDocument(_open_filled_path_pdf(path_commands)) as document:
+        with document._open_page(0) as page:
+            bbox = _normalize_pdf_page_bbox(page.get_bbox())
+            native_lines, native_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+            monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
+            reference_lines, reference_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+
+    monkeypatch.setattr(_object_bridge, "read_path_evidence", original_reader)
+    assert native_lines == reference_lines
+    assert native_infos == reference_infos
+    assert len(native_lines) == expected_line_count
+    if get_native() is not None and hasattr(get_native(), "read_pdfium_path_evidence"):
+        assert backend_info()["pdfium_path_evidence_bridge_calls"] > calls_before
+
+
 def test_drawing_lines_match_vector_and_snapshot_entries() -> None:
     """独立线接口、矢量几何和页面快照的绘图线逐字段且按顺序一致。"""
     data = _vector_page_pdf(600)
