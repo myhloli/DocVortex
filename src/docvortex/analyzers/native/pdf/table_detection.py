@@ -77,20 +77,22 @@ def _detect_table_candidates(
             *local_excluded_bboxes,
             *[_rotate_bbox_to_upright(bbox, source.page_size, angle) for bbox in source.form_bboxes],
         ]
-        rule_candidates.extend(
-            _build_rule_table_candidates(
-                rows,
-                angle_lines,
-                source.page_size,
-                angle,
-                median_height,
-                local_axis_lines,
-                path_infos=source.path_infos,
-                excluded_bboxes=local_excluded_bboxes,
-                caption_candidates=caption_candidates,
-                defer_materialization=True,
-            )
+        angle_rule_candidates = _build_rule_table_candidates(
+            rows,
+            angle_lines,
+            source.page_size,
+            angle,
+            median_height,
+            local_axis_lines,
+            path_infos=source.path_infos,
+            excluded_bboxes=local_excluded_bboxes,
+            caption_candidates=caption_candidates,
+            defer_materialization=True,
         )
+        rule_candidates.extend(angle_rule_candidates)
+        # 规则候选与闭合网格消费同一批横线/竖轨；复用上下文冻结的分量，
+        # 避免 pollutant 这类多表页面连续两次重建相同连通关系。
+        shared_grid_components = angle_rule_candidates[0].context.grid_components if angle_rule_candidates else None
         rule_candidates.extend(
             _build_closed_rule_grid_candidates(
                 rows,
@@ -101,6 +103,7 @@ def _detect_table_candidates(
                 local_axis_lines,
                 local_closed_grid_excluded_bboxes,
                 caption_candidates,
+                grid_components=shared_grid_components,
             )
         )
     merged_rule_candidates = [

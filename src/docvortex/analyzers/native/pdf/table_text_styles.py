@@ -84,7 +84,9 @@ def _cell_visual_lines(
 
     lines: list[_LineItem] = []
     for visual_row, row_glyphs in sorted(grouped.items()):
-        ordered = sorted(row_glyphs, key=lambda glyph: (glyph.bbox[0], glyph.bbox[1], glyph.glyph_id))
+        # 输入 glyph 已按 visual_row、x、y 和 glyph_id 排序；分组遍历保持
+        # 该顺序，因此这里不再对同一 visual row 重复执行一次稳定排序。
+        ordered = row_glyphs
         chars = [chars_by_source[glyph.source_index] for glyph in ordered if glyph.source_index in chars_by_source]
         bboxes = [bbox for char in chars if (bbox := _coerce_bbox(char.get("bbox"))) is not None]
         if not chars or not bboxes:

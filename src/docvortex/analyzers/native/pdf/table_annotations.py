@@ -162,6 +162,25 @@ class _PreparedTableCoreRows:
         return self.marker_prepared.prepare(line, page_size, angle)
 
 
+def _plain_marker_bbox(value) -> bool:
+    """按 marker 快路径的既有规则校验字符 bbox 形状和数值范围。"""
+    if type(value) not in (tuple, list, CharBbox):
+        return False
+    raw = value.bbox if type(value) is CharBbox else value
+    if type(raw) not in (tuple, list) or len(raw) != 4:
+        return False
+    for number in raw:
+        if type(number) is float:
+            if not math.isfinite(number):
+                return False
+        elif type(number) is int:
+            if not -(2**53) <= number <= 2**53:
+                return False
+        else:
+            return False
+    return True
+
+
 def _prepare_marker_line_context(lines):
     """同一候选上下文只校验一次 marker 输入，并冻结来源行索引。"""
     from ...._compute_backend import get_native
@@ -169,33 +188,32 @@ def _prepare_marker_line_context(lines):
     if get_native() is None:
         return False, {}
     source_lines: dict[int, list[_LineItem]] = {}
-    safe = all(
-        type(line) is _LineItem
-        and type(line.source_index) is int
-        and type(line.text) is str
-        and type(line.chars) is list
-        and all(
-            type(char) is dict
-            and (char.get("char") is None or type(char.get("char")) is str)
-            and (
-                char.get("bbox") is None
-                or (
-                    type(char.get("bbox")) in (tuple, list, CharBbox)
-                    and len(char["bbox"].bbox if type(char["bbox"]) is CharBbox else char["bbox"]) == 4
-                    and all(
-                        (type(value) is float and math.isfinite(value)) or (type(value) is int and -(2**53) <= value <= 2**53)
-                        for value in char["bbox"]
-                    )
-                )
-            )
-            for char in line.chars
-        )
-        for line in lines
-    )
-    if safe:
-        for line in lines:
-            source_lines.setdefault(line.source_index, []).append(line)
-    return safe, source_lines
+    # 直接单次遍历替代多层生成式，避免同一 char/bbox 字典键被重复读取；
+    # 任一特殊输入立即返回 False，保持原参考路径整体回退的语义。
+    for line in lines:
+        if (
+            type(line) is not _LineItem
+            or type(line.source_index) is not int
+            or type(line.text) is not str
+            or type(line.chars) is not list
+        ):
+            return False, {}
+        plain_chars = True
+        for char in line.chars:
+            if type(char) is not dict:
+                plain_chars = False
+                break
+            text = char.get("char")
+            if text is not None and type(text) is not str:
+                plain_chars = False
+                break
+            if not _plain_marker_bbox(char.get("bbox")) and char.get("bbox") is not None:
+                plain_chars = False
+                break
+        if not plain_chars:
+            return False, {}
+        source_lines.setdefault(line.source_index, []).append(line)
+    return True, source_lines
 
 
 def _prepare_table_core_rows(

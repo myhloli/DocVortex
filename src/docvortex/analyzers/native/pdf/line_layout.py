@@ -310,6 +310,7 @@ def _infer_text_lanes(
         )
     if nested_column_band is not None:
         nested_lanes, band_top, band_bottom = nested_column_band
+        nested_ordered_lanes = sorted(nested_lanes, key=lambda lane: lane.left)
         fallback_lane = _TextLane(
             left=filtered_intervals[0][0],
             right=filtered_intervals[0][1],
@@ -324,26 +325,17 @@ def _infer_text_lanes(
             ):
                 fallback_lane.lines.append(item)
                 continue
-            line_width = max(0.1, bbox[2] - bbox[0])
-            scored_lanes = [
-                (
-                    max(0.0, min(bbox[2], lane.right) - max(bbox[0], lane.left)) / line_width,
-                    lane,
-                )
-                for lane in nested_lanes
-            ]
-            coverage_scores = sorted(
-                (coverage for coverage, _lane in scored_lanes),
-                reverse=True,
+            best_lane, best_coverage, second_coverage = _best_lane_coverage(
+                bbox,
+                nested_lanes,
             )
-            best_coverage, best_lane = max(scored_lanes, key=lambda value: value[0])
-            fits_only_one_lane = _fits_only_one_lane(
+            fits_only_one_lane = _fits_only_one_lane_ordered(
                 bbox,
                 best_lane,
-                nested_lanes,
+                nested_ordered_lanes,
                 anchor_tolerance,
             )
-            if len(coverage_scores) > 1 and coverage_scores[1] >= 0.2 and not fits_only_one_lane:
+            if second_coverage >= 0.2 and not fits_only_one_lane:
                 span_lines.append(item)
                 continue
             if best_coverage >= 0.5 or fits_only_one_lane:
@@ -372,31 +364,20 @@ def _infer_text_lanes(
         return lanes
 
     lanes = [_TextLane(left=left, right=right) for left, right, _support in filtered_intervals]
+    ordered_lanes = sorted(lanes, key=lambda lane: lane.left)
     span_lines: list[tuple[_LineItem, BBox]] = []
     for item in line_geometry:
         bbox = item[1]
-        line_width = max(0.1, bbox[2] - bbox[0])
-        scored_lanes = [
-            (
-                max(0.0, min(bbox[2], lane.right) - max(bbox[0], lane.left)) / line_width,
-                lane,
-            )
-            for lane in lanes
-        ]
-        coverage_scores = sorted(
-            (coverage for coverage, _lane in scored_lanes),
-            reverse=True,
-        )
-        best_coverage, best_lane = max(scored_lanes, key=lambda value: value[0])
-        fits_only_one_lane = _fits_only_one_lane(
+        best_lane, best_coverage, second_coverage = _best_lane_coverage(bbox, lanes)
+        fits_only_one_lane = _fits_only_one_lane_ordered(
             bbox,
             best_lane,
-            lanes,
+            ordered_lanes,
             anchor_tolerance,
         )
         # 同时覆盖两个稳定正文栏的行仍属于跨栏内容；只进入单侧栏且未越过栏沟的
         # 宽正文行则回到该栏，避免窄图注把正文错误挤入 span lane。
-        if len(coverage_scores) > 1 and coverage_scores[1] >= 0.2 and not fits_only_one_lane:
+        if second_coverage >= 0.2 and not fits_only_one_lane:
             span_lines.append(item)
             continue
         if len(lanes) == 1 or fits_only_one_lane:
@@ -423,21 +404,57 @@ def _infer_text_lanes(
     return lanes
 
 
-def _fits_only_one_lane(
+def _best_lane_coverage(
+    bbox: BBox,
+    lanes: list[_TextLane],
+) -> tuple[_TextLane, float, float]:
+    """一次遍历求最佳栏覆盖与次高覆盖，平局保留原有首个最佳栏。"""
+
+    line_width = max(0.1, bbox[2] - bbox[0])
+    best_lane = lanes[0]
+    best_coverage = -1.0
+    second_coverage = -1.0
+    for lane in lanes:
+        coverage = max(0.0, min(bbox[2], lane.right) - max(bbox[0], lane.left)) / line_width
+        if coverage > best_coverage:
+            second_coverage = best_coverage
+            best_coverage = coverage
+            best_lane = lane
+        elif coverage > second_coverage:
+            second_coverage = coverage
+    return best_lane, best_coverage, second_coverage
+
+
+def _fits_only_one_lane_ordered(
     bbox: BBox,
     best_lane: _TextLane,
-    lanes: list[_TextLane],
+    ordered: list[_TextLane],
     tolerance: float,
 ) -> bool:
-    """判断宽行是否仍完整停留在某一栏及其栏沟边界以内。"""
+    """在调用方预排序的栏序列上判断宽行是否只停留在一个栏内。"""
 
-    ordered = sorted(lanes, key=lambda lane: lane.left)
     lane_index = ordered.index(best_lane)
     if lane_index > 0 and bbox[0] < ordered[lane_index - 1].right - tolerance:
         return False
     if lane_index + 1 < len(ordered) and bbox[2] > ordered[lane_index + 1].left - 0.25 * tolerance:
         return False
     return best_lane.left - tolerance <= _bbox_center_x(bbox) <= best_lane.right + max(tolerance, bbox[2] - best_lane.right)
+
+
+def _fits_only_one_lane(
+    bbox: BBox,
+    best_lane: _TextLane,
+    lanes: list[_TextLane],
+    tolerance: float,
+) -> bool:
+    """保留旧内部入口；独立调用仍自行排序，输出与预排序版完全一致。"""
+
+    return _fits_only_one_lane_ordered(
+        bbox,
+        best_lane,
+        sorted(lanes, key=lambda lane: lane.left),
+        tolerance,
+    )
 
 
 def _expand_nested_lane_intervals_from_members(
@@ -733,6 +750,10 @@ def _reattach_cross_lane_short_tails(
     median_height: float,
 ) -> None:
     """按纵向事件复用各栏最近前序行；特殊输入交给原逐次扫描实现。"""
+    # 只有一个栏带时不存在“跨栏”归属，直接跳过输入校验和前序扫描；
+    # 这不改变成员、顺序或边界，也能让常见单栏页面避开整页重复遍历。
+    if len(lanes) < 2:
+        return
     pending = []
     seen_lines, seen_indices = set(), set()
     for lane_index, lane in enumerate(lanes):

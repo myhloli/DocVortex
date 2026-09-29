@@ -916,6 +916,55 @@ def test_deferred_rule_candidates_match_eager_merge(monkeypatch, centered):
     assert pickle.dumps((rows, lines, rules)) == before
 
 
+def test_deferred_rule_candidates_share_frozen_grid_components(monkeypatch):
+    """确认延迟候选冻结的网格分量可被闭合网格检测复用而不重复扫描。"""
+    rows, lines, axis_lines = _rule_table_fixture()
+    original = table_rules._connected_rule_grid_components
+    calls = []
+
+    def counted(*args, **kwargs):
+        """只计数连通分量重建次数，不改变任何几何结果。"""
+        calls.append(1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(table_rules, "_connected_rule_grid_components", counted)
+    drafts = table_rules._build_rule_table_candidates(
+        rows,
+        lines,
+        (150.0, 100.0),
+        0,
+        5.0,
+        axis_lines,
+        defer_materialization=True,
+    )
+    assert drafts
+    assert len(calls) == 1
+    shared = drafts[0].context.grid_components
+    assert shared is not None
+    closed = table_rules._build_closed_rule_grid_candidates(
+        rows,
+        lines,
+        (150.0, 100.0),
+        0,
+        5.0,
+        axis_lines,
+        [],
+        None,
+        grid_components=shared,
+    )
+    assert len(calls) == 1
+    assert closed == table_rules._build_closed_rule_grid_candidates(
+        rows,
+        lines,
+        (150.0, 100.0),
+        0,
+        5.0,
+        axis_lines,
+        [],
+        None,
+    )
+
+
 def test_rule_table_candidate_accepts_center_aligned_columns_with_varying_widths() -> None:
     """验证左右边界变化但中心稳定的两列表格仍可形成候选。"""
 
