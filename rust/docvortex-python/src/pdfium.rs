@@ -235,6 +235,7 @@ pub fn read_pdfium_path_evidence(
         ));
     }
     let hypot = py.import("math")?.getattr("hypot")?;
+    let round = py.import("builtins")?.getattr("round")?;
     let records = unsafe {
         docvortex_pdfium::path_evidence::read_path_evidence_with_hypot(
             addresses,
@@ -249,6 +250,13 @@ pub fn read_pdfium_path_evidence(
                 hypot
                     .call1((x, y))
                     .and_then(|value| value.extract::<f64>())
+                    .unwrap_or(f64::NAN)
+            },
+            // 仅开放四角 Path 进入此回调，保留 Python round(value, 3) 的临界值语义。
+            |value: f64| {
+                round
+                    .call1((value, 3))
+                    .and_then(|result| result.extract::<f64>())
                     .unwrap_or(f64::NAN)
             },
         )

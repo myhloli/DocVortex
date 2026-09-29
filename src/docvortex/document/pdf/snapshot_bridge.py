@@ -61,28 +61,6 @@ def _standard_character_symbols():
     return (functions, addresses), None
 
 
-def _standard_page_text_symbols():
-    """核验 Rust 短暂加载、计数和关闭 textpage 的三个页面级函数。"""
-    specs = (
-        ("FPDFText_LoadPage", raw.FPDF_TEXTPAGE, (raw.FPDF_PAGE,)),
-        ("FPDFText_ClosePage", None, (raw.FPDF_TEXTPAGE,)),
-        ("FPDFText_CountChars", ct.c_int, (raw.FPDF_TEXTPAGE,)),
-    )
-    functions, addresses = [], []
-    for name, result, arguments in specs:
-        function = getattr(raw, name, None)
-        if (
-            not isinstance(function, ct._CFuncPtr)
-            or function.restype is not result
-            or tuple(function.argtypes or ()) != arguments
-            or getattr(function, "errcheck", None) is not None
-        ):
-            return None, f"unsupported page text symbol or ABI: {name}"
-        functions.append(function)
-        addresses.append(ct.cast(function, ct.c_void_p).value)
-    return (functions, addresses), None
-
-
 def _color_symbols():
     """核验隐藏文字判定所需的填充和描边颜色函数。"""
     uint_pointer = ct.POINTER(ct.c_uint)
@@ -113,8 +91,8 @@ def _color_symbols():
     return (functions, addresses), None
 
 
-def _ordinary_snapshot_arguments(source, raw_handle, frame, rotation, extended, visibility):
-    """集中执行两个入口共用的类型、数值和可见性输入检查。"""
+def _ordinary_snapshot_arguments(raw_handle, frame, rotation, extended, visibility):
+    """校验 textpage 快照的类型、数值和可见性输入。"""
     if (
         not raw_handle
         or type(extended) is not bool
@@ -128,7 +106,6 @@ def _ordinary_snapshot_arguments(source, raw_handle, frame, rotation, extended, 
         and 0 in visibility
     ):
         return False
-    del source
     return True
 
 
@@ -143,14 +120,14 @@ def _record_snapshot_result(snapshot, count):
 
 
 def read_text_snapshot(textpage, frame, rotation, extended, visibility=None):
-    """在原锁和 Python textpage 生命周期内读取、规范化与去重，保留兼容测试入口。"""
+    """在原锁和 Python textpage 生命周期内读取、规范化与去重。"""
     global _REASON
     native = get_native()
     if native is None or not hasattr(native, "read_pdfium_text_snapshot"):
         _REASON = "Python backend or native text snapshot unavailable"
         return None
     if type(textpage) is not pdfium.PdfTextPage or not _ordinary_snapshot_arguments(
-        textpage, textpage.raw, frame, rotation, extended, visibility
+        textpage.raw, frame, rotation, extended, visibility
     ):
         _REASON = "nonstandard text page, numerical metadata, or visibility"
         return None
@@ -188,49 +165,3 @@ def read_text_snapshot(textpage, frame, rotation, extended, visibility=None):
         return None
     _REASON = None
     return _record_snapshot_result(snapshot, count)
-
-
-def read_page_text_snapshot(page, frame, rotation, extended, visibility=None):
-    """让 Rust 在宿主锁内短暂加载并关闭 textpage，避免原生路径创建 Python 包装。"""
-    global _REASON
-    native = get_native()
-    if native is None or not hasattr(native, "read_pdfium_page_text_snapshot"):
-        _REASON = "Python backend or native page text snapshot unavailable"
-        return None
-    if type(page) is not pdfium.PdfPage or not _ordinary_snapshot_arguments(
-        page, page.raw, frame, rotation, extended, visibility
-    ):
-        _REASON = "nonstandard PDF page, numerical metadata, or visibility"
-        return None
-    characters, character_reason = _standard_character_symbols()
-    colors, color_reason = _color_symbols()
-    page_text, page_reason = _standard_page_text_symbols()
-    if characters is None or colors is None or page_text is None:
-        _REASON = character_reason or color_reason or page_reason
-        return None
-    character_functions, character_addresses = characters
-    color_functions, color_addresses = colors
-    page_functions, page_addresses = page_text
-    packed_visibility = (
-        {0 if key is None else key: value for key, value in visibility.items()} if visibility is not None else None
-    )
-    # 页面由调用方保活；Rust 仅在同锁作用内创建和关闭 textpage，不延长任何句柄。
-    with pdfium_guard():
-        try:
-            snapshot = native.read_pdfium_page_text_snapshot(
-                page_addresses,
-                ct.cast(page.raw, ct.c_void_p).value,
-                character_addresses,
-                color_addresses,
-                extended,
-                frame,
-                rotation,
-                packed_visibility,
-            )
-        except native.PdfiumReadError as exc:
-            raise pdfium.PdfiumError(str(exc)) from exc
-    if snapshot is None:
-        _REASON = "raw PDF numerical metadata outside native canonical admission"
-        return None
-    _REASON = None
-    return _record_snapshot_result(snapshot, snapshot.raw_char_count())

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import random
+import ctypes
 from importlib import import_module
 
 import pytest
@@ -221,6 +222,8 @@ def _open_filled_path_pdf(path_commands: bytes) -> bytes:
         (b"20 20 m 30 20 l 30 21 l 30 20 l f", 0),
         # 对象矩阵会把两条局部斜边转换为轴对齐边，应按转换后的线段判定。
         (b"q 1 0 -2 1 40 0 cm 20 20 m 30 20 l 32 21 l 22 21 l f Q", 1),
+        # Python round(x, 3) 与 Rust 先乘千再取整在这个角点上不同。
+        (b"20.0625 20 m 70.0625 20 l 70.0625 21 l 20.062498 21 l f", 1),
     ],
 )
 def test_native_open_filled_path_edges_match_reference(monkeypatch, path_commands, expected_line_count) -> None:
@@ -242,8 +245,44 @@ def test_native_open_filled_path_edges_match_reference(monkeypatch, path_command
     assert native_lines == reference_lines
     assert native_infos == reference_infos
     assert len(native_lines) == expected_line_count
+    with PDFDocument(_open_filled_path_pdf(path_commands)) as document:
+        native_page = document.get_page_vector_geometry(0)
+    with monkeypatch.context() as reference:
+        reference.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
+        with PDFDocument(_open_filled_path_pdf(path_commands)) as document:
+            reference_page = document.get_page_vector_geometry(0)
+    assert native_page == reference_page
     if get_native() is not None and hasattr(get_native(), "read_pdfium_path_evidence"):
         assert backend_info()["pdfium_path_evidence_bridge_calls"] > calls_before
+
+
+def test_native_path_failed_fill_color_keeps_unknown_rgba(monkeypatch) -> None:
+    """颜色查询失败仍按不透明判可见，但 Path 摘要不能伪造黑色填充。"""
+    import pypdfium2.raw as raw
+
+    from docvortex._compute_backend import get_native
+    from docvortex.analyzers.native.pdf.code_blocks import _path_has_visible_nonwhite_fill
+    from docvortex.document.pdf import _object_bridge
+    from docvortex.document.pdf.native_coordinates import _normalize_pdf_page_bbox
+
+    if get_native() is None:
+        pytest.skip("需要 Rust Path bridge 进行失败颜色差分")
+    original = raw.FPDFPageObj_GetFillColor
+    callback_type = ctypes.WINFUNCTYPE if hasattr(ctypes, "WINFUNCTYPE") else ctypes.CFUNCTYPE
+    failed_color = callback_type(original.restype, *original.argtypes)(lambda *_args: 0)
+    monkeypatch.setattr(raw, "FPDFPageObj_GetFillColor", failed_color)
+    payload = _open_filled_path_pdf(b"20 20 m 70 20 l 70 21 l 20 21 l f")
+    with PDFDocument(payload) as document:
+        with document._open_page(0) as page:
+            bbox = _normalize_pdf_page_bbox(page.get_bbox())
+            native_lines, native_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+            with monkeypatch.context() as reference:
+                reference.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
+                reference_lines, reference_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+    assert native_lines == reference_lines
+    assert native_infos == reference_infos
+    assert len(native_infos) == 1 and native_infos[0].fill_rgba is None
+    assert not _path_has_visible_nonwhite_fill(native_infos[0])
 
 
 def test_drawing_lines_match_vector_and_snapshot_entries() -> None:

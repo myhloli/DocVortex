@@ -267,6 +267,8 @@ def test_coerce_bbox_owned_fast_path_matches_general_input():
         Bbox([3.0, 4.0, 1.0, 2.0]),
         Bbox([1.0, math.nan, 3.0, 4.0]),
         Bbox([1, 2, 3, 4]),
+        Bbox([None, 2.0, 3.0, 4.0]),
+        Bbox(["1", 2.0, 3.0, 4.0]),
         (1.0, 2.0, 3.0, 4.0),
     ]
     for value in cases:

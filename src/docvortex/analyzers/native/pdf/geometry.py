@@ -147,9 +147,9 @@ def _coerce_bbox(value: Any) -> BBox | None:
         if (
             type(raw) is list
             and len(raw) == 4
+            and all(type(item) is float and math.isfinite(item) for item in raw)
             and raw[0] < raw[2]
             and raw[1] < raw[3]
-            and all(type(item) is float and math.isfinite(item) for item in raw)
         ):
             return (raw[0], raw[1], raw[2], raw[3])
     try:

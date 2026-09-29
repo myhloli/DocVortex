@@ -50,6 +50,19 @@ def test_protocol_and_invalid_mode(monkeypatch):
         backend.get_native()
 
 
+@pytest.mark.parametrize("mode", ["auto", "rust"])
+def test_protocol_28_obeys_backend_selection(monkeypatch, mode):
+    """旧协议 28 在 auto 下回退，在显式 rust 下报告扩展不兼容。"""
+    monkeypatch.setattr(backend.importlib, "import_module", Mock(return_value=SimpleNamespace(PROTOCOL_VERSION=28)))
+    monkeypatch.setenv("DOCVORTEX_COMPUTE_BACKEND", mode)
+    if mode == "auto":
+        assert backend.get_native() is None
+        assert "protocol mismatch" in backend.backend_info()["unavailable_reason"]
+    else:
+        with pytest.raises(RuntimeError, match="compatible"):
+            backend.get_native()
+
+
 def test_unexpected_import_error_is_not_hidden(monkeypatch):
     """扩展自身代码错误不能被自动回退掩盖。"""
     monkeypatch.setenv("DOCVORTEX_COMPUTE_BACKEND", "auto")

@@ -164,6 +164,7 @@ struct GeometryRecord {
     source: SourceRow,
     family: String,
     font_size: f64,
+    rounded_font_size: f64,
     flags: i32,
     weight: i32,
     script: String,
@@ -196,63 +197,6 @@ pub fn geometry_evidence_stats() -> (u64, u64, u64) {
         GEOMETRY_EVIDENCE_LINES.load(Ordering::Relaxed),
         GEOMETRY_EVIDENCE_FALLBACKS.load(Ordering::Relaxed),
     )
-}
-
-/// 由 Rust 短暂持有并释放 textpage，字符规范化仍复用同一个自有快照构建入口。
-#[pyfunction]
-pub fn read_pdfium_page_text_snapshot(
-    py: Python<'_>,
-    page_addresses: [usize; 3],
-    page_handle: usize,
-    addresses: Vec<usize>,
-    color_addresses: [usize; 2],
-    extended: bool,
-    frame: [f64; 4],
-    rotation: i32,
-    visibility: Option<HashMap<usize, (bool, Option<[f64; 4]>)>>,
-) -> PyResult<Option<NativeTextSnapshot>> {
-    if page_addresses.contains(&0) || page_handle == 0 {
-        return Err(PyValueError::new_err("invalid PDFium page text handle"));
-    }
-    // 安全条件：页面句柄、三个 textpage 函数和后续字符函数均来自同一运行库，并由宿主锁串行化。
-    let (text_handle, count) = unsafe {
-        let load: unsafe extern "system" fn(usize) -> usize =
-            std::mem::transmute(page_addresses[0]);
-        let close: unsafe extern "system" fn(usize) = std::mem::transmute(page_addresses[1]);
-        let count_chars: unsafe extern "system" fn(usize) -> i32 =
-            std::mem::transmute(page_addresses[2]);
-        let text_handle = load(page_handle);
-        if text_handle == 0 {
-            return Err(read_error(ReadError::Pdfium(
-                "Failed to load PDFium text page.",
-            )));
-        }
-        let count = count_chars(text_handle);
-        if count < 0 {
-            close(text_handle);
-            return Err(read_error(ReadError::Pdfium(
-                "negative PDFium character count",
-            )));
-        }
-        (text_handle, count as usize)
-    };
-    let result = read_pdfium_text_snapshot(
-        py,
-        addresses,
-        color_addresses,
-        text_handle,
-        count,
-        extended,
-        frame,
-        rotation,
-        visibility,
-    );
-    // 构建成功或失败都先关闭本次 Rust 加载的 textpage，产物只保留纯数值。
-    unsafe {
-        let close: unsafe extern "system" fn(usize) = std::mem::transmute(page_addresses[1]);
-        close(text_handle);
-    }
-    result
 }
 
 /// 同步借用 PDFium 读取原始字符；函数和句柄由已核验 ABI 的宿主 guard 保活。
@@ -466,11 +410,12 @@ impl NativeTextSnapshot {
     ) -> PyResult<Option<NativeGeometryEvidence>> {
         let char_geometry = py.import("docvortex.analyzers.native.pdf.char_geometry")?;
         let script_group = char_geometry.getattr("_script_group")?;
+        let is_anchor_text = char_geometry.getattr("_is_anchor_text")?;
         let normalize = char_geometry.getattr("_normalized_font_family")?;
         let round = py.import("builtins")?.getattr("round")?;
         let mut groups: HashMap<String, (String, bool)> = HashMap::new();
         let mut families: HashMap<String, String> = HashMap::new();
-        let mut font_metadata: HashMap<usize, (String, f64, i32, i32)> = HashMap::new();
+        let mut font_metadata: HashMap<usize, (String, f64, f64, i32, i32)> = HashMap::new();
         let mut records = Vec::with_capacity(self.data.chars.len());
         for ch in &self.data.chars {
             let font = &self.data.fonts[ch.font];
@@ -496,7 +441,8 @@ impl NativeTextSnapshot {
                 let rounded_size: f64 =
                     round.call1((font.size * 4.0,))?.extract::<i64>()? as f64 / 4.0;
                 let weight: i64 = round.call1((f64::from(font.weight) / 100.0,))?.extract()?;
-                let value = (family, rounded_size, font.flags, weight as i32);
+                // 分组使用取整字号，风险阈值仍须消费 PDFium 的原始字号。
+                let value = (family, font.size, rounded_size, font.flags, weight as i32);
                 font_metadata.insert(ch.font, value.clone());
                 value
             };
@@ -504,7 +450,8 @@ impl NativeTextSnapshot {
                 value.clone()
             } else {
                 let group: String = script_group.call1((&ch.text,))?.extract()?;
-                let value = (group.clone(), group != "other");
+                let anchor: bool = is_anchor_text.call1((&ch.text,))?.extract()?;
+                let value = (group.clone(), anchor);
                 groups.insert(ch.text.clone(), value.clone());
                 value
             };
@@ -512,8 +459,9 @@ impl NativeTextSnapshot {
                 source: (Some(ch.bbox), ch.loose, ch.tight, ch.origin, ch.rotation),
                 family: metadata.0,
                 font_size: metadata.1,
-                flags: metadata.2,
-                weight: metadata.3,
+                rounded_font_size: metadata.2,
+                flags: metadata.3,
+                weight: metadata.4,
                 script,
                 anchor,
             });
@@ -1179,7 +1127,7 @@ impl NativeGeometryEvidence {
             }
             let key: RunKey = (
                 record.family.clone(),
-                geometry_number_key(record.font_size),
+                geometry_number_key(record.rounded_font_size),
                 record.flags,
                 record.weight,
                 angle,

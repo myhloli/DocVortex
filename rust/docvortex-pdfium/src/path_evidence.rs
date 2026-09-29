@@ -113,16 +113,15 @@ unsafe fn path_state(raw: *mut c_void, api: &StateApi) -> PathState {
             raw_stroke_width: 0.0,
         };
     }
-    let mut fill = (0, 0, 0, 255);
-    if fill_mode != 0 {
-        fill = color(raw, api.fill_color);
-    }
-    let mut stroke_rgba = (0, 0, 0, 255);
-    if stroke != 0 {
-        stroke_rgba = color(raw, api.stroke_color);
-    }
-    let fill_visible = fill_mode != 0 && fill.3 > 0;
-    let stroke_visible = stroke != 0 && stroke_rgba.3 > 0;
+    let fill = (fill_mode != 0)
+        .then(|| color(raw, api.fill_color))
+        .flatten();
+    let stroke_rgba = (stroke != 0)
+        .then(|| color(raw, api.stroke_color))
+        .flatten();
+    // 查询失败只为可见性提供不透明 alpha；摘要仍保留颜色未知的 None。
+    let fill_visible = fill_mode != 0 && fill.is_none_or(|rgba| rgba.3 > 0);
+    let stroke_visible = stroke != 0 && stroke_rgba.is_none_or(|rgba| rgba.3 > 0);
     let mut width: c_float = 0.0;
     let raw_stroke_width = if stroke_visible && (api.stroke_width)(raw, &mut width) != 0 {
         let value = f64::from(width).abs();
@@ -137,18 +136,18 @@ unsafe fn path_state(raw: *mut c_void, api: &StateApi) -> PathState {
     PathState {
         fill_visible,
         stroke_visible,
-        fill_rgba: fill_visible.then_some(fill),
+        fill_rgba: if fill_visible { fill } else { None },
         raw_stroke_width,
     }
 }
 
-/// 调用一个 PDFium 颜色函数；失败时保持 alpha=255 的参考语义。
-unsafe fn color(raw: *mut c_void, getter: ColorFn) -> Rgba {
+/// 调用 PDFium 颜色函数；失败时保留未知颜色，由可见性判断单独回退 alpha。
+unsafe fn color(raw: *mut c_void, getter: ColorFn) -> Option<Rgba> {
     let (mut red, mut green, mut blue, mut alpha) = (0, 0, 0, 255);
     if getter(raw, &mut red, &mut green, &mut blue, &mut alpha) == 0 {
-        return (0, 0, 0, 255);
+        return None;
     }
-    (red, green, blue, alpha)
+    Some((red, green, blue, alpha))
 }
 
 /// 一次转换整个子路径，避免绘图线和路径摘要重复矩阵乘法。
@@ -279,7 +278,11 @@ fn axis_line(start: (f64, f64), end: (f64, f64), width: f64, page: (f64, f64)) -
 }
 
 /// 把闭合或参考实现认可的开放细长填充子路径折叠为中心线。
-fn thin_filled_line(subpath: &PreparedSubpath, page: (f64, f64)) -> Option<Line> {
+fn thin_filled_line<R: Fn(f64) -> f64>(
+    subpath: &PreparedSubpath,
+    page: (f64, f64),
+    round3: &R,
+) -> Option<Line> {
     if subpath.points.len() < 4 {
         return None;
     }
@@ -294,7 +297,7 @@ fn thin_filled_line(subpath: &PreparedSubpath, page: (f64, f64)) -> Option<Line>
         y1 = maximum(y1, y);
     }
     let (width, height) = (x1 - x0, y1 - y0);
-    if !subpath.closed && !open_thin_rectangle(subpath, x0, x1, y0, y1) {
+    if !subpath.closed && !open_thin_rectangle(subpath, x0, x1, y0, y1, round3) {
         return None;
     }
     let long_side = width.max(height);
@@ -320,18 +323,25 @@ fn thin_filled_line(subpath: &PreparedSubpath, page: (f64, f64)) -> Option<Line>
 }
 
 /// 仅接纳参考实现允许的开放四点三边轴对齐矩形。
-fn open_thin_rectangle(subpath: &PreparedSubpath, x0: f64, x1: f64, y0: f64, y1: f64) -> bool {
+fn open_thin_rectangle<R: Fn(f64) -> f64>(
+    subpath: &PreparedSubpath,
+    x0: f64,
+    x1: f64,
+    y0: f64,
+    y1: f64,
+    round3: &R,
+) -> bool {
     if subpath.points.len() != 4 || subpath.raw.lines.len() != 3 {
         return false;
     }
     let rounded = subpath
         .points
         .iter()
-        .map(|&(x, y)| ((x * 1000.0).round() / 1000.0, (y * 1000.0).round() / 1000.0))
+        .map(|&(x, y)| (round3(x), round3(y)))
         .collect::<Vec<_>>();
     let expected = [(x0, y0), (x0, y1), (x1, y0), (x1, y1)]
         .into_iter()
-        .map(|(x, y)| ((x * 1000.0).round() / 1000.0, (y * 1000.0).round() / 1000.0))
+        .map(|(x, y)| (round3(x), round3(y)))
         .collect::<Vec<_>>();
     // 与参考实现的集合相等语义保持一致：四个角点必须全部出现，缺失角点的退化开放路径不能折叠。
     if expected.iter().any(|point| !rounded.contains(point))
@@ -347,15 +357,17 @@ fn open_thin_rectangle(subpath: &PreparedSubpath, x0: f64, x1: f64, y0: f64, y1:
 }
 
 /// 生成单个 Path 的绘图线候选，不应用对象裁剪。
-fn object_lines_with<H>(
+fn object_lines_with<H, R>(
     prepared: &[PreparedSubpath],
     state: &PathState,
     matrix: [f64; 6],
     page: (f64, f64),
     hypot: &H,
+    round3: &R,
 ) -> Vec<Line>
 where
     H: Fn(f64, f64) -> f64,
+    R: Fn(f64) -> f64,
 {
     let mut output = Vec::new();
     if !state.fill_visible && !state.stroke_visible {
@@ -363,7 +375,7 @@ where
     }
     for subpath in prepared {
         if state.fill_visible {
-            if let Some(line) = thin_filled_line(subpath, page) {
+            if let Some(line) = thin_filled_line(subpath, page, round3) {
                 output.push(line);
                 continue;
             }
@@ -527,7 +539,7 @@ fn clipped_line(
 /// # Safety
 /// 调用方须验证全部 20 个函数 ABI，并持有同一 PDFium 页面、运行库和全局锁。
 #[allow(clippy::too_many_arguments)]
-pub unsafe fn read_path_evidence_with_hypot<H: Fn(f64, f64) -> f64>(
+pub unsafe fn read_path_evidence_with_hypot<H: Fn(f64, f64) -> f64, R: Fn(f64) -> f64>(
     addresses: Vec<usize>,
     handle: usize,
     frame: [f64; 4],
@@ -536,6 +548,7 @@ pub unsafe fn read_path_evidence_with_hypot<H: Fn(f64, f64) -> f64>(
     want_lines: bool,
     want_infos: bool,
     hypot: H,
+    round3: R,
 ) -> Result<Evidence, ReadError> {
     if addresses.len() != 20
         || addresses.contains(&0)
@@ -591,7 +604,7 @@ pub unsafe fn read_path_evidence_with_hypot<H: Fn(f64, f64) -> f64>(
             .map(|subpath| prepare_subpath(subpath, matrix, frame, rotation))
             .collect();
         if want_lines {
-            for line in object_lines_with(&prepared, &state, matrix, page, &hypot) {
+            for line in object_lines_with(&prepared, &state, matrix, page, &hypot, &round3) {
                 if let Some(line) = clipped_line(line, clip, frame, rotation) {
                     lines.push(line);
                 }

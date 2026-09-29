@@ -67,10 +67,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(
-        snapshot::read_pdfium_page_text_snapshot,
-        module
-    )?)?;
-    module.add_function(wrap_pyfunction!(
         snapshot::visual_evidence_stage_stats,
         module
     )?)?;

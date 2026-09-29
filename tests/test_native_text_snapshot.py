@@ -12,12 +12,14 @@ from unittest.mock import patch
 import pytest
 import pypdfium2 as pdfium
 from reportlab.pdfgen.canvas import Canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
 from docvortex._compute_backend import get_native
 from docvortex.document.pdf import PDFDocument
 from docvortex.document.pdf.pdfium import pdfium_guard
 from docvortex.document.pdf.native_text_geometry import _extract_page_text_geometry
-from docvortex.document.pdf.snapshot_bridge import read_page_text_snapshot, read_text_snapshot, snapshot_bridge_info
+from docvortex.document.pdf.snapshot_bridge import read_text_snapshot, snapshot_bridge_info
 from docvortex.document.pdf.text import _get_lines_from_chars_python
 from docvortex.document.pdf.text._contracts import Bbox
 from docvortex.analyzers.native.pdf.native_text import (
@@ -215,6 +217,67 @@ def test_owned_geometry_risk_matches_line_reference(native):
     assert fallback == expected
 
 
+@pytest.mark.parametrize(
+    ("font_size", "line_height", "style_risk"),
+    [(9.9, 14.925, True), (10.1, 15.075, False)],
+)
+def test_owned_geometry_uses_raw_font_size_for_style_risk(native, font_size, line_height, style_risk):
+    """分组字号取整不能改变原始字号参与的跨页样式膨胀阈值。"""
+    from docvortex.analyzers.native.pdf import char_geometry, pipeline
+
+    output = BytesIO()
+    canvas = Canvas(output, pagesize=(200, 200))
+    for _page in range(2):
+        canvas.setFont("Helvetica", font_size)
+        for y in (150, 120, 90):
+            canvas.drawString(20, y, "AAAA")
+        canvas.showPage()
+    canvas.save()
+
+    lines_by_page, geometries, owned_inputs = [], [], []
+    with PDFDocument(output.getvalue()) as document:
+        for page_index in range(2):
+            page = document._extract_native_page(page_index)
+            geometry, records = page.native_text.prepare_visual_evidence(page.page_size, page.rotation, (0.0, 90.0, 270.0))
+            lines = _build_native_line_items_from_records(records, page.page_size)
+            for line in lines:
+                line.effective_height = line_height
+            lines_by_page.append(lines)
+            geometries.append(geometry)
+            owned_inputs.append(pipeline._prepare_owned_geometry_evidence(page.native_text, geometry.chars))
+    args = (lines_by_page, geometries, [(200.0, 200.0)] * 2)
+    expected = char_geometry._document_requires_full_geometry(*args)
+    actual = char_geometry._document_requires_full_geometry(*args, owned_geometry_inputs=owned_inputs)
+    assert expected.style is style_risk
+    assert actual == expected
+
+
+def test_owned_geometry_excludes_cjk_punctuation_from_anchors(native):
+    """日文中点虽归入 cjk 文字组，仍不能作为几何风险锚点。"""
+    from docvortex.analyzers.native.pdf import char_geometry, pipeline
+    from docvortex.analyzers.native.pdf.models import _LineItem
+
+    pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
+    output = BytesIO()
+    canvas = Canvas(output, pagesize=(200, 200))
+    canvas.setFont("HeiseiKakuGo-W5", 12)
+    for y in (140, 120):
+        canvas.drawString(20, y, "・・・")
+    canvas.save()
+    with PDFDocument(output.getvalue()) as document:
+        page = document._extract_native_page(0)
+        geometry = page.native_text.materialize_geometry()
+        members = [char for char in geometry.chars if char["char"] == "・"]
+        owned = pipeline._prepare_owned_geometry_evidence(page.native_text, geometry.chars)
+    assert len(members) == 6
+    line = _LineItem("・・・・・・", (20.0, 45.0, 60.0, 90.0), 0, 0, chars=members, effective_height=12.0)
+    args = ([[line]], [geometry], [(200.0, 200.0)])
+    expected = char_geometry._document_requires_full_geometry(*args)
+    actual = char_geometry._document_requires_full_geometry(*args, owned_geometry_inputs=[owned])
+    assert expected.layout is False
+    assert actual == expected
+
+
 def test_owned_geometry_fallback_restarts_reference_run_namespace(native, monkeypatch):
     """启用 owned 通道后任一行失配必须整体重启参考路径，禁止两个从 0 起的 run 编号空间混用。"""
     from copy import deepcopy
@@ -272,18 +335,25 @@ def test_owned_table_and_geometry_evidence_match_reference(native, monkeypatch):
     assert after_geometry[2] == before_geometry[2]
 
 
-def test_page_snapshot_bridge_loads_and_closes_textpage(native):
-    """页面级入口不创建 Python textpage，并与兼容入口保持完整快照等价。"""
-    with (
-        pdfium_guard(),
-        pdfium.PdfDocument(_pdf()) as document,
-        closing(document[0]) as page,
-        closing(page.get_textpage()) as textpage,
-    ):
+def test_python_textpage_wrapper_is_closed_after_native_snapshot(native, monkeypatch):
+    """回退生命周期迁移后，页面只创建一次 Python textpage 并在快照后关闭。"""
+    with pdfium_guard(), pdfium.PdfDocument(_pdf()) as document, closing(document[0]) as page:
+        original = page.get_textpage
+        textpages = []
+
+        def tracked_textpage():
+            """记录本次页面创建的 Python 包装，以核对退出后的句柄状态。"""
+            result = original()
+            textpages.append(result)
+            return result
+
+        monkeypatch.setattr(page, "get_textpage", tracked_textpage)
         before = snapshot_bridge_info()["native_text_snapshot_calls"]
-        expected = read_text_snapshot(textpage, list(page.get_bbox()), 0, True)
-        actual = read_page_text_snapshot(page, list(page.get_bbox()), 0, True)
+        actual = _extract_page_text_geometry(page, include_extended_geometry=True, compact=True)
         assert isinstance(actual, native.NativeTextSnapshot)
+        assert len(textpages) == 1 and textpages[0].raw is None
+        with closing(original()) as textpage:
+            expected = read_text_snapshot(textpage, list(page.get_bbox()), 0, True)
         assert actual.raw_char_count() == expected.raw_char_count()
         assert _plain(actual.materialize_geometry()) == _plain(expected.materialize_geometry())
         assert snapshot_bridge_info()["native_text_snapshot_calls"] == before + 2
@@ -457,7 +527,7 @@ def test_owned_probe_does_not_materialize_reference_on_unsupported_metadata(nati
     """原生数值准入失败后只返回能力选择，不提前做一遍宿主随后还会重复的字符提取。"""
     with (
         PDFDocument(_pdf()) as document,
-        patch("docvortex.document.pdf.snapshot_bridge.read_page_text_snapshot", return_value=None),
+        patch("docvortex.document.pdf.snapshot_bridge.read_text_snapshot", return_value=None),
         patch(
             "docvortex.document.pdf.native_text_geometry.get_chars", side_effect=AssertionError("reference materialized twice")
         ),
