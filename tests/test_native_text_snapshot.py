@@ -16,7 +16,7 @@ from docvortex._compute_backend import get_native
 from docvortex.document.pdf import PDFDocument
 from docvortex.document.pdf.pdfium import pdfium_guard
 from docvortex.document.pdf.native_text_geometry import _extract_page_text_geometry
-from docvortex.document.pdf.snapshot_bridge import read_text_snapshot, snapshot_bridge_info
+from docvortex.document.pdf.snapshot_bridge import read_page_text_snapshot, read_text_snapshot, snapshot_bridge_info
 from docvortex.document.pdf.text import _get_lines_from_chars_python
 from docvortex.document.pdf.text._contracts import Bbox
 from docvortex.analyzers.native.pdf.native_text import (
@@ -191,6 +191,24 @@ def test_snapshot_special_metadata_selects_reference_before_calculation(native):
         assert "nonstandard" in snapshot_bridge_info()["native_text_snapshot_unavailable_reason"]
 
 
+def test_page_snapshot_bridge_loads_and_closes_textpage(native):
+    """页面级入口不创建 Python textpage，并与兼容入口保持完整快照等价。"""
+    with (
+        pdfium_guard(),
+        pdfium.PdfDocument(_pdf()) as document,
+        closing(document[0]) as page,
+        closing(page.get_textpage()) as textpage,
+    ):
+        before = snapshot_bridge_info()["native_text_snapshot_calls"]
+        expected = read_text_snapshot(textpage, list(page.get_bbox()), 0, True)
+        actual = read_page_text_snapshot(page, list(page.get_bbox()), 0, True)
+        assert isinstance(actual, native.NativeTextSnapshot)
+        assert actual.raw_char_count() == expected.raw_char_count()
+        assert _plain(actual.materialize_geometry()) == _plain(expected.materialize_geometry())
+        assert snapshot_bridge_info()["native_text_snapshot_calls"] == before + 2
+        assert snapshot_bridge_info()["native_text_snapshot_unavailable_reason"] is None
+
+
 def test_snapshot_keeps_public_geometry_dataclass_shape(native):
     """公开geometry仍只有原四字段；显式修改的geometry不能被快照旁路覆盖。"""
     from docvortex.analyzers.pdf import prepare_text_evidence
@@ -358,7 +376,7 @@ def test_owned_probe_does_not_materialize_reference_on_unsupported_metadata(nati
     """原生数值准入失败后只返回能力选择，不提前做一遍宿主随后还会重复的字符提取。"""
     with (
         PDFDocument(_pdf()) as document,
-        patch("docvortex.document.pdf.snapshot_bridge.read_text_snapshot", return_value=None),
+        patch("docvortex.document.pdf.snapshot_bridge.read_page_text_snapshot", return_value=None),
         patch(
             "docvortex.document.pdf.native_text_geometry.get_chars", side_effect=AssertionError("reference materialized twice")
         ),
