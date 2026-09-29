@@ -750,6 +750,10 @@ def _document_requires_full_geometry(lines_by_page, geometries, page_sizes, *, o
                     page_size,
                     line.angle,
                 )
+            elif owned_geometry_inputs is not None:
+                # 回退行与 owned 批次分用两个从 0 起的 run 编号空间，混入同一风险器会合并无关
+                # run、拆散同一 run；启用 owned 通道的文档任一行失配即整体回到参考路径。
+                return _document_requires_full_geometry_python(lines_by_page, geometries, page_sizes)
             else:
                 font_metadata = _ReadOnlyFontCache()
                 entries = []

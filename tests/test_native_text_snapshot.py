@@ -215,6 +215,38 @@ def test_owned_geometry_risk_matches_line_reference(native):
     assert fallback == expected
 
 
+def test_owned_geometry_fallback_restarts_reference_run_namespace(native, monkeypatch):
+    """启用 owned 通道后任一行失配必须整体重启参考路径，禁止两个从 0 起的 run 编号空间混用。"""
+    from copy import deepcopy
+    from docvortex.analyzers.native.pdf import char_geometry, pipeline
+
+    with PDFDocument(_pdf(long=True)) as document:
+        private = document._extract_native_page(0)
+        geometry, records = private.native_text.prepare_visual_evidence(private.page_size, private.rotation, (0.0, 90.0, 270.0))
+        lines = _build_native_line_items_from_records(records, private.page_size)
+        owned = pipeline._prepare_owned_geometry_evidence(private.native_text, geometry.chars)
+    expected = char_geometry._document_requires_full_geometry([lines], [geometry], [private.page_size])
+
+    reference = char_geometry._document_requires_full_geometry_python
+    calls = []
+
+    def spy(*args, **kwargs):
+        calls.append(args)
+        return reference(*args, **kwargs)
+
+    monkeypatch.setattr(char_geometry, "_document_requires_full_geometry_python", spy)
+    broken = deepcopy(lines)
+    broken[0].chars = [dict(broken[0].chars[0])]
+    identity_miss = char_geometry._document_requires_full_geometry(
+        [broken], [geometry], [private.page_size], owned_geometry_inputs=[owned]
+    )
+    page_missing = char_geometry._document_requires_full_geometry(
+        [lines], [geometry], [private.page_size], owned_geometry_inputs=[None]
+    )
+    assert [call[0] for call in calls] == [[broken], [lines]]
+    assert identity_miss == expected and page_missing == expected
+
+
 def test_owned_table_and_geometry_evidence_match_reference(native, monkeypatch):
     """表格脚本与全文几何 owned 输入必须与逐行参考输出完全一致。"""
     from docvortex.analyzers.native.pdf import pipeline
