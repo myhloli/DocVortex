@@ -157,6 +157,8 @@ def test_drawing_lines_skip_path_info_construction(monkeypatch) -> None:
 
 def test_path_dual_consumption_reads_draw_state_once(monkeypatch) -> None:
     """同一 Path 同时产出线与摘要时，绘制状态只允许读取一次。"""
+    from docvortex.document.pdf import _object_bridge
+
     original = native_objects._get_path_visibility
     calls = 0
 
@@ -167,12 +169,81 @@ def test_path_dual_consumption_reads_draw_state_once(monkeypatch) -> None:
         return original(*args, **kwargs)
 
     monkeypatch.setattr(native_objects, "_get_path_visibility", counted)
+    # 联合属性读取是 Python 参考路径的约束；原生批量路径另由桥接命中测试覆盖。
+    monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
     with PDFDocument(_vector_page_pdf(5)) as document:
         vector = document[0].get_vector_geometry()
         lines, path_infos = vector.drawing_lines, vector.path_infos
     assert lines
     assert len(path_infos) == 5
     assert calls == 5
+
+
+def test_native_path_evidence_matches_python_reference(monkeypatch) -> None:
+    """批量原生 Path 证据与逐对象 Python 参考输出逐字段且按顺序一致。"""
+    from docvortex.document.pdf import _object_bridge
+    from docvortex._compute_backend import backend_info, get_native
+    from docvortex.document.pdf.native_coordinates import _normalize_pdf_page_bbox
+
+    original_reader = _object_bridge.read_path_evidence
+    with PDFDocument(_vector_page_pdf(80)) as document:
+        with document._open_page(0) as page:
+            bbox = _normalize_pdf_page_bbox(page.get_bbox())
+            native_lines, native_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+            monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
+            reference_lines, reference_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+
+    monkeypatch.setattr(_object_bridge, "read_path_evidence", original_reader)
+    assert native_lines == reference_lines
+    assert native_infos == reference_infos
+    assert len(native_infos) == 80
+    if get_native() is not None:
+        assert backend_info()["pdfium_path_evidence_bridge_calls"] >= 1
+
+
+def _open_filled_path_pdf(path_commands: bytes) -> bytes:
+    """构造仅包含一个开放填充 Path 的最小 PDF，用于原生/参考差分。"""
+    content = b"0 0 0 rg\n" + path_commands
+    return _pdf(
+        [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 50] /Resources << >> /Contents 4 0 R >>",
+            b"<< /Length %d >>\nstream\n%s\nendstream" % (len(content), content),
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ("path_commands", "expected_line_count"),
+    [
+        # 缺失左上角且重复右下角时，参考实现不接受该开放路径为细矩形。
+        (b"20 20 m 30 20 l 30 21 l 30 20 l f", 0),
+        # 对象矩阵会把两条局部斜边转换为轴对齐边，应按转换后的线段判定。
+        (b"q 1 0 -2 1 40 0 cm 20 20 m 30 20 l 32 21 l 22 21 l f Q", 1),
+    ],
+)
+def test_native_open_filled_path_edges_match_reference(monkeypatch, path_commands, expected_line_count) -> None:
+    """覆盖开放细矩形的角点完整性与矩阵后轴对齐两个后端分歧行为。"""
+    from docvortex.document.pdf import _object_bridge
+    from docvortex._compute_backend import backend_info, get_native
+    from docvortex.document.pdf.native_coordinates import _normalize_pdf_page_bbox
+
+    original_reader = _object_bridge.read_path_evidence
+    calls_before = backend_info()["pdfium_path_evidence_bridge_calls"]
+    with PDFDocument(_open_filled_path_pdf(path_commands)) as document:
+        with document._open_page(0) as page:
+            bbox = _normalize_pdf_page_bbox(page.get_bbox())
+            native_lines, native_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+            monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
+            reference_lines, reference_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+
+    monkeypatch.setattr(_object_bridge, "read_path_evidence", original_reader)
+    assert native_lines == reference_lines
+    assert native_infos == reference_infos
+    assert len(native_lines) == expected_line_count
+    if get_native() is not None and hasattr(get_native(), "read_pdfium_path_evidence"):
+        assert backend_info()["pdfium_path_evidence_bridge_calls"] > calls_before
 
 
 def test_drawing_lines_match_vector_and_snapshot_entries() -> None:

@@ -5,6 +5,7 @@ pub mod classification;
 pub mod drawing_lines;
 pub mod fonts;
 pub mod objects;
+pub mod path_evidence;
 pub mod paths;
 pub mod text_colors;
 
