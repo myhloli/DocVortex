@@ -693,7 +693,7 @@ def _anchor_pair_statistics(rows, positive_source=False):
     return _anchor_pair_statistics_python(rows, positive_source)
 
 
-def _document_requires_full_geometry(lines_by_page, geometries, page_sizes):
+def _document_requires_full_geometry(lines_by_page, geometries, page_sizes, *, owned_geometry_inputs=None):
     """标准数值路径连续累积全文风险，自定义规则明确使用 Python 参考实现。"""
     from ...._compute_backend import get_native
 
@@ -704,7 +704,12 @@ def _document_requires_full_geometry(lines_by_page, geometries, page_sizes):
         or any(globals()[name] is not value for name, value in _RISK_FUNCTIONS.items())
     ):
         return _document_requires_full_geometry_python(lines_by_page, geometries, page_sizes)
+    if owned_geometry_inputs is not None and (
+        type(owned_geometry_inputs) is not list or len(owned_geometry_inputs) != len(lines_by_page)
+    ):
+        owned_geometry_inputs = None
     state = native.NativeGeometryRisk()
+    run_table = native.NativeGeometryRuns() if hasattr(native, "NativeGeometryRuns") else None
     run_ids = {}
     for page_index, (lines, geometry, page_size) in enumerate(zip(lines_by_page, geometries, page_sizes, strict=True)):
         for line in lines:
@@ -720,25 +725,50 @@ def _document_requires_full_geometry(lines_by_page, geometries, page_sizes):
                 )
             ):
                 return _document_requires_full_geometry_python(lines_by_page, geometries, page_sizes)
-            font_metadata = _ReadOnlyFontCache()
-            entries = []
-            for _position, text, _char_idx, char, prepared in _prepared_line_geometry(
-                line, geometry, page_size, anchors_only=True
-            ):
-                key, size = _font_run_key(char, line.angle, text, font_metadata)
-                entries.append((run_ids.setdefault(key, len(run_ids)), prepared[3], prepared[4], prepared[5], size))
-            early = state.add_line(
-                page_index,
-                line.source_index,
-                line.effective_height,
-                bool(
-                    line.angle != 0
-                    or line.formula_candidate_only
-                    or line.restored_inline_cluster
-                    or line.compact_formula_cluster
-                ),
-                entries,
+            skip_y = bool(
+                line.angle != 0 or line.formula_candidate_only or line.restored_inline_cluster or line.compact_formula_cluster
             )
+            owned = owned_geometry_inputs[page_index] if owned_geometry_inputs is not None else None
+            owned_indices = None
+            if owned is not None and run_table is not None:
+                identities = owned[1]
+                if type(line.chars) is not list:
+                    owned_indices = False
+                else:
+                    owned_indices = [identities.get(id(char)) for char in line.chars]
+                    if any(index is None for index in owned_indices):
+                        owned_indices = False
+            if owned_indices is not False and owned is not None and run_table is not None:
+                early = owned[0].add_line(
+                    state,
+                    run_table,
+                    page_index,
+                    line.source_index,
+                    line.effective_height,
+                    skip_y,
+                    owned_indices,
+                    page_size,
+                    line.angle,
+                )
+            elif owned_geometry_inputs is not None:
+                # 回退行与 owned 批次分用两个从 0 起的 run 编号空间，混入同一风险器会合并无关
+                # run、拆散同一 run；启用 owned 通道的文档任一行失配即整体回到参考路径。
+                return _document_requires_full_geometry_python(lines_by_page, geometries, page_sizes)
+            else:
+                font_metadata = _ReadOnlyFontCache()
+                entries = []
+                for _position, text, _char_idx, char, prepared in _prepared_line_geometry(
+                    line, geometry, page_size, anchors_only=True
+                ):
+                    key, size = _font_run_key(char, line.angle, text, font_metadata)
+                    entries.append((run_ids.setdefault(key, len(run_ids)), prepared[3], prepared[4], prepared[5], size))
+                early = state.add_line(
+                    page_index,
+                    line.source_index,
+                    line.effective_height,
+                    skip_y,
+                    entries,
+                )
             if early is None:
                 return _document_requires_full_geometry_python(lines_by_page, geometries, page_sizes)
             if early:
@@ -2050,17 +2080,24 @@ def build_document_geometry_plan(
     lines_by_page: list[list[_LineItem]],
     geometries: list[PDFPageTextGeometry],
     page_sizes: list[tuple[float, float]],
+    *,
+    owned_geometry_inputs: list[Any] | None = None,
 ) -> DocumentGeometryPlan:
     """构建文档级 X 修复、Y trim 与 split shadow 计划。"""
 
     plan = DocumentGeometryPlan()
     if not any(geometry.tight_bboxes and geometry.origins for geometry in geometries):
         return plan
-    risk = _document_requires_full_geometry(
-        lines_by_page,
-        geometries,
-        page_sizes,
-    )
+    if owned_geometry_inputs is None:
+        # 保持既有单页/测试替身签名；只有主链路显式提供页面级 evidence 才传私有参数。
+        risk = _document_requires_full_geometry(lines_by_page, geometries, page_sizes)
+    else:
+        risk = _document_requires_full_geometry(
+            lines_by_page,
+            geometries,
+            page_sizes,
+            owned_geometry_inputs=owned_geometry_inputs,
+        )
     if not risk.any:
         for geometry in geometries:
             geometry.loose_bboxes.clear()

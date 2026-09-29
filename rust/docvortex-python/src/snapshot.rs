@@ -1,6 +1,9 @@
 //! 同库原始读取直接进入自有 canonical 快照，只在兼容边界构造 Python 字符。
+use docvortex_core::geometry_risk::{Entry, RunKey};
 use docvortex_core::{
-    extraction, text_assignment, text_content,
+    extraction,
+    geometry::{self, SourceRow},
+    text_assignment, text_content,
     text_pipeline::{self, TextChar},
     text_snapshot::{
         self as snapshot, Angle, Character, Font, InputCharacter, Properties, SnapshotError,
@@ -155,6 +158,44 @@ fn supported(records: &[Record], frame: [f64; 4]) -> bool {
 pub struct NativeTextSnapshot {
     data: Arc<TextSnapshot>,
     raw_count: usize,
+}
+
+struct GeometryRecord {
+    source: SourceRow,
+    family: String,
+    font_size: f64,
+    flags: i32,
+    weight: i32,
+    script: String,
+    anchor: bool,
+}
+
+#[pyclass(frozen, module = "docvortex._native")]
+pub struct NativeGeometryEvidence {
+    records: Vec<GeometryRecord>,
+}
+
+static GEOMETRY_EVIDENCE_PREPARES: AtomicU64 = AtomicU64::new(0);
+static GEOMETRY_EVIDENCE_LINES: AtomicU64 = AtomicU64::new(0);
+static GEOMETRY_EVIDENCE_FALLBACKS: AtomicU64 = AtomicU64::new(0);
+
+/// Python float 字典语义把正负零视为同键；普通有限值按位型保持区分。
+fn geometry_number_key(value: f64) -> u64 {
+    if value == 0.0 {
+        0
+    } else {
+        value.to_bits()
+    }
+}
+
+/// 报告页面级 geometry evidence 准备、风险行命中和明确回退次数。
+#[pyfunction]
+pub fn geometry_evidence_stats() -> (u64, u64, u64) {
+    (
+        GEOMETRY_EVIDENCE_PREPARES.load(Ordering::Relaxed),
+        GEOMETRY_EVIDENCE_LINES.load(Ordering::Relaxed),
+        GEOMETRY_EVIDENCE_FALLBACKS.load(Ordering::Relaxed),
+    )
 }
 
 /// 由 Rust 短暂持有并释放 textpage，字符规范化仍复用同一个自有快照构建入口。
@@ -418,6 +459,69 @@ pub fn read_pdfium_text_snapshot(
 }
 
 impl NativeTextSnapshot {
+    /// 一次准备页面级风险输入；解释器 Unicode/round 语义只在不同文本和字体上调用。
+    fn prepare_geometry_evidence_impl(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<Option<NativeGeometryEvidence>> {
+        let char_geometry = py.import("docvortex.analyzers.native.pdf.char_geometry")?;
+        let script_group = char_geometry.getattr("_script_group")?;
+        let normalize = char_geometry.getattr("_normalized_font_family")?;
+        let round = py.import("builtins")?.getattr("round")?;
+        let mut groups: HashMap<String, (String, bool)> = HashMap::new();
+        let mut families: HashMap<String, String> = HashMap::new();
+        let mut font_metadata: HashMap<usize, (String, f64, i32, i32)> = HashMap::new();
+        let mut records = Vec::with_capacity(self.data.chars.len());
+        for ch in &self.data.chars {
+            let font = &self.data.fonts[ch.font];
+            if !font.size.is_finite() {
+                GEOMETRY_EVIDENCE_FALLBACKS.fetch_add(1, Ordering::Relaxed);
+                return Ok(None);
+            }
+            let metadata = if let Some(value) = font_metadata.get(&ch.font) {
+                value.clone()
+            } else {
+                let raw_name = if font.name.is_empty() {
+                    "<unknown>".to_owned()
+                } else {
+                    font.name.clone()
+                };
+                let family = if let Some(value) = families.get(&raw_name) {
+                    value.clone()
+                } else {
+                    let value: String = normalize.call1((&raw_name,))?.extract()?;
+                    families.insert(raw_name.clone(), value.clone());
+                    value
+                };
+                let rounded_size: f64 =
+                    round.call1((font.size * 4.0,))?.extract::<i64>()? as f64 / 4.0;
+                let weight: i64 = round.call1((f64::from(font.weight) / 100.0,))?.extract()?;
+                let value = (family, rounded_size, font.flags, weight as i32);
+                font_metadata.insert(ch.font, value.clone());
+                value
+            };
+            let (script, anchor) = if let Some(value) = groups.get(&ch.text) {
+                value.clone()
+            } else {
+                let group: String = script_group.call1((&ch.text,))?.extract()?;
+                let value = (group.clone(), group != "other");
+                groups.insert(ch.text.clone(), value.clone());
+                value
+            };
+            records.push(GeometryRecord {
+                source: (Some(ch.bbox), ch.loose, ch.tight, ch.origin, ch.rotation),
+                family: metadata.0,
+                font_size: metadata.1,
+                flags: metadata.2,
+                weight: metadata.3,
+                script,
+                anchor,
+            });
+        }
+        GEOMETRY_EVIDENCE_PREPARES.fetch_add(1, Ordering::Relaxed);
+        Ok(Some(NativeGeometryEvidence { records }))
+    }
+
     /// 一次物化中的字体字典共享，字符和 Bbox 独立；不会在 Rust 快照缓存 Python 可变对象。
     fn geometry<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyList>)> {
         let bbox_type = py
@@ -531,6 +635,14 @@ impl NativeTextSnapshot {
 
 #[pymethods]
 impl NativeTextSnapshot {
+    /// 一次准备全文风险使用的页面级 geometry evidence。
+    fn prepare_geometry_evidence(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<Option<NativeGeometryEvidence>> {
+        self.prepare_geometry_evidence_impl(py)
+    }
+
     /// 兼容属性每次创建独立输出，快照在页面关闭后仍能使用。
     fn materialize_geometry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.geometry(py).map(|(geometry, _)| geometry)
@@ -1022,6 +1134,66 @@ impl NativeTextSnapshot {
             ]);
         }
         Ok((geometry, lines))
+    }
+}
+
+#[pymethods]
+impl NativeGeometryEvidence {
+    /// 把同源行成员一次转换并累积到全文风险器；None 表示本行选择参考路径。
+    #[pyo3(signature = (risk, runs, page, source, height, skip_y, indices, size, angle))]
+    fn add_line(
+        &self,
+        py: Python<'_>,
+        mut risk: pyo3::PyRefMut<'_, super::geometry_risk::NativeGeometryRisk>,
+        mut runs: pyo3::PyRefMut<'_, super::geometry_risk::NativeGeometryRuns>,
+        page: usize,
+        source: i64,
+        height: f64,
+        skip_y: bool,
+        indices: Vec<usize>,
+        size: [f64; 2],
+        angle: i32,
+    ) -> Option<bool> {
+        if indices.iter().any(|&index| index >= self.records.len())
+            || !size.iter().all(|v| v.is_finite())
+        {
+            GEOMETRY_EVIDENCE_FALLBACKS.fetch_add(1, Ordering::Relaxed);
+            return None;
+        }
+        let rows: Vec<_> = indices
+            .iter()
+            .map(|&index| self.records[index].source)
+            .collect();
+        let prepared = py.detach(|| geometry::source_rows(rows, size, angle));
+        let mut entries: Vec<Entry> = Vec::with_capacity(indices.len());
+        for (record, prepared) in indices
+            .iter()
+            .map(|&index| &self.records[index])
+            .zip(prepared)
+        {
+            let Some(row) = prepared else {
+                continue;
+            };
+            if !record.anchor || !record.font_size.is_finite() {
+                continue;
+            }
+            let key: RunKey = (
+                record.family.clone(),
+                geometry_number_key(record.font_size),
+                record.flags,
+                record.weight,
+                angle,
+                record.script.clone(),
+            );
+            let run = runs.intern(key);
+            entries.push((run, row.3, row.4, row.5, record.font_size));
+        }
+        GEOMETRY_EVIDENCE_LINES.fetch_add(1, Ordering::Relaxed);
+        let result = risk.add_prepared(py, page, source, height, skip_y, entries);
+        if result.is_none() {
+            GEOMETRY_EVIDENCE_FALLBACKS.fetch_add(1, Ordering::Relaxed);
+        }
+        result
     }
 }
 
