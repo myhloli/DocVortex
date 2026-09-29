@@ -85,6 +85,24 @@ def test_object_bridge_rejects_invalid_addresses(native):
             native.read_pdfium_objects(addresses, handle, 1, depth)
 
 
+def test_drawing_bridge_fallback_and_compute_failure(native, monkeypatch):
+    """复杂 Form 与 ABI 不兼容回退；进入 Rust 后的计算错误原样传播。"""
+    assert hasattr(native, "read_pdfium_drawing_lines")
+    with pdfium_guard(), pdfium.PdfDocument(nested_pdf()) as document:
+        with closing(document[0]) as page:
+            bbox = page.get_bbox()
+            assert bridge.read_drawing_lines(page, bbox, 0) is None
+            assert "complex" in bridge.bridge_info()["pdfium_drawing_line_bridge_unavailable_reason"]
+            with monkeypatch.context() as context:
+                context.setattr(raw, "FPDFPageObj_GetStrokeWidth", Mock())
+                assert bridge.read_drawing_lines(page, bbox, 0) is None
+                assert "ABI" in bridge.bridge_info()["pdfium_drawing_line_bridge_unavailable_reason"]
+            with monkeypatch.context() as context:
+                context.setattr(native, "read_pdfium_drawing_lines", Mock(side_effect=ValueError("failed")))
+                with pytest.raises(ValueError, match="failed"):
+                    bridge.read_drawing_lines(page, bbox, 0)
+
+
 def test_native_subpaths_match_reference_and_share_endpoints(native):
     """原生解码保留子路径、曲线控制点、闭合边和同一点对象的引用。"""
     stream = BytesIO()

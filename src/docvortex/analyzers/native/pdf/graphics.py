@@ -7,6 +7,7 @@ from .layout_evidence import build_layout_evidence
 import math
 import re
 import statistics
+from bisect import bisect_left, bisect_right
 from dataclasses import replace
 from typing import Any
 
@@ -30,7 +31,7 @@ from .geometry import (
 )
 from .line_layout import _infer_text_lanes, _line_effective_height
 from .line_merging import _join_formula_visual_row
-from .models import _AxisLine, _GraphicCandidate, _LineItem, _PageSource, _TextLane
+from .models import _AxisLine, _DrawingComponentSummary, _GraphicCandidate, _LineItem, _PageSource, _TextLane
 from .native_text import _fill_native_typography, _normalize_native_run_text, _sanitize_pdf_control_text
 
 _MIN_RASTER_IMAGE_PAGE_AREA_RATIO = 0.0038
@@ -377,6 +378,7 @@ def _build_graphic_like_blocks(
         median_height,
         lanes,
         table_bboxes,
+        component_summaries=_drawing_component_summaries(source, max(2.0, 0.75 * median_height)),
     )
     # 复杂 Path 或成对坐标轴形成的强图形核心优先于普通绘图线组件，
     # 避免同一图表被拆成多个相互重叠的 image。
@@ -900,6 +902,7 @@ def _detect_strong_graphic_bboxes(source: _PageSource) -> list[BBox]:
             source.path_infos,
             source.page_size,
             median_height,
+            component_summaries=_drawing_component_summaries(source, max(2.0, 0.75 * median_height)),
         ),
     ]
 
@@ -974,10 +977,22 @@ def _detect_axis_path_graphics(
         and item.bbox[3] - item.bbox[1] >= minimum_axis_length
     ]
     tolerance = max(2.0, median_height)
+    # 复杂路径判定只依赖路径自身与 median_height，提到轴对循环外只算一次。
+    complex_candidates = [item for item in path_infos if _is_two_dimensional_complex_path(item, median_height)]
+    indexed_vertical_axes = sorted((_bbox_center_x(item.bbox), index) for index, item in enumerate(vertical_axes))
+    vertical_centers = [center for center, _index in indexed_vertical_axes]
     output: list[BBox] = []
     for horizontal in horizontal_axes:
         horizontal_y = _bbox_center_y(horizontal.bbox)
-        for vertical in vertical_axes:
+        # 命中横轴两个端点附近的纵轴，再恢复原输入顺序以维持候选顺序。
+        candidate_indices: set[int] = set()
+        for endpoint in (horizontal.bbox[0], horizontal.bbox[2]):
+            # 扩一 ULP 只影响候选集合；最终相交判断仍使用原始距离条件。
+            start = bisect_left(vertical_centers, math.nextafter(endpoint - tolerance, -math.inf))
+            end = bisect_right(vertical_centers, math.nextafter(endpoint + tolerance, math.inf))
+            candidate_indices.update(index for _center, index in indexed_vertical_axes[start:end])
+        for vertical_index in sorted(candidate_indices):
+            vertical = vertical_axes[vertical_index]
             vertical_x = _bbox_center_x(vertical.bbox)
             touches_x = (
                 min(
@@ -1000,12 +1015,7 @@ def _detect_axis_path_graphics(
             height = plot_bbox[3] - plot_bbox[1]
             if width > 0.65 * page_size[0] or height > 0.5 * page_size[1]:
                 continue
-            complex_paths = [
-                item
-                for item in path_infos
-                if _is_two_dimensional_complex_path(item, median_height)
-                and _bbox_overlap_in_smaller(item.bbox, plot_bbox) >= 0.2
-            ]
+            complex_paths = [item for item in complex_candidates if _bbox_overlap_in_smaller(item.bbox, plot_bbox) >= 0.2]
             if not complex_paths:
                 continue
             output.append(
@@ -1038,15 +1048,21 @@ def _detect_complex_drawing_components(
     path_infos: list[PDFPathInfo],
     page_size: tuple[float, float],
     median_height: float,
+    component_summaries: list[_DrawingComponentSummary] | None = None,
 ) -> list[BBox]:
     """以横纵绘图线组件和内部二维复杂 Path 识别坐标图或嵌入式图表。"""
 
     tolerance = max(2.0, 0.75 * median_height)
+    complex_candidates = [item for item in path_infos if _is_two_dimensional_complex_path(item, median_height)]
     output: list[BBox] = []
-    for component in _connected_drawing_line_components(drawing_lines, tolerance):
-        horizontal_count = sum(line.orientation == "horizontal" for line in component)
-        vertical_count = len(component) - horizontal_count
-        core_bbox = _bbox_union_many([line.bbox for line in component])
+    summaries = (
+        component_summaries if component_summaries is not None else _summarize_drawing_components(drawing_lines, tolerance)
+    )
+    for summary in summaries:
+        component = summary.lines
+        horizontal_count = summary.horizontal_count
+        vertical_count = summary.vertical_count
+        core_bbox = summary.bbox
         width = core_bbox[2] - core_bbox[0]
         height = core_bbox[3] - core_bbox[1]
         if (
@@ -1060,10 +1076,7 @@ def _detect_complex_drawing_components(
         ):
             continue
         complex_paths = [
-            path_info
-            for path_info in path_infos
-            if _is_two_dimensional_complex_path(path_info, median_height)
-            and _bbox_overlap_in_smaller(path_info.bbox, core_bbox) >= 0.2
+            path_info for path_info in complex_candidates if _bbox_overlap_in_smaller(path_info.bbox, core_bbox) >= 0.2
         ]
         if not complex_paths:
             continue
@@ -1146,15 +1159,20 @@ def _detect_graphic_candidates(
     median_height: float,
     lanes: list[_TextLane],
     table_bboxes: list[BBox],
+    component_summaries: list[_DrawingComponentSummary] | None = None,
 ) -> list[_GraphicCandidate]:
     """从非表格绘图线连通分量中筛选尺寸受限的图形容器。"""
 
     tolerance = max(2.0, 0.75 * median_height)
     candidates: list[_GraphicCandidate] = []
-    for component in _connected_drawing_line_components(drawing_lines, tolerance):
-        horizontal_count = sum(line.orientation == "horizontal" for line in component)
-        vertical_count = len(component) - horizontal_count
-        core_bbox = _bbox_union_many([line.bbox for line in component])
+    summaries = (
+        component_summaries if component_summaries is not None else _summarize_drawing_components(drawing_lines, tolerance)
+    )
+    for summary in summaries:
+        component = summary.lines
+        horizontal_count = summary.horizontal_count
+        vertical_count = summary.vertical_count
+        core_bbox = summary.bbox
         width = core_bbox[2] - core_bbox[0]
         height = core_bbox[3] - core_bbox[1]
         if (
@@ -1202,15 +1220,52 @@ def _connected_drawing_line_components(
         if first_root != second_root:
             parents[second_root] = first_root
 
-    for first_index, first in enumerate(drawing_lines):
-        for second_index in range(first_index + 1, len(drawing_lines)):
-            if _bbox_distance(first.bbox, drawing_lines[second_index].bbox) <= tolerance:
+    # 扫描线剪枝：按左缘升序排列后，第二条线起点超过第一条线右缘加容差时，
+    # 水平净空已超容差，其后所有配对必然不连通，无需再算欧氏距离。
+    order = sorted(range(len(drawing_lines)), key=lambda index: drawing_lines[index].bbox[0])
+    for position, first_index in enumerate(order):
+        first = drawing_lines[first_index].bbox
+        limit = first[2] + tolerance
+        for second_position in range(position + 1, len(order)):
+            second_index = order[second_position]
+            second = drawing_lines[second_index].bbox
+            if second[0] > limit:
+                break
+            if _bbox_distance(first, second) <= tolerance:
                 union(first_index, second_index)
 
     components: dict[int, list[_AxisLine]] = {}
     for line_index, line in enumerate(drawing_lines):
         components.setdefault(find(line_index), []).append(line)
     return list(components.values())
+
+
+def _summarize_drawing_components(drawing_lines: list[_AxisLine], tolerance: float) -> list[_DrawingComponentSummary]:
+    """一次计算分量、包围框及横纵线数量，保持原始分量顺序。"""
+
+    summaries = []
+    for component in _connected_drawing_line_components(drawing_lines, tolerance):
+        horizontal_count = sum(line.orientation == "horizontal" for line in component)
+        summaries.append(
+            _DrawingComponentSummary(
+                lines=component,
+                bbox=_bbox_union_many([line.bbox for line in component]),
+                horizontal_count=horizontal_count,
+                vertical_count=len(component) - horizontal_count,
+            )
+        )
+    return summaries
+
+
+def _drawing_component_summaries(source: _PageSource, tolerance: float) -> list[_DrawingComponentSummary]:
+    """仅在同一页、同一绘图线对象及同一容差下复用分量统计。"""
+
+    for lines, cached_tolerance, summaries in source.drawing_component_cache:
+        if lines is source.drawing_lines and cached_tolerance == tolerance:
+            return summaries
+    summaries = _summarize_drawing_components(source.drawing_lines, tolerance)
+    source.drawing_component_cache.append((source.drawing_lines, tolerance, summaries))
+    return summaries
 
 
 def _is_graphic_label_member(

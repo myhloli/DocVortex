@@ -59,6 +59,8 @@ def test_native_registration_contract(native):
         "read_pdfium_text_snapshot": "(addresses, color_addresses, handle, count, extended, frame, rotation, visibility)",
         "read_pdfium_chars": "(addresses, handle, count, extended)",
         "read_pdfium_objects": "(addresses, handle, kind, max_depth)",
+        "read_pdfium_drawing_lines": "(addresses, handle, bbox, rotation)",
+        "pdfium_drawing_line_stage_stats": "()",
         "read_pdfium_visual_batches": "(addresses, handle, count, extended, frame, angle)",
         "script_roles": "(records)",
         "script_roles_raw": "(loose, tight, origins, flags, fonts, fallback)",
@@ -92,13 +94,14 @@ def test_native_registration_contract(native):
         "PdfiumCharacterBatches": ("docvortex._native", None),
         "PdfiumVisualCharacterBatches": ("docvortex._native", None),
         "PdfiumObjectBatches": ("docvortex._native", None),
+        "PdfiumDrawingLineBatches": ("docvortex._native", None),
         "PreparedRuleCandidates": ("builtins", "(centers, rows)"),
         "PdfiumReadError": ("_native", None),
         "StableColumnClusters": ("builtins", "(compensated)"),
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 23, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 24, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)

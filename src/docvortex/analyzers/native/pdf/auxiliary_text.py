@@ -49,6 +49,7 @@ def _classify_page_auxiliary_text(prepared: _PreparedPage) -> None:
         prepared.table_bboxes,
         prepared.drawing_lines,
         prepared.page_size,
+        prepared=prepared,
     )
     prepared.page_footnote_groups += _classify_page_footnotes(
         prepared.remaining_lines,
@@ -56,6 +57,7 @@ def _classify_page_auxiliary_text(prepared: _PreparedPage) -> None:
         prepared.drawing_lines,
         prepared.page_size,
         visual_bboxes=[block["bbox"] for block in prepared.fixed_blocks if block.get("type") == "image"],
+        prepared=prepared,
     )
 
 
@@ -163,6 +165,7 @@ def _classify_image_footnotes(
     page_size: tuple[float, float],
     *,
     reference_body_height: float | None = None,
+    prepared: _PreparedPage | None = None,
 ) -> None:
     """用图片、下缘长横线和紧凑小字的联合关系识别图表脚注。"""
 
@@ -202,12 +205,11 @@ def _classify_image_footnotes(
             body_samples = [_line_effective_height(line, bbox) for line, bbox in line_geometry]
         body_height = max(0.1, statistics.median(body_samples))
     local_images = [_rotate_bbox_to_upright(bbox, page_size, dominant_angle) for bbox in image_bboxes]
-    local_axis_lines = _transform_axis_lines(
-        drawing_lines,
-        page_size,
-        dominant_angle,
-    )
-
+    if prepared is None:
+        local_axis_lines = _transform_axis_lines(drawing_lines, page_size, dominant_angle)
+        table_lines = _confirmed_table_horizontal_lines(local_axis_lines, table_bboxes)
+    else:
+        local_axis_lines, table_lines = _prepared_local_axis_table_lines(prepared, dominant_angle)
     matched_source_indices: set[int] = set()
     for image_bbox in local_images:
         image_width = max(0.1, image_bbox[2] - image_bbox[0])
@@ -229,8 +231,7 @@ def _classify_image_footnotes(
             and 0.0 <= axis_line.bbox[1] - row_bottom <= max(0.01 * local_page_height, 0.75 * body_height)
             and not _rule_belongs_to_confirmed_table(
                 axis_line,
-                local_axis_lines,
-                table_bboxes,
+                table_lines,
                 local_page_width,
             )
         ]
@@ -270,6 +271,7 @@ def _classify_deferred_image_footnotes(
             prepared.drawing_lines,
             prepared.page_size,
             reference_body_height=body_height,
+            prepared=prepared,
         )
 
 
@@ -361,6 +363,7 @@ def _classify_page_footnotes(
     page_size: tuple[float, float],
     *,
     visual_bboxes: list[BBox] | None = None,
+    prepared: _PreparedPage | None = None,
 ) -> list[set[int]]:
     """识别主方向页脚注，并按触发分隔线返回来源编号分组。"""
 
@@ -401,11 +404,11 @@ def _classify_page_footnotes(
         # 脚注分隔线应对齐稳定栏锚点，不能被页眉或跨栏关键词的宽行扩张污染。
         recalculate_intervals=False,
     )
-    local_axis_lines = _transform_axis_lines(
-        drawing_lines,
-        page_size,
-        dominant_angle,
-    )
+    if prepared is None:
+        local_axis_lines = _transform_axis_lines(drawing_lines, page_size, dominant_angle)
+        table_lines = _confirmed_table_horizontal_lines(local_axis_lines, table_bboxes)
+    else:
+        local_axis_lines, table_lines = _prepared_local_axis_table_lines(prepared, dominant_angle)
 
     candidate_groups: list[set[int]] = []
     visual_bboxes = visual_bboxes or []
@@ -435,8 +438,7 @@ def _classify_page_footnotes(
         # 表格边界会产生断裂横线；除框内线段外，也排除与其同高且近邻的框外线段。
         if _rule_belongs_to_confirmed_table(
             axis_line,
-            local_axis_lines,
-            table_bboxes,
+            table_lines,
             local_page_width,
         ):
             continue
@@ -535,29 +537,52 @@ def _augment_footnote_groups_with_edge_markers(
                 group.add(line.source_index)
 
 
-def _rule_belongs_to_confirmed_table(
-    candidate: _LocalAxisLine,
+def _prepared_local_axis_table_lines(
+    prepared: _PreparedPage,
+    dominant_angle: int,
+) -> tuple[list[_LocalAxisLine], list[_LocalAxisLine]]:
+    """按页和主方向复用轴线变换及确认表格横线，输入身份变化时重新计算。"""
+
+    key = (dominant_angle, id(prepared.drawing_lines), id(prepared.table_bboxes))
+    cached = prepared.local_axis_table_cache.get(key)
+    if cached is not None:
+        return cached
+    local_axis_lines = _transform_axis_lines(prepared.drawing_lines, prepared.page_size, dominant_angle)
+    table_lines = _confirmed_table_horizontal_lines(local_axis_lines, prepared.table_bboxes)
+    result = (local_axis_lines, table_lines)
+    prepared.local_axis_table_cache[key] = result
+    return result
+
+
+def _confirmed_table_horizontal_lines(
     local_axis_lines: list[_LocalAxisLine],
     table_bboxes: list[BBox],
+) -> list[_LocalAxisLine]:
+    """按页预计算与确认表格框相交的横线，供所有候选排除判断复用。"""
+
+    return [
+        table_line
+        for table_line in local_axis_lines
+        if table_line.orientation == "horizontal"
+        and any(
+            _bbox_intersects(
+                _expand_bbox(table_line.original_bbox, max(0.5, table_line.width)),
+                table_bbox,
+            )
+            for table_bbox in table_bboxes
+        )
+    ]
+
+
+def _rule_belongs_to_confirmed_table(
+    candidate: _LocalAxisLine,
+    table_lines: list[_LocalAxisLine],
     local_page_width: float,
 ) -> bool:
     """把表格框内横线及其同高近邻断裂段一并排除，避免框外残段触发脚注。"""
 
-    if not table_bboxes:
-        return False
     maximum_segment_gap = 0.04 * local_page_width
-    for table_line in local_axis_lines:
-        if table_line.orientation != "horizontal":
-            continue
-        table_margin = max(0.5, table_line.width)
-        if not any(
-            _bbox_intersects(
-                _expand_bbox(table_line.original_bbox, table_margin),
-                table_bbox,
-            )
-            for table_bbox in table_bboxes
-        ):
-            continue
+    for table_line in table_lines:
         center_tolerance = max(1.0, candidate.width, table_line.width)
         if abs(_bbox_center_y(candidate.bbox) - _bbox_center_y(table_line.bbox)) > center_tolerance:
             continue
@@ -800,11 +825,7 @@ def _classify_rule_delimited_headers(pages: list[_PreparedPage]) -> None:
         ]
         heights = [_line_effective_height(line, bbox) for line, bbox in local_lines]
         median_height = statistics.median(heights) if heights else 1.0
-        local_axis_lines = _transform_axis_lines(
-            page.drawing_lines,
-            page.page_size,
-            dominant_angle,
-        )
+        local_axis_lines, table_lines = _prepared_local_axis_table_lines(page, dominant_angle)
         candidates = [
             axis_line
             for axis_line in local_axis_lines
@@ -814,8 +835,7 @@ def _classify_rule_delimited_headers(pages: list[_PreparedPage]) -> None:
             and any(bbox[3] <= _bbox_center_y(axis_line.bbox) for bbox in header_evidence_bboxes)
             and not _rule_belongs_to_confirmed_table(
                 axis_line,
-                local_axis_lines,
-                page.table_bboxes,
+                table_lines,
                 local_page_width,
             )
             and not _rule_overlaps_fixed_container(
@@ -856,11 +876,7 @@ def _classify_rule_delimited_footers(pages: list[_PreparedPage]) -> None:
         local_page_width, local_page_height = local_page_size
         if local_page_width <= 0 or local_page_height <= 0:
             continue
-        local_axis_lines = _transform_axis_lines(
-            page.drawing_lines,
-            page.page_size,
-            dominant_angle,
-        )
+        local_axis_lines, table_lines = _prepared_local_axis_table_lines(page, dominant_angle)
         rules = [
             rule
             for rule in local_axis_lines
@@ -869,8 +885,7 @@ def _classify_rule_delimited_footers(pages: list[_PreparedPage]) -> None:
             and rule.bbox[2] - rule.bbox[0] >= 0.2 * local_page_width
             and not _rule_belongs_to_confirmed_table(
                 rule,
-                local_axis_lines,
-                page.table_bboxes,
+                table_lines,
                 local_page_width,
             )
             and not _rule_overlaps_fixed_container(

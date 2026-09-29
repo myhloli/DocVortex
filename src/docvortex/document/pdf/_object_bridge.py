@@ -11,11 +11,18 @@ from .pdfium import pdfium_guard
 
 _CALLS = 0
 _UNAVAILABLE_REASON = "not probed"
+_DRAWING_CALLS = 0
+_DRAWING_UNAVAILABLE_REASON = "not probed"
 
 
 def bridge_info():
     """报告真实完成的对象树读取，不能仅凭扩展存在判定原生路径已执行。"""
-    return {"pdfium_object_bridge_calls": _CALLS, "pdfium_object_bridge_unavailable_reason": _UNAVAILABLE_REASON}
+    return {
+        "pdfium_object_bridge_calls": _CALLS,
+        "pdfium_object_bridge_unavailable_reason": _UNAVAILABLE_REASON,
+        "pdfium_drawing_line_bridge_calls": _DRAWING_CALLS,
+        "pdfium_drawing_line_bridge_unavailable_reason": _DRAWING_UNAVAILABLE_REASON,
+    }
 
 
 def read_clipped_objects(page, kind, max_depth):
@@ -61,6 +68,66 @@ def read_clipped_objects(page, kind, max_depth):
         batches = native.read_pdfium_objects(addresses, ct.cast(page.raw, ct.c_void_p).value, kind, max_depth)
     _CALLS += 1
     _UNAVAILABLE_REASON = None
+    return chain.from_iterable(batches)
+
+
+def read_drawing_lines(page, page_bbox, rotation):
+    """仅对兼容 ABI 的简单描边页执行 Rust 轴线提取，复杂页返回参考路径。"""
+    global _DRAWING_CALLS, _DRAWING_UNAVAILABLE_REASON
+    native = get_native()
+    if native is None or type(page) is not pdfium.PdfPage or not page.raw:
+        _DRAWING_UNAVAILABLE_REASON = "python backend or nonstandard/closed page"
+        return None
+    if ct.sizeof(raw.FS_MATRIX) != 24 or any(
+        getattr(raw.FS_MATRIX, name).offset != offset * 4 for offset, name in enumerate("abcdef")
+    ):
+        _DRAWING_UNAVAILABLE_REASON = "FS_MATRIX ABI mismatch"
+        return None
+    obj, clip, segment = raw.FPDF_PAGEOBJECT, raw.FPDF_CLIPPATH, raw.FPDF_PATHSEGMENT
+    specs = (
+        ("FPDFPage_CountObjects", ct.c_int, (raw.FPDF_PAGE,)),
+        ("FPDFPage_GetObject", obj, (raw.FPDF_PAGE, ct.c_int)),
+        ("FPDFFormObj_CountObjects", ct.c_int, (obj,)),
+        ("FPDFFormObj_GetObject", obj, (obj, ct.c_ulong)),
+        ("FPDFPageObj_GetMatrix", ct.c_int, (obj, ct.POINTER(raw.FS_MATRIX))),
+        ("FPDFPageObj_GetType", ct.c_int, (obj,)),
+        ("FPDFPageObj_GetClipPath", clip, (obj,)),
+        ("FPDFClipPath_CountPaths", ct.c_int, (clip,)),
+        ("FPDFClipPath_CountPathSegments", ct.c_int, (clip, ct.c_int)),
+        ("FPDFClipPath_GetPathSegment", segment, (clip, ct.c_int, ct.c_int)),
+        ("FPDFPathSegment_GetPoint", ct.c_int, (segment, ct.POINTER(ct.c_float), ct.POINTER(ct.c_float))),
+        ("FPDFPath_CountSegments", ct.c_int, (obj,)),
+        ("FPDFPath_GetPathSegment", segment, (obj, ct.c_int)),
+        ("FPDFPathSegment_GetPoint", ct.c_int, (segment, ct.POINTER(ct.c_float), ct.POINTER(ct.c_float))),
+        ("FPDFPathSegment_GetType", ct.c_int, (segment,)),
+        ("FPDFPathSegment_GetClose", ct.c_int, (segment,)),
+        ("FPDFPath_GetDrawMode", ct.c_int, (obj, ct.POINTER(ct.c_int), ct.POINTER(ct.c_int))),
+        (
+            "FPDFPageObj_GetStrokeColor",
+            ct.c_int,
+            (obj, ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint)),
+        ),
+        ("FPDFPageObj_GetStrokeWidth", ct.c_int, (obj, ct.POINTER(ct.c_float))),
+    )
+    addresses = []
+    for name, result, arguments in specs:
+        function = getattr(raw, name, None)
+        if (
+            not isinstance(function, ct._CFuncPtr)
+            or function.restype is not result
+            or tuple(function.argtypes or ()) != arguments
+            or getattr(function, "errcheck", None) is not None
+        ):
+            _DRAWING_UNAVAILABLE_REASON = f"unsupported symbol or ABI: {name}"
+            return None
+        addresses.append(ct.cast(function, ct.c_void_p).value)
+    with pdfium_guard():
+        batches = native.read_pdfium_drawing_lines(addresses, ct.cast(page.raw, ct.c_void_p).value, page_bbox, rotation)
+    if batches is None:
+        _DRAWING_UNAVAILABLE_REASON = "complex path, transform, or clip requires Python reference"
+        return None
+    _DRAWING_CALLS += 1
+    _DRAWING_UNAVAILABLE_REASON = None
     return chain.from_iterable(batches)
 
 

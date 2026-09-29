@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 use std::ffi::{c_double, c_float, c_int, c_uint, c_ulong, c_void};
 pub mod classification;
+pub mod drawing_lines;
 pub mod fonts;
 pub mod objects;
 pub mod paths;

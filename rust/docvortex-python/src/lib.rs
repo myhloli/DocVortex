@@ -80,8 +80,14 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<pdfium::PdfiumCharacterBatches>()?;
     module.add_class::<pdfium::PdfiumVisualCharacterBatches>()?;
     module.add_class::<pdfium::PdfiumObjectBatches>()?;
+    module.add_class::<pdfium::PdfiumDrawingLineBatches>()?;
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_subpaths, module)?)?;
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_objects, module)?)?;
+    module.add_function(wrap_pyfunction!(pdfium::read_pdfium_drawing_lines, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        pdfium::pdfium_drawing_line_stage_stats,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(
         pdfium::read_pdfium_visual_batches,
         module

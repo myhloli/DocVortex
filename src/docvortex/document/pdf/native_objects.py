@@ -96,14 +96,15 @@ def _walk_clipped_objects(
     parent_matrix: tuple = (1, 0, 0, 1, 0, 0),
     depth: int = 0,
     inherited_clip: BBox | None = None,
+    max_depth: int = DRAWING_FORM_MAX_DEPTH,
 ) -> Iterator[_ClippedObject]:
     """遍历可见叶子并传播 Form 裁剪；对象矩阵只变换内容，clip 使用父矩阵。"""
-    if depth >= DRAWING_FORM_MAX_DEPTH:
+    if depth >= max_depth:
         return
-    count = pdfium_c.FPDFFormObj_CountObjects if is_form else pdfium_c.FPDFPage_CountObjects
+    count_objects = pdfium_c.FPDFFormObj_CountObjects if is_form else pdfium_c.FPDFPage_CountObjects
     get = pdfium_c.FPDFFormObj_GetObject if is_form else pdfium_c.FPDFPage_GetObject
     try:
-        size = int(count(container))
+        size = int(count_objects(container))
     except Exception:
         return
     for index in range(max(0, size)):
@@ -116,7 +117,12 @@ def _walk_clipped_objects(
             clip = _object_clip_bbox(raw, parent_matrix, inherited_clip)
             if int(pdfium_c.FPDFPageObj_GetType(raw)) == pdfium_c.FPDF_PAGEOBJ_FORM:
                 yield from _walk_clipped_objects(
-                    raw, is_form=True, parent_matrix=combined, depth=depth + 1, inherited_clip=clip
+                    raw,
+                    is_form=True,
+                    parent_matrix=combined,
+                    depth=depth + 1,
+                    inherited_clip=clip,
+                    max_depth=max_depth,
                 )
             else:
                 yield _ClippedObject(raw, combined, parent_matrix, depth, clip)
@@ -162,16 +168,20 @@ def _clipped_form_extent(raw: Any, page_bbox: BBox, rotation: int) -> BBox | Non
     return min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes)
 
 
-def _clipped_objects_of_type(page: Any, object_type: int) -> Iterator[_ClippedObject]:
+def _clipped_objects_of_type(
+    page: Any,
+    object_type: int,
+    max_depth: int = DRAWING_FORM_MAX_DEPTH,
+) -> Iterator[_ClippedObject]:
     """过滤已累计裁剪的对象类型，路径 source_index 保持既有遍历顺序。"""
     from ._object_bridge import read_clipped_objects
 
-    records = read_clipped_objects(page, object_type, DRAWING_FORM_MAX_DEPTH)
+    records = read_clipped_objects(page, object_type, max_depth)
     if records is not None:
         for address, matrix, parent, depth, clip in records:
             yield _ClippedObject(ctypes.cast(address, pdfium_c.FPDF_PAGEOBJECT), matrix, parent, depth, clip)
         return
-    for member in _walk_clipped_objects(page):
+    for member in _walk_clipped_objects(page, max_depth=max_depth):
         if int(pdfium_c.FPDFPageObj_GetType(member.raw)) == object_type:
             yield member
 
@@ -780,13 +790,13 @@ def _merge_orientation_lines(
     if not lines:
         return []
     coordinate_clusters: list[list[PDFDrawingLine]] = []
+    # 输入按轴坐标升序排序，聚类最小值恒为其首元素，记住起点即可免整簇重扫。
+    cluster_start = 0.0
     for line in sorted(lines, key=lambda item: (_line_axis_coordinate(item), _line_main_interval(item)[0])):
-        if (
-            not coordinate_clusters
-            or _line_axis_coordinate(line) - min(_line_axis_coordinate(item) for item in coordinate_clusters[-1])
-            > DRAWING_LINE_MERGE_TOLERANCE
-        ):
+        coordinate = _line_axis_coordinate(line)
+        if not coordinate_clusters or coordinate - cluster_start > DRAWING_LINE_MERGE_TOLERANCE:
             coordinate_clusters.append([line])
+            cluster_start = coordinate
         else:
             coordinate_clusters[-1].append(line)
 
@@ -1017,15 +1027,22 @@ def _extract_page_form_bboxes(
 
 def _extract_page_path_infos(page: pdfium.PdfPage, page_bbox: BBox, page_rotation: int) -> list[PDFPathInfo]:
     """复用含裁剪的统一提取，确保直接查询和快照一致。"""
-    return _extract_page_paths_and_lines(page, page_bbox, page_rotation)[1]
+    return _extract_page_paths_and_lines(page, page_bbox, page_rotation, want_lines=False)[1]
 
 
 def _extract_page_paths_and_lines(
     page: pdfium.PdfPage,
     page_bbox: BBox,
     page_rotation: int,
+    *,
+    want_lines: bool = True,
+    want_path_infos: bool = True,
 ) -> tuple[list[PDFDrawingLine], list[PDFPathInfo]]:
-    """一次遍历和解码 Path，分别隔离绘图线与路径信息的派生异常。"""
+    """一次遍历和解码 Path，分别隔离绘图线与路径信息的派生异常。
+
+    只需要单侧结果时用 want_* 关掉另一侧，避免构建后即丢弃的
+    PDFPathInfo/绘图线开销；两侧都关闭没有意义，不作为受支持的用法。
+    """
 
     drawing_lines: list[PDFDrawingLine] = []
     path_infos: list[PDFPathInfo] = []
@@ -1035,41 +1052,58 @@ def _extract_page_paths_and_lines(
             subpaths = _read_raw_path_subpaths(raw_obj)
         except Exception:
             continue
-        try:
-            for line in _extract_path_drawing_lines(raw_obj, matrix, page_bbox, page_rotation, subpaths=subpaths):
-                clipped = _clip_object_visual_bbox(line.bbox, member.clip, page_bbox, page_rotation)
-                if clipped is not None:
-                    if clipped == line.bbox:
-                        drawing_lines.append(line)
-                    else:
-                        if line.orientation == "horizontal":
-                            y = min(clipped[3], max(clipped[1], line.start[1]))
-                            start, end = (clipped[0], y), (clipped[2], y)
+        if want_lines:
+            try:
+                for line in _extract_path_drawing_lines(raw_obj, matrix, page_bbox, page_rotation, subpaths=subpaths):
+                    clipped = _clip_object_visual_bbox(line.bbox, member.clip, page_bbox, page_rotation)
+                    if clipped is not None:
+                        if clipped == line.bbox:
+                            drawing_lines.append(line)
                         else:
-                            x = min(clipped[2], max(clipped[0], line.start[0]))
-                            start, end = (x, clipped[1]), (x, clipped[3])
-                        drawing_lines.append(replace(line, bbox=clipped, start=start, end=end))
-        except Exception:
-            pass
-        try:
-            info = _path_info_from_object(
-                raw_obj,
-                matrix,
-                page_bbox,
-                page_rotation,
-                form_depth,
-                source_index,
-                subpaths=subpaths,
-            )
-        except Exception:
-            continue
-        if info is not None:
-            clipped = _clip_object_visual_bbox(info.bbox, member.clip, page_bbox, page_rotation)
-            if clipped is not None:
-                path_infos.append(info if clipped == info.bbox else replace(info, bbox=clipped))
-    return _merge_collinear_drawing_lines(drawing_lines, _drawing_page_size(page_bbox, page_rotation)), path_infos
+                            if line.orientation == "horizontal":
+                                y = min(clipped[3], max(clipped[1], line.start[1]))
+                                start, end = (clipped[0], y), (clipped[2], y)
+                            else:
+                                x = min(clipped[2], max(clipped[0], line.start[0]))
+                                start, end = (x, clipped[1]), (x, clipped[3])
+                            drawing_lines.append(replace(line, bbox=clipped, start=start, end=end))
+            except Exception:
+                pass
+        if want_path_infos:
+            try:
+                info = _path_info_from_object(
+                    raw_obj,
+                    matrix,
+                    page_bbox,
+                    page_rotation,
+                    form_depth,
+                    source_index,
+                    subpaths=subpaths,
+                )
+            except Exception:
+                continue
+            if info is not None:
+                clipped = _clip_object_visual_bbox(info.bbox, member.clip, page_bbox, page_rotation)
+                if clipped is not None:
+                    path_infos.append(info if clipped == info.bbox else replace(info, bbox=clipped))
+    merged_lines = (
+        _merge_collinear_drawing_lines(drawing_lines, _drawing_page_size(page_bbox, page_rotation))
+        if want_lines
+        else drawing_lines
+    )
+    return merged_lines, path_infos
 
 
 def _extract_page_drawing_lines(page: pdfium.PdfPage, page_bbox: BBox, page_rotation: int) -> list[PDFDrawingLine]:
     """复用统一裁剪，避免独立线查询重新暴露被 Form 隐藏的路径。"""
-    return _extract_page_paths_and_lines(page, page_bbox, page_rotation)[0]
+    from ._object_bridge import read_drawing_lines
+
+    records = read_drawing_lines(page, page_bbox, page_rotation)
+    if records is not None:
+        # 原生层只构建未合并轴线；共线合并继续沿用 Python 的稳定输出规则。
+        lines = [
+            PDFDrawingLine(start, end, bbox, width, "horizontal" if orientation == 0 else "vertical")
+            for start, end, bbox, width, orientation in records
+        ]
+        return _merge_collinear_drawing_lines(lines, _drawing_page_size(page_bbox, page_rotation))
+    return _extract_page_paths_and_lines(page, page_bbox, page_rotation, want_path_infos=False)[0]

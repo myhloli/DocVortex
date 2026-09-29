@@ -234,6 +234,16 @@ class _GraphicCandidate:
 
 
 @dataclass(slots=True)
+class _DrawingComponentSummary:
+    """缓存单页绘图线分量及两处图形检测共用的几何统计。"""
+
+    lines: list[_AxisLine]
+    bbox: BBox
+    horizontal_count: int
+    vertical_count: int
+
+
+@dataclass(slots=True)
 class _CodeCandidate:
     """保存由填充背景或成对横线与稳定文本节奏确认的代码区域。"""
 
@@ -277,6 +287,7 @@ class _PageSource:
     path_infos: list[PDFPathInfo] = field(default_factory=list)
     page_index: int | None = None
     publication_bboxes: list[BBox] = field(default_factory=list)
+    drawing_component_cache: list[tuple[list[_AxisLine], float, list[_DrawingComponentSummary]]] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -296,6 +307,9 @@ class _PreparedPage:
     script_lines: list[PDFTextScriptLine] = field(default_factory=list)
     formula_candidate_lines: list[_LineItem] = field(default_factory=list)
     formula_ink_bboxes: list[BBox] = field(default_factory=list)
+    local_axis_table_cache: dict[tuple[int, int, int], tuple[list[_LocalAxisLine], list[_LocalAxisLine]]] = field(
+        default_factory=dict
+    )
 
 
 @dataclass(slots=True)

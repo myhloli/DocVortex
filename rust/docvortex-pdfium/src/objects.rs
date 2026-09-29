@@ -134,9 +134,10 @@ impl Api {
                 continue;
             }
             let combined = multiply(matrix.values.map(f64::from), parent);
-            let clip = self.clip_bounds(raw, parent, inherited);
             let object_kind = (self.kind)(raw);
+            // 类型先于裁剪判断：类型不匹配的叶子（如纯路径页上的 Path）不必读 clip。
             if object_kind == 5 {
+                let clip = self.clip_bounds(raw, parent, inherited);
                 self.walk(
                     raw,
                     true,
@@ -148,6 +149,7 @@ impl Api {
                     output,
                 );
             } else if object_kind == kind {
+                let clip = self.clip_bounds(raw, parent, inherited);
                 output.push((raw as usize, combined, parent, depth, clip));
             }
         }

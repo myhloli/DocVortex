@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from ctypes import byref, c_int, create_string_buffer
+from ctypes import byref, c_float, c_int, create_string_buffer
 from io import BytesIO
 from typing import Any
 
@@ -214,7 +214,7 @@ def classify(pdf_doc: pdfium.PdfDocument, pdf_bytes: bytes) -> str:
                 )
                 return "ocr"
 
-            if get_high_image_coverage_ratio_pdfium(pdf_doc, page_indices) >= HIGH_IMAGE_COVERAGE_THRESHOLD:
+            if _get_high_image_coverage_ratio_from_samples(text_samples) >= HIGH_IMAGE_COVERAGE_THRESHOLD:
                 return "ocr"
 
     except (PdfiumFontError, NativeClassificationError):
@@ -264,18 +264,15 @@ def get_extreme_aspect_ratio_page_pdfium(
 ) -> tuple[Any, Any]:
     with pdfium_guard():
         for page_index in page_indices:
-            page = None
-            try:
-                page = pdf_doc[page_index]
-                page_width, page_height = page.get_size()
-                if page_width <= 0 or page_height <= 0:
-                    continue
+            # FPDF_GetPageSizeByIndexF 直接按索引取 MediaBox 尺寸，不加载页面、
+            # 不解析内容流；矢量密集页一次 FPDF_LoadPage 可达数秒。
+            page_width, page_height = pdf_doc.get_page_size(page_index)
+            if page_width <= 0 or page_height <= 0:
+                continue
 
-                aspect_ratio = max(page_width / page_height, page_height / page_width)
-                if aspect_ratio > max_page_aspect_ratio:
-                    return page_index, aspect_ratio
-            finally:
-                close_pdfium_child(page)
+            aspect_ratio = max(page_width / page_height, page_height / page_width)
+            if aspect_ratio > max_page_aspect_ratio:
+                return page_index, aspect_ratio
 
     return None, None
 
@@ -378,11 +375,25 @@ def _collect_pdfium_text_samples(pdf_doc: pdfium.PdfDocument, page_indices: list
             page = None
             try:
                 page = pdf_doc[page_index]
-                text_samples.append(_collect_pdfium_text_sample_from_page(page_index, page))
+                sample = _collect_pdfium_text_sample_from_page(page_index, page)
+                # 同一次页面加载顺带统计图像覆盖率，末尾的覆盖检查不再重新加载页面。
+                sample["image_coverage_ratio"] = _page_image_coverage_ratio(page)
+                text_samples.append(sample)
             finally:
                 close_pdfium_child(page)
 
     return text_samples
+
+
+def _get_high_image_coverage_ratio_from_samples(text_samples: list[dict[str, Any]]) -> float:
+    """基于已缓存抽样页的图像覆盖率统计高覆盖页占比。"""
+
+    if not text_samples:
+        return 0.0
+    high_image_coverage_pages = sum(
+        sample.get("image_coverage_ratio", 0.0) >= HIGH_IMAGE_COVERAGE_THRESHOLD for sample in text_samples
+    )
+    return high_image_coverage_pages / len(text_samples)
 
 
 def _get_avg_cleaned_chars_per_page_from_samples(text_samples: list[dict[str, Any]]) -> float:
@@ -906,12 +917,27 @@ def _count_identity_cid_string(value: Any) -> int:
 def _resource_graph_has_cid_without_to_unicode(
     resources: Any,
     font_analysis_cache: dict[tuple[Any, ...], dict[str, bool]],
-    active_form_keys: frozenset[tuple[Any, ...]] = frozenset(),
+    visited_form_keys: set[tuple[Any, ...]] | None = None,
+    visited_resource_keys: set[tuple[Any, ...]] | None = None,
 ) -> bool:
-    """递归检查页面及 Form 资源图中是否存在缺少 ToUnicode 的 Identity CID 字体。"""
+    """递归检查页面及 Form 资源图中是否存在缺少 ToUnicode 的 Identity CID 字体。
+
+    结果与路径无关，Form 和资源字典按对象身份各展开一次；此去重仅用于
+    资源可达性检查，不影响实际绘制实例或字形使用次数统计。
+    """
+    resource_ref = resources
     resources = _resolve_pdf_object(resources)
     if not resources:
         return False
+
+    if visited_form_keys is None:
+        visited_form_keys = set()
+    if visited_resource_keys is None:
+        visited_resource_keys = set()
+    resource_key = _get_pdf_object_cache_key(resource_ref, resources)
+    if resource_key in visited_resource_keys:
+        return False
+    visited_resource_keys.add(resource_key)
 
     fonts = _resolve_pdf_object(resources.get("/Font")) or {}
     for font_ref in fonts.values():
@@ -929,15 +955,17 @@ def _resource_graph_has_cid_without_to_unicode(
             continue
 
         form_key = _get_pdf_object_cache_key(xobject_ref, xobject)
-        if form_key in active_form_keys:
+        if form_key in visited_form_keys:
             continue
+        visited_form_keys.add(form_key)
         form_resources = xobject.get("/Resources")
         if form_resources is None:
             continue
         if _resource_graph_has_cid_without_to_unicode(
             form_resources,
             font_analysis_cache,
-            active_form_keys | {form_key},
+            visited_form_keys,
+            visited_resource_keys,
         ):
             return True
     return False
@@ -1114,17 +1142,25 @@ def _resolve_pdf_object(obj: Any) -> Any:
     return obj
 
 
-def _get_pdfium_page_object_bounds(page_object: Any) -> tuple[float, float, float, float]:
-    """兼容 pypdfium2 4.x/5.x，统一获取页面对象的边界坐标。"""
-    get_bounds = getattr(page_object, "get_bounds", None)
-    if callable(get_bounds):
-        return get_bounds()
+def _page_image_coverage_ratio(page: Any) -> float:
+    """统计单页图像覆盖率：类型过滤的原生 walk，不逐对象构建 Python 包装。"""
+    from .native_objects import _clipped_objects_of_type
 
-    get_pos = getattr(page_object, "get_pos", None)
-    if callable(get_pos):
-        return get_pos()
+    page_bbox = page.get_bbox()
+    page_area = abs((page_bbox[2] - page_bbox[0]) * (page_bbox[3] - page_bbox[1]))
+    if page_area <= 0:
+        return 0.0
 
-    raise AttributeError("PDFium page object has neither get_bounds() nor get_pos()")
+    image_area = 0.0
+    # 深度 3 等价旧 page.get_objects(max_depth=3)：页面与两层嵌套 Form 内的图像。
+    for member in _clipped_objects_of_type(page, pdfium_c.FPDF_PAGEOBJ_IMAGE, 3):
+        values = [c_float() for _ in range(4)]
+        if not pdfium_c.FPDFPageObj_GetBounds(member.raw, *(byref(value) for value in values)):
+            continue
+        left, bottom, right, top = (value.value for value in values)
+        image_area += max(0.0, right - left) * max(0.0, top - bottom)
+
+    return min(image_area / page_area, 1.0)
 
 
 def get_high_image_coverage_ratio_pdfium(pdf_doc: pdfium.PdfDocument, page_indices: list[int]) -> float:
@@ -1135,18 +1171,7 @@ def get_high_image_coverage_ratio_pdfium(pdf_doc: pdfium.PdfDocument, page_indic
             page = None
             try:
                 page = pdf_doc[page_index]
-                page_bbox: tuple[float, float, float, float] = page.get_bbox()
-                page_area = abs((page_bbox[2] - page_bbox[0]) * (page_bbox[3] - page_bbox[1]))
-                image_area = 0.0
-
-                for page_object in page.get_objects(filter=[pdfium_c.FPDF_PAGEOBJ_IMAGE], max_depth=3):
-                    try:
-                        left, bottom, right, top = _get_pdfium_page_object_bounds(page_object)
-                        image_area += max(0.0, right - left) * max(0.0, top - bottom)
-                    finally:
-                        close_pdfium_child(page_object)
-
-                coverage_ratio = min(image_area / page_area, 1.0) if page_area > 0 else 0.0
+                coverage_ratio = _page_image_coverage_ratio(page)
                 if coverage_ratio >= HIGH_IMAGE_COVERAGE_THRESHOLD:
                     high_image_coverage_pages += 1
             finally:

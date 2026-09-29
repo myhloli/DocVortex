@@ -96,6 +96,57 @@ pub fn read_pdfium_objects(
     })
 }
 
+/// 按固定批次向 Python 物化轴线数值记录，避免整页同时持有两份大列表。
+#[pyclass(module = "docvortex._native")]
+pub struct PdfiumDrawingLineBatches {
+    records: std::vec::IntoIter<docvortex_pdfium::drawing_lines::Line>,
+}
+
+#[pymethods]
+impl PdfiumDrawingLineBatches {
+    /// 返回当前迭代器以供页面作用域内同步消费。
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
+    }
+
+    /// 每次最多返回 1024 条线，剩余记录仍留在 Rust 内。
+    fn __next__(&mut self) -> Option<Vec<docvortex_pdfium::drawing_lines::Line>> {
+        let records: Vec<_> = self.records.by_ref().take(RECORD_BATCH_SIZE).collect();
+        if records.is_empty() {
+            None
+        } else {
+            Some(records)
+        }
+    }
+}
+
+/// 对简单描边 Path 批量提取轴线；不支持的复杂页返回 None 供参考实现处理。
+#[pyfunction]
+pub fn read_pdfium_drawing_lines(
+    addresses: Vec<usize>,
+    handle: usize,
+    bbox: [f64; 4],
+    rotation: i32,
+) -> PyResult<Option<PdfiumDrawingLineBatches>> {
+    let records = unsafe {
+        docvortex_pdfium::drawing_lines::read_fast_lines(addresses, handle, bbox, rotation)
+    }
+    .map_err(|error| match error {
+        ReadError::InvalidInput(message) => PyValueError::new_err(message),
+        ReadError::Pdfium(message) => PdfiumReadError::new_err(message),
+        ReadError::Allocation(message) => PyMemoryError::new_err(message),
+    })?;
+    Ok(records.map(|items| PdfiumDrawingLineBatches {
+        records: items.into_iter(),
+    }))
+}
+
+/// 暴露最近一次显式剖析的绘图线读取阶段耗时，单位为纳秒。
+#[pyfunction]
+pub fn pdfium_drawing_line_stage_stats() -> (u64, u64, u64) {
+    docvortex_pdfium::drawing_lines::stage_stats()
+}
+
 type VisualRecord = (
     u32,
     f64,
