@@ -50,6 +50,8 @@ def _recover_native_table_html(
     rectangles: tuple[NativeTableRectangle, ...] | None = None,
     tight_bboxes: dict[int, BBox] | None = None,
     origins: dict[int, tuple[float, float]] | None = None,
+    *,
+    _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
 ) -> str:
     """使用共享原生字符与绘图原语恢复高置信表格 HTML。"""
 
@@ -61,7 +63,12 @@ def _recover_native_table_html(
         drawing_lines=(drawing_lines if drawing_lines is not None else coerce_native_table_rules(source.drawing_lines)),
         rectangles=(rectangles if rectangles is not None else coerce_native_table_rectangles(source.path_infos)),
     )
-    recovered = recover_table_result(table_input, tight_bboxes or {}, origins or {})
+    recovered = recover_table_result(
+        table_input,
+        tight_bboxes or {},
+        origins or {},
+        _owned_script_inputs=_owned_script_inputs,
+    )
     return recovered[0] if recovered is not None else ""
 
 
@@ -71,6 +78,7 @@ def _materialize_table_blocks(
     *,
     tight_bboxes: dict[int, BBox] | None = None,
     origins: dict[int, tuple[float, float]] | None = None,
+    _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], set[int]]:
     """原子物化表体及其独立注释，仅认领整组成功输出的文本行。"""
 
@@ -109,6 +117,7 @@ def _materialize_table_blocks(
                 native_rectangles,
                 tight_bboxes,
                 origins,
+                _owned_script_inputs=_owned_script_inputs,
             )
         except Exception as exc:
             logger.warning(
@@ -541,6 +550,8 @@ def recover_table_result(
     table_input: NativeTableInput,
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
+    *,
+    _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
 ) -> tuple[str, NativeTableResult] | None:
     """统一表格恢复和上下标物化，保留调用方接受或回退的决策权。"""
     try:
@@ -549,5 +560,11 @@ def recover_table_result(
         raise PDFTableRecoveryError(str(error)) from error
     if result is None:
         return None
-    content = render_native_table_html_with_scripts(result, table_input, tight_bboxes, origins)
+    content = render_native_table_html_with_scripts(
+        result,
+        table_input,
+        tight_bboxes,
+        origins,
+        _owned_script_inputs=_owned_script_inputs,
+    )
     return content, result

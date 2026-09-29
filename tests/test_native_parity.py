@@ -31,6 +31,7 @@ def test_native_registration_contract(native):
         "build_geometry_runs": "(samples, by_line, keys, sample_type, run_type)",
         "text_snapshot_stats": "()",
         "visual_evidence_stage_stats": "()",
+        "geometry_evidence_stats": "()",
         "classification_snapshot_stats": "()",
         "read_pdfium_classification": "(addresses, handle, count, cjk_ranges, allowed_controls, private_range, normalize_font)",
         "script_snapshot_stats": "()",
@@ -85,7 +86,9 @@ def test_native_registration_contract(native):
         "NativeTableMerger": ("docvortex._native", "()"),
         "NativeStyleDocument": ("docvortex._native", "(with_samples=False)"),
         "NativeGeometryRisk": ("docvortex._native", "()"),
+        "NativeGeometryRuns": ("docvortex._native", "()"),
         "NativeTextSnapshot": ("docvortex._native", None),
+        "NativeGeometryEvidence": ("docvortex._native", None),
         "NativeClassificationSnapshot": ("docvortex._native", None),
         "NativeScriptEvidence": ("docvortex._native", None),
         "NativeFontProvider": (
@@ -107,7 +110,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 27, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 28, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)
