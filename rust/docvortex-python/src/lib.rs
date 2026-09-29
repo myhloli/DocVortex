@@ -63,6 +63,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         snapshot::read_pdfium_text_snapshot,
         module
     )?)?;
+    module.add_function(wrap_pyfunction!(
+        snapshot::visual_evidence_stage_stats,
+        module
+    )?)?;
     module.add_class::<fonts::NativeFontProvider>()?;
     module.add_class::<table_candidates::PreparedRuleCandidates>()?;
     module.add_function(wrap_pyfunction!(text_pipeline::group_text_lines, module)?)?;
@@ -92,6 +96,9 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         pdfium::pdfium_drawing_line_stage_stats,
         module
     )?)?;
+    module.add_class::<pdfium::PdfiumPathLineBatches>()?;
+    module.add_class::<pdfium::PdfiumPathInfoBatches>()?;
+    module.add_function(wrap_pyfunction!(pdfium::read_pdfium_path_evidence, module)?)?;
     module.add_function(wrap_pyfunction!(
         pdfium::read_pdfium_visual_batches,
         module

@@ -174,6 +174,101 @@ pub fn pdfium_drawing_line_stage_stats() -> (u64, u64, u64) {
     docvortex_pdfium::drawing_lines::stage_stats()
 }
 
+type PathLineRecord = docvortex_pdfium::path_evidence::Line;
+type PathInfoRecord = docvortex_pdfium::path_evidence::PathInfo;
+
+/// 按固定批次物化 Path 绘图线，页面证据仍留在 Rust 直到 Python 消费。
+#[pyclass(module = "docvortex._native")]
+pub struct PdfiumPathLineBatches {
+    records: std::vec::IntoIter<PathLineRecord>,
+}
+
+#[pymethods]
+impl PdfiumPathLineBatches {
+    /// 返回当前批次迭代器。
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
+    }
+
+    /// 每次最多返回 1024 条未合并轴线。
+    fn __next__(&mut self) -> Option<Vec<PathLineRecord>> {
+        let records: Vec<_> = self.records.by_ref().take(RECORD_BATCH_SIZE).collect();
+        (!records.is_empty()).then_some(records)
+    }
+}
+
+/// 按固定批次物化 Path 摘要，避免整页记录在边界外重复保存。
+#[pyclass(module = "docvortex._native")]
+pub struct PdfiumPathInfoBatches {
+    records: std::vec::IntoIter<PathInfoRecord>,
+}
+
+#[pymethods]
+impl PdfiumPathInfoBatches {
+    /// 返回当前批次迭代器。
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
+    }
+
+    /// 每次最多返回 1024 条路径摘要。
+    fn __next__(&mut self) -> Option<Vec<PathInfoRecord>> {
+        let records: Vec<_> = self.records.by_ref().take(RECORD_BATCH_SIZE).collect();
+        (!records.is_empty()).then_some(records)
+    }
+}
+
+/// 单次遍历批量生成 Path 双侧证据；复杂状态也留在原生路径中复刻。
+#[pyfunction]
+pub fn read_pdfium_path_evidence(
+    py: Python<'_>,
+    addresses: Vec<usize>,
+    handle: usize,
+    frame: [f64; 4],
+    rotation: i32,
+    max_depth: usize,
+    want_lines: bool,
+    want_infos: bool,
+) -> PyResult<Option<(PdfiumPathLineBatches, PdfiumPathInfoBatches)>> {
+    if !want_lines && !want_infos {
+        return Err(PyValueError::new_err(
+            "PDFium path evidence requires one output side",
+        ));
+    }
+    let hypot = py.import("math")?.getattr("hypot")?;
+    let records = unsafe {
+        docvortex_pdfium::path_evidence::read_path_evidence_with_hypot(
+            addresses,
+            handle,
+            frame,
+            rotation,
+            max_depth,
+            want_lines,
+            want_infos,
+            // 保持解释器 math.hypot 的逐位语义；异常输入由其返回 NaN/Inf，不中断同页。
+            |x: f64, y: f64| {
+                hypot
+                    .call1((x, y))
+                    .and_then(|value| value.extract::<f64>())
+                    .unwrap_or(f64::NAN)
+            },
+        )
+    }
+    .map_err(|error| match error {
+        ReadError::InvalidInput(message) => PyValueError::new_err(message),
+        ReadError::Pdfium(message) => PdfiumReadError::new_err(message),
+        ReadError::Allocation(message) => PyMemoryError::new_err(message),
+    })?;
+    let (lines, infos) = records;
+    Ok(Some((
+        PdfiumPathLineBatches {
+            records: lines.into_iter(),
+        },
+        PdfiumPathInfoBatches {
+            records: infos.into_iter(),
+        },
+    )))
+}
+
 type VisualRecord = (
     u32,
     f64,

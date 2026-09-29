@@ -157,6 +157,8 @@ def test_drawing_lines_skip_path_info_construction(monkeypatch) -> None:
 
 def test_path_dual_consumption_reads_draw_state_once(monkeypatch) -> None:
     """同一 Path 同时产出线与摘要时，绘制状态只允许读取一次。"""
+    from docvortex.document.pdf import _object_bridge
+
     original = native_objects._get_path_visibility
     calls = 0
 
@@ -167,12 +169,36 @@ def test_path_dual_consumption_reads_draw_state_once(monkeypatch) -> None:
         return original(*args, **kwargs)
 
     monkeypatch.setattr(native_objects, "_get_path_visibility", counted)
+    # 联合属性读取是 Python 参考路径的约束；原生批量路径另由桥接命中测试覆盖。
+    monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
     with PDFDocument(_vector_page_pdf(5)) as document:
         vector = document[0].get_vector_geometry()
         lines, path_infos = vector.drawing_lines, vector.path_infos
     assert lines
     assert len(path_infos) == 5
     assert calls == 5
+
+
+def test_native_path_evidence_matches_python_reference(monkeypatch) -> None:
+    """批量原生 Path 证据与逐对象 Python 参考输出逐字段且按顺序一致。"""
+    from docvortex.document.pdf import _object_bridge
+    from docvortex._compute_backend import backend_info, get_native
+    from docvortex.document.pdf.native_coordinates import _normalize_pdf_page_bbox
+
+    original_reader = _object_bridge.read_path_evidence
+    with PDFDocument(_vector_page_pdf(80)) as document:
+        with document._open_page(0) as page:
+            bbox = _normalize_pdf_page_bbox(page.get_bbox())
+            native_lines, native_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+            monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
+            reference_lines, reference_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+
+    monkeypatch.setattr(_object_bridge, "read_path_evidence", original_reader)
+    assert native_lines == reference_lines
+    assert native_infos == reference_infos
+    assert len(native_infos) == 80
+    if get_native() is not None:
+        assert backend_info()["pdfium_path_evidence_bridge_calls"] >= 1
 
 
 def test_drawing_lines_match_vector_and_snapshot_entries() -> None:

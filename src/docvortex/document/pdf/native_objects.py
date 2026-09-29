@@ -1077,6 +1077,30 @@ def _extract_page_paths_and_lines(
     standard_path = (
         _path_info_from_object is _STANDARD_PATH_INFO_EXTRACTOR and _extract_path_drawing_lines is _STANDARD_PATH_LINE_EXTRACTOR
     )
+    if standard_path:
+        from ._object_bridge import read_path_evidence
+
+        native_records = read_path_evidence(
+            page,
+            page_bbox,
+            page_rotation,
+            DRAWING_FORM_MAX_DEPTH,
+            want_lines=want_lines,
+            want_path_infos=want_path_infos,
+        )
+        if native_records is not None:
+            native_lines, native_infos = native_records
+            drawing_lines = [
+                PDFDrawingLine(start, end, bbox, width, "horizontal" if orientation == 0 else "vertical")
+                for start, end, bbox, width, orientation in native_lines
+            ]
+            path_infos = [PDFPathInfo(*record) for record in native_infos]
+            merged_lines = (
+                _merge_collinear_drawing_lines(drawing_lines, _drawing_page_size(page_bbox, page_rotation))
+                if want_lines
+                else drawing_lines
+            )
+            return merged_lines, path_infos
     for source_index, member in enumerate(_clipped_objects_of_type(page, pdfium_c.FPDF_PAGEOBJ_PATH)):
         raw_obj, matrix, form_depth = member.raw, member.matrix, member.depth
         try:

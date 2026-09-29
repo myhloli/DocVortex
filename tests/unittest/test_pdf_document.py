@@ -1199,6 +1199,7 @@ def test_native_page_snapshot_opens_once_and_closes_after_failure(monkeypatch: p
 
 def test_native_page_snapshot_decodes_each_path_once(monkeypatch: pytest.MonkeyPatch) -> None:
     """同一 Path 解码由绘图线和路径信息共享，避免独立接口的重复工作。"""
+    from docvortex.document.pdf import _object_bridge
 
     counts: list[object] = []
     original = pdf_document._read_raw_path_subpaths
@@ -1210,6 +1211,9 @@ def test_native_page_snapshot_decodes_each_path_once(monkeypatch: pytest.MonkeyP
         return original(raw_object)
 
     monkeypatch.setattr(native_objects, "_read_raw_path_subpaths", record_decode)
+    # 本例验证 Python 联合解码；原生批量路径和简单绘图线各有独立桥接测试。
+    monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
+    monkeypatch.setattr(_object_bridge, "read_drawing_lines", lambda *args, **kwargs: None)
     with pdf_document.PDFDocument(_build_drawing_pdf()) as document:
         document.get_page_drawing_lines(0)
         document.get_page_path_infos(0)

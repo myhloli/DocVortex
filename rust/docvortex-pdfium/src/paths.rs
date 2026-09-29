@@ -4,6 +4,19 @@ use crate::ReadError;
 use std::ffi::{c_float, c_int, c_void};
 
 pub type Point = (f64, f64);
+type CountFn = unsafe extern "system" fn(*mut c_void) -> c_int;
+type GetFn = unsafe extern "system" fn(*mut c_void, c_int) -> *mut c_void;
+type PointFn = unsafe extern "system" fn(*mut c_void, *mut c_float, *mut c_float) -> c_int;
+type SegmentFlagFn = unsafe extern "system" fn(*mut c_void) -> c_int;
+
+/// Path 段读取 ABI；同一页所有对象复用函数指针，不做逐对象重建。
+pub struct Api {
+    pub(crate) count: CountFn,
+    pub(crate) get: GetFn,
+    pub(crate) point: PointFn,
+    pub(crate) kind: SegmentFlagFn,
+    pub(crate) closes: SegmentFlagFn,
+}
 
 #[derive(Default)]
 pub struct Subpath {
@@ -25,28 +38,36 @@ pub unsafe fn read_subpaths(
             "invalid PDFium path bridge arguments",
         ));
     }
-    let count: unsafe extern "system" fn(*mut c_void) -> c_int = std::mem::transmute(addresses[0]);
-    let get: unsafe extern "system" fn(*mut c_void, c_int) -> *mut c_void =
-        std::mem::transmute(addresses[1]);
-    let point: unsafe extern "system" fn(*mut c_void, *mut c_float, *mut c_float) -> c_int =
-        std::mem::transmute(addresses[2]);
-    let kind: unsafe extern "system" fn(*mut c_void) -> c_int = std::mem::transmute(addresses[3]);
-    let closes: unsafe extern "system" fn(*mut c_void) -> c_int = std::mem::transmute(addresses[4]);
+    let api = Api {
+        count: std::mem::transmute::<usize, CountFn>(addresses[0]),
+        get: std::mem::transmute::<usize, GetFn>(addresses[1]),
+        point: std::mem::transmute::<usize, PointFn>(addresses[2]),
+        kind: std::mem::transmute::<usize, SegmentFlagFn>(addresses[3]),
+        closes: std::mem::transmute::<usize, SegmentFlagFn>(addresses[4]),
+    };
+    read_subpaths_with(&api, handle)
+}
+
+/// 使用已核验 ABI 解码一个 Path；段读取失败时保留参考实现的跳过语义。
+///
+/// # Safety
+/// 调用方须保持对象所属页面存活，并持有 PDFium 全局访问锁。
+pub unsafe fn read_subpaths_with(api: &Api, handle: usize) -> Result<Vec<Subpath>, ReadError> {
     let mut output = Vec::new();
     let mut current = Subpath::default();
     let mut current_index = 0;
-    for index in 0..count(handle as *mut c_void).max(0) {
-        let segment = get(handle as *mut c_void, index);
+    for index in 0..(api.count)(handle as *mut c_void).max(0) {
+        let segment = (api.get)(handle as *mut c_void, index);
         if segment.is_null() {
             continue;
         }
         let (mut x, mut y) = (0.0, 0.0);
-        if point(segment, &mut x, &mut y) == 0 {
+        if (api.point)(segment, &mut x, &mut y) == 0 {
             continue;
         }
         let value = (f64::from(x), f64::from(y));
-        let segment_type = kind(segment);
-        let segment_closes = closes(segment) != 0;
+        let segment_type = (api.kind)(segment);
+        let segment_closes = (api.closes)(segment) != 0;
         if segment_type == 2 {
             if !current.points.is_empty() {
                 output.push(std::mem::take(&mut current));

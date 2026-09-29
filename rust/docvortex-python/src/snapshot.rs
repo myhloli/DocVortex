@@ -843,6 +843,9 @@ impl NativeTextSnapshot {
         rotation: i32,
         supported_angles: Vec<f64>,
     ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyList>)> {
+        // 剖析开关只统计私有管线的五个连续阶段，不影响正式解析结果。
+        let profile = std::env::var_os("DOCVORTEX_PROFILE_VISUAL_EVIDENCE").is_some();
+        let total_started = std::time::Instant::now();
         if size.iter().chain(&supported_angles).any(|v| !v.is_finite()) {
             return Err(PyValueError::new_err("nonfinite visual snapshot arguments"));
         }
@@ -892,7 +895,11 @@ impl NativeTextSnapshot {
                 font_weight,
             });
         }
+        let font_ns = total_started.elapsed();
+        let unicode_started = std::time::Instant::now();
         let unicode = super::text_pipeline::unicode_properties(py, &records)?;
+        let unicode_ns = unicode_started.elapsed();
+        let runs_started = std::time::Instant::now();
         let runs = py.detach(|| {
             text_pipeline::prepare_visual_lines(
                 &records,
@@ -903,8 +910,49 @@ impl NativeTextSnapshot {
                 &families,
             )
         });
+        let runs_ns = runs_started.elapsed();
+        let geometry_started = std::time::Instant::now();
         let (geometry, chars) = self.geometry(py)?;
+        let geometry_ns = geometry_started.elapsed();
+        let materialize_started = std::time::Instant::now();
         let lines = super::text_pipeline::materialize_visual_runs(py, &chars, runs, &signatures)?;
+        let materialize_ns = materialize_started.elapsed();
+        if profile {
+            record_visual_stage_stats([
+                font_ns,
+                unicode_ns,
+                runs_ns,
+                geometry_ns,
+                materialize_ns,
+                total_started.elapsed(),
+            ]);
+        }
         Ok((geometry, lines))
     }
 }
+
+/// 累计剖析中的视觉证据阶段耗时，单位为纳秒。
+fn record_visual_stage_stats(values: [std::time::Duration; 6]) {
+    let mut slot = VISUAL_STAGE_NS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut next = [0; 7];
+    next[..6].copy_from_slice(&slot[..6]);
+    for (index, value) in values.iter().enumerate() {
+        next[index] = next[index].saturating_add(value.as_nanos() as u64);
+    }
+    next[6] = slot[6].saturating_add(1);
+    *slot = next;
+}
+
+/// 暴露累计视觉证据剖析，最后一项为页面调用数。
+#[pyfunction]
+pub fn visual_evidence_stage_stats() -> [u64; 7] {
+    let slot = VISUAL_STAGE_NS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    *slot
+}
+
+/// 保存累计视觉证据剖析的阶段耗时和调用数。
+static VISUAL_STAGE_NS: std::sync::Mutex<[u64; 7]> = std::sync::Mutex::new([0; 7]);

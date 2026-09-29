@@ -30,6 +30,7 @@ def test_native_registration_contract(native):
         "build_geometry_style": "(samples, by_line, keys, sample_type, run_type, line_type, page_sizes=None, bbox_type=None)",
         "build_geometry_runs": "(samples, by_line, keys, sample_type, run_type)",
         "text_snapshot_stats": "()",
+        "visual_evidence_stage_stats": "()",
         "classification_snapshot_stats": "()",
         "read_pdfium_classification": "(addresses, handle, count, cjk_ranges, allowed_controls, private_range, normalize_font)",
         "script_snapshot_stats": "()",
@@ -62,6 +63,7 @@ def test_native_registration_contract(native):
         "read_pdfium_text_visibility": "(addresses, handle, frame, rotation, max_depth)",
         "read_pdfium_drawing_lines": "(addresses, handle, bbox, rotation)",
         "pdfium_drawing_line_stage_stats": "()",
+        "read_pdfium_path_evidence": "(addresses, handle, frame, rotation, max_depth, want_lines, want_infos)",
         "read_pdfium_visual_batches": "(addresses, handle, count, extended, frame, angle)",
         "script_roles": "(records)",
         "script_roles_raw": "(loose, tight, origins, flags, fonts, fallback)",
@@ -96,13 +98,15 @@ def test_native_registration_contract(native):
         "PdfiumVisualCharacterBatches": ("docvortex._native", None),
         "PdfiumObjectBatches": ("docvortex._native", None),
         "PdfiumDrawingLineBatches": ("docvortex._native", None),
+        "PdfiumPathLineBatches": ("docvortex._native", None),
+        "PdfiumPathInfoBatches": ("docvortex._native", None),
         "PreparedRuleCandidates": ("builtins", "(centers, rows)"),
         "PdfiumReadError": ("_native", None),
         "StableColumnClusters": ("builtins", "(compensated)"),
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 25, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 26, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)
