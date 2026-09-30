@@ -1101,6 +1101,13 @@ def build_sparse_multiline_candidates(
     candidate = _build_candidate(table_input, text, record)
     if diagnostics is not None and record is not None:
         diagnostics.append(record)
+    if candidate is None:
+        from .grouped_rule_band import build_grouped_rule_band_candidate
+
+        grouped_record: dict[str, Any] = {"source": "sparse_multiline"}
+        candidate = build_grouped_rule_band_candidate(table_input, text, grouped_record)
+        if diagnostics is not None:
+            diagnostics.append(grouped_record)
     return [candidate] if candidate is not None else []
 
 
