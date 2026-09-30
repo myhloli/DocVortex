@@ -60,6 +60,7 @@ def test_native_registration_contract(native):
         "read_pdfium_subpaths": "(addresses, handle)",
         "read_pdfium_text_snapshot": "(addresses, color_addresses, handle, count, extended, frame, rotation, visibility)",
         "read_pdfium_chars": "(addresses, handle, count, extended)",
+        "read_pdfium_char_form_owners": "(function, handle, count, owners)",
         "read_pdfium_objects": "(addresses, handle, kind, max_depth)",
         "read_pdfium_text_visibility": "(addresses, handle, frame, rotation, max_depth)",
         "read_pdfium_drawing_lines": "(addresses, handle, bbox, rotation)",

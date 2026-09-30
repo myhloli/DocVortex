@@ -65,7 +65,10 @@ def _build_caption_graphic_blocks(
     captions = [
         line
         for line in source.lines
-        if line.angle == 0 and _FIGURE_CAPTION_LINE_RE.match(line.text) and line.source_index in caption_line_indices
+        if line.angle == 0
+        and _FIGURE_CAPTION_LINE_RE.match(line.text)
+        and line.source_index in caption_line_indices
+        and not any(_owned_form_member_bbox(source, line, form) is not None for form in source.retained_page_forms)
     ]
     primitives = list(source.image_bboxes) + [
         path.bbox
@@ -168,6 +171,7 @@ def _build_caption_graphic_blocks(
                 and line.bbox[3] <= cb[1]
                 and left <= _bbox_center_x(line.bbox) <= right
                 and _bbox_distance(line.ink_bbox or line.bbox, bbox) <= 4 * em
+                and _form_region_allows_line(source, line, bbox)
                 and (
                     len(line.text.split()) < 8
                     or _bbox_overlap_in_first(line.bbox, bbox) >= 0.9
@@ -223,6 +227,27 @@ def _form_member_bbox(line: _LineItem, form_bbox: BBox) -> BBox | None:
     return ink_bbox if _bbox_overlap_in_first(ink_bbox, form_bbox) >= 0.99 else None
 
 
+def _owned_form_member_bbox(source: _PageSource, line: _LineItem, form_bbox: BBox) -> BBox | None:
+    """有效结构同时要求字符来源属于该 Form；旧快照和未知结构保持原有空间判断。"""
+    members = source.form_member_sources.get(form_bbox)
+    if members is not None:
+        from .form_roles import form_owns_line
+
+        if not form_owns_line(line, members):
+            return None
+    return _form_member_bbox(line, form_bbox)
+
+
+def _form_region_allows_line(source: _PageSource, line: _LineItem, region: BBox) -> bool:
+    """图题合并和后续补认领也检查 Form 归属，图外图题仍可按正常空间证据处理。"""
+    containing = [
+        bbox
+        for bbox in source.form_member_sources
+        if _bbox_overlap_in_first(bbox, region) >= 0.75 and _form_member_bbox(line, bbox) is not None
+    ]
+    return not containing or any(_owned_form_member_bbox(source, line, bbox) is not None for bbox in containing)
+
+
 def _tighten_form_image_bbox(
     source: _PageSource,
     form_bbox: BBox,
@@ -232,7 +257,9 @@ def _tighten_form_image_bbox(
     internal_paths = [
         path_info.bbox
         for path_info in source.path_infos
-        if path_info.form_depth > 0 and _bbox_overlap_in_first(path_info.bbox, form_bbox) >= 0.9
+        if path_info.form_depth > 0
+        and _bbox_overlap_in_first(path_info.bbox, form_bbox) >= 0.9
+        and (form_bbox not in source.form_path_sources or path_info.source_index in source.form_path_sources[form_bbox])
     ]
     internal_drawing_lines = [
         drawing_line.bbox
@@ -242,13 +269,19 @@ def _tighten_form_image_bbox(
     # 至少两个嵌套 Path 和四个矢量元素，避免只凭普通边框或少量文本裁剪 Form。
     if len(internal_paths) < 2 or len(internal_paths) + len(internal_drawing_lines) < 4:
         return form_bbox
-    internal_text = [bbox for line in source.lines if (bbox := _form_member_bbox(line, form_bbox)) is not None]
+    internal_text = [bbox for line in source.lines if (bbox := _owned_form_member_bbox(source, line, form_bbox)) is not None]
     internal_text.extend(
         bbox
         for char in source.chars
         if str(char.get("char", "")).strip()
         and (bbox := _coerce_bbox(char.get("tight_bbox"))) is not None
         and _bbox_overlap_in_first(bbox, form_bbox) >= 0.99
+        and (
+            form_bbox not in source.form_member_sources
+            or any(
+                index in source.form_member_sources[form_bbox] for index in char.get("source_indices", (char.get("char_idx"),))
+            )
+        )
     )
     evidence_bbox = _clip_bbox(
         _bbox_union_many(internal_paths + internal_drawing_lines + internal_text),
@@ -285,8 +318,11 @@ def _select_form_image_bboxes(source: _PageSource) -> list[BBox]:
         width = bbox[2] - bbox[0]
         height = bbox[3] - bbox[1]
         area_ratio = _bbox_area(bbox) / page_area
+        # 实际调用树已确认这是保留的 Form；满页真实图形不能被旧面积上限排除。
+        retained_form = any(form.bbox == raw_bbox for form in source.form_infos)
         if not (
-            _MIN_FORM_IMAGE_PAGE_AREA_RATIO <= area_ratio <= _MAX_FORM_IMAGE_PAGE_AREA_RATIO
+            _MIN_FORM_IMAGE_PAGE_AREA_RATIO <= area_ratio
+            and (area_ratio <= _MAX_FORM_IMAGE_PAGE_AREA_RATIO or retained_form)
             and width >= 4.0 * median_height
             and height >= 4.0 * median_height
         ):
@@ -295,14 +331,19 @@ def _select_form_image_bboxes(source: _PageSource) -> list[BBox]:
         member_rows = {
             line.visual_row_id if line.visual_row_id is not None else line.source_index
             for line in source.lines
-            if _form_member_bbox(line, bbox) is not None
+            if _owned_form_member_bbox(source, line, bbox) is not None
         }
         internal_drawing_count = sum(
             _bbox_overlap_in_first(drawing_line.bbox, bbox) >= 0.9 for drawing_line in source.drawing_lines
         )
         if len(member_rows) < 2 and internal_drawing_count < 4:
             continue
-        output.append(_tighten_form_image_bbox(source, bbox))
+        tightened = _tighten_form_image_bbox(source, bbox)
+        if raw_bbox in source.form_member_sources:
+            source.form_member_sources[tightened] = source.form_member_sources[raw_bbox]
+        if raw_bbox in source.form_path_sources:
+            source.form_path_sources[tightened] = source.form_path_sources[raw_bbox]
+        output.append(tightened)
     return sorted(output, key=lambda bbox: (bbox[1], bbox[0], bbox[3], bbox[2]))
 
 
@@ -321,7 +362,9 @@ def _build_form_image_blocks(
         if line.source_index in claimed_line_indices:
             continue
         matching_indices = [
-            candidate_index for candidate_index, bbox in enumerate(form_bboxes) if _form_member_bbox(line, bbox) is not None
+            candidate_index
+            for candidate_index, bbox in enumerate(form_bboxes)
+            if _owned_form_member_bbox(source, line, bbox) is not None
         ]
         if not matching_indices:
             continue

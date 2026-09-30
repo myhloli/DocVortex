@@ -9,6 +9,23 @@ use docvortex_pdfium::{Fonts, ReadError, Record};
 
 pub const RECORD_BATCH_SIZE: usize = 1024;
 
+/// 在现有锁和文本页生命周期内批量读取字符 Form 编号，结果不含借用地址。
+#[pyfunction]
+pub fn read_pdfium_char_form_owners(
+    function: usize,
+    handle: usize,
+    count: usize,
+    owners: std::collections::HashMap<usize, usize>,
+) -> PyResult<Vec<Option<usize>>> {
+    unsafe { docvortex_pdfium::read_char_form_owners(function, handle, count, owners) }.map_err(
+        |error| match error {
+            ReadError::InvalidInput(message) => PyValueError::new_err(message),
+            ReadError::Pdfium(message) => PdfiumReadError::new_err(message),
+            ReadError::Allocation(message) => PyMemoryError::new_err(message),
+        },
+    )
+}
+
 /// 仅在最终边界构造点和端点索引，Python 复用同一点对象建立直线记录。
 #[pyfunction]
 pub fn read_pdfium_subpaths(

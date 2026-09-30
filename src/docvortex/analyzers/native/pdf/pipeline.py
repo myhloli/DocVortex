@@ -63,6 +63,7 @@ from .graphics import (
     _build_raster_image_blocks,
     _detect_strong_graphic_bboxes,
     _form_supersedes_nested_bbox,
+    _form_region_allows_line,
     _select_form_image_bboxes,
     _split_parallel_graphic_rule_rows,
 )
@@ -394,6 +395,7 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
             signature_bboxes=snapshot.signature_bboxes,
             form_bboxes=snapshot.form_bboxes,
             path_infos=snapshot.path_infos,
+            form_infos=getattr(snapshot, "form_infos", ()),
         )
         page_sources.append(source)
         page_text_geometries.append(text_geometry)
@@ -437,6 +439,9 @@ def _prepare_document_sources(
     if geometry_diagnostics is not None:
         geometry_diagnostics.append(geometry_plan.to_dict())
     _classify_raw_page_marginals(sources.page_sources)
+    from .form_roles import normalize_page_forms
+
+    normalize_page_forms(sources.page_sources)
     separators = _detect_repeated_header_separator_bboxes(sources.page_sources)
     repaired_chars_by_page: dict[int, dict[int, BBox]] = {}
     for (page_index, char_idx), repair in geometry_plan.char_repairs.items():
@@ -817,7 +822,11 @@ def _prepare_page_source(
         if line.semantic_type is not None or _is_strong_caption_text(line.text):
             continue
         ink = line.ink_bbox or line.bbox
-        matches = [block for block in image_containers if _bbox_overlap_in_first(ink, block["bbox"]) >= 0.98]
+        matches = [
+            block
+            for block in image_containers
+            if _bbox_overlap_in_first(ink, block["bbox"]) >= 0.98 and _form_region_allows_line(source, line, block["bbox"])
+        ]
         if matches:
             owner = min(matches, key=lambda block: _bbox_area(block["bbox"]))
             owner["content"] += "\n" + line.text

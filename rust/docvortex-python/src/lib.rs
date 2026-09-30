@@ -83,6 +83,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(dedup::mapping_runs, module)?)?;
     module.add_function(wrap_pyfunction!(dedup::mapping_glyph_rows, module)?)?;
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_chars, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        pdfium::read_pdfium_char_form_owners,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_char_batches, module)?)?;
     module.add_class::<pdfium::PdfiumCharacterBatches>()?;
     module.add_class::<pdfium::PdfiumVisualCharacterBatches>()?;

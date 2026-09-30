@@ -42,6 +42,37 @@ pub type Record = (
 );
 pub type Fonts = Vec<(Vec<u8>, i32)>;
 
+/// 只在文本页存活期间把字符对象地址转换为宿主分配的 Form 编号。
+///
+/// # Safety
+/// 调用方须核验 FPDFText_GetTextObject 的 ABI，持有同库函数、文本页和 PDFium 锁。
+pub unsafe fn read_char_form_owners(
+    function: usize,
+    handle: usize,
+    count: usize,
+    owners: HashMap<usize, usize>,
+) -> Result<Vec<Option<usize>>, ReadError> {
+    if function == 0 || handle == 0 || count > c_int::MAX as usize || owners.contains_key(&0) {
+        return Err(ReadError::InvalidInput(
+            "invalid PDFium character ownership arguments",
+        ));
+    }
+    let getter: unsafe extern "system" fn(*mut c_void, c_int) -> *mut c_void =
+        std::mem::transmute(function);
+    let mut output = Vec::new();
+    output
+        .try_reserve(count)
+        .map_err(|_| ReadError::Allocation("character ownership allocation failed"))?;
+    for index in 0..count {
+        output.push(
+            owners
+                .get(&(getter(handle as *mut c_void, index as c_int) as usize))
+                .copied(),
+        );
+    }
+    Ok(output)
+}
+
 /// 在调用方持有运行时锁期间同步读取字符，结果不拥有任何 PDFium 句柄。
 ///
 /// # Safety

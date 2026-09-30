@@ -11,6 +11,7 @@ from ....document.pdf.text._contracts import Char
 from ....schema import BBox
 
 if TYPE_CHECKING:
+    from ....document.pdf.form_structure import _PDFFormInfo
     from .inline.types import PDFTextScriptLine
 
 
@@ -289,6 +290,10 @@ class _PageSource:
     page_index: int | None = None
     publication_bboxes: list[BBox] = field(default_factory=list)
     drawing_component_cache: list[tuple[list[_AxisLine], float, list[_DrawingComponentSummary]]] = field(default_factory=list)
+    form_infos: tuple[_PDFFormInfo, ...] = ()
+    form_member_sources: dict[BBox, frozenset[int]] = field(default_factory=dict)
+    form_path_sources: dict[BBox, frozenset[int]] = field(default_factory=dict)
+    retained_page_forms: set[BBox] = field(default_factory=set)
 
 
 @dataclass(slots=True)

@@ -133,6 +133,25 @@ class PDFPageVectorGeometry:
     path_infos: tuple[PDFPathInfo, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class _PDFFormInfo:
+    """一个 Form 调用的自有证据；来源编号保持原字符与 Path 的遍历身份。"""
+
+    instance_id: int
+    parent_id: int | None
+    occurrence: tuple[int, ...]
+    bbox: BBox
+    declared_bbox: BBox | None
+    media_bbox: BBox
+    matrix: tuple[float, ...]
+    clip: BBox | None
+    paint_order: int
+    text_indices: frozenset[int]
+    path_indices: frozenset[int]
+    image_bboxes: tuple[BBox, ...]
+    structure_valid: bool
+
+
 @dataclass(frozen=True, slots=True, init=False)
 class _PDFPageSnapshot:
     """保存单次页面提取的自有原生文本或兼容证据，不持有 PDFium 子对象。"""
@@ -147,6 +166,7 @@ class _PDFPageSnapshot:
     signature_bboxes: list[BBox]
     link_annotations: list[PDFLinkAnnotation]
     native_text: Any = None
+    form_infos: tuple[_PDFFormInfo, ...] = ()
 
     def __init__(
         self,
@@ -160,6 +180,7 @@ class _PDFPageSnapshot:
         signature_bboxes: list[BBox],
         link_annotations: list[PDFLinkAnnotation],
         native_text: Any = None,
+        form_infos: tuple[_PDFFormInfo, ...] = (),
     ) -> None:
         """保留既有text_geometry构造关键字和位置顺序，内部字段仅用于惰性兼容缓存。"""
         for name, value in (
@@ -173,6 +194,7 @@ class _PDFPageSnapshot:
             ("signature_bboxes", signature_bboxes),
             ("link_annotations", link_annotations),
             ("native_text", native_text),
+            ("form_infos", form_infos),
         ):
             object.__setattr__(self, name, value)
 
