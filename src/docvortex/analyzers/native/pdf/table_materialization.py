@@ -52,6 +52,7 @@ def _recover_native_table_html(
     origins: dict[int, tuple[float, float]] | None = None,
     *,
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
+    preserve_font_styles: bool = False,
 ) -> str:
     """使用共享原生字符与绘图原语恢复高置信表格 HTML。"""
 
@@ -68,6 +69,7 @@ def _recover_native_table_html(
         tight_bboxes or {},
         origins or {},
         _owned_script_inputs=_owned_script_inputs,
+        preserve_font_styles=preserve_font_styles,
     )
     return recovered[0] if recovered is not None else ""
 
@@ -78,6 +80,7 @@ def _materialize_table_blocks(
     *,
     tight_bboxes: dict[int, BBox] | None = None,
     origins: dict[int, tuple[float, float]] | None = None,
+    calibrated_char_bboxes: dict[int, BBox] | None = None,
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], set[int]]:
     """原子物化表体及其独立注释，仅认领整组成功输出的文本行。"""
@@ -86,7 +89,16 @@ def _materialize_table_blocks(
     annotation_blocks: list[dict[str, Any]] = []
     accepted_candidate_bboxes: list[BBox] = []
     claimed: set[int] = set()
-    native_chars = tuple(source.chars)
+    # 只复制已有强证据校准的字符，保持原始来源记录及字符身份不变；未校准文档继续原路径。
+    calibrated = calibrated_char_bboxes or {}
+    native_chars = (
+        tuple(
+            dict(char, bbox=calibrated[char["char_idx"]]) if char.get("char_idx") in calibrated else char
+            for char in source.chars
+        )
+        if calibrated
+        else tuple(source.chars)
+    )
     native_rules = coerce_native_table_rules(source.drawing_lines)
     native_rectangles = coerce_native_table_rectangles(source.path_infos)
     for candidate in sorted(candidates, key=lambda item: item.score, reverse=True):
@@ -113,11 +125,16 @@ def _materialize_table_blocks(
                 body_bbox,
                 candidate.angle,
                 native_chars,
-                native_rules,
-                native_rectangles,
+                (() if candidate.inferred_grid_authoritative else native_rules)
+                + coerce_native_table_rules(candidate.inferred_grid),
+                () if candidate.inferred_grid_authoritative else native_rectangles,
                 tight_bboxes,
                 origins,
                 _owned_script_inputs=_owned_script_inputs,
+                preserve_font_styles=candidate.preserve_inline_font_styles
+                or any(
+                    _point_in_bbox(((box[0] + box[2]) / 2, (box[1] + box[3]) / 2), body_bbox) for box in calibrated.values()
+                ),
             )
         except Exception as exc:
             logger.warning(
@@ -552,6 +569,7 @@ def recover_table_result(
     origins: dict[int, tuple[float, float]],
     *,
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
+    preserve_font_styles: bool = False,
 ) -> tuple[str, NativeTableResult] | None:
     """统一表格恢复和上下标物化，保留调用方接受或回退的决策权。"""
     try:
@@ -566,5 +584,6 @@ def recover_table_result(
         tight_bboxes,
         origins,
         _owned_script_inputs=_owned_script_inputs,
+        preserve_font_styles=preserve_font_styles,
     )
     return content, result

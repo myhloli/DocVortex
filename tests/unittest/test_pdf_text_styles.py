@@ -1947,7 +1947,7 @@ def test_underline_does_not_wrap_boundary_spaces() -> None:
 def test_applies_style_specific_scope_to_natural_language_blocks(
     block_type: str,
 ) -> None:
-    """验证粗体和下划线仅进入 text，删除线保持自然语言范围。"""
+    """验证正文保留粗体与下划线、目录保留粗体，删除线保持自然语言范围。"""
 
     blocks = [
         {
@@ -1973,7 +1973,10 @@ def test_applies_style_specific_scope_to_natural_language_blocks(
 
     apply_pdf_text_styles(blocks, lines, (100.0, 100.0))
 
-    expected_styles = "bold,underline,strikethrough" if block_type == BlockType.TEXT else "strikethrough"
+    expected_styles = {
+        BlockType.TEXT: "bold,underline,strikethrough",
+        BlockType.INDEX: "bold,strikethrough",
+    }.get(block_type, "strikethrough")
     assert _span_snapshot(blocks[0]["content"]) == (f'<text style="{expected_styles}">styled</text>')
 
 

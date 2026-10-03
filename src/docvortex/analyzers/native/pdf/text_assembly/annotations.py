@@ -8,18 +8,67 @@ from typing import Any
 
 from .....schema import BBox
 from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_union_many
-from ..line_layout import _is_structural_typography_gap
+from ..line_layout import _is_structural_typography_gap, _line_effective_height
 from .common import _FIGURE_CAPTION_MARKER_RE, _components_share_lane_role, _merge_internal_text_block_group
+from .continuity import _reassemble_member_lines
+
+
+def _split_labeled_visual_note_blocks(blocks, image_bboxes):
+    """图下说明与来源使用不同标签和物理首行时保留各自边界，页内正文不参与分割。"""
+    output = []
+    for block in blocks:
+        lines = sorted(block.get("_text_lines", []), key=lambda line: (line.bbox[1], line.bbox[0]))
+        if (
+            block.get("type") != "text"
+            or len(lines) < 2
+            or not re.match(r"^\s*(?:notes?|注|备注)\s*[:：]", lines[0].text, re.I)
+        ):
+            output.append(block)
+            continue
+        em = statistics.median(_line_effective_height(line, line.bbox) for line in lines)
+        if not any(
+            0 <= block["bbox"][1] - image[3] <= 6 * em and _bbox_axis_overlap_ratio(block["bbox"], image, axis="x") >= 0.65
+            for image in image_bboxes
+        ):
+            output.append(block)
+            continue
+        cuts = [
+            0,
+            *(
+                index
+                for index, line in enumerate(lines[1:], 1)
+                if re.match(r"^\s*(?:sources?|资料来源|数据来源|来源)\s*[:：]", line.text, re.I)
+            ),
+            len(lines),
+        ]
+        if len(cuts) == 2:
+            output.append(block)
+            continue
+        for start, end in zip(cuts, cuts[1:]):
+            members = lines[start:end]
+            child = dict(block)
+            child["bbox"] = _bbox_union_many([line.bbox for line in members])
+            child["content"] = _reassemble_member_lines(members)
+            child["_text_lines"] = members
+            child["_local_line_bboxes"] = [line.bbox for line in members]
+            child["_local_output_line_bboxes"] = [line.ink_bbox or line.bbox for line in members]
+            child["_line_heights"] = [_line_effective_height(line, line.bbox) for line in members]
+            child["_font_signatures"] = {line.font_signature for line in members if line.font_signature is not None}
+            output.append(child)
+    return output
 
 
 def _merge_image_caption_text_blocks(
     blocks: list[dict[str, Any]],
     image_bboxes: list[BBox],
+    numeric_grid_bboxes: list[BBox] | None = None,
 ) -> list[dict[str, Any]]:
     """逐行恢复图注续文，后续轮次仅延伸尚未结束的图注，不能越过完整句尾吞入正文。"""
     continuation_only = False
     while True:
-        merged = _merge_image_caption_text_pass(blocks, image_bboxes, continuation_only=continuation_only)
+        merged = _merge_image_caption_text_pass(
+            blocks, image_bboxes, continuation_only=continuation_only, numeric_grid_bboxes=numeric_grid_bboxes
+        )
         if len(merged) == len(blocks):
             return merged
         blocks = merged
@@ -31,6 +80,7 @@ def _merge_image_caption_text_pass(
     image_bboxes: list[BBox],
     *,
     continuation_only: bool,
+    numeric_grid_bboxes: list[BBox] | None = None,
 ) -> list[dict[str, Any]]:
     """在图像邻接已成立后，用通用图注标记确认锚点并吸收同字体续行。"""
 
@@ -39,7 +89,7 @@ def _merge_image_caption_text_pass(
     text_indices = [
         index
         for index, block in enumerate(blocks)
-        if block.get("type") == "text"
+        if block.get("type") in {"text", "paragraph_title"}
         and isinstance(block.get("content"), str)
         and isinstance(block.get("bbox"), (list, tuple))
     ]
@@ -59,13 +109,22 @@ def _merge_image_caption_text_pass(
         for index in text_indices
         if _FIGURE_CAPTION_MARKER_RE.match(str(blocks[index]["content"]).strip())
         and not (continuation_only and re.search(r"[.!?。！？][\])’\"']*$", str(blocks[index]["content"]).rstrip()))
-        and any(
-            _caption_seed_matches_image(
-                blocks[index],
-                image_bbox,
-                median_height,
+        and (
+            any(
+                _caption_seed_matches_image(
+                    blocks[index],
+                    image_bbox,
+                    median_height,
+                )
+                for image_bbox in caption_image_bboxes
             )
-            for image_bbox in caption_image_bboxes
+            or (
+                re.search(r"\b(?:graph|chart|plot)\b", str(blocks[index]["content"]), re.I)
+                and any(
+                    _caption_seed_matches_image(blocks[index], box, median_height, max_gap_in_heights=4)
+                    for box in (numeric_grid_bboxes or [])
+                )
+            )
         )
     }
     if not seed_indices:
@@ -158,6 +217,7 @@ def _caption_seed_matches_image(
     block: dict[str, Any],
     image_bbox: BBox,
     median_height: float,
+    max_gap_in_heights: float = 2.5,
 ) -> bool:
     """用上下位置、水平投影和居中关系确认图像下方的图注空间候选。"""
 
@@ -167,7 +227,7 @@ def _caption_seed_matches_image(
     vertical_gap = max(0.0, bbox[1] - image_bbox[3])
     return (
         _bbox_center_y(bbox) >= image_bbox[3] - 0.25 * median_height
-        and vertical_gap <= 2.5 * median_height
+        and vertical_gap <= max_gap_in_heights * median_height
         and _bbox_axis_overlap_ratio(bbox, image_bbox, axis="x") >= 0.35
         and abs(_bbox_center_x(bbox) - _bbox_center_x(image_bbox)) <= 0.35 * max(image_width, block_width)
         and block_width <= 1.75 * image_width
@@ -237,28 +297,67 @@ def _caption_tail_matches_seed(
 ) -> bool:
     """只用同栏角色、字体、邻接和投影把无标记的图注续行接回锚点。"""
 
+    if candidate.get("_protected_hard_break_before") and str(seed.get("content", "")).rstrip().endswith((")", "）")):
+        # 已闭合括号署名之后的独立正文段界不能被图注补接抹掉；出版信息的普通句尾仍可续接。
+        return False
     seed_bbox = seed["bbox"]
     candidate_bbox = candidate["bbox"]
+    seed_heights = seed.get("_line_heights", [])
+    candidate_heights = candidate.get("_line_heights", [])
+    em = statistics.median(seed_heights) if seed_heights else median_height
+    if candidate.get("type") == "paragraph_title":
+        # 局部栏带可能把细小的图题尾行提升为标题；只回收同字体同尺度且无粗体结构证据的短尾。
+        seed_fonts = seed.get("_font_signatures")
+        tail_fonts = candidate.get("_font_signatures")
+        if (
+            not candidate_heights
+            or len(candidate_heights) > 2
+            or max(candidate_heights) > 1.1 * em
+            or not isinstance(seed_fonts, set)
+            or not isinstance(tail_fonts, set)
+            or not seed_fonts.intersection(tail_fonts)
+            or any((line.dominant_font_weight or 0) >= 600 for line in candidate.get("_text_lines", []))
+        ):
+            return False
+    centered_tail = (
+        bool(candidate_heights)
+        and len(candidate_heights) <= 2
+        and max(candidate_heights) <= 1.1 * em
+        and candidate_bbox[0] >= seed_bbox[0] - 0.25 * em
+        and candidate_bbox[2] <= seed_bbox[2] + 0.25 * em
+        and abs(_bbox_center_x(candidate_bbox) - _bbox_center_x(seed_bbox)) <= 2 * em
+        and -0.25 * em <= candidate_bbox[1] - seed_bbox[3] <= 0.5 * em
+    )
     # 环绕图片的正文可能在末行恢复通栏；其大外框不能充当右栏图注的续行。
     if candidate_bbox[0] < seed_bbox[0] - median_height and abs(
         _bbox_center_x(candidate_bbox) - _bbox_center_x(seed_bbox)
     ) > 0.25 * max(candidate_bbox[2] - candidate_bbox[0], seed_bbox[2] - seed_bbox[0]):
         return False
-    if not _components_share_lane_role(seed, candidate, median_height) and (
-        _bbox_axis_overlap_ratio(seed_bbox, candidate_bbox, axis="x") < 0.75
-        or abs(seed_bbox[0] - candidate_bbox[0]) > median_height
+    if (
+        not centered_tail
+        and not _components_share_lane_role(seed, candidate, median_height)
+        and (
+            _bbox_axis_overlap_ratio(seed_bbox, candidate_bbox, axis="x") < 0.75
+            or abs(seed_bbox[0] - candidate_bbox[0]) > median_height
+        )
     ):
         return False
     if _bbox_center_y(candidate_bbox) <= _bbox_center_y(seed_bbox):
         return False
     if _caption_body_has_structural_gap(seed, candidate):
         return False
+    if candidate_heights and min(candidate_heights) >= 1.15 * em and candidate_bbox[1] - seed_bbox[3] >= 0.5 * em:
+        return False
     vertical_gap = max(0.0, candidate_bbox[1] - seed_bbox[3])
-    if vertical_gap > 0.5 * median_height or _bbox_axis_overlap_ratio(seed_bbox, candidate_bbox, axis="x") < 0.35:
+    parenthetical_tail = str(candidate.get("content", "")).lstrip().startswith(("(", "（"))
+    if (
+        vertical_gap > (em if parenthetical_tail else 0.5 * median_height)
+        or _bbox_axis_overlap_ratio(seed_bbox, candidate_bbox, axis="x") < 0.35
+    ):
         return False
     seed_fonts = seed.get("_font_signatures")
     candidate_fonts = candidate.get("_font_signatures")
-    return not (
+    return centered_tail or not (
         isinstance(seed_fonts, set)
         and seed_fonts
         and isinstance(candidate_fonts, set)
@@ -294,6 +393,17 @@ def _merge_multiline_title_blocks(
             previous_index = groups[-1][-1]
             previous = blocks[previous_index]
             current = blocks[index]
+            current_lines = current.get("_text_lines", [])
+            if (
+                block_type == "paragraph_title"
+                and current_lines
+                and current_lines[0].explicit_section_title
+                and current_lines[0].title_band_id is not None
+            ):
+                previous_lines = previous.get("_text_lines", [])
+                if not previous_lines or previous_lines[-1].title_band_id != current_lines[0].title_band_id:
+                    groups.append([index])
+                    continue
             previous_bbox = previous["bbox"]
             current_bbox = current["bbox"]
             previous_heights = previous.get("_line_heights", [])
@@ -329,6 +439,15 @@ def _merge_multiline_title_blocks(
                 and current_fonts
                 and previous_fonts.isdisjoint(current_fonts)
             )
+            previous_lines = previous.get("_text_lines", [])
+            # 已由几何确认同一结构标题带时，编号与文字可以使用不同字体。
+            shared_structural_band = (
+                bool(previous_lines and current_lines)
+                and previous_lines[-1].structural_title
+                and current_lines[0].structural_title
+                and current_lines[0].title_band_id is not None
+                and previous_lines[-1].title_band_id == current_lines[0].title_band_id
+            )
             if (
                 -0.2 * max(previous_height, current_height) <= vertical_gap <= 0.4 * max(previous_height, current_height)
                 and _bbox_axis_overlap_ratio(
@@ -337,7 +456,7 @@ def _merge_multiline_title_blocks(
                     axis="x",
                 )
                 >= 0.2
-                and not fonts_conflict
+                and (not fonts_conflict or shared_structural_band)
             ):
                 groups[-1].append(index)
             else:

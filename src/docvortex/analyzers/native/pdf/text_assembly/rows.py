@@ -8,7 +8,7 @@ from typing import Sequence
 
 from .....foundation._text import is_hyphen_at_line_end
 from .....schema import BBox
-from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _rotate_bbox_to_upright
+from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _rotate_bbox_to_upright
 from ..line_layout import (
     _connection_crosses_table,
     _effective_body_text_row_gap,
@@ -19,6 +19,7 @@ from ..line_layout import (
     _title_fonts_compatible,
 )
 from ..models import _LineItem, _LocalAxisLine, _TextLane
+from ..inline.types import PDF_FONT_ITALIC_FLAG
 from .common import (
     _ABSTRACT_METADATA_RE,
     _BULLET_ITEM_RE,
@@ -29,6 +30,243 @@ from .common import (
     _REFERENCE_ENTRY_RE,
     _URL_LINE_RE,
 )
+
+
+def _top_marginal_text_break_sources(lane: _TextLane, page_height: float) -> set[int]:
+    """顶边独立编号或较小文字与稳定正文之间保留净空边界，不依赖跨页信息强制分类页眉。"""
+    rows = sorted(lane.lines, key=lambda item: (item[1][1], item[1][0]))
+    output: set[int] = set()
+    for index in range(1, len(rows) - 2):
+        band, body = rows[:index], rows[index : index + 3]
+        if any(bounds[3] > 0.08 * page_height for _, bounds in band):
+            break
+        if any(line.semantic_type is not None or line.caption_start for line, _ in [*band, *body]):
+            continue
+        height = statistics.median(_line_effective_height(line, bounds) for line, bounds in body)
+        if height <= 0 or body[0][1][1] > 0.16 * page_height:
+            continue
+        if any(not 0.85 * height <= _line_effective_height(line, bounds) <= 1.15 * height for line, bounds in body):
+            continue
+        left = body[0][1][0]
+        if any(abs(bounds[0] - left) > height for _, bounds in body):
+            continue
+        if any(len(re.findall(r"[A-Za-z]+|[\u4e00-\u9fff]", line.text)) < 4 for line, _ in body[:2]):
+            continue
+        if any(not -0.4 * height <= after[1][1] - before[1][3] <= height for before, after in zip(body, body[1:])):
+            continue
+        if body[0][1][1] - max(bounds[3] for _, bounds in band) < 0.5 * height:
+            continue
+        if not all(
+            re.fullmatch(r"\d{1,4}", line.text.strip())
+            and bounds[2] - bounds[0] <= 4 * height
+            or _line_effective_height(line, bounds) <= 0.95 * height
+            for line, bounds in band
+        ):
+            continue
+        output.add(body[0][0].source_index)
+        break
+    return output
+
+
+def _repeated_bullet_break_sources(line_geometry: list[tuple[_LineItem, BBox]]) -> set[int]:
+    """同左缘重复圆点形成独立项目起点；分离的圆点同时保护其唯一同排正文，条目长短不影响边界。"""
+    candidates: list[tuple[_LineItem, BBox, _LineItem | None]] = []
+    for marker, bounds in line_geometry:
+        if marker.semantic_type is not None or marker.caption_start or marker.paragraph_group is not None:
+            continue
+        if _BULLET_ITEM_RE.match(marker.text) is None:
+            continue
+        body = None
+        height = _line_effective_height(marker, bounds)
+        if marker.text.strip() in {"•", "●", "▪"}:
+            if bounds[2] - bounds[0] > height:
+                continue
+            hosts = [
+                line
+                for line, bbox in line_geometry
+                if line is not marker
+                and line.semantic_type is None
+                and not line.caption_start
+                and line.paragraph_group is None
+                and not line.formula_candidate_only
+                and 0 <= bbox[0] - bounds[2] <= 3.5 * height
+                and _bbox_axis_overlap_ratio(bounds, bbox, axis="y") >= 0.5
+                and 0.7 * height <= _line_effective_height(line, bbox) <= 1.5 * height
+                and len(re.findall(r"[A-Za-z]{2,}|[\u3400-\u9fff]", line.text)) >= 2
+            ]
+            if len(hosts) != 1:
+                continue
+            body = hosts[0]
+        elif len(re.findall(r"[A-Za-z]{2,}|[\u3400-\u9fff]", marker.text)) < 2:
+            continue
+        candidates.append((marker, bounds, body))
+    output: set[int] = set()
+    for marker, bounds, body in candidates:
+        height = _line_effective_height(marker, bounds)
+        for other, other_bounds, _ in candidates:
+            if other is marker:
+                continue
+            other_height = _line_effective_height(other, other_bounds)
+            if (
+                max(height, other_height) > 1.35 * min(height, other_height)
+                or abs(bounds[0] - other_bounds[0]) > 0.5 * max(height, other_height)
+                or not 0.7 * max(height, other_height)
+                <= abs(_bbox_center_y(bounds) - _bbox_center_y(other_bounds))
+                <= 8 * max(height, other_height)
+            ):
+                continue
+            output.add(marker.source_index)
+            if body is not None:
+                output.add(body.source_index)
+            break
+        if marker.source_index not in output:
+            # 左栏首条可接右栏重复项目；必须同时有左栏冒号引导句与右栏至少两个同式圆点。
+            peers = [
+                (other, box)
+                for other, box, _ in candidates
+                if other is not marker
+                and other.font_signature == marker.font_signature
+                and 0.85 <= _line_effective_height(other, box) / height <= 1.15
+                and box[0] >= bounds[2] + height
+            ]
+            repeated_other_column = any(
+                abs(first_box[0] - second_box[0]) <= 0.5 * height
+                and 0.7 * height <= abs(_bbox_center_y(first_box) - _bbox_center_y(second_box)) <= 8 * height
+                for first, first_box in peers
+                for second, second_box in peers
+                if first is not second
+            )
+            colon_intro = any(
+                line.semantic_type is None
+                and line.paragraph_group is None
+                and line.text.rstrip().endswith((":", "："))
+                and len(re.findall(r"[A-Za-z]{2,}|[\u3400-\u9fff]", line.text)) >= 2
+                and 0 <= bounds[1] - box[3] <= 3 * height
+                and 0 <= bounds[0] - box[0] <= 2 * height
+                for line, box in line_geometry
+            )
+            if repeated_other_column and colon_intro:
+                output.add(marker.source_index)
+                if body is not None:
+                    output.add(body.source_index)
+    return output
+
+
+def _italic_quote_to_body_break_sources(lane: _TextLane) -> set[int]:
+    """两行缩进斜体引文收句后，向左重置的常规正文形成永久段界，防止标题回退后反向粘连。"""
+    rows = sorted(lane.lines, key=lambda item: (item[1][1], item[1][0]))
+    output: set[int] = set()
+    for index in range(2, len(rows) - 1):
+        before, previous, current, following = rows[index - 2 : index + 2]
+        quote_lines = (before, previous)
+        body_lines = (current, following)
+        all_lines = (*quote_lines, *body_lines)
+        if any(
+            line.semantic_type is not None
+            or line.caption_start
+            or line.paragraph_group is not None
+            or line.font_signature is None
+            or line.formula_candidate_only
+            for line, _ in all_lines
+        ):
+            continue
+        if not all(line.font_signature[1] & PDF_FONT_ITALIC_FLAG for line, _ in quote_lines):
+            continue
+        if any(line.font_signature[1] & PDF_FONT_ITALIC_FLAG for line, _ in body_lines):
+            continue
+        height = statistics.median(_line_effective_height(line, bounds) for line, bounds in all_lines)
+        if height <= 0 or any(
+            not 0.85 * height <= _line_effective_height(line, bounds) <= 1.15 * height for line, bounds in all_lines
+        ):
+            continue
+        if (
+            not _title_fonts_compatible(before[0], previous[0])
+            or not _title_fonts_compatible(current[0], following[0])
+            or not (previous[0].paragraph_terminal or re.search(r"[.!?。！？][\])’\"']*$", previous[0].text.rstrip()))
+            or abs(before[1][0] - previous[1][0]) > 0.25 * height
+            or not 0.65 * height <= previous[1][0] - current[1][0] <= 3 * height
+            or current[1][2] - current[1][0] < 0.75 * (lane.right - lane.left)
+            or len(re.findall(r"\b[A-Za-z]{2,}\b", current[0].text)) < 6
+            or not all(-0.1 * height <= _effective_text_row_gap(a, b) <= 0.8 * height for a, b in zip(all_lines, all_lines[1:]))
+        ):
+            continue
+        output.add(current[0].source_index)
+    return output
+
+
+def _caption_to_body_break_sources(lane: _TextLane) -> set[int]:
+    """图注后字号增大且留白重置的正文形成永久边界，避免相同字体家族导致正文被吞入图注。"""
+    output: set[int] = set()
+    active = False
+    caption_left = 0.0
+    caption_center = 0.0
+    rows = sorted(lane.lines, key=lambda item: (item[1][1], item[1][0]))
+    for row_index, (previous, current) in enumerate(zip(rows, rows[1:])):
+        line, bounds = previous
+        following, next_bounds = current
+        body_continuation = (
+            bounds[2] - bounds[0] >= 0.75 * (lane.right - lane.left)
+            and not line.caption_start
+            and not line.text.rstrip().endswith((".", ":", "。", "：", "!", "?", "！", "？"))
+            and 0.85 <= _line_effective_height(line, bounds) / max(0.1, _line_effective_height(following, next_bounds)) <= 1.15
+        )
+        if (
+            following.caption_start
+            and not body_continuation
+            and _effective_text_row_gap(previous, current)
+            >= 0.5 * max(_line_effective_height(line, bounds), _line_effective_height(following, next_bounds))
+        ):
+            # 显式图表编号启动新的注释，不能续接前一图的Source或邻近正文。
+            # 正文续行即使恰从图号开头，也不能仅凭标记制造段界。
+            output.add(following.source_index)
+        if line.caption_start:
+            active = True
+            caption_left = bounds[0]
+            caption_center = (bounds[0] + bounds[2]) / 2
+        if line.semantic_type is not None or following.semantic_type is not None or following.caption_start:
+            active = False
+            continue
+        height = _line_effective_height(line, bounds)
+        next_height = _line_effective_height(following, next_bounds)
+        if (
+            active
+            and abs((next_bounds[0] + next_bounds[2]) / 2 - caption_center) <= 0.5 * height
+            and next_bounds[1] - bounds[3] <= 0.75 * height
+            and 0.85 <= next_height / height <= 1.15
+        ):
+            # 居中图题各行宽度不同，左缘稍向外伸不应提前丢失图题状态。
+            caption_left = min(caption_left, next_bounds[0])
+        # 居中署名的短括号尾行结束后，首行缩进加连续满栏行可确认正文重置；单个长图题续行不够。
+        width = lane.right - lane.left
+        body_rows = rows[row_index + 2 : row_index + 4]
+        centered_credit_to_body = (
+            active
+            and line.text.rstrip().endswith((")", "）"))
+            and bounds[2] - bounds[0] <= 0.6 * width
+            and abs((bounds[0] + bounds[2]) / 2 - (lane.left + lane.right) / 2) <= 0.08 * width
+            and 0.4 * height <= next_bounds[0] - lane.left <= 2 * height
+            and next_bounds[2] - next_bounds[0] >= 0.85 * width
+            and abs(next_bounds[2] - lane.right) <= 0.3 * height
+            and 0.85 <= next_height / height <= 1.15
+            and len(body_rows) == 2
+            and all(
+                abs(body_bbox[0] - lane.left) <= 0.3 * height
+                and abs(body_bbox[2] - lane.right) <= 0.3 * height
+                and 0.85 <= _line_effective_height(body_line, body_bbox) / height <= 1.15
+                for body_line, body_bbox in body_rows
+            )
+        )
+        if centered_credit_to_body:
+            output.add(following.source_index)
+            active = False
+            continue
+        if next_bounds[0] < caption_left - height or next_bounds[1] - bounds[3] > 3 * height:
+            active = False
+            continue
+        if active and next_height >= 1.15 * height and next_bounds[1] - bounds[3] >= 0.5 * height:
+            output.add(following.source_index)
+            active = False
+    return output
 
 
 def _local_tight_output_line_bboxes(
@@ -403,6 +641,26 @@ def _prose_paragraph_break_sources(lane: _TextLane, regular_gap: float, gap_mad:
             caption_left = fb[0]
         if caption_left is not None and abs(bbox[0] - caption_left) > em:
             caption_left = None
+        if caption_left is not None and index + 2 < len(rows):
+            next_line, next_bbox = rows[index + 2]
+            # 完整小字号图注收句后，留白及两行较大正文共同结束图注保护，恢复后续自然段判定。
+            first_height = _line_effective_height(first, fb)
+            body_height = _line_effective_height(line, bbox)
+            if (
+                first.paragraph_terminal
+                and first.semantic_type is None
+                and line.semantic_type is None
+                and next_line.semantic_type is None
+                and not line.caption_start
+                and not next_line.caption_start
+                and 0.7 * first_height <= _effective_body_text_row_gap(previous, current) <= 3 * first_height
+                and 1.05 * first_height <= body_height <= 1.25 * first_height
+                and 0.95 * body_height <= _line_effective_height(next_line, next_bbox) <= 1.05 * body_height
+                and bbox[2] - bbox[0] >= 0.7 * width
+                and next_bbox[2] - next_bbox[0] >= 0.7 * width
+                and _title_fonts_compatible(line, next_line)
+            ):
+                caption_left = None
         if re.match(r"^\s*(?:[•●▪]|\d+[.)](?:\s|$))", first.text) or _REFERENCE_ENTRY_RE.match(first.text):
             inside_item = True
         if (
@@ -427,6 +685,18 @@ def _prose_paragraph_break_sources(lane: _TextLane, regular_gap: float, gap_mad:
         first_ink, current_ink = first.ink_bbox or fb, line.ink_bbox or bbox
         if current_ink[1] < first_ink[3] - 0.15 * em:
             continue
+        # 原生段尾证据包含引用上标之前的句点；明显空行必须成为永久段界，不能被块级续行重新合并。
+        blank_paragraph = (
+            max(1.15 * em, regular_gap + 0.85 * em + 3 * gap_mad) <= gap <= 3 * em
+            and abs(bbox[0] - lane.left) <= 0.35 * em
+            and abs(fb[0] - lane.left) <= 0.35 * em
+            and _title_fonts_compatible(first, line)
+            and max(_line_effective_height(*previous), _line_effective_height(*current))
+            <= 1.2 * min(_line_effective_height(*previous), _line_effective_height(*current))
+        )
+        if blank_paragraph:
+            output.add(line.source_index)
+            continue
         if not -0.25 * em <= gap <= regular_gap + max(0.75 * em, 3 * gap_mad):
             continue
         following = rows[index + 2] if index + 2 < len(rows) else None
@@ -450,6 +720,98 @@ def _prose_paragraph_break_sources(lane: _TextLane, regular_gap: float, gap_mad:
         )
         if indented or short_tail:
             output.add(line.source_index)
+    return output
+
+
+def _cjk_prose_break_sources(lane: _TextLane, regular_gap: float, gap_mad: float) -> set[int]:
+    """中文句末后的额外净空证明段界，短冒号标签也保留边界；普通同距续行不拆分。"""
+    rows = sorted(lane.lines, key=lambda item: (item[1][1], item[1][0]))
+    width = max(0.1, lane.right - lane.left)
+    output = set()
+    for (previous, before), (current, bounds) in zip(rows, rows[1:]):
+        if any(
+            line.semantic_type is not None
+            or line.paragraph_group is not None
+            or line.caption_start
+            or line.formula_candidate_only
+            or line.compact_formula_cluster
+            or line.angle != 0
+            for line in (previous, current)
+        ):
+            continue
+        em = max(_line_effective_height(previous, before), _line_effective_height(current, bounds))
+        if (
+            em <= 0
+            or previous.font_signature is None
+            or not _title_fonts_compatible(previous, current)
+            or min(_line_effective_height(previous, before), _line_effective_height(current, bounds)) < 0.85 * em
+            or abs(bounds[0] - before[0]) > 0.25 * em
+            or not re.search(r"[。！？][”’）]*$", previous.text.rstrip())
+            or len(re.findall(r"[\u3400-\u9fff]", previous.text)) < 4
+            or len(re.findall(r"[\u3400-\u9fff]", current.text)) < 8
+        ):
+            continue
+        labelled = re.match(r"^[\u3400-\u9fff]{1,8}[：:]", current.text.strip()) is not None
+        if re.match(r"^[\u3400-\u9fff]", current.text.strip()) is None or bounds[2] - bounds[0] < 0.65 * width and not labelled:
+            continue
+        gap = _effective_body_text_row_gap((previous, before), (current, bounds))
+        threshold = max((0.5 if labelled else 0.65) * em, regular_gap + (0.2 if labelled else 0.3) * em + 3 * gap_mad)
+        if threshold <= gap <= 3 * em:
+            output.add(current.source_index)
+    return output
+
+
+def _cjk_entry_break_sources(lane: _TextLane) -> set[int]:
+    """同左缘连续顿号编号及带日期的重复书名号报告各自起段，不拆叙述中的编号或引用。"""
+    rows = sorted(
+        (
+            item
+            for item in lane.lines
+            if item[0].semantic_type is None and item[0].paragraph_group is None and not item[0].caption_start
+        ),
+        key=lambda item: (item[1][1], item[1][0]),
+    )
+    numbered = [
+        (index, line, bounds, re.match(r"^\s*(\d{1,2})、\s*[\u3400-\u9fff]", line.text))
+        for index, (line, bounds) in enumerate(rows)
+    ]
+    numbered = [(index, line, bounds, int(match.group(1))) for index, line, bounds, match in numbered if match]
+    output = set()
+    for first, second, third in zip(numbered, numbered[1:], numbered[2:]):
+        em = max(_line_effective_height(line, bounds) for _, line, bounds, _ in (first, second, third))
+        if (
+            second[3] == first[3] + 1
+            and third[3] == second[3] + 1
+            and first[1].font_signature is not None
+            and all(
+                _title_fonts_compatible(first[1], item[1])
+                and abs(item[2][0] - first[2][0]) <= 0.3 * em
+                and 0.85 * em <= _line_effective_height(item[1], item[2])
+                for item in (second, third)
+            )
+            and all(
+                1 <= after[0] - before[0] <= 8 and 0 < after[2][1] - before[2][3] <= 10 * em
+                for before, after in ((first, second), (second, third))
+            )
+        ):
+            output.update(item[1].source_index for item in (first, second, third))
+    references = [
+        (index, line, bounds) for index, (line, bounds) in enumerate(rows) if re.match(r"^《[\u3400-\u9fff]", line.text.strip())
+    ]
+    if len(references) >= 3:
+        for first, second in zip(references, references[1:]):
+            tail, tail_bounds = rows[second[0] - 1]
+            em = max(_line_effective_height(first[1], first[2]), _line_effective_height(second[1], second[2]))
+            if (
+                1 <= second[0] - first[0] <= 4
+                and first[1].font_signature is not None
+                and _title_fonts_compatible(first[1], second[1])
+                and abs(first[2][0] - second[2][0]) <= 0.3 * em
+                and 0.85 * em <= _line_effective_height(second[1], second[2])
+                and re.search(r"[—–-]+\s*\d{4}[-./]\d{1,2}[-./]\d{1,2}\s*$", tail.text)
+                and -0.1 * em <= second[2][1] - tail_bounds[3] <= em
+            ):
+                output.update((first[1].source_index, second[1].source_index))
     return output
 
 
@@ -565,16 +927,85 @@ def _leading_typography_reset_break_sources(
         )
         >= 3
     )
+    repeated_typographic_starts = (
+        sum(
+            line.leading_typography_width is not None and 0.02 * lane_width <= line.leading_typography_width <= 0.2 * lane_width
+            for line, _bbox in rows
+        )
+        >= 3
+    )
     output: set[int] = set()
-    for previous, current in zip(rows, rows[1:]):
+    for row_index, (previous, current) in enumerate(zip(rows, rows[1:])):
         previous_width = previous[1][2] - previous[1][0]
         current_width = current[1][2] - current[1][0]
         pair_height = max(
             _line_effective_height(*previous),
             _line_effective_height(*current),
         )
+        # 完整收句后的独立居中句有双侧缩进和明显净空；星号等外围装饰不改变句末证据。
+        if (
+            previous_width <= 0.65 * lane_width
+            and 0.4 * lane_width <= current_width <= 0.85 * lane_width
+            and abs(previous[1][0] - lane.left) <= 0.35 * pair_height
+            and min(current[1][0] - lane.left, lane.right - current[1][2]) >= 2 * pair_height
+            and abs(_bbox_center_x(current[1]) - 0.5 * (lane.left + lane.right)) <= 0.5 * pair_height
+            and min(_line_effective_height(*previous), _line_effective_height(*current)) >= 0.85 * pair_height
+            and re.search(r"[.!?。！？][\])’\"'*]*$", previous[0].text.rstrip())
+            and re.search(r"[.!?。！？][\])’\"'*]*$", current[0].text.rstrip())
+            and max(0.75 * pair_height, regular_gap + 0.5 * pair_height + 3 * gap_mad)
+            <= _effective_body_text_row_gap(previous, current)
+            <= 2 * pair_height
+            and previous[0].paragraph_group is None
+            and current[0].paragraph_group is None
+            and not previous[0].caption_start
+            and not current[0].caption_start
+            and not previous[0].formula_candidate_only
+            and not current[0].formula_candidate_only
+            and not previous[0].compact_formula_cluster
+            and not current[0].compact_formula_cluster
+            and not current[0].inline_math_regions
+        ):
+            output.add(current[0].source_index)
+            continue
+        # 重复行首字体标签与明显空行共同确认结构段，无需段尾以句点结束；保留普通字体续行和数学屏障。
+        if (
+            repeated_typographic_starts
+            and current[0].leading_typography_width is not None
+            and 0.02 * lane_width <= current[0].leading_typography_width <= 0.2 * lane_width
+            and current_width >= 0.75 * lane_width
+            and abs(previous[1][0] - lane.left) <= 0.35 * pair_height
+            and abs(current[1][0] - lane.left) <= 0.35 * pair_height
+            and max(0.9 * pair_height, regular_gap + 0.55 * pair_height + 3 * gap_mad)
+            <= _effective_body_text_row_gap(previous, current)
+            <= 3 * pair_height
+            and _title_fonts_compatible(previous[0], current[0])
+            and min(_line_effective_height(*previous), _line_effective_height(*current)) >= 0.85 * pair_height
+            and not previous[0].caption_start
+            and not current[0].caption_start
+            and previous[0].paragraph_group is None
+            and current[0].paragraph_group is None
+            and not previous[0].formula_candidate_only
+            and not current[0].formula_candidate_only
+            and not previous[0].compact_formula_cluster
+            and not current[0].compact_formula_cluster
+            and not current[0].inline_math_regions
+        ):
+            output.add(current[0].source_index)
+            continue
+        following = rows[row_index + 2] if row_index + 2 < len(rows) else None
+        local_emphasis = (
+            previous_width <= 0.45 * lane_width
+            and following is not None
+            and (current[0].dominant_font_weight or 0) >= 550
+            and following[0].dominant_font_weight is not None
+            and current[0].dominant_font_weight >= following[0].dominant_font_weight + 100
+            and following[0].leading_emphasis_width is None
+            and following[1][2] - following[1][0] >= 0.75 * lane_width
+            and abs(following[1][0] - lane.left) <= 0.5 * pair_height
+            and 0.85 * pair_height <= _line_effective_height(*following) <= 1.15 * pair_height
+        )
         explicit_emphasis = (
-            repeated_emphasis
+            (repeated_emphasis or local_emphasis)
             and current[0].leading_emphasis_width is not None
             and current[0].leading_emphasis_width <= 0.65 * lane_width
             and re.search(r"[.!?。！？][\])’\"']*$", previous[0].text.rstrip()) is not None

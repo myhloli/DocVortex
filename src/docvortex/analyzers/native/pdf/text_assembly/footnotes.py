@@ -36,14 +36,7 @@ def _build_grouped_page_footnote_blocks(
                 directional_lines,
                 page_size,
             ):
-                ordered_lines = sorted(
-                    entry_lines,
-                    key=lambda line: (
-                        _rotate_bbox_to_upright(line.bbox, page_size, angle)[1],
-                        _rotate_bbox_to_upright(line.bbox, page_size, angle)[0],
-                        line.source_index,
-                    ),
-                )
+                ordered_lines = _order_page_footnote_entry_lines(entry_lines, page_size)
                 content = _merge_text_line_content([line.text for line in ordered_lines])
                 if not content:
                     continue
@@ -73,6 +66,23 @@ def _build_grouped_page_footnote_blocks(
                 blocks.append(block)
                 consumed_source_indices.update(line.source_index for line in ordered_lines)
     return blocks, consumed_source_indices
+
+
+def _order_page_footnote_entry_lines(lines: list[_LineItem], page_size: tuple[float, float]) -> list[_LineItem]:
+    """同一物理行按横向顺序排列，避免略微抬高的脚注正文先于左侧编号输出。"""
+    geometry = [(line, _rotate_bbox_to_upright(line.bbox, page_size, line.angle)) for line in lines]
+    geometry.sort(key=lambda item: (item[1][1], item[1][0]))
+    height = statistics.median(_line_effective_height(line, box) for line, box in geometry)
+    rows = []
+    for item in geometry:
+        if (
+            rows
+            and abs(_bbox_center_y(item[1]) - statistics.median(_bbox_center_y(box) for _, box in rows[-1])) <= 0.5 * height
+        ):
+            rows[-1].append(item)
+        else:
+            rows.append([item])
+    return [line for row in rows for line, _ in sorted(row, key=lambda item: item[1][0])]
 
 
 def _split_page_footnote_entries(
@@ -117,6 +127,16 @@ def _split_page_footnote_entries(
     continuous = all(_effective_text_row_gap(a, b) <= 1.5 * median_height for a, b in zip(body_geometry, body_geometry[1:]))
     if institution.search(body_text) and continuous and separate_entries < 2 and (heading or inline_markers):
         return [[line for line, _ in line_geometry]]
+    superscript_starts = [
+        i
+        for i, (line, _bbox) in enumerate(line_geometry)
+        if line.footnote_marker_start or _has_leading_footnote_superscript(line)
+    ]
+    if superscript_starts and (len(superscript_starts) >= 2 or superscript_starts[0] > 0):
+        # 同一原生行中的上标编号也构成条目边界，不能只依赖独立编号 run。
+        prefix = _split_page_footnote_entries([line for line, _ in line_geometry[: superscript_starts[0]]], page_size)
+        boundaries = [*superscript_starts, len(line_geometry)]
+        return prefix + [[line for line, _ in line_geometry[a:b]] for a, b in zip(boundaries, boundaries[1:])]
     marker_rows = _find_page_footnote_marker_rows(
         line_geometry,
         median_height,
@@ -138,6 +158,34 @@ def _split_page_footnote_entries(
         base_left,
         maximum_row_width,
         indent_threshold,
+    )
+
+
+def _has_leading_footnote_superscript(line: _LineItem) -> bool:
+    """用编号与其后正文的相对字号和基线确认行内脚注首标，排除普通数字续行。"""
+    visible = [char for char in line.chars if str(char.get("char", "")).strip()]
+    prefix = []
+    for char in visible:
+        if not str(char.get("char", "")).isdigit():
+            break
+        prefix.append(char)
+    if not 1 <= len(prefix) <= 3 or len(visible) < len(prefix) + 3:
+        return False
+    body = visible[len(prefix) : len(prefix) + 8]
+    marker_size = statistics.median(float(char.get("font", {}).get("size", 0)) for char in prefix)
+    body_size = statistics.median(float(char.get("font", {}).get("size", 0)) for char in body)
+    marker_height = statistics.median(char["bbox"][3] - char["bbox"][1] for char in prefix)
+    body_height = statistics.median(char["bbox"][3] - char["bbox"][1] for char in body)
+    marker_origins = [char["origin"][1] for char in prefix if char.get("origin") is not None]
+    body_origins = [char["origin"][1] for char in body if char.get("origin") is not None]
+    return bool(
+        # 部分嵌入字体以恒定 size=1 配合变换绘字；几何收缩与抬高提供同等有效的证据。
+        line.angle == 0
+        and body_height > 0
+        and (body_size > 0 and marker_size <= 0.82 * body_size or marker_height <= 0.75 * body_height)
+        and marker_origins
+        and body_origins
+        and statistics.median(body_origins) - statistics.median(marker_origins) >= 0.15 * body_height
     )
 
 
@@ -164,14 +212,21 @@ def _find_page_footnote_marker_rows(
             continue
         marker, body = ordered[0], ordered[1]
         marker_width = marker[1][2] - marker[1][0]
+        # 两三位编号的总宽度会超过单字窄片段门槛；只有纯数字首标可以使用放宽的尺度。
+        local_marker_width_limit = (
+            max(marker_width_limit, 1.25 * median_height, 2.5 * median_glyph_width)
+            if re.fullmatch(r"\d{1,3}", marker[0].text.strip())
+            else marker_width_limit
+        )
         body_width = body[1][2] - body[1][0]
         horizontal_gap = body[1][0] - marker[1][2]
         if (
-            marker_width > marker_width_limit
+            marker_width > local_marker_width_limit
             or marker[1][0] - base_left > 0.5 * median_height
-            or not 0.0 <= horizontal_gap <= 1.5 * median_height
+            or not 0.0 <= horizontal_gap <= (2.0 if marker[0].text.strip().isdigit() else 1.5) * median_height
             or body[1][0] - base_left < max(1.5 * marker_width, 0.75 * median_height)
             or body_width < max(4.0 * marker_width, 4.0 * median_glyph_width)
+            and not _compact_numbered_note_body(marker[0], body[0])
             or abs(_bbox_center_y(marker[1]) - _bbox_center_y(body[1])) > 0.4 * median_height
         ):
             continue
@@ -185,6 +240,11 @@ def _find_page_footnote_marker_rows(
             base_left,
         )
     return marker_rows
+
+
+def _compact_numbered_note_body(marker: _LineItem, body: _LineItem) -> bool:
+    """独立数字编号后允许短小文字注释，长度不能把同上之类的真实注释丢回上一项。"""
+    return bool(re.fullmatch(r"\s*\d{1,3}[.)]?\s*", marker.text) and len(re.findall(r"[A-Za-z\u3400-\u9fff]", body.text)) >= 2)
 
 
 def _find_geometric_page_footnote_marker_rows(
@@ -208,7 +268,13 @@ def _find_geometric_page_footnote_marker_rows(
     ] = []
     for marker in line_geometry:
         marker_width = marker[1][2] - marker[1][0]
-        if marker_width > marker_width_limit or marker[1][0] - base_left > 0.5 * median_height:
+        # 无稳定视觉行编号时，也允许同尺度两三位数字提供几何首标。
+        local_marker_width_limit = (
+            max(marker_width_limit, 1.25 * median_height, 2.5 * median_glyph_width)
+            if re.fullmatch(r"\d{1,3}", marker[0].text.strip())
+            else marker_width_limit
+        )
+        if marker_width > local_marker_width_limit or marker[1][0] - base_left > 0.5 * median_height:
             continue
         for body in line_geometry:
             if body is marker:
@@ -216,7 +282,7 @@ def _find_geometric_page_footnote_marker_rows(
             body_width = body[1][2] - body[1][0]
             horizontal_gap = body[1][0] - marker[1][2]
             if (
-                not 0.0 <= horizontal_gap <= 1.5 * median_height
+                not 0.0 <= horizontal_gap <= (2.0 if marker[0].text.strip().isdigit() else 1.5) * median_height
                 or body[1][0] - base_left
                 < max(
                     1.5 * marker_width,
@@ -227,6 +293,7 @@ def _find_geometric_page_footnote_marker_rows(
                     4.0 * marker_width,
                     4.0 * median_glyph_width,
                 )
+                and not _compact_numbered_note_body(marker[0], body[0])
                 or abs(_bbox_center_y(marker[1]) - _bbox_center_y(body[1])) > 0.4 * median_height
                 or not _title_fonts_compatible(
                     marker[0],

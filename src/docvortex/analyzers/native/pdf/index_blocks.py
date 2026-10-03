@@ -40,6 +40,7 @@ def _extract_index_blocks(
     container_bboxes: list[BBox],
     *,
     require_heading: bool = False,
+    require_explicit_heading: bool = False,
 ) -> tuple[list[dict[str, object]], list[_LineItem]]:
     """用页码行尾和稳定版式识别目录；预判阶段可强制要求几何目录标题。"""
 
@@ -56,17 +57,31 @@ def _extract_index_blocks(
             for row in rows
             if not any(_bbox_overlap_in_smaller(row.local_bbox, container_bbox) >= 0.35 for container_bbox in local_containers)
         ]
+        for heading, candidate in _unpaged_numbered_index_bands(eligible_rows):
+            for line in heading.members:
+                line.semantic_type = "paragraph_title"
+            for row in candidate:
+                for line in row.members:
+                    line.semantic_type = BlockType.INDEX
+                    claimed_line_ids.add(id(line))
+            blocks.append(_index_rows_to_block(candidate, angle, page_size))
+        eligible_rows = [row for row in eligible_rows if not any(id(line) in claimed_line_ids for line in row.members)]
         for band in _split_index_bands(eligible_rows):
             candidate = _trim_index_band_edges(band)
-            if not _index_band_has_stable_layout(candidate, local_page_width):
-                continue
             heading_row = _find_index_heading_row(
                 eligible_rows,
                 candidate,
                 local_page_width,
             )
+            explicit_heading = heading_row is not None and _is_index_heading(heading_row.content)
+            if require_explicit_heading and not explicit_heading:
+                continue
+            if not _index_band_has_stable_layout(candidate, local_page_width, explicit_heading=explicit_heading):
+                continue
             if require_heading and heading_row is None:
                 continue
+            candidate = _include_repeated_leading_index_section(eligible_rows, candidate)
+            candidate = _join_index_label_continuations(candidate)
             if heading_row is not None:
                 for line in heading_row.members:
                     line.semantic_type = "paragraph_title"
@@ -74,23 +89,136 @@ def _extract_index_blocks(
                 for line in row.members:
                     line.semantic_type = BlockType.INDEX
                     claimed_line_ids.add(id(line))
-            candidate_lines = [line for row in candidate for line in row.members]
-            block: dict[str, object] = {
-                "type": BlockType.INDEX,
-                "bbox": _bbox_union_many([line.bbox for line in candidate_lines]),
-                "angle": angle,
-                "content": "\n".join(row.content for row in candidate),
-            }
-            tight_output_bbox = _lines_tight_output_bbox(
-                candidate_lines,
-                page_size,
-            )
-            if tight_output_bbox is not None:
-                block["_tight_output_bbox"] = tight_output_bbox
-            blocks.append(block)
+            blocks.append(_index_rows_to_block(candidate, angle, page_size))
 
     remaining_lines = [line for line in lines if id(line) not in claimed_line_ids]
     return blocks, remaining_lines
+
+
+def _index_rows_to_block(rows: list[_IndexRow], angle: int, page_size: tuple[float, float]) -> dict[str, object]:
+    """统一保存已确认目录的逻辑行顺序和原生成员范围，页码随完整条目输出。"""
+    members = [line for row in rows for line in row.members]
+    block: dict[str, object] = {
+        "type": BlockType.INDEX,
+        "bbox": _bbox_union_many([line.bbox for line in members]),
+        "angle": angle,
+        "content": "\n".join(row.content for row in rows),
+    }
+    tight = _lines_tight_output_bbox(members, page_size)
+    if tight is not None:
+        block["_tight_output_bbox"] = tight
+    return block
+
+
+def _index_row_em(row: _IndexRow) -> float:
+    """使用原生字形尺度比较行距，避免多行条目的合并外框放大字号。"""
+    return statistics.median(_line_effective_height(line, box) for line, box in zip(row.members, row.local_member_bboxes))
+
+
+def _include_repeated_leading_index_section(all_rows: list[_IndexRow], candidate: list[_IndexRow]) -> list[_IndexRow]:
+    """已确认页码目录内反复出现同式章节时，把紧邻首条的同式章节也归入目录。"""
+    if not candidate:
+        return candidate
+    position = next((index for index, row in enumerate(all_rows) if row is candidate[0]), 0)
+    if position == 0:
+        return candidate
+    previous = all_rows[position - 1]
+    marker = re.compile(r"^(?:part|chapter|section|book|volume|vol\.)\s+(?:[IVXLCDM]+|\d+)[.：:\s]", re.I)
+    if previous.ends_in_page_number or not marker.match(previous.content):
+        return candidate
+    font = previous.members[0].font_signature
+    em = _index_row_em(previous)
+    if font is None or em <= 0 or not 0.25 * em <= candidate[0].local_bbox[1] - previous.local_bbox[3] <= 3 * em:
+        return candidate
+    peers = [
+        row
+        for row in candidate
+        if not row.ends_in_page_number
+        and marker.match(row.content)
+        and row.members[0].font_signature == font
+        and 0.9 <= _index_row_em(row) / em <= 1.1
+        and abs(row.local_bbox[0] - previous.local_bbox[0]) <= 0.5 * em
+    ]
+    return [previous, *candidate] if len(peers) >= 2 else candidate
+
+
+def _join_index_label_continuations(rows: list[_IndexRow]) -> list[_IndexRow]:
+    """只在已确认目录内合并紧邻的同式标签续行，把右侧页码移到完整标签之后。"""
+    result: list[_IndexRow] = []
+    for row in rows:
+        if result:
+            previous = result[-1]
+            em = _index_row_em(previous)
+            sidecar = previous.members[-1]
+            label = previous.members[0]
+            if (
+                previous.ends_in_page_number
+                and not row.ends_in_page_number
+                and len(previous.members) >= 2
+                and re.fullmatch(r"[\d０-９ivxlcdmIVXLCDM]+", sidecar.text.strip())
+                and previous.local_member_bboxes[-1][0] > previous.local_bbox[0] + 8 * em
+                and not re.match(r"^(?:part|chapter|section|\d+[.)])\b", row.content, re.I)
+                and label.font_signature is not None
+                and all(line.font_signature == label.font_signature for line in row.members)
+                and 0.9 <= _index_row_em(row) / em <= 1.1
+                and abs(row.local_bbox[0] - previous.local_bbox[0]) <= 0.5 * em
+                and -0.25 * em <= row.local_bbox[1] - previous.local_bbox[3] <= 0.75 * em
+                and row.local_bbox[2] < previous.local_member_bboxes[-1][0] - em
+            ):
+                members = [*previous.members[:-1], *row.members, sidecar]
+                boxes = [*previous.local_member_bboxes[:-1], *row.local_member_bboxes, previous.local_member_bboxes[-1]]
+                result[-1] = _IndexRow(
+                    members, boxes, _bbox_union_many(boxes), " ".join(line.text.strip() for line in members), True
+                )
+                continue
+        result.append(row)
+    return result
+
+
+def _unpaged_numbered_index_bands(rows: list[_IndexRow]) -> list[tuple[_IndexRow, list[_IndexRow]]]:
+    """明确目录题名下连续五项以上的同式编号短条目可无页码，普通步骤正文不能触发。"""
+    result = []
+    numbered = re.compile(r"^(\d+)[.)]\s*(\S.+)$")
+    for position, heading in enumerate(rows[:-1]):
+        if not _is_index_heading(heading.content):
+            continue
+        first = rows[position + 1]
+        match = numbered.match(first.content)
+        em = _index_row_em(first)
+        font = first.members[0].font_signature
+        if (
+            match is None
+            or int(match[1]) != 1
+            or em <= 0
+            or font is None
+            or not 0 <= first.local_bbox[1] - heading.local_bbox[3] <= 6 * em
+            or not 1.1 <= _index_row_em(heading) / em <= 3
+        ):
+            continue
+        candidate = []
+        for row in rows[position + 1 :]:
+            # 只有小于半个正文尺度的孤立纯数字可忽略，不能跨越其他正文或新的章节。
+            if re.fullmatch(r"\d+", row.content) and _index_row_em(row) < 0.5 * em:
+                continue
+            match = numbered.match(row.content)
+            if (
+                match is None
+                or int(match[1]) != len(candidate) + 1
+                or row.ends_in_page_number
+                or len(re.findall(r"[A-Za-z]+", match[2])) > 14
+                or len(re.findall(r"[\u4e00-\u9fff]", match[2])) > 50
+                or re.search(r"[.!?。！？]\s*$", match[2])
+                or not 0.9 <= _index_row_em(row) / em <= 1.1
+                or any(line.font_signature != font for line in row.members)
+                or abs(row.local_bbox[0] - first.local_bbox[0]) > 0.5 * em
+                or candidate
+                and not 0.8 * em <= _bbox_center_y(row.local_bbox) - _bbox_center_y(candidate[-1].local_bbox) <= 3 * em
+            ):
+                break
+            candidate.append(row)
+        if len(candidate) >= _INDEX_MIN_ROWS:
+            result.append((heading, candidate))
+    return result
 
 
 def _build_index_rows(
@@ -103,6 +231,10 @@ def _build_index_rows(
     row_groups: dict[tuple[str, int], list[_LineItem]] = {}
     for line in lines:
         if line.angle != angle or line.semantic_type is not None:
+            continue
+        local = _rotate_bbox_to_upright(line.bbox, page_size, angle)
+        # 斜置水印可能被归入最近的正交方向，其外框远高于字形尺度，不能认领为目录成员。
+        if local[3] - local[1] > 1.7 * _line_effective_height(line, local):
             continue
         key = ("visual", line.visual_row_id) if line.visual_row_id is not None else ("source", line.source_index)
         row_groups.setdefault(key, []).append(line)
@@ -138,13 +270,40 @@ def _build_index_rows(
             min(line.source_index for line in row.members),
         )
     )
-    return rows
+    combined = []
+    for row in rows:
+        if combined:
+            previous = combined[-1]
+            em = max(previous.local_bbox[3] - previous.local_bbox[1], row.local_bbox[3] - row.local_bbox[1])
+            if abs(_bbox_center_y(row.local_bbox) - _bbox_center_y(previous.local_bbox)) <= 0.35 * em and (
+                row.local_bbox[0] >= previous.local_bbox[2] or previous.local_bbox[0] >= row.local_bbox[2]
+            ):
+                ordered = sorted(
+                    zip(previous.members + row.members, previous.local_member_bboxes + row.local_member_bboxes),
+                    key=lambda pair: pair[1][0],
+                )
+                content = " ".join(line.text.strip() for line, _ in ordered)
+                combined[-1] = _IndexRow(
+                    [line for line, _ in ordered],
+                    [bbox for _, bbox in ordered],
+                    _bbox_union_many([previous.local_bbox, row.local_bbox]),
+                    content,
+                    _index_row_ends_in_page_number(content),
+                )
+                continue
+        combined.append(row)
+    return combined
 
 
 def _index_row_ends_in_page_number(content: str) -> bool:
     """识别行尾的半角、全角阿拉伯页码或罗马页码。"""
 
     return _INDEX_PAGE_NUMBER_RE.search(content.rstrip()) is not None
+
+
+def _is_index_heading(text: str) -> bool:
+    """标准目录题名只提供语义先验，仍须重复条目和页码排列才能确认目录。"""
+    return re.fullmatch(r"(?:table\s+of\s+)?contents|目\s*录", text.strip(), re.I) is not None
 
 
 def _split_index_bands(rows: list[_IndexRow]) -> list[list[_IndexRow]]:
@@ -171,7 +330,9 @@ def _trim_index_band_edges(rows: list[_IndexRow]) -> list[_IndexRow]:
     end = len(rows)
     while start < end and not rows[start].ends_in_page_number:
         start += 1
-    while end > start and not rows[end - 1].ends_in_page_number:
+    while end > start and (
+        not rows[end - 1].ends_in_page_number or re.fullmatch(r"[\d\sivxlcdmIVXLCDM]+", rows[end - 1].content)
+    ):
         end -= 1
     return rows[start:end]
 
@@ -179,6 +340,8 @@ def _trim_index_band_edges(rows: list[_IndexRow]) -> list[_IndexRow]:
 def _index_band_has_stable_layout(
     rows: list[_IndexRow],
     local_page_width: float,
+    *,
+    explicit_heading: bool = False,
 ) -> bool:
     """联合页码比例、右边界、行宽、缩进和行距确认目录候选。"""
 
@@ -199,10 +362,12 @@ def _index_band_has_stable_layout(
     aligned_right_ratio = sum(abs(row.local_bbox[2] - median_right) <= right_tolerance for row in page_number_rows) / len(
         page_number_rows
     )
-    if median_right < 0.75 * local_page_width or aligned_right_ratio < 0.7:
+    if median_right < (0.5 if explicit_heading else 0.75) * local_page_width or aligned_right_ratio < 0.7:
         return False
 
-    wide_row_ratio = sum(row.local_bbox[2] - row.local_bbox[0] >= 0.55 * local_page_width for row in rows) / len(rows)
+    wide_row_ratio = sum(
+        row.local_bbox[2] - row.local_bbox[0] >= (0.4 if explicit_heading else 0.55) * local_page_width for row in rows
+    ) / len(rows)
     right_sidecar_count = sum(_index_row_has_right_sidecar(row, local_page_width, median_height) for row in rows)
     if wide_row_ratio < 0.7 and right_sidecar_count < 2:
         return False
@@ -247,7 +412,8 @@ def _find_index_heading_row(
     if (
         heading_width > 0.4 * local_page_width
         or not centered
-        or not 1.25 * median_height <= vertical_pitch <= 5.0 * median_height
+        and not _is_index_heading(heading.content)
+        or not 1.25 * median_height <= vertical_pitch <= (12.0 if _is_index_heading(heading.content) else 5.0) * median_height
     ):
         return None
     return heading

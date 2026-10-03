@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-_PROTOCOL_VERSION = 29
+_PROTOCOL_VERSION = 30
 _SELECTED_MODE = None
 _LOAD_FAILURE = None
 

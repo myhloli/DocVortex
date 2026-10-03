@@ -32,6 +32,10 @@ from .merging import (
     _merge_unterminated_text_components,
 )
 from .rows import (
+    _repeated_bullet_break_sources,
+    _italic_quote_to_body_break_sources,
+    _top_marginal_text_break_sources,
+    _caption_to_body_break_sources,
     _build_hanging_indent_group_map,
     _centered_visual_reset_break_sources,
     _component_starts_with_emphasized_row,
@@ -41,6 +45,8 @@ from .rows import (
     _infer_local_text_lane_map,
     _isolated_indented_paragraph_break_sources,
     _prose_paragraph_break_sources,
+    _cjk_prose_break_sources,
+    _cjk_entry_break_sources,
     _leading_typography_reset_break_sources,
     _local_tight_output_line_bboxes,
     _starts_structural_reference_entry,
@@ -77,6 +83,7 @@ def _build_text_blocks(
         local_page_height = page_size[0] if angle in {90, 270} else page_size[1]
         local_visual_bboxes = [_rotate_bbox_to_upright(bbox, page_size, angle) for bbox in (visual_bboxes or [])]
         lanes = _infer_text_lanes(line_geometry, local_page_width, median_height)
+        bullet_break_sources = _repeated_bullet_break_sources(line_geometry)
         local_axis_lines = _transform_axis_lines(drawing_lines or [], page_size, angle)
         split_row_counts: dict[int, int] = {}
         for line, _bbox in line_geometry:
@@ -119,9 +126,13 @@ def _build_text_blocks(
             structured_break_sources.update(typography_reset_sources)
             structured_break_sources.update(formula_text_break_sources)
             protected_break_sources: set[int] = set()
+            protected_break_sources.update(bullet_break_sources)
             protected_break_sources.update(visual_reset_sources)
             protected_break_sources.update(typography_reset_sources)
             protected_break_sources.update(formula_text_break_sources)
+            protected_break_sources.update(_caption_to_body_break_sources(lane))
+            protected_break_sources.update(_italic_quote_to_body_break_sources(lane))
+            protected_break_sources.update(_top_marginal_text_break_sources(lane, local_page_height))
             protected_break_sources.update(
                 _front_matter_keyword_break_sources(
                     lane,
@@ -131,6 +142,8 @@ def _build_text_blocks(
             )
             explicit_break_sources = _explicit_text_break_sources(lane)
             explicit_break_sources.update(_prose_paragraph_break_sources(lane, regular_gap, gap_mad))
+            explicit_break_sources.update(_cjk_prose_break_sources(lane, regular_gap, gap_mad))
+            explicit_break_sources.update(_cjk_entry_break_sources(lane))
             protected_break_sources.update(explicit_break_sources)
             structured_break_sources.update(
                 protected_break_sources,

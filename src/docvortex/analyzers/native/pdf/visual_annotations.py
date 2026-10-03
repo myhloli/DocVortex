@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 import statistics
-import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -13,6 +12,11 @@ from typing import Any, Literal
 from .._shared.xycut import sort_entries
 from ....schema import BBox
 
+from .annotation_text import (
+    _normalize_annotation_text,
+    _is_strong_caption_text,
+    _caption_identifier,
+)
 from .geometry import (
     _bbox_axis_overlap_ratio,
     _bbox_center_x,
@@ -40,41 +44,11 @@ _TABLE_FOOTNOTE_LANE_TOLERANCE = 0.5
 _TABLE_FOOTNOTE_MIN_LINE_HEIGHT_RATIO = 0.75
 _TABLE_FOOTNOTE_MAX_LINE_HEIGHT_RATIO = 1.25
 
-_IDENTIFIER_PATTERN = (
-    r"(?:"
-    r"(?:[A-Z]\s*[.-]?\s*)?\d+(?:\s*[-./–—]\s*[A-Z]?\d+)*[A-Z]?"
-    r"|[IVXLCDM]+"
-    r"|[零〇一二三四五六七八九十百千两]+"
-    r")"
-)
-_ENGLISH_CAPTION_RE = re.compile(
-    rf"^\s*(?:fig(?:ure)?|tab(?:le)?|alg(?:orithm)?|listing|chart|scheme)\.?(?:\s*)"
-    rf"(?P<identifier>{_IDENTIFIER_PATTERN})(?P<tail>.*)$",
-    re.IGNORECASE | re.DOTALL,
-)
-_CHINESE_CAPTION_RE = re.compile(
-    rf"^\s*(?:程序清单|图表|表格|算法|图|表)\s*"
-    rf"(?P<identifier>{_IDENTIFIER_PATTERN})(?P<tail>.*)$",
-    re.IGNORECASE | re.DOTALL,
-)
 _FOOTNOTE_RE = re.compile(
     r"^\s*(?:source(?:s|\(s\))?|data\s+source|note(?:s|\(s\))?"
     r"|资料来源|数据来源|来源|注|备注)\s*[:：]\s*\S",
     re.IGNORECASE | re.DOTALL,
 )
-_ENGLISH_REFERENCE_TAIL_RE = re.compile(
-    r"^(?:[,;]|and\b|or\b|&|shows?\b|illustrates?\b|presents?\b|depicts?\b|"
-    r"demonstrates?\b|lists?\b|summari[sz]es?\b|reports?\b|compares?\b|"
-    r"provides?\b|is\b|are\b|was\b|were\b|has\b|have\b|can\b)",
-    re.IGNORECASE,
-)
-_CHINESE_REFERENCE_TAIL_RE = re.compile(
-    r"^(?:[,;，；、]|和|及|与|为|是|展示|显示|给出|说明|列出|分别|可见|表明|描述|呈现|汇总|所示|中(?:的|为)?)",
-)
-_SUBFIGURE_REFERENCE_TAIL_RE = re.compile(
-    r"^[（(][^）)]+[）)]\s*(?:[、,，]|和|及|与)",
-)
-
 _Direction = Literal["above", "below", "left", "right"]
 _AnnotationKind = Literal["caption", "footnote"]
 _TextBlockGroupMerger = Callable[
@@ -90,6 +64,8 @@ class _VisualParent:
     member_indices: tuple[int, ...]
     angle: int
     local_bbox: BBox
+    # 数字网格证据只参与父对象选择，不加入公开输出schema。
+    native_numeric_grid: bool = False
 
 
 @dataclass(frozen=True)
@@ -104,54 +80,19 @@ class _AnnotationRelation:
     center_offset: float
 
 
-def _normalize_annotation_text(text: str) -> str:
-    """统一全角字符和兼容罗马数字，保留原文仅供规则判断。"""
-
-    return unicodedata.normalize("NFKC", text).strip()
-
-
-def _caption_tail_is_reference(tail: str) -> bool:
-    """排除编号后紧接叙述谓语、并列编号或正文连接词的引用句。"""
-
-    stripped = tail.lstrip()
-    if not stripped:
-        return False
-    if _SUBFIGURE_REFERENCE_TAIL_RE.match(stripped):
-        return True
-    if stripped[0] in ".:：-–—()[]（）":
-        return False
-    if _ENGLISH_REFERENCE_TAIL_RE.match(stripped) or _CHINESE_REFERENCE_TAIL_RE.match(stripped):
-        return True
-    return stripped[0].isascii() and stripped[0].isalpha() and stripped[0].islower()
-
-
-def _is_strong_caption_text(text: str) -> bool:
-    """判断文本是否以带编号的中英文强图表标题标记开头。"""
-
-    normalized = _normalize_annotation_text(text)
-    match = _ENGLISH_CAPTION_RE.match(normalized) or _CHINESE_CAPTION_RE.match(normalized)
-    return match is not None and not _caption_tail_is_reference(match.group("tail"))
-
-
-def _caption_identifier(text: str) -> str | None:
-    """返回中英文强图表题共用的规范化编号。"""
-
-    normalized = _normalize_annotation_text(text)
-    match = _ENGLISH_CAPTION_RE.match(normalized) or _CHINESE_CAPTION_RE.match(normalized)
-    return (
-        unicodedata.normalize(
-            "NFKC",
-            match.group("identifier"),
-        ).casefold()
-        if match is not None
-        else None
-    )
-
-
 def _is_strong_footnote_text(text: str) -> bool:
     """判断文本是否以带冒号的来源或注释强标记开头。"""
 
-    return bool(_FOOTNOTE_RE.match(_normalize_annotation_text(text)))
+    normalized = _normalize_annotation_text(text)
+    # 缩写解释可能和来源合成一块；解释本身必须有等号，来源仍须明确标记。
+    definition_with_source = re.match(
+        r"^[A-Za-z][A-Za-z0-9 -]{0,30}\s*=\s*\S.+?\s+Source(?:s)?\s*:\s*\S", normalized, re.I | re.S
+    )
+    reference_source = re.fullmatch(
+        r"\(?[A-Z][A-Za-z’'-]+\s+(?:(?:and|&)\s+[A-Z][A-Za-z’'-]+\s+|et\s+al\.?\s+)?[12]\d{3}\)?\.?", normalized
+    )
+    adapted_source = re.match(r"^(?:table|figure)\s+(?:adapted|reprinted|reproduced)\s+from\s+\S", normalized, re.I)
+    return bool(_FOOTNOTE_RE.match(normalized) or definition_with_source or reference_source or adapted_source)
 
 
 def _block_angle(block: dict[str, Any]) -> int:
@@ -207,14 +148,110 @@ def _collect_annotation_candidates(
         if block_type in {"caption", "footnote"}:
             output[index] = block_type
             continue
-        if block_type != "text" or not isinstance(block.get("content"), str):
+        if block_type not in {"text", "paragraph_title"} or not isinstance(block.get("content"), str):
             continue
         content = str(block["content"])
         if _is_strong_caption_text(content):
             output[index] = "caption"
-        elif _is_strong_footnote_text(content):
+        elif block_type == "text" and _is_strong_footnote_text(content):
             output[index] = "footnote"
+        elif block_type == "text" and _is_adjacent_unlabelled_italic_caption(index, blocks):
+            output[index] = "caption"
+    # 紧贴强来源标记的同字号解释先成为候选，否则解释行会被当作阻隔而使整个注释带无法绑定。
+    for anchor_index, kind in list(output.items()):
+        anchor = blocks[anchor_index]
+        if kind != "footnote" or _block_angle(anchor) != 0 or not _is_strong_footnote_text(str(anchor.get("content", ""))):
+            continue
+        height = _block_median_line_height(anchor, (0, 0))
+        bounds = _coerce_bbox(anchor.get("bbox"))
+        if bounds is None:
+            continue
+        images = [
+            box
+            for block in blocks
+            if block.get("type") == "image"
+            and (box := _coerce_bbox(block.get("bbox"))) is not None
+            and 0 <= bounds[1] - box[3] <= 6 * height
+            and box[0] - 0.25 * (box[2] - box[0]) <= bounds[0] <= box[2]
+        ]
+        if not images:
+            continue
+        image = max(images, key=lambda box: box[3])
+        lower = bounds[1]
+        preceding = sorted(
+            (
+                (index, box)
+                for index, block in enumerate(blocks)
+                if index not in output
+                and block.get("type") == "text"
+                and _block_angle(block) == 0
+                and (box := _coerce_bbox(block.get("bbox"))) is not None
+                and image[3] - 0.25 * height <= box[1]
+                and box[3] <= lower + 0.25 * height
+            ),
+            key=lambda item: item[1][3],
+            reverse=True,
+        )
+        for index, box in preceding:
+            candidate = blocks[index]
+            if (
+                lower - box[3] > 1.5 * height
+                or abs(box[0] - bounds[0]) > height
+                or not re.match(r"^[A-Za-z][A-Za-z0-9 -]{0,30}\s*(?:=|:)\s*\S", str(candidate.get("content", "")))
+                or not 0.85 * height <= _block_median_line_height(candidate, (0, 0)) <= 1.15 * height
+                or box[2] > image[2] + 0.25 * (image[2] - image[0])
+                or not _table_footnote_fonts_are_compatible(anchor, candidate)
+                or _is_strong_caption_text(str(candidate.get("content", "")))
+            ):
+                break
+            output[index] = "footnote"
+            lower = box[1]
     return output
+
+
+def _is_adjacent_unlabelled_italic_caption(index: int, blocks: list[dict[str, Any]]) -> bool:
+    """无编号图注需要单行斜体、紧贴大图和后续正文留白共同证明，不能只凭短句认领。"""
+    block = blocks[index]
+    box = _coerce_bbox(block.get("bbox"))
+    fonts = block.get("_font_signatures")
+    rows = block.get("_local_line_bboxes")
+    text = str(block.get("content", ""))
+    if (
+        box is None
+        or _block_angle(block) != 0
+        or not isinstance(fonts, (set, frozenset))
+        or not fonts
+        or not all(isinstance(font, tuple) and len(font) == 2 and isinstance(font[1], int) and font[1] & 64 for font in fonts)
+        or not isinstance(rows, list)
+        or len(rows) != 1
+        or not 4 <= len(re.findall(r"[A-Za-z]+", text)) <= 24
+    ):
+        return False
+    em = _block_median_line_height(block, (0, 0))
+    images = [
+        image
+        for image in blocks
+        if image.get("type") == "image"
+        and (bounds := _coerce_bbox(image.get("bbox"))) is not None
+        and bounds[2] - bounds[0] >= 10 * em
+        and bounds[3] - bounds[1] >= 8 * em
+        and 0 <= box[1] - bounds[3] <= 0.75 * em
+        and abs(box[0] - bounds[0]) <= 0.75 * em
+        and box[2] <= bounds[2] + 0.5 * em
+    ]
+    if len(images) != 1:
+        return False
+    following = [
+        bounds
+        for other in blocks
+        if other is not block
+        and other.get("type") == "text"
+        and (bounds := _coerce_bbox(other.get("bbox"))) is not None
+        and bounds[1] >= box[3]
+        and abs(bounds[0] - box[0]) <= em
+        and len(re.findall(r"[A-Za-z]+", str(other.get("content", "")))) >= 15
+    ]
+    return bool(following and min(bounds[1] for bounds in following) - box[3] >= 1.5 * em)
 
 
 def _coerce_lane_interval(value: object) -> tuple[float, float] | None:
@@ -657,7 +694,7 @@ def _build_visual_parents(
         if local_bbox is None:
             continue
         local_bboxes[index] = local_bbox
-        parents.append(_VisualParent((index,), angle, local_bbox))
+        parents.append(_VisualParent((index,), angle, local_bbox, bool(block.get("_native_numeric_grid"))))
         if block.get("type") == "image":
             image_indices_by_angle.setdefault(angle, []).append(index)
 
@@ -693,6 +730,79 @@ def _build_visual_parents(
                 )
             )
     return parents
+
+
+def _add_caption_supported_table_panel_parents(
+    blocks: list[dict[str, Any]],
+    page_size: tuple[float, float],
+    parents: list[_VisualParent],
+    candidates: dict[int, _AnnotationKind],
+) -> None:
+    """同高双表、各自a/b说明及跨栏总表题共同确认面板组；保持两个表体与总说明各出现一次。"""
+    tables = [
+        parent
+        for parent in parents
+        if len(parent.member_indices) == 1 and blocks[parent.member_indices[0]].get("type") == "table"
+    ]
+    for caption_index, kind in list(candidates.items()):
+        caption = blocks[caption_index]
+        if kind != "caption" or not re.match(r"^\s*tab(?:le)?[.\s0-9]", str(caption.get("content", "")), re.I):
+            continue
+        height = _block_median_line_height(caption, page_size)
+        angle = _block_angle(caption)
+        caption_box = _block_local_bbox(caption, page_size, angle)
+        if caption_box is None or height <= 0:
+            continue
+        nearby = sorted(
+            [
+                parent
+                for parent in tables
+                if parent.angle == angle
+                and 0 <= caption_box[1] - parent.local_bbox[3] <= 4 * height
+                and caption_box[0] - height <= parent.local_bbox[0]
+                and parent.local_bbox[2] <= caption_box[2] + height
+            ],
+            key=lambda parent: parent.local_bbox[0],
+        )
+        if len(nearby) != 2:
+            continue
+        left, right = nearby
+        a, b = left.local_bbox, right.local_bbox
+        if (
+            abs(a[1] - b[1]) > 0.5 * height
+            or abs(a[3] - b[3]) > 0.5 * height
+            or not 0 <= b[0] - a[2] <= 8 * height
+            or not 0.7 <= (a[2] - a[0]) / max(b[2] - b[0], 1e-6) <= 1.43
+        ):
+            continue
+        notes = []
+        for parent, letter in zip(nearby, ("a", "b")):
+            box = parent.local_bbox
+            matches = [
+                index
+                for index, block in enumerate(blocks)
+                if block.get("type") == "text"
+                and _block_angle(block) == angle
+                and re.match(rf"^\s*\({letter}\)\s+\S", str(block.get("content", "")))
+                and (note_box := _block_local_bbox(block, page_size, angle)) is not None
+                and 0 <= note_box[1] - box[3] <= 2 * height
+                and note_box[3] <= caption_box[1] + 0.1 * height
+                and box[0] - 0.25 * height <= note_box[0] < note_box[2] <= box[2] + 0.25 * height
+                and 0.75 * height <= _block_median_line_height(block, page_size) <= 1.25 * height
+            ]
+            if len(matches) != 1:
+                break
+            notes.extend(matches)
+        if len(notes) != 2:
+            continue
+        parent = _VisualParent(tuple(p.member_indices[0] for p in nearby), angle, _bbox_union_many([a, b]))
+        relation = _direction_relation(parent, caption_box, height, "below", 4)
+        if relation is None or _relation_has_intervening_block(
+            relation, caption_index, caption_box, height, blocks, page_size, set(candidates) | set(notes)
+        ):
+            continue
+        parents.append(parent)
+        candidates.update(dict.fromkeys(notes, "caption"))
 
 
 def _relation_has_intervening_block(
@@ -791,6 +901,59 @@ def _choose_annotation_relation(
         )
         is not None
     ]
+    if kind == "caption" and not relations and _is_strong_caption_text(str(annotation.get("content", ""))):
+        # 编号图题可沿正文栏外悬于居中图体；仅接纳唯一近邻且有多数横向覆盖的单图。
+        outdented = []
+        for parent in parents:
+            if (
+                parent.angle != angle
+                or len(parent.member_indices) != 1
+                or blocks[parent.member_indices[0]].get("type") != "image"
+            ):
+                continue
+            image = parent.local_bbox
+            direction = "above" if annotation_bbox[3] <= image[1] else "below"
+            gap = image[1] - annotation_bbox[3] if direction == "above" else annotation_bbox[1] - image[3]
+            projection, coverage, offset = _axis_overlap_metrics(annotation_bbox, image, axis="x", float_margin=line_height)
+            if (
+                0 <= gap <= 3 * line_height
+                and projection >= 0.55
+                and coverage >= 0.55
+                and annotation_bbox[0] >= image[0] - 0.45 * (image[2] - image[0])
+                and annotation_bbox[2] <= image[2] + 0.45 * (image[2] - image[0])
+            ):
+                outdented.append(_AnnotationRelation(parent, direction, gap / line_height, projection, coverage, offset))
+        if len(outdented) == 1:
+            relations.extend(outdented)
+    if kind == "footnote":
+        # 图题提供所属区域，允许短来源在图体左侧有限外悬；正文阻隔仍由统一走廊检查拒绝。
+        for parent in parents:
+            if (
+                parent.angle != angle
+                or len(parent.member_indices) != 1
+                or blocks[parent.member_indices[0]].get("type") != "image"
+            ):
+                continue
+            image = parent.local_bbox
+            image_width = image[2] - image[0]
+            if not (
+                0 <= annotation_bbox[1] - image[3] <= 6 * line_height
+                and image[0] - 0.25 * image_width <= annotation_bbox[0] <= image[2]
+                and annotation_bbox[2] <= image[2] + 0.25 * image_width
+            ):
+                continue
+            supported = any(
+                _is_strong_caption_text(str(blocks[index].get("content", "")))
+                and _block_angle(blocks[index]) == angle
+                and (caption_box := _block_local_bbox(blocks[index], page_size, angle)) is not None
+                and _best_parent_relation(parent, caption_box, _block_median_line_height(blocks[index], page_size), "caption")
+                is not None
+                for index in annotation_indices
+            )
+            if supported:
+                relations.append(
+                    _AnnotationRelation(parent, "below", (annotation_bbox[1] - image[3]) / line_height, 1.0, 1.0, 0.0)
+                )
     single_relations = [relation for relation in relations if len(relation.parent.member_indices) == 1]
     relations = [
         relation
@@ -808,6 +971,13 @@ def _choose_annotation_relation(
     ]
     if not relations:
         return None
+    # 图题明确描述曲线图且下方真实图像合法时，重复数字网格不能以较近距离抢占父关系。
+    if kind == "caption" and re.search(r"\b(?:graph|chart|plot)\b", str(annotation.get("content", "")), re.I):
+        alternatives = [
+            relation for relation in relations if not relation.parent.native_numeric_grid and relation.direction == "above"
+        ]
+        if alternatives and any(relation.parent.native_numeric_grid for relation in relations):
+            relations = alternatives
     return min(
         relations,
         key=lambda relation: (
@@ -1107,6 +1277,25 @@ def _build_visual_annotation_regions(
             if blocks[index].get("type") == "caption" and relation.direction in {"below", "right"}
         ]
         footnotes = [index for index in relations if blocks[index].get("type") == "footnote"]
+        # 双面板说明紧随自己的表体，保证公共归属阶段不因另一栏表体更近而误绑定。
+        ordered_bodies = []
+        panel_notes = set()
+        for body in _sort_visual_body_members(parent_indices, blocks, page_size):
+            ordered_bodies.append(body)
+            body_index = next(index for index in parent_indices if blocks[index] is body)
+            if body.get("type") != "table":
+                continue
+            notes = [
+                index
+                for index in trailing
+                if len(relations[index].parent.member_indices) == 1
+                and relations[index].parent.member_indices[0] == body_index
+                and re.match(r"^\s*\([a-z]\)\s+\S", str(blocks[index].get("content", "")))
+            ]
+            for index in _sort_annotation_indices_by_visual_rows(notes, blocks, page_size, relations):
+                ordered_bodies.append(blocks[index])
+                panel_notes.add(index)
+        trailing = [index for index in trailing if index not in panel_notes]
         regions.append(
             [
                 *(
@@ -1118,7 +1307,7 @@ def _build_visual_annotation_regions(
                         relations,
                     )
                 ),
-                *_sort_visual_body_members(parent_indices, blocks, page_size),
+                *ordered_bodies,
                 *(
                     blocks[index]
                     for index in _sort_annotation_indices_by_visual_rows(
@@ -1160,6 +1349,7 @@ def _classify_and_bind_visual_annotations(
     parents = _build_visual_parents(blocks, page_size, component_line_height)
     if not parents:
         return []
+    _add_caption_supported_table_panel_parents(blocks, page_size, parents, candidates)
     annotation_indices = set(candidates)
     assignments = {
         index: relation
@@ -1189,6 +1379,16 @@ def _classify_and_bind_visual_annotations(
             None,
         )
         if parent is not None:
+            previous = assignments.get(index)
+            # 装饰分隔线建立的旧图注带不能推翻已由数据网格与曲线图语义确认的父关系。
+            if (
+                candidates[index] == "caption"
+                and parent.native_numeric_grid
+                and previous is not None
+                and not previous.parent.native_numeric_grid
+                and re.search(r"\b(?:graph|chart|plot)\b", str(blocks[index].get("content", "")), re.I)
+            ):
+                continue
             direction = "above" if blocks[index]["bbox"][3] <= parent_block["bbox"][1] else "below"
             assignments[index] = _AnnotationRelation(parent, direction, 0.0, 1.0, 1.0, 0.0)
     assignments.update(
@@ -1218,6 +1418,15 @@ def _classify_and_bind_visual_annotations(
     for index, relation in assignments.items():
         blocks[index]["type"] = candidates[index]
         blocks[index]["_visual_annotation_direction"] = relation.direction
+        # 原生数据网格证据胜过近距父对象时，保留内部关联供公共MiddleJson转换消费，随后清除。
+        if (
+            candidates[index] == "caption"
+            and len(relation.parent.member_indices) == 1
+            and not relation.parent.native_numeric_grid
+            and any(parent.native_numeric_grid for parent in parents)
+            and re.search(r"\b(?:graph|chart|plot)\b", str(blocks[index].get("content", "")), re.I)
+        ):
+            blocks[index]["_native_annotation_parent_bbox"] = blocks[relation.parent.member_indices[0]]["bbox"]
     regions = _build_visual_annotation_regions(assignments, blocks, page_size)
     if consumed_indices:
         blocks[:] = [block for index, block in enumerate(blocks) if index not in consumed_indices]

@@ -25,7 +25,16 @@ def _document_uses_bbox(model_list: list[list[dict[str, Any]]]) -> bool:
 
 def _remove_private_block_metadata(block: dict[str, Any]) -> None:
     """递归清除对象化边界之前仅供 Analyze 计算使用的临时字段。"""
-    for field_name in ("lines", "_lines", "angle", "score", "label", "_reference_start", "_paragraph_boundary"):
+    for field_name in (
+        "lines",
+        "_lines",
+        "angle",
+        "score",
+        "label",
+        "_reference_start",
+        "_paragraph_boundary",
+        "_native_annotation_parent_bbox",
+    ):
         block.pop(field_name, None)
     content = block.get("content")
     if isinstance(content, list):

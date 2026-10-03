@@ -27,6 +27,29 @@ from ._script_geometry import classify_char_script_roles, paired_script_roles
 from ._interval_candidates import IntervalCandidates
 
 
+def _inherit_unanimous_structural_membership(merged: _LineItem, members: list[_LineItem]) -> None:
+    """同行片段共享明确段组或标题带时传递归属；不同归属不能由合并操作猜测。"""
+    if not members:
+        return
+    ordered = sorted(members, key=lambda line: line.bbox[0])
+    # 悬挂序号与标签合成同行时，传递标签释放字符前冻结的真实左缘。
+    if (
+        len(ordered) == 2
+        and re.fullmatch(r"(?:[A-Za-z]|\d{1,2})[.)]", ordered[0].text.strip())
+        and ordered[0].font_signature == ordered[1].font_signature
+    ):
+        merged.native_title_label_left = ordered[1].native_title_label_left
+    paragraph_group = members[0].paragraph_group
+    if paragraph_group is not None and all(member.paragraph_group == paragraph_group for member in members):
+        merged.paragraph_group = paragraph_group
+    title_band_id = members[0].title_band_id
+    if title_band_id is not None and all(member.title_band_id == title_band_id for member in members):
+        merged.title_band_id = title_band_id
+        merged.structural_title = all(member.structural_title for member in members)
+        merged.explicit_section_title = all(member.explicit_section_title for member in members)
+        merged.title_suppressed = all(member.title_suppressed for member in members)
+
+
 def _caption_crosses_left_text(members: list[_LineItem]) -> bool:
     """图题首行不得向左跨栏吞并正文，同栏后续行或右侧字体碎片仍可正常恢复。"""
     return any(
@@ -503,6 +526,7 @@ def _merge_overlapping_inline_cluster(
         leading_typography_width=ordered_members[0].leading_typography_width,
         paragraph_terminal=ordered_members[-1].paragraph_terminal,
         caption_start=any(member.caption_start for member in ordered_members),
+        native_math_words=frozenset(word for member in ordered_members for word in member.native_math_words),
         paragraph_formula_context=any(line.paragraph_formula_context for line in ordered_members),
         split_from_row=any(line.split_from_row for line in ordered_members),
         preserve_split_boundary=any(line.preserve_split_boundary for line in ordered_members),
@@ -516,6 +540,7 @@ def _merge_overlapping_inline_cluster(
             *detected_regions,
         ],
     )
+    _inherit_unanimous_structural_membership(merged, ordered_members)
     if merged.chars:
         _fill_native_typography(merged, page_size)
     return merged
@@ -897,6 +922,21 @@ def _same_baseline_geometry(
     return -0.25 * pair_height <= signed_gap <= gap_limit
 
 
+def _bullet_body_typography_member(members: list[_LineItem]) -> _LineItem | None:
+    """游离圆点只是项目标记，合行的字体统计应继承右侧主要文字，不能让符号字体覆盖整行正文。"""
+    first = members[0]
+    if (
+        len(members) < 2
+        or first.text.strip() not in {"•", "●", "▪"}
+        or first.bbox[2] - first.bbox[0] > _line_effective_height(first, first.bbox)
+    ):
+        return None
+    body = max(members[1:], key=lambda line: len(line.text.strip()))
+    if len(re.findall(r"[A-Za-z]{2,}|[\u3400-\u9fff]", body.text)) < 2:
+        return None
+    return body
+
+
 def _merge_same_baseline_group(
     indices: list[int],
     lines: list[_LineItem],
@@ -906,6 +946,7 @@ def _merge_same_baseline_group(
     """按局部 x 顺序合并一个同基线分量，并保留全部字符与几何信息。"""
 
     members = [lines[index] for index in indices]
+    body_typography = _bullet_body_typography_member(members)
     content_parts = [members[0].text.strip()]
     for previous_index, current_index in zip(indices, indices[1:]):
         previous_bbox = local_bboxes[previous_index]
@@ -950,8 +991,8 @@ def _merge_same_baseline_group(
         run_index=min(member.run_index for member in members),
         effective_height=statistics.median(member.effective_height for member in members),
         em_height=statistics.median(member.em_height or member.effective_height for member in members),
-        font_signature=members[0].font_signature,
-        font_coverage=min(member.font_coverage for member in members),
+        font_signature=(body_typography or members[0]).font_signature,
+        font_coverage=body_typography.font_coverage if body_typography else min(member.font_coverage for member in members),
         dominant_font_weight=statistics.median(
             member.dominant_font_weight for member in members if member.dominant_font_weight is not None
         )
@@ -966,6 +1007,7 @@ def _merge_same_baseline_group(
         leading_typography_width=members[0].leading_typography_width,
         paragraph_terminal=members[-1].paragraph_terminal,
         caption_start=any(member.caption_start for member in members),
+        native_math_words=frozenset(word for member in members for word in member.native_math_words),
         paragraph_formula_context=any(member.paragraph_formula_context for member in members),
         split_from_row=any(member.split_from_row for member in members),
         preserve_split_boundary=any(member.preserve_split_boundary for member in members),
@@ -976,6 +1018,7 @@ def _merge_same_baseline_group(
         style_scale_repaired=any(member.style_scale_repaired for member in members),
         inline_math_regions=[region for member in members for region in member.inline_math_regions],
     )
+    _inherit_unanimous_structural_membership(merged, members)
     if merged.chars:
         _fill_native_typography(merged, page_size)
     return merged
@@ -1108,6 +1151,8 @@ def _demote_runin_title_fragments(lines: list[_LineItem], page_size: tuple[float
                 for prefix in lines:
                     if (
                         prefix.semantic_type == "paragraph_title"
+                        # 单独字母序号是下一项的前缀，不是上一标题的换行碎片，不能向上传播降级。
+                        and re.fullmatch(r"[a-zA-Z][.)]", line.text.strip()) is None
                         and prefix.angle == line.angle
                         and not prefix.explicit_section_title
                         and abs(prefix.bbox[0] - line.bbox[0]) < height
@@ -1117,6 +1162,78 @@ def _demote_runin_title_fragments(lines: list[_LineItem], page_size: tuple[float
                         prefix.semantic_type = None
                         prefix.title_suppressed = True
                 break
+
+
+def _merge_metric_heading_fragments(
+    lines: list[_LineItem],
+    page_size: tuple[float, float],
+) -> list[_LineItem]:
+    """同排大号标题为数值指标提供版式证据，仅聚合紧邻方向箭头及引用上标，保留下一行说明。"""
+    consumed: set[int] = set()
+    merged_lines: list[_LineItem] = []
+    for value in lines:
+        if (
+            value.source_index in consumed
+            or value.semantic_type not in {None, "paragraph_title"}
+            or value.caption_start
+            or value.paragraph_terminal
+            or value.font_signature is None
+            or value.font_coverage < 0.75
+            or value.formula_candidate_only
+            or value.compact_formula_cluster
+            or re.fullmatch(r"\d+(?:[.,]\d+)?\s*(?:[A-Za-z]{1,4}|[%×])", value.text.strip()) is None
+        ):
+            continue
+        bounds = _rotate_bbox_to_upright(value.bbox, page_size, value.angle)
+        height = _line_effective_height(value, bounds)
+        arrows = []
+        for arrow in lines:
+            if (
+                arrow is value
+                or arrow.source_index in consumed
+                or arrow.angle != value.angle
+                or arrow.semantic_type != "paragraph_title"
+                or arrow.font_signature != value.font_signature
+                or arrow.caption_start
+                or arrow.formula_candidate_only
+                or arrow.compact_formula_cluster
+                or re.fullmatch(r"[↑↓↗↘]\s*\d{0,3}", arrow.text.strip()) is None
+            ):
+                continue
+            arrow_bounds = _rotate_bbox_to_upright(arrow.bbox, page_size, arrow.angle)
+            if (
+                0.45 * height <= _line_effective_height(arrow, arrow_bounds) <= 1.05 * height
+                and 0 <= arrow_bounds[0] - bounds[2] <= 0.75 * height
+                and _bbox_axis_overlap_ratio(bounds, arrow_bounds, axis="y") >= 0.7
+            ):
+                arrows.append(arrow)
+        if len(arrows) != 1:
+            continue
+        peers = [
+            other
+            for other in lines
+            if other is not value
+            and other is not arrows[0]
+            and other.angle == value.angle
+            and other.semantic_type == "paragraph_title"
+            and other.font_signature == value.font_signature
+            and not other.caption_start
+            and 0.8 * height <= _line_effective_height(other, other.bbox) <= 1.25 * height
+            and abs(_bbox_center_y(other.bbox) - _bbox_center_y(value.bbox)) <= 0.35 * height
+            and _horizontal_bbox_gap(other.bbox, value.bbox) >= 3 * height
+        ]
+        if not peers:
+            continue
+        merged = _merge_dense_split_visual_row([value, arrows[0]], page_size)
+        merged.semantic_type = "paragraph_title"
+        merged.structural_title = merged.explicit_section_title = True
+        merged.title_band_id = value.source_index
+        merged.effective_height = merged.em_height = height
+        merged_lines.append(merged)
+        consumed.update((value.source_index, arrows[0].source_index))
+    if not consumed:
+        return lines
+    return [line for line in lines if line.source_index not in consumed] + merged_lines
 
 
 def _merge_title_resolved_visual_rows(
@@ -1497,6 +1614,7 @@ def _merge_dense_split_visual_row(
         content_parts.extend([separator, current[0].text.strip()])
 
     ordered_members = [member for member, _bbox in ordered_geometry]
+    body_typography = _bullet_body_typography_member(ordered_members)
     merged = _LineItem(
         text="".join(content_parts).strip(),
         bbox=_bbox_union_many([member.bbox for member in ordered_members]),
@@ -1522,8 +1640,10 @@ def _merge_dense_split_visual_row(
         run_index=0,
         effective_height=statistics.median(_line_effective_height(member, bbox) for member, bbox in ordered_geometry),
         em_height=statistics.median(_line_effective_height(member, bbox) for member, bbox in ordered_geometry),
-        font_signature=ordered_members[0].font_signature,
-        font_coverage=min(member.font_coverage for member in ordered_members),
+        font_signature=(body_typography or ordered_members[0]).font_signature,
+        font_coverage=body_typography.font_coverage
+        if body_typography
+        else min(member.font_coverage for member in ordered_members),
         dominant_font_weight=statistics.median(
             member.dominant_font_weight for member in ordered_members if member.dominant_font_weight is not None
         )
@@ -1538,6 +1658,7 @@ def _merge_dense_split_visual_row(
         leading_typography_width=ordered_members[0].leading_typography_width,
         paragraph_terminal=ordered_members[-1].paragraph_terminal,
         caption_start=any(member.caption_start for member in ordered_members),
+        native_math_words=frozenset(word for member in ordered_members for word in member.native_math_words),
         paragraph_formula_context=any(member.paragraph_formula_context for member in ordered_members),
         split_from_row=False,
         preserve_split_boundary=any(member.preserve_split_boundary for member in ordered_members),
@@ -1548,6 +1669,7 @@ def _merge_dense_split_visual_row(
         style_scale_repaired=any(member.style_scale_repaired for member in ordered_members),
         inline_math_regions=[region for member in ordered_members for region in member.inline_math_regions],
     )
+    _inherit_unanimous_structural_membership(merged, ordered_members)
     if merged.chars:
         _fill_native_typography(merged, page_size)
     return merged

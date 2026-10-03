@@ -40,11 +40,30 @@ def _add_image(data_uri: str, assets: AssetStore) -> str:
     return path
 
 
+def _serializable_middle(middle: Any) -> dict[str, Any]:
+    """保留完整协议默认值，仅移除嵌套块中不允许出现的空续段字段以支持结果包回读。"""
+    value = middle.to_dict(skip_defaults=False)
+
+    def visit(block: dict[str, Any], nested: bool = False) -> None:
+        """沿语义子树清理序列化补入的空默认值，顶层续段信息原样保留。"""
+        if nested and block.get("continues_prev") is None:
+            block.pop("continues_prev", None)
+        if isinstance(block.get("content"), list):
+            for child in block["content"]:
+                if isinstance(child, dict):
+                    visit(child, True)
+
+    for page in value["pages"]:
+        for block in page["blocks"]:
+            visit(block)
+    return value
+
+
 def save_bundle(result: DocumentResult, path: Path, *, overwrite: bool = False) -> ExportResult:
     """将中间协议与素材清单放入同一文件事务。"""
     middle, assets = materialize_middle(result.middle_json, result.assets)
     validate_materialized_assets(middle, assets)
-    files: dict[str, bytes] = {"middle.json": middle.to_json(skip_defaults=False).encode("utf-8")}
+    files: dict[str, bytes] = {"middle.json": json.dumps(_serializable_middle(middle), ensure_ascii=False).encode("utf-8")}
     manifest: dict[str, Any] = {
         "schema": "docvortex.bundle",
         "schema_version": "2.0",

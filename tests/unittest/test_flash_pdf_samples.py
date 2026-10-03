@@ -298,7 +298,7 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
                     "header": 43,
                     "image": 14,
                     "page_number": 22,
-                    "paragraph_title": 26,
+                    "paragraph_title": 29,
                     "table": 20,
                     "text": 70,
                 }
@@ -372,7 +372,7 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
                 }
             ),
         ),
-        "demo6.pdf": (7, Counter({"image": 2, "paragraph_title": 9, "text": 22})),
+        "demo6.pdf": (7, Counter({"image": 2, "paragraph_title": 9, "text": 39})),
         "mixed_elements_pages_03_06.pdf": (
             4,
             Counter(
@@ -400,7 +400,7 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
                     "footer": 1,
                     "image": 2,
                     "page_number": 4,
-                    "page_footnote": 2,
+                    "page_footnote": 4,
                     "paragraph_title": 15,
                     "table": 2,
                     "text": 57,
@@ -499,8 +499,10 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
                     "image": 2,
                     "index": 1,
                     "page_number": 4,
+                    "paragraph_title": 1,
                     # 无效字重不再把两条句末中文说明误判为标题，原页均为普通正文。
-                    "text": 14,
+                    # 第2页独立“目录”题名经原页和前后标框复核恢复为标题，目录成员及水印过滤不变。
+                    "text": 13,
                 }
             ),
         ),
@@ -1564,17 +1566,15 @@ def test_demo6_default3_targeted_title_regressions() -> None:
     assert sum("盖章" in str(block["content"]) for block in model_list[6]) == 1
     assert not [block for page in model_list for block in page if block["type"] in {"caption", "footnote"}]
     page5 = model_list[4]
-    assert len(page5) == 1
-    assert page5[0]["type"] == "text"
-    assert all(
-        probe in _visible_content(page5[0])
-        for probe in (
-            "1.2",
-            "[2014]68 号",
-            "1.3",
-            "1.4",
-        )
-    )
+    # 原页顿号编号形成独立项目，正文类型与小数编号政策续行仍保持。
+    assert all(block["type"] == "text" for block in page5)
+    policy = [block for block in page5 if "[2014]68 号" in _visible_content(block)]
+    assert len(policy) == 1
+    assert all(probe in _visible_content(policy[0]) for probe in ("1.2", "1.3", "1.4"))
+    independent = [next(block for block in page5 if probe in _visible_content(block))
+                   for probe in ("1、时间:2026 年 06 月 29 日", "2、地点:郑州市经三路 15 号广汇国贸 A1202", "1、响应文件递交截止时间")]
+    assert len({id(block) for block in independent}) == 3
+    assert all(block is not policy[0] for block in independent)
 
 
 def test_mixed_elements_pages_03_06_force_txt_regressions() -> None:
@@ -2077,16 +2077,16 @@ def test_mixed_elements_pages_07_10_force_txt_regressions() -> None:
     assert len(url_footer) == 1
     assert url_footer[0]["type"] == "page_footnote"
     bottom_footnotes = [block for block in page9 if block["type"] == "page_footnote" and block["bbox"][1] >= 0.85]
-    assert len(bottom_footnotes) == 1
+    assert len(bottom_footnotes) == 3
     assert all(
-        probe in _visible_content(bottom_footnotes[0])
+        sum(probe in _visible_content(note) for note in bottom_footnotes) == 1
         for probe in (
             "http://klee.github.io",
             "llvm-slicing",
             "liuml07/giri",
         )
     )
-    assert sum(block["type"] == "page_footnote" for page in model_list for block in page) == 2
+    assert sum(block["type"] == "page_footnote" for page in model_list for block in page) == 4
 
     reference5 = _blocks_containing(page10, "[5] A. Srivastava")
     assert len(reference5) == 1
@@ -2180,3 +2180,11 @@ def test_mixed_elements_pages_39_40_force_txt_regressions() -> None:
     assert equation9_following[0]["type"] == "text"
     assert "is an unbiased estimator" in _visible_content(equation9_following[0])
     assert "McAllester and Schapire" in _visible_content(equation9_following[0])
+
+
+def test_caibao_risk_subsection_titles_remain_separate_from_their_native_body():
+    """风险主标题后两个独立短题名都应成标题，各自说明正文不能吞入标题。"""
+    page=_txt_model_list('caibao1.pdf')[18]
+    for text in ('宏观经济下行导致需求不足','芯片短缺问题持续影响整车生产'):
+        found=[block for block in page if _visible_content(block)==text]
+        assert len(found)==1 and found[0]['type']=='paragraph_title'

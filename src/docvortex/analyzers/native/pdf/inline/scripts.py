@@ -786,6 +786,44 @@ def _strong_structural_script_roles(
     return strong_roles
 
 
+def _drop_cap_body_indices(
+    chars: list[dict[str, Any]],
+    tight_bboxes: dict[int, BBox],
+    origins: dict[int, tuple[float, float]],
+) -> set[int]:
+    """识别下沉大写首字母旁同基线的小写词尾，避免将正文首词误作数学上标。"""
+    word = []
+    for index, char in enumerate(chars):
+        text = _script_char_text(char)
+        if not text.isascii() or not text.isalpha():
+            break
+        word.append(index)
+    if not 3 <= len(word) <= 12:
+        return set()
+    if not _script_char_text(chars[0]).isupper() or not all(_script_char_text(chars[index]).islower() for index in word[1:]):
+        return set()
+    boxes = [tight_bboxes.get(chars[index].get("char_idx")) for index in word]
+    points = [origins.get(chars[index].get("char_idx")) for index in word]
+    if any(value is None for value in boxes + points):
+        return set()
+    cap = boxes[0]
+    suffix_height = statistics.median(box[3] - box[1] for box in boxes[1:])
+    cap_height = cap[3] - cap[1]
+    baseline = statistics.median(point[1] for point in points[1:])
+    if suffix_height <= 0 or cap_height < 3 * suffix_height:
+        return set()
+    if not (
+        cap[1] + 0.25 * cap_height <= baseline <= cap[1] + 0.7 * cap_height
+        and points[0][1] - baseline >= 1.2 * suffix_height
+        and -0.1 * suffix_height <= boxes[1][0] - cap[2] <= 1.5 * suffix_height
+        and all(abs(point[1] - baseline) <= 0.15 * suffix_height for point in points[1:])
+        and all(0.5 * suffix_height <= box[3] - box[1] <= 1.5 * suffix_height for box in boxes[1:])
+        and all(box[0] >= cap[2] - 0.1 * suffix_height for box in boxes[1:])
+    ):
+        return set()
+    return set(word)
+
+
 def _classify_script_runs(
     chars: list[dict[str, Any]],
     local_tight_bboxes: dict[int, BBox],
@@ -849,6 +887,10 @@ def _classify_script_runs(
             formula_region=membership is not None,
             ordinary_native_roles=classified is not None and (prepared_native is not None or preclassified_native is not None),
         )
+        if membership is None and any(role != "body" for role in run_roles):
+            # 公式成员保持原脚本角色；正文下沉首字母需在计数前一起恢复，Python和native路径共用。
+            for index in _drop_cap_body_indices(run_chars, local_tight_bboxes, local_origins):
+                run_roles[index] = "body"
         if classified is not None and all(role == "body" for role in run_roles):
             body_count = 0
             for char in run_chars:

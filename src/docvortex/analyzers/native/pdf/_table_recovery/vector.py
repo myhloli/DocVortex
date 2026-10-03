@@ -1243,7 +1243,23 @@ def _physical_row_dense_baseline_pairs(
         )
 
     ambiguous_pairs: list[dict[str, object]] = []
+    text_rows_by_index = {row.row_index: row for row in text.rows}
+    # 首行两个答题列的双行列名不是漏行：后面至少三行仅有左侧行名，两列答案全空且列名不含数值。
+    blank_answer_header = (
+        cols == 3
+        and len(rows_by_band) >= 4
+        and len(rows_by_band[0]) == 2
+        and all(entry[1] == (1, 2) for entry in rows_by_band[0])
+        and sum(bool(entries) for band, entries in rows_by_band.items() if band) >= 3
+        and all(not entries or all(entry[1] == (0,) for entry in entries) for band, entries in rows_by_band.items() if band)
+        and all(
+            not any(char.isdigit() for token in text_rows_by_index[index].tokens for char in token.text)
+            for index, _cols in rows_by_band[0]
+        )
+    )
     for band, entries in rows_by_band.items():
+        if band == 0 and blank_answer_header:
+            continue
         nonempty_entries = [entry for entry in entries if entry[1]]
         if (
             len(nonempty_entries) < 2
@@ -2022,7 +2038,8 @@ def build_vector_candidates(
     )
     line_hypotheses = [raw_line_diagnostics] if raw_line_diagnostics is not None else []
     selected_line_diagnostics = raw_line_diagnostics
-    if line_candidate is None and len(line_hypotheses) < MAX_TRACK_HYPOTHESES:
+    # 低于verified门槛的原始候选也应尝试剔除单元格内装饰线，例如两行超链接的下划线。
+    if (line_candidate is None or line_candidate.score < 0.95) and len(line_hypotheses) < MAX_TRACK_HYPOTHESES:
         supported_line_diagnostics: dict[str, Any] | None = {} if diagnostics is not None else None
         supported_line_candidate = _build_vector_candidate(
             table_input,
@@ -2042,7 +2059,7 @@ def build_vector_candidates(
             if removed_tracks:
                 line_hypotheses.append(supported_line_diagnostics)
                 selected_line_diagnostics = supported_line_diagnostics
-        if supported_line_candidate is not None:
+        if supported_line_candidate is not None and (line_candidate is None or supported_line_candidate.score >= 0.95):
             line_candidate = supported_line_candidate
             selected_line_diagnostics = supported_line_diagnostics
     if diagnostics is not None and selected_line_diagnostics is not None:

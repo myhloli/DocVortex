@@ -115,6 +115,7 @@ class PDFPathInfo:
     form_depth: int
     source_index: int
     fill_rgba: tuple[int, int, int, int] | None = None
+    rectangle_bboxes: tuple[BBox, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -123,6 +124,9 @@ class PDFImageInfo:
 
     bbox: BBox
     fingerprint: str | None
+    smooth_background: bool = False
+    # 图片自身像素证明的白色/透明顶边，仅供原生布局排除相邻大标题使用。
+    blank_top_bbox: BBox | None = None
 
 
 @dataclass(frozen=True, slots=True)

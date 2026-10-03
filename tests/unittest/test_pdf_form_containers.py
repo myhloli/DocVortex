@@ -140,9 +140,16 @@ def test_issue23_report_keeps_six_charts_and_native_tables() -> None:
     assert "盈利预测调整说明" in text
     assert "预计" in text
     assert sum(block["type"] == "image" for block in pages[2]) == 1
-    for page in pages[3:]:
+    for number, page in enumerate(pages[3:], 4):
         assert any(block["type"] == "table" for block in page)
-        assert any(block["type"] == "text" for block in page)
+        if number == 4:
+            assert any(block["type"] == "text" for block in page)
+        else:
+            # 年份表头已归入完整表格，不能再用原先游离表头的 text 数量作为正文存在性断言。
+            assert any(block["type"] == "paragraph_title" and "财务预测与估值" in _visible(block["content"]) for block in page)
+            tables = [block for block in page if block["type"] == "table"]
+            assert len(tables) == 4
+            assert all("2022" in _visible(block["content"]) and "2026E" in _visible(block["content"]) for block in tables)
         assert not any(block["type"] == "image" and block["bbox"][3] - block["bbox"][1] > 0.7 for block in page)
 
 

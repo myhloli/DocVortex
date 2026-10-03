@@ -19,6 +19,7 @@ from .geometry import (
     _coerce_bbox,
 )
 from .models import _LineItem, _LocalAxisLine, _TextLane
+from .inline.types import PDF_FONT_ITALIC_FLAG
 from .typography import _normalized_font_family
 
 _TIGHT_OUTPUT_PADDING = 1.0
@@ -49,6 +50,14 @@ def _font_signatures_share_family(
     return first_family is not None and second_family is not None and first_family == second_family
 
 
+def _font_signatures_share_emphasis_family(first: tuple[str, int], second: tuple[str, int]) -> bool:
+    """仅在已确认的正文强调续行中忽略通用字重/斜体后缀，不改变标题或其他字体兼容规则。"""
+    style_suffix = r"(?:semibold|demibold|regular|regu|roman|bold|light|medium|italic|ital|oblique)+$"
+    first_family = re.sub(style_suffix, "", _normalized_font_family(first) or "")
+    second_family = re.sub(style_suffix, "", _normalized_font_family(second) or "")
+    return bool(first_family) and first_family == second_family
+
+
 def _font_weights_conflict(first: _LineItem, second: _LineItem) -> bool:
     """判断两行是否存在足以构成段落硬边界的显著字重差异。"""
 
@@ -74,6 +83,14 @@ def _should_connect_semantic_rows(
     previous_line, previous_bbox = previous
     current_line, current_bbox = current
     if previous_line.semantic_type != current_line.semantic_type:
+        return False
+    if (
+        current_line.semantic_type == "paragraph_title"
+        and current_line.explicit_section_title
+        and current_line.title_band_id is not None
+        and current_line.title_band_id != previous_line.title_band_id
+    ):
+        # 已确认的独立编号标题带构成永久边界，连续两级标题不能因紧排而粘连。
         return False
     if _connection_crosses_table(previous_line.bbox, current_line.bbox, table_bboxes):
         return False
@@ -106,7 +123,11 @@ def _should_connect_semantic_rows(
             or abs(previous_line.dominant_font_weight - current_line.dominant_font_weight) < 100.0
         )
     )
-    if font_conflicts and not uncertain_document_title_font:
+    if (
+        font_conflicts
+        and not uncertain_document_title_font
+        and not (shared_title_band and previous_line.structural_title and current_line.structural_title)
+    ):
         return False
     lane_width = max(0.1, lane.right - lane.left)
     centered_pair = abs(_bbox_center_x(previous_bbox) - _bbox_center_x(current_bbox)) <= 0.15 * lane_width
@@ -1012,18 +1033,59 @@ def _should_connect_text_rows(
         or (current_width <= 0.5 * lane_width and previous_line.font_signature[1] == current_line.font_signature[1])
     )
     previous_indent = previous_bbox[0] - lane.left
+    # 极端字体矩阵校正后，旧字框高度不再夸大缩进；真实同行左缘与常规基线间距仍约束续行。
+    local_metric_pair = all(
+        line.style_scale_repaired
+        and line.source_bbox is not None
+        and line.source_bbox[3] - line.source_bbox[1] >= 4 * _line_effective_height(line, bbox)
+        for line, bbox in (previous, current)
+    )
     repeated_indent_continuation = (
-        previous_indent >= max(5.0, 1.8 * pair_height)
+        previous_indent >= max(5.0, (1.25 if local_metric_pair else 1.8) * pair_height)
         and abs(current_bbox[0] - previous_bbox[0]) <= 0.5 * pair_height
         and reliable_font_match
         and -0.25 * pair_height <= vertical_gap <= regular_gap + max(0.75 * pair_height, 3.0 * gap_mad)
+    )
+    # 逗号未终止的满行正文可接同字体家族的粗体枚举短尾；真实标题、留白和字号变化仍拒绝。
+    emphasized_enumeration_tail = (
+        previous_line.semantic_type is None
+        and current_line.semantic_type is None
+        and previous_line.text.rstrip().endswith((",", "，"))
+        and (current_line.paragraph_terminal or bool(re.search(r"[.!?。！？]$", current_line.text.rstrip())))
+        and len(current_line.text.split()) <= 10
+        and previous_line.font_signature is not None
+        and current_line.font_signature is not None
+        and _font_signatures_share_emphasis_family(previous_line.font_signature, current_line.font_signature)
+        and max(previous_height, current_height) <= 1.2 * min(previous_height, current_height)
+        and -0.1 * pair_height <= vertical_gap <= 0.4 * pair_height
+    )
+    # 未收句的满栏正文后，连词或小写词开头的短斜体收句仍是正文续行；独立大写标签和公式不适用。
+    italic_sentence_tail = (
+        previous_line.semantic_type is None
+        and current_line.semantic_type is None
+        and not previous_line.paragraph_terminal
+        and re.search(r"[.!?。！？:：;；]$", previous_line.text.rstrip()) is None
+        and not previous_line.formula_candidate_only
+        and not current_line.formula_candidate_only
+        and not current_line.compact_formula_cluster
+        and (current_line.paragraph_terminal or bool(re.search(r"[.!?。！？]$", current_line.text.rstrip())))
+        and re.match(r"(?:[+&]\s+|[a-z])", current_line.text.strip()) is not None
+        and 1 <= len(re.findall(r"[A-Za-z]{2,}", current_line.text)) <= 10
+        and previous_line.font_signature is not None
+        and current_line.font_signature is not None
+        and current_line.font_signature[1] & PDF_FONT_ITALIC_FLAG
+        and not previous_line.font_signature[1] & PDF_FONT_ITALIC_FLAG
+        and _font_signatures_share_emphasis_family(previous_line.font_signature, current_line.font_signature)
+        and not _font_weights_conflict(previous_line, current_line)
+        and max(previous_height, current_height) <= 1.2 * min(previous_height, current_height)
+        and -0.1 * pair_height <= vertical_gap <= 0.4 * pair_height
     )
     safe_short_tail = (
         previous_width >= 0.75 * lane_width
         and current_width <= 0.7 * lane_width
         and (aligned_left_edges or current_returns_to_lane_left)
-        and reliable_font_match
-        and not _font_weights_conflict(previous_line, current_line)
+        and (reliable_font_match or emphasized_enumeration_tail or italic_sentence_tail)
+        and (not _font_weights_conflict(previous_line, current_line) or emphasized_enumeration_tail)
         and -0.25 * pair_height <= vertical_gap <= regular_gap + max(0.75 * pair_height, 3.0 * gap_mad)
     )
     height_ratio = max(previous_height, current_height) / min(previous_height, current_height)
@@ -1064,7 +1126,12 @@ def _should_connect_text_rows(
         and not _font_weights_conflict(previous_line, current_line)
         and -0.25 * pair_height <= vertical_gap <= regular_gap + max(0.35 * pair_height, 3.0 * gap_mad)
     )
-    if font_style_changed and _font_weights_conflict(previous_line, current_line) and not fallback_font_continuation:
+    if (
+        font_style_changed
+        and _font_weights_conflict(previous_line, current_line)
+        and not fallback_font_continuation
+        and not emphasized_enumeration_tail
+    ):
         # 显式样式位与显著字重同时变化仍是硬边界，不能被满栏几何放宽。
         return False
     if (

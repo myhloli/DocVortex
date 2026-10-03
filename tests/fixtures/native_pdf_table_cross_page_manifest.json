@@ -465,7 +465,7 @@
           1
         ]
       ],
-      "text_sha256": "d0e4429d94f793465108795e8b835dfaa5d9482a861ede79f09d8d76c2330e46"
+      "text_sha256": "1b592930f59f724b7800ba39cb100cb92fbe56c03fda78843119d8c7abcf36e6"
     },
     {
       "file": "manufacturing_facilities_cross_page_table.pdf",
@@ -573,7 +573,7 @@
           1
         ]
       ],
-      "text_sha256": "d45581f7a401d5bac5d5dc7d77b3a862d72252ad17bc86c1e6c21490e8bef9df"
+      "text_sha256": "0f1baae0c0a50bd698ae4bb4f7f31847219f5f04de7fb2828fea5e43b7ba7667"
     },
     {
       "file": "procurement_document_blank_page_tables.pdf",
@@ -1417,7 +1417,7 @@
           1
         ]
       ],
-      "text_sha256": "1ea46ec814021e97bd7637df48a3f3428f572b265b3c5e395c3d30dad4264b28",
+      "text_sha256": "c268b84b9da0a8ff219f0bf1599f6564c24fe07b58bb10988b3dc4e357a73a86",
       "target_reason": "canonical_track_alias"
     },
     {
@@ -2069,7 +2069,7 @@
           1
         ]
       ],
-      "text_sha256": "36fddefb6c3e69d327637f7011372ef3cf17cfd61316653acfd590cbf2bfa74e",
+      "text_sha256": "b68e6b1523a9e90e3a82d063a37580984630cf3daec2b44f86874a50d54780b0",
       "target_reason": "canonical_track_alias"
     },
     {
@@ -6654,7 +6654,7 @@
       "rows": 3,
       "cols": 15,
       "span_signature": [],
-      "text_sha256": "dd09406289c01d6df0c8e98a59333df322ba49c87bcb2c5bbebcecfc11313d50"
+      "text_sha256": "1915bb25b66f286e65c371bc20e1210f9edb712ed75e74ebb8972c4910c6bd50"
     },
     {
       "file": "pollutant_discharge_tables.pdf",
@@ -6688,7 +6688,7 @@
       "rows": 3,
       "cols": 15,
       "span_signature": [],
-      "text_sha256": "947e33095354f178a4a617202c37eeec86622c45fe7c809cd0980277f6659c25"
+      "text_sha256": "a20cb00755eb3090adeedf3cd07cc9210e09d68c42d1c2001ae136b59cf46203"
     },
     {
       "file": "pollutant_discharge_tables.pdf",
@@ -6705,7 +6705,7 @@
       "rows": 3,
       "cols": 15,
       "span_signature": [],
-      "text_sha256": "1b4335d34b5b8c6b6ffbd4abe9cee1671e6477436f6373d02a136cff0b586530"
+      "text_sha256": "26a0e893563fad967aac2df799c9c246371cd7cd4ff3c7e512c96b0c18270ba1"
     },
     {
       "file": "pollutant_discharge_tables.pdf",

@@ -154,6 +154,65 @@ def _classify_page_titles(
         )
         if document_body_profile is not None and document_body_profile.has_style_scale_repairs:
             _demote_non_structural_anomaly_titles(line_geometry)
+        peer_geometry = [
+            (line, _rotate_bbox_to_upright(line.bbox, page_size, angle))
+            for line in lines
+            if line.angle == angle and line.semantic_type in {None, "paragraph_title"} and not line.title_suppressed
+        ]
+        _restore_parallel_small_column_labels(peer_geometry, local_container_bboxes)
+
+
+def _restore_parallel_small_column_labels(
+    geometry: list[tuple[_LineItem, BBox]],
+    containers: list[BBox],
+) -> None:
+    """三栏同排小标签与各栏较大的简介构成重复标题结构，用已确认同级标题补齐其余栏。"""
+    candidates = []
+    for line, bounds in geometry:
+        height = _line_effective_height(line, bounds)
+        if (
+            line.paragraph_terminal
+            or line.caption_start
+            or line.font_signature is None
+            or not 1 <= len(line.text.split()) <= 6
+            or re.search(r"\d|[.!?：:;,]$", line.text.strip())
+            or bounds[2] - bounds[0] > 9 * height
+            or _line_inside_visual_container(bounds, containers)
+        ):
+            continue
+        followers = [
+            (other, bbox)
+            for other, bbox in geometry
+            if other is not line
+            and other.semantic_type is None
+            and abs(bbox[0] - bounds[0]) <= 0.25 * height
+            and 0.5 * height <= bbox[1] - bounds[3] <= 2 * height
+            and 1.2 * height <= _line_effective_height(other, bbox) <= 1.6 * height
+            and bbox[2] - bbox[0] >= 1.3 * (bounds[2] - bounds[0])
+            and len(re.findall(r"[A-Za-z]{2,}|[\u3400-\u9fff]", other.text)) >= 2
+        ]
+        if len(followers) == 1:
+            candidates.append((line, bounds))
+    for line, bounds in candidates:
+        height = _line_effective_height(line, bounds)
+        band = [
+            (other, bbox)
+            for other, bbox in candidates
+            if other.font_signature == line.font_signature
+            and 0.9 * height <= _line_effective_height(other, bbox) <= 1.1 * height
+            and abs(_bbox_center_y(bbox) - _bbox_center_y(bounds)) <= 0.15 * height
+        ]
+        band.sort(key=lambda item: item[1][0])
+        if (
+            len(band) < 3
+            or not any(other.semantic_type == "paragraph_title" for other, _ in band)
+            or any(after[1][0] - before[1][2] < 4 * height for before, after in zip(band, band[1:]))
+        ):
+            continue
+        for other, _ in band:
+            other.semantic_type = "paragraph_title"
+            other.structural_title = other.explicit_section_title = True
+            other.title_band_id = other.source_index
 
 
 def _demote_non_structural_anomaly_titles(
@@ -339,6 +398,13 @@ def _classify_document_title(
             if candidate_line.semantic_type is not None:
                 break
             candidate_height = _line_effective_height(candidate_line, candidate_bbox)
+            if (
+                candidate_bbox[1] > anchor_bbox[3]
+                and candidate_line.font_signature == anchor_line.font_signature
+                and candidate_height < 0.9 * anchor_height
+            ):
+                # 题名下方的显著字号收缩建立排版边界，不能只因同字体和居中继续扩张。
+                break
             if not 0.8 <= candidate_height / anchor_height <= 1.25:
                 break
             if not _document_title_fonts_compatible(anchor_line, candidate_line):
@@ -392,6 +458,12 @@ def _expand_document_title_across_lanes(
                 candidate_line,
                 candidate_bbox,
             )
+            if (
+                candidate_bbox[1] > title_bbox[3]
+                and any(candidate_line.font_signature == anchor.font_signature for anchor in anchors)
+                and candidate_height < 0.9 * title_height
+            ):
+                continue
             if not 0.8 <= candidate_height / max(0.1, title_height) <= 1.25:
                 continue
             if not any(_document_title_fonts_compatible(anchor, candidate_line) for anchor in anchors):

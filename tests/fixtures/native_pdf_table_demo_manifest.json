@@ -16753,7 +16753,7 @@
       "angle": 270,
       "expected_output": "html",
       "review_status": "target_verified",
-      "content_sha256": "412113029f464ab3d6c03d1ef843d614fe77470c1981b97bddd42663e39941c5",
+      "content_sha256": "b38bfc9d0c1367e2e4910038b177b7ad952f621d321c79975ec9130ae4232fbf",
       "expected_source": "sparse_multiline",
       "rows": 11,
       "cols": 11,
@@ -17219,7 +17219,7 @@
           "col": 10,
           "rowspan": 1,
           "colspan": 1,
-          "text": "Fahey and Jackson,1 997"
+          "text": "Fahey and Jackson, 1 997"
         },
         {
           "row": 6,
@@ -25825,7 +25825,7 @@
       "angle": 0,
       "expected_output": "html",
       "review_status": "target_verified",
-      "content_sha256": "4d136a33d95832a9e787f03e1067fd87178de6cb1dcccb6cdf6c508fbc807297",
+      "content_sha256": "e926d2c194bbc236af941cbf08bae5efa52bbf28cd0e4c7c1173432088a65d84",
       "expected_source": "vector_grid",
       "rows": 19,
       "cols": 6,
@@ -26256,7 +26256,7 @@
           "col": 0,
           "rowspan": 1,
           "colspan": 1,
-          "text": "EleuHthaerrnAesIsLM"
+          "text": "EleutherAI LM Harness"
         },
         {
           "row": 10,

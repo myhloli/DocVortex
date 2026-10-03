@@ -23,7 +23,9 @@ from ..line_layout import (
     _title_fonts_compatible,
 )
 from ..models import _DocumentBodyProfile, _DocumentTitleProfile, _LineItem, _PreparedPage, _TextLane
+from ..native_text import _fill_native_typography
 from .body_profile import _line_uses_document_regular_font
+
 from .common import (
     _NUMBERED_SECTION_TITLE_RE,
     _SECTION_NUMBER_ONLY_RE,
@@ -33,6 +35,794 @@ from .common import (
     _line_inside_visual_container,
 )
 from .page_titles import _classify_page_titles
+
+
+def _classify_short_cjk_section_leads(lines: list[_LineItem]) -> None:
+    """孤立短中文题名及其后两行同左缘正文证明章节起点，段内短尾和冒号引导不晋升标题。"""
+    rows = sorted(lines, key=lambda line: (line.bbox[1], line.bbox[0]))
+    for candidate in rows:
+        text = candidate.text.strip()
+        if (
+            candidate.semantic_type is not None
+            or candidate.paragraph_group is not None
+            or candidate.caption_start
+            or candidate.formula_candidate_only
+            or candidate.angle != 0
+            or candidate.font_signature is None
+            or re.fullmatch(r"[\u3400-\u9fff]{4,16}", text) is None
+        ):
+            continue
+        following = [
+            line
+            for line in rows
+            if line is not candidate
+            and line.semantic_type is None
+            and line.paragraph_group is None
+            and not line.caption_start
+            and line.angle == 0
+            and abs(line.bbox[0] - candidate.bbox[0]) <= 0.3 * candidate.effective_height
+            and line.bbox[1] >= candidate.bbox[3]
+        ]
+        if len(following) < 2:
+            continue
+        first, second = following[:2]
+        em = max(first.effective_height, second.effective_height)
+        width = first.bbox[2] - first.bbox[0]
+        if (
+            em <= 0
+            or width < 12 * em
+            or candidate.bbox[2] - candidate.bbox[0] >= 0.5 * width
+            or not 1 <= candidate.effective_height / em <= 1.65
+            or not 0.9 * em <= min(first.effective_height, second.effective_height)
+            or not _title_fonts_compatible(candidate, first)
+            or not _title_fonts_compatible(first, second)
+            or not 0 <= first.bbox[1] - candidate.bbox[3] <= 1.1 * em
+            or not -0.1 * em <= second.bbox[1] - first.bbox[3] <= 0.65 * em
+            or len(re.findall(r"[\u3400-\u9fff]", first.text)) < 12
+            or (
+                len(re.findall(r"[\u3400-\u9fff]", first.text + second.text)) < 18
+                and re.search(r"》\s*[—–-]+\s*\d{4}[-./]\d{1,2}[-./]\d{1,2}\s*$", second.text) is None
+            )
+        ):
+            continue
+        preceding = [
+            line
+            for line in rows
+            if line is not candidate
+            and line.angle == 0
+            and line.semantic_type not in {"paragraph_title", "doc_title"}
+            and line.bbox[3] <= candidate.bbox[1]
+            and _bbox_axis_overlap_ratio(line.bbox, candidate.bbox, axis="x") >= 0.5
+            and 0 <= candidate.bbox[1] - line.bbox[3] < 1.2 * em
+        ]
+        if preceding:
+            continue
+        candidate.semantic_type = "paragraph_title"
+
+
+def _mark_emphasized_quote_prose(lines: list[_LineItem]) -> None:
+    """多行同字号强调引用保留为原生正文；开引号或完整闭引号加自然语言反证标题和公式。"""
+    from ..inline.types import PDF_FONT_ITALIC_FLAG
+
+    heights = [line.effective_height for line in lines if line.angle == 0 and line.effective_height > 0]
+    if not heights:
+        return
+    body = statistics.median(heights)
+    styled = [
+        line
+        for line in lines
+        if line.angle == 0
+        and line.semantic_type is None
+        and not line.caption_start
+        and line.font_signature
+        and (line.font_signature[1] & PDF_FONT_ITALIC_FLAG or (line.dominant_font_weight or 400) >= 600)
+        and 0.8 <= line.effective_height / body <= 1.2
+    ]
+    rows = []
+    for line in sorted(styled, key=lambda item: (item.bbox[1], item.bbox[0])):
+        peers = [
+            row
+            for row in rows
+            if row[0].font_signature == line.font_signature
+            and row[0].visual_row_id is not None
+            and row[0].visual_row_id == line.visual_row_id
+            and min(abs(line.bbox[0] - row[-1].bbox[2]), abs(row[-1].bbox[0] - line.bbox[2])) <= 3 * body
+        ]
+        if peers:
+            peers[-1].append(line)
+        else:
+            rows.append([line])
+    pending = list(rows)
+    group = max((line.paragraph_group for line in lines if line.paragraph_group is not None), default=-1) + 1
+    while pending:
+        run = [pending.pop(0)]
+        while True:
+            previous = _bbox_union_many([line.bbox for line in run[-1]])
+            following = [
+                row
+                for row in pending
+                if row[0].font_signature == run[0][0].font_signature
+                and -0.15 * body <= min(line.bbox[1] for line in row) - previous[3] <= 0.8 * body
+                and _bbox_axis_overlap_ratio(_bbox_union_many([line.bbox for line in row]), previous, axis="x") >= 0.5
+            ]
+            if not following:
+                break
+            row = min(following, key=lambda items: min(line.bbox[1] for line in items))
+            pending.remove(row)
+            run.append(row)
+        text = " ".join(line.text for row in run for line in row).strip()
+        italic = bool(run[0][0].font_signature[1] & PDF_FONT_ITALIC_FLAG)
+        opening = text.startswith(("“", '"', "‘"))
+        closing = bool(re.search(r'[”"]\s*[.!?]?\s*$', text))
+        if len(run) < 3 or len(re.findall(r"\b[A-Za-z]{2,}\b", text)) < 15 or re.search(r"[=<>∑∫]", text):
+            continue
+        if not (italic and opening or len(run) >= 6 and closing):
+            continue
+        for row in run:
+            for line in row:
+                line.semantic_type = "text"
+                line.title_suppressed = True
+                line.paragraph_group = group
+        group += 1
+        bounds = _bbox_union_many([line.bbox for row in run for line in row])
+        # 同栏常规字体的完整冒号引导句仍为正文，不能因下方引用留白被提升为小节标题。
+        preceding = sorted(
+            [
+                line
+                for line in lines
+                if line.semantic_type is None
+                and not line.caption_start
+                and line.angle == 0
+                and 0.8 <= line.effective_height / body <= 1.2
+                and 0 <= bounds[1] - line.bbox[3] <= 4 * body
+                and _bbox_axis_overlap_ratio(line.bbox, bounds, axis="x") >= 0.5
+            ],
+            key=lambda item: item.bbox[1],
+        )
+        if preceding and preceding[-1].text.rstrip().endswith(":"):
+            intro = [preceding[-1]]
+            for line in reversed(preceding[:-1]):
+                if (
+                    line.font_signature != intro[0].font_signature
+                    or not -0.1 * body <= intro[0].bbox[1] - line.bbox[3] <= 0.8 * body
+                ):
+                    break
+                intro.insert(0, line)
+            if len(re.findall(r"\b[A-Za-z]{2,}\b", " ".join(line.text for line in intro))) >= 6:
+                for line in intro:
+                    line.semantic_type = "text"
+                    line.title_suppressed = True
+                    line.paragraph_group = group
+                group += 1
+
+
+def _classify_native_display_resets(lines, page_size, visual_bboxes, table_bboxes, *, page_index, reference_lines):
+    """由重复字体、容器净空和多行同级排版恢复标题；不用字体名称或具体文字判定。"""
+    available = [
+        line
+        for line in lines
+        if line.angle == 0
+        and line.semantic_type in {None, "paragraph_title"}
+        and not line.caption_start
+        and not line.title_suppressed
+        and line.font_signature
+    ]
+    regular = [
+        line
+        for line in reference_lines
+        if line.angle == 0
+        and line.effective_height > 0
+        and (len(re.findall(r"\b[A-Za-z]{2,}\b", line.text)) >= 4 or len(re.findall(r"[\u3400-\u9fff]", line.text)) >= 10)
+    ]
+    if len(regular) < 3:
+        return
+    body = statistics.median(line.effective_height for line in regular)
+    short = [
+        line
+        for line in available
+        if 3 <= len(re.findall(r"[A-Za-z\u3400-\u9fff]", line.text)) <= 70
+        and len(line.text.split()) <= 12
+        and not re.search(r"[=<>∑∫]|[.!。！;；]$", line.text.strip())
+    ]
+    # 等高轻字重标题由独立重复字体和上下正文/图像关系共同证明；侧栏图注不能仅凭字体不同晋升。
+    light = [
+        line
+        for line in short
+        if 0.85 <= line.effective_height / body <= 1.25
+        and line.dominant_font_weight is not None
+        and line.dominant_font_weight <= 350
+        and not any(other.font_signature == line.font_signature and len(other.text.split()) >= 12 for other in regular)
+    ]
+    for line in light:
+        peers = [
+            other
+            for other in light
+            if other.font_signature == line.font_signature and 0.9 <= other.effective_height / line.effective_height <= 1.1
+        ]
+        if len(peers) < 2:
+            continue
+        h = line.effective_height
+        followers = [
+            other
+            for other in regular
+            if other.font_signature != line.font_signature
+            and abs(other.bbox[0] - line.bbox[0]) <= 0.6 * h
+            and 0 <= other.bbox[1] - line.bbox[3] <= 3 * h
+            and other.bbox[2] - other.bbox[0] >= line.bbox[2] - line.bbox[0]
+        ]
+        above_image = any(
+            0 <= box[1] - line.bbox[3] <= 2 * h
+            and _bbox_axis_overlap_ratio(line.bbox, box, axis="x") >= 0.7
+            and (
+                abs(_bbox_center_x(line.bbox) - page_size[0] / 2) <= h
+                or abs(_bbox_center_x(line.bbox) - _bbox_center_x(box)) <= h
+            )
+            for box in visual_bboxes
+        )
+        if len(followers) >= 2 or above_image:
+            _set_native_title_band([line], lines)
+    # 完整网格上方居中的粗体短题名以表体字号为参照，防止表格内部表头和正文尾句被误收。
+    for line in short:
+        h = line.effective_height
+        if line.semantic_type is not None or (line.dominant_font_weight or 400) < 600 or h < 1.25 * body:
+            continue
+        if any(
+            0.3 * body <= box[1] - line.bbox[3] <= 2 * body
+            and 0.2 <= (line.bbox[2] - line.bbox[0]) / max(box[2] - box[0], 0.1) <= 0.7
+            and abs(_bbox_center_x(line.bbox) - _bbox_center_x(box)) <= 0.05 * (box[2] - box[0])
+            for box in table_bboxes
+        ):
+            _set_native_title_band([line], lines)
+    _classify_repeated_multiline_display_bands(short, body, page_size, page_index, lines)
+    # 重复冒号小标题必须比紧随的常规条目更粗，并有两行正文；冒号引导句仍保持正文。
+    labels = []
+    for line in short:
+        if (
+            line.semantic_type is not None
+            or not line.text.rstrip().endswith((":", "："))
+            or not 3 <= len(line.text.split()) <= 8
+        ):
+            continue
+        h = line.effective_height
+        followers = [
+            other
+            for other in regular
+            if other.semantic_type is None
+            and 0.8 <= other.effective_height / h <= 1.2
+            and 0 <= other.bbox[0] - line.bbox[0] <= 2 * h
+            and 0 <= other.bbox[1] - line.bbox[3] <= 3 * h
+            and (line.dominant_font_weight or 400) - (other.dominant_font_weight or 400) >= 100
+        ]
+        if len(followers) >= 2:
+            labels.append(line)
+    for line in labels:
+        if sum(other.font_signature == line.font_signature for other in labels) >= 3:
+            _set_native_title_band([line], lines)
+
+
+def _set_native_title_band(members, all_lines):
+    """明确原生标题带共享身份，同行碎片与续行合并而相邻不同级标题保持分离。"""
+    band = min(line.source_index for line in members)
+    group = max((line.paragraph_group for line in all_lines if line.paragraph_group is not None), default=-1) + 1
+    for line in members:
+        line.semantic_type = "paragraph_title"
+        line.structural_title = line.explicit_section_title = True
+        line.title_band_id = band
+        line.paragraph_group = group
+        line.title_suppressed = False
+
+
+def _freeze_wrapped_bold_title_evidence(line: _LineItem, page_size: tuple[float, float]) -> None:
+    """释放原生字符前冻结短粗体前缀与常规正文的两段几何，不保留跨页字符字典。"""
+    line.native_title_label_left = _numbered_title_label_left(line)
+    prefix = []
+    for char in line.chars:
+        if (char.get("font") or {}).get("weight", 0) < 600:
+            break
+        prefix.append(char)
+    tail_text = "".join(char.get("char", "") for char in prefix).strip()
+    rest = line.chars[len(prefix) :]
+    body_text = "".join(char.get("char", "") for char in rest).strip()
+    if (
+        not prefix
+        or not rest
+        or not 1 <= len(tail_text.split()) <= 3
+        or not tail_text.endswith((".", ":", "。", "："))
+        or len(body_text.split()) < 4
+        or any((char.get("font") or {}).get("weight", 0) > 500 for char in rest if char.get("char", "").strip())
+    ):
+        return
+    parts = []
+    for text, chars in ((tail_text, prefix), (body_text, rest)):
+        bounds = _bbox_union_many([tuple(char["bbox"]) for char in chars if char.get("char", "").strip()])
+        part = replace(
+            line, text=text, bbox=bounds, source_bbox=bounds, ink_bbox=None, chars=list(chars), wrapped_title_parts=None
+        )
+        _fill_native_typography(part, page_size)
+        part.chars.clear()
+        parts.append(part)
+    line.wrapped_title_parts = (parts[0], parts[1])
+
+
+def _restore_wrapped_bold_title_tails(lines: list[_LineItem], page_size: tuple[float, float]) -> list[_LineItem]:
+    """标题下一行的短加粗前缀与标题同式时按冻结原生证据切回标题，常规正文保持完整段组。"""
+    output = list(lines)
+    next_source = max((line.source_index for line in lines), default=-1) + 1
+    for current in lines:
+        if current.angle != 0 or current.semantic_type is not None or current.caption_start:
+            continue
+        if current.wrapped_title_parts is None and current.chars:
+            _freeze_wrapped_bold_title_evidence(current, page_size)
+        if current.wrapped_title_parts is None:
+            continue
+        suffix, body = current.wrapped_title_parts
+        prefix_box = suffix.bbox
+        em = _line_effective_height(current, current.bbox)
+        previous = [
+            line
+            for line in lines
+            if line.semantic_type == "paragraph_title"
+            and line.angle == 0
+            and (line.dominant_font_weight or 0) >= 600
+            and not line.paragraph_terminal
+            and not re.search(r"[.!?。！？]$", line.text.strip())
+            and abs(_numbered_title_label_left(line) - prefix_box[0]) <= 0.5 * em
+            and -0.1 * em <= prefix_box[1] - line.bbox[3] <= 0.65 * em
+            and line.font_signature is not None
+            and line.font_signature == suffix.font_signature
+        ]
+        if len(previous) != 1:
+            continue
+        head = previous[0]
+        suffix = replace(suffix, source_index=next_source)
+        next_source += 1
+        title_members = [
+            head,
+            suffix,
+            *(
+                line
+                for line in lines
+                if line is not head
+                and line.semantic_type == "paragraph_title"
+                and line.font_signature == head.font_signature
+                and _bbox_axis_overlap_ratio(line.bbox, head.bbox, axis="y") >= 0.7
+                and 0 <= head.bbox[0] - line.bbox[2] <= 3 * em
+            ),
+        ]
+        _set_native_title_band(title_members, output)
+        current.text, current.bbox, current.source_bbox = body.text, body.bbox, body.source_bbox
+        current.ink_bbox, current.chars = None, []
+        current.font_signature, current.dominant_font_weight = body.font_signature, body.dominant_font_weight
+        current.median_glyph_width, current.leading_emphasis_width = body.median_glyph_width, None
+        current.wrapped_title_parts = None
+        group = max((line.paragraph_group for line in output if line.paragraph_group is not None), default=-1) + 1
+        paragraph = [current]
+        for line in sorted(
+            (line for line in lines if line.source_index > current.source_index), key=lambda line: line.source_index
+        ):
+            before = paragraph[-1]
+            if (
+                line.semantic_type is not None
+                or line.caption_start
+                or line.angle != 0
+                or line.font_signature != current.font_signature
+                or not 0.9 <= _line_effective_height(line, line.bbox) / em <= 1.1
+                or not -0.1 * em <= line.bbox[1] - before.bbox[3] <= 0.65 * em
+                or abs(line.bbox[0] - prefix_box[0]) > 0.5 * em
+            ):
+                break
+            paragraph.append(line)
+        for line in paragraph:
+            line.paragraph_group = group
+        output.append(suffix)
+    return output
+
+
+def _numbered_title_label_left(line: _LineItem) -> float:
+    """同排序号并入标题时用实际标签首字左缘，不能把序号的悬挂缩进当成正文续行偏移。"""
+    if line.native_title_label_left is not None:
+        return line.native_title_label_left
+    if re.match(r"^(?:[A-Za-z]|\d{1,2})[.)]\s+", line.text) and line.chars:
+        marker_ended = False
+        for char in line.chars:
+            text = char.get("char", "")
+            if marker_ended and text.strip():
+                return float(char["bbox"][0])
+            if text in {".", ")"}:
+                marker_ended = True
+    return line.bbox[0]
+
+
+def _restore_short_heading_with_image_displaced_prose(lines: list[_LineItem], image_bboxes: list[BBox]) -> None:
+    """原生连续两行正文的短收句被整幅图挤开时保持段组，并保留上方有净空的独立短题名。"""
+    rows = sorted(lines, key=lambda line: line.source_index)
+    for index in range(len(rows) - 2):
+        first, second, tail = rows[index : index + 3]
+        if any(
+            line.angle != 0
+            or line.semantic_type is not None
+            or line.paragraph_group is not None
+            or line.caption_start
+            or line.formula_candidate_only
+            for line in (first, second, tail)
+        ):
+            continue
+        em = _line_effective_height(first, first.bbox)
+        if (
+            first.font_signature is None
+            or any(line.font_signature != first.font_signature for line in (second, tail))
+            or any(not 0.9 <= _line_effective_height(line, line.bbox) / em <= 1.1 for line in (second, tail))
+            or len(first.text.split()) < 8
+            or len(second.text.split()) < 8
+            or second.paragraph_terminal
+            or re.search(r"[.!?;:。！？；：]$", second.text.rstrip())
+            or not re.fullmatch(r"[a-z][A-Za-z-]*(?:\s+[a-z][A-Za-z-]*){0,2}[.!?]", tail.text.strip())
+            or not -0.1 * em <= second.bbox[1] - first.bbox[3] <= 0.6 * em
+            or abs(first.bbox[0] - second.bbox[0]) > 0.25 * em
+            or abs(first.bbox[0] - tail.bbox[0]) > 0.25 * em
+            or tail.bbox[2] - tail.bbox[0] > 5 * em
+        ):
+            continue
+        images = [
+            box
+            for box in image_bboxes
+            if box[3] - box[1] >= 8 * em
+            and second.bbox[3] - 0.2 * em <= box[1] <= second.bbox[3] + 2 * em
+            and tail.bbox[1] - em <= box[3] <= tail.bbox[3] + em
+            and _bbox_axis_overlap_ratio(box, first.bbox, axis="x") >= 0.5
+            and _bbox_axis_overlap_ratio(box, tail.bbox, axis="x") <= 0.1
+        ]
+        if len(images) != 1:
+            continue
+        group = max((line.paragraph_group for line in lines if line.paragraph_group is not None), default=-1) + 1
+        for line in (first, second, tail):
+            line.paragraph_group = group
+        if index:
+            heading = rows[index - 1]
+            if (
+                heading.angle == 0
+                and heading.semantic_type is None
+                and heading.font_signature == first.font_signature
+                and 2 <= len(heading.text.split()) <= 6
+                and not re.search(r"[.!?。！？:：;；]$", heading.text.rstrip())
+                and abs(heading.bbox[0] - first.bbox[0]) <= 0.25 * em
+                and em <= first.bbox[1] - heading.bbox[3] <= 3 * em
+            ):
+                _set_native_title_band([heading], lines)
+
+
+def _classify_repeated_multiline_display_bands(short, body, page_size, page_index, all_lines):
+    """重复大标题带或后续页中文跨行章节由同字体、同尺度与稳定对齐聚合。"""
+    large = [
+        line
+        for line in short
+        if line.effective_height >= 1.4 * body
+        and (
+            (line.dominant_font_weight or 400) >= 600 or page_index > 0 and len(re.findall(r"[\u3400-\u9fff]", line.text)) >= 3
+        )
+    ]
+    rows = []
+    for line in sorted(large, key=lambda item: (item.bbox[1], item.bbox[0])):
+        peers = [
+            row
+            for row in rows
+            if row[0].font_signature == line.font_signature
+            and _bbox_axis_overlap_ratio(row[0].bbox, line.bbox, axis="y") >= 0.75
+            and -0.1 * body
+            <= line.bbox[0] - max(member.bbox[2] for member in row)
+            <= (
+                6 * line.effective_height
+                if all(re.search(r"[\u3400-\u9fff]", member.text) for member in row + [line])
+                else 0.5 * line.effective_height
+            )
+        ]
+        if peers:
+            peers[-1].append(line)
+        else:
+            rows.append([line])
+    bands = []
+    pending = list(rows)
+    while pending:
+        band = [pending.pop(0)]
+        while True:
+            bounds = _bbox_union_many([line.bbox for line in band[-1]])
+            h = band[0][0].effective_height
+            following = [
+                row
+                for row in pending
+                if row[0].font_signature == band[0][0].font_signature
+                and 0.9 <= row[0].effective_height / h <= 1.1
+                and -0.2 * h <= min(line.bbox[1] for line in row) - bounds[3] <= 0.6 * h
+                and _bbox_center_y(_bbox_union_many([line.bbox for line in row])) > _bbox_center_y(bounds) + 0.5 * h
+                and (
+                    abs(_bbox_union_many([line.bbox for line in row])[0] - bounds[0]) <= 0.4 * h
+                    or abs(_bbox_center_x(_bbox_union_many([line.bbox for line in row])) - _bbox_center_x(bounds)) <= 0.4 * h
+                )
+            ]
+            if not following:
+                break
+            row = min(following, key=lambda members: min(line.bbox[1] for line in members))
+            pending.remove(row)
+            band.append(row)
+        if len(band) >= 2:
+            bands.append([line for row in band for line in row])
+    for band in bands:
+        chinese = (
+            page_index > 0
+            and any("：" in line.text or ":" in line.text for line in band[:1])
+            and all(len(re.findall(r"[\u3400-\u9fff]", line.text)) >= 3 for line in band)
+        )
+        repeated = (
+            all(line.text.isupper() and re.search(r"[A-Z]", line.text) for line in band)
+            and sum(
+                other[0].font_signature == band[0].font_signature
+                and 0.9 <= other[0].effective_height / band[0].effective_height <= 1.1
+                and all(line.text.isupper() for line in other)
+                for other in bands
+            )
+            >= 2
+        )
+        if chinese or repeated:
+            _set_native_title_band(band, all_lines)
+
+
+def _classify_bold_numbered_heading_rows(
+    lines: list[_LineItem], page_size: tuple[float, float], containers: list[BBox], *, appendix_only: bool = False
+) -> None:
+    """由粗体、编号、同基线和留白恢复数字或附录字母标题，保持成员一致。"""
+    available = [line for line in lines if line.angle == 0 and line.semantic_type in {None, "paragraph_title"}]
+    for line in available:
+        if line.title_band_id is not None and line.structural_title:
+            continue
+        text = line.text.strip()
+        if appendix_only and not re.match(r"^[A-Z](?:\s|$)", text):
+            continue
+        if not re.match(r"^(?:\d+(?:\.\d+)*\.?|[A-Z])(?:\s|$|[-–—]\s*(?=[A-Z]))", text):
+            continue
+        height = _line_effective_height(line, line.bbox)
+        members = [line]
+        if re.fullmatch(r"\d+(?:\.\d+)*\.?|[A-Z]", text):
+            companions = [
+                other
+                for other in available
+                if other is not line
+                and other.bbox[0] >= line.bbox[2]
+                and other.bbox[0] - line.bbox[2] <= 2 * height
+                and _bbox_axis_overlap_ratio(other.bbox, line.bbox, axis="y") >= 0.6
+            ]
+            if not companions:
+                continue
+            members.append(min(companions, key=lambda other: other.bbox[0]))
+        body = members[-1]
+        label = " ".join(member.text.strip() for member in members)
+        bounds = _bbox_union_many([member.bbox for member in members])
+        if (
+            body.dominant_font_weight is None
+            or body.dominant_font_weight < 600
+            or body.font_coverage < 0.75
+            or len(label.split()) > 15
+            or re.search(r"[A-Za-z\u3400-\u9fff]", body.text) is None
+            or re.match(r"^\d{4,}(?:\s|$)", label)
+            or re.search(r"[.!?。！？:：;；,，]$", label)
+            or bounds[2] - bounds[0] > 0.8 * page_size[0]
+            or any(
+                _bbox_axis_overlap_ratio(bounds, box, axis="x") > 0.5 and _bbox_axis_overlap_ratio(bounds, box, axis="y") > 0.5
+                for box in containers
+            )
+        ):
+            continue
+        # 粗体长标题在编号后的文字栏缩进续行；即使续行以数字开头，也继承同一段界身份。
+        if len(label.split()) >= 5:
+            continuations = [
+                other
+                for other in available
+                if other not in members
+                and (
+                    height < other.bbox[0] - bounds[0] <= 3 * height
+                    or abs(other.bbox[0] - bounds[0]) <= 0.25 * height
+                    and not re.match(r"^(?:\d+(?:\.\d+)*\.?|[A-Z])(?:\s|$)", other.text.strip())
+                )
+                and -0.25 * height <= other.bbox[1] - bounds[3] <= 0.75 * height
+                and _bbox_center_y(other.bbox) > _bbox_center_y(bounds) + 0.5 * height
+                and other.bbox[2] <= bounds[2] + height
+                and other.dominant_font_weight is not None
+                and other.dominant_font_weight >= 600
+                and body.font_signature == other.font_signature
+                and 0.9 <= _line_effective_height(other, other.bbox) / height <= 1.1
+            ]
+            if continuations:
+                members.append(min(continuations, key=lambda other: other.bbox[1]))
+        for member in members:
+            member.semantic_type = "paragraph_title"
+            member.structural_title = True
+            member.explicit_section_title = True
+            member.title_band_id = line.source_index
+            member.title_suppressed = False
+    if not appendix_only:
+        _classify_display_roman_heading_rows(lines, page_size, containers)
+    _classify_headings_after_extreme_local_metric_repair(lines, page_size, containers)
+
+
+def _classify_headings_after_extreme_local_metric_repair(lines, page_size, containers):
+    """极端行框校正后，使用粗体、上下净空和正文续行确认同字号操作章节标题。"""
+    repaired = [
+        line
+        for line in lines
+        if line.style_scale_repaired
+        and line.source_bbox is not None
+        and line.source_bbox[3] - line.source_bbox[1] >= 4 * _line_effective_height(line, line.bbox)
+    ]
+    if len(repaired) < 6:
+        return
+    body_height = statistics.median(_line_effective_height(line, line.bbox) for line in repaired)
+    available = [line for line in lines if line.angle == 0 and line.semantic_type in {None, "paragraph_title"}]
+    for line in available:
+        text = line.text.strip()
+        height = _line_effective_height(line, line.bbox)
+        if (
+            (line.dominant_font_weight or 0) < 600
+            or line.font_coverage < 0.4
+            or not 0.85 * body_height <= height <= 1.5 * body_height
+            or not 2 <= len(text.split()) <= 20
+            or re.match(r"^[\d•●▪]", text)
+            or re.search(r"[.!?。！？]$", text)
+            or line.caption_start
+            or line.formula_candidate_only
+            or line.inline_math_regions
+            or line.bbox[2] - line.bbox[0] > 0.85 * page_size[0]
+            or _line_inside_visual_container(line.bbox, containers)
+        ):
+            continue
+        # 同基线的独立表头、字段名和强调片段不成为独立章节。
+        if any(other is not line and _bbox_axis_overlap_ratio(other.bbox, line.bbox, axis="y") >= 0.6 for other in available):
+            continue
+        followers = [
+            other
+            for other in available
+            if other is not line
+            and (other.dominant_font_weight or 400) < 600
+            and -0.25 * body_height <= other.bbox[0] - line.bbox[0] <= 2.5 * body_height
+            and 0.2 * body_height <= other.bbox[1] - line.bbox[3] <= 8 * body_height
+        ]
+        if len(followers) < 2:
+            continue
+        following = min(followers, key=lambda other: other.bbox[1])
+        previous = [
+            other.bbox[3]
+            for other in available
+            if other is not line
+            and other.bbox[3] <= line.bbox[1]
+            and _bbox_axis_overlap_ratio(other.bbox, line.bbox, axis="x") >= 0.2
+        ]
+        gap_above = line.bbox[1] - max(previous) if previous else body_height
+        gap_below = following.bbox[1] - line.bbox[3]
+        if not 0.3 * body_height <= gap_above <= 3 * body_height or gap_below > 2.5 * body_height:
+            continue
+        line.semantic_type = "paragraph_title"
+        line.structural_title = line.explicit_section_title = True
+        line.title_band_id = line.source_index
+        line.title_suppressed = False
+
+
+def _classify_display_roman_heading_rows(
+    lines: list[_LineItem], page_size: tuple[float, float], containers: list[BBox]
+) -> None:
+    """大号粗体罗马编号与下方左对齐展示标题组成结构带；普通页码和正文数学符号不晋升。"""
+    available = [line for line in lines if line.angle == 0 and line.semantic_type in {None, "paragraph_title", "doc_title"}]
+    scales = [_line_canonical_style_scale(line, line.bbox) for line in available if len(line.text.split()) >= 4]
+    if len(scales) < 3:
+        return
+    body_height = statistics.median(scales)
+    for marker in available:
+        height = _line_canonical_style_scale(marker, marker.bbox)
+        if (
+            re.fullmatch(r"[IVXLCDM]{1,8}\.", marker.text.strip()) is None
+            or height < 1.8 * body_height
+            or (marker.dominant_font_weight or 0) < 600
+            or marker.font_coverage < 0.75
+            or marker.bbox[2] - marker.bbox[0] > 5 * height
+            or _line_inside_visual_container(marker.bbox, containers)
+        ):
+            continue
+        candidates = [
+            line
+            for line in available
+            if line is not marker
+            and not line.caption_start
+            and abs(line.bbox[0] - marker.bbox[0]) <= 0.25 * height
+            and -0.25 * height <= line.bbox[1] - marker.bbox[3] <= 0.5 * height
+            and _bbox_center_y(line.bbox) > _bbox_center_y(marker.bbox) + 0.5 * height
+            and 0.6 * height <= _line_canonical_style_scale(line, line.bbox) <= 1.4 * height
+            and _line_canonical_style_scale(line, line.bbox) >= 1.8 * body_height
+            and (line.dominant_font_weight or 0) >= 600
+            and line.font_coverage >= 0.75
+            and re.search(r"[A-Za-z]{2,}|[\u3400-\u9fff]{2,}", line.text)
+            and re.fullmatch(r"[IVXLCDM]+\.?", line.text.strip()) is None
+            and line.bbox[2] - line.bbox[0] <= 0.6 * page_size[0]
+            and not _line_inside_visual_container(line.bbox, containers)
+        ]
+        if not candidates:
+            continue
+        label = min(candidates, key=lambda line: _bbox_center_y(line.bbox))
+        members = [marker, label]
+        for _ in range(2):
+            previous = members[-1]
+            label_height = _line_canonical_style_scale(label, label.bbox)
+            continuations = [
+                line
+                for line in available
+                if line not in members
+                and not line.caption_start
+                and abs(line.bbox[0] - label.bbox[0]) <= 0.25 * label_height
+                and -0.2 * label_height <= line.bbox[1] - previous.bbox[3] <= 0.4 * label_height
+                and _bbox_center_y(line.bbox) > _bbox_center_y(previous.bbox) + 0.5 * label_height
+                and line.font_signature == label.font_signature
+                and 0.85 <= _line_canonical_style_scale(line, line.bbox) / label_height <= 1.15
+                and not _line_inside_visual_container(line.bbox, containers)
+            ]
+            if not continuations:
+                break
+            members.append(min(continuations, key=lambda line: line.bbox[1]))
+        for member in members:
+            member.semantic_type = "paragraph_title"
+            member.structural_title = member.explicit_section_title = True
+            member.title_band_id = marker.source_index
+            member.title_suppressed = False
+
+
+def _demote_regular_repeated_item_titles(
+    lines: list[_LineItem],
+    document_body_profile: _DocumentBodyProfile | None,
+) -> None:
+    """同字号常规字体的邻近圆点或连续编号项目提供正文反证，防止列表首项被短行标题规则晋升。"""
+    from ..inline.detection import _font_styles_from_metadata
+
+    body_height = (
+        document_body_profile.body_height
+        if document_body_profile
+        else statistics.median(
+            [_line_effective_height(line, line.bbox) for line in lines if len(line.text.split()) >= 5] or [1.0]
+        )
+    )
+    candidates = []
+    for line in lines:
+        match = re.match(r"^\s*(?:[•●▪]\s+|(?P<number>\d{1,2})[.)]\s+)\S", line.text)
+        if (
+            match is None
+            or line.angle != 0
+            or line.semantic_type not in {None, "paragraph_title"}
+            or line.structural_title
+            or line.explicit_section_title
+            or line.caption_start
+            or line.font_signature is None
+            or line.font_coverage < 0.75
+            or _line_effective_height(line, line.bbox) > 1.15 * body_height
+            or "bold" in _font_styles_from_metadata(line.font_signature[0], line.font_signature[1], line.dominant_font_weight)
+        ):
+            continue
+        candidates.append((line, int(match["number"]) if match["number"] else None))
+    for line, number in candidates:
+        height = _line_effective_height(line, line.bbox)
+        peers = [
+            other
+            for other, other_number in candidates
+            if other is not line
+            and (
+                number is None
+                and other_number is None
+                or number is not None
+                and other_number is not None
+                and abs(number - other_number) == 1
+            )
+            and line.font_signature == other.font_signature
+            and 0.9 * height <= _line_effective_height(other, other.bbox) <= 1.1 * height
+            and abs(line.bbox[0] - other.bbox[0]) <= 0.5 * height
+            and 0.75 * height <= abs(_bbox_center_y(line.bbox) - _bbox_center_y(other.bbox)) <= 8 * height
+        ]
+        if not peers:
+            continue
+        line.semantic_type = None
+        line.title_suppressed = True
 
 
 def _normalized_section_title_text(text: str) -> str:

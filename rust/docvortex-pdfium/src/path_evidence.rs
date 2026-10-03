@@ -13,6 +13,7 @@ pub type PathInfo = (
     usize,
     usize,
     Option<Rgba>,
+    Vec<(f64, f64, f64, f64)>,
 );
 pub type Evidence = (Vec<Line>, Vec<PathInfo>);
 
@@ -403,7 +404,7 @@ where
 
 /// 生成单个 Path 的摘要候选；无效几何返回 None。
 #[allow(clippy::too_many_arguments)]
-unsafe fn object_info_with<H>(
+unsafe fn object_info_with<H, R>(
     raw: *mut c_void,
     api: &StateApi,
     prepared: &[PreparedSubpath],
@@ -414,9 +415,11 @@ unsafe fn object_info_with<H>(
     depth: usize,
     source_index: usize,
     hypot: &H,
+    round3: &R,
 ) -> Option<PathInfo>
 where
     H: Fn(f64, f64) -> f64,
+    R: Fn(f64) -> f64,
 {
     let segment_count = (api.subpaths.count)(raw);
     if segment_count <= 0 || prepared.is_empty() {
@@ -463,10 +466,65 @@ where
             depth,
             source_index,
             state.fill_rgba,
+            if state.fill_visible {
+                prepared
+                    .iter()
+                    .filter_map(|path| filled_rectangle_bbox(path, round3))
+                    .collect()
+            } else {
+                Vec::new()
+            },
         ))
     } else {
         None
     }
+}
+
+/// 记录真实四角直边填充矩形，曲线控制点和复杂文字轮廓不能仅凭外框成为柱体。
+fn filled_rectangle_bbox<R: Fn(f64) -> f64>(
+    path: &PreparedSubpath,
+    round3: &R,
+) -> Option<(f64, f64, f64, f64)> {
+    if !(4..=5).contains(&path.points.len()) || !(3..=4).contains(&path.lines.len()) {
+        return None;
+    }
+    if path
+        .points
+        .iter()
+        .any(|p| !p.0.is_finite() || !p.1.is_finite())
+    {
+        return None;
+    }
+    let x0 = path.points.iter().map(|p| p.0).reduce(minimum)?;
+    let x1 = path.points.iter().map(|p| p.0).reduce(maximum)?;
+    let y0 = path.points.iter().map(|p| p.1).reduce(minimum)?;
+    let y1 = path.points.iter().map(|p| p.1).reduce(maximum)?;
+    if x1 <= x0
+        || y1 <= y0
+        || path
+            .lines
+            .iter()
+            .any(|(a, b)| (a.0 - b.0).abs() > 0.001 && (a.1 - b.1).abs() > 0.001)
+    {
+        return None;
+    }
+    let mut corners = Vec::new();
+    for p in &path.points {
+        let point = (round3(p.0), round3(p.1));
+        if !corners.contains(&point) {
+            corners.push(point);
+        }
+    }
+    if corners.len() != 4
+        || [x0, x1].iter().any(|x| {
+            [y0, y1]
+                .iter()
+                .any(|y| !corners.contains(&(round3(*x), round3(*y))))
+        })
+    {
+        return None;
+    }
+    Some((x0, y0, x1, y1))
 }
 
 /// 将父坐标裁剪转换为视觉外框并与对象边界求交。
@@ -622,9 +680,17 @@ pub unsafe fn read_path_evidence_with_hypot<H: Fn(f64, f64) -> f64, R: Fn(f64) -
                 depth,
                 source_index,
                 &hypot,
+                &round3,
             ) {
                 if let Some(bbox) = clipped_bbox(info.0, clip, frame, rotation) {
-                    infos.push((bbox, info.1, info.2, info.3, info.4, info.5, info.6));
+                    let rectangles = info
+                        .7
+                        .into_iter()
+                        .filter_map(|rect| clipped_bbox(rect, clip, frame, rotation))
+                        .collect();
+                    infos.push((
+                        bbox, info.1, info.2, info.3, info.4, info.5, info.6, rectangles,
+                    ));
                 }
             }
         }

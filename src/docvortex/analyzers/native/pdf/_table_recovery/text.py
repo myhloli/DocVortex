@@ -294,6 +294,13 @@ def _cell_row_separator(
 ) -> str:
     """按相邻行边界词元返回安全分隔符，非 Latin 边界保持直连。"""
 
+    # 日期或自然短语在逗号后续接数字仍有词界；纯数字、短变量与单位断行保持原紧凑规则。
+    if (
+        previous_line.rstrip().endswith((",", ";"))
+        and re.search(r"[A-Za-z]{3,}", previous_line)
+        and next_line.lstrip()[:1].isdigit()
+    ):
+        return " "
     previous_letter = _nearest_alphabetic_char(previous_line, reverse=True)
     next_letter = _nearest_alphabetic_char(next_line, reverse=False)
     if not (_is_latin_letter(previous_letter) and _is_latin_letter(next_letter)):
@@ -443,6 +450,29 @@ def build_cell_text_parts(
     grouped: dict[int, list[NativeTableGlyph]] = {}
     for glyph in glyphs:
         grouped.setdefault(glyph.visual_row, []).append(glyph)
+    # 整表聚行可能被其他列的垂直居中文字接桥；只细分有多个足高文字行的原组，保留已确认行和上下标。
+    refined = []
+    for index in sorted(grouped):
+        original = grouped[index]
+        local_rows = _assign_visual_rows(original, median_height)
+        # 松字框可跨越真实行距；要求每条行内字框中心共线，排除斜穿单元格的水印字串。
+        coherent = all(
+            max(bbox_center(g.bbox)[1] for g in row) - min(bbox_center(g.bbox)[1] for g in row) <= 0.3 * median_height
+            for row in local_rows
+        )
+        if (
+            len(local_rows) > 1
+            and coherent
+            and all(
+                len(row) >= 2
+                and 0.85 * median_height <= statistics.median(g.bbox[3] - g.bbox[1] for g in row) <= 1.25 * median_height
+                for row in local_rows
+            )
+        ):
+            refined.extend(local_rows)
+        else:
+            refined.append(original)
+    grouped = dict(enumerate(refined))
     parts: list[tuple[str, int | None]] = []
     previous_line = ""
     for row_index in sorted(grouped):

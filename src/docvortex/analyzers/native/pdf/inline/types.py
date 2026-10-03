@@ -106,7 +106,7 @@ PDF_NATURAL_TEXT_STYLE_BLOCK_TYPES = frozenset(
 )
 
 _PDF_TEXT_STYLE_TARGET_BLOCK_TYPES: dict[PDFTextStyle, frozenset[str]] = {
-    "bold": frozenset({BlockType.TEXT}),
+    "bold": frozenset({BlockType.TEXT, BlockType.INDEX}),
     "italic": frozenset(),
     "underline": frozenset({BlockType.TEXT}),
     "strikethrough": PDF_NATURAL_TEXT_STYLE_BLOCK_TYPES,

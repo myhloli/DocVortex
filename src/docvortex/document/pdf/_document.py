@@ -629,6 +629,27 @@ class PDFDocument:
         """一次读取字符、tight bbox 和字符原点，避免 Hybrid 重复打开 textpage。"""
         return self._get_page_text_geometry(page_idx, include_extended_geometry=True)
 
+    def _get_page_text_paint(self, page_idx: int, char_indices: Sequence[int]) -> dict[int, tuple[int, int, int, int]]:
+        """仅为可疑短文字读取原生绘制颜色；页面和文字句柄在共享锁内及时释放，不改变字符或公开输出。"""
+        from ctypes import byref, c_uint
+        import pypdfium2.raw as raw
+
+        result = {}
+        with self._open_page(page_idx) as page:
+            text = page.get_textpage()
+            try:
+                for index in dict.fromkeys(char_indices):
+                    obj = raw.FPDFText_GetTextObject(text.raw, index)
+                    if not obj or raw.FPDFTextObj_GetTextRenderMode(obj) != 0:
+                        # 带描边或仅裁剪的文字不能仅凭填色判定浅色噪声。
+                        continue
+                    values = [c_uint() for _ in range(4)]
+                    if raw.FPDFText_GetFillColor(text.raw, index, *(byref(value) for value in values)):
+                        result[index] = tuple(value.value for value in values)
+            finally:
+                text.close()
+        return result
+
     def _extract_owned_text_snapshot(self, page_idx: int, page, *, visible_only: bool, reference: bool = True):
         """只提取并弱缓存自有文本，完整页面快照复用它而不引入额外矢量或链接依赖。"""
         key = (page_idx, visible_only)
@@ -643,7 +664,12 @@ class PDFDocument:
                 else None
             )
         text = _extract_page_text_geometry(
-            page, include_extended_geometry=True, visible_only=visible_only, compact=True, compact_only=not reference
+            page,
+            include_extended_geometry=True,
+            visible_only=visible_only,
+            compact=True,
+            compact_only=not reference,
+            paint_page_reader=(lambda: self._get_form_resource_page(page_idx)) if visible_only else None,
         )
         if text is not None and not isinstance(text, PDFPageTextGeometry):
             self._owned_text_snapshots[key] = text

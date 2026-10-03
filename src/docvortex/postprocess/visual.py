@@ -515,6 +515,19 @@ def find_best_visual_parent(
     if not candidates:
         return None
 
+    # 原生视觉证据已确认父框时，仅在合法邻居中唯一匹配，不能被通用距离规则重新绑定。
+    native_parent = child_block.get("_native_annotation_parent_bbox")
+    if (
+        use_bbox
+        and isinstance(native_parent, (list, tuple))
+        and len(native_parent) == 4
+        and all(isinstance(value, (int, float)) for value in native_parent)
+    ):
+        target = _bbox_for_calculation(native_parent)
+        matches = [main for main in candidates if all(abs(a - b) <= 1e-6 for a, b in zip(_block_bbox(main), target))]
+        if len(matches) == 1:
+            return matches[0]
+
     min_effective_index_diff = min(
         effective_visual_index_diff(
             child_block,

@@ -27,10 +27,12 @@ def recover_image_annotation_bands(blocks, page_size, drawing_lines):
             if _is_strong_caption_text(str(block.get("content", "")))
             and block.get("_text_lines")
             and block["bbox"][0] < bounds[2]
-            and re.fullmatch(r"\s*(?:fig(?:ure)?\.?|图)\s*(?:\d+[A-Za-z]?|[IVX]+)[.:：]?\s*", str(block["content"]), re.I)
+            and re.fullmatch(
+                r"\s*(?:fig(?:ure)?\.?|diagram|图)\s*(?:\d+[A-Za-z]?|[IVX]+)[.:：]?\s*", str(block["content"]), re.I
+            )
             and (
                 abs(block["bbox"][3] - bounds[1]) < 1.5 * _annotation_em(block)
-                or 0 <= block["bbox"][1] - bounds[3] < 2 * _annotation_em(block)
+                or 0 <= block["bbox"][1] - bounds[3] < 4 * _annotation_em(block)
             )
         ]
         if not seeds:
@@ -55,7 +57,7 @@ def recover_image_annotation_bands(blocks, page_size, drawing_lines):
         if not candidates:
             continue
         first = candidates[0] if leading else seed
-        if first["bbox"][1] - bounds[3] > 2 * em:
+        if first["bbox"][1] - bounds[3] > 4 * em:
             continue
         left, right = first["bbox"][0], max(first["bbox"][2], bounds[2])
         if not leading:

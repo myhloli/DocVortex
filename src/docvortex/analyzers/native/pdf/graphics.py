@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .layout_evidence import build_layout_evidence
+from .annotation_text import _is_strong_caption_text
 
 import math
 import re
@@ -29,7 +30,7 @@ from .geometry import (
     _point_in_bbox,
     _rotate_bbox_to_upright,
 )
-from .line_layout import _infer_text_lanes, _line_effective_height
+from .line_layout import _infer_text_lanes, _line_effective_height, _font_signatures_share_family
 from .line_merging import _join_formula_visual_row
 from .models import _AxisLine, _DrawingComponentSummary, _GraphicCandidate, _LineItem, _PageSource, _TextLane
 from .native_text import _fill_native_typography, _normalize_native_run_text, _sanitize_pdf_control_text
@@ -55,6 +56,43 @@ _FIGURE_CAPTION_LINE_RE = re.compile(
 )
 
 
+def _caption_graphic_display_heading_floor(source: _PageSource, caption_bbox: BBox, em: float) -> float:
+    """照片上方独立居中大字号标题形成屏障，连同短续行阻止正文下划线和文字向图体扩框。"""
+    floor = 0.0
+    for image in source.image_bboxes:
+        if not (
+            image[3] <= caption_bbox[1] + 0.2 * em
+            and 0 <= caption_bbox[1] - image[3] <= 8 * em
+            and _bbox_axis_overlap_ratio(image, caption_bbox, axis="x") >= 0.35
+        ):
+            continue
+        width = image[2] - image[0]
+        for heading in source.lines:
+            if not (
+                heading.angle == 0
+                and not heading.caption_start
+                and _line_effective_height(heading, heading.bbox) >= 1.3 * em
+                and heading.bbox[2] - heading.bbox[0] >= 0.5 * width
+                and abs(_bbox_center_x(heading.bbox) - _bbox_center_x(image)) <= 0.08 * width
+                and 0.5 * em <= image[1] - heading.bbox[3] <= 4 * em
+            ):
+                continue
+            end = heading.bbox[3]
+            # 同字体居中短尾行可以是括号日期或缩写，不凭长度把它降为图片标签。
+            for tail in sorted(source.lines, key=lambda line: line.bbox[1]):
+                if (
+                    tail.angle == 0
+                    and tail.font_signature == heading.font_signature
+                    and 0 <= tail.bbox[1] - end <= 0.75 * em
+                    and tail.bbox[3] < image[1]
+                    and abs(_bbox_center_x(tail.bbox) - _bbox_center_x(image)) <= 0.08 * width
+                    and 0.85 <= _line_effective_height(tail, tail.bbox) / _line_effective_height(heading, heading.bbox) <= 1.15
+                ):
+                    end = tail.bbox[3]
+            floor = max(floor, end)
+    return floor
+
+
 def _build_caption_graphic_blocks(
     source: _PageSource, *, caption_line_indices: set[int], table_bboxes: list[BBox], code_bboxes: list[BBox]
 ) -> tuple[list[dict[str, Any]], set[int]]:
@@ -70,6 +108,17 @@ def _build_caption_graphic_blocks(
         and line.source_index in caption_line_indices
         and not any(_owned_form_member_bbox(source, line, form) is not None for form in source.retained_page_forms)
     ]
+    # 即使图题候选被邻栏正文屏障拒绝，照片旁已确认的连续段仍要跨局部栏宽保持同一成员组。
+    raster_prose = (
+        _raster_outside_prose_sources(
+            source,
+            [image for image in source.image_bboxes if image[2] - image[0] >= 5 * em and image[3] - image[1] >= 5 * em],
+            caption_line_indices,
+            em,
+        )
+        if caption_line_indices
+        else set()
+    )
     primitives = list(source.image_bboxes) + [
         path.bbox
         for path in source.path_infos
@@ -90,6 +139,20 @@ def _build_caption_graphic_blocks(
         if any(_bbox_overlap_in_first(line.bbox, code) >= 0.8 for code in code_bboxes)
     }
     for caption in sorted(captions, key=lambda line: (line.bbox[1], line.bbox[0])):
+        side_members = _framed_side_caption_members(source, caption)
+        if side_members:
+            blocks.append(
+                {
+                    "type": "caption",
+                    "bbox": _bbox_union_many([line.bbox for line in side_members]),
+                    "angle": 0,
+                    "content": " ".join(line.text.strip() for line in side_members),
+                    "_line_heights": [_line_effective_height(line, line.bbox) for line in side_members],
+                    "_font_signatures": {line.font_signature for line in side_members if line.font_signature},
+                }
+            )
+            claimed.update(line.source_index for line in side_members)
+            continue
         cb = caption.bbox
         # 图题中的数学上下标会拆开同一物理行，使用整行投影决定是否跨栏。
         companions = [
@@ -97,6 +160,7 @@ def _build_caption_graphic_blocks(
             for line in source.lines
             if line.angle == 0
             and line is not caption
+            and line not in captions
             and _bbox_axis_overlap_ratio(cb, line.bbox, axis="y") >= 0.5
             and min(abs(line.bbox[0] - cb[2]), abs(cb[0] - line.bbox[2])) <= em
         ]
@@ -106,6 +170,15 @@ def _build_caption_graphic_blocks(
         if corridor is None:
             continue
         left, right = corridor
+        # 同排独立编号图题建立横向边界，不能因上方没有正文栏带而把两张图分别扩成同一大框。
+        peers = [
+            line for line in captions if line is not caption and abs(_bbox_center_y(line.bbox) - _bbox_center_y(cb)) <= 1.5 * em
+        ]
+        for peer in peers:
+            if peer.bbox[2] <= cb[0] - 0.5 * em:
+                left = max(left, (peer.bbox[2] + cb[0]) / 2)
+            elif peer.bbox[0] >= cb[2] + 0.5 * em:
+                right = min(right, (cb[2] + peer.bbox[0]) / 2)
         barriers = [
             line.bbox[3]
             for line in source.lines
@@ -131,6 +204,7 @@ def _build_caption_graphic_blocks(
             )
         ]
         floor = max(barriers, default=0.06 * height)
+        floor = max(floor, _caption_graphic_display_heading_floor(source, cb, em))
         floor = max([floor, *(bbox[3] for bbox in table_bboxes if bbox[3] <= cb[1] and bbox[2] > left and bbox[0] < right)])
         floor = max([floor, *(bbox[3] for bbox in code_bboxes if bbox[3] <= cb[1] and bbox[2] > left and bbox[0] < right)])
         candidates = [
@@ -152,6 +226,12 @@ def _build_caption_graphic_blocks(
         # 同一图题上方直到正文、表格或前一图题的空白带属于同一绘图区域。
         selected = candidates
         bbox = _bbox_union_many(selected)
+        raster_cores = [
+            image
+            for image in source.image_bboxes
+            if _bbox_overlap_in_first(image, bbox) >= 0.95 and _bbox_area(image) >= 0.85 * _bbox_area(bbox)
+        ]
+        protected_prose = raster_prose if raster_cores else set()
         if any(_bbox_overlap_in_smaller(bbox, code) >= 0.8 for code in code_bboxes):
             continue
         if bbox[2] - bbox[0] < 4 * em or bbox[3] - bbox[1] < 3 * em:
@@ -163,6 +243,7 @@ def _build_caption_graphic_blocks(
                 line
                 for line in source.lines
                 if line.source_index not in claimed
+                and line.source_index not in protected_prose
                 and line.source_index not in code_members
                 and line not in captions
                 and line.source_index not in caption_line_indices
@@ -191,6 +272,8 @@ def _build_caption_graphic_blocks(
             ]
             if members:
                 bbox = _bbox_union_many([bbox, *(line.ink_bbox or line.bbox for line in members)])
+        if any(_image_bboxes_are_near_equal(bbox, existing["bbox"]) for existing in blocks):
+            continue
         blocks.append(
             {
                 "type": "image",
@@ -198,10 +281,177 @@ def _build_caption_graphic_blocks(
                 "angle": 0,
                 "content": _image_members_to_content(members, source.page_size),
                 "_caption_graphic": True,
+                "_native_numeric_grid": _graphic_members_are_numeric_grid(members),
             }
         )
         claimed.update(line.source_index for line in members)
     return blocks, claimed
+
+
+def _framed_side_caption_members(source: _PageSource, caption: _LineItem) -> list[_LineItem]:
+    """邻图旁的裸编号及同式多行说明有完整细线框时属于装饰图注卡，不能当作新图。"""
+    if not re.fullmatch(r"\s*(?:figure|fig\.)\s*\d+\s*", caption.text, re.I) or caption.font_signature is None:
+        return []
+    em = _line_effective_height(caption, caption.bbox)
+    left_images = [
+        box
+        for box in source.image_bboxes
+        if box[2] - box[0] >= 8 * em
+        and box[3] - box[1] >= 8 * em
+        and 0 <= caption.bbox[0] - box[2] <= 6 * em
+        and box[1] <= _bbox_center_y(caption.bbox) <= box[3]
+    ]
+    if len(left_images) != 1:
+        return []
+    description = sorted(
+        [
+            line
+            for line in source.lines
+            if line is not caption
+            and line.angle == caption.angle
+            and line.semantic_type is None
+            and line.font_signature == caption.font_signature
+            and 0.85 <= _line_effective_height(line, line.bbox) / em <= 1.15
+            and 0.5 * em <= line.bbox[0] - caption.bbox[2] <= 6 * em
+            and abs(_bbox_center_y(line.bbox) - _bbox_center_y(caption.bbox)) <= 3 * em
+        ],
+        key=lambda line: (line.bbox[1], line.bbox[0]),
+    )
+    if (
+        len(description) < 3
+        or len(re.findall(r"[A-Za-z]{2,}", " ".join(line.text for line in description))) < 8
+        or max(line.bbox[0] for line in description) - min(line.bbox[0] for line in description) > 0.5 * em
+        or any(
+            not 0.7 * em <= _bbox_center_y(b.bbox) - _bbox_center_y(a.bbox) <= 1.75 * em
+            for a, b in zip(description, description[1:])
+        )
+    ):
+        return []
+    bounds = _bbox_union_many([caption.bbox, *(line.bbox for line in description)])
+    horizontal = [
+        line.bbox
+        for line in source.drawing_lines
+        if line.orientation == "horizontal"
+        and line.width <= 0.15 * em
+        and line.bbox[0] <= bounds[0] + 0.25 * em
+        and line.bbox[2] >= bounds[2] - 0.25 * em
+    ]
+    top = [box for box in horizontal if -0.1 * em <= bounds[1] - box[3] <= 0.5 * em]
+    bottom = [box for box in horizontal if -0.1 * em <= box[1] - bounds[3] <= 0.5 * em]
+    sides = [
+        line
+        for line in source.drawing_lines
+        if line.orientation == "vertical"
+        and line.width <= 0.15 * em
+        and line.bbox[1] <= bounds[1] + 0.25 * em
+        and line.bbox[3] >= bounds[3] - 0.25 * em
+    ]
+    if not (
+        top
+        and bottom
+        and any(0 <= bounds[0] - line.bbox[2] <= em for line in sides)
+        and any(0 <= line.bbox[0] - bounds[2] <= 1.5 * em for line in sides)
+    ):
+        return []
+    return [caption, *description]
+
+
+def _graphic_members_are_numeric_grid(members: list[_LineItem]) -> bool:
+    """四排以上重复三列数字证明是原生数据网格，防止图题把电子表格误作折线图父对象。"""
+    numeric = [line for line in members if re.fullmatch(r"\s*[-+]?\d+(?:[,.]\d+)*%?\s*", line.text)]
+    if len(numeric) < 12:
+        return False
+    em = statistics.median(_line_effective_height(line, line.bbox) for line in numeric)
+    rows: list[list[_LineItem]] = []
+    for line in sorted(numeric, key=lambda line: (_bbox_center_y(line.bbox), line.bbox[0])):
+        if not rows or abs(_bbox_center_y(line.bbox) - _bbox_center_y(rows[-1][0].bbox)) > 0.4 * em:
+            rows.append([])
+        rows[-1].append(line)
+    dense = [row for row in rows if len(row) >= 3]
+    if len(dense) < 4:
+        return False
+    reference = dense[0]
+    return (
+        sum(sum(any(abs(line.bbox[0] - other.bbox[0]) <= em for other in row) for line in reference) >= 3 for row in dense) >= 4
+    )
+
+
+def _raster_outside_prose_sources(source, raster_bboxes, caption_indices, em):
+    """图片外同栏连续自然语言正文保持独立；短收句和同排强调碎片也不能被图题扩框认领。"""
+    free = [
+        line
+        for line in source.lines
+        if line.angle == 0
+        and line.semantic_type is None
+        and line.source_index not in caption_indices
+        and len(re.findall(r"[A-Za-z]{2,}|[\u3400-\u9fff]", line.text)) >= 1
+        and 0.7 * em <= _line_effective_height(line, line.bbox) <= 1.3 * em
+        and all(_bbox_overlap_in_first(line.ink_bbox or line.bbox, image) <= 0.1 for image in raster_bboxes)
+    ]
+    rows = []
+    for line in sorted(free, key=lambda item: (item.bbox[1], item.bbox[0])):
+        peers = [
+            row
+            for row in rows
+            if _bbox_axis_overlap_ratio(row[0].bbox, line.bbox, axis="y") >= 0.65
+            and -0.1 * em <= line.bbox[0] - max(member.bbox[2] for member in row) <= 3 * em
+        ]
+        if peers:
+            peers[-1].append(line)
+        else:
+            rows.append([line])
+    pending = list(rows)
+    protected = set()
+    while pending:
+        run = [pending.pop(0)]
+        while True:
+            previous = _bbox_union_many([line.bbox for line in run[-1]])
+            main = max(run[-1], key=lambda item: len(item.text))
+            followers = [
+                row
+                for row in pending
+                if max(row, key=lambda item: len(item.text)).font_signature == main.font_signature
+                and abs(min(line.bbox[0] for line in row) - previous[0]) <= 0.4 * em
+                and -0.25 * em <= min(line.bbox[1] for line in row) - previous[3] <= 0.85 * em
+                and _bbox_center_y(_bbox_union_many([line.bbox for line in row])) > _bbox_center_y(previous) + 0.5 * em
+            ]
+            if not followers:
+                break
+            row = min(followers, key=lambda members: min(line.bbox[1] for line in members))
+            # 明确短收句后恢复常规宽度属于新段，不能用照片旁连续排版抹掉原生段界。
+            following_box = _bbox_union_many([line.bbox for line in row])
+            if (
+                len(run) >= 2
+                and any(line.paragraph_terminal for line in run[-1])
+                and re.search(r"[.!?。！？]$", " ".join(line.text for line in run[-1]).strip())
+                and previous[2] - previous[0] < 0.65 * (following_box[2] - following_box[0])
+            ):
+                break
+            pending.remove(row)
+            run.append(row)
+        text = " ".join(line.text for row in run for line in row)
+        if (
+            len(run) >= 3
+            and len(re.findall(r"[A-Za-z]{2,}|[\u3400-\u9fff]", text)) >= 15
+            and re.search(r"[.!?。！？][\d\s]*$", text.strip())
+        ):
+            protected.update(line.source_index for row in run for line in row)
+            bounds = _bbox_union_many([line.bbox for row in run for line in row])
+            if any(
+                _bbox_axis_overlap_ratio(bounds, image, axis="x") <= 0.1
+                and _bbox_axis_overlap_ratio(bounds, image, axis="y") >= 0.5
+                and bounds[2] - bounds[0] <= 1.5 * (image[2] - image[0])
+                and -0.3 * em <= bounds[1] - image[1] <= 2 * em
+                and 0 <= bounds[3] - image[3] <= 5 * em
+                and run[-1][0].paragraph_terminal
+                and _bbox_union_many([line.bbox for line in run[-1]])[2] - bounds[0] < 0.7 * (bounds[2] - bounds[0])
+                for image in raster_bboxes
+            ):
+                group = max((line.paragraph_group for line in source.lines if line.paragraph_group is not None), default=-1) + 1
+                for row in run:
+                    for line in row:
+                        line.paragraph_group = group
+    return protected
 
 
 def _form_supersedes_nested_bbox(form_bbox: BBox, nested_bbox: BBox) -> bool:
@@ -396,10 +646,23 @@ def _build_graphic_like_blocks(
 ) -> tuple[list[dict[str, Any]], set[int]]:
     """在表格认领后把紧凑绘图组件及其短标签聚成内部图形文本块。"""
 
+    from .isolated_graphics import isolated_vector_components
+
+    isolated = isolated_vector_components(source)
+
     lines = [line for line in source.lines if line.source_index not in claimed_line_indices]
     if strong_core_bboxes is None:
         strong_core_bboxes = _detect_strong_graphic_bboxes(source)
-    if len(lines) < 2 or (len(source.drawing_lines) < 4 and not strong_core_bboxes):
+    if len(lines) < 2:
+        return (
+            [
+                {"type": "image", "content": "", "bbox": box, "angle": 0}
+                for box in isolated
+                if not any(_bbox_overlap_in_smaller(box, table) >= 0.5 for table in table_bboxes)
+            ],
+            set(),
+        )
+    if len(source.drawing_lines) < 4 and not strong_core_bboxes:
         return [], set()
 
     effective_heights = [
@@ -414,6 +677,13 @@ def _build_graphic_like_blocks(
         for line in lines
     ]
     median_height = statistics.median(effective_heights)
+    # 已有复杂填充容器可容许外框角落擦过长正文行，但不认领该正文或近旁标签。
+    isolated.extend(
+        box
+        for box in _detect_complex_path_containers(source.path_infos, source.page_size, median_height)
+        if not any(_bbox_overlap_in_first(line.bbox, box) > 0.05 for line in source.lines)
+        and not any(_bbox_overlap_in_smaller(box, raster) > 0.2 for raster in source.image_bboxes)
+    )
     lanes = _infer_graphic_text_lanes(lines, source.page_size, median_height)
     line_candidates = _detect_graphic_candidates(
         source.drawing_lines,
@@ -425,6 +695,7 @@ def _build_graphic_like_blocks(
     )
     # 复杂 Path 或成对坐标轴形成的强图形核心优先于普通绘图线组件，
     # 避免同一图表被拆成多个相互重叠的 image。
+    raster_axis_cores = _detect_native_raster_axis_graphics(source)
     candidates = [
         candidate
         for candidate in line_candidates
@@ -446,6 +717,10 @@ def _build_graphic_like_blocks(
                     for candidate in line_candidates
                 )
                 else 1.0
+            ),
+            strict_core_members=any(
+                _bbox_overlap_in_first(core_bbox, axis) >= 0.98 and _bbox_overlap_in_first(axis, core_bbox) >= 0.98
+                for axis in raster_axis_cores
             ),
         )
         for core_bbox in strong_core_bboxes
@@ -487,7 +762,9 @@ def _build_graphic_like_blocks(
             if candidate.lane_index >= 0 and candidate.lane_index != row_lane_index:
                 continue
             member_flags = [
-                _is_graphic_label_member(
+                _bbox_overlap_in_first(line.bbox, candidate.core_bbox) >= 0.95
+                if candidate.strict_core_members
+                else _is_graphic_label_member(
                     line,
                     candidate.core_bbox,
                     median_height,
@@ -516,6 +793,13 @@ def _build_graphic_like_blocks(
     claimed: set[int] = set()
     lines_by_index = {line.source_index: line for line in lines}
     for candidate in candidates:
+        if any(
+            _bbox_overlap_in_first(candidate.core_bbox, box) >= 0.95
+            and _bbox_overlap_in_first(box, candidate.core_bbox) >= 0.95
+            for box in isolated
+        ):
+            blocks.append({"type": "image", "content": "", "bbox": candidate.core_bbox, "angle": 0})
+            continue
         members = [
             lines_by_index[source_index] for source_index in sorted(candidate.line_indices) if source_index in lines_by_index
         ]
@@ -524,6 +808,7 @@ def _build_graphic_like_blocks(
         block = _graphic_members_to_block(candidate, members, source.page_size)
         if block is None:
             continue
+        block["_native_numeric_grid"] = _graphic_members_are_numeric_grid(members)
         blocks.append(block)
         claimed.update(line.source_index for line in members)
 
@@ -801,7 +1086,7 @@ def _graphic_caption_line_indices_to_preserve(
     candidates: list[_GraphicCandidate],
     median_height: float,
 ) -> set[int]:
-    """保护贴近图形下沿的图注及其同字体续行，避免末词被图片容器认领。"""
+    """保护图形上下沿的图注及其同字体续行，避免图题末行被图片容器认领。"""
 
     protected: set[int] = set()
     ordered_lines = sorted(
@@ -811,6 +1096,44 @@ def _graphic_caption_line_indices_to_preserve(
     for seed_index, seed in enumerate(ordered_lines):
         if not _FIGURE_CAPTION_LINE_RE.match(seed.text):
             continue
+        # 多行图题应以最后一行计算到图体的距离；首行较远不能让末行落入引线标签区。
+        wrapped = [seed]
+        if seed.font_signature is not None:
+            for tail in ordered_lines[seed_index + 1 :]:
+                if tail.bbox[1] - wrapped[-1].bbox[3] > 0.75 * median_height:
+                    break
+                if (
+                    not _font_signatures_share_family(tail.font_signature, seed.font_signature)
+                    or abs((tail.dominant_font_weight or 400) - (seed.dominant_font_weight or 400)) >= 100
+                    or abs(tail.bbox[0] - seed.bbox[0]) > 0.3 * median_height
+                ):
+                    continue
+                if _bbox_center_y(tail.bbox) <= _bbox_center_y(wrapped[-1].bbox):
+                    continue
+                if (
+                    len(re.findall(r"\b[A-Za-z]{2,}\b", tail.text)) < 2
+                    or _FIGURE_CAPTION_LINE_RE.match(tail.text)
+                    or tail.bbox[2] - tail.bbox[0] > 1.5 * (seed.bbox[2] - seed.bbox[0])
+                ):
+                    break
+                wrapped.append(tail)
+        wrapped_bounds = _bbox_union_many([line.bbox for line in wrapped])
+        wrapped_parents = [
+            candidate
+            for candidate in candidates
+            if len(wrapped) >= 2
+            and _is_strong_caption_text(seed.text)
+            and _bbox_axis_overlap_ratio(wrapped_bounds, candidate.core_bbox, axis="x") >= 0.35
+            and 0 <= candidate.core_bbox[1] - wrapped_bounds[3] <= 4 * median_height
+            and seed.bbox[3] <= candidate.core_bbox[1]
+        ]
+        if wrapped_parents:
+            caption_group = max((line.paragraph_group for line in lines if line.paragraph_group is not None), default=-1) + 1
+            for line in wrapped:
+                line.semantic_type = "caption"
+                line.title_suppressed = True
+                line.paragraph_group = caption_group
+                protected.add(line.source_index)
         matching_candidates = [
             candidate
             for candidate in candidates
@@ -820,9 +1143,12 @@ def _graphic_caption_line_indices_to_preserve(
                 axis="x",
             )
             >= 0.35
-            and candidate.core_bbox[3] - 2.5 * median_height
-            <= _bbox_center_y(seed.bbox)
-            <= candidate.core_bbox[3] + 2.5 * median_height
+            and (
+                candidate.core_bbox[3] - 2.5 * median_height
+                <= _bbox_center_y(seed.bbox)
+                <= candidate.core_bbox[3] + 2.5 * median_height
+                or -0.25 * median_height <= candidate.core_bbox[1] - seed.bbox[3] <= 4 * median_height
+            )
         ]
         if not matching_candidates:
             continue
@@ -833,7 +1159,20 @@ def _graphic_caption_line_indices_to_preserve(
                 break
             if _bbox_center_y(candidate_line.bbox) <= _bbox_center_y(previous.bbox):
                 continue
-            if abs(candidate_line.bbox[0] - seed.bbox[0]) > median_height or (
+            # 上方图题续行允许缩进，但必须留在种子行横向范围内，并排除紧邻的轴值和新标签。
+            above = any(seed.bbox[3] <= candidate.core_bbox[1] + 0.25 * median_height for candidate in matching_candidates)
+            inset_tail = (
+                above
+                and candidate_line.bbox[0] >= seed.bbox[0] - 0.25 * median_height
+                and candidate_line.bbox[2] <= seed.bbox[2] + 0.25 * median_height
+                and not re.fullmatch(r"\s*[+−-]?\d+(?:[,.]\d+)?%?\s*", candidate_line.text)
+                and not _FIGURE_CAPTION_LINE_RE.match(candidate_line.text)
+                and not re.match(r"^\s*(?:sources?|notes?)\s*:", candidate_line.text, re.I)
+                and candidate_line.bbox[3] <= min(candidate.core_bbox[1] for candidate in matching_candidates)
+            )
+            if above and not inset_tail:
+                break
+            if (not inset_tail and abs(candidate_line.bbox[0] - seed.bbox[0]) > median_height) or (
                 seed.font_signature is not None
                 and candidate_line.font_signature is not None
                 and seed.font_signature != candidate_line.font_signature
@@ -925,11 +1264,17 @@ def _graphic_body_tail_line_indices_to_preserve(
 def _detect_strong_graphic_bboxes(source: _PageSource) -> list[BBox]:
     """仅按复杂 Path、容器尺度与成对坐标轴识别高置信图形核心。"""
 
-    if not source.path_infos:
+    from .isolated_graphics import isolated_vector_components
+
+    if not source.path_infos and not source.image_bboxes:
         return []
     effective_heights = [_line_effective_height(line, line.bbox) for line in source.lines if line.angle == 0]
     median_height = statistics.median(effective_heights) if effective_heights else 1.0
     candidates = [
+        *isolated_vector_components(source),
+        *_detect_native_raster_axis_graphics(source),
+        *_detect_native_bar_graphics(source, median_height),
+        *_detect_captioned_concentric_path_graphics(source, median_height),
         *_detect_complex_path_containers(
             source.path_infos,
             source.page_size,
@@ -953,8 +1298,371 @@ def _detect_strong_graphic_bboxes(source: _PageSource) -> list[BBox]:
     for bbox in sorted(candidates, key=_bbox_area, reverse=True):
         if any(_bbox_overlap_in_first(bbox, accepted) >= 0.9 for accepted in output):
             continue
+        # 坐标轴候选与多系列柱核心可能只部分包含彼此；重叠的同一图体只输出一份。
+        overlapping = [accepted for accepted in output if _bbox_overlap_in_smaller(bbox, accepted) >= 0.75]
+        if overlapping:
+            output = [accepted for accepted in output if accepted not in overlapping]
+            bbox = _bbox_union_many([bbox, *overlapping])
         output.append(bbox)
     return sorted(output, key=lambda bbox: (bbox[1], bbox[0], bbox[3], bbox[2]))
+
+
+def _detect_native_raster_axis_graphics(source: _PageSource) -> list[BBox]:
+    """等差数值刻度与贴邻栅格图共同证明坐标图；完整聚合标签和小图例，独立大标题及远距脚注不扩框。"""
+    numeric = [
+        line
+        for line in source.lines
+        if line.angle == 0
+        and line.semantic_type is None
+        and line.effective_height > 0
+        and re.fullmatch(r"[+−-]?\d+(?:\.\d+)?", line.text.strip())
+        and len(line.text.strip()) <= 8
+        and line.bbox[2] - line.bbox[0] <= 4 * line.effective_height
+    ]
+    output = []
+    for vertical in (True, False):
+        groups = []
+        for line in sorted(numeric, key=lambda item: item.bbox[2] if vertical else _bbox_center_y(item.bbox)):
+            coordinate = line.bbox[2] if vertical else _bbox_center_y(line.bbox)
+            if groups:
+                prior = groups[-1]
+                anchor = statistics.median(item.bbox[2] if vertical else _bbox_center_y(item.bbox) for item in prior)
+                em = statistics.median(item.effective_height for item in [*prior, line])
+            if groups and abs(coordinate - anchor) <= 0.4 * em:
+                groups[-1].append(line)
+            else:
+                groups.append([line])
+        for ticks in groups:
+            if len(ticks) < 5:
+                continue
+            ticks.sort(key=lambda item: _bbox_center_y(item.bbox) if vertical else _bbox_center_x(item.bbox))
+            em = statistics.median(item.effective_height for item in ticks)
+            values = [float(item.text.strip().replace("−", "-")) for item in ticks]
+            steps = [b - a for a, b in zip(values, values[1:])]
+            positions = [_bbox_center_y(item.bbox) if vertical else _bbox_center_x(item.bbox) for item in ticks]
+            gaps = [b - a for a, b in zip(positions, positions[1:])]
+            if (
+                abs(steps[0]) < 1e-8
+                or any(abs(step - steps[0]) > 0.01 * abs(steps[0]) for step in steps)
+                or max(gaps) - min(gaps) > 0.4 * em
+                or min(gaps) < em
+                or min(item.effective_height for item in ticks) < 0.8 * em
+                or max(item.effective_height for item in ticks) > 1.2 * em
+            ):
+                continue
+            axis = _bbox_union_many([item.bbox for item in ticks])
+            matches = []
+            for image in source.image_bboxes:
+                width, height = image[2] - image[0], image[3] - image[1]
+                if width < 8 * em or height < 8 * em:
+                    continue
+                if vertical:
+                    compatible = (
+                        0 <= image[0] - axis[2] <= 4 * em
+                        and 0.7 * height <= axis[3] - axis[1] <= 1.25 * height
+                        and abs(_bbox_center_y(axis) - _bbox_center_y(image)) <= em
+                    )
+                else:
+                    compatible = (
+                        0 <= axis[1] - image[3] <= 2 * em
+                        and 0.7 * width <= axis[2] - axis[0] <= 1.25 * width
+                        and abs(_bbox_center_x(axis) - _bbox_center_x(image)) <= em
+                    )
+                if compatible:
+                    matches.append(image)
+            if not matches:
+                continue
+            image = max(matches, key=_bbox_area)
+            # 纵轴图下方可有两层类别和场景标签；横轴图的左侧类别与右侧图例都受刻度字号约束。
+            window = (
+                (axis[0] - 0.4 * em if vertical else image[0] - 10 * em),
+                image[1] - 1.5 * em,
+                image[2] + (2 * em if vertical else 11 * em),
+                image[3] + (6.5 * em if vertical else 2.3 * em),
+            )
+            members = [
+                line.bbox
+                for line in source.lines
+                if line.angle == 0
+                and not line.caption_start
+                and line.semantic_type is None
+                and 0.6 * em <= line.effective_height <= 1.8 * em
+                and _bbox_overlap_in_first(line.bbox, window) >= 0.95
+            ]
+            legends = [
+                box
+                for box in source.image_bboxes
+                if not vertical
+                and 0 <= box[0] - image[2] <= 4 * em
+                and box[2] - box[0] <= 10 * em
+                and box[3] - box[1] <= 6 * em
+                and _bbox_axis_overlap_ratio(box, image, axis="y") >= 0.8
+            ]
+            bounds = _bbox_union_many([image, axis, *members, *legends])
+            output.append((bounds[0] - 0.2 * em, bounds[1] - 0.2 * em, bounds[2] + 0.2 * em, bounds[3] + 0.2 * em))
+    return output
+
+
+def group_native_raster_chart_descriptions(source: _PageSource) -> None:
+    """刻度证明的图上方同式说明续行成组；短尾行须紧贴同栏长行，独立标题、列表和图注不参与。"""
+    cores = _detect_native_raster_axis_graphics(source)
+    next_group = max((line.paragraph_group for line in source.lines if line.paragraph_group is not None), default=0) + 1
+    for core in cores:
+        above = sorted(
+            [
+                line
+                for line in source.lines
+                if line.angle == 0
+                and line.semantic_type is None
+                and line.paragraph_group is None
+                and not line.caption_start
+                and line.font_signature
+                and 0 <= core[1] - line.bbox[3] <= 5 * line.effective_height
+                and _bbox_axis_overlap_ratio(line.bbox, core, axis="x") >= 0.3
+            ],
+            key=lambda line: line.bbox[1],
+        )
+        for first, tail in zip(above, above[1:]):
+            em = first.effective_height
+            if (
+                em <= 0
+                or first.font_signature != tail.font_signature
+                or not 0.9 * em <= tail.effective_height <= 1.1 * em
+                or abs(first.bbox[0] - tail.bbox[0]) > 0.2 * em
+                or first.bbox[2] - first.bbox[0] < 10 * em
+                or tail.bbox[2] - tail.bbox[0] > 0.6 * (first.bbox[2] - first.bbox[0])
+                or not 0 <= tail.bbox[1] - first.bbox[3] <= 0.75 * em
+                or first.paragraph_terminal
+                or re.match(r"\s*(?:\d+[.)、]|[•▪])", tail.text)
+                or not 0 <= core[1] - tail.bbox[3] <= 3 * em
+            ):
+                continue
+            first.paragraph_group = tail.paragraph_group = next_group
+            next_group += 1
+
+
+def _detect_captioned_concentric_path_graphics(source: _PageSource, em: float) -> list[BBox]:
+    """同心二维轮廓、百分比标签及邻近编号图题共同确认环图，连接引线也属于完整图体。"""
+    captions = [line for line in source.lines if line.angle == 0 and _FIGURE_CAPTION_LINE_RE.match(line.text)]
+    if not captions:
+        return []
+    paths = [
+        path
+        for path in source.path_infos
+        if path.form_depth == 0
+        and path.stroke_visible
+        and path.segment_count >= 7
+        and min(path.bbox[2] - path.bbox[0], path.bbox[3] - path.bbox[1]) >= 4 * em
+        and 0.7 <= (path.bbox[2] - path.bbox[0]) / max(0.1, path.bbox[3] - path.bbox[1]) <= 1.3
+    ]
+    output = []
+    for outer in paths:
+        bounds = outer.bbox
+        diameter = max(bounds[2] - bounds[0], bounds[3] - bounds[1])
+        if diameter > 0.4 * source.page_size[0] or diameter > 0.4 * source.page_size[1]:
+            continue
+        peers = [
+            path
+            for path in paths
+            if path is not outer
+            and _bbox_overlap_in_smaller(path.bbox, bounds) >= 0.9
+            and abs(_bbox_center_x(path.bbox) - _bbox_center_x(bounds)) <= 0.08 * diameter
+            and abs(_bbox_center_y(path.bbox) - _bbox_center_y(bounds)) <= 0.08 * diameter
+        ]
+        if not peers or not any(
+            0 <= bounds[1] - caption.bbox[3] <= 10 * em and _bbox_axis_overlap_ratio(caption.bbox, bounds, axis="x") >= 0.5
+            for caption in captions
+        ):
+            continue
+        percentages = [
+            line
+            for line in source.lines
+            if re.fullmatch(r"\s*\d+(?:[.,]\d+)?\s*%\s*", line.text) and _bbox_distance(line.bbox, bounds) <= 0.5 * diameter
+        ]
+        if len(percentages) < 2:
+            continue
+        leaders = [
+            path.bbox
+            for path in source.path_infos
+            if path.form_depth == 0
+            and path.stroke_visible
+            and 2 <= path.segment_count <= 5
+            and _bbox_overlap_in_smaller(path.bbox, bounds) >= 0.1
+            and path.bbox[2] - path.bbox[0] <= 0.7 * diameter
+            and path.bbox[3] - path.bbox[1] <= 0.8 * diameter
+        ]
+        complete = _bbox_union_many([bounds, *(path.bbox for path in peers), *leaders])
+        if not any(_bbox_overlap_in_first(complete, prior) >= 0.9 for prior in output):
+            output.append(complete)
+    return output
+
+
+def _bar_zero_axis_bboxes(source: _PageSource, bounds: BBox, horizontal: bool, baseline: float, em: float) -> list[BBox]:
+    """柱组已确认后补入共同零轴两端，拒绝浮动装饰线和明显超出图宽的跨栏横线。"""
+    result = []
+    for line in source.drawing_lines:
+        box = line.bbox
+        start, end = (box[1], box[3]) if horizontal else (box[0], box[2])
+        low, high = (bounds[1], bounds[3]) if horizontal else (bounds[0], bounds[2])
+        cross_start, cross_end = (box[0], box[2]) if horizontal else (box[1], box[3])
+        length = high - low
+        if (
+            line.orientation == ("vertical" if horizontal else "horizontal")
+            and cross_end - cross_start <= 0.25 * em
+            and abs((cross_start + cross_end) / 2 - baseline) <= 0.35 * em
+            and 0.8 * length <= end - start <= 2 * length
+            and max(0, min(end, high) - max(start, low)) >= 0.8 * length
+        ):
+            # 路径端点沿主轴再包含半个线宽，避免裁去可见线帽。
+            padding = max(0.0, line.width) / 2
+            result.append(
+                (box[0], box[1] - padding, box[2], box[3] + padding)
+                if horizontal
+                else (box[0] - padding, box[1], box[2] + padding, box[3])
+            )
+    return result
+
+
+def _detect_native_bar_graphics(source: _PageSource, em: float) -> list[BBox]:
+    """重复矩形的共同基线、不同长度及图外数值提供柱图证据，排除等宽表格底色。"""
+
+    def compound_baseline_is_shared(path, horizontal=None):
+        """复合路径整体须有稳定零轴，不能只取彩色表格某一行或某一列伪造柱组。"""
+        boxes = path.rectangle_bboxes
+        if len(boxes) <= 1:
+            return True
+        return any(
+            sum(min(abs(box[edge] - baseline) for edge in edges) <= 0.35 * em for box in boxes) >= 0.75 * len(boxes)
+            for edges in (((0, 2), (1, 3)) if horizontal is None else ((0, 2),) if horizontal else ((1, 3),))
+            for box in boxes
+            for baseline in (box[edges[0]], box[edges[1]])
+        )
+
+    paths = [
+        replace(path, bbox=box, segment_count=4)
+        for path in source.path_infos
+        for box in (path.rectangle_bboxes if len(path.rectangle_bboxes) > 1 else (path.bbox,))
+        if path.fill_visible
+        and compound_baseline_is_shared(path)
+        and (len(path.rectangle_bboxes) > 1 or 4 <= path.segment_count <= 24)
+        and path.fill_rgba is not None
+        and min(path.fill_rgba[:3]) < 230
+        and max(box[2] - box[0], box[3] - box[1]) >= 2 * em
+    ]
+    outputs = []
+    for horizontal in (True, False):
+        bars = [
+            path
+            for path in paths
+            if compound_baseline_is_shared(path, horizontal)
+            and 0.2 * em <= (path.bbox[3] - path.bbox[1] if horizontal else path.bbox[2] - path.bbox[0]) <= 5 * em
+            and (path.bbox[2] - path.bbox[0] if horizontal else path.bbox[3] - path.bbox[1])
+            >= 1.25 * (path.bbox[3] - path.bbox[1] if horizontal else path.bbox[2] - path.bbox[0])
+        ]
+        pending = set(range(len(bars)))
+        while pending:
+            seed = min(pending)
+            # 正负值以同一零轴为起点；择共同边最多的一侧，避免仅按柱底拆散负柱。
+            edges = (0, 2) if horizontal else (3, 1)
+            baseline, _ = max(
+                ((bars[seed].bbox[edge], edge) for edge in edges),
+                key=lambda candidate: sum(
+                    min(abs(bars[i].bbox[e] - candidate[0]) for e in edges) <= 0.35 * em for i in pending
+                ),
+            )
+            group = [i for i in pending if min(abs(bars[i].bbox[e] - baseline) for e in edges) <= 0.35 * em]
+            pending.difference_update(group)
+            group.sort(key=lambda i: bars[i].bbox[1] if horizontal else bars[i].bbox[0])
+            clusters = [[]]
+            for i in group:
+                if clusters[-1]:
+                    prior = bars[clusters[-1][-1]].bbox
+                    current = bars[i].bbox
+                    thickness = current[3] - current[1] if horizontal else current[2] - current[0]
+                    if (current[1] - prior[3] if horizontal else current[0] - prior[2]) > max(5 * em, 2 * thickness):
+                        clusters.append([])
+                clusters[-1].append(i)
+            for cluster in clusters:
+                members = [bars[i].bbox for i in cluster]
+                positions = {round((box[1] if horizontal else box[0]) / em, 1) for box in members}
+                lengths = [box[2] - box[0] if horizontal else box[3] - box[1] for box in members]
+                if len(positions) < 2 or max(lengths) - min(lengths) < 0.5 * em:
+                    continue
+                axis_edges = (1, 3) if horizontal else (0, 2)
+                intervals = sorted({(box[axis_edges[0]], box[axis_edges[1]]) for box in members})
+                if not any(second[0] - first[1] > 0.1 * em for first, second in zip(intervals, intervals[1:])):
+                    # 连续相接的色块是单元格或整片底色，柱组须在分类方向具有真实间隔。
+                    continue
+                bounds = _bbox_union_many(members)
+                numeric = [
+                    line
+                    for line in source.lines
+                    if re.fullmatch(r"\s*[+−-]?\d+(?:[,.]\d+)?%?\s*", line.text)
+                    and all(_bbox_overlap_in_first(line.bbox, bar) < 0.1 for bar in members)
+                    and _bbox_distance(line.bbox, bounds) <= 5 * em
+                ]
+                if len(numeric) < 2:
+                    continue
+                if bounds[2] - bounds[0] < 6 * em or bounds[3] - bounds[1] < 3 * em:
+                    continue
+                bounds = _bbox_union_many([bounds, *_bar_zero_axis_bboxes(source, bounds, horizontal, baseline, em)])
+                label_anchor = _bbox_union_many([bounds, *(line.bbox for line in numeric)])
+                caption_indices = _graphic_caption_line_indices_to_preserve(
+                    source.lines, [_GraphicCandidate(core_bbox=label_anchor, lane_index=-1)], em
+                )
+                # 同基线堆叠柱的其他色段与已确认图体相交，按真实接触关系补入整根柱。
+                for _ in range(2):
+                    additions = [path.bbox for path in paths if _bbox_overlap_in_smaller(path.bbox, bounds) >= 0.25]
+                    # 某些PDF把斜排国家标签输出成字形轮廓；只补入已确认柱图下沿附近的短小复杂墨迹。
+                    outlined_labels = [
+                        path.bbox
+                        for path in source.path_infos
+                        if path.fill_visible
+                        and path.segment_count > 24
+                        and path.bbox[2] - path.bbox[0] <= 0.4 * (bounds[2] - bounds[0])
+                        and path.bbox[3] - path.bbox[1] <= 6 * em
+                        and _bbox_axis_overlap_ratio(path.bbox, label_anchor, axis="x") >= 0.5
+                        and 0 <= path.bbox[1] - label_anchor[3] <= 2 * em
+                        and not any(
+                            re.match(r"^\s*(?:sources?|notes?)\s*:", line.text, re.I)
+                            and label_anchor[3] <= line.bbox[1] <= path.bbox[3]
+                            for line in source.lines
+                        )
+                    ]
+                    # 混合栅格和原生柱体时，以已确认柱图的接触关系补全系列，整页背景不参与。
+                    image_parts = [
+                        image
+                        for image in source.image_bboxes
+                        if _bbox_area(image) < 0.4 * source.page_size[0] * source.page_size[1]
+                        and (
+                            _bbox_overlap_in_smaller(image, bounds) >= 0.8
+                            or _bbox_axis_overlap_ratio(image, bounds, axis="x") >= 0.3
+                            and _bbox_distance(image, bounds) <= 1.5 * em
+                        )
+                    ]
+                    labels = [
+                        line.bbox
+                        for line in source.lines
+                        if line.semantic_type is None
+                        and line.source_index not in caption_indices
+                        and not re.match(r"^\s*(?:sources?|notes?|资料来源|数据来源|来源|注)\s*[:：]", line.text, re.I)
+                        and len(line.text.split()) <= 8
+                        and line.bbox[2] - line.bbox[0] <= 0.45 * source.page_size[0]
+                        and (
+                            _bbox_axis_overlap_ratio(line.bbox, bounds, axis="y") >= 0.35
+                            and _bbox_distance(line.bbox, bounds) <= 1.5 * em
+                            or line.angle not in {0, 90, 180, 270}
+                            and _bbox_axis_overlap_ratio(line.bbox, bounds, axis="x") >= 0.5
+                            and 0 <= line.bbox[1] - bounds[3] <= 4 * em
+                        )
+                        and _line_effective_height(line, line.bbox) <= 1.25 * em
+                        and not _FIGURE_CAPTION_LINE_RE.match(line.text)
+                    ]
+                    bounds = _bbox_union_many(
+                        [bounds, *additions, *outlined_labels, *image_parts, *labels, *(line.bbox for line in numeric)]
+                    )
+                outputs.append(bounds)
+    return outputs
 
 
 def _detect_complex_path_containers(
@@ -1320,6 +2028,8 @@ def _is_graphic_label_member(
 ) -> bool:
     """判断短文本是否位于图形核心内部或对应轴向的邻近标签区。"""
 
+    if re.match(r"^\s*(?:sources?|notes?|资料来源|数据来源|来源|注)\s*[:：]", line.text, re.I):
+        return False
     center = (_bbox_center_x(line.bbox), _bbox_center_y(line.bbox))
     if _point_in_bbox(center, core_bbox):
         return True
@@ -1344,8 +2054,12 @@ def _is_graphic_label_member(
     # 横排坐标轴标题允许比刻度标签略长，但必须与图宽、行高和上下间距同时相容。
     is_horizontal_axis_title = (
         line.angle in {0, 180}
-        and primary_length <= 8.0 * line_height
-        and primary_length <= 0.45 * core_primary_length
+        and (
+            primary_length <= 8.0 * line_height
+            and primary_length <= 0.45 * core_primary_length
+            or re.fullmatch(r"\s*(?:\d{4}\s*\([A-Za-z]+\)\s*){2,}\s*", line.text)
+            and primary_length <= 1.15 * core_primary_length
+        )
         and _bbox_axis_overlap_ratio(line.bbox, core_bbox, axis="x") >= 0.15
         and vertical_gap <= 2.5 * median_height
     )
@@ -1695,10 +2409,12 @@ def _build_raster_image_blocks(
     ]
     raster_bboxes: list[BBox] = []
     for bbox in _merge_vertical_raster_tiles(
-        clipped_raster_bboxes,
+        _deduplicate_contained_photo_frames(source, clipped_raster_bboxes),
         source.page_size,
     ):
-        if _bbox_area(bbox) / page_area < _MIN_RASTER_IMAGE_PAGE_AREA_RATIO:
+        from .isolated_graphics import meaningful_small_raster
+
+        if _bbox_area(bbox) / page_area < _MIN_RASTER_IMAGE_PAGE_AREA_RATIO and not meaningful_small_raster(source, bbox):
             continue
         if any(
             _bbox_overlap_in_smaller(bbox, container_bbox) >= _IMAGE_CONTAINER_OVERLAP_THRESHOLD
@@ -1761,3 +2477,32 @@ def _build_raster_image_blocks(
         blocks.append(block)
     blocks.sort(key=lambda block: (block["bbox"][1], block["bbox"][0]))
     return blocks, claimed
+
+
+def _deduplicate_contained_photo_frames(source, bboxes):
+    """近乎等大的照片和阴影边框合为一幅；独立内嵌小图及边框中的原生文字继续保留。"""
+    consumed = set()
+    for index, outer in enumerate(bboxes):
+        width, height = outer[2] - outer[0], outer[3] - outer[1]
+        if min(width, height) <= 0:
+            continue
+        for other, inner in enumerate(bboxes):
+            if index == other or _bbox_area(inner) >= _bbox_area(outer):
+                continue
+            if not (
+                _bbox_overlap_in_first(inner, outer) >= 0.999
+                and _bbox_area(inner) / _bbox_area(outer) >= 0.85
+                and 0 <= inner[0] - outer[0] <= 0.08 * width
+                and 0 <= outer[2] - inner[2] <= 0.08 * width
+                and 0 <= inner[1] - outer[1] <= 0.08 * height
+                and 0 <= outer[3] - inner[3] <= 0.08 * height
+            ):
+                continue
+            if any(
+                _point_in_bbox((_bbox_center_x(line.bbox), _bbox_center_y(line.bbox)), outer)
+                and not _point_in_bbox((_bbox_center_x(line.bbox), _bbox_center_y(line.bbox)), inner)
+                for line in source.lines
+            ):
+                continue
+            consumed.add(other)
+    return [bbox for index, bbox in enumerate(bboxes) if index not in consumed]

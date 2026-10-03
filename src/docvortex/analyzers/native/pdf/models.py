@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator, MutableSet
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
+import re
 
 from ....document.pdf._document import PDFPathInfo
 from ....document.pdf.text._contracts import Char
@@ -154,12 +155,23 @@ class _LineItem:
     reference_start: bool | None = None
     title_band_id: int | None = None
     caption_start: bool = False
+    footnote_marker_start: bool = False
+    note_marker_value: str | None = None
+    numbered_heading_start: bool = False
+    native_math_words: frozenset[str] = field(default_factory=frozenset)
+    wrapped_title_parts: tuple[_LineItem, _LineItem] | None = field(compare=False, repr=False, default=None)
+    native_title_label_left: float | None = field(compare=False, default=None)
 
     def __post_init__(self) -> None:
         """为旧调用与合成测试补齐可选来源几何字段。"""
 
         if self.source_bbox is None:
             self.source_bbox = self.bbox
+        # 数字 run 的角色在输入边界冻结，辅助空间分类只消费编号证据，不重新读取整行文字。
+        marker = self.text.strip()
+        self.note_marker_value = marker if marker.isdigit() and 1 <= len(marker) <= 3 else None
+        # 编号标题证据在输入边界冻结，辅助空间分类不重新访问全文。
+        self.numbered_heading_start = re.match(r"^\d+(?:\.\d+)*\.?(?:\s|$)\S", marker) is not None
 
 
 @dataclass(slots=True)
@@ -223,6 +235,11 @@ class _TableCandidate:
     core_bbox: BBox | None = None
     line_indices: MutableSet[int] = field(default_factory=set)
     annotations: list[_TableAnnotation] = field(default_factory=list)
+    inferred_grid: list[_AxisLine] = field(default_factory=list)
+    # 新恢复的文字网格按原生字符保留强调样式，已有表格维持原物化契约。
+    preserve_inline_font_styles: bool = False
+    # 高置信裁切空白表单已重建规范网格，不能再混入填色矩形的文字行带边界。
+    inferred_grid_authoritative: bool = False
 
 
 @dataclass(slots=True)
@@ -233,6 +250,8 @@ class _GraphicCandidate:
     lane_index: int
     label_margin_scale: float = 2.5
     line_indices: set[int] = field(default_factory=set)
+    # 刻度证明的栅格图已包含完整轴标签，只允许核心内成员，避免再吸入说明续行或图间小框。
+    strict_core_members: bool = False
 
 
 @dataclass(slots=True)
@@ -305,6 +324,8 @@ class _PreparedPage:
     table_bboxes: list[BBox]
     drawing_lines: list[_AxisLine]
     fixed_blocks: list[dict[str, Any]]
+    # 只保留小圆点候选的轻量路径证据，供完成文本聚合后恢复局部列表。
+    bullet_paths: tuple[PDFPathInfo, ...] = ()
     canonical_formula_geometry: bool = False
     canonical_formula_source_lines: list[_LineItem] = field(default_factory=list)
     page_footnote_groups: list[set[int]] = field(default_factory=list)
@@ -313,6 +334,8 @@ class _PreparedPage:
     script_lines: list[PDFTextScriptLine] = field(default_factory=list)
     formula_candidate_lines: list[_LineItem] = field(default_factory=list)
     formula_ink_bboxes: list[BBox] = field(default_factory=list)
+    # 稀疏表格页保留无字符载荷的原生行样式，防止表体认领后只用大题名反向统计正文。
+    table_body_profile_lines: list[_LineItem] = field(default_factory=list)
     local_axis_table_cache: dict[tuple[int, int, int], tuple[list[_LocalAxisLine], list[_LocalAxisLine]]] = field(
         default_factory=dict
     )

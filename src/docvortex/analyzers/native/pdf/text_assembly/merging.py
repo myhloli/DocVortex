@@ -42,12 +42,14 @@ def _merge_short_same_baseline_prefix_blocks(
     for prefix_index, prefix in enumerate(blocks):
         prefix_rows = prefix.get("_local_line_bboxes")
         prefix_content = str(prefix.get("content") or "").strip()
+        # 已由重复圆点和唯一同排正文确认的游离标记，允许跨越常见项目缩进接回文字。
+        bullet_prefix = prefix_content in {"•", "●", "▪"} and prefix.get("_protected_hard_break_before") is True
         if (
             prefix_index in consumed
             or prefix.get("type") != "text"
             or not isinstance(prefix_rows, list)
             or len(prefix_rows) != 1
-            or _SHORT_SAME_BASELINE_PREFIX_RE.match(prefix_content) is None
+            or not (bullet_prefix or _SHORT_SAME_BASELINE_PREFIX_RE.match(prefix_content) is not None)
         ):
             continue
         prefix_bbox = prefix_rows[0]
@@ -76,8 +78,8 @@ def _merge_short_same_baseline_prefix_blocks(
             horizontal_gap = host_bbox[0] - prefix_bbox[2]
             if (
                 host_bbox[0] < prefix_bbox[2]
-                or horizontal_gap > 1.25 * prefix_height
-                or host_width < 0.15 * local_page_width
+                or horizontal_gap > (3.5 if bullet_prefix else 1.25) * prefix_height
+                or host_width < (2 * prefix_height if bullet_prefix else 0.15 * local_page_width)
                 or _bbox_axis_overlap_ratio(
                     prefix_bbox,
                     host_bbox,
@@ -1198,8 +1200,33 @@ def _merge_unterminated_text_components(
             ):
                 continue
             interval = _component_lane_interval(first)
+            # 邻图结束可能改变推断栏带；实际两端行宽及边缘恒定的未终止正文仍是同一段。
+            actual_row_continuation = (
+                first.get("_lane_is_span") is False
+                and second.get("_lane_is_span") is False
+                and first_declared_interval is not None
+                and second_declared_interval is not None
+                and second_declared_interval[0] <= first_declared_interval[0] - 3 * pair_height
+                and abs(second_declared_interval[1] - first_declared_interval[1]) <= 0.75 * pair_height
+                and len(first_rows) >= 2
+                and len(second_rows) >= 1
+                and second_content.lstrip()[:1].islower()
+                and 0 <= second_rows[0][1] - first_rows[-1][3] <= 0.5 * pair_height
+                and abs(second_rows[0][0] - first_rows[-1][0]) <= 0.25 * pair_height
+                and (
+                    abs(second_rows[0][2] - first_rows[-1][2]) <= 0.25 * pair_height
+                    or len(second_rows) == 1
+                    and second_rows[0][2] - second_rows[0][0] >= 0.5 * (first_rows[-1][2] - first_rows[-1][0])
+                )
+                and first_rows[-1][2] - first_rows[-1][0]
+                >= 0.85 * (max(row[2] for row in first_rows) - min(row[0] for row in first_rows))
+                and first.get("_font_signatures")
+                and first.get("_font_signatures") == second.get("_font_signatures")
+            )
             if span_pair:
                 interval = first_declared_interval
+            elif actual_row_continuation:
+                interval = (min(row[0] for row in first_rows), max(row[2] for row in first_rows))
             elif interval is None or not _components_share_lane_role(
                 first,
                 second,

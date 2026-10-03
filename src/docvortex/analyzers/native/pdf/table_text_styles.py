@@ -28,6 +28,8 @@ from .inline.scripts import (
     _prepare_fraction_rules,
     _script_line_char_roles,
 )
+from .inline.detection import _char_font_styles, _pdf_font_metadata
+from .inline.types import PDF_FONT_ITALIC_FLAG
 from .line_merging import _merge_overlapping_inline_text_clusters
 from .models import _LineItem
 from .native_text import _fill_native_typography
@@ -348,8 +350,9 @@ def _render_styled_cell(
     chars_by_source: dict[int, Char] | None = None,
     tight_bboxes: dict[int, BBox] | None = None,
     origins: dict[int, tuple[float, float]] | None = None,
+    preserve_font_styles: bool = False,
 ) -> str:
-    """按旧文本重建规则安全插入平坦的 sup/sub 标签。"""
+    """按原字符来源安全插入上下标及可选的粗斜体，文字不匹配时保持转义回退。"""
 
     parts = build_cell_text_parts(glyphs, median_height)
     if "".join(text for text, _source_index in parts) != cell.content:
@@ -357,15 +360,20 @@ def _render_styled_cell(
 
     rendered: list[str] = []
     active_role: ScriptRole = "body"
+    active_styles = (False, False)
     active_parts: list[str] = []
 
     def flush() -> None:
-        """提交当前同角色片段，并只生成受信的上下标标签。"""
+        """提交同角色同字体样式片段，仅生成固定标签并转义原文。"""
 
         nonlocal active_parts
         if not active_parts:
             return
         content = html.escape("".join(active_parts), quote=False)
+        if active_styles[1]:
+            content = f"<i>{content}</i>"
+        if active_styles[0]:
+            content = f"<b>{content}</b>"
         if active_role == "sup":
             rendered.append(f"<sup>{content}</sup>")
         elif active_role == "sub":
@@ -377,6 +385,10 @@ def _render_styled_cell(
     previous_source = None
     for text, source_index in parts:
         role = roles.get(source_index, "body") if source_index is not None else "body"
+        styles = active_styles if source_index is None else (False, False)
+        if preserve_font_styles and chars_by_source is not None and source_index in chars_by_source:
+            char = chars_by_source[source_index]
+            styles = ("bold" in _char_font_styles(char), bool(_pdf_font_metadata(char)[1] & PDF_FONT_ITALIC_FLAG))
         if (
             chars_by_source is not None
             and role == active_role == "body"
@@ -390,9 +402,10 @@ def _render_styled_cell(
             )
         ):
             active_parts.append(" ")
-        if role != active_role:
+        if role != active_role or styles != active_styles:
             flush()
             active_role = role
+            active_styles = styles
         active_parts.append(text)
         previous_source = source_index
     flush()
@@ -406,6 +419,7 @@ def render_native_table_html_with_scripts(
     origins: dict[int, tuple[float, float]],
     *,
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
+    preserve_font_styles: bool = False,
 ) -> str:
     """为高置信原生表格恢复上下标，证据不足时返回原始 HTML。"""
 
@@ -504,7 +518,7 @@ def render_native_table_html_with_scripts(
                 )
                 for left, right in zip(glyphs, glyphs[1:])
             )
-    if not cell_roles and not has_missing_space:
+    if not cell_roles and not has_missing_space and not preserve_font_styles:
         return result.html
     return serialize_native_table_html(
         result.rows,
@@ -517,6 +531,7 @@ def render_native_table_html_with_scripts(
             chars_by_source=chars_by_source,
             tight_bboxes=tight_bboxes,
             origins=origins,
+            preserve_font_styles=preserve_font_styles,
         ),
     )
 

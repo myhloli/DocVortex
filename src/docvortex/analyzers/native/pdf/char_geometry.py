@@ -103,6 +103,8 @@ class DocumentGeometryPlan:
     char_repairs: dict[CharKey, CharLayoutGeometry] = field(default_factory=dict)
     line_repairs: dict[LineKey, LineGeometryRepair] = field(default_factory=dict)
     line_style_scales: dict[LineKey, float] = field(default_factory=dict)
+    # 单页极端字体矩阵异常有重复字形和健康同族行证明，允许在容器认领前校正。
+    local_metric_repair_sources: set[LineKey] = field(default_factory=set)
     line_ink_bboxes: dict[LineKey, BBox] = field(default_factory=dict)
     line_baselines: dict[LineKey, float] = field(default_factory=dict)
     style_inflated_runs: set[RunKey] = field(default_factory=set)
@@ -2076,6 +2078,114 @@ def _prepare_layout_document(lines_by_page, geometries, page_sizes, *, with_metr
     return _prepare_owned_document(lines_by_page, geometries, page_sizes, layout=True, with_metrics=with_metrics)
 
 
+def _repair_extreme_local_font_metrics(plan, by_line, page_sizes):
+    """用同页重复异常与健康同族行校准极端字体矩阵，不放宽普通跨页样式阈值。"""
+    groups = defaultdict(list)
+    for key, samples in by_line.items():
+        anchors = [sample for sample in samples if sample.is_anchor]
+        if len(anchors) < 4:
+            continue
+        dominant = Counter(sample.run_key for sample in anchors).most_common(1)[0][0]
+        family = re.sub(r"(?:semibold|demibold|regular|regu|bold|light|medium|italic|ital|oblique)+$", "", dominant[0])
+        # 描述标志、数字及希腊字符可在同一字体矩阵内变换，不应阻止正文行的尺度校准。
+        members = [
+            sample
+            for sample in anchors
+            if re.sub(r"(?:semibold|demibold|regular|regu|bold|light|medium|italic|ital|oblique)+$", "", sample.run_key[0])
+            == family
+            and sample.run_key[1] == dominant[1]
+            and sample.run_key[4] == dominant[4]
+        ]
+        if len(members) < 0.8 * len(anchors):
+            continue
+        height = _quantile([s.local_tight_bbox[3] - s.local_tight_bbox[1] for s in members], 0.75)
+        baseline = statistics.median(s.local_origin[1] for s in members)
+        if height <= 0 or sum(abs(s.local_origin[1] - baseline) <= 0.2 * height for s in members) < 0.85 * len(members):
+            continue
+        # 通用强调后缀只用于寻找健康同族几何，不把某个字体名称写成例外。
+        groups[key[0], family, dominant[1], dominant[4]].append((key, members, height, baseline))
+    for group in groups.values():
+        bad = [
+            row
+            for row in group
+            if row[1][0].line.effective_height >= 4 * row[2] and statistics.median(s.font_size for s in row[1]) <= 0.3 * row[2]
+        ]
+        if len(bad) < 6 or len(bad) < 0.6 * len(group):
+            continue
+        donors = [row for row in group if len(row[1]) >= 12 and 1.2 <= row[1][0].line.effective_height / row[2] <= 2.5]
+        if not donors:
+            continue
+        ascent = statistics.median((row[3] - row[1][0].local_source_bbox[1]) / row[2] for row in donors)
+        descent = statistics.median((row[1][0].local_source_bbox[3] - row[3]) / row[2] for row in donors)
+        if ascent <= 0 or descent < 0 or not 1.2 <= ascent + descent <= 2.5:
+            continue
+        for key, members, height, baseline in bad:
+            samples = by_line[key]
+            line = members[0].line
+            size = page_sizes[key[0]]
+            ink = _bbox_union_many([s.tight_bbox for s in samples])
+            local_ink = _rotate_bbox_to_upright(ink, size, line.angle)
+            local_source = _rotate_bbox_to_upright(line.bbox, size, line.angle)
+            local_layout = (
+                local_source[0],
+                min(local_ink[1], baseline - ascent * height),
+                local_source[2],
+                max(local_ink[3], baseline + descent * height),
+            )
+            layout = _clip_bbox(_rotate_bbox_from_upright(local_layout, size, line.angle), size)
+            if layout is None:
+                continue
+            scale = height * (ascent + descent)
+            old = plan.line_repairs.get(key)
+            plan.line_repairs[key] = LineGeometryRepair(
+                source_bbox=line.source_bbox or line.bbox,
+                layout_bbox=layout,
+                ink_bbox=ink,
+                baseline=baseline,
+                em_height=scale,
+                state="repair_xy" if old and old.state in {"repair_x", "repair_xy"} else "trim_y",
+                confidence=1.0,
+                run_key=members[0].run_key,
+            )
+            plan.line_style_scales[key] = scale
+            plan.local_metric_repair_sources.add(key)
+            # 字符与行共同回到同一基线包络，避免后续脚本/视觉行重分割又读回巨大原生字框。
+            for sample in samples:
+                if sample.local_source_bbox[3] - sample.local_source_bbox[1] < 4 * height:
+                    continue
+                old_char = plan.char_repairs.get((key[0], sample.char_idx))
+                char_local = _rotate_bbox_to_upright(old_char.layout_bbox if old_char else sample.source_bbox, size, line.angle)
+                delta = sample.local_origin[1] - baseline
+                char_layout = _clip_bbox(
+                    _rotate_bbox_from_upright(
+                        (
+                            char_local[0],
+                            min(local_layout[1] + delta, sample.local_tight_bbox[1]),
+                            char_local[2],
+                            max(local_layout[3] + delta, sample.local_tight_bbox[3]),
+                        ),
+                        size,
+                        line.angle,
+                    ),
+                    size,
+                )
+                if char_layout is None:
+                    continue
+                plan.char_repairs[key[0], sample.char_idx] = CharLayoutGeometry(
+                    source_bbox=sample.source_bbox,
+                    tight_bbox=sample.tight_bbox,
+                    origin=sample.origin,
+                    layout_bbox=char_layout,
+                    ink_bbox=sample.tight_bbox,
+                    baseline=sample.local_origin[1],
+                    advance=old_char.advance if old_char else None,
+                    em_height=scale,
+                    x_state=old_char.x_state if old_char else "healthy",
+                    y_state="abnormal",
+                    confidence=1.0,
+                )
+
+
 def build_document_geometry_plan(
     lines_by_page: list[list[_LineItem]],
     geometries: list[PDFPageTextGeometry],
@@ -2146,6 +2256,7 @@ def build_document_geometry_plan(
     analyses = _analyze_lines(lines_by_page, by_line, page_sizes)
     confirmed_runs = _mark_y_candidates(analyses)
     _repair_y_lines(plan, analyses, confirmed_runs, x_bad_runs, page_sizes)
+    _repair_extreme_local_font_metrics(plan, by_line, page_sizes)
     return plan
 
 
@@ -2174,14 +2285,19 @@ def apply_line_geometry_repairs(
         )
         if style_scale is not None:
             line.em_height = style_scale
-        line.style_scale_repaired = _line_uses_repaired_style_scale(
+        line.style_scale_repaired = (
+            page_index,
+            line.source_index,
+        ) in plan.local_metric_repair_sources or _line_uses_repaired_style_scale(
             line,
             plan.style_inflated_runs,
         )
         repair = plan.line_repairs.get((page_index, line.source_index))
         if repair is None:
             continue
-        if repair.state in {"trim_y", "repair_xy"} and not allow_y_trim:
+        # 极端局部异常已有健康同族行与六行重复证据，可在表格/图片成员认领前缩回真实行带。
+        local_metric_repair = (page_index, line.source_index) in plan.local_metric_repair_sources
+        if repair.state in {"trim_y", "repair_xy"} and not allow_y_trim and not local_metric_repair:
             if repair.state == "trim_y":
                 continue
             local_state = "repair_x"
@@ -2199,7 +2315,7 @@ def apply_line_geometry_repairs(
         line.split_y_candidate = repair.split_y_candidate
         line.bbox = layout
         line.em_height = style_scale if style_scale is not None else repair.em_height
-        if allow_y_trim and repair.state in {"trim_y", "repair_xy"}:
+        if (allow_y_trim or local_metric_repair) and repair.state in {"trim_y", "repair_xy"}:
             line.effective_height = repair.em_height
 
 

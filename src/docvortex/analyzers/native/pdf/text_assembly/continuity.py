@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import statistics
 
-from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_y, _rotate_bbox_to_upright
+from ..geometry import _bbox_axis_overlap_ratio, _bbox_center_y, _rotate_bbox_to_upright, _bbox_union_many
 from ..line_layout import _line_effective_height
 from ..layout_evidence import build_layout_evidence
 from ..text_roles import text_role, metadata_field
@@ -14,6 +14,111 @@ from .common import _merge_internal_text_block_group, _merge_text_line_content
 
 
 _REFERENCE_NUMBER = re.compile(r"^\s*(?:\[(\d{1,4})\]|(\d{1,3})[.])\s*(?=\D)")
+
+
+def group_native_inline_formula_prose(lines: list[_LineItem], regions: list[tuple]) -> None:
+    """至少两处原生行内矢量公式证明同式正文连续带，公式槽位纳入行宽且字体重置阻断段组。"""
+    if len(regions) < 2:
+        return
+    rows = []
+    eligible = [
+        line
+        for line in lines
+        if line.angle == 0
+        and line.semantic_type is None
+        and not line.caption_start
+        and line.paragraph_group is None
+        and line.font_signature is not None
+    ]
+    for line in sorted(eligible, key=lambda item: (item.bbox[1], item.bbox[0])):
+        same = [
+            row
+            for row in rows
+            if row[0].visual_row_id is not None
+            and row[0].visual_row_id == line.visual_row_id
+            and row[0].font_signature == line.font_signature
+        ]
+        if same:
+            same[0].append(line)
+        else:
+            rows.append([line])
+    by_source = {line.source_index: row for row in rows for line in row}
+    boxes = {id(row): _bbox_union_many([line.bbox for line in row]) for row in rows}
+    hits = {id(row): set() for row in rows}
+    for index, (bounds, sources) in enumerate(regions):
+        for source in sources:
+            row = by_source.get(source)
+            if row is not None:
+                boxes[id(row)] = _bbox_union_many([boxes[id(row)], bounds])
+                hits[id(row)].add(index)
+    pending = sorted(rows, key=lambda row: boxes[id(row)][1])
+    group = max((line.paragraph_group for line in lines if line.paragraph_group is not None), default=-1) + 1
+    while pending:
+        run = [pending.pop(0)]
+        em = statistics.median(_line_effective_height(line, line.bbox) for line in run[0])
+        while pending:
+            before = boxes[id(run[-1])]
+            current = pending[0]
+            bounds = boxes[id(current)]
+            if (
+                current[0].font_signature != run[0][0].font_signature
+                or any(not 0.85 <= _line_effective_height(line, line.bbox) / em <= 1.15 for line in current)
+                or not -0.15 * em <= bounds[1] - before[3] <= 0.8 * em
+                or _bbox_axis_overlap_ratio(before, bounds, axis="x") < 0.5
+            ):
+                break
+            run.append(pending.pop(0))
+        text = " ".join(line.text for row in run for line in row)
+        if (
+            len(run) < 3
+            or len(set().union(*(hits[id(row)] for row in run))) < 2
+            or len(re.findall(r"\b[A-Za-z]{2,}\b", text)) < 20
+        ):
+            continue
+        for row in run:
+            for line in row:
+                line.paragraph_group = group
+                line.semantic_type = "text"
+                line.title_suppressed = True
+        group += 1
+
+
+def _standalone_author_year_regions(page: _PreparedPage) -> list[tuple]:
+    """单页缺少参考文献标题时，以重复作者行、年代和悬挂缩进共同确认局部参考栏。"""
+    lines = [
+        line
+        for line in page.remaining_lines
+        if line.angle == 0 and line.semantic_type not in {"header", "footer", "page_number", "page_footnote"}
+    ]
+    if len(lines) < 15:
+        return []
+    layout = build_layout_evidence(lines, page.page_size, barriers=[block["bbox"] for block in page.fixed_blocks])
+    regions = []
+    for left, right in sorted(set(layout.corridor((lane.left, 0, lane.right, 1)) for lane in layout.lanes)):
+        members = [line for line in lines if left <= (line.bbox[0] + line.bbox[2]) / 2 < right]
+        if len(members) < 15:
+            continue
+        em = statistics.median(_line_effective_height(line, line.bbox) for line in members)
+        edge = min(line.bbox[0] for line in members)
+        starts = [
+            line
+            for line in members
+            if abs(line.bbox[0] - edge) <= 0.4 * em
+            and line.text.count(",") >= 2
+            and re.match(r"^[A-Z][^,]+,\s*[A-Z]", line.text)
+        ]
+        indented = [line for line in members if 0.5 * em < line.bbox[0] - edge < 2 * em]
+        dated = [line for line in members if re.search(r"\b(?:19|20)\d{2}[a-z]?\.", line.text)]
+        if len(starts) >= 4 and len(dated) >= 4 and len(indented) >= len(members) / 3:
+            regions.append(
+                (
+                    left,
+                    min(line.bbox[1] for line in members) - 0.2 * em,
+                    right,
+                    max(line.bbox[3] for line in members) + 0.2 * em,
+                )
+            )
+    return regions
 
 
 def _numbered_reference_regions(page: _PreparedPage, active: bool) -> list[tuple]:
@@ -128,6 +233,7 @@ def mark_document_reference_regions(pages: list[_PreparedPage]) -> None:
             continue
         numbered_active = False
         if not active and not headings:
+            page.reference_regions.extend(_standalone_author_year_regions(page))
             continue
         layout = build_layout_evidence(lines, page.page_size, barriers=[block["bbox"] for block in page.fixed_blocks])
         corridors = sorted(set(layout.corridor((lane.left, 0, lane.right, 1)) for lane in layout.lanes))

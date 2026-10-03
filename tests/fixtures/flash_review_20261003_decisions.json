@@ -1,0 +1,584 @@
+{
+  "decisions": [
+    {
+      "document": "mixed_text_layout_sample",
+      "source_sha256": "87d98f6f4e42152c38b0a1f8dcfefa3e5ac163cc086a6f37169cabadf77bd107",
+      "physical_page": 3,
+      "before": {
+        "page_index": 2,
+        "fingerprint": "995e10ce974ade1042fafa8d1d5c686e9d792c8a63da9ee73913f2f4b8865432",
+        "bbox_fingerprint": "6aa7e44ad613ebcdf2fb80b339d85bdf713733730f650f1de9d58896c3d577e3"
+      },
+      "after": {
+        "page_index": 2,
+        "fingerprint": "7893d7fe4f057cf7a5c21cc914046b36fa7140f24cbd7e4b8c725be772052524",
+        "bbox_fingerprint": "6aa7e44ad613ebcdf2fb80b339d85bdf713733730f650f1de9d58896c3d577e3"
+      },
+      "decision": "accept",
+      "reason": "原页一级目录条目与对应页码确为粗体；只增加INDEX粗体span，内容、顺序、框和编号不变。原页与前后标框已实际查看。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/reviewed-history/index-bold.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "mixed_elements_pages_07_10",
+      "source_sha256": "89076ee9cce2168ab894ee7e280872f8a3c09053b9dcdeda9c1da76d111adc1e",
+      "physical_page": 3,
+      "before": {
+        "page_index": 2,
+        "fingerprint": "0dfc82cf2795f0ed939b1c77e7c53c59f0788c28c5f1bef1ae4bd4e8fff8b8c7",
+        "bbox_fingerprint": "c83743f89e12f6984bd9eb20f37303a668c8df982be11f86c9ae4851e035aafe"
+      },
+      "after": {
+        "page_index": 2,
+        "fingerprint": "e6fb79e7152afcaf55356d423580b8208c4efe1bd7b95f565ceb42948ca4c67b",
+        "bbox_fingerprint": "36611d06fab0d9b2d098e897091573f5f49da5c0c370970ab206f00b3377d1dc"
+      },
+      "decision": "accept",
+      "reason": "原页有三个不同上标编号和三个URL；旧合并块错误，现为三项脚注，正文与原有图体/图注均无变化。原页与前后布局已实际查看。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/reviewed-history/url-footnotes.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "native_cjk_layout_synthetic",
+      "source_sha256": "78ae9e8f670a99c17058ec53e5abdf7631671830e84461803ed2f00c1778ee59",
+      "physical_page": 2,
+      "before": {
+        "type": "text",
+        "anchor": "目录"
+      },
+      "after": {
+        "type": "paragraph_title",
+        "anchor": "目录"
+      },
+      "decision": "accept",
+      "reason": "原页顶部独立目录题名的字号和留白确认标题，目录正文及水印过滤无变化。公开parse导出及bundle回读通过，原页与前后标框已查看。只调整对应清单计数。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/reviewed-history/cjk-index-title.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "manufacturing_facilities_cross_page_table.pdf",
+      "source_sha256": "517c1f2326ab5405ba2fa3ed2db5c5aa8aeadc91761ff09b4401462ef922862e",
+      "physical_page": 1,
+      "table_index": 0,
+      "before": {
+        "text_sha256": "d0e4429d94f793465108795e8b835dfaa5d9482a861ede79f09d8d76c2330e46"
+      },
+      "after": {
+        "text_sha256": "1b592930f59f724b7800ba39cb100cb92fbe56c03fda78843119d8c7abcf36e6"
+      },
+      "changed_cells": [
+        {
+          "row": 0,
+          "col": 13,
+          "bbox": [
+            650.0838907429779,
+            2.4699847412109364,
+            706.7838541795564,
+            66.89498779296875
+          ],
+          "before": "设计年生产时间（（7）h）",
+          "after": "设计年生产时间（h）（7）"
+        },
+        {
+          "row": 1,
+          "col": 8,
+          "bbox": [
+            394.9855257250275,
+            24.94498321533203,
+            441.44277765436647,
+            66.89498779296875
+          ],
+          "before": "其参他数设信施息",
+          "after": "其他设施参数信息"
+        }
+      ],
+      "decision": "accept",
+      "reason": "原页逐格视觉确认多行文字的正常行序，修复字符交错；结构、几何及其余单元格不变。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch14-table-cell-history/manufacturing_facilities_cross_page_table-p1-t0.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "manufacturing_facilities_cross_page_table.pdf",
+      "source_sha256": "517c1f2326ab5405ba2fa3ed2db5c5aa8aeadc91761ff09b4401462ef922862e",
+      "physical_page": 2,
+      "table_index": 0,
+      "before": {
+        "text_sha256": "d45581f7a401d5bac5d5dc7d77b3a862d72252ad17bc86c1e6c21490e8bef9df"
+      },
+      "after": {
+        "text_sha256": "0f1baae0c0a50bd698ae4bb4f7f31847219f5f04de7fb2828fea5e43b7ba7667"
+      },
+      "changed_cells": [
+        {
+          "row": 0,
+          "col": 13,
+          "bbox": [
+            649.241940702894,
+            2.4699847412109364,
+            705.9419045259818,
+            66.89498779296875
+          ],
+          "before": "设计年生产时间（（7）h）",
+          "after": "设计年生产时间（h）（7）"
+        },
+        {
+          "row": 1,
+          "col": 8,
+          "bbox": [
+            394.14395712234654,
+            24.94498321533203,
+            440.60045870856527,
+            66.89498779296875
+          ],
+          "before": "其参他数设信施息",
+          "after": "其他设施参数信息"
+        }
+      ],
+      "decision": "accept",
+      "reason": "原页逐格视觉确认多行文字的正常行序，修复字符交错；结构、几何及其余单元格不变。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch14-table-cell-history/manufacturing_facilities_cross_page_table-p2-t0.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "pollutant_discharge_tables.pdf",
+      "source_sha256": "11c25c8f4459174d57703fd225a1ea61a73cb8500158d08b80900ae050c9fc8a",
+      "physical_page": 7,
+      "table_index": 0,
+      "before": {
+        "text_sha256": "1ea46ec814021e97bd7637df48a3f3428f572b265b3c5e395c3d30dad4264b28"
+      },
+      "after": {
+        "text_sha256": "c268b84b9da0a8ff219f0bf1599f6564c24fe07b58bb10988b3dc4e357a73a86"
+      },
+      "changed_cells": [
+        {
+          "row": 4,
+          "col": 1,
+          "bbox": [
+            30.90351729152586,
+            175.69500610351562,
+            72.52918645488782,
+            324.551247845818
+          ],
+          "before": "石墨、碳品素，制01",
+          "after": "石墨、碳素制品，01"
+        },
+        {
+          "row": 4,
+          "col": 2,
+          "bbox": [
+            72.52918645488782,
+            175.69500610351562,
+            114.15485711271629,
+            324.551247845818
+          ],
+          "before": "普单煅元",
+          "after": "普煅单元"
+        },
+        {
+          "row": 5,
+          "col": 14,
+          "bbox": [
+            599.3230032994566,
+            238.595,
+            636.9863439156617,
+            301.4949938964844
+          ],
+          "before": "1硫#脱塔排放口",
+          "after": "1#脱硫塔排放口"
+        },
+        {
+          "row": 5,
+          "col": 17,
+          "bbox": [
+            711.7630183105468,
+            238.595,
+            749.4130122070312,
+            301.4949938964844
+          ],
+          "before": "主排要放口",
+          "after": "主要排放口"
+        }
+      ],
+      "decision": "accept",
+      "reason": "原页逐格视觉确认多行文字的正常行序，修复字符交错；结构、几何及其余单元格不变。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch14-table-cell-history/pollutant_discharge_tables-p7-t0.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "pollutant_discharge_tables.pdf",
+      "source_sha256": "11c25c8f4459174d57703fd225a1ea61a73cb8500158d08b80900ae050c9fc8a",
+      "physical_page": 11,
+      "table_index": 0,
+      "before": {
+        "text_sha256": "36fddefb6c3e69d327637f7011372ef3cf17cfd61316653acfd590cbf2bfa74e"
+      },
+      "after": {
+        "text_sha256": "b68e6b1523a9e90e3a82d063a37580984630cf3daec2b44f86874a50d54780b0"
+      },
+      "changed_cells": [
+        {
+          "row": 5,
+          "col": 1,
+          "bbox": [
+            30.90351729152586,
+            238.595,
+            72.52918645488782,
+            324.551247845818
+          ],
+          "before": "石墨品、素，碳制01",
+          "after": "石墨、碳素制品，01"
+        },
+        {
+          "row": 5,
+          "col": 2,
+          "bbox": [
+            72.52918645488782,
+            238.595,
+            114.15485711271629,
+            324.551247845818
+          ],
+          "before": "普单煅元",
+          "after": "普煅单元"
+        },
+        {
+          "row": 5,
+          "col": 6,
+          "bbox": [
+            239.05522189636807,
+            238.595,
+            280.6807936101198,
+            301.4949938964844
+          ],
+          "before": "二化氧硫",
+          "after": "二氧化硫"
+        },
+        {
+          "row": 5,
+          "col": 10,
+          "bbox": [
+            414.6974186883408,
+            238.595,
+            460.8770068390093,
+            301.4949938964844
+          ],
+          "before": "单脱碱硫法",
+          "after": "单碱法脱硫"
+        }
+      ],
+      "decision": "accept",
+      "reason": "原页逐格视觉确认多行文字的正常行序，修复字符交错；结构、几何及其余单元格不变。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch14-table-cell-history/pollutant_discharge_tables-p11-t0.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "pollutant_discharge_tables.pdf",
+      "source_sha256": "11c25c8f4459174d57703fd225a1ea61a73cb8500158d08b80900ae050c9fc8a",
+      "physical_page": 68,
+      "table_index": 0,
+      "before": {
+        "text_sha256": "dd09406289c01d6df0c8e98a59333df322ba49c87bcb2c5bbebcecfc11313d50"
+      },
+      "after": {
+        "text_sha256": "1915bb25b66f286e65c371bc20e1210f9edb712ed75e74ebb8972c4910c6bd50"
+      },
+      "changed_cells": [
+        {
+          "row": 2,
+          "col": 4,
+          "bbox": [
+            151.4105209760586,
+            180.02098846435547,
+            191.77573279448188,
+            316.4657342529297
+          ],
+          "before": "烟气流速,烟气温度,烟气含湿量气,量烟,烟道截面",
+          "after": "烟气流速,烟气温度,烟气含湿量,烟气量,烟道截面"
+        }
+      ],
+      "decision": "accept",
+      "reason": "原页逐格视觉确认多行文字的正常行序，修复字符交错；结构、几何及其余单元格不变。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch14-table-cell-history/pollutant_discharge_tables-p68-t0.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "pollutant_discharge_tables.pdf",
+      "source_sha256": "11c25c8f4459174d57703fd225a1ea61a73cb8500158d08b80900ae050c9fc8a",
+      "physical_page": 70,
+      "table_index": 0,
+      "before": {
+        "text_sha256": "947e33095354f178a4a617202c37eeec86622c45fe7c809cd0980277f6659c25"
+      },
+      "after": {
+        "text_sha256": "a20cb00755eb3090adeedf3cd07cc9210e09d68c42d1c2001ae136b59cf46203"
+      },
+      "changed_cells": [
+        {
+          "row": 2,
+          "col": 4,
+          "bbox": [
+            151.41052098029513,
+            153.3819873046875,
+            191.77573280210763,
+            317.06074760437014
+          ],
+          "before": "烟气流速,烟气温度,烟气含湿量,烟气烟量道,截面积,氧含量",
+          "after": "烟气流速,烟气温度,烟气含湿量,烟气量,烟道截面积,氧含量"
+        }
+      ],
+      "decision": "accept",
+      "reason": "原页逐格视觉确认多行文字的正常行序，修复字符交错；结构、几何及其余单元格不变。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch14-table-cell-history/pollutant_discharge_tables-p70-t0.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "pollutant_discharge_tables.pdf",
+      "source_sha256": "11c25c8f4459174d57703fd225a1ea61a73cb8500158d08b80900ae050c9fc8a",
+      "physical_page": 71,
+      "table_index": 0,
+      "before": {
+        "text_sha256": "1b4335d34b5b8c6b6ffbd4abe9cee1671e6477436f6373d02a136cff0b586530"
+      },
+      "after": {
+        "text_sha256": "26a0e893563fad967aac2df799c9c246371cd7cd4ff3c7e512c96b0c18270ba1"
+      },
+      "changed_cells": [
+        {
+          "row": 1,
+          "col": 4,
+          "bbox": [
+            151.41059028138102,
+            56.967987060546875,
+            191.77585754321626,
+            221.3719940185547
+          ],
+          "before": "烟气流速,烟气温度,烟气含湿量,烟气烟量道,截面积,氧含量",
+          "after": "烟气流速,烟气温度,烟气含湿量,烟气量,烟道截面积,氧含量"
+        }
+      ],
+      "decision": "accept",
+      "reason": "原页逐格视觉确认多行文字的正常行序，修复字符交错；结构、几何及其余单元格不变。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch14-table-cell-history/pollutant_discharge_tables-p71-t0.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "中文论文2",
+      "source_sha256": "937cfb51e9e8abc6b3a2d8c46d38003cd2ad795a0692eab3f9e92ac604fcc9ad",
+      "physical_page": 2,
+      "table_index": 0,
+      "before": {
+        "content_sha256": "4d136a33d95832a9e787f03e1067fd87178de6cb1dcccb6cdf6c508fbc807297",
+        "cell_text": "EleuHthaerrnAesIsLM"
+      },
+      "after": {
+        "content_sha256": "e926d2c194bbc236af941cbf08bae5efa52bbf28cd0e4c7c1173432088a65d84",
+        "cell_text": "EleutherAI LM Harness"
+      },
+      "decision": "accept",
+      "reason": "原页两条物理行确为EleutherAI LM及Harness，仅恢复被交错的单元格行序，其余113格与表格范围不变。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch14-table-cell-history/cjk2-eleuther.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "中文论文2",
+      "source_sha256": "937cfb51e9e8abc6b3a2d8c46d38003cd2ad795a0692eab3f9e92ac604fcc9ad",
+      "physical_page": 2,
+      "before": {
+        "page_index": 1,
+        "fingerprint": "926017782518ce5b92fcc983aa1f25d6b95a59daac6835001b389b9f7c37fd75",
+        "bbox_fingerprint": "f3ea5b64f2c0e26f8ee084452320da22e3d53785478bf8a934f36b3a8ebe11bb"
+      },
+      "after": {
+        "page_index": 1,
+        "fingerprint": "db63b518c4b9921f337e999c7dfdf3beeb5639feec36dc38996854c6acf4d0ad",
+        "bbox_fingerprint": "add9c60de0e40c709667f2faf324bd1c59d4acc976e9816f3ba8e3cf851071a3"
+      },
+      "decision": "accept",
+      "reason": "原页明确为两行EleutherAI LM / Harness；仅修复一个单元格字符交错，全文其他成员、顺序、类型及所有框均不变，原页与前后布局实际查看。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/reviewed-history/cjk2-table-cell.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "demo1.pdf",
+      "source_sha256": "f3b3be345bf2df8979f2491ca9466e078e4fd1d6a216611faa8566e4c44d474b",
+      "physical_page": 5,
+      "table_index": 0,
+      "before": {
+        "content_sha256": "412113029f464ab3d6c03d1ef843d614fe77470c1981b97bddd42663e39941c5",
+        "cell": {
+          "row": 5,
+          "col": 10,
+          "rowspan": 1,
+          "colspan": 1,
+          "text": "Fahey and Jackson,1 997"
+        }
+      },
+      "after": {
+        "content_sha256": "b38bfc9d0c1367e2e4910038b177b7ad952f621d321c79975ec9130ae4232fbf",
+        "cell": {
+          "row": 5,
+          "col": 10,
+          "rowspan": 1,
+          "colspan": 1,
+          "text": "Fahey and Jackson, 1 997"
+        }
+      },
+      "decision": "accept",
+      "reason": "原页引用为Fahey and Jackson,与下一行1997，两者有词界；仅增加逗号后空格，其余单元格、结构及几何不变。原有年份内部空格不属本次基线变化，继续保留。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch23-short-tables/review-sheets/demo1-p5-rotated.png",
+      "gt_used": false
+    },
+    {
+      "document": "demo1",
+      "source_sha256": "f3b3be345bf2df8979f2491ca9466e078e4fd1d6a216611faa8566e4c44d474b",
+      "physical_page": 5,
+      "before": {
+        "page_index": 4,
+        "fingerprint": "9628364973945ac7ffbceb9094aa09b9d25a0c88783b814637291bce20122ea6",
+        "bbox_fingerprint": "2f52c50b71aa97c63efc144b8760ae9841b1b97b522f121dc366198d8e006300"
+      },
+      "after": {
+        "page_index": 4,
+        "fingerprint": "f26b024a6aa935744eeea7183b57c84071fe0840e1249b7f4df8f296e65a5812",
+        "bbox_fingerprint": "2e531fc973f92309861a5fe905d3cb0833bd7c2596fd2335b03f05440ca53bb7"
+      },
+      "decision": "accept",
+      "reason": "已查看原页及22/23标框；仅引用单元格逗号后恢复空格，成员、顺序、几何及其他文字完全一致。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch23-short-tables/review-sheets/demo1-p5.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "mixed_text_layout_sample",
+      "source_sha256": "87d98f6f4e42152c38b0a1f8dcfefa3e5ac163cc086a6f37169cabadf77bd107",
+      "physical_page": 5,
+      "before": {
+        "page_index": 4,
+        "fingerprint": "ee5fa5b6311e65b4c30e668dab6f41b0acaff6a3e01c48aa17355037e136103c",
+        "bbox_fingerprint": "04a002521778c5ef296d5a3468c8c1c111cc54dcbac2457ee3f6a23f11c735ab"
+      },
+      "after": {
+        "page_index": 4,
+        "fingerprint": "94a49b0df227de4adff979f4895a2b9ef403be43eaa03a9be87a3263b8fa15d3",
+        "bbox_fingerprint": "4cf456fc74fda8488601b4f37966126a489b7e8558a54517f832ae1834ecc51c"
+      },
+      "decision": "accept",
+      "reason": "已逐页实际查看原页及29/30标框：仅将原页独立圆点项目分开，所有字词、章节、代码、图体、图注和非列表几何保持。该页逐项接受，其他页指纹不刷新。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch30-bullets/review-sheets/mixed-p5.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "mixed_text_layout_sample",
+      "source_sha256": "87d98f6f4e42152c38b0a1f8dcfefa3e5ac163cc086a6f37169cabadf77bd107",
+      "physical_page": 6,
+      "before": {
+        "page_index": 5,
+        "fingerprint": "abee9b87128e89537f59454f078156f7981d9b35405b07ce7b5039cdb1c4f1a4",
+        "bbox_fingerprint": "1b3887124eca5f098165bcde0ead0c84c99f6d68821d0640164e5f585c2aa9fe"
+      },
+      "after": {
+        "page_index": 5,
+        "fingerprint": "3c2f961c05bd5bf3ffd29ae638959358fad7f0b3d68eb2abc007e9ca1adeb6a9",
+        "bbox_fingerprint": "856fc164f910ecb6ee55d96d7c1f89eaecd4a4ef142a4196f2cb31728d363fc0"
+      },
+      "decision": "accept",
+      "reason": "已逐页实际查看原页及29/30标框：仅将原页独立圆点项目分开，所有字词、章节、代码、图体、图注和非列表几何保持。该页逐项接受，其他页指纹不刷新。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch30-bullets/review-sheets/mixed-p6.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "mixed_text_layout_sample",
+      "source_sha256": "87d98f6f4e42152c38b0a1f8dcfefa3e5ac163cc086a6f37169cabadf77bd107",
+      "physical_page": 9,
+      "before": {
+        "page_index": 8,
+        "fingerprint": "bd2c489e665e33ef2be2698a6b2bb1a817ddb16684c472f18e34012222b85860",
+        "bbox_fingerprint": "43606b72732bb29ccf312bf71309022a826b33017d48b4650f7a0dcaf56598b0"
+      },
+      "after": {
+        "page_index": 8,
+        "fingerprint": "cbe0fb5a9e660e953526f17808c6dd4f6d5f63a349620c67fdd4705ff4279b15",
+        "bbox_fingerprint": "e68f5836dbbae230a38787b743b0525bdb4002ad02e193dce55f1b4dc81268c1"
+      },
+      "decision": "accept",
+      "reason": "已逐页实际查看原页及29/30标框：仅将原页独立圆点项目分开，所有字词、章节、代码、图体、图注和非列表几何保持。该页逐项接受，其他页指纹不刷新。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch30-bullets/review-sheets/mixed-p9.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "caibao1",
+      "source_sha256": "8ed2d930833f2d5528747f74e1748a178e5ebca828034c7f7f72aa73f8e4d9e8",
+      "physical_page": 19,
+      "before": {
+        "page_index": 18,
+        "fingerprint": "34f0c4b9f918971fcc44f72339d24d8c66ba72942619981f4c92fe71ff484863",
+        "bbox_fingerprint": "c4fb92f66beaded040b3a014696d9dd5b75f8a83cb8b1a26bb0c9d3df3834833"
+      },
+      "after": {
+        "page_index": 18,
+        "fingerprint": "40d6ac43e7e8e58519ccf50f01cd0222bef1224af021ad2cbe19266b43daeb6c",
+        "bbox_fingerprint": "7873f75c9b3daeca18d58a4d2d61e7009c0f3d155aeb15bcf763f5f61bb4ed1e"
+      },
+      "code_sha256": "2ad80a9fbe3a0e92770ce5dd566d47fa1238ef176c1334cf34aac3e9d6a4587b",
+      "reason": "已实际查看原页及48/49b标框：独立短中文子标题与正文分开。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch49b-cjk-paragraphs-panel-order/review-sheets/maintained-caibao1-p19.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "caibao1",
+      "source_sha256": "8ed2d930833f2d5528747f74e1748a178e5ebca828034c7f7f72aa73f8e4d9e8",
+      "physical_page": 20,
+      "before": {
+        "page_index": 19,
+        "fingerprint": "80f1eaaa92b6bcb97503b925375b57233ab7ab18bb99f24844145a7b3f53a449",
+        "bbox_fingerprint": "ef82bcd85e74af91eacf39299dd816d89dab0708ba2f84fbae3bd4507c3db6eb"
+      },
+      "after": {
+        "page_index": 19,
+        "fingerprint": "62b6e28fd2f49f0b6caee4454065f71c782185a711275d943c59afb9d359f9a5",
+        "bbox_fingerprint": "09cde0fdf7325991c3a3c92b8fce16cf076d887cab6984aa0ded1fa419a2c974"
+      },
+      "code_sha256": "2ad80a9fbe3a0e92770ce5dd566d47fa1238ef176c1334cf34aac3e9d6a4587b",
+      "reason": "已实际查看原页及48/49b标框：独立短中文子标题与正文分开。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch49b-cjk-paragraphs-panel-order/review-sheets/maintained-caibao1-p20.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "demo6",
+      "source_sha256": "e7e4c215e14320c14b6d02e7e5af6f12630a4418757815dc385f1cdf2d3fde45",
+      "physical_page": 3,
+      "before": {
+        "page_index": 2,
+        "fingerprint": "8c8189740b17018a9839f3a8944a8e130c7eb36ced3c9a5eef0d080d9dd84b52",
+        "bbox_fingerprint": "be69bb403aecbf22f1f219ccb293d3923509b90b868a234a388967da5af0892e"
+      },
+      "after": {
+        "page_index": 2,
+        "fingerprint": "d6f5489eb253023dcbcb07fba008b2b0eb0467a31b760ca914455a4527c01e48",
+        "bbox_fingerprint": "4cf3857783a7515c88d0045ecb53040ceba8fc6310d0083049d73fb69131f68c"
+      },
+      "code_sha256": "2ad80a9fbe3a0e92770ce5dd566d47fa1238ef176c1334cf34aac3e9d6a4587b",
+      "reason": "已实际查看原页及48/49b标框：顿号编号项目各自起段，项目续行和所有原生文字保留；并未新增list类型。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch49b-cjk-paragraphs-panel-order/review-sheets/maintained-demo6-p3.jpg",
+      "gt_used": false
+    },
+    {
+      "document": "demo6",
+      "source_sha256": "e7e4c215e14320c14b6d02e7e5af6f12630a4418757815dc385f1cdf2d3fde45",
+      "physical_page": 5,
+      "before": {
+        "page_index": 4,
+        "fingerprint": "1fda4ad3d4e335660f9c69e5cf463d27c30162a1192dc2f6291958c69775484d",
+        "bbox_fingerprint": "0b138cb777fc302b11a8a7aa751f87b0ebf9935a39fa4498ae864f594daf513c"
+      },
+      "after": {
+        "page_index": 4,
+        "fingerprint": "fb2769a3139458b68d9b5bdfbbeff542ef6723d59def9d677913714abd9637c8",
+        "bbox_fingerprint": "19ec8507ea7f2f8110f8daccd47d87394effb0e5ef297b5395fe7c496894f392"
+      },
+      "code_sha256": "2ad80a9fbe3a0e92770ce5dd566d47fa1238ef176c1334cf34aac3e9d6a4587b",
+      "reason": "已实际查看原页及48/49b标框：顿号编号项目各自起段，项目续行和所有原生文字保留；并未新增list类型。",
+      "evidence": "/Volumes/2TB/projects/20240809magic_pdf/opendataloader-bench/flash-review-merged-20261003/batch49b-cjk-paragraphs-panel-order/review-sheets/maintained-demo6-p5.jpg",
+      "gt_used": false
+    }
+  ]
+}
