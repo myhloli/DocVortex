@@ -1,0 +1,88 @@
+{
+  "documents": [
+    {
+      "id": "dotted_contents",
+      "benchmark_id": 18,
+      "path": "tests/unittest/pdfs/benchmark_native/dotted_contents.pdf",
+      "sha256": "321a42833cde040a5e4525c5f84ca2e7df18ee57649c9b47a0e5472e1357abb6"
+    },
+    {
+      "id": "employment_charts",
+      "benchmark_id": 38,
+      "path": "tests/unittest/pdfs/benchmark_native/employment_charts.pdf",
+      "sha256": "22f4e5d348c45a3399f3c8a0e48756dd82a96ed9f5723a2a39183b554667d19a"
+    },
+    {
+      "id": "migration_charts",
+      "benchmark_id": 76,
+      "path": "tests/unittest/pdfs/benchmark_native/migration_charts.pdf",
+      "sha256": "6d5a00597cdd1d363b56eb0fdc9f239a462b44fcb0be53a93d62f0d6e35d428f"
+    },
+    {
+      "id": "microscope_steps",
+      "benchmark_id": 115,
+      "path": "tests/unittest/pdfs/benchmark_native/microscope_steps.pdf",
+      "sha256": "12e9c991f3d907593bacefdcf9a46c2cb57b7fb599e7840f438df04e416aab9d"
+    },
+    {
+      "id": "replication_sidebar",
+      "benchmark_id": 118,
+      "path": "tests/unittest/pdfs/benchmark_native/replication_sidebar.pdf",
+      "sha256": "39aec6caead187513fa9e2a26a3bbb54ba0a3a4ae8e879642ca1584330b0c285"
+    },
+    {
+      "id": "portfolio_sparse_table",
+      "benchmark_id": 130,
+      "path": "tests/unittest/pdfs/benchmark_native/portfolio_sparse_table.pdf",
+      "sha256": "95f808815969717e4ef6390b2b789a8ea552a000a2b936c3c9371f695a71bd9e"
+    },
+    {
+      "id": "linked_initiatives_table",
+      "benchmark_id": 147,
+      "path": "tests/unittest/pdfs/benchmark_native/linked_initiatives_table.pdf",
+      "sha256": "b862cd0d6f06c06ee5ab7729ed4e8ce58e6964eb0f1ab98b3865b57a4808216f"
+    },
+    {
+      "id": "competence_filled_table",
+      "benchmark_id": 150,
+      "path": "tests/unittest/pdfs/benchmark_native/competence_filled_table.pdf",
+      "sha256": "a46e40b2b04dc83e4014fca656dae6df20af1fe7a420df306406409ea8c0db31"
+    },
+    {
+      "id": "mineral_units_table",
+      "benchmark_id": 166,
+      "path": "tests/unittest/pdfs/benchmark_native/mineral_units_table.pdf",
+      "sha256": "2e4f2561d8624cab6140564d53aed11862cf5979572fc3d1205af105486e0b1f"
+    },
+    {
+      "id": "erosion_multilevel_tables",
+      "benchmark_id": 170,
+      "path": "tests/unittest/pdfs/benchmark_native/erosion_multilevel_tables.pdf",
+      "sha256": "4d5b682effaf9580928a7073980e3916687d168238bc96b6c17222f747eacde6"
+    },
+    {
+      "id": "recommendation_panels",
+      "benchmark_id": 183,
+      "path": "tests/unittest/pdfs/benchmark_native/recommendation_panels.pdf",
+      "sha256": "cbb4a13ffd01d9f777fdb939451d6a21cea1b869ee50d79581451e3601df9ec8"
+    },
+    {
+      "id": "search_value_panels",
+      "benchmark_id": 184,
+      "path": "tests/unittest/pdfs/benchmark_native/search_value_panels.pdf",
+      "sha256": "a7914baa31ab36088e7d4199120e23630c800e99d8f96aa5a21091d7a67ff1cf"
+    },
+    {
+      "id": "training_grouped_table",
+      "benchmark_id": 187,
+      "path": "tests/unittest/pdfs/benchmark_native/training_grouped_table.pdf",
+      "sha256": "29d883eb26e7b9d08250b4bab1c51092d74e310e6acfa955f8fe28f1008accf5"
+    },
+    {
+      "id": "ocr_performance_panels",
+      "benchmark_id": 199,
+      "path": "tests/unittest/pdfs/benchmark_native/ocr_performance_panels.pdf",
+      "sha256": "8bfb767df3506b4bd76b31e8823f59714c7abfc2a34ab11018e66fa2d9b5ed29"
+    }
+  ]
+}

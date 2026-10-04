@@ -112,7 +112,22 @@ def _index_rows_to_block(rows: list[_IndexRow], angle: int, page_size: tuple[flo
 
 def _index_row_em(row: _IndexRow) -> float:
     """使用原生字形尺度比较行距，避免多行条目的合并外框放大字号。"""
-    return statistics.median(_line_effective_height(line, box) for line, box in zip(row.members, row.local_member_bboxes))
+    return statistics.median(_index_line_height(line, box) for line, box in zip(row.members, row.local_member_bboxes))
+
+
+def _index_line_height(line: _LineItem, box: BBox) -> float:
+    """点线引导符占多数时，以字母数字的原生字框尺度验证目录行，避免点的墨迹高度污染。"""
+    height = _line_effective_height(line, box)
+    if re.search(r"(?:[.．·]\s*){3,}", line.text) is None:
+        return height
+    heights = []
+    for char in line.chars:
+        bounds = char.get("bbox")
+        if str(char.get("char", "")).isalnum() and bounds is not None:
+            local = _rotate_bbox_to_upright(bounds, (1.0, 1.0), line.angle)
+            if local[3] > local[1]:
+                heights.append(local[3] - local[1])
+    return max(height, statistics.median(heights)) if heights else height
 
 
 def _include_repeated_leading_index_section(all_rows: list[_IndexRow], candidate: list[_IndexRow]) -> list[_IndexRow]:
@@ -234,7 +249,7 @@ def _build_index_rows(
             continue
         local = _rotate_bbox_to_upright(line.bbox, page_size, angle)
         # 斜置水印可能被归入最近的正交方向，其外框远高于字形尺度，不能认领为目录成员。
-        if local[3] - local[1] > 1.7 * _line_effective_height(line, local):
+        if local[3] - local[1] > 1.7 * _index_line_height(line, local):
             continue
         key = ("visual", line.visual_row_id) if line.visual_row_id is not None else ("source", line.source_index)
         row_groups.setdefault(key, []).append(line)
@@ -311,7 +326,7 @@ def _split_index_bands(rows: list[_IndexRow]) -> list[list[_IndexRow]]:
 
     if not rows:
         return []
-    median_height = statistics.median(max(_line_effective_height(line, row.local_bbox) for line in row.members) for row in rows)
+    median_height = statistics.median(max(_index_line_height(line, row.local_bbox) for line in row.members) for row in rows)
     maximum_pitch = 3.25 * max(0.1, median_height)
     bands: list[list[_IndexRow]] = [[rows[0]]]
     for row in rows[1:]:

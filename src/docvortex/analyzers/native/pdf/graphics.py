@@ -2087,6 +2087,8 @@ def _is_graphic_label_member(
 def _image_members_to_content(
     members: list[_LineItem],
     page_size: tuple[float, float],
+    *,
+    spatial: bool = False,
 ) -> str:
     """按视觉行和页内位置生成图片内部文本，保留不同视觉行之间的换行。"""
 
@@ -2098,7 +2100,20 @@ def _image_members_to_content(
             row_kind, row_identity = 0, line.visual_row_id
         row_groups.setdefault((line.angle, row_kind, row_identity), []).append(line)
 
+    # 原生数值图同时包含旋转日期标签；斜置文本不能按轻微字框差异改变横轴顺序。
+    numeric_count = sum(re.fullmatch(r"[\d.,%+/−-]+", line.text.strip()) is not None for line in members)
+    numeric_chart = numeric_count >= 6 and numeric_count >= 0.45 * len(members)
+    if spatial and numeric_chart and all(line.angle == 0 for line in members):
+        from .spatial_text import _SpatialTextItem, _project_spatial_items
+
+        # 整批补认领的数值图保留横向列位置，避免原 PDF 文本对象顺序把图例插入数据。
+        return _sanitize_pdf_control_text(
+            _project_spatial_items([_SpatialTextItem(line.text, line.bbox) for line in members]),
+            preserve_newlines=True,
+        ).strip()
+
     rows: list[tuple[BBox, str]] = []
+    rotated_rows: list[tuple[int, BBox, str, int, float]] = []
     for row_lines in row_groups.values():
         row_bbox = _bbox_union_many([line.bbox for line in row_lines])
         angle = row_lines[0].angle
@@ -2106,6 +2121,19 @@ def _image_members_to_content(
         content = _join_formula_visual_row(local_geometry, page_size)
         if content:
             rows.append((row_bbox, content))
+            if numeric_chart and angle in {90, 270}:
+                rotated_rows.append((len(rows) - 1, row_bbox, content, angle, row_lines[0].effective_height))
+    # 同一轴上的旋转短标签用共同纵向带排序，避免文本长度让年份组越过左侧年份。
+    for index, bounds, _, angle, em in rotated_rows:
+        peers = [
+            (i, box, value)
+            for i, box, value, other_angle, other_em in rotated_rows
+            if other_angle == angle and min(abs(box[1] - bounds[1]), abs(box[3] - bounds[3])) <= 0.5 * min(em, other_em)
+        ]
+        if len(peers) >= 3:
+            top = min(box[1] for _, box, _ in peers)
+            for i, box, value in peers:
+                rows[i] = ((box[0], top, box[2], box[3]), value)
     rows.sort(key=lambda item: (item[0][1], item[0][0]))
     return _sanitize_pdf_control_text(
         "\n".join(row_content for _row_bbox, row_content in rows),

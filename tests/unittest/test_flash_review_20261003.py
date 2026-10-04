@@ -1247,14 +1247,14 @@ def test_three_column_small_labels_keep_equal_heading_status():
         assert len(matches)==1 and matches[0]['type']=='paragraph_title'
 
 
-def test_metric_value_arrow_and_citation_form_heading_without_subtitle():
-    """原页大号数值、上箭头与引用上标组成完整指标标题，下一行说明保持独立正文。"""
+def test_metric_value_arrow_and_citation_keep_separate_companion_heading():
+    """原页指标和三栏同式的小标题分别保持独立，下面较小字号的解释才是正文。"""
     blocks=_pages('review_184')[0]
     matches=[b for b in blocks if '1.8X' in _visible_text(b.get('content',''))]
     assert len(matches)==1 and matches[0]['type']=='paragraph_title'
     text=_visible_text(matches[0]['content']);assert '↑' in text and text.startswith('1.8X')
     subtitle=[b for b in blocks if _visible_text(b.get('content',''))=='Higher Return of Information']
-    assert len(subtitle)==1 and subtitle[0]['type']=='text'
+    assert len(subtitle)==1 and subtitle[0]['type']=='paragraph_title'
 
 
 def test_same_style_short_heading_before_lettered_item_remains_complete():

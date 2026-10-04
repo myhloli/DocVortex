@@ -938,6 +938,8 @@ def _prepare_page_source(
     # 所有已确认内容图共享成员补认领：几何校准后才进入点阵图/矢量图的原生标签也不能重复输出。
     image_containers = caption_graphics + form_image_blocks + graphic_blocks + raster_image_blocks
     reclaimed = set()
+    reclaimed_by_owner: dict[int, list[_LineItem]] = {}
+    original_image_content = {id(block): block["content"] for block in image_containers}
     for line in remaining_lines:
         if line.semantic_type is not None or _is_strong_caption_text(line.text):
             continue
@@ -957,8 +959,16 @@ def _prepare_page_source(
         ]
         if matches:
             owner = min(matches, key=lambda block: _bbox_area(block["bbox"]))
-            owner["content"] += "\n" + line.text
+            reclaimed_by_owner.setdefault(id(owner), []).append(line)
             reclaimed.add(line.source_index)
+    from .graphics import _image_members_to_content
+
+    for owner in image_containers:
+        members = reclaimed_by_owner.get(id(owner), [])
+        if members:
+            # 整批补认领的图内标签须按原生位置投影，不能沿 PDF 对象序逐条追加。
+            projected = _image_members_to_content(members, source.page_size, spatial=True)
+            owner["content"] = "\n".join(filter(None, [original_image_content[id(owner)], projected]))
     remaining_lines = [line for line in remaining_lines if line.source_index not in reclaimed]
     canonical_formula_source_lines = (
         [
@@ -1297,6 +1307,9 @@ def _finalize_prepared_page(
                 line.semantic_type = "paragraph_title"
     _demote_runin_title_fragments(remaining_lines, prepared.page_size)
     _demote_regular_repeated_item_titles(remaining_lines, document_body_profile)
+    from .title_analysis.panels import classify_panel_titles
+
+    classify_panel_titles(remaining_lines, caption_container_bboxes, prepared.page_size[0])
     _classify_bold_numbered_heading_rows(remaining_lines, prepared.page_size, title_container_bboxes)
     remaining_lines = _restore_wrapped_bold_title_tails(remaining_lines, prepared.page_size)
     _restore_short_heading_with_image_displaced_prose(
@@ -1507,9 +1520,12 @@ def _sort_blocks_with_visual_row_groups(
         region_consumed_indices.update(indices)
 
     region_groups = _numbered_panel_row_regions(region_groups, body_blocks)
-    from .panel_order import parallel_heading_panel_groups
+    from .panel_order import numbered_step_member_groups, parallel_heading_panel_groups
 
     for group in parallel_heading_panel_groups(body_blocks, region_consumed_indices):
+        region_groups.append([member for _, member in group])
+        region_consumed_indices.update(index for index, _ in group)
+    for group in numbered_step_member_groups(body_blocks, region_consumed_indices):
         region_groups.append([member for _, member in group])
         region_consumed_indices.update(index for index, _ in group)
 

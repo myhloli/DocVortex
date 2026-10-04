@@ -190,6 +190,11 @@ def _infer_document_body_profile(
     height_clusters = [[samples[index][:3] for index in group] for group in groups]
     cross_page_clusters = [cluster for cluster in height_clusters if len({item[1] for item in cluster}) >= 2]
     eligible_clusters = cross_page_clusters or height_clusters
+    # 单页演示稿中两条跨页宽大标题会压过多栏正文；至少三条独立正文行才竞争画像。
+    if len(prepared_pages) == 1 and len(samples) >= 6:
+        repeated_clusters = [cluster for cluster in eligible_clusters if len(cluster) >= 3]
+        if repeated_clusters:
+            eligible_clusters = repeated_clusters
     body_cluster = max(
         eligible_clusters,
         key=lambda cluster: (

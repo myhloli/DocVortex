@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .candidate import serialize_candidate_html
+from .banded_numeric import build_banded_numeric_candidate
 from .contracts import (
     NativeTableCandidate,
     NativeTableInput,
@@ -416,9 +417,15 @@ def _evaluate_native_pdf_table(
         if _has_alias_affected_physical_blank_row(vector_attempts):
             sparse_multiline_allowed = False
     sparse_multiline_candidates = build_sparse_multiline_candidates(table_input, text) if sparse_multiline_allowed else []
+    banded_candidate = (
+        build_banded_numeric_candidate(table_input, text, {})
+        if sparse_multiline_allowed and not sparse_multiline_candidates
+        else None
+    )
     generated_candidates = [
         *existing_generated_candidates,
         *sparse_multiline_candidates,
+        *([banded_candidate] if banded_candidate is not None else []),
     ]
     candidates = _remove_undercounted_vector_candidates(generated_candidates)
     selected = None if physical_topology_conflict else _select_candidate(candidates)
@@ -471,6 +478,10 @@ def diagnose_native_pdf_table(table_input: NativeTableInput) -> dict[str, Any]:
         if evaluation.text is not None
         else ()
     )
+    if evaluation.text is not None and len(evaluation.text.rows) >= 4:
+        banded_diagnostics: dict[str, Any] = {}
+        build_banded_numeric_candidate(table_input, evaluation.text, banded_diagnostics)
+        sparse_hybrid_attempts = (*sparse_hybrid_attempts, banded_diagnostics)
     rule_band_attempts: list[dict[str, Any]] = []
     if evaluation.text is not None:
         build_rule_band_candidates(table_input, evaluation.text, diagnostics=rule_band_attempts)

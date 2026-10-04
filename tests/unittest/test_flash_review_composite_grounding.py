@@ -25,7 +25,7 @@ def test_two_composite_raster_charts_keep_complete_axis_category_and_legend_memb
     assert any(b['type']=='page_footnote' for b in page)
     assert 'criteria' not in _visible_text(right['content'])
     assert '\n11\n' not in _visible_text(right['content'])
-    description=next(b for b in page if b['type']=='text' and 'performance details' in _visible_text(b['content']))
+    description=next(b for b in page if b['type']=='paragraph_title' and 'performance details' in _visible_text(b['content']))
     assert _visible_text(description['content']).endswith('criteria')
     notes=[b for b in page if b['type']=='page_footnote']
     assert len(notes)==6
