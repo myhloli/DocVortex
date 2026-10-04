@@ -1,4 +1,4 @@
-"""识别编号、排版重置及跨页一致的结构标题。"""
+"""Identification numbering, layout reset, and consistent structural headings across pages."""
 
 from __future__ import annotations
 
@@ -39,13 +39,13 @@ from .page_titles import _classify_page_titles
 
 
 def _line_has_bold_font(line: _LineItem) -> bool:
-    """复用样式判定兼容旧 PDFium 的低字重值；只有数字字重或明确粗体元数据才提供证据。"""
+    """Reuse styles are judged to be compatible with the low weight value of old PDFium; only numeric weights or explicit bold metadata provide evidence."""
     name, flags = line.font_signature or ("", 0)
     return "bold" in _font_styles_from_metadata(name, flags, line.dominant_font_weight)
 
 
 def _classify_short_cjk_section_leads(lines: list[_LineItem]) -> None:
-    """孤立短中文题名及其后两行同左缘正文证明章节起点，段内短尾和冒号引导不晋升标题。"""
+    """Isolate the short Chinese title and the following two lines with the left margin text to indicate the starting point of the chapter. The short tail and colon within the paragraph indicate that the title will not be promoted."""
     rows = sorted(lines, key=lambda line: (line.bbox[1], line.bbox[0]))
     for candidate in rows:
         text = candidate.text.strip()
@@ -108,7 +108,7 @@ def _classify_short_cjk_section_leads(lines: list[_LineItem]) -> None:
 
 
 def _mark_emphasized_quote_prose(lines: list[_LineItem]) -> None:
-    """多行同字号强调引用保留为原生正文；开引号或完整闭引号加自然语言反证标题和公式。"""
+    """Multiple lines with the same font size emphasize that quotations are retained as the original text; open quotation marks or complete closed quotation marks plus natural language to refute titles and formulas."""
     from ..inline.types import PDF_FONT_ITALIC_FLAG
 
     heights = [line.effective_height for line in lines if line.angle == 0 and line.effective_height > 0]
@@ -172,7 +172,7 @@ def _mark_emphasized_quote_prose(lines: list[_LineItem]) -> None:
                 line.paragraph_group = group
         group += 1
         bounds = _bbox_union_many([line.bbox for row in run for line in row])
-        # 同栏常规字体的完整冒号引导句仍为正文，不能因下方引用留白被提升为小节标题。
+        # The complete colon introductory sentence in the same column in regular font is still the main text and cannot be promoted to a section title due to the blank quotation below.
         preceding = sorted(
             [
                 line
@@ -204,7 +204,7 @@ def _mark_emphasized_quote_prose(lines: list[_LineItem]) -> None:
 
 
 def _classify_native_display_resets(lines, page_size, visual_bboxes, table_bboxes, *, page_index, reference_lines):
-    """由重复字体、容器净空和多行同级排版恢复标题；不用字体名称或具体文字判定。"""
+    """Recover titles from duplicate fonts, container headroom, and multi-line sibling; no font names or specific words are used for determination."""
     available = [
         line
         for line in lines
@@ -231,7 +231,7 @@ def _classify_native_display_resets(lines, page_size, visual_bboxes, table_bboxe
         and len(line.text.split()) <= 12
         and not re.search(r"[=<>∑∫]|[.!。！;；]$", line.text.strip())
     ]
-    # 等高轻字重标题由独立重复字体和上下正文/图像关系共同证明；侧栏图注不能仅凭字体不同晋升。
+    # Titles of equal height and light font weight are supported by independent repeated fonts and the relationship between upper and lower text/images; sidebar legends cannot be promoted based on different fonts alone.
     light = [
         line
         for line in short
@@ -268,7 +268,7 @@ def _classify_native_display_resets(lines, page_size, visual_bboxes, table_bboxe
         )
         if len(followers) >= 2 or above_image:
             _set_native_title_band([line], lines)
-    # 完整网格上方居中的粗体短题名以表体字号为参照，防止表格内部表头和正文尾句被误收。
+    # The bold short title centered above the complete grid is based on the font size of the table body to prevent the table header and the last sentence of the text from being mistakenly included.
     for line in short:
         h = line.effective_height
         if line.semantic_type is not None or not _line_has_bold_font(line) or h < 1.25 * body:
@@ -281,7 +281,7 @@ def _classify_native_display_resets(lines, page_size, visual_bboxes, table_bboxe
         ):
             _set_native_title_band([line], lines)
     _classify_repeated_multiline_display_bands(short, body, page_size, page_index, lines)
-    # 重复冒号小标题必须比紧随的常规条目更粗，并有两行正文；冒号引导句仍保持正文。
+    # Repeating colon subtitles must be bolder than the following regular entry and have two lines of text; the colon introductory sentence still maintains the text.
     labels = []
     for line in short:
         if (
@@ -308,7 +308,7 @@ def _classify_native_display_resets(lines, page_size, visual_bboxes, table_bboxe
 
 
 def _set_native_title_band(members, all_lines):
-    """明确原生标题带共享身份，同行碎片与续行合并而相邻不同级标题保持分离。"""
+    """Make it clear that native titles have a shared identity, peer fragments are merged with continuation lines, and adjacent titles of different levels remain separate."""
     band = min(line.source_index for line in members)
     group = max((line.paragraph_group for line in all_lines if line.paragraph_group is not None), default=-1) + 1
     for line in members:
@@ -320,7 +320,7 @@ def _set_native_title_band(members, all_lines):
 
 
 def _freeze_wrapped_bold_title_evidence(line: _LineItem, page_size: tuple[float, float]) -> None:
-    """释放原生字符前冻结短粗体前缀与常规正文的两段几何，不保留跨页字符字典。"""
+    """Freeze the short bold prefix and the two-section geometry of the regular text before releasing native characters, and do not retain the cross-page character dictionary."""
     line.native_title_label_left = _numbered_title_label_left(line)
     prefix = []
     for char in line.chars:
@@ -352,7 +352,7 @@ def _freeze_wrapped_bold_title_evidence(line: _LineItem, page_size: tuple[float,
 
 
 def _restore_wrapped_bold_title_tails(lines: list[_LineItem], page_size: tuple[float, float]) -> list[_LineItem]:
-    """标题下一行的短加粗前缀与标题同式时按冻结原生证据切回标题，常规正文保持完整段组。"""
+    """When the short bold prefix on the next line of the title is the same as the title, press Freeze Original Evidence to switch back to the title, and the regular text remains intact."""
     output = list(lines)
     next_source = max((line.source_index for line in lines), default=-1) + 1
     for current in lines:
@@ -426,7 +426,7 @@ def _restore_wrapped_bold_title_tails(lines: list[_LineItem], page_size: tuple[f
 
 
 def _numbered_title_label_left(line: _LineItem) -> float:
-    """同排序号并入标题时用实际标签首字左缘，不能把序号的悬挂缩进当成正文续行偏移。"""
+    """When incorporating the same sequence number into the title, use the left edge of the actual label's first word, and do not treat the hanging indent of the sequence number as an offset for the continuation of the text."""
     if line.native_title_label_left is not None:
         return line.native_title_label_left
     if re.match(r"^(?:[A-Za-z]|\d{1,2})[.)]\s+", line.text) and line.chars:
@@ -441,7 +441,7 @@ def _numbered_title_label_left(line: _LineItem) -> float:
 
 
 def _restore_short_heading_with_image_displaced_prose(lines: list[_LineItem], image_bboxes: list[BBox]) -> None:
-    """原生连续两行正文的短收句被整幅图挤开时保持段组，并保留上方有净空的独立短题名。"""
+    """When the original short closing sentence of two consecutive lines of text is squeezed out by the entire picture, the paragraph group is maintained, and the independent short title with a clear space above it is retained."""
     rows = sorted(lines, key=lambda line: line.source_index)
     for index in range(len(rows) - 2):
         first, second, tail = rows[index : index + 3]
@@ -499,7 +499,7 @@ def _restore_short_heading_with_image_displaced_prose(lines: list[_LineItem], im
 
 
 def _classify_repeated_multiline_display_bands(short, body, page_size, page_index, all_lines):
-    """重复大标题带或后续页中文跨行章节由同字体、同尺度与稳定对齐聚合。"""
+    """Repeating large titles or Chinese cross-line chapters on subsequent pages are aggregated with the same font, same scale and stable alignment."""
     large = [
         line
         for line in short
@@ -576,7 +576,7 @@ def _classify_repeated_multiline_display_bands(short, body, page_size, page_inde
 def _classify_bold_numbered_heading_rows(
     lines: list[_LineItem], page_size: tuple[float, float], containers: list[BBox], *, appendix_only: bool = False
 ) -> None:
-    """由粗体、编号、同基线和留白恢复数字或附录字母标题，保持成员一致。"""
+    """Restore numeric or appendix letter titles by bolding, numbering, synchronization, and white space to keep members consistent."""
     available = [line for line in lines if line.angle == 0 and line.semantic_type in {None, "paragraph_title"}]
     for line in available:
         if line.title_band_id is not None and line.structural_title:
@@ -608,7 +608,7 @@ def _classify_bold_numbered_heading_rows(
             or body.font_coverage < 0.75
             or len(label.split()) > 15
             or re.search(r"[A-Za-z\u3400-\u9fff]", body.text) is None
-            # 连续单字母图例或数学标签不构成附录题名，即使字体明确加粗也不能晋升。
+            # Consecutive single-letter legends or mathematical labels do not constitute an appendix title and will not be promoted even if the font is clearly bold.
             or re.fullmatch(r"[A-Z](?:\s+[A-Z])*", body.text.strip()) is not None
             or re.match(r"^\d{4,}(?:\s|$)", label)
             or re.search(r"[.!?。！？:：;；,，]$", label)
@@ -619,7 +619,7 @@ def _classify_bold_numbered_heading_rows(
             )
         ):
             continue
-        # 粗体长标题在编号后的文字栏缩进续行；即使续行以数字开头，也继承同一段界身份。
+        # Long bold headings indent the continuation line in the text field after the number; the continuation line inherits the same paragraph identity even if it begins with a number.
         if len(label.split()) >= 5:
             continuations = [
                 other
@@ -651,7 +651,7 @@ def _classify_bold_numbered_heading_rows(
 
 
 def _classify_headings_after_extreme_local_metric_repair(lines, page_size, containers):
-    """极端行框校正后，使用粗体、上下净空和正文续行确认同字号操作章节标题。"""
+    """After extreme line box correction, use bold, top and bottom spacing, and text continuation to confirm the same font size for operating chapter titles."""
     repaired = [
         line
         for line in lines
@@ -680,7 +680,7 @@ def _classify_headings_after_extreme_local_metric_repair(lines, page_size, conta
             or _line_inside_visual_container(line.bbox, containers)
         ):
             continue
-        # 同基线的独立表头、字段名和强调片段不成为独立章节。
+        # Independent headers, field names and emphasis fragments on the same baseline do not become independent chapters.
         if any(other is not line and _bbox_axis_overlap_ratio(other.bbox, line.bbox, axis="y") >= 0.6 for other in available):
             continue
         followers = [
@@ -714,7 +714,7 @@ def _classify_headings_after_extreme_local_metric_repair(lines, page_size, conta
 def _classify_display_roman_heading_rows(
     lines: list[_LineItem], page_size: tuple[float, float], containers: list[BBox]
 ) -> None:
-    """大号粗体罗马编号与下方左对齐展示标题组成结构带；普通页码和正文数学符号不晋升。"""
+    """Large bold Roman numbering and left-aligned titles below form a structural band; ordinary page numbers and text mathematical symbols are not promoted."""
     available = [line for line in lines if line.angle == 0 and line.semantic_type in {None, "paragraph_title", "doc_title"}]
     scales = [_line_canonical_style_scale(line, line.bbox) for line in available if len(line.text.split()) >= 4]
     if len(scales) < 3:
@@ -781,7 +781,7 @@ def _demote_regular_repeated_item_titles(
     lines: list[_LineItem],
     document_body_profile: _DocumentBodyProfile | None,
 ) -> None:
-    """同字号常规字体的邻近圆点或连续编号项目提供正文反证，防止列表首项被短行标题规则晋升。"""
+    """Adjacent dots or consecutively numbered items in regular fonts of the same size provide text counter-evidence to prevent the first item in the list from being promoted by the short-line heading rule."""
     from ..inline.detection import _font_styles_from_metadata
 
     body_height = (
@@ -833,7 +833,7 @@ def _demote_regular_repeated_item_titles(
 
 
 def _normalized_section_title_text(text: str) -> str:
-    """规范全半角编号和空白，仅用于结构标题规则判断。"""
+    """Standard full-width numbering and blank space, only used for structure title rule judgment."""
 
     return re.sub(
         r"\s+",
@@ -846,7 +846,7 @@ def _is_plausible_section_number(
     number: str,
     label: str = "",
 ) -> bool:
-    """排除年代、小数值和整句正文冒充的章节编号。"""
+    """Exclude dates, decimal values, and chapter numbers that impersonate entire sentences."""
 
     parts = [int(part) for part in re.findall(r"\d+", number)]
     if not parts or any(part > 99 for part in parts):
@@ -873,7 +873,7 @@ def _section_title_has_body_followers(
     *,
     minimum_count: int,
 ) -> bool:
-    """检查紧随标题的同栏常规正文行，避免把页码和数值标成标题。"""
+    """Check the regular text lines in the same column immediately following the title and avoid marking page numbers and values as titles."""
 
     followers = 0
     for line, bbox in sorted(
@@ -907,7 +907,7 @@ def _classify_explicit_section_titles(
     container_bboxes: list[BBox],
     document_body_profile: _DocumentBodyProfile | None,
 ) -> None:
-    """以通用编号行和紧凑结构转折补齐正文同字号章节标题。"""
+    """Use common numbered lines and compact structural transitions to complete the chapter headings of the same font size in the main text."""
 
     if document_body_profile is None or document_body_profile.body_height <= 0:
         return
@@ -1123,7 +1123,7 @@ def _classify_document_structural_titles(
     legacy_body_profile: _DocumentBodyProfile | None,
     document_title_profile: _DocumentTitleProfile | None,
 ) -> None:
-    """用跨页稳定栏带和段前后转折补齐正文同字号标题。"""
+    """Use cross-page stable columns and paragraph transitions to complete the title of the same font size in the main text."""
 
     if document_body_profile is None or not document_body_profile.has_style_scale_repairs:
         return
@@ -1219,7 +1219,7 @@ def _promote_noninitial_document_title_band(
     document_body_profile: _DocumentBodyProfile | None,
     title_candidate_source_indices: set[int],
 ) -> None:
-    """把非首页中已确认且显著大于正文的最强段落标题带升为文档标题。"""
+    """Promote the strongest paragraph title that has been confirmed in the non-home page and is significantly larger than the main text to the document title."""
 
     if page_index == 0 or document_body_profile is None:
         return
@@ -1358,7 +1358,7 @@ def _promote_noninitial_document_title_band(
 def _canonical_title_style_key(
     line: _LineItem,
 ) -> tuple[str, int, float, int] | None:
-    """返回 canonical-only 标题向同样式正文传播时使用的稳定键。"""
+    """Return canonical-only The stable key used when propagating the title to the body of the same style."""
 
     if line.font_signature is None or line.em_height <= 0:
         return None
@@ -1377,7 +1377,7 @@ def _classify_document_structural_title_candidates(
     prepared_pages: list[_PreparedPage],
     document_body_profile: _DocumentBodyProfile,
 ) -> None:
-    """在 canonical 行副本上收集所有满足结构转折的标题候选。"""
+    """Collect all title candidates that satisfy structural transitions on a copy of the canonical line."""
 
     body_height = max(0.1, document_body_profile.body_height)
     strong_candidates: list[tuple[int, _LineItem, tuple[str, int] | None, float]] = []
@@ -1587,7 +1587,7 @@ def _collect_legacy_paragraph_title_sources(
     document_body_profile: _DocumentBodyProfile | None,
     document_title_profile: _DocumentTitleProfile | None,
 ) -> set[tuple[int, int]]:
-    """在行副本上使用 legacy 尺度收集原本成立的段落标题身份。"""
+    """Use the legacy scale on the row copy to collect the originally established paragraph heading identity."""
 
     if document_body_profile is None:
         return set()
@@ -1629,7 +1629,7 @@ def _classify_inline_typography_reset_titles(
     container_bboxes: list[BBox],
     document_body_profile: _DocumentBodyProfile | None,
 ) -> None:
-    """用短段尾、字体切换和缩进正文识别行内结构标题。"""
+    """Identify inline structured headings with short paragraph endings, font switching, and indented body text."""
 
     if document_body_profile is None:
         return
@@ -1735,7 +1735,7 @@ def _classify_body_height_section_titles(
     document_body_profile: _DocumentBodyProfile | None,
     page_index: int = 1,
 ) -> None:
-    """用重复的短行加正文组结构识别与正文同字号的独立章节标题。"""
+    """Use repeated short lines plus text group structure to identify independent chapter headings with the same font size as the main text."""
 
     if document_body_profile is None:
         return
@@ -1839,7 +1839,7 @@ def _classify_body_height_section_titles(
                 and _title_fonts_compatible(line, peer_line)
             )
             if compatible_count >= 2:
-                # 只标记结构锚点本身，避免普通正文被标题邻行扩展再次吞入。
+                # Only mark the structural anchor itself to prevent ordinary text from being swallowed again by the expansion of adjacent lines of the title.
                 line.semantic_type = "paragraph_title"
 
 
@@ -1850,7 +1850,7 @@ def _body_height_section_followers(
     lane_by_source: dict[int, _TextLane],
     body_height: float,
 ) -> list[tuple[_LineItem, BBox]]:
-    """返回短标题后方同锚点、同正文尺度且行距稳定的前三行。"""
+    """Returns the first three lines after the short title with the same anchor point, the same text size, and stable line spacing."""
 
     followers: list[tuple[_LineItem, BBox]] = []
     previous_top = candidate_bbox[1]
@@ -1892,7 +1892,7 @@ __all__ = [
 
 
 def _following_stable_body_bounds(rows: list[_LineItem], start: int, em: float) -> BBox | None:
-    """从后继正文的重复左右缘估计局部栏宽，首行和列表缩进不决定栏中心。"""
+    """Local column widths are estimated from repeated left and right edges of subsequent text; first line and list indents do not determine column centers."""
     members: list[list[_LineItem]] = []
     for line in rows[start : start + 20]:
         if line.semantic_type is not None or line.paragraph_group is not None or line.title_suppressed:
@@ -1921,7 +1921,7 @@ def _following_stable_body_bounds(rows: list[_LineItem], start: int, em: float) 
 
 
 def _classify_recurrent_unknown_weight_titles(pages: list[_PreparedPage]) -> None:
-    """字重不可用时，以跨页独立短行组和字体切换恢复标题，普通连续正文样式不能成为种子。"""
+    """When the font weight is unavailable, the title is restored with a cross-page independent short line group and font switching. The ordinary continuous text style cannot be used as a seed."""
     candidates = []
     body_styles = set()
     for page_index, page in enumerate(pages):

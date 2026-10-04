@@ -1,4 +1,4 @@
-"""PPTX 固定规则和形状变换数据契约。"""
+"""PPTX Fixed rules and shape transformation data contracts."""
 
 from dataclasses import dataclass
 from typing import Any, Final, Optional
@@ -84,7 +84,7 @@ class _SlideTransform:
         self,
         bbox: Optional[tuple[float, float, float, float]],
     ) -> Optional[tuple[float, float, float, float]]:
-        """按既有形状缩放和平移规则转换几何，保持嵌套变换顺序。"""
+        """Transform geometry according to existing shape scaling and translation rules, preserving nested transformation order."""
         if bbox is None:
             return None
 
@@ -95,7 +95,7 @@ class _SlideTransform:
         return (left, top, right, bottom)
 
     def compose(self, inner: "_SlideTransform") -> "_SlideTransform":
-        """按既有形状缩放和平移规则转换几何，保持嵌套变换顺序。"""
+        """Transform geometry according to existing shape scaling and translation rules, preserving nested transformation order."""
         return _SlideTransform(
             scale_x=self.scale_x * inner.scale_x,
             scale_y=self.scale_y * inner.scale_y,

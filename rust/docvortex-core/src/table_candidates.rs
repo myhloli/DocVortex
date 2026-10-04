@@ -1,4 +1,4 @@
-//! 表格走廊的连续候选计算：闭区间分配、文本证据及核心几何共享一次准备。
+//! Continuous candidate calculation of table corridors: closed interval allocation, text evidence and core geometry share one preparation.
 use crate::row_geometry::RowGeometry;
 use std::collections::HashMap;
 
@@ -15,7 +15,7 @@ pub struct RuleCandidates {
 }
 
 impl RuleCandidates {
-    /// 一次验证并保存有限纯数值走廊；横线必须严格递增，不删除或重排任何行。
+    /// Verify and save limited pure numerical corridors at one time; horizontal lines must be strictly incremented and no rows should be deleted or rearranged.
     pub fn new(
         centers: Vec<f64>,
         rows: Vec<(f64, usize, [f64; 4], Vec<i64>)>,
@@ -43,7 +43,7 @@ impl RuleCandidates {
             on_rule.push(centers.get(band) == Some(&center));
             fragment_counts.push(count);
             boxes.push(bbox);
-            // 仅准备时散列原始来源；每个候选按紧凑 ID 位图去重，负数和稀疏 ID 不作下标。
+            // Hash the original source only when preparing; each candidate is deduplicated by the compact ID bitmap, negative and sparse ID are not subscripted.
             for source in sources {
                 let id = *interned.entry(source).or_insert_with(|| {
                     let id = source_ids.len();
@@ -68,7 +68,7 @@ impl RuleCandidates {
         })
     }
 
-    /// 保留共享横线两侧的双归属，在同一行扫描中收集多单元证据，不调用 Python。
+    /// Preserve dual homing on both sides of the shared horizontal line, collect multi-unit evidence in the same line scan, and do not call Python.
     pub fn partition(
         &self,
         start: usize,
@@ -112,7 +112,7 @@ impl RuleCandidates {
         Ok((groups, accepted))
     }
 
-    /// 按首次出现顺序收集成员，并返回核心并集四个坐标的来源，保留 Python 坐标对象与负零。
+    /// Collect members in order of first appearance and return the source of the core union of the four coordinates, retaining the Python coordinate object with negative zero.
     pub fn core(
         &self,
         start: usize,
@@ -127,7 +127,7 @@ impl RuleCandidates {
             return Err("invalid rule candidate core");
         }
         let selected = &self.members[self.member_offsets[start]..self.member_offsets[end]];
-        // 位图只属于本次查询；不可变快照无需共享标记或互斥，也不会污染并发查询。
+        // The bitmap only belongs to this query; immutable snapshots do not require shared tags or mutual exclusion, and will not pollute concurrent queries.
         let mut seen = vec![0_u64; self.source_ids.len().div_ceil(64)];
         let mut members = Vec::with_capacity(selected.len().min(self.source_ids.len()));
         for &id in selected {
@@ -163,7 +163,7 @@ impl RuleCandidates {
     }
 }
 
-/// 严格比较保持 Python min/max 的首个相等值，不使用改变负零来源的浮点 min/max。
+/// Strict comparison keeps the first equal value of Python min/max and does not use floating point min/max which changes the source of negative zero.
 fn better(candidate: f64, current: f64, axis: usize) -> bool {
     if axis < 2 {
         candidate < current

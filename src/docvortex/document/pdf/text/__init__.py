@@ -1,4 +1,4 @@
-"""PDF 字符到文本片段及行的共享纯数据接口。"""
+"""PDF Shared pure data interface from characters to text fragments and lines."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from .groups import assign_scripts, get_lines
 
 
 def get_spans(chars: list[Char], superscript_height_threshold: float = 0.8, line_distance_threshold: float = 0.1) -> list[Span]:
-    """直接从自有字符记录构建片段，避免容器与数组往返转换。"""
+    """Build fragments directly from own character records, avoiding container and array round-trip conversions."""
     spans: list[Span] = []
     for char in chars:
         current = spans[-1] if spans else None
@@ -52,7 +52,7 @@ def get_spans(chars: list[Char], superscript_height_threshold: float = 0.8, line
 def get_lines_from_chars(
     chars: list[Char], superscript_height_threshold: float = 0.7, line_distance_threshold: float = 0.1
 ) -> list[Line]:
-    """由已物化字符生成基础文本行，不访问 PDFium 或源文档。"""
+    """Generates base text lines from materialized characters without accessing PDFium or the source document."""
     from ...._compute_backend import get_native
 
     native = get_native()
@@ -71,7 +71,7 @@ def get_lines_from_chars(
 def _get_lines_from_chars_python(
     chars: list[Char], superscript_height_threshold: float = 0.7, line_distance_threshold: float = 0.1
 ) -> list[Line]:
-    """保留纯 Python 连续阶段，供后端差分和兼容环境使用。"""
+    """The pure Python continuous stage is reserved for use in back-end differential and compatible environments."""
     spans = get_spans(chars, superscript_height_threshold, line_distance_threshold)
     lines = get_lines(spans)
     assign_scripts(lines, superscript_height_threshold, line_distance_threshold)

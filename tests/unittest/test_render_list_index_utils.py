@@ -45,7 +45,7 @@ def test_parse_list_item_marker_classifies_supported_styles(
     value: int | None,
     ordered_style: str | None,
 ) -> None:
-    """验证共享 parser 区分原生列表与需要显式 marker 的编号风格。"""
+    """Validate shared parser to differentiate between native lists and numbering styles that require an explicit marker."""
     item = parse_list_item_marker(_inline(content))
 
     assert item.marker == marker
@@ -57,7 +57,7 @@ def test_parse_list_item_marker_classifies_supported_styles(
 
 @pytest.mark.parametrize("content", ["  2. item", "\t- item", "- \ncontinued", "  plain item"])
 def test_parse_list_item_marker_preserves_reconstructable_whitespace(content: str) -> None:
-    """验证 parser 单独保存前导与分隔空白，并可无损重建原内容。"""
+    """Verify that parser saves leading and delimiting whitespace separately and can reconstruct the original content without loss."""
     item = parse_list_item_marker(_inline(content))
     reconstructed = item.leading
     if item.marker is not None:
@@ -68,7 +68,7 @@ def test_parse_list_item_marker_preserves_reconstructable_whitespace(content: st
 
 
 def test_single_roman_letters_use_stable_roman_precedence() -> None:
-    """验证与字母编号同形的罗马字符固定优先解释为罗马数字。"""
+    """Verify that Roman characters with the same shape as alphabetical numbers are always interpreted as Roman numerals first."""
     assert parse_list_item_marker(_inline("v. item")).ordered_style == "lower-roman"
     assert parse_list_item_marker(_inline("v. item")).value == 5
     assert parse_list_item_marker(_inline("c. item")).ordered_style == "lower-roman"
@@ -89,7 +89,7 @@ def test_single_roman_letters_use_stable_roman_precedence() -> None:
     ],
 )
 def test_unbounded_or_invalid_ordered_markers_degrade_to_explicit(content: str) -> None:
-    """验证超长、超界或非规范编号不会触发大整数异常，并原样保留 marker。"""
+    """Verify that overlong, out-of-bounds, or non-canonical numbers do not trigger a large integer exception and leave marker as is."""
     item = parse_list_item_marker(_inline(content))
 
     assert item.kind == "explicit"
@@ -99,7 +99,7 @@ def test_unbounded_or_invalid_ordered_markers_degrade_to_explicit(content: str) 
 
 
 def test_markdown_existing_bullet_detection_remains_hyphen_only() -> None:
-    """验证参考文献补 bullet 只避开既有短横线，保持 Markdown 历史输出。"""
+    """Verification reference supplement bullet only avoids existing dashes and maintains Markdown historical output."""
     assert has_markdown_unordered_marker(_inline("  - existing"))
     assert not has_markdown_unordered_marker(_inline("* existing"))
     assert not has_markdown_unordered_marker(_inline("+ existing"))
@@ -108,12 +108,12 @@ def test_markdown_existing_bullet_detection_remains_hyphen_only() -> None:
 
 
 def _reference_list(*children: TextBlock | RefTextBlock | ListBlock) -> ListBlock:
-    """构造用于严格多数判定的参考文献列表。"""
+    """Construct a reference list for strict majority determination."""
     return ListBlock(type="list", sub_type="ref_text", content=list(children))
 
 
 def test_reference_list_bullet_rule_uses_visible_direct_item_strict_majority() -> None:
-    """验证富文本可见数字、空项和嵌套列表遵守既有严格多数规则。"""
+    """Verify that rich text visible numbers, empty items, and nested lists adhere to the established strict majority rule."""
     nested = _reference_list(RefTextBlock(type="ref_text", content=_inline("Author nested")))
     numbered_majority = _reference_list(
         RefTextBlock(
@@ -150,7 +150,7 @@ def test_reference_list_bullet_rule_uses_visible_direct_item_strict_majority() -
     ],
 )
 def test_strip_index_page_tail_uses_visible_tail_token(content: str, expected: str) -> None:
-    """验证目录仅删除可信的末尾页码，并把保留 tab 转为空格。"""
+    """Verify that the table of contents removes only trusted last page numbers and converts retained tab to spaces."""
     spans = (
         [
             {"type": "text", "content": "Title\t"},
@@ -164,11 +164,11 @@ def test_strip_index_page_tail_uses_visible_tail_token(content: str, expected: s
 
 @pytest.mark.parametrize("content", ["1", "１２", "iv", "XII", "a", "Z"])
 def test_index_page_token_accepts_supported_forms(content: str) -> None:
-    """验证数字、罗马数字与单字母可作为目录页码 token。"""
+    """Verify that numbers, Roman numerals and single letters can be used as catalog page numbers token."""
     assert looks_like_index_page_token(content)
 
 
 @pytest.mark.parametrize("content", ["", "AB", "A2", "appendix", "1234567890123"])
 def test_index_page_token_rejects_ambiguous_forms(content: str) -> None:
-    """验证空值、长值和普通词不会被误删为目录页码。"""
+    """Verify that null values, long values, and common words are not mistakenly deleted as table of contents page numbers."""
     assert not looks_like_index_page_token(content)

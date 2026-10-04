@@ -1,4 +1,4 @@
-"""关联候选区域、逐项视觉裁决与修复计划；自动匹配只定位，绝不自动宣布修复。"""
+"""Links candidate areas, piece-by-piece visual verdicts and restoration plans; automatic matching only locates, never automatically declares a restoration."""
 
 from __future__ import annotations
 
@@ -53,14 +53,14 @@ GROUPS = [
 
 
 def categories(case):
-    """复合问题可以属于多批，所有要求裁决后才允许闭环。"""
+    """Composite issues can belong to multiple batches, and the loop is allowed to be closed only after all requests are adjudicated."""
     text = case["expected"]
     result = [name for name, pattern, _, _ in GROUPS if re.search(pattern, text, re.I)]
     return result or ["标题、段落及阅读顺序"]
 
 
 def overlap(first, second):
-    """使用相对交叠定位变化后的成员，不依赖旧块号或全局输出编号。"""
+    """Position changed members using relative overlap, without relying on old block numbers or global output numbers."""
     area = max(0, min(first[2], second[2]) - max(first[0], second[0])) * max(
         0, min(first[3], second[3]) - max(first[1], second[1])
     )
@@ -69,7 +69,7 @@ def overlap(first, second):
 
 
 def anchor_matches(anchor, block):
-    """区域与文字分别给出候选定位证据；漏框的矢量公式可只靠已视觉冻结的区域定位。"""
+    """The region and text provide candidate positioning evidence respectively; the vector formula of the missing frame can only rely on the visually frozen area for positioning."""
     geographic = overlap(anchor["bbox"], block["bbox"])
     normalized = re.sub(r"\s+", "", block.get("text", ""))
     tokens = [re.sub(r"\s+", "", anchor.get(key, "")) for key in ("text_start", "text_end")]
@@ -78,7 +78,7 @@ def anchor_matches(anchor, block):
 
 
 def record_deduplication(data):
-    """用源指纹、物理页、区域和具体问题去重；仅类型相同但要求不同的复合问题继续独立裁决。"""
+    """Deduplication using source fingerprints, physical pages, regions, and specific questions; only composite questions of the same type but different requirements continue to be adjudicated independently."""
     groups = {}
     for doc in data["documents"]:
         for case in doc["cases"]:
@@ -100,9 +100,9 @@ def record_deduplication(data):
 
 
 def finalize(manifest, replay, decisions):
-    """更新正式可编辑交付物，只有明确的逐项裁决能改变必修问题的修复状态。"""
+    """Update formal editable deliverables so that only clear case-by-case rulings change the fix status of required issues."""
     if decisions is not None and not decisions.is_file():
-        # 显式裁决文件不存在时停止，不能把已确认的验收结果静默重置为待修复。
+        # Stopping when an explicit verdict file does not exist, and confirmed acceptance results cannot be silently reset to pending repair.
         raise FileNotFoundError(f"逐项裁决文件不存在：{decisions}")
     data = json.loads(manifest.read_text())
     run = json.loads((replay / "run.json").read_text())
@@ -145,7 +145,7 @@ def finalize(manifest, replay, decisions):
                 case["repair_status"] = verdict["status"]
                 case["repair_verification"] = verdict
             elif case["status"] == "确认问题" and case.get("repair_status") != "verified":
-                # 本轮只提交新增裁决；已通过基线和完整重放核验的历史结论及证据继续保留。
+                # Only new rulings will be submitted in this round; historical conclusions and evidence that have passed baseline and complete replay verification will continue to be retained.
                 case["repair_status"] = "pending"
     data["summary"] = dict(Counter(case["status"] for doc in data["documents"] for case in doc["cases"]))
     data["repair_summary"] = dict(
@@ -212,7 +212,7 @@ def finalize(manifest, replay, decisions):
 
 
 def main():
-    """接受显式合并清单、候选重放和人工式逐项裁决文件，不扫描benchmark。"""
+    """Explicit merge lists, candidate replays, and manual itemization files are accepted and benchmark is not scanned."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--replay", type=Path, required=True)

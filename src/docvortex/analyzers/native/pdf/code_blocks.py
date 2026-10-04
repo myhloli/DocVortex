@@ -1,4 +1,4 @@
-"""识别带填充背景的等宽代码区域并投影其空间文本。"""
+"""Identifies a constant-width code region with a filled background and projects its spatial text."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def _build_code_blocks(
     excluded_bboxes: list[BBox],
     claimed_line_indices: set[int],
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """检测代码背景、唯一认领其文本，并输出页内 code block。"""
+    """Detect code background, uniquely claim its text, and output in-page code block."""
 
     candidates = _detect_code_candidates(
         source,
@@ -55,7 +55,7 @@ def _build_rule_delimited_code_blocks(
     excluded_bboxes: list[BBox],
     claimed_line_indices: set[int] | None = None,
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """在表格认领前物化外框或上下横线限定的代码清单。"""
+    """Materialize the code list bounded by the outer frame or the upper and lower horizontal lines before the table is claimed."""
 
     candidates = _detect_rule_delimited_code_candidates(
         source,
@@ -73,7 +73,7 @@ def _detect_caption_algorithm_candidates(
     excluded_bboxes: list[BBox],
     claimed: set[int],
 ) -> list[_CodeCandidate]:
-    """按算法标题及重复控制行恢复清单，无横线时以正文或下一节边界停止。"""
+    """Restore the list according to the algorithm title and repetition control line. If there is no horizontal line, it will stop at the boundary of the main text or the next section."""
     width, _height = source.page_size
     headings = [
         line
@@ -146,7 +146,7 @@ def _materialize_code_candidates(
     source: _PageSource,
     candidates: list[_CodeCandidate],
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """统一投影代码候选，确保来源行只被一个 code block 认领。"""
+    """Unified projection code candidates ensure that the source row is claimed by only one code block."""
 
     if not candidates:
         return [], set()
@@ -186,7 +186,7 @@ def _vertical_rule_candidate_height_coverage(
     rule_bbox: BBox,
     candidate_bbox: BBox,
 ) -> float:
-    """计算竖轨在候选高度方向上的实际覆盖比例，长轨超出候选时仍按交集计量。"""
+    """Calculate the actual coverage ratio of the vertical rail in the candidate height direction. When the long rail exceeds the candidate height, it is still measured as an intersection."""
 
     candidate_height = max(0.0, candidate_bbox[3] - candidate_bbox[1])
     if candidate_height <= 0:
@@ -203,7 +203,7 @@ def _detect_rule_delimited_code_candidates(
     excluded_bboxes: list[BBox],
     claimed_line_indices: set[int],
 ) -> list[_CodeCandidate]:
-    """按规则边界、稳定行距和缩进层次识别非等宽代码清单。"""
+    """Identify non-monospaced code listings by regular boundaries, stable line spacing, and indentation levels."""
 
     page_width, page_height = source.page_size
     if page_width <= 0 or page_height <= 0:
@@ -249,7 +249,7 @@ def _detect_rule_delimited_code_candidates(
                 rule
                 for rule in vertical_rules
                 if candidate_bbox[0] + median_height < _bbox_center_x(rule.bbox) < candidate_bbox[2] - median_height
-                # 表格竖轨可能贯穿候选上下边界，必须相对候选高度计算覆盖率。
+                # The vertical rails of the table may pass through the upper and lower boundaries of the candidate, and the coverage must be calculated relative to the candidate height.
                 and _vertical_rule_candidate_height_coverage(
                     rule.bbox,
                     candidate_bbox,
@@ -293,7 +293,7 @@ def _rule_delimited_code_members_are_structured(
     candidate_bbox: BBox,
     median_height: float,
 ) -> bool:
-    """验证候选具有稳定基线、代码缩进或窄行号槽，并排除规则多列表格。"""
+    """Verify that candidates have a stable baseline, code indentation, or narrow line number slots, and exclude regular multi-column tables."""
 
     if len(members) < 5:
         return False
@@ -341,7 +341,7 @@ def _rule_delimited_code_members_are_structured(
     has_indent_hierarchy = len(indent_clusters) >= 3 and sum(len(cluster) >= 2 for cluster in indent_clusters) >= 2
     if not has_line_number_gutter and not has_indent_hierarchy:
         return False
-    # 稳定行号槽属于强代码证据，允许右侧长语句或注释自然触及清单边界。
+    # Stable line number slots are strong code evidence, allowing long statements or comments on the right to naturally touch listing boundaries.
     if has_line_number_gutter:
         return True
 
@@ -353,7 +353,7 @@ def _rule_delimited_code_members_are_structured(
 
 
 def _code_member_chars(lines: list[_LineItem]) -> list[dict[str, Any]]:
-    """按 char_idx 去重代码成员字符，避免区域内斜向水印混入空间投影。"""
+    """Press char_idx to deduplicate code member characters to avoid oblique watermarks in the area being mixed into spatial projection."""
 
     output: list[dict[str, Any]] = []
     seen: set[tuple[str, int]] = set()
@@ -377,7 +377,7 @@ def _detect_code_candidates(
     excluded_bboxes: list[BBox],
     claimed_line_indices: set[int],
 ) -> list[_CodeCandidate]:
-    """以非白填充矩形、等宽字体和规则空间栅格筛选代码候选。"""
+    """Filter code candidates with non-white filled rectangles, monospaced fonts, and regular spatial grids."""
 
     page_width, page_height = source.page_size
     page_area = max(0.0, page_width) * max(0.0, page_height)
@@ -439,7 +439,7 @@ def _detect_code_candidates(
 
 
 def _path_has_visible_nonwhite_fill(path_info: PDFPathInfo) -> bool:
-    """检查填充色是否可见且与白色背景存在最小颜色差。"""
+    """Check that the fill color is visible and has minimal color difference from the white background."""
 
     if path_info.fill_rgba is None:
         return False
@@ -448,7 +448,7 @@ def _path_has_visible_nonwhite_fill(path_info: PDFPathInfo) -> bool:
 
 
 def _dominant_code_angle(lines: list[_LineItem]) -> int:
-    """按估算字符数选择代码区域的主文本方向。"""
+    """Selects the main text direction for the code area by estimated number of characters."""
 
     support: dict[int, float] = {}
     for line in lines:
@@ -457,7 +457,7 @@ def _dominant_code_angle(lines: list[_LineItem]) -> int:
 
 
 def _estimated_line_character_count(line: _LineItem) -> float:
-    """优先按字符对象计数，缺失时用行宽和缓存字宽估算字符支持。"""
+    """Priority is given to counting by character objects, and when missing, character support is estimated using line width and cached word width."""
 
     valid_chars = [char for char in line.chars if isinstance(char, dict) and str(char.get("char") or "").strip()]
     if valid_chars:
@@ -468,7 +468,7 @@ def _estimated_line_character_count(line: _LineItem) -> float:
 
 
 def _font_name_looks_monospaced(name: str | None) -> bool:
-    """按字体元数据中的通用等宽提示判断字体族，不匹配文档内容。"""
+    """The font family is determined based on the universal equal-width prompt in the font metadata and does not match the document content."""
 
     normalized = (name or "").replace("-", "").replace("_", "").casefold()
     return any(hint in normalized for hint in _MONOSPACE_FONT_HINTS)
@@ -477,7 +477,7 @@ def _font_name_looks_monospaced(name: str | None) -> bool:
 def _monospace_character_support(
     lines: list[_LineItem],
 ) -> tuple[float, dict[str, list[float]]]:
-    """统计等宽字体字符占比，并按东西文宽度组收集字符 advance。"""
+    """Count the proportion of characters in the same-width font, and collect the characters advance according to the east and west width groups."""
 
     supported = 0.0
     total = 0.0
@@ -525,7 +525,7 @@ def _monospace_character_support(
 def _monospace_advances_are_stable(
     widths: dict[str, list[float]],
 ) -> bool:
-    """验证各字符宽度组的中位绝对偏差足够小，并校验中西文宽度关系。"""
+    """Verify that the median absolute deviation of each character width group is small enough, and verify the relationship between Chinese and Western widths."""
 
     populated = [values for values in widths.values() if values]
     if not populated or sum(len(values) for values in populated) < 3:
@@ -551,7 +551,7 @@ def _code_rows_have_spatial_structure(
     candidate_bbox: BBox,
     median_cell_width: float,
 ) -> bool:
-    """验证代码行具有规则基线，并且左缘落在一致的等宽字符槽。"""
+    """Verify that lines of code have regular baselines and that the left edge falls in a consistent, equal-width character slot."""
 
     rows: list[list[_LineItem]] = []
     for line in sorted(lines, key=lambda item: (_bbox_center_y(item.bbox), item.bbox[0])):
@@ -599,7 +599,7 @@ def _code_rows_have_spatial_structure(
 
 
 def _fallback_code_content(lines: list[_LineItem]) -> str:
-    """空间投影失败时按视觉行和水平位置保留代码文本的最小结构。"""
+    """Preserves minimal structure of code text in terms of visual lines and horizontal position when spatial projection fails."""
 
     ordered = sorted(
         lines,

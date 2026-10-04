@@ -1,4 +1,4 @@
-"""构建不依赖网络或用户目录的可复现 MIME 测试归档。"""
+"""Build a reproducible MIME test archive that does not rely on network or user directories."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from PIL import Image
 
 
 def image_bytes(color: str = "red") -> bytes:
-    """生成可实际解码的微型 PNG，便于检验素材字节不变。"""
+    """Generates a tiny PNG that can actually be decoded, making it easy to verify that the material is byte unchanged."""
     stream = BytesIO()
     Image.new("RGB", (12, 8), color).save(stream, format="PNG")
     return stream.getvalue()
@@ -27,7 +27,7 @@ def mime_part(
     charset: str | None = None,
     encoding: str = "base64",
 ) -> EmailMessage:
-    """构造指定编码、地址和标识的 MIME 叶子部件。"""
+    """Constructs a MIME leaf part specifying the encoding, address, and identity."""
     part = EmailMessage(policy=policy.SMTP)
     part.set_type(media)
     if charset:
@@ -47,7 +47,7 @@ def mime_part(
 
 
 def related(*parts: EmailMessage, start: str | None = None, location: str | None = None) -> EmailMessage:
-    """构造根或嵌套 related 容器，并保持给定部件顺序。"""
+    """Constructs a root or nested related container, maintaining the given parts order."""
     message = EmailMessage(policy=policy.SMTP)
     message.set_type("multipart/related")
     message.set_param("type", "text/html")
@@ -62,6 +62,6 @@ def related(*parts: EmailMessage, start: str | None = None, location: str | None
 
 
 def build_mhtml_fixture() -> bytes:
-    """提供格式矩阵共用的标题、中文正文、表格和内嵌图片。"""
+    """Provides common titles, Chinese text, tables and inline images for the format matrix."""
     body = '<html><head><title>Archive</title></head><body><h1>Archive</h1><p>中文正文 Native conversion</p><img src="cid:figure" alt="Figure"><table><tr><td>A</td><td>B</td></tr></table></body></html>'
     return related(mime_part(body.encode()), mime_part(image_bytes(), "image/png", cid="figure")).as_bytes()

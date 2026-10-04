@@ -1,4 +1,4 @@
-"""跨页表格的表头、宽度和边界行结构判定。"""
+"""Determination of header, width and boundary row structure of cross-page tables."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .models import MAX_HEADER_ROWS, TableMergeState
 def detect_table_headers(
     state1: TableMergeState, state2: TableMergeState, max_header_rows: int = MAX_HEADER_ROWS
 ) -> tuple[int, bool, list[list[str]]]:
-    """检测并比较两个表格的表头，仅扫描前几行."""
+    """Detect and compare the headers of two tables, scanning only the first few rows."""
     front_rows1 = state1.front_header_info[:max_header_rows]
     front_rows2 = state2.front_header_info[:max_header_rows]
 
@@ -54,7 +54,7 @@ def _detect_table_headers_visual(
     state2: TableMergeState,
     max_header_rows: int = MAX_HEADER_ROWS,
 ) -> tuple[int, bool, list[list[str]]]:
-    """基于视觉一致性检测表头（只比较文本内容，忽略colspan/rowspan差异）."""
+    """Detect header based on visual consistency (only compare text content, ignore colspan/rowspan differences)."""
     front_rows1 = state1.front_header_info[:max_header_rows]
     front_rows2 = state2.front_header_info[:max_header_rows]
 
@@ -66,7 +66,7 @@ def _detect_table_headers_visual(
     for row_idx in range(min_rows):
         row1 = front_rows1[row_idx]
         row2 = front_rows2[row_idx]
-        # OCR 识别表头时可能丢失 colspan/rowspan，这里用渲染段数约束视觉一致性。
+        # OCR colspan/rowspan may be lost when recognizing the header. Here, the number of rendering segments is used to constrain visual consistency.
         rendered_segments1 = calculate_row_rendered_segments(state1.rows, row_idx)
         rendered_segments2 = calculate_row_rendered_segments(state2.rows, row_idx)
         if row1.normalized_texts == row2.normalized_texts and rendered_segments1 == rendered_segments2:
@@ -83,11 +83,11 @@ def _detect_table_headers_visual(
 
 
 def _expand_header_count_by_rowspan(rows: list[Tag], header_count: int) -> int:
-    """按表头 rowspan 覆盖范围扩展跳过行数。
+    """Number of skipped rows by header rowspan coverage extension.
 
-    跨页续表的第一行表头可能包含 rowspan。如果只跳过已匹配的首行，
-    被该 rowspan 覆盖的后续表头行会失去占位来源，合并后形成半截表头。
-    因此跳过重复表头时，需要覆盖所有由已跳过表头行跨行占据的行。
+    The header of the first row of a cross-page continuation table may contain rowspan. If only the first matched line is skipped,
+    Subsequent header rows covered by this rowspan will lose their placeholder sources and form a half header after merging.
+    Therefore, when skipping repeated headers, you need to cover all rows occupied by skipped header rows.
     """
     if header_count <= 0 or not rows:
         return header_count
@@ -112,9 +112,9 @@ def can_merge_by_structure(
     current_bbox: Any = None,
     previous_bbox: Any = None,
 ) -> bool:
-    """仅基于表格结构判断是否可合并（不检查 caption/footnote）。
+    """Determine whether merging is possible based on table structure only (caption/footnote is not checked).
 
-    供外部工具调用，忽略 caption 和 footnote 检查。
+    Called by external tools, ignoring caption and footnote checks.
     """
     if (
         current_bbox is not None
@@ -141,7 +141,7 @@ def can_merge_by_structure(
 
 
 def _table_widths_are_compatible(current_bbox: Any, previous_bbox: Any) -> bool:
-    """使用千分位 bbox 判断两张表的宽度相对差是否小于百分之十。"""
+    """Use thousandths bbox to determine whether the relative difference in width between the two tables is less than ten percent."""
     current_calc_bbox = _bbox_for_calculation(current_bbox)
     previous_calc_bbox = _bbox_for_calculation(previous_bbox)
     if current_calc_bbox is None or previous_calc_bbox is None:
@@ -154,7 +154,7 @@ def _table_widths_are_compatible(current_bbox: Any, previous_bbox: Any) -> bool:
 
 
 def can_merge_tables(current_state: TableMergeState, previous_state: TableMergeState) -> bool:
-    """根据 dict 表格的辅助文本、宽度和 HTML 结构判断是否可合并。"""
+    """Determine whether it can be merged based on the auxiliary text, width and HTML structure of the dict table."""
     current_table_block = current_state.owner_block
     previous_table_block = previous_state.owner_block
 
@@ -186,7 +186,7 @@ def can_merge_tables(current_state: TableMergeState, previous_state: TableMergeS
 
 
 def check_rows_match(previous_state: TableMergeState, current_state: TableMergeState) -> bool:
-    """检查表格边界行是否匹配."""
+    """Check if table boundary rows match."""
     last_row_metrics = previous_state.last_data_row_metrics
     if last_row_metrics is None:
         return False
@@ -208,7 +208,7 @@ def check_rows_match(previous_state: TableMergeState, current_state: TableMergeS
 
 
 def check_row_columns_match(row1: Tag, row2: Tag) -> bool:
-    """判断两行显式单元格数量与 colspan 结构是否一致。"""
+    """Determine whether the number of explicit cells in two rows is consistent with the colspan structure."""
     cells1 = row1.find_all(["td", "th"])
     cells2 = row2.find_all(["td", "th"])
     if len(cells1) != len(cells2):

@@ -1,4 +1,4 @@
-"""HTML renderer 使用的严格 GFM pipe table 转换。"""
+"""HTML renderer Use strict GFM pipe table conversion."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ _SEPARATOR_CELL_RE = re.compile(r"^:?-{3,}:?$")
 
 
 def looks_like_gfm_table(content: str) -> bool:
-    """判断文本是否具有 GFM pipe table 的表头与分隔行外形。"""
+    """Determine whether the text has the header and separated line shapes of GFM pipe table."""
     lines = [line.strip() for line in content.strip().splitlines() if line.strip()]
     if len(lines) < 2:
         return False
@@ -22,7 +22,7 @@ def looks_like_gfm_table(content: str) -> bool:
 
 
 def render_gfm_table_html(content: str) -> HtmlInlineResult | None:
-    """把严格、等宽的简单 GFM pipe table 转换为语义 HTML。"""
+    """Convert strict, equal-width simple GFM pipe table to semantic HTML."""
     lines = [line.strip() for line in content.strip().splitlines() if line.strip()]
     if len(lines) < 2:
         return None
@@ -43,7 +43,7 @@ def render_gfm_table_html(content: str) -> HtmlInlineResult | None:
     has_math = False
 
     def _render_row(cells: list[str], cell_tag: str) -> str:
-        """渲染一行等宽单元格，并累积公式存在标记。"""
+        """Renders a row of equal-width cells with accumulated formula presence markers."""
         nonlocal has_math
         rendered_cells: list[str] = []
         for index, cell in enumerate(cells):
@@ -69,7 +69,7 @@ def render_gfm_table_html(content: str) -> HtmlInlineResult | None:
 
 
 def _split_pipe_row(line: str) -> list[str]:
-    """按未被奇数个反斜杠转义的竖线切分 GFM 表格行。"""
+    """Split GFM table rows by vertical bars not escaped by an odd number of backslashes."""
     normalized = line.strip()
     if normalized.startswith("|"):
         normalized = normalized[1:]
@@ -87,20 +87,20 @@ def _split_pipe_row(line: str) -> list[str]:
 
 
 def _is_escaped(content: str, index: int) -> bool:
-    """按 markdown-it table 规则判断 pipe 是否紧邻任意反斜杠。"""
+    """Determine whether pipe is immediately adjacent to any backslash according to the markdown-it table rule."""
     return index > 0 and content[index - 1] == "\\"
 
 
 def _contains_unescaped_pipe(content: str) -> bool:
-    """判断行内是否至少包含一个真正的 GFM 列分隔符。"""
+    """Determines whether the row contains at least one true GFM column delimiter."""
     return any(char == "|" and not _is_escaped(content, index) for index, char in enumerate(content))
 
 
 def _unescape_gfm_cell(content: str) -> str:
-    """按既有 2n+1 编码逆向恢复 GFM 单元格中的原始反斜杠与竖线。"""
+    """Reverse the original backslashes and vertical bars in GFM cells using the existing 2n+1 encoding."""
 
     def _replace(match: re.Match[str]) -> str:
-        """把竖线前 2n+1 个 Markdown 反斜杠还原为 n 个。"""
+        """Restore the 2n+1 Markdown backslashes before the vertical bar to n."""
         slash_count = len(match.group("slashes"))
         return "\\" * ((slash_count - 1) // 2) + "|"
 
@@ -108,7 +108,7 @@ def _unescape_gfm_cell(content: str) -> str:
 
 
 def _separator_alignment(cell: str) -> str | None:
-    """从 GFM 分隔单元格解析 left、center 或 right 对齐。"""
+    """Resolve left, center or right alignments from GFM delimited cells."""
     if cell.startswith(":") and cell.endswith(":"):
         return "center"
     if cell.endswith(":"):

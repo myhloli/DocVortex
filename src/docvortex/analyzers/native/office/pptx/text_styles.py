@@ -1,4 +1,4 @@
-"""PPTX 文字样式和继承，复用当前转换器的单文档状态。"""
+"""PPTX text style and inheritance, reuse the single document state of the current converter."""
 
 from typing import Any, Optional
 from loguru import logger
@@ -12,11 +12,11 @@ from .context import DRAWINGML_NS, A14_DRAWING_NS, OMML_NS
 
 
 class _PptxTextStyles:
-    """集中维护文字样式和继承，不改变文档生命周期和公开入口。"""
+    """Centrally maintain text styles and inheritance without changing the document life cycle and public access."""
 
     @staticmethod
     def _normalize_xml_toggle_attr(value: Optional[str]) -> Optional[bool]:
-        """按原有文字样式和继承规则执行 _normalize_xml_toggle_attr，保持输入顺序与降级行为。"""
+        """Execute _normalize_xml_toggle_attr according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if value is None:
             return None
 
@@ -33,7 +33,7 @@ class _PptxTextStyles:
         rpr: Optional[etree._Element],
         attr_name: str,
     ) -> Optional[bool]:
-        """按原有文字样式和继承规则执行 _parse_toggle_attr_from_rpr，保持输入顺序与降级行为。"""
+        """Execute _parse_toggle_attr_from_rpr according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if rpr is None:
             return None
         return cls._normalize_xml_toggle_attr(rpr.get(attr_name))
@@ -43,7 +43,7 @@ class _PptxTextStyles:
         cls,
         rpr: Optional[etree._Element],
     ) -> Optional[bool]:
-        """按原有文字样式和继承规则执行 _parse_underline_from_rpr，保持输入顺序与降级行为。"""
+        """Execute _parse_underline_from_rpr according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if rpr is None:
             return None
 
@@ -61,7 +61,7 @@ class _PptxTextStyles:
         cls,
         rpr: Optional[etree._Element],
     ) -> Optional[bool]:
-        """按原有文字样式和继承规则执行 _parse_strikethrough_from_rpr，保持输入顺序与降级行为。"""
+        """Execute _parse_strikethrough_from_rpr according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if rpr is None:
             return None
 
@@ -78,7 +78,7 @@ class _PptxTextStyles:
         self,
         run,
     ) -> Optional[etree._Element]:
-        """按原有文字样式和继承规则执行 _get_run_rpr，保持输入顺序与降级行为。"""
+        """Execute _get_run_rpr according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if run is None:
             return None
 
@@ -93,7 +93,7 @@ class _PptxTextStyles:
 
     @staticmethod
     def _get_run_raw_text(run) -> str:
-        """从run底层XML读取文本，避免数学run触发python-pptx的to_latex诊断输出。"""
+        """Read text from run underlying XML to avoid math run triggering to_latex diagnostic output of python-pptx."""
         run_xml = getattr(run, "_r", None)
         if run_xml is None:
             return ""
@@ -117,7 +117,7 @@ class _PptxTextStyles:
         paragraph_font_sources: list[etree._Element],
         parser,
     ) -> bool:
-        """按原有文字样式和继承规则执行 _resolve_effective_run_bool，保持输入顺序与降级行为。"""
+        """Execute _resolve_effective_run_bool according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         for source in [self._get_run_rpr(run), *paragraph_font_sources]:
             resolved = parser(source)
             if resolved is not None:
@@ -129,7 +129,7 @@ class _PptxTextStyles:
         run,
         paragraph_font_sources: list[etree._Element],
     ) -> bool:
-        """按原有文字样式和继承规则执行 _resolve_effective_run_italic，保持输入顺序与降级行为。"""
+        """Execute _resolve_effective_run_italic according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         return self._resolve_effective_run_bool(
             run,
             paragraph_font_sources,
@@ -141,7 +141,7 @@ class _PptxTextStyles:
         run,
         paragraph_font_sources: list[etree._Element],
     ) -> bool:
-        """按原有文字样式和继承规则执行 _resolve_effective_run_underline，保持输入顺序与降级行为。"""
+        """Execute _resolve_effective_run_underline according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         return self._resolve_effective_run_bool(
             run,
             paragraph_font_sources,
@@ -153,7 +153,7 @@ class _PptxTextStyles:
         run,
         paragraph_font_sources: list[etree._Element],
     ) -> bool:
-        """按原有文字样式和继承规则执行 _resolve_effective_run_strikethrough，保持输入顺序与降级行为。"""
+        """Execute _resolve_effective_run_strikethrough according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         return self._resolve_effective_run_bool(
             run,
             paragraph_font_sources,
@@ -165,7 +165,7 @@ class _PptxTextStyles:
         run,
         paragraph_font_sources: list[etree._Element],
     ) -> Optional[str]:
-        """从PPTX run对象提取可序列化的生效字体样式字符串。"""
+        """Extracts the serializable effective font style string from the PPTX run object."""
         if run is None:
             return None
 
@@ -182,7 +182,7 @@ class _PptxTextStyles:
         return ",".join(styles) if styles else None
 
     def _resolve_hyperlink_from_run(self, run, shape) -> Optional[str]:
-        """解析 run 对应的超链接，优先公开 API，回退到 XML + rels。"""
+        """Parse the hyperlink corresponding to run, give priority to API, and fall back to XML + rels."""
         try:
             if hasattr(run, "hyperlink") and run.hyperlink is not None:
                 address = run.hyperlink.address
@@ -224,7 +224,7 @@ class _PptxTextStyles:
         return None
 
     def _build_paragraph_plain_text(self, paragraph) -> str:
-        """构建段落纯文本（保留软换行为空格）。"""
+        """Constructs paragraph plain text (leaving soft breaks on whitespace)."""
         p = paragraph._element
         text_parts = []
         for node in p.content_children:
@@ -240,7 +240,7 @@ class _PptxTextStyles:
 
     @staticmethod
     def _is_math_content_node(node) -> bool:
-        """按原有文字样式和继承规则执行 _is_math_content_node，保持输入顺序与降级行为。"""
+        """Execute _is_math_content_node according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         tag = getattr(node, "tag", None)
         return tag in {
             f"{{{A14_DRAWING_NS}}}m",
@@ -250,7 +250,7 @@ class _PptxTextStyles:
 
     @staticmethod
     def _strip_math_delimiters(math_text: str) -> str:
-        """按原有文字样式和继承规则执行 _strip_math_delimiters，保持输入顺序与降级行为。"""
+        """Execute _strip_math_delimiters according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         stripped = math_text.strip()
         if stripped.startswith("$$") and stripped.endswith("$$") and len(stripped) >= 4:
             return stripped[2:-2].strip()
@@ -259,7 +259,7 @@ class _PptxTextStyles:
         return stripped
 
     def _convert_math_node_to_latex(self, node) -> Optional[str]:
-        """按原有文字样式和继承规则执行 _convert_math_node_to_latex，保持输入顺序与降级行为。"""
+        """Execute _convert_math_node_to_latex according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         omath = None
         if getattr(node, "tag", None) == f"{{{OMML_NS}}}oMath":
             omath = node
@@ -284,7 +284,7 @@ class _PptxTextStyles:
         return None
 
     def _build_paragraph_rich_text(self, paragraph, shape) -> list[dict[str, Any]]:
-        """按 run 维度构建段落 Span，支持样式、公式与超链接。"""
+        """Build paragraphs Span according to run dimensions, supporting styles, formulas and hyperlinks."""
         paragraph_font_sources = self._get_paragraph_font_sources(shape, paragraph)
         run_map = {}
         for run in paragraph.runs:
@@ -297,7 +297,7 @@ class _PptxTextStyles:
         segments: list[OfficeRichTextSegment] = []
 
         def flush_segments() -> None:
-            """在公式边界输出累计普通富文本 Span。"""
+            """Output cumulative plain rich text Span at formula boundaries."""
             if not segments:
                 return
             extend_inline_spans(output, build_rich_text_from_segments(list(segments)))
@@ -342,7 +342,7 @@ class _PptxTextStyles:
 
     @staticmethod
     def _trim_rich_text_segments(segments: list[dict]) -> list[dict]:
-        """按原有文字样式和继承规则执行 _trim_rich_text_segments，保持输入顺序与降级行为。"""
+        """Execute _trim_rich_text_segments according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         trimmed_segments = [dict(segment) for segment in segments if segment.get("text") is not None]
         if not trimmed_segments:
             return []
@@ -374,14 +374,14 @@ class _PptxTextStyles:
 
     @staticmethod
     def _normalize_text_block_content(content: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """裁剪提取文本首尾空白，同时保留 Span 样式和链接。"""
+        """Crop the leading and trailing whitespace of the extracted text while retaining the Span style and links."""
         return strip_span_dicts(content)
 
     @staticmethod
     def _parse_font_size_pt_from_rpr(
         rpr: Optional[etree._Element],
     ) -> Optional[float]:
-        """按原有文字样式和继承规则执行 _parse_font_size_pt_from_rpr，保持输入顺序与降级行为。"""
+        """Execute _parse_font_size_pt_from_rpr according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if rpr is None:
             return None
 
@@ -398,21 +398,21 @@ class _PptxTextStyles:
     def _parse_bold_from_rpr(
         rpr: Optional[etree._Element],
     ) -> Optional[bool]:
-        """按原有文字样式和继承规则执行 _parse_bold_from_rpr，保持输入顺序与降级行为。"""
+        """Execute _parse_bold_from_rpr according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         return _PptxTextStyles._parse_toggle_attr_from_rpr(rpr, "b")
 
     @staticmethod
     def _parse_italic_from_rpr(
         rpr: Optional[etree._Element],
     ) -> Optional[bool]:
-        """按原有文字样式和继承规则执行 _parse_italic_from_rpr，保持输入顺序与降级行为。"""
+        """Execute _parse_italic_from_rpr according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         return _PptxTextStyles._parse_toggle_attr_from_rpr(rpr, "i")
 
     def _find_def_rpr(
         self,
         paragraph_properties: Optional[etree._Element],
     ) -> Optional[etree._Element]:
-        """按原有文字样式和继承规则执行 _find_def_rpr，保持输入顺序与降级行为。"""
+        """Execute _find_def_rpr according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if paragraph_properties is None:
             return None
         return paragraph_properties.find("a:defRPr", namespaces=self.namespaces)
@@ -421,7 +421,7 @@ class _PptxTextStyles:
         self,
         paragraph: Optional[etree._Element],
     ) -> Optional[etree._Element]:
-        """按原有文字样式和继承规则执行 _find_end_para_rpr，保持输入顺序与降级行为。"""
+        """Execute _find_end_para_rpr according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if paragraph is None:
             return None
         return paragraph.find("a:endParaRPr", namespaces=self.namespaces)
@@ -430,7 +430,7 @@ class _PptxTextStyles:
         self,
         paragraph: Optional[etree._Element],
     ) -> list[etree._Element]:
-        """按原有文字样式和继承规则执行 _get_font_sources_from_paragraph，保持输入顺序与降级行为。"""
+        """Execute _get_font_sources_from_paragraph according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if paragraph is None:
             return []
 
@@ -451,7 +451,7 @@ class _PptxTextStyles:
         tx_body: Optional[etree._Element],
         level: int,
     ) -> list[etree._Element]:
-        """按原有文字样式和继承规则执行 _get_font_sources_from_text_body，保持输入顺序与降级行为。"""
+        """Execute _get_font_sources_from_text_body according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if tx_body is None:
             return []
 
@@ -480,7 +480,7 @@ class _PptxTextStyles:
         style_bucket: Optional[etree._Element],
         level: int,
     ) -> list[etree._Element]:
-        """按原有文字样式和继承规则执行 _get_font_sources_from_text_style_bucket，保持输入顺序与降级行为。"""
+        """Execute _get_font_sources_from_text_style_bucket according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if style_bucket is None:
             return []
 
@@ -504,7 +504,7 @@ class _PptxTextStyles:
         return sources
 
     def _resolve_layout_placeholder(self, shape):
-        """按原有文字样式和继承规则执行 _resolve_layout_placeholder，保持输入顺序与降级行为。"""
+        """Execute _resolve_layout_placeholder according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         if not getattr(shape, "is_placeholder", False):
             return None
 
@@ -530,7 +530,7 @@ class _PptxTextStyles:
         return None
 
     def _get_paragraph_font_sources(self, shape, paragraph) -> list[etree._Element]:
-        """按原有文字样式和继承规则执行 _get_paragraph_font_sources，保持输入顺序与降级行为。"""
+        """Execute _get_paragraph_font_sources according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         level = self._get_paragraph_level(paragraph._element)
         sources = self._get_font_sources_from_paragraph(paragraph._element)
 
@@ -570,7 +570,7 @@ class _PptxTextStyles:
         run,
         paragraph_font_sources: list[etree._Element],
     ) -> Optional[float]:
-        """按原有文字样式和继承规则执行 _resolve_effective_run_font_size_pt，保持输入顺序与降级行为。"""
+        """Execute _resolve_effective_run_font_size_pt according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         for source in [self._get_run_rpr(run), *paragraph_font_sources]:
             font_size_pt = self._parse_font_size_pt_from_rpr(source)
             if font_size_pt is not None:
@@ -582,7 +582,7 @@ class _PptxTextStyles:
         run,
         paragraph_font_sources: list[etree._Element],
     ) -> bool:
-        """按原有文字样式和继承规则执行 _resolve_effective_run_bold，保持输入顺序与降级行为。"""
+        """Execute _resolve_effective_run_bold according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         return self._resolve_effective_run_bool(
             run,
             paragraph_font_sources,
@@ -590,7 +590,7 @@ class _PptxTextStyles:
         )
 
     def _build_paragraph_style_profile(self, shape, paragraph) -> dict[str, Optional[float] | bool]:
-        """按原有文字样式和继承规则执行 _build_paragraph_style_profile，保持输入顺序与降级行为。"""
+        """Execute _build_paragraph_style_profile according to the original text style and inheritance rules, maintaining the input order and degradation behavior."""
         paragraph_font_sources = self._get_paragraph_font_sources(shape, paragraph)
         effective_font_size_pt = None
         all_bold = True

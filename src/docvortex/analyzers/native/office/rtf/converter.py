@@ -1,4 +1,4 @@
-"""把 typed RTF 语义文档转换为 DocVortex 单逻辑页 raw model-list。"""
+"""Convert typed RTF semantic document to DocVortex single logical page raw model-list."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from .parser import MAX_RTF_LIST_DEPTH, parse_rtf, read_rtf_bytes
 
 @dataclass(slots=True)
 class _GridOrigin:
-    """保存 HTML table 网格中一个 origin cell 的 span 状态。"""
+    """Saves the span state of a origin cell in a HTML table grid."""
 
     row: int
     col: int
@@ -42,14 +42,14 @@ class _GridOrigin:
 
 @dataclass(slots=True)
 class _HtmlListNode:
-    """保存表格单元格内列表段落的临时层级树。"""
+    """Saves a temporary hierarchical tree of list paragraphs within a table cell."""
 
     paragraph: RtfParagraph
     children: list[_HtmlListNode] = field(default_factory=list)
 
 
 def _style_names(run: RtfTextRun) -> list[str]:
-    """把 RTF 字符属性映射为现有 Office 富文本样式名。"""
+    """Maps RTF character attributes to existing Office rich text style names."""
     result: list[str] = []
     if run.style.bold:
         result.append("bold")
@@ -67,7 +67,7 @@ def _style_names(run: RtfTextRun) -> list[str]:
 
 
 def _paragraph_anchor(paragraph: RtfParagraph) -> str | None:
-    """返回段落内第一个非空 bookmark 名。"""
+    """Returns the first non-empty bookmark name in the paragraph."""
     for inline in paragraph.inlines:
         if isinstance(inline, RtfAnchor) and inline.name.strip():
             return inline.name.strip()
@@ -75,7 +75,7 @@ def _paragraph_anchor(paragraph: RtfParagraph) -> str | None:
 
 
 def _iter_nested_blocks(blocks: Iterable[RtfBlock]) -> Iterable[RtfBlock]:
-    """按深度优先顺序遍历正文及嵌套表格单元格块。"""
+    """Traverse text and nested table cell blocks in depth-first order."""
     pending = list(reversed(list(blocks)))
     while pending:
         block = pending.pop()
@@ -87,7 +87,7 @@ def _iter_nested_blocks(blocks: Iterable[RtfBlock]) -> Iterable[RtfBlock]:
 
 
 def _title_anchors(document: RtfDocument) -> set[str]:
-    """收集 schema 能公开的标题 bookmark，普通段落 bookmark 不生成悬空链接。"""
+    """Collect the titles that schema can publish bookmark, ordinary paragraphs bookmark do not generate dangling links."""
     result: set[str] = set()
     for block in _iter_nested_blocks(document.blocks):
         if not isinstance(block, RtfParagraph):
@@ -101,11 +101,11 @@ def _title_anchors(document: RtfDocument) -> set[str]:
 
 
 def _note_numbers(document: RtfDocument) -> dict[str, int]:
-    """按第一次引用顺序编号 note，未引用 note 稳定追加在末尾。"""
+    """note is numbered in order of first reference, with un-referenced note stably appended at the end."""
     numbers: dict[str, int] = {}
 
     def visit_blocks(blocks: Iterable[RtfBlock]) -> None:
-        """扫描一组块中的 note reference。"""
+        """Scan a set of blocks for note reference."""
         for block in _iter_nested_blocks(blocks):
             if not isinstance(block, RtfParagraph):
                 continue
@@ -124,7 +124,7 @@ def _note_numbers(document: RtfDocument) -> dict[str, int]:
 
 
 def _plain_inlines(inlines: Iterable[RtfInline], note_numbers: dict[str, int]) -> str:
-    """提取行内节点可见文本，供代码块、alt 和脚注降级使用。"""
+    """Extract visible text of inline nodes for use by code blocks, alt, and footnote degradation."""
     parts: list[str] = []
     for inline in inlines:
         if isinstance(inline, RtfTextRun):
@@ -143,10 +143,10 @@ def _plain_inlines(inlines: Iterable[RtfInline], note_numbers: dict[str, int]) -
 
 
 class RtfConverter:
-    """把 RTF typed IR 投影为现有 Office raw-block 协议。"""
+    """Project RTF typed IR to the existing Office raw-block protocol."""
 
     def __init__(self) -> None:
-        """初始化空输出和每文档图片公式 decoder。"""
+        """Initialize empty output and per-document picture formula decoder."""
         self.pages: list[list[dict[str, Any]]] = []
         self.document: RtfDocument | None = None
         self._note_numbers: dict[str, int] = {}
@@ -154,7 +154,7 @@ class RtfConverter:
         self._image_equations = OfficeImageEquationDecoder()
 
     def convert(self, file_binary: BinaryIO) -> None:
-        """解析 RTF 二进制流并生成固定单逻辑页 model-list。"""
+        """Parses the RTF binary stream and generates a fixed single logical page model-list."""
         document = parse_rtf(file_binary)
         self.document = document
         self._note_numbers = _note_numbers(document)
@@ -166,7 +166,7 @@ class RtfConverter:
         self.pages = [page]
 
     def _resolved_hyperlink(self, target: str | None) -> str | None:
-        """只保留指向可公开标题 bookmark 的内部链接。"""
+        """Only internal links to the publicly available title bookmark will be retained."""
         if not target:
             return None
         if target.startswith("#") and target[1:] not in self._title_anchors:
@@ -174,12 +174,12 @@ class RtfConverter:
         return target
 
     def _rich_text(self, inlines: Iterable[RtfInline]) -> list[dict[str, Any]]:
-        """把非图片行内节点直接转换为结构化 Span。"""
+        """Convert non-picture inline nodes directly to structured Span."""
         spans: list[dict[str, Any]] = []
         segments: list[OfficeRichTextSegment] = []
 
         def flush() -> None:
-            """在公式边界前输出累计普通富文本。"""
+            """Output cumulative plain rich text before formula boundaries."""
             if not segments:
                 return
             extend_inline_spans(spans, build_rich_text_from_segments(segments, trim_plain_edges=not spans))
@@ -213,7 +213,7 @@ class RtfConverter:
         return strip_span_dicts(spans)
 
     def _image_payload(self, image: RtfImage) -> tuple[bytes, str, str] | None:
-        """规范 DIB 载荷并返回图片数据、part name 和 content type。"""
+        """Specifies the DIB payload and returns image data, part name and content type."""
         if image.part_name.lower().endswith(".dib"):
             return ensure_bmp_header(image.data), "pict.bmp", "image/bmp"
         if is_vector_image_part(image.part_name, image.content_type) and not is_valid_vector_image_payload(
@@ -225,7 +225,7 @@ class RtfConverter:
         return image.data, image.part_name, image.content_type
 
     def _image_block(self, image: RtfImage) -> dict[str, Any] | None:
-        """优先恢复图片 MTEF 公式，否则序列化为安全图片 data URI。"""
+        """The picture MTEF formula is restored first, otherwise it is serialized to the safe picture data URI."""
         normalized = self._image_payload(image)
         if normalized is None:
             if image.alt.strip():
@@ -264,7 +264,7 @@ class RtfConverter:
         *,
         allow_title: bool,
     ) -> dict[str, Any] | None:
-        """把一个不含图片的段落片段投影为标题、代码或正文 raw block。"""
+        """Project a paragraph fragment without an image as a title, code, or text raw block."""
         if paragraph.block_style == "code":
             content = _plain_inlines(inlines, self._note_numbers).strip("\n")
             return {"type": BlockType.CODE, "content": content} if content else None
@@ -293,7 +293,7 @@ class RtfConverter:
         return block
 
     def _paragraph_blocks(self, paragraph: RtfParagraph) -> list[dict[str, Any]]:
-        """按行内图片位置拆分段落，并只让首个文本片段继承标题类型。"""
+        """Split paragraphs by inline image position, and let only the first text fragment inherit the heading type."""
         if paragraph.list_info is not None and (paragraph.is_title or paragraph.outline_level is not None):
             label = paragraph.list_info.label if paragraph.list_info.ordered else None
             if label:
@@ -322,7 +322,7 @@ class RtfConverter:
         text_emitted = False
 
         def flush() -> None:
-            """输出当前图片边界前累计的段落片段。"""
+            """Output the accumulated paragraph fragments before the current picture boundary."""
             nonlocal text_emitted
             block = self._paragraph_text_block(
                 paragraph,
@@ -352,7 +352,7 @@ class RtfConverter:
         identity: int | None,
         paragraph: RtfParagraph,
     ) -> int:
-        """把一个 RTF 列表段落追加到嵌套 raw list 树。"""
+        """Appends a RTF list paragraph to the nested raw list tree."""
         info = paragraph.list_info
         if info is None:
             return identity or -1
@@ -390,7 +390,7 @@ class RtfConverter:
         return info.identity
 
     def _document_blocks(self, blocks: Iterable[RtfBlock]) -> list[dict[str, Any]]:
-        """按源顺序转换正文块，并维护顶层列表连续性。"""
+        """Convert body blocks into source order and maintain top-level list continuity."""
         page: list[dict[str, Any]] = []
         list_stack: list[dict[str, Any]] = []
         list_identity: int | None = None
@@ -447,7 +447,7 @@ class RtfConverter:
         return page
 
     def _inline_html(self, inlines: Iterable[RtfInline]) -> str:
-        """把表格单元格行内节点转换为白名单 HTML。"""
+        """Convert table cell inline nodes to whitelist HTML."""
         parts: list[str] = []
         for inline in inlines:
             if isinstance(inline, RtfTextRun):
@@ -505,7 +505,7 @@ class RtfConverter:
         return "".join(parts)
 
     def _list_tree(self, paragraphs: list[RtfParagraph]) -> list[_HtmlListNode]:
-        """把连续列表段落构造成单元格 HTML 使用的嵌套树。"""
+        """Construct consecutive list paragraphs into a nested tree using cell HTML."""
         roots: list[_HtmlListNode] = []
         stack: list[_HtmlListNode] = []
         for paragraph in paragraphs:
@@ -521,7 +521,7 @@ class RtfConverter:
         return roots
 
     def _list_nodes_html(self, nodes: list[_HtmlListNode]) -> str:
-        """递归序列化一层单元格列表节点。"""
+        """Recursively serialize one level of cell list nodes."""
         if not nodes:
             return ""
         info = nodes[0].paragraph.list_info
@@ -536,7 +536,7 @@ class RtfConverter:
         return f"<{tag}{start}>{''.join(items)}</{tag}>"
 
     def _blocks_html(self, blocks: list[RtfBlock]) -> str:
-        """序列化 table cell 内允许的段落、列表、代码、引用和嵌套表格。"""
+        """Serialize table Paragraphs, lists, codes, quotes and nested tables allowed within cell."""
         parts: list[str] = []
         index = 0
         while index < len(blocks):
@@ -570,7 +570,7 @@ class RtfConverter:
         return "".join(parts)
 
     def _table_grid(self, table: RtfTable) -> list[list[_GridOrigin | None]]:
-        """解析横向与纵向 merge continuation，生成 exactly-once origin 网格。"""
+        """Parse horizontal and vertical merge continuation and generate exactly-once origin grid."""
         boundaries = sorted(
             {cell.right_boundary for row in table.rows for cell in row.cells if cell.right_boundary is not None}
         )
@@ -613,7 +613,7 @@ class RtfConverter:
         return grid
 
     def _table_html(self, table: RtfTable) -> str:
-        """把 RTF 表格输出为带 rowspan/colspan 的安全 HTML。"""
+        """Export the RTF table as safe HTML with rowspan/colspan."""
         grid = self._table_grid(table)
         rows: list[str] = []
         for row_index, slots in enumerate(grid):
@@ -633,7 +633,7 @@ class RtfConverter:
         return f"<table>{''.join(rows)}</table>"
 
     def _auxiliary_blocks(self, blocks: list[RtfBlock], block_type: BlockType) -> list[dict[str, Any]]:
-        """把页眉页脚段落去重后投影为页面辅助块。"""
+        """Deduplicate the header and footer paragraphs and project them into page auxiliary blocks."""
         result: list[dict[str, Any]] = []
         seen: set[str] = set()
         for block in blocks:
@@ -653,7 +653,7 @@ class RtfConverter:
         return result
 
     def _table_plain_text(self, table: RtfTable) -> str:
-        """把表格可见文本压平，供注释和辅助块无损降级。"""
+        """Flatten visible table text for lossless degradation of comments and auxiliary blocks."""
         rows: list[str] = []
         for row in table.rows:
             cells = [self._blocks_plain_text(cell.blocks) for cell in row.cells]
@@ -661,7 +661,7 @@ class RtfConverter:
         return "\n".join(rows)
 
     def _blocks_plain_text(self, blocks: Iterable[RtfBlock]) -> str:
-        """提取块列表可见文本，保持段落和表格行边界。"""
+        """Extract visible text from a block list, preserving paragraph and table row boundaries."""
         parts: list[str] = []
         for block in blocks:
             if isinstance(block, RtfParagraph):
@@ -673,7 +673,7 @@ class RtfConverter:
         return "\n".join(part for part in parts if part.strip())
 
     def _note_blocks(self, document: RtfDocument) -> list[dict[str, Any]]:
-        """按公开编号输出脚注与尾注正文。"""
+        """Output the text of footnotes and endnotes according to the public number."""
         result: list[dict[str, Any]] = []
         ordered = sorted(
             document.notes,
@@ -694,7 +694,7 @@ class RtfConverter:
 
 
 def extract_rtf_metadata(file_binary: BinaryIO) -> dict[str, str | None]:
-    """有界读取 RTF，仅解析 info destination 并返回 doclib 字段。"""
+    """Bounded read RTF, parses only info destination and returns doclib field."""
     from .metadata import read_rtf_properties
     from .....document.properties import legacy_properties
 

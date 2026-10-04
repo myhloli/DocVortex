@@ -1,3 +1,3 @@
-"""Flash DOCX 转换实现。"""
+"""Flash DOCX conversion implementation."""
 
 __all__: list[str] = []

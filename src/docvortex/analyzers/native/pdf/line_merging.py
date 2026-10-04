@@ -1,4 +1,4 @@
-"""提供同基线文本和拆分视觉行的几何合并。"""
+"""Provides geometric merging of same-baseline text and split visual lines."""
 
 from __future__ import annotations
 
@@ -28,11 +28,11 @@ from ._interval_candidates import IntervalCandidates
 
 
 def _inherit_unanimous_structural_membership(merged: _LineItem, members: list[_LineItem]) -> None:
-    """同行片段共享明确段组或标题带时传递归属；不同归属不能由合并操作猜测。"""
+    """Peer fragments pass ownership when they share an explicit segment group or title band; different ownership cannot be guessed by the merge operation."""
     if not members:
         return
     ordered = sorted(members, key=lambda line: line.bbox[0])
-    # 悬挂序号与标签合成同行时，传递标签释放字符前冻结的真实左缘。
+    # When the dangling sequence number is combined with the label, the true left edge of the label frozen before releasing the character is passed.
     if (
         len(ordered) == 2
         and re.fullmatch(r"(?:[A-Za-z]|\d{1,2})[.)]", ordered[0].text.strip())
@@ -51,7 +51,7 @@ def _inherit_unanimous_structural_membership(merged: _LineItem, members: list[_L
 
 
 def _caption_crosses_left_text(members: list[_LineItem]) -> bool:
-    """图题首行不得向左跨栏吞并正文，同栏后续行或右侧字体碎片仍可正常恢复。"""
+    """The first line of the figure title must not cross the column to the left and swallow up the main text. Font fragments in subsequent lines of the same column or on the right side can still be restored normally."""
     return any(
         seed.caption_start
         and other is not seed
@@ -63,7 +63,7 @@ def _caption_crosses_left_text(members: list[_LineItem]) -> bool:
 
 
 def _safe_candidate_box(box) -> bool:
-    """仅让内置浮点坐标进入预筛，整数算术和其他类型保留参考遍历。"""
+    """Let only built-in floating point coordinates enter prefiltering, integer arithmetic and other types retain reference traversal."""
     return (
         type(box) in (tuple, list)
         and len(box) == 4
@@ -74,7 +74,7 @@ def _safe_candidate_box(box) -> bool:
 
 
 def _overlapping_candidate_pairs(members):
-    """纵向区间是重叠连接的必要条件，原行序及最终判断保持不变。"""
+    """Vertical intervals are a necessary condition for overlapping connections, and the original row order and final judgment remain unchanged."""
     if len(members) <= 16 or any(not _safe_candidate_box(box) for _, box in members):
         return None
     groups = {}
@@ -88,15 +88,15 @@ def _same_baseline_candidate_pairs(
     local_bboxes: list[BBox],
     compatible_indices: dict[tuple[int, bool, str | None], list[int]],
 ) -> list[list[int]] | IntervalCandidates | None:
-    """筛除纵向远距行对，密集页面流式查询，异常几何保留原遍历。"""
+    """Filter out vertically distant row pairs, dense page streaming queries, and abnormal geometries to retain the original traversal."""
     bounds: list[tuple[float, float]] = []
     for line, box in zip(lines, local_bboxes, strict=True):
         try:
             height = _line_effective_height(line, box)
             if not all(math.isfinite(value) for value in (*box, height)) or box[2] <= box[0] or box[3] <= box[1]:
                 return None
-            # 同行规则既接受框交叠，也接受底边差不超过 0.25 * max(height) 的行。
-            # 两行各自扩展底边容差形成超集，最终仍由原判定函数决定是否合并。
+            # The peer rule accepts both box overlap and rows whose bases differ by no more than 0.25 * max(height).
+            # The two rows each expand the bottom tolerance to form a superset, and ultimately the original decision function still determines whether to merge.
             low, high = min(box[1], box[3] - 0.25 * height), box[3] + 0.25 * height
             if line.angle == 0 and line.source_bbox is not None:
                 source = line.source_bbox
@@ -131,7 +131,7 @@ def _same_baseline_candidate_pairs(
         ends: list[tuple[float, int]] = []
         for index in sorted(indices, key=lambda item: (bounds[item][0], item)):
             low, high = bounds[index]
-            # 保留相等端点，避免漏掉原规则恰好落在容差边界上的行对。
+            # Preserve equal endpoints to avoid missing row pairs where the original rule falls exactly on the tolerance boundary.
             while ends and ends[0][0] < low:
                 _, expired = heapq.heappop(ends)
                 active.remove(expired)
@@ -153,7 +153,7 @@ def _merge_same_baseline_text_lines(
     page_size: tuple[float, float],
     table_bboxes: list[BBox],
 ) -> list[_LineItem]:
-    """在表格认领后合并同基线、同字体且水平邻近的正文 run。"""
+    """Merge text run with the same baseline, same font, and horizontally adjacent text after table claim."""
 
     if len(lines) < 2:
         return list(lines)
@@ -161,7 +161,7 @@ def _merge_same_baseline_text_lines(
     parents = list(range(len(lines)))
 
     def find(index: int) -> int:
-        """查找同行合并并查集的根节点。"""
+        """Find the root node of peer merge and set."""
 
         while parents[index] != index:
             parents[index] = parents[parents[index]]
@@ -169,14 +169,14 @@ def _merge_same_baseline_text_lines(
         return index
 
     def union(left_index: int, right_index: int) -> None:
-        """合并两个满足同行条件的文本 run。"""
+        """Merge two texts that meet the same condition run."""
 
         left_root = find(left_index)
         right_root = find(right_index)
         if left_root != right_root:
             parents[right_root] = left_root
 
-    # 只枚举满足必要分类条件的行对，组内仍按原索引递增，保持并查集认领顺序。
+    # Only row pairs that meet the necessary classification conditions are enumerated, and the group is still incremented according to the original index, and the order of collection and claiming is maintained.
     compatible_indices: dict[tuple[int, bool, str | None], list[int]] = {}
     for index, line in enumerate(lines):
         compatible_indices.setdefault((line.angle, line.formula_candidate_only, line.semantic_type), []).append(index)
@@ -227,7 +227,7 @@ def _merge_overlapping_inline_text_clusters(
     page_size: tuple[float, float],
     table_bboxes: list[BBox],
 ) -> list[_LineItem]:
-    """在容器认领后恢复由分子、分母和上下标拆成的二维物理文本行。"""
+    """Restores 2D physical text lines separated by numerator, denominator and superscript and subscript after container claim."""
 
     if len(lines) < 2:
         return list(lines)
@@ -253,7 +253,7 @@ def _merge_overlapping_inline_text_clusters(
             parents = list(range(len(lane.lines)))
 
             def find(index: int) -> int:
-                """查找当前栏二维文本簇并查集的根节点。"""
+                """Find the two-dimensional text cluster in the current column and find the root node of the set."""
 
                 while parents[index] != index:
                     parents[index] = parents[parents[index]]
@@ -261,7 +261,7 @@ def _merge_overlapping_inline_text_clusters(
                 return index
 
             def union(first_index: int, second_index: int) -> None:
-                """合并两个满足二维物理行邻接条件的成员。"""
+                """Merges two members that satisfy the adjacency condition of a 2D physical row."""
 
                 first_root = find(first_index)
                 second_root = find(second_index)
@@ -335,7 +335,7 @@ def _overlapping_inline_cluster_pair_is_connected(
     *,
     local_page_width: float | None = None,
 ) -> bool:
-    """判断两个同栏成员是否为同一二维物理行中的重叠片段。"""
+    """Determine whether two members of the same column are overlapping segments in the same two-dimensional physical row."""
 
     first_line, first_bbox = first
     second_line, second_bbox = second
@@ -385,7 +385,7 @@ def _classify_overlapping_inline_cluster(
     median_height: float,
     table_bboxes: list[BBox],
 ) -> str | None:
-    """按正文宿主和紧凑程度区分行内文本簇与独立公式簇。"""
+    """Distinguish between inline text clusters and independent formula clusters based on text host and compactness."""
 
     if len(members) < 2 or _caption_crosses_left_text([line for line, _ in members]):
         return None
@@ -419,7 +419,7 @@ def _classify_overlapping_inline_cluster(
 
 
 def _has_paired_script_body_host(members: list[tuple[_LineItem, BBox]], median_height: float) -> bool:
-    """用正文宿主和跨 run 的成对上下标补证据，不放宽普通同行重叠阈值。"""
+    """Supplement evidence with pairwise superscripts and subscripts across text hosts and across run, without relaxing common peer overlap thresholds."""
 
     if len(members) != 2 or any(line.angle != 0 or line.preserve_split_boundary or line.semantic_type for line, _ in members):
         return False
@@ -436,7 +436,7 @@ def _has_paired_script_body_host(members: list[tuple[_LineItem, BBox]], median_h
     origins = {char["char_idx"]: char["origin"] for char in chars if char.get("origin") is not None}
     roles = classify_char_script_roles(chars, tight_bboxes=tight, origins=origins)
     paired = paired_script_roles(chars, roles, tight, origins)
-    # 上下标必须分属两个待合并 run，避免把一侧已有角标当作吞并邻块的依据。
+    # The upper and lower subscripts must belong to two runs to be merged, to avoid using the existing subscripts on one side as the basis for annexing adjacent blocks.
     return len(paired) == 2 and len({owned_chars[index][1] for index in paired}) == 2
 
 
@@ -444,13 +444,13 @@ def _select_overlapping_inline_cluster_host(
     members: list[tuple[_LineItem, BBox]],
     median_height: float,
 ) -> _LineItem:
-    """选择与其他成员纵向重叠最多且最接近正文尺度的宿主行。"""
+    """Select the host line that overlaps most vertically with other members and is closest to the body scale."""
 
     union_bbox = _bbox_union_many([bbox for _line, bbox in members])
     union_center_y = _bbox_center_y(union_bbox)
 
     def host_score(item: tuple[_LineItem, BBox]) -> tuple[float, ...]:
-        """生成宿主候选的正文尺度、同行支持和中心距离评分。"""
+        """Generate text scale, peer support, and central distance scores for host candidates."""
 
         line, bbox = item
         vertical_support = sum(
@@ -483,7 +483,7 @@ def _merge_overlapping_inline_cluster(
     *,
     compact_formula_cluster: bool,
 ) -> _LineItem:
-    """按来源顺序合并二维文本簇，并保留字符与宿主排版信息。"""
+    """Merge 2D text clusters in source order while preserving character and host typography information."""
 
     ordered_members = sorted(
         (line for line, _bbox in members),
@@ -495,7 +495,7 @@ def _merge_overlapping_inline_cluster(
         if compact_formula_cluster
         else [line.bbox for line in ordered_members if line is not host]
     )
-    # 成对角标跨 run 只是 PDF 物理拆行，不应在上、下标之间补正文空格。
+    # The diagonal subscripts across run are only physical line breaks of PDF, and text spaces should not be added between superscripts and subscripts.
     separator = "" if _has_paired_script_body_host(members, median_height) else " "
     merged = _LineItem(
         text=separator.join(text for line in ordered_members if (text := line.text.strip())),
@@ -551,7 +551,7 @@ def _merge_post_semantic_text_runs(
     page_size: tuple[float, float],
     table_bboxes: list[BBox],
 ) -> list[_LineItem]:
-    """在容器、公式和标题结束后合并紧贴同基线的普通混合字体 run。"""
+    """Merge the normal mixed font run close to the same baseline after containers, formulas and titles."""
 
     if len(lines) < 2:
         return list(lines)
@@ -565,7 +565,7 @@ def _merge_post_semantic_text_runs(
     parents = list(range(len(lines)))
 
     def find(index: int) -> int:
-        """查找后处理同行合并分量的根节点。"""
+        """Find the root node of the post-processed peer merged component."""
 
         while parents[index] != index:
             parents[index] = parents[parents[index]]
@@ -573,7 +573,7 @@ def _merge_post_semantic_text_runs(
         return index
 
     def union(first_index: int, second_index: int) -> None:
-        """合并两个后处理同行分量。"""
+        """Merge two post-processed peer components."""
 
         first_root = find(first_index)
         second_root = find(second_index)
@@ -706,7 +706,7 @@ def _merge_post_semantic_text_runs(
 def _post_semantic_candidate_pairs(
     lines: list[_LineItem], local_bboxes: list[BBox]
 ) -> tuple[IntervalCandidates, list[float]] | None:
-    """两条后处理合并路径共用纵向安全超集，保留原始行对枚举顺序。"""
+    """The two post-processing merge paths share a vertically safe superset, preserving the original row-pair enumeration order."""
 
     if len(lines) <= 32 or any(
         type(line) is not _LineItem
@@ -748,7 +748,7 @@ def _post_semantic_supports_row(
     supporting_rows: list[tuple[float, int]] | None,
     supporting_tops: list[float],
 ) -> bool:
-    """按原条件检查后续正文行；普通几何只查询必要的纵向带。"""
+    """Subsequent text lines are checked according to the original condition; ordinary geometry only queries the necessary longitudinal bands."""
 
     bottom = max(first_bbox[3], second_bbox[3])
     if supporting_rows is None:
@@ -777,7 +777,7 @@ def _post_semantic_same_baseline_geometry(
     second_bbox: BBox,
     second_height: float,
 ) -> bool:
-    """放宽上下标字号差异，仅合并水平紧贴且垂直充分交叠的普通 run。"""
+    """Relax the difference in font size between upper and lower subscripts, and only merge ordinary run that are closely aligned horizontally and fully overlap vertically."""
 
     pair_height = max(first_height, second_height)
     if (
@@ -812,7 +812,7 @@ def _can_merge_same_baseline_pair(
     second_bbox: BBox,
     table_bboxes: list[BBox],
 ) -> bool:
-    """判断两个剩余文本 run 是否属于同一条物理基线。"""
+    """Determine whether the two remaining texts run belong to the same physical baseline."""
 
     if first.angle != second.angle or _caption_crosses_left_text([first, second]):
         return False
@@ -849,7 +849,7 @@ def _can_merge_same_baseline_pair(
 
 
 def _consecutive_source_row(first: _LineItem, second: _LineItem) -> bool:
-    """以连续源字符和原始行框验证同行，避免替代字形的 ink 修复扩大字体间隙。"""
+    """ink Fix for enlarging font gaps by validating peers with continuous source characters and original line boxes to avoid substitution glyphs."""
     if first.angle != 0 or second.angle != 0 or first.baseline is None or second.baseline is None:
         return False
     if first.preserve_split_boundary or second.preserve_split_boundary or not first.chars or not second.chars:
@@ -858,16 +858,16 @@ def _consecutive_source_row(first: _LineItem, second: _LineItem) -> bool:
     if first_box is None or second_box is None:
         return False
     first_height, second_height = first_box[3] - first_box[1], second_box[3] - second_box[1]
-    # 原始大框可能覆盖整条分式，仍须有相近基线才能按普通同行处理。
+    # The original large frame may cover the entire fraction, but there must still be a similar baseline to be treated as a normal peer.
     if abs(first.baseline - second.baseline) > 0.25 * min(first_height, second_height):
         return False
     if not _same_baseline_geometry(first_box, first_height, second_box, second_height):
         return False
-    # 源框与基线已包含文本矩阵的缩放；名义字号比不能代表实际显示大小。
+    # The source box and baseline already include the scaling of the text matrix; the nominal font size ratio does not represent the actual display size.
     left, right = sorted((first, second), key=lambda line: line.bbox[0])
     left_indices = [index for char in left.chars for index in char.get("source_indices", (char.get("char_idx"),))]
     right_indices = [index for char in right.chars for index in char.get("source_indices", (char.get("char_idx"),))]
-    # 最多容许一个 PDFium 空格；跨行或跨阅读顺序的 run 不以字形距离强行合并。
+    # A maximum of one PDFium space is allowed; run across lines or across reading order are not forcibly merged with glyph distance.
     if not left_indices or not right_indices or not all(isinstance(index, int) for index in left_indices + right_indices):
         return False
     return 1 <= min(right_indices) - max(left_indices) <= 2
@@ -879,7 +879,7 @@ def _touching_same_baseline_geometry(
     second_bbox: BBox,
     second_height: float,
 ) -> bool:
-    """为低字体覆盖率 run 提供严格的紧贴同基线几何兜底。"""
+    """Provides strict conformance to the baseline geometry for low font coverage run."""
 
     pair_height = max(first_height, second_height)
     y_overlap = max(0.0, min(first_bbox[3], second_bbox[3]) - max(first_bbox[1], second_bbox[1]))
@@ -904,7 +904,7 @@ def _same_baseline_geometry(
     *,
     maximum_gap: float | None = None,
 ) -> bool:
-    """仅依据行高、垂直交叠和水平净空判断两个局部 bbox 是否同基线相邻。"""
+    """Determine whether two local bboxs are adjacent to the baseline based solely on row height, vertical overlap, and horizontal clearance."""
 
     pair_height = max(first_height, second_height)
     if min(first_height, second_height) <= 0 or pair_height / min(first_height, second_height) > 1.35:
@@ -923,7 +923,7 @@ def _same_baseline_geometry(
 
 
 def _bullet_body_typography_member(members: list[_LineItem]) -> _LineItem | None:
-    """游离圆点只是项目标记，合行的字体统计应继承右侧主要文字，不能让符号字体覆盖整行正文。"""
+    """Free dots are just item marks. The font statistics of the combined lines should inherit the main text on the right, and the symbol font cannot cover the entire line of text."""
     first = members[0]
     if (
         len(members) < 2
@@ -943,7 +943,7 @@ def _merge_same_baseline_group(
     local_bboxes: list[BBox],
     page_size: tuple[float, float],
 ) -> _LineItem:
-    """按局部 x 顺序合并一个同基线分量，并保留全部字符与几何信息。"""
+    """Merge a common baseline component in local x order, preserving all character and geometric information."""
 
     members = [lines[index] for index in indices]
     body_typography = _bullet_body_typography_member(members)
@@ -1028,7 +1028,7 @@ def _join_formula_visual_row(
     row: list[tuple[_LineItem, BBox]],
     page_size: tuple[float, float],
 ) -> str:
-    """将一个公式视觉行按局部 x 排序，并按字宽估计几何空格。"""
+    """Sort a formula visual line by local x and estimate geometric spacing by word width."""
 
     ordered = sorted(row, key=lambda item: (item[1][0], item[1][1], item[0].source_index))
     if not ordered:
@@ -1061,7 +1061,7 @@ def _restore_dense_split_visual_rows(
     page_size: tuple[float, float],
     table_bboxes: list[BBox],
 ) -> list[_LineItem]:
-    """在公式认领后恢复同一栏带内被均匀大空格拆开的密集原生视觉行。"""
+    """Restores dense native visual rows within the same column band separated by evenly large spaces after formula claim."""
 
     if len(lines) < 3:
         return list(lines)
@@ -1112,7 +1112,7 @@ def _restore_dense_split_visual_rows(
 
 
 def _demote_runin_title_fragments(lines: list[_LineItem], page_size: tuple[float, float]) -> None:
-    """同行正文延续的小标题属于段落内强调，保留原始字体证据供行内样式物化。"""
+    """Subheadings that continue with the main text belong to in-paragraph emphasis, and original font evidence is retained for inline style materialization."""
     layouts = {angle: build_layout_evidence(lines, page_size, angle=angle) for angle in {line.angle for line in lines}}
     for line in lines:
         was_title = line.semantic_type == "paragraph_title"
@@ -1151,7 +1151,7 @@ def _demote_runin_title_fragments(lines: list[_LineItem], page_size: tuple[float
                 for prefix in lines:
                     if (
                         prefix.semantic_type == "paragraph_title"
-                        # 单独字母序号是下一项的前缀，不是上一标题的换行碎片，不能向上传播降级。
+                        # The alphabetical number alone is a prefix for the next item, not a line-breaking fragment of the previous title, and cannot be propagated upward for downgrades.
                         and re.fullmatch(r"[a-zA-Z][.)]", line.text.strip()) is None
                         and prefix.angle == line.angle
                         and not prefix.explicit_section_title
@@ -1168,7 +1168,7 @@ def _merge_metric_heading_fragments(
     lines: list[_LineItem],
     page_size: tuple[float, float],
 ) -> list[_LineItem]:
-    """同排大号标题为数值指标提供版式证据，仅聚合紧邻方向箭头及引用上标，保留下一行说明。"""
+    """The large title in the same row provides layout evidence for the numerical indicator. Only the adjacent directional arrows and reference superscripts are aggregated, and the next line of explanation is retained."""
     consumed: set[int] = set()
     merged_lines: list[_LineItem] = []
     for value in lines:
@@ -1240,7 +1240,7 @@ def _merge_title_resolved_visual_rows(
     lines: list[_LineItem],
     page_size: tuple[float, float],
 ) -> list[_LineItem]:
-    """在标题判定后合并同行标题或已降级的混合字体正文 run。"""
+    """Merge peer titles or downgraded mixed font body text after title determination run."""
 
     row_groups: dict[tuple[int, int], list[_LineItem]] = {}
     for line in lines:
@@ -1318,7 +1318,7 @@ def _merge_numbered_title_fragments(
     lines: list[_LineItem],
     page_size: tuple[float, float],
 ) -> list[_LineItem]:
-    """合并 PDF 字体分割导致的章节编号与同基线标题文字。"""
+    """Merge PDF font splitting resulting in chapter numbers and same-baseline title text."""
 
     marker_re = re.compile(
         r"^\d+(?:\s*\.\s*\d+)*\.?$",
@@ -1407,7 +1407,7 @@ def _is_dense_same_font_two_run_row(
     members: list[_LineItem],
     page_size: tuple[float, float],
 ) -> bool:
-    """检查两个普通文本 run 是否为同字体且占用充分的完整视觉行。"""
+    """Check whether two normal texts run are in the same font and occupy enough complete visual lines."""
 
     if (
         len(members) != 2
@@ -1455,7 +1455,7 @@ def _is_sparse_short_prefix_two_run_row(
     members: list[_LineItem],
     page_size: tuple[float, float],
 ) -> bool:
-    """识别同视觉行中被宽空白拆开的短前缀与宽正文。"""
+    """Recognize short prefixes and wide text separated by wide whitespace in the same visual line."""
 
     if (
         len(members) != 2
@@ -1520,7 +1520,7 @@ def _can_restore_dense_split_visual_row(
     table_bboxes: list[BBox],
     lane_keys: dict[int, tuple[int, int]],
 ) -> bool:
-    """检查 hard-split run 是否构成同字体且占用充分的完整视觉行。"""
+    """Check whether hard-split run forms a complete visual line of the same font and occupies sufficient space."""
 
     if (
         len(members) < 2
@@ -1596,7 +1596,7 @@ def _merge_dense_split_visual_row(
     members: list[_LineItem],
     page_size: tuple[float, float],
 ) -> _LineItem:
-    """按局部 x 顺序恢复密集视觉行，正净空使用单空格，重叠片段直接连接。"""
+    """Recover dense visual rows in local x order, with single spaces used for positive clearance, and overlapping segments directly connected."""
 
     ordered_geometry = sorted(
         (
@@ -1678,7 +1678,7 @@ def _merge_dense_split_visual_row(
 def merge_text_line_clusters(
     lines: list[_LineItem], page_size: tuple[float, float], table_bboxes: list[BBox]
 ) -> list[_LineItem]:
-    """共享同基线、重叠簇和第二次同基线合并的确定性闭包。"""
+    """Deterministic closure of shared same-baseline, overlapping clusters, and second same-baseline merge."""
     lines = _merge_same_baseline_text_lines(lines, page_size, table_bboxes)
     lines = _merge_overlapping_inline_text_clusters(lines, page_size, table_bboxes)
     return _merge_same_baseline_text_lines(lines, page_size, table_bboxes)

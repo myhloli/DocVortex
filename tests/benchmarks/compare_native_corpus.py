@@ -1,4 +1,4 @@
-"""逐文档交替运行 Python/Rust 基准，核对完整输出并复测超过 5% 的退化。"""
+"""Alternately run the Python/Rust benchmark on a document-by-document basis, verifying the full output and retesting for degradation exceeding 5%."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def code_digest() -> str:
-    """冻结实际 Python/Rust 源码与构建输入，拒绝在测量中途混用版本。"""
+    """Freeze the actual Python/Rust source code and build input, and refuse to mix versions mid-measurement."""
     digest = hashlib.sha256()
     paths = [*ROOT.glob("src/**/*.py"), *ROOT.glob("rust/**/*.rs"), *ROOT.glob("rust/**/*.toml")]
     paths += [ROOT / name for name in ("Cargo.toml", "Cargo.lock", "pyproject.toml", "setup.py", "rust-toolchain.toml")]
@@ -27,7 +27,7 @@ def code_digest() -> str:
 
 
 def measure(path: Path, folder: Path, backend: str, runs: int) -> dict:
-    """复用既有 worker 的计时、输出和 RSS 定义；每种后端独立解释器。"""
+    """Reuse existing worker timing, output, and RSS definitions; independent interpreter for each backend."""
     subprocess.run(
         [
             sys.executable,
@@ -48,7 +48,7 @@ def measure(path: Path, folder: Path, backend: str, runs: int) -> dict:
 
 
 def comparison(pair: dict[str, dict]) -> dict:
-    """比较源文件和完整语义摘要，性能不用于掩盖输出变化。"""
+    """Comparing source files to full semantic summaries, performance is not used to mask output changes."""
     python, rust = pair["python"], pair["rust"]
     assert python["source_sha256"] == rust["source_sha256"]
     assert python["compute"]["backend"] == "python" and rust["compute"]["backend"] == "rust"
@@ -60,7 +60,7 @@ def comparison(pair: dict[str, dict]) -> dict:
 
 
 def main() -> None:
-    """轮换先后次序，保存全部第一次与复测记录，不刷新任何历史金标。"""
+    """Rotate the order, save all first-time and re-test records, and do not refresh any historical gold marks."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--path", type=Path, action="append")

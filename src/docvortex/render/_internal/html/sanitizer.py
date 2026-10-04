@@ -1,4 +1,4 @@
-"""HTML renderer 使用的嵌入片段与 URL 安全处理。"""
+"""HTML renderer uses embedded fragments that are handled safely with URL."""
 
 from __future__ import annotations
 
@@ -95,10 +95,10 @@ _TABLE_STRUCTURE_TAGS = {"colgroup", "table", "tbody", "tfoot", "thead", "tr"}
 
 
 def is_supported_html_markup(content: str) -> bool:
-    """判断内容是否包含需要交给安全层处理的 HTML 标签。
+    """Determine whether the content contains the HTML tag that needs to be handed over to the security layer for processing.
 
-    只有白名单标签或必须整体删除的活动标签才算 HTML，避免把
-    ``<local_dir>`` 和数学不等式这类普通文本误判为标记。
+    Only whitelisted tags or active tags that must be deleted in their entirety count as HTML to avoid
+    Ordinary text such as ``<local_dir>`` and mathematical inequalities are misidentified as tags.
     """
     if not isinstance(content, str):
         raise TypeError("content must be a string")
@@ -124,7 +124,7 @@ def is_supported_html_markup(content: str) -> bool:
 
 
 def sanitize_link_url(url: str) -> str | None:
-    """校验链接地址，仅保留安全的相对地址和显式允许的协议。"""
+    """Verify link addresses, retaining only safe relative addresses and explicitly allowed protocols."""
     normalized = _normalize_url_text(url, parameter_name="url")
     if normalized is None:
         return None
@@ -154,7 +154,7 @@ def sanitize_link_url(url: str) -> str | None:
 
 
 def sanitize_image_source(source: str, *, asset_base_url: str = "") -> str | None:
-    """校验图片来源，并为安全的相对 sidecar 路径添加资源根地址。"""
+    """Verify the source of the image and add the resource root address for a safe relative sidecar path."""
     normalized = _normalize_url_text(source, parameter_name="source")
     if normalized is None:
         return None
@@ -182,7 +182,7 @@ def sanitize_image_source(source: str, *, asset_base_url: str = "") -> str | Non
 
 
 def sanitize_html_fragment(markup: str, *, asset_base_url: str = "") -> str:
-    """清洗嵌入 HTML，保留表格语义、安全媒体与待渲染的 ``eq`` 标签。"""
+    """Clean embed HTML, preserving table semantics, secure media, and ``eq`` tags to be rendered."""
     if not isinstance(markup, str):
         raise TypeError("markup must be a string")
     if not isinstance(asset_base_url, str):
@@ -209,7 +209,7 @@ def sanitize_html_fragment(markup: str, *, asset_base_url: str = "") -> str:
 
 
 def _normalize_url_text(value: str, *, parameter_name: str) -> str | None:
-    """解码 HTML 实体并拒绝可用于混淆协议的控制字符。"""
+    """Decodes the HTML entity and rejects control characters that could be used to obfuscate the protocol."""
     if not isinstance(value, str):
         raise TypeError(f"{parameter_name} must be a string")
     normalized = value.strip()
@@ -225,7 +225,7 @@ def _normalize_url_text(value: str, *, parameter_name: str) -> str | None:
 
 
 def _sanitize_absolute_image_url(source: str) -> str | None:
-    """只允许带有有效主机名的 HTTP(S) 图片地址。"""
+    """Only HTTP(S) image addresses with valid hostnames are allowed."""
     if source.startswith(("//", "\\")):
         return None
     try:
@@ -243,7 +243,7 @@ def _sanitize_absolute_image_url(source: str) -> str | None:
 
 
 def _sanitize_raster_data_uri(source: str) -> str | None:
-    """校验栅格图或 renderer 生成的安全 SVG data URI。"""
+    """Verify raster plot or renderer generated security SVG data URI."""
     match = _DATA_IMAGE_RE.fullmatch(source)
     if match is None:
         return None
@@ -260,17 +260,17 @@ def _sanitize_raster_data_uri(source: str) -> str | None:
 
 
 def _quote_image_url(source: str) -> str:
-    """按现有 render 资源规则编码空格与括号，同时保留 URL 结构字符。"""
+    """Encode spaces and parentheses according to existing render resource rules while preserving URL structural characters."""
     return quote(source, safe="/:#?&=%@+~,;!$'*-._")
 
 
 def _quote_document_url(source: str) -> str:
-    """编码链接中的空格、反斜杠与括号，同时保留 URL 结构字符。"""
+    """Encodes spaces, backslashes, and parentheses in links while preserving URL structure characters."""
     return quote(source, safe="/:#?&=%@+~,;!$'*-._")
 
 
 def _is_safe_image_path(source: str) -> bool:
-    """判断相对或根相对图片路径是否不会逃逸 sidecar 根目录。"""
+    """Determines whether a relative or root relative image path will not escape the sidecar root directory."""
     if "\\" in source:
         return False
     try:
@@ -284,7 +284,7 @@ def _is_safe_image_path(source: str) -> bool:
 
 
 def _sanitize_asset_base_url(asset_base_url: str) -> str | None:
-    """校验用于拼接 sidecar 的资源根地址。"""
+    """Verify the resource root address used to splice sidecar."""
     normalized = _normalize_url_text(asset_base_url, parameter_name="asset_base_url")
     if normalized is None or normalized.startswith(("//", "\\", "#", "?")):
         return None
@@ -303,7 +303,7 @@ def _sanitize_asset_base_url(asset_base_url: str) -> str | None:
 
 
 def _has_unsafe_path_segment(path: str) -> bool:
-    """递归解码 URL 路径，识别控制字符、反斜杠和父目录逃逸。"""
+    """Recursively decode URL paths, identifying control characters, backslashes, and parent directory escapes."""
     decoded_path = path
     for _ in range(8):
         next_path = unquote(decoded_path)
@@ -316,14 +316,14 @@ def _has_unsafe_path_segment(path: str) -> bool:
 
 
 def _remove_active_content(soup: BeautifulSoup) -> None:
-    """在通用白名单清洗前，删除活动标签及其全部内容。"""
+    """Remove active tags and their entire contents before universal whitelist cleaning."""
     for tag in list(soup.find_all(_ACTIVE_CONTENT_TAGS)):
         if tag.parent is not None:
             tag.decompose()
 
 
 def _normalize_fragment_elements(soup: BeautifulSoup, *, asset_base_url: str) -> None:
-    """在 nh3 前重写图片、链接和有边界的数值属性。"""
+    """Override image, link and bounded numeric properties before nh3."""
     for tag in list(soup.find_all(True)):
         if tag.parent is None:
             continue
@@ -338,7 +338,7 @@ def _normalize_fragment_elements(soup: BeautifulSoup, *, asset_base_url: str) ->
 
 
 def _protect_equation_elements(soup: BeautifulSoup) -> None:
-    """使用临时自定义标签保护 ``eq``，规避 nh3 对该历史标签的特殊解析。"""
+    """Use a temporary custom tag to protect ``eq`` to avoid nh3's special parsing of this historical tag."""
     for forged_placeholder in list(soup.find_all(_EQ_PLACEHOLDER_TAG)):
         forged_placeholder.unwrap()
     for equation in soup.find_all("eq"):
@@ -349,7 +349,7 @@ def _protect_equation_elements(soup: BeautifulSoup) -> None:
 
 
 def _normalize_cleaned_content_models(soup: BeautifulSoup) -> None:
-    """修复 allowlist 清洗后仍可能违反 HTML content model 的列表、colgroup 与图片。"""
+    """Fix allowlist Lists, colgroup and pictures of HTML content model may still be violated after cleaning."""
     for image in soup.find_all("img"):
         if not image.has_attr("alt"):
             image["alt"] = ""
@@ -392,7 +392,7 @@ def _normalize_cleaned_content_models(soup: BeautifulSoup) -> None:
 
 
 def _normalize_link_element(tag: Tag) -> bool:
-    """清理链接属性，危险或缺失的 href 由调用方展开为普通文本。"""
+    """Clean up link properties, dangerous or missing href expanded to normal text by the caller."""
     href = sanitize_link_url(_attribute_text(tag.get("href")))
     if href is None:
         return False
@@ -405,7 +405,7 @@ def _normalize_link_element(tag: Tag) -> bool:
 
 
 def _normalize_image_element(tag: Tag, *, asset_base_url: str) -> None:
-    """清理图片属性，危险图片替换为可见且会被转义的 alt 文本。"""
+    """Clean image properties and replace dangerous images with visible and escaped text alt."""
     alt = _attribute_text(tag.get("alt"))
     source = sanitize_image_source(_attribute_text(tag.get("src")), asset_base_url=asset_base_url)
     if source is None:
@@ -419,7 +419,7 @@ def _normalize_image_element(tag: Tag, *, asset_base_url: str) -> None:
 
 
 def _normalized_non_url_attributes(tag: Tag) -> dict[str, str]:
-    """仅保留表格与列表语义需要的有界整数属性。"""
+    """Only bounded integer properties required for table and list semantics are retained."""
     attributes: dict[str, str] = {}
     if tag.name in {"td", "th"}:
         for name in ("colspan", "rowspan"):
@@ -444,7 +444,7 @@ def _normalized_non_url_attributes(tag: Tag) -> dict[str, str]:
 
 
 def _bounded_integer(value: str, *, minimum: int, maximum: int) -> str | None:
-    """解析并规范化指定闭区间内的十进制整数。"""
+    """Parses and normalizes decimal integers within the specified closed range."""
     if _INTEGER_RE.fullmatch(value) is None:
         return None
     number = int(value)
@@ -452,7 +452,7 @@ def _bounded_integer(value: str, *, minimum: int, maximum: int) -> str | None:
 
 
 def _attribute_text(value: object) -> str:
-    """将 BeautifulSoup 属性值稳定地转为字符串。"""
+    """Stable conversion of BeautifulSoup attribute value to string."""
     if value is None:
         return ""
     if isinstance(value, list):
@@ -461,7 +461,7 @@ def _attribute_text(value: object) -> str:
 
 
 def _filter_sanitized_attribute(tag: str, attribute: str, value: str) -> str | None:
-    """在 nh3 重新解析后再次校验 URL，防止解析差异导致属性绕过。"""
+    """Verify URL again after re-parsing nh3 to prevent attribute bypass due to parsing differences."""
     if tag == "a" and attribute == "href":
         return sanitize_link_url(value)
     if tag == "img" and attribute == "src":

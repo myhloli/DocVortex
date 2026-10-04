@@ -1,4 +1,4 @@
-"""Markdown renderer 的 HTML 表格判型与无损 GFM 转换。"""
+"""Markdown renderer's HTML table type determination and lossless GFM conversion."""
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ _STYLE_TAGS = {
 
 
 def _strip_embedded_images(markup: str) -> str:
-    """移除自定义图片 renderer 接管的 HTML 图片，并识别清理后的空内容。"""
+    """Remove the HTML image taken over by the custom image renderer and identify the cleaned empty content."""
     soup = BeautifulSoup(markup, "html.parser")
     images = soup.find_all("img")
     if not images:
@@ -82,7 +82,7 @@ def render_html_table(
     asset_base_url: str,
     delimiters: LatexDelimitersConfig,
 ) -> str | None:
-    """将 HTML table 按复杂度输出原 HTML 或转换为 GFM 表格。"""
+    """Output the original HTML or convert HTML table into the GFM table according to complexity."""
     prefixed = prefix_html_image_sources(content, asset_base_url)
     soup = BeautifulSoup(prefixed, "html.parser")
     tables = soup.find_all("table")
@@ -103,18 +103,18 @@ def format_embedded_html(
     asset_base_url: str,
     delimiters: LatexDelimitersConfig,
 ) -> str:
-    """统一处理嵌入 HTML 的图片地址与行内公式标签。"""
+    """Unified processing of image addresses and inline formula tags embedded in HTML."""
     prefixed = prefix_html_image_sources(markup, asset_base_url)
 
     def _replace_inline_equation(match: re.Match[str]) -> str:
-        """把单个 HTML eq 标签替换为配置的行内公式定界符。"""
+        """Replaces a single HTML eq tag with the configured inline formula delimiter."""
         return f" {delimiters.inline.left}{html.unescape(match.group('latex')).strip()}{delimiters.inline.right} "
 
     return _INLINE_EQ_RE.sub(_replace_inline_equation, prefixed)
 
 
 def _is_complex_table(table: Tag) -> bool:
-    """判断表格是否包含 GFM 无法无损表达的结构。"""
+    """Determine whether the table contains structures that cannot be expressed losslessly by GFM."""
     if table.find("table") is not None:
         return True
     thead = table.find("thead")
@@ -138,7 +138,7 @@ def _is_complex_table(table: Tag) -> bool:
 
 
 def _convert_simple_table(table: Tag, delimiters: LatexDelimitersConfig) -> str | None:
-    """把已确认简单的单层 HTML table 转换为 GFM。"""
+    """Converts confirmed simple single layer HTML table to GFM."""
     rows = table.find_all("tr")
     if not rows:
         return None
@@ -167,7 +167,7 @@ def _convert_simple_table(table: Tag, delimiters: LatexDelimitersConfig) -> str 
 
 
 def _detect_header_index(table: Tag, header_flags: list[list[bool]]) -> int:
-    """优先选择 thead 或全 th 行，否则使用首行作为 GFM 表头。"""
+    """Priority is given to selecting thead or all th rows, otherwise the first row is used as the GFM header."""
     thead = table.find("thead")
     if thead is not None and thead.find("tr", recursive=False) is not None:
         return 0
@@ -182,7 +182,7 @@ def _render_inline_children(
     delimiters: LatexDelimitersConfig,
     inherited_styles: tuple[str, ...] = (),
 ) -> str:
-    """递归渲染简单单元格中的安全行内 HTML。"""
+    """Recursively render safe inline HTML in simple cells."""
     parts: list[str] = []
     for child in node.children:
         if isinstance(child, NavigableString):
@@ -221,7 +221,7 @@ def _render_inline_children(
 
 
 def _node_has_complex_text_style(node: Tag, inherited_styles: tuple[str, ...]) -> bool:
-    """判断节点后代是否含必须用 HTML 表达的有效文字样式组合。"""
+    """Determines whether a node's descendants contain a valid text style combination that must be expressed using HTML."""
     for child in node.children:
         if isinstance(child, NavigableString):
             if str(child) and markdown_styles_require_html(inherited_styles):
@@ -237,17 +237,17 @@ def _node_has_complex_text_style(node: Tag, inherited_styles: tuple[str, ...]) -
 
 
 def _render_inline_code(content: str) -> str:
-    """使用足够长的反引号包装表格单元格内代码。"""
+    """Use long enough backticks to wrap code inside table cells."""
     longest = max((len(match.group(0)) for match in re.finditer(r"`+", content)), default=0)
     fence = "`" * max(1, longest + 1)
     return f"{fence}{_escape_cell_text(content)}{fence}"
 
 
 def _escape_gfm_formula_pipes(latex: str) -> str:
-    """转义公式竖线，并保证 GFM 解析后恢复原始反斜杠数量。"""
+    """Escape formula vertical bars and ensure that the original number of backslashes is restored after GFM parsing."""
 
     def _replace(match: re.Match[str]) -> str:
-        """把竖线前 n 个反斜杠扩展为 2n+1 个 Markdown 反斜杠。"""
+        """Expand n backslashes before the vertical bar to 2n+1 Markdown backslashes."""
         slash_count = len(match.group("slashes"))
         return "\\" * (2 * slash_count + 1) + "|"
 
@@ -255,18 +255,18 @@ def _escape_gfm_formula_pipes(latex: str) -> str:
 
 
 def _escape_link_url(url: str) -> str:
-    """转义 GFM 表格链接目标中的空格、反斜杠和括号。"""
+    """Escape spaces, backslashes, and parentheses in GFM table link targets."""
     return url.replace("\\", "%5C").replace(" ", "%20").replace("(", "%28").replace(")", "%29").replace("|", "%7C")
 
 
 def _escape_cell_text(content: str) -> str:
-    """转义 GFM 单元格中的 HTML、反斜杠与管道符，避免源文本注入活动标签。"""
+    """Escape HTML, backslashes, and pipe characters in the GFM cell to prevent source text from being injected into the active label."""
     escaped_html = content.replace("&", "&amp;").replace("<", "&lt;")
     return escaped_html.replace("\\", "\\\\").replace("|", r"\|")
 
 
 def _normalize_cell_text(content: str) -> str:
-    """压缩普通空白，同时保留显式 br 换行。"""
+    """Compress normal whitespace while preserving explicit br newlines."""
     content = re.sub(r"[ \t\r\f\v]+", " ", content)
     content = re.sub(r" *\n+ *", " ", content)
     content = re.sub(r" *<br> *", "<br>", content)
@@ -274,7 +274,7 @@ def _normalize_cell_text(content: str) -> str:
 
 
 def _format_markdown_row(row: list[str]) -> str:
-    """把一行单元格格式化为 GFM 行。"""
+    """Format a row of cells as row GFM."""
     return f"| {' | '.join(row)} |"
 
 

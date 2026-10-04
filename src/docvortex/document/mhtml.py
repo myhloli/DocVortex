@@ -1,4 +1,4 @@
-"""受限 MIME 归档、根文档选择及分作用域的资源索引。"""
+"""Restricted MIME Archiving, root document selection, and scoped resource indexing."""
 
 from __future__ import annotations
 
@@ -23,35 +23,35 @@ HTML_MEDIA_TYPES = frozenset({"text/html", "application/xhtml+xml"})
 
 
 class MhtmlParseError(DocumentError):
-    """表示归档结构、根文档或 MIME 编码无效。"""
+    """Indicates that the archive structure, root document, or MIME encoding is invalid."""
 
     def __init__(self, message: str) -> None:
-        """提供可供 CLI 和上层调用方识别的稳定错误码。"""
+        """Provide stable error codes that can be recognized by CLI and upper-level callers."""
         super().__init__("mhtml_invalid", message)
 
 
 class MhtmlResourceLimitError(DocumentError):
-    """表示 MIME 容器或累计解码内容超出预算。"""
+    """Indicates MIME container or cumulative decoded content exceeds budget."""
 
     def __init__(self, message: str) -> None:
-        """把归档预算错误映射为统一资源限制错误码。"""
+        """Map archive budget errors to uniform resource limit error codes."""
         super().__init__("resource_limit", message)
 
 
 def resolve_uri(base: str, reference: str) -> str:
-    """按基址解析引用，保留查询参数、片段和百分号编码以区分归档子页面。"""
-    # 使用虚拟 HTTP 基址处理没有原站地址的归档；此地址仅用于内部索引。
+    """Resolve references by base, preserving query parameters, fragments, and percent encoding to distinguish archive subpages."""
+    # Archives without an origin address are processed using the virtual HTTP base address; this address is used only for internal indexing.
     return urljoin(base or "https://mhtml.invalid/", reference.strip())
 
 
 def content_id(value: str) -> str:
-    """规范 MIME Content-ID 的外围空白和尖括号，保留标识符大小写。"""
+    """Specifies surrounding whitespace and angle brackets for MIME Content-ID, preserving identifier case."""
     return value.strip().removeprefix("<").removesuffix(">")
 
 
 @dataclass(eq=False)
 class ResourceScope:
-    """限制引用只查询当前 related 容器及其外层，避免串用 iframe 资源。"""
+    """Limit the reference to only query the current related container and its outer layer to avoid stringing iframe resources."""
 
     parent: ResourceScope | None = None
     locations: dict[str, ArchivePart] = field(default_factory=dict)
@@ -60,7 +60,7 @@ class ResourceScope:
 
 @dataclass(eq=False)
 class ArchivePart:
-    """保存部件头信息和按需解码缓存。"""
+    """Save part header information and decode on-demand cache."""
 
     message: Message
     scope: ResourceScope
@@ -70,25 +70,25 @@ class ArchivePart:
 
     @property
     def media_type(self) -> str:
-        """返回资源的 MIME 类型，调用方无需访问邮件对象。"""
+        """Returns the MIME type of the resource without requiring the caller to access the mail object."""
         return self.message.get_content_type()
 
     @property
     def charset(self) -> str | None:
-        """返回资源声明的字符集，缺失时交由调用方按用途推断。"""
+        """Returns the character set declared by the resource. If missing, it will be inferred by the caller based on usage."""
         return self.message.get_content_charset()
 
     @property
     def source_uri(self) -> str:
-        """返回已按容器基址解析的资源地址。"""
+        """Returns the resource address that has been resolved by the container's base address."""
         return self.location
 
 
 class MhtmlArchive:
-    """持有根 HTML 和只读 MIME 资源，不创建临时文件或请求网络。"""
+    """Holds root HTML and read-only MIME resources without creating temporary files or making network requests."""
 
     def __init__(self, data: bytes, source_context: HtmlSourceContext | None = None) -> None:
-        """校验容器、选择根文档并建立轻量资源索引。"""
+        """Verify containers, select root documents, and build lightweight resource indexes."""
         if len(data) > MAX_ARCHIVE_BYTES:
             raise MhtmlResourceLimitError(f"MHTML archive exceeds {MAX_ARCHIVE_BYTES} bytes")
         try:
@@ -127,7 +127,7 @@ class MhtmlArchive:
         self.subject = str(self.message.get("Subject", "")).strip() or None
 
     def _validate_tree(self) -> None:
-        """迭代校验部件数量、深度和边界缺陷，不展开任何资源内容。"""
+        """Iteratively check component quantity, depth and boundary defects without expanding any resource content."""
         stack = [(self.message, 1)]
         count = 0
         while stack:
@@ -145,7 +145,7 @@ class MhtmlArchive:
                 raise MhtmlParseError("Nested email messages are not MHTML resources")
 
     def _select_root(self, message: Message) -> Message:
-        """遵循 related 的 start/首部件规则和 alternative 的最后可用 HTML 规则。"""
+        """Follow the start/first part rules for related and the last available HTML rules for alternative."""
         media = message.get_content_type()
         if media in HTML_MEDIA_TYPES:
             return message
@@ -166,7 +166,7 @@ class MhtmlArchive:
         raise MhtmlParseError("MHTML root does not contain a supported HTML document")
 
     def _index(self, message: Message, scope: ResourceScope, base: str, *, root: bool = False) -> None:
-        """建立按 related 容器隔离的地址索引，并拒绝同一作用域中的歧义标识。"""
+        """Index addresses isolated by related container and reject ambiguous identities in the same scope."""
         location = str(message.get("Content-Location", ""))
         try:
             uri = urljoin(base, location) if location else base
@@ -182,7 +182,7 @@ class MhtmlArchive:
             for child in message.get_payload():
                 self._index(child, scope, uri)
             return
-        # 没有容器基址时，相对部件地址相对于主文档；不要把主文档的相对路径再次拼接。
+        # When there is no container base address, the relative component address is relative to the main document; do not splice the relative path of the main document again.
         if location and message is not self._root_message:
             uri = resolve_uri(base or self.source_context.source_uri or "", location)
         elif location:
@@ -197,7 +197,7 @@ class MhtmlArchive:
                 index[key] = part
 
     def find(self, reference: str, *, base_href: str | None = None) -> ArchivePart | None:
-        """在根文档可见的作用域内解析 CID 或 Content-Location 引用。"""
+        """Resolve a CID or Content-Location reference within a scope visible to the root document."""
         reference = reference.strip()
         try:
             is_cid = urlsplit(reference).scheme.casefold() == "cid"
@@ -210,7 +210,7 @@ class MhtmlArchive:
             index = scope.ids if is_cid else scope.locations
             part = index.get(key)
             if part is None and is_cid:
-                # Blink 用 Content-Location: cid:... 保存内联 CSS，标准 Content-ID 优先。
+                # Blink saves inline CSS with Content-Location: cid:..., standard Content-ID takes precedence.
                 part = scope.locations.get(reference)
             if part is None and not is_cid:
                 part = index.get(urldefrag(key)[0])
@@ -220,7 +220,7 @@ class MhtmlArchive:
         return None
 
     def decode(self, part: ArchivePart) -> bytes:
-        """按需严格解码资源并累计一次字节预算，缓存成功结果和失败原因。"""
+        """Strictly decode resources on demand and accumulate a byte budget, caching success results and failure reasons."""
         if part.error is not None:
             raise MhtmlParseError(part.error)
         if part.payload is not None:
@@ -248,7 +248,7 @@ class MhtmlArchive:
         return payload
 
     def report(self, code: str, reference: str) -> None:
-        """同一资源问题只报告一次，避免重复图片引用刷满诊断。"""
+        """The same resource problem is only reported once to avoid repeated image references to fill up the diagnosis."""
         key = (code, reference)
         if key not in self._reported:
             self._reported.add(key)

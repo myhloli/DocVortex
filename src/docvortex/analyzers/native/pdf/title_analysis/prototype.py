@@ -1,4 +1,4 @@
-"""匹配标题原型的字体、尺度和对齐特征。"""
+"""Match the font, scale, and alignment characteristics of the title prototype."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def _title_profile_seed_matches_cluster(
         ]
     ],
 ) -> bool:
-    """判断标题种子是否与已有字体、尺度和对齐簇兼容。"""
+    """Determines whether the title seed is compatible with existing font, scale, and alignment clusters."""
 
     reference = cluster[0]
     median_ratio = statistics.median(item[2] for item in cluster)
@@ -60,7 +60,7 @@ def _title_profile_alignment(
     lane: _TextLane,
     body_height: float,
 ) -> tuple[Literal["left", "center"], float] | None:
-    """返回标题行的栏内对齐模式及归一化锚点偏移。"""
+    """Returns the column alignment mode and normalized anchor offset of the title row."""
 
     lane_width = max(0.1, lane.right - lane.left)
     center_offset = (_bbox_center_x(bbox) - (lane.left + lane.right) / 2.0) / lane_width
@@ -79,7 +79,7 @@ def _matching_document_title_prototype(
     document_body_profile: _DocumentBodyProfile | None,
     document_title_profile: _DocumentTitleProfile | None,
 ) -> _TitleStylePrototype | None:
-    """返回与当前行字体、字号、字重和栏内锚点兼容的最强标题原型。"""
+    """Returns the strongest title prototype compatible with the current row's font, size, weight, and column anchors."""
 
     if (
         document_body_profile is None
@@ -132,7 +132,7 @@ def _line_conflicts_document_title_profile(
     document_body_profile: _DocumentBodyProfile | None,
     document_title_profile: _DocumentTitleProfile | None,
 ) -> bool:
-    """识别字体与标题原型一致、但字号明显落入正文带的弱标题候选。"""
+    """Identify weak title candidates whose fonts are consistent with the title prototype, but whose font size clearly falls into the text band."""
 
     if (
         document_body_profile is None
@@ -177,7 +177,7 @@ def _line_conflicts_document_title_profile(
 
 
 def _title_font_families_compatible(first: str, second: str) -> bool:
-    """忽略已由 flags 和字重单独约束的常见字体样式后缀。"""
+    """Ignore common font style suffixes that have been individually constrained by flags and weight."""
 
     if first == second:
         return True

@@ -1,4 +1,4 @@
-"""解析 DOC CLX piece table 并恢复全局 UTF-16 CP 文本流。"""
+"""Parse DOC CLX piece table and restore the global UTF-16 CP text stream."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from .records import DocBudget
 
 @dataclass(frozen=True, slots=True)
 class Piece:
-    """一个把逻辑 CP 范围映射到 WordDocument FC 的 piece。"""
+    """A piece that maps the logical CP range to WordDocument FC."""
 
     cp_start: int
     cp_end: int
@@ -25,7 +25,7 @@ class Piece:
 
 @dataclass(slots=True)
 class TextStream:
-    """字符标量及其 CP、FC 和 piece 映射。"""
+    """Character scalars and their CP, FC, and piece mappings."""
 
     chars: list[str]
     cps: list[int]
@@ -33,18 +33,18 @@ class TextStream:
     piece_indexes: list[int]
 
     def index_of_cp(self, cp: int) -> int:
-        """返回首个 CP 不小于目标值的字符索引。"""
+        """Return the first character index where CP is not less than the target value."""
 
         return bisect_left(self.cps, max(cp, 0))
 
     def text_between(self, cp_start: int, cp_end: int) -> str:
-        """返回指定 CP 半开区间的 Unicode 文本。"""
+        """Returns the Unicode text specifying the CP half-open range."""
 
         return "".join(self.chars[self.index_of_cp(cp_start) : self.index_of_cp(cp_end)])
 
 
 def _prm0_grpprl(prm: int) -> bytes:
-    """把 Prm0 中已支持的单个属性还原为 grpprl。"""
+    """Restore individual attributes already supported in Prm0 to grpprl."""
 
     isprm = (prm >> 1) & 0x7F
     value = (prm >> 8) & 0xFF
@@ -63,7 +63,7 @@ def _prm0_grpprl(prm: int) -> bytes:
 
 
 def _parse_plc_pcd(plc: bytes, prcs: list[bytes], budget: DocBudget) -> list[Piece]:
-    """解析 Pcdt 内的 PlcPcd 并绑定 piece Prm。"""
+    """Parse PlcPcd in Pcdt and bind piece to Prm."""
 
     if len(plc) < 16 or (len(plc) - 4) % 12:
         raise LegacyOfficeMalformedError("DOC piece table is empty or malformed")
@@ -107,7 +107,7 @@ def _parse_plc_pcd(plc: bytes, prcs: list[bytes], budget: DocBudget) -> list[Pie
 
 
 def parse_clx(table_stream: bytes, *, offset: int, size: int, budget: DocBudget) -> list[Piece]:
-    """解析 CLX 中的 Prc 数组和最终 Pcdt。"""
+    """Parse the Prc array and final Pcdt in CLX."""
 
     clx = bounded_slice(table_stream, offset, size)
     if clx is None:
@@ -140,7 +140,7 @@ def parse_clx(table_stream: bytes, *, offset: int, size: int, budget: DocBudget)
 
 
 def legacy_single_piece(*, fc_min: int, fc_mac: int, ccp_text: int) -> list[Piece]:
-    """为没有 CLX 的非 complex 文档构造保守单 piece。"""
+    """Construct conservative single piece for non-complex documents without CLX."""
 
     if fc_min < 0 or fc_mac <= fc_min:
         return []
@@ -151,7 +151,7 @@ def legacy_single_piece(*, fc_min: int, fc_mac: int, ccp_text: int) -> list[Piec
 
 
 def codec_for_lid(lid: int) -> str:
-    """把 Word LID 映射为 Python 可用的 ANSI/DBCS codec。"""
+    """Map Word LID to ANSI/DBCS codec available in Python."""
 
     primary = lid & 0x03FF
     if primary == 0x11:
@@ -182,7 +182,7 @@ def codec_for_lid(lid: int) -> str:
 
 
 def _lead_byte(codec: str, value: int) -> bool:
-    """判断一个压缩 piece 字节是否为 DBCS 首字节。"""
+    """Determine whether a compressed piece byte is the first byte of DBCS."""
 
     if codec == "cp932":
         return 0x81 <= value <= 0x9F or 0xE0 <= value <= 0xFC
@@ -199,7 +199,7 @@ def extract_text(
     codec: str,
     budget: DocBudget,
 ) -> TextStream:
-    """按 piece 顺序恢复字符，并保留字符到 CP/FC 的反向映射。"""
+    """Restore characters in piece order and preserve the reverse mapping of characters to CP/FC."""
 
     chars: list[str] = []
     cps: list[int] = []

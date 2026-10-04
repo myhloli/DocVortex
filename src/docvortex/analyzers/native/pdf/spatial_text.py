@@ -1,4 +1,4 @@
-"""将 PDF 字符或 OCR 结果投影为空间文本的共享算法。"""
+"""A shared algorithm for projecting PDF characters or OCR results into spatial text."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from ....schema import BBox
 from .table_geometry import normalize_bbox as _coerce_bbox
 from .table_geometry import rotate_local_bbox as _rotate_local_bbox
 
-# 空间投影思路参考 LiteParse v2.6.0 的字符分段和网格投影；
-# 本模块只针对已有 table bbox 重新实现，不引入 LiteParse 运行时依赖。
+# For spatial projection ideas, refer to the character segmentation and grid projection of LiteParse v2.6.0;
+# This module only re-implements the existing table bbox and does not introduce LiteParse runtime dependencies.
 _MAX_INLINE_GAP = 15.0
 _Y_TOLERANCE = 2.0
 _PENDING_SPACE_SPLIT_RATIO = 2.2
@@ -54,7 +54,7 @@ _PUNCTUATION_TRANSLATION = str.maketrans(
 
 @dataclass(slots=True)
 class _SpatialTextItem:
-    """保存表格局部坐标中的文本、外接框和识别置信度。"""
+    """Save the text, bounding box, and recognition confidence in table local coordinates."""
 
     text: str
     bbox: BBox
@@ -62,14 +62,14 @@ class _SpatialTextItem:
 
 
 def _normalize_table_text(value: Any) -> str:
-    """统一表格文本中的连字、控制横线和排版标点。"""
+    """Unify ligatures, control lines, and typographic punctuation in table text."""
     if not isinstance(value, str):
         return ""
     return value.translate(_PUNCTUATION_TRANSLATION)
 
 
 def _bbox_union(bbox1: BBox, bbox2: BBox) -> BBox:
-    """合并两个字符框，得到当前文本片段的外接框。"""
+    """Merge two character boxes to get the bounding box of the current text fragment."""
     return (
         min(bbox1[0], bbox2[0]),
         min(bbox1[1], bbox2[1]),
@@ -79,7 +79,7 @@ def _bbox_union(bbox1: BBox, bbox2: BBox) -> BBox:
 
 
 def _normalize_angle(angle: Any) -> int:
-    """把已有表格角度限制到四个标准方向，非法值按零度处理。"""
+    """Limit existing table angles to four standard directions, and illegal values are treated as zero degrees."""
     try:
         normalized_angle = int(float(angle or 0)) % 360
     except (TypeError, ValueError):
@@ -88,7 +88,7 @@ def _normalize_angle(angle: Any) -> int:
 
 
 def _select_table_chars(chars: list[Char], table_bbox: BBox) -> list[Char]:
-    """按字符框中心点选择表格内字符，并保持原始字符流顺序。"""
+    """Select the characters in the table according to the center point of the character box and maintain the original character flow order."""
     x0, y0, x1, y1 = table_bbox
     selected_chars: list[tuple[int, int, Char]] = []
     for fallback_idx, char in enumerate(chars):
@@ -115,7 +115,7 @@ def _select_table_chars(chars: list[Char], table_bbox: BBox) -> list[Char]:
 def _build_pdf_spatial_items(
     chars: list[Char], table_bbox: BBox, angle: int, *, infer_tight_spaces: bool = False
 ) -> list[_SpatialTextItem]:
-    """按换行、字符间距和几何连续性把 PDF 字符流拆成空间文本项。"""
+    """Split the PDF character stream into spatial text items based on line breaks, character spacing, and geometric continuity."""
     table_x0, table_y0, table_x1, table_y1 = table_bbox
     table_width = table_x1 - table_x0
     table_height = table_y1 - table_y0
@@ -130,7 +130,7 @@ def _build_pdf_spatial_items(
     last_source_char = None
 
     def flush_segment() -> None:
-        """提交当前 PDF 文本片段，并重置片段累计状态。"""
+        """Submits the current PDF text fragment and resets the fragment accumulation status."""
         nonlocal segment_parts, segment_bbox, last_char_bbox, char_widths, pending_space, last_source_char
         text = _normalize_table_text("".join(segment_parts)).strip()
         if text and segment_bbox is not None:
@@ -219,7 +219,7 @@ def _build_pdf_spatial_items(
 
 
 def _build_ocr_spatial_items(ocr_result: Any, table_size: tuple[int, int]) -> list[_SpatialTextItem]:
-    """把 MinerU OCR 四点框结果转换成可投影的空间文本项。"""
+    """Converts the MinerU OCR four-point box result into a projectable spatial text item."""
     table_width, table_height = table_size
     spatial_items: list[_SpatialTextItem] = []
     for raw_item in ocr_result or []:
@@ -253,7 +253,7 @@ def _build_ocr_spatial_items(ocr_result: Any, table_size: tuple[int, int]) -> li
 
 
 def _compute_text_grid_size(items: list[_SpatialTextItem]) -> tuple[float, float]:
-    """使用文本项的平均字符宽度和框高计算稳健的中位网格尺寸。"""
+    """Compute a robust median grid size using the average character width and box height of the text item."""
     char_widths = [
         (item.bbox[2] - item.bbox[0]) / max(1, len(item.text)) for item in items if item.bbox[2] > item.bbox[0] and item.text
     ]
@@ -268,7 +268,7 @@ def _form_spatial_lines(
     median_width: float,
     median_height: float,
 ) -> list[list[_SpatialTextItem]]:
-    """依据 y 网格、垂直交叠和水平碰撞关系把文本项归并为视觉行。"""
+    """Group text items into visual lines based on the y grid, vertical overlap, and horizontal collision relationships."""
     y_sort_tolerance = max(5.0, median_height * 0.5)
     sorted_items = sorted(
         items,
@@ -307,7 +307,7 @@ def _form_spatial_lines(
 
 
 def _trim_projected_lines(lines: list[str]) -> str:
-    """清理行尾空格和公共左缩进，同时保留表格内部列间距。"""
+    """Clean up end-of-line spaces and common left indentation while preserving internal table column spacing."""
     trimmed_lines = [line.rstrip() for line in lines]
     while trimmed_lines and not trimmed_lines[0]:
         trimmed_lines.pop(0)
@@ -328,7 +328,7 @@ def _project_spatial_items(
     *,
     preserve_blank_rows: bool = False,
 ) -> str:
-    """把空间文本项投影到等宽字符网格，并按需保留明显的空白行。"""
+    """Projects spatial text items to a constant-width character grid, preserving visible whitespace lines as needed."""
     valid_items = [item for item in items if item.text and item.bbox[2] > item.bbox[0] and item.bbox[3] > item.bbox[1]]
     if not valid_items:
         return ""
@@ -367,7 +367,7 @@ def project_pdf_spatial_text(
     preserve_blank_rows: bool = False,
     infer_tight_spaces: bool = False,
 ) -> str:
-    """从 PDF 指定区域提取字符，并返回可选保留空行的空间投影文本。"""
+    """Extracts characters from the range specified by PDF and returns spatially projected text, optionally preserving blank lines."""
 
     normalized_bbox = _coerce_bbox(region_bbox)
     if normalized_bbox is None:
@@ -379,13 +379,13 @@ def project_pdf_spatial_text(
 
 
 def project_pdf_table_text(chars: list[Char], table_bbox: BBox, angle: int = 0) -> str:
-    """从 PDF 原生字符中提取指定表格，并返回空间投影纯文本。"""
+    """Extracts the specified table from PDF native characters and returns spatially projected plain text."""
 
     return project_pdf_spatial_text(chars, table_bbox, angle, infer_tight_spaces=True)
 
 
 def project_ocr_table_text(ocr_result: Any, table_size: tuple[int, int]) -> str:
-    """从 MinerU OCR 结果生成指定表格的空间投影纯文本。"""
+    """Generates spatially projected plain text of the specified table from the MinerU OCR results."""
     table_width, table_height = table_size
     if table_width <= 0 or table_height <= 0:
         return ""

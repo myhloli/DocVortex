@@ -1,6 +1,6 @@
 # Portions derived from pdftext 0.7.1, Copyright Vik Paruchuri, Apache-2.0.
 # Changed in DocVortex: owned character types and source-index mappings replace upstream containers.
-"""DocVortex 自有 PDF 字符与几何数据，不携带 PDFium 句柄。"""
+"""DocVortex has its own PDF character and geometric data, and does not carry the PDFium handle."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ class Bbox:
     __slots__ = ("bbox", "ensure_nonzero_area")
 
     def __init__(self, bbox: list[float], ensure_nonzero_area: bool = False) -> None:
-        """建立独立矩形对象并按需保证面积。"""
+        """Create independent rectangular objects and ensure area as needed."""
         if ensure_nonzero_area:
             bbox = list(bbox)
             bbox[2] = max(bbox[0], bbox[2] + 1)
@@ -20,69 +20,69 @@ class Bbox:
         self.ensure_nonzero_area = ensure_nonzero_area
 
     def __getitem__(self, item: int | slice) -> float | list[float]:
-        """读取矩形坐标。"""
+        """Read the coordinates of the rectangle."""
         return self.bbox[item]
 
     def __repr__(self) -> str:
-        """返回矩形的可读表示。"""
+        """Returns a human-readable representation of the rectangle."""
         return f"Bbox({self.bbox})"
 
     def __reduce__(self) -> tuple:
         # ensure_nonzero_area is already applied at construction; don't re-apply on unpickle
-        """保存矩形数值以支持跨进程序列化。"""
+        """Save rectangular values to support cross-process serialization."""
         return (Bbox, (self.bbox,))
 
     def copy(self) -> Bbox:
-        """复制矩形避免共享累加状态。"""
+        """Duplicate the rectangle to avoid sharing accumulated state."""
         return Bbox(list(self.bbox))
 
     @property
     def height(self) -> float:
-        """计算矩形的 height 几何属性。"""
+        """Calculates the height geometric properties of a rectangle."""
         return self.bbox[3] - self.bbox[1]
 
     @property
     def width(self) -> float:
-        """计算矩形的 width 几何属性。"""
+        """Calculates the width geometric properties of a rectangle."""
         return self.bbox[2] - self.bbox[0]
 
     @property
     def area(self) -> float:
-        """计算矩形的 area 几何属性。"""
+        """Calculates the area geometric properties of a rectangle."""
         return self.width * self.height
 
     @property
     def center(self) -> list[float]:
-        """计算矩形的 center 几何属性。"""
+        """Calculates the center geometric properties of a rectangle."""
         return [(self.bbox[0] + self.bbox[2]) / 2, (self.bbox[1] + self.bbox[3]) / 2]
 
     @property
     def size(self) -> list[float]:
-        """计算矩形的 size 几何属性。"""
+        """Calculates the size geometric properties of a rectangle."""
         return [self.width, self.height]
 
     @property
     def x_start(self) -> float:
-        """计算矩形的 x_start 几何属性。"""
+        """Calculates the x_start geometric properties of a rectangle."""
         return self.bbox[0]
 
     @property
     def y_start(self) -> float:
-        """计算矩形的 y_start 几何属性。"""
+        """Calculates the y_start geometric properties of a rectangle."""
         return self.bbox[1]
 
     @property
     def x_end(self) -> float:
-        """计算矩形的 x_end 几何属性。"""
+        """Calculates the x_end geometric properties of a rectangle."""
         return self.bbox[2]
 
     @property
     def y_end(self) -> float:
-        """计算矩形的 y_end 几何属性。"""
+        """Calculates the y_end geometric properties of a rectangle."""
         return self.bbox[3]
 
     def merge(self, other: Bbox) -> Bbox:
-        """返回覆盖两个矩形的新对象。"""
+        """Returns a new object covering both rectangles."""
         self_bbox = self.bbox
         other_bbox = other.bbox
         return Bbox(
@@ -96,7 +96,7 @@ class Bbox:
 
     def merge_inplace(self, other: Bbox) -> Bbox:
         # Mutates this bbox; only safe on accumulator bboxes that aren't shared
-        """仅修改当前累加矩形。"""
+        """Only the current accumulation rectangle is modified."""
         self_bbox = self.bbox
         other_bbox = other.bbox
         if other_bbox[0] < self_bbox[0]:
@@ -110,19 +110,19 @@ class Bbox:
         return self
 
     def overlap_x(self, other: Bbox) -> float:
-        """计算矩形的 overlap_x 几何属性。"""
+        """Calculates the overlap_x geometric properties of a rectangle."""
         return max(0, min(self.bbox[2], other.bbox[2]) - max(self.bbox[0], other.bbox[0]))
 
     def overlap_y(self, other: Bbox) -> float:
-        """计算矩形的 overlap_y 几何属性。"""
+        """Calculates the overlap_y geometric properties of a rectangle."""
         return max(0, min(self.bbox[3], other.bbox[3]) - max(self.bbox[1], other.bbox[1]))
 
     def intersection_area(self, other: Bbox) -> float:
-        """计算矩形的 intersection_area 几何属性。"""
+        """Calculates the intersection_area geometric properties of a rectangle."""
         return self.overlap_x(other) * self.overlap_y(other)
 
     def intersection_pct(self, other: Bbox) -> float:
-        """计算矩形的 intersection_pct 几何属性。"""
+        """Calculates the intersection_pct geometric properties of a rectangle."""
         if self.area <= 0:
             return 0
 
@@ -130,7 +130,7 @@ class Bbox:
         return intersection / self.area
 
     def rotate(self, page_width: float, page_height: float, rotation: int) -> Bbox:
-        """将矩形转换到旋转后的页面坐标。"""
+        """Convert the rectangle to rotated page coordinates."""
         if rotation not in [0, 90, 180, 270]:
             raise ValueError("Rotation must be one of [0, 90, 180, 270] degrees.")
 
@@ -175,7 +175,7 @@ class _CharValue(TypedDict):
 
 
 class Char(_CharValue, total=False):
-    """字符及原始索引映射，几何缺失保留为显式空值。"""
+    """Character and raw index mapping, missing geometry is left as explicit null."""
 
     source_indices: tuple[int, ...]
     raw_code: int
@@ -189,7 +189,7 @@ class Char(_CharValue, total=False):
 
 
 class Span(TypedDict):
-    """基础字体片段，包含已解码文本及原始字符引用。"""
+    """Base font fragment containing decoded text and raw character references."""
 
     bbox: Bbox
     text: str
@@ -204,7 +204,7 @@ class Span(TypedDict):
 
 
 class Line(TypedDict):
-    """基础文本行，几何与片段顺序均保持可追溯。"""
+    """Basic text lines, geometry and fragment order remain traceable."""
 
     spans: list[Span]
     bbox: Bbox

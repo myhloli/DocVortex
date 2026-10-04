@@ -1,8 +1,8 @@
-"""共享 /Resources 的 Form 资源图只做可达性遍历，不得枚举简单路径。
+"""The Form resource graph that shares /Resources only performs reachability traversal and is not allowed to enumerate simple paths.
 
-回归 #17：多个 Form XObject 共用一个列出它们全部的 /Resources 字典时，
-`_resource_graph_has_cid_without_to_unicode()` 的结果与路径无关，每个 Form
-按对象身份只允许访问一次；路径局部防环会退化成 e·N! 次调用。
+Regression #17: When multiple Form XObject share a /Resources dictionary listing them all,
+The results of `_resource_graph_has_cid_without_to_unicode()` are path independent, each Form
+Only one access is allowed based on the object identity; the path local loop prevention will degrade to e·N! calls.
 """
 
 from io import BytesIO
@@ -22,7 +22,7 @@ classify = import_module("docvortex.document.pdf.classify")
 
 
 def _pdf(objects: list[bytes]) -> bytes:
-    """按对象号顺序写出带 xref 表的最小合法 PDF（对象 1 是 catalog）。"""
+    """Write the smallest legal PDF with the xref table in object number order (object 1 is catalog)."""
     out, offsets = bytearray(b"%PDF-1.7\n"), []
     for number, body in enumerate(objects, start=1):
         offsets.append(len(out))
@@ -35,10 +35,10 @@ def _pdf(objects: list[bytes]) -> bytes:
 
 
 def _forms_pdf(forms: int, *, shared: bool) -> bytes:
-    """一页文本绘制 `forms` 个空 Form。
+    """One page of text draws `forms` empty Form.
 
-    shared=True 时每个 Form 的 /Resources 都是被页引用、且列出全部 Form 的对象 4，
-    任意两个 Form 互相可达；否则每个 Form 携带自己的空 /Resources。
+    When shared=True, /Resources of each Form is the object 4 referenced by the page and lists all Form.
+    Any two Forms are reachable to each other; otherwise each Form carries its own empty /Resources.
     """
     xobjects = b" ".join(b"/X%d %d 0 R" % (i, 7 + i) for i in range(forms))
     text = b"BT /F1 12 Tf 72 720 Td (" + b"Plain text on a page with form XObjects. " * 3 + b") Tj ET\n"
@@ -62,7 +62,7 @@ def _forms_pdf(forms: int, *, shared: bool) -> bytes:
 
 
 def _form_chain_cid_pdf(forms: int) -> bytes:
-    """CID 字体只经由 Form 链可达：页 /Resources 只列 Form，共享的对象 7 才列字体与全部 Form。"""
+    """The CID font is only reachable via the Form link: page /Resources only lists Form, shared object 7 only lists the font with all Form."""
     form_refs = b" ".join(b"/X%d %d 0 R" % (i, 9 + i) for i in range(forms))
     text = b"BT /F1 12 Tf 72 720 Td (" + b"Plain text on a page with form XObjects. " * 3 + b") Tj ET\n"
     draws = b"".join(b"q /X%d Do Q\n" % i for i in range(forms))
@@ -85,12 +85,12 @@ def _form_chain_cid_pdf(forms: int) -> bytes:
 
 
 def _count_resource_graph_calls(monkeypatch):
-    """统计资源图函数的进入次数，递归也经过被替换的模块全局名。"""
+    """The number of entries of the resource graph function is counted, and the recursion also passes through the replaced module global name."""
     original = classify._resource_graph_has_cid_without_to_unicode
     counter = {"calls": 0}
 
     def counted(resources, font_analysis_cache, visited_form_keys=None, visited_resource_keys=None):
-        """记录 Form 递归进入次数，保留资源图函数的原始参数语义。"""
+        """Record the number of recursive entries of Form, retaining the original parameter semantics of the resource graph function."""
         counter["calls"] += 1
         return original(resources, font_analysis_cache, visited_form_keys, visited_resource_keys)
 
@@ -99,7 +99,7 @@ def _count_resource_graph_calls(monkeypatch):
 
 
 def _count_shared_resource_work(monkeypatch, resources):
-    """分别统计共享资源展开次数和枚举的 XObject 条目数。"""
+    """Count the number of shared resource expansions and the number of enumerated XObject entries respectively."""
     resolved = classify._resolve_pdf_object(resources)
     xobjects = classify._resolve_pdf_object(resolved.get("/XObject"))
     counts = {"resource_expansions": 0, "xobject_entries": 0}
@@ -107,13 +107,13 @@ def _count_shared_resource_work(monkeypatch, resources):
     original_values = DictionaryObject.values
 
     def counted_get(self, key, *args, **kwargs):
-        """用读取 /XObject 作为资源字典实际展开的计数点。"""
+        """Use read /XObject as the counting point at which the resource dictionary is actually expanded."""
         if self is resolved and key == "/XObject":
             counts["resource_expansions"] += 1
         return original_get(self, key, *args, **kwargs)
 
     def counted_values(self):
-        """只统计目标共享 XObject 字典的条目枚举。"""
+        """Only the entry enumeration of the target shared XObject dictionary is counted."""
         if self is xobjects:
             counts["xobject_entries"] += len(self)
         return original_values(self)
@@ -124,7 +124,7 @@ def _count_shared_resource_work(monkeypatch, resources):
 
 
 def _classify_shared_forms_worker(data: bytes, result_queue, ready_event, start_event) -> None:
-    """预热独立进程后同步启动分类，避免把进程导入耗时计入页面期限。"""
+    """Start the classification synchronously after preheating the independent process to avoid counting the process import time into the page deadline."""
     ready_event.set()
     if not start_event.wait(timeout=20.0):
         return
@@ -136,7 +136,7 @@ def _classify_shared_forms_worker(data: bytes, result_queue, ready_event, start_
 
 @pytest.mark.parametrize("shared", [False, True])
 def test_form_resource_graph_visits_each_form_once(monkeypatch, shared):
-    """共享与独占 /Resources 两种形态的调用次数都被 2N+1 约束，而不是阶乘级枚举。"""
+    """The number of calls in both forms of shared and exclusive /Resources is constrained by 2N+1, rather than factorial-level enumeration."""
     forms = 8
     counter = _count_resource_graph_calls(monkeypatch)
     reader = PdfReader(BytesIO(_forms_pdf(forms, shared=shared)))
@@ -147,7 +147,7 @@ def test_form_resource_graph_visits_each_form_once(monkeypatch, shared):
 
 
 def test_classify_returns_txt_for_shared_resource_forms(monkeypatch):
-    """端到端：页与 10 个 Form 共享 /Resources 时 classify 正常返回 txt 且访问次数有界。"""
+    """End-to-end: When the page shares /Resources with 10 Form, classify returns txt normally and the number of accesses is bounded."""
     forms = 10
     counter = _count_resource_graph_calls(monkeypatch)
 
@@ -158,7 +158,7 @@ def test_classify_returns_txt_for_shared_resource_forms(monkeypatch):
 
 @pytest.mark.parametrize("forms", [12, 115])
 def test_shared_resource_expansion_is_linear(monkeypatch, forms):
-    """共享资源的 Form 递归、资源展开和 XObject 枚举分别受线性上界约束。"""
+    """Form recursion, resource expansion, and XObject enumeration of shared resources are each subject to linear upper bounds."""
     reader = PdfReader(BytesIO(_forms_pdf(forms, shared=True)))
     resources = reader.pages[0]["/Resources"]
     graph_calls = _count_resource_graph_calls(monkeypatch)
@@ -173,7 +173,7 @@ def test_shared_resource_expansion_is_linear(monkeypatch, forms):
 @pytest.mark.parametrize(("forms", "seconds_limit"), [(12, 2.0), (115, 5.0)])
 @pytest.mark.skipif(bool(os.getenv("CI")), reason="性能时限在独立基准机运行，CI 仅验证操作次数和结果")
 def test_shared_forms_classification_deadline(forms: int, seconds_limit: float) -> None:
-    """共享资源 Form 分类在明确时限内返回已知的文本模式。"""
+    """Shared resource Form classification returns known text patterns within a defined time limit."""
     context = multiprocessing.get_context("spawn")
     result_queue = context.Queue()
     ready_event = context.Event()
@@ -199,7 +199,7 @@ def test_shared_forms_classification_deadline(forms: int, seconds_limit: float) 
 
 
 def test_form_chain_still_detects_cid_without_to_unicode():
-    """仅经 Form 链可达的 Identity CID 缺 ToUnicode 字体仍要触发信号。"""
+    """Identity CID that is only reachable via the Form chain still triggers the signal if the ToUnicode font is missing."""
     reader = PdfReader(BytesIO(_form_chain_cid_pdf(6)))
     resources = reader.pages[0]["/Resources"]
 

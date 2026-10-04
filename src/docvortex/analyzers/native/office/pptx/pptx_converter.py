@@ -14,7 +14,7 @@ from ..._shared.xycut import sort_entries
 from .....schema import BlockType
 
 # PPTX_XYCUT_BETA: Final = 0.7
-# PPTX 标题占位符角色仅用于单页内部归一化，返回 model_output 前必须清理。
+# PPTX The title placeholder role is only used for single page internal normalization and must be cleaned before returning model_output.
 
 
 from .context import (
@@ -46,16 +46,16 @@ from .text_styles import _PptxTextStyles
 from .lists import _PptxLists
 from .titles import _PptxTitles
 
-# python-pptx 默认模板幻灯片尺寸（10 × 7.5 英寸，EMU），用于缺 p:sldSz 的包。
+# python-pptx Default template slide size (10 × 7.5 inches, EMU) for packages missing p:sldSz.
 DEFAULT_SLIDE_WIDTH_EMU = 9144000
 DEFAULT_SLIDE_HEIGHT_EMU = 6858000
 
 
 class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _PptxTitles):
-    """编排 PPTX 包读取、逐页遍历、重试及职责处理。"""
+    """Orchestrate PPTX packet reading, page-by-page traversal, retries and responsibility processing."""
 
     def __init__(self):
-        """配置固定命名空间并为当前转换创建独立状态。"""
+        """Configure a fixed namespace and create independent state for the current transformation."""
         self.namespaces = {
             "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
             "c": "http://schemas.openxmlformats.org/drawingml/2006/chart",
@@ -68,7 +68,7 @@ class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _P
         self,
         file_stream: BinaryIO,
     ):
-        """解析 PPTX；资源异常直接传播，包兼容异常才进入规范化重试。"""
+        """Parsing PPTX; resource exceptions are propagated directly, and package compatibility exceptions enter normalized retry."""
         if rewind_stream(file_stream):
             try:
                 self._convert_package_stream(file_stream)
@@ -89,7 +89,7 @@ class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _P
             self._retry_convert_package_bytes_after_normalization(file_bytes, exc)
 
     def _reset_state(self) -> None:
-        """重置解析状态，确保失败重试时不会残留上一次半解析结果。"""
+        """Reset the parsing status to ensure that the last semi-parsed result will not remain when retrying after failure."""
         self.pages = []
         self.cur_page = []
         self.list_block_stack = []
@@ -101,11 +101,11 @@ class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _P
         self._mtef_warned_shapes = set()
 
     def _convert_package_bytes(self, file_bytes: bytes) -> None:
-        """用独立字节流解析 PPTX 包，便于原始包失败后用规范化包重试。"""
+        """Parse the PPTX packet with a separate byte stream to facilitate retrying with the normalized packet if the original packet fails."""
         self._convert_package_stream(BytesIO(file_bytes))
 
     def _convert_package_stream(self, file_stream: BinaryIO) -> None:
-        """直接使用可复位的 PPTX 流解析正常路径，避免提前复制完整包字节。"""
+        """Directly use the resettable PPTX stream to parse the normal path, avoiding early copying of full packet bytes."""
         self._reset_state()
         rewind_stream(file_stream)
         self.file_stream = file_stream
@@ -121,7 +121,7 @@ class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _P
         file_bytes: bytes,
         exc: Exception,
     ) -> None:
-        """首次解析失败后，仅在包规范化确实产生变化时使用规范化字节重试。"""
+        """After the first parse failure, retry using normalized bytes only if packet normalization does make a difference."""
         normalized_bytes = normalize_pptx_package(file_bytes)
         if normalized_bytes == file_bytes:
             raise exc
@@ -129,18 +129,18 @@ class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _P
         self._convert_package_bytes(normalized_bytes)
 
     def _walk_linear(self, pptx_obj: presentation.Presentation):
-        # 缺 p:sldSz 的非标准包 slide_width/height 为 None，按 python-pptx 默认模板尺寸回退。
+        # The non-standard package slide_width/height that lacks p:sldSz is None, and falls back to the default template size of python-pptx.
         slide_width = int(pptx_obj.slide_width or DEFAULT_SLIDE_WIDTH_EMU)
         slide_height = int(pptx_obj.slide_height or DEFAULT_SLIDE_HEIGHT_EMU)
         has_visible_content_slide = False
 
-        # 遍历每一张幻灯片
+        # Go through every slide
         for _, slide in enumerate(pptx_obj.slides):
             linear_shapes = self._flatten_slide_shapes(slide.shapes)
             sortable_shape_entries = []
             tail_blocks = []
 
-            # 遍历幻灯片中的每一个形状
+            # Iterate through every shape in the slide
             for shape_index, shape_entry in enumerate(linear_shapes):
                 shape_blocks = self._collect_shape_blocks(
                     shape_entry,
@@ -281,7 +281,7 @@ class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _P
         self.list_block_stack = []
         list_level_base: Optional[int] = None
 
-        # 遍历段落以构建文本
+        # Traverse paragraphs to build text
         for paragraph in shape.text_frame.paragraphs:
             list_info = self._get_paragraph_list_info(shape, paragraph)
 
@@ -303,7 +303,7 @@ class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _P
                     )
                 continue
 
-            # 段落不是列表项，关闭当前 shape 的列表上下文
+            # Paragraph is not a list item, close list context for current shape
             self.list_block_stack.clear()
             list_level_base = None
 
@@ -329,6 +329,6 @@ class PptxConverter(_PptxResources, _PptxShapes, _PptxTextStyles, _PptxLists, _P
 
             self.cur_page.append(block)
 
-        # shape 结束后清理列表上下文，避免跨 shape 污染
+        # Clean up the list context after shape ends to avoid cross-shape contamination
         self.list_block_stack.clear()
         return

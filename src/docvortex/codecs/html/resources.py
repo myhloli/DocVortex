@@ -1,4 +1,4 @@
-"""HTML wire 物化依赖的资源协议，不依赖具体输入解析器。"""
+"""HTML wire The resource protocol that materialization depends on does not rely on a specific input parser."""
 
 from __future__ import annotations
 
@@ -9,26 +9,26 @@ from ...content.markup import MarkupContext
 
 
 class WireAnchorResolver(Protocol):
-    """描述精确 HTML 文档提供的锚点解析能力。"""
+    """Describes the anchor resolution capabilities provided by the precise HTML document."""
 
     def resolve_fragment(self, fragment: str) -> str | None:
-        """将源 fragment 解析为规范内部链接。"""
+        """Resolve source fragment as a canonical internal link."""
 
     def heading_anchor(self, heading: etree._Element) -> str | None:
-        """返回标题的规范锚点。"""
+        """Returns the canonical anchor point of the title."""
 
     def heading_label(self, anchor: str) -> str | None:
-        """返回标题锚点对应的文字。"""
+        """Returns the text corresponding to the title anchor."""
 
     def note_anchor(self, note: etree._Element) -> str | None:
-        """返回页面脚注的规范锚点。"""
+        """Returns the canonical anchor point for the page footer."""
 
 
 class WireResourceContext(MarkupContext, Protocol):
-    """在共享 markup 能力上增加绑定精确 wire 锚点的操作。"""
+    """Added the ability to bind precise wire anchors to the shared markup capability."""
 
     def bind_anchors(self, anchors: WireAnchorResolver) -> None:
-        """绑定经过整棵 wire 验证的锚点解析器。"""
+        """Binds an anchor resolver verified by the entire wire tree."""
 
 
 __all__ = ["WireAnchorResolver", "WireResourceContext"]

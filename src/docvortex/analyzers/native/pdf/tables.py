@@ -1,4 +1,4 @@
-"""PDF 表格的兼容入口；实现按检测、注释和物化职责组织。"""
+"""Compatible entry for PDF tables; enables organization by detection, annotation and materialization responsibilities."""
 
 from ....document.pdf._document import PDFPathInfo as PDFPathInfo
 from ....document.pdf.text._contracts import Char as Char

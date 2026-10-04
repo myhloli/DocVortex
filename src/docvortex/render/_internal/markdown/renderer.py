@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到 Markdown 的公共渲染实现。"""
+"""Strictly a public rendering implementation for MiddleJson through Markdown."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def render_markdown(
     image_renderer: ImageRenderer | None = None,
     latex_delimiters: LatexDelimitersConfig | None = None,
 ) -> str:
-    """把严格 MiddleJson 纯函数式渲染为 Markdown 字符串。"""
+    """Render strictly functional MiddleJson to Markdown string."""
     if not isinstance(middle_json, MiddleJson):
         raise TypeError("render_markdown expects a MiddleJson instance")
     if not isinstance(mode, RenderMode):
@@ -57,7 +57,7 @@ def _render_page(
     anchor_targets: set[str] | None = None,
     emitted_anchors: set[str] | None = None,
 ) -> str:
-    """渲染单页逻辑块，并在默认模式中过滤重复页元素。"""
+    """Renders a single page logical block and filters duplicate page elements in default mode."""
     rendered: list[str] = []
     for planned in planned_blocks:
         if planned.removed:
@@ -78,7 +78,7 @@ def _render_page(
 
 
 def _collect_markdown_anchor_targets(middle_json: MiddleJson) -> set[str]:
-    """收集真实可见的顶层正文、标题和页面脚注 anchor，供目录链接判定。"""
+    """Collect truly visible top-level text, titles, and page footers anchor for directory link determination."""
     targets: set[str] = set()
     for page in middle_json.pages:
         for block in page.blocks:

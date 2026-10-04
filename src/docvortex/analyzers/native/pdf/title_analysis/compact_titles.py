@@ -1,4 +1,4 @@
-"""以独立留白和相对字重补充小字号标题，不放宽普通正文的标题评分。"""
+"""Supplement small font size titles with independent white space and relative font weight, and do not relax the title score of ordinary text."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from .structural import _following_stable_body_bounds
 
 
 def _classify_small_emphasized_titles(page: _PreparedPage, page_index: int) -> None:
-    """小字号粗体只有在独立标题带、真实正文转折和容器排除证据共同成立时提升。"""
+    """Small bold fonts are only promoted when independent title bands, true body transitions, and container exclusion evidence are established."""
     if page_index == 0:
         return
     containers = [block["bbox"] for block in page.fixed_blocks]
@@ -62,7 +62,7 @@ def _classify_small_emphasized_titles(page: _PreparedPage, page_index: int) -> N
             preceding = [line for line in rows[:i] if line.semantic_type not in {"header", "footer", "page_number"}]
             gap_above = band[1] - preceding[-1].bbox[3] if preceding else None
             gap_below = body.bbox[1] - band[3]
-            # 栏首没有上一段时，以全页正文区顶部约束位置，不能用页眉或无限留白支持提升。
+            # When there is no previous paragraph at the head of the column, the position is constrained by the top of the full-page text area, and headers or infinite white space cannot be used to support promotion.
             body_tops = [
                 line.bbox[1]
                 for line in page.remaining_lines

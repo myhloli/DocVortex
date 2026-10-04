@@ -1,4 +1,4 @@
-"""跨库依赖可使用的模块与符号清单；修改此表意味着公开 API 变更。"""
+"""List of modules and symbols that can be used for cross-library dependencies; modifying this list means exposing the API change."""
 
 PUBLIC_API: dict[str, tuple[str, ...]] = {
     "docvortex": (

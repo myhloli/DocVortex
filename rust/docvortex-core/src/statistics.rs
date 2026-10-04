@@ -1,6 +1,6 @@
-//! 对单调追加的聚类直接读取中位位置，保持原比较顺序和成员索引。
+//! Directly read the median position of the monotonic appended clusters and maintain the original comparison order and member index.
 
-/// 输入已稳定排序；每个簇按全局顺序追加，不需要再次排序。
+/// The input is stably sorted; each cluster is appended in global order and does not need to be sorted again.
 fn ordered_median(indices: &[usize], values: &[f64]) -> f64 {
     let n = indices.len();
     if n % 2 == 1 {
@@ -10,7 +10,7 @@ fn ordered_median(indices: &[usize], values: &[f64]) -> f64 {
     }
 }
 
-/// 按绝对或相对容差选首个簇，last_only 保留只检查末簇的原策略。
+/// Select the first cluster according to absolute or relative tolerance, and last_only retains the original strategy of only checking the last cluster.
 pub fn ordered_clusters(
     values: Vec<f64>,
     tolerance: f64,
@@ -50,7 +50,7 @@ pub fn ordered_clusters(
 use crate::geometry::Box4;
 use crate::median;
 
-/// 按调用方提供的值计算中位数，避免为了切片临时克隆整份向量。
+/// Calculate the median according to the value provided by the caller to avoid temporarily cloning the entire vector for slicing.
 fn median_values<I: IntoIterator<Item = f64>>(values: I) -> f64 {
     crate::median(values.into_iter().collect())
 }
@@ -65,7 +65,7 @@ pub type Typography = (
     Option<f64>,
 );
 
-/// 一次计算整行字体与字形统计；类别编号由 Python 按其字符串/整数语义提供。
+/// Calculate the entire line of font and glyph statistics at once; category numbers are provided by Python according to its string/integer semantics.
 pub fn typography(
     boxes: Vec<Option<Box4>>,
     fonts: Vec<Option<usize>>,
@@ -155,7 +155,7 @@ pub fn typography(
                 if !prefix.is_empty() && !body.is_empty() {
                     let p = median_values(prefix);
                     let b = median_values(body);
-                    // 中位数相加可能溢出，保留 Python 两个小于判断的否定，不能改写为大于等于。
+                    // Median addition may overflow, retain Python two negatives of less than judgment, and cannot be rewritten as greater than or equal to.
                     if !(p - b < 100.0 || p < 1.15 * 1.0_f64.max(b)) {
                         emphasis = Some(prefix_width);
                     }
@@ -199,7 +199,7 @@ pub fn typography(
     ))
 }
 
-/// 输入沿 Python 的稳定成员排序；快照只在本次调用使用，不缓存可变行。
+/// Input is sorted along the stable members of Python; snapshots are only used in this call and variable rows are not cached.
 pub fn lane_gap(
     boxes: Vec<Box4>,
     heights: Vec<f64>,
@@ -271,7 +271,7 @@ pub fn lane_gap(
     }
     Some((regular, mad))
 }
-/// 只在一次表格候选构建期间保存排序后的正文高度与来源中心范围。
+/// The sorted text height and source center range are only saved during one table candidate construction period.
 pub struct NoteMetrics {
     items: Vec<(i64, f64, f64)>,
     extents: std::collections::HashMap<i64, (f64, f64)>,
@@ -279,7 +279,7 @@ pub struct NoteMetrics {
 }
 
 impl NoteMetrics {
-    /// 将高度稳定排序一次，后续区间过滤保持 Python 排序后的平局顺序。
+    /// The height stability is sorted once, and subsequent interval filtering maintains the tie order after Python sorting.
     pub fn new(mut items: Vec<(i64, f64, f64)>) -> Option<Self> {
         if items
             .iter()
@@ -306,12 +306,12 @@ impl NoteMetrics {
         })
     }
 
-    /// 建立来源中心的行范围索引，整个走廊只传输一次成员。
+    /// The row range index of the source center is established, and the entire corridor only transmits members once.
     pub fn rows(&self, members: Vec<Vec<i64>>) -> crate::note_index::CoreRows {
         crate::note_index::CoreRows::new(members, &self.extents)
     }
 
-    /// 已证明核心全在排除区间时查询秩树，否则保留原生精确成员筛选。
+    /// It has been proven that the core queries the rank tree when excluding intervals, otherwise retaining native exact member filtering.
     pub fn height_for_rows(
         &self,
         rows: &crate::note_index::CoreRows,
@@ -331,12 +331,12 @@ impl NoteMetrics {
         self.height(top, bottom, &core, fallback)
     }
 
-    /// 过滤纵向排除区间和明确核心成员，直接读取最高四分位的中位位置。
+    /// Filter vertically exclude intervals and clear core members, and directly read the median position of the highest quartile.
     pub fn height(&self, top: f64, bottom: f64, core: &[i64], fallback: f64) -> Option<f64> {
         if !top.is_finite() || !bottom.is_finite() || !fallback.is_finite() {
             return None;
         }
-        // 处于排除区间内部的成员无需再次建哈希集合，重复来源仍按其全部中心范围检查。
+        // Members within the exclusion interval do not need to build a hash set again, and duplicate sources are still checked according to their entire central range.
         let excluded: std::collections::HashSet<i64> = core
             .iter()
             .copied()

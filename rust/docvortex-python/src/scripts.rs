@@ -1,4 +1,4 @@
-//! 上下标分类与配对绑定，Python 继续负责文本解释与物化。
+//! Superscript and subscript classification and pairing binding, Python continues to be responsible for text interpretation and materialization.
 
 use docvortex_core::geometry::{self, Size};
 use pyo3::prelude::*;
@@ -6,7 +6,7 @@ use pyo3::types::{PyFloat, PyList, PyTuple};
 
 use super::conversion::read_boxes;
 
-/// 批量计算行内上下标双向最近配对，Python 继续负责递归物化。
+/// Batch calculation of intra-line superscript and subscript bidirectional nearest pairing, Python continues to be responsible for recursive materialization.
 #[pyfunction]
 pub(super) fn inline_script_matches(
     py: Python<'_>,
@@ -15,7 +15,7 @@ pub(super) fn inline_script_matches(
     py.detach(|| docvortex_core::inline_pairs::matches(records))
 }
 
-/// 一次提取已物化的数值特征，释放 GIL 后计算整段字符角色。
+/// Extract the materialized numerical features at one time, and then calculate the entire character role after releasing GIL.
 #[pyfunction]
 pub(super) fn script_roles(
     py: Python<'_>,
@@ -24,7 +24,7 @@ pub(super) fn script_roles(
     py.detach(move || docvortex_core::scripts::classify(records))
 }
 
-/// 合并校验与分类边界，避免为每个字符创建两份中间 Python 坐标对象。
+/// Merge verification and classification boundaries to avoid creating two intermediate Python coordinate objects for each character.
 #[pyfunction]
 pub(super) fn script_roles_raw(
     py: Python<'_>,
@@ -66,7 +66,7 @@ pub(super) fn script_roles_raw(
     }))
 }
 
-/// 将独立公式分段的列式输入一次交给 Rust；每段保持原来的分类边界。
+/// The column input of independent formula segments is handed over to Rust once; each segment maintains the original classification boundary.
 #[pyfunction]
 pub(super) fn script_roles_raw_batch(
     py: Python<'_>,
@@ -116,7 +116,7 @@ pub(super) fn script_roles_raw_batch(
     }))
 }
 
-/// 只接受原生提取层的内置浮点几何，特殊 Python 对象交还原逐行路径。
+/// Only the built-in floating point geometry of the native extraction layer is accepted, and the special Python object intersection restores the progressive path.
 #[pyfunction]
 pub(super) fn script_roles_plain_batch(
     py: Python<'_>,
@@ -140,7 +140,7 @@ pub(super) fn script_roles_plain_batch(
     )?))
 }
 
-/// 验证列式记录的真实 Python 类型与有限数值，不隐式转换整数或自定义对象。
+/// Validate columnar records for true Python types and finite numeric values, without implicit conversion of integers or custom objects.
 fn plain_float_records(values: &Bound<'_, PyList>, width: usize) -> PyResult<bool> {
     let py = values.py();
     for item in values.iter() {

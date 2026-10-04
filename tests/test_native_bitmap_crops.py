@@ -1,4 +1,4 @@
-"""位图裁剪差分覆盖通道排列、行填充、旋转、边界与计算错误传播。"""
+"""Bitmap cropping differential covers channel arrangement, row filling, rotation, boundaries and computational error propagation."""
 
 from copy import deepcopy
 
@@ -13,7 +13,7 @@ from docvortex.document.pdf.visuals import _attach_owned_bitmap_crops, _attach_p
 
 @pytest.fixture
 def native():
-    """仅在显式 Python 参考后端下跳过原生算子检查。"""
+    """Skip native operator checking only under explicit Python reference backend."""
     module = get_native()
     if module is None:
         pytest.skip("Python reference backend")
@@ -23,7 +23,7 @@ def native():
 @pytest.mark.parametrize("mode", ["BGR", "BGRX", "BGRA", "RGB", "RGBX", "RGBA", "L"])
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_padded_bitmap_crop_matches_pillow_and_opencv(native, mode, angle):
-    """随机像素与非零行填充逐字节比对 PIL 解码、OpenCV 旋转及最终 JPEG。"""
+    """Random pixels and non-zero line padding byte-by-byte comparison PIL decoding, OpenCV rotation and final JPEG."""
     rng = np.random.default_rng(123)
     width, height = 37, 29
     channels = 1 if mode == "L" else len(mode)
@@ -51,27 +51,27 @@ def test_padded_bitmap_crop_matches_pillow_and_opencv(native, mode, angle):
 
 @pytest.mark.parametrize("bbox", [(0, 0, 0, 2), (0, 0, 5, 2), (2, 2, 1, 1)])
 def test_native_crop_rejects_invalid_bounds(native, bbox):
-    """非法裁剪不能访问缓冲外字节或隐式修正原生调用契约。"""
+    """Illegal clipping cannot access bytes outside the buffer or implicitly modify the native calling contract."""
     with pytest.raises(ValueError, match="bounds"):
         native.crop_bitmap_bgr(bytes(48), 4, 4, 12, "BGR", bbox, 0)
 
 
 @pytest.mark.parametrize("data,stride,mode,angle", [(bytes(47), 12, "BGR", 0), (bytes(48), 11, "BGR", 0), (bytes(48), 12, "XYZ", 0), (bytes(48), 12, "BGR", 45)])
 def test_native_crop_rejects_invalid_metadata(native, data, stride, mode, angle):
-    """截断缓冲、非法步长、未知格式与非直角方向必须明确报错。"""
+    """Truncated buffers, illegal step sizes, unknown formats and non-rectangular directions must be explicitly reported as errors."""
     with pytest.raises(ValueError):
         native.crop_bitmap_bgr(data, 4, 4, stride, mode, (0, 0, 4, 4), angle)
 
 
 def test_crop_compute_failure_is_not_silently_skipped(native):
-    """原生计算异常传播，只有既有无效视觉框允许跳过。"""
+    """Native calculation exception propagation, only existing invalid visual boxes are allowed to be skipped."""
     with pytest.raises(ValueError, match="buffer"):
         _attach_owned_bitmap_crops([(0, {"bbox": [0, 0, 1, 1]})], (b"", 4, 4, 12, "BGR"), native, 0)
 
 
 @pytest.mark.parametrize("bbox", [None, [], [float("nan"), 0, 1, 1], [-3, -3, -1, -1], [0.05, 0.1, 0.9, 0.85], [-1, 1, 8, 8]])
 def test_crop_normalization_matches_reference(native, bbox):
-    """边缘、归一化框、非有限值和完全越界框遵循旧路径的裁剪或跳过结果。"""
+    """Edges, normalized boxes, non-finite values, and completely out-of-bounds boxes follow the cropped or skipped results of the old path."""
     image = Image.new("RGB", (4, 5), (20, 30, 40))
     specs = [[(0, {"bbox": bbox, "angle": -90})]]
     expected = deepcopy(specs)

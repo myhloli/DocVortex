@@ -28,7 +28,7 @@ _NATURAL_TEXT_TYPES = {"text", "doc_title", "paragraph_title"}
 
 
 def _visible_text(value: Any) -> str:
-    """递归提取真实 Flash block 与 InlineSpan 的可见文本。"""
+    """Recursively extract the visible text of the real Flash block and InlineSpan."""
 
     if isinstance(value, str):
         return value
@@ -50,7 +50,7 @@ def _normalized_text(
     *,
     nfkc: bool = False,
 ) -> str:
-    """移除排版空白，保留语义字符供版本化期望比较。"""
+    """Remove typographical whitespace, retaining semantic characters for comparison against versioning expectations."""
 
     normalized = re.sub(r"\s+", "", _visible_text(value))
     return unicodedata.normalize("NFKC", normalized) if nfkc else normalized
@@ -58,7 +58,7 @@ def _normalized_text(
 
 @lru_cache(maxsize=1)
 def _expectation() -> dict[str, Any]:
-    """读取中文论文 Flash 语义期望并校验源文件指纹。"""
+    """Read the semantic expectations of Chinese paper Flash and verify the source file fingerprint."""
 
     payload = json.loads(_EXPECTATION_PATH.read_text(encoding="utf-8"))
     document = payload["documents"][0]
@@ -69,7 +69,7 @@ def _expectation() -> dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def _pages() -> tuple[tuple[dict[str, Any], ...], ...]:
-    """只解析一次真实中文论文，供本文件全部语义断言复用。"""
+    """The real Chinese paper is parsed only once for reuse by all semantic assertions in this document."""
 
     source = _PROJECT_ROOT / _expectation()["path"]
     with PDFDocument(str(source)) as document, formula_detection_evidence():
@@ -79,7 +79,7 @@ def _pages() -> tuple[tuple[dict[str, Any], ...], ...]:
 
 @lru_cache(maxsize=1)
 def _frozen_soil_pages() -> tuple[tuple[dict[str, Any], ...], ...]:
-    """只解析一次中文论文1，供 canonical 几何兼容性断言复用。"""
+    """The Chinese paper 1 is parsed only once for reuse by the canonical geometric compatibility assertion."""
 
     with PDFDocument(str(_FROZEN_SOIL_PATH)) as document, formula_detection_evidence():
         pages = _analyze_native_document(document)
@@ -90,7 +90,7 @@ def _frozen_soil_pages() -> tuple[tuple[dict[str, Any], ...], ...]:
 def _additional_chinese_paper_pages(
     relative_path: str,
 ) -> tuple[tuple[dict[str, Any], ...], ...]:
-    """按版本化相对路径缓存新增中文论文 Flash 页面。"""
+    """Cache the new Chinese paper Flash page by versioned relative path."""
 
     source = _PROJECT_ROOT / relative_path
     with PDFDocument(str(source)) as document, formula_detection_evidence():
@@ -100,7 +100,7 @@ def _additional_chinese_paper_pages(
 
 @lru_cache(maxsize=1)
 def _block_expectations() -> tuple[dict[str, Any], ...]:
-    """读取四篇中文论文的版本化 block 分组与类型库存期望。"""
+    """Reading versioned block grouping and type inventory expectations of four Chinese papers."""
 
     payload = json.loads(
         _BLOCK_EXPECTATION_PATH.read_text(encoding="utf-8"),
@@ -115,7 +115,7 @@ def _block_expectations() -> tuple[dict[str, Any], ...]:
 def _pages_for_expectation(
     expectation: dict[str, Any],
 ) -> tuple[tuple[dict[str, Any], ...], ...]:
-    """按版本化路径返回已缓存的真实 Flash 页面。"""
+    """Returns the actual cached Flash page by versioned path."""
 
     if expectation["path"] == "demo/pdfs/中文论文.pdf":
         return _frozen_soil_pages()
@@ -133,7 +133,7 @@ def _block_containing_fragment(
     block_type: str | None = None,
     nfkc: bool = False,
 ) -> tuple[int, dict[str, Any]]:
-    """返回唯一包含规范化片段的顶层 block 及其页内索引。"""
+    """Returns the only top-level block containing a normalized fragment and its in-page index."""
 
     normalized_fragment = _normalized_text(
         fragment,
@@ -168,7 +168,7 @@ def _block_containing_fragment(
 
 
 def test_frozen_soil_paper_keeps_tracked_semantic_and_bbox_gold() -> None:
-    """验证无长文档门槛时中文论文1仍逐页保持已有语义与 bbox 指纹。"""
+    """When verifying that there is no long document threshold, Chinese paper 1 still maintains the existing semantics and bbox fingerprint page by page."""
 
     manifest = json.loads(
         _GEOMETRY_MANIFEST_PATH.read_text(encoding="utf-8"),
@@ -181,7 +181,7 @@ def test_frozen_soil_paper_keeps_tracked_semantic_and_bbox_gold() -> None:
 
 
 def _typed_texts(block_type: str) -> Counter[tuple[int, str]]:
-    """按页号和规范文本统计指定类型，保留重复项检测能力。"""
+    """Specify types by page number and specification text statistics, retaining the ability to detect duplicates."""
 
     return Counter(
         (page_index, _normalized_text(block.get("content")))
@@ -192,7 +192,7 @@ def _typed_texts(block_type: str) -> Counter[tuple[int, str]]:
 
 
 def test_chinese_paper_matches_versioned_title_semantics() -> None:
-    """验证双语文档标题和四十个章节标题与人工视觉金标完全一致。"""
+    """Verify that the bilingual document title and forty chapter titles are fully consistent with the artificial visual gold mark."""
 
     expectation = _expectation()
     expected_doc_titles = Counter((item["page_index"], item["text"]) for item in expectation["doc_titles"])
@@ -205,7 +205,7 @@ def test_chinese_paper_matches_versioned_title_semantics() -> None:
 
 
 def test_chinese_paper_recovers_all_numbered_formula_blocks() -> None:
-    """验证式一至式十四唯一成块，且公式内容不吸收相邻说明句。"""
+    """Verify that Equations 1 to 14 are uniquely block-like, and the content of the formulas does not absorb adjacent explanatory sentences."""
 
     expectation = _expectation()
     equations = [block for page in _pages() for block in page if block.get("type") == "equation"]
@@ -223,7 +223,7 @@ def test_chinese_paper_recovers_all_numbered_formula_blocks() -> None:
 
 
 def test_chinese_paper_preserves_visual_controls_and_unique_blocks() -> None:
-    """验证表图页码数量、双栏归属和顶层自然文本无近乎完全重叠。"""
+    """Verify that table and figure page numbers, double-column attributions, and top-level natural text do not overlap nearly completely."""
 
     expectation = _expectation()
     counts = Counter(str(block.get("type")) for page in _pages() for block in page)
@@ -283,7 +283,7 @@ def test_chinese_paper_preserves_visual_controls_and_unique_blocks() -> None:
 
 
 def test_chinese_papers_match_versioned_block_group_expectations() -> None:
-    """验证四篇真实论文的类型库存、指定合并和指定拆分与人工审阅期望一致。"""
+    """Verify that the type inventory, specified merging, and specified splitting of four real papers are consistent with human review expectations."""
 
     for expectation in _block_expectations():
         pages = _pages_for_expectation(expectation)
@@ -351,7 +351,7 @@ def test_chinese_papers_match_versioned_block_group_expectations() -> None:
 
 
 def test_chinese_paper_four_third_page_upper_band_inventory() -> None:
-    """验证中文论文4第三页原假大表区域恢复为指定的文本、图表和标题库存。"""
+    """Verify that the original fake large table area on the third page of Chinese paper 4 is restored to the specified text, chart and title inventory."""
 
     pages = _additional_chinese_paper_pages(
         "demo/pdfs/中文论文4.pdf",
@@ -367,7 +367,7 @@ def test_chinese_paper_four_third_page_upper_band_inventory() -> None:
 
 
 def test_chinese_paper_continuation_caption_precedes_tight_table_body() -> None:
-    """验证第3页续表 caption 不进入 HTML，且其边界位于收紧后的表体上方。"""
+    """Verify that table caption, continued on page 3, does not enter HTML and that its boundary is above the tightened table body."""
 
     page = _pages()[2]
     _caption_index, caption = _block_containing_fragment(
@@ -383,7 +383,7 @@ def test_chinese_paper_continuation_caption_precedes_tight_table_body() -> None:
 
 
 def test_flash_layout_geometry_summary_comparison_is_strict() -> None:
-    """验证几何摘要缺失或任一计数漂移都会形成独立门禁失败。"""
+    """Missing verification geometry summaries or drifting of either count will result in independent gating failure."""
 
     expected = {
         "expected_geometry_summary": {

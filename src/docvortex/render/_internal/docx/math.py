@@ -1,4 +1,4 @@
-"""DOCX renderer 使用的 LaTeX 与 OMML 转换。"""
+"""DOCX renderer uses LaTeX to OMML conversion."""
 
 from __future__ import annotations
 
@@ -14,11 +14,11 @@ _GENFRAC_ARGUMENT_COUNT = 6
 
 
 class DocxFormulaError(ValueError):
-    """表示 LaTeX 无法转换为可插入 DOCX 的 OMML。"""
+    """Indicates that LaTeX cannot be converted to OMML that can be inserted into DOCX."""
 
 
 def split_formula_tag(content: str) -> tuple[str, str | None]:
-    """剥离公式末尾括号平衡的 ``\\tag{...}``，并返回正文与编号。"""
+    """Strips the balanced ``\\tag{...}`` of the parentheses at the end of the formula and returns the text and numbering."""
     stripped_end = len(content.rstrip())
     if stripped_end == 0 or content[stripped_end - 1] != "}":
         return content, None
@@ -39,7 +39,7 @@ def split_formula_tag(content: str) -> tuple[str, str | None]:
 
 
 def latex_to_omml(latex: str, *, display: bool) -> etree._Element:
-    """把 LaTeX 转换为带命名空间、可直接插入 DOCX 的 OMML 节点。"""
+    """Converts LaTeX into a namespaced OMML node that can be plugged directly into DOCX."""
     try:
         normalized_latex = _normalize_supported_genfrac(latex)
         normalized_latex = _EMPTY_SCRIPT_RE.sub("", normalized_latex)
@@ -61,7 +61,7 @@ def latex_to_omml(latex: str, *, display: bool) -> etree._Element:
 
 
 def _normalize_supported_genfrac(content: str) -> str:
-    """把规范无横线 genfrac 转为 latex2mathml 支持的双行 matrix。"""
+    """Convert the standard no horizontal line genfrac to the double line matrix supported by latex2mathml."""
     chunks: list[str] = []
     preserved_start = 0
     search_start = 0
@@ -104,7 +104,7 @@ def _parse_braced_arguments(
     cursor: int,
     count: int,
 ) -> tuple[tuple[str, ...], int] | None:
-    """从指定位置读取固定数量的平衡花括号参数，并返回参数与结束位置。"""
+    """Reads a fixed number of balanced brace arguments from the specified position and returns the arguments and the end position."""
     arguments: list[str] = []
     content_end = len(content)
     for _ in range(count):
@@ -121,7 +121,7 @@ def _parse_braced_arguments(
 
 
 def _repair_mathml2omml_xml(omml_xml: str) -> str:
-    """修复 mathml2omml 0.0.2 对 groupChrPr 写出的错误闭合标签。"""
+    """Fix incorrect closing tag written by mathml2omml 0.0.2 for groupChrPr."""
     return omml_xml.replace(
         "</m:groupChr><m:e>",
         "</m:groupChrPr><m:e>",
@@ -129,7 +129,7 @@ def _repair_mathml2omml_xml(omml_xml: str) -> str:
 
 
 def _normalize_omml(equation: etree._Element) -> None:
-    """补齐 Word 要求的根号属性，并隐藏无显式底数的脚本占位框。"""
+    """Complete the radical properties required by Word and hide the script placeholder box without explicit base."""
     namespace = f"{{{_OFFICE_MATH_NAMESPACE}}}"
     for radical in equation.findall(f".//{namespace}rad"):
         if radical.find(f"{namespace}deg") is not None:
@@ -157,7 +157,7 @@ def _normalize_omml(equation: etree._Element) -> None:
 
 
 def _is_escaped_command(content: str, command_start: int) -> bool:
-    """判断命令起始反斜杠是否被前一个反斜杠转义。"""
+    """Determine whether the starting backslash of the command is escaped by the previous backslash."""
     preceding_backslashes = 0
     cursor = command_start - 1
     while cursor >= 0 and content[cursor] == "\\":
@@ -167,7 +167,7 @@ def _is_escaped_command(content: str, command_start: int) -> bool:
 
 
 def _find_tag_opening_brace(content: str, tag_start: int, content_end: int) -> int | None:
-    """查找 tag 命令允许空白后的左花括号。"""
+    """Find tag command allows white space after opening curly brace."""
     cursor = tag_start + len(r"\tag")
     while cursor < content_end and content[cursor].isspace():
         cursor += 1
@@ -177,7 +177,7 @@ def _find_tag_opening_brace(content: str, tag_start: int, content_end: int) -> i
 
 
 def _find_balanced_closing_brace(content: str, opening_brace: int, content_end: int) -> int | None:
-    """查找与 tag 左花括号配对的右花括号，并忽略转义花括号。"""
+    """Finds a closing brace paired with a tag opening brace, and ignores escaped braces."""
     depth = 0
     for cursor in range(opening_brace, content_end):
         character = content[cursor]
@@ -192,7 +192,7 @@ def _find_balanced_closing_brace(content: str, opening_brace: int, content_end: 
 
 
 def _is_escaped_character(content: str, position: int) -> bool:
-    """判断指定字符前是否存在奇数个连续反斜杠。"""
+    """Determines whether there is an odd number of consecutive backslashes before the specified character."""
     preceding_backslashes = 0
     cursor = position - 1
     while cursor >= 0 and content[cursor] == "\\":
@@ -202,7 +202,7 @@ def _is_escaped_character(content: str, position: int) -> bool:
 
 
 def _parse_omml(omml_xml: str) -> etree._Element:
-    """为第三方库返回的未绑定 ``m`` 前缀补充命名空间并解析节点。"""
+    """Supplement the namespace and parse nodes for the unbound ``m`` prefix returned by third-party libraries."""
     wrapper_xml = f'<docx-math-root xmlns:m="{_OFFICE_MATH_NAMESPACE}">{omml_xml}</docx-math-root>'
     parser = etree.XMLParser(resolve_entities=False, no_network=True, recover=False)
     wrapper = etree.fromstring(wrapper_xml.encode("utf-8"), parser=parser)

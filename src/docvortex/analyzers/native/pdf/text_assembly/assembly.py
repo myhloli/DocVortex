@@ -1,4 +1,4 @@
-"""保持既有顺序编排正文行分组与块级组装。"""
+"""Maintain the existing order of text line grouping and block-level assembly."""
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ def _build_text_blocks(
     page_index: int | None = None,
     visual_bboxes: Sequence[BBox] | None = None,
 ) -> list[dict[str, Any]]:
-    """先构建分组脚注，再按类型屏障、栏带和自然段边界聚合其余文本。"""
+    """Group footnotes are built first, and then the rest of the text is aggregated by type barriers, column bands, and natural paragraph boundaries."""
 
     blocks, grouped_footnote_indices = _build_grouped_page_footnote_blocks(
         lines,
@@ -148,7 +148,7 @@ def _build_text_blocks(
             structured_break_sources.update(
                 protected_break_sources,
             )
-            # 实际分隔线形成永久段落边界，块级续行补合并也必须遵守。
+            # Actual separators form permanent paragraph boundaries, and block-level line continuations must also be respected.
             rule_break_sources = {
                 current[0].source_index
                 for previous, current in zip(lane.lines, lane.lines[1:])
@@ -209,10 +209,10 @@ def _build_text_blocks(
                     elif current[0].source_index in structured_break_sources:
                         should_connect = False
                     elif _starts_structural_reference_entry(previous, current):
-                        # 编号只确认已经由悬挂缩进几何形成的新条目，不能单独扩张范围。
+                        # Numbering only recognizes new entries that have been formed by dangling indent geometry, and cannot expand the scope alone.
                         should_connect = False
                     elif is_hyphen_at_line_end(previous[0].text):
-                        # 断词续行优先于悬挂缩进分组，但仍复用正文连接中的距离和障碍限制。
+                        # Line continuation takes precedence over hanging indent grouping, but still reuses the distance and barrier constraints in text connections.
                         should_connect = _should_connect_text_rows(
                             previous,
                             current,
@@ -249,7 +249,7 @@ def _build_text_blocks(
                 ):
                     component_local_lane = lane
                 if component_lines[0].semantic_type == "doc_title":
-                    # 文档标题保留自然换行，避免混排标题因语言检测在中文折行处插入空格。
+                    # The document title retains natural line breaks to avoid mixed titles inserting spaces at Chinese line breaks due to language detection.
                     content = "\n".join(
                         normalized for line in component_lines if (normalized := _normalize_native_run_text(line.text))
                     )
@@ -309,7 +309,7 @@ def _build_text_blocks(
                         ),
                     }
                 )
-    # 编号机构和参考条目已有明确成员关系，交由成员归组统一合并，避免通用续行跨组拼接。
+    # The numbering organization and reference entries have a clear membership relationship, and are handed over to the member groups for unified merging to avoid cross-group splicing of common continuation lines.
     grouped_blocks = [block for block in blocks if block.get("_reference_group") is not None]
     blocks = [block for block in blocks if block.get("_reference_group") is None]
     blocks = _merge_short_same_baseline_prefix_blocks(
@@ -333,7 +333,7 @@ def _build_text_blocks(
 def _restore_caption_wrap_text(
     blocks: list[dict[str, Any]], image_bboxes: list[BBox], page_size: tuple[float, float]
 ) -> list[dict[str, Any]]:
-    """按图注屏障分割连续窄宽行区间，镜像布局共用同一几何判定，几何断点不代表自然段。"""
+    """Continuous narrow and wide line intervals are divided according to legend barriers. The mirror layout shares the same geometric determination. Geometric breakpoints do not represent natural segments."""
     output = list(blocks)
     captions = [block for block in blocks if _FIGURE_CAPTION_MARKER_RE.match(str(block.get("content", "")))]
     for caption in captions:
@@ -353,7 +353,7 @@ def _restore_caption_wrap_text(
             right_side = lines[0].bbox[0] >= cb[2] - 0.25 * em
 
             def local(bbox):
-                """将右侧正文镜像到左侧，确保左右布局使用完全相同的阈值。"""
+                """Mirror the right body text to the left, making sure the left and right layouts use exactly the same threshold."""
                 return (page_size[0] - bbox[2], bbox[1], page_size[0] - bbox[0], bbox[3]) if right_side else bbox
 
             obstacle = local(cb)
@@ -405,7 +405,7 @@ def _restore_caption_wrap_text(
                 first = previous
             rebuilt = _build_text_blocks(narrow, [], page_size)
             tail_blocks = _build_text_blocks(tails, [], page_size)
-            # 独立几何约束阻止后续跨屏障扩框，不制造语义上的新自然段。
+            # Independent geometric constraints prevent subsequent cross-barrier frame expansion and do not create new natural segments in semantics.
             for item in rebuilt + tail_blocks:
                 item["_geometry_barriers"] = [cb]
             if tail_blocks:

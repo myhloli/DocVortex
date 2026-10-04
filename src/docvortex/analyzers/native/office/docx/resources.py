@@ -1,4 +1,4 @@
-"""DOCX 公式与图片资源处理；共享当前 Converter 的单文档状态。"""
+"""DOCX formula and picture resource processing; share the current single document status of Converter."""
 
 import hashlib
 import re
@@ -16,14 +16,14 @@ from .context import _DocxConstants
 
 
 class _DocxResources:
-    """集中维护公式与图片资源，不自行创建文档或持有跨文档缓存。"""
+    """Centrally maintain formulas and image resources without creating documents yourself or holding cross-document caches."""
 
     def _decode_docx_ole_equation(
         self,
         ole_element: Any,
         part: Any,
     ) -> str | None:
-        """从当前 DOCX part 的内部 OLE relationship 解码公式对象。"""
+        """Decode the formula object from the current DOCX part internal OLE relationship."""
 
         prog_id = ole_element.get("ProgID") or ole_element.get("ProgId")
         if not is_mathtype_equation_prog_id(prog_id):
@@ -69,7 +69,7 @@ class _DocxResources:
         shape_element: Any,
         part: Any,
     ) -> str | None:
-        """解码当前 VML shape 的 ``equationxml`` 并对失败告警去重。"""
+        """Decode the ``equationxml`` of the current VML shape and deduplicate failed alarms."""
 
         vml_shape_tag = f"{{{_DocxConstants._BLIP_NAMESPACES['v']}}}shape"
         if getattr(shape_element, "tag", None) != vml_shape_tag:
@@ -100,7 +100,7 @@ class _DocxResources:
 
     @staticmethod
     def _docx_image_relationship_id(image: Any) -> str | None:
-        """读取 DrawingML/VML 图片元素的内部 relationship id。"""
+        """Read the internal relationship id of the DrawingML/VML picture element."""
 
         relationship_id = image.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed")
         if not relationship_id:
@@ -109,7 +109,7 @@ class _DocxResources:
 
     @classmethod
     def _docx_image_part(cls, image: Any, part: Any) -> Any | None:
-        """通过当前 part 的内部关系解析图片 part。"""
+        """Parses the image part through the internal relationships of the current part."""
 
         relationship_id = cls._docx_image_relationship_id(image)
         relationships = getattr(part, "rels", None)
@@ -128,7 +128,7 @@ class _DocxResources:
         image: Any,
         part: Any,
     ) -> str | None:
-        """从当前图片 part 的 WMF/GIF comment 解码 MTEF。"""
+        """Decode MTEF from WMF/GIF comment of current picture part."""
 
         image_part = self._docx_image_part(image, part)
         if image_part is None:
@@ -147,7 +147,7 @@ class _DocxResources:
     def _select_docx_compatibility_tokens(
         token_groups: list[list[tuple[str, str]]],
     ) -> list[tuple[str, str]]:
-        """按 OMML、Equation XML、OLE MTEF、图片 MTEF 选择兼容分支。"""
+        """Press OMML, Equation XML, OLE MTEF, picture MTEF to select the compatible branch."""
 
         for token_kind in _DocxConstants._FORMULA_SOURCE_PRIORITY:
             for tokens in token_groups:
@@ -160,7 +160,7 @@ class _DocxResources:
         element: Any,
         part: Any,
     ) -> list[tuple[str, str]]:
-        """按文档顺序提取文本、OMML、Equation XML 和 MTEF。"""
+        """Extract text, OMML, Equation, XML and MTEF in document order."""
 
         tag_name = self._local_name(element)
         if tag_name is None:
@@ -179,7 +179,7 @@ class _DocxResources:
             return self._select_docx_compatibility_tokens(child_tokens)
 
         if tag_name == "txbxContent":
-            # 外层段落会单独遍历文本框内容，避免在此重复提取公式和文字。
+            # The outer paragraph will traverse the text box content separately to avoid repeated extraction of formulas and text here.
             return []
 
         if tag_name == "oMath" and "officeDocument/2006/math" in tag:
@@ -223,7 +223,7 @@ class _DocxResources:
         return tokens
 
     def _picture_is_equation_preview(self, image: Any, part: Any) -> bool:
-        """判断图片是否属于同一容器中已恢复的公式预览。"""
+        """Determine whether the picture belongs to the restored formula preview in the same container."""
 
         if self._decode_docx_image_equation(image, part):
             return True
@@ -248,10 +248,10 @@ class _DocxResources:
         part: Any | None = None,
     ) -> None:
         """
-        处理图片。
+        Process images.
 
         Args:
-            picture_refs: 图片引用元素列表
+            picture_refs: Picture reference element list
 
         Returns:
 
@@ -260,7 +260,7 @@ class _DocxResources:
         source_part = part or self._require_document_part()
 
         seen_rel_ids: set[str] = set()
-        # 遍历所有图片引用元素，支持 DrawingML blip 和 VML imagedata。
+        # Traverse all picture reference elements, support DrawingML blip and VML imagedata.
         for image in picture_refs:
             if self._picture_is_equation_preview(image, source_part):
                 continue
@@ -293,7 +293,7 @@ class _DocxResources:
 
     @staticmethod
     def _docx_image_alt_text(image: Any) -> str:
-        """读取 DrawingML wp:docPr 的 descr 或 VML v:shape 的 alt 替代文本。"""
+        """Read DrawingML descr for wp:docPr or VML alt for v:shape alternative text."""
         element = image
         while element is not None:
             tag = str(getattr(element, "tag", ""))
@@ -316,10 +316,10 @@ class _DocxResources:
 
     def _handle_drawingml(self, elements: list[BaseOxmlElement]):
         """
-        处理 DrawingML 元素，目前先处理 chart 元素。
+        Process the DrawingML element. Currently, the chart element is processed first.
 
         Args:
-            elements: 包含 DrawingML 元素的列表
+            elements: List containing DrawingML elements
 
         Returns:
 
@@ -385,17 +385,17 @@ class _DocxResources:
         textbox_elements: list,
     ):
         """
-        处理文本框内容并将其添加到文档结构。
+        Process the text box contents and add them to the document structure.
         """
-        # 收集并组织段落
+        # Collect and organize paragraphs
         container_paragraphs = self._collect_textbox_paragraphs(textbox_elements)
 
-        # 处理所有段落
+        # process all paragraphs
         all_paragraphs = []
 
-        # 对每个容器内的段落进行排序，然后按容器顺序处理
+        # Sort the paragraphs within each container and process them in container order
         for paragraphs in container_paragraphs.values():
-            # 按容器内的垂直位置进行排序
+            # Sort by vertical position within container
             sorted_container_paragraphs = sorted(
                 paragraphs,
                 key=lambda x: (
@@ -404,27 +404,27 @@ class _DocxResources:
                 ),
             )
 
-            # 将排序后的段落添加到待处理列表
+            # Add sorted paragraphs to the to-do list
             all_paragraphs.extend(sorted_container_paragraphs)
 
-        # 跟踪已处理段落以避免重复（相同内容和位置）
+        # Track processed paragraphs to avoid duplication (same content and location)
         processed_paragraphs = set()
 
-        # 处理所有段落
+        # process all paragraphs
         for p, position in all_paragraphs:
-            # 创建 Paragraph 对象以获取文本内容
+            # Create Paragraph object to obtain text content
             paragraph = Paragraph(p, self.docx_obj)
             text_content = self._get_paragraph_text(paragraph)
 
-            # 基于内容和位置创建唯一标识
+            # Create unique identifiers based on content and location
             paragraph_id = (text_content, position)
 
-            # 如果该段落（相同内容和位置）已处理，则跳过
+            # If the paragraph (same content and position) has already been processed, skip
             if paragraph_id in processed_paragraphs:
                 logger.debug(f"Skipping duplicate paragraph: content='{text_content[:50]}...', position={position}")
                 continue
 
-            # 将该段落标记为已处理
+            # Mark this paragraph as processed
             processed_paragraphs.add(paragraph_id)
 
             self._handle_text_elements(p)
@@ -432,14 +432,14 @@ class _DocxResources:
 
     def _collect_textbox_paragraphs(self, textbox_elements):
         """
-        从文本框元素中收集并组织段落。
+        Collect and organize paragraphs from text box elements.
         """
         processed_paragraphs = []
         container_paragraphs = {}
 
         for element in textbox_elements:
             element_id = id(element)
-            # 如果已处理相同元素，则跳过
+            # Skip if same element has already been processed
             if element_id in processed_paragraphs:
                 continue
 
@@ -448,9 +448,9 @@ class _DocxResources:
                 continue
             processed_paragraphs.append(element_id)
 
-            # 处理直接找到的段落（VML 文本框）
+            # Process directly found paragraphs (VML text box)
             if tag_name == "p":
-                # 查找包含该段落的文本框或形状元素
+                # Find the text box or shape element that contains the paragraph
                 container_id = None
                 for ancestor in element.iterancestors():
                     if any(ns in ancestor.tag for ns in ["textbox", "shape", "txbx"]):
@@ -461,7 +461,7 @@ class _DocxResources:
                     container_paragraphs[container_id] = []
                 container_paragraphs[container_id].append((element, self._get_paragraph_position(element)))
 
-            # 处理 txbxContent 元素（Word DrawingML 文本框）
+            # Processing the txbxContent element (Word DrawingML text box)
             elif tag_name == "txbxContent":
                 paragraphs = element.findall(".//w:p", namespaces=element.nsmap)
                 container_id = id(element)
@@ -474,7 +474,7 @@ class _DocxResources:
                         processed_paragraphs.append(p_id)
                         container_paragraphs[container_id].append((p, self._get_paragraph_position(p)))
             else:
-                # 尝试从未知元素中提取任何段落
+                # Try to extract any paragraph from unknown element
                 paragraphs = element.findall(".//w:p", namespaces=element.nsmap)
                 container_id = id(element)
                 if container_id not in container_paragraphs:
@@ -490,38 +490,38 @@ class _DocxResources:
 
     def _get_paragraph_position(self, paragraph_element):
         """
-        从段落元素提取垂直位置信息。
+        Extracts vertical position information from paragraph elements.
         """
-        # 先尝试直接从包含顺序相关属性的 w:p 元素获取索引
+        # First try to get the index directly from the w:p element containing the order-related attributes
         if hasattr(paragraph_element, "getparent") and paragraph_element.getparent() is not None:
             parent = paragraph_element.getparent()
-            # 获取所有段落兄弟节点
+            # Get all paragraph sibling nodes
             paragraphs = [p for p in parent.getchildren() if self._local_name(p) == "p"]
-            # 查找当前段落在其兄弟节点中的索引
+            # Find the index of the current paragraph within its sibling nodes
             try:
                 paragraph_index = paragraphs.index(paragraph_element)
-                return paragraph_index  # 使用索引作为位置以保证一致的排序
+                return paragraph_index  # Use index as location to guarantee consistent ordering
             except ValueError:
                 pass
 
-        # 在元素及其祖先中查找位置提示属性
+        # Find position hint attributes in elements and their ancestors
         for elem in (*[paragraph_element], *paragraph_element.iterancestors()):
-            # 检查直接的位置信息属性
+            # Check the direct location attribute
             for attr_name in ["y", "top", "positionY", "y-position", "position"]:
                 value = elem.get(attr_name)
                 if value:
                     try:
-                        # 移除任何非数字字符（如 'pt', 'px' 等）
+                        # Remove any non-numeric characters (such as 'pt', 'px', etc.)
                         clean_value = re.sub(r"[^0-9.]", "", value)
                         if clean_value:
                             return float(clean_value)
                     except (ValueError, TypeError):
                         pass
 
-            # 检查 transform 属性中的位移信息
+            # Check the displacement information in the transform attribute
             transform = elem.get("transform")
             if transform:
-                # 从 transform 矩阵中提取 translate 的第二个参数
+                # Extract the second parameter of translate from the transform matrix
                 match = re.search(r"translate\([^,]+,\s*([0-9.]+)", transform)
                 if match:
                     try:
@@ -529,16 +529,16 @@ class _DocxResources:
                     except ValueError:
                         pass
 
-            # 检查 Word 格式中的锚点或相对位置指示器
-            # 'dist' 类属性可以表示相对位置
+            # Check for anchor point or relative position indicator in Word format
+            # 'dist' class attribute can represent relative position
             for attr_name in ["distT", "distB", "anchor", "relativeFrom"]:
                 if elem.get(attr_name) is not None:
-                    return elem.sourceline  # 使用 XML 源行号作为回退
+                    return elem.sourceline  # Use XML source line number as fallback
 
-        # 针对 VML 形状，查找特定属性
+        # Find specific properties for the VML shape
         for ns_uri in paragraph_element.nsmap.values():
             if "vml" in ns_uri:
-                # 尝试从 style 属性提取 top 值
+                # Try to extract the top value from the style property
                 style = paragraph_element.get("style")
                 if style:
                     match = re.search(r"top:([0-9.]+)pt", style)
@@ -548,5 +548,5 @@ class _DocxResources:
                         except ValueError:
                             pass
 
-        # 如果没有更好的位置指示，则使用 XML 源行号作为顺序的代理
+        # If there is no better indication of the location, use the XML source line number as a proxy for the sequence
         return paragraph_element.sourceline if hasattr(paragraph_element, "sourceline") else None

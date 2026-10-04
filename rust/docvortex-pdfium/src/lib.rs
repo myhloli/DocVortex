@@ -1,4 +1,4 @@
-//! 同库 PDFium ABI 适配；不依赖 Python，不加载第二份运行库。
+//! The same library PDFium is adapted to ABI; it does not depend on Python and does not load the second runtime library.
 use std::collections::HashMap;
 use std::ffi::{c_double, c_float, c_int, c_uint, c_ulong, c_void};
 pub mod classification;
@@ -9,7 +9,7 @@ pub mod path_evidence;
 pub mod paths;
 pub mod text_colors;
 
-/// 保留原生错误分类，由绑定层映射到宿主异常。
+/// Retain the native error classification and map it to the host exception by the binding layer.
 #[derive(Debug)]
 pub enum ReadError {
     InvalidInput(&'static str),
@@ -42,10 +42,10 @@ pub type Record = (
 );
 pub type Fonts = Vec<(Vec<u8>, i32)>;
 
-/// 只在文本页存活期间把字符对象地址转换为宿主分配的 Form 编号。
+/// The character object address is converted to the Form number allocated by the host only during the survival of the text page.
 ///
 /// # Safety
-/// 调用方须核验 FPDFText_GetTextObject 的 ABI，持有同库函数、文本页和 PDFium 锁。
+/// The caller must verify the ABI of FPDFText_GetTextObject, which holds the same library function, text page and PDFium locks.
 pub unsafe fn read_char_form_owners(
     function: usize,
     handle: usize,
@@ -73,10 +73,10 @@ pub unsafe fn read_char_form_owners(
     Ok(output)
 }
 
-/// 在调用方持有运行时锁期间同步读取字符，结果不拥有任何 PDFium 句柄。
+/// Reading characters synchronously while the caller holds a runtime lock results in not owning any PDFium handle.
 ///
 /// # Safety
-/// 调用方须验证函数 ABI，保持同库函数、文本页及回调存活，并串行化全部 PDFium 调用。
+/// The caller must verify function ABI, keep the same library functions, text pages and callbacks alive, and serialize all PDFium calls.
 pub unsafe fn read_characters(
     addresses: Vec<usize>,
     handle: usize,
@@ -87,7 +87,7 @@ pub unsafe fn read_characters(
     {
         return Err(ReadError::InvalidInput("invalid PDFium bridge arguments"));
     }
-    // 安全边界：仅接受适配器持有强引用的 ctypes 函数，使用当前平台 FPDF_CALLCONV 对应的 system ABI。
+    // Security boundary: only accept the ctypes function with a strong reference held by the adapter, and use the system ABI corresponding to the current platform FPDF_CALLCONV.
     unsafe {
         let unicode: unsafe extern "system" fn(*mut c_void, c_int) -> c_uint =
             std::mem::transmute(addresses[0]);

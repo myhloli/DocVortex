@@ -1,4 +1,4 @@
-"""raw block 的文本、代码和公式内容清理规则。"""
+"""raw block Cleanup rules for text, code, and formula content."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from ..content.inline import map_text_span_content, normalize_inline_spans
 
 
 def code_content_clean(content: str | None) -> str:
-    """去除代码块外层 Markdown 围栏并保留代码正文。"""
+    """Remove the outer Markdown fence of the code block and retain the code body."""
     if not content:
         return ""
     lines = content.splitlines()
@@ -23,11 +23,11 @@ def code_content_clean(content: str | None) -> str:
 
 
 def clean_content(content: str | None) -> str | None:
-    """将成对的行间公式分隔符改为兼容文本清理的方括号。"""
+    """Changed paired interline formula delimiters to square brackets compatible with text sanitization."""
     if content and content.count("\\[") == content.count("\\]") and content.count("\\[") > 0:
 
         def replace_pattern(match: re.Match[str]) -> str:
-            """替换单个成对公式片段。"""
+            """Replaces a single pair of formula fragments."""
             return f"[{match.group(1)}]"
 
         content = re.sub(r"\\\[(.*?)\\\]", replace_pattern, content)
@@ -35,7 +35,7 @@ def clean_content(content: str | None) -> str | None:
 
 
 def clean_inline_content(content: Any) -> list[dict[str, Any]]:
-    """严格规范化 raw Span 列表，并返回可继续后处理的 JSON 字典。"""
+    """Strictly normalizes the raw Span list and returns a JSON dictionary that can be post-processed further."""
     if content is None:
         return []
     if not isinstance(content, list):
@@ -45,7 +45,7 @@ def clean_inline_content(content: Any) -> list[dict[str, Any]]:
 
 
 def collapse_inline_newlines(content: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """把标题 Span 中的换行及后续空白收敛为单个空格。"""
+    """Converge newlines and subsequent whitespace in header Span to a single space."""
     spans = map_text_span_content(normalize_inline_spans(content), lambda value: re.sub(r"\n\s*", " ", value))
     return [span.model_dump(mode="json") for span in spans]
 

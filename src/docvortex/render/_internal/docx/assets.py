@@ -1,4 +1,4 @@
-"""DOCX renderer 的安全图片素材解析与格式准备。"""
+"""DOCX renderer Security picture material analysis and format preparation."""
 
 from __future__ import annotations
 
@@ -35,12 +35,12 @@ _SVG_START_RE = re.compile(rb"^(?:\xef\xbb\xbf)?\s*(?:<\?xml\b.*?\?>\s*)?<svg\b"
 
 
 class DocxAssetError(ValueError):
-    """表示 DOCX renderer 无法安全加载或识别图片素材。"""
+    """Indicates DOCX renderer The image material cannot be safely loaded or recognized."""
 
 
 @dataclass(frozen=True, slots=True)
 class PreparedImage:
-    """保存可直接交给 DOCX 的图片字节、格式与像素尺寸。"""
+    """Save image bytes, format and pixel dimensions that can be passed directly to DOCX."""
 
     data: bytes
     extension: str
@@ -53,7 +53,7 @@ def prepare_block_image(
     block: ImagePayloadBlock,
     asset_resolver: AssetResolver | None = None,
 ) -> PreparedImage:
-    """从图片载荷 block 加载图片，按 sidecar、data URI 的公共优先级选择。"""
+    """Load images from image payload block, selected by common priority of sidecar, data URI."""
     if not isinstance(block, ImagePayloadBlock):
         raise TypeError("block must be an ImagePayloadBlock")
     if block.image_path is not None:
@@ -67,7 +67,7 @@ def prepare_html_image(
     source: str,
     asset_resolver: AssetResolver | None = None,
 ) -> PreparedImage:
-    """从 HTML ``img`` 的 src 加载 data URI 或安全的相对 sidecar 图片。"""
+    """Load data URI or safe relative sidecar pictures from HTML ``img``'s src."""
     if not isinstance(source, str):
         raise TypeError("HTML image source must be a string")
     normalized_source = source.strip()
@@ -85,7 +85,7 @@ def prepare_image_bytes(
     *,
     declared_extension: str | None = None,
 ) -> PreparedImage:
-    """严格解码图片字节，并将 Word 不直接支持的 WebP 在内存中转为 PNG。"""
+    """Strictly decode the picture bytes and convert WebP, which is not directly supported by Word, into PNG in memory."""
     if not isinstance(data, bytes):
         raise DocxAssetError("Image resolver must return bytes")
     if not data:
@@ -133,7 +133,7 @@ def prepare_image_bytes(
 
 
 def _prepare_data_uri(data_uri: str) -> PreparedImage:
-    """严格解析 data URI，并校验 MIME、签名和完整图片数据。"""
+    """Strictly parse data URI, and verify MIME, signature and complete image data."""
     try:
         data, extension = parse_image_data_uri_strict(data_uri)
     except ValueError as exc:
@@ -145,7 +145,7 @@ def _prepare_relative_asset(
     image_path: str,
     asset_resolver: AssetResolver | None,
 ) -> PreparedImage:
-    """校验相对 sidecar 路径，通过调用方 resolver 读取字节且不访问文件系统或网络。"""
+    """Verifies that relative sidecar paths read bytes through the caller resolver without accessing the file system or network."""
     parsed_source = urlsplit(image_path)
     if parsed_source.scheme or parsed_source.netloc:
         raise DocxAssetError(f"Remote or scheme-based image source is not supported: {image_path}")
@@ -165,7 +165,7 @@ def _prepare_relative_asset(
 
 
 def _normalize_extension(extension: str | None) -> str | None:
-    """规范化可识别的扩展名；未知扩展名不作为图片格式声明。"""
+    """Normalize recognized extensions; unknown extensions are not declared as image formats."""
     if extension is None:
         return None
     normalized = extension.lower().lstrip(".").split("+", 1)[0]
@@ -176,12 +176,12 @@ def _normalize_extension(extension: str | None) -> str | None:
 
 
 def _looks_like_svg(data: bytes) -> bool:
-    """识别带可选 BOM/XML 声明的 SVG 字节，以便给出明确的不支持错误。"""
+    """Identifies the SVG byte with the optional BOM/XML declaration to give an explicit unsupported error."""
     return _SVG_START_RE.match(data[:4096]) is not None
 
 
 def _convert_webp_to_png(image: Image.Image, width_px: int, height_px: int) -> PreparedImage:
-    """在内存中把已解码 WebP 转换为 PNG，保留透明通道与像素尺寸。"""
+    """Convert decoded WebP to PNG in memory, preserving transparency channels and pixel dimensions."""
     output = BytesIO()
     image.save(output, format="PNG")
     return PreparedImage(

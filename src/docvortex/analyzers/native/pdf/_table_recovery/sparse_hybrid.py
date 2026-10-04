@@ -1,4 +1,4 @@
-"""融合稀疏物理边界和文本对齐网络恢复少线表格结构。"""
+"""Fusion of sparse physical boundaries and text alignment networks to restore few-line table structures."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ MAX_HEADER_ROWS = 2
 
 @dataclass(frozen=True, slots=True)
 class _TrackHypothesis:
-    """保存一组少线表叶子列轨及其独立证据。"""
+    """Save a set of less-line table leaf tracks and their independent evidence."""
 
     evidence: str
     x_tracks: tuple[float, ...]
@@ -33,7 +33,7 @@ class _TrackHypothesis:
 
 @dataclass(frozen=True, slots=True)
 class _DenseLayout:
-    """保存正文稠密行推断出的列数和连续正文起点。"""
+    """Saves the inferred column number and starting point of continuous text for dense text rows."""
 
     target_cols: int
     body_start: int
@@ -44,7 +44,7 @@ def _long_horizontal_rules(
     rules: tuple[_LocalRule, ...],
     width: float,
 ) -> tuple[_LocalRule, ...]:
-    """筛选能够独立证明表带存在的长横线。"""
+    """Screen for long horizontal lines that independently prove the presence of a watch strap."""
 
     return tuple(rule for rule in rules if rule.orientation == "horizontal" and rule.end - rule.start >= 0.50 * width)
 
@@ -55,7 +55,7 @@ def _vertical_track_evidence(
     height: float,
     tolerance: float,
 ) -> tuple[tuple[float, ...], dict[float, float]]:
-    """合并同 X 分段竖线并返回覆盖足够的物理列轨。"""
+    """Merges the same segmented vertical lines as X and returns enough physical rail coverage."""
 
     vertical_rules = [rule for rule in rules if rule.orientation == "vertical"]
     clusters = cluster_members(
@@ -83,7 +83,7 @@ def _rectangle_edge_evidence(
     height: float,
     tolerance: float,
 ) -> tuple[float, ...]:
-    """从表头单元格矩形和上下细条中提取可复现的列边界。"""
+    """Extract reproducible column boundaries from header cell rectangles and upper and lower bars."""
 
     table_bbox = normalize_bbox(table_input.table_bbox)
     if table_bbox is None:
@@ -126,7 +126,7 @@ def _canonical_edge_tracks(
     width: float,
     tolerance: float,
 ) -> tuple[float, ...]:
-    """折叠靠近表格外缘的重复矩形端点并返回严格递增轨道。"""
+    """Collapses the endpoints of the repeating rectangle near the outer edge of the table and returns a strictly increasing track."""
 
     snapped = [0.0 if position <= tolerance else width if width - position <= tolerance else position for position in positions]
     tracks = tuple(sorted(set(snapped)))
@@ -136,7 +136,7 @@ def _canonical_edge_tracks(
 
 
 def _longest_consecutive_run(indices: list[int]) -> tuple[int, ...]:
-    """返回整数索引列表中最长的连续区间。"""
+    """Returns the longest contiguous interval in a list of integer indices."""
 
     if not indices:
         return ()
@@ -150,7 +150,7 @@ def _longest_consecutive_run(indices: list[int]) -> tuple[int, ...]:
 
 
 def _infer_dense_layout(text: NativeTableText) -> _DenseLayout | None:
-    """从正文重复 token 数选择叶子列数和首条正文行。"""
+    """Select the leaf column number and first body line from the body repeat token number."""
 
     counts = Counter(len(row.tokens) for row in text.rows if len(row.tokens) >= 2)
     hypotheses: list[tuple[int, int, int, tuple[int, ...]]] = []
@@ -175,7 +175,7 @@ def _infer_text_tracks(
     width: float,
     layout: _DenseLayout,
 ) -> tuple[float, ...] | None:
-    """用正文相邻 token 空隙的中位位置推断叶子列边界。"""
+    """Leaf column boundaries are inferred using the median position of text-adjacent token gaps."""
 
     dense_rows = [text.rows[index] for index in layout.dense_row_indices]
     boundaries: list[float] = []
@@ -192,10 +192,10 @@ def _infer_text_tracks(
 
 
 class _RowOccupancy:
-    """在一次候选恢复调用内复用字符中心与轨道结果，不挂到公开对象。"""
+    """Reuse character center and track results within a candidate recovery call without linking to public objects."""
 
     def __init__(self, text, native):
-        """只建立一次 glyph 索引；缓存随本次恢复结束释放。"""
+        """The glyph index is only created once; the cache is released with the end of this recovery."""
         self.text = text
         self.rows = None
         self.positions = {}
@@ -203,7 +203,7 @@ class _RowOccupancy:
         self.native = native
 
     def columns(self, tracks):
-        """相同轨道复用整表结果，非有限坐标采用原区间遍历，非有限轨道不存缓存。"""
+        """The same orbit reuses the entire table results, non-finite coordinates use the original interval traversal, and non-finite orbits are not cached."""
         if self.rows is None:
             centers = {glyph.glyph_id: (glyph.bbox[0] + glyph.bbox[2]) / 2.0 for glyph in self.text.glyphs}
             self.rows = [[centers[index] for index in row.glyph_ids] for row in self.text.rows]
@@ -233,7 +233,7 @@ def _row_glyph_occupancy(
     x_tracks: tuple[float, ...],
     occupancy: _RowOccupancy | None = None,
 ) -> set[int]:
-    """按字符中心统计一条视觉行实际占用的叶子列。"""
+    """Count the leaf columns actually occupied by a visual line according to the character center."""
 
     if occupancy is not None:
         return set(occupancy.columns(x_tracks)[occupancy.positions[id(row)]])
@@ -257,7 +257,7 @@ def _track_support(
     body_start: int,
     occupancy: _RowOccupancy | None = None,
 ) -> tuple[float, float, tuple[set[int], ...]] | None:
-    """校验正文行、关键列和各叶子列的重复占用支持。"""
+    """Verify support for duplicate occupancy of text rows, key columns, and leaf columns."""
 
     body_rows = text.rows[body_start:]
     cols = len(x_tracks) - 1
@@ -286,7 +286,7 @@ def _nearest_physical_boundaries(
     physical_positions: tuple[float, ...],
     tolerance: float,
 ) -> frozenset[int]:
-    """标记能被独立 drawing 或矩形边缘支持的内部列边界。"""
+    """Marks internal column boundaries that can be supported by independent drawing or rectangular edges."""
 
     return frozenset(
         index
@@ -300,7 +300,7 @@ def _infer_y_tracks(
     rules: tuple[_LocalRule, ...],
     height: float,
 ) -> tuple[float, ...] | None:
-    """以视觉行中心中点为基础并优先吸附相邻行间横线。"""
+    """Based on the midpoint of the visual line center and adsorbing the horizontal lines between adjacent lines first."""
 
     if len(text.rows) < 2:
         return None
@@ -328,7 +328,7 @@ def _horizontal_separator_coverage(
     right: float,
     tolerance: float,
 ) -> float:
-    """计算指定表头行边界在一个叶子列范围内的横线覆盖率。"""
+    """Calculate the horizontal line coverage of the specified header row boundary within a leaf column range."""
 
     intervals = [
         (rule.start, rule.end)
@@ -342,7 +342,7 @@ def _row_token_columns(
     row: NativeTableTextRow,
     x_tracks: tuple[float, ...],
 ) -> list[int]:
-    """把一行粗 token 的中心映射到叶子列。"""
+    """Maps the center of a row of thick token to the leaf columns."""
 
     output: list[int] = []
     for token in row.tokens:
@@ -364,7 +364,7 @@ def _two_level_header_specs(
     tolerance: float,
     occupancy: _RowOccupancy | None = None,
 ) -> tuple[GridCellSpec, ...] | None:
-    """用局部横线和上下层文本恢复两层表头的 rowspan/colspan。"""
+    """Use partial horizontal lines and upper and lower text to restore the rowspan/colspan of the two-layer header."""
 
     cols = len(x_tracks) - 1
     boundary = y_tracks[1]
@@ -465,7 +465,7 @@ def _build_sparse_specs(
     tolerance: float,
     occupancy: _RowOccupancy | None = None,
 ) -> tuple[GridCellSpec, ...] | None:
-    """构造完整少线网格，并仅在两层表头中推断合并格。"""
+    """Construct a complete few-line grid and infer merged grids in only two levels of headers."""
 
     rows = len(y_tracks) - 1
     cols = len(x_tracks) - 1
@@ -515,7 +515,7 @@ def _spec_owner_grid(
     cols: int,
     specs: tuple[GridCellSpec, ...],
 ) -> list[list[int]]:
-    """把逻辑单元格展开为原子格到 spec 下标的映射。"""
+    """Expand logical cells into a mapping of atomic cells to spec subscripts."""
 
     owners = [[-1 for _ in range(cols)] for _ in range(rows)]
     for index, spec in enumerate(specs):
@@ -531,7 +531,7 @@ def _validate_token_splits(
     specs: tuple[GridCellSpec, ...],
     physical_boundaries: frozenset[int],
 ) -> tuple[bool, int]:
-    """只允许被强物理边界证明且不横切字符的粗 token 跨格。"""
+    """Only coarse token spans justified by strong physical boundaries and not intersecting characters are allowed."""
 
     rows = len(text.rows)
     cols = len(x_tracks) - 1
@@ -566,7 +566,7 @@ def _build_hypothesis_candidate(
     diagnostics: dict[str, Any] | None,
     occupancy: _RowOccupancy | None = None,
 ) -> NativeTableCandidate | None:
-    """把一组少线轨道恢复为候选并执行全部高置信硬门。"""
+    """Recover a set of few-line tracks as candidates and perform all high-confidence hard gates."""
 
     x_tracks = hypothesis.x_tracks
     y_tracks = _infer_y_tracks(text, rules, height)
@@ -669,7 +669,7 @@ def _build_track_hypotheses(
     height: float,
     occupancy: _RowOccupancy | None = None,
 ) -> tuple[_TrackHypothesis, ...]:
-    """构造有限的文本轨和强竖线轨假设并消除同拓扑重复。"""
+    """Constructing limited text rails and strong vertical line rail hypotheses and eliminating identical topological duplications."""
 
     layout = _infer_dense_layout(text)
     if layout is None:
@@ -764,7 +764,7 @@ def build_sparse_hybrid_candidates(
     text: NativeTableText,
     diagnostics: list[dict[str, Any]] | None = None,
 ) -> list[NativeTableCandidate]:
-    """生成只在矢量网格失败后参与仲裁的高置信少线候选。"""
+    """Generate high-confidence few-line candidates that only participate in arbitration after vector grid failure."""
 
     table_bbox = normalize_bbox(table_input.table_bbox)
     if table_bbox is None:
@@ -846,7 +846,7 @@ def diagnose_sparse_hybrid_candidate_builds(
     table_input: NativeTableInput,
     text: NativeTableText,
 ) -> tuple[dict[str, Any], ...]:
-    """重放少线候选构造并返回不进入用户结果的诊断。"""
+    """Replay less-line candidate construction and return diagnostics that do not enter user results."""
 
     diagnostics: list[dict[str, Any]] = []
     build_sparse_hybrid_candidates(

@@ -1,4 +1,4 @@
-"""验证独立 WMF/EMF 渲染包的 Office 集成。"""
+"""Verify Office integration of the standalone WMF/EMF rendering package."""
 
 from __future__ import annotations
 
@@ -52,14 +52,14 @@ from docvortex.foundation._image_payload import extract_generated_svg_fallback
 
 
 def _open_result(payload: bytes) -> Image.Image:
-    """解码渲染结果并返回脱离 BytesIO 生命周期的 RGBA 图片。"""
+    """Decode the rendering result and return the RGBA image out of the BytesIO life cycle."""
     with Image.open(BytesIO(payload)) as image:
         image.load()
         return image.convert("RGBA")
 
 
 def _svg_data_uri_fallback(data_uri: str) -> tuple[Image.Image, tuple[int, int], bytes]:
-    """解析 MinerU SVG data URI，并返回 fallback 图片、逻辑尺寸和 SVG。"""
+    """Parses MinerU SVG data URI and returns the fallback picture, logical dimensions, and SVG."""
     assert data_uri.startswith("data:image/svg+xml;base64,")
     svg = base64.b64decode(data_uri.split(",", 1)[1])
     fallback, logical_width, logical_height = extract_generated_svg_fallback(svg)
@@ -67,7 +67,7 @@ def _svg_data_uri_fallback(data_uri: str) -> tuple[Image.Image, tuple[int, int],
 
 
 def _basic_emf_records() -> list[bytes]:
-    """返回覆盖画笔、画刷、文字和 DIB 的基础 EMF records。"""
+    """Returns base EMF records covering brushes, brushes, text, and DIB."""
     return [
         emf_create_pen(1, 0x00FF0000, width=2),
         emf_create_brush(2, 0x0000FF00),
@@ -82,7 +82,7 @@ def _basic_emf_records() -> list[bytes]:
 
 
 def _collect_image_data_uris(value: object) -> list[str]:
-    """递归收集 raw model-list 中的 image_base64 字段。"""
+    """Recursively collect the image_base64 fields in raw model-list."""
     if isinstance(value, dict):
         result = [value["image_base64"]] if isinstance(value.get("image_base64"), str) else []
         for item in value.values():
@@ -97,7 +97,7 @@ def _collect_image_data_uris(value: object) -> list[str]:
 
 
 def _replace_zip_member(package: bytes, member_name: str, payload: bytes) -> bytes:
-    """替换测试 ZIP 中的单个成员并保留其他成员及压缩方式。"""
+    """Replace a single member in test ZIP and preserve other members and compression."""
     output = BytesIO()
     with ZipFile(BytesIO(package)) as source, ZipFile(output, "w") as target:
         for info in source.infolist():
@@ -106,7 +106,7 @@ def _replace_zip_member(package: bytes, member_name: str, payload: bytes) -> byt
 
 
 def _build_doc_with_wmf_preview(payload: bytes) -> bytes:
-    """构造 Native 失败后使用 WMF PICF 预览的 DOC。"""
+    """DOC previewed using WMF PICF after failure to construct Native."""
     return build_equation_doc(
         [(1, b"invalid")],
         preview_storage_ids={1},
@@ -115,17 +115,17 @@ def _build_doc_with_wmf_preview(payload: bytes) -> bytes:
 
 
 def _build_ppt_with_wmf_preview(payload: bytes) -> bytes:
-    """构造 Native 失败后使用 OfficeArt WMF 预览的 PPT。"""
+    """PPT previewed using OfficeArt WMF after failure to construct Native."""
     return build_equation_ppt([b"invalid"], preview_payload=payload)
 
 
 def _build_xls_with_wmf_preview(payload: bytes) -> bytes:
-    """构造 Native 失败后使用 OfficeArt WMF 预览的 XLS。"""
+    """XLS previewed using OfficeArt WMF after failure to construct Native."""
     return build_equation_xls([(1, b"invalid")], preview_payload=payload)
 
 
 def test_oversized_generated_svg_degrades_to_png_for_office_consumers(monkeypatch: pytest.MonkeyPatch) -> None:
-    """通过公开 API 的资源错误验证 Office 消费者可靠回退到 PNG。"""
+    """Verification that Office consumers reliably fall back to PNG by exposing a resource error for API."""
     data = build_emf([emf_stretch_dib()])
     png = render_metafile(data, output_format="png")
     render = Mock(side_effect=[MetafileResourceLimitError("generated SVG exceeds budget"), png])
@@ -138,7 +138,7 @@ def test_oversized_generated_svg_degrades_to_png_for_office_consumers(monkeypatc
 
 
 def test_office_serializer_returns_generated_svg(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 Office 图片入口返回安全 SVG 和 PNG fallback。"""
+    """Verify that the Office image portal returns security SVG and PNG fallback."""
     data_uri = office_image.serialize_office_image(
         build_emf(_basic_emf_records()),
         part_name="/word/media/image1.emf",
@@ -153,7 +153,7 @@ def test_office_serializer_returns_generated_svg(monkeypatch: pytest.MonkeyPatch
 
 
 def test_officeart_emu_size_controls_standard_wmf_output(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证无 placeable header 的 OfficeArt WMF 使用 ptSize EMU 定标。"""
+    """Verify that OfficeArt without placeable header WMF is calibrated using ptSize EMU."""
     standard_wmf = basic_wmf()[22:]
     data_uri = office_image.serialize_office_image(
         standard_wmf,
@@ -169,7 +169,7 @@ def test_officeart_emu_size_controls_standard_wmf_output(monkeypatch: pytest.Mon
 
 
 def test_officeart_metafile_header_preserves_payload_and_emu_size() -> None:
-    """验证 BLIP 解包保留 WMF bytes，并读取规范 ptSize EMU。"""
+    """Verify BLIP unpack retains WMF bytes, and read specifications ptSize EMU."""
     standard_wmf = basic_wmf()[22:]
     compressed = zlib.compress(standard_wmf)
     metafile_header = bytearray(34)
@@ -193,7 +193,7 @@ def test_officeart_metafile_header_preserves_payload_and_emu_size() -> None:
 
 
 def test_office_serializer_uses_only_library_backend(monkeypatch: pytest.MonkeyPatch) -> None:
-    """所有平台都只调用独立库，失败后直接使用占位图。"""
+    """All platforms only call independent libraries, and use placeholder images directly after failure."""
     data = build_emf(_basic_emf_records())
     generated = Mock(return_value="data:image/svg+xml;base64,generated")
     pillow_open = Mock(side_effect=AssertionError("MinerU must not render metafiles with Pillow"))
@@ -207,12 +207,12 @@ def test_office_serializer_uses_only_library_backend(monkeypatch: pytest.MonkeyP
 
 
 def test_pptx_picture_path_uses_cross_platform_metafile_renderer(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 PPTX 普通 picture 不再绕过共享 WMF/EMF 序列化入口。"""
+    """Verification PPTX Common picture no longer bypasses the shared WMF/EMF serialization entry."""
     converter = PptxConverter()
     data = build_emf(_basic_emf_records())
 
     def fake_image_data(_shape: object) -> tuple[bytes, str]:
-        """返回固定 EMF 载荷以隔离 shape relationship 解析。"""
+        """Return fixed EMF payload to isolate shape relationship parsing."""
         return data, "image/x-emf"
 
     monkeypatch.setattr(converter, "_get_shape_image_data", fake_image_data)
@@ -222,7 +222,7 @@ def test_pptx_picture_path_uses_cross_platform_metafile_renderer(monkeypatch: py
 
 
 def test_xlsx_wps_cell_image_uses_cross_platform_metafile_renderer(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 WPS DISPIMG 的 cell-image 分支统一调用 Office 图片序列化器。"""
+    """Verify WPS The cell-image branch of DISPIMG uniformly calls the Office image serializer."""
     package = BytesIO()
     with ZipFile(package, "w", ZIP_DEFLATED) as archive:
         archive.writestr("xl/media/image1.emf", build_emf(_basic_emf_records()))
@@ -251,7 +251,7 @@ def test_modern_office_models_emit_rendered_emf_svg(
     builder: object,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 DOCX/PPTX/XLSX 完整模型链都产出安全 EMF SVG。"""
+    """Verify that the complete model chain of DOCX/PPTX/XLSX yields safe EMF and SVG."""
     package = builder(build_emf(_basic_emf_records()))  # type: ignore[operator]
     pages = model.predict(BytesIO(package))  # type: ignore[attr-defined]
     images = _collect_image_data_uris(pages)
@@ -276,7 +276,7 @@ def test_legacy_office_models_emit_rendered_wmf_svg(
     builder: object,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 DOC/PPT/XLS 的 OfficeArt/PICF WMF 预览进入跨平台 SVG。"""
+    """Verified OfficeArt/PICF WMF preview of DOC/PPT/XLS into cross-platform SVG."""
     pages = model.predict(BytesIO(builder(basic_wmf())))  # type: ignore[attr-defined,operator]
     images = _collect_image_data_uris(pages)
 
@@ -288,7 +288,7 @@ def test_legacy_office_models_emit_rendered_wmf_svg(
 
 
 def test_rtf_model_emf_picture_emits_rendered_svg(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 RTF emfblip 从 pict 捕获一路进入跨平台 SVG。"""
+    """Verification RTF emfblip captures from pict all the way into the cross-platform SVG."""
     emf = build_emf(_basic_emf_records())
     rtf = b"{\\rtf1 before {\\pict\\emfblip " + emf.hex().encode("ascii") + b"} after\\par}"
     images = _collect_image_data_uris(RtfModel().predict(BytesIO(rtf)))
@@ -311,7 +311,7 @@ def test_odf_models_emit_rendered_emf_svg(
     builder: object,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 ODT/ODS/ODP 包内 WMF/EMF 图片都复用统一渲染入口。"""
+    """Verify that all WMF/EMF images in the ODT/ODS/ODP package reuse the unified rendering entry."""
     package = builder()  # type: ignore[operator]
     package = _replace_zip_member(package, "Pictures/pixel.png", build_emf(_basic_emf_records()))
     images = _collect_image_data_uris(model.predict(BytesIO(package)))  # type: ignore[attr-defined]
@@ -321,7 +321,7 @@ def test_odf_models_emit_rendered_emf_svg(
 
 
 def test_pillow_identified_metafile_is_routed_before_load(monkeypatch: pytest.MonkeyPatch) -> None:
-    """由 Pillow 补充识别的矢量图也交给库处理，禁止触发 MinerU 内部原生加载。"""
+    """The vector images supplemented by Pillow are also handed over to the library for processing, which prohibits triggering the internal native loading of MinerU."""
     image = Mock(format="WMF")
     generated = Mock(return_value="data:image/svg+xml;base64,generated")
     monkeypatch.setattr(office_image.Image, "open", Mock(return_value=image))

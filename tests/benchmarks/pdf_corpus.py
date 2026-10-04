@@ -1,4 +1,4 @@
-"""统一 Flash 与共享 PDF 基准的语料发现和输入指纹。"""
+"""Corpus discovery and input fingerprinting of the unified Flash and shared PDF benchmarks."""
 
 from __future__ import annotations
 
@@ -10,13 +10,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def discover_demo_pdfs(root: Path = ROOT) -> list[Path]:
-    """递归发现 demo PDF，使新增子目录样本自动进入下一次基准。"""
+    """Recursively discover demo PDF, so that newly added subdirectory samples automatically enter the next baseline."""
 
     return sorted((root / "demo/pdfs").rglob("*.pdf"))
 
 
 def corpus_paths(kind: str, root: Path = ROOT) -> list[Path]:
-    """按固定顺序合并既有布局、全部 demo 和原生表格语料。"""
+    """Merge existing layouts, all demo and native table corpus in fixed order."""
 
     if kind not in {"demo", "all"}:
         raise ValueError(f"Unknown PDF corpus: {kind}")
@@ -33,7 +33,7 @@ def corpus_paths(kind: str, root: Path = ROOT) -> list[Path]:
 
 
 def corpus_manifest(paths: list[Path]) -> list[dict[str, str | int]]:
-    """冻结正式输入的路径、源字节和页数，阻止测量中途替换。"""
+    """Freezes the formal input path, source bytes, and page numbers to prevent mid-measurement replacement."""
 
     from pypdfium2 import PdfDocument
 

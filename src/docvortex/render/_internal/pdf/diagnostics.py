@@ -1,4 +1,4 @@
-"""收集一次 PDF 导出的结构化诊断，同时保留底层日志。"""
+"""Collect structured diagnostics exported by PDF once, while retaining the underlying logs."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ _diagnostics: ContextVar[list[Diagnostic] | None] = ContextVar("pdf_diagnostics"
 
 @contextmanager
 def collect_pdf_diagnostics() -> Iterator[list[Diagnostic]]:
-    """隔离并发或重入调用的诊断，退出时恢复外层收集器。"""
+    """Isolate diagnostics for concurrent or reentrant calls and restore the outer collector on exit."""
     items: list[Diagnostic] = []
     token = _diagnostics.set(items)
     try:
@@ -26,7 +26,7 @@ def collect_pdf_diagnostics() -> Iterator[list[Diagnostic]]:
 
 
 def report_pdf_diagnostic(code: str, message: str, page_index: int | None = None) -> None:
-    """PDF 渲染诊断统一使用 DEBUG 日志，结构化诊断保持完整。"""
+    """PDF rendering diagnostics use DEBUG logs uniformly, and structured diagnostics remain intact."""
     logger.debug("{}: {}", code, message)
     items = _diagnostics.get()
     if items is not None:

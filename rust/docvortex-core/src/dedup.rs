@@ -1,4 +1,4 @@
-//! 保持分桶访问次序、候选上限及最早来源规则的字符重复计算。
+//! Keep the bucket access order, candidate upper limit and character duplication calculation of the earliest source rule.
 
 use crate::geometry::{Box4, Size};
 use std::collections::HashMap;
@@ -8,7 +8,7 @@ pub type Pair = (usize, usize);
 pub type Offset = (usize, usize, f64, f64);
 pub type MappingRecord = (Option<i64>, i64, i64, usize, f64, Option<Size>, Box4, bool);
 
-/// 批量识别连续的一对多来源映射，只返回范围，Unicode 合并仍由 Python 执行。
+/// Batch identification of continuous one-to-many source mapping, only return range, Unicode merge is still performed by Python.
 pub fn mapping_runs(records: Vec<MappingRecord>) -> Option<Vec<(usize, usize)>> {
     if records.iter().any(|r| {
         !r.4.is_finite()
@@ -42,14 +42,14 @@ pub fn mapping_runs(records: Vec<MappingRecord>) -> Option<Vec<(usize, usize)>> 
     Some(groups)
 }
 
-/// 数值缺失、非有限或超出容差时不得作为相同位置的证据。
+/// Values that are missing, non-limited, or exceed tolerances shall not be used as evidence of the same location.
 fn close<const N: usize>(a: [f64; N], b: [f64; N], epsilon: f64) -> bool {
     a.iter()
         .zip(b)
         .all(|(x, y)| x.is_finite() && y.is_finite() && (*x - y).abs() <= epsilon)
 }
 
-/// 计算覆盖较小矩形的比例，与 Python 的减法、乘除次序一致。
+/// Calculate the proportion of the smaller rectangle covered, consistent with the order of subtraction, multiplication and division of Python.
 fn overlap(a: Box4, b: Box4) -> f64 {
     let area = ((a[2] - a[0]) * (a[3] - a[1])).min((b[2] - b[0]) * (b[3] - b[1]));
     if area > 0.0 {
@@ -60,7 +60,7 @@ fn overlap(a: Box4, b: Box4) -> f64 {
     }
 }
 
-/// 按签名和相邻九桶生成精确重复与平移候选，保留每桶最多 64 项。
+/// Generate exact repeat and translation candidates by signature and adjacent nine buckets, retaining up to 64 entries per bucket.
 pub fn paint_pairs(records: Vec<PaintRecord>) -> Option<(Vec<Pair>, Vec<Offset>)> {
     if records
         .iter()
@@ -122,7 +122,7 @@ pub fn paint_pairs(records: Vec<PaintRecord>) -> Option<(Vec<Pair>, Vec<Offset>)
     Some((exact, offsets))
 }
 
-/// 精确复现原并查集的路径压缩与最终一次父节点跳转。
+/// Accurately reproduce the path compression and the last parent node jump of the original union search set.
 pub fn components(count: usize, pairs: &[Pair]) -> Vec<usize> {
     let mut parents: Vec<_> = (0..count).collect();
     for &(mut a, mut b) in pairs {
@@ -143,14 +143,14 @@ pub fn components(count: usize, pairs: &[Pair]) -> Vec<usize> {
 }
 
 pub type EvidenceRecord = (Option<Box4>, f64, usize, usize, bool);
-/// 连续证据中间仅允许空白或两端字形的副本。
+/// Only blank spaces or copies of the glyphs at both ends are allowed in the middle of the continuous evidence.
 fn endpoints(records: &[EvidenceRecord], roots: &[usize], start: usize, end: usize) -> bool {
     end - start <= 128
         && (start + 1..end)
             .all(|i| records[i].4 || roots[i] == roots[start] || roots[i] == roots[end])
 }
 
-/// 保留字典插入次序聚类平移证据，再以连续三字形、两种文本确认阴影。
+/// Keep the dictionary insertion order clustering translation evidence, and then confirm the shadow with continuous triglyphs and two kinds of text.
 pub fn confirmed_offsets(
     records: Vec<EvidenceRecord>,
     pairs: Vec<Offset>,
@@ -243,7 +243,7 @@ pub fn confirmed_offsets(
     confirmed
 }
 
-/// 用 Python 预计算的 sin/cos 投影，避免跨平台三角函数差异。
+/// Use Python precomputed sin/cos projection to avoid cross-platform trigonometric differences.
 pub fn project(b: Box4, co: f64, si: f64) -> Box4 {
     let points = [(b[0], b[1]), (b[0], b[3]), (b[2], b[1]), (b[2], b[3])]
         .map(|(x, y)| (co * x + si * y, -si * x + co * y));
@@ -272,7 +272,7 @@ pub type HiddenRecord = (
     usize,
 );
 
-/// 产生隐藏文本和可见文本的几何配对；Unicode 文本判据仍由 Python 执行。
+/// Generate geometric pairings of hidden and visible text; the Unicode text criterion is still performed by Python.
 pub fn hidden_candidates(records: Vec<HiddenRecord>) -> Option<Vec<(Vec<usize>, Vec<usize>)>> {
     if records.iter().any(|r| {
         r.0.is_some_and(|b| b.iter().any(|v| !v.is_finite() || v.abs() > 1e15))

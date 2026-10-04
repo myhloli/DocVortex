@@ -1,4 +1,4 @@
-"""完整文档结果与渲染产物；便捷方法显式委托对应处理层。"""
+"""Complete documentation of results and rendering products; convenience methods to explicitly delegate to the corresponding processing layer."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .render.contracts import RenderFormat, RenderOptions
 
 @dataclass(frozen=True, slots=True)
 class Diagnostic:
-    """记录可定位的非致命文档处理信息。"""
+    """Logs locatable, non-fatal document processing information."""
 
     code: str
     message: str
@@ -22,7 +22,7 @@ class Diagnostic:
 
 @dataclass(slots=True)
 class MetadataResult:
-    """返回独立读取的源文档属性和不影响正文解析的诊断。"""
+    """Returns source document properties that are read independently and diagnostics that do not affect text parsing."""
 
     metadata: DocumentMetadata
     diagnostics: tuple[Diagnostic, ...] = ()
@@ -30,7 +30,7 @@ class MetadataResult:
 
 @dataclass(slots=True)
 class AnalysisResult:
-    """原生分析输出，允许独立进行后处理或交给其他消费者。"""
+    """Native analysis output, allowing independent post-processing or delivery to other consumers."""
 
     model_json: ModelJson
     assets: AssetStore = field(default_factory=AssetStore)
@@ -40,7 +40,7 @@ class AnalysisResult:
 
 @dataclass(frozen=True, slots=True)
 class ExportResult:
-    """返回实际写出的主文件及素材路径。"""
+    """Returns the actual written main file and material path."""
 
     path: Path
     asset_paths: tuple[Path, ...] = ()
@@ -48,7 +48,7 @@ class ExportResult:
 
 @dataclass(slots=True)
 class RenderArtifact:
-    """可独立写出的主文件内容和全部旁文件。"""
+    """The contents of the main file and all side files can be written independently."""
 
     content: bytes
     output_format: RenderFormat
@@ -57,7 +57,7 @@ class RenderArtifact:
     diagnostics: tuple[Diagnostic, ...] = ()
 
     def write(self, path: str | Path, *, overwrite: bool = False) -> ExportResult:
-        """预检全部文件后原子提交，不在渲染期间执行文件写入。"""
+        """Atomic commit after prefetching all files, no file writing is performed during rendering."""
         from .export.files import write_artifact
 
         return write_artifact(self, Path(path), overwrite=overwrite)
@@ -65,7 +65,7 @@ class RenderArtifact:
 
 @dataclass(slots=True)
 class DocumentResult:
-    """持有语义文档与素材，解析结束后无需保留源文档。"""
+    """It holds semantic documents and materials, and there is no need to retain the source documents after parsing."""
 
     middle_json: MiddleJson
     assets: AssetStore = field(default_factory=AssetStore)
@@ -80,19 +80,19 @@ class DocumentResult:
         options: RenderOptions | None = None,
         overwrite: bool = False,
     ) -> ExportResult:
-        """复用当前解析结果渲染指定格式，不重新分析输入。"""
+        """Reuse the current parsing results to render the specified format without re-analyzing the input."""
         from .api import render
 
         return render(self.middle_json, output_format, assets=self.assets, options=options).write(path, overwrite=overwrite)
 
     def save_bundle(self, path: str | Path, *, overwrite: bool = False) -> ExportResult:
-        """把当前文档、可选分析结果与素材保存成可移植结果包。"""
+        """Save the current document, optional analysis results, and materials into a portable results package."""
         from .export.bundle import save_bundle
 
         return save_bundle(self, Path(path), overwrite=overwrite)
 
     def to_dict(self) -> dict[str, Any]:
-        """仅返回中性语义协议；素材通过结果包或显式接口保存。"""
+        """Only semantically neutral protocols are returned; material is saved via result packets or explicit interfaces."""
         return self.middle_json.to_dict()
 
 

@@ -1,4 +1,4 @@
-"""Flash PDF、EPUB、HTML、OFD、CSV 与 Office/RTF 文档模型。"""
+"""Flash PDF, EPUB, HTML, OFD, CSV and Office/RTF document models."""
 
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ if TYPE_CHECKING:
 
 
 class PdfModel:
-    """将 Flash 原生 PDF 流水线包装为无状态模型。"""
+    """The Flash native PDF pipeline is packaged as a stateless model."""
 
     def predict(self, pdf_doc: PDFDocument) -> list[list[dict[str, Any]]]:
-        """分析调用方持有的 PDFDocument，在所有文字匹配结束后统一输出可见英数。"""
+        """Analyze the PDFDocument held by the caller, and uniformly output visible English numbers after all text matching is completed."""
         from ...content import normalize_pdf_model_text
         from .pdf import pipeline
 
@@ -24,23 +24,23 @@ class PdfModel:
 
 
 class CsvModel:
-    """将 CSV 分隔符文本包装为无状态 Flash 模型。"""
+    """Wrap CSV delimiter text into a stateless Flash model."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的 CSV 二进制流，并返回单逻辑页 model_list。"""
+        """Convert the CSV binary stream held by the caller and return the single logical page model_list."""
         from .csv import convert_csv
 
         return convert_csv(file_binary)
 
 
 class EpubModel:
-    """将 EPUB OCF/OPF 文档包装为无状态 Flash 模型。"""
+    """Wrap the EPUB OCF/OPF document into a stateless Flash model."""
 
     def predict(
         self,
         file_binary: BinaryIO,
     ) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的整本 EPUB 流，并返回目录页和全部正文逻辑页。"""
+        """Convert the entire EPUB stream held by the caller, and return the directory page and all text logical pages."""
         from .epub.converter import EpubConverter
 
         converter = EpubConverter()
@@ -49,7 +49,7 @@ class EpubModel:
 
 
 class HtmlModel:
-    """将 standalone HTML 文档包装为无状态 Flash 模型。"""
+    """Wrap the standalone HTML document into a stateless Flash model."""
 
     def predict(
         self,
@@ -57,7 +57,7 @@ class HtmlModel:
         *,
         source_context: HtmlSourceContext | None = None,
     ) -> list[list[dict[str, Any]]]:
-        """转换静态 HTML 流，并返回单逻辑页 model_list。"""
+        """Convert static HTML stream and return single logical page model_list."""
         from .html.converter import HtmlConverter
 
         converter = HtmlConverter()
@@ -66,14 +66,14 @@ class HtmlModel:
 
 
 class OfdModel:
-    """包装 OFD 固定版式解析，保留最近一次调用的非致命诊断。"""
+    """Wrap OFD fixed layout parsing, retaining the most recently called non-fatal diagnosis."""
 
     def __init__(self) -> None:
-        """初始化实例级诊断，避免不同文档间串用结果。"""
+        """Initialize instance-level diagnosis to avoid cross-using results between different documents."""
         self.diagnostics: list[dict[str, Any]] = []
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的整份 OFD 流，并返回逐物理页 model-list。"""
+        """Convert the entire OFD stream held by the caller and return model-list on a per-physical page basis."""
         from .ofd.converter import OfdConverter
 
         self.diagnostics = []
@@ -84,10 +84,10 @@ class OfdModel:
 
 
 class RtfModel:
-    """将 Rich Text Format 文档包装为无状态 Flash 模型。"""
+    """Wrap the Rich Text Format document into a stateless Flash model."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的 RTF 二进制流，并返回单逻辑页 model_list。"""
+        """Convert the RTF binary stream held by the caller and return the single logical page model_list."""
         from .office.rtf.converter import RtfConverter
 
         converter = RtfConverter()
@@ -96,12 +96,12 @@ class RtfModel:
 
 
 class DocxModel:
-    """将 DOCX Converter 包装为无状态模型。"""
+    """Pack DOCX Converter as a stateless model."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的 DOCX 二进制流，并返回分页 model_list。"""
+        """Convert the DOCX binary stream held by the caller and return the paged model_list."""
 
-        # 延迟加载 Converter，避免纯 PDF 路径提前加载 Office 依赖。
+        # Delay loading of Converter to avoid early loading of Office dependencies in pure PDF paths.
         from .office.docx.docx_converter import DocxConverter
 
         converter = DocxConverter()
@@ -110,12 +110,12 @@ class DocxModel:
 
 
 class DocModel:
-    """将 Word 97–2003 Converter 包装为无状态模型。"""
+    """Wrap Word 97–2003 Converter as a stateless model."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的 DOC 二进制流，并返回逐 section model-list。"""
+        """Convert the DOC binary stream held by the caller and return section to model-list."""
 
-        # 延迟加载旧版 DOC 解析器，避免其他格式提前加载 olefile。
+        # Delay loading of the old version of DOC parser to prevent other formats from loading olefile in advance.
         from .office.doc.doc_converter import DocConverter
 
         converter = DocConverter()
@@ -124,12 +124,12 @@ class DocModel:
 
 
 class PptxModel:
-    """将 PPTX Converter 包装为无状态模型。"""
+    """Package PPTX Converter as a stateless model."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的 PPTX 二进制流，并返回分页 model_list。"""
+        """Convert the PPTX binary stream held by the caller and return the paged model_list."""
 
-        # 延迟加载 Converter，避免纯 PDF 路径提前加载 Office 依赖。
+        # Delay loading of Converter to avoid early loading of Office dependencies in pure PDF paths.
         from .office.pptx.pptx_converter import PptxConverter
 
         converter = PptxConverter()
@@ -138,12 +138,12 @@ class PptxModel:
 
 
 class PptModel:
-    """将 PowerPoint 97–2003 Converter 包装为无状态模型。"""
+    """Wrap PowerPoint 97–2003 Converter as a stateless model."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的 PPT 二进制流，并返回逐幻灯片 model-list。"""
+        """Convert the PPT binary stream held by the caller and return slide-by-slide model-list."""
 
-        # 延迟加载旧版 PPT 解析器，避免其他格式提前加载 olefile。
+        # Delay loading of the old version of PPT parser to prevent other formats from loading olefile in advance.
         from .office.ppt.ppt_converter import PptConverter
 
         converter = PptConverter()
@@ -152,12 +152,12 @@ class PptModel:
 
 
 class XlsModel:
-    """将 Excel 97–2003 Converter 包装为无状态模型。"""
+    """Wrap Excel 97–2003 Converter as a stateless model."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的 XLS 二进制流，并返回逐工作表 model-list。"""
+        """Converts the XLS binary stream held by the caller and returns model-list per worksheet."""
 
-        # 延迟加载旧版 XLS 解析器，避免其他格式提前加载 olefile/openpyxl。
+        # Delay loading of legacy XLS parsers to avoid early loading of olefile/openpyxl for other formats.
         from .office.xls.xls_converter import XlsConverter
 
         converter = XlsConverter()
@@ -166,12 +166,12 @@ class XlsModel:
 
 
 class XlsxModel:
-    """将 XLSX Converter 包装为无状态模型。"""
+    """Wrap XLSX Converter as a stateless model."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的 XLSX 二进制流，并返回分页 model_list。"""
+        """Converts the XLSX binary stream held by the caller and returns paged model_list."""
 
-        # 延迟加载 Converter，避免纯 PDF 路径提前加载 Office 依赖。
+        # Delay loading of Converter to avoid early loading of Office dependencies in pure PDF paths.
         from .office.xlsx.xlsx_converter import XlsxConverter
 
         converter = XlsxConverter()
@@ -180,10 +180,10 @@ class XlsxModel:
 
 
 class OdtModel:
-    """将 OpenDocument Text 包装为无状态 Flash 模型。"""
+    """Wrap OpenDocument Text into a stateless Flash model."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的 ODT 二进制流，并返回分页 model_list。"""
+        """Converts the ODT binary stream held by the caller and returns paged model_list."""
         from .office.odf.converters import OdtConverter
 
         converter = OdtConverter()
@@ -192,10 +192,10 @@ class OdtModel:
 
 
 class OdsModel:
-    """将 OpenDocument Spreadsheet 包装为无状态 Flash 模型。"""
+    """Wrap OpenDocument Spreadsheet into a stateless Flash model."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的 ODS 二进制流，并返回逐工作表 model_list。"""
+        """Converts the ODS binary stream held by the caller and returns model_list per worksheet."""
         from .office.odf.converters import OdsConverter
 
         converter = OdsConverter()
@@ -204,10 +204,10 @@ class OdsModel:
 
 
 class OdpModel:
-    """将 OpenDocument Presentation 包装为无状态 Flash 模型。"""
+    """Wrap OpenDocument Presentation into a stateless Flash model."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """转换调用方持有的 ODP 二进制流，并返回逐幻灯片 model_list。"""
+        """Converts the ODP binary stream held by the caller and returns slide-by-slide model_list."""
         from .office.odf.converters import OdpConverter
 
         converter = OdpConverter()

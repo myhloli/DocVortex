@@ -8,7 +8,7 @@ from docvortex.schema import BlockType
 
 
 def test_page_blocks_keep_canonical_equation_type_and_clean_content() -> None:
-    """验证单页后处理清理行间公式内容时不改写 equation 类型。"""
+    """Verify that the equation type is not overwritten when cleaning up interline formula content in single page post-processing."""
     equation = {
         "type": BlockType.EQUATION,
         "content": r"\[x+1\]",
@@ -26,7 +26,7 @@ def test_page_blocks_keep_canonical_equation_type_and_clean_content() -> None:
 
 
 def test_fix_pdf_list_blocks_supports_unit_bbox_without_rewrite() -> None:
-    """验证归一化列表框可与像素文本框计算包含关系且不回写 bbox。"""
+    """Verify that the normalized listbox calculates inclusion with the pixel textbox and does not write back bbox."""
     list_bbox = [0.0, 0.0, 1.0, 1.0]
     text_bbox = [100, 100, 200, 200]
     list_block = {
@@ -56,7 +56,7 @@ def test_fix_pdf_list_blocks_supports_unit_bbox_without_rewrite() -> None:
 
 
 def test_page_blocks_group_bbox_dict_visual_blocks() -> None:
-    """验证单页后处理可将带 bbox 的 dict 视觉块完成分组。"""
+    """Verify single page post processing completes grouping of dict visual blocks with bbox."""
     blocks = process_page_blocks(
         [
             {
@@ -83,7 +83,7 @@ def test_page_blocks_group_bbox_dict_visual_blocks() -> None:
 
 
 def test_page_blocks_group_no_bbox_office_caption_by_prefix() -> None:
-    """验证单页后处理使用 Office 前缀规则分组无 bbox 视觉块。"""
+    """Verify single page post processing uses Office prefix rule grouping without bbox visual blocks."""
     blocks = process_page_blocks(
         [
             {
@@ -108,7 +108,7 @@ def test_page_blocks_group_no_bbox_office_caption_by_prefix() -> None:
 
 
 def test_page_blocks_group_no_bbox_chart_and_code_captions() -> None:
-    """验证无 bbox 的 chart/code caption 映射及 code subtype 保留。"""
+    """Verify chart/code caption mapping without bbox and code subtype retained."""
     blocks = process_page_blocks(
         [
             {"type": BlockType.CHART_CAPTION, "content": _inline("Chart 1")},

@@ -1,4 +1,4 @@
-"""解析 OFD PathObject 并提取表格可用的轴向线段。"""
+"""Parse OFD PathObject and extract the axial line segments available in the table."""
 
 from __future__ import annotations
 
@@ -21,26 +21,26 @@ _TOKEN_RE = re.compile(r"CM|[SMLQBAC]|[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d
 
 @dataclass(slots=True)
 class OfdPathBudget:
-    """累计限制紧缩路径 token 与命令数量。"""
+    """Cumulative limit compaction path token and number of commands."""
 
     command_count: int = 0
     token_count: int = 0
 
     def charge_token(self) -> None:
-        """累计实际扫描的路径 token 并在超限时失败。"""
+        """Accumulate the actual scanned path token and fail when it exceeds the limit."""
         self.token_count += 1
         if self.token_count > MAX_PATH_TOKENS:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_path_tokens={MAX_PATH_TOKENS}")
 
     def charge_command(self) -> None:
-        """累计实际扫描的路径命令并在超限时失败。"""
+        """The path commands actually scanned are accumulated and fail when the limit is exceeded."""
         self.command_count += 1
         if self.command_count > MAX_PATH_COMMANDS:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_path_commands={MAX_PATH_COMMANDS}")
 
 
 def _finite_float(value: str) -> float | None:
-    """把路径 token 转换为有限浮点数。"""
+    """Convert the path token into a finite floating point number."""
     try:
         parsed = float(value)
     except ValueError:
@@ -49,7 +49,7 @@ def _finite_float(value: str) -> float | None:
 
 
 def _line_bbox(first: tuple[float, float], second: tuple[float, float], width: float) -> tuple[BBox, str] | None:
-    """把近似水平或垂直线段转换为非退化 bbox。"""
+    """Convert approximately horizontal or vertical line segments to non-degenerate bbox."""
     dx = second[0] - first[0]
     dy = second[1] - first[1]
     length = math.hypot(dx, dy)
@@ -84,7 +84,7 @@ PathCommand = tuple[str, tuple[float, ...]]
 
 
 def parse_path_commands(value: str, budget: OfdPathBudget) -> tuple[PathCommand, ...]:
-    """只扫描一次完整路径命令，绘制与表格检测共用同一份受限数值结果。"""
+    """Only scan the complete path command once, and the drawing and table detection share the same limited numerical result."""
     commands: list[PathCommand] = []
     operator: str | None = None
     parameters: list[float] = []
@@ -127,7 +127,7 @@ def parse_path_commands(value: str, budget: OfdPathBudget) -> tuple[PathCommand,
 def command_segments(
     commands: tuple[PathCommand, ...], transform: Affine
 ) -> list[tuple[tuple[float, float], tuple[float, float]]]:
-    """从已解析路径读取直线段，曲线只更新端点而不把控制线当表格边框。"""
+    """Read the straight line segment from the parsed path, and the curve only updates the endpoint and does not use the control line as the table border."""
     result = []
     current = start = None
     for operator, values in commands:
@@ -147,7 +147,7 @@ def command_segments(
 
 
 def _segments(value: str, transform: Affine, budget: OfdPathBudget) -> list[tuple[tuple[float, float], tuple[float, float]]]:
-    """保留既有内部入口，复用完整命令解析提取直线段。"""
+    """Retain the existing internal entrance and reuse the complete command to parse and extract straight line segments."""
     return command_segments(parse_path_commands(value, budget), transform)
 
 
@@ -162,7 +162,7 @@ def build_axis_lines(
     resolved_style: dict[str, str] | None = None,
     commands: tuple[PathCommand, ...] | None = None,
 ) -> list[AxisLine]:
-    """从一个 PathObject 提取可见轴向线段。"""
+    """Extract visible axial segments from a PathObject."""
     style = resolved_style or {}
     if (style.get("Visible") or path_object.get("Visible") or "true").casefold() in {"false", "0"}:
         return []
@@ -194,7 +194,7 @@ def build_axis_lines(
     fill = style.get("Fill", path_object.get("Fill", "false")).casefold() in {"true", "1"}
     extracted: list[AxisLine] = []
     if fill and not stroke:
-        # 只把单个细长矩形归约为中心线，字形轮廓、背景和角点填充均不能提供边框证据。
+        # Only a single elongated rectangle is reduced to the center line, and the glyph outline, background and corner filling cannot provide border evidence.
         if len(segments) != 4 or not commands or commands[-1][0] != "C":
             return []
         points = {point for segment in segments for point in segment}

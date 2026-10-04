@@ -1,4 +1,4 @@
-"""在既有正文统计和结构证据下分类栏内标题。"""
+"""Title in the category column under existing text statistical and structural evidence."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def _classify_paragraph_titles_in_lane(
     document_title_profile: _DocumentTitleProfile | None,
     page_index: int,
 ) -> None:
-    """以字号、样式、留白、对齐、栏宽和容器邻接判定段落标题。"""
+    """Determine paragraph titles based on font size, style, white space, alignment, column width, and container adjacency."""
 
     lane_width = max(0.1, lane.right - lane.left)
     rows = lane.lines
@@ -63,7 +63,7 @@ def _classify_paragraph_titles_in_lane(
             and document_title_bottom <= 0.6 * local_page_height
             and _bbox_center_y(bbox) >= 0.84 * local_page_height
         ):
-            # 首页底部短行通常是版本、日期等封面元数据，不属于正文标题层级。
+            # The short line at the bottom of the home page usually contains cover metadata such as version and date, and does not belong to the text title level.
             continue
         line_height = _line_effective_height(line, bbox)
         title_prototype = _matching_document_title_prototype(
@@ -104,7 +104,7 @@ def _classify_paragraph_titles_in_lane(
                 for container in container_bboxes
             )
         )
-        # 较大字体、独立留白及居中对齐同时成立的图前标题继续参加标题判定，普通图注保持邻图抑制。
+        # Captions in front of figures with larger font size, independent white space and center alignment will continue to participate in title determination, and ordinary captions will remain suppressed for adjacent figures.
         if inside_visual_container or (near_visual_container and title_prototype is None and not independent_display_heading):
             continue
 
@@ -259,7 +259,7 @@ def _classify_paragraph_titles_in_lane(
                 or gap_above_excess >= 0.35
             )
         )
-        # 正文原型不能反向充当标题原型；通栏长行和常规行距共同否决弱提升。
+        # The text prototype cannot serve as the title prototype in reverse; long column lines and regular line spacing jointly prevent weak promotion.
         if document_regular_body_candidate and width_ratio >= 0.8 and not weight_emphasized and height_ratio < 1.18:
             continue
         prototype_inline_heading = (
@@ -371,7 +371,7 @@ def _protect_front_matter_title_types(
     profile: _LaneBodyProfile,
     front_matter_boundary: float,
 ) -> None:
-    """把作者区误命中的标题降为正文，并仅保留原本需要跨行聚合的内部标记。"""
+    """Reduce titles hit by author error to text, and retain only internal tags that would otherwise need to be aggregated across lines."""
 
     front_title_indices = [
         index
@@ -398,7 +398,7 @@ def _visual_row_has_body_style_sibling(
     rows: list[tuple[_LineItem, BBox]],
     index: int,
 ) -> bool:
-    """检查同一完整视觉行是否同时包含标题样式与正文样式 run。"""
+    """Check if the same full visual line contains both title and body styles run."""
 
     line, _bbox = rows[index]
     if line.visual_row_id is None:
@@ -415,7 +415,7 @@ def _is_near_full_mixed_inline_row(
     lane_width: float,
     profile: _LaneBodyProfile,
 ) -> bool:
-    """识别近满栏混合字体行内强调，避免把粗体条目头单独标成标题。"""
+    """Identify near-full columns of mixed fonts for inline emphasis, and avoid marking bold item headings as separate headings."""
 
     line, bbox = rows[index]
     line_height = _line_effective_height(line, bbox)
@@ -442,7 +442,7 @@ def _continues_local_body_row(
     lane_width: float,
     profile: _LaneBodyProfile,
 ) -> bool:
-    """识别紧随同字体满行的正文尾行，阻止全局小字号基线造成标题误判。"""
+    """Identify the last line of text that follows a full line of the same font to prevent the global small font size baseline from causing title misjudgment."""
 
     if index <= 0:
         return False
@@ -494,7 +494,7 @@ def _is_continuous_field_row(
     lane_width: float,
     profile: _LaneBodyProfile,
 ) -> bool:
-    """识别同缩进、同尺度且紧邻的连续字段行，阻止其借居中误差成为标题。"""
+    """Identify consecutive field lines with the same indentation, same scale, and close proximity to prevent them from becoming titles through centering errors."""
 
     _line, bbox = rows[index]
     line_height = _line_effective_height(*rows[index])
@@ -526,7 +526,7 @@ def _is_full_width_sentence_body_run(
     lane_width: float,
     profile: _LaneBodyProfile,
 ) -> bool:
-    """局部斜体多数不能使常规字体的连续长句变成标题；同字号、同栏三行自然句提供正文反证。"""
+    """Most partial italics cannot turn a long continuous sentence in regular font into a title; three lines of natural sentences in the same font size and column provide counter-evidence in the text."""
     run = rows[index : index + 3]
     if len(run) < 3:
         return False
@@ -567,7 +567,7 @@ def _is_full_width_inline_heading(
     lane_width: float,
     profile: _LaneBodyProfile,
 ) -> bool:
-    """识别后接常规正文续行的满栏正常字号行内标题。"""
+    """Identifies full-column inline titles of normal font size followed by regular text continuation lines."""
 
     line, bbox = rows[index]
     line_height = _line_effective_height(line, bbox)
@@ -605,7 +605,7 @@ def _has_following_body_row(
     lane_left: float,
     profile: _LaneBodyProfile,
 ) -> bool:
-    """只检查紧邻且空间相关的下一行，禁止用远处正文支撑小字号标题。"""
+    """Only the immediately following and spatially relevant line is checked, and small font titles supported by distant text are prohibited."""
 
     if index + 1 >= len(rows):
         return False
@@ -637,7 +637,7 @@ def _has_following_compact_text_section(
     index: int,
     lane_width: float,
 ) -> bool:
-    """检查小字号候选后是否紧接三行同尺度的宽文本区段。"""
+    """Check whether the small font size candidate is immediately followed by three lines of wide text of the same size."""
 
     candidate = rows[index]
     candidate_height = _line_effective_height(*candidate)
@@ -666,7 +666,7 @@ def _unify_visual_row_title_types(
     lane: _TextLane,
     selected_indices: set[int],
 ) -> None:
-    """按完整 visual_row_id 统一标题类型：同样式整行晋升，混合样式整行降级。"""
+    """Unified title type by complete visual_row_id: same style whole row promoted, mixed style whole row demoted."""
 
     row_indices: dict[int, list[int]] = {}
     for index, (line, _bbox) in enumerate(lane.lines):
@@ -700,7 +700,7 @@ def _infer_front_matter_boundary(
     *,
     document_title_bottom: float | None,
 ) -> float | None:
-    """用短行后衔接满栏正文的几何转折点界定首页作者等前置信息。"""
+    """Use the geometric turning point after the short line to connect the full column text to define the author of the home page and other pre-information."""
 
     if document_title_bottom is None:
         return None
@@ -738,7 +738,7 @@ def _normalized_title_gap(
     body_height: float,
     physical_gaps: dict[int, tuple[float | None, float | None]],
 ) -> float:
-    """返回栏内邻行和页面最近物理邻行中较小的归一化净空。"""
+    """Returns the smaller of the normalized headroom between the in-column neighbor and the nearest physical neighbor on the page."""
 
     neighbor_index = index + direction
     if 0 <= neighbor_index < len(rows):
@@ -759,7 +759,7 @@ def _expand_paragraph_title_neighbors(
     selected_indices: set[int],
     profile: _LaneBodyProfile,
 ) -> None:
-    """用相邻行的字体、尺寸、对齐和紧凑净空补齐折行段落标题。"""
+    """Complete wrapped paragraph headings with the font, size, alignment, and tight headroom of the adjacent line."""
 
     if not selected_indices:
         return

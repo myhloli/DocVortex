@@ -1,10 +1,10 @@
-//! 从宿主同库 textpage 读取按对象首次字符确定的透明度，不保存句柄或加载运行库。
+//! Read the transparency determined by the first character of the object from the same host library textpage, without saving the handle or loading the runtime library.
 use crate::ReadError;
 use std::ffi::{c_int, c_uint, c_void};
 
-/// 遵循原 fill/stroke 查询顺序，失败返回值保守视为不可见。
+/// Following the original fill/stroke query sequence, the failure return value is conservatively regarded as invisible.
 /// # Safety
-/// 宿主须验证两个地址的 ABI，保持 textpage/库/回调存活，并持有 PDFium 全局锁。
+/// The host must verify the ABI of both addresses, keep textpage/library/callback alive, and hold the PDFium global lock.
 pub unsafe fn read_visible(
     addresses: [usize; 2],
     handle: usize,

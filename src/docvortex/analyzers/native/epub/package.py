@@ -1,4 +1,4 @@
-"""在固定资源预算内读取 EPUB OCF 容器、OPF manifest 与 spine。"""
+"""Read EPUB OCF containers, OPF manifest and spine within a fixed resource budget."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from .errors import EpubEncryptedError, EpubParseError, EpubResourceLimitError
 
 @dataclass(frozen=True, slots=True)
 class EpubTarget:
-    """保存解析后的 OCF 成员路径和可选 fragment。"""
+    """Save the parsed OCF member path and optional fragment."""
 
     path: str
     fragment: str | None = None
@@ -36,7 +36,7 @@ class EpubTarget:
 
 @dataclass(frozen=True, slots=True)
 class EpubManifestItem:
-    """保存 OPF manifest 中一个资源的规范信息。"""
+    """Save the specification information of a resource in OPF manifest."""
 
     item_id: str
     path: str
@@ -47,7 +47,7 @@ class EpubManifestItem:
 
 @dataclass(frozen=True, slots=True)
 class EpubSpineItem:
-    """保存默认阅读顺序中一个已解析的逻辑内容项。"""
+    """Save a parsed logical content item in the default reading order."""
 
     index: int
     idref: str
@@ -59,7 +59,7 @@ class EpubSpineItem:
 
 @dataclass(frozen=True, slots=True)
 class EpubMetadata:
-    """保存 OPF 中供 doclib 使用的基础出版物元数据。"""
+    """Save base publication metadata in OPF for use by doclib."""
 
     title: str | None
     author: str | None
@@ -69,7 +69,7 @@ class EpubMetadata:
 
 
 def _xml_parser() -> etree.XMLParser:
-    """为每个 EPUB XML part 创建禁用实体、DTD 和网络的 parser。"""
+    """For each EPUB XML part create a disabled entity, DTD and a network's parser."""
     return etree.XMLParser(
         resolve_entities=False,
         load_dtd=False,
@@ -81,7 +81,7 @@ def _xml_parser() -> etree.XMLParser:
 
 
 def _recovering_xml_parser() -> etree.XMLParser:
-    """创建禁用实体、DTD 和网络但允许修复局部 XHTML 语法的 parser。"""
+    """Created parser that disables entities, DTD, and networks but allows fixing local XHTML syntax."""
     return etree.XMLParser(
         resolve_entities=False,
         load_dtd=False,
@@ -93,7 +93,7 @@ def _recovering_xml_parser() -> etree.XMLParser:
 
 
 def _recovering_html_parser() -> etree.HTMLParser:
-    """创建禁用网络并按 HTML 空元素语义修复正文结构的 parser。"""
+    """Create a parser that disables the network and fixes the text structure by HTML empty element semantics."""
     return etree.HTMLParser(
         no_network=True,
         recover=True,
@@ -104,12 +104,12 @@ def _recovering_html_parser() -> etree.HTMLParser:
 
 
 def _local_name(element: etree._Element) -> str:
-    """返回 XML 元素不含命名空间的本地名。"""
+    """Return the local name of the XML element without a namespace."""
     return etree.QName(element).localname
 
 
 def _element_text(element: etree._Element | None) -> str | None:
-    """返回元素折叠首尾空白后的完整文本。"""
+    """Return the complete text of the element after folding the leading and trailing blanks."""
     if element is None:
         return None
     value = "".join(element.itertext()).strip()
@@ -117,10 +117,10 @@ def _element_text(element: etree._Element | None) -> str | None:
 
 
 class EpubPackage:
-    """负责 EPUB 包身份、资源读取、OPF 和 spine 的受限解析。"""
+    """Responsible for EPUB package identity, resource reading, restricted parsing of OPF and spine."""
 
     def __init__(self, file_bytes: bytes) -> None:
-        """打开内存 EPUB，并在读取正文前校验中央目录和必需结构。"""
+        """Open the memory EPUB and verify the central directory and necessary structures before reading the text."""
         if len(file_bytes) > MAX_TOTAL_BYTES:
             raise EpubResourceLimitError(f"EPUB resource limit exceeded: max_total_bytes={MAX_TOTAL_BYTES}")
         try:
@@ -155,7 +155,7 @@ class EpubPackage:
 
     @staticmethod
     def _validate_members(infos: list[ZipInfo]) -> dict[str, ZipInfo]:
-        """校验成员数量、体积、路径、重名和 ZIP 级加密。"""
+        """Verify member number, volume, path, duplicate name and ZIP level encryption."""
         if len(infos) > MAX_ENTRY_COUNT:
             raise EpubResourceLimitError(f"EPUB resource limit exceeded: max_entry_count={MAX_ENTRY_COUNT}")
         total_size = 0
@@ -182,14 +182,14 @@ class EpubPackage:
 
     @staticmethod
     def _is_safe_member_name(name: str) -> bool:
-        """判断 ZIP 成员是否为无绝对路径、反斜杠和上跳段的 POSIX 路径。"""
+        """Determine whether the ZIP member is a POSIX path without absolute paths, backslashes and up-hop segments."""
         if not name or "\x00" in name or "\\" in name or name.startswith("/"):
             return False
         parts = PurePosixPath(name).parts
         return bool(parts) and all(part not in {"", ".", ".."} for part in parts)
 
     def _validate_mimetype(self) -> None:
-        """验证存在时的 EPUB mimetype，并对顺序或压缩不规范记录兼容告警。"""
+        """Verify EPUB mimetype when present, and record compatible alarms for sequence or compression irregularities."""
         info = self._infos.get("mimetype")
         if info is None:
             logger.warning("EPUB package has no mimetype member; using container.xml compatibility detection")
@@ -209,7 +209,7 @@ class EpubPackage:
             logger.warning("EPUB mimetype is not the first uncompressed member; continuing in compatibility mode")
 
     def read_part(self, part_name: str, *, required: bool = False, asset: bool = False) -> bytes | None:
-        """读取一个已校验成员，并按唯一资源累计图片载荷。"""
+        """Read a verified member, and accumulate image loads by unique resources."""
         if part_name in self._encrypted_parts:
             raise EpubEncryptedError(f"Encrypted EPUB resource is not supported: {part_name!r}")
         info = self._infos.get(part_name)
@@ -240,7 +240,7 @@ class EpubPackage:
         return data
 
     def _charge_total(self, part_name: str, byte_count: int) -> None:
-        """按首次实际读取字节累计全包解压预算。"""
+        """Accumulate the full packet decompression budget by the first actual read byte."""
         self._total_read += byte_count
         if self._total_read > MAX_TOTAL_BYTES:
             raise EpubResourceLimitError(
@@ -248,7 +248,7 @@ class EpubPackage:
             )
 
     def _charge_asset(self, part_name: str, byte_count: int) -> None:
-        """按唯一包成员累计保留图片字节，重复引用不重复计费。"""
+        """The picture bytes are accumulated according to the unique package member, and repeated references are not charged repeatedly."""
         if part_name in self._asset_parts:
             return
         self._asset_parts.add(part_name)
@@ -263,7 +263,7 @@ class EpubPackage:
         required: bool = False,
         allow_external_doctype: bool = False,
     ) -> etree._Element | None:
-        """安全解析 XML/XHTML part，并校验节点数和最大深度。"""
+        """Safely parse XML/XHTML part, and verify the number of nodes and the maximum depth."""
         data = self.read_part(part_name, required=required)
         if data is None:
             return None
@@ -283,7 +283,7 @@ class EpubPackage:
         required: bool = False,
         allow_external_doctype: bool = True,
     ) -> etree._Element | None:
-        """严格解析 spine XHTML，失败后在相同安全预算内尝试局部语法恢复。"""
+        """Strictly parse spine XHTML, and upon failure attempt partial syntax recovery within the same security budget."""
         data = self.read_part(part_name, required=required)
         if data is None:
             return None
@@ -334,7 +334,7 @@ class EpubPackage:
         *,
         allow_external_doctype: bool,
     ) -> None:
-        """统一校验已解析 XML/XHTML 的 DTD 策略、节点数和最大深度。"""
+        """Uniformly verify the DTD strategy, node number and maximum depth of the parsed XML/XHTML."""
         docinfo = root.getroottree().docinfo
         if docinfo.doctype:
             internal_dtd = docinfo.internalDTD
@@ -345,7 +345,7 @@ class EpubPackage:
 
     @staticmethod
     def _validate_xml_shape(root: etree._Element, part_name: str) -> None:
-        """迭代统计 XML 节点与深度，避免超大或深层 DOM 继续传播。"""
+        """Iterate statistics on XML nodes and depth to avoid continued propagation of extremely large or deep DOM."""
         node_count = 0
         stack: list[tuple[etree._Element, int]] = [(root, 1)]
         while stack:
@@ -362,7 +362,7 @@ class EpubPackage:
             stack.extend((child, depth + 1) for child in element if isinstance(child.tag, str))
 
     def resolve_reference(self, href: str, *, base_part: str) -> EpubTarget | None:
-        """按 OCF URI 规则解析相对引用，拒绝外部地址和编码后的结构字符。"""
+        """Relative references are parsed according to OCF URI rules, and external addresses and encoded structural characters are rejected."""
         raw_href = (href or "").strip()
         if not raw_href:
             return None
@@ -394,7 +394,7 @@ class EpubPackage:
         return EpubTarget(path=path, fragment=fragment)
 
     def _read_encrypted_parts(self) -> frozenset[str]:
-        """读取 encryption.xml 中的 CipherReference URI，损坏时按加密文件失败。"""
+        """Reading CipherReference URI in encryption.xml fails to encrypt the file when it is damaged."""
         if "META-INF/encryption.xml" not in self._infos:
             return frozenset()
         data = self._read_unchecked_part("META-INF/encryption.xml")
@@ -411,14 +411,14 @@ class EpubPackage:
             uri = element.get("URI")
             if not uri:
                 continue
-            # OCF 规定 META-INF 控制文件中的 URI 以容器根为基准。
+            # OCF specifies that URI in the META-INF control file is based on the container root.
             target = self._resolve_reference_against_members(uri, base_part="")
             if target:
                 encrypted.add(target.path)
         return frozenset(encrypted)
 
     def _read_unchecked_part(self, part_name: str) -> bytes:
-        """在加密成员集合尚未建立时读取已验证的小型控制 part。"""
+        """Reading authenticated small control part when the cryptographic membership set has not yet been established."""
         info = self._infos.get(part_name)
         if info is None:
             raise EpubParseError(f"Malformed EPUB package: missing required part {part_name!r}")
@@ -435,7 +435,7 @@ class EpubPackage:
         return data
 
     def _resolve_reference_against_members(self, href: str, *, base_part: str) -> EpubTarget | None:
-        """在初始化阶段仅依赖中央目录解析安全包内引用。"""
+        """During the initialization phase, only the central directory is relied upon to resolve references within the security package."""
         raw_href = (href or "").strip()
         if not raw_href:
             return None
@@ -460,7 +460,7 @@ class EpubPackage:
         return EpubTarget(path, unquote(split.fragment) if split.fragment else None) if path in self._infos else None
 
     def _read_default_rootfile(self) -> str:
-        """从 container.xml 读取第一个默认 rendition 的 OPF 路径。"""
+        """Read the OPF path of the first default rendition from container.xml."""
         container = self.xml_part("META-INF/container.xml", required=True)
         assert container is not None
         for element in container.iter():
@@ -475,7 +475,7 @@ class EpubPackage:
         raise EpubParseError("Malformed EPUB package: container.xml has no usable rootfile")
 
     def _read_manifest(self) -> dict[str, EpubManifestItem]:
-        """读取 OPF manifest，并把 href 规范化为实际包成员路径。"""
+        """Read OPF manifest, and normalize href to the actual package member path."""
         manifest: dict[str, EpubManifestItem] = {}
         for element in self.opf_root.iter():
             if not isinstance(element.tag, str) or _local_name(element) != "item":
@@ -498,7 +498,7 @@ class EpubPackage:
         return manifest
 
     def _supported_manifest_item(self, item_id: str) -> EpubManifestItem | None:
-        """沿 manifest fallback chain 找到首个支持的 XHTML 或 SVG 内容项。"""
+        """Follow manifest fallback chain to find the first supported XHTML or SVG content item."""
         visited: set[str] = set()
         current_id: str | None = item_id
         while current_id and current_id not in visited:
@@ -512,7 +512,7 @@ class EpubPackage:
         return None
 
     def _read_spine(self) -> list[EpubSpineItem]:
-        """按 OPF itemref 顺序建立稳定逻辑页，并保留 non-linear 内容。"""
+        """Create stable logical pages in the order of OPF itemref and retain the contents of non-linear."""
         spine_element = next(
             (element for element in self.opf_root.iter() if isinstance(element.tag, str) and _local_name(element) == "spine"),
             None,
@@ -540,14 +540,14 @@ class EpubPackage:
         return result
 
     def _read_navigation_path(self) -> str | None:
-        """返回 manifest 中首个 EPUB3 navigation document 路径。"""
+        """Return the first EPUB3 navigation document path in manifest."""
         for item in self.manifest.values():
             if "nav" in item.properties and item.media_type in XHTML_MEDIA_TYPES and item.path:
                 return item.path
         return None
 
     def _read_ncx_path(self) -> str | None:
-        """按 OPF spine 的 toc ID 返回 EPUB2 NCX 资源路径。"""
+        """Press toc ID of OPF spine to return the resource path of EPUB2 NCX."""
         spine_element = next(
             (element for element in self.opf_root.iter() if isinstance(element.tag, str) and _local_name(element) == "spine"),
             None,
@@ -559,7 +559,7 @@ class EpubPackage:
         return item.path if item is not None and item.path else None
 
     def _read_metadata(self) -> EpubMetadata:
-        """提取 OPF 的首个标题、作者、主题、关键词和布局模式。"""
+        """Extract the first title, author, subject, keywords and layout mode of OPF."""
         properties = self.document_properties
         layout = "reflowable"
         for element in self.opf_root.iter():
@@ -578,19 +578,19 @@ class EpubPackage:
         )
 
     def content_type_for(self, part_name: str) -> str | None:
-        """返回 manifest 为指定成员声明的媒体类型。"""
+        """Return manifest The media type declared for the specified member."""
         for item in self.manifest.values():
             if item.path == part_name:
                 return item.media_type or None
         return None
 
     def close(self) -> None:
-        """关闭底层 ZipFile。"""
+        """Close underlying ZipFile."""
         self._zip.close()
 
 
 def _detect_epub_zip(package: ZipFile) -> bool:
-    """在已打开 ZIP 中按 mimetype 或有效 container rootfile 识别 EPUB。"""
+    """Press mimetype or valid container rootfile in an open ZIP to identify EPUB."""
     try:
         mime_info = package.getinfo("mimetype")
         if mime_info.file_size <= len(EPUB_MIME):
@@ -620,7 +620,7 @@ def _detect_epub_zip(package: ZipFile) -> bool:
 
 
 def detect_epub(file_bytes: bytes) -> bool:
-    """从内存字节按 EPUB mimetype 或有效 container rootfile 识别 OCF 包。"""
+    """Identify OCF packet from memory bytes by EPUB mimetype or valid container rootfile."""
     try:
         with ZipFile(BytesIO(file_bytes)) as package:
             return _detect_epub_zip(package)
@@ -629,7 +629,7 @@ def detect_epub(file_bytes: bytes) -> bool:
 
 
 def detect_epub_path(file_path: str | Path) -> bool:
-    """从文件路径打开 ZIP 并验证 EPUB 强内容身份。"""
+    """Open ZIP from the file path and verify the EPUB strong content identity."""
     try:
         with ZipFile(file_path) as package:
             return _detect_epub_zip(package)

@@ -27,7 +27,7 @@ from docvortex.schema import BlockType
 
 
 def test_doc_image_store_distinguishes_render_size_without_double_accounting() -> None:
-    """验证相同图片的不同 ptSize 独立缓存，但原始 bytes 只计费和解码一次。"""
+    """Verify that different ptSizes of the same picture are cached independently, but the original bytes is only billed and decoded once."""
     decoder = Mock()
     decoder.decode.return_value = None
     store = ImageStore(equation_decoder=decoder)
@@ -46,7 +46,7 @@ def test_doc_image_store_distinguishes_render_size_without_double_accounting() -
 
 
 def test_doc_model_preserves_empty_sections_and_ignores_page_breaks() -> None:
-    """验证 section 是唯一分页来源，空 section 保留且分页符不额外切页。"""
+    """Verify that section is the only page break source, empty section is reserved and page breaks do not cut additional pages."""
 
     text = "\fFirst\rSecond\r"
     first_end = utf16_cp("\fFirst\r")
@@ -76,7 +76,7 @@ def test_doc_piece_text_preserves_non_bmp_and_compressed_codepage(
     compressed: bool,
     kwargs: dict[str, object],
 ) -> None:
-    """验证 UTF-16 非 BMP CP 和压缩 ANSI piece 均恢复原文本。"""
+    """Verification UTF-16 non-BMP CP and compressed ANSI piece both restore the original text."""
 
     pages = DocModel().predict(BytesIO(build_doc(text, compressed=compressed, **kwargs)))
 
@@ -84,7 +84,7 @@ def test_doc_piece_text_preserves_non_bmp_and_compressed_codepage(
 
 
 def test_doc_footnote_reference_and_body_bind_to_reference_section() -> None:
-    """验证脚注引用使用上标样式，脚注正文追加到引用所在 section。"""
+    """Verify that footnote references use superscript style and the footnote text is appended to section where the reference is located."""
 
     pages = DocModel().predict(
         BytesIO(
@@ -105,7 +105,7 @@ def test_doc_footnote_reference_and_body_bind_to_reference_section() -> None:
 
 
 def test_doc_hyperlink_field_keeps_safe_target_and_drops_dangerous_target() -> None:
-    """验证字段缓存结果保留，危险 URL 只降级为普通文本。"""
+    """Validation field cache results preserved, DANGER URL downgraded to plain text only."""
 
     text = '\x13 HYPERLINK "https://example.test/a" \x14Safe\x15\r\x13 HYPERLINK "javascript:alert(1)" \x14Danger\x15\r'
     pages = DocModel().predict(BytesIO(build_doc(text)))
@@ -127,7 +127,7 @@ def test_doc_hyperlink_field_keeps_safe_target_and_drops_dangerous_target() -> N
     ],
 )
 def test_doc_hyperlink_security_policy(target: str, expected: str | None) -> None:
-    """验证 DOC 链接白名单拒绝本地和可执行目标。"""
+    """Verify that DOC link whitelist denies local and executable targets."""
 
     assert (
         sanitize_hyperlink_target(
@@ -141,7 +141,7 @@ def test_doc_hyperlink_security_policy(target: str, expected: str | None) -> Non
 
 
 def test_doc_character_sprms_preserve_visible_styles_and_hide_revisions() -> None:
-    """验证常见 CHPX 样式、上下标、隐藏和删除修订状态。"""
+    """Validates common CHPX styles, superscript and subscript, hidden and deleted revision status."""
 
     grpprl = (
         b"\x35\x08\x01"  # bold
@@ -161,7 +161,7 @@ def test_doc_character_sprms_preserve_visible_styles_and_hide_revisions() -> Non
 
 
 def test_doc_exact_list_label_is_consumed_before_strict_projection() -> None:
-    """验证 Roman/复合列表标签优先于通用十进制编号且私有字段被删除。"""
+    """Verify that Roman/composite list tags take precedence over universal decimal numbers and private fields are removed."""
 
     blocks = [
         {
@@ -179,7 +179,7 @@ def test_doc_exact_list_label_is_consumed_before_strict_projection() -> None:
 
 
 def test_doc_table_grid_materializes_colspan_and_rowspan() -> None:
-    """验证 Word table edge 网格能同时恢复横向和纵向合并。"""
+    """Verify that the Word table edge mesh can restore both horizontal and vertical merges."""
 
     from docvortex.analyzers.native.office.doc.models import DocTableCellFormat, DocTableFormat
 
@@ -214,7 +214,7 @@ def test_doc_table_grid_materializes_colspan_and_rowspan() -> None:
 
 
 def test_doc_rejects_word95_encryption_rtf_and_missing_word_stream() -> None:
-    """验证不支持版本、加密、RTF 冒充和缺失核心 stream 使用稳定错误。"""
+    """Verify unsupported version, encryption, RTF impersonation and missing core stream usage stability error."""
 
     with pytest.raises(LegacyOfficeMalformedError, match="Word 95"):
         DocModel().predict(BytesIO(build_doc("old\r", n_fib=0x0065)))
@@ -227,7 +227,7 @@ def test_doc_rejects_word95_encryption_rtf_and_missing_word_stream() -> None:
 
 
 def test_doc_budget_uses_stable_resource_limit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 DOC 记录预算超过固定上限时使用共享错误类型。"""
+    """Verification DOC Shared error type is used when the recording budget exceeds a fixed limit."""
 
     import docvortex.analyzers.native.office.doc.records as records
 

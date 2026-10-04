@@ -1,4 +1,4 @@
-"""严格文档树的公共遍历能力。"""
+"""Public traversal capabilities of strict document trees."""
 
 from collections.abc import Iterator
 
@@ -7,7 +7,7 @@ from ..schema import _iter_child_blocks as iter_child_blocks
 
 
 def iter_image_payloads(block: BlockBase) -> Iterator[ImagePayloadBlock]:
-    """按当前节点优先的深度优先顺序遍历图片载荷，不修改文档树。"""
+    """Traverse the image payload in depth-first order based on the current node first, without modifying the document tree."""
     if isinstance(block, ImagePayloadBlock):
         yield block
     for child in iter_child_blocks(block):

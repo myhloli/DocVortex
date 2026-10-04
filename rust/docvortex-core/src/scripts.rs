@@ -1,4 +1,4 @@
-//! 逐值复现 origin/loose/tight 上下标判定；Unicode 特征由 Python 提供。
+//! Value-by-value reproduction of origin/loose/tight superscript and subscript determination; Unicode features are provided by Python.
 
 use crate::{median, quantile};
 
@@ -23,27 +23,27 @@ struct Feature {
     font: i64,
 }
 impl Feature {
-    /// 检查 Python 预计算的字符类别或保护位。
+    /// Check Python precomputed character class or protection bit.
     fn has(&self, flag: u32) -> bool {
         self.flags & flag != 0
     }
-    /// 返回 loose 字形高度。
+    /// Return loose glyph height.
     fn lh(&self) -> f64 {
         self.loose[3] - self.loose[1]
     }
-    /// 返回有效 tight 字形高度。
+    /// Returns the valid tight glyph height.
     fn th(&self) -> f64 {
         self.tight.map_or(0.0, |b| b[3] - b[1])
     }
-    /// 返回 loose 中心，保持加法后除二的运算次序。
+    /// Return to the loose center, keeping the order of addition and division by two.
     fn lc(&self) -> f64 {
         (self.loose[1] + self.loose[3]) / 2.0
     }
-    /// 返回 tight 中心，仅在已有有效框的分支使用。
+    /// Return to tight center, only used in branches that already have valid frames.
     fn tc(&self) -> f64 {
         self.tight.map_or(0.0, |b| (b[1] + b[3]) / 2.0)
     }
-    /// 返回字符 origin 基线。
+    /// Return character origin baseline.
     fn y(&self) -> f64 {
         self.origin.map_or(0.0, |p| p[1])
     }
@@ -57,7 +57,7 @@ struct Cluster {
     loose: f64,
 }
 
-/// 返回上下标角色：零为正文、一为上标、二为下标。
+/// Return the superscript and subscript roles: zero is the text, one is the superscript, and two is the subscript.
 fn role(shift: f64) -> u8 {
     if shift > 0.0 {
         2
@@ -66,12 +66,12 @@ fn role(shift: f64) -> u8 {
     }
 }
 
-/// 保留双向水平净空的原比较规则。
+/// The original comparison rules of two-way horizontal clearance are retained.
 fn gap(a: Box4, b: Box4) -> f64 {
     0.0_f64.max(a[0] - b[2]).max(b[0] - a[2])
 }
 
-/// 按来源顺序切分视觉组件，保留缺失几何字符的位置。
+/// Segment the visual components in order of source and retain the positions of missing geometric characters.
 fn components(f: &[Feature]) -> Vec<Vec<usize>> {
     let heights: Vec<_> = f.iter().map(Feature::lh).filter(|v| *v > 0.0).collect();
     let scale = if heights.is_empty() {
@@ -111,7 +111,7 @@ fn components(f: &[Feature]) -> Vec<Vec<usize>> {
     result
 }
 
-/// 按 origin 稳定聚类字母数字锚点，并缓存簇的双框高度。
+/// Stable clustering of alphanumeric anchors by origin and caching of double box heights of clusters.
 fn clusters(f: &[Feature], indices: &[usize]) -> (Vec<Cluster>, f64) {
     let mut anchors: Vec<_> = indices
         .iter()
@@ -146,7 +146,7 @@ fn clusters(f: &[Feature], indices: &[usize]) -> (Vec<Cluster>, f64) {
     )
 }
 
-/// 从同一簇的成员生成参考统计。
+/// Generate reference statistics from members of the same cluster.
 fn make_cluster(f: &[Feature], indices: Vec<usize>) -> Cluster {
     Cluster {
         baseline: median(indices.iter().map(|i| f[*i].y()).collect()),
@@ -170,7 +170,7 @@ fn make_cluster(f: &[Feature], indices: Vec<usize>) -> Cluster {
     }
 }
 
-/// 在可比高度中选最多成员的簇，相同键保留首个候选。
+/// Select the cluster with the most members at comparable heights, and retain the first candidate with the same key.
 fn body(cs: &[Cluster]) -> Option<usize> {
     let max_height = cs.iter().map(|c| c.tight).fold(0.0_f64, f64::max);
     let mut best: Option<usize> = None;
@@ -187,7 +187,7 @@ fn body(cs: &[Cluster]) -> Option<usize> {
     best
 }
 
-/// 取得同簇字符中心中位数。
+/// Obtain the center median of characters in the same cluster.
 fn center(f: &[Feature], c: &Cluster, tight: bool) -> f64 {
     median(
         c.indices
@@ -197,7 +197,7 @@ fn center(f: &[Feature], c: &Cluster, tight: bool) -> f64 {
     )
 }
 
-/// 判断三种位移证据是否形成足够的同向共识。
+/// Determine whether the three displacement evidences form sufficient consensus in the same direction.
 fn consistent(f: &[Feature], c: &Cluster, b: &Cluster) -> bool {
     let shift = c.baseline - b.baseline;
     let t = center(f, c, true) - center(f, b, true);
@@ -211,7 +211,7 @@ fn consistent(f: &[Feature], c: &Cluster, b: &Cluster) -> bool {
             || (t.abs() / b.tight.max(1e-6) >= 0.3 && l.abs() / b.loose.max(1e-6) >= 0.15))
 }
 
-/// 用连续同字体局部正文撤销弱角标，不使用本轮撤销后的角色作参考。
+/// Undo weak subtitles with continuous local text in the same font, and do not use the role after the current round of undoing for reference.
 fn recheck(f: &[Feature], indices: &[usize], cs: &[Cluster], bidx: usize, roles: &mut [u8]) {
     let b = &cs[bidx];
     let initial = roles.to_vec();
@@ -296,7 +296,7 @@ fn recheck(f: &[Feature], indices: &[usize], cs: &[Cluster], bidx: usize, roles:
     }
 }
 
-/// 处理单个组件；集合遍历会影响精确平局时交回 Python 保留其原始顺序。
+/// Handling individual components; handing back Python when collection traversal affects exact draw preserves its original order.
 fn assign(f: &[Feature], indices: &[usize], roles: &mut [u8]) -> Option<()> {
     let (cs, tolerance) = clusters(f, indices);
     let Some(bidx) = body(&cs) else {
@@ -458,7 +458,7 @@ fn assign(f: &[Feature], indices: &[usize], roles: &mut [u8]) -> Option<()> {
     Some(())
 }
 
-/// 独立收集数字引用上标，不让新角色反过来污染后续正文参考。
+/// Collect digital reference superscripts independently to prevent new characters from contaminating subsequent text references.
 fn numeric(f: &[Feature], roles: &[u8]) -> Vec<usize> {
     let mut accepted = Vec::new();
     let mut start = 0;
@@ -540,7 +540,7 @@ fn numeric(f: &[Feature], roles: &[u8]) -> Vec<usize> {
     accepted
 }
 
-/// 分类整批字符；极端浮点或集合顺序平局由参考算法精确处理。
+/// Classify entire batches of characters; extreme floating point or set-order ties are handled accurately by the reference algorithm.
 pub fn classify(records: Vec<Record>) -> Option<Vec<u8>> {
     let f: Vec<_> = records
         .into_iter()

@@ -1,4 +1,4 @@
-"""独立分账完整公开 parse；默认只计完整阶段，详细 cProfile 必须作为另一份诊断运行。"""
+"""The independent ledger is fully disclosed parse; by default only the complete stage is counted, and the detailed cProfile must be run as another diagnosis."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import time
 
 
 def main():
-    """只包装高层编排边界，保留字符提取器/规则函数身份与原生路径选择。"""
+    """Only wraps high-level orchestration boundaries, preserving character extractor/rule function identity and native path selection."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--path", type=Path, required=True)
@@ -58,11 +58,11 @@ def main():
     originals = {}
 
     def wrap(name, function):
-        """仅记录进入和退出，嵌套阶段扣除子阶段耗时，不接触字符或规则参数。"""
+        """Only entry and exit are recorded, the nested stage deducts the time spent in sub-stages, and does not touch characters or rule parameters."""
 
         @wraps(function)
         def measured(*values, **keywords):
-            """确保异常也能完成计时栈清理，原函数返回值与异常保持不变。"""
+            """Ensure that exceptions can also complete timing stack cleaning, and the return value of the original function and the exception remain unchanged."""
             frame = [time.perf_counter(), 0.0]
             stack.append(frame)
             try:

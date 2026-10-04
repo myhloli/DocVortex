@@ -1,4 +1,4 @@
-"""验证几何 SDK 的显式坐标语义及导入依赖边界。"""
+"""Validate explicit coordinate semantics and import dependency boundaries for geometry SDK."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from docvortex.geometry import convert_bbox, rotate_bbox
 
 
 def test_geometry_import_does_not_load_image_or_pdf_runtime() -> None:
-    """独立解释器中的几何导入不隐式加载图像解码或 PDFium。"""
+    """Geometry import in the standalone interpreter does not implicitly load image decoding or PDFium."""
     code = """
 import sys
 from docvortex.geometry import convert_bbox
@@ -33,14 +33,14 @@ for name in ('cv2', 'PIL', 'pypdfium2', 'torch', 'transformers'):
     ],
 )
 def test_coordinate_spaces(source: str, target: str, bbox: tuple, expected: tuple) -> None:
-    """相同数值只有配合明确空间才能解释，避免自动判断单位。"""
+    """Identical values can only be interpreted with a clear space to avoid automatic judgment of units."""
     assert convert_bbox(bbox, source_space=source, target_space=target, page_size=(100, 200), render_scale=2) == pytest.approx(
         expected
     )
 
 
 def test_clipping_and_degenerate_bbox() -> None:
-    """显式裁剪不改变合法区域，退化框不进入后续图像处理。"""
+    """Explicit cropping does not change the legal area, and the degraded frame does not enter subsequent image processing."""
     assert convert_bbox((-1, -1, 2, 2), source_space="unit", target_space="point", page_size=(100, 200), clip=True) == (
         0,
         0,
@@ -62,5 +62,5 @@ def test_clipping_and_degenerate_bbox() -> None:
     ],
 )
 def test_rotated_rectangle(angle: int, expected: tuple) -> None:
-    """四种旋转保持与现有视觉块方向一致的坐标变换。"""
+    """The four rotations maintain coordinate transformations that are consistent with the orientation of the existing visual patch."""
     assert rotate_bbox((10, 20, 30, 40), 100, 200, angle) == expected

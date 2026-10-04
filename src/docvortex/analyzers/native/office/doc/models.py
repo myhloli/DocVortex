@@ -1,4 +1,4 @@
-"""Word 二进制解析器与 Converter 之间的内部语义模型。"""
+"""Internal semantic model between Word binary parser and Converter."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import TypeAlias
 
 @dataclass(frozen=True, slots=True)
 class DocCharStyle:
-    """一个连续 DOC 文字 run 的可见字符样式。"""
+    """The visible character pattern of a continuous DOC text run."""
 
     bold: bool = False
     italic: bool = False
@@ -23,7 +23,7 @@ class DocCharStyle:
 
 @dataclass(frozen=True, slots=True)
 class DocTextRun:
-    """一段样式及超链接目标相同的可见文字。"""
+    """A section of visible text with the same style and hyperlink target."""
 
     text: str
     style: DocCharStyle = DocCharStyle()
@@ -33,7 +33,7 @@ class DocTextRun:
 
 @dataclass(frozen=True, slots=True)
 class DocListInfo:
-    """段落从 PlfLst/PlfLfo 解析出的列表信息。"""
+    """Paragraph is the list information parsed from PlfLst/PlfLfo."""
 
     identity: int
     level: int
@@ -44,7 +44,7 @@ class DocListInfo:
 
 @dataclass(frozen=True, slots=True)
 class DocTableCellFormat:
-    """一格 Word 表格在行定义中的合并属性。"""
+    """The merge attribute of a Word table in the row definition."""
 
     right: int
     horizontal_first: bool = False
@@ -55,7 +55,7 @@ class DocTableCellFormat:
 
 @dataclass(frozen=True, slots=True)
 class DocTableFormat:
-    """一个 TTP 段落解析出的表格行定义。"""
+    """A table row definition parsed from a TTP paragraph."""
 
     boundaries: tuple[int, ...] = ()
     cells: tuple[DocTableCellFormat, ...] = ()
@@ -64,7 +64,7 @@ class DocTableFormat:
 
 @dataclass(slots=True)
 class DocParagraph:
-    """完成样式、字段和段落属性解析的段落。"""
+    """Complete the paragraph of style, field and paragraph attribute parsing."""
 
     cp_start: int
     cp_end: int
@@ -88,7 +88,7 @@ class DocParagraph:
 
 @dataclass(frozen=True, slots=True)
 class DocImagePayload:
-    """一张从 PICF/OfficeArt 恢复的图片原始载荷。"""
+    """A picture original load recovered from PICF/OfficeArt."""
 
     data: bytes
     extension: str
@@ -99,7 +99,7 @@ class DocImagePayload:
 
 @dataclass(frozen=True, slots=True)
 class DocChartPayload:
-    """一个可编辑 OLE chart 的 HTML 数据和可选预览图。"""
+    """An editable OLE HTML data and optional preview of chart."""
 
     content: str
     preview: DocImagePayload | None = None
@@ -110,7 +110,7 @@ DocVisualPayload: TypeAlias = DocImagePayload | DocChartPayload
 
 @dataclass(slots=True)
 class DocImage:
-    """按主 story CP 定位的内联或浮动图片。"""
+    """Inline or floating picture positioned by main story CP."""
 
     cp: int
     payload: DocImagePayload
@@ -118,7 +118,7 @@ class DocImage:
 
 @dataclass(slots=True)
 class DocTableCell:
-    """Word 表格单元格及其嵌套内容。"""
+    """Word Table cells and their nested contents."""
 
     blocks: list[DocElement] = field(default_factory=list)
     row_span: int = 1
@@ -127,7 +127,7 @@ class DocTableCell:
 
 @dataclass(slots=True)
 class DocTableRow:
-    """Word 表格的一行。"""
+    """Word A row of the table."""
 
     cells: list[DocTableCell] = field(default_factory=list)
     header: bool = False
@@ -135,7 +135,7 @@ class DocTableRow:
 
 @dataclass(slots=True)
 class DocTable:
-    """按 CP 顺序组装出的普通或嵌套表格。"""
+    """Ordinary or nested tables assembled in the order of CP."""
 
     cp_start: int
     cp_end: int
@@ -147,7 +147,7 @@ DocElement: TypeAlias = DocParagraph | DocImage | DocTable
 
 @dataclass(slots=True)
 class DocSection:
-    """一个 Word section 及其页面辅助文本。"""
+    """A Word section and its page auxiliary text."""
 
     cp_start: int
     cp_end: int
@@ -159,6 +159,6 @@ class DocSection:
 
 @dataclass(slots=True)
 class DocDocument:
-    """一份可投影为 model-list 的 DOC 文档。"""
+    """A DOC document that can be projected as model-list."""
 
     sections: list[DocSection] = field(default_factory=list)

@@ -17,12 +17,12 @@ from docvortex.schema import IndexBlock, MiddleJson, PageInfo, Producer, RefText
 
 
 def _inline(text: str) -> list[dict[str, str]]:
-    """构造最小结构化文本 span。"""
+    """Construct minimal structured text span."""
     return [{"type": "text", "content": text}]
 
 
 def _middle_with_text_anchor() -> MiddleJson:
-    """构造目录前向引用顶层 TextBlock 的严格文档。"""
+    """Constructs a strict document that forward references the top-level TextBlock."""
     return MiddleJson(
         pages=[
             PageInfo(
@@ -47,13 +47,13 @@ def _middle_with_text_anchor() -> MiddleJson:
 
 
 def _zip_text(payload: bytes, name: str) -> str:
-    """读取 ZIP 容器中的 UTF-8 XML 文本。"""
+    """Read the UTF-8 XML text in the ZIP container."""
     with ZipFile(BytesIO(payload)) as archive:
         return archive.read(name).decode("utf-8")
 
 
 def test_text_anchor_is_strict_and_blocks_continuation_merge() -> None:
-    """验证 TextBlock 接受 anchor，而带目标的续段不会被规划器吸收。"""
+    """Verify that TextBlock accepts anchor while continuations with targets are not absorbed by the planner."""
     anchored = TextBlock(type="text", anchor="target", content=_inline("continued"), continues_prev=True)
     middle = MiddleJson(
         pages=[
@@ -73,7 +73,7 @@ def test_text_anchor_is_strict_and_blocks_continuation_merge() -> None:
 
 
 def test_duplicate_and_empty_text_anchors_emit_only_the_first_visible_target() -> None:
-    """验证重复正文 anchor 仅首项生效，空正文不会产生悬空目标。"""
+    """Verify that only the first item of duplicate text anchor takes effect, and empty text will not produce dangling targets."""
     middle = MiddleJson(
         pages=[
             PageInfo(
@@ -97,7 +97,7 @@ def test_duplicate_and_empty_text_anchors_emit_only_the_first_visible_target() -
 
 
 def test_text_anchor_markdown_html_and_html_wire_roundtrip() -> None:
-    """验证 Markdown、HTML 目标与 canonical HTML v1 往返保持 TextBlock anchor。"""
+    """Verify Markdown, HTML targets hold TextBlock anchor to and from canonical HTML v1."""
     middle = _middle_with_text_anchor()
 
     markdown = render_markdown(middle)
@@ -145,7 +145,7 @@ def test_text_anchor_markdown_html_and_html_wire_roundtrip() -> None:
 
 
 def test_text_anchor_docx_pdf_and_epub_targets() -> None:
-    """验证 DOCX bookmark、PDF 内链和 EPUB XHTML 目标均指向 TextBlock。"""
+    """Verify that the DOCX bookmark, PDF internal links, and EPUB XHTML targets all point to TextBlock."""
     middle = _middle_with_text_anchor()
 
     document_xml = _zip_text(render_docx(middle), "word/document.xml")

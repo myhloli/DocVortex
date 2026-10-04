@@ -7,7 +7,7 @@ from docvortex.analyzers.native.pdf import line_layout, pipeline, text_blocks
 
 
 def test_line_tight_output_bbox_adds_one_point_padding_and_clips_page() -> None:
-    """验证可靠 tight 字形框四边各扩 1pt，并在页面边缘安全裁剪。"""
+    """Verified and reliable tight The font frame is expanded by 1pt on each side and is safely cropped at the edge of the page."""
 
     line = _text_line(
         "value",
@@ -23,7 +23,7 @@ def test_line_tight_output_bbox_adds_one_point_padding_and_clips_page() -> None:
 
 
 def test_text_block_applies_tight_output_bbox_after_aggregation() -> None:
-    """验证文本先按 layout 聚合，再同步应用 tight+1pt 的 block 与 line bbox。"""
+    """The verification text is first aggregated by layout, and then block and line of tight+1pt are applied simultaneously to bbox."""
 
     line = _text_line(
         "value",
@@ -51,7 +51,7 @@ def test_text_block_applies_tight_output_bbox_after_aggregation() -> None:
 
 
 def test_direct_formula_tight_bbox_is_applied_and_internal_key_removed() -> None:
-    """验证文本公式的聚合后候选替换公开框，且内部字段不会继续外泄。"""
+    """Verify that aggregation candidates for text formulas replace the exposed box and internal fields do not continue to be exposed."""
 
     blocks = [
         {
@@ -79,7 +79,7 @@ def test_direct_formula_tight_bbox_is_applied_and_internal_key_removed() -> None
 def test_output_normalization_exposes_lines_for_pdf_text_types(
     block_type: str,
 ) -> None:
-    """验证 Flash 对包括 ref_text 在内的 PDF 文本块公开归一化行框。"""
+    """Verify that Flash exposes normalized line boxes for PDF text blocks including ref_text."""
 
     block = pipeline._normalize_output_block(
         {
@@ -114,7 +114,7 @@ def test_output_normalization_restores_rotated_line_bbox_to_page(
     angle: int,
     expected_bbox: list[float],
 ) -> None:
-    """验证局部行框会按 block 方向逆变换到原页面坐标。"""
+    """Verify that the local line frame will be inversely transformed to the original page coordinates in the direction of block."""
 
     block = pipeline._normalize_output_block(
         {
@@ -145,7 +145,7 @@ def test_output_normalization_fails_closed_for_invalid_line_bboxes(
     block_type: str,
     local_line_bboxes: object,
 ) -> None:
-    """验证 text/ref_text 内部行框缺失、为空或任一非法时输出空 lines。"""
+    """Verify that text/ref_text outputs empty lines when the internal line box is missing, empty, or any one is illegal."""
 
     block = pipeline._normalize_output_block(
         {

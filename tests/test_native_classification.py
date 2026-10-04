@@ -1,4 +1,4 @@
-"""原始分类统计与 Python 参考的字段级差分，禁止从去重字符反推分类结果。"""
+"""The field-level difference between the original classification statistics and the Python reference, prohibiting the inference of classification results from deduplicated characters."""
 
 from contextlib import closing
 from io import BytesIO
@@ -21,7 +21,7 @@ classify = import_module("docvortex.document.pdf.classify")
 
 @pytest.fixture
 def native():
-    """Rust 作业必须使用本次原始统计扩展，纯 Python 作业明确跳过。"""
+    """Rust jobs must use this raw statistics extension, pure Python jobs are explicitly skipped."""
     extension = get_native()
     if extension is None:
         pytest.skip("Python backend")
@@ -30,7 +30,7 @@ def native():
 
 
 def pdf_bytes():
-    """包含字体子集、连字、PUA、控制字符、隐藏副本及空页的真实 PDF。"""
+    """Real PDF including font subsets, ligatures, PUA, control characters, hidden copies and empty pages."""
     pdfmetrics.registerFont(TTFont("ClassificationVera", str(Path(reportlab.__file__).parent / "fonts/Vera.ttf")))
     stream = BytesIO()
     canvas = Canvas(stream, pagesize=(400, 300))
@@ -51,7 +51,7 @@ def pdf_bytes():
 @pytest.mark.parametrize("page_index", [0, 1])
 @pytest.mark.parametrize("alternate_rules", [False, True])
 def test_raw_classification_matches_reference(native, monkeypatch, page_index, alternate_rules):
-    """所有统计字段及字体键顺序一致，运行时允许字符集配置也必须传入 Rust。"""
+    """All statistical fields and font keys are in the same order, and the character set configuration allowed at runtime must also be passed to Rust."""
     if alternate_rules:
         monkeypatch.setattr(classify, "_ALLOWED_CONTROL_CODES", {0, 2, 10})
         monkeypatch.setattr(classify, "CJK_TEXT_RANGES", ((65, 90), (0x4E00, 0x9FFF)))
@@ -71,7 +71,7 @@ def test_raw_classification_matches_reference(native, monkeypatch, page_index, a
 
 
 def test_raw_classification_respects_custom_font_reader(native, monkeypatch):
-    """替换字符字体读取规则时必须执行调用方函数，不静默使用原始 PDFium 字体。"""
+    """The caller function must be executed when replacing character font reading rules and does not silently use the original PDFium font."""
     before = native.classification_snapshot_stats()
     monkeypatch.setattr(classify, "_get_pdfium_char_font_name", lambda *_: "CUSTOM")
     with pdfium_guard(), pdfium.PdfDocument(pdf_bytes()) as document, closing(document[0]) as page:
@@ -81,7 +81,7 @@ def test_raw_classification_respects_custom_font_reader(native, monkeypatch):
 
 
 def test_classification_snapshot_survives_text_page_close(native):
-    """统计所有权独立于文本页；导出字典的修改不会污染后续读取。"""
+    """Statistics ownership is independent of text pages; modifications to the exported dictionary do not pollute subsequent reads."""
     with (
         pdfium_guard(),
         pdfium.PdfDocument(pdf_bytes()) as document,
@@ -104,7 +104,7 @@ def test_classification_snapshot_survives_text_page_close(native):
 
 
 def test_raw_font_bytes_and_negative_pdfium_flags(native):
-    """人工同 ABI 回调覆盖无效 UTF-8、规范化字体碰撞及 PDFium 负返回值的原真值语义。"""
+    """Manual synchronization with the ABI callback overrides the true semantics of invalid UTF-8, normalized font collision, and PDFium negative return values."""
     import ctypes as ct
 
     convention = getattr(ct, "WINFUNCTYPE", ct.CFUNCTYPE)
@@ -119,7 +119,7 @@ def test_raw_font_bytes_and_negative_pdfium_flags(native):
 
     @convention(ct.c_ulong, ct.c_void_p, ct.c_int, ct.c_void_p, ct.c_ulong, ct.POINTER(ct.c_int))
     def font_info(_page, index, buffer, capacity, flags):
-        """遵循先查询长度再写入的 PDFium 约定，模拟原始字体字节而非 Python 字符串。"""
+        """Emulates raw font bytes rather than Python strings, following the PDFium convention of querying the length before writing."""
         flags[0] = 0
         value = names[index]
         if buffer and capacity >= len(value):
@@ -154,16 +154,16 @@ def test_raw_font_bytes_and_negative_pdfium_flags(native):
 
 @pytest.mark.parametrize("addresses,handle,count", [([0, 1, 1, 1], 1, 0), ([1, 1, 1, 1], 0, 0), ([1, 1, 1, 1], 1, 2**31)])
 def test_classification_rejects_invalid_abi_before_dereference(native, addresses, handle, count):
-    """空函数、空句柄和超范围索引必须在读取任何指针前被拒绝。"""
+    """Null functions, null handles, and out-of-range indexes must be rejected before any pointers are read."""
     with pytest.raises(ValueError, match="classification ABI or character count"):
         native.read_pdfium_classification(addresses, handle, count, [], [], (0xE000, 0xF8FF), classify._normalize_pdf_font_name)
 
 
 def test_native_classification_failure_is_not_silently_ocr(native, monkeypatch):
-    """原生计算失败保留异常原因，不进入分类器原有的通用 OCR 回退。"""
+    """The original calculation failure retains the exception reason and does not enter the classifier's original general OCR fallback."""
 
     def fail(*args):
-        """模拟已选中原生入口后的计算错误。"""
+        """Simulate the calculation error when the native portal is selected."""
         raise RuntimeError("native computation failed")
 
     monkeypatch.setattr(classification_bridge, "read_classification_snapshot", fail)

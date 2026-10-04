@@ -45,11 +45,11 @@ OMML_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
 # Mapping from OMML <m:scr> values to LaTeX math font commands.
 # Used in do_r to convert math script/font style to appropriate LaTeX commands.
 SCR_TO_LATEX = {
-    "script": "\\mathscr{{{0}}}",  # 手写体/花体 — \mathscr covers both upper and lowercase
-    "fraktur": "\\mathfrak{{{0}}}",  # 德国哥特体 — \mathfrak for upper and lowercase
-    "double-struck": "\\mathbb{{{0}}}",  # 双线体/黑板粗体 — \mathbb
-    "sans-serif": "\\mathsf{{{0}}}",  # 无衬线体
-    "monospace": "\\mathtt{{{0}}}",  # 等宽字体
+    "script": "\\mathscr{{{0}}}",  # Handwriting/Flower Style — \mathscr covers both upper and lowercase
+    "fraktur": "\\mathfrak{{{0}}}",  # German Gothic — \mathfrak for upper and lowercase
+    "double-struck": "\\mathbb{{{0}}}",  # Two-line/blackboard bold — \mathbb
+    "sans-serif": "\\mathsf{{{0}}}",  # sans serif
+    "monospace": "\\mathtt{{{0}}}",  # monospaced font
 }
 
 LOWER_GROUP_LIMITS = ("\\underbrace{", "\\underbracket{", "\\underparen{")
@@ -89,14 +89,14 @@ def get_val(key, default=None, store=CHR):
 
 
 def _normalize_latex_delimiter(delimiter):
-    """将 Word OMML 定界符字符转换为 LaTeX/KaTeX 可渲染的定界符。"""
+    """Converts the Word OMML delimiter character to the LaTeX/KaTeX renderable delimiter character."""
     if delimiter in ("\u2225", "\u2016"):
         return r"\|"
     return delimiter
 
 
 def _ensure_latex_command_boundary(latex_text):
-    """为裸 LaTeX 字母控制词补终止空格，避免后续变量被拼成未知命令。"""
+    """Add terminating spaces to bare LaTeX letter control words to prevent subsequent variables from being spelled into unknown commands."""
     if re.fullmatch(r"\\[A-Za-z]+", latex_text):
         return f"{latex_text} "
     return latex_text
@@ -477,8 +477,8 @@ class oMath2Latex(Tag2Method):
 
         out_latex_str = self.u.unicode_to_latex(s)
 
-        # pylatexenc常把数学字符包成 {\ensuremath{...}}，这里只剥离外层包装，
-        # 不能删除内部LaTeX命令的闭合花括号。
+        # pylatexenc often wraps mathematical characters into {\ensuremath{...}}, here only the outer packaging is stripped off,
+        # The closing curly brace of the internal LaTeX command cannot be removed.
         if out_latex_str.startswith(r"{\ensuremath{") and out_latex_str.endswith("}}"):
             out_latex_str = out_latex_str[len(r"{\ensuremath{") : -2]
             out_latex_str = _ensure_latex_command_boundary(out_latex_str)

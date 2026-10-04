@@ -19,7 +19,7 @@ from docvortex.schema import ImageBodyBlock
 
 
 def _image_bytes(image_format: str, *, size: tuple[int, int] = (7, 5)) -> bytes:
-    """生成指定格式的有效测试图片字节。"""
+    """Generate valid test image bytes in the specified format."""
     output = BytesIO()
     Image.new("RGBA" if image_format == "PNG" else "RGB", size, (20, 40, 60, 128)).save(
         output,
@@ -29,13 +29,13 @@ def _image_bytes(image_format: str, *, size: tuple[int, int] = (7, 5)) -> bytes:
 
 
 def _data_uri(mime_subtype: str, payload: bytes) -> str:
-    """把测试图片包装成严格 base64 data URI。"""
+    """Pack the test pictures strictly base64 data URI."""
     encoded = base64.b64encode(payload).decode("ascii")
     return f"data:image/{mime_subtype};base64,{encoded}"
 
 
 def _generated_svg(*, logical_size: tuple[int, int] = (7, 5), fallback_size: tuple[int, int] = (56, 40)) -> bytes:
-    """构造带高密度 PNG fallback 的最小 MinerU SVG。"""
+    """Constructs minimum MinerU SVG with high density PNG fallback."""
     fallback = base64.b64encode(_image_bytes("PNG", size=fallback_size)).decode("ascii")
     width, height = logical_size
     return (
@@ -48,7 +48,7 @@ def _generated_svg(*, logical_size: tuple[int, int] = (7, 5), fallback_size: tup
 
 
 def test_generated_svg_rejects_dtd_beyond_prefix_window() -> None:
-    """验证 DOCX 不会嵌入在长前缀后隐藏 DTD 或实体声明的 SVG。"""
+    """Verify that DOCX does not embed DTD or entity-declared SVG behind a long prefix."""
     payload = (
         b" " * 4097
         + b'<!DOCTYPE svg [<!ENTITY injected "expanded">]>'
@@ -60,17 +60,17 @@ def test_generated_svg_rejects_dtd_beyond_prefix_window() -> None:
 
 
 def _image_block(**values: str | None) -> ImageBodyBlock:
-    """构造最小图片 body block。"""
+    """Construct a minimal picture body block."""
     return ImageBodyBlock(type="image_body", index=0, content="", **values)
 
 
 def test_block_prefers_sidecar_over_base64() -> None:
-    """验证同时存在两种载荷时按公共契约优先解析 image_path。"""
+    """When verifying that there are two payloads at the same time, image_path is parsed first according to the public contract."""
     embedded_data = _image_bytes("PNG", size=(11, 9))
     sidecar_data = _image_bytes("PNG", size=(13, 7))
 
     def resolver(path: str) -> bytes:
-        """验证 helper 请求规范 sidecar 路径并返回不同尺寸图片。"""
+        """Verify helper request specification sidecar path and return images of different sizes."""
         assert path == "images/preferred.png"
         return sidecar_data
 
@@ -83,12 +83,12 @@ def test_block_prefers_sidecar_over_base64() -> None:
 
 
 def test_block_loads_safe_sidecar_through_resolver() -> None:
-    """验证 sidecar 仅通过 resolver 读取，并返回真实格式和尺寸。"""
+    """Verify that sidecar only reads via resolver and returns the true format and size."""
     jpeg_data = _image_bytes("JPEG", size=(13, 8))
     requested_paths: list[str] = []
 
     def resolver(path: str) -> bytes:
-        """记录 renderer 交给调用方的规范化路径。"""
+        """Record renderer The normalized path handed to the caller."""
         requested_paths.append(path)
         return jpeg_data
 
@@ -99,7 +99,7 @@ def test_block_loads_safe_sidecar_through_resolver() -> None:
 
 
 def test_existing_cwd_file_is_never_read_without_resolver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证即使 cwd 存在同名文件，helper 也不会自行读取。"""
+    """Verify that even if a file with the same name exists for cwd, helper will not read it on its own."""
     image_path = tmp_path / "images/local.png"
     image_path.parent.mkdir()
     image_path.write_bytes(_image_bytes("PNG"))
@@ -110,10 +110,10 @@ def test_existing_cwd_file_is_never_read_without_resolver(tmp_path: Path, monkey
 
 
 def test_resolver_error_is_wrapped_with_safe_path() -> None:
-    """验证 resolver 的底层异常被统一包装，并保留原始异常链。"""
+    """Verify that the underlying exception of resolver is uniformly packaged and the original exception chain is retained."""
 
     def failing_resolver(_path: str) -> bytes:
-        """模拟调用方无法读取 sidecar。"""
+        """The impersonation caller cannot read sidecar."""
         raise OSError("disk unavailable")
 
     with pytest.raises(DocxAssetError, match="images/missing.png") as error:
@@ -135,11 +135,11 @@ def test_resolver_error_is_wrapped_with_safe_path() -> None:
     ],
 )
 def test_html_image_rejects_remote_absolute_and_unsafe_sources(source: str) -> None:
-    """验证 HTML 图片不会触发联网、绝对路径读取或目录逃逸。"""
+    """Verify that the HTML image does not trigger networking, absolute path reads, or directory escapes."""
     resolver_called = False
 
     def resolver(_path: str) -> bytes:
-        """记录非法来源是否越过安全校验。"""
+        """Record whether the illegal source has passed the security check."""
         nonlocal resolver_called
         resolver_called = True
         return _image_bytes("PNG")
@@ -151,7 +151,7 @@ def test_html_image_rejects_remote_absolute_and_unsafe_sources(source: str) -> N
 
 
 def test_html_data_uri_and_relative_sidecar_use_the_expected_source() -> None:
-    """验证 HTML src 支持内联 data URI 以及由 resolver 提供的相对 sidecar。"""
+    """Verification HTML src supports inline data URI and the relative sidecar provided by resolver."""
     gif_data = _image_bytes("GIF", size=(6, 4))
     inline = prepare_html_image(_data_uri("gif", gif_data))
     sidecar = prepare_html_image("images/figure.gif", lambda path: gif_data if path == "images/figure.gif" else b"")
@@ -162,7 +162,7 @@ def test_html_data_uri_and_relative_sidecar_use_the_expected_source() -> None:
 
 @pytest.mark.skipif(not features.check("webp"), reason="Pillow build does not support WebP")
 def test_webp_is_converted_to_png_in_memory() -> None:
-    """验证 WebP 会转为可嵌入 Word 的 PNG，且尺寸和像素保持有效。"""
+    """Verify that WebP is converted to PNG that can be embedded in Word and that dimensions and pixels remain valid."""
     webp_data = _image_bytes("WEBP", size=(9, 7))
     prepared = prepare_html_image(_data_uri("webp", webp_data))
 
@@ -185,7 +185,7 @@ def test_webp_is_converted_to_png_in_memory() -> None:
     ],
 )
 def test_supported_word_image_formats_keep_original_bytes(image_format: str, extension: str) -> None:
-    """验证 Word 可直接使用的五种格式不发生重编码。"""
+    """Verify that no re-encoding occurs in the five formats that can be used directly by Word."""
     data = _image_bytes(image_format)
 
     prepared = prepare_image_bytes(data)
@@ -196,7 +196,7 @@ def test_supported_word_image_formats_keep_original_bytes(image_format: str, ext
 
 
 def test_svg_is_rejected_explicitly_for_data_uri_and_sidecar() -> None:
-    """验证内联与 sidecar SVG 都返回明确的不支持错误。"""
+    """Verification inline with sidecar and SVG both return explicit unsupported errors."""
     svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'
 
     with pytest.raises(DocxAssetError, match="SVG images are not supported"):
@@ -206,7 +206,7 @@ def test_svg_is_rejected_explicitly_for_data_uri_and_sidecar() -> None:
 
 
 def test_mineru_generated_svg_keeps_native_data_and_high_density_png_fallback() -> None:
-    """验证 DOCX 图片准备同时保留 SVG、逻辑尺寸与高密度 PNG。"""
+    """Verify DOCX image preparation while preserving SVG, logical size and high density PNG."""
     svg = _generated_svg()
 
     prepared = prepare_html_image(_data_uri("svg+xml", svg))
@@ -231,13 +231,13 @@ def test_mineru_generated_svg_keeps_native_data_and_high_density_png_fallback() 
     ],
 )
 def test_invalid_mime_empty_and_corrupt_payloads_are_rejected(action: object) -> None:
-    """验证 MIME 不符、坏 base64、空字节、坏签名和扩展名不符都报错。"""
+    """Verification MIME mismatch, bad base64, null byte, bad signature and extension mismatch all report errors."""
     with pytest.raises(DocxAssetError):
         action()  # type: ignore[operator]
 
 
 def test_prepared_image_is_immutable() -> None:
-    """验证 PreparedImage 是不可变的值对象。"""
+    """Verify that PreparedImage is an immutable value object."""
     prepared = PreparedImage(b"image", "png", 1, 1)
 
     with pytest.raises(FrozenInstanceError):

@@ -1,4 +1,4 @@
-"""选择进程内的私有计算后端，不改变公共 Python 类型或错误语义。"""
+"""Selecting an in-process private compute backend does not change the public Python type or error semantics."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ _LOAD_FAILURE = None
 
 @lru_cache(maxsize=1)
 def get_native() -> ModuleType | None:
-    """默认 auto 优先 Rust，首次使用时固定后端；仅 auto 允许加载失败回退，计算异常直接传播。"""
+    """The default auto takes precedence over Rust, and the backend is fixed when used for the first time; only auto allows rollback on loading failure, and calculation exceptions are propagated directly."""
     global _SELECTED_MODE, _LOAD_FAILURE
     mode = os.environ.get("DOCVORTEX_COMPUTE_BACKEND", "auto")
     _SELECTED_MODE, _LOAD_FAILURE = mode, None
@@ -38,7 +38,7 @@ def get_native() -> ModuleType | None:
 
 
 def backend_info() -> dict[str, str | int | None]:
-    """为基准和安装检查报告实际后端，不能用环境变量冒充已执行 Rust。"""
+    """To report the actual backend for baseline and installation checks, environment variables cannot be used to impersonate executed Rust."""
     native = get_native()
     path = getattr(native, "__file__", None)
     bridge = sys.modules.get("docvortex.document.pdf.text._pdfium_bridge")

@@ -1,4 +1,4 @@
-//! 批量计算表格筛选、线段覆盖、网格连通和字符归属；候选裁决留在 Python。
+//! Batch calculation table screening, line segment coverage, grid connectivity and character attribution; candidate decisions remain in Python.
 
 use crate::geometry::{self, Box4};
 use std::collections::HashMap;
@@ -8,7 +8,7 @@ pub type GridIndex = (Vec<f64>, Vec<f64>, Vec<Vec<usize>>);
 type CoverageCache = HashMap<(u8, Vec<u64>, u64), Vec<(f64, f64)>>;
 pub type ComponentSpecs = (Vec<usize>, Option<Vec<(usize, usize, usize, usize)>>);
 
-/// 取得矩形交集，边界相接仍视为无面积。
+/// Obtain the intersection of rectangles, and the boundary is still considered to have no area.
 fn intersection(a: Box4, b: Box4) -> Option<Box4> {
     let c = [
         a[0].max(b[0]),
@@ -23,7 +23,7 @@ fn intersection(a: Box4, b: Box4) -> Option<Box4> {
     }
 }
 
-/// 批量筛出中心落在表格内的源框，并预先计算局部坐标。
+/// Batch screen out the source boxes whose centers fall within the table, and pre-calculate local coordinates.
 pub fn select_boxes(
     values: Vec<Option<Box4>>,
     table: Box4,
@@ -56,7 +56,7 @@ pub fn select_boxes(
     result
 }
 
-/// 用稳定端点排序与顺序累加计算覆盖率。
+/// Calculate coverage using stable endpoint sorting and sequence accumulation.
 fn coverage(intervals: &[(f64, f64)], start: f64, end: f64) -> f64 {
     if end <= start {
         return 0.0;
@@ -91,7 +91,7 @@ fn coverage(intervals: &[(f64, f64)], start: f64, end: f64) -> f64 {
     1.0_f64.min(covered / (end - start))
 }
 
-/// 在一次调用中复用轨道区间，避免每个 separator 单独跨语言调用。
+/// Multiplex the track interval in one call to avoid each separator being called separately across languages.
 pub fn coverage_batch(rules: Vec<Rule>, queries: Vec<Query>) -> Option<Vec<f64>> {
     if rules
         .iter()
@@ -130,7 +130,7 @@ pub fn coverage_batch(rules: Vec<Rule>, queries: Vec<Query>) -> Option<Vec<f64>>
     )
 }
 
-/// 使用 Python 已计算的簇均值合并整批线段，保持求和/舍入的版本语义。
+/// Merge the entire batch of segments using the Python calculated cluster mean, maintaining the summed/rounded version semantics.
 pub fn merge_rules(
     rules: Vec<Rule>,
     coordinates: Vec<(u8, Vec<f64>)>,
@@ -174,7 +174,7 @@ pub fn merge_rules(
     Some(output)
 }
 
-/// 计算字符相交面积比例，维持原来的上界截断。
+/// Calculate the character intersection area ratio and maintain the original upper bound truncation.
 fn overlap(glyph: Box4, cell: Box4) -> f64 {
     let area = (glyph[2] - glyph[0]) * (glyph[3] - glyph[1]);
     let Some(b) = intersection(glyph, cell) else {
@@ -187,14 +187,14 @@ fn overlap(glyph: Box4, cell: Box4) -> f64 {
     }
 }
 
-/// 检查中心归属，供零交叠情况下的原规则回退使用。
+/// Check center ownership for rollback of original rules in the case of zero overlap.
 fn contains(cell: Box4, glyph: Box4) -> bool {
     let x = (glyph[0] + glyph[2]) / 2.0;
     let y = (glyph[1] + glyph[3]) / 2.0;
     cell[0] <= x && x <= cell[2] && cell[1] <= y && y <= cell[3]
 }
 
-/// 将二分位置限制在实际原子轨道范围内。
+/// Limit the bisecting positions to the range of actual atomic orbitals.
 fn track_index(tracks: &[f64], value: f64, right: bool) -> usize {
     let at = if right {
         tracks.partition_point(|v| *v <= value)
@@ -204,7 +204,7 @@ fn track_index(tracks: &[f64], value: f64, right: bool) -> usize {
     at.saturating_sub(1).min(tracks.len() - 2)
 }
 
-/// 整张表格执行现有索引或穷举落格判定，相同比例仍优先最大单元格索引。
+/// The entire table executes the existing index or the exhaustive selection decision, and the largest cell index is still given priority in the same proportion.
 pub fn assign_cells(
     glyphs: Vec<Box4>,
     specs: Vec<Box4>,
@@ -293,7 +293,7 @@ pub fn assign_cells(
     )
 }
 
-/// 对既有父节点执行完整路径压缩，与表格并查集的递归 find 等价。
+/// Perform full path compression on existing parent nodes, which is equivalent to the recursive find of table union lookup.
 fn find(parents: &mut [usize], index: usize) -> usize {
     let mut root = index;
     while parents[root] != root {
@@ -308,7 +308,7 @@ fn find(parents: &mut [usize], index: usize) -> usize {
     root
 }
 
-/// 批量连接原子格，并保留 first-root 拥有 second-root 的规则。
+/// Connect atomic grids in batches and retain the rule that first-root owns second-root.
 pub fn grid_parents(count: usize, pairs: Vec<(usize, usize)>) -> Vec<usize> {
     let mut parents: Vec<_> = (0..count).collect();
     for (a, b) in pairs {
@@ -321,7 +321,7 @@ pub fn grid_parents(count: usize, pairs: Vec<(usize, usize)>) -> Vec<usize> {
     parents
 }
 
-/// 将连通格转换为矩形范围；不完整矩形仍拒绝整份候选。
+/// Convert the connected lattice into a rectangular range; incomplete rectangles still reject the entire candidate.
 pub fn component_specs(mut parents: Vec<usize>, rows: usize, cols: usize) -> ComponentSpecs {
     let mut groups: HashMap<usize, (usize, usize, usize, usize, usize)> = HashMap::new();
     for r in 0..rows {
@@ -346,7 +346,7 @@ pub fn component_specs(mut parents: Vec<usize>, rows: usize, cols: usize) -> Com
     (parents, Some(specs))
 }
 
-/// 保持反向候选遍历、严格距离平局与前缀下界提前停止的视觉组行。
+/// Visual grouping of rows preserving reverse candidate traversal, strict distance ties, and prefix lower bound early stopping.
 pub fn visual_rows(
     boxes: Vec<Box4>,
     ids: Vec<usize>,
@@ -446,7 +446,7 @@ pub fn visual_rows(
     )
 }
 
-/// 整表计算列占用；公共边界仍归属从左到右第一个符合区间的列。
+/// The entire table calculates column occupancy; the common boundary still belongs to the first column from left to right that conforms to the interval.
 pub fn row_occupancy(rows: Vec<Vec<f64>>, tracks: Vec<f64>) -> Option<Vec<Vec<usize>>> {
     if rows
         .iter()

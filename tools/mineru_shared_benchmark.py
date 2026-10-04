@@ -1,4 +1,4 @@
-"""实际共享 PDF 入口的模型录制/回放：渲染、文本、表格和素材均真实执行。"""
+"""Model recording/playback of the actual shared PDF portal: rendering, text, tables and materials are all executed realistically."""
 
 from __future__ import annotations
 
@@ -21,12 +21,12 @@ from mineru_flash_benchmark import repository_identity, utc_now
 
 
 def write_json(path, value):
-    """计时结束后保存完整协议及证据，不把序列化混入 PDF 耗时。"""
+    """After the timer expires, the complete protocol and evidence are saved, and the serialization is not mixed into PDF, which is time-consuming."""
     path.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2), encoding="utf-8")
 
 
 def main():
-    """显式绑定双仓源码和可信本机 tape，不允许录制错误或输入差异被静默忽略。"""
+    """Explicitly bind the dual warehouse source code and the trusted native tape, no recording errors or input differences are allowed to be silently ignored."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--path", type=Path, required=True)
     parser.add_argument("--docvortex-source", type=Path, required=True)
@@ -58,7 +58,7 @@ def main():
         ORT_DISABLE_TELEMETRY="1",
         LOGURU_LEVEL="WARNING",
     )
-    # 录制固定使用现有本地 ONNX 模型，不让自动设备选择改变推理路径。
+    # Recording is fixed using the existing local ONNX model and does not allow automatic device selection to change the inference path.
     os.environ.setdefault("MINERU_MODEL_SMALL_BACKEND", "onnx")
     sys.path[:0] = [str(args.docvortex_source.resolve() / "src"), str(args.mineru_source.resolve())]
     started = time.perf_counter()
@@ -104,14 +104,14 @@ def main():
     contexts = []
 
     def get_context():
-        """延迟初始化真实模型，仅第一次录制调用需要模型权重。"""
+        """Lazy initialization of the real model, only the first recording call requires model weights."""
         if not contexts:
             real = original_factory().get_model() if args.record else None
             contexts.append(ContextProxy(tape, real))
         return contexts[0]
 
     def get_predictor(config):
-        """VLM 也只冻结模型边界；回放不连接服务器或加载语言模型。"""
+        """VLM also only freezes model boundaries; playback does not connect to the server or load the language model."""
         real, backend = original_predictor(config) if args.record else (None, "replay")
         return ModelProxy(tape, "vlm", lambda: real), backend
 

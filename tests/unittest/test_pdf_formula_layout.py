@@ -1,4 +1,4 @@
-"""验证行间公式的数学样式、独立序号和原版式安全占用范围。"""
+"""Verify math style, independent sequence numbers, and original style safe occupancy of inline formulas."""
 
 from __future__ import annotations
 
@@ -29,13 +29,13 @@ from docvortex.schema import EquationBlock, MiddleJson, PageInfo, TextBlock
 
 
 def _vector(width: float, height: float, *, descent: float = 2, axis: float = 3, multiline: bool = False) -> FormulaVector:
-    """提供尺寸明确的矢量，独立验证排版不变量而不依赖特定字形。"""
+    """Provides well-sized vectors that independently verify typographic invariants without relying on specific glyphs."""
     return FormulaVector(Drawing(width, height), width, height, height - descent, descent, axis, multiline)
 
 
 @pytest.mark.parametrize("width", [80, 190, 400])
 def test_number_keeps_size_right_edge_and_em_clearance(width: float) -> None:
-    """短公式居中，碰撞公式左移，超长公式只缩小本体，序号保持统一字号。"""
+    """Short formulas are centered, collision formulas are moved to the left, long formulas only reduce the size, and the serial numbers remain the same font size."""
     flow = DisplayFormulaFlowable(_vector(width, 25), _vector(20, 10))
     flow.wrap(240, 1)
     assert flow.width == 240
@@ -52,7 +52,7 @@ def test_number_keeps_size_right_edge_and_em_clearance(width: float) -> None:
 
 
 def test_height_fitting_preserves_number_and_does_not_scale_column() -> None:
-    """矮框只缩小高公式，最后的栏宽和序号字号不随高度比例收缩。"""
+    """The short frame only shrinks the tall formula, and the final column width and serial number font size do not shrink in proportion to the height."""
     flow = DisplayFormulaFlowable(_vector(120, 80, descent=35), _vector(12, 9))
     flow.fit_to_box(220, font_size=10.5, max_height=25)
     assert flow.height <= 25 + 1e-8
@@ -64,7 +64,7 @@ def test_height_fitting_preserves_number_and_does_not_scale_column() -> None:
 
 @pytest.mark.parametrize("multiline", [False, True])
 def test_number_alignment_uses_math_axis_or_multiline_center(multiline: bool) -> None:
-    """不对称高公式按数学轴对齐；真正多行公式按总高度中心对齐。"""
+    """Asymmetrical height formulas are aligned on the math axis; true multi-line formulas are centered on the overall height."""
     main = _vector(100, 70, descent=40, axis=3, multiline=multiline)
     tag = _vector(12, 10, descent=2, axis=3)
     flow = DisplayFormulaFlowable(main, tag)
@@ -77,7 +77,7 @@ def test_number_alignment_uses_math_axis_or_multiline_center(multiline: bool) ->
 
 
 def test_repeated_wrap_restores_full_size_after_narrow_and_short_trials() -> None:
-    """ReportLab 多次试排的结果只依赖本次约束，不能留下以前的编号缩放。"""
+    """ReportLab The results of multiple trial layouts only rely on this constraint, and the previous number scaling cannot be left behind."""
     flow = DisplayFormulaFlowable(_vector(170, 45), _vector(80, 10))
     fresh = DisplayFormulaFlowable(flow.formula, flow.tag)
     flow.wrap(60, 1000)
@@ -91,7 +91,7 @@ def test_repeated_wrap_restores_full_size_after_narrow_and_short_trials() -> Non
 
 @pytest.mark.parametrize("width,height", [(100, 100), (10, 8), (1, 1)])
 def test_long_number_and_extreme_box_keep_both_elements_inside(width: float, height: float) -> None:
-    """长编号在必要时独占末行，极窄矮框也不产生重叠或裁切。"""
+    """Long numbers occupy the last row when necessary, and extremely narrow frames do not cause overlap or clipping."""
     flow = DisplayFormulaFlowable(_vector(120, 30), _vector(200, 10))
     flow.fit_to_box(width, font_size=10.5, max_height=height)
     for rect in [flow.formula_rect, flow.tag_rect]:
@@ -101,7 +101,7 @@ def test_long_number_and_extreme_box_keep_both_elements_inside(width: float, hei
 
 
 def test_small_formula_reports_diagnostic_when_drawn() -> None:
-    """低于 6 pt 的本体即使序号仍正常，也必须报告带块定位的诊断。"""
+    """Units below 6 pt must report diagnostics with block location even if the serial number is still normal."""
     flow = DisplayFormulaFlowable(_vector(400, 30), _vector(20, 10), location="block_index=7", page_index=2)
     flow.wrap(100, 1000)
     with collect_pdf_diagnostics() as diagnostics:
@@ -110,7 +110,7 @@ def test_small_formula_reports_diagnostic_when_drawn() -> None:
 
 
 def test_fraction_style_is_compact_but_explicit_styles_and_limits_survive() -> None:
-    """紧凑分数必须降低真实矢量高度，同时保留作者显式要求的大算子和上下限。"""
+    """The compact fraction must reduce the true vector height while preserving the large operators and upper and lower bounds explicitly required by the authors."""
     source = r"\frac{\sum_i^N x_i^2}{\sum_i^N y_i^2}"
     renderer = FormulaRenderer()
     compact = renderer.render(source, inline=False, font_size=14)
@@ -127,7 +127,7 @@ def test_fraction_style_is_compact_but_explicit_styles_and_limits_survive() -> N
 
 
 def test_inline_formula_svg_is_unchanged_and_aligned_stays_multiline() -> None:
-    """兼容层不触碰行内公式；现有 aligned 预处理和多行检测仍然生效。"""
+    """The compatibility layer does not touch inline formulas; existing aligned preprocessing and multiline detection still take effect."""
     source = r"\frac{\sum_i^N x_i^2}{y}"
     vector = FormulaRenderer().render(source, inline=True, font_size=12)
     previous = ziamath.config.svg2
@@ -146,7 +146,7 @@ def test_inline_formula_svg_is_unchanged_and_aligned_stays_multiline() -> None:
 
 
 def _prepared(index: int, rect: tuple, *, text: str | None = None, size: float = 10.5) -> PreparedBlock:
-    """构造 point 坐标明确的正文或公式，用于安全区域和局部字号测试。"""
+    """Construct text or formula with clear coordinates of point for safe area and local font size testing."""
     x0, y0, x1, y1 = rect
     block = (
         TextBlock(type="text", index=index, content=[{"type": "text", "content": text}])
@@ -168,7 +168,7 @@ def _prepared(index: int, rect: tuple, *, text: str | None = None, size: float =
 
 
 def test_original_uses_column_median_excludes_short_text_and_preserves_input() -> None:
-    """同栏中位字号排除短连接词和对侧栏，并只修改临时绘制矩形。"""
+    """The middle font size in the same column excludes short connectors and the opposite column, and only modifies the temporary drawn rectangle."""
     bodies = [
         _prepared(0, (40, 40, 180, 100), text="left column body paragraph" * 3, size=9),
         _prepared(1, (40, 200, 180, 250), text="left column another paragraph" * 3, size=11),
@@ -189,7 +189,7 @@ def test_original_uses_column_median_excludes_short_text_and_preserves_input() -
 
 
 def test_adjacent_formulas_respect_final_title_and_previous_formula_rectangles() -> None:
-    """相邻公式按顺序借用空白，并避开标题已经扩展后的真实占用范围。"""
+    """Adjacent formulas borrow whitespace sequentially and avoid the true occupancy of the title after it has been expanded."""
     top = _prepared(0, (40, 40, 180, 100), text="body text used as reference" * 3)
     title = _prepared(1, (40, 210, 180, 220), text="title")
     title.draw_rect = (40, 195, 180, 220)
@@ -203,7 +203,7 @@ def test_adjacent_formulas_respect_final_title_and_previous_formula_rectangles()
 
 
 def test_original_font_fallbacks_and_unavailable_clearance() -> None:
-    """无同栏正文时使用页中位数，无正文时使用默认字号，冲突输入不扩框。"""
+    """If there is no text in the same column, the page median will be used. If there is no text, the default font size will be used. Conflicting input will not expand the frame."""
     equation = _prepared(0, (40, 125, 180, 130))
     other_column = _prepared(1, (220, 40, 360, 250), text="another column paragraph" * 3, size=9)
     place_formulas([equation, other_column], 400, 10.5)
@@ -218,7 +218,7 @@ def test_original_font_fallbacks_and_unavailable_clearance() -> None:
 
 
 def test_real_original_render_avoids_tiny_equation_four_and_preserves_document() -> None:
-    """用样张的真实公式及窄矮框验证完整 PDF 路径、独立编号和输入不变性。"""
+    """Verify complete PDF path, independent numbering and input invariance with real formula and narrow frame of sample."""
     source = r"E=1.0-\frac{\sum_{i=1}^N(O_i-P_i)^2}{\sum_{i=1}^N(O_i-\bar O)^2}\tag{4}"
     middle = MiddleJson(
         pages=[
@@ -257,7 +257,7 @@ def test_real_original_render_avoids_tiny_equation_four_and_preserves_document()
 
 
 def test_plain_alphanumeric_tag_uses_upright_glyphs_at_body_size() -> None:
-    """普通字母编号不能继承数学斜体，序号与本体从相同正文基准字号构建。"""
+    """Ordinary letter numbers cannot inherit mathematical italics, and the serial number and body are constructed from the same text base font size."""
     middle = MiddleJson(
         pages=[],
         metadata={"file_suffix": "pdf", "producer": {"name": "test", "version": "1"}},

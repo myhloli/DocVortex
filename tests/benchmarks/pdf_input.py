@@ -1,4 +1,4 @@
-"""输入 PDF 的分类、字符/矢量提取和栅格化分账，不混入导出 PDF 或模型推理。"""
+"""Classification, character/vector extraction and rasterization splits for input PDF, without mixing in export PDF or model inference."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import time
 
 
 def read_input(path):
-    """读取语料并按既有固定密钥解码 XOR，分别保留文件与解析载荷摘要。"""
+    """Read the corpus and decode XOR according to the existing fixed key, retaining the file and parsing payload digest respectively."""
     source = path.read_bytes()
     payload = source
     encoding = "pdf"
@@ -27,7 +27,7 @@ def read_input(path):
 
 
 def resolve_render_mode(args, images, document_class):
-    """验证实际渲染选择；旧基线仅允许 legacy，缺少 session 能力直接失败。"""
+    """Verify actual rendering selection; the old baseline only allowed legacy, which failed directly due to lack of session capability."""
     selector = getattr(images, "get_pdf_render_backend", None)
     factory = getattr(document_class, "get_render_session", None)
     if selector is None:
@@ -52,7 +52,7 @@ def resolve_render_mode(args, images, document_class):
 
 
 def worker(args):
-    """独立进程预热后计时，像素摘要与结果检查放在各阶段计时之外。"""
+    """Timing after independent process warm-up, pixel summary and result checking are placed outside of each stage timing."""
     started = time.perf_counter()
     from docvortex.document.pdf import PDFDocument, images as image_service
     from docvortex.document.pdf.images import load_images_from_pdf_bytes_range, shutdown_pdf_render_executor
@@ -96,7 +96,7 @@ def worker(args):
                     started = time.perf_counter()
                     vectors = page.get_vector_geometry()
                     durations["vectors"] += time.perf_counter() - started
-                    # 该摘要只用于重复运行稳定性；完整结果差分仍由 rust_pdf 基准负责。
+                    # This summary is for repeat run stability only; full result differentiation remains the responsibility of the rust_pdf benchmark.
                     state = [{k: list(v) if k == "bbox" else v for k, v in c.items()} for c in geometry.chars]
                     fingerprint.update(json.dumps(state, sort_keys=True).encode())
                     fingerprint.update(repr(vectors).encode())
@@ -174,7 +174,7 @@ def worker(args):
 
 
 def main():
-    """显式冻结实际导入的源码及后端，禁止覆盖既有记录。"""
+    """Explicitly freeze the actual imported source code and backend, and prohibit overwriting of existing records."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--path", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)

@@ -1,4 +1,4 @@
-"""生成可公开的密集表格压力样本，不依赖本地外部 PDF 或业务内容。"""
+"""Generates publicly available dense tabular stress samples without reliance on local external PDF or business content."""
 
 from pathlib import Path
 import sys
@@ -7,7 +7,7 @@ from reportlab.pdfgen.canvas import Canvas
 
 
 def generate(path: Path) -> None:
-    """用固定元数据和 120 行七列表格复现字符密集、横线区间多的计算负载。"""
+    """Use fixed metadata and a 120-row, seven-column table to reproduce the computational load with dense characters and many horizontal lines."""
     path.parent.mkdir(parents=True, exist_ok=True)
     canvas = Canvas(str(path), pagesize=(595, 842), invariant=1)
     canvas.setLineWidth(0.3)

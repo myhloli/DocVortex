@@ -1,4 +1,4 @@
-"""PDF 模型输出的可见文字清洗；原始字符、布局证据及其它输入格式不在此处理。"""
+"""PDF Visible text cleaning of model output; original characters, layout evidence, and other input formats are not processed here."""
 
 from __future__ import annotations
 
@@ -60,12 +60,12 @@ _OPAQUE_HTML_TAGS = frozenset(
 
 
 def _normalize_plain_text(content: str) -> str:
-    """按一对一码点映射转换英数和 PDF 符号白名单，不改变通用英数工具的契约。"""
+    """Converts alphanumeric and PDF symbol whitelists according to a one-to-one code point mapping, without changing the contract of the universal alphanumeric tool."""
     return full_to_half_exclude_marks(content).translate(_PDF_SYMBOL_TRANSLATION)
 
 
 def _normalize_text(content: str) -> str:
-    """转换公式范围之外的英数及白名单符号；未闭合公式保护到逻辑文字段末尾。"""
+    """Convert alphanumeric and whitelist symbols outside the formula range; unclosed formulas are protected to the end of the logical text field."""
     if not _FULLWIDTH_MODEL_TEXT.search(content):
         return content
     parts: list[str] = []
@@ -84,12 +84,12 @@ def _normalize_text(content: str) -> str:
 
 
 def _normalize_parts(parts: Sequence[str]) -> list[str]:
-    """先识别跨节点公式，再按原长度分回节点，保持样式与链接的边界。"""
+    """First identify the cross-node formula, and then divide the nodes back according to the original length to maintain the boundaries of styles and links."""
     source = "".join(parts)
     normalized = _normalize_text(source)
     if source == normalized:
         return list(parts)
-    # 英数及符号映射始终一对一；不要使用可能扩展字符的整体 Unicode 规范化。
+    # Alphanumeric and symbol mapping is always one-to-one; do not use overall Unicode normalization that may extend characters.
     result: list[str] = []
     offset = 0
     for part in parts:
@@ -99,7 +99,7 @@ def _normalize_parts(parts: Sequence[str]) -> list[str]:
 
 
 def _span_parts(spans: list[Any]) -> Iterator[tuple[dict[str, Any] | None, str]]:
-    """递归遍历可见 TextSpan；不读取 URL，并用不可见屏障隔离公式和代码载荷。"""
+    """Recursively traverse visible TextSpan; do not read URL, and isolate the formula and code payload with an invisible barrier."""
     for span in spans:
         if not isinstance(span, dict):
             yield None, "\0"
@@ -114,7 +114,7 @@ def _span_parts(spans: list[Any]) -> Iterator[tuple[dict[str, Any] | None, str]]
 
 
 def _normalize_spans(spans: list[Any]) -> None:
-    """只更新文字叶子的内容，既不重建 Span，也不合并相邻等样式片段。"""
+    """Only the content of the text leaf is updated, neither rebuilding Span nor merging adjacent style fragments."""
     entries = list(_span_parts(spans))
     normalized = _normalize_parts([text for _span, text in entries])
     for (span, original), replacement in zip(entries, normalized):
@@ -123,7 +123,7 @@ def _normalize_spans(spans: list[Any]) -> None:
 
 
 def _is_opaque_html_node(node: Any) -> bool:
-    """识别现有 HTML 公式、代码及非文本载体，保持它们的内容与属性原样。"""
+    """Recognize existing HTML formulas, codes, and non-text vectors, keeping their content and properties intact."""
     name = str(node.name).split(":")[-1].lower()
     return (
         name in _OPAQUE_HTML_TAGS
@@ -135,17 +135,17 @@ def _is_opaque_html_node(node: Any) -> bool:
 
 
 def _normalize_table(markup: str) -> str:
-    """只修改单元格的可见文本节点；没有实际变化时保留原 HTML 字节表示。"""
+    """Only the visible text node of the cell is modified; if there is no actual change, the original HTML byte representation is retained."""
     if not _FULLWIDTH_MODEL_TEXT.search(markup) and "&#" not in markup:
         return markup
-    # 与现有表格处理保持同一 HTML 解析器，公开模块导入不触发 HTML 依赖。
+    # Keeping the same HTML parser as existing table handling, exposing module imports does not trigger HTML dependencies.
     from bs4 import BeautifulSoup, NavigableString, Tag
 
     soup = BeautifulSoup(markup, "html.parser")
     changed = False
 
     def cell_parts(node: Any) -> Iterator[tuple[NavigableString | None, str]]:
-        """样式标签保持透明，嵌套表格由其自身单元格处理，换行和载荷不能拼出定界符。"""
+        """Style labels remain transparent, nested tables are handled by their own cells, and line breaks and loads cannot spell out delimiters."""
         if type(node) is NavigableString:
             yield node, str(node)
         elif isinstance(node, Tag):
@@ -168,10 +168,10 @@ def _normalize_table(markup: str) -> str:
 
 
 def normalize_pdf_model_text(model_list: list[list[dict[str, Any]]]) -> None:
-    """统一 PDF 自然语言及表格可见英数与白名单符号，保留公式、代码、URL 和结构。
+    """Unify PDF natural language and tables with visible alphanumeric and whitelist symbols, retaining formulas, codes, URL and structures.
 
-    应在样式、上下标和链接匹配结束后、ModelJson 构造前调用；函数幂等，不修改
-    原始字符证据，也不会将字符串转换为 Span 或清理其它模型元数据。
+    Should be called after the matching of styles, superscripts, subscripts and links is completed and before the construction of ModelJson; the function is idempotent and does not modify
+    Raw character evidence, nor converting strings to Span or cleaning other model metadata.
     """
     for page in model_list:
         for block in page:

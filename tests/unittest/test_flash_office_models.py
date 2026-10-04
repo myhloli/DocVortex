@@ -56,7 +56,7 @@ def test_flash_office_model_conversion(
     convert_binary: Callable[[BinaryIO], list[list[dict[str, Any]]]],
     expected_pages: int,
 ) -> None:
-    """验证独立 Office 模型与兼容函数的真实样例结果保持不变。"""
+    """Verify that real-world sample results for the stand-alone Office model and compatible functions remain unchanged."""
 
     sample_path = _OFFICE_SAMPLE_DIR / f"{suffix}_01.{suffix}"
     with sample_path.open("rb") as stream:
@@ -92,7 +92,7 @@ def test_office_model_creates_converter_per_prediction(
     converter_module: ModuleType,
     converter_name: str,
 ) -> None:
-    """验证 Office 模型每次预测使用独立 Converter，且不关闭输入流。"""
+    """Validating the Office model uses an independent Converter for each prediction without closing the input stream."""
 
     first_converter = MagicMock()
     first_converter.pages = [[{"content": "first"}]]
@@ -127,7 +127,7 @@ def test_convert_binary_delegates_to_document_model(
     main_module: ModuleType,
     model_name: str,
 ) -> None:
-    """验证旧 convert_binary 函数仅负责转发给对应文档模型。"""
+    """Verify that the old convert_binary function is only responsible for forwarding to the corresponding document model."""
 
     expected_pages = [[{"content": "model"}]]
     model = MagicMock()
@@ -155,7 +155,7 @@ def test_convert_path_delegates_to_binary_helper(
     main_module: ModuleType,
     suffix: str,
 ) -> None:
-    """验证旧 convert_path 函数打开文件后转发给二进制兼容入口。"""
+    """Verify that the old convert_path function forwards the file to the binary compatibility portal after opening it."""
 
     sample_path = tmp_path / f"sample.{suffix}"
     sample_path.write_bytes(b"office")
@@ -169,7 +169,7 @@ def test_convert_path_delegates_to_binary_helper(
 
 
 def test_models_are_exported_from_flash_root() -> None:
-    """验证全部模型统一由 Flash 根包公开。"""
+    """Verify that all models are uniformly exposed by the Flash root package."""
 
     assert flash_models.__all__ == [
         "PdfModel",
@@ -219,7 +219,7 @@ def test_models_are_exported_from_flash_root() -> None:
     ],
 )
 def test_office_subpackages_do_not_export_models(package_name: str, model_name: str) -> None:
-    """验证 Office 子包不再导出模型类或保留独立 model 模块。"""
+    """Verify that the Office subpackage no longer exports model classes or remains a standalone model module."""
 
     package = importlib.import_module(package_name)
     assert not hasattr(package, model_name)
@@ -227,7 +227,7 @@ def test_office_subpackages_do_not_export_models(package_name: str, model_name: 
 
 
 def test_importing_pdf_model_does_not_load_office_converters() -> None:
-    """验证纯 PDF 模型导入不会提前加载任何 Office Converter。"""
+    """Verify that pure PDF model import does not early load any Office Converter."""
 
     script = "\n".join(
         [

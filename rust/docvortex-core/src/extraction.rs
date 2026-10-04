@@ -1,10 +1,10 @@
-//! 仅处理 PDFium 已读出的数值；不持有、传递或调用任何原生 PDF 句柄。
+//! Only process the value read by PDFium; do not hold, pass or call any native PDF handle.
 
 use crate::geometry::{Box4, Size};
 pub type RawGeometry = (Box4, Option<Box4>, Option<Box4>, Option<Size>);
 pub type VisualGeometry = (Box4, Option<Box4>, Option<Box4>, Option<Size>);
 
-/// 与 Python min 保持相同的有符号零及 NaN 首项语义。
+/// Maintain the same signed zero and NaN leading semantics as Python min.
 fn minimum(a: f64, b: f64) -> f64 {
     if b < a {
         b
@@ -12,7 +12,7 @@ fn minimum(a: f64, b: f64) -> f64 {
         a
     }
 }
-/// 与 Python max 保持相同的首项语义。
+/// Maintain the same first-term semantics as Python max.
 fn maximum(a: f64, b: f64) -> f64 {
     if b > a {
         b
@@ -21,7 +21,7 @@ fn maximum(a: f64, b: f64) -> f64 {
     }
 }
 
-/// 把 PDF 原始点转为视觉页面坐标，保留浮点页面边界。
+/// Convert PDF original point to visual page coordinates, retaining floating point page boundaries.
 fn point(p: Size, frame: Box4, angle: i32) -> Size {
     let w = (frame[2] - frame[0]).abs();
     let h = (frame[3] - frame[1]).abs();
@@ -35,7 +35,7 @@ fn point(p: Size, frame: Box4, angle: i32) -> Size {
     }
 }
 
-/// 按原四角遍历次序转换扩展框，非有限或零面积返回空值。
+/// The expansion frame is converted according to the original four-corner traversal order, and a null value is returned for non-limited or zero area.
 fn visual(raw: Option<Box4>, frame: Box4, angle: i32) -> Option<Box4> {
     let b = raw?;
     let points =
@@ -56,7 +56,7 @@ fn visual(raw: Option<Box4>, frame: Box4, angle: i32) -> Option<Box4> {
     }
 }
 
-/// 批量物化布局框与扩展框，布局框仍使用原有整数页面高度。
+/// Batch materialize layout boxes and expansion boxes, and the layout boxes still use the original integer page height.
 pub fn materialize(
     rows: Vec<RawGeometry>,
     frame: Box4,

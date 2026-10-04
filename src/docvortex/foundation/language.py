@@ -5,12 +5,12 @@ _INVALID_SURROGATES = re.compile("[\ud800-\udfff]")
 
 
 def remove_invalid_surrogates(text: str) -> str:
-    """等价移除代理码点；常见合法 Unicode 文本无需逐字符 Python 扫描。"""
+    """Equivalent to removing surrogate code points; common legal Unicode text does not need to be scanned character by character Python."""
     return _INVALID_SURROGATES.sub("", text)
 
 
 def _normalize_text_for_language_guess(code: str) -> str:
-    """移除孤立代理字符并还原合法代理对，供代码语言识别使用。"""
+    """Removes orphan surrogate characters and restores legal surrogate pairs for use by code language recognition."""
     if not code:
         return ""
     normalized: list[str] = []
@@ -38,7 +38,7 @@ def _normalize_text_for_language_guess(code: str) -> str:
 
 
 def guess_code_language(code: str) -> str:
-    """使用 Magika 推断代码块语言，失败时返回纯文本类型。"""
+    """Use Magika to infer the code block language, returning a plain text type on failure."""
     normalized_code = _normalize_text_for_language_guess(code)
     if not normalized_code:
         return DEFAULT_CODE_LANGUAGE

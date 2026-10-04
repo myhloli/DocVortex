@@ -1,3 +1,3 @@
-"""旧版 Office OLE、OfficeArt 与二进制读取实现。"""
+"""Legacy Office OLE, OfficeArt with binary read implementation."""
 
 __all__: list[str] = []

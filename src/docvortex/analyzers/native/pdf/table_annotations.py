@@ -1,4 +1,4 @@
-"""PDF 表题和表注认领；保留原有认领顺序与判定规则。"""
+"""PDF claim table titles and notes; retain the original claim order and judgment rules."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from .table_rows import _clip_visual_row_to_corridor
 
 @dataclass(slots=True)
 class _PreparedTableNoteRow:
-    """保存表注走廊中与候选上下边界无关的预计算行信息。"""
+    """Saves precomputed row information in the table annotation corridor independent of candidate upper and lower bounds."""
 
     row: _VisualRow
     line_indices: frozenset[int]
@@ -44,7 +44,7 @@ class _PreparedTableNoteRow:
 
 @dataclass(slots=True)
 class _PreparedTableNoteBodyMetrics:
-    """保存同一文本方向的正文高度样本，供候选按纵向排除区间精确筛选。"""
+    """Save text height samples in the same text direction for precise screening of candidates based on vertical exclusion intervals."""
 
     items: tuple[tuple[int, float, float], ...]
     centers: tuple[float, ...]
@@ -53,7 +53,7 @@ class _PreparedTableNoteBodyMetrics:
 
 @dataclass(slots=True)
 class _PreparedMarkerCache:
-    """在同一横线候选构建过程复用字形，只保留有界来源行。"""
+    """Reuse glyphs during the same horizontal line candidate construction process, retaining only bounded source lines."""
 
     values: OrderedDict[int, tuple[_LineItem, list[tuple[str, BBox]], tuple[int, tuple[str, ...]]]] = field(
         default_factory=OrderedDict
@@ -61,7 +61,7 @@ class _PreparedMarkerCache:
     glyph_count: int = 0
 
     def prepare(self, line: _LineItem, page_size: tuple[float, float], angle: int):
-        """命中时返回原字形；淘汰只触发重算，不影响标记裁决。"""
+        """The original glyph is returned on hit; elimination only triggers recalculation and does not affect the mark decision."""
 
         key = id(line)
         cached = self.values.get(key)
@@ -82,7 +82,7 @@ class _PreparedMarkerCache:
 
 @dataclass(slots=True)
 class _PreparedTableCoreRows:
-    """保存一个走廊的原始行引用和来源倒排索引，不跨候选构建缓存。"""
+    """Saves the original row reference and source inverted index of a corridor and does not build cache across candidates."""
 
     rows: list[_VisualRow]
     positions: dict[int, int]
@@ -95,14 +95,14 @@ class _PreparedTableCoreRows:
     marker_prepared: _PreparedMarkerCache = field(default_factory=_PreparedMarkerCache)
 
     def bbox(self, start, end):
-        """按极值来源复用原始坐标对象，避免新建大量 Python 浮点值。"""
+        """Reuse the original coordinate object according to the extreme value source to avoid creating a large number of Python floating point values."""
         if self.geometry is None:
             return None
         indices = self.geometry.union_indices(start, end)
         return tuple(self.rows[index].bbox[axis] for axis, index in enumerate(indices)) if indices is not None else None
 
     def interval(self, rows: list[_VisualRow]) -> tuple[int, int] | None:
-        """只有完全相同、连续且顺序一致的行引用才能使用区间描述。"""
+        """Only identical, consecutive, and sequential row references can use interval descriptions."""
         if not rows:
             return None
         start = self.positions.get(id(rows[0]))
@@ -113,7 +113,7 @@ class _PreparedTableCoreRows:
         return start, start + len(rows)
 
     def references(self, marker, start, end, lines, page_size, angle, marker_cache):
-        """只检查当前区间的未知行，命中即停；小候选不再预先扫描整个走廊。"""
+        """Only unknown rows in the current interval are checked and stop when hit; small candidates no longer pre-scan the entire corridor."""
         known, hits = self.marker_states.get(marker, (0, 0))
         selected = ((1 << (end - start)) - 1) << start
         if hits & selected:
@@ -136,7 +136,7 @@ class _PreparedTableCoreRows:
                 if marker_cache is not None and key in marker_cache:
                     matched = marker_cache[key]
                 else:
-                    # 缓存模式遵循同来源首行裁决；不向旧缓存写入稠密 False。
+                    # Cache mode follows same-origin first-row ruling; do not write dense False to old cache.
                     selected_lines = source_lines if marker_cache is None else source_lines[:1]
                     matched = _table_core_references_marker(marker, selected_lines, page_size, angle, prepared_core=self)
                 if matched:
@@ -150,20 +150,20 @@ class _PreparedTableCoreRows:
         return False
 
     def _remember_marker(self, marker, known, hits):
-        """用两个压缩行位图记录结果，最多保留 128 个标记；淘汰只重算，不删候选。"""
+        """Use two compressed row bitmaps to record the results, retaining up to 128 marks; elimination only recalculates, but does not delete candidates."""
         self.marker_states[marker] = (known, hits)
         self.marker_states.move_to_end(marker)
         if len(self.marker_states) > 128:
             self.marker_states.popitem(last=False)
 
     def prepared_marker_line(self, line: _LineItem, page_size: tuple[float, float], angle: int):
-        """按当前走廊共享的有界缓存查询来源行字形。"""
+        """Query source row glyphs by bounded cache shared by the current corridor."""
 
         return self.marker_prepared.prepare(line, page_size, angle)
 
 
 def _plain_marker_bbox(value) -> bool:
-    """按 marker 快路径的既有规则校验字符 bbox 形状和数值范围。"""
+    """Verify character bbox shape and value range according to existing rules for marker fast path."""
     if type(value) not in (tuple, list, CharBbox):
         return False
     raw = value.bbox if type(value) is CharBbox else value
@@ -182,14 +182,14 @@ def _plain_marker_bbox(value) -> bool:
 
 
 def _prepare_marker_line_context(lines):
-    """同一候选上下文只校验一次 marker 输入，并冻结来源行索引。"""
+    """The marker input is verified only once for the same candidate context, and the source row index is frozen."""
     from ...._compute_backend import get_native
 
     if get_native() is None:
         return False, {}
     source_lines: dict[int, list[_LineItem]] = {}
-    # 直接单次遍历替代多层生成式，避免同一 char/bbox 字典键被重复读取；
-    # 任一特殊输入立即返回 False，保持原参考路径整体回退的语义。
+    # Direct single traversal replaces multi-layer productions to avoid repeated reading of the same char/bbox dictionary key;
+    # Any special input returns False immediately, maintaining the semantics of the overall rollback of the original reference path.
     for line in lines:
         if (
             type(line) is not _LineItem
@@ -225,7 +225,7 @@ def _prepare_table_core_rows(
     marker_safe: bool | None = None,
     source_lines: dict[int, list[_LineItem]] | None = None,
 ):
-    """一次校验并打包走廊成员；特殊来源和对象仍交给原集合路径。"""
+    """Corridor members are verified and packaged once; special sources and objects are still handed over to the original collection path."""
     if metrics.native is None or len({id(row) for row in rows}) != len(rows):
         return None
     members = []
@@ -262,10 +262,10 @@ def _prepare_table_core_rows(
 
 
 class _PreparedTableNoteRows(list):
-    """保留列表协议并附加本次表注走廊的保序下边界索引。"""
+    """The list protocol is retained and the order-preserving lower boundary index of the corridor is appended."""
 
     def __init__(self, rows):
-        """只为普通有限行框建立索引，特殊几何保持原遍历行为。"""
+        """Only ordinary finite row boxes are indexed, special geometries retain the original traversal behavior."""
         super().__init__(rows)
         from ...._compute_backend import get_native
 
@@ -280,7 +280,7 @@ class _PreparedTableNoteRows(list):
             self.geometry = native.TableRowGeometry([row.row.bbox for row in rows])
 
     def first_after(self, bottom):
-        """查找可以跳过的前缀，非有限表底仍从原始首行开始。"""
+        """Find prefixes that can be skipped so that the bottom of the non-finite table still starts from the original first row."""
         if self.geometry is None or type(bottom) is not float:
             return 0
         result = self.geometry.first_after(bottom)
@@ -293,7 +293,7 @@ def _table_caption_candidates(
     angle: int,
     median_height: float,
 ) -> list[tuple[_LineItem, BBox]]:
-    """预先筛出当前文本方向可能成为表题的行，保留原有文本判定顺序。"""
+    """Pre-screen out the lines that may become table headings in the current text direction, and retain the original text judgment order."""
     candidates: list[tuple[_LineItem, BBox]] = []
     for line in lines:
         text = line.text.strip()
@@ -312,10 +312,10 @@ def _table_caption_candidates(
 
 
 class _PreparedAnnotationGeometry:
-    """为候选组共享原片段及坐标引用，查询不缓存候选结果。"""
+    """The original fragment and coordinate references are shared for candidate groups, and the query does not cache candidate results."""
 
     def __init__(self, rows, native):
-        """仅记录首次出现的片段，重复选择在查询阶段保留原顺序。"""
+        """Only the first occurrence of the fragment is recorded, and repeated selection retains the original order during the query phase."""
         self.selections = OrderedDict()
         self.results = OrderedDict()
         self.selection_weight = 0
@@ -344,7 +344,7 @@ class _PreparedAnnotationGeometry:
         self.native = native.AnnotationGeometry(records)
 
     def build(self, kind, rows, excluded, local):
-        """按原顺序构造注释，未知片段或特殊输入明确交回参考路径。"""
+        """Annotations are constructed in original order, with unknown fragments or special inputs explicitly referred back to the reference path."""
         if self.native is None or (
             local is not None
             and (
@@ -409,7 +409,7 @@ class _PreparedAnnotationGeometry:
 
     @staticmethod
     def _clone(annotation):
-        """每个候选持有独立可变成员，合并器不能写入缓存快照。"""
+        """Each candidate holds an independent mutable member, and the merger cannot write cached snapshots."""
         if annotation is None:
             return None
         return _TableAnnotation(
@@ -420,7 +420,7 @@ class _PreparedAnnotationGeometry:
         )
 
     def _remember(self, key, rows, result):
-        """按来源总数和条目数双重限制缓存，淘汰只导致等价重算。"""
+        """The cache is double-limited by the total number of sources and the number of entries, and eviction only results in equivalent recalculation."""
         weight = max(1, len(result.line_bboxes)) if result is not None else 1
         if weight > 16384:
             return
@@ -432,7 +432,7 @@ class _PreparedAnnotationGeometry:
 
 
 def _prepare_annotation_geometry(rows):
-    """只为较大候选组准备一次数值快照，小页面保留原物化开销。"""
+    """Only one numerical snapshot is prepared for the larger candidate group, and the original materialization overhead is retained for small pages."""
     from ...._compute_backend import get_native
 
     native = get_native()
@@ -450,7 +450,7 @@ def _build_table_annotation(
     excluded_local_bbox: BBox | None = None,
     prepared_geometry: _PreparedAnnotationGeometry | None = None,
 ) -> _TableAnnotation | None:
-    """把已确认视觉行压缩成一个带精确来源行集合的表格注释记录。"""
+    """Condenses confirmed visual rows into a table annotation record with a precise set of source rows."""
 
     excluded_line_indices = excluded_line_indices or set()
     if prepared_geometry is not None:
@@ -493,7 +493,7 @@ def _collect_caption_rows(
     rule_bbox: BBox,
     median_height: float,
 ) -> list[_VisualRow]:
-    """收集显式标题所在行及其到表格上边界之间的连续换行。"""
+    """Collects consecutive line breaks between the explicit title row and the upper edge of the table."""
 
     if caption_line is None:
         return []
@@ -535,7 +535,7 @@ def _prepare_table_note_rows(
     page_size: tuple[float, float],
     angle: int,
 ) -> list[_PreparedTableNoteRow]:
-    """按精确横向走廊预计算表注行的候选无关属性，供多个表格候选复用。"""
+    """Precompute candidate irrelevant attributes of table annotation rows by precise lateral corridor for reuse by multiple table candidates."""
 
     margin = 2.0 * median_height
     line_by_index = {line.source_index: line for line in lines}
@@ -576,7 +576,7 @@ def _prepare_table_note_body_metrics(
     page_size: tuple[float, float],
     angle: int,
 ) -> _PreparedTableNoteBodyMetrics:
-    """预先计算同方向文本行的局部中心和有效高度，避免候选重复旋转与测量。"""
+    """Precalculate the local center and effective height of text lines in the same direction to avoid repeated rotation and measurement of candidates."""
 
     items: list[tuple[int, float, float]] = []
     for line in lines:
@@ -626,7 +626,7 @@ def _collect_footnote_rows(
     prepared_body_metrics: _PreparedTableNoteBodyMetrics | None = None,
     prepared_core: tuple[_PreparedTableCoreRows, int, int] | None = None,
 ) -> list[_VisualRow]:
-    """从表格下边界吸收具有表内引用和版面证据的表注连续行。"""
+    """Absorb consecutive rows of table notes with in-table citations and layout evidence from the lower edge of the table."""
 
     output: list[_VisualRow] = []
     bottom = rule_bbox[3]
@@ -691,7 +691,7 @@ def _collect_footnote_rows(
                 )
             else:
                 if body_reference_height is None:
-                    # 仅辅助标记表注需要正文高度参照；显式 Note/Source 不再提前扫描整页。
+                    # Only auxiliary markup table notes require text height reference; explicit Note/Source no longer scans the entire page ahead of time.
                     body_reference_height = _table_note_body_reference_height(
                         lines,
                         rule_bbox,
@@ -721,7 +721,7 @@ def _collect_footnote_rows(
             or (note_fonts and row_fonts and note_fonts.isdisjoint(row_fonts))
             or _bbox_axis_overlap_ratio(clipped_row.bbox, rule_bbox, axis="x") < 0.35
         ):
-            # 字号、字体或缩进突变表明已进入标题/正文，表注链必须立即终止。
+            # Sudden changes in size, font, or indentation indicate that the title/text has been entered, and the table-note chain must be terminated immediately.
             break
         output.append(clipped_row)
         selected_line_indices.update(line_indices)
@@ -731,7 +731,7 @@ def _collect_footnote_rows(
 
 
 def _extract_auxiliary_table_note_marker(text: str) -> str | None:
-    """提取行首一至三个通用 Unicode 标记，不解释任何具体标记含义。"""
+    """Extract one to three general Unicode tags at the beginning of the line without explaining the meaning of any specific tags."""
 
     match = _AUXILIARY_TABLE_NOTE_RE.match(str(text or ""))
     if match is None:
@@ -745,7 +745,7 @@ def _extract_auxiliary_table_note_marker(text: str) -> str | None:
 def _prepare_marker_line(
     line: _LineItem, page_size: tuple[float, float], angle: int
 ) -> tuple[list[tuple[str, BBox]], tuple[int, tuple[str, ...]]] | None:
-    """仅为普通来源行准备与具体标记无关的局部字形及紧凑 token。"""
+    """Only local glyphs and compacts independent of specific tags are prepared for common source lines token."""
 
     if (
         type(line) is not _LineItem
@@ -787,7 +787,7 @@ def _table_core_references_marker(
     marker_cache: dict[tuple[int, str], bool] | None = None,
     prepared_core: _PreparedTableCoreRows | None = None,
 ) -> bool:
-    """要求通用短标记在表格核心中具有上标或紧凑单元格引用。"""
+    """Requires universal short tags to have superscripts or compact cell references in the table core."""
 
     for line in core_lines:
         key = (line.source_index, marker)
@@ -807,7 +807,7 @@ def _table_core_references_marker(
 
 
 def _compact_marker_data(text: str) -> tuple[int, tuple[str, ...]]:
-    """按原 Unicode 规则准备短文本标记 token，超长正文不保留 token。"""
+    """Prepare the short text mark token according to the original Unicode rules, and do not retain the long text token."""
 
     normalized_text = unicodedata.normalize("NFKC", str(text or "")).casefold()
     count = sum(not char.isspace() for char in normalized_text)
@@ -827,7 +827,7 @@ def _compact_marker_data(text: str) -> tuple[int, tuple[str, ...]]:
 
 
 def _line_has_compact_marker_token(text: str, marker: str, prepared: tuple[int, tuple[str, ...]] | None = None) -> bool:
-    """短小单元格只匹配独立标记 token，复用同来源的只读准备结果。"""
+    """Short cells only match the independent tag token, reusing the read-only preparation results from the same source."""
 
     count, tokens = prepared if prepared is not None else _compact_marker_data(text)
     return count <= 12 and len(tokens) <= 4 and marker in tokens
@@ -840,7 +840,7 @@ def _line_has_superscript_marker(
     angle: int,
     prepared_glyphs: list[tuple[str, BBox]] | None = None,
 ) -> bool:
-    """在正向局部坐标中检查标记字形是否同时更小并明显上移。"""
+    """Check in positive local coordinates whether the marker glyph is simultaneously smaller and shifted significantly upward."""
 
     glyphs: list[tuple[str, BBox]] = []
     if prepared_glyphs is None:
@@ -893,7 +893,7 @@ def _table_note_body_reference_height(
     prepared_metrics: _PreparedTableNoteBodyMetrics | None = None,
     prepared_core: tuple[_PreparedTableCoreRows, int, int] | None = None,
 ) -> float:
-    """以同方向非表格行的最高四分位估计正文高度，样本不足时稳健回退。"""
+    """Use the highest quartile of non-table rows in the same direction to estimate text height, with robust fallback when there are insufficient samples."""
 
     exclusion_top = rule_bbox[1] - 3.0 * median_height
     exclusion_bottom = rule_bbox[3] + 10.0 * median_height
@@ -945,13 +945,13 @@ def _table_note_body_reference_height(
 
 
 def _visual_row_text(row: _VisualRow) -> str:
-    """按局部 x 顺序拼接视觉行文本，供拆分脚注标记判断。"""
+    """Splice visual line text in local x order for split footnote mark judgment."""
 
     return " ".join(fragment.text.strip() for fragment in row.fragments if fragment.text.strip())
 
 
 def _has_possible_table_note_rows(rows: list[_VisualRow]) -> bool:
-    """判断给定视觉行集合中是否存在显式或辅助表注起始行。"""
+    """Determines whether an explicit or auxiliary table annotation start row exists in the given set of visual rows."""
 
     return any(
         _is_table_note_text(text := _visual_row_text(row)) or _extract_auxiliary_table_note_marker(text) is not None
@@ -964,7 +964,7 @@ def _has_possible_table_note_rows_in_corridor(
     rule_bbox: BBox,
     median_height: float,
 ) -> bool:
-    """按与真实表注收集一致的横向走廊裁剪后，再执行安全的负向预筛。"""
+    """After cutting according to the horizontal corridor consistent with the real table annotation collection, a safe negative pre-screening is performed."""
 
     margin = 2.0 * median_height
     clipped_rows = [
@@ -974,7 +974,7 @@ def _has_possible_table_note_rows_in_corridor(
 
 
 def _is_table_note_text(text: str) -> bool:
-    """判断表后首行是否具有明确的注释、来源或脚注标记。"""
+    """Determine whether the first row after the table has clear comments, sources, or footnotes."""
 
     return bool(_TABLE_NOTE_RE.match(str(text or "").strip()))
 
@@ -987,7 +987,7 @@ def _find_table_caption(
     median_height: float,
     caption_candidates: list[tuple[_LineItem, BBox]] | None = None,
 ) -> _LineItem | None:
-    """在核心表格上方最多十二倍行高内查找显式 Table/表标题。"""
+    """Look for explicit Table/table headers up to twelve times the row height above the core table."""
 
     candidates: list[tuple[float, _LineItem]] = []
     candidate_rows = caption_candidates
@@ -1011,7 +1011,7 @@ def _find_caption_number_peers(
     angle: int,
     median_height: float,
 ) -> list[_LineItem]:
-    """查找与拆分 Table/表 标签同一视觉行的编号文本。"""
+    """Find and split numbered text in the same visual line of the Table/Table label."""
 
     caption_local_bbox = _rotate_bbox_to_upright(caption_line.bbox, page_size, angle)
     peers: list[_LineItem] = []
@@ -1034,7 +1034,7 @@ def _merge_table_candidate_annotations(
     target: _TableCandidate,
     candidate: _TableCandidate,
 ) -> None:
-    """按类型合并重复候选注释，并以表体优先消解来源行角色冲突。"""
+    """Merge duplicate candidate annotations by type, and resolve source row role conflicts with table bodies first."""
 
     for annotation in candidate.annotations:
         existing = next(
@@ -1057,10 +1057,10 @@ def _merge_table_candidate_annotations(
             existing_bbox = existing.line_bboxes.get(line_index)
             existing.line_bboxes[line_index] = bbox if existing_bbox is None else _bbox_union(existing_bbox, bbox)
 
-    # 重复候选发生角色冲突时以任一候选确认的表体成员为准，避免表头被并入 caption。
+    # When role conflicts occur among duplicate candidates, the table body members confirmed by any candidate shall prevail to prevent the table header from being merged into caption.
     retained_annotations: list[_TableAnnotation] = []
     for annotation in target.annotations:
-        # 注释成员通常很少，逐个查询大型共享表体集合比反向遍历表体成员更省时。
+        # Annotation members are usually few, and it is less time-consuming to query a large shared table body collection one by one than to traverse the table body members in reverse.
         annotation.line_indices = {
             line_index for line_index in annotation.line_indices if line_index not in target.line_indices
         }

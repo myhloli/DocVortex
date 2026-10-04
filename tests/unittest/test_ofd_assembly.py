@@ -1,4 +1,4 @@
-"""OFD 视觉行、保守段落和单元格图片归属的合成回归。"""
+"""OFD Synthetic regression of visual row, conservative paragraph and cell picture attributions."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from docvortex.schema import ModelJson
 def _line(
     text: str, bbox: tuple[float, float, float, float], baseline: float, *, styles: tuple[str, ...] = (), angle: int = 0
 ) -> TextLine:
-    """构造具有独立字形框和真实基线的可旋转文字片段。"""
+    """Construct rotatable text fragments with independent glyph boxes and true baselines."""
     quad = tuple(upright_point(x, y, -angle) for x, y in rect_quad(bbox))
     rotated = (min(p[0] for p in quad), min(p[1] for p in quad), max(p[0] for p in quad), max(p[1] for p in quad))
     origin = upright_point(bbox[0], baseline, -angle)
@@ -33,7 +33,7 @@ def _line(
 
 
 def _image(bbox: tuple[float, float, float, float], *, decoded: bool = True) -> ImageItem:
-    """构造可实际导出的图片或已降级的无载荷图片。"""
+    """Construct actual exportable images or degraded payloadless images."""
     buffer = BytesIO()
     Image.new("RGB", (20, 10), "blue").save(buffer, format="PNG")
     source = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
@@ -41,26 +41,26 @@ def _image(bbox: tuple[float, float, float, float], *, decoded: bool = True) -> 
 
 
 def _grid() -> list[AxisLine]:
-    """构造两行两列的完整网格，供内容归属测试复用。"""
+    """Construct a complete grid with two rows and two columns for reuse in content attribution testing."""
     return [AxisLine((10, y, 90, y), "horizontal", 0.1, 0, None) for y in (10, 40, 70)] + [
         AxisLine((x, 10, x, 70), "vertical", 0.1, 0, None) for x in (10, 50, 90)
     ]
 
 
 def _project(lines: list[TextLine], *, images: list[ImageItem] | None = None, axis: list[AxisLine] | None = None) -> list[dict]:
-    """运行真实页面投影，验证行、段落和视觉块之间的交互。"""
+    """Run real page projections to verify interactions between lines, paragraphs, and visual blocks."""
     scene = OfdPageScene(0, (0, 0, 210, 297), None, lines, axis or [], images or [])
     return OfdReadingOrderProjector([scene]).project_page(scene)
 
 
 def _plain(block: dict) -> str:
-    """读取测试输出的结构化正文，保留全部字符及空格。"""
+    """Read the structured text of the test output, retaining all characters and spaces."""
     return "".join(span["content"] for span in block["content"])
 
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_mixed_glyph_heights_and_styles_share_real_baseline(angle: int) -> None:
-    """中文、英文和标点的字形高度不同仍组成同一行，并保留局部样式。"""
+    """Chinese, English and punctuation glyphs with different heights still form the same line and retain local styles."""
     lines = [
         _line("中文", (10, 10, 20, 15), 15, angle=angle),
         _line("ZIP", (21, 11.5, 29, 14.5), 15, styles=("bold",), angle=angle),
@@ -74,7 +74,7 @@ def test_mixed_glyph_heights_and_styles_share_real_baseline(angle: int) -> None:
 
 
 def test_parallel_columns_and_template_layers_remain_separate() -> None:
-    """同一基线的远距离两栏以及不同模板来源不会误拼接。"""
+    """Two distant columns of the same baseline and different template sources will not be accidentally spliced."""
     left = _line("left column", (10, 10, 60, 15), 15)
     right = _line("right column", (90, 10, 150, 15), 15)
     assert len(merge_same_baseline_lines([right, left])) == 2
@@ -83,7 +83,7 @@ def test_parallel_columns_and_template_layers_remain_separate() -> None:
 
 
 def test_paragraph_indentation_short_tail_and_punctuation() -> None:
-    """缩进和短尾行恢复三段，正常行末句号不会强制换段。"""
+    """Indentation and short tail lines are restored to three paragraphs, and periods at the end of normal lines will not force a paragraph break."""
     lines = [
         _line("这是第一段首行。", (20, 10, 100, 15), 15),
         _line("第一段继续正文", (10, 21, 100, 26), 26),
@@ -100,7 +100,7 @@ def test_paragraph_indentation_short_tail_and_punctuation() -> None:
 
 
 def test_large_gap_list_and_standalone_short_lines_are_boundaries() -> None:
-    """明显空白、列表起始和独立短行阻断正文合并。"""
+    """Obvious whitespace, list starts, and standalone short lines block text merging."""
     lines = [
         _line("标题", (10, 10, 20, 15), 15),
         _line("第一段正常正文", (10, 21, 100, 26), 26),
@@ -112,7 +112,7 @@ def test_large_gap_list_and_standalone_short_lines_are_boundaries() -> None:
 
 
 def test_two_columns_do_not_form_cross_column_paragraphs() -> None:
-    """双栏正文各自合段，不把阅读顺序中相邻的两栏串接。"""
+    """The two-column text should be combined into separate paragraphs, and the two adjacent columns in the reading order should not be connected."""
     lines = [_line(f"左栏连续正文{row}", (10, 10 + row * 8, 65, 15 + row * 8), 15 + row * 8) for row in range(3)]
     lines += [_line(f"右栏连续正文{row}", (95, 10 + row * 8, 150, 15 + row * 8), 15 + row * 8) for row in range(3)]
     blocks = _project(lines)
@@ -122,13 +122,13 @@ def test_two_columns_do_not_form_cross_column_paragraphs() -> None:
 
 
 def test_image_is_a_paragraph_barrier() -> None:
-    """正文间独立图片维持阅读顺序屏障，不跨图直接合段。"""
+    """Independent pictures between the main text maintain a reading order barrier, and do not directly join paragraphs across pictures."""
     lines = [_line("图片上方连续正文", (10, 10, 90, 15), 15), _line("图片下方连续正文", (10, 30, 90, 35), 35)]
     assert [block["type"] for block in _project(lines, images=[_image((10, 18, 90, 27))])] == ["text", "image", "text"]
 
 
 def test_cells_claim_images_once_and_keep_adjacent_text_separate() -> None:
-    """相邻单元格文字先归属后组行，图片仅在对应单元格输出一次。"""
+    """The text in adjacent cells is first assigned and then grouped into rows, and the picture is only output once in the corresponding cell."""
     lines = [_line("甲文字", (40, 15, 49, 20), 20), _line("乙文字", (51, 15, 65, 20), 20)]
     images = [_image((15, 45, 45, 65)), _image((55, 45, 85, 65))]
     blocks = _project(lines, images=images, axis=_grid())
@@ -148,7 +148,7 @@ def test_cells_claim_images_once_and_keep_adjacent_text_separate() -> None:
 
 @pytest.mark.parametrize("bbox", [(40, 45, 60, 65), (5, 5, 95, 75), (100, 45, 120, 65), (49.8, 45, 50.2, 65)])
 def test_ambiguous_or_external_images_are_not_claimed(bbox: tuple[float, float, float, float]) -> None:
-    """跨格、覆盖、表外及容差内双重归属的图片保留独立身份。"""
+    """Pictures that are dually attributed across grids, overlays, outside the table, and within tolerances retain independent identities."""
     lines = [_line("甲文字", (15, 15, 35, 20), 20), _line("乙文字", (55, 15, 75, 20), 20)]
     image = _image(bbox)
     tables = recover_tables(_grid(), lines, OfdTableBudget(), images=[image])
@@ -159,7 +159,7 @@ def test_ambiguous_or_external_images_are_not_claimed(bbox: tuple[float, float, 
 
 
 def test_undecodable_image_keeps_existing_degradation_and_cell_bounds_are_total() -> None:
-    """无载荷图片不被表格吞掉或生成空 img，区间外坐标返回空归属。"""
+    """The unloaded image is not swallowed by the table or generates empty img, and the coordinates outside the interval return empty attributes."""
     lines = [_line("甲文字", (15, 15, 35, 20), 20), _line("乙文字", (55, 15, 75, 20), 20)]
     image = _image((15, 45, 45, 65), decoded=False)
     table = recover_tables(_grid(), lines, OfdTableBudget(), images=[image])[0]
@@ -178,7 +178,7 @@ def test_undecodable_image_keeps_existing_degradation_and_cell_bounds_are_total(
     ],
 )
 def test_english_paragraph_boundaries_keep_spacing(first: str, second: str, expected: str) -> None:
-    """英文句末标点和单词换行补空格，但不改写现有空白及连字符。"""
+    """Punctuation and word breaks at the end of English sentences are filled with spaces, but existing spaces and hyphens are not overwritten."""
     lines = [_line(first, (10, 10, 100, 15), 15), _line(second, (10, 18, 95, 23), 23)]
     blocks = _project(lines)
     assert len(blocks) == 1 and _plain(blocks[0]) == expected
@@ -186,7 +186,7 @@ def test_english_paragraph_boundaries_keep_spacing(first: str, second: str, expe
 
 
 def test_page_paragraphs_use_existing_cross_page_continuation() -> None:
-    """先组成页内段落，再由现有公共规则建立跨页续接且清理私有几何。"""
+    """First, form intra-page paragraphs, then create cross-page continuations based on existing public rules and clean up private geometry."""
     scenes = [
         OfdPageScene(
             0,
@@ -219,7 +219,7 @@ def test_page_paragraphs_use_existing_cross_page_continuation() -> None:
 
 
 def test_table_html_assets_survive_export_and_bundle(tmp_path: Path) -> None:
-    """单元格图片沿公共素材链路外置后仍可导出，并在结果包往返中保留。"""
+    """Cell pictures can still be exported after being externalized along the public material link, and will be retained in the result package round trip."""
     from docvortex import load_bundle
     from docvortex.api import postprocess
 

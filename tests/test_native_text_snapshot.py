@@ -1,4 +1,4 @@
-"""Rust 自有 canonical 快照的真实读取、生命周期和完整语义差分。"""
+"""Rust True reads, lifecycle and full semantic differentiation of own canonical snapshots."""
 
 from contextlib import closing
 from dataclasses import fields, is_dataclass
@@ -30,7 +30,7 @@ from docvortex.analyzers.native.pdf.native_text import (
 
 @pytest.fixture
 def native():
-    """纯 Python 作业明确跳过，Rust 作业必须加载真正的快照扩展。"""
+    """Pure Python jobs are explicitly skipped, Rust jobs must load the true snapshot extension."""
     value = get_native()
     if value is None:
         pytest.skip("Python backend")
@@ -39,7 +39,7 @@ def native():
 
 
 def _pdf(rotation=0, long=False):
-    """生成旋转、多个字号、重复绘制、隐藏副本、裁剪以及空页。"""
+    """Generates rotation, multiple font sizes, repeat drawing, hidden copy, cropping, and empty pages."""
     output = BytesIO()
     canvas = Canvas(output, pagesize=(450.5, 650.25))
     canvas.setPageRotation(rotation)
@@ -67,7 +67,7 @@ def _pdf(rotation=0, long=False):
 
 
 def _plain(value):
-    """比较所有字段及数值，避免 dataclass 内部 Bbox 的对象地址干扰。"""
+    """Compare all fields and values to avoid interference with the object address of Bbox within dataclass."""
     if isinstance(value, Bbox):
         return (value.bbox, value.ensure_nonzero_area)
     if is_dataclass(value):
@@ -83,7 +83,7 @@ def _plain(value):
 @pytest.mark.parametrize("visible", [False, True])
 @pytest.mark.parametrize("extended", [False, True])
 def test_snapshot_canonical_and_visual_parity(native, rotation, visible, extended):
-    """独立 Python 参考覆盖 public/Flash 两策略与可选几何，所有成员字段必须相同。"""
+    """Standalone Python reference overrides public/Flash two strategies with optional geometry, all member fields must be the same."""
     with pdfium_guard(), pdfium.PdfDocument(_pdf(rotation)) as document:
         for page_index in range(len(document)):
             with closing(document[page_index]) as page:
@@ -125,7 +125,7 @@ def test_snapshot_canonical_and_visual_parity(native, rotation, visible, extende
 
 
 def test_snapshot_is_native_before_any_python_char_materialization(native):
-    """阻断旧字符物化器，证明首次快照及内部组行从未先生成 Python 字符字典。"""
+    """Blocking the old character materializer proves that the first snapshot and internal group lines never generated the Python character dictionary."""
     with PDFDocument(_pdf()) as document:
         with patch(
             "docvortex.document.pdf.native_text_geometry.get_chars", side_effect=AssertionError("Python chars materialized")
@@ -144,14 +144,14 @@ def test_snapshot_is_native_before_any_python_char_materialization(native):
 
 
 def test_snapshot_surrogates_cross_batch_and_invalid_code(native, monkeypatch):
-    """代理项跨旧1024批界仍保留原索引，超出Unicode上限保持ValueError。"""
+    """Surrogate items that cross the old 1024 batch boundary still retain the original index, and exceed the upper limit of Unicode and retain ValueError."""
     from docvortex.document.pdf import snapshot_bridge
 
     factory = ctypes.WINFUNCTYPE if hasattr(ctypes, "WINFUNCTYPE") else ctypes.CFUNCTYPE
     original = snapshot_bridge.raw.FPDFText_GetUnicode
 
     def unicode_value(handle, index):
-        """仅注入成对代理项，其余读取原始 PDFium。"""
+        """Only the paired surrogates are injected, the rest reads the original PDFium."""
         return {1023: 0xD83D, 1024: 0xDE00}.get(index, original(handle, index))
 
     monkeypatch.setattr(
@@ -167,7 +167,7 @@ def test_snapshot_surrogates_cross_batch_and_invalid_code(native, monkeypatch):
         )
 
         def invalid_unicode(handle, index):
-            """真实句柄的非法原始码值不得被替换成UFFFD。"""
+            """Illegal source code values for real handles must not be replaced with UFFFD."""
             return 0x110000 if index == 0 else original(handle, index)
 
         monkeypatch.setattr(
@@ -178,7 +178,7 @@ def test_snapshot_surrogates_cross_batch_and_invalid_code(native, monkeypatch):
 
 
 def test_snapshot_special_metadata_selects_reference_before_calculation(native):
-    """自定义映射和非标准数值不进入新算法，原因可诊断且不伪报原生成功。"""
+    """Custom mappings and non-standard values do not enter the new algorithm. The reasons are diagnosable and native success is not falsely reported."""
     from collections import UserDict
 
     with (
@@ -195,7 +195,7 @@ def test_snapshot_special_metadata_selects_reference_before_calculation(native):
 
 
 def test_owned_geometry_risk_matches_line_reference(native):
-    """页面级 geometry evidence 与逐行参考风险结论一致，身份副本强制回退。"""
+    """Page level geometry evidence Consistent with the row-by-row reference risk conclusion, the identity copy is forced to fall back."""
     from copy import deepcopy
     from docvortex.analyzers.native.pdf import char_geometry, pipeline
     from docvortex.analyzers.native.pdf.native_text import _build_native_line_items_from_records
@@ -222,7 +222,7 @@ def test_owned_geometry_risk_matches_line_reference(native):
     [(9.9, 14.925, True), (10.1, 15.075, False)],
 )
 def test_owned_geometry_uses_raw_font_size_for_style_risk(native, font_size, line_height, style_risk):
-    """分组字号取整不能改变原始字号参与的跨页样式膨胀阈值。"""
+    """Grouped font size rounding cannot change the cross-page style expansion threshold of the original font size."""
     from docvortex.analyzers.native.pdf import char_geometry, pipeline
 
     output = BytesIO()
@@ -253,7 +253,7 @@ def test_owned_geometry_uses_raw_font_size_for_style_risk(native, font_size, lin
 
 
 def test_owned_geometry_excludes_cjk_punctuation_from_anchors(native):
-    """日文中点虽归入 cjk 文字组，仍不能作为几何风险锚点。"""
+    """Although the Japanese midpoint is classified into the cjk text group, it cannot be used as a geometric risk anchor point."""
     from docvortex.analyzers.native.pdf import char_geometry, pipeline
     from docvortex.analyzers.native.pdf.models import _LineItem
 
@@ -279,7 +279,7 @@ def test_owned_geometry_excludes_cjk_punctuation_from_anchors(native):
 
 
 def test_owned_geometry_fallback_restarts_reference_run_namespace(native, monkeypatch):
-    """启用 owned 通道后任一行失配必须整体重启参考路径，禁止两个从 0 起的 run 编号空间混用。"""
+    """After enabling the owned channel, any row mismatch must restart the reference path as a whole, and the mixing of two run number spaces starting from 0 is prohibited."""
     from copy import deepcopy
     from docvortex.analyzers.native.pdf import char_geometry, pipeline
 
@@ -311,7 +311,7 @@ def test_owned_geometry_fallback_restarts_reference_run_namespace(native, monkey
 
 
 def test_owned_table_and_geometry_evidence_match_reference(native, monkeypatch):
-    """表格脚本与全文几何 owned 输入必须与逐行参考输出完全一致。"""
+    """Table scripts and full-text geometry owned input must be identical to the line-by-line reference output."""
     from docvortex.analyzers.native.pdf import pipeline
     from docvortex.analyzers.native.pdf.table_text_styles import table_script_stats
     from docvortex._native import geometry_evidence_stats
@@ -336,13 +336,13 @@ def test_owned_table_and_geometry_evidence_match_reference(native, monkeypatch):
 
 
 def test_python_textpage_wrapper_is_closed_after_native_snapshot(native, monkeypatch):
-    """回退生命周期迁移后，页面只创建一次 Python textpage 并在快照后关闭。"""
+    """After the rollback lifecycle migration, the page Python textpage is created only once and is closed after the snapshot."""
     with pdfium_guard(), pdfium.PdfDocument(_pdf()) as document, closing(document[0]) as page:
         original = page.get_textpage
         textpages = []
 
         def tracked_textpage():
-            """记录本次页面创建的 Python 包装，以核对退出后的句柄状态。"""
+            """Record the Python package created on this page to check the handle status after exit."""
             result = original()
             textpages.append(result)
             return result
@@ -361,7 +361,7 @@ def test_python_textpage_wrapper_is_closed_after_native_snapshot(native, monkeyp
 
 
 def test_snapshot_keeps_public_geometry_dataclass_shape(native):
-    """公开geometry仍只有原四字段；显式修改的geometry不能被快照旁路覆盖。"""
+    """The public geometry still only has the original four fields; the explicitly modified geometry cannot be overwritten by the snapshot bypass."""
     from docvortex.analyzers.pdf import prepare_text_evidence
 
     with PDFDocument(_pdf()) as document:
@@ -375,7 +375,7 @@ def test_snapshot_keeps_public_geometry_dataclass_shape(native):
 
 
 def test_owned_text_entry_has_no_vector_or_link_dependency(native):
-    """方向等只读文本消费者不被提前路径提取约束，完整快照复用同一个Rust文本对象。"""
+    """Read-only text consumers such as directions are not constrained by advance path extraction, and the full snapshot reuses the same Rust text object."""
     with PDFDocument(_pdf()) as document:
         with (
             patch("docvortex.document.pdf._document._extract_page_paths_and_lines", side_effect=AssertionError("paths")),
@@ -392,14 +392,14 @@ def test_owned_text_entry_has_no_vector_or_link_dependency(native):
 
 
 def test_snapshot_read_failure_does_not_retry_reference(native, monkeypatch):
-    """已准入的PDFium失败直接传播，不通过旧路径读取第二次掩盖错误。"""
+    """The admitted PDFium failed to propagate directly without reading the second time through the old path to cover up the error."""
     from docvortex.document.pdf import snapshot_bridge
 
     factory = ctypes.WINFUNCTYPE if hasattr(ctypes, "WINFUNCTYPE") else ctypes.CFUNCTYPE
     original = snapshot_bridge.raw.FPDFText_GetLooseCharBox
 
     def failed_box(handle, index, rectangle):
-        """保持ABI正确，仅注入PDFium失败返回值。"""
+        """Keep ABI correct and only inject PDFium failure return value."""
         return 0
 
     monkeypatch.setattr(
@@ -415,7 +415,7 @@ def test_snapshot_read_failure_does_not_retry_reference(native, monkeypatch):
 
 
 def test_snapshot_long_font_decoding_and_signed_zero_font_sharing(native, monkeypatch):
-    """长非法UTF8字体名与正负零字号遵守首值缓存，保留同次字体字典共享。"""
+    """Long illegal UTF8 font names and positive and negative zero font sizes comply with the first value cache and retain the same font dictionary sharing."""
     from docvortex.document.pdf import snapshot_bridge
 
     factory = ctypes.WINFUNCTYPE if hasattr(ctypes, "WINFUNCTYPE") else ctypes.CFUNCTYPE
@@ -424,14 +424,14 @@ def test_snapshot_long_font_decoding_and_signed_zero_font_sharing(native, monkey
     name = b"Snapshot-" + b"A" * 300 + b"\xff\0"
 
     def font_info(handle, index, buffer, capacity, flags):
-        """按真实长度协议触发第二次缓冲读取，并保持非法字节替换语义。"""
+        """Triggers a second buffered read per real-length protocol and maintains illegal byte replacement semantics."""
         flags[0] = 32
         if capacity >= len(name):
             ctypes.memmove(buffer, name, len(name))
         return len(name)
 
     def font_size(handle, index):
-        """对相邻字符交替返回零位型，缓存必须保留首次字号对象的符号。"""
+        """A zero-bit type is returned for adjacent characters alternately. The cache must retain the sign of the first font size object."""
         return -0.0 if index % 2 else 0.0
 
     monkeypatch.setattr(
@@ -456,7 +456,7 @@ def test_snapshot_long_font_decoding_and_signed_zero_font_sharing(native, monkey
 
 
 def test_public_text_snapshot_summaries_do_not_materialize_chars(native):
-    """公开轻量入口生成精确粗行摘要，方向判断不创建字符、字体字典或Bbox。"""
+    """The public lightweight entry generates an accurate thick line summary, and the direction judgment does not create a character, font dictionary or Bbox."""
     with PDFDocument(_pdf()) as document:
         page = document[0]
         with (
@@ -488,7 +488,7 @@ def test_public_text_snapshot_summaries_do_not_materialize_chars(native):
 
 
 def test_public_text_snapshot_python_backend_does_not_extract(native):
-    """参考后端能力探测立即返回None，不为了方向fallback多读一次字符。"""
+    """Refer to the backend capability detection to immediately return None, and do not read more characters for the direction fallback."""
     with PDFDocument(_pdf()) as document:
         page = document[0]
         with (
@@ -500,7 +500,7 @@ def test_public_text_snapshot_python_backend_does_not_extract(native):
 
 
 def test_private_snapshot_retains_constructor_keyword_and_lazy_cache(native):
-    """旧假源可以继续传text_geometry，原生私有快照仅在访问时物化并保持该视图。"""
+    """The old fake source can continue to transfer text_geometry, and the native private snapshot is only materialized when accessed and the view is maintained."""
     from docvortex.document.pdf.native_contracts import _PDFPageSnapshot, PDFPageTextGeometry
 
     geometry = PDFPageTextGeometry([], {}, {})
@@ -524,7 +524,7 @@ def test_private_snapshot_retains_constructor_keyword_and_lazy_cache(native):
 
 
 def test_owned_probe_does_not_materialize_reference_on_unsupported_metadata(native):
-    """原生数值准入失败后只返回能力选择，不提前做一遍宿主随后还会重复的字符提取。"""
+    """After the native value access fails, only the ability selection will be returned. If the host does not do it in advance, the host will repeat the character extraction later."""
     with (
         PDFDocument(_pdf()) as document,
         patch("docvortex.document.pdf.snapshot_bridge.read_text_snapshot", return_value=None),
@@ -537,7 +537,7 @@ def test_owned_probe_does_not_materialize_reference_on_unsupported_metadata(nati
 
 
 def test_owned_script_indices_match_plain_batches(native):
-    """关闭文档后以重复、乱序及分段索引对照原列式上下标入口，边界非法必须报错。"""
+    """After closing the document, compare the original column type superscript and subscript entries with duplicate, disordered and segmented indexes. If the boundary is illegal, an error must be reported."""
     from docvortex.analyzers.native.pdf.inline import scripts
     from docvortex.analyzers.native.pdf._script_geometry import _coerce_finite_bbox
     import random
@@ -563,7 +563,7 @@ def test_owned_script_indices_match_plain_batches(native):
 
 
 def test_owned_script_copied_members_use_reference(native):
-    """行几何修复形成的字符副本不能凭相同 char_idx 复用旧快照；原成员仍按索引计算。"""
+    """Character copies formed by row geometry repair cannot reuse old snapshots with the same char_idx; original members are still counted by index."""
     from copy import deepcopy
     from docvortex.analyzers.native.pdf.inline import scripts
     from docvortex.analyzers.native.pdf.native_text import _build_native_line_items_from_records
@@ -588,7 +588,7 @@ def test_owned_script_copied_members_use_reference(native):
 
 
 def test_flash_consumes_and_releases_owned_script_pages(native, monkeypatch):
-    """Flash 保留全文几何先行依赖；脚本复用与参考结果一致，并逐页释放原生输入队列。"""
+    """Flash retains full-text geometry look-ahead dependencies; script reuse is consistent with reference results, and the native input queue is released page by page."""
     from docvortex.analyzers.native.pdf import pipeline
 
     before = native.script_snapshot_stats()

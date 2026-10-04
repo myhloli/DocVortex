@@ -1,4 +1,4 @@
-//! 字符几何与坐标转换绑定，保留 Python 坐标对象复用语义。
+//! Character geometry is bound to coordinate transformation, retaining the Python coordinate object reuse semantics.
 
 use docvortex_core::extraction;
 use docvortex_core::geometry::{self, Box4, Size};
@@ -7,7 +7,7 @@ use pyo3::types::{PyFloat, PyInt, PyList, PyTuple};
 
 use super::conversion::{box_tuple, read_boxes, BoxTuple};
 
-/// 在 PDFium 读取结束后批量转换数值，不接触句柄或同步锁。
+/// After the PDFium reading is completed, the values are converted in batches without touching the handle or synchronization lock.
 #[pyfunction]
 pub(super) fn materialize_geometry(
     py: Python<'_>,
@@ -31,7 +31,7 @@ pub(super) fn materialize_geometry(
     })
 }
 
-/// 一次消费整行锚点，不回传重复坐标，只返回合格相邻对的统计量。
+/// The entire row of anchor points is consumed at one time, repeated coordinates are not returned, and only the statistics of qualified adjacent pairs are returned.
 #[pyfunction]
 pub(super) fn anchor_pairs(
     py: Python<'_>,
@@ -41,7 +41,7 @@ pub(super) fn anchor_pairs(
     py.detach(move || geometry::anchor_pairs(records, positive_source))
 }
 
-/// 批量替代逐字符框转换，只在边界持有 Python 对象。
+/// Batch replacement for frame-by-frame conversion, only holding Python objects at the boundary.
 #[pyfunction]
 pub(super) fn normalize_boxes(
     py: Python<'_>,
@@ -58,7 +58,7 @@ pub(super) fn normalize_boxes(
     }))
 }
 
-/// 一次完成整行裁剪、旋转、字距统计与分组；结果保留源范围。
+/// Complete line cropping, rotation, kerning statistics and grouping at one time; the result retains the source range.
 #[pyfunction]
 pub(super) fn visual_runs(
     py: Python<'_>,
@@ -84,7 +84,7 @@ pub(super) fn visual_runs(
     }))
 }
 
-/// 一次计算字体统计所需的合法局部框，保持空字符对应的原索引。
+/// Calculate the legal local frame required for font statistics once and keep the original index corresponding to the empty character.
 #[pyfunction]
 pub(super) fn local_boxes(
     py: Python<'_>,
@@ -105,7 +105,7 @@ pub(super) fn local_boxes(
     }))
 }
 
-/// 为未改变的坐标复用已有 Python 浮点对象，避免 canonical 样本复制整本坐标。
+/// Reuse existing Python floating point objects for unchanged coordinates to avoid duplicating the entire coordinates of the canonical sample.
 pub(super) fn shared_coordinates<'py, const N: usize>(
     py: Python<'py>,
     values: [f64; N],
@@ -115,7 +115,7 @@ pub(super) fn shared_coordinates<'py, const N: usize>(
     for (index, value) in values.into_iter().enumerate() {
         let mut shared = None;
         for candidate in candidates {
-            // 只读取普通传输容器；特殊输入已由原校验器处理，不再次触发用户方法。
+            // Only ordinary transport containers are read; special input has been processed by the original validator and the user method is not triggered again.
             if !candidate.is_exact_instance_of::<PyList>()
                 && !candidate.is_exact_instance_of::<PyTuple>()
             {
@@ -135,7 +135,7 @@ pub(super) fn shared_coordinates<'py, const N: usize>(
     Ok(PyTuple::new(py, output)?.into_any())
 }
 
-/// 数值仍批量计算，但未旋转的局部框复用 source/tight tuple，不复制长期存活的坐标。
+/// Numerical values are still calculated in batches, but the unrotated local frames reuse source/tight and tuple, and long-term surviving coordinates are not copied.
 #[pyfunction]
 pub(super) fn source_rows<'py>(
     py: Python<'py>,
@@ -213,7 +213,7 @@ pub(super) fn source_rows<'py>(
     Ok(output)
 }
 
-/// 只借用内置浮点序列，特殊类型及异常数值返回参考路径而不执行转换回调。
+/// Only borrowing the built-in floating point sequence, special types and exception values return the reference path without executing the conversion callback.
 pub(super) fn plain_coordinates<const N: usize>(
     value: &Bound<'_, PyAny>,
 ) -> Option<Option<[f64; N]>> {
@@ -239,7 +239,7 @@ pub(super) fn plain_coordinates<const N: usize>(
     Some(Some(result))
 }
 
-/// 每行只接收一份保序记录，融合普通数值校验及既有源框选择、裁剪和旋转。
+/// Each row receives only one order-preserving record, integrating ordinary value verification and existing source frame selection, cropping and rotation.
 #[pyfunction]
 pub(super) fn source_rows_plain<'py>(
     py: Python<'py>,

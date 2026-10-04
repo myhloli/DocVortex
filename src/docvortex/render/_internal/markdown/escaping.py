@@ -1,4 +1,4 @@
-"""Markdown 文本转义与 block 前缀保护。"""
+"""Markdown text escape and block prefix protection."""
 
 import re
 
@@ -45,7 +45,7 @@ def escape_text_block_markdown_prefix(content: str) -> str:
 
 
 def escape_standalone_marker_rule(content: str) -> str:
-    """转义独立的下划线或短横线序列，避免被 Markdown 识别为分割线。"""
+    """Escape individual underscore or dash sequences to avoid being recognized as dividing lines by Markdown."""
     if content and (set(content) == {"_"} or set(content) == {"-"}):
         return f"\\{content}"
     return content

@@ -1,4 +1,4 @@
-"""PDF renderer 的页面几何、字体与打印样式。"""
+"""Page geometry, fonts and print styles for PDF renderer."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ _HEADING_SIZES = (20.0, 16.0, 14.0, 12.0, 11.0, 10.0)
 
 @dataclass(frozen=True, slots=True)
 class PdfStyleSet:
-    """保存 PDF renderer 使用的全部稳定段落样式。"""
+    """Save PDF All stable paragraph styles used by renderer."""
 
     body: ParagraphStyle
     headings: tuple[ParagraphStyle, ...]
@@ -50,12 +50,12 @@ class PdfStyleSet:
     table_header: ParagraphStyle
 
     def heading(self, level: int) -> ParagraphStyle:
-        """按公开一到六级标题返回对应的 PDF 样式。"""
+        """Return the corresponding PDF style according to the public first to sixth level titles."""
         return self.headings[min(max(level, 1), len(self.headings)) - 1]
 
 
 def build_pdf_styles() -> PdfStyleSet:
-    """注册标准 CID 字体并构造无外部字体依赖的打印样式集。"""
+    """Registers the standard CID font and constructs a print style set with no external font dependencies."""
     _register_pdf_fonts()
     body = ParagraphStyle(
         "DocVortex PDF Body",
@@ -171,7 +171,7 @@ def build_pdf_styles() -> PdfStyleSet:
 
 
 def _register_pdf_fonts() -> None:
-    """幂等注册中日韩 CID 字体与 ziafont 自带 Unicode 回退字体。"""
+    """Idempotent registered Chinese, Japanese and Korean CID fonts and ziafont come with Unicode fallback fonts."""
     with _FONT_LOCK:
         registered = set(pdfmetrics.getRegisteredFontNames())
         for font_name in (HAN_FONT, JAPANESE_FONT, KOREAN_FONT):

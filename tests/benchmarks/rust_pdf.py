@@ -1,4 +1,4 @@
-"""在独立进程内测量公开解析和共享 PDF 接口，严格比较完整输出及固定表格区域。"""
+"""Measures public parsing and shared PDF interfaces in independent processes, strictly comparing full output and fixed table regions."""
 
 from __future__ import annotations
 
@@ -24,17 +24,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def write_json(path: Path, value: object) -> None:
-    """将计时之外的完整结果保存为可复核 JSON。"""
+    """Save complete results beyond timing as reviewable JSON."""
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def digest(value: object) -> str:
-    """不忽略字段、文字或坐标地计算完整协议摘要。"""
+    """Compute the complete protocol summary without ignoring fields, text or coordinates."""
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
 def source_identity(package: Path) -> dict:
-    """记录真正导入的源码指纹，冻结副本不能借用父目录仓库的 HEAD。"""
+    """Record the fingerprint of the source code that was actually imported. The frozen copy cannot borrow HEAD from the parent directory warehouse."""
     package = package.resolve()
     source_root = package.parents[2]
     marker = source_root / "benchmark-revision.json"
@@ -58,7 +58,7 @@ def source_identity(package: Path) -> dict:
 
 
 def public_once(payload: bytes) -> tuple[dict, dict]:
-    """测量完整公开 parse，结果序列化和素材摘要不计入解析耗时。"""
+    """The measurement of parse is fully disclosed, and the result serialization and material summary are not included in the analysis time."""
     from docvortex import parse
 
     started = time.perf_counter()
@@ -73,7 +73,7 @@ def public_once(payload: bytes) -> tuple[dict, dict]:
 
 
 def shared_once(payload: bytes, model: list) -> tuple[dict, dict]:
-    """以冻结的 Flash 区域输入分别测量提取、复用、文本物化和表格恢复。"""
+    """Extraction, reuse, text materialization and table recovery were measured separately with frozen Flash region input."""
     from docvortex.analyzers.pdf import apply_text_evidence, prepare_table_page, prepare_text_evidence, recover_table_region
     from docvortex.document.pdf import PDFDocument
 
@@ -130,12 +130,12 @@ def shared_once(payload: bytes, model: list) -> tuple[dict, dict]:
 
 
 def worker(args: argparse.Namespace) -> None:
-    """先预热再计时，在计时外验证重复输出，并另跑一轮独立采样内存。"""
-    # API 不能撤回初始化事件，必须在导入前禁用上传器；渲染子进程也继承此设置。
+    """Warm up first and then time, verify repeated output outside of timing, and run another round of independent sampling memory."""
+    # API The initialization event cannot be withdrawn and the uploader must be disabled before importing; the rendering child process also inherits this setting.
     os.environ["ORT_DISABLE_TELEMETRY"] = "1"
     import onnxruntime
 
-    # 关闭与解析无关的后台联网，避免 ORT 遥测线程干扰计时及解释器退出。
+    # Turn off background networking unrelated to parsing to prevent the ORT telemetry thread from interfering with timing and interpreter exit.
     onnxruntime.disable_telemetry_events()
     from loguru import logger
     from docvortex._compute_backend import backend_info
@@ -216,7 +216,7 @@ def worker(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    """每份文档独立运行，拒绝覆盖报告或比较不同源文件/区域输入。"""
+    """Each document runs independently, refusing to overwrite reports or compare different source files/region inputs."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--baseline", type=Path)
@@ -233,7 +233,7 @@ def main() -> None:
     if args.suite == "shared" and args.flash_baseline is None:
         parser.error("shared benchmarks require --flash-baseline with frozen region inputs")
     os.environ["DOCVORTEX_COMPUTE_BACKEND"] = args.backend
-    # 子进程渲染器另行初始化日志，使用环境变量避免 DEBUG I/O 混入正式计时。
+    # The child process renderer initializes the log separately, using environment variables to prevent DEBUG I/O from being mixed into the official timing.
     os.environ["LOGURU_LEVEL"] = "WARNING"
     if args.worker:
         worker(args)

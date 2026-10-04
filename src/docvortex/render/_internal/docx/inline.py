@@ -1,4 +1,4 @@
-"""Middle JSON 2.0 行内 Span 到 Word run、超链接、书签和 OMML 的写入。"""
+"""Middle JSON 2.0 Inline writing of Span to Word run, hyperlinks, bookmarks and OMML."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ _NONBREAKING_SPACE = "\u00a0"
 
 @dataclass(frozen=True, slots=True)
 class InlineRenderContext:
-    """保存行内渲染告警所需的 block 定位与书签表。"""
+    """Saves the block location and bookmark table required for inline rendering alerts."""
 
     bookmarks: BookmarkRegistry
     page_idx: int
@@ -38,15 +38,15 @@ class InlineRenderContext:
     block_type: str
 
     def location(self) -> str:
-        """返回稳定、可读的 page/block 定位文本。"""
+        """Returns stable, readable page/block anchor text."""
         return f"page_idx={self.page_idx}, block_index={self.block_index}, block_type={self.block_type}"
 
 
 class BookmarkRegistry:
-    """把 MiddleJson anchor 映射为合法且唯一的 Word bookmark 名称。"""
+    """Map MiddleJson anchor to the legal and unique Word bookmark name."""
 
     def __init__(self, anchors: Iterable[str]) -> None:
-        """预注册全部 anchor，保证标题、目录和脚注前向引用可提前解析。"""
+        """Pre-register all anchor to ensure that title, table of contents and footnote forward references are resolved in advance."""
         self._names: dict[str, str] = {}
         self._attached: set[str] = set()
         self._used_names: set[str] = set()
@@ -57,7 +57,7 @@ class BookmarkRegistry:
                 self._names[normalized] = self._allocate_name(normalized)
 
     def _allocate_name(self, anchor: str) -> str:
-        """为一个原始 anchor 分配满足 Word 限制的确定性名称。"""
+        """Assigns a deterministic name to a raw anchor that satisfies the restrictions of Word."""
         base = _BOOKMARK_SAFE_RE.sub("_", anchor).strip("_")
         if not base or not base[0].isalpha():
             base = f"b_{base}"
@@ -78,13 +78,13 @@ class BookmarkRegistry:
         return candidate
 
     def resolve(self, anchor: str | None) -> str | None:
-        """解析已注册 anchor；空值或未知 anchor 返回 None。"""
+        """Resolving registered anchor; null or unknown anchor returns None."""
         if not anchor:
             return None
         return self._names.get(anchor.strip())
 
     def attach(self, paragraph: Paragraph, anchor: str | None) -> bool:
-        """把 anchor bookmark 包围当前段落内容；重复正文 anchor 只保留首个。"""
+        """Surround the current paragraph content with anchor bookmark; repeat the text anchor and keep only the first one."""
         normalized = (anchor or "").strip()
         name = self.resolve(normalized)
         if name is None:
@@ -115,7 +115,7 @@ def append_inline_content(
     *,
     context: InlineRenderContext,
 ) -> None:
-    """把一段 MiddleJson 行内 Span 追加到 Word 段落。"""
+    """Appends the MiddleJson inline Span paragraph to the Word paragraph."""
     append_inline_spans(paragraph, content, context=context)
 
 
@@ -125,7 +125,7 @@ def append_joined_inline_contents(
     *,
     context: InlineRenderContext,
 ) -> None:
-    """按共享边界规则合并续段，并把结构化行内 Span 写入 Word。"""
+    """Merge continuation segments according to shared boundary rules and write structured inline Span to Word."""
     append_inline_spans(paragraph, join_inline_spans(contents), context=context)
 
 
@@ -136,7 +136,7 @@ def append_inline_spans(
     context: InlineRenderContext,
     inherited_styles: tuple[str, ...] = (),
 ) -> None:
-    """把行内 Span 写入段落，同时保留样式、链接与公式语义。"""
+    """Write Span inline to a paragraph while preserving style, link, and formula semantics."""
     _append_spans_to_container(
         paragraph._p,
         paragraph,
@@ -154,7 +154,7 @@ def append_internal_link(
     anchor: str | None,
     context: InlineRenderContext,
 ) -> bool:
-    """把目录标签写为内部链接；目标缺失时退回普通行内内容。"""
+    """Write directory tags as internal links; fall back to normal inline content when the target is missing."""
     bookmark_name = context.bookmarks.resolve(anchor)
     if bookmark_name is None:
         append_inline_spans(paragraph, label_spans, context=context)
@@ -186,7 +186,7 @@ def _append_spans_to_container(
     inherited_styles: tuple[str, ...],
     hyperlink: bool,
 ) -> None:
-    """递归写入一个段落或 hyperlink XML 容器。"""
+    """Recursively writes to a paragraph or hyperlink XML container."""
     for span in spans:
         if isinstance(span, TextSpan):
             styles = tuple(dict.fromkeys((*inherited_styles, *span.styles)))
@@ -287,7 +287,7 @@ def _append_inline_internal_link(
     context: InlineRenderContext,
     inherited_styles: tuple[str, ...],
 ) -> None:
-    """把 #anchor 行内链接写为 Word bookmark 跳转，未知目标退化为普通文本。"""
+    """Write the #anchor inline link as Word bookmark to jump, and the unknown target is reduced to ordinary text."""
     anchor = span.url[1:].strip()
     bookmark_name = context.bookmarks.resolve(anchor)
     if bookmark_name is None:
@@ -322,7 +322,7 @@ def _append_external_link(
     context: InlineRenderContext,
     inherited_styles: tuple[str, ...],
 ) -> None:
-    """创建外部 hyperlink relationship，并写入完整标签内容。"""
+    """Create external hyperlink relationship and write the complete tag content."""
     relation_id = paragraph.part.relate_to(
         sanitize_xml_text(span.url, context=context),
         RELATIONSHIP_TYPE.HYPERLINK,
@@ -351,7 +351,7 @@ def _append_text_run(
     context: InlineRenderContext,
     formula_fallback: bool = False,
 ) -> Run:
-    """向 XML 容器追加一个 run，并应用 MiddleJson 行内样式。"""
+    """Appends a run to the XML container and applies the MiddleJson inline style."""
     run_xml = OxmlElement("w:r")
     container.append(run_xml)
     run = Run(run_xml, paragraph)
@@ -369,7 +369,7 @@ def _append_text_run(
 
 
 def _make_visible_style_spaces(content: str, styles: tuple[str, ...]) -> str:
-    """把可见样式 run 的边界 ASCII 空格等量转为 NBSP，避免 Word 隐藏装饰线。"""
+    """Convert the border ASCII spaces of the visible style run to NBSP to avoid hiding the decorative lines of Word."""
     if not content or not _VISIBLE_SPACE_STYLES.intersection(styles):
         return content
 
@@ -385,7 +385,7 @@ def _make_visible_style_spaces(content: str, styles: tuple[str, ...]) -> str:
 
 
 def sanitize_xml_text(content: str, *, context: InlineRenderContext) -> str:
-    """把 XML 1.0 禁止字符替换为 U+FFFD，并记录可定位的 renderer 告警。"""
+    """Replace XML 1.0 forbidden characters with U+FFFD and log the locateable renderer alarm."""
     sanitized, replacement_count = _INVALID_XML_TEXT_RE.subn("\ufffd", content)
     if replacement_count:
         logger.warning(
@@ -397,7 +397,7 @@ def sanitize_xml_text(content: str, *, context: InlineRenderContext) -> str:
 
 
 def _apply_run_styles(run: Run, styles: tuple[str, ...]) -> None:
-    """把已解析的行内样式应用到 Word run。"""
+    """Apply parsed inline styles to Word run."""
     style_set = set(styles)
     run.bold = "bold" in style_set
     run.italic = "italic" in style_set
@@ -413,12 +413,12 @@ def _apply_run_styles(run: Run, styles: tuple[str, ...]) -> None:
 
 
 def _rgb_color(value: str) -> RGBColor:
-    """延迟构造 RGBColor，避免在模块常量阶段加载额外对象。"""
+    """Lazy construction of RGBColor to avoid loading extra objects during module constant phase."""
     return RGBColor.from_string(value)
 
 
 def plain_inline_text(content: list[InlineSpan]) -> str:
-    """提取一段 MiddleJson 行内内容的可见文本。"""
+    """Extract the visible text of a piece of content in line MiddleJson."""
     return inline_plain_text(content)
 
 

@@ -1,4 +1,4 @@
-"""HTML 静态 Flash 解析实现。"""
+"""HTML static Flash analysis implementation."""
 
 from .errors import HtmlParseError, HtmlResourceLimitError
 

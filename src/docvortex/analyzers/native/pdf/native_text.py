@@ -1,4 +1,4 @@
-"""将 PDF 原生字符重建为带排版信息的视觉文本行。"""
+"""Reconstruct PDF native characters into visual text lines with typographic information."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ _PDF_LINE_END_SOFT_HYPHEN_RE = re.compile(r"(?<=[A-Za-z])[\x02\u00ad](?=[\t ]*(?
 _INLINE_REFERENCE_MARKER_RE = re.compile(
     r"^[\[（(［]\s*\d{1,4}\s*[\]）)］]$",
 )
-# Unicode Zs 空格在 model_list 中只承担分词作用，统一成可互操作的 ASCII 空格。
+# Unicode Zs spaces only play the role of word segmentation in model_list and are unified into interoperable ASCII spaces.
 _PDF_SEPARATOR_SPACE_CHARS = "\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u202f\u205f\u3000"
 _PDF_UNICODE_TEXT_TRANSLATION = str.maketrans(
     {
@@ -57,7 +57,7 @@ _PDFTEXT_FORMULA_OPERATOR_CHARS = frozenset("=∑∫√±×÷")
 
 @dataclass(frozen=True, slots=True)
 class _NativeVisualResplit:
-    """保存一个粗行及其按 canonical 字符框重切后的成员。"""
+    """Saves a thick line and its members after being recut by the canonical character box."""
 
     source: _LineItem
     members: tuple[_LineItem, ...]
@@ -70,7 +70,7 @@ def _build_native_line_items_from_chars(
     page_rotation: int = 0,
     supported_angles: Sequence[float] = _SUPPORTED_PDFTEXT_LINE_ANGLES,
 ) -> list[_LineItem]:
-    """连续消费字符到视觉 run，省去基础片段和粗行的 Python 中间物化。"""
+    """Consecutive consumption of characters into visual run, eliminating intermediate materialization of base fragments and thick lines Python."""
     from ...._compute_backend import get_native
     from ....document.pdf.text import _get_lines_from_chars_python
 
@@ -99,7 +99,7 @@ def _build_native_line_items_from_chars(
 
 
 def _build_native_line_items_from_records(records, page_size):
-    """把已完成原生计算的视觉记录物化为原有行对象，供字符列表和自有快照共用。"""
+    """Materialize the visual record of completed native calculations into a raw row object for use by character lists and own snapshots."""
     normal_items: list[_LineItem] = []
     formula_items: list[_LineItem] = []
     for text, bbox, angle, members, row_id, run_index, split, formula, coarse, metrics, terminal in records:
@@ -149,7 +149,7 @@ def _build_native_line_items(
     page_rotation: int = 0,
     supported_angles: Sequence[float] = _SUPPORTED_PDFTEXT_LINE_ANGLES,
 ) -> list[_LineItem]:
-    """按指定视觉方向将 pdftext 粗行精修成字符间隙分隔的视觉 run。"""
+    """Refine pdftext thick lines into character gap separated visual run in the specified visual direction."""
 
     normal_items: list[_LineItem] = []
     formula_items: list[_LineItem] = []
@@ -191,7 +191,7 @@ def _build_native_line_items(
 
     stable_items = _merge_native_inline_scripts(normal_items, page_size)
     for source_index, item in enumerate(stable_items):
-        # source_index 必须在页内唯一，表格投影和失败回滚都依赖该精确成员标识。
+        # source_index must be unique within the page; both table projection and failure rollback rely on this precise member ID.
         item.source_index = source_index
     formula_items = _merge_native_inline_scripts(formula_items, page_size)
     next_source_index = len(stable_items)
@@ -207,7 +207,7 @@ def _extract_decorative_text_rules(
     lines: list[_LineItem],
     page_size: tuple[float, float],
 ) -> tuple[list[_LineItem], list[_AxisLine]]:
-    """把宽幅私用区重复字形转为装饰分隔线，避免其进入文本块。"""
+    """Convert wide private area repeating glyphs into decorative dividers to prevent them from entering the text block."""
 
     retained: list[_LineItem] = []
     decorative_rules: list[_AxisLine] = []
@@ -251,7 +251,7 @@ def _extract_decorative_text_rules(
 
 
 def _pdftext_angle_degrees(value: Any) -> float:
-    """把 pdftext 弧度方向转换为 0 到 360 度，非法值按 0 度处理。"""
+    """Convert the pdftext radian direction to 0 to 360 degrees, and illegal values are treated as 0 degrees."""
 
     try:
         angle_radians = float(value or 0.0)
@@ -263,13 +263,13 @@ def _pdftext_angle_degrees(value: Any) -> float:
 
 
 def _circular_angle_distance(first: float, second: float) -> float:
-    """返回两个方向之间不超过 180 度的最短圆周角差。"""
+    """Returns the shortest circumferential angle difference between two directions that does not exceed 180 degrees."""
 
     return abs((first - second + 180.0) % 360.0 - 180.0)
 
 
 def _span_has_visible_text(span: dict[str, Any]) -> bool:
-    """判断 span 是否包含可见的非空白字符，换行与占位空格不参与方向拆分。"""
+    """Determine whether span contains visible non-whitespace characters. Line breaks and placeholder spaces do not participate in directional splitting."""
 
     return any(char.isprintable() and not char.isspace() for char in str(span.get("text") or ""))
 
@@ -279,7 +279,7 @@ def _build_pdftext_child_line(
     spans: list[dict[str, Any]],
     angle_degrees: float,
 ) -> dict[str, Any]:
-    """使用同方向 span 重建子行，并收缩原粗行被异向内容扩大的 bbox。"""
+    """Use span in the same direction to reconstruct the subrows, and shrink the bbox in which the original thick row was enlarged by the opposite direction content."""
 
     span_bboxes = [bbox for span in spans if (bbox := _coerce_bbox(span.get("bbox"))) is not None]
     child_line = dict(pdf_line)
@@ -290,7 +290,7 @@ def _build_pdftext_child_line(
 
 
 def _split_pdftext_line_by_rotation(pdf_line: dict[str, Any]) -> list[dict[str, Any]]:
-    """按 45 度边界拆开 pdftext 误合并的异向 span，并保留小角度仿斜体。"""
+    """Split pdftext by 45 degree boundaries Mis-merged anti-orientation span and retain small angle faux italics."""
 
     spans = [span for span in (pdf_line.get("spans") or []) if isinstance(span, dict)]
     if not spans:
@@ -322,7 +322,7 @@ def _is_supported_pdftext_line_rotation(
     page_rotation: int,
     supported_angles: Sequence[float] = _SUPPORTED_PDFTEXT_LINE_ANGLES,
 ) -> bool:
-    """应用页面旋转后按调用方白名单筛选视觉文字方向。"""
+    """Filter visual text direction by caller whitelist after applying page rotation."""
 
     visual_angle = (_pdftext_angle_degrees(value) + int(page_rotation or 0)) % 360.0
     return any(
@@ -337,7 +337,7 @@ def _resolve_pdftext_line_angle(
     page_rotation: int,
     supported_angles: Sequence[float] = _SUPPORTED_PDFTEXT_LINE_ANGLES,
 ) -> int | None:
-    """解析视觉文字方向，并用字符基线纠正字体 shear 造成的伪斜向行。"""
+    """Parse visual text direction and use character baselines to correct pseudo-skewed lines caused by font shear."""
 
     visual_angle = (_pdftext_angle_degrees(pdf_line.get("rotation")) + int(page_rotation or 0)) % 360.0
     for supported_angle in supported_angles:
@@ -362,7 +362,7 @@ def _resolve_pdftext_formula_candidate_angle(
     page_rotation: int,
     supported_angles: Sequence[float],
 ) -> int | None:
-    """保留小角度字体矩阵下的公式专用粗行，未被公式认领时不回流正文。"""
+    """Reserve the dedicated thick lines for formulas under the small-angle font matrix, and do not reflow the text when it is not claimed by the formula."""
     visual_angle = (_pdftext_angle_degrees(pdf_line.get("rotation")) + int(page_rotation or 0)) % 360.0
     nearest = min(supported_angles, key=lambda angle: _circular_angle_distance(visual_angle, angle))
     if _circular_angle_distance(visual_angle, nearest) > _PDFTEXT_SHEARED_HORIZONTAL_MAX_ANGLE_DEGREES:
@@ -387,7 +387,7 @@ def _resolve_pdftext_formula_candidate_angle(
 def _pdftext_line_has_horizontal_char_baseline(
     pdf_line: dict[str, Any],
 ) -> bool:
-    """用字符中心的水平基线确认小角度只来自仿斜体变换，而非真实旋转。"""
+    """Use the horizontal baseline at the center of the character to confirm that the small angle only comes from the faux italic transformation, not the true rotation."""
 
     visible_bboxes: list[BBox] = []
     for span in pdf_line.get("spans") or []:
@@ -441,7 +441,7 @@ def _split_native_visual_runs(
     visual_bboxes: Mapping[int, BBox] | None = None,
     preserve_vertical_bbox: BBox | None = None,
 ) -> list[_LineItem]:
-    """批量处理视觉 run 几何，Python 保留文字清洗及原对象物化。"""
+    """Batch processing of vision run geometry, Python preserving text cleaning and original object materialization."""
     from ...._compute_backend import get_native
     from ._native_geometry import glyph_flags, raw_bbox
 
@@ -498,7 +498,7 @@ def _split_native_visual_runs_python(
     visual_bboxes: Mapping[int, BBox] | None = None,
     preserve_vertical_bbox: BBox | None = None,
 ) -> list[_LineItem]:
-    """保留字符源顺序与空白信息，并按 canonical 字符框拆分远距视觉 run。"""
+    """Preserve character source order and whitespace information, and split distance vision run by canonical character box."""
 
     tokens: list[tuple[Char, str, BBox | None, BBox | None]] = []
     for char in line.chars:
@@ -548,8 +548,8 @@ def _split_native_visual_runs_python(
         gap = _horizontal_bbox_gap(previous_bbox, current_bbox)
         if gap < hard_gap_threshold:
             adjacent_gaps.append(gap)
-    # 少于三个相邻样本无法可靠代表“常规”字距；零间隙也是真实的紧排字距，
-    # 必须纳入统计，避免唯一的 15pt cell gap 反过来抬高软拆阈值。
+    # Fewer than three adjacent samples cannot reliably represent "regular" kerning; zero gaps are also true kerning,
+    # Must be included in statistics to avoid the unique 15pt cell gap in turn raising the soft tear threshold.
     median_regular_gap = statistics.median(adjacent_gaps) if len(adjacent_gaps) >= 3 else 0.0
 
     split_indices: list[int] = []
@@ -630,7 +630,7 @@ def _resplit_native_visual_runs(
     *,
     source_index_start: int | None = None,
 ) -> tuple[list[_LineItem], dict[int, _NativeVisualResplit]]:
-    """重切跨栏粗行，并返回供行内 evidence 分片使用的来源映射。"""
+    """Recut the thick row across columns and return the source map for use by the inline evidence fragment."""
 
     if not lines or not visual_bboxes:
         return list(lines), {}
@@ -724,7 +724,7 @@ def _resplit_native_visual_runs(
 
 
 def _normalize_native_run_text(text: str) -> str:
-    """清理原生 run 文本，并把字母后的 PDF 软断词标记转换成 ASCII hyphen。"""
+    """Cleans native run text and converts PDF soft word break tags after letters to ASCII hyphen."""
 
     normalized = _sanitize_pdf_control_text(text, preserve_newlines=False)
     normalized = re.sub(r"[\t\f\v ]+", " ", normalized)
@@ -732,7 +732,7 @@ def _normalize_native_run_text(text: str) -> str:
 
 
 def _sanitize_pdf_control_text(text: str, *, preserve_newlines: bool) -> str:
-    """规范 PDF 排版空白与控制字符，并按调用场景决定是否保留物理换行。"""
+    """Standardize PDF to typeset whitespace and control characters, and decide whether to retain physical line breaks according to the calling scenario."""
 
     normalized = str(text or "").replace("\r\n", "\n").replace("\r", "\n")
     normalized = normalized.translate(_PDF_UNICODE_TEXT_TRANSLATION)
@@ -747,7 +747,7 @@ def _sanitize_pdf_control_text(text: str, *, preserve_newlines: bool) -> str:
 def _detect_leading_emphasis_width(
     glyphs: list[tuple[BBox, tuple[str, int] | None, float | None]],
 ) -> float | None:
-    """从行首连续字体 run 中提取字重显著高于后续正文的几何宽度。"""
+    """Extracted from line-starting continuous font run with a weight significantly greater than the geometric width of the subsequent body text."""
 
     if len(glyphs) < 4:
         return None
@@ -783,7 +783,7 @@ def _detect_leading_emphasis_width(
 def _detect_leading_typography_width(
     glyphs: list[tuple[BBox, tuple[str, int] | None, float | None]],
 ) -> float | None:
-    """提取与同行主体字体族不同的连续行首 run 几何宽度。"""
+    """Extracts the geometric width of consecutive line starts run that differs from the peer body font family."""
 
     if len(glyphs) < 4:
         return None
@@ -815,7 +815,7 @@ def _detect_leading_typography_width(
 
 
 def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> None:
-    """按行聚合数值统计；字体类别仍由 Python 编码，缓存只存在于本次调用。"""
+    """Aggregate numeric statistics by row; font class is still encoded by Python, cache only exists for this call."""
     from ...._compute_backend import get_native
     from ._native_geometry import glyph_flags, raw_bbox
 
@@ -830,7 +830,7 @@ def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> 
     )
     signatures, signature_ids, families, family_ids = [], {}, [], {}
     font_ids, weights = [], []
-    # 字体字典由提取层复用；保留强引用避免本次调用内对象地址重用。
+    # The font dictionary is reused by the extraction layer; strong references are retained to avoid object address reuse within this call.
     font_cache = {}
     for char, box in zip(line.chars, boxes, strict=True):
         if box is None:
@@ -885,7 +885,7 @@ def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> 
 
 
 def _fill_native_typography_python(line: _LineItem, page_size: tuple[float, float]) -> None:
-    """使用原始 bbox、PDF 字号和 dominant font 填充两套排版特征。"""
+    """Populate two sets of typographic features using the original bbox, PDF font sizes, and dominant font."""
 
     canonical_em_height = line.em_height
     heights: list[float] = []
@@ -947,7 +947,7 @@ def _fill_native_typography_python(line: _LineItem, page_size: tuple[float, floa
 
 
 def _native_sentence_terminal(line: _LineItem) -> bool:
-    """识别真正句尾及其后的小字号引用，普通小数或同字号数字不能充当句末引用。"""
+    """Identify the real sentence end and subsequent small font quotations. Ordinary decimals or numbers with the same font size cannot be used as sentence end quotations."""
     if re.search(r"[.!?。！？][\]\)}）】》”’'\"]*$", line.text.rstrip()):
         return True
     match = re.search(r"[.!?。！？](?P<references>\d[\d,–—-]*)$", line.text.rstrip())
@@ -957,7 +957,7 @@ def _native_sentence_terminal(line: _LineItem) -> bool:
     count = len(match.group("references"))
     if len(chars) <= count:
         return False
-    # 一些嵌入字体把字号固定为 1 再用矩阵缩放，实际字形高度才反映引用的缩小比例。
+    # Some embedded fonts fix the font size to 1 and then use matrix scaling, so that the actual glyph height reflects the referenced reduction ratio.
     axis = 0 if line.angle in {90, 270} else 1
     sizes = [float(char["bbox"][axis + 2] - char["bbox"][axis]) for char in chars]
     body = [size for size in sizes[:-count] if size > 0]
@@ -969,7 +969,7 @@ def _is_detached_inline_script_candidate(
     base_bbox: BBox,
     base_height: float,
 ) -> bool:
-    """仅依据紧凑宽度、边缘邻接和垂直偏移确认低重叠外置上下标。"""
+    """Confirm low-overlapping external subscripts and subscripts based only on compact width, edge adjacency, and vertical offset."""
 
     small_width = max(0.0, small_bbox[2] - small_bbox[0])
     edge_distance = min(
@@ -996,7 +996,7 @@ def _is_detached_inline_script_candidate(
 
 
 def _native_typographic_scale(line: _LineItem) -> float:
-    """返回原生行的字体尺度，禁止 loose 空间高度参与上下标字号比较。"""
+    """Returns the font size of the native line, prohibiting the loose space height from participating in the comparison of superscript and subscript font sizes."""
 
     cached = line.native_typographic_scale
     if cached is not None and math.isfinite(cached) and cached > 0:
@@ -1016,8 +1016,8 @@ def _native_typographic_scale(line: _LineItem) -> float:
 
 
 def _native_inline_script_matches(lines, page_size):
-    """每次配对重新准备只读输入，特殊对象和值仍交给原 Python 规则。"""
-    # 候选生成期间行不会修改，按本轮索引缓存字符统计，避免每对行重算字号中位数。
+    """Read-only input is prepared anew for each pairing, and special objects and values are still handed over to the original Python rule."""
+    # The lines will not be modified during candidate generation, and character statistics are cached according to the current round index to avoid recalculating the median font size for each pair of lines.
     compact_texts = ["".join(char for char in line.text if not char.isspace()) for line in lines]
     reference_markers = [_INLINE_REFERENCE_MARKER_RE.fullmatch(text) is not None for text in compact_texts]
     local_bboxes = [_rotate_bbox_to_upright(line.bbox, page_size, line.angle) for line in lines]
@@ -1065,11 +1065,11 @@ def _native_inline_script_matches(lines, page_size):
 
 
 def _inline_script_matches_python(lines, compact_texts, reference_markers, local_bboxes, canonical_scales):
-    """保留原逐对打分和首命中规则，作为回退及独立差分参考。"""
+    """The original pair-by-pair scoring and first-hit rules are retained as fallback and independent differential reference."""
     candidates: list[tuple[float, int, int, Literal["prefix", "suffix"]]] = []
     detached_candidate_pairs: set[tuple[int, int, Literal["prefix", "suffix"]]] = set()
-    # 上下标只能贴近主体行的左右边缘。按文本方向分别建立左右边缘索引，
-    # 先取可能相邻的安全超集，再复用下面完整判定，避免密集表格页做 O(n²) 全配对。
+    # Superscripts and subscripts can only be placed close to the left and right edges of the body line. Create left and right edge indexes respectively according to the text direction.
+    # First take the possible adjacent safe superset, and then reuse the complete judgment below to avoid O (n²) full matching on dense table pages.
     left_edge_index: dict[int, list[tuple[float, int]]] = {}
     right_edge_index: dict[int, list[tuple[float, int]]] = {}
     maximum_scale_by_angle: dict[int, float] = {}
@@ -1156,7 +1156,7 @@ def _inline_script_matches_python(lines, compact_texts, reference_markers, local
                 continue
             center_offset = abs(_bbox_center_y(small_local_bbox) - _bbox_center_y(base_local_bbox))
             if center_offset < max(0.5, 0.12 * base_scale):
-                # 同基线居中的小字号文本更可能是表格相邻 cell，而不是上下标。
+                # Small font size text centered on the baseline is more likely to be table-adjacent cell rather than superscript or subscript.
                 continue
             gap_limit = max(1.5, 0.35 * base_scale)
             edge_options: list[tuple[float, Literal["prefix", "suffix"], float]] = []
@@ -1176,7 +1176,7 @@ def _inline_script_matches_python(lines, compact_texts, reference_markers, local
             )
             tightly_attached = abs(gap) <= max(1.0, 0.1 * base_scale)
             if outside_offset < max(0.5, 0.08 * base_scale) and not tightly_attached:
-                # 紧贴边缘的小字号上下标可能完全落入高字形 bbox；其余内嵌小字仍按普通 cell 排除。
+                # Small font size superscripts and subscripts close to the edge may fall completely into the tall font bbox; other inline small fonts are still excluded as ordinary cell.
                 continue
             metric = abs(gap) + (1.0 - overlap_ratio) * base_scale
             candidates.append((metric, small_index, base_index, position))
@@ -1204,7 +1204,7 @@ def _merge_native_inline_scripts(
     lines: list[_LineItem],
     page_size: tuple[float, float],
 ) -> list[_LineItem]:
-    """以 mutual-nearest 规则把跨粗行的小字号前后置标记合入主体视觉行。"""
+    """Use the mutual-nearest rule to merge the small font size before and after the bold line into the main visual line."""
 
     matches, detached_candidate_pairs = _native_inline_script_matches(lines, page_size)
 
@@ -1212,7 +1212,7 @@ def _merge_native_inline_scripts(
     merged_base_indices: set[int] = set()
 
     def merge_children(base_index: int, visiting: set[int], recurse) -> None:
-        """显式传递递归函数，避免自引用闭包滞留已消费行；先合并更小标记。"""
+        """Explicitly pass recursive functions to avoid self-referential closures stuck on consumed rows; merge smaller tags first."""
 
         if base_index in merged_base_indices or base_index in visiting:
             return
@@ -1251,7 +1251,7 @@ def _merge_native_inline_scripts(
             base.inline_math_regions.extend(suffix.inline_math_regions)
         base.bbox = merged_bbox
         base.chars = merged_chars
-        # 只有低重叠外置候选才需要按完整二维 bbox 计算后继行距；普通上下标保持原有基线行为。
+        # Only low-overlap external candidates need to calculate subsequent line spacing according to the full two-dimensional bbox; ordinary superscripts and subscripts maintain the original baseline behavior.
         base.restored_inline_cluster = base.restored_inline_cluster or any(
             lines[child_index].restored_inline_cluster or (child_index, base_index, position) in detached_candidate_pairs
             for position, child_index in positions.items()
@@ -1261,7 +1261,7 @@ def _merge_native_inline_scripts(
         visiting.remove(base_index)
         merged_base_indices.add(base_index)
 
-    # 从最终不会被消费的根主体开始，确保 small -> medium -> large 链不会丢失最小节点。
+    # Starting from the root body, which will not eventually be consumed, ensure that the small -> medium -> large chain does not lose the smallest node.
     root_base_indices = [base_index for base_index in matches if base_index not in consumed_small_indices]
     for base_index in root_base_indices:
         merge_children(base_index, set(), merge_children)
@@ -1274,7 +1274,7 @@ def _merge_native_inline_scripts(
 
 
 def _normalize_pdftext_angle(value: Any) -> int:
-    """将 pdftext 弧度方向就近归一到四个标准角度。"""
+    """Normalize the pdftext arc direction to the nearest four standard angles."""
 
     try:
         angle_radians = float(value or 0.0)
@@ -1286,13 +1286,13 @@ def _normalize_pdftext_angle(value: Any) -> int:
 
 
 def _get_pdf_drawing_lines(pdf_doc: PDFDocument, page_idx: int) -> list[_AxisLine]:
-    """读取 PDFDocument 的公共绘图线结果，并隔离具体 PDFium 类型。"""
+    """Reads the public plot line results for PDFDocument and isolates the specific PDFium type."""
 
     return _coerce_pdf_drawing_lines(pdf_doc.get_page_drawing_lines(page_idx))
 
 
 def _coerce_pdf_drawing_lines(drawing_lines: Sequence[PDFDrawingLine]) -> list[_AxisLine]:
-    """把独立接口或批量快照中的绘图线统一转换为 Flash 内部坐标类型。"""
+    """Convert drawing lines in independent interfaces or batch snapshots to the Flash internal coordinate type."""
 
     output: list[_AxisLine] = []
     for drawing_line in drawing_lines:
@@ -1310,7 +1310,7 @@ def _coerce_pdf_drawing_lines(drawing_lines: Sequence[PDFDrawingLine]) -> list[_
 
 
 def _median_native_glyph_width(line: _LineItem, page_size: tuple[float, float]) -> float | None:
-    """返回单个原生 run 的可见字符中位宽度，缺少字符时返回空。"""
+    """Returns the median visible character width of a single native run, or null if characters are missing."""
 
     if line.median_glyph_width is not None:
         return line.median_glyph_width

@@ -1,4 +1,4 @@
-"""结果拥有的素材字节集合，所有路径均相对于输出目录。"""
+"""The resulting collection of footage bytes, with all paths relative to the output directory."""
 
 from __future__ import annotations
 
@@ -9,17 +9,17 @@ from ..foundation._image_payload import validate_image_sidecar_path
 
 
 class AssetStore(Mapping[str, bytes]):
-    """以稳定相对路径读取素材，并共享相同内容的字节对象。"""
+    """Read assets with stable relative paths and share bytes objects with the same content."""
 
     def __init__(self, files: Mapping[str, bytes] | None = None) -> None:
-        """复制素材索引，调用者后续修改字典不会污染结果。"""
+        """By copying the material index, subsequent modifications to the dictionary by the caller will not pollute the results."""
         self._files: dict[str, bytes] = {}
         self._content: dict[str, bytes] = {}
         for path, payload in (files or {}).items():
             self.add(path, payload)
 
     def add(self, path: str, payload: bytes) -> None:
-        """校验相对路径并拒绝同名不同内容，避免覆盖现有素材。"""
+        """Verify relative paths and reject content with different names to avoid overwriting existing assets."""
         path = validate_image_sidecar_path(path)
         if not isinstance(payload, bytes):
             raise TypeError("Asset payload must be bytes")
@@ -29,19 +29,19 @@ class AssetStore(Mapping[str, bytes]):
         self._files[path] = payload
 
     def __getitem__(self, path: str) -> bytes:
-        """按经过验证的相对路径解析素材，不读取宿主文件或网络。"""
+        """Parses assets by validated relative paths, without reading host files or the network."""
         return self._files[validate_image_sidecar_path(path)]
 
     def __iter__(self) -> Iterator[str]:
-        """以登记顺序遍历素材路径。"""
+        """Traverse the material path in registration order."""
         return iter(self._files)
 
     def __len__(self) -> int:
-        """返回素材引用数量。"""
+        """Returns the number of material references."""
         return len(self._files)
 
     def copy(self) -> AssetStore:
-        """建立独立索引并复用不可变字节。"""
+        """Build independent indexes and reuse immutable bytes."""
         copied = AssetStore()
         copied._files = self._files.copy()
         copied._content = self._content.copy()

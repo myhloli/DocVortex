@@ -1,4 +1,4 @@
-//! 在自有文本数据上连续执行 tight-first、标点桥接及空白归属，不依赖 Python/PDFium。
+//! Continuously execute tight-first, punctuation bridging and blank attribution on own text data without relying on Python/PDFium.
 use crate::geometry::Box4;
 use std::collections::HashMap;
 
@@ -14,7 +14,7 @@ pub struct Character {
     pub flags: u8,
 }
 
-/// 与 Python 的有限 bbox 校验一致，空白字符额外允许零面积 advance point。
+/// Consistent with the limited bbox checksum of Python, whitespace characters are additionally allowed for zero area advance point.
 fn valid(b: Box4, zero: bool) -> bool {
     b.iter().all(|value| value.is_finite())
         && if zero {
@@ -24,7 +24,7 @@ fn valid(b: Box4, zero: bool) -> bool {
         }
 }
 
-/// 保持原有中轴阈值及起止标点边界规则，双重标点优先按行尾规则处理。
+/// Keep the original central axis threshold and starting and ending punctuation boundary rules, and double punctuation will be processed first according to the end-of-line rules.
 fn inside(b: Box4, span: Box4, flags: u8, ratio: f64) -> bool {
     let x = (b[0] + b[2]) / 2.0;
     let y = (b[1] + b[3]) / 2.0;
@@ -45,7 +45,7 @@ fn inside(b: Box4, span: Box4, flags: u8, ratio: f64) -> bool {
     }
 }
 
-/// 保留归一化纵/横中心距离及原 span 顺序的稳定排名。
+/// Retain the stable ranking of the normalized vertical/horizontal center distance and the original span order.
 fn rank(b: Box4, span: Box4, index: usize) -> (f64, f64, usize) {
     let width = (span[2] - span[0]).max(1e-6);
     let height = (span[3] - span[1]).max(1e-6);
@@ -64,7 +64,7 @@ struct Grid {
 }
 
 impl Grid {
-    /// 常见范围使用网格；巨大范围改为等价区间扫描，不截断任何候选。
+    /// Common ranges use grids; huge ranges are changed to equivalent interval scans without truncating any candidates.
     fn new(spans: &[Box4], size: f64, ratio: f64) -> Self {
         let ranges: Vec<_> = spans
             .iter()
@@ -92,7 +92,7 @@ impl Grid {
         }
     }
 
-    /// 候选顺序保持 span 输入顺序，空白按首个命中而非最小距离归属。
+    /// The candidate order maintains the span input order, and blanks are assigned by the first hit rather than the minimum distance.
     fn matching(&self, b: Box4, flags: u8, spans: &[Box4], first: bool) -> Option<usize> {
         let cell = (((b[1] + b[3]) / 2.0) / self.size).trunc();
         let x = (b[0] + b[2]) / 2.0;
@@ -132,7 +132,7 @@ impl Grid {
     }
 }
 
-/// 一次完成可见字符匹配、断行隔离、标点补归属与空白修复，输出原字符顺序的 span 索引。
+/// Complete visible character matching, line break isolation, punctuation filling and blank repair at one time, and output the span index of the original character sequence.
 pub fn assign(
     chars: &[Character],
     spans: &[Box4],
@@ -221,7 +221,7 @@ pub fn assign(
 mod tests {
     use super::*;
 
-    /// 构造不依赖 PDFium 的真实几何输入，测试归属边界而非绑定实现。
+    /// Construct real geometric inputs that do not rely on PDFium, testing belonging boundaries rather than binding implementations.
     fn character(bbox: Box4, flags: u8) -> Character {
         Character {
             bbox,
@@ -232,7 +232,7 @@ mod tests {
 
     #[test]
     fn tight_precedes_loose_and_ties_keep_span_order() {
-        // tight 命中第二框时不得被 loose 的首框覆盖；完全重叠时保留输入顺序。
+        // When tight hits the second box, it must not be covered by the first box of loose; the input sequence is retained when completely overlapping.
         let mut chars = vec![character([2.0, 2.0, 4.0, 8.0], 0)];
         chars[0].tight = Some([12.0, 2.0, 14.0, 8.0]);
         let spans = [[0.0, 0.0, 10.0, 10.0], [10.0, 0.0, 20.0, 10.0]];
@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn neighbor_spaces_and_punctuation_do_not_cross_breaks() {
-        // 标点超出中轴带但中心仍在同框内时桥接；断行阻止邻居归属传播。
+        // Bridge when the punctuation point exceeds the central axis zone but the center is still within the same frame; line breaks prevent neighbor attribution propagation.
         let span = [[0.0, 0.0, 10.0, 10.0]];
         let chars = [
             character([1.0, 2.0, 2.0, 8.0], 0),
@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn whitespace_uses_first_match_instead_of_nearest() {
-        // 无邻居空白按原候选顺序，而普通字符采用最近中心。
+        // No-neighbor blanks are in original candidate order, while ordinary characters use the nearest center.
         let spans = [[0.0, 0.0, 10.0, 20.0], [0.0, 5.0, 10.0, 15.0]];
         let spaces = [character([4.0, 7.0, 5.0, 9.0], SPACE)];
         assert_eq!(assign(&spaces, &spans, 10.0, 0.33), [Some(0)]);
@@ -268,7 +268,7 @@ mod tests {
 
     #[test]
     fn sparse_grid_preserves_large_range_candidates() {
-        // 巨大网格范围使用等价扫描，仍命中全覆盖 span，不按候选数量裁剪。
+        // The huge grid range uses equivalent scanning, and still hits the full coverage span, without cropping according to the number of candidates.
         let spans = [[0.0, 0.0, 10.0, 100_000_000.0]];
         let chars = [character([3.0, 49_999_999.0, 4.0, 50_000_001.0], 0)];
         assert_eq!(assign(&chars, &spans, 1.0, 0.33), [Some(0)]);

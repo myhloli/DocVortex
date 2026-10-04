@@ -1,4 +1,4 @@
-"""按需加载的图像统计与素材生成入口。"""
+"""Image statistics and material generation portal loaded on demand."""
 
 from __future__ import annotations
 
@@ -8,30 +8,30 @@ from ..schema import BBox
 
 
 class ImageArray(Protocol):
-    """图像数组的轻量形状契约，导入素材 SDK 时无需加载 NumPy。"""
+    """Lightweight shape contract for image arrays, no need to load NumPy when importing material SDK."""
 
     @property
     def shape(self) -> tuple[int, ...]:
-        """返回数组各维长度，前两维表示图像高度和宽度。"""
+        """Returns the length of each dimension of the array. The first two dimensions represent the image height and width."""
         ...
 
 
 def calculate_contrast(img: ImageArray, img_mode: str) -> float:
-    """按原有 RGB/BGR 通道规则计算图像对比度。"""
+    """Calculate image contrast according to original RGB/BGR channel rules."""
     from ..foundation._image import calculate_contrast as calculate
 
     return calculate(img, img_mode)
 
 
 def crop_pil_image(bbox: BBox, image: Any) -> Any:
-    """按归一化区域裁剪 Pillow 图像，保留空框处理语义。"""
+    """Crop Pillow images by normalized regions, preserving empty box processing semantics."""
     from ..foundation._image import crop_pil_image as crop
 
     return crop(bbox, image)
 
 
 def image_size(image: Any) -> tuple[int, int]:
-    """读取 Pillow 或 NumPy 图像的宽高，不触发 PDF 运行时。"""
+    """Reading the width and height of the Pillow or NumPy image does not trigger the PDF runtime."""
     if hasattr(image, "shape"):
         height, width = image.shape[:2]
         return width, height
@@ -39,14 +39,14 @@ def image_size(image: Any) -> tuple[int, int]:
 
 
 def rotate_image_to_upright(image: ImageArray, angle: int) -> ImageArray:
-    """按视觉块方向旋转图像，保留原有角度约定。"""
+    """Rotate the image according to the visual block direction, retaining the original angle convention."""
     from ..foundation._image_operations import rotate_image_to_upright as rotate
 
     return rotate(image, angle)
 
 
 def encode_crop_as_jpeg_data_uri(image: ImageArray, bbox: BBox, angle: int) -> str:
-    """按像素区域裁剪、旋转并编码 JPEG 素材。"""
+    """Crop, rotate and encode JPEG footage by pixel area."""
     from ..foundation._image_operations import encode_crop_as_jpeg_data_uri as encode
 
     return encode(image, bbox, angle)

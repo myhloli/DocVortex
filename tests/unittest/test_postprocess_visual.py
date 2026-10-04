@@ -1,4 +1,4 @@
-"""视觉块后处理规则的聚焦回归测试。"""
+"""A focused regression test of visual block post-processing rules."""
 
 from __future__ import annotations
 
@@ -16,12 +16,12 @@ from docvortex.schema import RAW_CAPTION, RAW_FOOTNOTE, BlockType
 
 
 def _line_metadata(count: int) -> list[dict[str, list[float]]]:
-    """构造仅包含 bbox 的 dict 行级元数据。"""
+    """Constructs dict row-level metadata containing only bbox."""
     return [{"bbox": [0.0, float(index), 1.0, float(index + 1)]} for index in range(count)]
 
 
 def test_bbox_for_calculation_scales_only_all_unit_range_coordinates() -> None:
-    """验证仅四个坐标均不大于一时生成放大后的计算副本。"""
+    """A magnified copy of the calculation is generated only when verifying that none of the four coordinates is greater than one."""
     normalized_bbox = (0.123, 0.221, 0.445, 0.556)
 
     assert _bbox_for_calculation(normalized_bbox) == (123.0, 221.0, 445.0, 556.0)
@@ -32,7 +32,7 @@ def test_bbox_for_calculation_scales_only_all_unit_range_coordinates() -> None:
 
 
 def test_normalized_dict_bbox_matches_scaled_caption_geometry_without_rewrite() -> None:
-    """验证 dict 归一化框与千倍坐标使用相同标题几何且不回写 bbox。"""
+    """Verify that the dict normalization box uses the same header geometry as the thousand times coordinates and does not write back bbox."""
     companion = {
         "index": 1,
         "type": BlockType.TEXT,
@@ -74,7 +74,7 @@ def test_normalized_dict_bbox_matches_scaled_caption_geometry_without_rewrite() 
 
 
 def test_normalized_dict_bbox_matches_scaled_visual_parent_without_rewrite() -> None:
-    """验证 raw dict 归一化框与千倍坐标选择同一视觉父块且保留原框。"""
+    """Verify that raw dict selects the same visual parent block for the normalized frame and thousand times coordinates and retains the original frame."""
     previous_table = {"index": 0, "type": BlockType.TABLE_BODY, "bbox": [0.1, 0.1, 0.4, 0.4]}
     caption = {"index": 1, "type": RAW_CAPTION, "bbox": [0.1, 0.42, 0.4, 0.44]}
     following_table = {"index": 2, "type": BlockType.TABLE_BODY, "bbox": [0.1, 0.8, 0.4, 0.95]}
@@ -101,7 +101,7 @@ def test_normalized_dict_bbox_matches_scaled_visual_parent_without_rewrite() -> 
 
 
 def test_normalized_dict_bbox_matches_scaled_visual_gap_geometry() -> None:
-    """验证归一化框在视觉间隔、相交和重叠判断中与千倍坐标一致。"""
+    """Verify that the normalized box is consistent with thousand-fold coordinates in visual separation, intersection, and overlap judgments."""
     child = {"index": 0, "type": RAW_CAPTION, "bbox": [0.1, 0.1, 0.4, 0.2]}
     inside_gap = {"index": 1, "type": BlockType.TEXT, "bbox": [0.8, 0.3, 0.9, 0.4]}
     outside_gap = {"index": 2, "type": BlockType.TEXT, "bbox": [0.8, 0.8, 0.9, 0.9]}
@@ -116,7 +116,7 @@ def test_normalized_dict_bbox_matches_scaled_visual_gap_geometry() -> None:
 
 
 def test_dict_inline_caption_fragment_uses_common_fields() -> None:
-    """验证 dict 同行标题片段可原地改成通用 caption。"""
+    """Verify that the dict peer title fragment can be changed in-place to the generic caption."""
     companion = {
         "index": 1,
         "type": BlockType.TEXT,
@@ -147,7 +147,7 @@ def test_dict_inline_caption_fragment_uses_common_fields() -> None:
 
 
 def test_dict_stacked_caption_fragment_uses_line_metadata() -> None:
-    """验证堆叠标题片段根据 dict 的临时 lines 区分单行和多行。"""
+    """Verify that stacked header fragments differentiate between single and multiple lines based on a dict's temporary lines."""
     single_line = {
         "index": 1,
         "type": BlockType.TEXT,
@@ -184,7 +184,7 @@ def test_dict_stacked_caption_fragment_uses_line_metadata() -> None:
 
 
 def test_dict_leading_table_continuation_reads_top_level_content() -> None:
-    """验证 dict 页首续表使用顶层 content 和临时 lines 完成判断。"""
+    """Verification dict Top of page continuation table uses the top-level content and temporary lines to complete the judgment."""
     continuation = {
         "index": 0,
         "type": BlockType.TEXT,
@@ -208,7 +208,7 @@ def test_dict_leading_table_continuation_reads_top_level_content() -> None:
 
 
 def test_regroup_visual_blocks_supports_bbox_dicts() -> None:
-    """验证带 bbox 的 dict 可沿用现有视觉关系规则生成 dict 两层块。"""
+    """Verify that dict with bbox can produce a dict two-layer block using existing visual relationship rules."""
     caption = {
         "index": 0,
         "type": RAW_CAPTION,
@@ -253,7 +253,7 @@ def test_regroup_visual_blocks_supports_bbox_dicts() -> None:
 
 
 def test_regroup_visual_blocks_preserves_dict_visual_metadata() -> None:
-    """验证 dict 根节点保留 code subtype、视觉 subtype 与表格合并信息。"""
+    """Verify that the dict root node retains code, subtype, visual subtype, and table merge information."""
     blocks = [
         {
             "index": 0,
@@ -295,7 +295,7 @@ def test_regroup_visual_blocks_preserves_dict_visual_metadata() -> None:
 
 
 def test_regroup_visual_blocks_lifts_cell_merge_to_table() -> None:
-    """验证 raw dict 表体的 cell_merge 上浮到 table 根块。"""
+    """Verify that the raw dict meter body's cell_merge floats up to the table root block."""
     table_body = {
         "index": 0,
         "type": BlockType.TABLE_BODY,
@@ -314,7 +314,7 @@ def test_regroup_visual_blocks_lifts_cell_merge_to_table() -> None:
 
 
 def test_regroup_visual_blocks_without_bbox_prefers_previous_parent() -> None:
-    """验证无 bbox 等距匹配优先选择 caption 前方的视觉主体。"""
+    """Verify that no bbox isometric matching preferentially selects the visual subject in front of caption."""
     image_body = {"index": 0, "type": BlockType.IMAGE_BODY, "content": ""}
     caption = {"index": 1, "type": RAW_CAPTION, "content": "Figure 1"}
     table_body = {"index": 2, "type": BlockType.TABLE_BODY, "content": ""}
@@ -334,7 +334,7 @@ def test_regroup_visual_blocks_without_bbox_prefers_previous_parent() -> None:
 
 
 def test_regroup_visual_blocks_supports_code_footnote() -> None:
-    """验证具体 code_footnote 可直接归入 code，且不会残留为额外顶层块。"""
+    """Verify that the specific code_footnote can be directly subsumed into code and will not remain as an additional top-level block."""
     code_body = {
         "index": 0,
         "type": BlockType.CODE_BODY,
@@ -360,7 +360,7 @@ def test_regroup_visual_blocks_supports_code_footnote() -> None:
 
 
 def test_regroup_visual_blocks_without_bbox_keeps_text_as_barrier() -> None:
-    """验证无 bbox 模式不会跨过普通文本关联 caption。"""
+    """Verify that the pattern without bbox does not cross the normal text association caption."""
     caption = {"index": 0, "type": RAW_CAPTION, "content": "Table 1"}
     text = {"index": 1, "type": BlockType.TEXT, "content": "paragraph"}
     table_body = {"index": 2, "type": BlockType.TABLE_BODY, "content": ""}
@@ -375,7 +375,7 @@ def test_regroup_visual_blocks_without_bbox_keeps_text_as_barrier() -> None:
 
 
 def test_no_bbox_caption_fallback_uses_office_prefixes() -> None:
-    """验证无 bbox 的 table/image/chart 后置文本按 Office 前缀提升。"""
+    """Verify that table/image/chart suffix text without bbox is promoted by the Office prefix."""
     cases = [
         (BlockType.TABLE_BODY, "Table 1", RAW_CAPTION),
         (BlockType.IMAGE_BODY, "图 1", RAW_CAPTION),

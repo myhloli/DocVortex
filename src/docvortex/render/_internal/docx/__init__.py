@@ -1,3 +1,3 @@
-"""DOCX renderer 的内部实现。"""
+"""DOCX Internal implementation of renderer."""
 
 __all__: list[str] = []

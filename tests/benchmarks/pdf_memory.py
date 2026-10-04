@@ -1,4 +1,4 @@
-"""独立进程采样入口 RSS，避免完整 JSON 校验的大块临时分配污染内存门禁。"""
+"""Independent process sampling entry RSS to avoid contaminating the memory gate with large temporary allocations of complete JSON verification."""
 
 from __future__ import annotations
 
@@ -16,16 +16,16 @@ from pipeline import MemorySampler
 
 
 class EntryMemorySampler(MemorySampler):
-    """读取完整后代树，包含渲染 worker、forkserver 和资源跟踪进程。"""
+    """Read the complete descendant tree, including rendering worker, forkserver and resource tracking processes."""
 
     def __init__(self) -> None:
-        """在采样前准备查询对象；采样失败必须传播，不能产生虚假的低峰值。"""
+        """Prepare query objects before sampling; sampling failures must be propagated and cannot produce false low peaks."""
         self.parent = psutil.Process()
         self.error = None
         super().__init__()
 
     def collect(self) -> None:
-        """直接读取进程 RSS，避免把轮询命令自身算入被测进程树。"""
+        """Read the process RSS directly to avoid counting the polling command itself into the process tree under test."""
         try:
             while not self.stop.is_set():
                 values = {}
@@ -44,7 +44,7 @@ class EntryMemorySampler(MemorySampler):
             self.stop.set()
 
     def finish(self) -> dict:
-        """拒绝采样异常或空记录，保持内存门禁失败可见。"""
+        """Reject sampling exceptions or empty records and keep memory access failures visible."""
         result = super().finish()
         if self.error is not None:
             raise RuntimeError("Process-tree RSS sampling failed") from self.error
@@ -54,7 +54,7 @@ class EntryMemorySampler(MemorySampler):
 
 
 def memory_worker(config: dict, folder: Path) -> None:
-    """只预热实际入口，在采样停止后序列化并与原计时输出做完整差分。"""
+    """Only the actual inlet is warmed up, serialized after sampling is stopped and fully differentiated from the original timing output."""
     os.environ["ORT_DISABLE_TELEMETRY"] = "1"
     os.environ["DOCVORTEX_COMPUTE_BACKEND"] = config["compute"]["backend"]
     os.environ["LOGURU_LEVEL"] = "WARNING"
@@ -136,7 +136,7 @@ def memory_worker(config: dict, folder: Path) -> None:
 
 
 def measure(config: dict, folder: Path) -> dict:
-    """结束上一独立进程后再采样下一组，已完成审计可恢复而不重跑计时。"""
+    """After ending the previous independent process, sample the next group. The completed audit can be resumed without re-running the timing."""
     if not (folder / "result.json").exists():
         config_path = folder.with_suffix(".config.json")
         config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -153,7 +153,7 @@ def measure(config: dict, folder: Path) -> dict:
 
 
 def ratios(records: dict) -> dict:
-    """按同一时刻的进程树 RSS 比较三组关系，不将各进程独立峰值直接相加。"""
+    """Compare three sets of relationships based on the process tree RSS at the same time, without directly adding the independent peak values of each process."""
     pairs = {
         "backends": ("python-current", "rust-current"),
         "rust-revision": ("rust-reference", "rust-current"),
@@ -166,7 +166,7 @@ def ratios(records: dict) -> dict:
 
 
 def main() -> None:
-    """复用已完成计时的源码及输入身份，统一重测 RSS，并反序确认超过 5% 的增长。"""
+    """Reuse the source code and input identity that have completed timing, retest RSS uniformly, and confirm an increase of more than 5% in reverse order."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timing-report", type=Path)

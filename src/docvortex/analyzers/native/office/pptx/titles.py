@@ -1,4 +1,4 @@
-"""PPTX 幻灯片标题判定，复用当前转换器的单文档状态。"""
+"""PPTX slide title determination, reuse the single document status of the current converter."""
 
 from collections import Counter
 from typing import Optional
@@ -15,11 +15,11 @@ from .context import (
 
 
 class _PptxTitles:
-    """集中维护幻灯片标题判定，不改变文档生命周期和公开入口。"""
+    """Centrally maintain slide title determination without changing the document life cycle and public entry."""
 
     @staticmethod
     def _most_common_size(font_sizes: list[float]) -> Optional[float]:
-        """按原有幻灯片标题判定规则执行 _most_common_size，保持输入顺序与降级行为。"""
+        """Execute _most_common_size according to the original slide title determination rules, maintaining the input order and degradation behavior."""
         if not font_sizes:
             return None
 
@@ -30,7 +30,7 @@ class _PptxTitles:
         )[0]
 
     def _promote_slide_text_blocks_to_titles(self, slide_blocks: list[dict]) -> None:
-        """按原有幻灯片标题判定规则执行 _promote_slide_text_blocks_to_titles，保持输入顺序与降级行为。"""
+        """Execute _promote_slide_text_blocks_to_titles according to the original slide title determination rules, maintaining the input order and degradation behavior."""
         body_font_size_pt = self._most_common_size(
             [
                 block[_EFFECTIVE_FONT_SIZE_KEY]
@@ -52,7 +52,7 @@ class _PptxTitles:
         slide_blocks: list[dict],
         body_font_size_pt: Optional[float],
     ) -> None:
-        """按原有幻灯片标题判定规则执行 _promote_level2_text_blocks，保持输入顺序与降级行为。"""
+        """Execute _promote_level2_text_blocks according to the original slide title determination rules, maintaining the input order and degradation behavior."""
         bold_text_blocks = [
             block
             for block in slide_blocks
@@ -90,7 +90,7 @@ class _PptxTitles:
         slide_blocks: list[dict],
         body_font_size_pt: Optional[float],
     ) -> None:
-        """按原有幻灯片标题判定规则执行 _promote_level3_text_blocks，保持输入顺序与降级行为。"""
+        """Execute _promote_level3_text_blocks according to the original slide title determination rules, maintaining the input order and degradation behavior."""
         if body_font_size_pt is None:
             return
 
@@ -149,7 +149,7 @@ class _PptxTitles:
         *,
         is_first_visible_slide: bool,
     ) -> None:
-        """将 PPTX 标题候选统一拆分为文档标题、段落标题或普通文本。"""
+        """Uniformly split PPTX title candidates into document titles, paragraph titles, or plain text."""
         for block in slide_blocks:
             is_title_candidate = block.pop(_PPTX_TITLE_CANDIDATE_KEY, False) is True
             title_role = block.pop(_PPTX_TITLE_ROLE_KEY, None)
@@ -170,7 +170,7 @@ class _PptxTitles:
 
     @staticmethod
     def _cleanup_slide_text_block_metadata(slide_blocks: list[dict]) -> None:
-        """按原有幻灯片标题判定规则执行 _cleanup_slide_text_block_metadata，保持输入顺序与降级行为。"""
+        """Execute _cleanup_slide_text_block_metadata according to the original slide title determination rules, maintaining the input order and degradation behavior."""
         for block in slide_blocks:
             block.pop(_EFFECTIVE_FONT_SIZE_KEY, None)
             block.pop(_EFFECTIVE_ALL_BOLD_KEY, None)

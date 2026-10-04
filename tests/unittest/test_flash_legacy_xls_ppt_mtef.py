@@ -15,7 +15,7 @@ from docvortex.schema import BlockType
 
 
 def test_xls_equation_editor_corpus_decodes_to_exact_equation_blocks() -> None:
-    """验证 XLS 的 MBD/OBJ 绑定把完整公式语料恢复为精确 LaTeX。"""
+    """Verifying the MBD/OBJ binding of XLS restores the full formula corpus to the exact LaTeX."""
 
     corpus = formula_corpus()
     file_bytes = build_equation_xls(
@@ -29,7 +29,7 @@ def test_xls_equation_editor_corpus_decodes_to_exact_equation_blocks() -> None:
 
 
 def test_ppt_equation_editor_corpus_stays_bound_to_its_slides() -> None:
-    """验证 PPT 的 ExObjRef/persist 绑定逐 slide 恢复完整公式语料。"""
+    """Verify that PPT binds ExObjRef/persist to slide to restore the complete formula corpus."""
 
     corpus = formula_corpus()
     file_bytes = build_equation_ppt(
@@ -43,7 +43,7 @@ def test_ppt_equation_editor_corpus_stays_bound_to_its_slides() -> None:
 
 
 def test_xls_equation_inside_table_is_not_duplicated_as_top_level_block() -> None:
-    """验证落在表格坐标内的 XLS 公式进入 cell HTML 且不重复输出。"""
+    """Verify that XLS formulas that fall within table coordinates enter cell and HTML and are not output repeatedly."""
 
     _name, mtef, expected = formula_corpus()[0]
     pages = XlsModel().predict(
@@ -81,7 +81,7 @@ def test_native_equation_wins_and_invalid_native_keeps_preview(
     valid_file: Callable[[bytes], bytes],
     invalid_file: Callable[[], bytes],
 ) -> None:
-    """验证 XLS/PPT 都优先原生公式，坏 MTEF 则保留缓存预览。"""
+    """Verified XLS/PPT gives priority to native formulas, bad MTEF retains cached previews."""
 
     _name, mtef, expected = formula_corpus()[1]
     native_pages = model.predict(BytesIO(valid_file(mtef)))
@@ -93,7 +93,7 @@ def test_native_equation_wins_and_invalid_native_keeps_preview(
 
 
 def test_ppt_uncompressed_equation_storage_is_supported() -> None:
-    """验证 recInstance=0 的未压缩 ExOleObjStg 同样可以恢复公式。"""
+    """Verifying the uncompressed ExOleObjStg with recInstance=0 also restores the formula."""
 
     _name, mtef, expected = formula_corpus()[2]
 
@@ -103,7 +103,7 @@ def test_ppt_uncompressed_equation_storage_is_supported() -> None:
 
 
 def test_ppt_equation_decompression_honors_shared_entry_limit() -> None:
-    """验证恶意 ExOleObjStg 声明长度触发稳定资源限制。"""
+    """Verify that malicious ExOleObjStg statement length triggers stable resource limits."""
 
     _name, mtef, _expected = formula_corpus()[0]
     file_bytes = build_equation_ppt(

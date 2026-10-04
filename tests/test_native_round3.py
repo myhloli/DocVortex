@@ -1,4 +1,4 @@
-"""第三轮候选流、批量几何和原生读取的独立参考差分。"""
+"""Independent reference differencing of third-round candidate streams, batch geometries, and native reads."""
 
 import math
 import random
@@ -12,7 +12,7 @@ from docvortex.analyzers.native.pdf import _interval_candidates as intervals
 @pytest.mark.parametrize("seed", range(12))
 @pytest.mark.parametrize("python_only", (False, True))
 def test_interval_tree_matches_complete_pairs(monkeypatch, seed, python_only):
-    """逐行比较完整区间交集，覆盖端点相等、重复键和跨组排除。"""
+    """Compare complete interval intersections row-by-row, covering endpoint equality, duplicate keys, and cross-group exclusion."""
     if python_only:
         monkeypatch.setattr(intervals, "get_native", lambda: None)
     rng = random.Random(seed)
@@ -38,7 +38,7 @@ def test_interval_tree_matches_complete_pairs(monkeypatch, seed, python_only):
 
 
 def test_dense_interval_storage_is_linear():
-    """复现新增密集页面规模，只允许线性索引及一批候选存活。"""
+    """To reproduce the size of newly added dense pages, only linear indexes and a batch of candidates are allowed to survive."""
     count = 6555
     index = intervals.IntervalCandidates([(0.0, 10.0)] * count, {0: list(range(count))})
     assert index[0] == list(range(1, count))
@@ -48,7 +48,7 @@ def test_dense_interval_storage_is_linear():
 
 
 def test_native_interval_rejects_invalid_records():
-    """直接绑定也必须拒绝非法组号和非有限区间，不能越界或排序崩溃。"""
+    """Direct binding must also reject illegal group numbers and non-limited intervals, and must not cross boundaries or cause sorting to collapse."""
     native = intervals.get_native()
     if native is None:
         pytest.skip("native backend is not selected")
@@ -59,7 +59,7 @@ def test_native_interval_rejects_invalid_records():
 
 @pytest.mark.parametrize("seed", range(12))
 def test_table_note_query_matches_reference(seed):
-    """比较重复来源、上下边界和核心成员排除，保留最高四分位奇偶中位数。"""
+    """Duplicate sources, upper and lower bounds, and core member exclusion were compared, retaining the highest quartile odd-even median."""
     from docvortex.analyzers.native.pdf import table_annotations as notes
 
     native = intervals.get_native()
@@ -85,7 +85,7 @@ def test_table_note_query_matches_reference(seed):
 
 @pytest.mark.parametrize("seed", range(30))
 def test_lane_predecessor_events_match_reference(seed):
-    """覆盖同高行、跨栏迁移和字体冲突，比较完整成员顺序及对象身份守恒。"""
+    """Covers same-height rows, cross-column migration and font conflicts, and compares complete member order and object identity conservation."""
     from docvortex.analyzers.native.pdf import line_layout as layout
     from docvortex.analyzers.native.pdf.models import _LineItem, _TextLane
 
@@ -118,7 +118,7 @@ def test_lane_predecessor_events_match_reference(seed):
 
 
 def test_font_snapshot_tracks_mutation_and_conversion():
-    """相同字体字典字段变化后必须重新转换，缓存不能改变数值和异常语义。"""
+    """Dictionary fields of the same font must be re-converted after changes, and the cache cannot change values and exception semantics."""
     from docvortex.analyzers.native.pdf.char_geometry import _font_run_key
 
     font = {"name": "ABCDEF+Example", "size": 12.0, "flags": 0, "weight": 400}
@@ -131,7 +131,7 @@ def test_font_snapshot_tracks_mutation_and_conversion():
 
 @pytest.mark.parametrize("seed", range(15))
 def test_mapping_ranges_preserve_char_groups(seed):
-    """批量映射保持连字组、重复来源和相等阈值，同时保留原始字符对象。"""
+    """Batch mapping maintains ligature groups, duplicate origins, and equality thresholds while preserving the original character objects."""
     from docvortex.document.pdf.text import dedup
     from docvortex.document.pdf.text._contracts import Bbox
 
@@ -162,7 +162,7 @@ def test_mapping_ranges_preserve_char_groups(seed):
 
 
 def test_zero_rotation_script_snapshot_preserves_inputs(monkeypatch):
-    """直接借用普通几何与原物化路径比较全部返回字段，源对象不得被修改。"""
+    """Directly borrow ordinary geometry and compare all returned fields with the original materialized path, and the source object must not be modified."""
     import pickle
     from docvortex.analyzers.native.pdf.inline import scripts
     from docvortex.analyzers.native.pdf.models import _LineItem
@@ -186,7 +186,7 @@ def test_zero_rotation_script_snapshot_preserves_inputs(monkeypatch):
 
 @pytest.mark.parametrize("seed", range(12))
 def test_title_gaps_match_reference(seed):
-    """重复来源键、共享行对象和视觉行相等时仍保持全部物理净空一致。"""
+    """Duplicate source keys, shared row objects, and visual rows are equal while maintaining all physical headroom consistent."""
     from docvortex.analyzers.native.pdf.title_analysis import common
     from docvortex.analyzers.native.pdf.models import _LineItem
 
@@ -212,7 +212,7 @@ def test_title_gaps_match_reference(seed):
 @pytest.mark.parametrize("seed", range(12))
 @pytest.mark.parametrize("positive", (False, True))
 def test_anchor_pair_statistics_match_reference(seed, positive):
-    """分别验证风险与完整样本的宽度准入，包含相等阈值和顺序相关相邻对。"""
+    """Validate risk versus full sample width admissions separately, including equality thresholds and sequentially correlated adjacent pairs."""
     from docvortex.analyzers.native.pdf import char_geometry as geometry
 
     rng = random.Random(seed)
@@ -226,7 +226,7 @@ def test_anchor_pair_statistics_match_reference(seed, positive):
 
 
 def test_neighbor_indices_match_original_geometry():
-    """最近基线的平局保留原索引，并排除同一对象的重复记录。"""
+    """A tie of the most recent baseline retains the original index and excludes duplicate records for the same object."""
     from types import SimpleNamespace
     from docvortex.analyzers.native.pdf import char_geometry as geometry
 
@@ -258,7 +258,7 @@ def test_neighbor_indices_match_original_geometry():
 
 
 def test_coerce_bbox_owned_fast_path_matches_general_input():
-    """确认自有 Bbox 快路径与通用转换在正常和异常形状上逐值一致。"""
+    """Confirmed that the own Bbox fast path is consistent value-by-value with the universal transformation on both normal and abnormal shapes."""
     from docvortex.analyzers.native.pdf.geometry import _coerce_bbox
     from docvortex.document.pdf.text._contracts import Bbox
 
@@ -277,14 +277,14 @@ def test_coerce_bbox_owned_fast_path_matches_general_input():
 
 
 def test_marker_context_preserves_source_order_and_fallbacks(monkeypatch):
-    """覆盖 marker 上下文快路径的身份映射、空 bbox 和特殊输入回退。"""
+    """Override identity mapping for marker context fast path, null bbox and special input fallback."""
     import docvortex._compute_backend as compute_backend
     from docvortex.analyzers.native.pdf import table_annotations as annotations
     from docvortex.analyzers.native.pdf.models import _LineItem
     from docvortex.document.pdf.text._contracts import Bbox
 
     def line(source_index, chars):
-        """构造最小 marker 输入行，保持测试数据与生产 _LineItem 一致。"""
+        """Construct a minimal marker input row keeping test data consistent with production _LineItem."""
         return _LineItem(str(source_index), (0, 0, 10, 10), 0, source_index, chars=chars)
 
     first = line(3, [{"char": "A", "char_idx": 3, "bbox": Bbox([1.0, 2.0, 3.0, 4.0])}])
@@ -303,7 +303,7 @@ def test_marker_context_preserves_source_order_and_fallbacks(monkeypatch):
 
 
 def test_single_lane_short_tail_reattachment_skips_validation():
-    """单栏没有跨栏目标时应保持成员原样并跳过特殊输入扫描。"""
+    """Single columns without cross-column targets should leave members as is and skip special input scanning."""
     from docvortex.analyzers.native.pdf import line_layout as layout
     from docvortex.analyzers.native.pdf.models import _TextLane
 

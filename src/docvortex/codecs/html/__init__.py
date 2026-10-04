@@ -1,4 +1,4 @@
-"""DocVortex HTML v1 canonical wire 的轻量内部入口。"""
+"""DocVortex HTML v1 canonical Lightweight interior entry for wire."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from .contracts import DOCVORTEX_HTML_VERSION, WireDecodeResult
 
 
 def decode_docvortex_html_wire(body: etree._Element, resources: WireResourceContext) -> WireDecodeResult:
-    """只对 canonical v1 wire 精确解码，其余输入返回通用投影信号。"""
+    """Only canonical v1 wire is accurately decoded, the rest of the inputs return a universal projection signal."""
     from .materializer import materialize_docvortex_html_wire
     from .parser import parse_docvortex_html_wire
 

@@ -1,3 +1,3 @@
-"""Markdown 与 Content List 共用的内部实现。"""
+"""Internal implementation shared by Markdown and Content List."""
 
 __all__: list[str] = []

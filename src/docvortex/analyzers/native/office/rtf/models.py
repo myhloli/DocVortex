@@ -1,4 +1,4 @@
-"""RTF parser 与 DocVortex raw-block converter 之间的显式语义模型。"""
+"""Explicit semantic model between RTF parser and DocVortex raw-block converter."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Literal, TypeAlias, Union
 
 @dataclass(frozen=True, slots=True)
 class RtfTextStyle:
-    """保存一个 RTF 字符 run 可投影到 Middle JSON 的样式。"""
+    """Saves a RTF character run in a style that projects to Middle JSON."""
 
     bold: bool = False
     italic: bool = False
@@ -21,7 +21,7 @@ class RtfTextStyle:
 
 @dataclass(frozen=True, slots=True)
 class RtfTextRun:
-    """保存已完成代码页解码的文本、样式和可选安全链接。"""
+    """Saves text, styles, and optional safe links for completed code page decoding."""
 
     text: str
     style: RtfTextStyle = RtfTextStyle()
@@ -30,14 +30,14 @@ class RtfTextRun:
 
 @dataclass(frozen=True, slots=True)
 class RtfInlineEquation:
-    """保存不含定界符的行内 LaTeX。"""
+    """Save inline LaTeX without delimiters."""
 
     latex: str
 
 
 @dataclass(frozen=True, slots=True)
 class RtfImage:
-    """保存 RTF pict 载荷及可验证的来源信息。"""
+    """Save RTF pict payload and verifiable source information."""
 
     data: bytes
     content_type: str
@@ -47,21 +47,21 @@ class RtfImage:
 
 @dataclass(frozen=True, slots=True)
 class RtfNoteReference:
-    """保存脚注或尾注引用的内部稳定 id。"""
+    """Internally stable id that preserves footnote or endnote references."""
 
     note_id: str
 
 
 @dataclass(frozen=True, slots=True)
 class RtfAnchor:
-    """保存段落内书签锚点，converter 仅在标题上公开。"""
+    """Save in-paragraph bookmark anchor, converter Exposed only on title."""
 
     name: str
 
 
 @dataclass(frozen=True, slots=True)
 class RtfLineBreak:
-    """表示 RTF 行、列或显式分页控制携带的语义换行。"""
+    """Represents RTF Semantic wrapping carried by row, column, or explicit paging control."""
 
 
 RtfInline: TypeAlias = Union[
@@ -76,7 +76,7 @@ RtfInline: TypeAlias = Union[
 
 @dataclass(frozen=True, slots=True)
 class RtfListInfo:
-    """保存一个列表段落的身份、层级、编号类型和精确标签。"""
+    """Saves the identity, hierarchy, numbering type and precise label of a list paragraph."""
 
     identity: int
     level: int
@@ -88,7 +88,7 @@ class RtfListInfo:
 
 @dataclass(slots=True)
 class RtfParagraph:
-    """保存一个 RTF 语义段落及其块级属性。"""
+    """Saves a RTF semantic paragraph and its block-level attributes."""
 
     inlines: list[RtfInline] = field(default_factory=list)
     style_name: str = ""
@@ -100,14 +100,14 @@ class RtfParagraph:
 
 @dataclass(slots=True)
 class RtfDisplayEquation:
-    """保存 RTF Office Math 行间公式。"""
+    """Save RTF Office Math interline formula."""
 
     latex: str
 
 
 @dataclass(slots=True)
 class RtfTableCell:
-    """保存表格 origin cell 的语义内容和合并标记。"""
+    """Save the semantic content and merge tags of table origin cell."""
 
     blocks: list[RtfBlock] = field(default_factory=list)
     horizontal_merge: Literal["none", "start", "continue"] = "none"
@@ -117,7 +117,7 @@ class RtfTableCell:
 
 @dataclass(slots=True)
 class RtfTableRow:
-    """保存 RTF 表格的一行及表头标记。"""
+    """Save a row and header mark of the RTF table."""
 
     cells: list[RtfTableCell] = field(default_factory=list)
     header: bool = False
@@ -125,7 +125,7 @@ class RtfTableRow:
 
 @dataclass(slots=True)
 class RtfTable:
-    """保存按源顺序排列的 RTF 表格行。"""
+    """Saves the RTF table rows in source order."""
 
     rows: list[RtfTableRow] = field(default_factory=list)
 
@@ -135,7 +135,7 @@ RtfBlock: TypeAlias = Union[RtfParagraph, RtfDisplayEquation, RtfTable]
 
 @dataclass(slots=True)
 class RtfNote:
-    """保存脚注、尾注或批注正文。"""
+    """Save footnotes, endnotes, or comment text."""
 
     id: str
     kind: Literal["footnote", "endnote", "annotation"]
@@ -144,7 +144,7 @@ class RtfNote:
 
 @dataclass(slots=True)
 class RtfMetadata:
-    """保存 RTF info destination 中允许公开的文档属性。"""
+    """Save Document properties allowed to be exposed in RTF info destination."""
 
     title: str | None = None
     author: str | None = None
@@ -154,7 +154,7 @@ class RtfMetadata:
 
 @dataclass(slots=True)
 class RtfDocument:
-    """保存单逻辑页 RTF 文档、辅助内容、注释、素材与元数据。"""
+    """Saves a single logical page RTF document, ancillary content, annotations, footage and metadata."""
 
     blocks: list[RtfBlock] = field(default_factory=list)
     notes: list[RtfNote] = field(default_factory=list)

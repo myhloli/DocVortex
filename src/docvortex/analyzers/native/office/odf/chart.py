@@ -1,4 +1,4 @@
-"""恢复 ODF 嵌入图表的预览与源数据表。"""
+"""Restore ODF embedded chart preview with source data table."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from .table import (
 
 
 def _chart_range_bounds(chart: etree._Element) -> tuple[int, int, int, int] | None:
-    """收集 chart series、label 和 categories 的精确单元格引用范围。"""
+    """Collect the exact cell reference ranges for chart, series, label, and categories."""
     values: list[tuple[int, int, int, int]] = []
     attribute_names = {
         qname("chart", "values-cell-range-address"),
@@ -35,7 +35,7 @@ def _chart_range_bounds(chart: etree._Element) -> tuple[int, int, int, int] | No
 
 
 def _single_nonempty_grid(grids: list[TableGrid]) -> TableGrid | None:
-    """仅在对象内存在唯一非空表格时返回安全回退候选。"""
+    """A safe fallback candidate is only returned if there is a unique non-empty table within the object."""
     nonempty = [grid for grid in grids if grid.rows]
     return nonempty[0] if len(nonempty) == 1 else None
 
@@ -47,7 +47,7 @@ def parse_chart_block(
     preview_data_uri: str | None,
     table_expansion_budget: OdfTableExpansionBudget | None = None,
 ) -> dict | None:
-    """按精确引用优先、唯一表回退的规则构造图表 raw block。"""
+    """Construct the chart according to the rules of exact reference first, unique table fallback raw block."""
     chart = next(object_root.iter(qname("chart", "chart")), None)
     if chart is None:
         return None

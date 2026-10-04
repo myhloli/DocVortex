@@ -20,7 +20,7 @@ _IGNORED_FINGERPRINT_KEYS = {
     "image_url",
     "img_path",
     "_layout_tree",
-    # 临时段界证据由公共页面连续性测试验收，不属于可见内容或版面指纹。
+    # Temporary segment boundary evidence is accepted by the public page continuity test and does not belong to visible content or layout fingerprints.
     "_reference_start",
     "_paragraph_boundary",
 }
@@ -31,14 +31,14 @@ _BBOX_COORD_NAMES = ("x0", "y0", "x1", "y1")
 
 @contextmanager
 def formula_detection_evidence():
-    """语义金标检查清空前的检测证据；同时断言真实输出边界已将公式内容清空。
+    """The semantic gold standard checks the detection evidence before clearing; at the same time, it asserts that the true output boundary has cleared the formula content.
 
-    仅供检测、编号归属和几何金标使用。公开解析及 renderer 测试不得使用此辅助器。
+    For testing, numbering, and geometric gold marking purposes only. This helper must not be used for public parsing and renderer testing.
     """
     normalize = pipeline._normalize_output_block
 
     def capture(block, page_size):
-        """保留最终检测证据供旧金标比较，避免图片化掩盖公式识别退化。"""
+        """The final inspection evidence is retained for comparison with old gold labels to avoid pictures covering up the degradation of formula recognition."""
         output = normalize(block, page_size)
         if output is not None and output["type"] == "equation":
             assert output["content"] == ""
@@ -50,13 +50,13 @@ def formula_detection_evidence():
 
 
 def _sha256_bytes(value: bytes) -> str:
-    """返回测试载荷的稳定 SHA256。"""
+    """Returns the stable SHA256 of the test load."""
 
     return hashlib.sha256(value).hexdigest()
 
 
 def _canonical_value(value: Any) -> Any:
-    """移除允许变化的几何与大载荷，保留语义标签、层级和可见内容。"""
+    """Removes allowed geometry and large payloads, retaining semantic labels, hierarchies and visible content."""
 
     if isinstance(value, dict):
         return {
@@ -72,7 +72,7 @@ def _canonical_value(value: Any) -> Any:
 
 
 def _visible_text(value: Any) -> str:
-    """递归提取指纹计算使用的可见文本。"""
+    """Recursively extract visible text used in fingerprint calculations."""
 
     if isinstance(value, str):
         return value
@@ -84,14 +84,14 @@ def _visible_text(value: Any) -> str:
 
 
 def _page_fingerprint(page: list[dict[str, Any]]) -> str:
-    """计算忽略输出 bbox 后的逐页语义指纹。"""
+    """Compute page-by-page semantic fingerprints ignoring the output bbox."""
 
     payload = json.dumps(_canonical_value(page), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return _sha256_bytes(payload.encode("utf-8"))
 
 
 def _page_bbox_fingerprint(page: list[dict[str, Any]]) -> str:
-    """计算类型、文本顺序和公开 bbox 共同组成的逐页指纹。"""
+    """Calculation type, text sequence, and public bbox combine to form a page-by-page fingerprint."""
 
     payload = [
         {
@@ -105,7 +105,7 @@ def _page_bbox_fingerprint(page: list[dict[str, Any]]) -> str:
 
 
 def _bbox_grid_steps(bbox: Any) -> list[int]:
-    """按 0.001 输出量化网格取整数刻度，避免浮点表示差造成边界误判。"""
+    """The output quantization grid is an integer scale based on 0.001 to avoid boundary misjudgments caused by floating point representation differences."""
 
     values = list(bbox) if isinstance(bbox, (list, tuple)) else None
     assert values is not None and len(values) == 4, ("bbox must hold four coordinates", bbox)
@@ -119,9 +119,9 @@ def _assert_page_bboxes_within(
     allowances: dict[str, dict[str, int]],
     context: tuple[Any, ...],
 ) -> None:
-    """逐块比较 bbox 的整数刻度差；未配置坐标的容差为零，超差即失败。
+    """Compare the integer scale difference of bbox block by block; the tolerance of unconfigured coordinates is zero, and failure occurs if the tolerance is exceeded.
 
-    allowances 的块索引与坐标名为 JSON 字符串键，例如 {"3": {"y0": 2}}。
+    The block index and coordinate name of allowances is JSON string key, for example {"3": {"y0": 2}}.
     """
 
     assert len(page) == len(reference_bboxes), (*context, "block count", len(page), len(reference_bboxes))
@@ -149,7 +149,7 @@ def _assert_page_bboxes_within(
 
 
 def _assert_history_page(page: list[dict[str, Any]], expected: dict[str, Any], context: tuple[Any, ...], platform: str) -> None:
-    """内容指纹始终精确校验；仅平台命中冻结容差的页面用整数刻度比较替代 bbox 指纹。"""
+    """Content fingerprints are always verified exactly; only pages that hit the platform's freeze tolerance have their bbox fingerprint replaced with an integer scale comparison."""
 
     assert _page_fingerprint(page) == expected["fingerprint"], (*context, "content")
     tolerance = expected.get("bbox_tolerance")
@@ -164,7 +164,7 @@ def _geometry_summary_mismatch(
     expected_document: dict[str, Any],
     actual_document: dict[str, Any],
 ) -> dict[str, Any] | None:
-    """比较版本化几何摘要，并返回缺失或数值漂移的结构化诊断。"""
+    """Compares versioned geometry summaries and returns structured diagnostics of missingness or numerical drift."""
 
     expected_summary = expected_document.get("expected_geometry_summary")
     actual_summary = actual_document.get("geometry_summary")
@@ -204,7 +204,7 @@ def _text_line(
     semantic_type: str | None = None,
     ink_bbox: tuple[float, float, float, float] | None = None,
 ) -> models._LineItem:
-    """构造栏带、排版恢复与图形标签测试使用的原生文本行。"""
+    """Construct native lines of text for use in banding, typography recovery, and graphic label testing."""
 
     return models._LineItem(
         text=text,
@@ -232,7 +232,7 @@ def _prepared_text_page(
     *lines: models._LineItem,
     page_size: tuple[float, float] = (100.0, 100.0),
 ) -> models._PreparedPage:
-    """构造跨页边缘类型测试使用的无容器轻量页面。"""
+    """Construct container-less lightweight pages for cross-page edge type testing."""
 
     return models._PreparedPage(
         page_size=page_size,

@@ -1,4 +1,4 @@
-"""在自然语言块最终物化时补词界，避免影响代码、公式及布局分类。"""
+"""Complement the word boundary when the natural language chunk is finally materialized to avoid affecting the classification of codes, formulas and layouts."""
 
 from dataclasses import dataclass
 
@@ -10,7 +10,7 @@ from .matching import _assign_lines_to_blocks, _project_content_chars, _match_li
 
 @dataclass(frozen=True, slots=True)
 class PDFTextSpacingLine:
-    """只保留存在缺失词界的紧凑行证据，不延长字符几何的生命周期。"""
+    """Only compact line evidence of missing word boundaries is retained, without extending the lifetime of character geometry."""
 
     bbox: tuple[float, float, float, float]
     text: str
@@ -19,7 +19,7 @@ class PDFTextSpacingLine:
 
 
 def prepare_spacing_lines(lines, space_before=None):
-    """按原视觉行提取可恢复的词界偏移，原始行文本和字符保持只读。"""
+    """Recoverable word boundary offsets are extracted by the original visual line, and the original line text and characters remain read-only."""
     if space_before is not None and not space_before:
         return []
     output = []
@@ -36,7 +36,7 @@ def prepare_spacing_lines(lines, space_before=None):
                 and line.chars[index - 1].get("char_idx", -2) + 1 == line.chars[index].get("char_idx")
             )
         }
-        # 断词续行即使没有新词界也保留首尾上下文，复用既有连字符投影规则。
+        # Even if there is no new word boundary, the first and last context of word break and line continuation will be retained, and the existing hyphen projection rules will be reused.
         continuation = bool(
             output and output[-1].source_index + 1 == line.source_index and is_hyphen_at_line_end(output[-1].text)
         )
@@ -56,7 +56,7 @@ def prepare_spacing_lines(lines, space_before=None):
 
 
 def apply_spacing_lines(blocks, lines, page_size):
-    """仅对完整匹配且原文中没有分隔符的自然语言行补空格。"""
+    """Only whitespace is added to natural language lines that match a complete match and have no separators in the original text."""
     if not lines:
         return
     for block_index, assigned in _assign_lines_to_blocks(blocks, lines, page_size).items():

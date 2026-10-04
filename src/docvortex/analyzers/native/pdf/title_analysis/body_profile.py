@@ -1,4 +1,4 @@
-"""统计全文和栏内正文排版基线。"""
+"""Statistics of full text and in-column text formatting baseline."""
 
 from __future__ import annotations
 
@@ -12,15 +12,15 @@ from ..models import _DocumentBodyProfile, _LaneBodyProfile, _LineItem, _Prepare
 
 
 def _plain_profile_number(value) -> bool:
-    """仅让有限内置数值进入无回调的阶段缓存，巨大整数保持原异常路径。"""
+    """Only limited built-in values are allowed to enter the stage cache without callbacks, and huge integers maintain the original exception path."""
     return type(value) is float and math.isfinite(value) or type(value) is int and -(2**53) <= value <= 2**53
 
 
 class _LaneProfileContext:
-    """在一次标题判定中复用只读行尺度；语义写入由调用方立即通知失效。"""
+    """Read-only row sizes are reused in a single header determination; semantic writes are immediately invalidated by the caller."""
 
     def __init__(self, lanes, line_geometry=None):
-        """只接纳普通栏与行，记录所有身份归属以处理重复成员的失效。"""
+        """Only normal columns and rows are accepted, and all identity attributions are recorded to handle the failure of duplicate members."""
         self.profiles = {}
         self.heights = {}
         self.memberships = {}
@@ -83,7 +83,7 @@ class _LaneProfileContext:
             self.memberships.clear()
 
     def profile(self, lane):
-        """保留首次统计导致的排序副作用，不把排序前结果缓存到排序后状态。"""
+        """Keep the sorting side effects caused by the first statistics, and do not cache the pre-sort results to the post-sort state."""
         if not self.plain:
             return _infer_lane_body_profile(lane)
         cached = self.profiles.get(id(lane))
@@ -96,18 +96,18 @@ class _LaneProfileContext:
         return result
 
     def height(self, line, box):
-        """只复用阶段内已准备的原行框尺度，框或行身份不同则现场计算。"""
+        """Only the original row frame dimensions prepared in the stage are reused. If the frame or row identity is different, it will be calculated on-site."""
         value = self.heights.get((id(line), id(box)))
         return value if value is not None else _line_effective_height(line, box)
 
     def invalidate(self, line):
-        """语义变化后清除所有包含该行的栏统计，保留未变动的只读几何。"""
+        """Clear all column statistics containing this row after the semantic change, leaving the read-only geometry unchanged."""
         for lane_id in self.memberships.get(id(line), ()):
             self.profiles.pop(lane_id, None)
 
 
 def _stage_profile_context(lanes, line_geometry, container_bboxes=(), document_body_profile=None, scalars=()):
-    """特殊容器或文档字体可能通过回调修改普通行，整阶段恢复原实时统计。"""
+    """Special containers or document fonts may modify ordinary lines through callbacks, restoring the original real-time statistics in the entire stage."""
     context = _LaneProfileContext(lanes, line_geometry)
     boxes_plain = type(container_bboxes) in (tuple, list) and all(
         type(box) in (tuple, list) and len(box) == 4 and all(_plain_profile_number(value) for value in box)
@@ -137,7 +137,7 @@ def _infer_document_body_profile(
     *,
     use_canonical_scale: bool = False,
 ) -> _DocumentBodyProfile | None:
-    """按跨页覆盖和累计行宽推断全文正文行高及常规字体集合。"""
+    """Infer full-text text line height and regular font collection based on cross-page coverage and cumulative line width."""
 
     samples: list[
         tuple[
@@ -150,7 +150,7 @@ def _infer_document_body_profile(
     ] = []
     sparse_document = sum(line.semantic_type is None for prepared in prepared_pages for line in prepared.remaining_lines) <= 6
     for page_index, prepared in enumerate(prepared_pages):
-        # 表格几乎覆盖全页时，完整认领不应删除正文样式的统计证据；缓存不含原生字符字典。
+        # When the table covers almost the entire page, a full claim should not remove text-style statistical evidence; the cache does not contain native character dictionaries.
         profile_lines = [*prepared.remaining_lines, *(prepared.table_body_profile_lines if sparse_document else [])]
         for line in profile_lines:
             if line.semantic_type is not None:
@@ -190,7 +190,7 @@ def _infer_document_body_profile(
     height_clusters = [[samples[index][:3] for index in group] for group in groups]
     cross_page_clusters = [cluster for cluster in height_clusters if len({item[1] for item in cluster}) >= 2]
     eligible_clusters = cross_page_clusters or height_clusters
-    # 单页演示稿中两条跨页宽大标题会压过多栏正文；至少三条独立正文行才竞争画像。
+    # In a single-page presentation, two large cross-page titles will overwhelm multiple columns of text; at least three independent lines of text will compete for the portrait.
     if len(prepared_pages) == 1 and len(samples) >= 6:
         repeated_clusters = [cluster for cluster in eligible_clusters if len(cluster) >= 3]
         if repeated_clusters:
@@ -218,7 +218,7 @@ def _infer_document_body_profile(
     for height, page_index, width, font, weight in samples:
         if font is None or not 0.9 <= height / body_height <= 1.1:
             continue
-        # 常规字体支持必须来自正文高度带；跨页重复的大标题不能反向污染正文画像。
+        # Regular font support must come from the text height band; large titles repeated across pages cannot reversely pollute the text image.
         font_pages.setdefault(font, set()).add(page_index)
         font_widths[font] = font_widths.get(font, 0.0) + width
         if weight is not None:
@@ -251,7 +251,7 @@ def _document_font_is_regular(
     weights: list[float],
     body_weight: float | None,
 ) -> bool:
-    """用字体样式位和全文正文基准过滤斜体、粗体等强调字体。"""
+    """Use font style bits and full-text text benchmarks to filter italic, bold, and other emphasis fonts."""
 
     if font[1] & (PDF_FONT_ITALIC_FLAG | PDF_FONT_FORCE_BOLD_FLAG):
         return False
@@ -262,9 +262,9 @@ def _document_font_is_regular(
 
 
 def _infer_lane_body_profile(lane: _TextLane) -> _LaneBodyProfile:
-    """从栏带的长行主体估计正文行高、主字体、字重、常规行距和样式占比。"""
+    """Estimate text line height, main font, font weight, regular line spacing, and style proportions from the long line body of the column strip."""
 
-    # 快照只覆盖本次分析，后续行成员或几何变化时由调用方重新进入。
+    # The snapshot only covers this analysis and will be re-entered by the caller when subsequent row members or geometry changes.
     available = [(line, bbox, _line_effective_height(line, bbox)) for line, bbox in lane.lines if line.semantic_type is None]
     if not available:
         return _LaneBodyProfile(1.0, None, None, 0.35, {})
@@ -311,7 +311,7 @@ def _line_uses_document_regular_font(
     line: _LineItem,
     document_body_profile: _DocumentBodyProfile | None,
 ) -> bool:
-    """判断当前行是否使用跨页反复出现且未加粗的常规字体。"""
+    """Determines whether the current line uses a regular font that is repeated across the page and is not bold."""
 
     return (
         document_body_profile is not None

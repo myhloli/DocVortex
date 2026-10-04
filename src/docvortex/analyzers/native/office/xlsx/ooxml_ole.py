@@ -1,4 +1,4 @@
-"""读取 XLSX worksheet 中的 MathType/Equation OLE 对象、anchor 与预览。"""
+"""Read XLSX MathType/Equation OLE object, anchor and preview in worksheet."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ RELATIONSHIP_NS_SUFFIX = "/relationships"
 
 @dataclass(frozen=True, slots=True)
 class XlsxOleEquationArtifact:
-    """一个已绑定 worksheet anchor 的公式 OLE 结果或预览。"""
+    """A formula OLE result or preview bound to worksheet anchor."""
 
     row: int | None
     col: int | None
@@ -34,7 +34,7 @@ class XlsxOleEquationArtifact:
 
 @dataclass(frozen=True, slots=True)
 class XlsxImageArtifact:
-    """一个从原始 worksheet drawing 读取的图片和 cell anchor。"""
+    """A picture read from the original worksheet drawing and cell anchor."""
 
     row: int | None
     col: int | None
@@ -45,7 +45,7 @@ class XlsxImageArtifact:
 
 @dataclass(frozen=True, slots=True)
 class _Relationship:
-    """一个经过安全路径规范化的 OPC relationship。"""
+    """A OPC relationship normalized to a secure path."""
 
     target: str | None
     reltype: str
@@ -53,14 +53,14 @@ class _Relationship:
 
 
 def _local_name(value: object) -> str:
-    """返回 XML QName 或普通属性名的本地名称。"""
+    """Returns XML QName or the local name of a common property name."""
 
     text = str(value)
     return text.rsplit("}", 1)[-1].rsplit(":", 1)[-1]
 
 
 def _relationship_id(element: ET.Element) -> str | None:
-    """读取 r:id，避免把普通 shape id 误当 relationship。"""
+    """Read r:id to avoid mistaking ordinary shape id for relationship."""
 
     for attribute, value in element.attrib.items():
         if not attribute.endswith("}id"):
@@ -72,7 +72,7 @@ def _relationship_id(element: ET.Element) -> str | None:
 
 
 def _relationship_embed_id(element: ET.Element) -> str | None:
-    """读取 DrawingML a:blip 的 r:embed relationship id。"""
+    """Read DrawingML a:blip r:embed relationship id."""
 
     for attribute, value in element.attrib.items():
         if not attribute.endswith("}embed"):
@@ -84,14 +84,14 @@ def _relationship_embed_id(element: ET.Element) -> str | None:
 
 
 def _relationship_part_name(source_part: str) -> str:
-    """由源 part 生成同目录的 .rels part 名称。"""
+    """The .rels part name is generated from the source part in the same directory."""
 
     directory, basename = posixpath.split(source_part)
     return posixpath.join(directory, "_rels", f"{basename}.rels")
 
 
 def _resolve_internal_target(source_part: str, target: str) -> str | None:
-    """解析 OPC 内部 target，并拒绝反斜杠和越界路径。"""
+    """Parse OPC internal target, rejecting backslashes and out-of-bounds paths."""
 
     candidate = target.strip()
     if not candidate or "\\" in candidate:
@@ -106,7 +106,7 @@ def _resolve_internal_target(source_part: str, target: str) -> str | None:
 
 
 def _read_xml(source: ZipFile, part_name: str) -> ET.Element | None:
-    """尽力读取一个 XML part，坏可选 part 返回空。"""
+    """Best effort to read a XML part, bad optional part returns null."""
 
     if part_name not in source.namelist():
         return None
@@ -117,7 +117,7 @@ def _read_xml(source: ZipFile, part_name: str) -> ET.Element | None:
 
 
 def _relationships(source: ZipFile, source_part: str) -> dict[str, _Relationship]:
-    """读取源 part 的 relationships，并规范化所有内部 target。"""
+    """Reads the relationships of source part and normalizes all internal target."""
 
     root = _read_xml(source, _relationship_part_name(source_part))
     if root is None:
@@ -145,7 +145,7 @@ def _relationships(source: ZipFile, source_part: str) -> dict[str, _Relationship
 
 
 def _read_member_bounded(source: ZipFile, part_name: str | None) -> bytes | None:
-    """按共享单 part 上限读取 XLSX ZIP 成员。"""
+    """Read XLSX ZIP member by shared single part upper limit."""
 
     if part_name is None:
         return None
@@ -162,7 +162,7 @@ def _read_member_bounded(source: ZipFile, part_name: str | None) -> bytes | None
 
 
 def workbook_sheet_parts(source: ZipFile) -> dict[str, str]:
-    """按 workbook sheet 名称建立 worksheet part 映射。"""
+    """Create worksheet part mapping by workbook sheet name."""
 
     workbook = _read_xml(source, WORKBOOK_PART)
     if workbook is None:
@@ -191,7 +191,7 @@ def package_has_sheet_ole_objects(
     source: ZipFile,
     worksheet_parts: dict[str, str],
 ) -> bool:
-    """判断任一 worksheet 是否包含 openpyxl 无法安全忽略的 oleObjects。"""
+    """Determines whether any worksheet contains a oleObjects that openpyxl cannot safely ignore."""
 
     for part_name in worksheet_parts.values():
         root = _read_xml(source, part_name)
@@ -203,7 +203,7 @@ def package_has_sheet_ole_objects(
 
 
 def _child_int(element: ET.Element, name: str) -> int | None:
-    """读取指定本地名称的首个整数子元素。"""
+    """Reads the first integer child element of the specified local name."""
 
     for child in element.iter():
         if _local_name(child.tag) != name or child.text is None:
@@ -216,7 +216,7 @@ def _child_int(element: ET.Element, name: str) -> int | None:
 
 
 def _anchor_from_object_properties(ole_object: ET.Element) -> tuple[int, int] | None:
-    """优先从 objectPr/anchor/from 读取零基 row/col。"""
+    """Zero-based row/col is read first from objectPr/anchor/from."""
 
     for object_properties in ole_object:
         if _local_name(object_properties.tag) != "objectPr":
@@ -238,7 +238,7 @@ def _anchor_from_object_properties(ole_object: ET.Element) -> tuple[int, int] | 
 
 
 def _object_preview_relationship_id(ole_object: ET.Element) -> str | None:
-    """读取 objectPr 指向缓存预览图片的 relationship id。"""
+    """Read objectPr pointing to relationship id of the cached preview image."""
 
     for child in ole_object:
         if _local_name(child.tag) == "objectPr":
@@ -247,7 +247,7 @@ def _object_preview_relationship_id(ole_object: ET.Element) -> str | None:
 
 
 def _shape_id_matches(raw_id: str | None, shape_id: str) -> bool:
-    """兼容 DrawingML 数字 id 和 VML `_x0000_sNNN` 写法。"""
+    """Compatible with DrawingML digital id and VML `_x0000_sNNN` writing methods."""
 
     if raw_id is None:
         return False
@@ -262,7 +262,7 @@ def _drawing_shape_info(
     drawing_part: str,
     shape_id: str,
 ) -> tuple[tuple[int, int] | None, str | None]:
-    """从 DrawingML anchor 按 cNvPr id 查找坐标和预览 part。"""
+    """From DrawingML anchor Press cNvPr id Find coordinates and preview part."""
 
     root = _read_xml(source, drawing_part)
     if root is None:
@@ -297,7 +297,7 @@ def read_sheet_image_artifacts(
     source: ZipFile,
     worksheet_part: str,
 ) -> list[XlsxImageArtifact]:
-    """从原始 worksheet DrawingML 读取未经过 openpyxl 转码的图片。"""
+    """Reads images from raw worksheet DrawingML without openpyxl transcoding."""
 
     worksheet_relationships = _relationships(source, worksheet_part)
     drawing_parts = [
@@ -358,7 +358,7 @@ def _vml_shape_info(
     drawing_part: str,
     shape_id: str,
 ) -> tuple[tuple[int, int] | None, str | None]:
-    """从 VML ClientData/Anchor 按 shape id 查找坐标和预览 part。"""
+    """From VML ClientData/Anchor Press shape id Find coordinates and preview part."""
 
     root = _read_xml(source, drawing_part)
     if root is None:
@@ -407,7 +407,7 @@ def _shape_anchor_and_preview(
     worksheet_relationships: dict[str, _Relationship],
     shape_id: str,
 ) -> tuple[tuple[int, int] | None, str | None]:
-    """按 DrawingML 后 VML 的顺序恢复 shape anchor 与预览。"""
+    """Recover shape anchor with preview in the order DrawingML followed by VML."""
 
     candidates = [
         relationship
@@ -443,7 +443,7 @@ def read_sheet_equation_artifacts(
     decoder: OoxmlEquationDecoder,
     image_decoder: OfficeImageEquationDecoder,
 ) -> list[XlsxOleEquationArtifact]:
-    """读取一个 worksheet 的公式 OLE 对象并绑定公式或图片回退。"""
+    """Read a worksheet formula OLE object and bind the formula or picture fallback."""
 
     worksheet = _read_xml(source, worksheet_part)
     if worksheet is None:

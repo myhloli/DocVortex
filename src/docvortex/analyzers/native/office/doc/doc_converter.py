@@ -1,4 +1,4 @@
-"""把 Word 97–2003 语义模型转换为 DocVortex 分页 model-list。"""
+"""Convert Word 97–2003 semantic model to DocVortex paging model-list."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ _OBJECT_POOL_CHART_RE = re.compile(
 
 
 def _read_object_pool_charts(ole: BoundedOleReader) -> dict[int, str]:
-    """读取 DOC ObjectPool 中带 Workbook/Book 的可编辑 chart。"""
+    """Read the editable chart with Workbook/Book in DOC ObjectPool."""
 
     charts: dict[int, str] = {}
     for stream_name in ole.stream_names(prefix="ObjectPool/"):
@@ -57,15 +57,15 @@ def _read_object_pool_charts(ole: BoundedOleReader) -> dict[int, str]:
 
 
 class DocConverter:
-    """将 Word 97–2003 OLE 二进制流转换为逐 section raw blocks。"""
+    """Convert Word 97–2003 OLE binary stream to section raw blocks."""
 
     def __init__(self) -> None:
-        """初始化空输出。"""
+        """Initialize empty output."""
 
         self.pages: list[list[dict[str, Any]]] = []
 
     def convert(self, file_binary: BinaryIO) -> None:
-        """读取输入 OLE streams，解析 DOC 并生成 model-list。"""
+        """Read input OLE streams, parse DOC and generate model-list."""
 
         file_bytes = read_stream_bytes_from_start(file_binary)
         with BoundedOleReader(file_bytes) as ole:
@@ -95,7 +95,7 @@ class DocConverter:
 
     @staticmethod
     def _style_names(style: DocCharStyle) -> list[str]:
-        """把 DOC 字符属性转换为 DocVortex 富文本样式名。"""
+        """Convert DOC character attributes into DocVortex rich text style names."""
 
         names: list[str] = []
         if style.bold:
@@ -116,13 +116,13 @@ class DocConverter:
 
     @classmethod
     def _rich_text(cls, runs: Iterable[DocTextRun], *, trim: bool = True) -> list[dict[str, Any]]:
-        """把 DOC runs 直接转换为结构化 Span。"""
+        """Convert DOC runs directly into structured Span."""
 
         spans: list[dict[str, Any]] = []
         segments: list[OfficeRichTextSegment] = []
 
         def flush_segments() -> None:
-            """输出公式边界前累计的普通富文本。"""
+            """Output the common rich text accumulated before the formula boundary."""
 
             if not segments:
                 return
@@ -149,12 +149,12 @@ class DocConverter:
 
     @classmethod
     def _cell_rich_text_html(cls, runs: Iterable[DocTextRun], *, trim: bool = True) -> str:
-        """把 DOC 表格单元格 runs 序列化为安全 HTML。"""
+        """Serialize DOC table cell runs to secure HTML."""
         parts: list[str] = []
         segments: list[OfficeRichTextSegment] = []
 
         def flush_segments() -> None:
-            """在公式边界输出累计单元格文字。"""
+            """Output cumulative cell text at formula boundary."""
             if not segments:
                 return
             parts.append(build_rich_text_html_from_segments(segments, trim_plain_edges=trim and not parts))
@@ -180,13 +180,13 @@ class DocConverter:
 
     @staticmethod
     def _plain_text(paragraph: DocParagraph) -> str:
-        """返回段落不含内部标记的可见文本。"""
+        """Return the visible text of the paragraph without internal markup."""
 
         return "".join(run.text for run in paragraph.runs)
 
     @staticmethod
     def _serialize_image(payload: DocImagePayload) -> str | None:
-        """复用 Office 图片序列化与矢量占位策略。"""
+        """Multiplexing Office picture serialization and vector occupancy strategy."""
 
         return serialize_office_image(
             payload.data,
@@ -197,7 +197,7 @@ class DocConverter:
 
     @classmethod
     def _image_block(cls, payload: DocVisualPayload) -> dict[str, Any] | None:
-        """把图片、公式或 chart 载荷转换为对应 raw block。"""
+        """Convert pictures, formulas or chart payloads to corresponding raw block."""
 
         if isinstance(payload, DocChartPayload):
             block: dict[str, Any] = {
@@ -223,7 +223,7 @@ class DocConverter:
 
     @classmethod
     def _toc_runs(cls, paragraph: DocParagraph) -> list[DocTextRun]:
-        """从 TOC 段落末尾移除仅用于排版的 tab/page number。"""
+        """Removed tab/page number for typesetting purposes only from the end of the TOC paragraph."""
 
         runs = list(paragraph.runs)
         while runs and re.fullmatch(r"[\s\t]*\d+[\s\t]*", runs[-1].text):
@@ -237,7 +237,7 @@ class DocConverter:
 
     @classmethod
     def _toc_anchor(cls, paragraph: DocParagraph) -> str | None:
-        """读取 TOC 超链接指向的内部书签。"""
+        """Read the internal bookmark pointed to by the TOC hyperlink."""
 
         for run in paragraph.runs:
             if run.hyperlink and run.hyperlink.startswith("#") and len(run.hyperlink) > 1:
@@ -251,7 +251,7 @@ class DocConverter:
         stack: list[dict[str, Any]],
         paragraph: DocParagraph,
     ) -> None:
-        """把一个 TOC 段落追加到对应层级的 index 树。"""
+        """Append a TOC paragraph to the index tree of the corresponding level."""
 
         content = cls._rich_text(cls._toc_runs(paragraph))
         for payload in paragraph.images:
@@ -287,7 +287,7 @@ class DocConverter:
         identity: int | None,
         paragraph: DocParagraph,
     ) -> int:
-        """把一个 DOC 列表段落追加到嵌套 raw list 树。"""
+        """Append a DOC list paragraph to the nested raw list tree."""
 
         info = paragraph.list_info
         if info is None:
@@ -332,7 +332,7 @@ class DocConverter:
 
     @classmethod
     def _paragraph_blocks(cls, paragraph: DocParagraph) -> list[dict[str, Any]]:
-        """把非目录、非普通列表段落投影为 raw blocks。"""
+        """Project non-table of contents, non-ordinary list paragraphs to raw blocks."""
 
         content = cls._rich_text(paragraph.runs)
         blocks: list[dict[str, Any]] = []
@@ -379,7 +379,7 @@ class DocConverter:
 
     @classmethod
     def _cell_list_html(cls, paragraphs: list[DocParagraph]) -> str:
-        """把连续表格单元格列表段落序列化为嵌套 HTML list。"""
+        """Serialize consecutive table cell list paragraphs into nested HTML list."""
 
         result: list[str] = []
         stack: list[str] = []
@@ -410,7 +410,7 @@ class DocConverter:
 
     @classmethod
     def _cell_paragraph_html(cls, paragraph: DocParagraph) -> str:
-        """序列化一个表格单元格段落及其内联图片。"""
+        """Serialize a table cell paragraph and its inline picture."""
 
         parts: list[str] = []
         content = cls._cell_rich_text_html(paragraph.runs, trim=False)
@@ -424,7 +424,7 @@ class DocConverter:
         cls,
         payloads: list[DocVisualPayload],
     ) -> str:
-        """把表格段落中的图片或 comment 公式序列化为内联 HTML。"""
+        """Serialize pictures or comment formulas in table paragraphs to inline HTML."""
 
         parts: list[str] = []
         for payload in payloads:
@@ -445,13 +445,13 @@ class DocConverter:
 
     @classmethod
     def _cell_html(cls, cell: DocTableCell) -> str:
-        """递归序列化单元格中的段落和嵌套表格。"""
+        """Recursively serialize paragraphs and nested tables in cells."""
 
         parts: list[str] = []
         paragraph_buffer: list[DocParagraph] = []
 
         def flush() -> None:
-            """输出当前连续段落缓冲。"""
+            """Output the current continuous paragraph buffer."""
 
             nonlocal paragraph_buffer
             if paragraph_buffer:
@@ -477,7 +477,7 @@ class DocConverter:
 
     @classmethod
     def _table_html(cls, table: DocTable) -> str:
-        """序列化带 rowspan/colspan 及嵌套内容的 Word 表格。"""
+        """Serialize Word table with rowspan/colspan and nested content."""
 
         rows: list[str] = []
         for row in table.rows:
@@ -496,7 +496,7 @@ class DocConverter:
 
     @classmethod
     def _element_blocks(cls, element: DocElement) -> list[dict[str, Any]]:
-        """把正文语义元素转换为 raw block。"""
+        """Convert text semantic elements to raw block."""
 
         if isinstance(element, DocImage):
             image = cls._image_block(element.payload)
@@ -507,7 +507,7 @@ class DocConverter:
 
     @classmethod
     def _auxiliary_contents(cls, paragraphs: list[DocParagraph]) -> list[list[dict[str, Any]]]:
-        """去重页眉页脚段落并过滤纯页码。"""
+        """Remove duplicate header and footer paragraphs and filter pure page numbers."""
 
         result: list[list[dict[str, Any]]] = []
         seen: set[str] = set()
@@ -523,7 +523,7 @@ class DocConverter:
 
     @classmethod
     def _section_page(cls, section: DocSection) -> list[dict[str, Any]]:
-        """转换一个 section，并将页面辅助文本稳定追加到末尾。"""
+        """Convert a section and append the page auxiliary text stably to the end."""
 
         page: list[dict[str, Any]] = []
         list_stack: list[dict[str, Any]] = []
@@ -567,7 +567,7 @@ class DocConverter:
 
     @classmethod
     def _document_pages(cls, document: DocDocument) -> list[list[dict[str, Any]]]:
-        """转换整份 DOC，并至少保留一个空 section page。"""
+        """Convert the entire DOC and leave at least one empty section page."""
 
         pages = [cls._section_page(section) for section in document.sections]
         return pages or [[]]

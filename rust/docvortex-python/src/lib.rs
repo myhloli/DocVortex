@@ -1,5 +1,5 @@
-//! 将 Python 批量参数转换为自有记录，再交给纯 Rust 核心计算。
-// 绑定使用列式数组和原四元组输出，不为私有传输引入新的公开对象类型。
+//! Convert Python batch parameters into own records, and then hand them over to pure Rust core calculation.
+// Binding uses columnar arrays and raw quadruple outputs, and does not introduce new public object types for private transfers.
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
 use pyo3::prelude::*;
@@ -25,7 +25,7 @@ mod table_merge;
 mod tables;
 mod text_pipeline;
 
-/// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
+/// Register private extension and protocol number; the public Python interface is still provided by the original module.
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(inline_styles::inline_style_stats, module)?)?;

@@ -1,4 +1,4 @@
-"""在实际运行平台导出未嵌入字体 PDF 的布局标注和语义 HTML，供跨平台审阅。"""
+"""Export layout annotations and semantic HTML of PDF without embedded fonts on the actual running platform for cross-platform review."""
 
 from __future__ import annotations
 
@@ -43,13 +43,13 @@ _DOCUMENTS = (
 
 
 def block_type(block: dict[str, Any]) -> str:
-    """将原始字符串或枚举统一为可读的布局类型。"""
+    """Unify a raw string or enumeration into a readable layout type."""
     value = block.get("type", "unknown")
     return str(getattr(value, "value", value))
 
 
 def draw_layout(source: Image.Image, blocks: list[dict[str, Any]], destination: Path) -> None:
-    """按归一化 bbox 在原页像素上叠加类型和序号，保留源页面尺寸。"""
+    """Press normalized bbox to superimpose the type and serial number on the original page pixels, retaining the source page size."""
     canvas = source.convert("RGB")
     try:
         painter = ImageDraw.Draw(canvas)
@@ -74,9 +74,9 @@ def draw_layout(source: Image.Image, blocks: list[dict[str, Any]], destination: 
 
 
 def capture_document(source: Path, destination: Path) -> dict[str, Any]:
-    """一次分析生成原始/中间协议、真实页面标注图和带素材的渲染 HTML。"""
+    """One analysis generates original/intermediate protocols, real page annotations, and renders with footage HTML."""
     destination.mkdir(parents=True, exist_ok=True)
-    # 单独的全新进程保留默认提供器对照，不能在当前 PDFium 上切换字体策略。
+    # A separate fresh process retains the default provider mapping and cannot switch font policies on the current PDFium.
     subprocess.run(
         [
             sys.executable,
@@ -124,7 +124,7 @@ def capture_document(source: Path, destination: Path) -> dict[str, Any]:
 
 
 def main() -> None:
-    """从源仓库语料生成可下载的审阅产物，并记录实际平台及依赖版本。"""
+    """Generate downloadable review products from the source warehouse corpus, and record the actual platform and dependent versions."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()

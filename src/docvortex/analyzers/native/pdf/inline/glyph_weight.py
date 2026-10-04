@@ -1,4 +1,4 @@
-"""仅在字重缺失时，以同页同字符的原生字形像素补充粗体证据。"""
+"""Only when the font weight is missing, the bold evidence is supplemented with the native glyph pixels of the same character on the same page."""
 
 from collections import defaultdict
 from dataclasses import replace
@@ -11,7 +11,7 @@ from .detection import _char_font_styles, _coerce_bbox, _pdf_font_metadata, dete
 
 
 def _glyph_mask(image, bbox, scale):
-    """归一化单字符墨迹，排除过小或无墨迹区域并保持相同字符比较。"""
+    """Normalizes single-character ink, excluding areas that are too small or uninked and maintains same-character comparisons."""
     crop = image.crop(tuple(math.floor(v * scale) if i < 2 else math.ceil(v * scale) for i, v in enumerate(bbox)))
     try:
         if crop.width < 6 or crop.height < 9:
@@ -34,7 +34,7 @@ def _glyph_mask(image, bbox, scale):
 
 
 def glyph_weight_style_lines(lines, geometry, render):
-    """缺失字重且有足量对照字符时才渲染；证据不足保持原结果，兼容只提供快照的来源。"""
+    """Render only if the font weight is missing and there are sufficient control characters; if there is insufficient evidence, keep the original result and be compatible with sources that only provide snapshots."""
     groups = defaultdict(lambda: defaultdict(list))
     counts = defaultdict(int)
     for line in lines:

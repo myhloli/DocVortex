@@ -1,4 +1,4 @@
-"""非标准 OOXML 包（非惯例 part 路径、ISO Strict、缺 sldSz、AlternateContent 公式）的转换回归测试。"""
+"""Conversion regression testing for non-standard OOXML packages (non-conventional part paths, ISO Strict, missing sldSz, AlternateContent formulas)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
 
 def _block_text(block: dict) -> str:
-    """把 block 的 content（字符串或任意深度嵌套的内联 span）压成纯文本。"""
+    """Compress content (string or arbitrarily deeply nested inline span) of block to plain text."""
     content = block.get("content")
 
     def render(value) -> str:
@@ -30,12 +30,12 @@ def _block_text(block: dict) -> str:
 
 
 def _flatten_pages(pages: list[list[dict]]) -> list[dict]:
-    """展开分页 block 列表并过滤空内容。"""
+    """Expand the paginated block list and filter for empty content."""
     return [block for page in pages for block in page]
 
 
 def _convert(model, fixture: Path) -> str:
-    """转换 fixture 并返回全部文本内容，供子串断言。"""
+    """Converts fixture and returns the entire text content for substring assertion."""
     pages = model().predict(BytesIO(fixture.read_bytes()))
     blocks = _flatten_pages(pages)
     return "\n".join(filter(None, (_block_text(block) for block in blocks)))
@@ -91,14 +91,14 @@ ROBUST_CASES = [
     ids=[case[0] for case in ROBUST_CASES],
 )
 def test_robust_ooxml_fixture_converts(model, filename: str, expected_fragments: list[str]) -> None:
-    """非标准包应完整转换并保留关键内容，而不是在入口或解析阶段失败。"""
+    """Non-standard packages should be fully converted and retain critical content, rather than failing at the entry or parsing stage."""
     text = _convert(model, FIXTURES / ("docx" if filename.endswith(".docx") else "pptx") / filename)
     for fragment in expected_fragments:
         assert fragment in text, f"{fragment!r} missing from {filename} output:\n{text}"
 
 
 def test_handmade_math_pptx_outputs_alternate_content_formula() -> None:
-    """AlternateContent Choice 分支中的 OMML 公式应转为 LaTeX 输出。"""
+    """AlternateContent OMML formulas in the Choice branch should be converted to LaTeX output."""
     pages = PptxModel().predict(BytesIO((FIXTURES / "pptx" / "handmade-math.pptx").read_bytes()))
     equation_text = "\n".join(
         _block_text(block)

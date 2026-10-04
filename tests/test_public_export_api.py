@@ -1,4 +1,4 @@
-"""验证跨库素材导出接口的字节所有权及字面量边界。"""
+"""Verify byte ownership and literal boundaries of cross-library material export interfaces."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from docvortex.schema import MiddleJson
 
 
 def test_public_export_preserves_payloads_geometry_and_code() -> None:
-    """直接图与表内图外置后字节不变，代码中的同名字面量不被当作素材。"""
+    """The bytes of direct images and in-table images remain unchanged after they are externalized, and literals with the same name in the code are not considered as material."""
     image = b"\xff\xd8\xffexample\xff\xd9"
     uri = "data:image/jpeg;base64," + base64.b64encode(image).decode()
     markup = f'<img src="{uri}" width="10">'

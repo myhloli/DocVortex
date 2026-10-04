@@ -1,4 +1,4 @@
-"""守卫独立引擎边界、导入副作用和唯一协议身份。"""
+"""Guard independent engine boundaries, import side effects, and unique protocol identities."""
 
 from __future__ import annotations
 
@@ -12,13 +12,13 @@ import docvortex
 
 
 def test_engine_does_not_ship_host_protocol_adapters() -> None:
-    """宿主产品封装和旧结果迁移不再作为引擎模块发布。"""
+    """Host product packaging and legacy result migrations are no longer released as engine modules."""
     assert find_spec("docvortex.compat") is None
     assert not (Path(docvortex.__file__).parent / "compat").exists()
 
 
 def test_source_has_no_host_or_pdftext_imports() -> None:
-    """普通、惰性和类型检查导入均不得依赖宿主或已移除的抽取库。"""
+    """Normal, lazy, and type-checked imports must not rely on the host or removed extraction libraries."""
     root = Path(docvortex.__file__).parent
     offenders = []
     for path in root.rglob("*.py"):
@@ -36,7 +36,7 @@ def test_source_has_no_host_or_pdftext_imports() -> None:
 
 
 def test_engine_tests_do_not_import_host_packages() -> None:
-    """测试与辅助模块也必须独立运行，避免依赖宿主安装或测试服务器。"""
+    """Test and auxiliary modules must also run independently to avoid dependence on the host installation or test server."""
     root = Path(__file__).parent
     offenders = []
     forbidden = {"mineru", "pdftext", "fastapi", "httpx"}
@@ -55,7 +55,7 @@ def test_engine_tests_do_not_import_host_packages() -> None:
 
 
 def test_public_import_is_lightweight_and_does_not_mutate_environment() -> None:
-    """独立解释器导入公共 API 时，不加载重依赖或修改宿主环境。"""
+    """When the standalone interpreter imports public API, it does not load heavy dependencies or modify the host environment."""
     code = """
 import os, sys
 before = dict(os.environ)
@@ -72,7 +72,7 @@ for name in ('torch', 'cv2', 'pypdfium2', 'pdftext', 'docgale', 'mineru', 'lxml'
 
 
 def test_all_package_boundaries_are_explicit() -> None:
-    """每个包都显式列出公开符号，避免运行时自动发现接口。"""
+    """Each package explicitly lists public symbols to avoid automatic discovery of interfaces at runtime."""
     root = Path(docvortex.__file__).parent
     for path in root.rglob("__init__.py"):
         nodes = ast.parse(path.read_text(encoding="utf-8")).body

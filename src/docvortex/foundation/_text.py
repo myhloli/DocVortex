@@ -1,4 +1,4 @@
-"""跨模型共享的文本字符规范化与换行连接规则。"""
+"""Text character normalization and line wrapping join rules shared across models."""
 
 import re
 import unicodedata
@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 from .language import remove_invalid_surrogates
 
-# 使用固定码点区间覆盖扩展汉字、假名和中日标点，避免不同 Python 的 Unicode 版本改变结果。
+# Use fixed code point intervals to cover extended kanji, kana, and Chinese and Japanese punctuation to avoid changing results with different Unicode versions of Python.
 _UNSPACED_RANGES = (
     (0x3000, 0x303F),
     (0x3040, 0x30FF),
@@ -23,23 +23,23 @@ _UNSPACED_RANGES = (
 )
 _CJK_PUNCTUATION = frozenset("，。！？；：、（）【】《》〈〉「」『』〔〕［］｛｝")
 _CLOSING_PUNCTUATION = frozenset(",.;:!?%")
-# 明确的复合词前缀与连接词只用于保守保留硬连字符，不承担语言识别或词典分词。
+# Explicit compound word prefixes and connectives are only used to conservatively retain hard hyphens and do not undertake language recognition or dictionary segmentation.
 _COMPOUND_PREFIXES = frozenset({"open", "non", "self", "cross", "anti", "pre", "post", "co", "semi", "multi", "quasi"})
 _COMPOUND_CONNECTORS = frozenset({"of", "the", "to", "and", "in", "for", "on", "by", "with"})
-# 只投影已有的行内样式标记，不把任意 HTML 或公式解析为可改写内容。
+# Only existing inline style tags are projected, and any HTML or formulas are not interpreted as overridable content.
 _INLINE_STYLE_TAG_RE = re.compile(r"</?(?:sup|sub|b|strong|i|em|u|s|del|strike)\b[^>]*>", re.IGNORECASE)
 
-# PDF 文本抽取时，英文跨行断词可能被编码为多种 hyphen 字符。
-# 这里只用于判断“行末英文断词符”，不要扩展到 en/em dash 等普通破折号。
+# PDF When extracting text, English cross-line word segmentation may be encoded into a variety of hyphen characters.
+# This is only used to determine the "end-of-line English word breaker", and does not extend to ordinary dashes such as en/em dash.
 LINE_END_HYPHEN_CHARS = "-\u00ad\u2010\u2011\u2043"
 LINE_END_HYPHEN_RE = re.compile(rf"[A-Za-z]+[{re.escape(LINE_END_HYPHEN_CHARS)}]\s*$")
 
-# URL 候选仅允许 RFC 3986 常见 ASCII 字符，避免把中文正文吞入链接。
+# The URL candidate only allows RFC 3986 common ASCII characters to avoid swallowing the Chinese text into the link.
 _URL_CANDIDATE_RE = re.compile(
     r"(?<![A-Za-z0-9])(?:(?:https?|ftp)://|www\.)[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+",
     re.ASCII | re.IGNORECASE,
 )
-# 下一行自身以完整 URL 开头时，必须保留边界，避免两条独立链接相连。
+# When the next line itself begins with the full URL, the boundary must be preserved to prevent two independent links from being connected.
 _URL_AT_LINE_START_RE = re.compile(
     r"(?:(?:https?|ftp)://|www\.)",
     re.ASCII | re.IGNORECASE,
@@ -47,15 +47,15 @@ _URL_AT_LINE_START_RE = re.compile(
 
 
 def is_hyphen_at_line_end(line: str) -> bool:
-    """判断文本行是否以英文单词的跨行断词符结尾。
+    """Determine whether the text line ends with an English word's cross-line breaker.
 
-    只识别字母后紧跟行末 hyphen 的断词场景，不处理词内连字符或普通破折号。
+    Only recognizes word segmentation scenarios where a letter is immediately followed by the end-of-line hyphen and does not handle intra-word hyphens or ordinary dashes.
     """
     return bool(LINE_END_HYPHEN_RE.search(line))
 
 
 def _url_spans_line_boundary(previous_content: str, next_content: str) -> bool:
-    """判断无空格候选中是否存在严格横跨当前物理行边界的 URL。"""
+    """Determine whether there is a URL in the non-space candidate that strictly spans the current physical line boundary."""
     stripped_previous = previous_content.rstrip()
     stripped_next = next_content.lstrip()
     if not stripped_previous or not stripped_next:
@@ -70,11 +70,11 @@ def resolve_text_line_boundary(
     *,
     next_content: str,
 ) -> tuple[str, str]:
-    """返回处理后的上一行内容和本次物理行边界分隔符。
+    """Returns the processed content of the previous line and the current physical line boundary separator.
 
-    严格横跨边界的 URL 候选直接连接，但下一行自身为完整 URL 时保留空格。
-    按当前可见边界判断空格，不检测整段语言。汉字和假名直接连接，韩文与
-    西文保留词间空格；既定 URL 和英文断词规则优先，且只改写真实的行末断词符。
+    URL candidates that strictly span the boundary are connected directly, but spaces are preserved when the next line is itself a complete URL.
+    Spaces are judged based on the current visible boundary, and the entire language is not detected. Kanji and kana are directly connected, and Korean and
+    Spanish retains spaces between words; the established URL and English word breaking rules take precedence, and only the actual end-of-line word breaking characters are rewritten.
     """
     processed_content = remove_invalid_surrogates(previous_content).rstrip()
     if not processed_content:
@@ -88,7 +88,7 @@ def resolve_text_line_boundary(
         return processed_content, ""
     if is_hyphen_at_line_end(processed_content):
         previous_word = re.search(r"([A-Za-z]+)[-\u00ad\u2010\u2011\u2043]$", processed_content)
-        # GLGE-difficult 等缩写复合词的连接符有语义，不能当作普通断词符删除。
+        # The connectors of abbreviated compound words such as GLGE-difficult have semantic meaning and cannot be deleted as ordinary word breakers.
         acronym = previous_word is not None and len(previous_word[1]) > 1 and previous_word[1].isupper()
         hard_compound = (
             previous_word is not None
@@ -121,21 +121,21 @@ def resolve_text_line_boundary(
 
 
 def _boundary_character(content: str, *, from_end: bool) -> str:
-    """读取可见边界字符，忽略样式标记及附着的组合字符，不改写原始正文。"""
+    """Read visible boundary characters, ignore style tags and attached combining characters, and do not rewrite the original text."""
     visible = _INLINE_STYLE_TAG_RE.sub("", content).strip()
     characters = reversed(visible) if from_end else iter(visible)
     return next((char for char in characters if unicodedata.category(char)[0] not in {"M", "C"}), "")
 
 
 def _is_unspaced_character(char: str) -> bool:
-    """判断汉字、假名及中日标点，韩文字母不属于无空格文字。"""
+    """Determine Chinese characters, kana, Chinese and Japanese punctuation, and Korean letters are not spaces-free text."""
     return char in _CJK_PUNCTUATION or any(start <= ord(char) <= end for start, end in _UNSPACED_RANGES)
 
 
 def merge_text_line_contents(
     line_contents: Sequence[str],
 ) -> str:
-    """按累计文本上下文折叠物理行，支持跨越三行以上的 URL 连续拼接。"""
+    """Collapse of physical lines by cumulative text context, supporting URL continuous splicing spanning more than three lines."""
 
     normalized_lines = [cleaned for content in line_contents if (cleaned := remove_invalid_surrogates(str(content)).strip())]
     if not normalized_lines:
@@ -151,7 +151,7 @@ def merge_text_line_contents(
 
 
 def full_to_half_exclude_marks(text: str) -> str:
-    """将全角英文字母和数字转换为半角形式，同时保留全角标点。"""
+    """Convert full-width English letters and numbers to half-width form while retaining full-width punctuation."""
     result = []
     for char in text:
         code = ord(char)
@@ -164,7 +164,7 @@ def full_to_half_exclude_marks(text: str) -> str:
 
 
 def full_to_half(text: str) -> str:
-    """将全角 ASCII 字母、数字和标点统一转换为半角形式。"""
+    """Convert full-width ASCII letters, numbers and punctuation characters to half-width form."""
     result = []
     for char in text:
         code = ord(char)
@@ -177,7 +177,7 @@ def full_to_half(text: str) -> str:
 
 
 def clean_isolated_formula(content: str) -> str:
-    """移除行间公式外层的反斜杠方括号并清理首尾空白。"""
+    """Remove outer backslash brackets from inline formulas and clear leading and trailing whitespace."""
     latex = content[:]
     if latex.startswith("\\["):
         latex = latex[2:]
@@ -187,7 +187,7 @@ def clean_isolated_formula(content: str) -> str:
 
 
 def normalize_formula_tag_content(tag_content: str) -> str:
-    """归一化公式编号文本，去掉全角字符和包裹括号后用于 \\tag{}。"""
+    """Normalized formula number text, stripped of full-width characters and wrapping brackets, for use with \\tag{}."""
     tag_content = full_to_half(str(tag_content or "").strip())
     if tag_content.startswith(("(", "﹙")):
         tag_content = tag_content[1:].strip()
@@ -197,12 +197,12 @@ def normalize_formula_tag_content(tag_content: str) -> str:
 
 
 def normalize_formula_content_for_tag(formula_content: str) -> str:
-    """归一化待合并编号的公式正文，去掉模型可能携带的展示公式分隔符。"""
+    """Normalize the text of the formula to be merged and remove the display formula separators that may be carried by the model."""
     return clean_isolated_formula(str(formula_content or ""))
 
 
 def build_tagged_formula_content(formula_content: str, tag_content: str) -> str | None:
-    """将公式正文和编号文本合成为带 LaTeX tag 的纯公式内容。"""
+    """Combine the formula body and number text into pure formula content with LaTeX and tag."""
     formula_content = normalize_formula_content_for_tag(formula_content)
     tag_content = normalize_formula_tag_content(tag_content)
     if not formula_content or not tag_content:

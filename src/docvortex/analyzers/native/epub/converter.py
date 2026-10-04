@@ -1,4 +1,4 @@
-"""EPUB OCF/OPF/spine 到 DocVortex raw model-list 的原生 converter。"""
+"""Native converter from EPUB OCF/OPF/spine to DocVortex raw model-list."""
 
 from __future__ import annotations
 
@@ -14,14 +14,14 @@ from .xhtml import EpubChapterConverter, build_anchor_registry, convert_svg_spin
 
 
 class EpubConverter:
-    """把 EPUB spine 转换为稳定的逐逻辑页 raw blocks。"""
+    """Convert EPUB spine to stable logical page by page raw blocks."""
 
     def __init__(self) -> None:
-        """初始化空页面结果。"""
+        """Initialize empty page results."""
         self.pages: list[list[dict[str, Any]]] = []
 
     def convert(self, file_binary: BinaryIO) -> None:
-        """读取调用方 EPUB 流，转换整本内容并保持输入流所有权。"""
+        """Read the caller's EPUB stream, converting the entire contents and maintaining input stream ownership."""
         package = EpubPackage(file_binary.read())
         try:
             parsed: list[tuple[int, str, str, etree._Element | None]] = []

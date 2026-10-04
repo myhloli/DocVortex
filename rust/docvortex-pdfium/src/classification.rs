@@ -1,4 +1,4 @@
-//! 分类所需的原始字符统计读取；不做去重、规范化或几何筛选。
+//! The raw character statistics required for classification are read; no deduplication, normalization or geometric filtering is performed.
 use crate::ReadError;
 use std::{
     collections::HashMap,
@@ -8,10 +8,10 @@ use std::{
 pub type RawRecord = (u32, bool, bool, usize);
 pub type RawPage = (Vec<RawRecord>, Vec<Vec<u8>>);
 
-/// 同步读取原始 Unicode、generated、map error 和字体字节；不保留 PDFium 指针。
+/// Synchronously read raw Unicode, generated, map error and font bytes; do not retain PDFium pointer.
 ///
 /// # Safety
-/// 调用方必须校验同库函数 ABI，并在整个调用期间持有运行时锁与有效文本页。
+/// The caller must verify the same library function ABI and hold the runtime lock and valid text page during the entire call.
 pub unsafe fn read(
     addresses: [usize; 4],
     handle: usize,

@@ -1,6 +1,6 @@
-//! 对独立位图字节执行裁剪、通道排列及直角旋转，不持有 PDFium 指针。
+//! Perform clipping, channel alignment and rectangular rotation on independent bitmap bytes, do not hold PDFium pointer.
 
-/// 校验步长和边界，按原方向分类语义返回 OpenCV 所需的连续 BGR 像素。
+/// Verify the step size and boundary, and return the continuous BGR pixels required for OpenCV according to the original direction classification semantics.
 pub fn crop_bgr(
     data: &[u8],
     width: usize,

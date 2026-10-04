@@ -1,16 +1,16 @@
-"""OFD 原生解析错误类型。"""
+"""OFD Native parsing error type."""
 
 
 class OfdParseError(ValueError):
-    """表示 OFD 包结构或必需内容不合法。"""
+    """Indicates OFD The package structure or required content is illegal."""
 
 
 class OfdEncryptedError(OfdParseError):
-    """表示 OFD 包或成员使用了不支持的加密。"""
+    """Indicates OFD The package or member uses unsupported encryption."""
 
 
 class OfdResourceLimitError(OfdParseError):
-    """表示 OFD 输入超过固定资源预算。"""
+    """Indicates that OFD input exceeds the fixed resource budget."""
 
 
 __all__ = ["OfdEncryptedError", "OfdParseError", "OfdResourceLimitError"]

@@ -1,4 +1,4 @@
-"""验证公共图片输出、像素保真、资源释放与载荷遍历契约。"""
+"""Verify public image output, pixel fidelity, resource release and payload traversal contracts."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from docvortex.schema import ChartBlock, ChartBodyBlock, EquationBlock, ImageBlo
 
 
 def _detail_pdf(rotation: int = 0) -> bytes:
-    """生成带彩色细线与高对比边缘的矢量页面，避免输入压缩干扰断言。"""
+    """Generate vector pages with thin colored lines and high-contrast edges to avoid input compression interfering with assertions."""
     buffer = BytesIO()
     canvas = Canvas(buffer, pagesize=(120, 80))
     canvas.setPageRotation(rotation)
@@ -36,7 +36,7 @@ def _detail_pdf(rotation: int = 0) -> bytes:
 @pytest.mark.parametrize("image_format,extension", [("jpeg", "jpg"), ("png", "png"), ("webp", "webp")])
 @pytest.mark.parametrize("bbox", [None, (0.1, 0.2, 0.8, 0.7)])
 def test_image_output_survives_document_close(image_format: ImageFormat, extension: str, bbox: tuple | None) -> None:
-    """输出字节独立于文档生命周期，元数据与实际编码尺寸一致。"""
+    """Output bytes are independent of document lifecycle, and metadata is consistent with the actual encoded size."""
     with PDFDocument(_detail_pdf()) as document:
         artifact = document.render_image(0, bbox=bbox, image_format=image_format)
     assert isinstance(artifact, ImageArtifact)
@@ -52,7 +52,7 @@ def test_image_output_survives_document_close(image_format: ImageFormat, extensi
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
 @pytest.mark.parametrize("bbox", [(0.13, 0.17, 0.83, 0.77), (-0.1, -0.1, 1.1, 1.1)])
 def test_png_crop_preserves_rendered_pixels(rotation: int, bbox: tuple) -> None:
-    """PNG 裁剪与同一次配置的原始页面像素相同，包括旋转及边界裁剪。"""
+    """PNG cropping is the same pixels as the original page configured at the same time, including rotation and border cropping."""
     with PDFDocument(_detail_pdf(rotation)) as document:
         rendered = document.render_page(0, scale=1.5).pil_image
         try:
@@ -70,7 +70,7 @@ def test_png_crop_preserves_rendered_pixels(rotation: int, bbox: tuple) -> None:
 
 @pytest.mark.parametrize("bbox", [(0, 0, 0, 1), (0, float("nan"), 1, 1), (2, 2, 3, 3)])
 def test_invalid_region_rejected(bbox: tuple) -> None:
-    """拒绝空区域、非有限坐标和完全超出页面的区域。"""
+    """Empty areas, non-finite coordinates, and areas completely outside the page are rejected."""
     with PDFDocument(_detail_pdf()) as document:
         with pytest.raises(ValueError):
             document.render_image(0, bbox=bbox)
@@ -79,7 +79,7 @@ def test_invalid_region_rejected(bbox: tuple) -> None:
 @pytest.mark.parametrize("failure", [False, True])
 @pytest.mark.parametrize("with_crop", [False, True])
 def test_render_closes_owned_images(monkeypatch: pytest.MonkeyPatch, failure: bool, with_crop: bool) -> None:
-    """真实图像在编码成功和异常时均关闭，区域副本也不泄漏。"""
+    """The real image is closed on both successful encoding and exception, and region copies are not leaked."""
     import docvortex.document.pdf._document as implementation
 
     page = Image.new("RGB", (20, 20))
@@ -105,7 +105,7 @@ def test_render_closes_owned_images(monkeypatch: pytest.MonkeyPatch, failure: bo
 
 @pytest.mark.parametrize("failure", [False, True])
 def test_transcode_closes_conversion_copy(monkeypatch: pytest.MonkeyPatch, failure: bool) -> None:
-    """透明图片转 JPEG 时关闭转换副本，并由转码入口关闭源图。"""
+    """When converting a transparent image to JPEG, the conversion copy is closed, and the source image is closed by the transcoding portal."""
     import docvortex.foundation.image_encoding as implementation
 
     source = Image.new("RGBA", (5, 4), (200, 30, 50, 0))
@@ -125,7 +125,7 @@ def test_transcode_closes_conversion_copy(monkeypatch: pytest.MonkeyPatch, failu
 
 
 def test_public_asset_validation() -> None:
-    """公共入口沿用严格签名校验，拒绝损坏图片与未知输出格式。"""
+    """The public entrance continues to use strict signature verification, rejecting damaged images and unknown output formats."""
     from docvortex.foundation.image_encoding import image_to_b64str
 
     with Image.new("RGBA", (3, 2), (20, 50, 90, 100)) as image:
@@ -145,7 +145,7 @@ def test_public_asset_validation() -> None:
 
 
 def test_payload_order_and_tree_immutability() -> None:
-    """图表、表格、图片和公式按前序输出载荷，并保留原树内容。"""
+    """Charts, tables, pictures and formulas output loads in pre-order and retain the original tree content."""
     image = ImageBodyBlock(type="image_body", content="", index=0)
     chart = ChartBodyBlock(type="chart_body", content="", index=3)
     table = TableBodyBlock(type="table_body", content="", index=1)
@@ -165,7 +165,7 @@ def test_payload_order_and_tree_immutability() -> None:
 
 
 def test_public_assets_import_without_model_dependencies() -> None:
-    """素材公共入口不导入 PDF 渲染、MinerU 或模型重依赖。"""
+    """The material public entrance does not import PDF rendering, MinerU or model heavy dependencies."""
     result = subprocess.run(
         [
             sys.executable,

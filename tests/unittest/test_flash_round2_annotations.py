@@ -1,4 +1,4 @@
-"""第二轮真实原件断言：段落语义边界、可见字符和容器成员同时验收。"""
+"""The second round of true original assertion: simultaneous acceptance of paragraph semantic boundaries, visible characters, and container members."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ MANIFEST = json.loads((Path(__file__).parents[2] / "tests/fixtures/flash_round2_
 
 
 def _starting(name: str, page: int, prefix: str) -> dict:
-    """按可见文字起点定位，禁止使用修复后不稳定的块编号。"""
+    """Positioning by starting point of visible text prohibits the use of unstable block numbers after repair."""
     matches = [block for block in _model(name)[page - 1] if visible(block.get("content")).startswith(prefix)]
     assert len(matches) == 1, (name, page, prefix)
     return matches[0]
@@ -34,7 +34,7 @@ def _starting(name: str, page: int, prefix: str) -> dict:
     ],
 )
 def test_explicit_paragraph_boundaries(name: str, page: int, prefixes: list[str]) -> None:
-    """明确的新段各自成为 text，段首提示不单独形成嵌套标题。"""
+    """Explicit new paragraphs each become text, and the paragraph header prompt does not form a separate nested title."""
     matches = [_starting(name, page, prefix) for prefix in prefixes]
     assert all(block["type"] == "text" for block in matches)
     assert len({id(block) for block in matches}) == len(prefixes)
@@ -43,7 +43,7 @@ def test_explicit_paragraph_boundaries(name: str, page: int, prefixes: list[str]
 
 
 def test_runin_paragraph_prompts_keep_bold() -> None:
-    """段落拆分不丢失原有段首粗体。"""
+    """Paragraph splitting does not lose the original bold font at the beginning of the paragraph."""
     for prefix in ["Utility", "Generation Speed", "Future work"]:
         block = _starting("nougat", 9, prefix)
         assert any(prefix in visible(span) and "bold" in span.get("styles", []) for span in block["content"])
@@ -55,7 +55,7 @@ def test_runin_paragraph_prompts_keep_bold() -> None:
     ids=[c["id"] for d in MANIFEST["documents"] for c in d["cases"] if c["operation"] == "title"],
 )
 def test_independent_recurrent_headings(document: dict, case: dict) -> None:
-    """全文重复样式的一至两行独立标题应整体识别，不能仅靠字重数值。"""
+    """One or two lines of independent titles in a full-text repeating style should be identified as a whole, not just by the word weight value."""
     expected = visible(case["anchors"][0]["content"])
     matches = [block for block in _model(document["name"])[case["page"] - 1] if visible(block["content"]) == expected]
     assert len(matches) == 1
@@ -65,7 +65,7 @@ def test_independent_recurrent_headings(document: dict, case: dict) -> None:
 
 
 def test_nougat_numbered_url_footnotes_are_not_fraction_neighbors() -> None:
-    """短正文尾行和 URL 脚注不构成分式，三个编号链接都归入脚注。"""
+    """The short text last line and the URL footnote do not form a fraction, and the three numbered links are included in the footnote."""
     page = _model("nougat")[4]
     for url in ["https://github.com/phfaist/pylatexenc", "https://mupdf.com/", "https://github.com/taleinat/fuzzysearch"]:
         found = [b for b in page if url in visible(b["content"])]
@@ -73,7 +73,7 @@ def test_nougat_numbered_url_footnotes_are_not_fraction_neighbors() -> None:
 
 
 def test_mmlu_native_form_owns_last_options_and_caption_binds() -> None:
-    """图中最后一行选项进入图，图题前不再残留假正文屏障。"""
+    """The last row of options in the figure enters the figure, and there is no longer a false text barrier left before the figure title."""
     page = _model("mmlu_redux")[1]
     found = [b for b in page if "A. Clark" in visible(b["content"])]
     assert len(found) == 1 and found[0]["type"] == "image"
@@ -90,7 +90,7 @@ def test_mmlu_native_form_owns_last_options_and_caption_binds() -> None:
 
 
 def test_mmlu_wrapped_body_merges_above_independent_wide_tail() -> None:
-    """图旁原块 4、5、6 的窄行连续成段，恢复通栏的尾行独立且不混入 caption。"""
+    """The narrow rows of original blocks 4, 5, and 6 next to the picture are continuously formed into segments, and the last row of the banner is restored to be independent and not mixed with caption."""
     body = _starting("mmlu_redux", 2, "We identify numerous errors")
     tail = _starting("mmlu_redux", 2, "documentation, it is difficult")
     caption = _starting("mmlu_redux", 2, "Figure 1:")
@@ -106,7 +106,7 @@ def test_mmlu_wrapped_body_merges_above_independent_wide_tail() -> None:
 
 
 def test_confirmed_algorithm_is_complete_and_excluded_from_figure() -> None:
-    """算法全部十二行只属于代码，图形边界不能侵入其末四行。"""
+    """All twelve lines of the algorithm belong only to the code, and graphics boundaries cannot invade the last four lines."""
     page = _model("frames_v1")[7]
     code = [b for b in page if b["type"] == "code"]
     images = [b for b in page if b["type"] == "image"]
@@ -117,7 +117,7 @@ def test_confirmed_algorithm_is_complete_and_excluded_from_figure() -> None:
 
 
 def test_full_width_affiliation_footnote_keeps_visual_row_order() -> None:
-    """通栏机构脚注恢复三条实际行，不按上标拆出来的片段交错排列。"""
+    """The footnotes of the banner structure are restored to three actual lines, and are not staggered according to the fragments separated by superscripts."""
     page = _model("nash_review")[10]
     notes = [b for b in page if b["type"] == "page_footnote"]
     assert len(notes) == 1
@@ -130,7 +130,7 @@ def test_full_width_affiliation_footnote_keeps_visual_row_order() -> None:
 
 
 def test_inline_footnote_fragment_is_reunited_with_its_own_note() -> None:
-    """上标附近的同行续文与下一行属于同一脚注，右栏正文不被认领。"""
+    """The peer continuation near the superscript belongs to the same footnote as the next line, and the main text in the right column is not claimed."""
     page = _model("k2_treap")[9]
     found = [b for b in page if "which allow us to use it for" in visible(b["content"])]
     assert len(found) == 1 and found[0]["type"] == "page_footnote"
@@ -140,7 +140,7 @@ def test_inline_footnote_fragment_is_reunited_with_its_own_note() -> None:
 
 
 def test_article_info_and_abstract_are_independent_text_regions() -> None:
-    """弱表中的元数据与摘要恢复独立文本分区，不能把真正单元格表当作同类候选。"""
+    """Metadata and summaries in weak tables recover independent text partitions, and real cell tables cannot be considered as homogeneous candidates."""
     page = _model("k2_treap")[0]
     assert not any(b["type"] == "table" and 0.3 < b["bbox"][1] < 0.6 for b in page)
     for text in ["articleinfo", "abstract"]:
@@ -150,7 +150,7 @@ def test_article_info_and_abstract_are_independent_text_regions() -> None:
 
 
 def test_clipped_browser_footer_is_not_visible_text() -> None:
-    """嵌套 Form 外的浏览器页脚不参与任何分类，可见论文页码仍保留。"""
+    """The browser footer outside the nested Form does not participate in any classification, and it can be seen that the paper page number is still retained."""
     page = _model("nougat")[16]
     assert not any(
         value in visible(b["content"]) for b in page for value in ["3.86.159.32", "10/03/2023, 17:22", "latex-ocr-demo"]

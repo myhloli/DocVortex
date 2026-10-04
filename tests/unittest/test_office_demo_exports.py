@@ -1,4 +1,4 @@
-"""真实 Office 样例的原生解析、后处理与素材导出回归。"""
+"""Native parsing, post-processing and material export regression of real Office samples."""
 
 from collections import Counter
 from pathlib import Path
@@ -15,14 +15,14 @@ _OFFICE_SAMPLE_DIR = Path(__file__).parents[2] / "demo" / "ms_office_docs"
 
 
 def _analyze_sample(file_suffix: str) -> tuple[MiddleJson, ModelJson]:
-    """从公开分析结果构建未导出素材的语义树，以验证 sidecar 导出闭包。"""
+    """Construct a semantic tree of unexported material from public analysis results to verify sidecar export closure."""
     basename = {"doc": "docx", "ppt": "pptx", "xls": "xlsx"}[file_suffix]
     model = analyze(_OFFICE_SAMPLE_DIR / f"{basename}_01.{file_suffix}").model_json
     return model_json_to_middle_json(model), model
 
 
 def test_real_doc_recovers_sections_structure_and_sidecars(tmp_path: Path) -> None:
-    """验证真实 DOC 的 section、目录、表格、图片和严格 export 闭包。"""
+    """Verify section, table of contents, tables, pictures and strict export closures of real DOC."""
 
     middle, model = _analyze_sample("doc")
     counts = Counter(block.get("type") for page in model.pages for block in page)
@@ -72,7 +72,7 @@ def test_real_doc_recovers_sections_structure_and_sidecars(tmp_path: Path) -> No
 
 
 def test_real_ppt_recovers_table_notes_images_and_exports(tmp_path: Path) -> None:
-    """验证真实六页 PPT 的合并表格、备注、图片及 sidecar 完整闭包。"""
+    """Verify the true six-page PPT's combined tables, notes, pictures and complete closure of sidecar."""
 
     middle_json, model_json = _analyze_sample("ppt")
 
@@ -141,7 +141,7 @@ def test_real_ppt_recovers_table_notes_images_and_exports(tmp_path: Path) -> Non
 
 
 def test_real_xls_recovers_tables_charts_image_link_and_exports(tmp_path: Path) -> None:
-    """验证真实 XLS 的三页结构、图表、图片、链接与 sidecar 闭包。"""
+    """Three pages of structure, diagrams, images, links and sidecar closures that verify the real XLS."""
 
     middle_json, model_json = _analyze_sample("xls")
 
@@ -205,7 +205,7 @@ def test_real_xls_recovers_tables_charts_image_link_and_exports(tmp_path: Path) 
 
 
 def test_rtf_model_parses_real_libreoffice_fixture() -> None:
-    """验证真实 LibreOffice RTF 在纯 Python 路径中保留全部可见段落。"""
+    """Verify true LibreOffice RTF Keep all visible passages in pure Python paths."""
     with (_OFFICE_SAMPLE_DIR / "rtf_01.rtf").open("rb") as stream:
         pages = RtfModel().predict(stream)
 

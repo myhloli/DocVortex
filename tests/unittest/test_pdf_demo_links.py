@@ -1,4 +1,4 @@
-"""真实 PDF 超链接从原生分析到各格式输出的回归。"""
+"""Regression of real PDF hyperlinks from native analysis to output across formats."""
 
 from io import BytesIO
 from pathlib import Path
@@ -14,7 +14,7 @@ from docvortex.schema import MiddleJson, ModelJson, PageInfo
 
 
 def test_demo1_pdf_link_reaches_model_middle_and_all_renderers() -> None:
-    """验证真实 demo1 URI Link 贯穿 model、MiddleJson 和四类 renderer。"""
+    """Verified Authentic demo1 URI Link through model, MiddleJson and Category IV renderer."""
 
     pdf_path = Path(__file__).parents[2] / "demo/pdfs/demo1.pdf"
     with PDFDocument(str(pdf_path)) as document:

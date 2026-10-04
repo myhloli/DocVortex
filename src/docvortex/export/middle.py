@@ -1,4 +1,4 @@
-"""语义文档与图片旁文件的原子导出。"""
+"""Atomic export of semantic documents and files next to images."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from ._images import _materialize_images
 
 @dataclass(frozen=True, slots=True)
 class MiddleJsonExportResult:
-    """Middle JSON 图片外置后的对象副本与实际文件路径。"""
+    """Middle JSON The object copy and actual file path after the picture is externalized."""
 
     middle_json: MiddleJson
     json_path: Path
@@ -21,13 +21,13 @@ class MiddleJsonExportResult:
 
 
 def _prepare_export_copy(middle_json: MiddleJson) -> tuple[MiddleJson, dict[str, bytes]]:
-    """复用统一物化流程，为原子文件导出提供文档副本及图片字节。"""
+    """Reuse the unified materialization process to provide document copies and image bytes for atomic file export."""
     document, assets = _materialize_images(middle_json)
     return document, dict(assets)
 
 
 def _resolve_export_target(output_root: Path, relative_path: str) -> Path:
-    """校验导出相对路径并确保解析后的目标仍位于文档输出目录内。"""
+    """Verify export relative paths and ensure that the parsed target is still within the document output directory."""
     from ..foundation._image_payload import validate_image_sidecar_path
 
     safe_path = validate_image_sidecar_path(relative_path)
@@ -52,7 +52,7 @@ def _resolve_export_target(output_root: Path, relative_path: str) -> Path:
 
 
 def _commit_export_files(files: dict[Path, bytes], *, overwrite: bool) -> None:
-    """预检冲突后以临时文件提交，并在提交失败时恢复已有文件。"""
+    """Submit as a temporary file after preflight conflicts, and restore existing files when submission fails."""
     pending: dict[Path, bytes] = {}
     originals: dict[Path, bytes | None] = {}
     for target, payload in files.items():
@@ -100,7 +100,7 @@ def _commit_export_files(files: dict[Path, bytes], *, overwrite: bool) -> None:
 
 
 def _validate_export_path_relationships(relative_paths: list[str]) -> None:
-    """拒绝任一导出文件占用另一文件的父目录，避免提交阶段才产生冲突。"""
+    """Deny any exported file from occupying the parent directory of another file to avoid conflicts during the submission phase."""
     path_parts = {relative_path: Path(relative_path).parts for relative_path in relative_paths}
     for relative_path, parts in path_parts.items():
         for other_path, other_parts in path_parts.items():
@@ -117,7 +117,7 @@ def _export_middle_json(
     json_name: str,
     overwrite: bool,
 ) -> MiddleJsonExportResult:
-    """构造完整导出事务，保证 JSON 与图片使用同一份规范化对象副本。"""
+    """Construct a complete export transaction to ensure that JSON and the picture use the same normalized object copy."""
     from ..foundation._image_payload import validate_image_sidecar_path
 
     exported, image_files = _prepare_export_copy(middle_json)
@@ -149,7 +149,7 @@ def _export_middle_json(
 def export_middle_json(
     middle_json: MiddleJson, output_dir: str | Path, *, json_name: str = "middle_json.json", overwrite: bool = False
 ) -> MiddleJsonExportResult:
-    """显式导出语义协议及图片，保持基础 schema 无文件系统依赖。"""
+    """Explicitly export semantic protocols and images, keeping the base schema without file system dependencies."""
     return _export_middle_json(middle_json, Path(output_dir), json_name=json_name, overwrite=overwrite)
 
 

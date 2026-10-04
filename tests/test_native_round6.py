@@ -1,4 +1,4 @@
-"""第六轮字符批量分类和分式空间索引的独立差分。"""
+"""Sixth-round independent differentiation of character batch classification and fractional spatial indexing."""
 
 import random
 import math
@@ -18,7 +18,7 @@ from docvortex.analyzers.native.pdf.models import _LineItem
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 @pytest.mark.parametrize("seed", range(16))
 def test_script_batch_keeps_python_roles_and_sources(angle, seed, monkeypatch):
-    """对分段、字号及旋转字符比较原始来源与完整脚本角色。"""
+    """Compare original source to full scripted characters for segmentation, font size, and rotated characters."""
 
     if get_native() is None:
         pytest.skip("native backend is not selected")
@@ -54,7 +54,7 @@ def test_script_batch_keeps_python_roles_and_sources(angle, seed, monkeypatch):
 
 @pytest.mark.parametrize("seed", range(24))
 def test_fraction_index_matches_exhaustive(seed, monkeypatch):
-    """用原全字符扫描比较分式成员，覆盖远处横线、边界和退化框。"""
+    """Use the original full character scan to compare fraction members, covering distant horizontal lines, boundaries and degenerate boxes."""
 
     rng = random.Random(seed)
     chars, tight = [], {}
@@ -72,7 +72,7 @@ def test_fraction_index_matches_exhaustive(seed, monkeypatch):
 
 
 def test_fraction_rules_are_reused_without_changing_cell_scale():
-    """预旋转横线不能把单元格尺度替换为整页尺度。"""
+    """Prerotating horizontal lines does not replace cell scale with full page scale."""
 
     rules = [(0.0, 10.0, 8.0, 10.1), (20.0, 11.0, 30.0, 11.1)]
     prepared = scripts._prepare_fraction_rules(rules, (100.0, 100.0), 90)
@@ -86,7 +86,7 @@ def test_fraction_rules_are_reused_without_changing_cell_scale():
 
 @pytest.mark.parametrize("invalid", [0, math.nan, math.inf, 10**400])
 def test_plain_script_batch_rejects_non_float_geometry(invalid):
-    """整数、非有限值与超大整数不能静默改变原 Python 几何准入。"""
+    """Integers, non-finite values, and very large integers cannot silently change the original Python geometry admission."""
 
     native = get_native()
     if native is None:
@@ -103,7 +103,7 @@ def test_plain_script_batch_rejects_non_float_geometry(invalid):
 
 
 def test_script_batches_preserve_line_order_across_chunk_boundary(monkeypatch):
-    """超过 64 行时仍按原来源顺序返回全部 sidecar，含公式段。"""
+    """If there are more than 64 lines, all sidecar, including formula sections, will still be returned in the original source order."""
 
     if get_native() is None:
         pytest.skip("native backend is not selected")
@@ -131,7 +131,7 @@ def test_script_batches_preserve_line_order_across_chunk_boundary(monkeypatch):
 
 @pytest.mark.parametrize("seed", range(20))
 def test_post_semantic_candidates_match_exhaustive_merge(seed, monkeypatch):
-    """旋转、共享视觉行与正文续行的合并闭包保持原穷举结果。"""
+    """The merge closure of rotation, shared visual line and text continuation line maintains the original exhaustive result."""
 
     rng = random.Random(seed)
     lines = []
@@ -154,7 +154,7 @@ def test_post_semantic_candidates_match_exhaustive_merge(seed, monkeypatch):
 
 
 def test_post_semantic_special_geometry_uses_reference_pairs():
-    """非有限框和整数输入不得进入新的后处理行索引。"""
+    """Non-finite box and integer inputs must not go into the new postprocessing row index."""
 
     lines = [_LineItem("x", (float(i), 0.0, float(i + 1), 10.0), 0, i, chars=[]) for i in range(40)]
     boxes = [line.bbox for line in lines]
@@ -165,7 +165,7 @@ def test_post_semantic_special_geometry_uses_reference_pairs():
 
 
 def test_rule_interval_prefix_keeps_duplicate_boundary_assignment():
-    """递增横线复用前缀；重复边界、交换行顺序仍与原二分分配一致。"""
+    """Increasing horizontal lines reuse prefixes; repeating boundaries and swapping rows are still consistent with the original binary allocation."""
 
     rows = [SimpleNamespace(center_y=value) for value in (10.0, 15.0, 20.0, 20.0, 25.0, 30.0)]
     rules = [SimpleNamespace(bbox=(0.0, value, 10.0, value)) for value in (10.0, 20.0, 30.0, 40.0)]
@@ -182,7 +182,7 @@ def test_rule_interval_prefix_keeps_duplicate_boundary_assignment():
 
 
 def test_prepared_rule_bands_match_every_contiguous_interval():
-    """完整横线组首区间在所有连续行切片和闭边界上复现原二分规则。"""
+    """The first interval of the complete horizontal line group reproduces the original bisection rule on all consecutive line slices and closed boundaries."""
 
     rules = [SimpleNamespace(bbox=(0.0, value, 10.0, value)) for value in (0.0, 10.0, 20.0, 30.0, 40.0, 50.0)]
     rows = [SimpleNamespace(center_y=value) for value in (-5.0, 0.0, 5.0, 10.0, 10.0, 19.9, 20.0, 25.0, 40.0, 50.0, 55.0)]
@@ -202,7 +202,7 @@ def test_prepared_rule_bands_match_every_contiguous_interval():
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_prepared_marker_glyphs_match_reference(angle):
-    """同来源多标记复用字形时保持完整 Unicode、字号和位置判断。"""
+    """Maintain integrity of Unicode, font size and position judgment when multiplexing glyphs from the same source."""
 
     chars = [
         {"char": text, "bbox": box}
@@ -224,7 +224,7 @@ def test_prepared_marker_glyphs_match_reference(angle):
 
 
 def test_marker_preparation_cache_is_bounded_and_rejects_special_values():
-    """超过容量只淘汰只读结果，异常整数坐标留给原标记规则。"""
+    """Only read-only results will be eliminated if the capacity is exceeded, and abnormal integer coordinates will be left to the original marking rules."""
 
     context = table_annotations._PreparedTableCoreRows([], {}, {}, None)
     for index in range(9000):

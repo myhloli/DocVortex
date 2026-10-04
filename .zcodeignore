@@ -27,7 +27,7 @@ build/
 *.so
 *.pyd
 
-# ===== ↑ 以上同步自 .gitignore（「从 .gitignore 同步」只重写以上部分）=====
+# ===== ↑ Synced from .gitignore above ("Sync from .gitignore" rewrites only the section above) =====
 .git/
 .hg/
 .svn/
@@ -53,5 +53,5 @@ cdk.out/
 eggs/
 pip-wheel-metadata/
 wheels/
-# ----- ↑ 以上为 ZCode 默认排除规则（自定义规则请写在本行下方，不会被同步/恢复改动）-----
-# 自定义规则写在下方（本行提示可删除）
+# ----- ↑ ZCode default exclusion rules above (custom rules below this line are preserved during sync/restore) -----
+# Write custom rules below (this reminder may be deleted)

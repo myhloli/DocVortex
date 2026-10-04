@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到 EPUB 3.3 的轻量公共门面。"""
+"""Lightweight public facade for strictly MiddleJson to EPUB 3.3."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ def render_epub(
     modified_at: datetime | None = None,
     asset_resolver: AssetResolver | None = None,
 ) -> bytes:
-    """惰性加载 EPUB 实现并返回完整 EPUB 3.3 容器字节。"""
+    """Lazy-load the EPUB implementation and return the full EPUB 3.3 container bytes."""
     from ._internal.epub.renderer import render_epub as _render_epub
 
     return _render_epub(

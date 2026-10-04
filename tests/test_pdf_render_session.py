@@ -1,4 +1,4 @@
-"""真实 PDF 验证定向渲染会话的复用、像素所有权及异常清理。"""
+"""Real PDF Verifies reuse, pixel ownership and exception cleanup of directional rendering sessions."""
 
 from contextlib import contextmanager
 from copy import deepcopy
@@ -17,7 +17,7 @@ from docvortex.document.pdf.visuals import _attach_prepared_visual_block_images
 
 @pytest.fixture
 def session_pdf():
-    """生成具有不同尺寸、透明图形和稀疏视觉页的多页真实 PDF。"""
+    """Generate multiple pages of real PDF with different sizes, transparent graphics and sparse visual pages."""
     output = BytesIO()
     canvas = Canvas(output, pagesize=(120, 180))
     for index in range(5):
@@ -34,7 +34,7 @@ def session_pdf():
 
 @contextmanager
 def _blocked_render(session, monkeypatch):
-    """在真实任务确认前挂起渲染，用事件控制租约占用，避免依赖任务耗时。"""
+    """Suspend rendering before real task confirmation, and use events to control lease occupancy to avoid time-consuming dependent tasks."""
     session.render(image_type="base64_img")
     ready = threading.Event()
     release = threading.Event()
@@ -42,13 +42,13 @@ def _blocked_render(session, monkeypatch):
     receive = session._receive
 
     def blocked_receive(*args, **kwargs):
-        """任务已发给进程后阻塞，允许主线程确定性验证争用和取消。"""
+        """Blocks after the task has been issued to the process, allowing the main thread to deterministically verify contention and cancellation."""
         ready.set()
         assert release.wait(10)
         return receive(*args, **kwargs)
 
     def render_task():
-        """保存后台异常供取消、超时与正常归还场景分别断言。"""
+        """Save background exceptions for separate assertions in cancellation, timeout and normal return scenarios."""
         try:
             session.render(image_type="base64_img", timeout=10)
         except BaseException as exc:
@@ -68,7 +68,7 @@ def _blocked_render(session, monkeypatch):
 
 
 def test_session_sparse_windows_reuse_document_and_return_owned_pixels(session_pdf):
-    """稀疏窗口只打开一次文档，像素逐字节等价且关闭后仍可使用。"""
+    """A sparse window opens the document only once, is equivalent pixel-by-byte, and remains usable after closing."""
     images = []
     with PDFRenderSession(session_pdf, threads=1) as session:
         directory = Path(session._directory.name)
@@ -92,7 +92,7 @@ def test_session_sparse_windows_reuse_document_and_return_owned_pixels(session_p
 
 
 def test_session_multiple_crops_match_existing_encoder(session_pdf):
-    """同页多个不同角度裁图复用一次栅格化并保持原编码结果。"""
+    """Multiple cuts of the same page from different angles are rasterized once and the original encoding results are maintained."""
     specs = [
         [
             (2, {"bbox": [0.1, 0.1, 0.5, 0.5], "angle": 0, "type": "image"}),
@@ -112,14 +112,14 @@ def test_session_multiple_crops_match_existing_encoder(session_pdf):
 
 
 def test_session_timeout_releases_input_and_workers(session_pdf, monkeypatch):
-    """在真实 worker 已打开文档后注入过期截止时间，确定性验证超时及资源回收。"""
+    """Inject expiry deadlines, deterministic validation timeouts and resource recycling after a real worker document has been opened."""
     session = PDFRenderSession(session_pdf)
     session.render(image_type="base64_img")
     assert not session._workers
     receive = session._receive
 
     def expired_response(worker, request_id, deadline, **kwargs):
-        """只改变响应等待截止时间，保留真实管道、超时检测和失败清理路径。"""
+        """Only the response waiting deadline is changed, and the real pipeline, timeout detection and failure cleanup path are retained."""
         return receive(worker, request_id, float("-inf"), **kwargs)
 
     monkeypatch.setattr(session, "_receive", expired_response)
@@ -132,7 +132,7 @@ def test_session_timeout_releases_input_and_workers(session_pdf, monkeypatch):
 
 
 def test_session_worker_crash_releases_resources(session_pdf, monkeypatch):
-    """任务期间进程崩溃使会话失败关闭，预算归还后其他会话仍能渲染。"""
+    """A process crash during a task causes the session to fail to close, and other sessions can still render after the budget is returned."""
     from docvortex.document.pdf import render_session as module
 
     with PDFRenderSession(session_pdf) as session:
@@ -154,7 +154,7 @@ def test_session_worker_crash_releases_resources(session_pdf, monkeypatch):
 
 
 def test_session_rejects_mismatched_document(session_pdf):
-    """错误文档不得误用已有会话返回另一份 PDF 的像素。"""
+    """Error documents must not misuse the pixels of an existing session to return another copy of PDF."""
     with PDFRenderSession(session_pdf) as session:
         with pytest.raises(ValueError, match="does not match"):
             load_images_from_pdf_bytes_range(b"different PDF", session=session)
@@ -162,7 +162,7 @@ def test_session_rejects_mismatched_document(session_pdf):
 
 
 def test_session_cancel_interrupts_wait_and_reclaims_workers(session_pdf, monkeypatch):
-    """并发取消唤醒等待任务且不会因关闭锁产生死锁。"""
+    """Concurrently cancel and wake up waiting tasks without causing deadlock due to closing locks."""
     from concurrent.futures import CancelledError
 
     session = PDFRenderSession(session_pdf)
@@ -171,13 +171,13 @@ def test_session_cancel_interrupts_wait_and_reclaims_workers(session_pdf, monkey
     original = session._receive
 
     def await_cancel(worker, request_id, deadline, **kwargs):
-        """把响应等待固定在可取消点，避免依赖机器渲染速度。"""
+        """Fix response waiting at a cancelable point to avoid relying on machine rendering speed."""
         ready.set()
         session._cancelled.wait(10)
         return original(worker, request_id, deadline, **kwargs)
 
     def render_task():
-        """记录后台任务异常以验证取消类型与资源清理。"""
+        """Log background task exceptions to verify cancellation type and resource cleanup."""
         try:
             session.render()
         except BaseException as exc:
@@ -195,7 +195,7 @@ def test_session_cancel_interrupts_wait_and_reclaims_workers(session_pdf, monkey
 
 
 def test_sessions_reuse_worker_after_document_close_ack(session_pdf):
-    """跨文档保持同一进程，关闭确认后输入映射可删除并重开另一文档。"""
+    """The same process is maintained across documents. After closing and confirming, the input mapping can be deleted and reopened in another document."""
     shutdown_pdf_render_sessions()
     try:
         with PDFRenderSession(session_pdf) as first:
@@ -218,7 +218,7 @@ def test_sessions_reuse_worker_after_document_close_ack(session_pdf):
 
 
 def test_concurrent_documents_wait_for_lease_and_reuse_worker(session_pdf, monkeypatch):
-    """两份文档争用一个槽位时等待关闭确认后复用进程，不共用活动句柄。"""
+    """When two documents compete for a slot, they wait for the shutdown confirmation and then reuse the process without sharing active handles."""
     from docvortex.document.pdf import render_session as module
 
     shutdown_pdf_render_sessions()
@@ -227,7 +227,7 @@ def test_concurrent_documents_wait_for_lease_and_reuse_worker(session_pdf, monke
     acquire = budget.acquire
 
     def observe_acquire(*args, **kwargs):
-        """记录租约真正耗尽，避免依赖睡眠推测后台线程已进入等待。"""
+        """Record the real exhaustion of the lease and avoid relying on sleep to speculate that the background thread has entered a wait."""
         result = acquire(*args, **kwargs)
         if not result:
             waiting.set()
@@ -240,7 +240,7 @@ def test_concurrent_documents_wait_for_lease_and_reuse_worker(session_pdf, monke
     errors = []
 
     def render_second():
-        """后台申请第二份文档的独占租约并记录异常。"""
+        """The backend applies for an exclusive lease on the second document and logs the exception."""
         try:
             second.render(image_type="base64_img", timeout=10)
         except BaseException as exc:
@@ -269,7 +269,7 @@ def test_concurrent_documents_wait_for_lease_and_reuse_worker(session_pdf, monke
 
 
 def test_lease_timeout_does_not_destroy_another_document(session_pdf, monkeypatch):
-    """等待槽位超时仅回收自己的会话，另一文档仍可正常渲染。"""
+    """When the waiting slot times out, only its own session is recycled, and another document can still be rendered normally."""
     from docvortex.document.pdf import render_session as module
 
     shutdown_pdf_render_sessions()
@@ -289,7 +289,7 @@ def test_lease_timeout_does_not_destroy_another_document(session_pdf, monkeypatc
 
 
 def test_forced_pool_shutdown_releases_active_lease(session_pdf, monkeypatch):
-    """全池强制关闭释放活跃租约，新会话无需等待旧对象再次调用 close。"""
+    """A pool-wide force shutdown releases active leases and new sessions do not need to wait for old objects to call close again."""
     from concurrent.futures import CancelledError
     from docvortex.document.pdf import render_session as module
 
@@ -311,7 +311,7 @@ def test_forced_pool_shutdown_releases_active_lease(session_pdf, monkeypatch):
 
 
 def test_two_workers_preserve_page_order_and_reuse_handles():
-    """两个定向进程处理交错页号后恢复原页序，第二个窗口不重开文档。"""
+    """The two directed processes restore the original page order after processing the interleaved page numbers, and the second window does not reopen the document."""
     output = BytesIO()
     canvas = Canvas(output, pagesize=(40, 50))
     for index in range(60):
@@ -330,7 +330,7 @@ def test_two_workers_preserve_page_order_and_reuse_handles():
 
 
 def test_mode_switch_rejects_overlap_without_cancelling_active_task(session_pdf, monkeypatch):
-    """新旧模式重叠只拒绝新请求，既有活动会话或旧窗口仍保持可用。"""
+    """New and old modes overlap only new requests are rejected, existing active sessions or old windows remain available."""
     from docvortex.document.pdf.render_session import legacy_render_scope
 
     monkeypatch.setenv("DOCVORTEX_PDF_RENDER_BACKEND", "legacy")
@@ -340,7 +340,7 @@ def test_mode_switch_rejects_overlap_without_cancelling_active_task(session_pdf,
             with pytest.raises(RuntimeError, match="active PDF render sessions"):
                 load_images_from_pdf_bytes_range(session_pdf)
         assert not errors
-        # 空闲缓存允许切换旧后端，随后原会话可以重新打开输入。
+        # The free cache allows the old backend to be switched and the original session can then be reopened for input.
         result = load_images_from_pdf_bytes_range(session_pdf)
         for item in result:
             item["img_pil"].close()
@@ -354,7 +354,7 @@ def test_mode_switch_rejects_overlap_without_cancelling_active_task(session_pdf,
 
 
 def test_busy_session_lock_timeout_preserves_session(session_pdf):
-    """同会话等待串行锁超时不破坏持锁方的文档状态。"""
+    """Waiting for a serial lock timeout in the same session does not destroy the document state of the lock holder."""
     with PDFRenderSession(session_pdf) as session:
         with session._lock:
             with pytest.raises(TimeoutError, match="lock"):
@@ -364,7 +364,7 @@ def test_busy_session_lock_timeout_preserves_session(session_pdf):
 
 
 def test_document_owns_one_session_and_releases_on_close(session_pdf):
-    """文档惰性会话跨窗口保持身份，文档关闭后归还租约并删除输入。"""
+    """Document lazy sessions maintain identity across windows, returning the lease and removing input when the document is closed."""
     from docvortex.document.pdf import PDFDocument, PDFRenderSession as exported
 
     assert exported is PDFRenderSession
@@ -382,12 +382,12 @@ def test_document_owns_one_session_and_releases_on_close(session_pdf):
 
 
 def test_session_backend_routes_bytes_and_visual_windows(session_pdf, monkeypatch):
-    """统一选择器让 bytes 与稀疏视觉窗口均绕过旧池且复用定向进程。"""
+    """The unified selector allows both bytes and sparse visual windows to bypass the old pool and reuse the directional process."""
     from docvortex.document.pdf import PDFDocument, images
     from docvortex.document.pdf.visuals import attach_visual_block_images_from_pdf
 
     def forbidden(*args, **kwargs):
-        """session 配置下任何旧池请求都视为路由错误。"""
+        """Any old pool request under session configuration is considered a routing error."""
         raise AssertionError("legacy pool must not run")
 
     monkeypatch.setenv("DOCVORTEX_PDF_RENDER_BACKEND", "session")
@@ -411,19 +411,19 @@ def test_session_backend_routes_bytes_and_visual_windows(session_pdf, monkeypatc
 
 
 def test_unknown_render_backend_is_not_silently_ignored(session_pdf, monkeypatch):
-    """拼错后端选择必须明确失败，不能误用旧路径产出误导基准。"""
+    """Misspelled backend selections must clearly fail, and old paths must not be misused to produce misleading benchmarks."""
     monkeypatch.setenv("DOCVORTEX_PDF_RENDER_BACKEND", "sessions")
     with pytest.raises(ValueError, match="legacy or session"):
         load_images_from_pdf_bytes_range(session_pdf)
 
 
 def test_document_close_preserves_original_error_after_session_cleanup_failure(session_pdf):
-    """会话清理失败仍关闭 PDFium 句柄，不能覆盖解析抛出的原始异常。"""
+    """Session cleanup failure still closes the PDFium handle and cannot override the original exception thrown by parsing."""
     from types import SimpleNamespace
     from docvortex.document.pdf import PDFDocument
 
     def fail_close():
-        """模拟关闭会话时发生的次生资源错误。"""
+        """Simulates secondary resource errors that occur when closing a session."""
         raise RuntimeError("secondary close failure")
 
     document = PDFDocument(session_pdf)
@@ -438,7 +438,7 @@ def test_document_close_preserves_original_error_after_session_cleanup_failure(s
 
 
 def test_render_document_closes_with_old_generation_wrappers(session_pdf, tmp_path, monkeypatch):
-    """旧代文档与页面包装仍被引用时，文件也必须确定释放而不调用 GC。"""
+    """While old generation documents and page wrappers are still referenced, the file must also be definitively freed without calling GC."""
     import gc
 
     from docvortex.document.pdf.pdfium import pdfium_guard
@@ -448,7 +448,7 @@ def test_render_document_closes_with_old_generation_wrappers(session_pdf, tmp_pa
     source_path.write_bytes(session_pdf)
     owner = _RenderPdfDocument(source_path)
     native = owner.document
-    # 主动保留闭合包装及其自循环，覆盖自动 GC 已把它们提升到旧代的情形。
+    # Actively retain closed packages and their self-loops, overriding the situation where automatic GC has promoted them to the old generation.
     native._retained_cycle = (native,)
     with pdfium_guard():
         page = native[0]
@@ -456,7 +456,7 @@ def test_render_document_closes_with_old_generation_wrappers(session_pdf, tmp_pa
     gc.collect(2)
 
     def forbid_collection(*args, **kwargs):
-        """禁止用强制全代 GC 避开导出视图所有权缺陷。"""
+        """Disabled use of force full generation GC to get around the export view ownership flaw."""
         raise AssertionError("mapped input cleanup must not depend on GC")
 
     enabled = gc.isenabled()
@@ -477,7 +477,7 @@ def test_render_document_closes_with_old_generation_wrappers(session_pdf, tmp_pa
 
 
 def test_render_document_keeps_input_when_native_close_fails(session_pdf, tmp_path, monkeypatch):
-    """PDFium 尚未确认关闭时保留原生所有权，恢复关闭后才释放文件。"""
+    """PDFium Retains native ownership on unconfirmed shutdown, and releases the file after restoring shutdown."""
     from docvortex.document.pdf import pdfium as runtime
     from docvortex.document.pdf.render_session import _RenderPdfDocument
 
@@ -486,7 +486,7 @@ def test_render_document_keeps_input_when_native_close_fails(session_pdf, tmp_pa
     owner = _RenderPdfDocument(source_path)
 
     def fail_close(document):
-        """模拟 native close 在句柄仍存活时抛错。"""
+        """Simulation native close throws an error while the handle is still alive."""
         raise RuntimeError("native close failed")
 
     try:
@@ -503,7 +503,7 @@ def test_render_document_keeps_input_when_native_close_fails(session_pdf, tmp_pa
 
 
 def test_render_document_open_failure_releases_file(tmp_path):
-    """真实 PDFium 拒绝输入后文件仍可删除，失败的加载不留下文件句柄。"""
+    """TRUE PDFium Files can still be deleted after rejecting input, and failed loads leave no file handles."""
     import pypdfium2
     from docvortex.document.pdf.render_session import _RenderPdfDocument
 
@@ -517,7 +517,7 @@ def test_render_document_open_failure_releases_file(tmp_path):
 @pytest.mark.parametrize("pixel_format", [1, 2, 3, 4])
 @pytest.mark.parametrize("reverse", [False, True])
 def test_raw_pixel_transport_preserves_format_stride_and_ownership(session_pdf, tmp_path, monkeypatch, pixel_format, reverse):
-    """灰度、三通道及带透明通道的原始缓冲均保持像素、行跨度和关闭后所有权。"""
+    """Grayscale, three-channel, and raw buffers with transparency channels all maintain pixel, line span, and post-close ownership."""
     import mmap
     import pypdfium2 as pdfium
     from PIL import Image
@@ -528,7 +528,7 @@ def test_raw_pixel_transport_preserves_format_stride_and_ownership(session_pdf, 
         render = page.render
 
         def selected_format(**kwargs):
-            """显式覆盖真实 PDFium 位图格式及旋转裁剪，验证传输不依赖默认三通道。"""
+            """Explicitly overrides the real PDFium bitmap format and rotation and cropping, verifying that the transmission does not rely on the default three channels."""
             return render(**kwargs, force_bitmap_format=pixel_format, rev_byteorder=reverse, rotation=90, crop=(1, 2, 3, 4))
 
         monkeypatch.setattr(page, "render", selected_format)
@@ -553,7 +553,7 @@ def test_raw_pixel_transport_preserves_format_stride_and_ownership(session_pdf, 
 
 
 def test_parallel_session_preserves_order_pixels_and_crop_budget(monkeypatch):
-    """真实多进程覆盖旋转与透明页：像素、页序和关闭后所有权不变，裁图不增加 worker。"""
+    """Real multi-process coverage of rotation and transparent pages: pixels, page order and ownership remain unchanged after closing, and cropping does not increase worker."""
     import os
     from docvortex.document.pdf import render_session
 
@@ -597,7 +597,7 @@ def test_parallel_session_preserves_order_pixels_and_crop_budget(monkeypatch):
 
 
 def test_owned_bitmap_survives_pdfium_close_without_pil(session_pdf, monkeypatch):
-    """直接取图不经过 PIL，位图及文档关闭后独立字节仍可裁剪编码。"""
+    """Directly capture the image without going through PIL. Independent bytes can still be cropped and encoded after the bitmap and document are closed."""
     import pypdfium2 as pdfium
     from docvortex._compute_backend import get_native
     from docvortex.document.pdf.pdfium import pdfium_guard
@@ -609,7 +609,7 @@ def test_owned_bitmap_survives_pdfium_close_without_pil(session_pdf, monkeypatch
         pytest.skip("Python reference backend")
 
     def forbidden_pil(*args, **kwargs):
-        """新直裁路径若物化整页 PIL，立即使测试失败。"""
+        """If the new direct cutting path materializes the entire page PIL, the test will fail immediately."""
         raise AssertionError("unexpected full-page PIL materialization")
 
     monkeypatch.setattr(pdfium.PdfBitmap, "to_pil", forbidden_pil)
@@ -626,7 +626,7 @@ def test_owned_bitmap_survives_pdfium_close_without_pil(session_pdf, monkeypatch
 
 
 def test_default_auto_render_backend_and_explicit_modes(monkeypatch):
-    """默认及显式 auto 均启用会话，显式 session 和 legacy 保留选择能力。"""
+    """Both default and explicit auto enable sessions, explicit session and legacy retain selection capabilities."""
     from docvortex.document.pdf.images import get_pdf_render_backend
 
     monkeypatch.delenv("DOCVORTEX_PDF_RENDER_BACKEND", raising=False)
@@ -639,7 +639,7 @@ def test_default_auto_render_backend_and_explicit_modes(monkeypatch):
 
 
 def test_five_open_sessions_share_three_workers_without_waiting_for_close(monkeypatch):
-    """五份文档保持打开并交错渲染，逐像素相等且整个测试最多创建三个进程。"""
+    """Five documents were kept open and rendered interleaved, pixel-by-pixel equal and a maximum of three processes were created throughout the test."""
     from concurrent.futures import ThreadPoolExecutor
     from docvortex.document.pdf import render_session as module
 
@@ -660,13 +660,13 @@ def test_five_open_sessions_share_three_workers_without_waiting_for_close(monkey
             payload = output.getvalue()
             sessions.append(PDFRenderSession(payload, threads=3, timeout=10))
             expected.append(load_images_from_pdf_core(payload, dpi=72, image_type="base64_img"))
-        # 单个未关闭会话先使用全部额度，其他会话必须仍可借到这些进程。
+        # A single unclosed session uses the entire quota first, and other sessions must still be able to borrow these processes.
         assert sessions[0].render(0, 11, dpi=72, image_type="base64_img") == expected[0]
         assert not sessions[0]._workers and not module._leased_workers
         seen_pids.update(worker[0].pid for worker in module._all_workers)
 
         def render_document(index):
-            """各轮同时提交真实任务，保持所有文档会话存活以复现长期占池场景。"""
+            """Real tasks are submitted simultaneously in each round, keeping all document sessions alive to reproduce long-term pool occupation scenarios."""
             for _ in range(3):
                 barrier.wait(timeout=10)
                 assert sessions[index].render(0, 11, dpi=72, image_type="base64_img") == expected[index]
@@ -688,7 +688,7 @@ def test_five_open_sessions_share_three_workers_without_waiting_for_close(monkey
 
 
 def test_idle_cache_affinity_preserves_both_documents(session_pdf, monkeypatch):
-    """空闲池同时缓存两份文档时按文档亲和性选择，交错窗口不重复打开输入。"""
+    """When the free pool caches two documents at the same time, the selection is based on document affinity, and the interleaved window is not opened repeatedly for input."""
     from docvortex.document.pdf import render_session as module
 
     shutdown_pdf_render_sessions()
@@ -714,7 +714,7 @@ def test_idle_cache_affinity_preserves_both_documents(session_pdf, monkeypatch):
 
 @pytest.mark.parametrize("cancel_old", [False, True])
 def test_old_session_close_does_not_touch_new_active_lease(session_pdf, monkeypatch, cancel_old):
-    """原会话关闭或取消时，同一进程上新会话的活动任务继续正常完成。"""
+    """When the original session is closed or canceled, active tasks for the new session on the same process continue to complete normally."""
     from docvortex.document.pdf import render_session as module
 
     shutdown_pdf_render_sessions()
@@ -737,7 +737,7 @@ def test_old_session_close_does_not_touch_new_active_lease(session_pdf, monkeypa
 
 
 def test_close_waits_for_cached_input_eviction_ack(session_pdf, monkeypatch):
-    """旧输入关闭确认尚未收到时不删文件，确认后不必等待新文档整个任务结束。"""
+    """The file will not be deleted when the old input closing confirmation has not been received, and there is no need to wait for the entire task of the new document to be completed after confirmation."""
     from docvortex.document.pdf import render_session as module
 
     shutdown_pdf_render_sessions()
@@ -753,27 +753,27 @@ def test_close_waits_for_cached_input_eviction_ack(session_pdf, monkeypatch):
     wait = module._worker_available.wait
 
     def pause_eviction(worker, request_id, deadline, **kwargs):
-        """只暂停第一次切换输入的关闭确认，让旧会话关闭与其确定性交错。"""
+        """Only suspend the closing confirmation of the first toggle input, letting old session closings be interleaved with their finality."""
         if not switching.is_set():
             switching.set()
             assert allow_close_ack.wait(10)
         return receive(worker, request_id, deadline, **kwargs)
 
     def observe_close_wait(*args, **kwargs):
-        """记录旧会话确实在等待缓存释放，而非测试线程还没开始关闭。"""
+        """Logging that the old session is indeed waiting for the cache to be released, the non-test thread hasn't started shutting down yet."""
         if threading.current_thread().name == "old-input-close":
             close_waiting.set()
         return wait(*args, **kwargs)
 
     def render_second():
-        """记录切换输入和渲染过程中的异常。"""
+        """Log exceptions during switching input and rendering."""
         try:
             second.render(image_type="base64_img", timeout=10)
         except BaseException as exc:
             errors.append(exc)
 
     def close_first():
-        """关闭旧会话后记录完成，确保不因换主误删正在读取的文件。"""
+        """Recording is completed after closing the old session to ensure that files being read are not accidentally deleted due to owner change."""
         try:
             first.close()
             old_closed.set()
@@ -809,7 +809,7 @@ def test_close_waits_for_cached_input_eviction_ack(session_pdf, monkeypatch):
 
 @pytest.mark.parametrize("fault", ["close", "open"])
 def test_input_switch_failure_reclaims_budget_and_preserves_old_session(session_pdf, monkeypatch, fault):
-    """切换的关闭或打开失败都回收唯一槽位，旧会话随后仍能重新渲染。"""
+    """Failure to close or open the switch reclaims the unique slot, and the old session can still be re-rendered later."""
     from docvortex.document.pdf import render_session as module
 
     shutdown_pdf_render_sessions()
@@ -820,7 +820,7 @@ def test_input_switch_failure_reclaims_budget_and_preserves_old_session(session_
             send = second._send
 
             def fail_switch(worker, operation, payload):
-                """在指定协议阶段注入发送失败，覆盖旧缓存与新缓存两种归属。"""
+                """Injection failure in the specified protocol phase, covering both the old cache and the new cache."""
                 if operation == fault:
                     raise OSError("injected input switch failure")
                 return send(worker, operation, payload)
@@ -838,7 +838,7 @@ def test_input_switch_failure_reclaims_budget_and_preserves_old_session(session_
 
 @pytest.mark.parametrize("cancel_head", [False, True])
 def test_worker_queue_is_fifo_and_cancel_wakes_waiters(session_pdf, monkeypatch, cancel_head):
-    """事件通知保证先到先服务，队首取消立即出队且不会消耗或释放他人的额度。"""
+    """Event notifications are guaranteed to be served on a first-come, first-served basis. If the leader of the queue is cancelled, he will be immediately de-queued and will not consume or release other people’s quota."""
     from concurrent.futures import CancelledError
     from docvortex.document.pdf import render_session as module
 
@@ -853,20 +853,20 @@ def test_worker_queue_is_fifo_and_cancel_wakes_waiters(session_pdf, monkeypatch,
     ensure = PDFRenderSession._ensure_workers
 
     def observe_wait(*args, **kwargs):
-        """由真实条件变量等待通知测试线程，避免按睡眠时间猜测入队顺序。"""
+        """The test thread is notified by the real condition variable to wait and avoid guessing the queue order according to the sleep time."""
         name = threading.current_thread().name
         if name.startswith("lease-waiter-"):
             waiting[int(name.rsplit("-", 1)[1])].set()
         return wait(*args, **kwargs)
 
     def observe_lease(session, *args):
-        """持有真实租约时记录获取顺序，避免任务返回后线程调度影响断言。"""
+        """Record the acquisition sequence when holding a real lease to avoid thread scheduling affecting assertions after the task returns."""
         ensure(session, *args)
         if session in queued:
             acquired.append(queued.index(session))
 
     def render_waiter(index):
-        """为各等待者单独保存异常，验证仅目标会话收到取消。"""
+        """Save exceptions separately for each waiter to verify that only the target session received the cancellation."""
         try:
             queued[index].render(image_type="base64_img")
         except BaseException as exc:
@@ -905,7 +905,7 @@ def test_worker_queue_is_fifo_and_cancel_wakes_waiters(session_pdf, monkeypatch,
 
 
 def test_idle_worker_crash_reopens_cache_without_leaking_budget(session_pdf, monkeypatch):
-    """空闲进程崩溃仅使缓存失效，同一会话下一窗口可重建进程并继续使用。"""
+    """The crash of an idle process only invalidates the cache, and the process can be rebuilt in the next window of the same session and continued to be used."""
     from docvortex.document.pdf import render_session as module
 
     shutdown_pdf_render_sessions()
@@ -926,7 +926,7 @@ def test_idle_worker_crash_reopens_cache_without_leaking_budget(session_pdf, mon
 
 
 def test_waiting_session_rechecks_legacy_overlap_after_wakeup(session_pdf, monkeypatch):
-    """归还与唤醒之间旧后端取得池时，等待者重新检查互斥而不是再创建一组进程。"""
+    """When the old backend acquires the pool between return and wakeup, the waiter rechecks the mutex instead of creating another set of processes."""
     from docvortex.document.pdf import render_session as module
 
     shutdown_pdf_render_sessions()
@@ -941,19 +941,19 @@ def test_waiting_session_rechecks_legacy_overlap_after_wakeup(session_pdf, monke
     release = first._release_workers
 
     def observe_wait(*args, **kwargs):
-        """确认第二会话已经进入预算等待。"""
+        """Confirm that the second session has entered budget waiting."""
         waiting.set()
         return wait(*args, **kwargs)
 
     def release_then_start_legacy():
-        """在同一池锁内归还任务并启动旧后端，确定性复现后端切换竞态。"""
+        """Return the task within the same pool lock and start the old backend to deterministically reproduce the backend switching race condition."""
         with module._worker_available:
             release()
             legacy.__enter__()
             entered.append(True)
 
     def render_second():
-        """记录等待者重新检查后端状态时的明确错误。"""
+        """Log explicit errors when waiters recheck backend status."""
         try:
             second.render(image_type="base64_img", timeout=10)
         except BaseException as exc:

@@ -13,12 +13,12 @@ from docvortex.schema import EquationBlock, MiddleJson, PageInfo, Producer, Tabl
 
 
 def _data_uri(mime_subtype: str, payload: bytes) -> str:
-    """把测试图片字节编码为 data URI。"""
+    """Encode the test image bytes as data URI."""
     return f"data:image/{mime_subtype};base64,{base64.b64encode(payload).decode('ascii')}"
 
 
 def _middle_json_with_table(body: TableBodyBlock) -> MiddleJson:
-    """构造只包含一个表格载体的最小 Office MiddleJson。"""
+    """Construct a minimal Office MiddleJson containing only one table vector."""
     table = TableBlock(type="table", index=body.index, content=[body])
     return MiddleJson(
         pages=[PageInfo(page_idx=3, blocks=[table])],
@@ -29,7 +29,7 @@ def _middle_json_with_table(body: TableBodyBlock) -> MiddleJson:
 
 
 def test_full_serialization_round_trip_and_recursive_field_exclusion() -> None:
-    """验证完整 dump 保留图片，而递归排除不遗漏 visual 子块。"""
+    """Verification of complete dump preserves the picture, while recursive exclusion does not miss visual subchunks."""
     jpeg_uri = _data_uri("jpeg", b"\xff\xd8\xffpayload\xff\xd9")
     middle_json = _middle_json_with_table(
         TableBodyBlock(type="table_body", index=0, content="<table></table>", image_base64=jpeg_uri)
@@ -44,7 +44,7 @@ def test_full_serialization_round_trip_and_recursive_field_exclusion() -> None:
 
 
 def test_equation_export_uses_canonical_sidecar_name(tmp_path: Path) -> None:
-    """验证行间公式图片使用 equation discriminator 生成确定性 sidecar 名称。"""
+    """The Validate Interline Formula picture uses equation discriminator to generate the deterministic sidecar name."""
     jpeg_payload = b"\xff\xd8\xffequation\xff\xd9"
     equation = EquationBlock(
         type="equation",
@@ -70,7 +70,7 @@ def test_equation_export_uses_canonical_sidecar_name(tmp_path: Path) -> None:
 
 
 def test_export_writes_direct_and_multiple_html_images_without_mutating_source(tmp_path: Path) -> None:
-    """验证直接图片与 HTML 多图采用确定性命名，导出副本不污染原对象。"""
+    """Verify that direct pictures and HTML multi-pictures use deterministic naming, and exported copies do not contaminate the original objects."""
     jpeg_payload = b"\xff\xd8\xffjpeg\xff\xd9"
     gif_payload = b"GIF89agif"
     png_payload = b"\x89PNG\r\n\x1a\npng"
@@ -103,7 +103,7 @@ def test_export_writes_direct_and_multiple_html_images_without_mutating_source(t
 
 
 def test_export_supports_strict_svg_payload(tmp_path: Path) -> None:
-    """验证 PPTX 可能产出的 SVG data URI 可按 XML 根元素严格校验并外置。"""
+    """Verify that the SVG data URI that may be produced by PPTX can be strictly verified and externalized according to the root element of XML."""
     svg_payload = b'<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>'
     middle_json = _middle_json_with_table(
         TableBodyBlock(
@@ -121,7 +121,7 @@ def test_export_supports_strict_svg_payload(tmp_path: Path) -> None:
 
 
 def test_export_supports_direct_png_and_html_jpeg(tmp_path: Path) -> None:
-    """验证直接 PNG 与 Office 表格 HTML 内嵌 JPEG 都能按各自格式外置。"""
+    """Verify that both PNG and Office tables, HTML embedded and JPEG can be externalized according to their respective formats."""
     png_payload = b"\x89PNG\r\n\x1a\npng"
     jpeg_payload = b"\xff\xd8\xffjpeg\xff\xd9"
     jpeg_uri = _data_uri("jpeg", jpeg_payload)
@@ -151,7 +151,7 @@ def test_export_supports_direct_png_and_html_jpeg(tmp_path: Path) -> None:
     ],
 )
 def test_export_rejects_invalid_payload_before_writing(tmp_path: Path, data_uri: str) -> None:
-    """验证非法 base64、MIME 签名不符和不支持格式均不会产生半成品。"""
+    """Verification of illegal base64, MIME signature inconsistencies and unsupported formats will not produce semi-finished products."""
     output_dir = tmp_path / "output"
     middle_json = _middle_json_with_table(
         TableBodyBlock(type="table_body", index=0, content="<table></table>", image_base64=data_uri)
@@ -164,7 +164,7 @@ def test_export_rejects_invalid_payload_before_writing(tmp_path: Path, data_uri:
 
 
 def test_export_rejects_unparsed_inline_data_uri_before_writing(tmp_path: Path) -> None:
-    """验证不符合 base64 data URI 语法的 HTML 图片不会原样泄漏到导出 JSON。"""
+    """Verify that HTML images that do not conform to base64 data URI syntax are not leaked unchanged to export JSON."""
     output_dir = tmp_path / "output"
     middle_json = _middle_json_with_table(
         TableBodyBlock(
@@ -181,7 +181,7 @@ def test_export_rejects_unparsed_inline_data_uri_before_writing(tmp_path: Path) 
 
 
 def test_export_preflights_conflicts_and_supports_explicit_overwrite(tmp_path: Path) -> None:
-    """验证同名同内容可复用、不同内容默认报错且 overwrite 可替换。"""
+    """Verify that the same name and the same content can be reused, different content will report an error by default, and overwrite can be replaced."""
     first_payload = b"\xff\xd8\xfffirst\xff\xd9"
     second_payload = b"\xff\xd8\xffsecond\xff\xd9"
     first = _middle_json_with_table(
@@ -213,7 +213,7 @@ def test_export_preflights_conflicts_and_supports_explicit_overwrite(tmp_path: P
 
 
 def test_export_conflicting_json_rolls_back_before_any_image_write(tmp_path: Path) -> None:
-    """验证 JSON 冲突在提交前被发现，不会先留下图片 sidecar。"""
+    """Verify that the JSON conflict was discovered before committing, without leaving the image sidecar first."""
     (tmp_path / "middle_json.json").write_text("occupied")
     middle_json = _middle_json_with_table(
         TableBodyBlock(
@@ -235,7 +235,7 @@ def test_export_restores_existing_files_after_commit_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证提交中途失败时会恢复已覆盖文件，并清理全部临时文件。"""
+    """If the verification submission fails, the overwritten files will be restored and all temporary files will be cleared."""
     image_path = tmp_path / "images/page_3_table_0.jpg"
     image_path.parent.mkdir()
     image_path.write_bytes(b"old-image")
@@ -253,7 +253,7 @@ def test_export_restores_existing_files_after_commit_failure(
     replace_count = 0
 
     def fail_second_replace(source: str | Path, target: str | Path) -> None:
-        """模拟第二个文件提交失败，以覆盖事务回滚分支。"""
+        """Simulate a second file commit failure to override the transaction rollback branch."""
         nonlocal replace_count
         replace_count += 1
         if replace_count == 2:
@@ -272,14 +272,14 @@ def test_export_restores_existing_files_after_commit_failure(
 
 @pytest.mark.parametrize("json_name", ["../middle.json", "/tmp/middle.json", "..\\middle.json"])
 def test_export_rejects_path_escape(tmp_path: Path, json_name: str) -> None:
-    """验证 JSON 输出名不能使用绝对路径或逃逸文档目录。"""
+    """Verify that JSON output names cannot use absolute paths or escape document directories."""
     middle_json = _middle_json_with_table(TableBodyBlock(type="table_body", index=0, content="<table></table>"))
     with pytest.raises(ValueError):
         export_middle_json(middle_json, tmp_path, json_name=json_name)
 
 
 def test_export_rejects_file_and_directory_path_collision(tmp_path: Path) -> None:
-    """验证 JSON 文件名不能占用图片 sidecar 所需的 images 目录。"""
+    """Verify that the JSON filename does not occupy the images directory required for picture sidecar."""
     output_dir = tmp_path / "output"
     middle_json = _middle_json_with_table(
         TableBodyBlock(
@@ -297,7 +297,7 @@ def test_export_rejects_file_and_directory_path_collision(tmp_path: Path) -> Non
 
 
 def test_export_rejects_symlink_output_directory(tmp_path: Path) -> None:
-    """验证导出根目录是符号链接时直接拒绝写入。"""
+    """Directly deny writing when verifying that the export root directory is a symlink."""
     actual_dir = tmp_path / "actual"
     actual_dir.mkdir()
     link_dir = tmp_path / "link"
@@ -311,7 +311,7 @@ def test_export_rejects_symlink_output_directory(tmp_path: Path) -> None:
 
 
 def test_export_rejects_symlink_sidecar_directory(tmp_path: Path) -> None:
-    """验证图片子目录是符号链接时不会跟随链接写到文档目录之外。"""
+    """Verify that when the image subdirectory is a symbolic link, the link will not be written outside the document directory."""
     outside_dir = tmp_path / "outside"
     outside_dir.mkdir()
     output_dir = tmp_path / "output"
@@ -333,7 +333,7 @@ def test_export_rejects_symlink_sidecar_directory(tmp_path: Path) -> None:
 
 
 def test_image_path_is_validated_during_deserialization() -> None:
-    """验证对象边界拒绝绝对路径、目录逃逸和 Windows 反斜杠路径。"""
+    """Validation object boundaries reject absolute paths, directory escapes, and Windows backslash paths."""
     for image_path in ("/tmp/image.jpg", "../image.jpg", "images\\image.jpg"):
         with pytest.raises(ValueError):
             TableBodyBlock(
@@ -345,7 +345,7 @@ def test_image_path_is_validated_during_deserialization() -> None:
 
 
 def test_exported_json_is_a_pure_middle_json_object(tmp_path: Path) -> None:
-    """验证导出 JSON 可独立严格反序列化且不依赖导出结果包装对象。"""
+    """Validation export JSON can be strictly deserialized independently and does not rely on the export result wrapper object."""
     middle_json = _middle_json_with_table(TableBodyBlock(type="table_body", index=0, content="<table></table>"))
     result = export_middle_json(middle_json, tmp_path)
 

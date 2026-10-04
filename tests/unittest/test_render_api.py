@@ -28,7 +28,7 @@ from docvortex.schema import ImageBlock, ImageBodyBlock, MiddleJson, PageBlock, 
 
 
 def _middle(*pages: PageInfo) -> MiddleJson:
-    """构造无需 PDF bbox 的最小严格 MiddleJson。"""
+    """Construct a minimally stringent MiddleJson that does not require PDF bbox."""
     return MiddleJson(
         pages=list(pages),
         is_full_document=True,
@@ -38,19 +38,19 @@ def _middle(*pages: PageInfo) -> MiddleJson:
 
 
 def _page(page_idx: int, *blocks: PageBlock) -> PageInfo:
-    """按调用方顺序构造一页严格 MiddleJson 内容。"""
+    """Constructs a page of strictly MiddleJson content in caller order."""
     return PageInfo(page_idx=page_idx, blocks=list(blocks))
 
 
 def _png_bytes() -> bytes:
-    """生成可被 Pillow 与 python-docx 完整读取的 PNG。"""
+    """Generate PNG that can be fully read by Pillow and python-docx."""
     output = BytesIO()
     Image.new("RGB", (2, 2), (30, 60, 90)).save(output, format="PNG")
     return output.getvalue()
 
 
 def test_unified_render_dispatches_all_native_output_types_without_mutation() -> None:
-    """验证统一入口分发全部原生结果且不修改输入。"""
+    """Verify that the unified portal distributes all native results and does not modify the input."""
     middle = _middle(_page(0, TextBlock(type="text", index=0, content=_inline("hello"))))
     original = deepcopy(middle)
     markdown = render(middle, RenderFormat.MARKDOWN)
@@ -72,7 +72,7 @@ def test_unified_render_dispatches_all_native_output_types_without_mutation() ->
 
 
 def test_unified_render_forwards_format_specific_options() -> None:
-    """验证 Markdown/HTML 模式与各格式专属资源选项分别透传。"""
+    """Verify that Markdown/HTML mode and each format's exclusive resource options are transparently transmitted respectively."""
     middle = _middle(
         _page(0, TextBlock(type="text", index=0, content=_inline("first-"))),
         _page(1, TextBlock(type="text", index=0, content=_inline("second"), continues_prev=True)),
@@ -128,11 +128,11 @@ def test_unified_render_forwards_format_specific_options() -> None:
 
 
 def test_unified_docx_uses_typed_asset_resolver_and_propagates_public_errors() -> None:
-    """验证 DOCX Options 传递素材解析器，并保留带定位的公共异常。"""
+    """Verify DOCX Options passes the material parser and preserves the public exception with positioning."""
     requested_paths: list[str] = []
 
     def resolve_asset(relative_path: str) -> bytes:
-        """记录统一入口请求的相对路径并返回有效 PNG。"""
+        """Record the relative path of the unified portal request and return valid PNG."""
         requested_paths.append(relative_path)
         return _png_bytes()
 
@@ -155,7 +155,7 @@ def test_unified_docx_uses_typed_asset_resolver_and_propagates_public_errors() -
 
 
 def test_unified_render_rejects_legacy_format_and_mismatched_options() -> None:
-    """验证统一入口拒绝旧字典、字符串格式和跨格式 Options。"""
+    """Validation Unified Portal rejects old dictionary, string format, and cross-format Options."""
     middle = _middle(_page(0))
     with pytest.raises(TypeError, match="MiddleJson"):
         render(middle.to_dict(), RenderFormat.MARKDOWN)
@@ -174,7 +174,7 @@ def test_unified_render_rejects_legacy_format_and_mismatched_options() -> None:
 
 
 def test_public_options_validate_fields() -> None:
-    """验证 Options 构造期的严格字段类型检查。"""
+    """Verify Options Strict field type checking at construction time."""
     with pytest.raises(TypeError, match="RenderMode"):
         MarkdownRenderOptions(mode="default")
     assert "mode" in signature(MarkdownRenderOptions).parameters

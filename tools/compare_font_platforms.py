@@ -1,4 +1,4 @@
-"""比较固定 PDFium/font 的平台产物，严格验证 CJK 几何及有序语义。"""
+"""Compare the platform products with fixed PDFium/font and strictly verify the geometry and ordering semantics of CJK."""
 
 from __future__ import annotations
 
@@ -12,12 +12,12 @@ _TOLERANCE = 1e-3
 
 
 def _read(path: Path) -> Any:
-    """以明确编码读取不依赖当前平台区域设置的产物。"""
+    """Read artifacts in an explicit encoding that does not depend on the current platform locale."""
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def compare_geometry(reference: dict[str, Any], candidate: dict[str, Any], font_hash: str) -> dict[str, Any]:
-    """所有字符索引/Unicode 必须一致；被接管字形的 loose/tight/origin 使用 PDF point 容差。"""
+    """All character indexes/Unicode must be consistent; the loose/tight/origin of the taken over glyph uses the PDF point tolerance."""
     assert reference["source_sha256"] == candidate["source_sha256"], "Source PDF differs"
     assert len(reference["pages"]) == len(candidate["pages"]), "Page count differs"
     count = 0
@@ -51,12 +51,12 @@ def compare_geometry(reference: dict[str, Any], candidate: dict[str, Any], font_
 
 
 def _semantics(model: dict[str, Any]) -> list[list[tuple[Any, ...]]]:
-    """按原阅读顺序比较块类型、文本/表格结构及角度，素材像素单独供视觉审阅。"""
+    """Block type, text/table structure and angles are compared in original reading order, with material pixels separated for visual review."""
     return [[(block["type"], block.get("content"), block.get("angle")) for block in page] for page in model["pages"]]
 
 
 def main() -> None:
-    """以一个平台为参考，检查全部其他平台并保存可审计的最大几何差。"""
+    """Using one platform as a reference, all other platforms are checked and the maximum auditable geometric difference is saved."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directories", nargs="+", type=Path)
     parser.add_argument("--output", type=Path, required=True)

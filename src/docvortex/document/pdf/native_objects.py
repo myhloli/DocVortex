@@ -1,4 +1,4 @@
-"""PDF Path、Image 与 Form 对象提取，保持原生提取算法与资源语义。"""
+"""PDF Path, Image and Form object extraction, maintaining the native extraction algorithm and resource semantics."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ logger = logging.getLogger("docvortex.document.pdf._document")
 
 @dataclass(frozen=True)
 class _ClippedObject:
-    """保存对象坐标系和累积裁剪，避免把父坐标中的 clip 再乘一次对象矩阵。"""
+    """Save the object coordinate system and cumulative clipping to avoid multiplying the clip in the parent coordinates by the object matrix again."""
 
     raw: Any
     matrix: tuple[float, float, float, float, float, float]
@@ -50,20 +50,20 @@ class _ClippedObject:
 
 
 def _intersect_object_bbox(first: BBox, second: BBox | None) -> BBox:
-    """求边界交集，空交集保持为空矩形，不能重新当成无裁剪。"""
+    """Find the boundary intersection. An empty intersection remains an empty rectangle and cannot be re-considered as no clipping."""
     if second is None:
         return first
     return max(first[0], second[0]), max(first[1], second[1]), min(first[2], second[2]), min(first[3], second[3])
 
 
 def _transform_object_bbox(bbox: BBox, transform: Any) -> BBox:
-    """变换四角后取保守外框，兼容旋转和斜切。"""
+    """After transforming the four corners, a conservative outer frame is adopted, which is compatible with rotation and beveling."""
     points = [transform((x, y)) for x in (bbox[0], bbox[2]) for y in (bbox[1], bbox[3])]
     return min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)
 
 
 def _object_clip_bbox(raw: Any, parent_matrix: tuple, inherited: BBox | None) -> BBox | None:
-    """读取父坐标系中的裁剪路径；各路径相交，曲线以含控制点的保守外框约束。"""
+    """The clipping paths in the parent coordinate system are read; the paths intersect and the curve is constrained by a conservative outer bounding box with control points."""
     result = inherited
     try:
         clip = pdfium_c.FPDFPageObj_GetClipPath(raw)
@@ -84,7 +84,7 @@ def _object_clip_bbox(raw: Any, parent_matrix: tuple, inherited: BBox | None) ->
                 )
                 result = _intersect_object_bbox(bounds, result)
     except Exception:
-        # 缺失或损坏的局部 clip 不能抹掉已经确认的父级裁剪。
+        # Missing or corrupted partial clip Confirmed parent crop cannot be erased.
         pass
     return result
 
@@ -98,7 +98,7 @@ def _walk_clipped_objects(
     inherited_clip: BBox | None = None,
     max_depth: int = DRAWING_FORM_MAX_DEPTH,
 ) -> Iterator[_ClippedObject]:
-    """遍历可见叶子并传播 Form 裁剪；对象矩阵只变换内容，clip 使用父矩阵。"""
+    """Traverse visible leaves and propagate Form clipping; object matrix only transforms content, clip uses parent matrix."""
     if depth >= max_depth:
         return
     count_objects = pdfium_c.FPDFFormObj_CountObjects if is_form else pdfium_c.FPDFPage_CountObjects
@@ -131,7 +131,7 @@ def _walk_clipped_objects(
 
 
 def _clip_object_visual_bbox(bbox: BBox, clip: BBox | None, page_bbox: BBox, rotation: int) -> BBox | None:
-    """在统一页面视觉坐标中应用累积裁剪。"""
+    """Apply cumulative cropping in unified page visual coordinates."""
     if clip is not None and (clip[2] <= clip[0] or clip[3] <= clip[1]):
         return None
     if clip is not None:
@@ -142,7 +142,7 @@ def _clip_object_visual_bbox(bbox: BBox, clip: BBox | None, page_bbox: BBox, rot
 
 
 def _clipped_form_extent(raw: Any, page_bbox: BBox, rotation: int) -> BBox | None:
-    """仅在 Form 内存在裁剪时用可见叶子重建边界；无 clip 的既有输出保持原值。"""
+    """Only in Form memory the boundaries are reconstructed with visible leaves when clipping; existing output without clip remains unchanged."""
     matrix = _get_raw_object_matrix(raw)
     if matrix is None:
         return None
@@ -173,7 +173,7 @@ def _clipped_objects_of_type(
     object_type: int,
     max_depth: int = DRAWING_FORM_MAX_DEPTH,
 ) -> Iterator[_ClippedObject]:
-    """过滤已累计裁剪的对象类型，路径 source_index 保持既有遍历顺序。"""
+    """Filter the accumulated cropped object types, and the path source_index maintains the existing traversal order."""
     from ._object_bridge import read_clipped_objects
 
     records = read_clipped_objects(page, object_type, max_depth)
@@ -189,7 +189,7 @@ def _clipped_objects_of_type(
 def _text_object_visibility(
     page: Any, page_bbox: BBox, rotation: int, paint_page_reader=None
 ) -> dict[int, tuple[bool, BBox | None]]:
-    """一次遍历建立文字对象的绘制状态与有效裁剪；地址只在本次页面提取内使用。"""
+    """One traversal establishes the drawing state and effective cropping of the text object; the address is only used within this page extraction."""
     from ._object_bridge import read_text_visibility
 
     records = read_text_visibility(page, page_bbox, rotation, DRAWING_FORM_MAX_DEPTH)
@@ -236,7 +236,7 @@ def _walk_raw_page_objects_with_depth(
     depth: int,
     target_type: int,
 ) -> Iterator[tuple[Any, tuple[float, float, float, float, float, float], int]]:
-    """递归遍历目标对象，并携带累积矩阵及所在 Form 深度。"""
+    """Recursively traverse the target object and carry the accumulation matrix and its Form depth."""
     if depth >= DRAWING_FORM_MAX_DEPTH:
         return
 
@@ -260,7 +260,7 @@ def _walk_raw_page_objects_with_depth(
                 continue
             combined_matrix = _multiply_pdf_matrices(object_matrix, parent_matrix)
         except Exception:
-            # 单个损坏页面对象不能中断同页其他目标对象遍历。
+            # A single damaged page object cannot interrupt the traversal of other target objects on the same page.
             continue
 
         if object_type == target_type:
@@ -283,7 +283,7 @@ def _walk_raw_page_objects(
     depth: int,
     target_type: int,
 ) -> Iterator[tuple[Any, tuple[float, float, float, float, float, float]]]:
-    """兼容既有调用，仅返回目标对象及累积到页面坐标的矩阵。"""
+    """Compatible with existing calls, only the target object and the matrix accumulated to the page coordinates are returned."""
 
     for raw_obj, matrix, _form_depth in _walk_raw_page_objects_with_depth(
         container,
@@ -302,7 +302,7 @@ def _walk_raw_path_objects(
     parent_matrix: tuple[float, float, float, float, float, float],
     depth: int,
 ) -> Iterator[tuple[Any, tuple[float, float, float, float, float, float]]]:
-    """递归遍历页面或 Form 中的 Path，并携带累积到页面坐标的矩阵。"""
+    """Recursively traverse the page or Path in Form and carry a matrix accumulated up to the page coordinates."""
     yield from _walk_raw_page_objects(
         container,
         is_form=is_form,
@@ -315,7 +315,7 @@ def _walk_raw_path_objects(
 def _iter_raw_path_objects(
     page: pdfium.PdfPage,
 ) -> Iterator[tuple[Any, tuple[float, float, float, float, float, float]]]:
-    """从页面根对象开始遍历全部 Path，包括嵌套 Form 中的 Path。"""
+    """Traverse all Paths starting from the page root object, including Path within nested Form."""
     identity = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
     yield from _walk_raw_path_objects(
         page,
@@ -328,7 +328,7 @@ def _iter_raw_path_objects(
 def _iter_raw_path_objects_with_depth(
     page: pdfium.PdfPage,
 ) -> Iterator[tuple[Any, tuple[float, float, float, float, float, float], int]]:
-    """遍历全部 Path，并保留其所在 Form 深度供上层过滤图标。"""
+    """Traverse all Path and retain its Form depth for upper filter icons."""
 
     identity = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
     yield from _walk_raw_page_objects_with_depth(
@@ -343,7 +343,7 @@ def _iter_raw_path_objects_with_depth(
 def _iter_raw_image_objects(
     page: pdfium.PdfPage,
 ) -> Iterator[tuple[Any, tuple[float, float, float, float, float, float]]]:
-    """从页面根对象开始遍历全部点阵图，包括嵌套 Form 中的图片。"""
+    """Traverse all bitmap images starting from the page root object, including images in nested Form."""
     identity = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
     yield from _walk_raw_page_objects(
         page,
@@ -355,7 +355,7 @@ def _iter_raw_image_objects(
 
 
 def _iter_raw_root_form_objects(page: pdfium.PdfPage) -> Iterator[Any]:
-    """只遍历页面根层的 Form，避免把同一矢量图的嵌套子 Form 重复输出。"""
+    """Only traverse the Form at the root level of the page to avoid repeatedly outputting the nested sub-Form of the same vector image."""
 
     try:
         object_count = int(pdfium_c.FPDFPage_CountObjects(page))
@@ -370,7 +370,7 @@ def _iter_raw_root_form_objects(page: pdfium.PdfPage) -> Iterator[Any]:
             if raw_obj and int(pdfium_c.FPDFPageObj_GetType(raw_obj)) == pdfium_c.FPDF_PAGEOBJ_FORM:
                 yield raw_obj
         except Exception:
-            # 单个损坏对象不能阻断同页其他顶层 Form 的提取。
+            # A single corrupt object cannot block the extraction of other top-level Forms on the same page.
             continue
 
 
@@ -378,7 +378,7 @@ def _get_raw_object_rgba(
     raw_obj: Any,
     color_getter: Any,
 ) -> tuple[int, int, int, int] | None:
-    """读取对象 RGBA；旧 PDFium、不支持的对象或读取失败时返回 None。"""
+    """Read object RGBA; returns None for old PDFium, unsupported object, or read failure."""
 
     red = ctypes.c_uint()
     green = ctypes.c_uint()
@@ -405,14 +405,14 @@ def _get_raw_object_rgba(
 
 
 def _get_raw_object_alpha(raw_obj: Any, color_getter: Any) -> int:
-    """读取对象颜色 alpha；旧 PDFium 或读取失败时按不透明处理。"""
+    """Read object color alpha; old PDFium or read as opaque when failed."""
 
     rgba = _get_raw_object_rgba(raw_obj, color_getter)
     return rgba[3] if rgba is not None else 255
 
 
 def _get_path_visibility(raw_obj: Any) -> tuple[bool, bool]:
-    """分别判断 Path 的填充与描边是否实际可见。"""
+    """Determine whether the fill and stroke of Path are actually visible respectively."""
     fill_mode = ctypes.c_int()
     stroke = ctypes.c_int()
     try:
@@ -430,7 +430,7 @@ def _get_path_visibility(raw_obj: Any) -> tuple[bool, bool]:
 
 
 def _get_raw_stroke_width(raw_obj: Any) -> float:
-    """读取 Path 在对象局部坐标中的描边宽度。"""
+    """Reads the stroke width of Path in the object's local coordinates."""
     stroke_width = ctypes.c_float()
     try:
         ok = pdfium_c.FPDFPageObj_GetStrokeWidth(raw_obj, ctypes.byref(stroke_width))
@@ -448,7 +448,7 @@ def _get_segment_stroke_width(
     end: tuple[float, float],
     matrix: tuple[float, float, float, float, float, float],
 ) -> float:
-    """按线段局部法向量换算非等比矩阵下的实际描边宽度。"""
+    """The actual stroke width under the non-proportional matrix is converted according to the local normal vector of the line segment."""
     delta_x = end[0] - start[0]
     delta_y = end[1] - start[1]
     segment_length = math.hypot(delta_x, delta_y)
@@ -466,7 +466,7 @@ def _get_segment_stroke_width(
 
 
 def _read_raw_path_subpaths(raw_obj: Any) -> list[_PathSubpath]:
-    """读取 Path 段并拆为子路径，只把 LINETO 与闭合边记录为直线段。"""
+    """Read the Path segment and split it into sub-paths, and only record LINETO and closed edges as straight line segments."""
     from ._object_bridge import read_path_subpaths
 
     records = read_path_subpaths(raw_obj)
@@ -479,7 +479,7 @@ def _read_raw_path_subpaths(raw_obj: Any) -> list[_PathSubpath]:
 
 
 def _read_raw_path_subpaths_python(raw_obj: Any) -> list[_PathSubpath]:
-    """保留逐段参考实现，用于非标准 ABI 与迁移差分。"""
+    """Retained segment-by-section reference implementation for non-standard ABI with migrated differentials."""
     try:
         segment_count = int(pdfium_c.FPDFPath_CountSegments(raw_obj))
     except Exception:
@@ -541,10 +541,10 @@ def _transform_path_subpath(
     page_bbox: BBox,
     page_rotation: int,
 ) -> _PathSubpath:
-    """将一个子路径从对象局部坐标转换为页面左上坐标。"""
+    """Converts a subpath from object local coordinates to page top-left coordinates."""
 
     def transform(point: tuple[float, float]) -> tuple[float, float]:
-        """先应用对象/Form 矩阵，再应用页面坐标与旋转转换。"""
+        """Apply the object/Form matrix first, then apply the page coordinates and rotation transformation."""
         return _transform_drawing_point(_apply_pdf_matrix(point, matrix), page_bbox, page_rotation)
 
     return _PathSubpath(
@@ -566,7 +566,7 @@ def _path_object_evidence(
     want_lines: bool,
     want_path_infos: bool,
 ) -> tuple[list[PDFDrawingLine], PDFPathInfo | None]:
-    """一次读取 Path 状态并转换子路径，同时供绘图线和路径摘要复用。"""
+    """Reads the Path state once and converts subpaths for reuse by both plot lines and path summaries."""
 
     fill_visible, stroke_visible = _get_path_visibility(raw_obj)
     raw_stroke_width = _get_raw_stroke_width(raw_obj) if stroke_visible else 0.0
@@ -634,7 +634,7 @@ def _path_object_evidence(
 
 
 def _filled_rectangle_bbox(subpath: _PathSubpath) -> BBox | None:
-    """仅把四角与直边均轴对齐的填充子路径记录为矩形，曲线和字形轮廓不能借外框冒充柱体。"""
+    """Only filled sub-paths with four corners and straight sides aligned on the average axis are recorded as rectangles. Curves and glyph outlines cannot use the outer frame to pretend to be a cylinder."""
     points = subpath.points
     if len(points) not in (4, 5) or len(subpath.straight_segments) not in (3, 4):
         return None
@@ -662,7 +662,7 @@ def _path_info_from_object(
     *,
     subpaths: list[_PathSubpath] | None = None,
 ) -> PDFPathInfo | None:
-    """保留独立路径摘要入口；缺省时读取并转换原始 Path 后复用联合证据。"""
+    """Preserve independent path summary entries; the default is to read and convert the original Path before reusing the joint evidence."""
 
     resolved = _read_raw_path_subpaths(raw_obj) if subpaths is None else subpaths
     return _path_object_evidence(
@@ -682,7 +682,7 @@ def _get_thin_filled_subpath_line(
     subpath: _PathSubpath,
     page_size: tuple[float, float],
 ) -> PDFDrawingLine | None:
-    """把闭合的细长填充子路径折叠为一条中心线，避免把矩形四边重复输出。"""
+    """Collapse the closed slender filled sub-path into a center line to avoid repeated output of the four sides of the rectangle."""
     if len(subpath.points) < 4:
         return None
     x_values = [point[0] for point in subpath.points]
@@ -692,8 +692,8 @@ def _get_thin_filled_subpath_line(
     width = x1 - x0
     height = y1 - y0
     if not subpath.closed:
-        # PDF 填充操作会隐式闭合子路径；仅接纳四个轴对齐顶点和三条直边，
-        # 不把开放折线、三角形或贝塞尔控制点的外框当作矩形横线。
+        # PDF The fill operation implicitly closes the subpath; only four axis-aligned vertices and three straight edges are accepted.
+        # Do not treat the bounding box of an open polyline, triangle, or Bézier control point as a rectangular horizontal line.
         if len(subpath.points) != 4 or len(subpath.straight_segments) != 3:
             return None
         corners = {(round(x, 3), round(y, 3)) for x, y in subpath.points}
@@ -720,7 +720,7 @@ def _make_axis_drawing_line(
     width: float,
     page_size: tuple[float, float],
 ) -> PDFDrawingLine | None:
-    """将近水平或近竖直线段吸附到坐标轴、裁剪到页面并生成公开结果。"""
+    """Snap near-horizontal or near-vertical segments to the coordinate axis, crop to the page, and generate public results."""
     page_width, page_height = page_size
     x0, y0 = start
     x1, y1 = end
@@ -793,7 +793,7 @@ def _extract_path_drawing_lines(
     *,
     subpaths: list[_PathSubpath] | None = None,
 ) -> list[PDFDrawingLine]:
-    """保留独立绘图线入口；缺省时读取并转换原始 Path 后复用联合证据。"""
+    """Preserve independent plot line entries; default is to read and convert the original Path before reusing the joint evidence."""
 
     resolved = _read_raw_path_subpaths(raw_obj) if subpaths is None else subpaths
     return _path_object_evidence(
@@ -814,12 +814,12 @@ _STANDARD_PATH_LINE_EXTRACTOR = _extract_path_drawing_lines
 
 
 def _line_axis_coordinate(line: PDFDrawingLine) -> float:
-    """返回绘图线在垂直于自身方向的轴坐标。"""
+    """Returns the axis coordinate of the plot line perpendicular to itself."""
     return line.start[1] if line.orientation == "horizontal" else line.start[0]
 
 
 def _line_main_interval(line: PDFDrawingLine) -> tuple[float, float]:
-    """返回绘图线沿自身方向的起止区间。"""
+    """Returns the starting and ending intervals of the drawing line along its own direction."""
     if line.orientation == "horizontal":
         return line.start[0], line.end[0]
     return line.start[1], line.end[1]
@@ -829,7 +829,7 @@ def _combine_collinear_line_group(
     lines: list[PDFDrawingLine],
     page_size: tuple[float, float],
 ) -> PDFDrawingLine | None:
-    """把坐标接近且区间相连的一组线合并为一条稳定中心线。"""
+    """Merge a group of lines with close coordinates and connected intervals into a stable center line."""
     orientation = lines[0].orientation
     intervals = [_line_main_interval(line) for line in lines]
     lengths = [max(end - start, 0.01) for start, end in intervals]
@@ -849,11 +849,11 @@ def _merge_orientation_lines(
     lines: list[PDFDrawingLine],
     page_size: tuple[float, float],
 ) -> list[PDFDrawingLine]:
-    """按轴坐标聚类，再合并间距不超过约 2pt 的同方向线段。"""
+    """Cluster according to the axis coordinates, and then merge the line segments in the same direction with a distance of no more than about 2pt."""
     if not lines:
         return []
     coordinate_clusters: list[list[PDFDrawingLine]] = []
-    # 输入按轴坐标升序排序，聚类最小值恒为其首元素，记住起点即可免整簇重扫。
+    # The input is sorted in ascending order of axis coordinates, and the minimum value of the cluster is always the first element. Remembering the starting point can avoid rescanning the entire cluster.
     cluster_start = 0.0
     for line in sorted(lines, key=lambda item: (_line_axis_coordinate(item), _line_main_interval(item)[0])):
         coordinate = _line_axis_coordinate(line)
@@ -888,7 +888,7 @@ def _merge_collinear_drawing_lines(
     lines: list[PDFDrawingLine],
     page_size: tuple[float, float],
 ) -> list[PDFDrawingLine]:
-    """合并水平和竖直共线段，并按页面视觉位置稳定排序。"""
+    """Merge horizontal and vertical collinear segments and stably sort by visual position on the page."""
     horizontal = _merge_orientation_lines(
         [line for line in lines if line.orientation == "horizontal"],
         page_size,
@@ -908,7 +908,7 @@ def _image_bbox_from_matrix(
     page_bbox: BBox,
     page_rotation: int,
 ) -> BBox | None:
-    """把点阵图单位矩形经对象/Form 矩阵转换并裁剪为页面左上坐标 bbox。"""
+    """Convert the bitmap unit rectangle through the object/Form matrix and crop it to the upper left coordinate of the page, bbox."""
     page_points = [
         _transform_drawing_point(
             _apply_pdf_matrix(point, matrix),
@@ -936,7 +936,7 @@ def _form_bbox_from_object(
     page_bbox: BBox,
     page_rotation: int,
 ) -> BBox | None:
-    """读取顶层 Form 的页面坐标边界，并转换、裁剪到视觉页面范围。"""
+    """Read the page coordinate boundary of the top-level Form, and convert and crop it to the visual page range."""
 
     left = ctypes.c_float()
     bottom = ctypes.c_float()
@@ -982,7 +982,7 @@ def _extract_page_image_bboxes(
     page_bbox: BBox,
     page_rotation: int,
 ) -> list[BBox]:
-    """在调用方持有 PDFium 锁时提取全部有效点阵图 bbox，并隔离单对象异常。"""
+    """Extract all valid bitmaps bbox while the caller holds the PDFium lock, and isolate single-object exceptions."""
     image_bboxes: list[BBox] = []
     for member in _clipped_objects_of_type(page, pdfium_c.FPDF_PAGEOBJ_IMAGE):
         try:
@@ -990,7 +990,7 @@ def _extract_page_image_bboxes(
             if image_bbox is not None:
                 image_bbox = _clip_object_visual_bbox(image_bbox, member.clip, page_bbox, page_rotation)
         except Exception:
-            # 单个损坏 Image 对象不能中断同页其他点阵图提取。
+            # A single corrupted Image object cannot interrupt other bitmap extractions on the same page.
             continue
         if image_bbox is not None:
             image_bboxes.append(image_bbox)
@@ -998,7 +998,7 @@ def _extract_page_image_bboxes(
 
 
 def _get_raw_image_fingerprint(raw_obj: Any, page: pdfium.PdfPage) -> str | None:
-    """读取受限大小的图片原始流，并结合像素宽高生成 SHA-256 指纹。"""
+    """Read the original stream of images with limited size and combine the pixel width and height to generate SHA-256 fingerprint."""
 
     metadata = pdfium_c.FPDF_IMAGEOBJ_METADATA()
     try:
@@ -1038,7 +1038,7 @@ def _extract_page_image_infos(
     page_bbox: BBox,
     page_rotation: int,
 ) -> list[PDFImageInfo]:
-    """提取全部有效点阵图几何；单图指纹失败时保留 bbox 并按放行处理。"""
+    """Extract all valid bitmap geometries; when a single image fingerprint fails, bbox is retained and processed as released."""
 
     image_infos: list[PDFImageInfo] = []
     for member in _clipped_objects_of_type(page, pdfium_c.FPDF_PAGEOBJ_IMAGE):
@@ -1048,7 +1048,7 @@ def _extract_page_image_infos(
             if image_bbox is not None:
                 image_bbox = _clip_object_visual_bbox(image_bbox, member.clip, page_bbox, page_rotation)
         except Exception:
-            # 单个损坏 Image 对象不能中断同页其他点阵图提取。
+            # A single corrupted Image object cannot interrupt other bitmap extractions on the same page.
             continue
         if image_bbox is None:
             continue
@@ -1067,7 +1067,7 @@ def _extract_page_image_infos(
 
 
 def _blank_image_top_fraction(image) -> float:
-    """只识别全宽近白色或透明顶边，不识别图中文字，也不裁去任何可见非白内容。"""
+    """Only the full-width near-white or transparent top edge is recognized, text in the image is not recognized, and any visible non-white content is not cropped."""
     from PIL import Image, ImageChops
 
     if image.width * image.height > 4_000_000:
@@ -1095,7 +1095,7 @@ def _blank_image_top_fraction(image) -> float:
 
 
 def _native_image_blank_top_bbox(raw_obj, page, matrix, image_bbox, page_bbox, page_rotation):
-    """正向轴对齐且未裁切顶部的原图才能提供白边证据，损坏或旋转对象均保守保留。"""
+    """The original image with positive axis alignment and uncropped top can provide evidence of white edges, and damaged or rotated objects are conservatively preserved."""
     if page_rotation != 0 or matrix[0] <= 0 or matrix[3] <= 0 or abs(matrix[1]) + abs(matrix[2]) > 1e-6:
         return None
     full = _image_bbox_from_matrix(matrix, page_bbox, page_rotation)
@@ -1125,7 +1125,7 @@ def _native_image_blank_top_bbox(raw_obj, page, matrix, image_bbox, page_bbox, p
 
 
 def _is_smooth_page_background(raw_obj: Any, page: pdfium.PdfPage, image_bbox: BBox, page_bbox: BBox) -> bool:
-    """仅为近整页图提取低分辨率色差证据，区分渐变背景与包含文字或图形的内容图。"""
+    """Extract low-resolution color difference evidence only for nearly full-page images to distinguish between gradient backgrounds and content images containing text or graphics."""
     page_area = max(0.0, page_bbox[2] - page_bbox[0]) * max(0.0, page_bbox[3] - page_bbox[1])
     if page_area <= 0 or (image_bbox[2] - image_bbox[0]) * (image_bbox[3] - image_bbox[1]) < 0.95 * page_area:
         return False
@@ -1151,7 +1151,7 @@ def _is_smooth_page_background(raw_obj: Any, page: pdfium.PdfPage, image_bbox: B
         ]
         return sum(value > 12 for value in differences) / len(differences) <= 0.015
     except Exception:
-        # 证据读取失败保留图像，不能因损坏对象或不支持的编码删除内容。
+        # Evidence read failure retains the image, content cannot be deleted due to corrupted objects or unsupported encoding.
         return False
     finally:
         if bitmap is not None:
@@ -1163,7 +1163,7 @@ def _extract_page_form_bboxes(
     page_bbox: BBox,
     page_rotation: int,
 ) -> list[BBox]:
-    """在调用方持有 PDFium 锁时提取顶层 Form bbox，并隔离单对象异常。"""
+    """Extract the top-level Form bbox while the caller holds the PDFium lock, and isolate the single-object exception."""
 
     form_bboxes: list[BBox] = []
     for raw_obj in _iter_raw_root_form_objects(page):
@@ -1175,7 +1175,7 @@ def _extract_page_form_bboxes(
                 if form_bbox[2] <= form_bbox[0] or form_bbox[3] <= form_bbox[1]:
                     form_bbox = None
         except Exception:
-            # PDFium 遇到个别损坏 Form 时，保留同页其他有效结果。
+            # PDFium When encountering individual damaged Form, keep other valid results on the same page.
             continue
         if form_bbox is not None:
             form_bboxes.append(form_bbox)
@@ -1183,7 +1183,7 @@ def _extract_page_form_bboxes(
 
 
 def _extract_page_path_infos(page: pdfium.PdfPage, page_bbox: BBox, page_rotation: int) -> list[PDFPathInfo]:
-    """复用含裁剪的统一提取，确保直接查询和快照一致。"""
+    """Reuse unified extraction with clipping to ensure consistency between direct query and snapshot."""
     return _extract_page_paths_and_lines(page, page_bbox, page_rotation, want_lines=False)[1]
 
 
@@ -1195,10 +1195,10 @@ def _extract_page_paths_and_lines(
     want_lines: bool = True,
     want_path_infos: bool = True,
 ) -> tuple[list[PDFDrawingLine], list[PDFPathInfo]]:
-    """一次遍历和解码 Path，分别隔离绘图线与路径信息的派生异常。
+    """Traverse and decode Path in one go, isolating the derived exceptions for drawing lines and path information respectively.
 
-    只需要单侧结果时用 want_* 关掉另一侧，避免构建后即丢弃的
-    PDFPathInfo/绘图线开销；两侧都关闭没有意义，不作为受支持的用法。
+    When only one side of the result is needed, use want_* to turn off the other side to avoid discarding it after construction.
+    PDFPathInfo/Plot Line Overhead; having both sides turned off has no meaning and is not a supported usage.
     """
 
     drawing_lines: list[PDFDrawingLine] = []
@@ -1318,12 +1318,12 @@ def _extract_page_paths_and_lines(
 
 
 def _extract_page_drawing_lines(page: pdfium.PdfPage, page_bbox: BBox, page_rotation: int) -> list[PDFDrawingLine]:
-    """复用统一裁剪，避免独立线查询重新暴露被 Form 隐藏的路径。"""
+    """Reuse unified clipping to avoid independent line queries from re-exposing paths hidden by Form."""
     from ._object_bridge import read_drawing_lines
 
     records = read_drawing_lines(page, page_bbox, page_rotation)
     if records is not None:
-        # 原生层只构建未合并轴线；共线合并继续沿用 Python 的稳定输出规则。
+        # The native layer only builds unmerged axes; collinear merging continues to use the stable output rules of Python.
         lines = [
             PDFDrawingLine(start, end, bbox, width, "horizontal" if orientation == 0 else "vertical")
             for start, end, bbox, width, orientation in records

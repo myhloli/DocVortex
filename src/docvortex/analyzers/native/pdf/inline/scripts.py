@@ -1,4 +1,4 @@
-"""按公式区域和字符几何识别上下标证据。"""
+"""Identify superscript and subscript evidence by formula area and character geometry."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def _rotate_origin_to_upright(
     page_size: tuple[float, float],
     angle: int,
 ) -> tuple[float, float]:
-    """把页面字符 origin 旋到当前 Flash 行的局部正向坐标。"""
+    """Rotate page character origin to the local forward coordinate of the current Flash row."""
     x, y = origin
     page_width, page_height = page_size
     if angle == 270:
@@ -55,7 +55,7 @@ def _rotate_origin_to_upright(
 
 
 def _bbox_center_inside_region(bbox: BBox, region: BBox) -> bool:
-    """判断字符 tight bbox 中心是否落入公式区域。"""
+    """Determine whether the center of characters tight bbox falls into the formula area."""
     center_x = (bbox[0] + bbox[2]) / 2
     center_y = (bbox[1] + bbox[3]) / 2
     return region[0] <= center_x <= region[2] and region[1] <= center_y <= region[3]
@@ -66,7 +66,7 @@ def _script_region_memberships(
     tight_bboxes: dict[int, BBox],
     regions: list[BBox],
 ) -> list[int | None]:
-    """按页面 tight 中心把字符分配到公式区域，区域外返回 None。"""
+    """Allocate characters to the formula area according to the center of the page tight, and return to None outside the area."""
     memberships: list[int | None] = []
     for char in chars:
         char_idx = char.get("char_idx")
@@ -82,13 +82,13 @@ def _script_region_memberships(
 
 
 def _script_char_text(char: dict[str, Any]) -> str:
-    """返回单字符脚本判定使用的稳定文本。"""
+    """Returns the stable text used by single-character script determination."""
     value = char.get("char", "")
     return value if type(value) is str else str(value)
 
 
 def _is_cjk_text(text: str) -> bool:
-    """判断单字符是否属于 CJK、日文假名或韩文书写系统。"""
+    """Determines whether a single character belongs to CJK, Japanese Kana, or Korean writing systems."""
     if len(text) != 1:
         return False
     codepoint = ord(text)
@@ -103,7 +103,7 @@ def _is_cjk_text(text: str) -> bool:
 
 @lru_cache(maxsize=8192)
 def _is_math_identifier_char(text: str) -> bool:
-    """识别可与拉丁 base/index 共同组成数学 token 的字母数字字符。"""
+    """Identifies alphanumeric characters that can be combined with Latin base/index to form math token."""
     if len(text) != 1 or _is_cjk_text(text):
         return False
     if text.isascii():
@@ -121,12 +121,12 @@ def _is_math_identifier_char(text: str) -> bool:
 
 
 def _is_math_script_token_char(text: str) -> bool:
-    """判断字符是否属于可按 source order 重新锚定的数学 token。"""
+    """Determines whether a character is a mathematical token that can be re-anchored by source order."""
     return _is_math_identifier_char(text) or text in _PDF_SCRIPT_TOKEN_CONNECTORS
 
 
 def _iter_math_script_tokens(chars: list[dict[str, Any]]) -> list[list[int]]:
-    """按连续数学 identifier 和连接符切分局部 token，并在 CJK 边界断开。"""
+    """Split local token by continuous math identifier and connectors, and break at CJK boundaries."""
     tokens: list[list[int]] = []
     current: list[int] = []
     for index, char in enumerate(chars):
@@ -142,7 +142,7 @@ def _iter_math_script_tokens(chars: list[dict[str, Any]]) -> list[list[int]]:
 
 
 def _citation_script_indices(chars: list[dict[str, Any]], roles: list[ScriptRole]) -> set[int]:
-    """识别方括号引用区间，避免保守 token 规则删除数字引用。"""
+    """Recognize square bracket reference intervals to avoid conservative token rule deletion of numeric references."""
     protected: set[int] = set()
     for start, char in enumerate(chars):
         closing = _PDF_SCRIPT_CITATION_BRACKETS.get(_script_char_text(char))
@@ -161,7 +161,7 @@ def _token_origin(
     char: dict[str, Any],
     origins: dict[int, tuple[float, float]],
 ) -> float | None:
-    """读取 token 字符的局部正向 origin y。"""
+    """Read token character partial forward origin y."""
     char_idx = char.get("char_idx")
     origin = origins.get(char_idx) if isinstance(char_idx, int) else None
     return float(origin[1]) if origin is not None else None
@@ -171,7 +171,7 @@ def _token_tight_height(
     char: dict[str, Any],
     tight_bboxes: dict[int, BBox],
 ) -> float:
-    """读取 token 字符的局部正向 tight 高度。"""
+    """Read the local forward tight height of the token character."""
     char_idx = char.get("char_idx")
     bbox = tight_bboxes.get(char_idx) if isinstance(char_idx, int) else None
     return max(0.0, bbox[3] - bbox[1]) if bbox is not None else 0.0
@@ -184,7 +184,7 @@ def _has_adjacent_math_base(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
 ) -> bool:
-    """判断孤立索引左侧是否存在紧邻且位移明确的非 CJK 数学 base。"""
+    """Determines whether there is a non-CJK immediately to the left of the isolated index with a clear displacement Math base."""
     if index <= 0 or roles[index - 1] != "body":
         return False
     base_text = _script_char_text(chars[index - 1])
@@ -206,7 +206,7 @@ def _has_adjacent_math_base(
 
 
 def _horizontal_gap_between_bboxes(first: BBox, second: BBox) -> float:
-    """返回两个 tight bbox 的水平间隙。"""
+    """Returns the horizontal gap between two tight bbox."""
     return max(0.0, first[0] - second[2], second[0] - first[2])
 
 
@@ -217,7 +217,7 @@ def _token_split_position(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
 ) -> int | None:
-    """用最左 origin 簇和显式连接符确定 base 与索引的分界。"""
+    """Use the leftmost origin cluster and an explicit join character to delimit the base from the index."""
     alnum_positions = [index for index in token if _is_math_identifier_char(_script_char_text(chars[index]))]
     if len(alnum_positions) < 2:
         return None
@@ -240,7 +240,7 @@ def _token_split_position(
             and all(roles[index] == "body" and _script_char_text(chars[index]).isalpha() for index in prefix)
             and all(roles[index] == "sup" and _script_char_text(chars[index]).isdigit() for index in suffix)
         ):
-            # 姓名、词语后的数字上标已具备明确边界，不用正文内部的下伸字形重新切分。
+            # The numerical superscripts after names and words already have clear boundaries and do not need to be re-segmented by descending glyphs within the text.
             return first_scripted
     for position in alnum_positions[1:]:
         if any(_script_char_text(chars[index]) in _PDF_SCRIPT_TOKEN_CONNECTORS for index in range(first + 1, position)):
@@ -260,7 +260,7 @@ def _script_geometry_is_aligned(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
 ) -> bool:
-    """判断两个字符是否处在同一 displaced baseline 上。"""
+    """Determine whether two characters are on the same displaced baseline."""
     first_origin = _token_origin(chars[first], origins)
     second_origin = _token_origin(chars[second], origins)
     first_height = _token_tight_height(chars[first], tight_bboxes)
@@ -285,7 +285,7 @@ def _nearest_nonspace_index(
     start: int,
     step: Literal[-1, 1],
 ) -> int | None:
-    """从指定位置向前或向后查找最近的非空白字符。"""
+    """Finds the nearest non-whitespace character forward or backward from the specified position."""
     index = start + step
     while 0 <= index < len(chars):
         if not _script_char_text(chars[index]).isspace():
@@ -300,7 +300,7 @@ def _close_spaced_script_operators(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
 ) -> None:
-    """跨少量 PDF 空格闭合同基线的 `1 - x` 一类角标 run。"""
+    """`1 - x` Class I subscript run across a small number of PDF spaces closing the same baseline."""
     for seed, role in enumerate(list(roles)):
         if role == "body" or not _is_math_identifier_char(_script_char_text(chars[seed])):
             continue
@@ -329,7 +329,7 @@ def _close_compact_aligned_script_suffixes(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
 ) -> None:
-    """把已有可信角标 run 后同基线的紧凑连字符后缀整体闭合。"""
+    """Close the existing trusted corner mark run with the compact hyphen suffix of the baseline."""
     for joiner_index in range(1, len(chars) - 1):
         if _script_char_text(chars[joiner_index]) not in _PDF_SCRIPT_COMPACT_JOINERS:
             continue
@@ -381,7 +381,7 @@ def _protected_subscript_indices(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
 ) -> set[int]:
-    """找出拥有内部 base 或与其同基线连通的下标字符。"""
+    """Find subscript characters that have internal base or are connected to the same baseline."""
     protected: set[int] = set()
     for token in tokens:
         for position, index in enumerate(token):
@@ -424,15 +424,15 @@ def _refine_math_script_tokens(
     formula_region: bool,
     ordinary_native_roles: bool = False,
 ) -> list[ScriptRole]:
-    """以最左稳定簇保护 base，并对弱单字符和复杂未分段 token 保守拒识。"""
+    """Protect base with the leftmost stable cluster, and conservatively reject weak single characters and complex unsegmented token."""
     refined = list(roles)
-    # 原规则只有已标记种子才能闭合/精炼新脚本；普通原生批次的全 body 行无需重扫 token。
+    # The original rule only has marked seeds to close/refine new scripts; the entire body lines of ordinary native batches do not need to be rescanned for tokens.
     if ordinary_native_roles and all(role == "body" for role in refined):
         return refined
     citation_indices = _citation_script_indices(chars, refined)
     numeric_indices: set[int] = set()
     if any(role == "sup" and _script_char_text(char).isdecimal() for char, role in zip(chars, roles)):
-        # 数字引用的基字符在 token 外；保护双 bbox/origin 已确认的整串，不能重置首位数字。
+        # The base character of the numeric reference is outside token; double bbox/origin is protected to confirm the entire string and the first digit cannot be reset.
         candidates = _numeric_superscript_indices(build_script_features(chars, tight_bboxes, origins, set()), roles, set())
         numeric_indices = {index for index in candidates if roles[index] == "sup"}
     complex_unsegmented_token = False
@@ -468,7 +468,7 @@ def _refine_math_script_tokens(
         if any(index in citation_indices for index in token):
             continue
         if all(index in numeric_indices for index in token):
-            # 只跳过纯数字引用的 base 重选，后续分式及复杂数学过滤仍按原规则执行。
+            # Only the base reselection of purely numerical references is skipped, and subsequent fractional and complex mathematical filtering is still performed according to the original rules.
             continue
         token_key = tuple(token)
         alnum_positions = token_alnum_positions[token_key]
@@ -626,7 +626,7 @@ def _refine_math_script_tokens(
 
 
 def _bbox_axis_overlap(first: BBox, second: BBox, *, axis: Literal["x", "y"]) -> float:
-    """返回两个 bbox 在指定轴上的绝对重叠长度。"""
+    """Returns the absolute overlap length of two bboxs on the specified axis."""
     start, end = (0, 2) if axis == "x" else (1, 3)
     return max(0.0, min(first[end], second[end]) - max(first[start], second[start]))
 
@@ -639,7 +639,7 @@ def _fraction_member_indices(
     angle: int,
     prepared_rules: list[BBox | None] | None = None,
 ) -> set[int]:
-    """按页面方向一次识别分数线两侧的上下叠字，供复杂分式整块拒识。"""
+    """Recognize the upper and lower characters on both sides of the fraction line at a time according to the page direction, so that complex fractions can be rejected as a whole block."""
     if not all_chars or not drawing_lines:
         return set()
     local_chars: list[tuple[int, str, BBox]] = []
@@ -696,7 +696,7 @@ def _fraction_member_indices(
 
 
 def _prepare_fraction_rules(drawing_lines: Sequence[Any], page_size: tuple[float, float], angle: int) -> list[BBox | None]:
-    """按原绘图顺序准备一次局部横线框，供同一表格的多个单元格复用。"""
+    """Prepare a partial horizontal line frame according to the original drawing order for reuse by multiple cells in the same table."""
 
     return [
         _rotate_bbox_to_upright(raw, page_size, angle)
@@ -707,10 +707,10 @@ def _prepare_fraction_rules(drawing_lines: Sequence[Any], page_size: tuple[float
 
 
 class _FractionCharIndex:
-    """只保存本次分式检测的字符索引，查询返回原字符顺序的安全超集。"""
+    """Only the character index of this fractional detection is saved, and the query returns a safe superset of the original character sequence."""
 
     def __init__(self, chars: list[tuple[int, str, BBox]]):
-        """异常数值不建立索引，由查询回退原列表。"""
+        """No index will be created for abnormal values, and the query will return to the original list."""
 
         self.chars = chars
         self.safe = all(type(value) is float and math.isfinite(value) for _index, _text, box in chars for value in box)
@@ -726,7 +726,7 @@ class _FractionCharIndex:
             self.maxima[node] = max(self.maxima[node * 2], self.maxima[node * 2 + 1])
 
     def query(self, rule: BBox, scale: float) -> list[tuple[int, str, BBox]]:
-        """按横向可能相交的闭区间返回字符，保留原顺序与边界相等值。"""
+        """Return characters in a closed range that may intersect laterally, retaining the original order and boundary equality values."""
 
         if not self.safe or not all(type(value) is float and math.isfinite(value) for value in (*rule, scale)):
             return self.chars
@@ -754,7 +754,7 @@ def _strong_structural_script_roles(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
 ) -> dict[int, ScriptRole]:
-    """提取可在恢复公式区域中保留的引用和邻接 base 强脚本证据。"""
+    """Extract references and adjacencies base strong script evidence that can be preserved in the recovery formula area."""
 
     roles = classify_char_script_roles(
         chars,
@@ -791,7 +791,7 @@ def _drop_cap_body_indices(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
 ) -> set[int]:
-    """识别下沉大写首字母旁同基线的小写词尾，避免将正文首词误作数学上标。"""
+    """Identify lowercase word endings with the same baseline next to the dropped capital letter to avoid mistakenly using the first word of the text as a mathematical superscript."""
     word = []
     for index, char in enumerate(chars):
         text = _script_char_text(char)
@@ -832,7 +832,7 @@ def _classify_script_runs(
     prepared_native: tuple | None = None,
     preclassified_native: list[bytes | None] | None = None,
 ) -> tuple[list[str], list[int], list[bool]]:
-    """按公式区域边界分段分类，并要求公式段内部存在稳定 body。"""
+    """Classified according to the formula area boundary segmentation, and requires stable body to exist inside the formula segment."""
     roles: list[ScriptRole] = ["body"] * len(chars)
     body_counts = [0] * len(chars)
     formula_flags = [False] * len(chars)
@@ -888,7 +888,7 @@ def _classify_script_runs(
             ordinary_native_roles=classified is not None and (prepared_native is not None or preclassified_native is not None),
         )
         if membership is None and any(role != "body" for role in run_roles):
-            # 公式成员保持原脚本角色；正文下沉首字母需在计数前一起恢复，Python和native路径共用。
+            # The formula members maintain their original script roles; the dropped initials of the text need to be restored together before counting, and the paths of Python and native are shared.
             for index in _drop_cap_body_indices(run_chars, local_tight_bboxes, local_origins):
                 run_roles[index] = "body"
         if classified is not None and all(role == "body" for role in run_roles):
@@ -940,7 +940,7 @@ def _classify_script_runs(
 
 
 def _plain_script_geometry(chars, tight_bboxes, origins):
-    """只有无自定义读取行为的普通几何才能直接借用，特殊值保留原逐字符物化。"""
+    """Only ordinary geometries without custom read behavior can be borrowed directly, and special values retain their original character-by-character materialization."""
     if type(tight_bboxes) is not dict or type(origins) is not dict:
         return False
     for char in chars:
@@ -959,7 +959,7 @@ def _plain_script_geometry(chars, tight_bboxes, origins):
 
 
 def _prepare_plain_script_input(chars, tight_bboxes, origins):
-    """在验证普通字符的同时打包一行只读脚本输入；特殊对象返回参考路径。"""
+    """Packs a line of read-only script input while validating normal characters; special objects return a reference path."""
 
     if type(tight_bboxes) is not dict or type(origins) is not dict:
         return None
@@ -996,7 +996,7 @@ def _prepare_plain_script_input(chars, tight_bboxes, origins):
 
 
 def _pack_plain_script_input(chars, tight_bboxes, origins):
-    """仅检查普通容器形状，坐标内置浮点验证交由批量 Rust 入口执行。"""
+    """Only ordinary container shapes are checked, and built-in floating point verification of coordinates is performed by the batch Rust entry."""
 
     if type(tight_bboxes) is not dict or type(origins) is not dict:
         return None
@@ -1036,7 +1036,7 @@ def _script_line_char_roles(
     fraction_members: set[int],
     prepared: tuple[list[dict[str, Any]], list[int | None], list[bytes | None]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[ScriptRole], list[int], list[bool]]:
-    """按正文同款公式分段返回原字符及其上下标角色。"""
+    """Return the original characters and their superscript and subscript roles in segments according to the same formula in the text."""
 
     chars = prepared[0] if prepared is not None else _ordered_line_chars(line)
     if not chars:
@@ -1120,7 +1120,7 @@ def _script_line_payload(
     fraction_members: set[int],
     prepared: tuple[list[dict[str, Any]], list[int | None], list[bytes | None]] | None = None,
 ) -> PDFTextScriptLine | None:
-    """把 Flash 行转换为公式分段后的紧凑上下标 sidecar。"""
+    """Converts the Flash line into the formula segmented compact superscript sidecar."""
 
     chars, roles, body_counts, formula_flags = _script_line_char_roles(
         line,
@@ -1195,7 +1195,7 @@ def _script_line_payload(
 
 
 def _plain_script_payload(line: Any, chars: list[dict[str, Any]], angle: int) -> PDFTextScriptLine | None:
-    """全正文行只构造原文本 sidecar，不复制不会参与范围计算的框。"""
+    """The full text line only constructs the original text sidecar, and does not copy the boxes that will not participate in the range calculation."""
 
     text = "".join(fragment for char in chars if (fragment := _normalize_match_fragment(char.get("char"))))
     if not text:
@@ -1210,7 +1210,7 @@ def _plain_script_payload(line: Any, chars: list[dict[str, Any]], angle: int) ->
 
 
 def _prepare_owned_script_evidence(owner, chars):
-    """只供尚未公开的同源几何使用；不缓存跨调用的 Python 身份或可变字符内容。"""
+    """For use only by homologous geometries that have not yet been exposed; Python identity or variable character content across calls is not cached."""
     if _native_text_flags is not _STANDARD_NATIVE_TEXT_FLAGS or _script_font_key is not _STANDARD_SCRIPT_FONT_KEY:
         return None
     prepared = owner.prepare_script_evidence(_native_text_flags)
@@ -1229,11 +1229,11 @@ def detect_pdf_text_script_lines(
     drawing_lines: Sequence[Any] | None = None,
     _owned_inputs=None,
 ) -> list[PDFTextScriptLine]:
-    """检测 Flash 剩余自然文本行中的上下标候选。"""
+    """Detecting superscript and subscript candidates in Flash remaining natural text lines."""
     resolved_chars = all_chars or []
     resolved_drawings = drawing_lines or []
     if type(lines) is list and not lines:
-        # 空页保留后端加载检查和参数真值读取，不创建不会被消费的分类闭包。
+        # Empty pages retain backend loading checks and parameter truth values, and do not create classification closures that will not be consumed.
         from ....._compute_backend import get_native
 
         get_native()
@@ -1256,7 +1256,7 @@ def detect_pdf_text_script_lines(
     pending_chars = 0
 
     def append_line(line: Any, prepared: tuple | None = None) -> None:
-        """按原行顺序物化一条证据，并释放本批字符引用。"""
+        """Materialize a piece of evidence in original line order and release this batch of character references."""
 
         angle = int(getattr(line, "angle", 0) or 0) % 360
         payload = _script_line_payload(line, page_size, tight_bboxes, origins, fraction_members_by_angle[angle], prepared)
@@ -1264,7 +1264,7 @@ def detect_pdf_text_script_lines(
             output.append(payload)
 
     def flush_pending() -> None:
-        """每批独立行最多 64 条或 8192 字，超长行单独计算。"""
+        """Each batch of independent lines can have a maximum of 64 entries or 8192 words, and extra-long lines will be counted separately."""
 
         nonlocal pending_chars
         if not pending:
@@ -1373,6 +1373,6 @@ __all__ = [
     "detect_pdf_text_script_lines",
 ]
 
-# 自定义字符分类规则仍走原参数准备，不使用固化的原生字体键语义。
+# Custom character classification rules are still prepared according to the original parameters and do not use the solidified native font key semantics.
 _STANDARD_NATIVE_TEXT_FLAGS = _native_text_flags
 _STANDARD_SCRIPT_FONT_KEY = _script_font_key

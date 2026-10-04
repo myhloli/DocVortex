@@ -18,7 +18,7 @@ def _table_body(
     index: int = 0,
     bbox: list[float] | None = None,
 ) -> dict[str, Any]:
-    """构造归一化 bbox 的 table body 测试块。"""
+    """Construct table body test block of normalized bbox."""
     body: dict[str, Any] = {
         "type": BlockType.TABLE_BODY,
         "index": index,
@@ -34,7 +34,7 @@ def _caption(
     index: int = 0,
     bbox: list[float] | None = None,
 ) -> dict[str, Any]:
-    """构造 table caption 测试块。"""
+    """Construct the table caption test block."""
     return {
         "type": BlockType.TABLE_CAPTION,
         "index": index,
@@ -44,7 +44,7 @@ def _caption(
 
 
 def _footnote(text: str, *, index: int = 1) -> dict[str, Any]:
-    """构造 table footnote 测试块。"""
+    """Construct the table footnote test block."""
     return {
         "type": BlockType.TABLE_FOOTNOTE,
         "index": index,
@@ -61,7 +61,7 @@ def _table(
     children: list[dict[str, Any]] | None = None,
     cell_merge: list[int] | None = None,
 ) -> dict[str, Any]:
-    """构造两层 dict table 测试块。"""
+    """Construct a two-layer dict table test block."""
     table_bbox = deepcopy(bbox or [0.1, 0.1, 0.9, 0.9])
     body = _table_body(
         html,
@@ -80,12 +80,12 @@ def _table(
 
 
 def _page(page_idx: int, blocks: list[dict[str, Any]]) -> dict[str, Any]:
-    """构造 ModelJson 后处理阶段使用的 raw 页面。"""
+    """Constructs the raw page used by the ModelJson post-processing stage."""
     return {"page_idx": page_idx, "blocks": blocks}
 
 
 def _noise(block_type: str) -> dict[str, Any]:
-    """构造页边界可忽略的噪声块。"""
+    """Construct blocks of negligible noise at page boundaries."""
     return {
         "type": block_type,
         "index": 99,
@@ -95,18 +95,18 @@ def _noise(block_type: str) -> dict[str, Any]:
 
 
 def _merged_soup(table: dict[str, Any]) -> BeautifulSoup:
-    """读取合并结果中的 table body HTML。"""
+    """Read table body HTML in merged results."""
     body = next(child for child in table["content"] if child["type"] == BlockType.TABLE_BODY)
     return BeautifulSoup(body["content"], "html.parser")
 
 
 def _row_texts(table: dict[str, Any]) -> list[list[str]]:
-    """提取合并 HTML 的逐行单元格文本。"""
+    """Extract line-by-line cell text of merged HTML."""
     return [[cell.get_text() for cell in row.find_all(["td", "th"])] for row in _merged_soup(table).find_all("tr")]
 
 
 def test_merge_table_marks_reverse_multi_page_chain_and_cleans_stale_markers() -> None:
-    """验证多页链倒序识别，并清理根块及子块的过期标记。"""
+    """Verify the reverse order recognition of multi-page chains and clean up the expiration marks of root blocks and sub-blocks."""
     tables = [_table(index) for index in range(3)]
     tables[0]["continues_prev"] = True
     tables[0]["content"][0]["continues_prev"] = True
@@ -128,7 +128,7 @@ def test_merge_table_marks_reverse_multi_page_chain_and_cleans_stale_markers() -
 def test_merge_table_requires_consecutive_increasing_page_indices(
     page_indices: tuple[int, int],
 ) -> None:
-    """验证跳页和逆序 page_idx 都不会建立跨页关系。"""
+    """Verify that neither page jump nor reverse order page_idx will establish a cross-page relationship."""
     previous_table = _table(0)
     current_table = _table(1)
 
@@ -153,7 +153,7 @@ def test_merge_table_requires_consecutive_increasing_page_indices(
     ],
 )
 def test_merge_table_skips_boundary_noise(block_type: str) -> None:
-    """验证指定页眉页脚类块不会阻断边界 table 扫描。"""
+    """Verify that specifying header and footer class blocks does not block boundary table scanning."""
     previous_table = _table(0)
     current_table = _table(1)
     pages = [
@@ -168,7 +168,7 @@ def test_merge_table_skips_boundary_noise(block_type: str) -> None:
 
 @pytest.mark.parametrize("barrier_side", ["previous", "current"])
 def test_merge_table_is_blocked_by_boundary_semantic_block(barrier_side: str) -> None:
-    """验证普通正文位于页边界时会阻断 table 关系。"""
+    """Validating that normal text is on a page boundary blocks the table relationship."""
     previous_table = _table(0)
     current_table = _table(1)
     text = _noise(BlockType.TEXT)
@@ -196,7 +196,7 @@ def test_merge_table_applies_caption_and_footnote_rules(
     current_caption: str | None,
     expected: bool,
 ) -> None:
-    """验证续表 caption 与前表 footnote 的组合规则。"""
+    """Verify the rules for combining the continuation table caption with the previous table footnote."""
     previous_children = [_table_body()]
     previous_children.extend(_footnote(f"old-{index}", index=index + 1) for index in range(previous_footnotes))
     current_children = [_table_body(index=1)]
@@ -211,7 +211,7 @@ def test_merge_table_applies_caption_and_footnote_rules(
 
 
 def test_post_table_non_continuation_caption_does_not_block_merge() -> None:
-    """验证 table body 下方的非续表 caption 不参与阻断判断。"""
+    """Verify that the non-continuation table caption below table body does not participate in blocking judgment."""
     current_children = [
         _table_body(index=1, bbox=[0.1, 0.1, 0.9, 0.7]),
         _caption("Next section", index=2, bbox=[0.1, 0.75, 0.9, 0.8]),
@@ -224,7 +224,7 @@ def test_post_table_non_continuation_caption_does_not_block_merge() -> None:
 
 
 def test_merge_table_enforces_strict_ten_percent_width_threshold() -> None:
-    """验证宽度差恰好百分之十时拒绝，小于阈值时接受。"""
+    """Reject if the verification width difference is exactly ten percent, and accept if it is less than the threshold."""
     previous_table = _table(0, bbox=[0.1, 0.1, 0.9, 0.9])
     exact_threshold = _table(1, bbox=[0.06, 0.1, 0.94, 0.9])
     pages = [_page(0, [previous_table]), _page(1, [exact_threshold])]
@@ -239,7 +239,7 @@ def test_merge_table_enforces_strict_ten_percent_width_threshold() -> None:
 
 
 def test_merge_table_uses_boundary_row_metrics_when_total_columns_differ() -> None:
-    """验证总列数不同后按边界行 effective/actual/渲染段数回退判断。"""
+    """After verifying that the total number of columns is different, the judgment is made based on the boundary row effective/actual/number of rendering segments."""
     matching_previous = _table(
         0,
         "<table><tr><td colspan='3'>H</td></tr><tr><td>A</td><td>B</td></tr></table>",
@@ -267,14 +267,14 @@ def test_merge_table_uses_boundary_row_metrics_when_total_columns_differ() -> No
     ],
 )
 def test_merge_table_safely_skips_invalid_bbox_body_or_html(current_table: dict[str, Any]) -> None:
-    """验证非法 bbox、table body 和 HTML 均安全降级。"""
+    """Verification illegal bbox, table body and HTML are all safely downgraded."""
     current_table = deepcopy(current_table)
     merge_table([_page(0, [_table(0)]), _page(1, [current_table])])
     assert "continues_prev" not in current_table
 
 
 def test_merge_table_only_changes_markers_and_preserves_normalized_bboxes() -> None:
-    """验证千分位计算不会回写 bbox，检测也不修改任何表格内容。"""
+    """Verify that the thousandth calculation will not write back bbox, and the detection will not modify any table content."""
     previous_table = _table(0)
     current_table = _table(1)
     pages = [_page(0, [previous_table]), _page(1, [current_table])]
@@ -287,7 +287,7 @@ def test_merge_table_only_changes_markers_and_preserves_normalized_bboxes() -> N
 
 
 def test_merge_table_content_removes_repeated_rowspan_header_and_appends_data() -> None:
-    """验证重复表头按 rowspan 覆盖范围删除，并追加当前数据行。"""
+    """Verify that duplicate headers are removed by rowspan coverage and the current data row is appended."""
     previous_html = (
         "<table><tr><th rowspan='2'>H1</th><th>H2</th></tr><tr><th>H3</th></tr><tr><td>A</td><td>B</td></tr></table>"
     )
@@ -300,7 +300,7 @@ def test_merge_table_content_removes_repeated_rowspan_header_and_appends_data() 
 
 
 def test_merge_table_content_repairs_colspan_on_narrower_current_rows() -> None:
-    """验证较窄的当前页数据行会补齐末单元格 colspan。"""
+    """Verify that the narrower current page data row fills the last cell colspan."""
     previous = _table(0, "<table><tr><td>A</td><td colspan='2'>B</td></tr></table>")
     current = _table(1, "<table><tr><td>C</td><td>D</td></tr></table>")
 
@@ -313,7 +313,7 @@ def test_merge_table_content_repairs_colspan_on_narrower_current_rows() -> None:
 
 
 def test_merge_table_content_clips_overlapped_blank_rowspan_placeholder() -> None:
-    """验证当前页重复空白 rowspan 占位会按上页剩余跨度裁剪。"""
+    """Verify that the current page is repeatedly blank. The rowspan placeholder will be cropped according to the remaining span of the previous page."""
     previous = _table(0, "<table><tr><td rowspan='2'>A</td><td>X</td></tr></table>")
     current = _table(
         1,
@@ -329,7 +329,7 @@ def test_merge_table_content_clips_overlapped_blank_rowspan_placeholder() -> Non
 
 
 def test_merge_table_content_replaces_footnote_and_preserves_previous_payloads() -> None:
-    """验证纯合并保留前表载荷、忽略当前 caption，并替换 footnote。"""
+    """Verify that a pure merge preserves the previous table load, ignores the current caption, and replaces footnote."""
     previous_body = _table_body(
         "<table><tr><th>H</th></tr><tr><td>A</td></tr></table>",
         index=5,
@@ -382,7 +382,7 @@ def test_merge_table_content_returns_none_for_invalid_input(
     previous: dict[str, Any],
     current: dict[str, Any],
 ) -> None:
-    """验证纯内容操作遇到非法 HTML、主体或 bbox 时返回空。"""
+    """Validate content-only operation returns null when encountering an illegal HTML, body, or bbox."""
     previous_original = deepcopy(previous)
     current_original = deepcopy(current)
 

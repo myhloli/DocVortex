@@ -1,4 +1,4 @@
-"""读取实际 Form 调用及成员来源；快照只保存自有编号，不保存 PDFium 地址。"""
+"""Read the actual Form call and member source; the snapshot only saves the own number, not the PDFium address."""
 
 from __future__ import annotations
 
@@ -32,18 +32,18 @@ _IDENTITY = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
 
 
 def _visual_bbox(bounds: BBox, matrix: tuple, page_bbox: BBox, rotation: int) -> BBox:
-    """把声明框或父坐标框变换到页面视觉坐标，保留未裁剪的页面框架。"""
+    """Transform the declaration box or parent coordinate box to page visual coordinates, retaining the uncropped page frame."""
     return _transform_object_bbox(
         bounds, lambda point: _transform_drawing_point(_apply_pdf_matrix(point, matrix), page_bbox, rotation)
     )
 
 
 def _read_form_declarations(page: Any) -> dict[tuple[int, ...], tuple[BBox, tuple]]:
-    """只沿实际 Do 调用展开 Form，区分重复调用并隔离损坏资源和循环引用。"""
+    """Expand Form only along the actual Do call, distinguishing duplicate calls and isolating corrupt resources and circular references."""
     output: dict[tuple[int, ...], tuple[BBox, tuple]] = {}
 
     def walk(stream, resources, matrix: tuple, occurrence: tuple, active: frozenset, depth: int) -> None:
-        """传播 q/Q 与 cm 状态，为每个有效 Form 调用分配容器内序号。"""
+        """Propagates q/Q and cm status, assigning an in-container sequence number to each valid Form call."""
         if depth >= DRAWING_FORM_MAX_DEPTH or stream is None:
             return
         stack = []
@@ -84,7 +84,7 @@ def _read_form_declarations(page: Any) -> dict[tuple[int, ...], tuple[BBox, tupl
 
 
 def _read_char_form_owners(textpage, owners: dict[int, int]) -> list[int | None]:
-    """在 textpage 存活时将原字符关联到稳定 Form 编号；标准 ABI 使用 Rust 批量读取。"""
+    """Relate original characters to stable Form numbers while textpage is alive; standard ABI uses Rust for batch reading."""
     getter = raw.FPDFText_GetTextObject
     count = textpage.count_chars()
     native = get_native()
@@ -101,14 +101,14 @@ def _read_char_form_owners(textpage, owners: dict[int, int]) -> list[int | None]
 
 
 def extract_form_structure(page, page_bbox: BBox, rotation: int, reader_page: Any | None) -> tuple[_PDFFormInfo, ...]:
-    """在当前页面锁内收集调用树和成员；声明匹配失败时保留未知 Form，不猜测展开。"""
+    """Collects call trees and members within the current page lock; retains unknown Form if statement match fails, does not guess expansion."""
     forms: list[dict] = []
     text_objects: dict[int, int] = {}
     path_index = 0
     paint_order = 0
 
     def walk(container, parent_matrix: tuple, ancestor_ids: tuple[int, ...], occurrence: tuple, clip, depth: int) -> None:
-        """以与现有 Path 提取相同的深度优先顺序建立祖先归属和可见框。"""
+        """Establish ancestry and visible boxes in the same depth-first order as existing Path extractions."""
         nonlocal path_index, paint_order
         if depth >= DRAWING_FORM_MAX_DEPTH:
             return
@@ -191,7 +191,7 @@ def extract_form_structure(page, page_bbox: BBox, rotation: int, reader_page: An
             declarations = _read_form_declarations(reader_page)
             media_bbox = _visual_bbox(tuple(float(v) for v in reader_page.mediabox), _IDENTITY, page_bbox, rotation)
         except Exception:
-            # PDF 资源损坏只取消结构判定，不影响 PDFium 已恢复的原生内容。
+            # PDF Resource damage only cancels the structure determination and does not affect the restored native content of PDFium.
             declarations = {}
     matched_tree = set(declarations) == {form["occurrence"] for form in forms}
     output = []
@@ -204,7 +204,7 @@ def extract_form_structure(page, page_bbox: BBox, rotation: int, reader_page: An
         )
         declared_bbox = _visual_bbox(declaration[0], declaration[1], page_bbox, rotation) if valid else None
         if declared_bbox is not None:
-            # Form 的 BBox 同时是隐式裁剪，提升嵌套 Form 时不能把框外描边重新带入。
+            # BBox of Form is also implicitly clipped. When upgrading the nested Form, the stroke outside the frame cannot be re-introduced.
             visible_clip = declared_bbox
             if form["clip"] is not None:
                 visible_clip = _intersect_object_bbox(visible_clip, _visual_bbox(form["clip"], _IDENTITY, page_bbox, rotation))

@@ -1,4 +1,4 @@
-"""识别并构造 Flash 原生 PDF 的目录正文块。"""
+"""Identifies and constructs the directory body block of Flash native PDF."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ _INDEX_MIN_PAGE_NUMBER_RATIO = 0.7
 
 @dataclass(slots=True)
 class _IndexRow:
-    """保存目录候选视觉行的成员、局部几何和合并文本。"""
+    """Saves the members, local geometry, and merged text of the catalog candidate visual line."""
 
     members: list[_LineItem]
     local_member_bboxes: list[BBox]
@@ -42,7 +42,7 @@ def _extract_index_blocks(
     require_heading: bool = False,
     require_explicit_heading: bool = False,
 ) -> tuple[list[dict[str, object]], list[_LineItem]]:
-    """用页码行尾和稳定版式识别目录；预判阶段可强制要求几何目录标题。"""
+    """Identify the table of contents with page number line endings and stable layout; geometric table of contents titles can be mandated in the pre-judgment stage."""
 
     claimed_line_ids: set[int] = set()
     blocks: list[dict[str, object]] = []
@@ -96,7 +96,7 @@ def _extract_index_blocks(
 
 
 def _index_rows_to_block(rows: list[_IndexRow], angle: int, page_size: tuple[float, float]) -> dict[str, object]:
-    """统一保存已确认目录的逻辑行顺序和原生成员范围，页码随完整条目输出。"""
+    """The logical line order and native member range of the confirmed directory are uniformly saved, and the page number is output along with the complete entry."""
     members = [line for row in rows for line in row.members]
     block: dict[str, object] = {
         "type": BlockType.INDEX,
@@ -111,12 +111,12 @@ def _index_rows_to_block(rows: list[_IndexRow], angle: int, page_size: tuple[flo
 
 
 def _index_row_em(row: _IndexRow) -> float:
-    """使用原生字形尺度比较行距，避免多行条目的合并外框放大字号。"""
+    """Use the native font scale to compare line spacing to avoid merging multiple lines of items to enlarge the font size."""
     return statistics.median(_index_line_height(line, box) for line, box in zip(row.members, row.local_member_bboxes))
 
 
 def _index_line_height(line: _LineItem, box: BBox) -> float:
-    """点线引导符占多数时，以字母数字的原生字框尺度验证目录行，避免点的墨迹高度污染。"""
+    """When dotted and line guides are the majority, the directory lines are verified using the native alphanumeric font size to avoid high contamination of dotted ink."""
     height = _line_effective_height(line, box)
     if re.search(r"(?:[.．·]\s*){3,}", line.text) is None:
         return height
@@ -131,7 +131,7 @@ def _index_line_height(line: _LineItem, box: BBox) -> float:
 
 
 def _include_repeated_leading_index_section(all_rows: list[_IndexRow], candidate: list[_IndexRow]) -> list[_IndexRow]:
-    """已确认页码目录内反复出现同式章节时，把紧邻首条的同式章节也归入目录。"""
+    """When the same type of chapters appear repeatedly in the confirmed page table of contents, the same type of chapters next to the first item will also be included in the table of contents."""
     if not candidate:
         return candidate
     position = next((index for index, row in enumerate(all_rows) if row is candidate[0]), 0)
@@ -158,7 +158,7 @@ def _include_repeated_leading_index_section(all_rows: list[_IndexRow], candidate
 
 
 def _join_index_label_continuations(rows: list[_IndexRow]) -> list[_IndexRow]:
-    """只在已确认目录内合并紧邻的同式标签续行，把右侧页码移到完整标签之后。"""
+    """Only merge the adjacent continuation lines of the same label within the confirmed table of contents, and move the page number on the right after the complete label."""
     result: list[_IndexRow] = []
     for row in rows:
         if result:
@@ -191,7 +191,7 @@ def _join_index_label_continuations(rows: list[_IndexRow]) -> list[_IndexRow]:
 
 
 def _unpaged_numbered_index_bands(rows: list[_IndexRow]) -> list[tuple[_IndexRow, list[_IndexRow]]]:
-    """明确目录题名下连续五项以上的同式编号短条目可无页码，普通步骤正文不能触发。"""
+    """It is clear that more than five consecutive short entries with the same number under the catalog title do not need page numbers, and the text of ordinary steps cannot be triggered."""
     result = []
     numbered = re.compile(r"^(\d+)[.)]\s*(\S.+)$")
     for position, heading in enumerate(rows[:-1]):
@@ -212,7 +212,7 @@ def _unpaged_numbered_index_bands(rows: list[_IndexRow]) -> list[tuple[_IndexRow
             continue
         candidate = []
         for row in rows[position + 1 :]:
-            # 只有小于半个正文尺度的孤立纯数字可忽略，不能跨越其他正文或新的章节。
+            # Only isolated pure numbers smaller than half the text size can be ignored and cannot span other text or new chapters.
             if re.fullmatch(r"\d+", row.content) and _index_row_em(row) < 0.5 * em:
                 continue
             match = numbered.match(row.content)
@@ -241,14 +241,14 @@ def _build_index_rows(
     page_size: tuple[float, float],
     angle: int,
 ) -> list[_IndexRow]:
-    """按 visual_row_id 复原当前方向的完整视觉行，保留左右分裂成员。"""
+    """Pressing visual_row_id restores the complete visual row in the current direction, retaining the left and right split members."""
 
     row_groups: dict[tuple[str, int], list[_LineItem]] = {}
     for line in lines:
         if line.angle != angle or line.semantic_type is not None:
             continue
         local = _rotate_bbox_to_upright(line.bbox, page_size, angle)
-        # 斜置水印可能被归入最近的正交方向，其外框远高于字形尺度，不能认领为目录成员。
+        # An oblique watermark may be classified in the nearest orthogonal direction, with its outer frame well above the glyph scale, and cannot be claimed as a directory member.
         if local[3] - local[1] > 1.7 * _index_line_height(line, local):
             continue
         key = ("visual", line.visual_row_id) if line.visual_row_id is not None else ("source", line.source_index)
@@ -311,18 +311,18 @@ def _build_index_rows(
 
 
 def _index_row_ends_in_page_number(content: str) -> bool:
-    """识别行尾的半角、全角阿拉伯页码或罗马页码。"""
+    """Identifies half-width, full-width Arabic page numbers or Roman page numbers at the end of a line."""
 
     return _INDEX_PAGE_NUMBER_RE.search(content.rstrip()) is not None
 
 
 def _is_index_heading(text: str) -> bool:
-    """标准目录题名只提供语义先验，仍须重复条目和页码排列才能确认目录。"""
+    """Standard catalog titles only provide semantic a priori, and entries and page numbers must still be repeated to confirm the catalog."""
     return re.fullmatch(r"(?:table\s+of\s+)?contents|目\s*录", text.strip(), re.I) is not None
 
 
 def _split_index_bands(rows: list[_IndexRow]) -> list[list[_IndexRow]]:
-    """按显著纵向断层拆分候选带，同时容纳目录章节之间的加大行距。"""
+    """Split candidate zones by significant longitudinal faults while accommodating increased line spacing between table of contents chapters."""
 
     if not rows:
         return []
@@ -339,7 +339,7 @@ def _split_index_bands(rows: list[_IndexRow]) -> list[list[_IndexRow]]:
 
 
 def _trim_index_band_edges(rows: list[_IndexRow]) -> list[_IndexRow]:
-    """移除候选带两端不带页码的标题或邻接正文，内部少量续行继续保留。"""
+    """Remove the candidate title or adjacent text without page numbers at both ends, and retain a small number of internal continuation lines."""
 
     start = 0
     end = len(rows)
@@ -358,7 +358,7 @@ def _index_band_has_stable_layout(
     *,
     explicit_heading: bool = False,
 ) -> bool:
-    """联合页码比例、右边界、行宽、缩进和行距确认目录候选。"""
+    """Confirm table of contents candidates in conjunction with page number ratio, right margin, line width, indentation, and line spacing."""
 
     if len(rows) < _INDEX_MIN_ROWS or local_page_width <= 0:
         return False
@@ -406,7 +406,7 @@ def _find_index_heading_row(
     candidate: list[_IndexRow],
     local_page_width: float,
 ) -> _IndexRow | None:
-    """用候选带上方的居中、短行和垂直邻接关系保留目录标题。"""
+    """Preserve table of contents titles with centering, short lines, and vertical adjacency above candidate bands."""
 
     if not candidate:
         return None
@@ -439,7 +439,7 @@ def _index_row_has_right_sidecar(
     local_page_width: float,
     median_height: float,
 ) -> bool:
-    """检查视觉行末尾是否存在靠近页面右侧的窄页码片段。"""
+    """Check the end of the visual line for a narrow page number fragment near the right side of the page."""
 
     if len(row.members) < 2:
         return False

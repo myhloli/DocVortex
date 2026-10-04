@@ -1,4 +1,4 @@
-"""覆盖全部十七种原生文档输入与七种输出的独立端到端矩阵。"""
+"""Independent end-to-end matrix covering all seventeen native document inputs and seven outputs."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from _mhtml_test_utils import build_mhtml_fixture
 
 
 def source_payload(suffix: str) -> bytes:
-    """使用迁移的公共样例和合成容器构造原生输入。"""
+    """Construct native input using migrated public samples and composition containers."""
     root = Path(__file__).resolve().parents[1]
     builders = {
         "epub": build_epub_fixture,
@@ -61,12 +61,12 @@ def source_payload(suffix: str) -> bytes:
     ],
 )
 def test_all_native_formats_render_all_targets(suffix: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    """每种原生格式完成分析、后处理和七种目标编码，不导入宿主。"""
+    """Each native format completes analysis, post-processing and seven target encodings without importing into the host."""
     if suffix != "pdf":
         from docvortex import content
 
         def forbidden(_pages: object) -> None:
-            """非 PDF 格式不应调用 PDF 专用文字清洗。"""
+            """Non-PDF formats should not call PDF specific text cleaning."""
             raise AssertionError("PDF normalization used for another input format")
 
         monkeypatch.setattr(content, "normalize_pdf_model_text", forbidden)

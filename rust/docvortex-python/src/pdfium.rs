@@ -1,4 +1,4 @@
-//! 仅在现有 Python guard 内借用同一 PDFium 的函数和 textpage，不拥有或关闭任何句柄。
+//! Only borrow functions of the same PDFium and textpage within the existing Python guard, without owning or closing any handles.
 
 use pyo3::exceptions::{PyException, PyMemoryError, PyValueError};
 use pyo3::prelude::*;
@@ -9,7 +9,7 @@ use docvortex_pdfium::{Fonts, ReadError, Record};
 
 pub const RECORD_BATCH_SIZE: usize = 1024;
 
-/// 在现有锁和文本页生命周期内批量读取字符 Form 编号，结果不含借用地址。
+/// Batch reading of character Form numbers within the lifetime of the existing lock and text page, the result does not contain the borrowed address.
 #[pyfunction]
 pub fn read_pdfium_char_form_owners(
     function: usize,
@@ -26,13 +26,13 @@ pub fn read_pdfium_char_form_owners(
     )
 }
 
-/// 仅在最终边界构造点和端点索引，Python 复用同一点对象建立直线记录。
+/// Only point and endpoint indexes are constructed at the final boundary, and Python reuses the same point object to establish a straight line record.
 #[pyfunction]
 pub fn read_pdfium_subpaths(
     addresses: Vec<usize>,
     handle: usize,
 ) -> PyResult<Vec<(Vec<(f64, f64)>, Vec<(usize, usize)>, bool)>> {
-    // Python 适配器验证 ABI 并持有运行库、页面和锁，本次读取不释放 GIL。
+    // The Python adapter verifies ABI and holds the runtime library, page and lock. This read does not release GIL.
     let records =
         unsafe { docvortex_pdfium::paths::read_subpaths(addresses, handle) }.map_err(|error| {
             match error {
@@ -55,7 +55,7 @@ type ObjectRecord = (
     Option<(f64, f64, f64, f64)>,
 );
 
-/// 对象记录按固定批次物化，防止整页 Python 元组与最终路径证据同时驻留。
+/// Object records are materialized in fixed batches, preventing full page Python tuples from residing at the same time as final path evidence.
 #[pyclass(module = "docvortex._native")]
 pub struct PdfiumObjectBatches {
     records: std::vec::IntoIter<docvortex_pdfium::objects::Object>,
@@ -63,12 +63,12 @@ pub struct PdfiumObjectBatches {
 
 #[pymethods]
 impl PdfiumObjectBatches {
-    /// 迭代纯数值；借用地址仍须由调用方在页面作用域内消费。
+    /// Iterate purely numerical values; the borrowed address must still be consumed within the page scope by the caller.
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
 
-    /// 每批最多生成 1024 条对象记录，不持有或释放 PDFium 资源。
+    /// Each batch generates a maximum of 1024 object records and does not hold or release PDFium resources.
     fn __next__(&mut self) -> Option<Vec<ObjectRecord>> {
         let records: Vec<_> = self
             .records
@@ -92,7 +92,7 @@ impl PdfiumObjectBatches {
     }
 }
 
-/// 同步消费对象遍历；返回地址只能由持有页面的适配器立即使用。
+/// Synchronous consumption object traversal; the return address can only be used immediately by the adapter holding the page.
 #[pyfunction]
 pub fn read_pdfium_objects(
     addresses: Vec<usize>,
@@ -100,7 +100,7 @@ pub fn read_pdfium_objects(
     kind: i32,
     max_depth: usize,
 ) -> PyResult<PdfiumObjectBatches> {
-    // ABI、运行库和页面由适配器保持存活，全程保留 GIL 与既有运行时锁。
+    // ABI, runtime and pages are kept alive by the adapter, retaining GIL and existing runtime locks throughout.
     let records =
         unsafe { docvortex_pdfium::objects::read_objects(addresses, handle, kind, max_depth) }
             .map_err(|error| match error {
@@ -115,7 +115,7 @@ pub fn read_pdfium_objects(
 
 type TextVisibilityRecord = (usize, bool, Option<(f64, f64, f64, f64)>);
 
-/// 单次 TEXT 遍历返回绘制状态与页面视觉裁剪，供 Python 建立地址索引。
+/// A single TEXT traversal returns the drawing status and page visual cropping for Python to establish an address index.
 #[pyfunction]
 pub fn read_pdfium_text_visibility(
     addresses: Vec<usize>,
@@ -140,7 +140,7 @@ pub fn read_pdfium_text_visibility(
         .collect())
 }
 
-/// 按固定批次向 Python 物化轴线数值记录，避免整页同时持有两份大列表。
+/// Record the numerical value of the Python materialization axis in fixed batches to avoid holding two large lists on the entire page at the same time.
 #[pyclass(module = "docvortex._native")]
 pub struct PdfiumDrawingLineBatches {
     records: std::vec::IntoIter<docvortex_pdfium::drawing_lines::Line>,
@@ -148,12 +148,12 @@ pub struct PdfiumDrawingLineBatches {
 
 #[pymethods]
 impl PdfiumDrawingLineBatches {
-    /// 返回当前迭代器以供页面作用域内同步消费。
+    /// Return the current iterator for synchronous consumption within the page scope.
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
 
-    /// 每次最多返回 1024 条线，剩余记录仍留在 Rust 内。
+    /// A maximum of 1024 lines are returned each time, and the remaining records remain in Rust.
     fn __next__(&mut self) -> Option<Vec<docvortex_pdfium::drawing_lines::Line>> {
         let records: Vec<_> = self.records.by_ref().take(RECORD_BATCH_SIZE).collect();
         if records.is_empty() {
@@ -164,7 +164,7 @@ impl PdfiumDrawingLineBatches {
     }
 }
 
-/// 对简单描边 Path 批量提取轴线；不支持的复杂页返回 None 供参考实现处理。
+/// Extract axis lines in batches using Path for simple strokes; return None for unsupported complex pages for reference implementation processing.
 #[pyfunction]
 pub fn read_pdfium_drawing_lines(
     addresses: Vec<usize>,
@@ -185,7 +185,7 @@ pub fn read_pdfium_drawing_lines(
     }))
 }
 
-/// 暴露最近一次显式剖析的绘图线读取阶段耗时，单位为纳秒。
+/// The time taken to read the drawing line of the latest explicit analysis is exposed, in nanoseconds.
 #[pyfunction]
 pub fn pdfium_drawing_line_stage_stats() -> (u64, u64, u64) {
     docvortex_pdfium::drawing_lines::stage_stats()
@@ -194,7 +194,7 @@ pub fn pdfium_drawing_line_stage_stats() -> (u64, u64, u64) {
 type PathLineRecord = docvortex_pdfium::path_evidence::Line;
 type PathInfoRecord = docvortex_pdfium::path_evidence::PathInfo;
 
-/// 按固定批次物化 Path 绘图线，页面证据仍留在 Rust 直到 Python 消费。
+/// Materializing Path plot lines in fixed batches, page evidence remains in Rust until Python is consumed.
 #[pyclass(module = "docvortex._native")]
 pub struct PdfiumPathLineBatches {
     records: std::vec::IntoIter<PathLineRecord>,
@@ -202,19 +202,19 @@ pub struct PdfiumPathLineBatches {
 
 #[pymethods]
 impl PdfiumPathLineBatches {
-    /// 返回当前批次迭代器。
+    /// Return the current batch iterator.
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
 
-    /// 每次最多返回 1024 条未合并轴线。
+    /// A maximum of 1024 unmerged axes are returned each time.
     fn __next__(&mut self) -> Option<Vec<PathLineRecord>> {
         let records: Vec<_> = self.records.by_ref().take(RECORD_BATCH_SIZE).collect();
         (!records.is_empty()).then_some(records)
     }
 }
 
-/// 按固定批次物化 Path 摘要，避免整页记录在边界外重复保存。
+/// Materialize Path abstracts in fixed batches to avoid repeated saving of entire page records outside the boundary.
 #[pyclass(module = "docvortex._native")]
 pub struct PdfiumPathInfoBatches {
     records: std::vec::IntoIter<PathInfoRecord>,
@@ -222,19 +222,19 @@ pub struct PdfiumPathInfoBatches {
 
 #[pymethods]
 impl PdfiumPathInfoBatches {
-    /// 返回当前批次迭代器。
+    /// Return the current batch iterator.
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
 
-    /// 每次最多返回 1024 条路径摘要。
+    /// A maximum of 1024 path summaries are returned each time.
     fn __next__(&mut self) -> Option<Vec<PathInfoRecord>> {
         let records: Vec<_> = self.records.by_ref().take(RECORD_BATCH_SIZE).collect();
         (!records.is_empty()).then_some(records)
     }
 }
 
-/// 单次遍历批量生成 Path 双侧证据；复杂状态也留在原生路径中复刻。
+/// A single traversal batch generates Path bilateral evidence; the complex state is also left in the native path for replication.
 #[pyfunction]
 pub fn read_pdfium_path_evidence(
     py: Python<'_>,
@@ -262,14 +262,14 @@ pub fn read_pdfium_path_evidence(
             max_depth,
             want_lines,
             want_infos,
-            // 保持解释器 math.hypot 的逐位语义；异常输入由其返回 NaN/Inf，不中断同页。
+            // Maintain the bit-by-bit semantics of the interpreter math.hypot; exception input is returned by it to NaN/Inf without interrupting the same page.
             |x: f64, y: f64| {
                 hypot
                     .call1((x, y))
                     .and_then(|value| value.extract::<f64>())
                     .unwrap_or(f64::NAN)
             },
-            // 仅开放四角 Path 进入此回调，保留 Python round(value, 3) 的临界值语义。
+            // Only open four corners Path enter this callback, retaining the critical value semantics of Python round (value, 3).
             |value: f64| {
                 round
                     .call1((value, 3))
@@ -308,7 +308,7 @@ type VisualRecord = (
     Option<(f64, f64)>,
 );
 
-/// 原始字符保留在 Rust，每批直接生成最终坐标，省去 Python 几何重打包。
+/// The original characters are retained in Rust, and the final coordinates are directly generated for each batch, eliminating the need for geometric repackaging of Python.
 #[pyclass(module = "docvortex._native")]
 pub struct PdfiumVisualCharacterBatches {
     records: std::vec::IntoIter<Record>,
@@ -320,12 +320,12 @@ pub struct PdfiumVisualCharacterBatches {
 
 #[pymethods]
 impl PdfiumVisualCharacterBatches {
-    /// 数值记录不依赖已关闭的 PDFium 页面，允许延后消费。
+    /// Value recording does not rely on the closed PDFium page, allowing delayed consumption.
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
 
-    /// 在固定批次内融合坐标转换，原始几何不会先物化为 Python 元组。
+    /// To fuse coordinate transformations within a fixed batch, the original geometry is not first materialized into Python tuples.
     fn __next__(&mut self, py: Python<'_>) -> Option<Vec<VisualRecord>> {
         let chunk: Vec<_> = self.records.by_ref().take(RECORD_BATCH_SIZE).collect();
         if chunk.is_empty() {
@@ -338,7 +338,7 @@ impl PdfiumVisualCharacterBatches {
                 .iter()
                 .map(|record| {
                     let selected = if record.1 == 0.0 { record.2 } else { record.3 };
-                    // 读取阶段已验证每个字符的选定框，缺失框在 FFI 返回前报错。
+                    // The selected box of each character has been verified in the reading phase, and the missing box will report an error before FFI returns.
                     (
                         selected.expect("validated character box").into(),
                         if extended {
@@ -379,7 +379,7 @@ impl PdfiumVisualCharacterBatches {
     }
 }
 
-/// 借用当前运行库同步读取；之后的坐标转换只依赖自有 Rust 数据。
+/// Borrow the current runtime library to read synchronously; subsequent coordinate conversion only relies on its own Rust data.
 #[pyfunction]
 pub fn read_pdfium_visual_batches(
     addresses: Vec<usize>,
@@ -408,7 +408,7 @@ pub fn read_pdfium_visual_batches(
     ))
 }
 
-/// 持有本次读取的纯数值，逐批构造 Python 元组，避免整页临时对象与最终字符同时常驻。
+/// Hold the pure numerical value read this time and construct Python tuples batch by batch to avoid the temporary object of the whole page and the final character being resident at the same time.
 #[pyclass(module = "docvortex._native")]
 pub struct PdfiumCharacterBatches {
     records: std::vec::IntoIter<Record>,
@@ -416,12 +416,12 @@ pub struct PdfiumCharacterBatches {
 
 #[pymethods]
 impl PdfiumCharacterBatches {
-    /// 迭代器仅拥有数值，不拥有 PDFium 句柄或回调。
+    /// The iterator only holds values, not PDFium handles or callbacks.
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
         slf
     }
 
-    /// 每批只构造上限内的 Python 记录，调用方消费后即可释放这一批临时元组。
+    /// Each batch only constructs Python records within the upper limit, and the caller can release this batch of temporary tuples after consumption.
     fn __next__(&mut self) -> Option<Vec<Record>> {
         let chunk: Vec<_> = self.records.by_ref().take(RECORD_BATCH_SIZE).collect();
         if chunk.is_empty() {
@@ -432,7 +432,7 @@ impl PdfiumCharacterBatches {
     }
 }
 
-/// 保留协议 4 最初的完整列表入口，旧绑定调用方无需改变返回值处理。
+/// The original complete list entry of protocol 4 is retained, and the old binding caller does not need to change the return value processing.
 #[pyfunction]
 pub fn read_pdfium_chars(
     addresses: Vec<usize>,
@@ -443,7 +443,7 @@ pub fn read_pdfium_chars(
     read_pdfium_data(addresses, handle, count, extended)
 }
 
-/// 同一次 PDFium 调用的结果按数值缓冲保存，随后有界地交给 Python 物化。
+/// The result of the same PDFium call is saved in a numerical buffer and then handed over to Python in a bounded manner for materialization.
 #[pyfunction]
 pub fn read_pdfium_char_batches(
     py: Python<'_>,
@@ -464,14 +464,14 @@ pub fn read_pdfium_char_batches(
     ))
 }
 
-/// 保留持锁和持有 GIL 的同步边界，将纯 Rust 错误转换为已有 Python 异常。
+/// Preserve synchronization boundaries for holding locks and holding GIL, converting pure Rust errors into existing Python exceptions.
 fn read_pdfium_data(
     addresses: Vec<usize>,
     handle: usize,
     count: usize,
     extended: bool,
 ) -> PyResult<(Vec<Record>, Fonts)> {
-    // 安全条件由现有 Python ABI 探测和 pdfium_guard 保证，调用期间不释放 GIL。
+    // Safety conditions are guaranteed by the existing Python ABI probe and pdfium_guard, GIL is not released during the call.
     unsafe { docvortex_pdfium::read_characters(addresses, handle, count, extended) }.map_err(
         |error| match error {
             ReadError::InvalidInput(message) => PyValueError::new_err(message),

@@ -1,4 +1,4 @@
-//! 字体提供器的薄绑定；生命周期与 C 回调由同库 PDFium 适配层管理。
+//! Thin binding of font providers; life cycle and C callbacks are managed by the PDFium adaptation layer of the same library.
 use docvortex_pdfium::fonts::FontProvider;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -12,7 +12,7 @@ pub struct NativeFontProvider {
 
 #[pymethods]
 impl NativeFontProvider {
-    /// 接受 Python 已验证并保活的 ABI 地址和固定字体资源。
+    /// Accept Python verified and kept-alive ABI addresses and fixed font resources.
     #[new]
     fn new(
         addresses: [usize; 3],
@@ -37,25 +37,25 @@ impl NativeFontProvider {
         .map_err(PyRuntimeError::new_err)?;
         Ok(Self { provider })
     }
-    /// 等待可重入状态锁时释放 GIL，避免其它回调等待 GIL 造成锁顺序死锁。
+    /// Release GIL when waiting for the reentrant state lock to avoid lock sequence deadlock caused by other callbacks waiting for GIL.
     fn install(&self, py: Python<'_>) -> PyResult<()> {
         py.detach(|| self.provider.install())
             .map_err(PyRuntimeError::new_err)
     }
-    /// 将永久原生回调故障转换为上层可分类异常。
+    /// Convert permanent native callback failures into upper-layer classifiable exceptions.
     fn raise_if_failed(&self, py: Python<'_>) -> PyResult<()> {
         py.detach(|| self.provider.check())
             .map_err(PyRuntimeError::new_err)
     }
-    /// 提供私有 ABI 验证入口，不能在提供器回收后使用返回地址。
+    /// Provide private ABI verification entry, return address cannot be used after provider recycling.
     fn _interface_address(&self) -> usize {
         self.provider.interface_address()
     }
-    /// 返回释放状态、固定字体请求数及完整字库复制数。
+    /// Return the release status, the number of fixed font requests and the number of complete font copies.
     fn stats(&self, py: Python<'_>) -> (bool, usize, usize) {
         py.detach(|| self.provider.stats())
     }
-    /// 提供与参考实现的名称识别差分入口，不操作 PDFium 全局接口。
+    /// Provides a name recognition differential entry from the reference implementation, without operating the PDFium global interface.
     fn classify(&self, py: Python<'_>, face: &[u8], charset: i32) -> Option<i32> {
         py.detach(|| self.provider.classify(face, charset))
     }

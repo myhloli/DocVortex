@@ -1,4 +1,4 @@
-"""PDF 表格视觉行几何；保留原有认领顺序与判定规则。"""
+"""PDF table visual row geometry; retain the original claiming order and judgment rules."""
 
 from __future__ import annotations
 from ....schema import BBox
@@ -16,7 +16,7 @@ def _clip_visual_row_to_corridor(
     *,
     margin: float,
 ) -> _VisualRow | None:
-    """仅保留横向走廊内的片段，避免同基线的另一栏文本污染表格区域。"""
+    """Keep only the fragments within the horizontal corridor to prevent another column of text from the same baseline from contaminating the table area."""
 
     fragments = [
         fragment

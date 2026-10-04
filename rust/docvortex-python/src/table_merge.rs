@@ -1,4 +1,4 @@
-//! 仅在候选语义输入与最终输出边界构造 Python 对象，核心成员不逐候选往返。
+//! The Python object is constructed only at the boundary between the candidate semantic input and the final output, and the core members do not round trip candidate by candidate.
 use docvortex_core::geometry::{Box4, Size};
 use docvortex_core::table_merge::{
     self, Annotation, Candidate, GridContext, Ids, Members, Merger, Row,
@@ -12,29 +12,29 @@ pub(super) struct OwnedRuleCore {
 }
 #[pymethods]
 impl OwnedRuleCore {
-    /// 对少量注释成员执行包含查询，不导出整个核心集合。
+    /// Execute containment queries on a small number of annotation members without exporting the entire core collection.
     fn contains_all(&self, values: Vec<i64>) -> bool {
         values.iter().all(|v| self.members.contains(v))
     }
-    /// 批量筛选核心之外的成员，避免每个注释行号单独跨越 Python 边界。
+    /// Batch filter members outside the core to avoid each comment line number crossing the Python boundary individually.
     fn difference(&self, values: Vec<i64>) -> Vec<i64> {
         values
             .into_iter()
             .filter(|v| !self.members.contains(v))
             .collect()
     }
-    /// 批量求注释交集，只导出当前边界确实需要的来源行号。
+    /// Find the annotation intersection in batches, and only export the source line numbers that are really needed for the current boundary.
     fn intersection(&self, values: Vec<i64>) -> Vec<i64> {
         values
             .into_iter()
             .filter(|v| self.members.contains(v))
             .collect()
     }
-    /// 仅参考适配或显式枚举时导出核心成员。
+    /// Export core members only by reference to adaptation or explicit enumeration.
     fn members(&self) -> Vec<i64> {
         self.members.iter().copied().collect()
     }
-    /// 不物化即可判断空集合，保持 Python 注释分支的真假值语义。
+    /// The empty set can be judged without materialization, and the true and false value semantics of the Python annotation branch are maintained.
     fn __len__(&self) -> usize {
         self.members.len()
     }
@@ -46,7 +46,7 @@ pub(super) struct NativeTableGrid {
 }
 #[pymethods]
 impl NativeTableGrid {
-    /// 每个页面候选组只准备一次网格和行片段，生命周期不依赖 PDFium。
+    /// Each page candidate group only prepares grid and row fragments once, and the life cycle does not depend on PDFium.
     #[new]
     fn new(
         py: Python<'_>,
@@ -78,14 +78,14 @@ pub(super) struct NativeTableMerger {
 }
 #[pymethods]
 impl NativeTableMerger {
-    /// 新建一次性候选流，调用方须保持原有稳定分数排序。
+    /// To create a new one-time candidate stream, the caller must maintain the original stable score sorting.
     #[new]
     fn new() -> Self {
         Self {
             state: Some(Merger::default()),
         }
     }
-    /// 连续执行网格扩展、共享成员更新和首目标合并，全部输入验证后才改变状态。
+    /// Grid expansion, shared member update and first target merging are performed continuously, and the status is changed after all inputs are verified.
     #[pyo3(signature=(bbox, local, angle, score, core, members, annotations, owned=None, grid=None))]
     fn add(
         &mut self,
@@ -150,7 +150,7 @@ impl NativeTableMerger {
         });
         Ok(())
     }
-    /// 消费候选流后仅物化保留结果；重复结束或继续追加明确报错。
+    /// After consuming the candidate stream, only the result is materialized and retained; the repetition ends or continues to append a clear error.
     fn finish(&mut self, py: Python<'_>) -> PyResult<Vec<Output>> {
         let state = self
             .state

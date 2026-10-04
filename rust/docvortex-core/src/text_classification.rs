@@ -1,4 +1,4 @@
-//! 原始字符分类统计，与 canonical 去重后的页面字符严格分离。
+//! The original character classification statistics are strictly separated from the page characters after canonical deduplication.
 use std::collections::HashSet;
 
 #[derive(Default)]
@@ -13,7 +13,7 @@ pub struct Counts {
     pub font_first: Vec<[usize; 3]>,
 }
 
-/// 保留原判定分支优先级，并按原始字体 ID 累积全部、非生成及非生成 CJK 字符数。
+/// Retain the original decision branch priority, and accumulate all, non-generated and non-generated CJK character numbers according to the original font ID.
 pub fn count(
     records: &[(u32, bool, bool, usize)],
     font_count: usize,
@@ -56,7 +56,7 @@ pub fn count(
 mod tests {
     use super::*;
 
-    /// 控制字符优先级不受重叠 PUA 范围影响，generated 与错误码统计独立保留。
+    /// The control character priority is not affected by the overlapping PUA range, and generated is retained independently from error code statistics.
     #[test]
     fn raw_priority_and_generated_counts() {
         let records = [

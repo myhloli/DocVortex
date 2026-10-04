@@ -1,3 +1,3 @@
-"""Flash XLSX 转换实现。"""
+"""Flash XLSX conversion implementation."""
 
 __all__: list[str] = []

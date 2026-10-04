@@ -1,4 +1,4 @@
-"""验证 PDF 实际页归属、分页完整性及超高内容的降级行为。"""
+"""Verify PDF actual page ownership, paging integrity, and degradation behavior for ultra-high content."""
 
 from __future__ import annotations
 
@@ -23,12 +23,12 @@ HEIGHT = A4[1] - 2 * (PAGE_MARGIN + FRAME_PADDING)
 
 
 def _page_texts(payload: bytes) -> list[str]:
-    """提取每页文字，以实际 PDF 页归属验证分页而非检查实现类型。"""
+    """Extract text from each page and verify pagination with actual PDF page ownership instead of checking implementation type."""
     return [page.extract_text() or "" for page in PdfReader(BytesIO(payload)).pages]
 
 
 def _story_pdf(story: list) -> bytes:
-    """用与产品一致的内容框渲染可精确控制页底余量的测试文档。"""
+    """Render test documents with product-consistent content boxes with precise control of footer margins."""
     output = BytesIO()
     SimpleDocTemplate(
         output,
@@ -42,18 +42,18 @@ def _story_pdf(story: list) -> bytes:
 
 
 def _lines(count: int, prefix: str = "LINE") -> Paragraph:
-    """生成每行有独立标记的段落，支持检查孤行与重复丢失。"""
+    """Generate paragraphs with independent markers for each line, and support checking for orphan lines and duplicate losses."""
     return Paragraph("<br/>".join(f"{prefix}_{i:03}" for i in range(count)), build_pdf_styles().body)
 
 
 def _protect(content: list, *, table: bool = False) -> list:
-    """按生产阈值运行分页保护，再交给真实 ReportLab 文档分页。"""
+    """Run paging protection against production thresholds before handing over real ReportLab document paging."""
     helper = protect_tables if table else protect_paragraphs
     return helper(content, width=WIDTH, height=HEIGHT, canvas=Canvas(BytesIO()))
 
 
 def _table(rows: int, *, row_lines: int = 1) -> _PdfLongTable:
-    """构造带重复表头的原生长表，每行文字标记可跨页核对。"""
+    """Construct a native table with repeated headers, and each row of text marks can be checked across pages."""
     style = build_pdf_styles().table_cell
     data = [[Paragraph("HEADER", style)]]
     data.extend([Paragraph("<br/>".join(f"ROW_{row:03}_{line:03}" for line in range(row_lines)), style)] for row in range(rows))
@@ -61,7 +61,7 @@ def _table(rows: int, *, row_lines: int = 1) -> _PdfLongTable:
 
 
 def _middle(blocks: list) -> MiddleJson:
-    """构造用于公共渲染入口的严格文档，避免测试依赖其他测试模块。"""
+    """Construct strict documentation for public rendering entries to avoid tests relying on other test modules."""
     return MiddleJson(
         pages=[PageInfo(page_idx=0, blocks=blocks)],
         is_full_document=True,
@@ -71,7 +71,7 @@ def _middle(blocks: list) -> MiddleJson:
 
 
 def _image(*, index: int = 0, ordinal: int = 0, tall: bool = False, long_note: bool = False) -> ImageBlock:
-    """生成离线图片及说明，覆盖单图、多图与超长说明。"""
+    """Generate offline pictures and descriptions, covering single pictures, multiple pictures and super long descriptions."""
     output = BytesIO()
     PillowImage.new("RGB", (200, 2400 if tall else 600), (30, 80, 130)).save(output, format="PNG")
     uri = "data:image/png;base64," + base64.b64encode(output.getvalue()).decode("ascii")
@@ -88,7 +88,7 @@ def _image(*, index: int = 0, ordinal: int = 0, tall: bool = False, long_note: b
 
 @pytest.mark.parametrize("lines,kept", [(10, True), (11, False), (12, False)])
 def test_paragraph_height_threshold_controls_actual_page_assignment(lines: int, kept: bool) -> None:
-    """短段整块换页，刚超过四分之一页的段落允许利用当前页余量。"""
+    """Short paragraphs are paged in their entirety. Paragraphs that are just over a quarter of a page are allowed to use the current page margin."""
     pages = _page_texts(_story_pdf([Spacer(1, HEIGHT - 40), *_protect([_lines(lines)])]))
     assert len(pages) == 2
     assert ("LINE_000" not in pages[0]) is kept
@@ -98,7 +98,7 @@ def test_paragraph_height_threshold_controls_actual_page_assignment(lines: int, 
 
 @pytest.mark.parametrize("remaining", [20, 40, 180])
 def test_long_paragraph_avoids_single_lines_at_page_boundaries(remaining: int) -> None:
-    """长段分页时不在两侧留下孤立单行，且超整页内容能持续分页。"""
+    """When paginating long sections, no single lines will be left on either side, and over-full page content can be paginated continuously."""
     pages = _page_texts(_story_pdf([Spacer(1, HEIGHT - remaining), *_protect([_lines(100)])]))
     counts = [sum(f"LINE_{i:03}" in page for i in range(100)) for page in pages]
     assert sum(counts) == 100
@@ -106,7 +106,7 @@ def test_long_paragraph_avoids_single_lines_at_page_boundaries(remaining: int) -
 
 
 def test_heading_stays_with_protected_paragraph() -> None:
-    """嵌套保护块返回真实高度，标题不会独自留在上一页。"""
+    """Nested guard blocks return the true height and the title does not stay on the previous page alone."""
     heading = Paragraph("HEADING", build_pdf_styles().heading(2))
     pages = _page_texts(_story_pdf([Spacer(1, HEIGHT - 60), heading, *_protect([_lines(5)])]))
     assert "HEADING" not in pages[0]
@@ -115,7 +115,7 @@ def test_heading_stays_with_protected_paragraph() -> None:
 
 @pytest.mark.parametrize("rows,kept", [(8, True), (18, True), (19, False), (45, False)])
 def test_table_height_threshold_includes_annotations(rows: int, kept: bool) -> None:
-    """半页阈值包含说明与间距，长表仍能从当前页开始并重复表头。"""
+    """The half-page threshold includes descriptions and spacing, and long tables can still start on the current page and repeat the header."""
     notes = Paragraph("TABLE_NOTE", build_pdf_styles().caption)
     pages = _page_texts(_story_pdf([Spacer(1, HEIGHT - 100), *_protect([_table(rows), notes], table=True)]))
     assert ("ROW_000_000" not in pages[0]) is kept
@@ -125,7 +125,7 @@ def test_table_height_threshold_includes_annotations(rows: int, kept: bool) -> N
 
 
 def test_table_annotations_follow_first_and_last_fragments() -> None:
-    """长表首尾说明分别跟随首末片段，尾注不会被挤到单独一页。"""
+    """The first and last descriptions of long tables follow the first and last fragments respectively, and the endnotes will not be squeezed into a separate page."""
     styles = build_pdf_styles()
     before = Paragraph("BEFORE_TABLE", styles.caption)
     after = Paragraph("AFTER_TABLE", styles.caption)
@@ -137,7 +137,7 @@ def test_table_annotations_follow_first_and_last_fragments() -> None:
 
 
 def test_normal_table_row_moves_before_in_row_splitting() -> None:
-    """普通高行在页尾放不下时整体换页，不提前拆开单元格。"""
+    """When ordinary tall rows cannot fit at the end of the page, the entire page will be changed without splitting the cells in advance."""
     pages = _page_texts(_story_pdf([Spacer(1, HEIGHT - 80), *_protect([_table(5, row_lines=20)], table=True)]))
     assert "ROW_000_000" not in pages[0]
     assert "ROW_000_000" in pages[1] and "ROW_000_019" in pages[1]
@@ -145,7 +145,7 @@ def test_normal_table_row_moves_before_in_row_splitting() -> None:
 
 
 def test_oversized_table_row_splits_on_fresh_page_with_caption() -> None:
-    """单行超过整页时仍可拆分，末段与说明同页且内容完整。"""
+    """If a single line exceeds the entire page, it can still be split. The last paragraph and description are on the same page and the content is complete."""
     after = Paragraph("AFTER_TABLE", build_pdf_styles().caption)
     pages = _page_texts(_story_pdf(_protect([_table(1, row_lines=150), after], table=True)))
     assert len(pages) >= 3
@@ -155,7 +155,7 @@ def test_oversized_table_row_splits_on_fresh_page_with_caption() -> None:
 
 @pytest.mark.parametrize("count,tall,long_note", [(1, False, False), (1, True, False), (2, True, False), (1, True, True)])
 def test_public_pdf_images_fit_frames_and_keep_short_captions(count: int, tall: bool, long_note: bool) -> None:
-    """公共入口可渲染超高图与多图，并将简短说明和图片放在同页。"""
+    """The public portal can render superelevation images and multi-images, and place short descriptions and images on the same page."""
     filler = [TextBlock(type="text", index=i, content=[{"type": "text", "content": f"FILLER_{i}"}]) for i in range(15)]
     images = [_image(index=15 + i, ordinal=i, tall=tall, long_note=long_note) for i in range(count)]
     reader = PdfReader(BytesIO(render_pdf(_middle([*filler, *images]))))
@@ -169,7 +169,7 @@ def test_public_pdf_images_fit_frames_and_keep_short_captions(count: int, tall: 
 
 
 def test_full_height_image_reserves_title_and_caption_space() -> None:
-    """超高图与标题及图注恰好占满一页时不产生空白页，图像始终位于内容框内。"""
+    """When the superelevation image, title and legend exactly fill a page, no blank page will be generated, and the image will always be within the content frame."""
     heading = ParagraphTitleBlock(type="paragraph_title", index=0, level=2, content=[{"type": "text", "content": "HEADING"}])
     reader = PdfReader(BytesIO(render_pdf(_middle([heading, _image(index=1, tall=True)]))))
     assert len(reader.pages) == 1
@@ -178,7 +178,7 @@ def test_full_height_image_reserves_title_and_caption_space() -> None:
     positions = []
 
     def record_image(operator, operands, matrix, text_matrix):
-        """记录 PDF 图像绘制时的真实变换，核对边界而非只检查资源存在。"""
+        """Record the actual transformation of the PDF image when drawing, checking for boundaries instead of just checking for resource existence."""
         if operator == b"Do":
             positions.append(matrix[:])
 
@@ -192,7 +192,7 @@ def test_full_height_image_reserves_title_and_caption_space() -> None:
 
 
 def test_list_keeps_individual_items_without_moving_entire_list() -> None:
-    """长列表继续利用当前页，保护粒度是单项而不是整张列表。"""
+    """Long lists continue to use the current page, and the granularity of protection is individual items rather than the entire list."""
     filler = [TextBlock(type="text", index=i, content=[{"type": "text", "content": f"FILLER_{i}"}]) for i in range(20)]
     items = [TextBlock(type="text", content=[{"type": "text", "content": f"ITEM_{i:03}"}]) for i in range(60)]
     pages = _page_texts(render_pdf(_middle([*filler, ListBlock(type="list", index=20, content=items)])))
@@ -202,7 +202,7 @@ def test_list_keeps_individual_items_without_moving_entire_list() -> None:
 
 
 def test_long_table_preserves_rowspans_across_page_boundaries() -> None:
-    """多页表格中的普通跨行合并保持完整，重复表头和末尾说明正常输出。"""
+    """Ordinary cross-row merges in multi-page tables remain intact, with repeated headers and tails indicating normal output."""
     style = build_pdf_styles().table_cell
     data = [[Paragraph("HEADER", style), ""]]
     spans = []
@@ -225,7 +225,7 @@ def test_long_table_preserves_rowspans_across_page_boundaries() -> None:
 
 
 def test_public_pdf_short_text_and_html_table_move_whole() -> None:
-    """公共入口保护真实语义段落和 HTML 短表，并保持确定性输出。"""
+    """The public portal protects the true semantic paragraphs and HTML short tables and maintains deterministic output."""
     filler = [TextBlock(type="text", index=i, content=[{"type": "text", "content": f"FILLER_{i}"}]) for i in range(28)]
     paragraph = TextBlock(type="text", index=28, content=[{"type": "text", "content": "START " + "word " * 110 + " END"}])
     table = TableBlock.model_validate(

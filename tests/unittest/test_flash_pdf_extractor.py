@@ -2,7 +2,7 @@ from docvortex.analyzers.native.pdf import pipeline
 
 
 def test_marginal_header_row_does_not_break_two_column_reading_order() -> None:
-    """验证边缘页眉按视觉行排序且正文保持先左栏后右栏。"""
+    """Verify that marginal headers are sorted by visual rows and that body text remains column-left then right-column."""
     blocks = [
         {"type": "header", "bbox": (80.0, 2.0, 120.0, 12.0), "angle": 0, "content": "center"},
         {"type": "page_number", "bbox": (2.0, 0.0, 12.0, 14.0), "angle": 0, "content": "page"},
@@ -27,7 +27,7 @@ def test_marginal_header_row_does_not_break_two_column_reading_order() -> None:
 
 
 def test_overlapping_span_captions_follow_visual_center_order() -> None:
-    """验证跨栏带中轻微重叠的图注按视觉中心稳定排序。"""
+    """Verify that slightly overlapping legends in hurdle strips are stably sorted by visual center."""
     common = {
         "type": "text",
         "angle": 0,

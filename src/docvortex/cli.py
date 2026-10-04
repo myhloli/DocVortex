@@ -1,4 +1,4 @@
-"""独立转换命令行，业务行为全部委托公开 API。"""
+"""Convert the command line independently, and all business behaviors are entrusted to the public API."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ _LOG_LEVELS = ("trace", "debug", "info", "warning", "error", "critical")
 
 
 def _configure_log_level(level: str) -> None:
-    """按全局参数重建 loguru 标准错误输出，并过滤低于该等级的日志。"""
+    """Rebuild loguru standard error output by global parameters and filter logs below that level."""
     logger.remove()
     logger.add(sys.stderr, level=level.upper())
 
@@ -31,7 +31,7 @@ def _configure_log_level(level: str) -> None:
     help="Global loguru log level; place this root option before the command.",
 )
 def main(log_level: str) -> None:
-    """提供独立文档引擎的命令行入口，并应用全局日志等级。"""
+    """Provides a command line entry for an independent document engine and applies global log levels."""
     _configure_log_level(log_level)
 
 
@@ -49,7 +49,7 @@ def main(log_level: str) -> None:
 @click.option("--overwrite", is_flag=True)
 @click.option("--pdf-layout", type=click.Choice(["auto", "original", "reflow"]), default="auto", show_default=True)
 def convert_command(source: Path, output: Path, output_format: str, page_range: str, overwrite: bool, pdf_layout: str) -> None:
-    """转换原生文档并写出目标文件及所需素材。"""
+    """Convert native documents and write out target files and required materials."""
     from .api import convert
     from .render import PdfLayout, PdfRenderOptions
 
@@ -68,7 +68,7 @@ def convert_command(source: Path, output: Path, output_format: str, page_range: 
 @main.command("classify")
 @click.argument("source", type=click.Path(exists=True, dir_okay=False, path_type=Path))
 def classify_command(source: Path) -> None:
-    """显式判断 PDF 应使用文本解析还是 OCR，不启动任何推理。"""
+    """Explicitly determine whether PDF or OCR should use text parsing, without initiating any inference."""
     from .document.pdf import PDFDocument
 
     with PDFDocument(source.read_bytes()) as document:

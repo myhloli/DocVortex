@@ -1,4 +1,4 @@
-"""按实际排版高度保护短语义块，并保留长表格的分页能力。"""
+"""Protect short semantic blocks according to the actual typesetting height, and retain the paging capabilities of long tables."""
 
 from __future__ import annotations
 
@@ -11,55 +11,55 @@ TABLE_KEEP_RATIO = 0.5
 
 
 class _FlowableGroup(Flowable):
-    """提供可测量的容器，同时允许 ReportLab 将前面的标题与容器绑定。"""
+    """Provides a measurable container while allowing ReportLab to bind the preceding header to the container."""
 
     def __init__(self, content: list[Flowable]) -> None:
-        """保存有序子项，不继承会被标题绑定逻辑排除的内部容器基类。"""
+        """Saves ordered children without inheriting the inner container base class which would be excluded by title binding logic."""
         super().__init__()
         self._content = content
 
     def wrap(self, availWidth: float, availHeight: float) -> tuple[float, float]:
-        """测量真实高度，使外层标题绑定逻辑可以正确判断剩余空间。"""
+        """Measure the true height so that the outer title binding logic can correctly determine the remaining space."""
         self.width, self.height = _listWrapOn(self._content, availWidth, self.canv)
         return self.width, self.height
 
     def getSpaceBefore(self) -> float:
-        """把第一个子项的外侧间距交给内容框处理。"""
+        """Leave the outer spacing of the first child to the content box."""
         return self._content[0].getSpaceBefore()
 
     def getSpaceAfter(self) -> float:
-        """把最后一个子项的外侧间距交给内容框处理。"""
+        """Leave the outer spacing of the last child to the content box."""
         return self._content[-1].getSpaceAfter()
 
     def drawOn(self, canv: Canvas, x: float, y: float, _sW: float = 0) -> None:
-        """复用 ReportLab 容器绘制，保持子项对齐、链接及合并间距。"""
+        """Reuse ReportLab container drawing to maintain alignment, linking and merging spacing of sub-items."""
         _Container.drawOn(self, canv, x, y, _sW=_sW)
 
 
 class _MeasuredKeepTogether(_FlowableGroup):
-    """以真实高度参与排版，并在空间不足时委托 KeepTogether 换页。"""
+    """Engage in typesetting at true height and entrust KeepTogether to page change when space is insufficient."""
 
     def split(self, availWidth: float, availHeight: float) -> list[Flowable]:
-        """保留 KeepTogether 对超高内容的降级，避免保护规则导致无限换页。"""
+        """Preserve KeepTogether downgrade for ultra-high content to avoid infinite paging caused by protection rules."""
         group = KeepTogether(self._content)
         group._frame = getattr(self, "_frame", None)
         return group.splitOn(self.canv, availWidth, availHeight)
 
 
 def _measure(content: list[Flowable], width: float, canvas: Canvas) -> float:
-    """测量合并相邻间距后的高度，不包含整个容器的外侧间距。"""
+    """Measure the height combined with adjacent spacing, excluding the outside spacing of the entire container."""
     return _listWrapOn(content, width, canvas)[1] if content else 0.0
 
 
 def _total_height(content: list[Flowable], width: float, canvas: Canvas) -> float:
-    """计算用于保护阈值判断的完整高度，包含首尾外侧间距。"""
+    """Calculate the complete height used for protection threshold judgment, including the distance between the front and rear outer sides."""
     if not content:
         return 0.0
     return _measure(content, width, canvas) + content[0].getSpaceBefore() + content[-1].getSpaceAfter()
 
 
 def protect_paragraphs(content: list[Flowable], *, width: float, height: float, canvas: Canvas) -> list[Flowable]:
-    """逐段保护短文本，避免把整个列表绑定为不可分页的大块。"""
+    """Protect short text paragraph by paragraph and avoid binding the entire list into one non-pageable chunk."""
     return [
         _MeasuredKeepTogether([item])
         if isinstance(item, Paragraph) and _total_height([item], width, canvas) <= height * PARAGRAPH_KEEP_RATIO
@@ -69,7 +69,7 @@ def protect_paragraphs(content: list[Flowable], *, width: float, height: float, 
 
 
 def protect_images(content: list[Flowable], *, width: float, height: float, canvas: Canvas) -> list[Flowable]:
-    """绑定图片和简短说明，多图超过整页时按图片主体边界降级分页。"""
+    """Bind pictures and short descriptions. When multiple pictures exceed the entire page, they will be downgraded and paginated according to the boundaries of the main body of the picture."""
     if not content:
         return []
     images = [item for item in content if isinstance(item, Image)]
@@ -97,7 +97,7 @@ def protect_images(content: list[Flowable], *, width: float, height: float, canv
         result.extend(protect_images(group, width=width, height=height, canvas=canvas))
         return result
     if len(images) == 1:
-        # 超长脚注不应解除图片与相邻短图注的绑定；只把超出预算的说明放回文本流。
+        # Extra-long footnotes should not unbind the figure from the adjacent short figure legend; only put the over-budget caption back into the text flow.
         start = content.index(images[0])
         end = start + 1
         selected_notes: list[Flowable] = []
@@ -122,17 +122,17 @@ def protect_images(content: list[Flowable], *, width: float, height: float, canv
 
 
 class _AnnotatedTable(_FlowableGroup):
-    """让前置说明跟随表格首段，后置说明跟随最后一段。"""
+    """Let the pre-description follow the first paragraph of the table, and the post-description follow the last paragraph."""
 
     def __init__(self, table: Table, before: list[Flowable], after: list[Flowable]) -> None:
-        """保存原生表格及说明，继续由 ReportLab 处理表头与合并单元格。"""
+        """Save the original table and description, and continue to use ReportLab to process headers and merged cells."""
         super().__init__([*before, table, *after])
         self.table = table
         self.before = before
         self.after = after
 
     def split(self, availWidth: float, availHeight: float) -> list[Flowable]:
-        """分页时只拆表格主体，并为末段保留简短说明所需的高度。"""
+        """When paginating, split only the main body of the table and leave the height required for the short description at the end."""
         table_height = self.table.wrapOn(self.canv, availWidth, 0xFFFFFF)[1]
         before_height = _measure([*self.before, self.table], availWidth, self.canv) - table_height
         after_height = _measure([self.table, *self.after], availWidth, self.canv) - table_height
@@ -141,7 +141,7 @@ class _AnnotatedTable(_FlowableGroup):
             budget -= after_height
         if budget <= 0:
             return []
-        # 将容器所在页的位置传给表格，避免在页尾提前拆开普通单元格。
+        # Pass the position of the page where the container is located to the table to avoid opening ordinary cells in advance at the end of the page.
         previous_frame = getattr(self.table, "_frame", None)
         self.table._frame = getattr(self, "_frame", None)
         try:
@@ -160,7 +160,7 @@ class _AnnotatedTable(_FlowableGroup):
 
 
 def protect_tables(content: list[Flowable], *, width: float, height: float, canvas: Canvas) -> list[Flowable]:
-    """保护短表整体，并按表格主体分组处理长表的前后说明。"""
+    """Protect the short table as a whole and process the before and after instructions of the long table by grouping the main body of the table."""
     if not content:
         return []
     if _total_height(content, width, canvas) <= height * TABLE_KEEP_RATIO:

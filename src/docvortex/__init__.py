@@ -1,4 +1,4 @@
-"""快速多格式文档解析与转换引擎。"""
+"""Fast multi-format document parsing and conversion engine."""
 
 from .version import __version__
 from .api import analyze, parse, convert, extract_metadata

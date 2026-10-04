@@ -1,3 +1,3 @@
-"""纯 Python RTF 语义解析实现。"""
+"""Pure Python RTF semantic parsing implementation."""
 
 __all__: list[str] = []

@@ -1,4 +1,4 @@
-"""按来源行和标记组装页面脚注。"""
+"""Assemble page footers by source line and tag."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def _build_grouped_page_footnote_blocks(
     source_groups: Sequence[set[int]],
     page_size: tuple[float, float],
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """按分隔线组切分几何脚注条目，并返回已消费的来源编号。"""
+    """Split geometry footnote entries by divider group and return the consumed source number."""
 
     footnote_by_source = {line.source_index: line for line in lines if line.semantic_type == "page_footnote"}
     blocks: list[dict[str, Any]] = []
@@ -69,7 +69,7 @@ def _build_grouped_page_footnote_blocks(
 
 
 def _order_page_footnote_entry_lines(lines: list[_LineItem], page_size: tuple[float, float]) -> list[_LineItem]:
-    """同一物理行按横向顺序排列，避免略微抬高的脚注正文先于左侧编号输出。"""
+    """The same physical line is arranged in horizontal order to avoid slightly elevated footnote text being output before the left numbering."""
     geometry = [(line, _rotate_bbox_to_upright(line.bbox, page_size, line.angle)) for line in lines]
     geometry.sort(key=lambda item: (item[1][1], item[1][0]))
     height = statistics.median(_line_effective_height(line, box) for line, box in geometry)
@@ -89,7 +89,7 @@ def _split_page_footnote_entries(
     lines: list[_LineItem],
     page_size: tuple[float, float],
 ) -> list[list[_LineItem]]:
-    """按首行或续行缩进模式，把同一分隔线下的脚注行切成条目。"""
+    """Use first line or continuation line indentation mode to break footnote lines under the same separator line into entries."""
 
     if not lines:
         return []
@@ -106,7 +106,7 @@ def _split_page_footnote_entries(
     indent_threshold = max(1.5 * median_height, 2.0 * median_glyph_width)
     base_left = min(bbox[0] for _line, bbox in line_geometry)
     maximum_row_width = max(bbox[2] - bbox[0] for _line, bbox in line_geometry)
-    # 区域标题只提供角色，机构内容与行内编号连续性共同决定是否归为一组。
+    # The area title only provides roles, and the organization content and the continuity of the line number determine whether to be grouped together.
     heading = text_role(line_geometry[0][0].text) == "affiliations"
     body_geometry = line_geometry[1:] if heading else line_geometry
     institution = re.compile(r"department|university|institute|hospital|centre|center|大学|学院|研究所|医院", re.IGNORECASE)
@@ -133,7 +133,7 @@ def _split_page_footnote_entries(
         if line.footnote_marker_start or _has_leading_footnote_superscript(line)
     ]
     if superscript_starts and (len(superscript_starts) >= 2 or superscript_starts[0] > 0):
-        # 同一原生行中的上标编号也构成条目边界，不能只依赖独立编号 run。
+        # Superscript numbers in the same native line also form entry boundaries and cannot rely solely on the independent number run.
         prefix = _split_page_footnote_entries([line for line, _ in line_geometry[: superscript_starts[0]]], page_size)
         boundaries = [*superscript_starts, len(line_geometry)]
         return prefix + [[line for line, _ in line_geometry[a:b]] for a, b in zip(boundaries, boundaries[1:])]
@@ -162,7 +162,7 @@ def _split_page_footnote_entries(
 
 
 def _has_leading_footnote_superscript(line: _LineItem) -> bool:
-    """用编号与其后正文的相对字号和基线确认行内脚注首标，排除普通数字续行。"""
+    """Confirm the header of the in-line footnote with the relative font size and baseline between the number and the following text, and exclude ordinary number continuation lines."""
     visible = [char for char in line.chars if str(char.get("char", "")).strip()]
     prefix = []
     for char in visible:
@@ -179,7 +179,7 @@ def _has_leading_footnote_superscript(line: _LineItem) -> bool:
     marker_origins = [char["origin"][1] for char in prefix if char.get("origin") is not None]
     body_origins = [char["origin"][1] for char in body if char.get("origin") is not None]
     return bool(
-        # 部分嵌入字体以恒定 size=1 配合变换绘字；几何收缩与抬高提供同等有效的证据。
+        # Partially embedded fonts are used with constant size=1 to match the transformed glyphs; geometric contraction and elevation provide equally effective evidence.
         line.angle == 0
         and body_height > 0
         and (body_size > 0 and marker_size <= 0.82 * body_size or marker_height <= 0.75 * body_height)
@@ -195,7 +195,7 @@ def _find_page_footnote_marker_rows(
     median_glyph_width: float,
     base_left: float,
 ) -> list[tuple[tuple[_LineItem, BBox], tuple[_LineItem, BBox]]]:
-    """用同视觉行的窄左片段和右侧正文识别脚注编号锚点。"""
+    """Identify the footnote number anchor with a narrow left fragment and right body text on the same visual line."""
 
     by_visual_row: dict[int, list[tuple[_LineItem, BBox]]] = {}
     for item in line_geometry:
@@ -212,7 +212,7 @@ def _find_page_footnote_marker_rows(
             continue
         marker, body = ordered[0], ordered[1]
         marker_width = marker[1][2] - marker[1][0]
-        # 两三位编号的总宽度会超过单字窄片段门槛；只有纯数字首标可以使用放宽的尺度。
+        # The total width of two- and three-digit numbers would exceed the single-word narrow segment threshold; only purely numeric headers can use the relaxed scale.
         local_marker_width_limit = (
             max(marker_width_limit, 1.25 * median_height, 2.5 * median_glyph_width)
             if re.fullmatch(r"\d{1,3}", marker[0].text.strip())
@@ -243,7 +243,7 @@ def _find_page_footnote_marker_rows(
 
 
 def _compact_numbered_note_body(marker: _LineItem, body: _LineItem) -> bool:
-    """独立数字编号后允许短小文字注释，长度不能把同上之类的真实注释丢回上一项。"""
+    """Short text comments are allowed after independent numbering, and the length cannot throw real comments such as the same as above back to the previous item."""
     return bool(re.fullmatch(r"\s*\d{1,3}[.)]?\s*", marker.text) and len(re.findall(r"[A-Za-z\u3400-\u9fff]", body.text)) >= 2)
 
 
@@ -253,7 +253,7 @@ def _find_geometric_page_footnote_marker_rows(
     median_glyph_width: float,
     base_left: float,
 ) -> list[tuple[tuple[_LineItem, BBox], tuple[_LineItem, BBox]]]:
-    """在 row id 缺失时用同基线窄标记和右侧正文恢复脚注首行。"""
+    """Restore footnote first line with same baseline narrow mark and right body text when row id is missing."""
 
     marker_width_limit = max(
         1.5 * median_glyph_width,
@@ -268,7 +268,7 @@ def _find_geometric_page_footnote_marker_rows(
     ] = []
     for marker in line_geometry:
         marker_width = marker[1][2] - marker[1][0]
-        # 无稳定视觉行编号时，也允许同尺度两三位数字提供几何首标。
+        # When there is no stable visual line numbering, two or three digits of the same scale are also allowed to provide geometric headers.
         local_marker_width_limit = (
             max(marker_width_limit, 1.25 * median_height, 2.5 * median_glyph_width)
             if re.fullmatch(r"\d{1,3}", marker[0].text.strip())
@@ -340,7 +340,7 @@ def _split_marked_page_footnote_entries(
     maximum_row_width: float,
     indent_threshold: float,
 ) -> list[list[_LineItem]]:
-    """把编号、右侧首行和对齐续行聚合，并保留编号区之前的独立脚注。"""
+    """Aggregate numbering, first right-hand line, and aligned continuation lines, and retain independent footnotes before the numbering area."""
 
     first_marker_top = min(marker_rows[0][0][1][1], marker_rows[0][1][1][1])
     prefix_geometry = [item for item in line_geometry if item[1][1] < first_marker_top]
@@ -399,7 +399,7 @@ def _split_unmarked_page_footnote_entries(
     maximum_row_width: float,
     indent_threshold: float,
 ) -> list[list[_LineItem]]:
-    """沿用首行和续行缩进模式切分没有稳定编号锚点的脚注行。"""
+    """Separate footnote lines without stable numbering anchors using first line and continuation line indentation patterns."""
 
     if not line_geometry:
         return []
@@ -417,7 +417,7 @@ def _split_unmarked_page_footnote_entries(
             and _title_fonts_compatible(previous[0], current[0])
             and _effective_text_row_gap(previous, current) <= indent_threshold
         )
-        # 满行后必然续接；其余行按首页观测到的首行/续行缩进模式决定边界。
+        # When the line is full, it must be continued; the remaining lines are bounded by the first line/continuation line indentation pattern observed on the home page.
         continues_previous = (
             previous_is_near_full
             or same_left_compact_continuation
@@ -434,7 +434,7 @@ def _tight_page_footnote_bboxes(
     lines: list[_LineItem],
     page_size: tuple[float, float],
 ) -> dict[int, BBox]:
-    """以有效行高和相邻行距收紧脚注框，避免异常字体框跨入相邻条目。"""
+    """Tighten footnote boxes with effective line height and adjacent line spacing to prevent abnormal font boxes from crossing into adjacent entries."""
 
     if not lines:
         return {}

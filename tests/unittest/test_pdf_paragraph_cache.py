@@ -1,4 +1,4 @@
-"""验证普通段落复用测量时的状态失效、拆分及富文本边界。"""
+"""Verify state invalidation, splitting, and rich text boundaries when measuring common paragraph reuse."""
 
 from copy import deepcopy
 
@@ -10,7 +10,7 @@ from docvortex.render._internal.pdf.styles import build_pdf_styles, HAN_FONT
 
 
 def test_only_expensive_ordinary_paragraphs_use_measurement_cache():
-    """短 Latin 文本、原布局和标题沿用原生段落，避免缓存成本超过换行本身。"""
+    """Short Latin Text, original layout, and titles follow native paragraphs to avoid caching costs exceeding the line breaks themselves."""
     from docvortex.render._internal.pdf.formula import FormulaRenderer
     from docvortex.render._internal.pdf.inline import PdfAnchorRegistry, PdfInlineContext, build_pdf_paragraph
     from docvortex.schema import TextSpan
@@ -38,12 +38,12 @@ def test_only_expensive_ordinary_paragraphs_use_measurement_cache():
 
 
 def test_same_width_reuses_layout_but_new_width_rewraps(monkeypatch):
-    """可用高度变化不影响段落换行，宽度变化仍执行原生测量。"""
+    """Available height changes do not affect paragraph wrapping, and width changes still perform native measurements."""
     calls = []
     original = Paragraph.wrap
 
     def wrap(self, width, height):
-        """记录真实 ReportLab 换行调用，而不是比较缓存内部字段。"""
+        """Log real ReportLab newline call instead of comparing cache internal fields."""
         calls.append((width, height))
         return original(self, width, height)
 
@@ -62,7 +62,7 @@ def test_same_width_reuses_layout_but_new_width_rewraps(monkeypatch):
 
 @pytest.mark.parametrize("change", ["style", "text", "geometry", "leading", "fragment_font"])
 def test_changed_state_invalidates_cached_layout(change):
-    """修改字体、内容、几何或实例行高后与从头测量的 Paragraph 一致。"""
+    """Modifications to font, content, geometry, or instance line height are consistent with Paragraph measured from scratch."""
     style = build_pdf_styles().body.clone("mutable-cjk", fontName=HAN_FONT, wordWrap="CJK")
     paragraph = MeasuredParagraph("正文 Mixed text " * 20, style)
     paragraph.wrap(140, 1000)
@@ -85,7 +85,7 @@ def test_changed_state_invalidates_cached_layout(change):
 
 
 def test_split_paragraphs_have_independent_layouts():
-    """分页后两段在不同宽度下独立换行，原对象不沿用拆分前缓存。"""
+    """After paging, the two paragraphs wrap independently at different widths, and the original object does not use the cache before splitting."""
     style = build_pdf_styles().body.clone("split-cjk", fontName=HAN_FONT, wordWrap="CJK")
     paragraph = MeasuredParagraph("中英混排 Alpha Beta " * 50, style)
     paragraph.wrap(160, 1000)
@@ -101,7 +101,7 @@ def test_split_paragraphs_have_independent_layouts():
 
 
 def test_anchor_callbacks_always_use_reportlab_measurement():
-    """含 anchor 回调的段落不复用测量，避免隐藏可变回调状态。"""
+    """Paragraphs containing anchor callbacks do not reuse measurements to avoid hiding variable callback states."""
     paragraph = MeasuredParagraph('<a name="target"/>Anchor text', build_pdf_styles().body)
     paragraph.wrap(180, 1000)
     assert paragraph._measurement_cache is None

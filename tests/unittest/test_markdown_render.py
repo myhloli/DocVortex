@@ -34,7 +34,7 @@ from docvortex.schema import (
 
 
 def _middle(*pages: PageInfo, file_suffix: str = "docx") -> MiddleJson:
-    """构造最小严格 MiddleJson 测试对象。"""
+    """Construct the minimally stringent MiddleJson test object."""
     return MiddleJson(
         pages=list(pages),
         is_full_document=True,
@@ -44,12 +44,12 @@ def _middle(*pages: PageInfo, file_suffix: str = "docx") -> MiddleJson:
 
 
 def _page(page_idx: int, *blocks: PageBlock) -> PageInfo:
-    """构造一页并保留调用方给定的 block 顺序。"""
+    """Constructs a page preserving the block order given by the caller."""
     return PageInfo(page_idx=page_idx, blocks=list(blocks))
 
 
 def _image(index: int, path: str = "images/a.png") -> ImageBlock:
-    """构造带 path 的图片父块。"""
+    """Constructs a picture parent block with path."""
     return ImageBlock(
         type="image",
         index=index,
@@ -58,7 +58,7 @@ def _image(index: int, path: str = "images/a.png") -> ImageBlock:
 
 
 def _table(index: int, content: str, *, continues_prev: bool | None = None) -> TableBlock:
-    """构造无 bbox 的 Office 表格父块。"""
+    """Constructs the Office table parent block without bbox."""
     return TableBlock(
         type="table",
         index=index,
@@ -73,7 +73,7 @@ def _pdf_table(
     *,
     continues_prev: bool | None = None,
 ) -> TableBlock:
-    """构造带归一化 bbox 的 PDF 表格父块。"""
+    """Constructs the PDF table parent block with normalized bbox."""
     bbox = (0.1, 0.1, 0.9, 0.9)
     return TableBlock(
         type="table",
@@ -90,7 +90,7 @@ def _list(
     sub_type: Literal["text", "ref_text"] | None = None,
     continues_prev: bool | None = None,
 ) -> ListBlock:
-    """构造带归一化 bbox 的列表父块，并按子类型生成文本叶子。"""
+    """Constructs a list parent block with normalized bbox and generates text leaves by subtype."""
     child_type = sub_type or "text"
     child_class = RefTextBlock if child_type == "ref_text" else TextBlock
     return ListBlock(
@@ -104,7 +104,7 @@ def _list(
 
 
 def _ref_text(index: int, content: str, *, continues_prev: bool | None = None) -> RefTextBlock:
-    """构造可携带续段标记的顶层参考文献文本块。"""
+    """Constructs a top-level reference text block that can carry continuation markers."""
     return RefTextBlock(
         type="ref_text",
         index=index,
@@ -114,7 +114,7 @@ def _ref_text(index: int, content: str, *, continues_prev: bool | None = None) -
 
 
 def test_render_modes_filter_merge_and_preserve_input() -> None:
-    """验证两种模式的过滤、页内/跨页合并、分页线及无副作用。"""
+    """Verify filtering, intra-page/cross-page merging, page breaks and no side effects in both modes."""
     middle = _middle(
         _page(
             0,
@@ -150,7 +150,7 @@ def test_render_modes_filter_merge_and_preserve_input() -> None:
 
 
 def test_page_footnote_is_styled_and_linkable_in_default_and_full_modes() -> None:
-    """验证默认与完整模式都输出非折叠的小字号页面脚注及 anchor。"""
+    """Verify that both default and full modes output non-folded small page footnotes and anchor."""
     middle = _middle(
         _page(
             0,
@@ -182,7 +182,7 @@ def test_page_footnote_is_styled_and_linkable_in_default_and_full_modes() -> Non
 
 
 def test_page_footnote_does_not_interrupt_continued_text_rendering() -> None:
-    """验证页面脚注保持独立输出，但不会阻断前后正文续接。"""
+    """The footer of the verification page remains output independently, but does not block the continuation of the previous and subsequent text."""
     middle = _middle(
         _page(
             0,
@@ -199,7 +199,7 @@ def test_page_footnote_does_not_interrupt_continued_text_rendering() -> None:
 
 
 def test_full_mode_preserves_empty_page_boundaries() -> None:
-    """验证 FULL 对空白页仍保留相邻页分割线。"""
+    """Verify that FULL retains adjacent page separators for blank pages."""
     middle = _middle(_page(0), _page(1, TextBlock(type="text", index=0, content=_inline("x"))), _page(2))
 
     assert render_markdown(middle, mode=RenderMode.FULL) == "\n\n---\n\nx\n\n---\n\n"
@@ -207,7 +207,7 @@ def test_full_mode_preserves_empty_page_boundaries() -> None:
 
 
 def test_text_continuation_handles_hyphen_and_cjk_boundaries() -> None:
-    """验证续写文本沿用西文断词与 CJK 直接连接规则。"""
+    """Verify that the continuation text follows the Western segmentation and CJK direct connection rules."""
     western = _middle(
         _page(
             0,
@@ -228,7 +228,7 @@ def test_text_continuation_handles_hyphen_and_cjk_boundaries() -> None:
 
 
 def test_ref_text_continuation_skips_merge_transparent_blocks_by_mode() -> None:
-    """验证 ref_text 可跨页面脚注与辅助块查找，FULL 仍保留页界。"""
+    """Verify that ref_text can search across page footers and auxiliary blocks, and FULL still preserves page boundaries."""
     middle = _middle(
         _page(
             0,
@@ -253,7 +253,7 @@ def test_ref_text_continuation_skips_merge_transparent_blocks_by_mode() -> None:
 
 
 def test_ref_text_continuation_keeps_semantic_barrier() -> None:
-    """验证手工标记也不能让 ref_text 跨过正文等语义块。"""
+    """Validating manual tagging also does not allow ref_text to cross semantic blocks such as body text."""
     middle = _middle(
         _page(
             0,
@@ -267,7 +267,7 @@ def test_ref_text_continuation_keeps_semantic_barrier() -> None:
 
 
 def test_ref_text_continuation_reuses_url_boundary_joining() -> None:
-    """验证 ref_text 续段复用正文的跨块 URL 连接规则。"""
+    """Verify cross-block URL join rules for ref_text continuation multiplex text."""
     middle = _middle(
         _page(
             0,
@@ -280,7 +280,7 @@ def test_ref_text_continuation_reuses_url_boundary_joining() -> None:
 
 
 def test_list_continuation_merges_same_page_in_both_modes_without_mutating_input() -> None:
-    """验证同页同子类型列表在两种模式下拼接，且不污染原始 MiddleJson。"""
+    """Verify that the same subtype list on the same page is spliced in both modes without contaminating the original MiddleJson."""
     middle = _middle(
         _page(
             0,
@@ -297,7 +297,7 @@ def test_list_continuation_merges_same_page_in_both_modes_without_mutating_input
 
 
 def test_list_continuation_merges_cross_page_chain_only_in_default_mode() -> None:
-    """验证跨页列表链仅在默认模式整体拼接，完整模式保留页界并合并页内续段。"""
+    """Verify that cross-page list chains are only spliced as a whole in the default mode, and the complete mode retains page boundaries and merges continuations within the page."""
     middle = _middle(
         _page(0, _list(0, "[1] first", sub_type="ref_text")),
         _page(
@@ -313,7 +313,7 @@ def test_list_continuation_merges_cross_page_chain_only_in_default_mode() -> Non
 
 
 def test_ref_list_continuation_skips_merge_transparent_blocks_without_mutating_input() -> None:
-    """验证默认模式跨页面脚注与辅助块合并参考文献，FULL 仍保留页界。"""
+    """Verify that default mode cross-page footer merges references with auxiliary blocks, FULL still preserves page boundaries."""
     middle = _middle(
         _page(
             0,
@@ -338,7 +338,7 @@ def test_ref_list_continuation_skips_merge_transparent_blocks_without_mutating_i
 
 
 def test_ordinary_list_continuation_does_not_skip_page_footnote() -> None:
-    """验证页面脚注透明规则只作用于参考文献，普通列表仍要求物理相邻。"""
+    """Validation page footer transparency rules only apply to references, normal lists still require physical proximity."""
     middle = _middle(
         _page(
             0,
@@ -359,7 +359,7 @@ def test_ordinary_list_continuation_does_not_skip_page_footnote() -> None:
 
 
 def test_list_continuation_keeps_semantic_barrier_and_matching_subtype() -> None:
-    """验证语义块仍会阻断列表续接，且子类型不一致时保持独立输出。"""
+    """Validation semantic blocks will still block list continuation and maintain independent output when subtypes are inconsistent."""
     non_adjacent = _middle(
         _page(
             0,
@@ -395,7 +395,7 @@ def test_list_continuation_keeps_semantic_barrier_and_matching_subtype() -> None
     ],
 )
 def test_reference_list_keeps_supported_numeric_prefix_styles(item: str, expected: str) -> None:
-    """验证数字出现在前五个可见字符内时，单条参考文献保留原有编号。"""
+    """When the verification number appears within the first five visible characters, a single reference retains its original number."""
     content = (
         [
             {"type": "text", "content": "[1]", "styles": ["bold"]},
@@ -410,7 +410,7 @@ def test_reference_list_keeps_supported_numeric_prefix_styles(item: str, expecte
 
 
 def test_reference_list_uses_strict_numeric_prefix_majority() -> None:
-    """验证参考文献按全部直属非空条目的严格多数决定是否补无序标记。"""
+    """Verification references are determined by a strict majority of all direct non-null entries to determine whether to fill out the out-of-order mark."""
     numbered_majority = _middle(
         _page(0, _list(0, "[1] first", "missing marker", "3) third", sub_type="ref_text")),
         file_suffix="pdf",
@@ -432,7 +432,7 @@ def test_reference_list_uses_strict_numeric_prefix_majority() -> None:
 
 
 def test_reference_list_bullets_mixed_children_without_duplication() -> None:
-    """验证混合直属类型共同参与统计，已有短横线不重复且多行正文正确缩进。"""
+    """Verify that mixed direct types participate in statistics, existing dashes are not repeated, and multi-line text is correctly indented."""
     block = ListBlock(
         type="list",
         index=0,
@@ -448,7 +448,7 @@ def test_reference_list_bullets_mixed_children_without_duplication() -> None:
 
 
 def test_nested_reference_list_decides_bullets_independently() -> None:
-    """验证嵌套参考文献依据自身子类型判定，外层普通列表行为保持不变。"""
+    """Validation of nested references is based on their own subtypes, and the behavior of the outer normal list remains unchanged."""
     nested = ListBlock(
         type="list",
         sub_type="ref_text",
@@ -466,7 +466,7 @@ def test_nested_reference_list_decides_bullets_independently() -> None:
 
 
 def test_text_continuation_joins_url_candidates_but_separates_independent_urls() -> None:
-    """验证 Markdown 续写连接跨块 URL，同时保留两条独立 URL 的分隔。"""
+    """Verify that Markdown rewrites the connection across block URL while preserving the separation of two independent URLs."""
     continued_url = _middle(
         _page(
             0,
@@ -487,7 +487,7 @@ def test_text_continuation_joins_url_candidates_but_separates_independent_urls()
 
 
 def test_text_continuation_does_not_rewrite_formula_or_style_wrappers() -> None:
-    """验证续写边界不会越过末尾公式或破坏样式节点。"""
+    """Verify that continuation boundaries do not cross the last formula or break style nodes."""
     formula = _middle(
         _page(
             0,
@@ -512,7 +512,7 @@ def test_text_continuation_does_not_rewrite_formula_or_style_wrappers() -> None:
 
 
 def test_render_rejects_legacy_inputs_and_string_mode() -> None:
-    """验证公共入口不兼容旧 dict/pages 输入或字符串模式。"""
+    """Verify that the public entry is not compatible with old dict/pages input or string modes."""
     middle = _middle(_page(0))
 
     with pytest.raises(TypeError, match="MiddleJson"):
@@ -522,7 +522,7 @@ def test_render_rejects_legacy_inputs_and_string_mode() -> None:
 
 
 def test_inline_rich_text_unknown_tags_and_visible_spaces() -> None:
-    """验证富文本、公式、链接、未知标签与可见空白。"""
+    """Validate rich text, formulas, links, unknown tags and visible whitespace."""
     content = [
         {"type": "text", "content": "A "},
         {"type": "text", "content": "B", "styles": ["bold"]},
@@ -561,7 +561,7 @@ def test_inline_rich_text_unknown_tags_and_visible_spaces() -> None:
     ],
 )
 def test_visible_style_ascii_spaces_use_dev_markers(style: str, expected: str) -> None:
-    """验证纯 ASCII 样式空格使用 dev 的下划线或短横线 marker。"""
+    """Verify that plain ASCII style spaces use dev for underscores or dashes for marker."""
     content = [
         {"type": "text", "content": "A"},
         {"type": "text", "content": "   ", "styles": style.split(",")},
@@ -580,7 +580,7 @@ def test_visible_style_ascii_spaces_use_dev_markers(style: str, expected: str) -
     ],
 )
 def test_visible_style_edge_spaces_use_dev_markers(style: str, expected: str) -> None:
-    """验证非空样式文本只替换首尾 ASCII 空格。"""
+    """Verify that non-empty style text only replaces leading and trailing ASCII spaces."""
     content = _inline("   广东  ", styles=style.split(","))
 
     assert render_markdown(_middle(_page(0, TextBlock(type="text", index=0, content=content)))) == expected
@@ -594,14 +594,14 @@ def test_visible_style_edge_spaces_use_dev_markers(style: str, expected: str) ->
     ],
 )
 def test_standalone_visible_space_markers_are_escaped(style: str, expected: str) -> None:
-    """验证整块 marker 会转义首字符，避免被当作 Markdown 分割线。"""
+    """Verify that the entire marker will escape the first character to avoid being treated as a Markdown dividing line."""
     content = _inline("   ", styles=[style])
 
     assert render_markdown(_middle(_page(0, TextBlock(type="text", index=0, content=content)))) == expected
 
 
 def test_emphasis_only_spaces_keep_existing_html_behavior() -> None:
-    """验证 emphasis-only 空格不进入 underline/strikethrough marker 规则。"""
+    """Verify that emphasis-only spaces do not enter the underline/strikethrough marker rule."""
     content = _inline("  ", styles=["emphasis"])
 
     rendered = render_markdown(_middle(_page(0, TextBlock(type="text", index=0, content=content))))
@@ -610,7 +610,7 @@ def test_emphasis_only_spaces_keep_existing_html_behavior() -> None:
 
 
 def test_text_block_escapes_markdown_prefix_and_malformed_tag() -> None:
-    """验证普通 text 不会误变列表，损坏白名单标签按原文转义。"""
+    """Verify that ordinary text does not erroneously change the list, and the damaged whitelist tags are escaped according to the original text."""
     middle = _middle(
         _page(
             0,
@@ -623,7 +623,7 @@ def test_text_block_escapes_markdown_prefix_and_malformed_tag() -> None:
 
 
 def test_title_and_index_render_anchor_links_without_heading_leaves() -> None:
-    """验证标题 anchor 与递归目录 title leaf 的链接输出。"""
+    """Verify link output of header anchor with recursive directory title leaf."""
     index = IndexBlock(
         type="index",
         index=0,
@@ -655,7 +655,7 @@ def test_title_and_index_render_anchor_links_without_heading_leaves() -> None:
 
 
 def test_equation_uses_content_then_image_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证行间公式定界符配置及空公式图片回退。"""
+    """Verify the configuration of interline formula delimiters and fallback of empty formula images."""
     configured = LatexDelimitersConfig(
         **{"display": {"left": "\\[", "right": "\\]"}, "inline": {"left": "\\(", "right": "\\)"}}
     )
@@ -687,7 +687,7 @@ def test_equation_uses_content_then_image_fallback(monkeypatch: pytest.MonkeyPat
     ],
 )
 def test_complex_html_tables_fall_back_to_html(html_table: str) -> None:
-    """验证不可无损转换的表格结构保持 HTML。"""
+    """Verification that non-lossless convertible table structure remains HTML."""
     rendered = render_markdown(_middle(_page(0, _table(0, html_table))), asset_base_url="assets")
 
     assert rendered.startswith("<table")
@@ -697,7 +697,7 @@ def test_complex_html_tables_fall_back_to_html(html_table: str) -> None:
 
 
 def test_simple_html_table_converts_to_gfm_and_preserves_inline_formula() -> None:
-    """验证简单 HTML table 转 GFM，并保留单元格公式反斜杠。"""
+    """Verification is simple HTML table to GFM, and cell formula backslashes are preserved."""
     content = "<table><tr><th>Name</th><th>Value</th></tr><tr><td>A|B</td><td><eq>\\frac{1}{2}</eq></td></tr></table>"
 
     assert render_markdown(_middle(_page(0, _table(0, content)))) == "\n".join(
@@ -710,7 +710,7 @@ def test_simple_html_table_converts_to_gfm_and_preserves_inline_formula() -> Non
 
 
 def test_spatial_table_uses_dynamic_fence_and_empty_table_uses_image() -> None:
-    """验证空间投影文本保留空白，且空表回退图片。"""
+    """Verify that spatially projected text remains blank, and empty tables fall back to images."""
     spatial = _table(0, "A   B\n```\n1   2")
     empty = TableBlock(
         type="table",
@@ -725,7 +725,7 @@ def test_spatial_table_uses_dynamic_fence_and_empty_table_uses_image() -> None:
 
 
 def test_cross_page_table_merges_only_in_default_mode() -> None:
-    """验证续表只在 DEFAULT 跨页合并，FULL 保持分页。"""
+    """Verify that the continuation table is only merged across pages at DEFAULT and remains paged at FULL."""
     previous_html = "<table><tr><th>H</th></tr><tr><td>A</td></tr></table>"
     current_html = "<table><tr><th>H</th></tr><tr><td>B</td></tr></table>"
     middle = _middle(
@@ -745,7 +745,7 @@ def test_cross_page_table_merges_only_in_default_mode() -> None:
 
 
 def test_code_uses_language_and_dynamic_fence() -> None:
-    """验证普通代码使用 guess_lang 和足够长的 fenced block。"""
+    """Verify that normal code uses guess_lang and fenced of sufficient length to block."""
     code = CodeBlock(
         type="code",
         index=0,
@@ -768,7 +768,7 @@ def test_code_uses_language_and_dynamic_fence() -> None:
 
 
 def test_algorithm_preserves_whitespace_comparisons_scripts_and_formula() -> None:
-    """验证算法 raw HTML 使用 HTML 行内语法并保留缩进与相邻公式。"""
+    """Verification algorithm raw HTML uses HTML inline syntax and preserves indentation and adjacent formulas."""
     algorithm = CodeBlock(
         type="code",
         index=0,
@@ -823,7 +823,7 @@ def test_algorithm_preserves_whitespace_comparisons_scripts_and_formula() -> Non
 
 
 def test_image_path_precedes_base64_and_visual_child_order_is_preserved() -> None:
-    """验证图片资源优先级、base URL 和视觉子块原始顺序。"""
+    """Verify picture resource priority, base URL, and visual subchunk original order."""
     image = ImageBlock.model_validate(
         {
             "type": "image",
@@ -850,7 +850,7 @@ def test_image_path_precedes_base64_and_visual_child_order_is_preserved() -> Non
 
 
 def test_chart_without_image_outputs_existing_gfm_content() -> None:
-    """验证无图片图表直接输出已有 GFM 内容。"""
+    """Verify that the direct output of charts without pictures already contains GFM content."""
     chart = ChartBlock(
         type="chart",
         index=0,
@@ -861,7 +861,7 @@ def test_chart_without_image_outputs_existing_gfm_content() -> None:
 
 
 def test_chart_without_image_converts_simple_html_table_to_gfm() -> None:
-    """验证无图片 chart 的简单 HTML table 直接转换为 GFM。"""
+    """Verification without image chart Simple HTML table directly converted to GFM."""
     chart = ChartBlock(
         type="chart",
         index=0,
@@ -878,7 +878,7 @@ def test_chart_without_image_converts_simple_html_table_to_gfm() -> None:
 
 
 def test_chart_with_image_places_converted_gfm_in_details() -> None:
-    """验证有图片 chart 保留图片，并把简单表格 GFM 放入 details。"""
+    """Verify that there is picture chart. Keep the picture and put the simple form GFM into details."""
     chart = ChartBlock(
         type="chart",
         index=0,
@@ -901,7 +901,7 @@ def test_chart_with_image_places_converted_gfm_in_details() -> None:
 
 
 def test_chart_complex_html_table_remains_html() -> None:
-    """验证 chart 的复杂 HTML table 不会被有损转换为 GFM。"""
+    """Verify that the complex HTML of chart table will not be lossy converted to GFM."""
     chart = ChartBlock(
         type="chart",
         index=0,
@@ -921,7 +921,7 @@ def test_chart_complex_html_table_remains_html() -> None:
 
 
 def test_direct_base64_image_fallback() -> None:
-    """验证未外置图片时 Markdown 直接使用 data URI。"""
+    """When verifying that there is no external image, Markdown directly uses data and URI."""
     image = ImageBlock(
         type="image",
         index=0,

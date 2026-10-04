@@ -1,4 +1,4 @@
-"""面向已有 table bbox 的 Native PDF 表格结构恢复公共内部入口。"""
+"""Restore common internal entry for Native PDF table structure that already has table bbox."""
 
 from .contracts import NativeTableCell, NativeTableInput, NativeTableRectangle, NativeTableResult, NativeTableRule
 from .engine import coerce_native_table_rectangles, coerce_native_table_rules, recover_native_pdf_table

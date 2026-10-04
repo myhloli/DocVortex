@@ -1,4 +1,4 @@
-"""生成真实 PDF 的原页、块级还原、叠加图与诊断，供逐页视觉验收。"""
+"""Generate original pages, block-level restorations, overlays and diagnostics of real PDF for page-by-page visual acceptance."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from docvortex.schema import CodeInlineSpan, HyperlinkSpan, InlineContentBlock, 
 
 
 def review_pdf(source: Path, output: Path) -> dict:
-    """完整解析真实文档并生成可独立查看、重放的逐页验收材料。"""
+    """Completely parse real documents and generate page-by-page acceptance materials that can be viewed and replayed independently."""
     output.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, output / "source.pdf")
     result = parse(source, file_suffix="pdf")
@@ -124,7 +124,7 @@ def review_pdf(source: Path, output: Path) -> dict:
 
 
 def _layout_leaves(blocks):
-    """独立遍历有坐标叶子，缺子坐标的组合以整个父框作为占用区域。"""
+    """Independently traverse the leaves with coordinates, and the combination of missing child coordinates uses the entire parent box as the occupied area."""
     for block in blocks:
         if block.type in {"image", "table", "chart", "code", "list", "index"} and all(
             child.bbox is not None for child in block.content
@@ -135,7 +135,7 @@ def _layout_leaves(blocks):
 
 
 def _check_title_geometry(middle, plans):
-    """独立核对最终标题框与其它原框或标题最终框的间距，不复用布局算法来判断成功。"""
+    """Independently check the spacing between the final title box and other original boxes or the final title box, without reusing the layout algorithm to determine success."""
     sizes = read_layout_geometry(middle)
     records = [title for plan in plans for title in plan.titles]
     violations = []
@@ -199,7 +199,7 @@ def _check_title_geometry(middle, plans):
 
 
 def _text_spans(spans):
-    """枚举应保持可复制的普通文字，排除矢量公式和区域图内文字。"""
+    """Enumerations should remain copyable plain text, excluding vector formulas and area plot text."""
     for span in spans:
         if isinstance(span, HyperlinkSpan):
             yield from _text_spans(span.content)
@@ -208,7 +208,7 @@ def _text_spans(spans):
 
 
 def main() -> None:
-    """从明确的文件入口运行，以兼容 macOS PDF 渲染的 spawn 工作进程。"""
+    """Runs from an explicit file entry for compatibility with the macOS PDF rendered spawn worker process."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("sources", nargs="+", type=Path)
     parser.add_argument("--output", required=True, type=Path)

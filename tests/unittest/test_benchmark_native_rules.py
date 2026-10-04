@@ -1,4 +1,4 @@
-"""用变形正例及缺证据反例限制原生表格、面板和成员排序规则。"""
+"""Constrain native tables, panels, and member ordering rules with deformed positive examples and missing-evidence counterexamples."""
 
 from dataclasses import replace
 import pytest
@@ -13,7 +13,7 @@ from docvortex.analyzers.native.pdf.graphics import _image_members_to_content
 
 
 def _numeric_table(scale: float, offset: float) -> NativeTableInput:
-    """构造两列三数据行的少线表，平移和缩放不应改变结构判断。"""
+    """Construct a few-line table with two columns and three data rows. Panning and scaling should not change the structure judgment."""
     entries = [("Material", (4, 5, 45, 13)), ("Value", (80, 5, 105, 13))]
     for row, value in enumerate(["10", "20", "30"]):
         y = 23 + row * 18
@@ -35,7 +35,7 @@ def _numeric_table(scale: float, offset: float) -> NativeTableInput:
 
 @pytest.mark.parametrize("scale,offset", [(1, 0), (0.6, 19), (1.8, 31)])
 def test_sparse_numeric_table_is_scale_and_position_independent(scale, offset):
-    """重复数值列和物理外线共同证明四行两列，不依赖固定坐标。"""
+    """Repeating numerical columns and physical outer lines together prove four rows and two columns without relying on fixed coordinates."""
     table = _numeric_table(scale, offset)
     text = build_native_table_text(table)
     candidate = build_banded_numeric_candidate(table, text, {})
@@ -45,13 +45,13 @@ def test_sparse_numeric_table_is_scale_and_position_independent(scale, offset):
 
 
 def test_sparse_numeric_table_requires_physical_support():
-    """没有底线或底色支持的段落不能仅凭数字列被恢复为表格。"""
+    """Paragraphs without underlining or background color support cannot be restored to tables based on numerical columns alone."""
     table = replace(_numeric_table(1, 0), drawing_lines=())
     assert build_banded_numeric_candidate(table, build_native_table_text(table), {}) is None
 
 
 def test_sparse_numeric_table_rejects_crossing_glyph():
-    """正文中跨列界的完整大字形不能被新候选拆成两个格。"""
+    """Complete large glyphs that cross column boundaries in the text cannot be split into two cells by new candidates."""
     table = _numeric_table(1, 0)
     chars = (*table.chars, {"char": "W", "bbox": (40, 23, 84, 31), "char_idx": len(table.chars)})
     table = replace(table, chars=chars)
@@ -59,7 +59,7 @@ def test_sparse_numeric_table_rejects_crossing_glyph():
 
 
 def _panel_lines(body_height: float = 10) -> list[_LineItem]:
-    """构造等式标题与不同字号简介的重复两栏，不给出具体页面名称。"""
+    """Construct two repeated columns of equation title and introduction with different font sizes, without giving a specific page name."""
     lines = []
     for column in range(2):
         x = 20 + 220 * column
@@ -79,7 +79,7 @@ def _panel_lines(body_height: float = 10) -> list[_LineItem]:
 
 
 def test_parallel_panel_titles_require_typographic_transition():
-    """相邻完整面板的标题和小字号简介构成正证据。"""
+    """The title and small font introduction of the adjacent full panel constitute positive evidence."""
     lines = _panel_lines()
     classify_panel_titles(lines, [], 500)
     assert [line.semantic_type for line in lines] == ["paragraph_title", None, "paragraph_title", None]
@@ -87,7 +87,7 @@ def test_parallel_panel_titles_require_typographic_transition():
 
 @pytest.mark.parametrize("kind", ["same_body_scale", "single_panel", "different_style"])
 def test_panel_rule_rejects_unverified_parallel_prose(kind):
-    """同字号正文、孤立标签或不同式行均不能借重复列布局提升为标题。"""
+    """Text with the same font size, isolated tags, or rows of different styles cannot be promoted to titles through repeated column layout."""
     lines = _panel_lines(14 if kind == "same_body_scale" else 10)
     if kind == "single_panel":
         lines = lines[:2]
@@ -98,7 +98,7 @@ def test_panel_rule_rejects_unverified_parallel_prose(kind):
 
 
 def test_step_member_group_requires_consecutive_children():
-    """缺少中间子项时不宣称稳定字母序列，也不改变全局阅读顺序。"""
+    """The absence of an intermediate child does not claim to stabilize the letter sequence, nor does it change the global reading order."""
     blocks = [
         {"type": "text", "content": value, "bbox": (left, top, left + 130, top + 10)}
         for value, left, top in [
@@ -113,7 +113,7 @@ def test_step_member_group_requires_consecutive_children():
 
 
 def test_rotated_axis_keeps_left_to_right_order_for_unequal_label_lengths():
-    """共用轴线的长短标签按横坐标排列，不能按文字长度形成不同年份或类别组。"""
+    """Long and short labels that share a common axis are arranged according to the abscissa, and cannot form different years or category groups based on text length."""
     members = [_LineItem(str(i), (10, 10 + i * 8, 15, 16 + i * 8), 0, i, effective_height=6) for i in range(8)]
     for column, (text, length) in enumerate([("Longest category", 70), ("Short", 25), ("Middle label", 50)]):
         members.append(

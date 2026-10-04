@@ -1,4 +1,4 @@
-"""面向区域分析与模型融合的 PDF 证据和表格能力。"""
+"""PDF evidence and tabulation capabilities for regional analysis and model fusion."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from .native.pdf.inline.types import (
 
 @dataclass(frozen=True, slots=True)
 class PDFTextEvidence:
-    """保存可脱离 PDF 句柄使用的页面文字证据，不暴露组行中间对象。"""
+    """Preserves page textual evidence that can be used outside of the PDF handle without exposing group row intermediate objects."""
 
     page_size: tuple[float, float]
     geometry: PDFPageTextGeometry | None = None
@@ -36,7 +36,7 @@ class PDFTextEvidence:
 
 @dataclass(frozen=True, slots=True)
 class PDFTablePage:
-    """一次准备并由同页多个表格区域复用的物化原语。"""
+    """Materialized primitives prepared once and reused by multiple table regions on the same page."""
 
     page_size: tuple[float, float]
     geometry: PDFPageTextGeometry
@@ -46,7 +46,7 @@ class PDFTablePage:
 
 @dataclass(frozen=True, slots=True)
 class PDFTableResult:
-    """返回已物化上下标的表格 HTML 及接受结果所需的诊断。"""
+    """Returns the materialized superscripted table HTML and the diagnostics required to accept the result."""
 
     html: str
     source: str
@@ -64,7 +64,7 @@ def prepare_text_evidence(
     excluded_script_regions: Sequence[BBox] = (),
     snapshot: PDFPageSnapshot | None = None,
 ) -> PDFTextEvidence:
-    """读取一次字符及注释，按既定组行闭包生成页面文字证据。"""
+    """Read characters and comments once, and generate page text evidence according to the set group line closure."""
     from .native.pdf.inline.detection import detect_pdf_text_link_lines, detect_pdf_text_style_lines
     from .native.pdf.inline.scripts import detect_pdf_text_script_lines
     from .native.pdf.line_merging import merge_text_line_clusters
@@ -94,7 +94,7 @@ def prepare_text_evidence(
         vector_geometry = snapshot.vector_geometry
     geometry = geometry if geometry is not None else page.get_chars_with_geometry()
     page_size = tuple(float(value) for value in (snapshot.page_size if snapshot is not None else page.size))
-    # 源字符只读；组行使用独立累加框，旋转等变换在消费处创建局部字符副本。
+    # Source characters are read-only; group lines use independent accumulation boxes, rotation and other transformations to create local character copies at the consumer location.
     chars = geometry.chars
     if native_records is not None:
         lines = _build_native_line_items_from_records(native_records, page_size)
@@ -111,7 +111,7 @@ def prepare_text_evidence(
         lines, snapshot.link_annotations if snapshot is not None else page.get_link_annotations()
     )
     script_lines = merge_text_line_clusters(list(lines), page_size, list(table_regions))
-    # 仅本调用新鲜物化且未暴露给调用方的字符可按身份复用；旋转或修复副本不会命中。
+    # Only characters freshly materialized by this call and not exposed to the caller may be reused by identity; rotated or repaired copies will not hit.
     owned_scripts = None
     if native_owner is not None:
         from .native.pdf.inline.scripts import _prepare_owned_script_evidence
@@ -151,7 +151,7 @@ def apply_text_evidence(
     *,
     diagnostics: list[dict[str, Any]] | None = None,
 ) -> None:
-    """按链接、样式、上下标顺序物化目标块，保持证据和源字符不变。"""
+    """Materialize the target blocks in order of link, style, superscript and subscript, keeping the evidence and source characters unchanged."""
     from .native.pdf.inline.materialize import apply_pdf_inline_evidence
 
     apply_pdf_inline_evidence(
@@ -171,7 +171,7 @@ def prepare_table_page(
     vector_geometry: PDFPageVectorGeometry | None = None,
     snapshot: PDFPageSnapshot | None = None,
 ) -> PDFTablePage:
-    """在调用方确认存在候选表格后物化页面原语，复用已有字符几何。"""
+    """After the caller confirms that the candidate table exists, the page primitive is materialized and the existing character geometry is reused."""
     from .native.pdf._table_recovery.engine import coerce_native_table_rectangles, coerce_native_table_rules
 
     if snapshot is not None:
@@ -190,7 +190,7 @@ def prepare_table_page(
 
 
 def recover_table_region(page: PDFTablePage, bbox: BBox, *, angle: int = 0) -> PDFTableResult | None:
-    """恢复指定 PDF point 区域并物化上下标，不决定宿主的模型回退策略。"""
+    """Restores the specified PDF point region and materializes the superscript and subscript, without determining the host's model rollback strategy."""
     from .native.pdf._table_recovery.contracts import NativeTableInput
     from .native.pdf.table_materialization import recover_table_result
 
@@ -210,7 +210,7 @@ def recover_table_region(page: PDFTablePage, bbox: BBox, *, angle: int = 0) -> P
 
 
 def project_table_text(ocr_result: Any, table_size: tuple[int, int]) -> str:
-    """按空间位置投影 OCR 表格文字，保持已有空输入和排序语义。"""
+    """Project OCR table text by spatial position, preserving existing empty input and sorting semantics."""
     from .native.pdf.spatial_text import project_ocr_table_text
 
     return project_ocr_table_text(ocr_result, table_size)

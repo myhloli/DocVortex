@@ -1,4 +1,4 @@
-"""验证表格性能路径在容差、来源索引和缓存生命周期边界上的等价性。"""
+"""Verify equivalence of table performance paths across tolerance, source index, and cache lifetime boundaries."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ from docvortex.document.pdf.text._contracts import Bbox
 
 
 def test_separator_index_matches_full_scan_at_float_boundaries() -> None:
-    """用确定性随机线段及容差相邻浮点数检查覆盖率逐位一致。"""
+    """Check coverage for bit-by-bit consistency using deterministic random line segments and tolerant adjacent floats."""
     randomizer = random.Random(70915)
     rules = [
         _MergedRule(
@@ -70,7 +70,7 @@ def test_separator_index_matches_full_scan_at_float_boundaries() -> None:
 
 
 def test_separator_cache_does_not_cross_rule_sets() -> None:
-    """同一坐标在不同表格或物理证据中独立查询，防止错误复用接受条件。"""
+    """The same coordinates can be queried independently in different tables or physical evidence to prevent incorrect reuse of acceptance conditions."""
     full = _IndexedRules([_MergedRule("horizontal", 10.0, 0.0, 100.0)])
     partial = _IndexedRules([_MergedRule("horizontal", 10.0, 0.0, 30.0)])
     assert _separator_coverage(full, "horizontal", 10.0, 0.0, 100.0, 0.5) == 1.0
@@ -80,7 +80,7 @@ def test_separator_cache_does_not_cross_rule_sets() -> None:
 
 @pytest.mark.parametrize("angle", (0, 90, 180, 270))
 def test_character_preparation_keeps_source_order_and_explicit_boundaries(angle: int) -> None:
-    """重复及异常来源索引保持稳定排序，空格换行不占用可见字符索引。"""
+    """The index of duplicate and abnormal sources maintains a stable sorting, and space breaks do not occupy the visible character index."""
     chars = (
         {"char": "A", "bbox": Bbox([1.0, 1.0, 3.0, 9.0]), "char_idx": 2},
         {"char": " ", "bbox": (3.0, 1.0, 4.0, 9.0), "char_idx": 2},
@@ -118,7 +118,7 @@ def test_character_preparation_keeps_source_order_and_explicit_boundaries(angle:
     ),
 )
 def test_bbox_normalization_preserves_stable_pair_order(values: tuple) -> None:
-    """固定旧两元素排序的退化框、NaN 和带符号零语义。"""
+    """Fixed degenerate box, NaN and signed zero semantics for old two-element sorting."""
     x0, y0, x1, y1 = map(float, values)
     left, right = sorted((x0, x1))
     top, bottom = sorted((y0, y1))
@@ -132,13 +132,13 @@ def test_bbox_normalization_preserves_stable_pair_order(values: tuple) -> None:
 
 
 def test_owned_bbox_fast_read_preserves_subclass_protocol() -> None:
-    """自有框可直接读取数组，第三方子类仍保留覆盖后的下标语义。"""
+    """The own box can directly read the array, and the third-party subclass still retains the overridden subscript semantics."""
 
     class ShiftedBbox(Bbox):
-        """模拟读取时转换坐标的外部框子类。"""
+        """An outer box subclass that simulates converting coordinates when reading."""
 
         def __getitem__(self, index):
-            """在原下标协议上平移坐标，确认快路径不会忽略覆盖。"""
+            """Translate the coordinates on the original subscript protocol to confirm that the fast path does not ignore coverage."""
             return super().__getitem__(index) + 100.0
 
     assert normalize_bbox(Bbox([4.0, 5.0, 1.0, 2.0])) == (1.0, 2.0, 4.0, 5.0)
@@ -146,7 +146,7 @@ def test_owned_bbox_fast_read_preserves_subclass_protocol() -> None:
 
 
 def test_indexed_assignment_preserves_ties_and_outside_glyphs() -> None:
-    """覆盖单格快路径、跨格平局、外缘裁剪及合并格，逐字符比较穷举结果。"""
+    """Covers single-cell fast paths, cross-cell draws, outer edge cropping and merged cells, and compares exhaustive results character by character."""
     specs = (
         GridCellSpec(0, 0, 1, 2, (0.0, 0.0, 20.0, 10.0)),
         GridCellSpec(1, 0, 1, 1, (0.0, 10.0, 10.0, 20.0)),
@@ -161,7 +161,7 @@ def test_indexed_assignment_preserves_ties_and_outside_glyphs() -> None:
 
 
 def test_baseline_median_reuse_preserves_cluster_membership() -> None:
-    """在临界偏移及重复 origin 下与逐次 statistics.median 的旧判定比较。"""
+    """Comparison with the old decision of successive statistics.median at critical offset and repeated origin."""
     randomizer = random.Random(115)
     for _ in range(60):
         origins = {index: (float(index), 10.0 + randomizer.choice((0, 0.35, 0.4, 0.8, 2.0))) for index in range(40)}
@@ -184,7 +184,7 @@ def test_baseline_median_reuse_preserves_cluster_membership() -> None:
 
 @pytest.mark.parametrize("second_visual_row", (0, 1))
 def test_lazy_typography_keeps_cell_script_roles(monkeypatch: pytest.MonkeyPatch, second_visual_row: int) -> None:
-    """单行及多行字符脚本与旧的无条件排版特征计算得到完全相同角色。"""
+    """Single-line and multi-line character scripts compute exactly the same characters as the old unconditional typesetting feature."""
     bboxes = ((10.0, 40.0, 20.0, 50.0), (20.0, 34.0, 26.0, 40.0))
     chars = {
         index: {"char": text, "char_idx": index, "bbox": bbox, "font": {"name": "Times", "flags": 0}}
@@ -199,7 +199,7 @@ def test_lazy_typography_keeps_cell_script_roles(monkeypatch: pytest.MonkeyPatch
     build_lines = table_text_styles._cell_visual_lines
 
     def eager_lines(*args):
-        """重放旧路径为单行同样填充完整排版统计。"""
+        """Replaying the old path as a single line also populates the full layout statistics."""
         lines = build_lines(*args)
         if len(lines) == 1:
             table_text_styles._fill_native_typography(lines[0], args[2])

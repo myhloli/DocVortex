@@ -1,4 +1,4 @@
-"""验证 demo/pdfs 少线表高置信门的可移植真实文档真值。"""
+"""Verification of portable real-document truth values for demo/pdfs few-line table high-confidence gates."""
 
 from __future__ import annotations
 
@@ -25,13 +25,13 @@ _MANIFEST_PATH = _PROJECT_ROOT / "tests" / "fixtures" / "native_pdf_table_demo_m
 
 
 def _is_html_table(content: object) -> bool:
-    """判断表体是否采用 Native HTML 输出。"""
+    """Determine whether the meter body adopts Native HTML output."""
 
     return isinstance(content, str) and content.lstrip().lower().startswith("<table")
 
 
 def _html_shape(content: str) -> tuple[int, int]:
-    """计算 HTML 表格的物理行数和最大展开列数。"""
+    """Calculate the number of physical rows and maximum number of expanded columns for the HTML table."""
 
     soup = BeautifulSoup(content, "html.parser")
     rows = soup.find_all("tr")
@@ -43,7 +43,7 @@ def _html_shape(content: str) -> tuple[int, int]:
 
 
 def _html_cell_truth(content: str) -> list[dict[str, Any]]:
-    """把 HTML 单元格展开为带网格位置和 span 的稳定记录。"""
+    """Expand the HTML cell into a stable record with grid position and span."""
 
     soup = BeautifulSoup(content, "html.parser")
     occupied: set[tuple[int, int]] = set()
@@ -75,7 +75,7 @@ def _native_table_input(
     document: PDFDocument,
     target: dict[str, Any],
 ) -> NativeTableInput:
-    """按归一化真值 bbox 构造共享 Native Table 输入。"""
+    """Construct shared Native Table input in terms of normalized true values bbox."""
 
     page = document[target["page_index"]]
     width, height = page.size
@@ -96,13 +96,13 @@ def _native_table_input(
 
 
 def _load_manifest() -> dict[str, Any]:
-    """读取仓库相对路径的 demo 少线表真值。"""
+    """Read the truth value of demo few line table for warehouse relative path."""
 
     return json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
 def test_demo_sparse_table_confidence_manifest() -> None:
-    """验证全部 demo 表格的逐格真值和保守回退保持固定。"""
+    """Verify that the cell-wise truth value and conservative fallback remain fixed for all demo tables."""
 
     manifest = _load_manifest()
     source_root = _PROJECT_ROOT / manifest["source_root"]

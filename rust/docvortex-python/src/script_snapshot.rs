@@ -1,4 +1,4 @@
-//! 页面级自有上下标输入：绑定层只接收字符索引，不重复读取 Python 字符字典。
+//! Page level own superscript and subscript input: the binding layer only receives the character index and does not read the Python character dictionary repeatedly.
 use docvortex_core::{geometry, scripts, text_snapshot::TextSnapshot};
 use pyo3::{exceptions::PyValueError, prelude::*};
 use std::{
@@ -13,7 +13,7 @@ pub struct NativeScriptEvidence {
     records: Vec<scripts::Record>,
 }
 
-/// 按唯一文本取得当前解释器 Unicode 标志，原始字体等价类与扩展几何在 Rust 内一次准备。
+/// Obtain the current interpreter Unicode mark by unique text, and the original font equivalence class and extended geometry are prepared once in Rust.
 pub fn prepare(
     data: &TextSnapshot,
     flags: &Bound<'_, PyAny>,
@@ -54,7 +54,7 @@ pub fn prepare(
                 value
             }
         };
-        // canonical 字体 ID 可直接复用等价类，避免每个字符复制并重新哈希字体名。
+        // canonical font ID can directly reuse equivalent classes to avoid copying and re-hashing the font name for each character.
         let font_id = if let Some(id) = prepared_fonts[ch.font] {
             id
         } else {
@@ -87,7 +87,7 @@ pub fn prepare(
 
 #[pymethods]
 impl NativeScriptEvidence {
-    /// 按原公式分段的边界分类，源索引允许重复和重排；越界或错误边界明确报错。
+    /// According to the boundary classification of the original formula segmentation, the source index allows duplication and rearrangement; out-of-bounds or wrong boundaries are clearly reported.
     fn classify_indices(
         &self,
         py: Python<'_>,
@@ -121,7 +121,7 @@ impl NativeScriptEvidence {
     }
 }
 
-/// 报告真实页面自有脚本批次调用次数，供全量回放确认命中了新路径。
+/// Report the number of batch calls of the real page's own script for full playback to confirm that the new path has been hit.
 #[pyfunction]
 pub fn script_snapshot_stats() -> u64 {
     BATCH_CALLS.load(Ordering::Relaxed)

@@ -7,7 +7,7 @@ from docvortex.schema import BlockType, ImageBlock, ModelJson, Producer
 
 
 def _model_json(pages: list[list[dict[str, Any]]]) -> ModelJson:
-    """为 raw block 对象化回归构造最小严格 ModelJson。"""
+    """Construct minimally stringent ModelJson for raw block objectified regression."""
     return ModelJson(
         pages=pages,
         page_index_map=[],
@@ -17,7 +17,7 @@ def _model_json(pages: list[list[dict[str, Any]]]) -> ModelJson:
 
 
 def test_postprocess_groups_pdf_visual_blocks_without_dict_access() -> None:
-    """验证 PDF raw 视觉块会在严格对象化边界完成分组。"""
+    """Verification PDF raw Vision blocks are grouped at strict object boundaries."""
     page = model_json_to_pages(
         _model_json(
             [
@@ -45,7 +45,7 @@ def test_postprocess_groups_pdf_visual_blocks_without_dict_access() -> None:
 
 
 def test_postprocess_groups_raw_vision_footnote_as_image_footnote() -> None:
-    """验证通用 raw footnote 会归入相邻图片而不是页脚注。"""
+    """Verify that the generic raw footnote is relegated to the adjacent image instead of the footer."""
     page = model_json_to_pages(
         _model_json(
             [

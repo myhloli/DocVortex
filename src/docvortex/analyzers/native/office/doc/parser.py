@@ -1,4 +1,4 @@
-"""把 WordDocument/Table/Data streams 解析为逐 section DOC 语义模型。"""
+"""Parse WordDocument/Table/Data streams into section DOC semantic model."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ from .styles import Stylesheet, parse_stylesheet
 
 @dataclass(slots=True)
 class _FieldFrame:
-    """一个尚未闭合的 Word 字段。"""
+    """A Word field that has not been closed."""
 
     instruction: str = ""
     in_result: bool = False
@@ -70,14 +70,14 @@ class _FieldFrame:
 
 @dataclass(slots=True)
 class _RawTableRow:
-    """应用全表网格前的一行单元格。"""
+    """Apply a row of cells before the full table grid."""
 
     cells: list[DocTableCell]
     table_format: DocTableFormat | None
 
 
 class _Assembler:
-    """把全局文字流、格式 run 和辅助 PLC 组装为段落及表格。"""
+    """Assemble the global text flow, format run and auxiliary PLC into paragraphs and tables."""
 
     def __init__(
         self,
@@ -94,7 +94,7 @@ class _Assembler:
         native_equations: dict[int, str] | None = None,
         native_charts: dict[int, str] | None = None,
     ) -> None:
-        """保存解析上下文；每个 story 开始时会重置字段栈。"""
+        """Save the parsing context; the field stack is reset at the beginning of each story."""
 
         self.text = text
         self.pieces = pieces
@@ -110,7 +110,7 @@ class _Assembler:
         self._fields: list[_FieldFrame] = []
 
     def _piece_prm(self, char_index: int) -> bytes:
-        """返回字符所在 piece 的 Prm grpprl。"""
+        """Return the Prm grpprl where the character is located piece."""
 
         if char_index >= len(self.text.piece_indexes):
             return b""
@@ -118,7 +118,7 @@ class _Assembler:
         return self.pieces[piece_index].prm if piece_index < len(self.pieces) else b""
 
     def _character_style(self, fc: int, char_index: int) -> DocCharStyle:
-        """按样式链、CHPX、piece Prm 顺序解析字符样式。"""
+        """Parse character styles in order of style chain, CHPX, piece, Prm."""
 
         paragraph_run = self.formatting.paragraph_at(fc)
         paragraph_style_id = paragraph_run.style_id if paragraph_run is not None else 0
@@ -135,7 +135,7 @@ class _Assembler:
         return result
 
     def _paragraph_properties(self, fc: int, char_index: int) -> tuple[int, PapDelta]:
-        """按样式链、PAPX、piece Prm 顺序解析段落属性。"""
+        """Paragraph attributes are parsed in the order of style chain, PAPX, piece and Prm."""
 
         paragraph_run = self.formatting.paragraph_at(fc)
         style_id = paragraph_run.style_id if paragraph_run is not None else 0
@@ -150,7 +150,7 @@ class _Assembler:
 
     @staticmethod
     def _append_run(target: list[DocTextRun], run: DocTextRun) -> None:
-        """合并相邻同样式同链接 run。"""
+        """Merge adjacent links of the same style run."""
 
         if not run.text:
             return
@@ -171,7 +171,7 @@ class _Assembler:
             target.append(run)
 
     def _push_visible_run(self, visible: list[DocTextRun], run: DocTextRun) -> None:
-        """把一个结果 run 送入当前字段或段落。"""
+        """Send a result run into the current field or paragraph."""
 
         if not self._fields:
             self._append_run(visible, run)
@@ -185,12 +185,12 @@ class _Assembler:
             self._append_run(frame.runs, run)
 
     def _field_begin(self) -> None:
-        """打开一个嵌套字段。"""
+        """Open a nested field."""
 
         self._fields.append(_FieldFrame())
 
     def _field_separator(self, paragraph_keywords: set[str]) -> None:
-        """结束字段指令并识别跨段 TOC。"""
+        """End field command and identify span TOC."""
 
         if not self._fields:
             return
@@ -207,7 +207,7 @@ class _Assembler:
         paragraph_keywords: set[str],
         visuals: list[DocVisualPayload],
     ) -> None:
-        """关闭字段，把缓存结果绑定链接后放回父上下文。"""
+        """Close the field and return the cached result to the parent context after binding the link."""
 
         if not self._fields:
             return
@@ -225,7 +225,7 @@ class _Assembler:
             self._push_visible_run(visible, run)
 
     def _paragraph_anchor(self, cp_start: int, cp_end: int) -> str | None:
-        """返回段落范围内优先级最高的书签起点。"""
+        """Return the bookmark starting point with the highest priority within the paragraph range."""
 
         candidates = [name for cp, names in self.bookmarks.items() if cp_start <= cp < cp_end for name in names]
         if not candidates:
@@ -244,7 +244,7 @@ class _Assembler:
         images: list[DocVisualPayload],
         keywords: set[str],
     ) -> DocParagraph | None:
-        """把段落终止字符上的 PAPX 解析为完整语义段落。"""
+        """Parse PAPX on the paragraph termination character into a complete semantic paragraph."""
 
         style_id, pap = self._paragraph_properties(fc, char_index)
         style = self.stylesheet.get(style_id)
@@ -288,7 +288,7 @@ class _Assembler:
         *,
         note_refs: dict[int, str] | None = None,
     ) -> list[DocParagraph]:
-        """解析一个 story CP 范围内的全部段落。"""
+        """Parse all paragraphs within a story CP range."""
 
         self._fields = []
         refs = note_refs or {}
@@ -408,13 +408,13 @@ class _Assembler:
 
 
 def _paragraph_visible(paragraph: DocParagraph) -> bool:
-    """判断表格标记段落是否含有实际单元格内容。"""
+    """Determine whether the table mark paragraph contains actual cell content."""
 
     return any(run.text for run in paragraph.runs) or bool(paragraph.images)
 
 
 def _cell_formats(row: _RawTableRow) -> tuple[list[int], list[DocTableCellFormat]]:
-    """为缺失 TAP 的行构造稳定伪边界和默认 cell 属性。"""
+    """Construct stable pseudo-boundary and default cell attributes for rows with missing TAP."""
 
     count = len(row.cells)
     table_format = row.table_format
@@ -429,7 +429,7 @@ def _cell_formats(row: _RawTableRow) -> tuple[list[int], list[DocTableCellFormat
 
 
 def _materialize_table_rows(raw_rows: list[_RawTableRow], budget: DocBudget) -> list[DocTableRow]:
-    """把各行独立 twip 边界统一为 rowspan/colspan HTML 网格。"""
+    """Unify the independent twip boundaries of each row into a rowspan/colspan HTML grid."""
 
     all_boundaries: set[int] = set()
     row_formats: list[tuple[list[int], list[DocTableCellFormat]]] = []
@@ -484,7 +484,7 @@ def _parse_table(
     depth: int,
     budget: DocBudget,
 ) -> tuple[DocTable, int]:
-    """递归解析指定 table depth 的表格和嵌套表格。"""
+    """Recursively parse tables and nested tables specifying table depth."""
 
     index = start
     cp_start = paragraphs[start].cp_start
@@ -532,14 +532,14 @@ def _assemble_main_elements(
     floating: list[DocImage],
     budget: DocBudget,
 ) -> list[DocElement]:
-    """把连续 table paragraph 收敛成表格，并按 CP 合入 floating 图片。"""
+    """Converge the continuous table paragraph into a table, and merge the floating pictures according to CP."""
 
     elements: list[DocElement] = []
     index = 0
     while index < len(paragraphs):
         paragraph = paragraphs[index]
         if paragraph.in_table and paragraph.table_depth > 0:
-            # DOC 可直接以 depth=2 的 inner-cell 开始；从 depth=1 建立隐式外层格。
+            # DOC can directly start with inner-cell with depth=2; create an implicit outer grid from depth=1.
             table, index = _parse_table(paragraphs, index, 1, budget)
             if table.rows:
                 elements.append(table)
@@ -561,7 +561,7 @@ def _section_ranges(
     fib: FileInformationBlock,
     budget: DocBudget,
 ) -> list[tuple[int, int]]:
-    """从 PlcfSed 恢复 section CP 范围，损坏时回退单 section。"""
+    """Restore section from PlcfSed to CP range, fall back to single section when damaged."""
 
     pair = fib.pair(FCLCB_SECTION)
     payload = bounded_slice(table_stream, pair.fc, pair.lcb)
@@ -583,7 +583,7 @@ def _distribute_sections(
     ranges: list[tuple[int, int]],
     elements: list[DocElement],
 ) -> list[DocSection]:
-    """按元素起始 CP 将主文档内容绑定到 section。"""
+    """Bind main document content to section by element start CP."""
 
     sections = [DocSection(start, end) for start, end in ranges]
     for element in elements:
@@ -602,7 +602,7 @@ def _header_story_ranges(
     fib: FileInformationBlock,
     budget: DocBudget,
 ) -> list[tuple[int, int]]:
-    """返回 PlcfHdd 中相对于 header story 的范围。"""
+    """Returns the range in PlcfHdd relative to header and story."""
 
     pair = fib.pair(FCLCB_HEADER)
     payload = bounded_slice(table_stream, pair.fc, pair.lcb)
@@ -620,7 +620,7 @@ def _attach_headers(
     fib: FileInformationBlock,
     budget: DocBudget,
 ) -> None:
-    """把每节六种 header/footer story 的非空段落绑定到 section。"""
+    """Bind the non-empty paragraphs of six header/footer story in each section to section."""
 
     ranges = _header_story_ranges(table_stream, fib, budget)
     base = fib.story_bases["header"]
@@ -653,7 +653,7 @@ def _note_ranges(
     prefix: str,
     budget: DocBudget,
 ) -> tuple[dict[int, str], list[tuple[int, int, int, str]]]:
-    """解析脚注或尾注 reference CP 与正文 story 范围。"""
+    """Parse footnote or endnote reference CP and text story range."""
 
     ref_payload = bounded_slice(table_stream, ref_offset, ref_size)
     text_payload = bounded_slice(table_stream, text_offset, text_size)
@@ -680,7 +680,7 @@ def _note_ranges(
 
 
 def _prepend_note_label(paragraphs: list[DocParagraph], label: str) -> None:
-    """把脚注或尾注编号写入首个可见段落。"""
+    """Write the footnote or endnote number into the first visible paragraph."""
 
     if not paragraphs:
         return
@@ -693,7 +693,7 @@ def _attach_notes(
     footnote_ranges: list[tuple[int, int, int, str]],
     endnote_ranges: list[tuple[int, int, int, str]],
 ) -> None:
-    """脚注按引用 section、尾注按最后 section 追加。"""
+    """Footnotes are appended by reference section, and endnotes are appended by the last section."""
 
     for reference_cp, start, end, label in footnote_ranges:
         paragraphs = assembler.paragraphs(start, end)
@@ -719,7 +719,7 @@ def parse_doc_document(
     native_equations: dict[int, str] | None = None,
     native_charts: dict[int, str] | None = None,
 ) -> DocDocument:
-    """解析三个核心 streams 并返回逐 section 语义文档。"""
+    """Parse three core streamss and return semantic documents per section."""
 
     budget = DocBudget()
     clx = fib.pair(FCLCB_CLX)

@@ -1,4 +1,4 @@
-"""共享正文块连接的几何、内容拼接和来源规则。"""
+"""Geometry, content splicing, and provenance rules for shared body block connections."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ def _merge_internal_text_block_group(
     *,
     preserve_visual_spaces: bool = False,
 ) -> dict[str, Any]:
-    """合并内部文本块及其版面元数据，最终输出阶段仍会统一移除这些字段。"""
+    """Internal text blocks and their layout metadata are merged, and these fields are still removed uniformly during the final output stage."""
 
     ordered_indices = sorted(
         indices,
@@ -126,7 +126,7 @@ def _merge_internal_text_block_group(
 def _component_declared_lane_interval(
     block: dict[str, Any],
 ) -> tuple[float, float] | None:
-    """读取组件声明的有效栏带区间，不区分普通栏或跨栏。"""
+    """Read the valid column band interval declared by the component, without distinguishing between ordinary columns and cross-columns."""
 
     interval = block.get("_lane_interval")
     if (
@@ -142,7 +142,7 @@ def _component_declared_lane_interval(
 def _component_lane_interval(
     block: dict[str, Any],
 ) -> tuple[float, float] | None:
-    """读取普通文本组件所属的有效非跨栏栏带区间。"""
+    """Read the valid non-crossbar band interval to which the ordinary text component belongs."""
 
     if block.get("_lane_is_span") is not False:
         return None
@@ -153,7 +153,7 @@ def _component_reference_width(
     block: dict[str, Any],
     local_page_width: float,
 ) -> float:
-    """优先返回组件的局部栏宽，缺少可靠栏带时回退页面宽度。"""
+    """The local column width of the component is returned first, and the page width is returned when there is no reliable column band."""
 
     interval = _component_lane_interval(block)
     return interval[1] - interval[0] if interval is not None else local_page_width
@@ -165,7 +165,7 @@ def _compatible_component_lane_width(
     local_page_width: float,
     median_height: float,
 ) -> float:
-    """同一局部栏带的两个组件使用栏宽，否则继续使用页面宽度。"""
+    """Two components of the same partial column band use the column width, otherwise they continue to use the page width."""
 
     first_interval = _component_lane_interval(first_block)
     second_interval = _component_lane_interval(second_block)
@@ -185,7 +185,7 @@ def _components_share_lane_role(
     second_block: dict[str, Any],
     median_height: float,
 ) -> bool:
-    """要求二次合并组件同为跨栏或属于同一普通栏带。"""
+    """It is required that the secondary merged components are both hurdles or belong to the same common hurdle belt."""
 
     first_role = first_block.get("_lane_is_span")
     second_role = second_block.get("_lane_is_span")
@@ -203,7 +203,7 @@ def _components_share_lane_role(
             abs(first_interval[0] - second_interval[0]) <= tolerance
             and abs(first_interval[1] - second_interval[1]) <= tolerance
         )
-    # 兼容缺少内部栏元数据的旧调用；生产路径始终会携带该字段。
+    # Compatible with old calls missing internal column metadata; production paths will always carry this field.
     return not isinstance(first_role, bool) and not isinstance(second_role, bool)
 
 
@@ -211,7 +211,7 @@ def _block_starts_with_short_wide_rows(
     block: dict[str, Any],
     local_page_width: float,
 ) -> bool:
-    """判断组件内部是否以短首行和紧邻宽正文形成明确分组起点。"""
+    """Determine whether the short first line and the adjacent wide body text form a clear starting point for grouping within the component."""
 
     line_bboxes = block.get("_local_line_bboxes")
     if not isinstance(line_bboxes, list) or len(line_bboxes) < 2:
@@ -229,7 +229,7 @@ def _find_short_opener_pairs(
     local_page_width: float,
     median_height: float,
 ) -> list[tuple[int, int]]:
-    """查找跨栏拆开的短首行与紧邻满宽正文组件。"""
+    """Finds a short first line split across columns and an adjacent full-width body component."""
 
     output: list[tuple[int, int]] = []
     for opener_index in candidate_indices:
@@ -286,7 +286,7 @@ def _nearest_following_text_component(
     maximum_gap: float,
     section_starts: set[int],
 ) -> int | None:
-    """返回同一水平流中紧邻且不是新分组起点的下一正文组件。"""
+    """Returns the next text component in the same horizontal flow that is immediately adjacent and is not the start of a new grouping."""
 
     current_bbox = blocks[current_index]["_local_line_bboxes"][-1]
     matches: list[tuple[float, float, int]] = []
@@ -325,7 +325,7 @@ def _has_parallel_text_component(
     current_index: int,
     candidate_indices: list[int],
 ) -> bool:
-    """检查当前组件同一纵向带内是否存在水平分离的并栏组件。"""
+    """Check whether there are horizontally separated parallel components in the same vertical band of the current component."""
 
     current_bbox = blocks[current_index]["bbox"]
     for candidate_index in candidate_indices:
@@ -349,7 +349,7 @@ def _nearest_tapered_tail_component(
     median_height: float,
     section_starts: set[int],
 ) -> int | None:
-    """查找左对齐、行宽递减且行距略大的信息组尾行组件。"""
+    """Look for information group trailing components that are left-aligned, have decreasing line width, and slightly larger leading spacing."""
 
     previous_bbox = blocks[current_index]["_local_line_bboxes"][-1]
     previous_width = previous_bbox[2] - previous_bbox[0]
@@ -395,7 +395,7 @@ def _component_connection_skips_block(
     second_index: int,
     median_height: float,
 ) -> bool:
-    """检查两个正文组件之间是否已有同水平流的中间块，禁止二次合并跨越它。"""
+    """Check whether there is an intermediate block with the same level of flow between the two text components, and prohibit secondary merging across it."""
 
     first_bbox = blocks[first_index]["_local_line_bboxes"][-1]
     second_bbox = blocks[second_index]["_local_line_bboxes"][0]
@@ -424,14 +424,14 @@ def _component_connection_skips_block(
 
 
 def _text_component_sort_key(block: dict[str, Any]) -> tuple[float, float]:
-    """返回正文组件按局部首行位置排序的稳定键。"""
+    """Returns the stable key of the text component sorted by the local first row position."""
 
     first_bbox = block["_local_line_bboxes"][0]
     return first_bbox[1], first_bbox[0]
 
 
 def _merge_text_line_content(line_texts: Sequence[str]) -> str:
-    """按 Hybrid 语言与行末连字规则折叠普通文本行。"""
+    """Folds normal text lines according to Hybrid language and end-of-line hyphenation rules."""
 
     normalized_lines = [_normalize_native_run_text(str(text or "")) for text in line_texts]
     normalized_lines = [text for text in normalized_lines if text]

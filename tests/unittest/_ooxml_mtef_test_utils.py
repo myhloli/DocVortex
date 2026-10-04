@@ -1,4 +1,4 @@
-"""构造带 MathType/Equation OLE 对象的确定性 DOCX/PPTX/XLSX 测试包。"""
+"""Construct a deterministic DOCX/PPTX/XLSX test package with MathType/Equation OLE objects."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def _rewrite_zip(
     replacements: dict[str, bytes],
     additions: dict[str, bytes],
 ) -> bytes:
-    """在内存中替换或新增 OPC 成员并保持确定性压缩。"""
+    """Replace or add a OPC member in memory and maintain deterministic compression."""
 
     source_buffer = BytesIO(package)
     output = BytesIO()
@@ -57,7 +57,7 @@ def _rewrite_zip(
 
 
 def _content_types_with_ole(content_types: bytes) -> bytes:
-    """为 .bin 公式 OLE persistence part 添加默认内容类型。"""
+    """Added default content type for .bin formula OLE persistence part."""
 
     root = etree.fromstring(content_types)
     if not any(child.get("Extension", "").casefold() == "bin" for child in root):
@@ -78,7 +78,7 @@ def _content_types_with_ole(content_types: bytes) -> bytes:
 
 
 def _relationships_root(payload: bytes | None) -> etree._Element:
-    """读取 relationships XML，不存在时创建空根。"""
+    """Read relationships XML, creating an empty root if it does not exist."""
 
     if payload:
         return etree.fromstring(payload)
@@ -93,7 +93,7 @@ def _append_relationship(
     *,
     external: bool = False,
 ) -> None:
-    """向 relationships 根追加一个确定性关系。"""
+    """Append a deterministic relationship to the relationships root."""
 
     attributes = {
         "Id": relationship_id,
@@ -115,7 +115,7 @@ def _word_ole_run(
     image_relationship_id: str,
     prog_id: str,
 ) -> etree._Element:
-    """构造包含 VML 预览和 o:OLEObject 的 Word run。"""
+    """Construct Word run containing VML preview and o:OLEObject."""
 
     run = etree.Element(f"{{{W_NS}}}r")
     object_element = etree.SubElement(run, f"{{{W_NS}}}object")
@@ -151,7 +151,7 @@ def _replace_word_placeholder(
     placeholder: str,
     replacement: etree._Element,
 ) -> None:
-    """用公式 run 或 AlternateContent 替换指定占位 run。"""
+    """Replace the specified placeholder run with the formula run or AlternateContent."""
 
     text_node = next(
         (node for node in root.findall(f".//{{{W_NS}}}t") if node.text == placeholder),
@@ -172,7 +172,7 @@ def _patch_word_part(
     prog_id: str,
     preview_image: bytes,
 ) -> tuple[bytes, bytes]:
-    """向一个 Word XML part 及其 relationships 注入多个公式 OLE 对象。"""
+    """Inject multiple formula OLE objects into a Word XML part and its relationships."""
 
     root = etree.fromstring(source.read(part_name))
     directory, basename = part_name.rsplit("/", 1)
@@ -227,7 +227,7 @@ def _patch_word_part(
 
 
 def _wrap_word_equations_in_textboxes(document_xml: bytes) -> bytes:
-    """把正文 Equation.3 run 包入 VML textbox，验证文本框独立遍历。"""
+    """Wrap the text Equation.3 run into VML textbox and verify that the text box is traversed independently."""
 
     root = etree.fromstring(document_xml)
     for index, ole_object in enumerate(
@@ -258,7 +258,7 @@ def _wrap_word_equations_in_textboxes(document_xml: bytes) -> bytes:
 
 
 def _set_word_equations_as_icons(document_xml: bytes) -> bytes:
-    """把 Word OLE 对象切换为 DrawAspect=Icon。"""
+    """Switch the Word OLE object to DrawAspect=Icon."""
 
     root = etree.fromstring(document_xml)
     for ole_object in root.findall(f".//{{{O_NS}}}OLEObject"):
@@ -283,7 +283,7 @@ def build_equation_docx(
     prog_id: str = "Equation.3",
     preview_image: bytes = _TINY_PNG,
 ) -> bytes:
-    """构造正文、表格或页眉页脚中含公式 OLE 对象的 DOCX。"""
+    """Constructs a DOCX object containing the formula OLE in the body, table, or header or footer."""
 
     document = Document()
     target_part = "word/document.xml"
@@ -383,7 +383,7 @@ def build_equation_pptx(
     prog_id: str = "Equation.3",
     preview_image: bytes = _TINY_PNG,
 ) -> bytes:
-    """使用 python-pptx 生成每页一个公式 OLE 对象的 PPTX。"""
+    """Use python-pptx to generate PPTX for one formula OLE object per page."""
 
     presentation = Presentation()
     presentation.slides.add_slide(presentation.slide_layouts[6])
@@ -446,7 +446,7 @@ def _move_pptx_equations_to_notes(
     *,
     show_as_icon: bool,
 ) -> bytes:
-    """把每页 OLE graphicFrame 移到对应 notesSlide 并重建关系。"""
+    """Move each page OLE graphicFrame to the corresponding notesSlide and rebuild the relationship."""
 
     replacements: dict[str, bytes] = {}
     with ZipFile(BytesIO(package)) as source:
@@ -531,7 +531,7 @@ def _xlsx_anchor(
     col: int,
     preview_relationship_id: str,
 ) -> None:
-    """向 x:oleObject 写入 objectPr/anchor/from/to。"""
+    """Write objectPr/anchor/from/to to x:oleObject."""
 
     object_properties = etree.SubElement(
         ole_object,
@@ -554,7 +554,7 @@ def _xlsx_drawing_parts(
     *,
     omml: bool = False,
 ) -> tuple[bytes, bytes]:
-    """构造按 cNvPr id 绑定预览的 DrawingML part 及 relationships。"""
+    """Construct DrawingML part and relationships previewed by cNvPr id binding."""
 
     root = etree.Element(f"{{{XDR_NS}}}wsDr", nsmap={"xdr": XDR_NS, "a": A_NS, "r": REL_NS})
     anchor = etree.SubElement(root, f"{{{XDR_NS}}}twoCellAnchor")
@@ -588,7 +588,7 @@ def _xlsx_vml_parts(
     row: int,
     col: int,
 ) -> tuple[bytes, bytes]:
-    """构造按 `_x0000_sNNN` 绑定预览的 VML drawing 与 relationships。"""
+    """Construct VML drawing and relationships previewed by `_x0000_sNNN` binding."""
 
     root = etree.Element("xml", nsmap={"v": V_NS, "x": XVML_NS, "r": REL_NS})
     shape = etree.SubElement(root, f"{{{V_NS}}}shape", id=f"_x0000_s{shape_id}")
@@ -615,7 +615,7 @@ def build_equation_xlsx(
     prog_id: str = "Equation.3",
     preview_image: bytes = _TINY_PNG,
 ) -> bytes:
-    """构造使用 objectPr、DrawingML 或 VML anchor 的公式 OLE XLSX。"""
+    """Construct the formula OLE XLSX using objectPr, DrawingML, or VML anchor."""
 
     workbook = Workbook()
     worksheet = workbook.active

@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到单正文 EPUB 3.3 的静态 XHTML renderer。"""
+"""Static XHTML renderer from validated MiddleJson to a single-body EPUB 3.3 document."""
 
 from __future__ import annotations
 
@@ -162,7 +162,7 @@ _TABLE_PARENT_RULES = {
 
 @dataclass(frozen=True, slots=True)
 class _TitleTarget:
-    """保存正文标题的可见文本、层级与 XHTML 目标。"""
+    """Store the visible text, level, and XHTML target of a body heading."""
 
     title: str
     level: int
@@ -170,10 +170,10 @@ class _TitleTarget:
 
 
 class _AnchorRegistry:
-    """为正文文本、标题和页面脚注分配文档级唯一 XHTML id。"""
+    """Assign document-wide unique XHTML IDs to body text, headings, and page footnotes."""
 
     def __init__(self, middle_json: MiddleJson) -> None:
-        """按页面与 block 顺序建立目标、来源 anchor 和标题索引。"""
+        """Index targets, source anchors, and headings in page and block order."""
         self._block_targets: dict[tuple[int, int, str], str] = {}
         self._anchor_targets: dict[str, str] = {}
         self._footnote_targets: set[str] = set()
@@ -225,22 +225,22 @@ class _AnchorRegistry:
                     self._anchor_targets[anchor_key] = target_id
 
     def target_for_block(self, page_idx: int, block: BlockBase) -> str | None:
-        """按来源页、index 和类型返回标题或脚注的唯一目标。"""
+        """Return the unique heading or footnote target by source page, index, and type."""
         if block.index is None:
             return None
         return self._block_targets.get((page_idx, block.index, str(block.type)))
 
     def target_for_anchor(self, anchor: str | None) -> str | None:
-        """按 producer anchor 返回首次匹配的正文目标。"""
+        """Return the first matching body target for a producer anchor."""
         return self._anchor_targets.get(_anchor_key(anchor))
 
     def is_footnote_target(self, target_id: str) -> bool:
-        """判断目标是否对应页面脚注，以便标注 noteref 语义。"""
+        """Check whether a target is a page footnote to mark noteref semantics."""
         return target_id in self._footnote_targets
 
 
 class _EpubXhtmlRenderer:
-    """维护单个 EPUB 正文的锚点、素材与 MathML 状态。"""
+    """Maintain anchors, assets, and MathML state for one EPUB body."""
 
     def __init__(
         self,
@@ -250,7 +250,7 @@ class _EpubXhtmlRenderer:
         assets: EpubAssetRegistry,
         anchors: _AnchorRegistry,
     ) -> None:
-        """保存严格输入和已规范化的调用状态。"""
+        """Store validated input and normalized call state."""
         self.middle_json = middle_json
         self.metadata = metadata
         self.assets = assets
@@ -258,7 +258,7 @@ class _EpubXhtmlRenderer:
         self.has_mathml = False
 
     def render(self) -> bytes:
-        """把完整 render plan 写成一个无脚本 XHTML content document。"""
+        """Write the complete render plan as one script-free XHTML content document."""
         root = etree.Element(
             _xhtml("html"),
             nsmap={None: _XHTML_NS, "epub": _EPUB_NS},
@@ -291,7 +291,7 @@ class _EpubXhtmlRenderer:
         )
 
     def _render_pages(self, parent: etree._Element, pages: list[list[PlannedBlock]]) -> None:
-        """把默认计划展平到单个连续阅读容器。"""
+        """Flatten the default plan into one continuous reading container."""
         for page in pages:
             for planned in page:
                 rendered = self._render_planned_block(planned)
@@ -299,7 +299,7 @@ class _EpubXhtmlRenderer:
                     parent.append(rendered)
 
     def _render_planned_block(self, planned: PlannedBlock) -> etree._Element | None:
-        """过滤计划块、分派具体类型并追加稳定来源属性。"""
+        """Filter planned blocks, dispatch their types, and append stable source attributes."""
         if planned.removed:
             return None
         block = planned.block
@@ -322,7 +322,7 @@ class _EpubXhtmlRenderer:
         return wrapper
 
     def _render_block_content(self, planned: PlannedBlock) -> etree._Element | None:
-        """把一个具体 PageBlock 映射为静态 XHTML 元素。"""
+        """Map a concrete PageBlock to static XHTML elements."""
         block = planned.block
         if isinstance(block, (TextBlock, RefTextBlock)):
             content = join_inline_spans(planned.text_contents or [block.content])
@@ -357,7 +357,7 @@ class _EpubXhtmlRenderer:
         raise TypeError(f"Unsupported PageBlock type: {type(block).__name__}")
 
     def _render_title(self, page_idx: int, block: TitleBlockBase) -> etree._Element | None:
-        """渲染带文档级唯一 id 的 h1-h6 标题。"""
+        """Render an h1-h6 heading with a document-wide unique ID."""
         if not inline_plain_text(block.content).strip():
             return None
         level = min(max(block.level, 1), 6)
@@ -369,7 +369,7 @@ class _EpubXhtmlRenderer:
         return heading
 
     def _render_page_footnote(self, page_idx: int, block: PageFootnoteBlock) -> etree._Element | None:
-        """把页面脚注保留为 EPUB footnote aside。"""
+        """Preserve a page footnote as an EPUB footnote aside."""
         footnote = etree.Element(
             _xhtml("aside"),
             attrib={"class": "docvortex-page-footnote", f"{{{_EPUB_NS}}}type": "footnote", "role": "doc-footnote"},
@@ -381,7 +381,7 @@ class _EpubXhtmlRenderer:
         return footnote if _has_visible_content(footnote) else None
 
     def _render_equation(self, block: EquationBlock) -> etree._Element | None:
-        """优先渲染行间 MathML，空公式时才尝试包内图片。"""
+        """Prefer display MathML; try an embedded image only for an empty equation."""
         container = etree.Element(_xhtml("div"), attrib={"class": "docvortex-equation"})
         if block.content.strip():
             self._append_math(container, block.content, display="block")
@@ -390,7 +390,7 @@ class _EpubXhtmlRenderer:
         return container if _has_visible_content(container) else None
 
     def _render_list(self, block: ListBlock) -> etree._Element | None:
-        """按共享 marker 语义递归渲染原生有序、无序或显式 marker 列表。"""
+        """Recursively render ordered, unordered, or explicit-marker lists using shared marker semantics."""
         parsed_leaves = [
             parse_list_item_marker(child.content)
             for child in block.content
@@ -438,14 +438,14 @@ class _EpubXhtmlRenderer:
         return container if len(container) else None
 
     def _render_index(self, block: IndexBlock) -> etree._Element | None:
-        """把源目录保留为正文内导航，并只链接到真实正文目标。"""
+        """Preserve the source table of contents as body navigation linking only to actual body targets."""
         navigation = etree.Element(_xhtml("nav"), attrib={"class": "docvortex-index", "aria-label": "Table of contents"})
         listing = etree.SubElement(navigation, _xhtml("ul"))
         self._append_index_children(listing, block)
         return navigation if len(listing) else None
 
     def _append_index_children(self, parent: etree._Element, block: IndexBlock) -> None:
-        """递归渲染 IndexBlock，并把孤立嵌套目录提升到当前层级。"""
+        """Render IndexBlock recursively, promoting orphaned nested indexes to the current level."""
         last_item: etree._Element | None = None
         for child in block.content:
             if isinstance(child, IndexBlock):
@@ -469,7 +469,7 @@ class _EpubXhtmlRenderer:
             last_item = item
 
     def _render_image_block(self, block: ImageBlock) -> etree._Element | None:
-        """按子块顺序渲染图片主体及其标题、脚注。"""
+        """Render an image body, captions, and footnotes in child-block order."""
         figure = etree.Element(_xhtml("figure"), attrib={"class": "docvortex-figure docvortex-figure--image"})
         for child in block.content:
             rendered = (
@@ -480,7 +480,7 @@ class _EpubXhtmlRenderer:
         return figure if len(figure) else None
 
     def _render_image_body(self, parent: ImageBlock, block: ImageBodyBlock) -> etree._Element | None:
-        """渲染包内图片，并在缺图时保留已有结构或可见文字。"""
+        """Render an embedded image, preserving existing structure or visible text when it is missing."""
         container = etree.Element(_xhtml("div"), attrib={"class": "docvortex-visual-body docvortex-visual-body--image"})
         source = self.assets.resolve_block(block)
         if source:
@@ -494,7 +494,7 @@ class _EpubXhtmlRenderer:
         return container if _has_visible_content(container) else None
 
     def _render_table_block(self, block: TableBlock) -> etree._Element | None:
-        """按子块顺序渲染结构表格、图片回退及说明。"""
+        """Render structured tables, image fallbacks, and descriptions in child-block order."""
         figure = etree.Element(_xhtml("figure"), attrib={"class": "docvortex-figure docvortex-figure--table"})
         for child in block.content:
             rendered = self._render_table_body(child) if isinstance(child, TableBodyBlock) else self._render_annotation(child)
@@ -503,7 +503,7 @@ class _EpubXhtmlRenderer:
         return figure if len(figure) else None
 
     def _render_table_body(self, block: TableBodyBlock) -> etree._Element | None:
-        """优先输出安全结构内容，无内容时尝试整体表格图片。"""
+        """Prefer safe structured content; try a whole-table image when content is absent."""
         container = etree.Element(_xhtml("div"), attrib={"class": "docvortex-visual-body docvortex-visual-body--table"})
         if block.content.strip():
             if _is_supported_markup(block.content):
@@ -516,7 +516,7 @@ class _EpubXhtmlRenderer:
         return container if _has_visible_content(container) else None
 
     def _render_chart_block(self, block: ChartBlock) -> etree._Element | None:
-        """按子块顺序渲染图表图片、结构内容及说明。"""
+        """Render chart images, structured content, and descriptions in child-block order."""
         figure = etree.Element(_xhtml("figure"), attrib={"class": "docvortex-figure docvortex-figure--chart"})
         for child in block.content:
             rendered = (
@@ -527,7 +527,7 @@ class _EpubXhtmlRenderer:
         return figure if len(figure) else None
 
     def _render_chart_body(self, parent: ChartBlock, block: ChartBodyBlock) -> etree._Element | None:
-        """渲染包内图表图片，并始终保留并存结构内容。"""
+        """Render an embedded chart image and always preserve accompanying structured content."""
         container = etree.Element(_xhtml("div"), attrib={"class": "docvortex-visual-body docvortex-visual-body--chart"})
         if source := self.assets.resolve_block(block):
             etree.SubElement(
@@ -545,7 +545,7 @@ class _EpubXhtmlRenderer:
         return container if _has_visible_content(container) else None
 
     def _render_code_block(self, block: CodeBlock) -> etree._Element | None:
-        """按子块顺序渲染静态代码、算法及其说明。"""
+        """Render static code, algorithms, and descriptions in child-block order."""
         figure = etree.Element(_xhtml("figure"), attrib={"class": "docvortex-figure docvortex-figure--code"})
         for child in block.content:
             if isinstance(child, (CodeBodyBlock, AlgorithmBodyBlock)):
@@ -557,7 +557,7 @@ class _EpubXhtmlRenderer:
         return figure if len(figure) else None
 
     def _render_code_body(self, parent: CodeBlock, block: CodeBodyBlock | AlgorithmBodyBlock) -> etree._Element:
-        """代码使用 pre/code，算法使用保留换行的结构化 Span。"""
+        """Use pre/code for code and structured spans preserving line breaks for algorithms."""
         container = etree.Element(_xhtml("div"), attrib={"class": "docvortex-visual-body docvortex-visual-body--code"})
         if parent.sub_type == BlockType.CODE:
             if not isinstance(block, CodeBodyBlock):
@@ -581,7 +581,7 @@ class _EpubXhtmlRenderer:
         self,
         block: ImageAnnotationBlock | TableAnnotationBlock | ChartAnnotationBlock | CodeAnnotationBlock,
     ) -> etree._Element | None:
-        """按 caption 或 footnote 语义渲染视觉说明。"""
+        """Render visual descriptions according to caption or footnote semantics."""
         role = "docvortex-caption" if str(block.type).endswith("caption") else "docvortex-footnote"
         annotation = etree.Element(
             _xhtml("p"),
@@ -598,7 +598,7 @@ class _EpubXhtmlRenderer:
         preserve_newlines: bool = False,
         separate_adjacent_math: bool = False,
     ) -> None:
-        """按结构化 Span 顺序向 XHTML mixed content 追加安全节点。"""
+        """Append safe nodes to XHTML mixed content in structured-span order."""
         previous_was_math = False
         for span in spans:
             current_is_math = isinstance(span, EquationInlineSpan)
@@ -608,7 +608,7 @@ class _EpubXhtmlRenderer:
             previous_was_math = current_is_math
 
     def _append_inline_span(self, parent: etree._Element, span: InlineSpan, *, preserve_newlines: bool) -> None:
-        """把单个 Text/Code/Equation/Hyperlink Span 追加到父节点。"""
+        """Append one Text, Code, Equation, or Hyperlink span to its parent."""
         if isinstance(span, TextSpan):
             target = _append_text_style_container(parent, span)
             _append_text(target, span.content, preserve_newlines=preserve_newlines)
@@ -633,7 +633,7 @@ class _EpubXhtmlRenderer:
         raise TypeError(f"Unsupported inline span: {type(span).__name__}")
 
     def _append_math(self, parent: etree._Element, latex: str, *, display: str) -> None:
-        """追加 Presentation MathML，并在转换失败时显示原始 LaTeX。"""
+        """Append Presentation MathML, displaying the original LaTeX if conversion fails."""
         normalized = latex.strip()
         if not normalized:
             return
@@ -655,7 +655,7 @@ class _EpubXhtmlRenderer:
         self.has_mathml = True
 
     def _append_rich_or_text(self, parent: etree._Element, content: str, *, preformatted: bool = False) -> None:
-        """识别安全富 HTML，否则按普通文本或预格式文本输出。"""
+        """Recognize safe rich HTML; otherwise emit plain or preformatted text."""
         if _is_supported_markup(content):
             self._append_markup(parent, content)
             return
@@ -666,13 +666,13 @@ class _EpubXhtmlRenderer:
             _append_text(parent, content)
 
     def _append_markup(self, parent: etree._Element, markup: str) -> None:
-        """通过 EPUB 专用 allowlist 把不可信 HTML 转为安全 XHTML 节点。"""
+        """Convert untrusted HTML to safe XHTML nodes using the EPUB-specific allowlist."""
         soup = BeautifulSoup(_normalize_xml_text(markup), "html.parser")
         for child in list(soup.contents):
             self._append_soup_node(parent, child)
 
     def _append_soup_node(self, parent: etree._Element, node: object) -> None:
-        """递归复制一个 BeautifulSoup 节点，仅创建允许的 XHTML 结构。"""
+        """Recursively copy a BeautifulSoup node, creating only allowed XHTML structures."""
         if isinstance(node, (Comment, Doctype, ProcessingInstruction)):
             return
         if isinstance(node, NavigableString):
@@ -758,7 +758,7 @@ class _EpubXhtmlRenderer:
                 self._append_soup_node(element, child)
 
     def _resolve_link(self, url: str) -> tuple[str | None, str | None]:
-        """保留安全外链或已登记 fragment，删除无包内目标的相对链接。"""
+        """Preserve safe external links or registered fragments; remove relative links without package targets."""
         normalized = _normalize_xml_text(url).strip()
         if not normalized or normalized.startswith(("//", "\\")):
             return None, None
@@ -794,7 +794,7 @@ def render_epub(
     modified_at: datetime | None = None,
     asset_resolver: AssetResolver | None = None,
 ) -> bytes:
-    """把严格 MiddleJson 无副作用地渲染为单正文 EPUB 3.3 字节。"""
+    """Render validated MiddleJson as single-body EPUB 3.3 bytes without side effects."""
     if not isinstance(middle_json, MiddleJson):
         raise TypeError("render_epub expects a MiddleJson instance")
     options = EpubRenderOptions(
@@ -849,7 +849,7 @@ def render_epub(
 
 
 def _build_navigation(middle_json: MiddleJson, anchors: _AnchorRegistry, document_title: str) -> list[NavigationItem]:
-    """优先使用有效 IndexBlock，否则按标题层级或正文起点生成 toc。"""
+    """Prefer a valid IndexBlock; otherwise build the TOC from heading levels or the body start."""
     for page in middle_json.pages:
         for block in page.blocks:
             if not isinstance(block, IndexBlock):
@@ -877,7 +877,7 @@ def _build_navigation(middle_json: MiddleJson, anchors: _AnchorRegistry, documen
 
 
 def _navigation_from_index(block: IndexBlock, anchors: _AnchorRegistry) -> list[NavigationItem]:
-    """从一个 IndexBlock 提取仅包含真实标题目标的层级导航。"""
+    """Extract hierarchical navigation containing only actual heading targets from an IndexBlock."""
     result: list[NavigationItem] = []
     last_item: NavigationItem | None = None
     for child in block.content:
@@ -901,7 +901,7 @@ def _navigation_from_index(block: IndexBlock, anchors: _AnchorRegistry) -> list[
 
 
 def _classify_list(items: list[ListItem], add_reference_bullets: bool) -> tuple[str, str | None, str]:
-    """根据直属 marker 选择原生列表类型或显式 marker 模式。"""
+    """Choose a native list type or explicit-marker mode from direct child markers."""
     if add_reference_bullets:
         return "ul", None, "docvortex-list--reference"
     if items and all(item.kind == "unordered" for item in items):
@@ -927,7 +927,7 @@ def _list_item_content(
     *,
     explicit_markers: bool,
 ) -> tuple[list[InlineSpan], str | None]:
-    """决定列表项应剥离、保留还是显式显示源 marker。"""
+    """Decide whether a list item should strip, retain, or explicitly display its source marker."""
     if add_reference_bullets:
         if item.kind == "unordered":
             return item.body, None
@@ -942,7 +942,7 @@ def _list_item_content(
 
 
 def _append_text_style_container(parent: etree._Element, span: TextSpan) -> etree._Element:
-    """按固定样式顺序创建 TextSpan 的 XHTML 包装节点。"""
+    """Create XHTML wrappers for a TextSpan in a fixed style order."""
     target = parent
     if _needs_whitespace_preservation(span.content):
         target = etree.SubElement(target, _xhtml("span"), attrib={"class": "docvortex-preserve-whitespace"})
@@ -967,7 +967,7 @@ def _append_text_style_container(parent: etree._Element, span: TextSpan) -> etre
 
 
 def _append_text(parent: etree._Element, content: str, *, preserve_newlines: bool = False) -> None:
-    """向 mixed content 追加安全文本，并按需把换行转换为 br。"""
+    """Append safe text to mixed content, converting line breaks to br elements as needed."""
     normalized = _normalize_xml_text(content).replace("\r\n", "\n").replace("\r", "\n")
     if preserve_newlines:
         _append_raw_text(parent, normalized)
@@ -980,7 +980,7 @@ def _append_text(parent: etree._Element, content: str, *, preserve_newlines: boo
 
 
 def _append_raw_text(parent: etree._Element, content: str) -> None:
-    """在不破坏既有子节点 tail 的前提下追加一段普通文本。"""
+    """Append plain text without disrupting existing child-node tails."""
     if not content:
         return
     if len(parent):
@@ -991,7 +991,7 @@ def _append_raw_text(parent: etree._Element, content: str) -> None:
 
 
 def _safe_markup_attributes(name: str, tag: Tag) -> dict[str, str]:
-    """只保留表格和列表语义需要的有界属性。"""
+    """Keep only bounded attributes required for table and list semantics."""
     attributes: dict[str, str] = {}
     if name in {"td", "th"}:
         for attribute in ("colspan", "rowspan"):
@@ -1013,7 +1013,7 @@ def _safe_markup_attributes(name: str, tag: Tag) -> dict[str, str]:
 
 
 def _bounded_integer(value: str, *, minimum: int, maximum: int) -> str | None:
-    """把十进制属性约束到 EPUB renderer 支持的闭区间。"""
+    """Clamp decimal attributes to the closed interval supported by the EPUB renderer."""
     if re.fullmatch(r"[+-]?\d+", value) is None:
         return None
     number = int(value)
@@ -1021,7 +1021,7 @@ def _bounded_integer(value: str, *, minimum: int, maximum: int) -> str | None:
 
 
 def _attribute_text(value: object) -> str:
-    """把 BeautifulSoup 属性值稳定转换为普通字符串。"""
+    """Convert BeautifulSoup attribute values to plain strings consistently."""
     if value is None:
         return ""
     if isinstance(value, list):
@@ -1030,7 +1030,7 @@ def _attribute_text(value: object) -> str:
 
 
 def _is_supported_markup(content: str) -> bool:
-    """仅把白名单或需整段删除的活动标签识别为富 HTML。"""
+    """Recognize rich HTML only for allowlisted tags or active tags requiring complete removal."""
     if "<" not in content or ">" not in content:
         return False
     tokens = list(_MARKUP_TOKEN_RE.finditer(content))
@@ -1053,7 +1053,7 @@ def _is_supported_markup(content: str) -> bool:
 
 
 def _resolve_document_title(middle_json: MiddleJson, explicit_title: str | None) -> str:
-    """按显式值、首个文档标题和固定回退值解析书名。"""
+    """Resolve the book title from an explicit value, the first document title, or a fixed fallback."""
     if explicit_title:
         return _normalize_xml_text(explicit_title).strip()
     for page in middle_json.pages:
@@ -1066,7 +1066,7 @@ def _resolve_document_title(middle_json: MiddleJson, explicit_title: str | None)
 
 
 def _stable_identifier(middle_json: MiddleJson, *, title: str, authors: tuple[str, ...], language: str) -> str:
-    """由规范化 MiddleJson 和不随渲染时间变化的元数据生成稳定 UUID URN。"""
+    """Generate a stable UUID URN from normalized MiddleJson and metadata independent of render time."""
     seed = json.dumps(
         {
             "middle_json": middle_json.model_dump(mode="json"),
@@ -1083,7 +1083,7 @@ def _stable_identifier(middle_json: MiddleJson, *, title: str, authors: tuple[st
 
 
 def _allocate_target_id(anchor: str | None, *, fallback: str, used_ids: set[str]) -> str:
-    """从 producer anchor 或固定回退值分配无空白且不碰撞的 id。"""
+    """Assign a unique whitespace-free ID from a producer anchor or fixed fallback."""
     base = _safe_id_base(_anchor_key(anchor)) or fallback
     candidate = base
     suffix = 2
@@ -1095,7 +1095,7 @@ def _allocate_target_id(anchor: str | None, *, fallback: str, used_ids: set[str]
 
 
 def _safe_id_base(value: str) -> str:
-    """把 anchor 归一化为适合 XHTML fragment 的稳定 id 基值。"""
+    """Normalize an anchor into a stable base ID suitable for XHTML fragments."""
     normalized = _normalize_xml_text(value).strip()
     normalized = re.sub(r"\s+", "-", normalized)
     normalized = re.sub(r"[^\w.:-]+", "-", normalized, flags=re.UNICODE).strip("-")
@@ -1103,12 +1103,12 @@ def _safe_id_base(value: str) -> str:
 
 
 def _anchor_key(anchor: str | None) -> str:
-    """保留 producer anchor 身份，仅去除首尾空白。"""
+    """Preserve producer-anchor identity, stripping only surrounding whitespace."""
     return (anchor or "").strip()
 
 
 def _plain_content_text(content: str) -> str:
-    """从 body 内容提取图片 alt 所需的可见纯文本。"""
+    """Extract visible plain text from body content for image alt text."""
     if not content:
         return ""
     if _is_supported_markup(content):
@@ -1117,23 +1117,23 @@ def _plain_content_text(content: str) -> str:
 
 
 def _normalize_code_language(language: str | None) -> str | None:
-    """把代码语言限制为不会构造危险 class token 的短名称。"""
+    """Restrict code languages to short names that cannot create unsafe class tokens."""
     normalized = (language or "").strip().lower().replace("_", "-")
     return normalized if _SAFE_LANGUAGE_RE.fullmatch(normalized) else None
 
 
 def _normalize_xml_text(content: str) -> str:
-    """替换 XML 1.0 禁止的控制字符和孤立 surrogate。"""
+    """Replace control characters forbidden by XML 1.0 and lone surrogates."""
     return _INVALID_XML_TEXT_RE.sub("\ufffd", content)
 
 
 def _needs_whitespace_preservation(content: str) -> bool:
-    """判断文本是否含有 XHTML 默认会折叠的有效空白。"""
+    """Check for meaningful whitespace that XHTML would collapse by default."""
     return bool(content and (content != content.strip(" \t\n") or "  " in content or "\t" in content or "\n" in content))
 
 
 def _has_visible_content(element: etree._Element) -> bool:
-    """判断元素是否包含可见文本或媒体、结构子节点。"""
+    """Check whether an element contains visible text, media, or structural children."""
     if element.text and element.text.strip():
         return True
     if len(element):
@@ -1142,13 +1142,13 @@ def _has_visible_content(element: etree._Element) -> bool:
 
 
 def _xhtml(tag: str) -> str:
-    """返回 XHTML namespace 下的 Clark notation 标签名。"""
+    """Return a Clark-notation tag name in the XHTML namespace."""
     return f"{{{_XHTML_NS}}}{tag}"
 
 
 @lru_cache(maxsize=1)
 def _load_epub_stylesheet() -> bytes:
-    """读取随包分发的静态 EPUB 样式表并缓存字节。"""
+    """Load and cache the static EPUB stylesheet distributed with the package."""
     root = resources.files("docvortex").joinpath("resources", "epub")
     return root.joinpath(_STYLE_RESOURCE_NAME).read_bytes()
 

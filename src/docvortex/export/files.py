@@ -1,4 +1,4 @@
-"""独立渲染文件和文档素材的统一写出。"""
+"""Unified writing of independent rendering files and document materials."""
 
 from __future__ import annotations
 
@@ -21,17 +21,17 @@ def materialize_middle(
     image_resolver: Callable[[ImagePayloadBlock, int], tuple[bytes, str] | None] | None = None,
     asset_resolver: Callable[[str], bytes] | None = None,
 ) -> tuple[MiddleJson, AssetStore]:
-    """在副本上按视觉父块外置图片；仅通过显式回调获取宿主文件或裁图。
+    """External image by visual parent block on copy; only get host file or crop through explicit callback.
 
-    image_resolver 接收载荷块和原始页索引，返回字节与扩展名；返回 None
-    表示保留当前载荷，不触发默认解析。asset_resolver 仅接收经过校验的
-    HTML 图片相对路径。不提供回调时，只解析内嵌图片并保留已有素材引用。
+    image_resolver receives the payload block and original page index, returns bytes and extension; returns None
+    Indicates that the current payload is retained and default parsing is not triggered. asset_resolver only accepts verified
+    HTML Image relative path. When no callback is provided, only embedded images are parsed and existing material references are retained.
     """
     return _materialize_images(middle_json, assets, image_resolver=image_resolver, asset_resolver=asset_resolver)
 
 
 def validate_materialized_assets(middle_json: MiddleJson, assets: AssetStore) -> None:
-    """拒绝缺失的已物化素材，保证结果包内部引用完整；源文档外链原样保留。"""
+    """Missing materialized materials are rejected to ensure complete internal references in the result package; external links to the source documents are retained as they are."""
     from bs4 import BeautifulSoup
 
     pending = [block for page in middle_json.pages for block in page.blocks]
@@ -55,7 +55,7 @@ def validate_materialized_assets(middle_json: MiddleJson, assets: AssetStore) ->
 
 
 def write_artifact(artifact: RenderArtifact, path: Path, *, overwrite: bool) -> ExportResult:
-    """检查主文件与素材的路径关系后，以同一事务写出。"""
+    """After checking the path relationship between the main file and the material, write it out in the same transaction."""
     path = path.absolute()
     relative_files = {path.name: artifact.content, **dict(artifact.assets)}
     if path.name in artifact.assets:
@@ -67,7 +67,7 @@ def write_artifact(artifact: RenderArtifact, path: Path, *, overwrite: bool) -> 
 
 
 def _is_external_reference(reference: str) -> bool:
-    """判断富文本图片引用是否为保留的受限 HTTP(S) 外链。"""
+    """Determine whether the rich text image reference is a reserved restricted HTTP(S) external link."""
     try:
         return urlsplit(reference).scheme.casefold() in {"http", "https"}
     except ValueError:

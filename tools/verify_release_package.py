@@ -10,7 +10,7 @@ import docvortex
 
 
 def verify_release_package(pdf_path: Path, release_tag: str) -> None:
-    """校验已安装 wheel 的版本、来源和真实 PDF 元数据解析能力。"""
+    """Verify the version, source, and true PDF metadata parsing capabilities of the installed wheel."""
     version = release_tag.removeprefix("v")
     assert docvortex.__version__ == version, (docvortex.__version__, version)
 
@@ -26,7 +26,7 @@ def verify_release_package(pdf_path: Path, release_tag: str) -> None:
 
 
 def main() -> None:
-    """解析冒烟输入，并显式给出成功结果以便 CI 日志阅读。"""
+    """Parse smoke input and give success results explicitly for CI log reading."""
     if len(sys.argv) != 2:
         raise SystemExit(f"Usage: {Path(sys.argv[0]).name} PDF_PATH")
     pdf_path = Path(sys.argv[1])

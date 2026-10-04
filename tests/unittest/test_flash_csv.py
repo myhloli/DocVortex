@@ -17,7 +17,7 @@ from docvortex.schema import BlockType
 
 
 def _raw_table_html(payload: bytes) -> str:
-    """解析 CSV 并返回 model-list 中唯一表格的 HTML。"""
+    """Parses CSV and returns HTML for the only table in model-list."""
     pages = CsvModel().predict(BytesIO(payload))
     assert len(pages) == 1
     assert len(pages[0]) == 1
@@ -26,7 +26,7 @@ def _raw_table_html(payload: bytes) -> str:
 
 
 def _html_rows(payload: bytes) -> list[list[str]]:
-    """把 CSV 投影 HTML 还原为逐行单元格纯文本，方便断言语义。"""
+    """Restore CSV projection HTML to line-by-line cell plain text to facilitate assertion semantics."""
     soup = BeautifulSoup(_raw_table_html(payload), "html.parser")
     return [[cell.get_text("\n") for cell in row.find_all(["th", "td"])] for row in soup.find_all("tr")]
 
@@ -41,19 +41,19 @@ def _html_rows(payload: bytes) -> list[list[str]]:
     ],
 )
 def test_csv_decodes_common_encodings_and_delimiters(payload: bytes, expected: list[list[str]]) -> None:
-    """验证常见中西文编码和四种分隔符都进入同一表格语义。"""
+    """Verify that common Chinese and Western encodings and four delimiters enter the same table semantics."""
     assert _html_rows(payload) == expected
 
 
 def test_csv_sep_directive_overrides_delimiter_sniffing() -> None:
-    """验证 Excel sep 指令只控制分隔符，不作为数据行输出。"""
+    """Verification Excel The sep command only controls the delimiter and is not output as a data line."""
     payload = 'sep=;\r\nname;note\r\nAlice;"1,2"\r\n'.encode()
 
     assert _html_rows(payload) == [["name", "note"], ["Alice", "1,2"]]
 
 
 def test_csv_preserves_multiline_quotes_padding_ragged_rows_and_safe_text() -> None:
-    """验证多行字段、引号、前导零、首尾空格、短行补齐和 HTML 转义。"""
+    """Validates multiline fields, quotes, leading zeros, leading and trailing spaces, short line padding, and HTML escaping."""
     payload = (
         'name,note,code,markup\nAlice,"line 1\nline 2",001,"<script>alert(1)</script>"\nBob,"  say ""hi""  ",02\n'
     ).encode()
@@ -86,13 +86,13 @@ def test_csv_preserves_multiline_quotes_padding_ragged_rows_and_safe_text() -> N
     ],
 )
 def test_csv_header_inference_is_deterministic(payload: bytes, expected_header: bool) -> None:
-    """验证有类型证据、纯文本标签、纯数据和单行文件的表头边界。"""
+    """Validates header boundaries with type evidence, plain text labels, plain data, and single-line files."""
     soup = BeautifulSoup(_raw_table_html(payload), "html.parser")
     assert bool(soup.find("th")) is expected_header
 
 
 def test_csv_empty_single_column_and_blank_records_keep_one_logical_page() -> None:
-    """验证空 CSV、单列 CSV 和空记录都保留确定的一页语义。"""
+    """Verify that empty CSV, single-column CSV, and empty records all preserve certain one-page semantics."""
     assert CsvModel().predict(BytesIO(b"")) == [[]]
     assert _html_rows(b"value\none\n\ntwo\n") == [["value"], ["one"], [""], ["two"]]
 
@@ -105,7 +105,7 @@ def test_csv_empty_single_column_and_blank_records_keep_one_logical_page() -> No
     ],
 )
 def test_csv_rejects_malformed_syntax_and_unsupported_encoding(payload: bytes) -> None:
-    """验证损坏引号或无法严格解码的字节会让整份 CSV 失败。"""
+    """Validating broken quotes or bytes that cannot be strictly decoded will fail the entire CSV."""
     with pytest.raises(ValueError):
         CsvModel().predict(BytesIO(payload))
 
@@ -126,7 +126,7 @@ def test_csv_enforces_resource_limits(
     payload: bytes,
     message: str,
 ) -> None:
-    """验证输入、行、列和规则化网格限制都采用显式失败。"""
+    """Validation of input, row, column, and regularized grid constraints all fail explicitly."""
     monkeypatch.setattr(csv_module, constant, limit)
 
     with pytest.raises(ValueError, match=message):
@@ -134,7 +134,7 @@ def test_csv_enforces_resource_limits(
 
 
 def test_csv_grid_limit_short_circuits_before_trailing_malformed_record(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证网格超限后立即失败，不再继续读取尾部损坏记录。"""
+    """Verification fails immediately after the grid exceeds the limit, and no longer continues to read the tail damaged records."""
     monkeypatch.setattr(csv_module, "MAX_CSV_GRID_SLOTS", 3)
 
     with pytest.raises(ValueError, match="max_grid_slots"):
@@ -142,11 +142,11 @@ def test_csv_grid_limit_short_circuits_before_trailing_malformed_record(monkeypa
 
 
 def test_csv_rendered_budget_fails_before_materializing_escaped_field(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 HTML 展开超限时不会先创建放大的字段字符串。"""
+    """Verification HTML Expansion overrun does not create the expanded field string first."""
     monkeypatch.setattr(csv_module, "MAX_CSV_RENDERED_BYTES", 64)
 
     def unexpected_escape(_value: str) -> str:
-        """输出预算应在进入 html.escape 前拒绝字段。"""
+        """The output budget should reject fields before entering html.escape."""
         pytest.fail("oversized CSV field reached HTML escaping")
 
     monkeypatch.setattr(csv_module, "_render_field_html", unexpected_escape)
@@ -156,7 +156,7 @@ def test_csv_rendered_budget_fails_before_materializing_escaped_field(monkeypatc
 
 
 def test_csv_rendered_size_estimator_matches_html_escape_semantics() -> None:
-    """验证特殊字符、换行、控制符和非 ASCII 文本的 UTF-8 预算精确。"""
+    """Verify that UTF-8 budgets for special characters, line breaks, control characters, and non-ASCII text are accurate."""
     value = "&<>\"'\r\n\x01中"
     rendered = csv_module._render_field_html(value)
 
@@ -164,7 +164,7 @@ def test_csv_rendered_size_estimator_matches_html_escape_semantics() -> None:
 
 
 def test_csv_default_grid_budget_rejects_wide_dom_before_rendering() -> None:
-    """验证默认预算在宽空表生成数十万 HTML 节点前拒绝输入。"""
+    """Verify that the default budget rejects input before generating hundreds of thousands of HTML nodes in the wide-empty table."""
     assert csv_module.MAX_CSV_GRID_SLOTS == 250_000
     wide_empty_row = b"," * (csv_module.MAX_CSV_COLUMNS - 1) + b"\n"
     payload = wide_empty_row * 16
@@ -174,7 +174,7 @@ def test_csv_default_grid_budget_rejects_wide_dom_before_rendering() -> None:
 
 
 def test_delimited_extension_resolves_to_independent_suffix() -> None:
-    """以 .csv/.tsv 路径兜底时按扩展名返回独立后缀，不再把 tsv 折叠为 csv。"""
+    """When using the .csv/.tsv path, the independent suffix will be returned according to the extension, and tsv will no longer be folded into csv."""
     payload = b"name,city\nAlice,London\n"
 
     assert guess_suffix_by_bytes(payload, "demo.csv") == "csv"
@@ -182,21 +182,21 @@ def test_delimited_extension_resolves_to_independent_suffix() -> None:
 
 
 def test_tsv_signatureless_bytes_without_path_require_explicit_suffix() -> None:
-    """无路径字节流不自动进入 tsv 解析，必须显式 file_suffix（与 csv 对称）。"""
+    """Pathless byte streams do not automatically enter tsv parsing and must explicitly file_suffix (symmetrical to csv)."""
     payload = b"name\tcity\nAlice\tLondon\nBob\tParis\n" * 5
 
     assert guess_suffix_by_bytes(payload) == "txt"
 
 
 def test_strong_content_signature_overrides_tsv_extension_fallback() -> None:
-    """RTF 强内容签名必须覆盖 .tsv 的无签名扩展名兜底。"""
+    """RTF Strong content signature must override the unsigned extension of .tsv."""
     payload = b"\xef\xbb\xbf \r\n{\\RTF1\\ANSI body}"
 
     assert guess_suffix_by_bytes(payload, "disguised.tsv") == "rtf"
 
 
 def test_tsv_path_detection_returns_independent_suffix(tmp_path: Path) -> None:
-    """真实 .tsv 路径按独立后缀识别。"""
+    """Real .tsv paths are identified by a separate suffix."""
     tsv_path = tmp_path / "demo.tsv"
     tsv_path.write_bytes("姓名\t年龄\n张三\t30\n李四\t40\n".encode())
 
@@ -204,7 +204,7 @@ def test_tsv_path_detection_returns_independent_suffix(tmp_path: Path) -> None:
 
 
 def test_tsv_uses_shared_csv_engine_and_records_independent_file_suffix() -> None:
-    """tsv 复用 CSV 引擎与自动分隔符嗅探，并如实记录独立 file_suffix。"""
+    """tsv reuses the CSV engine with automatic delimiter sniffing and faithfully records the standalone file_suffix."""
     payload = "姓名\t年龄\n张三\t30\n李四\t40\n".encode()
     middle, _ = analyze_native_test_document(payload, file_suffix="tsv")
 

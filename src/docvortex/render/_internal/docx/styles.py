@@ -1,4 +1,4 @@
-"""DOCX renderer 的页面几何与 Word 样式定义。"""
+"""DOCX Page geometry for renderer and Word style definitions."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ _HEADING_SIZES = (20, 18, 16, 14, 13, 12, 11, 10.5, 10.5)
 
 
 def configure_document(document: Document) -> None:
-    """设置 A4 页面几何，并创建 renderer 使用的全部显式样式。"""
+    """Sets the A4 page geometry and creates all explicit styles used by renderer."""
     section = document.sections[0]
     section.page_width = Mm(210)
     section.page_height = Mm(297)
@@ -117,20 +117,20 @@ def configure_document(document: Document) -> None:
 
 
 def usable_width_twips(document: Document) -> int:
-    """返回首个 section 扣除左右页边距后的可用宽度，单位 twip。"""
+    """Returns the available width of the first section after deducting the left and right margins, unit twip."""
     section = document.sections[0]
     usable_emu = int(section.page_width) - int(section.left_margin) - int(section.right_margin)
     return max(1, round(usable_emu / 635))
 
 
 def usable_width_emu(document: Document) -> int:
-    """返回首个 section 扣除左右页边距后的可用宽度，单位 EMU。"""
+    """Returns the available width of the first section after deducting the left and right margins, unit EMU."""
     section = document.sections[0]
     return max(1, int(section.page_width) - int(section.left_margin) - int(section.right_margin))
 
 
 def _get_or_add_paragraph_style(document: Document, name: str) -> _ParagraphStyle:
-    """获取既有段落样式，缺失时创建同名样式。"""
+    """Get an existing paragraph style, and create a style with the same name if missing."""
     styles = document.styles
     try:
         style = styles[name]
@@ -154,7 +154,7 @@ def _configure_paragraph_style(
     space_after_pt: float,
     line_spacing: float,
 ) -> None:
-    """给一个 Word 段落样式写入确定性的字体与段落节奏。"""
+    """Write a deterministic font and paragraph rhythm to a Word paragraph style."""
     style.font.name = western_font
     style.font.size = Pt(size_pt)
     style.font.bold = bold
@@ -173,7 +173,7 @@ def _configure_paragraph_style(
 
 
 def _set_paragraph_shading(style: _ParagraphStyle, fill: str) -> None:
-    """给段落样式设置稳定的背景色。"""
+    """Set a stable background color for paragraph styles."""
     paragraph_properties = style._element.get_or_add_pPr()
     shading = paragraph_properties.find(qn("w:shd"))
     if shading is None:

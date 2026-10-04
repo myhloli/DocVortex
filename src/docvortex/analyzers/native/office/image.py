@@ -1,4 +1,4 @@
-"""Flash Office 文档的图片识别、转码与占位图生成。"""
+"""Flash Office Image recognition, transcoding and placeholder image generation of documents."""
 
 import base64
 import struct
@@ -36,7 +36,7 @@ STANDARD_VECTOR_PLACEHOLDER_LINES: Final = (
 
 
 def _is_wmf_payload(image_data: bytes) -> bool:
-    """根据 placeable 或标准 METAHEADER magic 判断原始载荷是否为 WMF。"""
+    """Determine whether the original load is WMF based on placeable or standard METAHEADER magic."""
 
     return image_data.startswith(b"\xd7\xcd\xc6\x9a") or (
         len(image_data) >= 4 and image_data[:2] in {b"\x01\x00", b"\x02\x00"} and image_data[2:4] == b"\x09\x00"
@@ -44,17 +44,17 @@ def _is_wmf_payload(image_data: bytes) -> bool:
 
 
 def _is_emf_payload(image_data: bytes) -> bool:
-    """根据 EMR_HEADER type 与 ENHMETA_SIGNATURE 判断载荷是否为 EMF。"""
+    """Determine whether the load is EMF based on EMR_HEADER type and ENHMETA_SIGNATURE."""
     return len(image_data) >= 44 and struct.unpack_from("<I", image_data, 0)[0] == 1 and image_data[40:44] == b" EMF"
 
 
 def is_vector_image(pil_image: Image.Image) -> bool:
-    """判断已由 Pillow 打开的图片是否属于 WMF/EMF 矢量格式。"""
+    """Determine whether the picture opened by Pillow belongs to WMF/EMF vector format."""
     return (getattr(pil_image, "format", None) or "").upper() in VECTOR_IMAGE_FORMATS
 
 
 def is_vector_image_part(part_name: object | None = None, content_type: str | None = None) -> bool:
-    """根据 OOXML 部件扩展名和内容类型判断是否为矢量图片。"""
+    """Determine whether it is a vector image based on the OOXML component extension and content type."""
     suffix = PurePosixPath(str(part_name or "")).suffix.lower()
     if suffix in VECTOR_IMAGE_EXTENSIONS:
         return True
@@ -68,7 +68,7 @@ def is_valid_vector_image_payload(
     part_name: object | None = None,
     content_type: str | None = None,
 ) -> bool:
-    """校验 WMF/EMF 最小文件签名，避免为任意伪装字节生成矢量占位图。"""
+    """Verify WMF/EMF minimal file signature to avoid generating vector bitmaps for arbitrary camouflaged bytes."""
     label = _vector_image_format_label(part_name, content_type)
     if label == "WMF":
         return _is_wmf_payload(image_data)
@@ -78,7 +78,7 @@ def is_valid_vector_image_payload(
 
 
 def _vector_image_format_label(part_name: object | None = None, content_type: str | None = None) -> str:
-    """从 OOXML 部件信息推断用于日志和占位图的矢量格式名称。"""
+    """The vector format names used for logs and placemaps are inferred from the OOXML part information."""
     suffix = PurePosixPath(str(part_name or "")).suffix.lower()
     normalized_content_type = (content_type or "").lower()
     if suffix == ".wmf" or "wmf" in normalized_content_type:
@@ -89,7 +89,7 @@ def _vector_image_format_label(part_name: object | None = None, content_type: st
 
 
 def _load_placeholder_font(font_size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    """按优先级加载占位图字体，均不可用时退回 Pillow 默认字体。"""
+    """Load placeholder fonts according to priority, and fall back to the default font Pillow when none is available."""
     for font_name in ("DejaVuSans.ttf", "Arial.ttf", "LiberationSans-Regular.ttf"):
         try:
             return ImageFont.truetype(font_name, font_size)
@@ -99,7 +99,7 @@ def _load_placeholder_font(font_size: int) -> ImageFont.FreeTypeFont | ImageFont
 
 
 def create_text_placeholder(size: tuple[int, int], lines: list[str]) -> Image.Image:
-    """按目标尺寸绘制带边框和居中文案的 RGB 占位图。"""
+    """Draws the RGB placeholder image with borders and centered copy at the target size."""
     width = max(int(size[0]), 1)
     height = max(int(size[1]), 1)
     placeholder = Image.new("RGB", (width, height), (240, 240, 240))
@@ -152,7 +152,7 @@ def create_text_placeholder(size: tuple[int, int], lines: list[str]) -> Image.Im
 
 @lru_cache(maxsize=1)
 def _standard_vector_placeholder_data_uri() -> str:
-    """生成并缓存标准 WMF/EMF 占位图，避免每张矢量图重复绘制。"""
+    """Generate and cache standard WMF/EMF placeholder images to avoid repeated drawing of each vector image."""
     placeholder = create_text_placeholder(
         STANDARD_VECTOR_PLACEHOLDER_SIZE,
         list(STANDARD_VECTOR_PLACEHOLDER_LINES),
@@ -161,7 +161,7 @@ def _standard_vector_placeholder_data_uri() -> str:
 
 
 def get_standard_vector_placeholder_data_uri() -> str:
-    """返回标准 WMF/EMF 占位图 data URI，供 Office 各格式复用。"""
+    """Returns the standard WMF/EMF placeholder image data URI for reuse in each format of Office."""
     return _standard_vector_placeholder_data_uri()
 
 
@@ -170,7 +170,7 @@ def serialize_vector_part_with_placeholder(
     content_type: str | None = None,
     size: tuple[int, int] = (320, 180),
 ) -> str:
-    """跳过未加载的矢量部件并返回可嵌入文档的标准占位图。"""
+    """Skips unloaded vector parts and returns a standard placeholder image that can be embedded in the document."""
     image_format = _vector_image_format_label(part_name, content_type)
     logger.debug(
         f"Skipping {image_format} image part before Pillow load, "
@@ -180,7 +180,7 @@ def serialize_vector_part_with_placeholder(
 
 
 def _render_size_from_emu(render_size_emu: tuple[int, int] | None, *, dpi: int) -> tuple[int, int] | None:
-    """把 OfficeArt ptSize 的 EMU 尺寸按指定 DPI 转换为像素提示。"""
+    """Convert EMU dimensions of OfficeArt ptSize to pixel hints as specified DPI."""
     if render_size_emu is None or render_size_emu[0] <= 0 or render_size_emu[1] <= 0:
         return None
     emu_per_inch = 914_400
@@ -196,7 +196,7 @@ def _serialize_metafile(
     *,
     size_hint: tuple[int, int] | None = None,
 ) -> str | None:
-    """调用 metafile-render WMF/EMF 引擎并生成带 PNG fallback 的 SVG。"""
+    """Calls the metafile-render WMF/EMF engine and generates SVG with PNG fallback."""
     try:
         rendered = render_metafile(
             image_data,
@@ -240,7 +240,7 @@ def serialize_office_image(
     content_type: str | None = None,
     render_size_emu: tuple[int, int] | None = None,
 ) -> str | None:
-    """识别并序列化 Office 图片，透明图保留 PNG，普通位图优先使用 JPEG。"""
+    """Recognize and serialize Office images, retain PNG for transparent images, and use JPEG for ordinary bitmaps."""
     is_wmf_payload = _is_wmf_payload(image_data)
     is_emf_payload = _is_emf_payload(image_data)
     if is_wmf_payload:
@@ -295,7 +295,7 @@ def serialize_office_image(
 
 
 def ensure_bmp_header(image_data: bytes) -> bytes:
-    """为裸 DIB 补齐 BMP 文件头，无法可靠推断时保留原始载荷。"""
+    """Complete the BMP file header for bare DIB, retaining the original payload when it cannot be reliably inferred."""
     if image_data.startswith(b"BM") or len(image_data) < 4:
         return image_data
     header_size = int(struct.unpack_from("<I", image_data, 0)[0])

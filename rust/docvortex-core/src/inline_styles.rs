@@ -1,4 +1,4 @@
-//! 在快照字符上连续构造样式候选、匹配装饰线并输出紧凑区间。
+//! Continuously construct style candidates on snapshot characters, match decorative lines and output compact intervals.
 use crate::{geometry::Box4, median};
 use std::collections::HashMap;
 
@@ -39,12 +39,12 @@ struct Match {
     overlap: f64,
 }
 
-/// 与 Python 严格框规范一致，零面积框不参与候选。
+/// Consistent with the Python strict frame specification, zero area frames are not candidates.
 fn valid(b: Box4) -> bool {
     b.iter().all(|v| v.is_finite()) && b[2] > b[0] && b[3] > b[1]
 }
 
-/// 按原始字符索引稳定排序，过滤短粗体与分离的行首项目符号。
+/// Stable sorting by original character index, filtering short bold and separated first-of-line bullets.
 fn candidate(mut line: Line, chars: &[Character], min_bold: usize) -> Option<Candidate> {
     if !valid(line.bbox) {
         return None;
@@ -138,7 +138,7 @@ fn candidate(mut line: Line, chars: &[Character], min_bold: usize) -> Option<Can
     })
 }
 
-/// 保留目标距离、覆盖、端点和墨迹穿越的全部阈值，返回原字符半开区间。
+/// All thresholds of target distance, coverage, endpoint and ink crossing are retained, and the original character half-open interval is returned.
 fn drawing_match(
     line: &Candidate,
     chars: &[Character],
@@ -207,7 +207,7 @@ fn drawing_match(
     })
 }
 
-/// 先建立相同网格超集，再逐条绘图线选择同一最优目标；极端网格范围返回参考选择。
+/// The same grid superset is first established, and then the same optimal target is selected one drawing line at a time; the extreme grid range returns to the reference selection.
 pub fn detect(
     chars: &[Character],
     lines: Vec<Line>,

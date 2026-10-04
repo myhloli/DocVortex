@@ -1,4 +1,4 @@
-"""构造结果已知的 MathType MTEF v5 测试字节流。"""
+"""Constructs a MathType MTEF v5 test byte stream whose result is known."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import struct
 
 
 def v5_signed(value: int) -> bytes:
-    """按 MTEF v5 紧凑格式编码一个有符号整数。"""
+    """Encodes a signed integer in MTEF v5 compact format."""
 
     if not -0x8000 <= value <= 0x7FFF:
         raise ValueError("MTEF v5 signed fixture is out of range")
@@ -16,7 +16,7 @@ def v5_signed(value: int) -> bytes:
 
 
 def v5_unsigned(value: int) -> bytes:
-    """按 MTEF v5 紧凑格式编码一个无符号整数。"""
+    """Encodes an unsigned integer in MTEF v5 compact format."""
 
     if not 0 <= value <= 0xFFFF:
         raise ValueError("MTEF v5 unsigned fixture is out of range")
@@ -24,7 +24,7 @@ def v5_unsigned(value: int) -> bytes:
 
 
 def v5_variation(value: int) -> bytes:
-    """按 MTEF v5 一或两字节格式编码 template variation。"""
+    """Encoded in MTEF v5 one or two byte format template variation."""
 
     if not 0 <= value <= 0x7FFF:
         raise ValueError("MTEF v5 variation fixture is out of range")
@@ -42,7 +42,7 @@ def v5_char(
     font_position: int | None = None,
     omit_mtcode: bool = False,
 ) -> bytes:
-    """构造一个带可选字体位置、函数起点和 embellishments 的 CHAR。"""
+    """Constructs a CHAR with optional font position, function start point, and embellishments."""
 
     if len(value) != 1 or ord(value) > 0xFFFF:
         raise ValueError("MTEF v5 CHAR fixture requires one BMP character")
@@ -67,13 +67,13 @@ def v5_char(
 
 
 def v5_text(value: str, *, typeface: int = 3) -> bytes:
-    """把 BMP 字符串编码为连续 MTEF v5 CHAR records。"""
+    """Encode the BMP string into consecutive MTEF v5 CHAR records."""
 
     return b"".join(v5_char(character, typeface=typeface) for character in value)
 
 
 def v5_line(*records: bytes, null: bool = False) -> bytes:
-    """构造一个普通或 NULL LINE。"""
+    """Constructs a normal NULL or LINE."""
 
     if null:
         if records:
@@ -88,19 +88,19 @@ def v5_template(
     variation: int = 0,
     options: int = 0,
 ) -> bytes:
-    """构造一个含完整 subobject list 的 MTEF v5 TMPL。"""
+    """Construct a MTEF v5 TMPL containing the complete subobject list."""
 
     return bytes([3, 0, selector]) + v5_variation(variation) + bytes([options]) + b"".join(slots) + b"\x00"
 
 
 def v5_pile(*lines: bytes) -> bytes:
-    """构造居中的 MTEF v5 PILE。"""
+    """Construct centered MTEF v5 PILE."""
 
     return b"\x04\x00\x02\x00" + b"".join(lines) + b"\x00"
 
 
 def v5_matrix(rows: list[list[bytes]]) -> bytes:
-    """构造无 partition lines 的 MTEF v5 MATRIX。"""
+    """Construct MTEF v5 MATRIX without partition lines."""
 
     if not rows or not rows[0] or any(len(row) != len(rows[0]) for row in rows):
         raise ValueError("MTEF v5 matrix fixture must be rectangular")
@@ -113,19 +113,19 @@ def v5_matrix(rows: list[list[bytes]]) -> bytes:
 
 
 def v5_encoding_definition(name: str) -> bytes:
-    """构造一个 ENCODING_DEF。"""
+    """Construct a ENCODING_DEF."""
 
     return b"\x13" + name.encode("ascii") + b"\x00"
 
 
 def v5_font_definition(encoding_index: int, name: str) -> bytes:
-    """构造一个 FONT_DEF。"""
+    """Construct a FONT_DEF."""
 
     return b"\x11" + v5_unsigned(encoding_index) + name.encode("ascii") + b"\x00"
 
 
 def v5_font_style_definition(font_index: int, style_bits: int) -> bytes:
-    """构造一个 FONT_STYLE_DEF。"""
+    """Construct a FONT_STYLE_DEF."""
 
     return b"\x08" + v5_unsigned(font_index) + bytes([style_bits])
 
@@ -133,7 +133,7 @@ def v5_font_style_definition(font_index: int, style_bits: int) -> bytes:
 def v5_equation_preferences(
     styles: list[tuple[int, int] | None],
 ) -> bytes:
-    """构造尺寸和间距为空、仅含 style definitions 的 EQN_PREFS。"""
+    """Construct EQN_PREFS with empty dimensions and spacing, only style definitions."""
 
     payload = bytearray([18, 0, 0, 0, len(styles)])
     for style in styles:
@@ -147,7 +147,7 @@ def v5_equation_preferences(
 
 
 def v5_future_record(payload: bytes) -> bytes:
-    """构造可由旧 reader 按显式长度跳过的 future record。"""
+    """Constructs a future record that can be skipped by the old reader by explicit length."""
 
     return b"\x64" + v5_unsigned(len(payload)) + payload
 
@@ -158,7 +158,7 @@ def v5_equation(
     application_key: str = "DSMT7",
     inline: bool = False,
 ) -> bytes:
-    """构造完整 v5 header、定义记录、初始 SIZE、根 LINE 和 END。"""
+    """Constructs complete v5 header, definition record, initial SIZE, root LINE and END."""
 
     header = bytes([5, 1, 0, 7, 0])
     header += application_key.encode("ascii") + b"\x00" + bytes([1 if inline else 0])
@@ -166,7 +166,7 @@ def v5_equation(
 
 
 def v5_formula_corpus() -> list[tuple[str, bytes, str]]:
-    """返回覆盖常见 v5 CHAR、TMPL、PILE 与 MATRIX 的公式语料。"""
+    """Returns the formula corpus covering the common v5 CHAR, TMPL, PILE and MATRIX."""
 
     fraction = v5_template(
         11,
@@ -257,7 +257,7 @@ def v5_formula_corpus() -> list[tuple[str, bytes, str]]:
 
 
 def v5_template_corpus() -> list[tuple[str, bytes, str]]:
-    """返回覆盖 v5 各类标准 template selector 的精确语料。"""
+    """Return accurate corpus covering various standards v5 template selector."""
 
     line_x = v5_line(v5_char("x"))
     line_a = v5_line(v5_char("a"))

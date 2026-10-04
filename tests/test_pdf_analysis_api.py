@@ -1,4 +1,4 @@
-"""验证区域分析公开接口的证据所有权、缓存与输出契约。"""
+"""Verify the evidence ownership, caching and output contracts of the zone analysis public interface."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from docvortex.public_api import PUBLIC_API
 
 
 def test_public_api_manifest_exports_exist() -> None:
-    """静态清单中的模块和符号必须真实可用，不接受过期或仅存在于测试的声明。"""
+    """Modules and symbols in the static manifest must be real and available, declarations that are expired or only exist for testing are not accepted."""
     for module, names in PUBLIC_API.items():
         imported = import_module(module)
         for name in names:
@@ -39,7 +39,7 @@ def test_public_api_manifest_exports_exist() -> None:
 
 
 def test_public_api_manifest_covers_explicit_exports() -> None:
-    """公开模块的显式导出必须登记，避免清单遗漏已可跨库使用的入口。"""
+    """Explicit exports of public modules must be registered to prevent the manifest from omitting entries that are already available across libraries."""
     for module, names in PUBLIC_API.items():
         imported = import_module(module)
         missing = set(getattr(imported, "__all__", ())) - set(names)
@@ -47,7 +47,7 @@ def test_public_api_manifest_covers_explicit_exports() -> None:
 
 
 def test_public_api_facades_preserve_shared_types_and_entrypoints() -> None:
-    """顶层便捷入口和渲染门面的类型保持同一对象，确保宿主注解与类型判断兼容。"""
+    """The types of the top-level convenience entrance and the rendering facade remain the same object, ensuring that host annotations and type judgments are compatible."""
     root = import_module("docvortex")
     api = import_module("docvortex.api")
     results = import_module("docvortex.result")
@@ -62,7 +62,7 @@ def test_public_api_facades_preserve_shared_types_and_entrypoints() -> None:
 
 
 def test_new_api_annotations_resolve() -> None:
-    """公共类型和函数不依赖调用方预加载旧模块才能解析注解。"""
+    """Public types and functions do not rely on the caller to preload the old module in order to resolve annotations."""
     for value in (
         PDFTablePage,
         PDFTableResult,
@@ -94,12 +94,12 @@ def test_new_api_annotations_resolve() -> None:
     ],
 )
 def test_replaced_modules_are_removed(module: str) -> None:
-    """被替代的 Python 入口本轮直接删除，不保留静态或动态兼容转发。"""
+    """The replaced Python entry is deleted directly this round, and static or dynamic compatible forwarding is not retained."""
     assert find_spec(module) is None
 
 
 def test_text_evidence_excludes_formula_regions_and_preserves_source(monkeypatch: pytest.MonkeyPatch) -> None:
-    """区域中心排除规则保留边界语义，并且不修改源字符与原脚本区间。"""
+    """Region center exclusion rules preserve boundary semantics and do not modify the source character and original script interval."""
     from docvortex.analyzers.native.pdf.inline import scripts
 
     line = PDFTextScriptLine(
@@ -129,7 +129,7 @@ def test_text_evidence_excludes_formula_regions_and_preserves_source(monkeypatch
 
 
 def test_table_page_is_reused_and_returns_materialized_html(monkeypatch: pytest.MonkeyPatch) -> None:
-    """多个区域共享同页原语，结果直接携带最终 HTML 且不包含页面句柄。"""
+    """Multiple regions share the same page primitive, and the result directly carries the final HTML and does not include the page handle."""
     from docvortex.analyzers.native.pdf import table_materialization
 
     page = MagicMock(size=(100.0, 200.0))
@@ -158,7 +158,7 @@ def test_table_page_is_reused_and_returns_materialized_html(monkeypatch: pytest.
 
 
 def test_apply_evidence_does_not_modify_its_inputs() -> None:
-    """最终物化仅更新目标 blocks，允许同一证据安全用于另一个结果。"""
+    """The final materialization only updates the target blocks, allowing the same evidence to be safely used for another result."""
     evidence = PDFTextEvidence(
         (100.0, 100.0),
         scripts=(
@@ -182,7 +182,7 @@ def test_apply_evidence_does_not_modify_its_inputs() -> None:
 
 
 def test_table_failure_stages_remain_distinguishable(monkeypatch: pytest.MonkeyPatch) -> None:
-    """结构恢复异常带原始原因，HTML 物化异常保持原异常类型向外传播。"""
+    """The structure recovery exception brings the original cause, and the HTML materialization exception keeps the original exception type and propagates outward."""
     from docvortex.analyzers.native.pdf import table_materialization
 
     page = PDFTablePage((100.0, 100.0), PDFPageTextGeometry([], {}, {}))

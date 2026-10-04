@@ -8,7 +8,7 @@ DELIMITERS = LatexDelimitersConfig()
 
 
 def test_render_html_table_uses_first_row_when_th_is_absent() -> None:
-    """验证普通 td 首行可作为 GFM 表头。"""
+    """Verify that the first line of ordinary td can be used as the header of GFM."""
     html = "<table><tr><td>A</td><td>B</td></tr><tr><td>1</td><td>2</td></tr></table>"
 
     assert render_html_table(html, asset_base_url="", delimiters=DELIMITERS) == "\n".join(
@@ -17,7 +17,7 @@ def test_render_html_table_uses_first_row_when_th_is_absent() -> None:
 
 
 def test_render_html_table_preserves_supported_inline_markup() -> None:
-    """验证简单单元格保留链接、强调、代码、换行和上下标。"""
+    """Verify that simple cells retain links, emphasis, code, line breaks, and superscripts and subscripts."""
     html = (
         "<table><tr><th>Item</th><th>Note</th></tr>"
         "<tr><td><code>x|y</code></td>"
@@ -35,7 +35,7 @@ def test_render_html_table_preserves_supported_inline_markup() -> None:
 
 
 def test_render_html_table_uses_markdown_only_for_simple_style_sets() -> None:
-    """验证标准 HTML 标签按有效样式集合选择 Markdown 或完整 HTML wrapper。"""
+    """Validation standard HTML tag selects Markdown or full HTML wrapper by valid style set."""
     html = (
         "<table><tr><td><strong>bold</strong></td><td><em>italic</em></td>"
         "<td><s>strike</s></td><td><em><strong>both</strong></em></td>"
@@ -57,7 +57,7 @@ def test_render_html_table_uses_markdown_only_for_simple_style_sets() -> None:
 
 
 def test_render_html_table_escapes_angle_brackets_from_text_nodes() -> None:
-    """验证实体解码后的文本尖括号不会重新变成可执行 Markdown HTML。"""
+    """Verify that entity-decoded textual angle brackets do not become executable again Markdown HTML."""
     html = (
         "<table><tr><th>Name</th><th>Value</th></tr>"
         "<tr><td>unsafe</td><td>&lt;script&gt;alert(1)&lt;/script&gt;</td></tr></table>"
@@ -78,7 +78,7 @@ def test_render_html_table_escapes_angle_brackets_from_text_nodes() -> None:
 
 
 def test_render_html_table_escapes_formula_pipes_without_changing_latex() -> None:
-    """验证 GFM 源码转义公式竖线，Markdown 解析后恢复原始 LaTeX。"""
+    """Verify the vertical bars in the GFM source code escape formula, and restore the original LaTeX after parsing Markdown."""
     formulas = [
         r"\left|x\right|",
         r"\|x\|",
@@ -101,14 +101,14 @@ def test_render_html_table_escapes_formula_pipes_without_changing_latex() -> Non
 
 
 def test_render_html_table_falls_back_for_span_attribute_even_when_value_is_one() -> None:
-    """验证只要显式出现 rowspan/colspan 就按复杂 HTML 输出。"""
+    """Verify that the output is as complex as HTML whenever rowspan/colspan appears explicitly."""
     html = '<table><tr><td colspan="1">A</td></tr></table>'
 
     assert render_html_table(html, asset_base_url="", delimiters=DELIMITERS) == html
 
 
 def test_format_embedded_html_rewrites_relative_images_and_equations() -> None:
-    """验证复杂 HTML 的相对图片和行内公式统一改写。"""
+    """Verify that relative pictures and inline formulas of complex HTML are rewritten uniformly."""
     html = '<table><tr><td><img src="images/a.png"><eq>x&lt;y</eq></td></tr></table>'
 
     formatted = format_embedded_html(html, asset_base_url="https://cdn.example/doc", delimiters=DELIMITERS)
@@ -118,7 +118,7 @@ def test_format_embedded_html_rewrites_relative_images_and_equations() -> None:
 
 
 def test_format_embedded_html_keeps_absolute_and_data_images() -> None:
-    """验证已经可访问的绝对图片来源不会重复添加 base URL。"""
+    """Verify that an already accessible absolute image source does not duplicate base URL."""
     html = '<table><tr><td><img src="https://example.com/a.png"><img src="data:image/png;base64,AAAA"></td></tr></table>'
 
     formatted = format_embedded_html(html, asset_base_url="https://cdn.example/doc", delimiters=DELIMITERS)

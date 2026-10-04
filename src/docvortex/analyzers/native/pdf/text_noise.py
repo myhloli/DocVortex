@@ -1,4 +1,4 @@
-"""按原生绘制颜色和正文嵌套关系排除独立浅灰数字噪声，不依赖字符的具体内容或字体名称。"""
+"""Excludes independent light gray digital noise based on native drawing color and text nesting relationship, without relying on the specific content of characters or font names."""
 
 import re
 
@@ -6,7 +6,7 @@ from .geometry import _bbox_overlap_in_first, _bbox_union_many
 
 
 def _gutter_noise_references(source, line, visual_bboxes):
-    """完整图体之间的空白缝不属于任一图；短数字还需原生浅灰颜色与正文绘制对照才能删除。"""
+    """The blank seams between the complete figures do not belong to any figure; short numbers need to be drawn in the original light gray color and compared with the main text to be deleted."""
     em = line.effective_height
     if not any(
         a[2] + 0.2 * em <= line.bbox[0]
@@ -28,7 +28,7 @@ def _gutter_noise_references(source, line, visual_bboxes):
 
 
 def _nested_prose_numeric_outliers(source, visual_bboxes=()):
-    """寻找独立字体的短数字叠入正常多行正文的情形；图表刻度、同字体数字和小号脚注不列为候选。"""
+    """Look for short numbers in separate fonts that overlap into normal multi-line text; chart scales, same-font numbers, and small footnotes are not candidates."""
     candidates = []
     for line in source.lines:
         if (
@@ -61,7 +61,7 @@ def _nested_prose_numeric_outliers(source, visual_bboxes=()):
         if len(prose) >= 2 and _bbox_overlap_in_first(line.bbox, _bbox_union_many([peer.bbox for peer in prose])) >= 0.95:
             candidates.append((line, prose))
             continue
-        # 目录中的页码应与条目同行；大条目框间的孤立小数字、独立字体和浅色绘制需要另行裁决。
+        # Page numbers in the table of contents should accompany the entries; isolated small numbers, separate fonts, and light-colored drawings between large entry boxes require separate rulings.
         entries = [
             peer
             for peer in source.lines
@@ -86,7 +86,7 @@ def _nested_prose_numeric_outliers(source, visual_bboxes=()):
 
 
 def exclude_faint_native_noise(source, read_paint, visual_bboxes=()):
-    """先证明嵌套的独立数字字体，再与深色正文或背景上的白色条目对照浅灰噪声；证据不足保持原文。"""
+    """Prove nested independent numeric fonts first, then contrast light gray noise with dark text or white entries on background; insufficient evidence to keep original text."""
     candidates = _nested_prose_numeric_outliers(source, visual_bboxes)
     if not candidates or read_paint is None:
         return set()

@@ -1,4 +1,4 @@
-"""旧版 Excel 解析阶段使用的内部语义模型。"""
+"""Legacy Excel Internal semantic model used by the parsing phase."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True, slots=True)
 class XlsFontStyle:
-    """一个 BIFF FONT 记录中可表达的行内文字样式。"""
+    """Inline text styles expressible in a BIFF FONT record."""
 
     bold: bool = False
     italic: bool = False
@@ -19,7 +19,7 @@ class XlsFontStyle:
 
 @dataclass(frozen=True, slots=True)
 class XlsRichRun:
-    """以 Python 字符索引表示的富文本区间。"""
+    """Rich text range represented by Python character index."""
 
     start: int
     end: int
@@ -28,7 +28,7 @@ class XlsRichRun:
 
 @dataclass(frozen=True, slots=True)
 class XlsRichText:
-    """单元格或 drawing 文本及其富文本区间。"""
+    """Cell or drawing text and its rich text range."""
 
     text: str
     runs: tuple[XlsRichRun, ...] = ()
@@ -36,7 +36,7 @@ class XlsRichText:
 
 @dataclass(slots=True)
 class XlsCell:
-    """工作表中的一个可见语义单元格。"""
+    """A visible semantic cell in the worksheet."""
 
     row: int
     col: int
@@ -46,7 +46,7 @@ class XlsCell:
 
 @dataclass(frozen=True, slots=True)
 class XlsImage:
-    """绑定到工作表 cell anchor 的已序列化图片。"""
+    """Serialized picture bound to worksheet cell anchor."""
 
     row: int
     col: int
@@ -55,7 +55,7 @@ class XlsImage:
 
 @dataclass(frozen=True, slots=True)
 class XlsEquation:
-    """绑定到工作表 cell anchor 的原生或图片 comment 公式。"""
+    """Native or picture comment formula bound to worksheet cell anchor."""
 
     row: int
     col: int
@@ -64,7 +64,7 @@ class XlsEquation:
 
 @dataclass(frozen=True, slots=True)
 class XlsChart:
-    """由嵌入 chart 引用恢复出的源数据坐标。"""
+    """Source data coordinates recovered from embedded chart reference."""
 
     row: int
     col: int
@@ -75,7 +75,7 @@ class XlsChart:
 
 @dataclass(slots=True)
 class XlsSheet:
-    """一个 worksheet 的单元格、合并区域与 drawing 资源。"""
+    """A worksheet cell, merge range, and drawing resource."""
 
     name: str
     visible: bool
@@ -90,7 +90,7 @@ class XlsSheet:
 
 @dataclass(frozen=True, slots=True)
 class XlsChartSheet:
-    """一个独立 chart sheet 及其源工作表选择范围。"""
+    """A standalone chart sheet and its source worksheet selection range."""
 
     name: str
     visible: bool
@@ -102,7 +102,7 @@ class XlsChartSheet:
 
 @dataclass(slots=True)
 class XlsWorkbook:
-    """Excel 97–2003 工作簿的内部分页表示。"""
+    """Excel 97–2003 Internal pagination representation of a workbook."""
 
     sheets: list[XlsSheet]
     chart_sheets: list[XlsChartSheet] = field(default_factory=list)

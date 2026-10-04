@@ -1,4 +1,4 @@
-"""按当前阶段的实际文字构建栏证据；不缓存可变成员，也不假设页面中线是栏沟。"""
+"""Construct column evidence based on actual text at the current stage; no mutable members are cached, and no assumption is made that the center line of the page is a column ditch."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .models import _LineItem, _TextLane
 
 @dataclass
 class LayoutEvidence:
-    """保存一个分析阶段的正向栏带、局部尺度与视觉屏障。"""
+    """Save forward bars, local scales, and visual barriers for an analysis phase."""
 
     lanes: list[_TextLane]
     width: float
@@ -22,7 +22,7 @@ class LayoutEvidence:
     geometry: tuple = ()
 
     def corridor(self, bbox: BBox) -> tuple[float, float] | None:
-        """用实际栏间空白分配区域，覆盖多栏的块独立使用通栏区域。"""
+        """Allocate the area with actual inter-column space, and blocks that cover multiple columns use the banner area independently."""
         if not self.lanes:
             return None
         overlaps = [max(0.0, min(bbox[2], lane.right) - max(bbox[0], lane.left)) for lane in self.lanes]
@@ -41,11 +41,11 @@ class LayoutEvidence:
         return None
 
     def separated(self, first: BBox, second: BBox) -> bool:
-        """仅明确属于不同非跨栏区域时阻止认领，缺少证据不创造虚假栏沟。"""
+        """Only block claims if they clearly belong to different non-hurdling areas, and do not create false hurdles in the absence of evidence."""
         a, b = self.corridor(first), self.corridor(second)
         if a is not None and b is not None and a != b and (0.0, self.width) not in (a, b):
             return True
-        # 全页有通栏正文时，图旁的局部窄栏仍须由同高度附近的重复边缘独立确认。
+        # When there is banner text on the entire page, the partial narrow column next to the image must still be independently confirmed by repeated edges near the same height.
         left, right = sorted((first, second), key=lambda bounds: bounds[0])
         if right[0] - left[2] <= 0.5 * self.em or min(left[2] - left[0], right[2] - right[0]) < 3 * self.em:
             return False
@@ -53,7 +53,7 @@ class LayoutEvidence:
         local = [(line, bounds) for line, bounds in self.geometry if top <= (bounds[1] + bounds[3]) / 2 <= bottom]
         if not local:
             return False
-        # 图注有显式首行身份，短尾行也能支持局部栏；不要求它达到正文长行阈值。
+        # Legends have explicit first line identity, and short tail lines can also support partial columns; they are not required to meet the text long line threshold.
         for seed, bounds in local:
             if not seed.caption_start:
                 continue
@@ -81,7 +81,7 @@ class LayoutEvidence:
 def build_layout_evidence(
     lines: list[_LineItem], page_size: tuple[float, float], *, angle: int = 0, barriers=()
 ) -> LayoutEvidence:
-    """复用稳定左右边缘推断，过滤视觉容器内部标签；成员变化后由调用方重新构建。"""
+    """Reuse to stabilize left and right edge inference and filter the internal labels of the visual container; it will be rebuilt by the caller after the members change."""
     width = page_size[1] if angle in {90, 270} else page_size[0]
     geometry = [
         (line, _rotate_bbox_to_upright(line.ink_bbox or line.bbox, page_size, angle))
@@ -93,7 +93,7 @@ def build_layout_evidence(
         return LayoutEvidence([], width, em, tuple(barriers))
     lanes = _infer_text_lanes(geometry, width, em, recalculate_intervals=False)
     stable = sorted([lane for lane in lanes if not lane.is_span and len(lane.lines) >= 3], key=lambda lane: lane.left)
-    # 重叠局部带不能被错误解释为并列栏；优先保留拥有更多成员的栏证据。
+    # Overlapping local bands cannot be misinterpreted as parallel columns; evidence of columns with more members is preserved preferentially.
     distinct = []
     for lane in stable:
         if distinct and lane.left < distinct[-1].right:

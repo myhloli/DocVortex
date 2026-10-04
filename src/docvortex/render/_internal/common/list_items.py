@@ -1,4 +1,4 @@
-"""各格式共用的列表 marker 解析与参考文献判定。"""
+"""List common to each format marker parsing and reference determination."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ _LIST_ITEM_MARKER_RE = re.compile(
     re.DOTALL,
 )
 _LEADING_WHITESPACE_RE = re.compile(r"^[ \t]*")
-# 去除首部空白后，前五个可见字符内出现 Unicode 数字即视为单项命中。
+# After removing the leading blank, the presence of the number Unicode within the first five visible characters is considered a single hit.
 _REFERENCE_NUMBER_PREFIX_RE = re.compile(r"^\D{0,4}\d")
 _MARKDOWN_UNORDERED_MARKER_RE = re.compile(r"^[ \t]*-[ \t]+")
 _ROMAN_MARKER_RE = re.compile(r"[IVXLCDM]+", re.IGNORECASE)
@@ -32,7 +32,7 @@ _MAX_NATIVE_ORDERED_VALUE = 1_000_000
 
 @dataclass(frozen=True, slots=True)
 class ListItem:
-    """保存一个列表条目的原始标记、正文与 HTML 所需分类。"""
+    """Saves a list entry's original tags, text, and HTML required classification."""
 
     marker: str | None
     body: list[InlineSpan]
@@ -44,7 +44,7 @@ class ListItem:
 
 
 def parse_list_item_marker(content: list[InlineSpan]) -> ListItem:
-    """解析列表行首 marker；无法识别时仍拆出前导水平空白。"""
+    """marker at the beginning of the parsed list line; leading horizontal blanks are still removed when unrecognizable."""
     content = normalize_inline_spans(content)
     visible_text = inline_plain_text(content)
     match = _LIST_ITEM_MARKER_RE.match(visible_text)
@@ -91,14 +91,14 @@ def parse_list_item_marker(content: list[InlineSpan]) -> ListItem:
 
 
 def _ordered_marker_value(marker: str) -> tuple[int, OrderedListStyle] | None:
-    """把有界且规范的点号 marker 转成序号；超限或畸形时返回 None。"""
+    """Convert the bounded and standardized point number marker into a serial number; when it exceeds the limit or is abnormal, it returns None."""
     stem = marker[:-1]
     if re.fullmatch(r"(?:0|[1-9][0-9]*)", stem):
         if len(stem) > 7:
             return None
         value = int(stem)
         return (value, "decimal") if value <= _MAX_NATIVE_ORDERED_VALUE else None
-    # 单字符 i/v/x/l/c/d/m 固定按罗马数字解释，消除与字母序号的歧义。
+    # The single character i/v/x/l/c/d/m is always interpreted as Roman numerals to eliminate ambiguity with alphabetical numbers.
     if _ROMAN_MARKER_RE.fullmatch(stem):
         if _CANONICAL_ROMAN_RE.fullmatch(stem.upper()) is None:
             return None
@@ -111,7 +111,7 @@ def _ordered_marker_value(marker: str) -> tuple[int, OrderedListStyle] | None:
 
 
 def _roman_marker_value(marker: str) -> int:
-    """按减法记数规则计算罗马 marker 的数值，兼容 producer 的宽松组合。"""
+    """Calculate the value of Roman marker according to subtraction notation rules, compatible with loose combinations of producer."""
     total = 0
     previous = 0
     for character in reversed(marker.upper()):
@@ -125,12 +125,12 @@ def _roman_marker_value(marker: str) -> int:
 
 
 def has_markdown_unordered_marker(content: list[InlineSpan]) -> bool:
-    """判断条目是否已有 Markdown 短横线 marker，保持既有补 bullet 规则。"""
+    """Determine whether the entry already has Markdown dash marker, and keep the existing supplementary bullet rule."""
     return _MARKDOWN_UNORDERED_MARKER_RE.match(inline_plain_text(normalize_inline_spans(content))) is not None
 
 
 def reference_list_needs_bullets(block: ListBlock) -> bool:
-    """按直属非空条目的数字前缀严格多数规则判断是否补无序 marker。"""
+    """Determine whether to fill the disorder according to the strict majority rule of the numerical prefix of the immediate non-null entry marker."""
     if block.sub_type != BlockType.REF_TEXT:
         return False
 

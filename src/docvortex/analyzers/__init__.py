@@ -1,3 +1,3 @@
-"""DocVortex 模块边界。"""
+"""DocVortex module boundary."""
 
 __all__ = []

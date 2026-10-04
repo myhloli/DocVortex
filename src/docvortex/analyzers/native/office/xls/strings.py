@@ -1,4 +1,4 @@
-"""BIFF5–BIFF8 字符串、富文本区间与 codepage 解码。"""
+"""BIFF5–BIFF8 string, rich text range and codepage decoding."""
 
 from __future__ import annotations
 
@@ -12,21 +12,21 @@ from .records import SegmentReader
 
 @dataclass(frozen=True, slots=True)
 class DecodedString:
-    """已解码文本及以 UTF-16 code unit 表示的字体切换点。"""
+    """Decoded text and font switching point represented by UTF-16 code unit."""
 
     text: str
     font_starts: tuple[tuple[int, int], ...] = ()
 
 
 def clean_text(text: str) -> str:
-    """规范换行、NUL 与不可见控制字符，同时保留制表符。"""
+    """Standardizes line breaks, NUL, and invisible control characters while preserving tab characters."""
 
     normalized = text.replace("\r\n", "\n").replace("\r", "\n").rstrip("\x00")
     return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", normalized)
 
 
 def codepage_name(codepage: int) -> str:
-    """把 BIFF CODEPAGE 值映射为 Python codec 名称。"""
+    """Map BIFF CODEPAGE value to Python codec name."""
 
     return {
         874: "cp874",
@@ -48,7 +48,7 @@ def codepage_name(codepage: int) -> str:
 
 
 def _decode_utf16_units(units: list[int]) -> str:
-    """容错解码 UTF-16 code units。"""
+    """Fault-tolerant decoding UTF-16 code units."""
 
     payload = struct.pack(f"<{len(units)}H", *units) if units else b""
     return payload.decode("utf-16le", "replace")
@@ -60,7 +60,7 @@ def read_biff8_string(
     short: bool,
     rich: bool,
 ) -> DecodedString | None:
-    """读取可跨 CONTINUE 且可切换压缩模式的 BIFF8 Unicode 字符串。"""
+    """Reads BIFF8 Unicode strings that span CONTINUE and can switch compression modes."""
 
     character_count = reader.u8() if short else reader.u16()
     flags = reader.u8()
@@ -117,7 +117,7 @@ def read_byte_string(
     short: bool,
     encoding: str,
 ) -> DecodedString | None:
-    """按 workbook CODEPAGE 读取 BIFF5/BIFF7 单字节字符串。"""
+    """Press workbook CODEPAGE to read BIFF5/BIFF7 single byte string."""
 
     character_count = reader.u8() if short else reader.u16()
     if character_count is None:
@@ -133,7 +133,7 @@ def read_byte_string(
 
 
 def utf16_unit_to_index(text: str, unit_offset: int) -> int:
-    """把 UTF-16 code unit 偏移转换为 Python 字符索引。"""
+    """Convert UTF-16 code unit offset to Python character index."""
 
     units = 0
     for index, char in enumerate(text):
@@ -147,7 +147,7 @@ def to_rich_text(
     decoded: DecodedString,
     fonts: list[XlsFontStyle],
 ) -> XlsRichText:
-    """把字体切换点解析成稳定的字符区间。"""
+    """Parse font switching points into stable character intervals."""
 
     if not decoded.font_starts or not decoded.text:
         return XlsRichText(decoded.text)
@@ -169,7 +169,7 @@ def read_txo_text(
     continuation_segments: list[bytes],
     fonts: list[XlsFontStyle],
 ) -> XlsRichText | None:
-    """读取 TXO 文本和 8 字节 formatting runs。"""
+    """Read TXO text and 8-byte formatting runs."""
 
     if len(base_payload) < 14:
         return None

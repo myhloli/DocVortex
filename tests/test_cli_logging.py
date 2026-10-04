@@ -1,4 +1,4 @@
-"""验证 CLI 全局 loguru 日志等级参数的解析与过滤行为。"""
+"""Verify the parsing and filtering behavior of the CLI global loguru log level parameter."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from docvortex import cli
 
 @pytest.fixture
 def isolated_logger() -> Iterator[None]:
-    """隔离 loguru 全局 sink，避免 CLI 日志测试影响其他用例。"""
+    """Isolate loguru global sink to prevent CLI log testing from affecting other use cases."""
     logger.remove()
     yield
     logger.remove()
@@ -24,7 +24,7 @@ def isolated_logger() -> Iterator[None]:
 
 
 class _DummyPDFDocument:
-    """替身 PDF 文档，避免日志参数测试依赖真实 PDF 解析。"""
+    """Replace the PDF document to avoid log parameter testing relying on the real PDF parsing."""
 
     def __enter__(self) -> "_DummyPDFDocument":
         return self
@@ -37,12 +37,12 @@ class _DummyPDFDocument:
 
 
 def _invoke_classify(runner: CliRunner, source: Path, *arguments: str):
-    """调用 classify 子命令并返回执行结果，供日志参数断言复用。"""
+    """Call the classify subcommand and return the execution results for log parameter assertion reuse."""
     return runner.invoke(cli.main, [*arguments, "classify", str(source)])
 
 
 def test_cli_log_level_defaults_to_info(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """未显式配置时，根命令默认传入 info 日志等级。"""
+    """When not explicitly configured, the root command defaults to info log level."""
     source = tmp_path / "source.pdf"
     source.write_bytes(b"dummy")
     levels = []
@@ -58,7 +58,7 @@ def test_cli_log_level_defaults_to_info(tmp_path: Path, monkeypatch: pytest.Monk
 def test_cli_log_level_accepts_root_option_and_environment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """根命令参数生效，且显式参数优先于环境变量。"""
+    """Root command parameters take effect, and explicit parameters take precedence over environment variables."""
     source = tmp_path / "source.pdf"
     source.write_bytes(b"dummy")
     levels = []
@@ -76,7 +76,7 @@ def test_cli_log_level_accepts_root_option_and_environment(
 
 
 def test_cli_rejects_invalid_log_level(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """非法日志等级在进入业务命令前被 Click 拒绝。"""
+    """Illegal log levels are rejected by Click before entering the business command."""
     source = tmp_path / "source.pdf"
     source.write_bytes(b"dummy")
     levels = []
@@ -101,7 +101,7 @@ def test_cli_rejects_invalid_log_level(tmp_path: Path, monkeypatch: pytest.Monke
 def test_configure_log_level_filters_loguru_output(
     isolated_logger, capsys: pytest.CaptureFixture[str], level: str, expected: tuple[str, bool, str, bool]
 ) -> None:
-    """全局日志等级按 loguru 阈值过滤标准错误输出。"""
+    """The global log level filters standard error output by the loguru threshold."""
     cli._configure_log_level(level)
     logger.debug("debug hidden" if level == "info" else "debug shown")
     logger.warning("warning hidden" if level == "error" else "warning shown")
@@ -115,7 +115,7 @@ def test_configure_log_level_filters_loguru_output(
 
 
 def test_importing_cli_preserves_host_loguru_sink() -> None:
-    """导入 CLI 模块不重建宿主应用已配置的 loguru sink。"""
+    """Importing the CLI module does not rebuild the loguru sink that the host application has configured."""
     messages: list[str] = []
     handler_id = logger.add(messages.append, level="DEBUG", format="{message}")
     try:

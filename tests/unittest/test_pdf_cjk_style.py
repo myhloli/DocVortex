@@ -1,4 +1,4 @@
-"""验证普通 CJK 样式比较的局部替换、复杂内容回退与原生排版等价性。"""
+"""Verify partial replacement, complex content fallback and native typesetting equivalence for common CJK style comparisons."""
 
 from copy import deepcopy
 
@@ -17,16 +17,16 @@ _TEXT = '<font name="Helvetica">Alpha 123 </font>中文混排，标点。<font n
 
 
 def _paragraph(cls=subject.PlainCJKParagraph, text=_TEXT):
-    """构造交替字体的真实 CJK 片段，确保经过多片段组行路径。"""
+    """Constructs real CJK fragments of alternating fonts, ensuring path through multi-fragment group lines."""
     style = build_pdf_styles().body.clone("cjk-style-test", fontName=HAN_FONT, wordWrap="CJK")
     return cls(text, style)
 
 
 def _layout(paragraph):
-    """提取完整组行状态，用独立深副本对照几何和片段样式。"""
+    """Extract the full group row state and compare geometry and fragment styles with independent deep copies."""
 
     def normalize(value):
-        """把没有值相等运算的 ABag 转成结构数据，避免按对象身份误报差异。"""
+        """Convert ABag without value equality operations into structured data to avoid false reporting of differences based on object identity."""
         if isinstance(value, ABag):
             return normalize(vars(value))
         if isinstance(value, dict):
@@ -41,7 +41,7 @@ def _layout(paragraph):
 @pytest.mark.parametrize("cls", [subject.PlainCJKParagraph, subject.MeasuredCJKParagraph])
 @pytest.mark.parametrize("widths", [(180, 40, 180), (1, 2, 60), (82.5, 82.5, 300)])
 def test_plain_cjk_keeps_exact_line_layout(cls, widths):
-    """中英混排在宽窄交替和极窄区域的行几何、片段顺序完全不变。"""
+    """The row geometry and segment order of mixed Chinese and English in the alternating wide and narrow areas and extremely narrow areas remain completely unchanged."""
     actual, expected = _paragraph(cls), _paragraph(Paragraph)
     for width in widths:
         assert actual.wrap(width, 1000) == expected.wrap(width, 1000)
@@ -49,13 +49,13 @@ def test_plain_cjk_keeps_exact_line_layout(cls, widths):
 
 
 def test_plain_path_does_not_replace_reportlab_globals(monkeypatch):
-    """本地调用链确实使用快速比较，同时第三方段落的模块入口不变。"""
+    """The local call chain does use fast comparison, while the module entry of the third-party paragraph remains unchanged."""
     original = (rl_paragraph.sameFrag, rl_paragraph.makeCJKParaLine, rl_paragraph.cjkFragSplit, Paragraph.breakLinesCJK)
     local = subject._PLAIN_CJK_BREAK
     calls = []
 
     def record(self, widths):
-        """统计自有段落对本地组行入口的调用。"""
+        """Count calls made by own paragraphs to local group line entries."""
         calls.append(1)
         return local(self, widths)
 
@@ -68,7 +68,7 @@ def test_plain_path_does_not_replace_reportlab_globals(monkeypatch):
 
 @pytest.mark.parametrize("change", ["link", "us_lines", "rise", "nobr", "lineBreak", "cbDefn", "split", "bullet", "dots"])
 def test_changed_complex_content_returns_to_original(monkeypatch, change):
-    """普通段落后续出现富样式、回调或拆分标记时重新检查资格。"""
+    """Eligibility is rechecked when rich styles, callbacks, or split tags appear subsequently in ordinary paragraphs."""
     actual = _paragraph()
     actual.wrap(120, 1000)
     if change == "split":
@@ -82,7 +82,7 @@ def test_changed_complex_content_returns_to_original(monkeypatch, change):
     calls = []
 
     def fallback(self, widths):
-        """截获原入口，避免伪造回调被真正绘制。"""
+        """Intercept the original entry to prevent the fake callback from being actually drawn."""
         calls.append(self)
         return "fallback"
 
@@ -93,7 +93,7 @@ def test_changed_complex_content_returns_to_original(monkeypatch, change):
 
 @pytest.mark.parametrize("field", subject._STYLE_FIELDS)
 def test_style_comparison_observes_changes(field):
-    """比较不缓存可变字段，且保留缺失属性与显式 None 的原生区别。"""
+    """Comparison does not cache mutable fields and preserves the native difference between missing attributes and explicit None."""
     first, second = ParaFrag(), ParaFrag()
     assert subject._same_plain_style(first, second)
     setattr(first, field, None)
@@ -105,7 +105,7 @@ def test_style_comparison_observes_changes(field):
 
 
 def test_mutated_text_and_style_match_fresh_layout():
-    """同一段落的文字、颜色和字号修改后，不复用旧的比较结论。"""
+    """After the text, color and font size of the same paragraph are modified, the old comparison conclusion will not be used again."""
     actual = _paragraph(subject.MeasuredCJKParagraph)
     actual.wrap(120, 1000)
     actual.frags[1].text += "新增文本" * 10
@@ -117,7 +117,7 @@ def test_mutated_text_and_style_match_fresh_layout():
 
 
 def test_split_paragraphs_keep_independent_layout():
-    """长段拆分后逐个对照原段落的再次测量和内容，不共享测量状态。"""
+    """After the long paragraph is split, the re-measurement and content of the original paragraph are compared one by one, and the measurement status is not shared."""
     actual = _paragraph(subject.MeasuredCJKParagraph, _TEXT * 20)
     expected = _paragraph(Paragraph, _TEXT * 20)
     actual.wrap(140, 1000)
@@ -131,14 +131,14 @@ def test_split_paragraphs_keep_independent_layout():
 
 
 def test_unknown_reportlab_implementation_disables_adapter(monkeypatch):
-    """依赖内部函数消失或被外部包装后，局部适配器拒绝猜测新调用链。"""
+    """The local adapter refuses to guess new call chains after a dependent inner function disappears or is wrapped externally."""
     monkeypatch.delattr(rl_paragraph, "makeCJKParaLine")
     assert subject._plain_cjk_breaker() is None
 
 
 @pytest.mark.parametrize("text", ["<b>粗体中文</b>", '<a href="https://example.com">链接中文</a>', "第一行<br/>第二行"])
 def test_rich_markup_layout_is_unchanged(text):
-    """富文本和强制换行仍按原断行入口排版。"""
+    """Rich text and forced line breaks are still formatted according to the original line break entry."""
     actual, expected = _paragraph(text=text), _paragraph(Paragraph, text=text)
     assert actual.wrap(70, 1000) == expected.wrap(70, 1000)
     assert _layout(actual) == _layout(expected)
@@ -147,7 +147,7 @@ def test_rich_markup_layout_is_unchanged(text):
 @pytest.mark.parametrize("kind", ["plain", "styled", "link", "code", "title", "anchor", "latin"])
 @pytest.mark.parametrize("cached", [False, True])
 def test_renderer_selects_only_plain_cjk(kind, cached):
-    """真实入口按语义选择普通段落，富标题、链接、样式和代码不进入局部适配器。"""
+    """The real entry selects ordinary paragraphs semantically, and rich titles, links, styles and codes do not enter the local adapter."""
     from docvortex.render._internal.pdf.formula import FormulaRenderer
     from docvortex.render._internal.pdf.inline import PdfAnchorRegistry, PdfInlineContext, build_pdf_paragraph
     from docvortex.schema import TextSpan

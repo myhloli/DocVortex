@@ -1,4 +1,4 @@
-"""使用既有页面分类探测构建全文标题原型。"""
+"""Build full-text title prototypes using existing page category detection."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ def _infer_document_title_profile(
     prepared_pages: list[_PreparedPage],
     document_body_profile: _DocumentBodyProfile | None,
 ) -> _DocumentTitleProfile | None:
-    """在副本上复用现有标题判定，并把跨页稳定样式聚成标题原型。"""
+    """Reuse existing title decisions on copy and aggregate cross-page stable styles into title prototypes."""
 
     if document_body_profile is None:
         return None

@@ -1,4 +1,4 @@
-"""受限读取 OpenDocument ZIP 包及 XML part。"""
+"""Restricted access to OpenDocument ZIP packages and XML part."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from .errors import OdfEncryptedError, OdfParseError, OdfResourceLimitError
 
 
 def _xml_parser() -> etree.XMLParser:
-    """为每次 part 解析新建禁用实体、DTD 和网络的 XML parser。"""
+    """Create a new disabled entity, DTD and XML parser for the network for each part resolution."""
     return etree.XMLParser(
         resolve_entities=False,
         load_dtd=False,
@@ -39,10 +39,10 @@ def _xml_parser() -> etree.XMLParser:
 
 
 class OdfPackage:
-    """在固定资源预算内读取一个 OpenDocument ZIP 包。"""
+    """Read a OpenDocument ZIP package within a fixed resource budget."""
 
     def __init__(self, file_bytes: bytes) -> None:
-        """打开内存包并在读取正文前完成中央目录安全校验。"""
+        """Open the memory package and complete the central directory security check before reading the text."""
         try:
             self._zip = ZipFile(BytesIO(file_bytes))
         except (BadZipFile, OSError, ValueError) as exc:
@@ -59,7 +59,7 @@ class OdfPackage:
 
     @staticmethod
     def _validate_members(infos: list[ZipInfo]) -> dict[str, ZipInfo]:
-        """校验成员数量、解压体积、路径与重名，避免包级歧义。"""
+        """Verify the number of members, decompression volume, paths and duplicate names to avoid package-level ambiguity."""
         if len(infos) > MAX_ENTRY_COUNT:
             raise OdfResourceLimitError(f"ODF resource limit exceeded: max_entry_count={MAX_ENTRY_COUNT}")
         total_size = 0
@@ -82,18 +82,18 @@ class OdfPackage:
 
     @staticmethod
     def _is_safe_member_name(name: str) -> bool:
-        """判断 ZIP 成员是否为无反斜杠、无绝对路径和上跳段的 POSIX 路径。"""
+        """Determine whether the ZIP member is a POSIX path without backslash, absolute path and up-hop segment."""
         if not name or "\x00" in name or "\\" in name or name.startswith("/"):
             return False
         parts = PurePosixPath(name).parts
         return bool(parts) and all(part not in {"", ".", ".."} for part in parts)
 
     def has_part(self, part_name: str) -> bool:
-        """返回包内是否存在指定规范成员。"""
+        """Return whether the specified specification member exists in the package."""
         return part_name in self._infos
 
     def read_part(self, part_name: str, *, required: bool = False, asset: bool = False) -> bytes | None:
-        """读取一个已校验成员，并对累计图片资源执行独立限制。"""
+        """Read a verified member and enforce independent limits on the cumulative image resource."""
         info = self._infos.get(part_name)
         if info is None:
             if required:
@@ -120,7 +120,7 @@ class OdfPackage:
         return data
 
     def _charge_asset(self, part_name: str, byte_count: int) -> None:
-        """按唯一资源成员累计保留字节，重复引用不重复计费。"""
+        """Bytes are reserved cumulatively based on unique resource members, and repeated references will not be billed again."""
         if part_name in self._asset_parts:
             return
         self._asset_parts.add(part_name)
@@ -129,7 +129,7 @@ class OdfPackage:
             raise OdfResourceLimitError(f"ODF resource limit exceeded: max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}")
 
     def xml_part(self, part_name: str, *, required: bool = False) -> etree._Element | None:
-        """禁用实体和网络后解析 XML，并校验节点数及最大深度。"""
+        """Parse XML after disabling entities and networks, and verify the number of nodes and maximum depth."""
         data = self.read_part(part_name, required=required)
         if data is None:
             return None
@@ -146,7 +146,7 @@ class OdfPackage:
 
     @staticmethod
     def _validate_xml_shape(root: etree._Element, part_name: str) -> None:
-        """迭代统计 XML 节点与深度，避免深递归或超大 DOM 继续传播。"""
+        """Iteratively count XML nodes and depths to avoid deep recursion or continued propagation of extremely large DOM."""
         node_count = 0
         stack: list[tuple[etree._Element, int]] = [(root, 1)]
         while stack:
@@ -161,7 +161,7 @@ class OdfPackage:
                     stack.append((child, depth + 1))
 
     def detected_suffix(self) -> OdfSuffix | None:
-        """按 mimetype、manifest 根条目依次识别 ODF 三种包类型。"""
+        """Identify the three package types ODF in sequence according to the root entries of mimetype and manifest."""
         mimetype = self.read_part("mimetype")
         if mimetype is not None:
             try:
@@ -173,7 +173,7 @@ class OdfPackage:
         return ODF_SUFFIX_BY_MIME.get(self.manifest_media_types().get("/", ""))
 
     def validate_document(self, expected_suffix: OdfSuffix) -> etree._Element:
-        """校验包类型、加密状态和 required 正文 body 后返回内容根节点。"""
+        """After verifying the package type, encryption status and required body body, the content root node is returned."""
         detected = self.detected_suffix()
         if detected is not None and detected != expected_suffix:
             raise OdfParseError(
@@ -190,7 +190,7 @@ class OdfPackage:
         return content_root
 
     def manifest_media_types(self) -> dict[str, str]:
-        """读取 manifest 中规范成员路径到 MIME 的映射，损坏时安全降级为空。"""
+        """Reads the mapping of canonical member paths in manifest to MIME, safely downgrading to null when corrupted."""
         if self._manifest_media_types is not None:
             return self._manifest_media_types
         result: dict[str, str] = {}
@@ -205,16 +205,16 @@ class OdfPackage:
         return result
 
     def is_encrypted(self) -> bool:
-        """按 manifest:encryption-data 元素判断包内是否存在加密内容。"""
+        """Use the manifest:encryption-data element to determine whether there is encrypted content in the package."""
         root = self.xml_part("META-INF/manifest.xml")
         return root is not None and next(root.iter(qname("manifest", "encryption-data")), None) is not None
 
     def content_type_for(self, part_name: str) -> str | None:
-        """返回 manifest 为指定成员声明的媒体类型。"""
+        """Return manifest The media type declared for the specified member."""
         return self.manifest_media_types().get(part_name)
 
     def resolve_reference(self, href: str, *, base_part: str = "content.xml") -> str | None:
-        """把相对 xlink 引用解析为安全包成员；绝对 URI 和上跳路径返回空。"""
+        """Resolve relative xlink references as security package members; absolute URI and up-hop paths return null."""
         normalized_href = unquote((href or "").strip())
         if not normalized_href or normalized_href.startswith("#"):
             return None
@@ -232,7 +232,7 @@ class OdfPackage:
         return resolved.removeprefix("./")
 
     def resolve_object_content(self, href: str, *, base_part: str = "content.xml") -> str | None:
-        """把 draw:object 目录引用解析到其 content.xml 成员。"""
+        """Resolve the draw:object directory reference to its content.xml member."""
         resolved = self.resolve_reference(href, base_part=base_part)
         if resolved is None:
             return None
@@ -241,7 +241,7 @@ class OdfPackage:
         return f"{resolved.rstrip('/')}/content.xml"
 
     def body_element(self, content_root: etree._Element, suffix: OdfSuffix) -> etree._Element:
-        """返回已验证内容树中的 text、spreadsheet 或 presentation 正文节点。"""
+        """Returns the text, spreadsheet, or presentation text node in the verified content tree."""
         body = content_root.find(f".//{qname('office', 'body')}")
         if body is None:
             raise OdfParseError("Malformed ODF package: content.xml has no office:body")
@@ -251,12 +251,12 @@ class OdfPackage:
         return child
 
     def close(self) -> None:
-        """关闭底层 ZipFile，但不触碰调用方提供的输入流。"""
+        """Closes the underlying ZipFile without touching the caller-supplied input stream."""
         self._zip.close()
 
 
 def detect_odf_suffix(file_bytes: bytes) -> OdfSuffix | None:
-    """只按 ODF 包身份识别三种后缀，任意损坏均返回空供上层继续兜底。"""
+    """Only use the ODF package to identify the three suffixes, and any damage will be returned to the upper level to continue to take advantage of it."""
     try:
         package = OdfPackage(file_bytes)
     except (OdfParseError, OdfResourceLimitError):

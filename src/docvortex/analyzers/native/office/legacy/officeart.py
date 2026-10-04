@@ -1,4 +1,4 @@
-"""旧版 Office 二进制格式共享的 OfficeArt 记录与图片解码。"""
+"""OfficeArt logging and picture decoding for legacy Office binary format sharing."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ F_USE_HIDDEN = 0x0002_0000
 
 @dataclass(frozen=True, slots=True)
 class OfficeArtRecord:
-    """一条已经通过长度边界校验的 OfficeArt 记录。"""
+    """A OfficeArt record that has passed length boundary verification."""
 
     offset: int
     version: int
@@ -42,7 +42,7 @@ class OfficeArtRecord:
 
 @dataclass(frozen=True, slots=True)
 class OfficeImagePayload:
-    """从 BLIP 中恢复出的原始图片及其媒体类型。"""
+    """Original pictures and their media types recovered from BLIP."""
 
     data: bytes
     extension: str
@@ -52,7 +52,7 @@ class OfficeImagePayload:
 
 @dataclass(frozen=True, slots=True)
 class OfficeArtShape:
-    """Excel drawing 中可绑定到 OBJ 的形状属性。"""
+    """Excel Shape properties in drawing that can be bound to OBJ."""
 
     shape_id: int | None
     anchor: tuple[int, int, int, int] | None
@@ -67,7 +67,7 @@ def record_at(
     end: int | None = None,
     charge: Callable[[], None] | None = None,
 ) -> OfficeArtRecord | None:
-    """从指定偏移读取一条 OfficeArt 记录，坏边界返回空值。"""
+    """Reads a OfficeArt record from the specified offset, returns NULL for bad boundaries."""
 
     limit = len(data) if end is None else min(end, len(data))
     if offset < 0 or offset + 8 > limit:
@@ -95,7 +95,7 @@ def iter_records(
     end: int | None = None,
     charge: Callable[[], None] | None = None,
 ) -> Iterator[OfficeArtRecord]:
-    """顺序遍历同一 OfficeArt 容器内的直接子记录。"""
+    """Sequentially traverses direct child records within the same OfficeArt container."""
 
     limit = len(data) if end is None else min(end, len(data))
     cursor = start
@@ -112,7 +112,7 @@ def iter_descendants(
     *,
     charge: Callable[[], None] | None = None,
 ) -> Iterator[OfficeArtRecord]:
-    """以显式栈深度优先遍历 OfficeArt 记录树并限制嵌套深度。"""
+    """Traverse the OfficeArt record tree with explicit stack depth first and limit the nesting depth."""
 
     stack: list[Iterator[OfficeArtRecord]] = [iter_records(data, charge=charge)]
     while stack:
@@ -129,7 +129,7 @@ def iter_descendants(
 
 
 def _simple_properties(record: OfficeArtRecord) -> dict[int, int]:
-    """读取 FOPT 简单属性并让后出现的同名属性覆盖前值。"""
+    """Reads the FOPT simple attribute and allows subsequent occurrences of the same name to overwrite the previous value."""
 
     properties: dict[int, int] = {}
     for index in range(record.instance):
@@ -142,7 +142,7 @@ def _simple_properties(record: OfficeArtRecord) -> dict[int, int]:
 
 
 def _excel_client_anchor(payload: bytes) -> tuple[int, int, int, int] | None:
-    """把 OfficeArtClientAnchorChart 转成起止行列坐标。"""
+    """Convert OfficeArtClientAnchorChart into start and end row and column coordinates."""
 
     if len(payload) < 18:
         return None
@@ -158,7 +158,7 @@ def _shape_from_container(
     *,
     charge: Callable[[], None] | None = None,
 ) -> OfficeArtShape | None:
-    """从单个 SpContainer 提取 shape id、anchor、pib 与隐藏状态。"""
+    """Extract shape id, anchor, pib with hidden state from a single SpContainer."""
 
     shape_id: int | None = None
     anchor: tuple[int, int, int, int] | None = None
@@ -183,7 +183,7 @@ def extract_excel_shapes(
     *,
     charge: Callable[[], None] | None = None,
 ) -> list[OfficeArtShape]:
-    """按 drawing 顺序提取可与 Excel OBJ 一一绑定的形状。"""
+    """Extract shapes that can be bound one by one to Excel OBJ in the order of drawing."""
 
     shapes: list[OfficeArtShape] = []
     for record in iter_descendants(data, charge=charge):
@@ -196,7 +196,7 @@ def extract_excel_shapes(
 
 
 def _bitmap_payload(body: bytes, instance: int) -> bytes | None:
-    """跳过 BLIP UID 和 tag，返回位图原始载荷。"""
+    """Skips BLIP UID and tag, returning the bitmap original payload."""
 
     doubled = instance in {0x46B, 0x6E3, 0x6E1, 0x7A9}
     start = (32 if doubled else 16) + 1
@@ -204,7 +204,7 @@ def _bitmap_payload(body: bytes, instance: int) -> bytes | None:
 
 
 def decode_blip(record: OfficeArtRecord) -> OfficeImagePayload | None:
-    """解码常见位图和 EMF/WMF BLIP，并限制矢量解压输出。"""
+    """Decode common bitmaps and EMF/WMF BLIP, and limit vector decompression output."""
 
     instance = record.instance
     body = record.payload
@@ -264,7 +264,7 @@ def decode_blip(record: OfficeArtRecord) -> OfficeImagePayload | None:
             content_type="image/emf",
             render_size_emu=render_size_emu,
         )
-    # 保留合法 placeable header，使跨平台渲染器继续获得 bbox 与 units-per-inch。
+    # Keep legal placeable header so cross-platform renderers continue to get bbox and units-per-inch.
     return OfficeImagePayload(
         data=data,
         extension="wmf",
@@ -278,7 +278,7 @@ def first_blip(
     *,
     charge: Callable[[], None] | None = None,
 ) -> OfficeImagePayload | None:
-    """深度优先返回一段 OfficeArt 数据中的首个可支持 BLIP。"""
+    """Depth first returns the first supported BLIP in a section of OfficeArt data."""
 
     for record in iter_descendants(data, charge=charge):
         if record.record_type == OFFICEART_BSE:
@@ -296,7 +296,7 @@ def extract_word_shapes(
     *,
     charge: Callable[[], None] | None = None,
 ) -> list[OfficeArtShape]:
-    """按 Word drawing 顺序提取 shape id、pib 和隐藏状态。"""
+    """Extract shape id, pib and hidden states in order Word drawing."""
 
     shapes: list[OfficeArtShape] = []
     for record in iter_descendants(data, charge=charge):
@@ -314,7 +314,7 @@ def _decode_bse_body(
     charge: Callable[[], None] | None = None,
     delay_stream: bytes | None = None,
 ) -> OfficeImagePayload | None:
-    """从 FBSE body 的内嵌或延迟 BLIP 中恢复图片。"""
+    """Recover pictures from FBSE body embedded or delayed BLIP."""
 
     if len(body) < 36:
         return None
@@ -337,7 +337,7 @@ def decode_bstore(
     charge: Callable[[], None] | None = None,
     delay_stream: bytes | None = None,
 ) -> dict[int, OfficeImagePayload]:
-    """按一基 BSE 序号解码 drawing group 中的图片资源。"""
+    """Decode the image resources in drawing group according to a base BSE serial number."""
 
     bse_records = [record for record in iter_descendants(data, charge=charge) if record.record_type == OFFICEART_BSE]
     result: dict[int, OfficeImagePayload] = {}

@@ -1,4 +1,4 @@
-"""源属性的纯数据规范化，不读取宿主配置或推断缺失值。"""
+"""Pure data normalization of source attributes, without reading host configuration or inferring missing values."""
 
 from __future__ import annotations
 
@@ -9,20 +9,20 @@ from ..schema import DocumentProperties
 
 
 def property_text(value: object) -> str | None:
-    """规范化实际文本值，拒绝把容器和任意对象转换成伪属性。"""
+    """Normalizes actual text values and refuses to convert containers and arbitrary objects into pseudo properties."""
     if isinstance(value, bytes):
         value = value.decode("utf-8", errors="replace")
     return value.strip().replace("\x00", "") or None if isinstance(value, str) else None
 
 
 def property_values(value: object) -> list[str]:
-    """将源标量或序列转成稳定列表，不拆分作者姓名或关键词字符串。"""
+    """Convert a source scalar or sequence into a stable list without splitting author names or keyword strings."""
     values = value if isinstance(value, (list, tuple)) else [value]
     return list(dict.fromkeys(text for item in values if (text := property_text(item))))
 
 
 def property_date(value: object, *, warnings: list[str] | None = None) -> str | None:
-    """保留日期精度和显式时区；支持 PDF 日期而不补造缺失时间。"""
+    """Preserves date precision and explicit time zone; supports PDF dates without compensating for missing times."""
     if isinstance(value, (date, datetime)):
         return value.isoformat()
     text = property_text(value)
@@ -59,7 +59,7 @@ def property_date(value: object, *, warnings: list[str] | None = None) -> str | 
 
 
 def property_count(value: object) -> int | None:
-    """接受非负计数，非法或缺失的声明值保持未知。"""
+    """Non-negative counts are accepted, illegal or missing declared values remain unknown."""
     if isinstance(value, bool):
         return None
     if not isinstance(value, (int, str)):
@@ -72,7 +72,7 @@ def property_count(value: object) -> int | None:
 
 
 def legacy_properties(properties: DocumentProperties) -> dict[str, object | None]:
-    """供既有按格式接口投影基础属性，格式读取仍只有一份实现。"""
+    """For the existing interface to project basic attributes by format, there is still only one implementation for format reading."""
     return {
         "page_count": properties.page_count,
         "title": properties.title,

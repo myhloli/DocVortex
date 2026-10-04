@@ -1,4 +1,4 @@
-"""根据页面框架、正文栏及独立图题展开页面 Form，保守保留真实整图。"""
+"""Expand the page Form according to the page frame, text column and independent figure title, conservatively retaining the true entire figure."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .visual_annotations import _is_strong_caption_text
 
 
 def form_owns_line(line: _LineItem, members: frozenset[int]) -> bool:
-    """按去重后字符保留的原来源判定归属，不把矩形重叠当作对象成员关系。"""
+    """Attribution is determined based on the original source of characters retained after deduplication, and overlapping rectangles are not regarded as object membership."""
     chars = [char for char in line.chars if str(char.get("char", "")).strip()]
     return bool(chars) and all(
         any(index in members for index in char.get("source_indices", (char.get("char_idx"),))) for char in chars
@@ -24,7 +24,7 @@ def form_owns_line(line: _LineItem, members: frozenset[int]) -> bool:
 
 
 def _page_frame_matches(source: _PageSource, form: _PDFFormInfo) -> bool:
-    """声明框映射到 MediaBox 或 CropBox 的各边误差不超过对应页面尺寸的百分之二。"""
+    """The declaration box is mapped to MediaBox or CropBox within two percent of the corresponding page size on each side."""
     if not form.structure_valid or form.declared_bbox is None:
         return False
     width, height = source.page_size
@@ -36,7 +36,7 @@ def _page_frame_matches(source: _PageSource, form: _PDFFormInfo) -> bool:
 
 
 def _form_masks(source: _PageSource, form: _PDFFormInfo) -> list[BBox]:
-    """保护栅格图、独立子 Form 和按候选局部深度识别的统一绘图核心。"""
+    """Protected raster maps, independent sub-Form and unified drawing core by candidate local depth identification."""
     children = [
         child.bbox
         for child in source.form_infos
@@ -50,7 +50,7 @@ def _form_masks(source: _PageSource, form: _PDFFormInfo) -> list[BBox]:
         if path.source_index in form.path_indices
     ]
     em = statistics.median([_line_effective_height(line, line.bbox) for line in source.lines]) if source.lines else 10.0
-    # 两段且横纵都有跨度的描边是斜连线，参与图形核心；矩形表格网格不满足此条件。
+    # A two-section stroke with both horizontal and vertical spans is a diagonal connecting line and participates in the core of the graphic; a rectangular table grid does not meet this condition.
     graphic_paths = [
         replace(path, segment_count=6)
         if path.segment_count == 2
@@ -59,7 +59,7 @@ def _form_masks(source: _PageSource, form: _PDFFormInfo) -> list[BBox]:
         else path
         for path in relative_paths
     ]
-    # 页面角色需要保护满页绘图；扩大检测尺度只取消现有图形核心的页内尺寸上限。
+    # Page roles need to protect full-page drawings; expanding the detection scale only removes the existing graphics core's in-page size limit.
     local = replace(
         source, path_infos=graphic_paths, page_size=tuple(2 * size for size in source.page_size), drawing_component_cache=[]
     )
@@ -70,7 +70,7 @@ def _form_masks(source: _PageSource, form: _PDFFormInfo) -> list[BBox]:
         and path.stroke_visible
         and min(path.bbox[2] - path.bbox[0], path.bbox[3] - path.bbox[1]) >= 0.5 * em
     ]
-    # 封闭框内同时有多个绘图元素和斜连线时保护整个绘图；纯横纵表格网格不触发。
+    # Protect the entire drawing when there are multiple drawing elements and diagonal lines in the closed box; pure horizontal and vertical table grids are not triggered.
     connected_frames = [
         path.bbox
         for path in relative_paths
@@ -86,7 +86,7 @@ def _form_masks(source: _PageSource, form: _PDFFormInfo) -> list[BBox]:
 
 
 def _masked_line(bbox: BBox, masks: list[BBox]) -> bool:
-    """按遮罩并集计算覆盖率，多面板跨图长标签不能被误当作外部正文。"""
+    """Coverage is calculated by mask union, and multi-panel labels spanning the length of the image cannot be mistaken for external text."""
     rectangles = [
         (max(bbox[0], mask[0]), max(bbox[1], mask[1]), min(bbox[2], mask[2]), min(bbox[3], mask[3])) for mask in masks
     ]
@@ -108,12 +108,12 @@ def _masked_line(bbox: BBox, masks: list[BBox]) -> bool:
 
 
 def _has_body_lane(source: _PageSource, form: _PDFFormInfo, masks: list[BBox], *, minimum_rows: int = 6) -> bool:
-    """六行以上连续正文、稳定栏缘和长行共同支持页面角色，图内标签不参与。"""
+    """Continuous text of more than six lines, stable column margins, and long lines jointly support page roles, and labels within images do not participate."""
     evidence_lines = source.lines
     if not evidence_lines and source.chars:
         from .native_text import _build_native_line_items_from_chars
 
-        # 180 度页面的正文目前不进入公开组装；角色证据仍须识别，保持包装前后的原有行为一致。
+        # The text of the 180-degree page does not currently enter public assembly; character evidence must still be identified to keep the original behavior consistent before and after packaging.
         evidence_lines = _build_native_line_items_from_chars(
             source.chars, source.page_size, supported_angles=(0.0, 90.0, 180.0, 270.0)
         )
@@ -154,7 +154,7 @@ def _has_body_lane(source: _PageSource, form: _PDFFormInfo, masks: list[BBox], *
 
 
 def _has_independent_figures(source: _PageSource, form: _PDFFormInfo, masks: list[BBox]) -> bool:
-    """每个图形须拥有不同的独立图题；共同图题下的多个面板不构成展开证据。"""
+    """Each figure must have a different independent figure title; multiple panels under the same figure title do not constitute evidence of expansion."""
     captions = [
         line
         for line in source.lines
@@ -180,7 +180,7 @@ def _has_independent_figures(source: _PageSource, form: _PDFFormInfo, masks: lis
 
 
 def _is_underlay(source: _PageSource, form: _PDFFormInfo) -> bool:
-    """只在无内部正文/图片、仅有简单页面矩形且有外部正文时确认装饰底层。"""
+    """Only confirm the decorative bottom layer when there is no inner text/image, just a simple page rectangle and there is outer body."""
     paths = [path for path in source.path_infos if path.source_index in form.path_indices]
     if (
         form.paint_order != 0
@@ -196,7 +196,7 @@ def _is_underlay(source: _PageSource, form: _PDFFormInfo) -> bool:
 
 
 def _has_native_table_regions(source: _PageSource, form: _PDFFormInfo, masks: list[BBox]) -> bool:
-    """已确认页面家族内，充分的原生表格成员可支持纯表格页；大图核心仍优先保护。"""
+    """It has been confirmed that within the page family, sufficient native table members can support pure table pages; the large image core is still prioritized for protection."""
     if any(_bbox_area(mask) >= 0.05 * source.page_size[0] * source.page_size[1] for mask in masks):
         return False
     from .tables import _detect_table_candidates
@@ -221,7 +221,7 @@ def _has_native_table_regions(source: _PageSource, form: _PDFFormInfo, masks: li
 
 
 def _layout_framework(source: _PageSource, form: _PDFFormInfo, masks: list[BBox]) -> list[tuple[float, float, float]]:
-    """复用栏位证据保存稳定栏缘，跨页辅助判断同时要求页面映射和版式对应。"""
+    """Reuse field evidence to preserve stable column edges, assist cross-page judgments, and require page mapping and layout correspondence."""
     lines = [
         line
         for line in source.lines
@@ -234,7 +234,7 @@ def _layout_framework(source: _PageSource, form: _PDFFormInfo, masks: list[BBox]
         output.extend(
             (angle, lane.left / width, lane.right / width) for lane in layout.lanes if not lane.is_span and len(lane.lines) >= 3
         )
-    # 表格单元格文字可能居中，重复水平格线提供比文字栏缘更稳定的同版式边界。
+    # Table cell text may be centered, and repeating horizontal grid lines provide a more stable formatting boundary than text column edges.
     rules: dict[tuple[float, float], int] = {}
     width = source.page_size[0]
     for path in source.path_infos:
@@ -251,7 +251,7 @@ def _layout_framework(source: _PageSource, form: _PDFFormInfo, masks: list[BBox]
 
 
 def normalize_page_forms(sources: list[_PageSource]) -> None:
-    """一次判定全文页面角色，再同步候选、成员归属及用于分析的相对 Form 深度。"""
+    """Determine full-text page roles once, then synchronize candidates, membership, and relative Form depth for analysis."""
     decisions: list[tuple[_PageSource, set[int], set[int]]] = []
     families: dict[tuple[float, ...], list[tuple[float, float, float]]] = {}
     for source in sources:
@@ -272,7 +272,7 @@ def normalize_page_forms(sources: list[_PageSource]) -> None:
     for source, expanded, decorations in decisions:
         if not source.form_infos:
             continue
-        # 稀疏正文页可继承已确认页面框架；任何内部图形核心仍阻止仅凭跨页证据展开。
+        # Sparse text pages can inherit confirmed page frames; any internal graphics core still prevents expansion based solely on cross-page evidence.
         for form in source.form_infos:
             if form.instance_id in expanded | decorations or not _page_frame_matches(source, form):
                 continue
@@ -289,7 +289,7 @@ def normalize_page_forms(sources: list[_PageSource]) -> None:
                     _has_body_lane(source, form, masks, minimum_rows=3) or _has_native_table_regions(source, form, masks)
                 ):
                     expanded.add(form.instance_id)
-        # 仅展开页面根或已展开页面容器的直接后代，不穿透仍保留的真实图形。
+        # Expands only the page root or direct descendants of an expanded page container, without penetrating the remaining real graphics.
         for form in source.form_infos:
             if form.parent_id is not None and form.parent_id not in expanded | decorations:
                 expanded.discard(form.instance_id)
@@ -302,11 +302,11 @@ def normalize_page_forms(sources: list[_PageSource]) -> None:
             if form.instance_id not in removed and (form.parent_id is None or form.parent_id in removed)
         ]
         if not removed:
-            # 未展开时保留既有顶层候选范围；结构读取失败也不能提升未知子 Form。
+            # Retain existing top-level candidate ranges when not expanded; structure read failure cannot promote unknown sub-Form.
             active = [form for form in source.form_infos if form.parent_id is None]
         source.form_bboxes = [form.bbox for form in active if _bbox_area(form.bbox) > 0]
         source.retained_page_forms = {form.bbox for form in active if _page_frame_matches(source, form)}
-        # 同一位置重复调用也可能拥有不同成员；不能让后一次调用覆盖前一次来源。
+        # Repeated calls to the same location may also have different members; subsequent calls cannot overwrite the previous source.
         valid_boxes = {form.bbox for form in active if form.structure_valid} - {
             form.bbox for form in active if not form.structure_valid
         }

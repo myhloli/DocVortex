@@ -1,4 +1,4 @@
-"""安全解析 Equation Native 中的 MTEF v3/v5 公式。"""
+"""Safely resolve MTEF v3/v5 formulas in Equation Native."""
 
 from __future__ import annotations
 
@@ -25,12 +25,12 @@ _XF_LMOVE = 0x80
 
 
 class _MtefError(ValueError):
-    """MTEF 输入不完整、不受支持或超过安全限制。"""
+    """MTEF The input is incomplete, unsupported, or exceeds security limits."""
 
 
 @dataclass(frozen=True, slots=True)
 class _Node:
-    """MTEF 解析后的最小公式语法节点。"""
+    """MTEF The parsed minimum formula syntax node."""
 
     kind: str
     value: object | None = None
@@ -38,10 +38,10 @@ class _Node:
 
 
 class _MtefReader:
-    """有界读取 MTEF v3 record tree。"""
+    """Bounded read MTEF v3 record tree."""
 
     def __init__(self, data: bytes) -> None:
-        """校验五字节 MTEF v3 头并初始化游标。"""
+        """Verify the five-byte MTEF v3 header and initialize the cursor."""
 
         if len(data) < 5 or data[0] != 3:
             raise _MtefError("Equation Native does not contain MTEF v3")
@@ -51,14 +51,14 @@ class _MtefReader:
         self.records = 0
 
     def _charge(self) -> None:
-        """计入一条 record，超过共享上限时拒绝对象。"""
+        """A record is included, and the object is rejected when the sharing limit is exceeded."""
 
         self.records += 1
         if self.records > MAX_RECORDS:
             raise LegacyOfficeResourceLimitError(f"MTEF record count exceeds max_records={MAX_RECORDS}")
 
     def _u8(self) -> int:
-        """有界读取一个无符号字节。"""
+        """Bounded read of an unsigned byte."""
 
         if self.pos >= len(self.data):
             raise _MtefError("MTEF record is truncated")
@@ -67,7 +67,7 @@ class _MtefReader:
         return value
 
     def _u16(self) -> int:
-        """有界读取小端 u16。"""
+        """Bounded read little endian u16."""
 
         if self.pos + 2 > len(self.data):
             raise _MtefError("MTEF u16 is truncated")
@@ -76,7 +76,7 @@ class _MtefReader:
         return value
 
     def _skip_nudge(self) -> None:
-        """跳过短或长格式的 nudge 偏移。"""
+        """Skip nudge offset in short or long format."""
 
         dx = self._u8()
         dy = self._u8()
@@ -85,19 +85,19 @@ class _MtefReader:
             self._u16()
 
     def _enter(self) -> None:
-        """进入一个嵌套 object list 并限制深度。"""
+        """Enter a nested object list and limit the depth."""
 
         self.depth += 1
         if self.depth > MAX_RECORD_DEPTH:
             raise LegacyOfficeResourceLimitError(f"MTEF nesting exceeds max_record_depth={MAX_RECORD_DEPTH}")
 
     def _leave(self) -> None:
-        """离开一个嵌套 object list。"""
+        """Leave a nested object list."""
 
         self.depth -= 1
 
     def _skip_ruler(self) -> None:
-        """跳过不影响公式语义的 RULER record。"""
+        """Skip RULER record which do not affect formula semantics."""
 
         count = self._u8()
         for _ in range(count):
@@ -105,7 +105,7 @@ class _MtefReader:
             self._u16()
 
     def _skip_font(self) -> None:
-        """跳过 FONT 的 typeface、style 和零结尾名称。"""
+        """Skip typeface, style and zero-ending names for FONT."""
 
         self._u8()
         self._u8()
@@ -113,7 +113,7 @@ class _MtefReader:
             pass
 
     def _skip_size(self) -> None:
-        """跳过三种长度形式的 SIZE record。"""
+        """Skip three length forms of SIZE record."""
 
         first = self._u8()
         if first == 100:
@@ -125,7 +125,7 @@ class _MtefReader:
             self._u8()
 
     def _parse_embellishments(self) -> tuple[int, ...]:
-        """读取 CHAR 后以 END 终止的 embellishment 列表。"""
+        """List of embellishments that terminate with END after reading CHAR."""
 
         values: list[int] = []
         while True:
@@ -142,7 +142,7 @@ class _MtefReader:
             values.append(self._u8())
 
     def _parse_line(self, flags: int) -> _Node:
-        """解析一个 LINE slot。"""
+        """Parse a LINE slot."""
 
         if flags & _XF_NULL:
             return _Node("sequence")
@@ -161,7 +161,7 @@ class _MtefReader:
         return _Node("sequence", children=children)
 
     def _parse_template(self, flags: int) -> _Node:
-        """解析 TMPL selector、variation、options 和 slots。"""
+        """Resolve TMPL selector, variation, options and slots."""
 
         if flags & _XF_LMOVE:
             self._skip_nudge()
@@ -174,7 +174,7 @@ class _MtefReader:
         return _Node("template", (selector, variation, options), slots)
 
     def _parse_pile(self, flags: int) -> _Node:
-        """解析纵向 PILE 中的 LINE slots。"""
+        """Resolving LINE slots in longitudinal PILE."""
 
         if flags & _XF_LMOVE:
             self._skip_nudge()
@@ -191,7 +191,7 @@ class _MtefReader:
         return _Node("pile", children=slots)
 
     def _parse_matrix(self, flags: int) -> _Node:
-        """解析 MATRIX 维度、分隔线位图和逐格 LINE。"""
+        """Parse MATRIX dimensions, divider bitmaps, and frame-by-frame LINE."""
 
         if flags & _XF_LMOVE:
             self._skip_nudge()
@@ -233,7 +233,7 @@ class _MtefReader:
         return _Node("matrix", (rows, cols), tuple(cells))
 
     def _parse_record(self, record_type: int, flags: int) -> _Node:
-        """解析一条已读取 tag 的语义 record。"""
+        """Parse the semantics record of a read tag."""
 
         if record_type == 1:
             return self._parse_line(flags)
@@ -268,7 +268,7 @@ class _MtefReader:
         raise _MtefError(f"unsupported MTEF v3 record type: {record_type}")
 
     def _parse_list(self) -> tuple[_Node, ...]:
-        """解析以 END 终止的普通 object list。"""
+        """Parses a plain object list terminated by END."""
 
         nodes: list[_Node] = []
         while True:
@@ -282,7 +282,7 @@ class _MtefReader:
                 nodes.append(node)
 
     def _parse_slots(self) -> tuple[_Node, ...]:
-        """解析 template/pile 中每个 LINE 对应的 slot。"""
+        """Parse the slot corresponding to each LINE in template/pile."""
 
         slots: list[_Node] = []
         while True:
@@ -306,7 +306,7 @@ class _MtefReader:
                 slots.append(self._parse_record(record_type, flags))
 
     def parse(self) -> _Node:
-        """解析根 object list 并拒绝没有可见内容的对象。"""
+        """Resolve root object list and reject objects with no visible content."""
 
         children = self._parse_list()
         root = _Node("sequence", children=children)
@@ -367,7 +367,7 @@ _CHAR_LATEX = {
 
 
 def _render_character(character: int) -> str:
-    """把 MTEF 字符转为安全 LaTeX。"""
+    """Convert MTEF characters to safe LaTeX."""
 
     try:
         value = chr(character)
@@ -390,7 +390,7 @@ def _render_character(character: int) -> str:
 
 
 def _escape_latex_text(value: str) -> str:
-    """转义 ``\text{}`` 中会改变 LaTeX 结构的字符。"""
+    """Escape characters in ``\text{}`` that would change the structure of LaTeX."""
 
     replacements = {
         "\\": r"\textbackslash{}",
@@ -408,7 +408,7 @@ def _escape_latex_text(value: str) -> str:
 
 
 def _apply_embellishments(value: str, embellishments: tuple[int, ...]) -> str:
-    """按记录顺序把常见 embellishment 转为 LaTeX。"""
+    """Convert common embellishment to LaTeX in the order of recording."""
 
     for embellishment in embellishments:
         if embellishment == 2:
@@ -489,13 +489,13 @@ def _apply_embellishments(value: str, embellishments: tuple[int, ...]) -> str:
 
 
 def _slot(slots: tuple[_Node, ...], index: int) -> str:
-    """渲染一个可选 template slot。"""
+    """Renders an optional template slot."""
 
     return _render_node(slots[index]).strip() if index < len(slots) else ""
 
 
 def _fence(selector: int, variation: int, body: str) -> str:
-    """渲染左右 fence 及单边 variation。"""
+    """Render left and right fence and single side variation."""
 
     pairs = {
         0: (r"\langle", r"\rangle"),
@@ -518,7 +518,7 @@ def _fence(selector: int, variation: int, body: str) -> str:
 
 
 def _big_operator(selector: int, slots: tuple[_Node, ...]) -> str:
-    """渲染积分、求和、乘积及集合大运算。"""
+    """Render integrals, sums, products, and set large operations."""
 
     operators = {
         21: r"\int",
@@ -547,7 +547,7 @@ def _big_operator(selector: int, slots: tuple[_Node, ...]) -> str:
 
 
 def _render_template(selector: int, variation: int, options: int, slots: tuple[_Node, ...]) -> str:
-    """把一个受支持的 MTEF v3 template 转为 LaTeX。"""
+    """Convert a supported MTEF v3 template to LaTeX."""
 
     del options
     if 0 <= selector <= 7:
@@ -614,7 +614,7 @@ def _render_template(selector: int, variation: int, options: int, slots: tuple[_
 
 
 def _render_node(node: _Node) -> str:
-    """递归序列化 MTEF AST。"""
+    """Recursive serialization MTEF AST."""
 
     if node.kind == "sequence":
         return "".join(_render_node(child) for child in node.children)
@@ -807,7 +807,7 @@ def _render_node(node: _Node) -> str:
 
 
 def decode_mtef_v3(data: bytes) -> str | None:
-    """把 MTEF v3 字节流转换为 LaTeX；不可信对象失败时返回 None。"""
+    """Convert MTEF v3 byte stream to LaTeX; returns None when untrusted object fails."""
 
     try:
         latex = _render_node(_MtefReader(data).parse()).strip()
@@ -819,7 +819,7 @@ def decode_mtef_v3(data: bytes) -> str | None:
 
 
 def decode_mtef_v5(data: bytes) -> str | None:
-    """延迟加载独立 v5 reader，并返回其完整 LaTeX 结果。"""
+    """Lazy loads the standalone v5 reader and returns its complete LaTeX result."""
 
     from .mtef_v5 import decode_mtef_v5 as _decode_mtef_v5
 
@@ -827,7 +827,7 @@ def decode_mtef_v5(data: bytes) -> str | None:
 
 
 def decode_mtef(data: bytes) -> str | None:
-    """仅按 MTEF header 首字节分派 v3/v5，其他版本整体拒绝。"""
+    """Only the first byte of MTEF header is dispatched v3/v5, other versions are rejected as a whole."""
 
     if not data:
         return None
@@ -839,7 +839,7 @@ def decode_mtef(data: bytes) -> str | None:
 
 
 def decode_equation_native(data: bytes) -> str | None:
-    """校验 28 字节 EQNOLEFILEHDR 并按 header 解码 MTEF v3/v5。"""
+    """Check 28 bytes EQNOLEFILEHDR and decode MTEF v3/v5 as header."""
 
     if len(data) < 28:
         return None
@@ -853,7 +853,7 @@ def decode_equation_native(data: bytes) -> str | None:
 
 
 def decode_equation_object(data: bytes) -> str | None:
-    """从独立公式 OLE 对象读取 Equation Native 并转为 LaTeX。"""
+    """Read Equation Native from the stand-alone formula OLE object and convert to LaTeX."""
 
     try:
         with BoundedOleReader(data) as ole:
@@ -866,7 +866,7 @@ def decode_equation_object(data: bytes) -> str | None:
 
 
 def read_object_pool_equations(ole: BoundedOleReader) -> dict[int, str]:
-    """只读提取 DOC ObjectPool 中可安全解码的 Equation Native streams。"""
+    """Read-only extraction of DOC ObjectPool safe decoding of Equation Native streams."""
 
     equations: dict[int, str] = {}
     for stream_name in ole.stream_names(prefix="ObjectPool/"):

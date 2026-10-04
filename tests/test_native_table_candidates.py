@@ -1,4 +1,4 @@
-"""候选连续管线与 Python 参考规则逐区间差分，保留候选覆盖与坐标来源。"""
+"""Candidate continuous pipelines are differentiated from the Python reference rule on an interval-by-interval basis, preserving candidate coverage and coordinate sources."""
 
 import math
 from types import SimpleNamespace
@@ -11,7 +11,7 @@ from docvortex.analyzers.native.pdf.models import _Fragment, _LocalAxisLine, _Vi
 
 
 def _native():
-    """要求已注册的新原生对象，旧扩展或显式 Python 后端不伪报原生验证。"""
+    """Requires registered new native objects, old extensions or explicit Python backends to not falsely report native validation."""
     native = get_native()
     if native is None or not hasattr(native, "PreparedRuleCandidates"):
         pytest.skip("native rule candidate extension unavailable")
@@ -19,7 +19,7 @@ def _native():
 
 
 def _rows(centers, counts):
-    """构造含重复来源及有限几何的真实视觉行，用于身份与成员对照。"""
+    """Construct realistic visual rows with repeated sources and limited geometry for identity and membership comparison."""
     output = []
     for position, (center, count) in enumerate(zip(centers, counts, strict=True)):
         box = (0.0, center - 1.0, 10.0, center + 1.0)
@@ -29,12 +29,12 @@ def _rows(centers, counts):
 
 
 def _rules(centers):
-    """建立严格有序横线，复用原始框对象以检查极值的稳定来源。"""
+    """Create strictly ordered horizontal lines and reuse the original box object to check for stable sources of extreme values."""
     return [_LocalAxisLine((0.0, y, 10.0, y), (0.0, y, 10.0, y), "horizontal", 1.0) for y in centers]
 
 
 def test_all_slices_preserve_boundary_members_and_interval_evidence():
-    """穷举行切片和横线跨度，覆盖共享边界、重复行高与紧凑首表头例外。"""
+    """Exhausts slicing and horizontal line spans, covering shared boundaries, repeating row heights, and compact header exceptions."""
     _native()
     rows = _rows([-5.0, 0.0, 5.0, 10.0, 10.0, 19.9, 20.0, 25.0, 40.0, 55.0], [1, 1, 1, 2, 3, 0, 1, 2, 1, 2])
     rules = _rules([0.0, 10.0, 20.0, 30.0, 40.0, 50.0])
@@ -69,7 +69,7 @@ def test_all_slices_preserve_boundary_members_and_interval_evidence():
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_core_expansion_preserves_members_geometry_and_signed_zero(angle):
-    """已接受候选复用走廊数据，四向坐标、成员与相等值来源保持一致。"""
+    """Candidate reuse corridor data has been accepted, and the four-way coordinates, members and equal value sources are consistent."""
     _native()
     rows = _rows([0.0, 5.0, 10.0, 20.0], [2, 3, 1, 2])
     rows[0].bbox = (-0.0, -0.0, 10.0, 1.0)
@@ -97,7 +97,7 @@ def test_core_expansion_preserves_members_geometry_and_signed_zero(angle):
 
 
 def test_special_objects_stay_on_reference_before_native_calculation():
-    """特殊对象、超大来源 ID 和非有限值在准备阶段明确回退，不捕获运算错误。"""
+    """Special objects, very large sources ID and non-finite values fall back explicitly during the preparation phase and do not catch arithmetic errors."""
     _native()
     rules = _rules([0.0, 10.0, 20.0])
     rows = [SimpleNamespace(center_y=1.0), SimpleNamespace(center_y=10.0)]
@@ -116,7 +116,7 @@ def test_special_objects_stay_on_reference_before_native_calculation():
 
 
 def test_native_candidate_validation_errors_are_not_swallowed():
-    """已准入对象的非法区间必须显式报错，不能隐式切回 Python 后继续。"""
+    """The illegal range of the admitted object must report an error explicitly, and cannot switch back to Python implicitly before continuing."""
     native = _native()
     state = native.PreparedRuleCandidates([0.0, 10.0], [(5.0, 2, (0.0, 0.0, 10.0, 10.0), [1, 2])])
     with pytest.raises(ValueError, match="interval"):
@@ -128,7 +128,7 @@ def test_native_candidate_validation_errors_are_not_swallowed():
 
 
 def test_full_candidate_enumeration_and_deferred_merge_match_reference(monkeypatch):
-    """真实构建入口保留全部跨度及延后物化顺序，同时确认共享原生对象确实被使用。"""
+    """The real build entry preserves all spans and deferred materialization orders while confirming that shared native objects are actually used."""
     import pickle
     from docvortex import _compute_backend
     from docvortex.analyzers.native.pdf.models import _LineItem
@@ -163,7 +163,7 @@ def test_full_candidate_enumeration_and_deferred_merge_match_reference(monkeypat
 
 
 def test_compact_core_members_preserve_sparse_signed_ids_and_first_order():
-    """来源压缩及跨位图字去重保留区间内首次出现顺序，支持负数与完整 i64 边界。"""
+    """Source compression and cross-bitmap word deduplication preserve the order of first occurrence within a range, supporting negative and full i64 boundaries."""
     native = _native()
     original = [*range(-70, 70), -(2**63), 2**63 - 1]
     sources = [original, [2**63 - 1, -70, 33, -(2**63), 2**63 - 1, 0, -1], [], list(reversed(original))]
@@ -178,7 +178,7 @@ def test_compact_core_members_preserve_sparse_signed_ids_and_first_order():
 
 
 def test_compact_core_member_queries_are_independent_across_threads():
-    """并发查询仅使用各自局部位图，不能复用另一查询的已见标记或返回顺序。"""
+    """Concurrent queries use only their respective local bitmaps and cannot reuse the seen tags or return order of another query."""
     from concurrent.futures import ThreadPoolExecutor
 
     native = _native()
@@ -188,7 +188,7 @@ def test_compact_core_member_queries_are_independent_across_threads():
     intervals = [(start, end) for start in range(6) for end in range(start + 1, 7)] * 8
 
     def query(interval):
-        """在释放 GIL 的原生查询中核对独立切片的首次来源顺序。"""
+        """Check first source order of independent slices in native query that releases GIL."""
         start, end = interval
         expected = list(dict.fromkeys(source for row in sources[start:end] for source in row))
         return state.core(start, end, [(0.0, 0.0, 10.0, 10.0)])[0] == expected
@@ -198,7 +198,7 @@ def test_compact_core_member_queries_are_independent_across_threads():
 
 
 def test_prevalidated_core_interval_reuses_only_identical_corridor_rows(monkeypatch):
-    """只在两个索引的完整走廊行身份一致时省去第二次线性切片校验。"""
+    """The second linear slice check is only omitted when the complete corridor row identities of the two indexes are consistent."""
     _native()
     rows = _rows([1.0, 5.0, 9.0], [2, 2, 2])
     index = rules_api._prepare_rule_band_index(rows, _rules([0.0, 10.0, 20.0]))
@@ -209,18 +209,18 @@ def test_prevalidated_core_interval_reuses_only_identical_corridor_rows(monkeypa
     assert rules_api._prepared_rule_candidate_query(index, selected, (core, 1, 3)) == expected
 
     def unexpected_scan(self, values):
-        """相同已验证走廊不得重复执行逐行身份扫描。"""
+        """Line-by-line identity scans may not be performed repeatedly in the same authenticated corridor."""
         raise AssertionError("duplicate interval scan")
 
     with monkeypatch.context() as patched:
         patched.setattr(rules_api._RuleBandIndex, "interval", unexpected_scan)
         assert rules_api._prepared_rule_candidate_query(index, selected, (core, 1, 3)) == expected
-    # 同长度 tuple 字段替换仍必须使已缓存匹配失效，不能复用旧区间。
+    # Same-length tuple field replacement must still invalidate cached matches and cannot reuse old ranges.
     core.rows = tuple(reversed(rows))
     assert rules_api._prepared_rule_candidate_query(index, selected, (core, 0, 2)) == expected
     assert index.shared_core_rows[2] is False
     assert rules_api._prepared_rule_candidate_query(index, rows[::-1], (core, 0, 3)) is None
-    # 外部可变列表和相似鸭子对象保持每次参考校验，不能建立可信来源缓存。
+    # External mutable lists and similar duck objects maintain per-reference verification and cannot build trusted origin caches.
     for foreign in (SimpleNamespace(rows=tuple(rows)), rules_api._PreparedTableCoreRows(list(rows), {}, {}, None)):
         assert rules_api._prepared_rule_candidate_query(index, selected, (foreign, 0, 2)) == expected
         foreign.rows = list(reversed(rows))
@@ -228,7 +228,7 @@ def test_prevalidated_core_interval_reuses_only_identical_corridor_rows(monkeypa
 
 
 def _decode_merged(rows):
-    """把私有输出恢复为公共候选字段，便于与原 Python 规则完整对照。"""
+    """Restore private outputs to public candidate fields for complete comparison with the original Python rules."""
     from docvortex.analyzers.native.pdf.models import _TableAnnotation, _TableCandidate
 
     return [
@@ -249,7 +249,7 @@ def _decode_merged(rows):
 
 
 def test_owned_grid_and_dynamic_merge_match_reference():
-    """随机重叠、不同方向、并列分数和注释角色冲突均与完整参考链路一致。"""
+    """Random overlaps, different orientations, tied scores, and annotation role conflicts are consistent with the full reference link."""
     import random
     from copy import deepcopy
     from docvortex.analyzers.native.pdf.models import _TableAnnotation, _TableCandidate
@@ -290,7 +290,7 @@ def test_owned_grid_and_dynamic_merge_match_reference():
 
 
 def test_owned_core_queries_do_not_materialize_members(monkeypatch):
-    """表注局部查询和复制不枚举核心，新增选择也不改变原核心集合。"""
+    """Note that local queries and copies do not enumerate cores, and new selections do not change the original core collection."""
     from docvortex.analyzers.native.pdf._native_table_merge import _NativeCoreLineSet
 
     native = _native()
@@ -300,7 +300,7 @@ def test_owned_core_queries_do_not_materialize_members(monkeypatch):
     values = _NativeCoreLineSet(core)
 
     def reject_iteration(self):
-        """正常注释查询不得导出完整核心成员。"""
+        """Normal annotation queries must not export full core members."""
         raise AssertionError("core materialized")
 
     monkeypatch.setattr(_NativeCoreLineSet, "__iter__", reject_iteration)
@@ -313,7 +313,7 @@ def test_owned_core_queries_do_not_materialize_members(monkeypatch):
 
 
 def test_native_merger_validates_before_mutation_and_consumes_once():
-    """无效后续候选不得改变已有结果，结束后的操作均明确报错。"""
+    """Invalid subsequent candidates must not change the existing results, and all subsequent operations will clearly report an error."""
     native = _native()
     merger = native.NativeTableMerger()
     box = (0.0, 0.0, 10.0, 10.0)
@@ -328,7 +328,7 @@ def test_native_merger_validates_before_mutation_and_consumes_once():
 
 
 def test_owned_merge_rejects_unrepresentable_score_without_mutation():
-    """超大整数分数保留 Python 排序语义，准入失败不修改任何候选。"""
+    """Oversized integer scores retain Python sorting semantics, and admission failures do not modify any candidates."""
     from copy import deepcopy
     from docvortex.analyzers.native.pdf._native_table_merge import merge_owned
     from docvortex.analyzers.native.pdf.models import _TableCandidate

@@ -1,4 +1,4 @@
-//! 表格候选连续计算的薄绑定，仅在结果边界物化整数成员与来源索引。
+//! Thin binding of table candidate continuation calculations, materializing integer members with source indices only at result boundaries.
 use docvortex_core::table_candidates::RuleCandidates;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -10,7 +10,7 @@ pub(super) struct PreparedRuleCandidates {
 
 #[pymethods]
 impl PreparedRuleCandidates {
-    /// Python 准入验证之后一次创建不可变走廊数据，计算错误显式传播。
+    /// Python Immutable corridor data is created once after admission verification, and calculation errors are propagated explicitly.
     #[new]
     fn new(
         py: Python<'_>,
@@ -21,7 +21,7 @@ impl PreparedRuleCandidates {
             .map(|state| Self { state })
             .map_err(PyValueError::new_err)
     }
-    /// 保留核心成员于 Rust，不为候选注释和合并提前创建 Python 集合。
+    /// Retain core members in Rust and do not create the Python set in advance for candidate annotation and merging.
     fn owned_core(
         &self,
         py: Python<'_>,
@@ -39,7 +39,7 @@ impl PreparedRuleCandidates {
             sources,
         ))
     }
-    /// 一个原生调用同时完成闭区间分配与首区间表头例外判定。
+    /// A native call simultaneously completes the closed interval allocation and the first interval header exception determination.
     fn partition(
         &self,
         py: Python<'_>,
@@ -52,7 +52,7 @@ impl PreparedRuleCandidates {
         py.detach(|| self.state.partition(start, end, first, rule_count, height))
             .map_err(PyValueError::new_err)
     }
-    /// 在已准备走廊上完成成员去重和核心几何展开，返回原对象来源索引。
+    /// Complete member deduplication and core geometry expansion on the prepared corridor, and return to the original object source index.
     fn core(
         &self,
         py: Python<'_>,

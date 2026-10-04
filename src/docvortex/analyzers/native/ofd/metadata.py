@@ -1,4 +1,4 @@
-"""从 OFD.xml 与 Document.xml 提取 Doclib 基础元数据。"""
+"""Extract Doclib basic metadata from OFD.xml and Document.xml."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .package import OfdPackage, first_descendant, local_name
 
 
 def read_ofd_properties(file_bytes: bytes) -> tuple[DocumentProperties, list[str]]:
-    """返回全部 DocBody 的总页数和首个非空文档元数据。"""
+    """Return the total number of pages and the first non-empty document metadata of all DocBody."""
     if len(file_bytes) > MAX_TOTAL_BYTES:
         raise OfdResourceLimitError(f"OFD resource limit exceeded: max_total_bytes={MAX_TOTAL_BYTES}")
     warnings: list[str] = []
@@ -79,7 +79,7 @@ def read_ofd_properties(file_bytes: bytes) -> tuple[DocumentProperties, list[str
 
 
 def extract_ofd_metadata(file_binary: BinaryIO) -> dict[str, object | None]:
-    """既有基础接口委托统一属性提取，保留原有返回字段。"""
+    """The existing basic interface delegates unified attribute extraction and retains the original return fields."""
     properties, _ = read_ofd_properties(file_binary.read(MAX_TOTAL_BYTES + 1))
     return {**legacy_properties(properties), "is_image_based": 0}
 

@@ -1,3 +1,3 @@
-"""MHTML 网页归档的 MIME 解包与静态正文解析。"""
+"""MIME unpacking and static text parsing of MHTML web page archive."""
 
 __all__: list[str] = []

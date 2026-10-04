@@ -1,4 +1,4 @@
-"""跨页表格合并使用的内部状态模型。"""
+"""Internal state model used by cross-page table merging."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ CalculationBBox: TypeAlias = tuple[int, int, int, int]
 
 @dataclass
 class RowMetrics:
-    """记录单行的有效列、实际列和视觉列指标。"""
+    """Records the effective column, actual column, and visual column metrics for a single row."""
 
     row_idx: int
     effective_cols: int
@@ -24,7 +24,7 @@ class RowMetrics:
 
 @dataclass
 class RowSignature:
-    """记录表头行的列结构与规范化文本签名。"""
+    """Record the column structure and normalized text signature of the header row."""
 
     effective_cols: int
     colspans: tuple[int, ...]
@@ -34,13 +34,13 @@ class RowSignature:
 
     @property
     def cell_count(self) -> int:
-        """返回签名中的显式单元格数量。"""
+        """Returns the number of explicit cells in the signature."""
         return len(self.colspans)
 
 
 @dataclass
 class RenderedCellSegment:
-    """记录一个渲染单元格覆盖的视觉列区间。"""
+    """Records the visual column interval covered by a rendered cell."""
 
     text: str
     start_col: int
@@ -49,7 +49,7 @@ class RenderedCellSegment:
 
 @dataclass
 class RowScanResult:
-    """封装一次 HTML 行扫描得到的列指标与跨行占位。"""
+    """Encapsulates the column index and cross-row occupancy obtained by a HTML row scan."""
 
     row_effective_cols: list[int]
     row_metrics: list[RowMetrics]
@@ -60,7 +60,7 @@ class RowScanResult:
 
 @dataclass
 class TableMergeState:
-    """缓存单张表格的 block 所有者、HTML 树和结构指标。"""
+    """Cache block owner, HTML tree and structure indicators for a single table."""
 
     owner_block: BlockDict | None
     body_block: BlockDict | None

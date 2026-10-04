@@ -1,4 +1,4 @@
-"""把 ODF 文本、列表、表格和嵌入对象投影为 DocVortex raw blocks。"""
+"""Project ODF text, lists, tables, and embedded objects to DocVortex raw blocks."""
 
 from __future__ import annotations
 
@@ -40,12 +40,12 @@ _MAX_EXPLICIT_SPACE_COUNT = 10_000
 
 @dataclass(slots=True)
 class OdfTextExpansionBudget:
-    """记录单个 ODF 文档显式文本膨胀的累计字节数。"""
+    """Record the cumulative number of bytes of explicit text bloat for a single ODF document."""
 
     used_bytes: int = 0
 
     def charge(self, byte_count: int) -> None:
-        """在分配膨胀文本前计费，超过固定上限时立即失败。"""
+        """Billed before distributing bloated text, failing immediately when a fixed limit is exceeded."""
         if byte_count < 0 or self.used_bytes > MAX_EXPANSION_TEXT_BYTES - byte_count:
             raise OdfResourceLimitError(f"ODF resource limit exceeded: max_expansion_text_bytes={MAX_EXPANSION_TEXT_BYTES}")
         self.used_bytes += byte_count
@@ -53,7 +53,7 @@ class OdfTextExpansionBudget:
 
 @dataclass(frozen=True, slots=True)
 class OdfMasterPageChange:
-    """表示列表流中由段落样式请求的 master-page 变化。"""
+    """Represents the master-page change requested by the paragraph style in the list stream."""
 
     master_page_name: str
 
@@ -63,14 +63,14 @@ OdfListFlowItem = dict[str, Any] | InlineNote | OdfMasterPageChange
 
 
 def _clean_xml_text(value: str | None) -> str:
-    """折叠 XML 排版空白，显式多空格由 text:s 单独恢复。"""
+    """Collapse XML typesetting whitespace, explicit multi-space restored by text:s alone."""
     if not value:
         return ""
     return _WHITESPACE_RE.sub(" ", value)
 
 
 def _paragraph_anchor(paragraph: etree._Element) -> str | None:
-    """返回段落最终能够挂载到输出 block 的首个 bookmark 名称。"""
+    """The return section can finally be mounted to the first bookmark name of the output block."""
     for tag in (qname("text", "bookmark"), qname("text", "bookmark-start")):
         bookmark = next(paragraph.iter(tag), None)
         if bookmark is not None and (name := bookmark.get(qname("text", "name"))):
@@ -79,7 +79,7 @@ def _paragraph_anchor(paragraph: etree._Element) -> str | None:
 
 
 def collect_emittable_anchor_targets(root: etree._Element, styles: OdfStyles) -> frozenset[str]:
-    """收集 ODT 标题类 block 实际能够公开的 bookmark target。"""
+    """Collect ODT title class block bookmark target that can actually be exposed."""
     targets: set[str] = set()
     for paragraph in root.iter():
         if paragraph.tag not in {qname("text", "p"), qname("text", "h")}:
@@ -93,7 +93,7 @@ def collect_emittable_anchor_targets(root: etree._Element, styles: OdfStyles) ->
 
 
 def _style_html(text: str, style: TextStyle) -> str:
-    """按稳定顺序把已转义文本包裹为 HTML 行内样式。"""
+    """Wraps escaped text into the HTML inline style in stable order."""
     rendered = text
     wrappers = [
         (style.bold, "strong"),
@@ -113,7 +113,7 @@ _SVG_RENDER_DPI = 200
 
 
 def _frame_render_size(frame: etree._Element | None) -> tuple[int, int] | None:
-    """按 draw:frame 显示尺寸换算渲染像素，作为 SVG 光栅化的目标尺寸。"""
+    """Converts rendered pixels to the draw:frame display size as the target size for SVG rasterization."""
     from .converters import _length_to_points
 
     if frame is None:
@@ -132,7 +132,7 @@ def _serialize_odf_image(
     content_type: str | None,
     size_hint: tuple[int, int] | None = None,
 ) -> str | None:
-    """序列化 ODF 图片；SVG 光栅化为 PNG，SVM 和 GDIMeta 使用安全占位图保留对象位置。"""
+    """ODF pictures are serialized; SVG is rasterized to PNG, SVM and GDIMeta use safe placemaps to preserve object positions."""
     normalized_type = (content_type or "").split(";", 1)[0].strip().casefold()
     suffix = (part_name or "").rsplit(".", 1)[-1].casefold() if "." in (part_name or "") else ""
     if normalized_type == "image/svg+xml" or suffix == "svg":
@@ -148,7 +148,7 @@ def _serialize_odf_image(
 
 
 def render_atoms_to_html(atoms: Sequence[InlineAtom]) -> str:
-    """把 ODF 行内语义序列安全渲染为表格单元格 HTML。"""
+    """Safely render the ODF inline semantic sequence into table cell HTML."""
     parts: list[str] = []
     for atom in atoms:
         if isinstance(atom, InlineText):
@@ -168,7 +168,7 @@ def render_atoms_to_html(atoms: Sequence[InlineAtom]) -> str:
 
 
 def render_atoms_to_model(atoms: Sequence[InlineAtom], *, trim_edges: bool = False) -> list[dict[str, Any]]:
-    """把 ODF 行内语义序列直接转换为结构化 Span。"""
+    """Convert ODF inline semantic sequences directly into structured Span."""
     spans: list[dict[str, Any]] = []
     segments: list[OfficeRichTextSegment] = []
     text_fragments: list[str] = []
@@ -176,7 +176,7 @@ def render_atoms_to_model(atoms: Sequence[InlineAtom], *, trim_edges: bool = Fal
     fragment_hyperlink: str | None = None
 
     def flush_text_fragments() -> None:
-        """线性合并连续同样式文本，避免逐片段重复复制前缀。"""
+        """Linearly merge consecutive text of the same style to avoid duplicating prefixes segment by segment."""
         nonlocal fragment_style, fragment_hyperlink
         if not text_fragments:
             return
@@ -186,7 +186,7 @@ def render_atoms_to_model(atoms: Sequence[InlineAtom], *, trim_edges: bool = Fal
         fragment_hyperlink = None
 
     def flush_segments() -> None:
-        """把连续文本片段批量写入富文本结果。"""
+        """Batch continuous text fragments into rich text results."""
         flush_text_fragments()
         if not segments:
             return
@@ -218,7 +218,7 @@ def render_atoms_to_model(atoms: Sequence[InlineAtom], *, trim_edges: bool = Fal
 
 
 class OdfBlockParser:
-    """在单个 ODF 包上下文中解析正文、表格和嵌入资源。"""
+    """Parse text, tables and embedded resources in the context of a single ODF package."""
 
     def __init__(
         self,
@@ -235,7 +235,7 @@ class OdfBlockParser:
         text_expansion_budget: OdfTextExpansionBudget | None = None,
         table_expansion_budget: OdfTableExpansionBudget | None = None,
     ) -> None:
-        """绑定单次解析包、样式、子文档路径及可跨 parser 共享的状态。"""
+        """Binds single parse packages, styles, subdocument paths and state that can be shared across parser."""
         self.package = package
         self.styles = styles
         self.base_part = base_part
@@ -257,7 +257,7 @@ class OdfBlockParser:
         hyperlink: str | None,
         preserve_whitespace: bool = False,
     ) -> None:
-        """清理并追加文本节点；显式 ODF 空格可跳过普通 XML 空白折叠。"""
+        """Clean and append text nodes; explicit ODF whitespace skips normal XML whitespace folding."""
         text = value if preserve_whitespace else _clean_xml_text(value)
         if not text:
             return
@@ -271,7 +271,7 @@ class OdfBlockParser:
         hyperlink: str | None,
         atoms: list[InlineAtom],
     ) -> None:
-        """递归遍历段落行内节点，并把 frame 视觉对象旁路为 block。"""
+        """Recursively traverse the paragraph inline nodes and bypass the frame visual to block."""
         self._append_text_atom(atoms, element.text, style=style, hyperlink=hyperlink)
         for child in element:
             if not isinstance(child.tag, str):
@@ -356,7 +356,7 @@ class OdfBlockParser:
             self._append_text_atom(atoms, child.tail, style=style, hyperlink=hyperlink)
 
     def _annotation_text(self, annotation: etree._Element) -> str:
-        """只提取 ODF annotation 的正文段落与列表，不混入作者日期元数据。"""
+        """Only extract the text paragraphs and lists of ODF annotation without mixing in author date metadata."""
         return flatten_block_text(self.parse_container(annotation)).strip()
 
     def _parse_note(
@@ -367,7 +367,7 @@ class OdfBlockParser:
         hyperlink: str | None,
         atoms: list[InlineAtom],
     ) -> None:
-        """保留脚注标记，并把 note-body 内容排入当前逻辑页脚注队列。"""
+        """Preserve the footnote mark and enqueue the contents of note-body into the current logical page footer queue."""
         citation = note.find(qname("text", "note-citation"))
         citation_text = (
             "".join(citation.itertext()).strip()
@@ -384,7 +384,7 @@ class OdfBlockParser:
             atoms.append(InlineNote(f"[{citation_text}] {visible}"))
 
     def parse_inline_atoms(self, paragraph: etree._Element) -> list[InlineAtom]:
-        """解析一个段落的行内语义，并用原位 marker 保留段外 block。"""
+        """Parse the inline semantics of a paragraph and preserve the out-of-paragraph block with in-place marker."""
         paragraph_style = self.styles.text_style(
             paragraph.get(qname("text", "style-name")),
             family="paragraph",
@@ -399,7 +399,7 @@ class OdfBlockParser:
         return atoms
 
     def parse_paragraph(self, paragraph: etree._Element) -> list[RawFlowItem]:
-        """把 text:p/text:h 转为标题、正文、公式和段外内容。"""
+        """Convert text:p/text:h into titles, text, formulas and extra-paragraph content."""
         atoms = self.parse_inline_atoms(paragraph)
         results: list[RawFlowItem] = []
         is_heading = paragraph.tag == qname("text", "h")
@@ -447,7 +447,7 @@ class OdfBlockParser:
         inherited_style: str | None = None,
         emit_master_page_changes: bool = False,
     ) -> list[OdfListFlowItem]:
-        """递归构造严格 LIST 分片，并把不允许嵌套的 block 提升为有序兄弟。"""
+        """Recursively construct strict LIST shards and promote blocks that do not allow nesting to ordered siblings."""
         items = [
             item
             for item in element
@@ -470,7 +470,7 @@ class OdfBlockParser:
         inherited_style: str | None,
         emit_master_page_changes: bool,
     ) -> list[OdfListFlowItem]:
-        """按源条目构造 LIST 分片，每个条目只保留一个文本叶子和一个 marker。"""
+        """Construct LIST shards by source entries, keeping only one text leaf and one marker per entry."""
         style_name = element.get(qname("text", "style-name")) or inherited_style
         level = self.styles.list_level(style_name, depth)
         key = (style_name or "", depth)
@@ -487,7 +487,7 @@ class OdfBlockParser:
         active_master: str | None = None
 
         def flush_content(fragment_start: int) -> None:
-            """把当前合法子块冻结为一个 LIST 分片；无标记列表按普通段落序列输出。"""
+            """Freeze the current legal sub-block into a LIST slice; the unmarked list is output as a normal paragraph sequence."""
             if content:
                 if level is None:
                     results.extend(content)
@@ -517,7 +517,7 @@ class OdfBlockParser:
                         fragment_start = start
                     except ValueError:
                         pass
-                # 统一 LIST 只支持列表级起始值，后续逐项重启按连续序号投影。
+                # Unified LIST only supports list-level starting values, and subsequent item-by-item restarts are projected according to consecutive serial numbers.
                 item_count += 1
             first_paragraph = next(
                 (
@@ -542,7 +542,7 @@ class OdfBlockParser:
             lifted_blocks: list[OdfListFlowItem] = []
 
             def consume_flow(flow: Sequence[RawFlowItem]) -> None:
-                """把段落子流投影到列表文本、嵌套列表或提升块。"""
+                """Project paragraph subflows to list text, nested lists, or lifted blocks."""
                 for block in flow:
                     if isinstance(block, InlineNote):
                         if emit_master_page_changes:
@@ -612,7 +612,7 @@ class OdfBlockParser:
         inherited_style: str | None = None,
         emit_master_page_changes: bool = False,
     ) -> list[OdfListFlowItem]:
-        """把含 text:h 的编号章节提升为标题，并保留其余连续列表。"""
+        """Promote numbered sections containing text:h to titles and retain the rest of the contiguous list."""
         if next(element.iter(qname("text", "h")), None) is None:
             return self.parse_list(
                 element,
@@ -625,7 +625,7 @@ class OdfBlockParser:
         active_master: str | None = None
 
         def flush_pending() -> None:
-            """把标题之间积累的普通列表项写为独立连续 LIST block。"""
+            """Write ordinary list items accumulated between headings as independent contiguous LIST block."""
             if not pending_items:
                 return
             blocks = self._parse_list_items(
@@ -681,7 +681,7 @@ class OdfBlockParser:
         return results
 
     def _parse_index(self, element: etree._Element) -> dict[str, Any] | None:
-        """把 ODF 已存储目录正文转换为扁平 INDEX 子项。"""
+        """Convert ODF stored directory body to flattened INDEX subkeys."""
         leaves: list[dict[str, Any]] = []
         for paragraph in element.iter():
             if paragraph.tag not in {qname("text", "p"), qname("text", "h")}:
@@ -697,13 +697,13 @@ class OdfBlockParser:
         return {"type": BlockType.INDEX, "ilevel": 0, "content": leaves}
 
     def parse_table(self, element: etree._Element) -> dict[str, Any] | None:
-        """把一个 ODF table 转为包含合并语义的 TABLE raw block。"""
+        """Convert a ODF table to TABLE raw block including merge semantics."""
         grid = parse_table_grid(element, self.render_cell_html, expansion_budget=self.table_expansion_budget)
         content = table_grid_to_html(grid)
         return {"type": BlockType.TABLE, "content": content} if content else None
 
     def _load_image(self, image: etree._Element) -> tuple[str | None, str]:
-        """读取 draw:image 的包内或内联载荷并复用 Office 图片序列化。"""
+        """Read the in-package or inline payload of draw:image and reuse the Office image serialization."""
         href = image.get(qname("xlink", "href"), "")
         part_name = self.package.resolve_reference(href, base_part=self.base_part) if href else None
         image_bytes: bytes | None = None
@@ -744,7 +744,7 @@ class OdfBlockParser:
         )
 
     def _object_root(self, object_element: etree._Element) -> tuple[etree._Element | None, str | None]:
-        """读取 draw:object 指向的子文档内容树和成员路径。"""
+        """Read the subdocument content tree and member paths pointed to by draw:object."""
         inline_math = next(object_element.iter(qname("math", "math")), None)
         if inline_math is not None:
             return inline_math, self.base_part
@@ -755,13 +755,13 @@ class OdfBlockParser:
         return self.package.xml_part(part_name), part_name
 
     def _parse_frame(self, frame: etree._Element) -> tuple[InlineAtom | None, list[dict[str, Any]]]:
-        """按公式、图表、文本框、表格、图片优先级解析一个 draw:frame。"""
+        """Parse a draw:frame by formula, chart, text box, table, picture priority."""
         image_element = next(frame.iter(qname("draw", "image")), None)
         preview_uri: str | None = None
         preview_alt = ""
 
         def load_preview() -> tuple[str | None, str]:
-            """只在对象需要图片回退或图表预览时读取 sibling draw:image。"""
+            """sibling draw:image is only read if the object requires image rollback or chart preview."""
             nonlocal preview_uri, preview_alt
             if image_element is not None and preview_uri is None:
                 preview_uri, preview_alt = self._load_image(image_element)
@@ -811,7 +811,7 @@ class OdfBlockParser:
             return None, [table_block]
         load_preview()
         if preview_uri:
-            # svg:title/svg:desc 拼出的替代文本随图片块输出，作为图片识别内容。
+            # The alternative text spelled out by svg:title/svg:desc is output with the picture block as the picture recognition content.
             image_block = {"type": BlockType.IMAGE, "image_base64": preview_uri}
             if preview_alt:
                 image_block["content"] = preview_alt
@@ -821,7 +821,7 @@ class OdfBlockParser:
         return None, []
 
     def parse_frame_blocks(self, frame: etree._Element) -> list[dict[str, Any]]:
-        """把 frame 的内联结果提升为页面级 block，避免正文重复图片。"""
+        """Promote the inline results of frame to page-level block to avoid duplicate images in the text."""
         inline, blocks = self._parse_frame(frame)
         if blocks:
             return blocks
@@ -838,7 +838,7 @@ class OdfBlockParser:
         return []
 
     def parse_element(self, element: etree._Element) -> list[dict[str, Any]]:
-        """解析一个 ODF block 元素，不移动或修改原始 XML 节点。"""
+        """Resolve a ODF block element without moving or modifying the original XML node."""
         if element.tag in {qname("text", "p"), qname("text", "h")}:
             blocks: list[dict[str, Any]] = []
             for item in self.parse_paragraph(element):
@@ -879,7 +879,7 @@ class OdfBlockParser:
         return []
 
     def parse_container(self, parent: etree._Element) -> list[dict[str, Any]]:
-        """按文档顺序解析普通 ODF block 容器，不建立页面边界。"""
+        """Parse ordinary ODF block containers in document order, without establishing page boundaries."""
         blocks: list[dict[str, Any]] = []
         for child in parent:
             if isinstance(child.tag, str):
@@ -893,7 +893,7 @@ class OdfBlockParser:
         *,
         inline_image_rendered: bool,
     ) -> None:
-        """按单元格视觉策略收集或内联 block，并避免重复输出配对图片。"""
+        """Collect or inline block by cell visual strategy and avoid duplicate output of paired images."""
         for block in blocks:
             block_type = block.get("type")
             if self._collect_cell_visuals and block_type in {
@@ -911,11 +911,11 @@ class OdfBlockParser:
                 parts.append(f'<img src="{html.escape(str(block["image_base64"]), quote=True)}"/>')
 
     def _queue_inline_notes(self, atoms: Sequence[InlineAtom]) -> None:
-        """把单元格行内流中的 note marker 排入当前逻辑页队列。"""
+        """Enqueue note marker in the cell inline stream into the current logical page queue."""
         self.notes.extend(atom.content for atom in atoms if isinstance(atom, InlineNote))
 
     def _render_cell_paragraph(self, child: etree._Element, parts: list[str]) -> None:
-        """把单元格里的一个裸段落渲染为 <p>，并回收行内块组的单元格子块。"""
+        """Renders a bare paragraph in a cell to <p> and recycles the cell subblocks of the inline block group."""
         atoms = self.parse_inline_atoms(child)
         self._queue_inline_notes(atoms)
         rendered_atoms = [atom for atom in atoms if not isinstance(atom, InlineImage)] if self._collect_cell_visuals else atoms
@@ -929,7 +929,7 @@ class OdfBlockParser:
                 )
 
     def render_cell_html(self, cell: etree._Element) -> str:
-        """把表格单元格中的段落、列表、嵌套表和 frame 转为 HTML。"""
+        """Convert paragraphs, lists, nested tables and frame in table cells to HTML."""
         parts: list[str] = []
         for child in cell:
             if not isinstance(child.tag, str):
@@ -953,7 +953,7 @@ class OdfBlockParser:
         return "".join(part for part in parts if part)
 
     def _render_list_html(self, element: etree._Element, *, depth: int = 0, inherited_style: str | None = None) -> str:
-        """把单元格内 ODF 列表递归渲染为 ol/ul HTML。"""
+        """Recursively render the ODF list in the cell to ol/ul HTML."""
         style_name = element.get(qname("text", "style-name")) or inherited_style
         level = self.styles.list_level(style_name, depth)
         if level is None:
@@ -990,7 +990,7 @@ class OdfBlockParser:
         depth: int,
         inherited_style: str | None,
     ) -> str:
-        """把引用空列表样式（无可见标记）的单元格列表按裸段落序列渲染。"""
+        """Render a list of cells referencing an empty list style (no visible markup) as a bare paragraph sequence."""
         parts: list[str] = []
         for item in element:
             if not isinstance(item.tag, str) or item.tag not in {
@@ -1008,20 +1008,20 @@ class OdfBlockParser:
         return "".join(part for part in parts if part)
 
     def drain_notes(self) -> list[str]:
-        """取出当前累计脚注并清空共享队列。"""
+        """Remove the current accumulated footnotes and clear the shared queue."""
         values = list(self.notes)
         self.notes.clear()
         return values
 
     def drain_cell_visuals(self) -> list[dict[str, Any]]:
-        """取出 ODS 单元格解析期间收集的视觉对象并清空队列。"""
+        """Takes out the visuals collected during ODS cell parsing and clears the queue."""
         values = list(self._cell_visuals)
         self._cell_visuals.clear()
         return values
 
 
 def _positive_space_count(value: str | None) -> int:
-    """在整数转换前校验并限制 text:s 重复空格数，非法值按一处理。"""
+    """Verify and limit the number of repeated spaces in text:s before integer conversion, and illegal values are processed as one."""
     normalized = (value or "").strip()
     if normalized.startswith("+"):
         normalized = normalized[1:]
@@ -1037,7 +1037,7 @@ def _positive_space_count(value: str | None) -> int:
 
 
 def flatten_block_text(blocks: list[dict[str, Any]]) -> str:
-    """递归提取 raw block 的可见字符串，供标题和备注聚合。"""
+    """Recursively extract the visible strings of raw block for title and note aggregation."""
     parts: list[str] = []
     for block in blocks:
         content = block.get("content")

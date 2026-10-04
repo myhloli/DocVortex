@@ -1,4 +1,4 @@
-"""Standalone HTML 链接、图片与本地 stylesheet 的安全解析。"""
+"""Safe parsing of Standalone HTML links, pictures and local stylesheet."""
 
 from __future__ import annotations
 
@@ -35,23 +35,23 @@ _SAME_DOCUMENT_SCHEMES = frozenset({"file", "http", "https"})
 
 
 class HtmlAnchorResolver(Protocol):
-    """定义资源解析与共享 projector 所需的文档内 anchor 查询。"""
+    """Define the in-document anchor query required for resource resolution and sharing projector."""
 
     def resolve_fragment(self, fragment: str) -> str | None:
-        """把源 fragment 转为统一内部链接。"""
+        """Convert source fragment to unified internal link."""
 
     def heading_anchor(self, heading: etree._Element) -> str | None:
-        """返回标题节点的统一 anchor。"""
+        """Return the unified anchor of the title node."""
 
     def heading_label(self, anchor: str) -> str | None:
-        """返回统一 anchor 对应的标题文本。"""
+        """Return the title text corresponding to unified anchor."""
 
     def note_anchor(self, note: etree._Element) -> str | None:
-        """返回脚注节点的统一 anchor。"""
+        """Return the unified anchor of the footnote node."""
 
 
 class HtmlResourceContext:
-    """实现共享 projector 所需的 HTML 来源、资源与 anchor 适配。"""
+    """To realize the adaptation of HTML sources and resources required for sharing projector to anchor."""
 
     def __init__(
         self,
@@ -59,7 +59,7 @@ class HtmlResourceContext:
         *,
         base_href: str | None = None,
     ) -> None:
-        """绑定来源上下文并计算不会逃逸本地根目录的 base。"""
+        """Bind source context and compute base that does not escape the local root directory."""
         self.source_context = source_context
         self.base_href = base_href
         self.anchors: HtmlAnchorResolver | None = None
@@ -73,11 +73,11 @@ class HtmlResourceContext:
         self._remote_base = self._resolve_remote_base()
 
     def bind_anchors(self, anchors: HtmlAnchorResolver) -> None:
-        """在正文选择完成后绑定仅包含实际输出目标的 anchor 表。"""
+        """Bind the anchor table containing only the actual output targets after text selection is completed."""
         self.anchors = anchors
 
     def same_document_fragment(self, href: str) -> str | None:
-        """解析纯 fragment 或与来源文档身份相同的相对、绝对 URL fragment。"""
+        """Resolve pure fragment or relative, absolute URL fragment with the same identity as the source document."""
         normalized = sanitize_hyperlink_target(
             href,
             allowed_schemes=_SAME_DOCUMENT_SCHEMES,
@@ -106,7 +106,7 @@ class HtmlResourceContext:
         return fragment
 
     def resolve_link(self, href: str) -> str | None:
-        """解析安全外链、相对链接或实际存在的文档内 fragment。"""
+        """Parse fragment within safe external links, relative links or actual existing documents."""
         candidate = (href or "").strip()
         if self._remote_base and candidate.startswith("//"):
             try:
@@ -158,7 +158,7 @@ class HtmlResourceContext:
         return sanitize_hyperlink_target(normalized, allow_relative=True, allow_fragment=True)
 
     def resolve_image(self, source: str, *, alt: str = "") -> ResolvedMarkupImage | None:
-        """按 data URI、远程 URL、本地安全文件的顺序解析图片，远程图片仅保留受限外链。"""
+        """The pictures are parsed in the order of data, URI, remote URL, and local security files, and the remote pictures only retain restricted external links."""
         normalized = (source or "").strip()
         if not normalized:
             return ResolvedMarkupImage(alt=alt) if alt else None
@@ -187,7 +187,7 @@ class HtmlResourceContext:
         return ResolvedMarkupImage(image_base64=data_uri, alt=alt)
 
     def load_stylesheet(self, href: str) -> str | None:
-        """只读取安全本地根目录内的 stylesheet，远程 CSS 始终忽略。"""
+        """Only stylesheet within the secure local root directory is read, remote CSS is always ignored."""
         path = self._resolve_local_path(href)
         if path is None or not path.is_file():
             return None
@@ -202,11 +202,11 @@ class HtmlResourceContext:
         return stylesheet
 
     def charge_inline_stylesheet(self, stylesheet: str) -> None:
-        """把一段内联 CSS 的 UTF-8 字节数计入统一 stylesheet 预算。"""
+        """Count the UTF-8 bytes of an inline CSS into the unified stylesheet budget."""
         self._charge_stylesheet_bytes(len(stylesheet.encode("utf-8")))
 
     def _charge_stylesheet_bytes(self, byte_count: int) -> None:
-        """执行单份和整文档 stylesheet 字节限制，并只在校验通过后累计。"""
+        """Implement stylesheet byte limit for single copy and entire document, and only accumulate after passing the verification."""
         if byte_count > MAX_HTML_STYLESHEET_BYTES:
             raise HtmlResourceLimitError(f"HTML stylesheet exceeds max_html_stylesheet_bytes={MAX_HTML_STYLESHEET_BYTES}")
         total_bytes = self._stylesheet_bytes + byte_count
@@ -217,19 +217,19 @@ class HtmlResourceContext:
         self._stylesheet_bytes = total_bytes
 
     def heading_anchor(self, heading: etree._Element) -> str | None:
-        """把标题 anchor 查询委托给已绑定的注册表。"""
+        """Delegate query for title anchor to bound registry."""
         return self.anchors.heading_anchor(heading) if self.anchors else None
 
     def heading_label(self, anchor: str) -> str | None:
-        """把标题标签查询委托给已绑定的注册表。"""
+        """Delegate title tag queries to bound registries."""
         return self.anchors.heading_label(anchor) if self.anchors else None
 
     def note_anchor(self, note: etree._Element) -> str | None:
-        """把脚注 anchor 查询委托给已绑定的注册表。"""
+        """Delegate the footnote anchor query to the bound registry."""
         return self.anchors.note_anchor(note) if self.anchors else None
 
     def _resolve_data_image(self, data_uri: str, *, alt: str) -> ResolvedMarkupImage | None:
-        """严格解析 data URI 并执行图片预算，SVG 光栅化为 PNG 后内嵌。"""
+        """Strictly parse data URI and perform image budgeting, SVG is rasterized into PNG and then embedded."""
         if cached := self._data_image_cache.get(data_uri):
             return ResolvedMarkupImage(image_base64=cached.image_base64, alt=alt)
         if len(data_uri) > MAX_HTML_IMAGE_BYTES * 2:
@@ -256,13 +256,13 @@ class HtmlResourceContext:
         return resolved
 
     def _charge_image_bytes(self, byte_count: int) -> None:
-        """累计实际保留的图片字节，并在超限时终止整份文档。"""
+        """The actual reserved picture bytes are accumulated, and the entire document is terminated when the limit is exceeded."""
         self._image_bytes += byte_count
         if self._image_bytes > MAX_HTML_IMAGE_TOTAL_BYTES:
             raise HtmlResourceLimitError(f"HTML images exceed max_html_image_total_bytes={MAX_HTML_IMAGE_TOTAL_BYTES}")
 
     def _resolve_remote_image_url(self, source: str) -> str | None:
-        """把远程或远程来源相对图片解析为受限 HTTP(S) 绝对 URL。"""
+        """Parse remote or remote source relative pictures to restricted HTTP (S) absolute URL."""
         try:
             parsed = urlsplit(source)
         except ValueError:
@@ -280,7 +280,7 @@ class HtmlResourceContext:
             return None
 
     def _resolve_remote_base(self) -> str | None:
-        """返回来源 URI 与 base href 合成后的 HTTP(S) 资源基址。"""
+        """Return the resource base address of HTTP (S) synthesized from URI and base href."""
         source_uri = (self.source_context.source_uri or "").strip()
         base_href = (self.base_href or "").strip()
         try:
@@ -301,7 +301,7 @@ class HtmlResourceContext:
         return base if parsed.scheme.casefold() in {"http", "https"} and parsed.hostname else None
 
     def _resolve_local_base(self) -> Path | None:
-        """按本地安全根与相对 base href 计算资源起始目录。"""
+        """Calculate resource starting directory by local security root and relative base href."""
         root = self._local_root
         if root is None:
             return None
@@ -322,7 +322,7 @@ class HtmlResourceContext:
         return base if _is_within(base, root) else root
 
     def _resolve_local_path(self, source: str) -> Path | None:
-        """解析本地相对资源，并在 resolve 后再次校验根目录边界。"""
+        """Parse local relative resources and verify the root directory boundary again after resolve."""
         root = self._local_root
         base = self._local_base
         if root is None or base is None:
@@ -341,7 +341,7 @@ class HtmlResourceContext:
 
 
 def _image_data_uri(payload: bytes) -> str | None:
-    """按文件签名构造并复核受支持栅格图片的 data URI。"""
+    """Construct and review data URI for supported raster images by file signature."""
     mime = next(
         (
             media_type
@@ -363,14 +363,14 @@ def _image_data_uri(payload: bytes) -> str | None:
 
 
 def _document_url_identity(parts: SplitResult) -> tuple[str, str, str, str]:
-    """返回忽略 fragment 的确定文档身份，并规范层级 URL 的空路径。"""
+    """Return a confirmed document identity ignoring fragment, and an empty path to the normalized hierarchy URL."""
     scheme = parts.scheme.casefold()
     path = parts.path or ("/" if scheme in {"http", "https"} else "")
     return scheme, parts.netloc.casefold(), unquote(path), parts.query
 
 
 def _is_within(path: Path, root: Path) -> bool:
-    """判断已解析路径是否等于安全根或位于其内部。"""
+    """Determine whether the resolved path is equal to or within the security root."""
     return path == root or root in path.parents
 
 

@@ -1,4 +1,4 @@
-"""文档素材的显式字节所有权、图像转码与读取接口。"""
+"""Explicit byte ownership of document material, image transcoding and reading interfaces."""
 
 from ..foundation._image_payload import parse_image_data_uri_strict, validate_image_sidecar_path
 from ..foundation.image_encoding import ImageArtifact, ImageFormat, transcode_image

@@ -1,4 +1,4 @@
-"""把 Excel 97–2003 BIFF 工作簿转换为 DocVortex 分页 model-list。"""
+"""Convert Excel 97–2003 BIFF workbook to DocVortex paginated model-list."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ _XLS_EQUATION_STREAM_RE = re.compile(
 
 
 def _read_embedded_equations(ole: BoundedOleReader) -> dict[str, str]:
-    """读取 XLS embedding storages 中可安全解码的 Equation Native。"""
+    """Read XLS embedding storages Equation Native that can be safely decoded."""
 
     equations: dict[str, str] = {}
     for stream_name in ole.stream_names(prefix="MBD"):
@@ -52,7 +52,7 @@ def _read_embedded_equations(ole: BoundedOleReader) -> dict[str, str]:
 
 
 def _inline_font(rich_text: XlsRichText, start: int) -> InlineFont | None:
-    """返回覆盖指定字符位置的 openpyxl 行内字体。"""
+    """Returns the openpyxl inline font covering the specified character position."""
 
     for run in rich_text.runs:
         if run.start <= start < run.end:
@@ -68,7 +68,7 @@ def _inline_font(rich_text: XlsRichText, start: int) -> InlineFont | None:
 
 
 def _rich_text_boundaries(value: XlsRichText) -> list[int]:
-    """收集富文本的起止边界并裁剪到有效字符范围。"""
+    """Collect the starting and ending boundaries of rich text and clip it to the valid character range."""
 
     boundaries = {0, len(value.text)}
     for run in value.runs:
@@ -78,7 +78,7 @@ def _rich_text_boundaries(value: XlsRichText) -> list[int]:
 
 
 def _to_openpyxl_rich_text(value: XlsRichText) -> str | CellRichText:
-    """把内部富文本转换为 XlsxConverter 已支持的 CellRichText。"""
+    """Convert internal rich text to XlsxConverter already supported by CellRichText."""
 
     if not value.runs:
         return value.text
@@ -94,10 +94,10 @@ def _to_openpyxl_rich_text(value: XlsRichText) -> str | CellRichText:
 
 
 class _XlsPageBuilder(SpreadsheetProjector):
-    """用轻量 openpyxl worksheet 适配器复用现有网格与 HTML 投影。"""
+    """Reuse existing meshes with HTML projections using the lightweight openpyxl worksheet adapter."""
 
     def __init__(self, workbook_model: XlsWorkbook) -> None:
-        """初始化解析结果映射和全工作簿网格预算。"""
+        """Initialize parsing results mapping and full workbook grid budget."""
 
         super().__init__(include_hidden_sheets=False)
         self.workbook_model = workbook_model
@@ -107,7 +107,7 @@ class _XlsPageBuilder(SpreadsheetProjector):
         self._grid_slots = 0
 
     def _build_openpyxl_workbook(self) -> Workbook:
-        """把 BIFF 语义模型投影成不落盘的 worksheet 对象。"""
+        """Project the BIFF semantic model into a non-displaced worksheet object."""
 
         workbook = Workbook()
         merge_grid_slots = 0
@@ -138,7 +138,7 @@ class _XlsPageBuilder(SpreadsheetProjector):
         return workbook
 
     def _ensure_workbook(self) -> Workbook:
-        """惰性构造一次 openpyxl 适配工作簿。"""
+        """Lazily construct the openpyxl adaptation workbook once."""
 
         workbook = getattr(self, "workbook", None)
         if workbook is None:
@@ -152,7 +152,7 @@ class _XlsPageBuilder(SpreadsheetProjector):
         rows: tuple[int, ...] | list[int],
         cols: tuple[int, ...] | list[int],
     ) -> str | None:
-        """把指定 worksheet 行列选择渲染为共享 chart HTML。"""
+        """Render the specified worksheet row and column selection as shared chart HTML."""
 
         if not rows or not cols:
             return None
@@ -172,7 +172,7 @@ class _XlsPageBuilder(SpreadsheetProjector):
         return render_spreadsheet_table(table)
 
     def _chart_sheet_page(self, chart_sheet: XlsChartSheet) -> list[dict[str, Any]]:
-        """把独立 chart sheet 投影为仅含 chart block 的逻辑页。"""
+        """Project standalone chart sheet to a logical page containing only chart block."""
 
         if chart_sheet.source_sheet_name is None:
             return []
@@ -184,7 +184,7 @@ class _XlsPageBuilder(SpreadsheetProjector):
         return [{"type": BlockType.CHART, "content": content}] if content else []
 
     def build_pages(self) -> list[list[dict[str, Any]]]:
-        """按原目录顺序生成可见 worksheet/chart sheet 页面。"""
+        """Visible worksheet/chart sheet pages are generated in the order of the original directory."""
 
         self.workbook = self._build_openpyxl_workbook()
         pages_by_name: dict[str, list[dict[str, Any]]] = {}
@@ -212,7 +212,7 @@ class _XlsPageBuilder(SpreadsheetProjector):
         return [page for _, page in sheet_pages]
 
     def _collect_sheet_images(self, sheet: Worksheet) -> list[SheetImage]:
-        """返回解析器已经绑定到当前 sheet 的图片。"""
+        """Returns the image that the parser has bound to the current sheet."""
 
         sheet_model = self._sheet_by_title.get(sheet.title)
         if sheet_model is None:
@@ -226,7 +226,7 @@ class _XlsPageBuilder(SpreadsheetProjector):
         ]
 
     def _map_math_formulas_to_cells(self, sheet: Worksheet) -> FormulaMap:
-        """把 legacy Equation Editor 公式映射到表格 cell anchor。"""
+        """Map the legacy Equation Editor formula to the table cell anchor."""
 
         math_map: dict[tuple[int, int], list[str]] = collections.defaultdict(list)
         sheet_model = self._sheet_by_title.get(sheet.title)
@@ -240,14 +240,14 @@ class _XlsPageBuilder(SpreadsheetProjector):
         self,
         sheet: Worksheet,
     ) -> tuple[set[tuple[int, int]], list[tuple[tuple[int, int], int, dict]]]:
-        """记录表格已吸收坐标，供独立公式去重。"""
+        """The record table has absorbed the coordinates for independent formula deduplication."""
 
         used_cells, artifacts = super()._find_tables_in_sheet(sheet)
         self._used_cells = used_cells
         return used_cells, artifacts
 
     def _find_data_tables(self, sheet: Worksheet) -> list[ExcelTable]:
-        """复用 XLSX 区域发现并累计限制实际物化网格。"""
+        """Reuse XLSX area discovery and cumulative constraints on the actual materialized mesh."""
 
         tables = super()._find_data_tables(sheet)
         self._grid_slots += sum(table.num_rows * table.num_cols for table in tables)
@@ -256,7 +256,7 @@ class _XlsPageBuilder(SpreadsheetProjector):
         return tables
 
     def _chart_block(self, sheet: Worksheet, chart: XlsChart) -> dict[str, Any] | None:
-        """把简单 chart 引用转换成数据表，并保留可用预览图片。"""
+        """Convert a simple chart reference into a data table and keep the preview image available."""
 
         if chart.source_rows and chart.source_cols:
             content = self.render_chart_selection(
@@ -285,7 +285,7 @@ class _XlsPageBuilder(SpreadsheetProjector):
         self,
         sheet: Worksheet,
     ) -> list[AnchoredBlock]:
-        """按 cell anchor 输出当前工作表的 legacy chart blocks。"""
+        """Press cell anchor to output legacy chart blocks of the current worksheet."""
 
         sheet_model = self._sheet_by_title.get(sheet.title)
         if sheet_model is None:
@@ -316,7 +316,7 @@ def render_xls_chart_html(
     rows: tuple[int, ...] | list[int],
     cols: tuple[int, ...] | list[int],
 ) -> str | None:
-    """为 DOC/PPT 嵌入式 chart 复用 XLS 的稳定 HTML 投影。"""
+    """Stable HTML projection of XLS multiplexed for DOC/PPT embedded chart."""
 
     return _XlsPageBuilder(workbook).render_chart_selection(
         sheet_name,
@@ -326,15 +326,15 @@ def render_xls_chart_html(
 
 
 class XlsConverter:
-    """将 Excel 97–2003 OLE/BIFF 二进制流转换为 model-list。"""
+    """Convert Excel 97–2003 OLE/BIFF binary stream to model-list."""
 
     def __init__(self) -> None:
-        """初始化空分页输出。"""
+        """Initialize empty paged output."""
 
         self.pages: list[list[dict[str, Any]]] = []
 
     def convert(self, file_binary: BinaryIO) -> None:
-        """读取 Workbook/Book stream，解析 BIFF 并生成可见 sheet 页面。"""
+        """Read Workbook/Book stream, parse BIFF and generate visible sheet page."""
 
         file_bytes = read_stream_bytes_from_start(file_binary)
         with BoundedOleReader(file_bytes) as ole:

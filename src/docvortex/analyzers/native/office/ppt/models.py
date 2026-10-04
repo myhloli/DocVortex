@@ -1,4 +1,4 @@
-"""旧版 PPT 解析阶段使用的内部语义模型。"""
+"""Legacy PPT Internal semantic model used by the parsing phase."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Literal, TypeAlias
 
 @dataclass(frozen=True, slots=True)
 class PptTextRun:
-    """一个样式与超链接均已解析的文本片段。"""
+    """A text fragment with resolved styles and hyperlinks."""
 
     text: str
     bold: bool = False
@@ -21,7 +21,7 @@ class PptTextRun:
 
 @dataclass(frozen=True, slots=True)
 class PptParagraph:
-    """一个段落及其列表层级和编号属性。"""
+    """A paragraph and its list level and numbering properties."""
 
     runs: tuple[PptTextRun, ...]
     depth: int = 0
@@ -32,7 +32,7 @@ class PptParagraph:
 
 @dataclass(frozen=True, slots=True)
 class PptTextElement:
-    """带幻灯片坐标的文本形状。"""
+    """Text shape with slide coordinates."""
 
     paragraphs: tuple[PptParagraph, ...]
     text_type: int
@@ -44,7 +44,7 @@ class PptTextElement:
 
 @dataclass(frozen=True, slots=True)
 class PptImageElement:
-    """已经绑定到具体幻灯片形状的图片。"""
+    """An image that has been bound to a specific slide shape."""
 
     image_base64: str
     bbox: tuple[float, float, float, float]
@@ -54,7 +54,7 @@ class PptImageElement:
 
 @dataclass(frozen=True, slots=True)
 class PptEquationElement:
-    """已经从原生对象或图片 comment 恢复的 LaTeX 公式。"""
+    """The LaTeX formula has been restored from the native object or picture comment."""
 
     latex: str
     bbox: tuple[float, float, float, float]
@@ -64,7 +64,7 @@ class PptEquationElement:
 
 @dataclass(frozen=True, slots=True)
 class PptChartElement:
-    """已经绑定到幻灯片 shape 的可编辑 OLE chart。"""
+    """Editable OLE chart already bound to slide shape."""
 
     content: str
     image_base64: str | None
@@ -75,7 +75,7 @@ class PptChartElement:
 
 @dataclass(frozen=True, slots=True)
 class PptTableCell:
-    """表格原点单元格及其跨行跨列范围。"""
+    """The table origin cell and its range across rows and columns."""
 
     row: int
     col: int
@@ -86,7 +86,7 @@ class PptTableCell:
 
 @dataclass(frozen=True, slots=True)
 class PptTableElement:
-    """由 OfficeArt 表格组重建出的规则网格。"""
+    """Regular grid reconstructed from OfficeArt table group."""
 
     rows: int
     cols: int
@@ -101,7 +101,7 @@ PptSlideElement: TypeAlias = PptTextElement | PptImageElement | PptEquationEleme
 
 @dataclass(slots=True)
 class PptSlide:
-    """一张幻灯片的语义内容与备注。"""
+    """Semantic content and notes of a slide."""
 
     slide_id: int | None
     elements: list[PptSlideElement] = field(default_factory=list)
@@ -111,7 +111,7 @@ class PptSlide:
 
 @dataclass(slots=True)
 class PptPresentation:
-    """旧版 PPT 的分页内部表示。"""
+    """Paginated internal representation of legacy PPT."""
 
     slides: list[PptSlide]
     width: int = 5760

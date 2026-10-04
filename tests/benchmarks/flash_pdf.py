@@ -1,5 +1,5 @@
 # ruff: noqa: E402
-"""生成 Flash PDF 完整输出基线，并在独立进程中测量耗时和峰值内存。"""
+"""Generate Flash PDF full output baseline and measure elapsed time and peak memory in independent processes."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from typing import Any
 os.environ["ORT_DISABLE_TELEMETRY"] = "1"
 import onnxruntime
 
-# 基准进程关闭与 PDF 计算无关的后台遥测，生产包的运行设置保持不变。
+# The baseline process turns off background telemetry that is not relevant to the PDF calculation, and the production package's run settings remain unchanged.
 onnxruntime.disable_telemetry_events()
 
 from docvortex.schema import Producer
@@ -45,7 +45,7 @@ from docvortex.schema import ModelJson
 
 
 def _read_pdf(path: Path) -> bytes:
-    """读取原始语料，在内存中解码版本化 XOR 测试文件。"""
+    """Read the original corpus and decode the versioned XOR test file in memory."""
     payload = path.read_bytes()
     if path.suffix == ".xor":
         key = b"MinerU flash layout fixture"
@@ -54,7 +54,7 @@ def _read_pdf(path: Path) -> bytes:
 
 
 def _path_label(path: Path) -> str:
-    """为仓库内外的语料生成稳定标签，避免绝对路径无法 relative_to。"""
+    """Generate stable labels for corpus inside and outside the warehouse to avoid absolute path failure relative_to."""
     resolved = path.resolve()
     try:
         return str(resolved.relative_to(ROOT.resolve()))
@@ -63,24 +63,24 @@ def _path_label(path: Path) -> str:
 
 
 def _digest(value: Any) -> str:
-    """对完整 JSON 值计算稳定摘要，不忽略几何、空格或任何字段。"""
+    """Computes a stable summary on the full JSON value, not ignoring geometry, spaces, or any fields."""
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
 def _write_json(path: Path, value: Any) -> None:
-    """写入可审查 JSON 产物，父目录由本次运行独立创建。"""
+    """Writes the auditable JSON product, the parent directory created independently by this run."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def _predict(payload: bytes) -> list[list[dict[str, Any]]]:
-    """在单次文档生命周期内执行原生分析，确保计时包含页面打开和关闭。"""
+    """Perform native analysis during a single document lifecycle, ensuring timings include page opens and closes."""
     with PDFDocument(payload) as document:
         return PdfModel().predict(document)
 
 
 def _predict_with_timings(payload: bytes) -> tuple[list[list[dict[str, Any]]], dict[str, float]]:
-    """在不改动生产接口的前提下记录表格检测两个主要阶段的耗时。"""
+    """The time consumption of the two main stages of form detection is recorded without changing the production interface."""
     from unittest.mock import patch
 
     from docvortex.analyzers.native.pdf import pipeline, table_detection, table_rules
@@ -122,7 +122,7 @@ def _predict_with_timings(payload: bytes) -> tuple[list[list[dict[str, Any]]], d
 
 
 def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
-    """隔离一份文档的计时、完整输出和进程峰值内存，避免其它文档污染 RSS。"""
+    """Isolate timing, full output, and process peak memory for one document to prevent other documents from contaminating RSS."""
     import resource
 
     from loguru import logger
@@ -225,7 +225,7 @@ def _worker(path: Path, destination: Path, runs: int, profile: bool) -> None:
 
 
 def _compare(output: Path, baseline: Path, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """核对完整语料集合、源文件指纹及输出，并单独报告性能变化。"""
+    """Check the complete corpus collection, source file fingerprints and outputs, and report performance changes individually."""
     previous = json.loads((baseline / "report.json").read_text(encoding="utf-8"))
     by_path = {record["path"]: record for record in previous["documents"]}
     if set(by_path) != {record["path"] for record in results}:
@@ -248,7 +248,7 @@ def _compare(output: Path, baseline: Path, results: list[dict[str, Any]]) -> lis
 
 
 def main() -> None:
-    """执行完整回归或指定样本基准；每份文档单独启动子进程。"""
+    """Perform a full regression or a specified sample benchmark; launch a separate subprocess for each document."""
     if "--pipeline" in sys.argv:
         from pipeline import main as pipeline_main
 

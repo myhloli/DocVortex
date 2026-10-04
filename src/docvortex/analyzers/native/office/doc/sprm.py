@@ -1,4 +1,4 @@
-"""遍历并应用 Word 二进制单属性修饰符 SPRM。"""
+"""Traverse and apply Word binary single attribute modifier SPRM."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from .records import DocBudget
 
 
 def _operand_length(opcode: int, operand: bytes) -> int:
-    """根据 SPRM 的 spra 字段计算 operand 字节数。"""
+    """Calculate the number of bytes of operand based on the spra field of SPRM."""
 
     spra = opcode >> 13
     if spra in {0, 1}:
@@ -34,7 +34,7 @@ def walk_sprms(
     *,
     budget: DocBudget | None = None,
 ) -> None:
-    """有界顺序遍历 grpprl，截断尾部按可恢复内容处理。"""
+    """Traverse grpprl in bounded order, truncating the tail and processing it as recoverable content."""
 
     cursor = 0
     while cursor + 2 <= len(grpprl):
@@ -50,7 +50,7 @@ def walk_sprms(
 
 
 def _toggle(operand: bytes, base: bool) -> bool | None:
-    """把 Word ToggleOperand 解析为相对样式基值。"""
+    """Parse Word ToggleOperand into a relative style base value."""
 
     if not operand:
         return None
@@ -58,12 +58,12 @@ def _toggle(operand: bytes, base: bool) -> bool | None:
 
 
 def chpx_style_id(grpprl: bytes) -> int | None:
-    """读取 CHPX 指定的字符样式 istd。"""
+    """Read the character pattern istd specified by CHPX."""
 
     result: int | None = None
 
     def consume(opcode: int, operand: bytes) -> None:
-        """记录最后一个有效 sprmCIstd。"""
+        """Record the last valid sprmCIstd."""
 
         nonlocal result
         if opcode == 0x4A30:
@@ -74,12 +74,12 @@ def chpx_style_id(grpprl: bytes) -> int | None:
 
 
 def chpx_picture_location(grpprl: bytes) -> int | None:
-    """读取 CHPX 中的 sprmCPicLocation。"""
+    """Read sprmCPicLocation in CHPX."""
 
     result: int | None = None
 
     def consume(opcode: int, operand: bytes) -> None:
-        """记录最后一个有效图片偏移。"""
+        """Record the last valid picture offset."""
 
         nonlocal result
         if opcode == 0x6A03:
@@ -96,12 +96,12 @@ def apply_character_sprms(
     *,
     budget: DocBudget | None = None,
 ) -> DocCharStyle:
-    """按 Word 样式覆盖顺序把 CHPX 应用到字符样式。"""
+    """Apply CHPX to character styles in Word style override order."""
 
     style = current
 
     def consume(opcode: int, operand: bytes) -> None:
-        """应用当前可表达的字符属性。"""
+        """Apply currently expressible character attributes."""
 
         nonlocal style
         toggle_field = {
@@ -136,7 +136,7 @@ def apply_character_sprms(
 
 @dataclass(frozen=True, slots=True)
 class PapDelta:
-    """PAPX 或段落样式对可见段落属性的增量。"""
+    """PAPX or paragraph style increment to visible paragraph properties."""
 
     in_table: bool | None = None
     row_mark: bool | None = None
@@ -149,7 +149,7 @@ class PapDelta:
     table: DocTableFormat | None = None
 
     def merge(self, over: PapDelta) -> PapDelta:
-        """让后应用的段落属性覆盖当前增量。"""
+        """Let the paragraph attribute applied later overwrite the current increment."""
 
         return PapDelta(
             in_table=over.in_table if over.in_table is not None else self.in_table,
@@ -165,7 +165,7 @@ class PapDelta:
 
 
 def _parse_tdef_table(operand: bytes) -> DocTableFormat | None:
-    """解析 TDefTableOperand 中的边界和横纵向合并标志。"""
+    """Parse the boundary and horizontal and vertical merge flags in TDefTableOperand."""
 
     if len(operand) < 3:
         return None
@@ -204,12 +204,12 @@ def apply_paragraph_sprms(
     *,
     budget: DocBudget | None = None,
 ) -> PapDelta:
-    """应用 PAPX SPRM，并解析 huge PAPX 与表格行属性。"""
+    """Apply PAPX SPRM, and parse huge PAPX and table row attributes."""
 
     delta = initial or PapDelta()
 
     def consume(opcode: int, operand: bytes) -> None:
-        """应用一个段落或表格属性。"""
+        """Apply a paragraph or table attribute."""
 
         nonlocal delta
         if opcode == 0x2416 and operand:

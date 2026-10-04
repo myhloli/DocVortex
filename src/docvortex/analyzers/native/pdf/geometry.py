@@ -1,4 +1,4 @@
-"""Flash 原生 PDF 提取使用的纯几何工具。"""
+"""Flash Native PDF extraction using pure geometry tools."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .models import _AxisLine, _LocalAxisLine
 
 
 def _horizontal_bbox_gap(first_bbox: BBox, second_bbox: BBox) -> float:
-    """返回两个局部 bbox 在 x 轴上的无方向净空，重叠时为零。"""
+    """Returns the undirectional headroom of two local bboxs on the x axis, zero when overlapping."""
 
     return max(first_bbox[0] - second_bbox[2], second_bbox[0] - first_bbox[2], 0.0)
 
@@ -23,7 +23,7 @@ def _transform_axis_lines(
     page_size: tuple[float, float],
     angle: int,
 ) -> list[_LocalAxisLine]:
-    """将原页面横竖线转入当前文本方向的局部坐标。"""
+    """Convert the horizontal and vertical lines of the original page to the local coordinates of the current text direction."""
 
     output: list[_LocalAxisLine] = []
     for line in lines:
@@ -43,7 +43,7 @@ def _transform_axis_lines(
 
 
 def _bbox_overlap_in_first(first: BBox, second: BBox) -> float:
-    """计算交集面积占第一个 bbox 面积的比例。"""
+    """Calculate the ratio of the intersection area to the area of the first bbox."""
 
     width = max(0.0, min(first[2], second[2]) - max(first[0], second[0]))
     height = max(0.0, min(first[3], second[3]) - max(first[1], second[1]))
@@ -52,7 +52,7 @@ def _bbox_overlap_in_first(first: BBox, second: BBox) -> float:
 
 
 def _bbox_area(bbox: BBox) -> float:
-    """返回合法 bbox 的非负面积。"""
+    """Returns the non-negative area of legal bbox."""
 
     return max(0.0, bbox[2] - bbox[0]) * max(0.0, bbox[3] - bbox[1])
 
@@ -61,7 +61,7 @@ def _normalize_bbox_to_unit(
     bbox: BBox,
     page_size: tuple[float, float],
 ) -> list[float]:
-    """将绝对 bbox 归一化到 0-1 单位区间，并保证舍入后的宽高至少各占一个刻度。"""
+    """Normalize the absolute bbox to the 0-1 unit interval, and ensure that the rounded width and height each occupy at least one tick."""
 
     page_width, page_height = page_size
     ticks = [
@@ -88,7 +88,7 @@ def _rotate_bbox_to_upright(
     page_size: tuple[float, float],
     angle: int,
 ) -> BBox:
-    """将页面 bbox 转到当前文本方向的正向局部坐标。"""
+    """Moves page bbox to the positive local coordinates of the current text direction."""
 
     page_width, page_height = page_size
     x0, y0, x1, y1 = bbox
@@ -106,7 +106,7 @@ def _rotate_bbox_from_upright(
     page_size: tuple[float, float],
     angle: int,
 ) -> BBox:
-    """将正向局部 bbox 逆变换回 PDF 页面坐标。"""
+    """Inversely transform forward local bbox back to PDF page coordinates."""
 
     page_width, page_height = page_size
     x0, y0, x1, y1 = bbox
@@ -124,7 +124,7 @@ def _rotate_origin_to_upright(
     page_size: tuple[float, float],
     angle: int,
 ) -> tuple[float, float]:
-    """将页面字符 origin 转到当前文字方向的正向局部坐标。"""
+    """Move page character origin to the positive local coordinate of the current text direction."""
 
     page_width, page_height = page_size
     x, y = origin
@@ -138,10 +138,10 @@ def _rotate_origin_to_upright(
 
 
 def _coerce_bbox(value: Any) -> BBox | None:
-    """将任意四元 bbox 规范成非退化浮点坐标。"""
+    """Normalize any quaternion bbox to non-degenerate floating point coordinates."""
 
-    # 自有 Bbox 是热路径中的固定 slot 容器；先按原校验规则读取内部
-    # 四个 float，可避免通用迭代转换和重复下标调用，异常形状仍走旧路径。
+    # The own Bbox is a fixed slot container in the hot path; first read the internal according to the original verification rules
+    # Four floats, avoid generic iterative transformations and repeated subscript calls, and abnormal shapes still follow the old path.
     if type(value) is CharacterBbox:
         raw = value.bbox
         if (
@@ -169,7 +169,7 @@ def _clip_bbox(
     bbox: BBox | None,
     page_size: tuple[float, float],
 ) -> BBox | None:
-    """将 bbox 裁剪到页面范围，退化框返回 None。"""
+    """Crops bbox to the page range and the degradation box returns None."""
 
     if bbox is None:
         return None
@@ -185,7 +185,7 @@ def _clip_bbox(
 
 
 def _clip_validated_bbox(bbox: BBox | None, page_size: tuple[float, float]) -> BBox | None:
-    """复用本阶段已校验的有限正向框；不再次转换、排序或校验同一组坐标。"""
+    """Reuse the verified limited forward frame at this stage; do not convert, sort or verify the same set of coordinates again."""
     if bbox is None:
         return None
     page_width, page_height = page_size
@@ -199,7 +199,7 @@ def _clip_validated_bbox(bbox: BBox | None, page_size: tuple[float, float]) -> B
 
 
 def _bbox_union(first: BBox, second: BBox) -> BBox:
-    """返回两个 bbox 的外接并集框。"""
+    """Returns the external union box of two bbox."""
 
     return (
         min(first[0], second[0]),
@@ -210,7 +210,7 @@ def _bbox_union(first: BBox, second: BBox) -> BBox:
 
 
 def _bbox_union_many(bboxes: Sequence[BBox]) -> BBox:
-    """返回非空 bbox 序列的外接并集框。"""
+    """Returns the bounding union box of the non-empty bbox sequence."""
 
     if not bboxes:
         raise ValueError("bbox sequence must not be empty")
@@ -221,7 +221,7 @@ def _bbox_union_many(bboxes: Sequence[BBox]) -> BBox:
 
 
 def _expand_bbox(bbox: BBox, margin: float) -> BBox:
-    """向四周扩展 bbox，仅供几何容差判定使用。"""
+    """Expand bbox to all sides, only for geometric tolerance determination."""
 
     return (
         bbox[0] - margin,
@@ -232,25 +232,25 @@ def _expand_bbox(bbox: BBox, margin: float) -> BBox:
 
 
 def _bbox_center_x(bbox: BBox) -> float:
-    """返回 bbox 的水平中心。"""
+    """Returns the horizontal center of bbox."""
 
     return (bbox[0] + bbox[2]) / 2.0
 
 
 def _bbox_center_y(bbox: BBox) -> float:
-    """返回 bbox 的垂直中心。"""
+    """Returns the vertical center of bbox."""
 
     return (bbox[1] + bbox[3]) / 2.0
 
 
 def _bbox_intersects(first: BBox, second: BBox) -> bool:
-    """检查两个 bbox 是否存在正面积交叠。"""
+    """Check for positive area overlap of two bboxs."""
 
     return min(first[2], second[2]) > max(first[0], second[0]) and min(first[3], second[3]) > max(first[1], second[1])
 
 
 def _bbox_distance(first: BBox, second: BBox) -> float:
-    """返回两个 bbox 的欧氏净空距离，交叠或相接时为零。"""
+    """Returns the Euclidean clearance distance of two bboxs, which is zero if they overlap or touch."""
 
     horizontal_gap = max(first[0] - second[2], second[0] - first[2], 0.0)
     vertical_gap = max(first[1] - second[3], second[1] - first[3], 0.0)
@@ -258,7 +258,7 @@ def _bbox_distance(first: BBox, second: BBox) -> float:
 
 
 def _bbox_overlap_in_smaller(first: BBox, second: BBox) -> float:
-    """计算交集面积占较小 bbox 面积的比例。"""
+    """Calculate the intersection area as a proportion of the smaller bbox area."""
 
     width = max(0.0, min(first[2], second[2]) - max(first[0], second[0]))
     height = max(0.0, min(first[3], second[3]) - max(first[1], second[1]))
@@ -275,7 +275,7 @@ def _bbox_axis_overlap_ratio(
     *,
     axis: Literal["x", "y"],
 ) -> float:
-    """计算指定轴上的交叠长度占较短轴长的比例。"""
+    """Calculates the length of the overlap on the specified axis as a proportion of the length of the shorter axis."""
 
     if axis == "x":
         first_start, first_end = first[0], first[2]
@@ -289,6 +289,6 @@ def _bbox_axis_overlap_ratio(
 
 
 def _point_in_bbox(point: tuple[float, float], bbox: BBox) -> bool:
-    """检查点是否位于 bbox 内部或边界上。"""
+    """Check if the point is inside or on the boundary of bbox."""
 
     return bbox[0] <= point[0] <= bbox[2] and bbox[1] <= point[1] <= bbox[3]

@@ -1,4 +1,4 @@
-"""通过公共解析入口冻结指定语料的模型、导出与标框，不修改评估原件。"""
+"""Freeze the model, export and frame of the specified corpus through the public parsing entrance without modifying the original evaluation document."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 def main() -> None:
-    """隔离源码入口并逐份保存可复核产物，避免渲染子进程重复执行。"""
+    """Isolate the source code entry and save the reviewable product one by one to avoid repeated execution of the rendering sub-process."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--input-dir", type=Path, required=True)

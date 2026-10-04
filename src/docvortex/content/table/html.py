@@ -1,4 +1,4 @@
-"""HTML 表格解析、行列扫描和结构状态缓存。"""
+"""HTML Table parsing, row and column scanning and structure status caching."""
 
 from __future__ import annotations
 
@@ -11,34 +11,34 @@ from .models import MAX_HEADER_ROWS, RenderedCellSegment, RowMetrics, RowScanRes
 
 
 def _colspan(cell: Any) -> int:
-    """读取 HTML 单元格 colspan，非法值交由上层安全降级。"""
+    """Read cell HTML colspan, illegal values are handed over to the upper layer for security downgrade."""
     val = cell.get("colspan", "1")
     assert isinstance(val, str)
     return int(val)
 
 
 def _rowspan(cell: Any) -> int:
-    """读取 HTML 单元格 rowspan，非法值交由上层安全降级。"""
+    """Read cell HTML rowspan, illegal values are handed over to the upper layer for security downgrade."""
     val = cell.get("rowspan", "1")
     assert isinstance(val, str)
     return int(val)
 
 
 def _normalize_cell_text(cell: Tag) -> str:
-    """生成表头匹配使用的半角无空白文本。"""
+    """Generate table header matching using half-width text without white space."""
     return "".join(full_to_half(cell.get_text()).split())
 
 
 def _display_cell_text(cell: Tag) -> str:
-    """生成保留内部空白的半角展示文本。"""
+    """Generates half-width display text that preserves internal whitespace."""
     return full_to_half(cell.get_text().strip())
 
 
 def _scan_rows(rows: list[Tag], initial_occupied: dict[int, set[int]] | None = None, start_row_idx: int = 0) -> RowScanResult:
-    """单次扫描 HTML 行并缓存有效列、显式列和跨行占位指标。
+    """A single scan of the HTML row and cache of valid columns, explicit columns, and cross-row placeholder metrics.
 
-    ``initial_occupied`` 使用相对首行的偏移记录未来行占位，从而保留跨越
-    前后表边界的 rowspan 结构。
+    ``initial_occupied`` records future line occupancies using offsets relative to the first line, thereby preserving spanning
+    rowspan structure for front and rear table boundaries.
     """
     occupied: dict[int, dict[int, bool]] = {}
     max_cols = 0
@@ -104,7 +104,7 @@ def _scan_rows(rows: list[Tag], initial_occupied: dict[int, set[int]] | None = N
 
 
 def _build_row_signature(row: Tag, effective_cols: int) -> RowSignature:
-    """构建表头检测使用的行结构与文本签名。"""
+    """Build the row structure and text signature used by header detection."""
     cells = row.find_all(["td", "th"])
     return RowSignature(
         effective_cols=effective_cols,
@@ -118,7 +118,7 @@ def _build_row_signature(row: Tag, effective_cols: int) -> RowSignature:
 def _build_front_cache(
     rows: list[Tag], max_header_rows: int = MAX_HEADER_ROWS
 ) -> tuple[list[RowSignature], dict[int, RowMetrics]]:
-    """缓存表格前部表头签名和首批数据行指标。"""
+    """Cache the table header signature and the first batch of data row indicators."""
     front_limit = min(len(rows), max_header_rows + 1)
     front_rows = rows[:front_limit]
     front_scan = _scan_rows(front_rows)
@@ -132,7 +132,7 @@ def _build_front_cache(
 
 
 def _refresh_table_state_metrics(state: TableMergeState) -> None:
-    """HTML 结构调整后重新计算表格状态指标。"""
+    """HTML Table status indicator is recalculated after structural adjustment."""
     scan = _scan_rows(state.rows)
     state.row_effective_cols = scan.row_effective_cols
     state.total_cols = scan.total_cols
@@ -145,10 +145,10 @@ def build_table_state_from_html(
     html: str,
     max_header_rows: int = MAX_HEADER_ROWS,
 ) -> TableMergeState | None:
-    """从原始 HTML 构建 TableMergeState，不依赖 DocVortex block 结构。
+    """TableMergeState is built from the original HTML and does not rely on the DocVortex block structure.
 
-    供外部工具（如 mineru-vl-utils）调用，用于跨页表格结构检测。
-    返回的 state 供 HTML-only 结构 helper 使用，不包含 DocVortex block 所有者。
+    Called by external tools (such as mineru-vl-utils) for cross-page table structure detection.
+    The returned state is used by the HTML-only structure helper and does not contain the DocVortex block owner.
     """
     if not html:
         return None
@@ -186,7 +186,7 @@ def build_table_state_from_html(
 
 
 def _serialize_table_state_html(state: TableMergeState) -> bool:
-    """将合并后的 BeautifulSoup 写回克隆表体，缺失表体时返回失败。"""
+    """Write the merged BeautifulSoup back to the clone table body, and return failure if the table body is missing."""
     if state.body_block is None:
         return False
     state.body_block["content"] = str(state.soup)
@@ -195,13 +195,13 @@ def _serialize_table_state_html(state: TableMergeState) -> bool:
 
 
 def calculate_table_total_columns(soup: BeautifulSoup) -> int:
-    """计算表格的总列数，通过分析整个表格结构来处理rowspan和colspan."""
+    """Calculate the total number of columns of the table, processing rowspan and colspan by analyzing the entire table structure."""
     rows = soup.find_all("tr")
     return _scan_rows(rows).total_cols if rows else 0
 
 
 def build_table_occupied_matrix(soup: BeautifulSoup) -> dict[int, int]:
-    """构建表格的占用矩阵，返回每行的有效列数."""
+    """Constructs the occupancy matrix of the table, returning the effective number of columns for each row."""
     rows = soup.find_all("tr")
     if not rows:
         return {}
@@ -211,13 +211,13 @@ def build_table_occupied_matrix(soup: BeautifulSoup) -> dict[int, int]:
 
 
 def calculate_row_effective_columns(soup: BeautifulSoup, row_idx: int) -> int:
-    """计算指定行的有效列数（考虑rowspan占用）."""
+    """Calculate the effective number of columns for the specified row (taking into account rowspan occupation)."""
     row_effective_cols = build_table_occupied_matrix(soup)
     return row_effective_cols.get(row_idx, 0)
 
 
 def calculate_row_columns(row: Tag) -> int:
-    """计算表格行的实际列数，考虑colspan属性."""
+    """Calculate the actual number of columns for table rows, taking into account the colspan attribute."""
     cells = row.find_all(["td", "th"])
     column_count = 0
 
@@ -229,7 +229,7 @@ def calculate_row_columns(row: Tag) -> int:
 
 
 def calculate_visual_columns(row: Tag) -> int:
-    """计算表格行的视觉列数（实际td/th单元格数量，不考虑colspan）."""
+    """Calculate the number of visual columns for table rows (actual number of td/th cells, colspan is not taken into account)."""
     cells = row.find_all(["td", "th"])
     return len(cells)
 
@@ -239,11 +239,11 @@ def _scan_row_visual_sources(
     target_row_index: int,
     initial_occupied: dict[int, set[int]] | None = None,
 ) -> tuple[dict[int, tuple[int, int]], int]:
-    """扫描到目标行，记录每个视觉列当前由哪个源单元格占据。
+    """Scan to the target row, recording which source cell is currently occupied by each visual column.
 
-    initial_occupied 表示从上一页延续过来的 rowspan 占位，行号相对
-    rows[0] 计算。它只作为虚拟源单元格参与列定位，不对应当前页真实
-    <td>/<th> 元素。
+    initial_occupied represents the rowspan placeholder continued from the previous page, and the line number is relative
+    rows[0] calculation. It only participates in column positioning as a virtual source cell and does not correspond to the actual current page.
+    <td>/<th> elements.
     """
     if target_row_index < 0:
         target_row_index += len(rows)
@@ -285,10 +285,10 @@ def build_visual_col_mapping(
     target_row_index: int,
     initial_occupied: dict[int, set[int]] | None = None,
 ) -> list[int]:
-    """构建目标行中每个显式 <td>/<th> 元素到视觉列位置的映射。
+    """Constructs a mapping of each explicit <td>/<th> element in the target row to the visual column position.
 
-    该映射会正确考虑从前序行继承而来的 rowspan 占位。
-    initial_occupied 可额外传入上一页延续到当前切片的 rowspan 占位。
+    The mapping correctly takes into account the rowspan placeholder inherited from the preceding row.
+    initial_occupied can additionally pass in the rowspan placeholder that continues from the previous page to the current slice.
     """
     if target_row_index < 0:
         target_row_index += len(rows)
@@ -318,11 +318,11 @@ def build_row_rendered_cell_segments(
     target_row_index: int,
     initial_occupied: dict[int, set[int]] | None = None,
 ) -> list[RenderedCellSegment]:
-    """构建目标行的渲染单元格段，保留每段覆盖的视觉列范围。
+    """Constructs rendered cell segments of the target row, preserving the visual column range covered by each segment.
 
-    该函数复用表格行视觉来源扫描结果，语义与 calculate_row_rendered_segments()
-    保持一致：colspan 只算一个渲染段，rowspan 延续下来的单元格也会作为
-    目标行的渲染段返回。
+    This function reuses the table row visual source scan results, and its semantics are the same as calculate_row_rendered_segments()
+    To be consistent: colspan only counts as one rendering segment, and the cells continued from rowspan will also be used as
+    The rendering segment of the target row is returned.
     """
     if target_row_index < 0:
         target_row_index += len(rows)
@@ -342,7 +342,7 @@ def build_row_rendered_cell_segments(
     current_start_col: int | None = None
     current_text = ""
 
-    # 连续视觉列来自同一个源单元格时，合并为一个渲染段。
+    # Consecutive visual columns from the same source cell are combined into one rendering segment.
     for col_idx in range(total_cols):
         marker = target_occupied.get(col_idx)
         if marker is None:
@@ -372,12 +372,12 @@ def build_row_rendered_cell_segments(
 
 
 def calculate_row_rendered_segments(rows: list[Tag], target_row_index: int) -> int:
-    """计算目标行渲染后的视觉段数。
+    """Calculate the number of visual segments after rendering of the target row.
 
-    段数按“渲染出来的单元格块”统计：
-    - 当前行显式单元格各算一段，不展开 colspan
-    - 从前序行继承而来的 rowspan 占位也算段
-    - 只有连续列且来自同一个源单元格时才算同一段
+    The number of segments is counted according to "rendered cell blocks":
+    - Each explicit cell in the current row counts as one section and is not expanded. colspan
+    - The rowspan placeholder inherited from the previous sequence is also counted as a segment
+    - Only consecutive columns and from the same source cell are considered the same segment
     """
     target_occupied, total_cols = _scan_row_visual_sources(rows, target_row_index)
     if total_cols == 0:

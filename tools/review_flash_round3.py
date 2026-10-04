@@ -1,4 +1,4 @@
-"""重放第三轮原件并生成原页、修改前标框、当前标框的逐页验收画廊。"""
+"""Replay the third round of originals and generate a page-by-page acceptance gallery of the original page, the modified pre-frame, and the current frame."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from _flash_pdf_test_utils import _page_bbox_fingerprint, _page_fingerprint  # n
 
 
 def main() -> None:
-    """保存可复核的图像证据；报告不自动修改或批准任何测试基线。"""
+    """Reviewable image evidence is saved; the report does not automatically modify or approve any test baselines."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "output/pdf/flash-round3/final")
     parser.add_argument("--baseline", type=Path, default=ROOT / "output/pdf/flash-round3-analysis")

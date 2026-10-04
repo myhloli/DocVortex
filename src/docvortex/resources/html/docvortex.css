@@ -1,4 +1,4 @@
-/* DocVortex 独立 HTML 主题。所有文档规则均限定在 DocVortex 根节点内。 */
+/* DocVortex Standalone HTML theme. All document rules are limited to the DocVortex root node. */
 .docvortex-html-body {
   background: #ffffff;
   margin: 0;
@@ -35,7 +35,7 @@
   box-sizing: inherit;
 }
 
-/* 标题与正文使用紧凑但稳定的阅读节奏。 */
+/* Use a tight but steady reading rhythm for titles and text. */
 .docvortex-document :is(h1, h2, h3, h4, h5, h6) {
   color: var(--docvortex-text);
   font-weight: 600;
@@ -118,7 +118,7 @@
   margin-bottom: 0;
 }
 
-/* 普通列表使用浏览器语义，混合标记列表使用 renderer 输出的显式网格。 */
+/* Normal lists use browser semantics, mixed tagged lists use the explicit grid output by renderer. */
 .docvortex-document :is(ol, ul) {
   margin: 0 0 1rem;
   padding-left: 1.75rem;
@@ -219,7 +219,7 @@
   overflow-wrap: anywhere;
 }
 
-/* 表格在屏幕内独立滚动，打印时恢复为完整 table。 */
+/* The table scrolls independently within the screen and returns to full table when printed. */
 .docvortex-document table {
   border-collapse: collapse;
   border-spacing: 0;
@@ -260,7 +260,7 @@
   text-align: right;
 }
 
-/* 图片、图表及说明共享同一视觉容器。 */
+/* Images, charts, and descriptions share the same visual container. */
 .docvortex-document img {
   height: auto;
   max-width: 100%;
@@ -277,7 +277,7 @@
   margin-inline: 0;
 }
 
-/* 原图恒为主视图；折叠 details 只展示按需渲染的 Mermaid 图。 */
+/* The original image is always the main view; folding details only displays the Mermaid image rendered on demand. */
 .docvortex-document .docvortex-flowchart {
   margin: 1rem 0 0.5rem;
   max-width: 100%;
@@ -352,7 +352,7 @@
   font-size: 0.875rem;
 }
 
-/* 行内代码、预格式内容和 Prism token 采用 DocVortex 自有配色。 */
+/* Inline code, pre-formatted content and Prism token comes in DocVortex's own color scheme. */
 .docvortex-document code,
 .docvortex-document pre,
 .docvortex-document .docvortex-algorithm {
@@ -477,7 +477,7 @@
   word-break: normal;
 }
 
-/* 空间投影表格和无法结构化的原文保留空白与换行。 */
+/* Space-projected tables and unstructured original text retain whitespace and line breaks. */
 .docvortex-document .docvortex-table-text,
 .docvortex-document .docvortex-raw-fallback {
   overflow: auto;
@@ -495,7 +495,7 @@
   color: var(--docvortex-muted);
 }
 
-/* MathJax 接管前保持 TeX 可见，长公式只在自身容器内滚动。 */
+/* MathJax keeps TeX visible before taking over, and the long formula only scrolls within its own container. */
 .docvortex-document .docvortex-math {
   overflow-wrap: anywhere;
 }
@@ -526,7 +526,7 @@
   text-emphasis-position: under right;
 }
 
-/* FULL 模式在屏幕上显示页间边界，在打印时改用硬分页。 */
+/* FULL mode displays page boundaries on the screen and uses hard paging instead when printing. */
 .docvortex-document .docvortex-page {
   min-width: 0;
   position: relative;

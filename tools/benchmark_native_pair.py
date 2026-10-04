@@ -1,4 +1,4 @@
-"""在相同运行时交替比较两个冻结源码，保留逐文档耗时、公开输出指纹与进程树峰值内存。"""
+"""Alternately compare two frozen sources during the same run, preserving document-by-document elapsed time, public output fingerprints, and process tree peak memory."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import time
 
 
 def _worker(args: argparse.Namespace) -> None:
-    """预热后计量公共 parse，内存包含当前进程及渲染子进程，输出指纹不进入解析计时。"""
+    """After preheating, the public parse is measured. The memory contains the current process and the rendering sub-process. The output fingerprint does not enter the analysis timing."""
     sys.path.insert(0, str(args.source_root.resolve() / "src"))
     import psutil
     from loguru import logger
@@ -31,7 +31,7 @@ def _worker(args: argparse.Namespace) -> None:
     peak = [0]
 
     def sample() -> None:
-        """用低频采样记录同一进程树的 RSS 总量，不累计已经退出的子进程峰值。"""
+        """Use low-frequency sampling to record the total RSS of the same process tree, and do not accumulate the peak value of the child processes that have exited."""
         while not stop.is_set():
             resident = 0
             for member in [process, *process.children(recursive=True)]:
@@ -72,7 +72,7 @@ def _worker(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    """五轮默认按 AB、BA 交替执行，检查同一源码的输出稳定性后汇总配对耗时与内存。"""
+    """The five rounds are executed alternately by AB and BA by default. After checking the output stability of the same source code, the pairing time and memory are summarized."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline-root", type=Path)
     parser.add_argument("--candidate-root", type=Path)

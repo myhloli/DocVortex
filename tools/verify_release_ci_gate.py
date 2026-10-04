@@ -1,10 +1,10 @@
-"""发布门禁校验：release commit 自身有成功 CI，或与最近绿灯祖先仅差版本号赋值。
+"""Release access control verification: release commit itself has a successful CI, or it is only different from the latest green light ancestor by version number assignment.
 
-纯版本号 bump 的 push 不触发 CI（ci.yml 对 version.py 配置了 paths-ignore），
-此时允许 release 借用第一父链上最近一次绿灯 run 的结论，但借用必须同时满足：
-release commit 包含在 origin/main 历史内、两次 commit 之间的改动仅涉及版本文件，
-且该文件的 AST 除顶层 __version__ 字符串字面量外完全一致，避免夹带未经 CI
-检验的发布内容。
+push with pure version number bump does not trigger CI (ci.yml configures paths-ignore for version.py),
+At this time, release is allowed to borrow the conclusion of the latest green light run on the first parent chain, but the borrowing must also meet:
+release commit is included in the history of origin/main, and the changes between two commit only involve version files.
+And the AST of this file is completely consistent except for the top-level __version__ string literal, to avoid entrainment of unused CI
+Check published content.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ ANCESTOR_LIMIT = 16
 
 
 def successful_push_shas(api_url: str, repository: str, token: str, branch: str = "main", per_page: int = 30) -> set[str]:
-    """查询分支上 push 事件触发的 CI run，返回结论为成功的 head SHA 集合。"""
+    """Query the CI run triggered by the push event on the branch, and return the set of head SHA whose conclusion is successful."""
     query = urllib.parse.urlencode({"branch": branch, "event": "push", "per_page": str(per_page)})
     request = urllib.request.Request(
         f"{api_url}/repos/{repository}/actions/runs?{query}",
@@ -40,7 +40,7 @@ def successful_push_shas(api_url: str, repository: str, token: str, branch: str 
 
 
 def first_parent_chain(repo: str, sha: str, limit: int = ANCESTOR_LIMIT) -> list[str]:
-    """返回从 sha 起沿第一父链的 commit 列表（含自身），受 limit 约束。"""
+    """Returns a list of commits (including itself) along the first parent chain starting from sha, subject to limit."""
     output = subprocess.run(
         ["git", "-C", repo, "rev-list", "--first-parent", "-n", str(limit), sha],
         check=True,
@@ -52,7 +52,7 @@ def first_parent_chain(repo: str, sha: str, limit: int = ANCESTOR_LIMIT) -> list
 
 
 def changed_files(repo: str, base: str, target: str) -> list[str]:
-    """列出两次 commit 之间的改动文件路径。"""
+    """List the changed file paths between two commit."""
     output = subprocess.run(
         ["git", "-C", repo, "diff", "--name-only", base, target],
         check=True,
@@ -64,7 +64,7 @@ def changed_files(repo: str, base: str, target: str) -> list[str]:
 
 
 def reachable_from(repo: str, sha: str, reference: str = MAIN_REF) -> bool:
-    """判断 commit 是否包含在 reference（默认 origin/main）的历史内。"""
+    """Determine whether commit is included in the history of reference (default origin/main)."""
     return (
         subprocess.run(
             ["git", "-C", repo, "merge-base", "--is-ancestor", sha, reference],
@@ -75,7 +75,7 @@ def reachable_from(repo: str, sha: str, reference: str = MAIN_REF) -> bool:
 
 
 def _signature_without_version_assignment(source: str) -> str | None:
-    """解析版本模块，移除唯一的顶层 __version__ 字符串赋值后返回 AST 签名；结构异常返回 None。"""
+    """Parse the version module, remove the only top-level __version__ string assignment and return AST signature; structural exception returns None."""
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -100,7 +100,7 @@ def _signature_without_version_assignment(source: str) -> str | None:
 
 
 def version_assignment_only_change(repo: str, base: str, target: str) -> tuple[bool, str]:
-    """校验两次 commit 的版本模块仅顶层 __version__ 字符串字面量不同，其余语句的 AST 完全一致。"""
+    """Verify the version module of commit twice. Only the top-level __version__ string literal is different, and the AST of the other statements are completely consistent."""
     signatures = []
     for revision in (base, target):
         show = subprocess.run(
@@ -121,7 +121,7 @@ def version_assignment_only_change(repo: str, base: str, target: str) -> tuple[b
 
 
 def verify(repo: str, release_sha: str, green_shas: set[str], main_ref: str = MAIN_REF) -> tuple[bool, str]:
-    """校验发布门禁，返回（是否通过, 说明）。"""
+    """Verify the released access control and return (whether passed, explanation)."""
     chain = first_parent_chain(repo, release_sha)
     if release_sha in green_shas:
         return True, "release commit has a successful CI run on main"

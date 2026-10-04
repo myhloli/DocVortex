@@ -1,4 +1,4 @@
-"""OFD ImageObject 资源解码与安全图片投影。"""
+"""OFD ImageObject resource decoding and secure image projection."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ _JBIG2_SIGNATURE = b"\x97JB2\r\n\x1a\n"
 
 
 def _serialize_raster(data: bytes, *, alpha: int, angle: int) -> str | None:
-    """使用 Pillow 校验、旋转并编码常见位图。"""
+    """Verify, rotate and encode common bitmaps using Pillow."""
     try:
         with Image.open(BytesIO(data)) as source:
             validate_decoded_raster_size(*source.size)
@@ -58,7 +58,7 @@ def build_image_item(
     template_id: int | None,
     resolved_style: dict[str, str] | None = None,
 ) -> ImageItem | None:
-    """解析一个 ImageObject，并保留不支持图片的占位几何。"""
+    """Parse a ImageObject and retain the placeholder geometry that does not support images."""
     style = resolved_style or {}
     if (style.get("Visible") or image_object.get("Visible") or "true").casefold() in {"false", "0"}:
         return None

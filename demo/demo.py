@@ -1,4 +1,4 @@
-"""使用 DocVortex 公开接口完成原生解析、Markdown 导出和结果包保存。"""
+"""Use the DocVortex public interface to complete native parsing, Markdown export and result package saving."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from docvortex import parse
 
 
 def run_demo(input_path: Path, output_dir: Path, *, page_range: str = "", overwrite: bool = False) -> None:
-    """解析一次后复用结果导出，结果包可在没有源文件的环境中恢复。"""
+    """After parsing once, the multiplexed result is exported, and the result package can be restored in an environment without source files."""
     result = parse(input_path, page_range=page_range, keep_model_json=True)
     markdown = result.export(output_dir / f"{input_path.stem}.md", overwrite=overwrite)
     bundle = result.save_bundle(output_dir / f"{input_path.stem}.docvortex", overwrite=overwrite)
@@ -18,7 +18,7 @@ def run_demo(input_path: Path, output_dir: Path, *, page_range: str = "", overwr
 
 
 def main() -> None:
-    """运行默认文本 PDF 示例，也允许传入其他支持的原生文档。"""
+    """Runs the default text PDF example, also allowing other supported native documents to be passed in."""
     demo_dir = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", nargs="?", type=Path, default=demo_dir / "pdfs/demo1.pdf")

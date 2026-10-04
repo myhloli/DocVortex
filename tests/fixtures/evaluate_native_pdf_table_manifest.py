@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""运行外部跨页 PDF 真值 manifest 的 Native Table 发布门。"""
+"""Native Table release gate that runs external spread PDF true value manifest."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ _DEFAULT_SOURCE_ROOT = Path(__file__).resolve().parents[1] / "unittest" / "pdfs"
 
 
 def _validate_portable_manifest(manifest: dict[str, Any]) -> None:
-    """拒绝把语料根目录或主机绝对路径固化进版本化 manifest。"""
+    """Refuse to solidify the corpus root directory or the absolute path of the host into version manifest."""
 
     forbidden_root_keys = {"source_root", "source_root_hint"}
     persisted_root_keys = forbidden_root_keys.intersection(manifest)
@@ -46,7 +46,7 @@ def _validate_portable_manifest(manifest: dict[str, Any]) -> None:
 
 
 def _result_signature(result: Any) -> dict[str, Any] | None:
-    """把原生结构结果转换为 manifest 可比较的稳定签名。"""
+    """Convert native structure results to a stable signature comparable to manifest."""
 
     if result is None:
         return None
@@ -65,11 +65,11 @@ def _recover_table_input(
     *,
     measure_performance: bool,
 ) -> tuple[dict[str, Any] | None, float]:
-    """按性能门开关执行一次功能恢复，或执行预热后的正式计时恢复。"""
+    """Press the performance door switch to perform a function recovery, or perform a formal timing recovery after warm-up."""
 
     if not measure_performance:
         return _result_signature(recover_native_pdf_table(table_input)), 0.0
-    # 性能模式保留一次不计时预热，避免 Python 首次路径和页面缓存抖动污染 p95。
+    # Performance mode retains an untimed warm-up to avoid Python first path and page cache thrashing contamination of p95.
     recover_native_pdf_table(table_input)
     started = time.perf_counter()
     result = recover_native_pdf_table(table_input)
@@ -82,7 +82,7 @@ def _maybe_diagnose_table_input(
     collect_diagnostics: bool,
     mismatch: bool,
 ) -> dict[str, Any] | None:
-    """仅在显式请求诊断或结果不匹配时执行昂贵的候选诊断。"""
+    """Expensive candidate diagnostics are only performed when a diagnostic is explicitly requested or when the results do not match."""
 
     if not collect_diagnostics and not mismatch:
         return None
@@ -96,7 +96,7 @@ def _evaluate_entry(
     *,
     measure_performance: bool,
 ) -> tuple[dict[str, Any] | None, float, NativeTableInput]:
-    """构造一个 manifest 表格输入，并返回结构签名、耗时和诊断输入。"""
+    """Constructs a manifest form input and returns the structure signature, elapsed time, and diagnostic input."""
 
     page_index = int(entry["page_index"])
     if page_index not in page_cache:
@@ -112,8 +112,8 @@ def _evaluate_entry(
         point_bbox = tuple(float(value) for value in entry["bbox_points"])
     else:
         bbox = entry["bbox"]
-        # layout bbox 使用整数化 PDFPage 尺寸还原；评测必须复现同一生产坐标边界，
-        # 避免亚点级外缘生成幽灵轨道。
+        # layout bbox Use integerization PDFPage Dimension reduction; evaluation must reproduce the same production coordinate boundary,
+        # Avoid the generation of ghost orbits at the outer edge of the sub-point level.
         production_page_size = (int(page_size[0]), int(page_size[1]))
         point_bbox = tuple(
             bbox[index] * (production_page_size[0] if index % 2 == 0 else production_page_size[1]) for index in range(4)
@@ -137,7 +137,7 @@ def _entry_mismatch(
     entry: dict[str, Any],
     actual: dict[str, Any] | None,
 ) -> tuple[str, bool]:
-    """比较一个真值条目的输出模式、拓扑和单元格文本哈希。"""
+    """Compares the output pattern, topology, and cell text hash of a truth entry."""
 
     actual_output = "html" if actual is not None else "projection"
     expected_output = entry["expected_output"]
@@ -156,7 +156,7 @@ def _entry_mismatch(
 
 
 def main() -> None:
-    """校验 HTML 覆盖率、结构真值、文本哈希和解析性能。"""
+    """Check HTML coverage, structural truth, text hashing and parsing performance."""
 
     parser = argparse.ArgumentParser()
     parser.add_argument(

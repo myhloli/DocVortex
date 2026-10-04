@@ -1,4 +1,4 @@
-"""从 DOC Data/PICF 与 Word OfficeArt drawing 中恢复图片。"""
+"""Recover pictures from DOC Data/PICF and Word OfficeArt drawing."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ _PLACEABLE_WMF_MAGIC = b"\xd7\xcd\xc6\x9a"
 
 @dataclass(slots=True)
 class ImageStore:
-    """按内容去重并限制 DOC 图片累计字节数。"""
+    """Deduplication by content and limit the cumulative number of bytes of DOC pictures."""
 
     total: int = 0
     cache: dict[tuple[bytes, tuple[int, int] | None], DocImagePayload] = field(default_factory=dict)
@@ -30,7 +30,7 @@ class ImageStore:
     equation_decoder: OfficeImageEquationDecoder = field(default_factory=OfficeImageEquationDecoder)
 
     def add(self, payload: OfficeImagePayload) -> DocImagePayload:
-        """计入一张唯一图片并返回内部载荷。"""
+        """Count a unique image and return the internal payload."""
 
         digest = hashlib.sha256(payload.data).digest()
         cache_key = digest, payload.render_size_emu
@@ -70,7 +70,7 @@ def inline_picture(
     store: ImageStore,
     budget: DocBudget,
 ) -> DocImagePayload | None:
-    """解析 sprmCPicLocation 指向的 PICFAndOfficeArtData。"""
+    """Parse PICFAndOfficeArtData pointed to by sprmCPicLocation."""
 
     total_length = get_u32(data_stream, offset)
     header_length = get_u16(data_stream, offset + 4)
@@ -83,7 +83,7 @@ def inline_picture(
     art = picf[min(header_length, len(picf)) :]
     decoded = first_blip(art, charge=budget.charge)
     if decoded is None:
-        # 少量旧文件把原始位图直接放在 PICF 尾部，按 magic 尽力保留。
+        # For a small number of old files, the original bitmap is directly placed at the end of PICF, and magic is used to preserve it as best as possible.
         signatures = (
             (_PLACEABLE_WMF_MAGIC, "wmf", "image/wmf"),
             (b"\x89PNG\r\n\x1a\n", "png", "image/png"),
@@ -112,7 +112,7 @@ def floating_pictures(
     store: ImageStore,
     budget: DocBudget,
 ) -> list[DocImage]:
-    """按 PlcfSpaMom anchor CP 将 floating shape 的 BStore 图片绑定到正文。"""
+    """Press PlcfSpaMom anchor CP to bind the BStore picture of floating shape to the text."""
 
     plc_payload = bounded_slice(table_stream, shape_plc_offset, shape_plc_size)
     drawing = bounded_slice(table_stream, drawing_offset, drawing_size)
@@ -130,7 +130,7 @@ def floating_pictures(
     first = record_at(drawing, 0, charge=budget.charge)
     cursor = (8 + len(first.payload)) if first is not None else len(drawing)
     while cursor < len(drawing):
-        # OfficeArtWordDrawing 在 DgContainer 前有一个 main/header 标签字节。
+        # OfficeArtWordDrawing There is a main/header tag byte before DgContainer.
         cursor += 1
         container = record_at(drawing, cursor, charge=budget.charge)
         if container is None:

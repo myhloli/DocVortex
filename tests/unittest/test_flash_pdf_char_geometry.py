@@ -18,7 +18,7 @@ _PDF_FIXTURE_XOR_KEY = b"MinerU flash layout fixture"
 
 
 def _read_pdf_fixture(path: Path) -> bytes:
-    """读取普通 PDF，或在内存中解密以 .xor 结尾的测试样本。"""
+    """Read plain PDF, or decrypt test samples ending in .xor in memory."""
 
     payload = path.read_bytes()
     if path.suffix != ".xor":
@@ -41,7 +41,7 @@ def _line_fixture(
     start_char_idx: int = 0,
     split_baseline: float | None = None,
 ) -> tuple[_LineItem, PDFPageTextGeometry]:
-    """构造 loose/tight/origin 均可控的单行几何 fixture。"""
+    """Construct a single-row geometry fixture that is controllable by both loose/tight/origin."""
 
     chars = []
     loose_bboxes = {}
@@ -100,7 +100,7 @@ def _line_fixture(
 
 
 def _merge_geometries(*geometries: PDFPageTextGeometry) -> PDFPageTextGeometry:
-    """合并同页多行 fixture 的字符 side-map。"""
+    """Merge the character side-map of multiple fixtures on the same page."""
 
     return PDFPageTextGeometry(
         chars=[char for geometry in geometries for char in geometry.chars],
@@ -111,7 +111,7 @@ def _merge_geometries(*geometries: PDFPageTextGeometry) -> PDFPageTextGeometry:
 
 
 def test_two_page_repeated_loose_height_inflation_sets_canonical_em_scale() -> None:
-    """验证两页内重复的 loose 高度异常即可按字号与 tight 几何校准全文。"""
+    """Verify that the repeated loose height anomaly within two pages can calibrate the full text by font size and tight geometry."""
 
     lines_by_page: list[list[_LineItem]] = []
     geometries: list[PDFPageTextGeometry] = []
@@ -155,7 +155,7 @@ def test_two_page_repeated_loose_height_inflation_sets_canonical_em_scale() -> N
 
 
 def test_line_loose_tier_shrinks_repeated_largest_tier_to_second_tier() -> None:
-    """验证同行重复最大 loose 档按次档的归一化 ascent/descent 回缩。"""
+    """Verify that peer repeats the normalized ascent/descent retraction of the maximum loose bin by bin."""
 
     offsets = _line_loose_tier_offsets(
         [(8.0, 2.0, 7.0, 10.0)] * 6 + [(20.0, 4.0, 7.0, 10.0)] * 4,
@@ -166,7 +166,7 @@ def test_line_loose_tier_shrinks_repeated_largest_tier_to_second_tier() -> None:
 
 
 def test_line_loose_tier_preserves_legitimate_mixed_font_sizes() -> None:
-    """验证按各自 em 归一化后相同的真实混合字号不会形成异常高度档。"""
+    """Verify that the same true mixed font sizes, normalized by their respective em, do not create unusual height profiles."""
 
     offsets = _line_loose_tier_offsets(
         [(8.0, 2.0, 7.0, 10.0)] * 4 + [(16.0, 4.0, 14.0, 20.0)] * 4,
@@ -177,7 +177,7 @@ def test_line_loose_tier_preserves_legitimate_mixed_font_sizes() -> None:
 
 
 def test_line_loose_tier_ignores_single_large_outlier() -> None:
-    """验证单个 loose 高度离群字符不足以触发整行档位回缩。"""
+    """Verify that a single loose highly outlier character is not sufficient to trigger an entire row of gear retraction."""
 
     offsets = _line_loose_tier_offsets(
         [(8.0, 2.0, 7.0, 10.0)] * 7 + [(20.0, 4.0, 7.0, 10.0)],
@@ -188,7 +188,7 @@ def test_line_loose_tier_ignores_single_large_outlier() -> None:
 
 
 def test_strong_x_run_repairs_advance_and_contains_tight_bbox() -> None:
-    """验证强 X 异常 run 按 origin advance 收缩且仍包含 tight。"""
+    """Verify strong X exception run shrinks by origin advance and still contains tight."""
 
     line, geometry = _line_fixture(source_index=0, baseline=20.0, loose_width=12.0)
     plan = build_document_geometry_plan([[line]], [geometry], [(400.0, 100.0)])
@@ -203,7 +203,7 @@ def test_strong_x_run_repairs_advance_and_contains_tight_bbox() -> None:
 
 
 def test_sparse_trailing_punctuation_inherits_confirmed_x_repair() -> None:
-    """验证异常字体 run 尾部的稀疏标点使用同样式 donor 收紧字符和行框。"""
+    """Verify exception font run Sparse punctuation at the end uses the same style donor to tighten characters and line boxes."""
 
     line, geometry = _line_fixture(
         source_index=0,
@@ -236,7 +236,7 @@ def test_sparse_trailing_punctuation_inherits_confirmed_x_repair() -> None:
 
 
 def test_sparse_punctuation_fallback_requires_inflated_matching_style() -> None:
-    """验证正常宽标点和不同字体标点不会仅因邻近异常字母而继承 donor。"""
+    """Verify that normal wide punctuation and different font punctuation do not inherit donor simply due to proximity to unusual letters."""
 
     normal, normal_geometry = _line_fixture(
         source_index=0,
@@ -288,7 +288,7 @@ def test_sparse_punctuation_fallback_requires_inflated_matching_style() -> None:
 
 
 def test_sparse_column_boundary_glyph_repair_restores_native_resplit() -> None:
-    """验证左栏末尾稀疏字符修复后恢复栏沟，使生产重切生成唯一来源序号。"""
+    """Verify that the sparse characters at the end of the left column are repaired and the column groove is restored, so that the production can be re-cut to generate a unique source serial number."""
 
     line, geometry = _line_fixture(
         source_index=0,
@@ -358,7 +358,7 @@ def test_sparse_column_boundary_glyph_repair_restores_native_resplit() -> None:
 
 
 def test_short_rows_accumulate_enough_pairs_for_strong_x_repair() -> None:
-    """验证大量三字符短行仍可累计文档级 X 异常证据。"""
+    """Verify that large numbers of short three-character lines can still accumulate evidence of document-level X anomalies."""
 
     lines = []
     geometries = []
@@ -385,7 +385,7 @@ def test_short_rows_accumulate_enough_pairs_for_strong_x_repair() -> None:
 
 
 def test_style_only_prefilter_calibrates_scale_without_rewriting_output_geometry() -> None:
-    """验证温和跨页高度异常只校准字号，不顺带启用公开 bbox 重写。"""
+    """Verification that mild cross-page height anomalies only calibrate font size, does not incidentally enable the public bbox override."""
 
     lines_by_page = []
     geometries = []
@@ -433,7 +433,7 @@ def test_style_only_prefilter_calibrates_scale_without_rewriting_output_geometry
 
 
 def test_style_prefilter_keeps_subthreshold_document_on_identity_path() -> None:
-    """验证未超过 style inflation 阈值的跨页行保持完全 identity。"""
+    """Verify that cross-page rows that do not exceed the style inflation threshold remain fully identity."""
 
     lines_by_page = []
     geometries = []
@@ -468,7 +468,7 @@ def test_style_prefilter_keeps_subthreshold_document_on_identity_path() -> None:
 
 
 def test_canonical_line_metrics_propagate_without_y_bbox_rewrite() -> None:
-    """验证只发生 X 修复的行仍获得 tight 字形并集和 dominant origin 基线。"""
+    """Verify that only lines where the X fix occurs still get the tight glyph union and the dominant origin baseline."""
 
     line, geometry = _line_fixture(
         source_index=0,
@@ -499,7 +499,7 @@ def test_canonical_line_metrics_propagate_without_y_bbox_rewrite() -> None:
 
 
 def test_normal_monospace_run_keeps_identity_geometry() -> None:
-    """验证 fixed cell 与 origin advance 一致时不会被判为异常。"""
+    """Verify that fixed, cell and origin will not be considered abnormal if they are consistent with advance."""
 
     line, geometry = _line_fixture(source_index=0, baseline=20.0, loose_width=6.0)
     plan = build_document_geometry_plan([[line]], [geometry], [(400.0, 100.0)])
@@ -509,7 +509,7 @@ def test_normal_monospace_run_keeps_identity_geometry() -> None:
 
 
 def test_zero_rotation_ignores_untrusted_loose_side_map_shadow() -> None:
-    """验证零旋转字符只使用原始 bbox，不让密集 side-map 扰动改变布局计划。"""
+    """Verify that zero-rotation characters only use the original bbox and do not allow dense side-map perturbations to change the layout plan."""
 
     line, geometry = _line_fixture(source_index=0, baseline=20.0, loose_width=6.0)
     perturbed = {
@@ -525,7 +525,7 @@ def test_zero_rotation_ignores_untrusted_loose_side_map_shadow() -> None:
 
 
 def test_rotated_char_rejects_implausible_side_map_x_expansion() -> None:
-    """验证旋转字符的 loose 宽度远超原始和 tight 框时回退稳定原始几何。"""
+    """Verify that the rotated character's loose width far exceeds the original and tight fallback to stabilize the original geometry."""
 
     line, geometry = _line_fixture(source_index=0, baseline=20.0, loose_width=6.0)
     for char in line.chars:
@@ -541,7 +541,7 @@ def test_rotated_char_rejects_implausible_side_map_x_expansion() -> None:
 
 
 def test_missing_extended_geometry_is_exact_identity() -> None:
-    """验证 tight/origin 缺失时完全沿用 legacy loose 行。"""
+    """Verify that the legacy and loose lines are completely inherited when tight/origin is missing."""
 
     line, geometry = _line_fixture(source_index=0, baseline=20.0)
     empty = PDFPageTextGeometry(chars=geometry.chars, tight_bboxes={}, origins={}, loose_bboxes=geometry.loose_bboxes)
@@ -555,7 +555,7 @@ def test_missing_extended_geometry_is_exact_identity() -> None:
 
 
 def test_repeated_neighbor_intrusion_trims_only_y() -> None:
-    """验证同 run 多行 loose 侵入邻行 tight core 时仅裁剪 Y。"""
+    """Verification Same as run Multi-row loose Intrudes into adjacent rows tight core Only crops Y."""
 
     lines = []
     geometries = []
@@ -586,7 +586,7 @@ def test_repeated_neighbor_intrusion_trims_only_y() -> None:
 
 
 def test_split_y_is_shadow_only() -> None:
-    """验证多基线 legacy line 只记录 split 候选而不改变输出。"""
+    """Validating multiple baselines legacy line only logs the split candidate without changing the output."""
 
     line, geometry = _line_fixture(
         source_index=0,
@@ -604,7 +604,7 @@ def test_split_y_is_shadow_only() -> None:
 
 
 def test_y_trim_is_not_applied_to_formula_candidate() -> None:
-    """验证公式候选行不会进入生产 Y trim。"""
+    """Validation formula candidate row does not go into production Y trim."""
 
     lines = []
     geometries = []
@@ -625,7 +625,7 @@ def test_y_trim_is_not_applied_to_formula_candidate() -> None:
 
 
 def test_strong_bad_font_family_propagates_to_supported_sibling_run() -> None:
-    """验证已确认异常字体族只向仍有 overlap 证据的 sibling 传播。"""
+    """Verification has confirmed that the anomalous font family is propagated only to sibling where there is still evidence of overlap."""
 
     strong, strong_geometry = _line_fixture(
         source_index=0,
@@ -659,7 +659,7 @@ def test_strong_bad_font_family_propagates_to_supported_sibling_run() -> None:
 
 
 def test_versioned_mixed_text_fixture_keeps_normal_geometry_identity() -> None:
-    """验证版本化中英混排与等宽字体样本不会误触发生产修复。"""
+    """Verify that versioned Chinese-English mixed typeface and fixed-width font samples will not accidentally trigger production fixes."""
 
     project_root = Path(__file__).parents[2]
     fixture = project_root / "tests" / "unittest" / "pdfs" / "flash_layout" / "mixed_text_layout_sample.pdf.xor"
@@ -696,7 +696,7 @@ def test_versioned_mixed_text_fixture_keeps_normal_geometry_identity() -> None:
 
 
 def test_flash_layout_manifest_uses_portable_repository_paths() -> None:
-    """验证版本化 layout manifest 不保存主机绝对路径且页数完整。"""
+    """Verify versioning layout manifest Does not save host absolute path with complete page count."""
 
     project_root = Path(__file__).parents[2]
     payload = json.loads(
@@ -713,7 +713,7 @@ def test_flash_layout_manifest_uses_portable_repository_paths() -> None:
 
 
 def test_native_document_risk_randomized_reference_parity() -> None:
-    """随机组合跨页字号、混合 run、拆行和公式标志，逐项比较风险结论。"""
+    """Randomly combine cross-page font sizes, mixed run, line breaks, and formula flags to compare risk conclusions on a case-by-case basis."""
     import random
     import pytest
     from docvortex._compute_backend import get_native
@@ -798,7 +798,7 @@ def test_native_document_risk_randomized_reference_parity() -> None:
 
 
 def test_native_document_risk_custom_threshold_uses_reference(monkeypatch) -> None:
-    """自定义阈值必须命中参考实现，不能静默使用 Rust 固定配置。"""
+    """Custom thresholds must hit the reference implementation and cannot silently use the Rust fixed configuration."""
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
     expected = rules._DocumentGeometryRisk(style=True)
@@ -808,17 +808,17 @@ def test_native_document_risk_custom_threshold_uses_reference(monkeypatch) -> No
 
 
 def test_native_document_risk_failure_is_not_silently_retried(monkeypatch) -> None:
-    """原生计算异常直接传播；只有明确不支持的输入允许参考计算。"""
+    """Native calculation exceptions are propagated directly; only explicitly unsupported inputs are allowed reference calculations."""
     import pytest
     from docvortex import _compute_backend
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
     class FailedNative:
-        """模拟原生构造失败，排除静默回退。"""
+        """Simulate native construction failure, excluding silent fallback."""
 
         @staticmethod
         def NativeGeometryRisk():
-            """抛出计算错误。"""
+            """Throws a calculation error."""
             raise RuntimeError("risk failure")
 
     monkeypatch.setattr(_compute_backend, "get_native", lambda: FailedNative)
@@ -827,7 +827,7 @@ def test_native_document_risk_failure_is_not_silently_retried(monkeypatch) -> No
 
 
 def test_native_run_statistics_consumes_standard_samples(monkeypatch) -> None:
-    """确认标准几何实际进入原生批次，并保持所有成员对象身份。"""
+    """Confirm that the standard geometry actually goes into the native batch and maintains the identity of all member objects."""
     import pytest
     from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
@@ -839,7 +839,7 @@ def test_native_run_statistics_consumes_standard_samples(monkeypatch) -> None:
     expected = rules._build_run_stats_python(samples, by_line)
 
     def rejected_reference(*args):
-        """标准样本若回退则测试失败，避免差分只覆盖同一参考实现。"""
+        """If the standard sample is rolled back, the test will fail to prevent the difference from only covering the same reference implementation."""
         raise AssertionError("unexpected reference fallback")
 
     monkeypatch.setattr(rules, "_build_run_stats_python", rejected_reference)
@@ -850,7 +850,7 @@ def test_native_run_statistics_consumes_standard_samples(monkeypatch) -> None:
 
 
 def test_native_run_statistics_duplicate_members_use_reference() -> None:
-    """别名样本不能按唯一索引表达时保留原成员重复次数与统计结果。"""
+    """When the alias sample cannot be expressed by a unique index, the number of repetitions and statistical results of the original members are retained."""
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
     line, geometry = _line_fixture(source_index=0, baseline=30.0)
@@ -860,7 +860,7 @@ def test_native_run_statistics_duplicate_members_use_reference() -> None:
 
 
 def _cross_page_style_samples():
-    """构造跨页异常字体、健康行以及并列主字体，用于验证全文校准的传播。"""
+    """Construct cross-page anomaly fonts, healthy rows, and parallel main fonts to verify the propagation of full-text calibration."""
     from collections import defaultdict
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
@@ -883,7 +883,7 @@ def _cross_page_style_samples():
 
 
 def test_native_style_propagates_globally_and_preserves_ties(monkeypatch) -> None:
-    """异常字体触发全文校准，健康行也校准，主字体并列仍选择首见者。"""
+    """Abnormal fonts trigger full-text calibration, healthy lines are also calibrated, and the first-seen font is still selected when the main font is juxtaposed."""
     import pytest
     from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
@@ -893,7 +893,7 @@ def test_native_style_propagates_globally_and_preserves_ties(monkeypatch) -> Non
     samples, by_line = _cross_page_style_samples()
 
     def rejected_reference(*args):
-        """标准样本不允许退回原 run 统计路径。"""
+        """Standard samples are not allowed to return to the original run statistical path."""
         raise AssertionError("unexpected reference fallback")
 
     monkeypatch.setattr(rules, "_build_run_stats_python", rejected_reference)
@@ -906,7 +906,7 @@ def test_native_style_propagates_globally_and_preserves_ties(monkeypatch) -> Non
 
 
 def test_native_style_duplicate_sources_and_custom_rule(monkeypatch) -> None:
-    """重复来源行按原集合统计，自定义全文开关仍按原先顺序调用。"""
+    """Duplicate source rows are counted according to the original set, and the custom full-text switch is still called in the original order."""
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
     samples, by_line = _cross_page_style_samples()
@@ -924,7 +924,7 @@ def test_native_style_duplicate_sources_and_custom_rule(monkeypatch) -> None:
 
 
 def test_native_style_restores_source_before_single_run_statistics() -> None:
-    """全文样式恢复直接使用原始字符框，最终统计和所有回写样本与两遍参考计算相等。"""
+    """Full-text style restoration uses the original character box directly, and final statistics and all writeback samples are calculated equal to the two-pass reference."""
     from copy import deepcopy
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
@@ -946,7 +946,7 @@ def test_native_style_restores_source_before_single_run_statistics() -> None:
     if get_native() is not None:
         assert restored
     if not restored:
-        # 无原生扩展的参考任务仍需验证原流程，不能把未恢复的中间态当作最终结果。
+        # Reference tasks without native extensions still need to verify the original process, and the unrestored intermediate state cannot be regarded as the final result.
         rules._restore_stable_legacy_source_bboxes(by_line, [(600.0, 100.0)] * 2)
         actual_runs = rules._build_run_stats_python(samples, by_line)
         for run in actual_runs.values():
@@ -957,7 +957,7 @@ def test_native_style_restores_source_before_single_run_statistics() -> None:
 
 
 def test_native_style_rejection_does_not_partially_restore_samples() -> None:
-    """后部字符包含不支持的来源框时，原生拒绝不得提前修改前部样本。"""
+    """Native rejection must not modify the front sample early when the back character contains an unsupported source box."""
     import pytest
     from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
@@ -982,7 +982,7 @@ def test_native_style_rejection_does_not_partially_restore_samples() -> None:
 
 
 def test_native_style_restore_respects_repeated_members_and_page_keys() -> None:
-    """同一样本跨来源键重复出现时，依次使用映射页尺寸并保留最后一次恢复结果。"""
+    """When the same sample reoccurs across source keys, the mapping page size is used sequentially and the last recovery result is retained."""
     import pytest
     from copy import deepcopy
     from docvortex._compute_backend import get_native
@@ -1008,7 +1008,7 @@ def test_native_style_restore_respects_repeated_members_and_page_keys() -> None:
 
 
 def _style_only_document_fixture():
-    """构造仅触发样式风险的两页文档，正常源框不触发 X/Y 布局修复。"""
+    """Constructing a two-page document that only triggers style risk, normal source boxes do not trigger the X/Y layout fix."""
     pages, geometries = [], []
     for _page in range(2):
         lines = []
@@ -1035,7 +1035,7 @@ def _style_only_document_fixture():
 
 
 def test_native_style_document_avoids_python_character_samples(monkeypatch) -> None:
-    """样式文档必须直接消费 Rust 数据，完整计划与参考一致且不构造字符 dataclass。"""
+    """The style document must consume the Rust data directly, with the complete scheme consistent with the reference and without constructing the character dataclass."""
     import pytest
     from copy import deepcopy
     from docvortex._compute_backend import get_native
@@ -1050,7 +1050,7 @@ def test_native_style_document_avoids_python_character_samples(monkeypatch) -> N
         expected = rules.build_document_geometry_plan(*reference)
 
     def rejected_sample(*args, **kwargs):
-        """标准样式文档不得物化 Python 字符样本。"""
+        """Standard style documents must not materialize Python character samples."""
         raise AssertionError("Python character sample materialized")
 
     monkeypatch.setattr(rules._CharSample, "__init__", rejected_sample)
@@ -1060,7 +1060,7 @@ def test_native_style_document_avoids_python_character_samples(monkeypatch) -> N
 
 
 def test_native_style_document_consumes_once_and_rejects_partial_line() -> None:
-    """构造器错误不追加半行，结束后不能继续读取或追加自有文档。"""
+    """Constructor error does not append half a line, and cannot continue to read or append its own document after the end."""
     import pytest
     from docvortex._compute_backend import get_native
 
@@ -1080,7 +1080,7 @@ def test_native_style_document_consumes_once_and_rejects_partial_line() -> None:
 
 
 def test_owned_layout_document_preserves_rotations_and_complete_records() -> None:
-    """四种页面文字方向均保留完整字符和 run 字段，并只在最终边界物化一次。"""
+    """All four page text directions retain full characters and the run field, and materialize only once at the final boundary."""
     import pytest
     from copy import deepcopy
     from docvortex._compute_backend import get_native
@@ -1103,7 +1103,7 @@ def test_owned_layout_document_preserves_rotations_and_complete_records() -> Non
 
 
 def test_owned_document_rejects_custom_font_before_conversion() -> None:
-    """拒绝含自定义字体转换的文档时不执行转换、不清理侧表，参考路径仍只执行原次数。"""
+    """When rejecting a document containing custom font conversion, the conversion will not be performed, the side table will not be cleaned, and the reference path will still only be executed the original number of times."""
     import pytest
     from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
@@ -1112,12 +1112,12 @@ def test_owned_document_rejects_custom_font_before_conversion() -> None:
         pytest.skip("需要原生扩展")
 
     class FontSize:
-        """记录自定义浮点转换是否被原生试探提前执行。"""
+        """Logs whether custom floating point conversions are performed ahead of time by native heuristics."""
 
         calls = 0
 
         def __float__(self):
-            """统计实际转换次数。"""
+            """Count the actual number of conversions."""
             self.calls += 1
             return 10.0
 
@@ -1132,7 +1132,7 @@ def test_owned_document_rejects_custom_font_before_conversion() -> None:
 
 
 def test_native_style_restoration_accepts_owned_bbox_container() -> None:
-    """真实字符 Bbox 包装不能导致原生恢复半途退回参考路径。"""
+    """Real character Bbox wrapper cannot cause native restore to fall back to reference path halfway."""
     import pytest
     from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
@@ -1150,7 +1150,7 @@ def test_native_style_restoration_accepts_owned_bbox_container() -> None:
 
 
 def test_owned_line_metrics_match_reference_across_flags_and_baselines() -> None:
-    """共享聚类后仍保留宽度/人数的不同主基线规则、旋转与重复来源行语义。"""
+    """Different primary baseline rules for width/number of people, rotation and duplicate source row semantics are preserved after shared clustering."""
     import random
     from copy import deepcopy
     import pytest
@@ -1209,7 +1209,7 @@ def test_owned_line_metrics_match_reference_across_flags_and_baselines() -> None
 
 
 def test_owned_layout_without_repairs_avoids_character_materialization(monkeypatch) -> None:
-    """布局准入后没有实际 X/Y 修复时，仍返回完整 canonical 计划且不构造字符对象。"""
+    """When no actual X/Y is fixed after layout admission, the full canonical plan is still returned and the character object is not constructed."""
     from copy import deepcopy
     import pytest
     from docvortex._compute_backend import get_native
@@ -1221,7 +1221,7 @@ def test_owned_layout_without_repairs_avoids_character_materialization(monkeypat
     args = ([[line]], [geometry], [(600.0, 100.0)])
 
     def full_layout(*args):
-        """固定准入，以检查二级风险排除后是否消除字符物化。"""
+        """Fixed admissions to check if character materialization is eliminated after secondary risk removal."""
         return rules._DocumentGeometryRisk(layout=True, style=False)
 
     monkeypatch.setattr(rules, "_document_requires_full_geometry", full_layout)
@@ -1230,7 +1230,7 @@ def test_owned_layout_without_repairs_avoids_character_materialization(monkeypat
         expected = rules.build_document_geometry_plan(*deepcopy(args))
 
     def reject_sample(*args, **kwargs):
-        """此分支不应再调用 Python 字符构造器。"""
+        """This branch should no longer call the Python character constructor."""
         raise AssertionError("Unexpected character materialization")
 
     monkeypatch.setattr(rules._CharSample, "__init__", reject_sample)

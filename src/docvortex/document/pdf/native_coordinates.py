@@ -1,4 +1,4 @@
-"""PDF 页面坐标、矩阵与扩展字符几何，保持原生提取算法与资源语义。"""
+"""PDF page coordinates, matrix and extended character geometry, maintaining the native extraction algorithm and resource semantics."""
 
 from __future__ import annotations
 
@@ -17,13 +17,13 @@ logger = logging.getLogger("docvortex.document.pdf._document")
 
 
 def _normalize_pdf_page_bbox(bbox: tuple[float, float, float, float]) -> BBox:
-    """规范化 PDFium 页面框，兼容上下坐标顺序相反的测试或异常文档。"""
+    """Standardized PDFium page frame, compatible with test or exception documents whose upper and lower coordinates are in reverse order."""
     x0, y0, x1, y1 = (float(value) for value in bbox)
     return min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)
 
 
 def _drawing_page_size(page_bbox: BBox, page_rotation: int) -> tuple[float, float]:
-    """根据未旋转页面框和页面旋转角计算左上坐标系中的页面尺寸。"""
+    """Calculate the page size in the upper-left coordinate system based on the unrotated page box and the page rotation angle."""
     width = page_bbox[2] - page_bbox[0]
     height = page_bbox[3] - page_bbox[1]
     if page_rotation in (90, 270):
@@ -36,7 +36,7 @@ def _transform_drawing_point(
     page_bbox: BBox,
     page_rotation: int,
 ) -> tuple[float, float]:
-    """把 PDF 底左原点坐标转换为应用页面旋转后的左上原点坐标。"""
+    """Convert the bottom left origin coordinates of PDF to the upper left origin coordinates after applying page rotation."""
     x, y = point
     left, bottom, right, top = page_bbox
     if page_rotation == 90:
@@ -56,7 +56,7 @@ def _char_visual_bbox_from_pdfium(
     page_bbox: BBox,
     page_rotation: int,
 ) -> BBox | None:
-    """把 PDFium 字符 user-space 框转换为合法视觉页面 bbox。"""
+    """Convert PDFium character user-space box to legal visual page bbox."""
     points = [
         _transform_drawing_point(point, page_bbox, page_rotation)
         for point in (
@@ -83,7 +83,7 @@ def _extract_page_char_extended_geometry(
     page_bbox: BBox,
     page_rotation: int,
 ) -> tuple[dict[int, BBox], dict[int, BBox], dict[int, tuple[float, float]]]:
-    """逐字符读取 loose/tight/origin；单字符失败不影响其余文本。"""
+    """Read loose/tight/origin character by character; failure of a single character does not affect the rest of the text."""
     loose_bboxes: dict[int, BBox] = {}
     tight_bboxes: dict[int, BBox] = {}
     origins: dict[int, tuple[float, float]] = {}
@@ -98,8 +98,8 @@ def _extract_page_char_extended_geometry(
             char_rotation = float(char.get("rotation") or 0.0)
         except (TypeError, ValueError):
             char_rotation = math.nan
-        # pdftext 已在 char["bbox"] 中保留零旋转 loose；side-map 只记录
-        # 非零旋转或来源不明字符的显式覆盖，避免整本重复分配 bbox tuple。
+        # pdftext has reserved zero rotation in char["bbox"] loose; side-map only records
+        # Explicit overwriting of non-zero rotation or characters of unknown origin to avoid repeated allocation of the entire book bbox tuple.
         if not math.isfinite(char_rotation) or abs(char_rotation) > 1e-9:
             loose_rect = pdfium_c.FS_RECTF()
             try:
@@ -176,7 +176,7 @@ def _multiply_pdf_matrices(
     first: tuple[float, float, float, float, float, float],
     second: tuple[float, float, float, float, float, float],
 ) -> tuple[float, float, float, float, float, float]:
-    """按 PDF 行向量约定合并对象矩阵与父 Form 矩阵。"""
+    """Merges the object matrix with the parent Form matrix according to the PDF row vector convention."""
     a1, b1, c1, d1, e1, f1 = first
     a2, b2, c2, d2, e2, f2 = second
     return (
@@ -193,14 +193,14 @@ def _apply_pdf_matrix(
     point: tuple[float, float],
     matrix: tuple[float, float, float, float, float, float],
 ) -> tuple[float, float]:
-    """将 PDF 仿射矩阵应用到一个路径点。"""
+    """Applies the PDF affine matrix to a waypoint."""
     x, y = point
     a, b, c, d, e, f = matrix
     return a * x + c * y + e, b * x + d * y + f
 
 
 def _get_raw_object_matrix(raw_obj: Any) -> tuple[float, float, float, float, float, float] | None:
-    """读取一个原始 PDFium 页面对象矩阵，读取失败时返回 None。"""
+    """Read a raw PDFium page object matrix, and return None when the read fails."""
     matrix = pdfium_c.FS_MATRIX()
     try:
         ok = pdfium_c.FPDFPageObj_GetMatrix(raw_obj, ctypes.byref(matrix))

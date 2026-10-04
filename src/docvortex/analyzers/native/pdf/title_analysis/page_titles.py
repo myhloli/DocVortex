@@ -1,4 +1,4 @@
-"""编排页面文档标题、跨栏标题及误判回退。"""
+"""Arrange page document titles, cross-column titles and misjudgment fallback."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def _classify_page_titles(
     document_body_profile: _DocumentBodyProfile | None = None,
     document_title_profile: _DocumentTitleProfile | None = None,
 ) -> None:
-    """只用页面几何与字体排版标注首页文档标题和各页段落标题。"""
+    """Only use page geometry and font layout to mark the document title on the home page and the paragraph titles on each page."""
 
     for angle in sorted({line.angle for line in lines if line.semantic_type is None and not line.title_suppressed}):
         line_geometry = [
@@ -166,7 +166,7 @@ def _restore_parallel_small_column_labels(
     geometry: list[tuple[_LineItem, BBox]],
     containers: list[BBox],
 ) -> None:
-    """三栏同排小标签与各栏较大的简介构成重复标题结构，用已确认同级标题补齐其余栏。"""
+    """The three columns of small labels in the same row and the larger introductions in each column form a repeated title structure, and the remaining columns are completed with confirmed titles of the same level."""
     candidates = []
     for line, bounds in geometry:
         height = _line_effective_height(line, bounds)
@@ -218,7 +218,7 @@ def _restore_parallel_small_column_labels(
 def _demote_non_structural_anomaly_titles(
     line_geometry: list[tuple[_LineItem, BBox]],
 ) -> None:
-    """在 loose 高度异常文档中只保留预先通过结构转折校验的段落标题。"""
+    """In loose highly abnormal documents, only paragraph titles that have passed structural transition verification in advance are retained."""
 
     for line, _bbox in line_geometry:
         if line.semantic_type == "paragraph_title" and not line.structural_title:
@@ -229,7 +229,7 @@ def _find_repeated_grid_title_suppressions(
     lanes: list[_TextLane],
     median_height: float,
 ) -> set[int]:
-    """识别重复双栏信息网格中的短首行，避免把城市等记录头标成标题。"""
+    """Identify short first lines in repeated two-column information grids to avoid marking records such as cities as titles."""
 
     candidates: list[tuple[int, int, float]] = []
     for lane_index, lane in enumerate(lanes):
@@ -280,7 +280,7 @@ def _find_container_visual_row_title_suppressions(
     container_bboxes: list[BBox],
     median_height: float,
 ) -> set[int]:
-    """用完整视觉行与图表容器的邻接关系抑制拆分 caption 标题误报。"""
+    """Suppress splitting caption title false positives with full visual row adjacency to chart container."""
 
     visual_rows: dict[int, list[tuple[_LineItem, BBox]]] = {}
     for item in line_geometry:
@@ -313,7 +313,7 @@ def _classify_document_title(
     *,
     document_body_profile: _DocumentBodyProfile | None = None,
 ) -> float | None:
-    """从首页上部选取显著大字号锚点，并用同版式邻行扩展多行文档标题。"""
+    """Select a prominently large font anchor point from the top of the home page and extend the multi-line document title with adjacent lines of the same format."""
 
     candidates: list[tuple[float, _TextLane, int, tuple[_LineItem, BBox]]] = []
     lane_profiles = [(lane, _infer_lane_body_profile(lane)) for lane in lanes]
@@ -403,7 +403,7 @@ def _classify_document_title(
                 and candidate_line.font_signature == anchor_line.font_signature
                 and candidate_height < 0.9 * anchor_height
             ):
-                # 题名下方的显著字号收缩建立排版边界，不能只因同字体和居中继续扩张。
+                # The prominent font size below the title shrinks to establish a typographic boundary and cannot continue to expand just because of the same font and centering.
                 break
             if not 0.8 <= candidate_height / anchor_height <= 1.25:
                 break
@@ -428,7 +428,7 @@ def _expand_document_title_across_lanes(
     local_page_height: float,
     document_title_bottom: float | None,
 ) -> float | None:
-    """跨错误推断栏扩展紧邻、同字号且对齐的多行文档标题。"""
+    """Expand adjacent, same-sized, and aligned multi-line document titles across error inference columns."""
 
     title_items = [item for item in line_geometry if item[0].semantic_type == "doc_title"]
     if not title_items:
@@ -497,7 +497,7 @@ def _classify_additional_document_title_bands(
     *,
     document_body_profile: _DocumentBodyProfile | None,
 ) -> float | None:
-    """用居中译题与后续作者行结构补充首页第二文档标题带。"""
+    """Supplement the title band of the second document on the first page with a centered translation title and subsequent author line structure."""
 
     if document_title_bottom is None or document_body_profile is None or not document_body_profile.has_style_scale_repairs:
         return document_title_bottom
@@ -546,7 +546,7 @@ def _classify_cross_lane_centered_section_titles(
     page_index: int,
     document_title_bottom: float | None,
 ) -> None:
-    """用正文栏中心、上下留白和正文邻行补标被单独推成窄栏的标题。"""
+    """Use the center of the text column, the top and bottom margins, and the text adjacent lines to separate the titles into narrow columns."""
 
     stable_lanes = [
         lane for lane in lanes if not lane.is_span and len(lane.lines) >= 5 and lane.right - lane.left >= 0.2 * local_page_width
@@ -646,7 +646,7 @@ def _demote_cross_lane_body_continuation_titles(
     line_geometry: list[tuple[_LineItem, BBox]],
     lanes: list[_TextLane],
 ) -> None:
-    """把紧接上一正文行、同字号同字体的短续行从标题降回正文。"""
+    """Drop a short continuation line of the same size and font immediately following the previous text line from the title back to the text."""
 
     stable_lanes = [lane for lane in lanes if not lane.is_span and len(lane.lines) >= 4]
     context = _stage_profile_context(stable_lanes, line_geometry)
@@ -763,7 +763,7 @@ def _classify_cross_lane_emphasized_section_titles(
     document_title_bottom: float | None,
     document_body_profile: _DocumentBodyProfile | None,
 ) -> None:
-    """用正文栏左缘、强调字体和段间留白补标跨栏推断失败的小节标题。"""
+    """Use the left margin of the text column, emphasized fonts, and white space between paragraphs to cross-column infer section titles that failed."""
 
     stable_lanes = [
         lane for lane in lanes if not lane.is_span and len(lane.lines) >= 5 and lane.right - lane.left >= 0.2 * local_page_width
@@ -842,7 +842,7 @@ def _is_wide_leading_title_continuation(
     title_height: float,
     candidate_height: float,
 ) -> bool:
-    """识别紧贴在窄标题锚点上方、同中心的较宽首行。"""
+    """Identify the wider first line, centered just above the narrow title anchor."""
 
     pair_height = max(0.1, title_height, candidate_height)
     title_width = max(0.1, title_bbox[2] - title_bbox[0])
@@ -860,7 +860,7 @@ def _is_wide_leading_title_continuation(
 def _expand_cross_lane_paragraph_title_neighbors(
     line_geometry: list[tuple[_LineItem, BBox]],
 ) -> None:
-    """把紧贴标题锚点的同字体相邻行跨栏补标为同一标题。"""
+    """Mark the adjacent lines of the same font next to the title anchor across columns as the same title."""
 
     changed = True
     while changed:
@@ -908,7 +908,7 @@ def _expand_cross_lane_paragraph_title_neighbors(
                 )
                 if vertical_gap > 0.35 * max(title_height, candidate_height):
                     continue
-                # 相同正文字体的紧邻段落不能无限递归扩展成标题；段尾上标同样构成停止证据。
+                # Adjacent paragraphs in the same text font cannot be infinitely recursively expanded into titles; superscripts at the end of paragraphs also constitute evidence of stopping.
                 if title_line.paragraph_terminal or candidate_line.paragraph_terminal:
                     continue
                 if (
@@ -929,7 +929,7 @@ def _demote_hanging_multiline_text_titles(
     *,
     page_index: int,
 ) -> None:
-    """把缩进满行后回到栏左缘的紧邻标题行组降回正文。"""
+    """Lower the group of adjacent heading lines that are indented to the left edge of the column back to the text."""
 
     if page_index != 0 or document_body_profile is None:
         return
@@ -982,7 +982,7 @@ def _demote_visual_container_caption_titles(
     line_geometry: list[tuple[_LineItem, BBox]],
     container_bboxes: list[BBox],
 ) -> None:
-    """把紧贴视觉容器下缘且水平居中的标题候选降回普通图注文本。"""
+    """Lowers the horizontally centered title candidate just below the bottom edge of the visual container back to normal legend text."""
 
     for line, bbox in line_geometry:
         if line.semantic_type != "paragraph_title":
@@ -1006,7 +1006,7 @@ def _demote_visual_container_caption_titles(
 def _demote_sentence_tail_titles(
     line_geometry: list[tuple[_LineItem, BBox]],
 ) -> None:
-    """把紧接未完正文、以句末标点结束的短行标题降回正文。"""
+    """Drop short-line headings that immediately follow unfinished text and end with sentence-end punctuation back into the text."""
 
     for line, bbox in line_geometry:
         if (
@@ -1077,7 +1077,7 @@ def _document_title_fonts_compatible(
     first: _LineItem,
     second: _LineItem,
 ) -> bool:
-    """允许混排标题因主字体覆盖不足而切换字体，同时保留可靠字重屏障。"""
+    """Allows mixed titles to switch fonts due to insufficient coverage of the main font, while maintaining a reliable weight barrier."""
 
     if _title_fonts_compatible(first, second):
         return True
@@ -1097,7 +1097,7 @@ def _document_title_uses_page_fallback(
     *,
     document_body_profile: _DocumentBodyProfile | None = None,
 ) -> bool:
-    """判断首页标题是否依赖跨栏 1.30 倍全文正文行高兜底。"""
+    """Determine whether the title of the homepage relies on the column height to be 1.30 times that of the full text."""
 
     title_heights = [
         _line_effective_height(line, bbox) for lane in lanes for line, bbox in lane.lines if line.semantic_type == "doc_title"

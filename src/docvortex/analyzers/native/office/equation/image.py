@@ -1,4 +1,4 @@
-"""从 WMF/GIF 图片 comment 中安全恢复 MathType MTEF 公式。"""
+"""Safe recovery of MathType MTEF formulas from WMF/GIF pictures comment."""
 
 from __future__ import annotations
 
@@ -26,12 +26,12 @@ _HISTORICAL_APPS_SIGNATURES = {
 
 
 class _ImageEquationError(ValueError):
-    """图片 comment 结构损坏、冲突或不受支持。"""
+    """Image comment The structure is corrupt, conflicting, or unsupported."""
 
 
 @dataclass(frozen=True, slots=True)
 class _AppsChunk:
-    """一段已验证边界和 signature 的 AppsMFCC 数据。"""
+    """A piece of AppsMFCC data with verified boundaries and signature."""
 
     key: tuple[str, ...]
     total_length: int
@@ -39,7 +39,7 @@ class _AppsChunk:
 
 
 def _charge_picture_record(counter: list[int]) -> None:
-    """累计 WMF/GIF record 数并在超限时抛稳定资源错误。"""
+    """Accumulate the number of WMF/GIF and record and throw a stable resource error when it exceeds the limit."""
 
     counter[0] += 1
     if counter[0] > MAX_PICTURE_RECORDS:
@@ -47,7 +47,7 @@ def _charge_picture_record(counter: list[int]) -> None:
 
 
 def _signature_components(value: str) -> tuple[str, ...] | None:
-    """按 AppsMFCC 转义规则拆分 slash 分隔的 signature。"""
+    """Split slash delimited signature by AppsMFCC escape rules."""
 
     components: list[str] = []
     current: list[str] = []
@@ -72,7 +72,7 @@ def _signature_components(value: str) -> tuple[str, ...] | None:
 
 
 def _parse_apps_chunk(comment: bytes) -> _AppsChunk | None:
-    """解析一个 AppsMFCC comment，并仅接受规范或历史 MTEF signature。"""
+    """Parse a AppsMFCC comment and accept only canonical or historical MTEF signature."""
 
     if not comment.startswith(_APPS_MFCC_ID):
         return None
@@ -120,7 +120,7 @@ def _parse_apps_chunk(comment: bytes) -> _AppsChunk | None:
 
 
 def _pre6_mtef_comment(comment: bytes) -> bytes | None:
-    """从 MathType 6.0b 前的单 comment 头提取 MTEF。"""
+    """Extract MTEF from the single comment header before MathType 6.0b."""
 
     if not comment.startswith(b"MathType"):
         return None
@@ -130,7 +130,7 @@ def _pre6_mtef_comment(comment: bytes) -> bytes | None:
         raise _ImageEquationError("pre-6 MathType comment is truncated")
     magic, data_length = struct.unpack_from("<HH", comment, 8)
     if magic != 0x5555:
-        # type=0 是 baseline comment，其他类型也不是 MTEF。
+        # type=0 is baseline comment, other types are not MTEF.
         return None
     data_start = 12
     data_end = data_start + int(data_length)
@@ -142,7 +142,7 @@ def _pre6_mtef_comment(comment: bytes) -> bytes | None:
 
 
 def _wmf_comments(image_data: bytes) -> tuple[list[bytes], bool]:
-    """有界遍历 WMF META_ESCAPE/MFCOMMENT 并返回 comment payloads。"""
+    """Bounded iteration of WMF META_ESCAPE/MFCOMMENT and returns comment payloads."""
 
     cursor = 22 if image_data.startswith(_PLACEABLE_WMF_MAGIC) else 0
     if cursor + 18 > len(image_data):
@@ -204,7 +204,7 @@ def _wmf_comments(image_data: bytes) -> tuple[list[bytes], bool]:
 
 
 def _wmf_mtef_candidates(image_data: bytes) -> tuple[list[bytes], bool]:
-    """从 WMF comments 提取 pre-6 与 AppsMFCC MTEF candidates。"""
+    """Extract pre-6 and AppsMFCC from WMF comments MTEF candidates."""
 
     comments, is_wmf = _wmf_comments(image_data)
     if not is_wmf:
@@ -276,7 +276,7 @@ def _gif_subblocks(
     subblock_counter: list[int],
     candidate_bytes_remaining: int | None = None,
 ) -> tuple[bytes | None, int]:
-    """读取 GIF sub-block 序列；仅对已识别的公式扩展保留 payload。"""
+    """Reads the GIF sub-block sequence; payload is reserved only for recognized formula extensions."""
 
     chunks: list[bytes] = []
     total = 0
@@ -294,7 +294,7 @@ def _gif_subblocks(
         if end < cursor or end > len(image_data):
             raise _ImageEquationError("GIF sub-block data is truncated")
         if collect_payload:
-            # 普通帧只遍历结构；公式载荷在复制、拼接前检查单候选和剩余累计预算。
+            # Ordinary frames only traverse the structure; formula loads check single candidates and remaining accumulated budget before copying and splicing.
             total += size
             if total > MAX_ENTRY_BYTES:
                 raise LegacyOfficeResourceLimitError(f"GIF sub-block payload exceeds max_entry_bytes={MAX_ENTRY_BYTES}")
@@ -307,7 +307,7 @@ def _gif_subblocks(
 
 
 def _gif_mtef_candidates(image_data: bytes, *, candidate_bytes_remaining: int | None = None) -> tuple[list[bytes], bool]:
-    """完整遍历 GIF 结构，并在剩余累计预算内提取 MathType/001 载荷。"""
+    """Completely traverse the GIF structure and extract the MathType/001 payload within the remaining cumulative budget."""
 
     if candidate_bytes_remaining is None:
         candidate_bytes_remaining = MAX_EQUATION_CANDIDATE_TOTAL_BYTES
@@ -394,7 +394,7 @@ def _gif_mtef_candidates(image_data: bytes, *, candidate_bytes_remaining: int | 
             recognized = True
             candidates.append(payload)
             candidate_bytes_remaining -= len(payload)
-        # MathType/002 是 baseline，必须明确忽略。
+        # MathType/002 is baseline and must be explicitly ignored.
 
     if not saw_trailer:
         raise _ImageEquationError("GIF trailer is missing")
@@ -404,7 +404,7 @@ def _gif_mtef_candidates(image_data: bytes, *, candidate_bytes_remaining: int | 
 
 
 def _select_candidate_latex(candidates: list[bytes]) -> str | None:
-    """解码全部 candidates；仅返回唯一且完整一致的 LaTeX。"""
+    """Decode all candidatess; only return unique and complete LaTeXs."""
 
     decoded = {latex for candidate in candidates if (latex := decode_mtef(candidate)) is not None}
     return next(iter(decoded)) if len(decoded) == 1 else None
@@ -415,7 +415,7 @@ def _format_hint(
     part_name: object | None,
     content_type: str | None,
 ) -> str | None:
-    """结合 magic、扩展名和内容类型确定 WMF/GIF decoder。"""
+    """Combine magic, extension and content type to determine WMF/GIF decoder."""
 
     if image_data[:6] in _GIF_HEADERS:
         return "gif"
@@ -438,7 +438,7 @@ def _format_hint(
 
 @dataclass(slots=True)
 class OfficeImageEquationDecoder:
-    """按共享资源上限缓存并解码 WMF/GIF 图片中的 MTEF。"""
+    """Cache and decode WMF/GIF MTEF from the shared resource limit."""
 
     total_bytes: int = 0
     _cache: dict[tuple[str, bytes], str | None] = field(default_factory=dict)
@@ -446,7 +446,7 @@ class OfficeImageEquationDecoder:
 
     @property
     def candidate_total_bytes(self) -> int:
-        """返回已计入预算的公式 candidate 总字节数。"""
+        """Returns the budgeted total bytes of formula candidate."""
 
         return self.total_bytes
 
@@ -457,7 +457,7 @@ class OfficeImageEquationDecoder:
         part_name: object | None = None,
         content_type: str | None = None,
     ) -> str | None:
-        """识别图片格式、执行有界 comment 解包并返回完整 LaTeX。"""
+        """Recognize image format, perform bounded comment unpacking and return complete LaTeX."""
 
         if not isinstance(image_data, bytes):
             return None
@@ -508,7 +508,7 @@ def decode_image_embedded_equation(
     part_name: object | None = None,
     content_type: str | None = None,
 ) -> str | None:
-    """使用一次性有界 decoder 从单张 WMF/GIF 中恢复 MTEF。"""
+    """Recover MTEF from single WMF/GIF using one-shot bounded decoder."""
 
     return OfficeImageEquationDecoder().decode(
         image_data,

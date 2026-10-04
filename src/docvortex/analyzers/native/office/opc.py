@@ -1,4 +1,4 @@
-"""OOXML 格式复用的 Open Packaging Conventions 基础能力。"""
+"""OOXML Open Packaging Conventions basic capabilities for format multiplexing."""
 
 from __future__ import annotations
 
@@ -20,8 +20,8 @@ OFFICE_DOCUMENT_REL_TAIL = "officeDocument"
 WORDPROCESSINGML_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 STRICT_WORDPROCESSINGML_NS = "http://purl.oclc.org/ooxml/wordprocessingml/main"
 
-# Strict OOXML 与 Transitional 共用的 URI 映射；格式专属命名空间（如 presentationml）由各
-# normalizer 追加。前缀类映射必须放在更短的同前缀映射之前。
+# Strict OOXML URI mapping common to Transitional; format-specific namespaces (such as presentationml) are defined by each
+# normalizer appended. Prefix class mappings must precede shorter same-prefix mappings.
 STRICT_OOXML_COMMON_REPLACEMENTS: tuple[tuple[bytes, bytes], ...] = (
     (
         b"http://purl.oclc.org/ooxml/officeDocument/relationships/metadata/thumbnail",
@@ -70,7 +70,7 @@ def translate_strict_ooxml_uris(
     xml_bytes: bytes,
     replacements: Sequence[tuple[bytes, bytes]],
 ) -> bytes:
-    """按给定映射把 Strict OOXML URI 字节替换为 Transitional URI。"""
+    """Replace Strict OOXML URI bytes with Transitional URI according to the given mapping."""
     normalized = xml_bytes
     for strict_uri, transitional_uri in replacements:
         normalized = normalized.replace(strict_uri, transitional_uri)
@@ -81,13 +81,13 @@ def repair_content_type_overrides(
     member_data: dict[str, bytes],
     rel_tail_content_types: dict[str, str],
 ) -> bytes | None:
-    """按关系图为缺失或错误的 Office part 补 [Content_Types].xml Override。
+    """Complement [Content_Types].xml Override for missing or incorrect Office part by diagram.
 
-    非标准包的主文档与子 part 常没有 Override（有效内容类型退化为 application/xml），
-    python-docx/python-pptx 无法识别。关系类型比 Content_Types 更可信，这里从根
-    officeDocument 关系出发沿关系图补全；rel_tail_content_types 以关系类型尾段（如
-    "officeDocument"、"slide"、"styles"）映射到期望内容类型。返回新的
-    [Content_Types].xml 字节，无需修改时返回 None。
+    The main document and sub-part of a non-standard package often do not have Override (the effective content type degenerates to application/xml),
+    python-docx/python-pptx not recognized. The relationship type is more trustworthy than Content_Types, here we start from the root
+    officeDocument The relationship starts along the relationship diagram completion; rel_tail_content_types starts with the relationship type tail segment (such as
+    "officeDocument", "slide", "styles") are mapped to the expected content type. return new
+    [Content_Types].xml bytes, returns None if no modification is required.
     """
     content_types_xml = member_data.get(CONTENT_TYPES_MEMBER)
     root_rels_xml = member_data.get(ROOT_RELS_MEMBER)
@@ -128,7 +128,7 @@ def repair_content_type_overrides(
 
 
 def _content_type_override_elements(content_types_root: etree._Element) -> dict[str, etree._Element]:
-    """按去除前导斜杠的 PartName 建立已存在 Override 的索引。"""
+    """Index an existing Override by PartName with the leading slash removed."""
     overrides: dict[str, etree._Element] = {}
     for override in content_types_root:
         if override.tag != f"{{{CONTENT_TYPES_NS}}}Override":
@@ -145,7 +145,7 @@ def _collect_parts_needing_overrides(
     root_rels_root: etree._Element,
     rel_tail_content_types: dict[str, str],
 ) -> list[tuple[str, str]]:
-    """从根 officeDocument 关系出发沿关系图收集需要补 Override 的 Office part。"""
+    """Starting from the root officeDocument relationship, collect the Office part that need to be supplemented by Override along the relationship graph."""
     parser = etree.XMLParser(resolve_entities=False, remove_blank_text=False)
     queue: list[tuple[str, str]] = []
     for relationship in root_rels_root:
@@ -190,7 +190,7 @@ def _collect_parts_needing_overrides(
 
 
 def _part_relationships_member(part_name: str) -> str | None:
-    """根据 part 路径推导其关系成员路径（如 word/document.xml → word/_rels/document.xml.rels）。"""
+    """Derive its relationship member path based on the part path (such as word/document.xml → word/_rels/document.xml.rels)."""
     normalized = part_name.replace("\\", "/")
     if normalized in {"", "."}:
         return None
@@ -203,7 +203,7 @@ def _part_relationships_member(part_name: str) -> str | None:
 
 
 def _is_relationship_element(element: etree._Element) -> bool:
-    """判断元素是否为 Relationship，兼容缺省命名空间写法。"""
+    """Determine whether the element is Relationship, which is compatible with the default namespace writing method."""
     if element.tag == RELATIONSHIP_TAG:
         return True
     try:
@@ -213,7 +213,7 @@ def _is_relationship_element(element: etree._Element) -> bool:
 
 
 def _resolve_relationship_target(rels_filename: str, target: str | None) -> str | None:
-    """把关系文件中的 Target 解析成 ZIP 包内的规范成员路径。"""
+    """Parse Target in the relationship file into the canonical member path in the ZIP package."""
     if not target:
         return None
 
@@ -232,7 +232,7 @@ def _resolve_relationship_target(rels_filename: str, target: str | None) -> str 
 
 
 def write_zip_package(members: Sequence[tuple[ZipInfo, bytes]]) -> bytes:
-    """把规范化后的成员重新写成 ZIP 包，并由标准库重新计算 CRC。"""
+    """Rewrite the normalized members into the ZIP package, and recalculate CRC by the standard library."""
     output = BytesIO()
     with ZipFile(output, "w", ZIP_DEFLATED) as target:
         for info, member_data in members:
@@ -241,7 +241,7 @@ def write_zip_package(members: Sequence[tuple[ZipInfo, bytes]]) -> bytes:
 
 
 def relationship_source_base_dir(rels_filename: str) -> str | None:
-    """从规范 OPC relationship 成员路径推导源 part 所在目录。"""
+    """The directory where the source part is located is deduced from the canonical OPC relationship member path."""
     if rels_filename == "_rels/.rels":
         return ""
 

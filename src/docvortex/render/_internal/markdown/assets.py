@@ -1,4 +1,4 @@
-"""Markdown 与 Content List 共用的图片资源解析。"""
+"""Analysis of image resources shared by Markdown and Content List."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ _HTML_IMAGE_SRC_RE = re.compile(
 
 
 def resolve_image_source(block: ImagePayloadBlock, asset_base_url: str = "") -> str | None:
-    """按 sidecar、data URI、远程 URL 的稳定优先级解析图片来源。"""
+    """Resolve image sources by stable priority of sidecar, data, URI, remote URL."""
     if block.image_path:
         return join_asset_base_url(asset_base_url, block.image_path)
     if block.image_base64:
@@ -25,14 +25,14 @@ def resolve_image_source(block: ImagePayloadBlock, asset_base_url: str = "") -> 
 
 
 def join_asset_base_url(asset_base_url: str, relative_path: str) -> str:
-    """使用 POSIX 语义拼接资源根地址与安全相对路径。"""
+    """Use POSIX semantics to splice resource root addresses and safe relative paths."""
     if not asset_base_url:
         return relative_path
     return f"{asset_base_url.rstrip('/')}/{relative_path.lstrip('/')}"
 
 
 def build_markdown_image(source: str, alt: str = "") -> str:
-    """构造不会被空格或括号截断的 Markdown 图片语法。"""
+    """Constructs a Markdown picture syntax that is not truncated by spaces or parentheses."""
     if not source:
         return ""
     safe_alt = alt.replace("[", r"\[").replace("]", r"\]")
@@ -41,19 +41,19 @@ def build_markdown_image(source: str, alt: str = "") -> str:
 
 
 def normalize_image_source(source: str) -> str:
-    """把图片来源规范化为 Markdown 与 structured_content 共用的安全地址。"""
+    """Normalize the image source to the secure address shared by Markdown and structured_content."""
     if source.startswith("data:"):
         return source
     return quote(source, safe="/:#?&=%@+~,;!$'*-._")
 
 
 def prefix_html_image_sources(markup: str, asset_base_url: str = "") -> str:
-    """给 HTML 中的相对图片地址添加资源根地址。"""
+    """Add the resource root address to the relative image address in HTML."""
     if not markup or not asset_base_url:
         return markup
 
     def _replace(match: re.Match[str]) -> str:
-        """只重写相对 src，保留 data URI、绝对 URL 与根路径。"""
+        """Only relative src is rewritten, data URI, absolute URL and the root path are retained."""
         source = match.group("src")
         if _is_absolute_image_source(source):
             return match.group(0)
@@ -64,7 +64,7 @@ def prefix_html_image_sources(markup: str, asset_base_url: str = "") -> str:
 
 
 def _is_absolute_image_source(source: str) -> bool:
-    """判断 HTML 图片地址是否已经是绝对或不可前缀化的来源。"""
+    """Determine whether the HTML image address is already an absolute or non-prefixable source."""
     normalized = source.strip().lower()
     return normalized.startswith(("data:", "http://", "https://", "//", "/", "#"))
 

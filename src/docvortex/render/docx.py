@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到 DOCX 的轻量公共门面与稳定异常。"""
+"""Strictly a lightweight public facade with stable exceptions from MiddleJson to DOCX."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from .contracts import AssetResolver
 
 
 class DocxRenderError(RuntimeError):
-    """表示 renderer 无法在不丢失必需内容的前提下生成 DOCX。"""
+    """Indicates that renderer cannot generate DOCX without losing necessary content."""
 
     def __init__(
         self,
@@ -17,7 +17,7 @@ class DocxRenderError(RuntimeError):
         block_index: int | None,
         block_type: str,
     ) -> None:
-        """保存错误消息及稳定的 page/block 定位字段。"""
+        """Save error message and stable page/block location field."""
         self.page_idx = page_idx
         self.block_index = block_index
         self.block_type = block_type
@@ -29,7 +29,7 @@ def render_docx(
     *,
     asset_resolver: AssetResolver | None = None,
 ) -> bytes:
-    """惰性加载 DOCX 实现并渲染严格 MiddleJson。"""
+    """Lazy loading DOCX implements and renders strict MiddleJson."""
     from ._internal.docx.renderer import render_docx as _render_docx
 
     return _render_docx(middle_json, asset_resolver=asset_resolver)

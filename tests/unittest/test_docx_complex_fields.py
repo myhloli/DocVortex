@@ -19,7 +19,7 @@ from docvortex.schema import IndexBlock, ParagraphTitleBlock, TextBlock
 
 
 def _append_field_char(paragraph: Paragraph, field_type: str) -> None:
-    """向段落追加一个复杂字段边界 run。"""
+    """Appends a complex field boundary run to the paragraph."""
     run = OxmlElement("w:r")
     field_char = OxmlElement("w:fldChar")
     field_char.set(qn("w:fldCharType"), field_type)
@@ -28,7 +28,7 @@ def _append_field_char(paragraph: Paragraph, field_type: str) -> None:
 
 
 def _append_instruction(paragraph: Paragraph, instruction: str) -> None:
-    """向段落追加复杂字段指令 run。"""
+    """Append complex field command run to paragraph."""
     run = OxmlElement("w:r")
     instruction_element = OxmlElement("w:instrText")
     instruction_element.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
@@ -43,7 +43,7 @@ def _append_result_text(
     *,
     bold: bool = False,
 ) -> None:
-    """向字段结果追加一个可见文本 run。"""
+    """Appends a visible text run to the field results."""
     run = OxmlElement("w:r")
     if bold:
         run_properties = OxmlElement("w:rPr")
@@ -62,7 +62,7 @@ def _append_native_hyperlink(
     target: str,
     parts: list[tuple[str, bool]],
 ) -> None:
-    """向段落追加由多个格式 run 组成的真实外部超链接。"""
+    """Appends a real external hyperlink consisting of multiple formats run to the paragraph."""
 
     relationship_id = paragraph.part.relate_to(
         target,
@@ -87,7 +87,7 @@ def _append_native_hyperlink(
 
 
 def _append_result_tab(paragraph: Paragraph) -> None:
-    """向字段结果追加 Word 制表符 run。"""
+    """Appends the Word tab character run to the field results."""
     run = OxmlElement("w:r")
     run.append(OxmlElement("w:tab"))
     paragraph._p.append(run)
@@ -102,7 +102,7 @@ def _append_toc_complex_field(
     include_outer_toc: bool,
     split_hyperlink_instruction: bool = False,
 ) -> None:
-    """构造 WPS 常见的 TOC、HYPERLINK 与 PAGEREF 嵌套复杂域。"""
+    """Construct WPS common TOC, HYPERLINK and PAGEREF nested complex domains."""
     if include_outer_toc:
         _append_field_char(paragraph, "begin")
         _append_instruction(paragraph, ' TOC \\o "1-1" \\h \\z \\u ')
@@ -131,7 +131,7 @@ def _append_toc_complex_field(
 
 
 def _attach_bookmark(paragraph: Paragraph, anchor: str, bookmark_id: int) -> None:
-    """把 bookmark 包围段落现有正文，模拟 TOC 的真实跳转目标。"""
+    """Surround the existing text of the paragraph with bookmark to simulate the real jump target of TOC."""
     start = OxmlElement("w:bookmarkStart")
     start.set(qn("w:id"), str(bookmark_id))
     start.set(qn("w:name"), anchor)
@@ -143,7 +143,7 @@ def _attach_bookmark(paragraph: Paragraph, anchor: str, bookmark_id: int) -> Non
 
 
 def _build_complex_toc_docx() -> bytes:
-    """生成一个包含匹配目标和缺失目标的最小复杂域目录 DOCX。"""
+    """Generate a minimally complex domain directory DOCX containing matching and missing targets."""
     document = Document()
     toc_style = document.styles.add_style("TOC 1", WD_STYLE_TYPE.PARAGRAPH)
 
@@ -174,7 +174,7 @@ def _build_complex_toc_docx() -> bytes:
 
 
 def _build_external_bookmark_field_docx() -> bytes:
-    """生成同时包含外部文档地址与 bookmark switch 的复杂字段。"""
+    """Generates a complex field that contains both the external document address and bookmark switch."""
 
     document = Document()
     paragraph = document.add_paragraph()
@@ -193,7 +193,7 @@ def _build_external_bookmark_field_docx() -> bytes:
 
 
 def _build_multi_alias_toc_docx() -> bytes:
-    """生成两个被引用 TOC bookmark 指向同一正文段落的 DOCX。"""
+    """Generates two references TOC bookmark pointing to the same body paragraph DOCX."""
 
     document = Document()
     toc_style = document.styles.add_style("TOC 1", WD_STYLE_TYPE.PARAGRAPH)
@@ -230,7 +230,7 @@ def _build_multi_alias_toc_docx() -> bytes:
 
 
 def test_nested_complex_toc_fields_preserve_titles_and_strict_index_targets() -> None:
-    """验证拆分且嵌套的复杂域不会只剩页码，并按真实正文目标收敛目录 anchor。"""
+    """Verify that split and nested complex fields are not reduced to page numbers and converge the table of contents by true text target anchor."""
     file_bytes = _build_complex_toc_docx()
     model_pages = DocxModel().predict(BytesIO(file_bytes))
     raw_index = next(block for page in model_pages for block in page if block["type"] == "index")
@@ -252,7 +252,7 @@ def test_nested_complex_toc_fields_preserve_titles_and_strict_index_targets() ->
 
 
 def test_external_complex_hyperlink_preserves_bookmark_switch() -> None:
-    """验证外部复杂字段把文档地址与 bookmark 合成为同一个链接目标。"""
+    """Verify that the external complex field combines the document address and bookmark into the same link target."""
 
     file_bytes = _build_external_bookmark_field_docx()
     model_pages = DocxModel().predict(BytesIO(file_bytes))
@@ -269,7 +269,7 @@ def test_external_complex_hyperlink_preserves_bookmark_switch() -> None:
 
 
 def test_split_toc_bookmark_aliases_collapse_to_one_target_anchor() -> None:
-    """验证拆分字段引用的同段落 bookmark aliases 收敛为唯一公开 anchor。"""
+    """Verify that the split field referenced by the same paragraph as bookmark aliases converges to the only public anchor."""
 
     file_bytes = _build_multi_alias_toc_docx()
     model_pages = DocxModel().predict(BytesIO(file_bytes))
@@ -303,7 +303,7 @@ def test_split_toc_bookmark_aliases_collapse_to_one_target_anchor() -> None:
 
 
 def test_native_hyperlink_preserves_spaces_between_formatted_runs() -> None:
-    """验证真实超链接跨格式 run 时保留内部空格并维持单一链接目标。"""
+    """Preserve internal whitespace and maintain a single link target when validating real hyperlinks across formats run."""
 
     document = Document()
     paragraph = document.add_paragraph()
@@ -324,7 +324,7 @@ def test_native_hyperlink_preserves_spaces_between_formatted_runs() -> None:
 
 
 def test_native_hyperlink_moves_trailing_space_to_plain_text() -> None:
-    """验证链接尾部空格移到后续普通文本，既保留分隔也不扩大可点击范围。"""
+    """The trailing space of the verification link is moved to the subsequent normal text, which neither retains the separation nor expands the clickable range."""
 
     document = Document()
     paragraph = document.add_paragraph()
@@ -350,7 +350,7 @@ def test_native_hyperlink_moves_trailing_space_to_plain_text() -> None:
 
 
 def test_hyperlink_boundary_spaces_are_plain_and_only_paragraph_edges_trim() -> None:
-    """验证链接首尾空格移为普通元素，不同链接间保留间隔且仅段落外缘裁剪。"""
+    """Verify that the spaces at the beginning and end of the link are moved to ordinary elements, the space between different links is retained, and only the outer edge of the paragraph is cropped."""
 
     first_target = "https://example.test/first"
     second_target = "https://example.test/second"

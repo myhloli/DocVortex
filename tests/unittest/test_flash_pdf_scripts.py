@@ -154,7 +154,7 @@ def _origin_from_upright(
     page_size: tuple[float, float],
     angle: int,
 ) -> tuple[float, float]:
-    """把局部正向 origin 逆变换到页面坐标。"""
+    """Inversely transform local forward origin to page coordinates."""
     x, y = origin
     page_width, page_height = page_size
     if angle == 270:
@@ -171,7 +171,7 @@ def _script_fixture(
     angle: int = 0,
     formula_region: bool = True,
 ) -> tuple[_LineItem, dict[int, BBox], dict[int, tuple[float, float]], tuple[float, float]]:
-    """构造同时含稳定上标和下标的 D-i-p 局部公式行。"""
+    """Constructs a D-i-p local formula row containing both stable superscripts and subscripts."""
     page_size = (100.0, 120.0)
     local_bboxes = (
         (10.0, 40.0, 20.0, 50.0),
@@ -222,7 +222,7 @@ def _script_fixture(
 
 
 def _compact_refinement_fixture(text: str) -> tuple[list[Char], dict[int, BBox], dict[int, tuple[float, float]]]:
-    """构造同一 tight/origin 基线上的紧凑 token 精炼 fixture。"""
+    """Construct a compact token refined fixture on the same tight/origin baseline."""
     chars: list[Char] = []
     tight_bboxes: dict[int, BBox] = {}
     origins: dict[int, tuple[float, float]] = {}
@@ -244,7 +244,7 @@ def _compact_refinement_fixture(text: str) -> tuple[list[Char], dict[int, BBox],
 
 
 def test_flash_compact_aligned_script_suffix_closes_complete_run() -> None:
-    """验证可信 BASE 下标会把同基线的 ``-SAT`` 整体闭合。"""
+    """Verifying that the trusted BASE subscript will completely close the ``-SAT`` with the same baseline."""
     chars, tight_bboxes, origins = _compact_refinement_fixture("XBASE-SAT")
 
     roles = _refine_math_script_tokens(
@@ -269,7 +269,7 @@ def test_flash_compact_script_suffix_requires_anchor_and_raw_geometry(
     text: str,
     raw_roles: list[ScriptRole],
 ) -> None:
-    """验证无正文锚点或无原始角标证据时不会闭合连字符词。"""
+    """Hyphenated words will not be closed when validating without text anchors or original subscript evidence."""
     chars, tight_bboxes, origins = _compact_refinement_fixture(text)
 
     roles = _refine_math_script_tokens(
@@ -285,7 +285,7 @@ def test_flash_compact_script_suffix_requires_anchor_and_raw_geometry(
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_flash_script_geometry_uses_upright_coordinates(angle: int) -> None:
-    """验证四种页面方向下 loose/tight/origin 同步正向化后角色一致。"""
+    """Verify that the roles of loose/tight/origin are consistent after synchronization and forwarding in four page directions."""
     line, tight_bboxes, origins, page_size = _script_fixture(angle=angle)
 
     script_lines = detect_pdf_text_script_lines(
@@ -302,7 +302,7 @@ def test_flash_script_geometry_uses_upright_coordinates(angle: int) -> None:
 
 
 def test_flash_formula_region_rebases_before_classification() -> None:
-    """验证公式区域使用内部 D 基线，同时稳定输出 i 上标和 p 下标。"""
+    """The validation formula area uses the internal D baseline while stabilizing the output i superscript and p subscript."""
     line, tight_bboxes, origins, page_size = _script_fixture()
 
     script_line = detect_pdf_text_script_lines(
@@ -320,7 +320,7 @@ def test_flash_formula_region_rebases_before_classification() -> None:
 
 
 def test_flash_formula_region_without_internal_body_stays_plain() -> None:
-    """验证公式区域全部字符同步偏移且无内部正文基线时不输出 style。"""
+    """style is not output when verifying that all characters in the formula area are offset synchronously and there is no internal text baseline."""
     line, tight_bboxes, origins, page_size = _script_fixture()
     line = replace(line, chars=line.chars[1:], text="ip")
     line.inline_math_regions = [line.bbox]
@@ -336,7 +336,7 @@ def test_flash_formula_region_without_internal_body_stays_plain() -> None:
 
 
 def test_flash_missing_extended_geometry_stays_plain() -> None:
-    """验证 Flash 缺少 tight/origin 时不通过 loose bbox 猜测上下标。"""
+    """Verify that Flash does not pass loose when tight/origin is missing bbox guesses superscript and subscript."""
     line, _tight_bboxes, _origins, page_size = _script_fixture()
 
     script_line = detect_pdf_text_script_lines([line], page_size, {}, {})[0]
@@ -345,7 +345,7 @@ def test_flash_missing_extended_geometry_stays_plain() -> None:
 
 
 def test_flash_fraction_bar_suppresses_stacked_script_candidate() -> None:
-    """验证上下叠字被短横线分隔时按整处分式拒识上下标。"""
+    """Verify that when overlapping words are separated by dashes, superscripts and subscripts will be rejected as whole fractions."""
     page_size = (100.0, 120.0)
     line_chars: list[Char] = [
         {"char": "x", "char_idx": 0, "bbox": Bbox([10.0, 40.0, 20.0, 50.0]), "rotation": 0.0, "font": {}},
@@ -387,7 +387,7 @@ def test_flash_fraction_bar_suppresses_stacked_script_candidate() -> None:
 
 
 def test_flash_long_text_separator_does_not_suppress_leading_note_marker() -> None:
-    """验证长脚注分隔线两侧的正文不会被误判成局部分式。"""
+    """Verify that text on either side of a long footnote separator is not misinterpreted as a partial formula."""
 
     page_size = (100.0, 100.0)
     below_chars: list[Char] = []
@@ -438,7 +438,7 @@ def test_flash_restored_formula_line_preserves_strong_structural_scripts(
     script_start: int,
     expected_text: str,
 ) -> None:
-    """验证恢复公式行只退让弱 token，并保留局部几何稳定的强脚本结构。"""
+    """Verify that the recovery formula line yields only weak token and preserves the locally geometrically stable strong script structure."""
 
     chars: list[Char] = []
     tight_bboxes: dict[int, BBox] = {}
@@ -474,7 +474,7 @@ def test_flash_restored_formula_line_preserves_strong_structural_scripts(
 
 @pytest.mark.parametrize("text", ["Bm", "r1"])
 def test_flash_formula_region_marks_only_the_index(text: str) -> None:
-    """验证公式内部 B_m 与 r_1 只标记下移索引，不把整个 token 标成下标。"""
+    """The B_m and r_1 inside the verification formula only mark the downward index, and do not mark the entire token as a subscript."""
     line, tight_bboxes, origins, page_size = _script_fixture()
     body_char = {**line.chars[0], "char": text[0]}
     index_char = {**line.chars[2], "char": text[1]}
@@ -491,7 +491,7 @@ def test_flash_formula_region_marks_only_the_index(text: str) -> None:
 
 
 def test_flash_script_projection_combines_font_styles() -> None:
-    """验证 Flash 上下标与已有粗体区间在同一 InlineSpan 流中组合。"""
+    """Verify that the Flash superscript and subscript are combined in the same InlineSpan stream with the existing bold range."""
     blocks = [
         {
             "type": "text",
@@ -533,7 +533,7 @@ def test_flash_script_projection_combines_font_styles() -> None:
 
 
 def test_flash_script_projection_does_not_leak_to_same_text() -> None:
-    """验证公式内候选按整行区间投影，不会回退到同行同名普通字符。"""
+    """Candidates in the verification formula are projected according to the entire line interval, and will not fall back to ordinary characters with the same name in the same line."""
     blocks = [
         {
             "type": "text",
@@ -559,7 +559,7 @@ def test_flash_script_projection_does_not_leak_to_same_text() -> None:
 
 
 def test_flash_script_projection_ignores_unrelated_line_cursor() -> None:
-    """验证无关短行不会推进共享 cursor 并吞掉后续完整引用脚本。"""
+    """Validating extraneous short lines does not advance shared cursor and swallow up subsequent fully referenced scripts."""
 
     blocks = [{"type": "text", "bbox": [0.0, 0.0, 1.0, 1.0], "content": "[12]"}]
     lines = [
@@ -586,7 +586,7 @@ def test_flash_script_projection_ignores_unrelated_line_cursor() -> None:
 
 
 def test_flash_script_projection_combines_hyperlink() -> None:
-    """验证超链接与上下标区间共同物化时保持子 Span 顺序和 URL。"""
+    """Verify that subscript Span order and URL are preserved when hyperlinks are comaterialized with superscript and subscript intervals."""
     blocks = [
         {
             "type": "text",
@@ -626,7 +626,7 @@ def test_flash_script_projection_combines_hyperlink() -> None:
 
 @pytest.mark.parametrize("block_type", ["table", "code", "equation", "image"])
 def test_flash_scripts_exclude_non_natural_blocks(block_type: str) -> None:
-    """验证表格、代码、独立公式和图片容器不接收 Flash 上下标。"""
+    """Validation tables, codes, stand-alone formulas, and image containers do not receive subscripts or subscripts Flash."""
     blocks = [
         {
             "type": block_type,
@@ -658,7 +658,7 @@ def test_flash_scripts_exclude_non_natural_blocks(block_type: str) -> None:
 
 
 def test_late_inline_math_region_drops_unrebased_candidate() -> None:
-    """验证后续恢复的公式区域会过滤未在公式内部重新基线的候选。"""
+    """Validation of subsequently recovered formula regions filters out candidates that are not rebaselined within the formula."""
     blocks = [
         {
             "type": "text",
@@ -695,7 +695,7 @@ def test_late_inline_math_region_drops_unrebased_candidate() -> None:
 def _flash_script_analysis(
     pdf_name: str,
 ) -> tuple[tuple[tuple[dict[str, Any], ...], ...], tuple[dict[str, Any], ...]]:
-    """一次解析真实 Flash PDF，缓存清空前的公式检测证据和逐行脚本诊断。"""
+    """Parse real Flash PDF at once, formula detection evidence and line-by-line script diagnostics before cache flush."""
 
     diagnostics: list[dict[str, Any]] = []
     with PDFDocument(str(_DEMO_PDF_DIR / pdf_name)) as document, formula_detection_evidence():
@@ -704,13 +704,13 @@ def _flash_script_analysis(
 
 
 def _flash_script_runs(pdf_name: str) -> list[tuple[str, tuple[str, ...]]]:
-    """从缓存的真实 Flash 页面收集最终 TextSpan 上下标。"""
+    """Collects the final TextSpan superscript and subscript from the cached real Flash page."""
 
     pages, _diagnostics = _flash_script_analysis(pdf_name)
     runs: list[tuple[str, tuple[str, ...]]] = []
 
     def walk(value: Any) -> None:
-        """递归收集最终 TextSpan style。"""
+        """Recursively collect final TextSpan style."""
         if isinstance(value, dict):
             styles = tuple(str(style) for style in value.get("styles", []))
             content = value.get("content")
@@ -727,7 +727,7 @@ def _flash_script_runs(pdf_name: str) -> list[tuple[str, tuple[str, ...]]]:
 
 
 def _flash_script_diagnostics(pdf_name: str) -> tuple[dict[str, Any], ...]:
-    """返回统一分析缓存中的逐行上下标 sidecar。"""
+    """Return line-by-line superscript sidecar in the unified analysis cache."""
 
     _pages, diagnostics = _flash_script_analysis(pdf_name)
     return diagnostics
@@ -735,7 +735,7 @@ def _flash_script_diagnostics(pdf_name: str) -> tuple[dict[str, Any], ...]:
 
 @pytest.fixture(scope="module", autouse=True)
 def _clear_real_script_analysis_cache_after_module() -> Iterator[None]:
-    """模块结束后释放真实 PDF 页面和脚本诊断缓存。"""
+    """Release the real PDF page and script diagnostic cache after the module ends."""
 
     yield
     _flash_script_analysis.cache_clear()
@@ -745,12 +745,12 @@ def test_real_script_pages_and_diagnostics_share_one_analysis(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """验证最终脚本 span 与逐行诊断共用同一次真实文档分析。"""
+    """Verification final script span shares the same real document analysis with line-by-line diagnostics."""
 
     analyze_calls: list[object] = []
 
     class FakePDFDocument:
-        """提供脚本缓存测试所需的最小上下文。"""
+        """Provides the minimal context required for script cache testing."""
 
         def __init__(self, path: str) -> None:
             self.path = path
@@ -766,7 +766,7 @@ def test_real_script_pages_and_diagnostics_share_one_analysis(
         *,
         script_diagnostics: list[dict[str, Any]],
     ) -> list[list[dict[str, Any]]]:
-        """记录分析并同时构造页面和诊断。"""
+        """Log analysis and construct pages and diagnostics simultaneously."""
 
         analyze_calls.append(document)
         script_diagnostics.append(
@@ -805,7 +805,7 @@ def test_real_script_pages_and_diagnostics_share_one_analysis(
 
 @pytest.mark.parametrize("pdf_name", tuple(_REVIEWED_SCRIPT_EXPECTATIONS))
 def test_user_reviewed_flash_script_ranges(pdf_name: str) -> None:
-    """逐项锁定人工审阅反馈涉及的 base、索引、分式和复杂公式边界。"""
+    """Lock base, indexes, fractions and complex formula boundaries involved in manual review feedback item by item."""
     diagnostics = _flash_script_diagnostics(pdf_name)
 
     for (page_index, source_index), expected in _REVIEWED_SCRIPT_EXPECTATIONS[pdf_name].items():
@@ -825,7 +825,7 @@ def test_user_reviewed_flash_script_ranges(pdf_name: str) -> None:
 
 @pytest.mark.parametrize("pdf_name", tuple(_RUN_CLOSURE_EXPECTATIONS))
 def test_user_reviewed_flash_script_run_closures(pdf_name: str) -> None:
-    """验证运算符、小数点和作者括号与同基线角标保持为连续 run。"""
+    """Verify that operators, decimal points, and author brackets remain contiguous with co-baseline subscripts run."""
     diagnostics = _flash_script_diagnostics(pdf_name)
 
     for (page_index, source_index), expected in _RUN_CLOSURE_EXPECTATIONS[pdf_name].items():
@@ -845,7 +845,7 @@ def test_user_reviewed_flash_script_run_closures(pdf_name: str) -> None:
 
 @pytest.mark.parametrize("pdf_name", tuple(_NO_SCRIPT_SOURCE_EXPECTATIONS))
 def test_user_reviewed_unicode_math_tokens_stay_body(pdf_name: str) -> None:
-    """验证没有内部 base 的独立 Greek token 不因 CJK 正文基线而成为下标。"""
+    """Verify that standalone Greek without internal base token is not subscripted due to CJK text baseline."""
     diagnostics = _flash_script_diagnostics(pdf_name)
 
     for page_index, source_index in _NO_SCRIPT_SOURCE_EXPECTATIONS[pdf_name]:
@@ -856,7 +856,7 @@ def test_user_reviewed_unicode_math_tokens_stay_body(pdf_name: str) -> None:
 
 @pytest.mark.parametrize("pdf_name", tuple(_GENERAL_RECOVERY_EXPECTATIONS))
 def test_general_flash_script_recovery_candidates_materialize(pdf_name: str) -> None:
-    """验证脚注、邻接 base 与数字引用通过通用几何规则检测并物化。"""
+    """Validation footnotes, adjacencies base and numeric references are detected and materialized via common geometric rules."""
 
     diagnostics = _flash_script_diagnostics(pdf_name)
     for (page_index, source_index), expected in _GENERAL_RECOVERY_EXPECTATIONS[pdf_name].items():
@@ -872,7 +872,7 @@ def test_general_flash_script_recovery_candidates_materialize(pdf_name: str) -> 
 
 
 def test_chinese_paper_page_12_recovers_numbered_formula_regions() -> None:
-    """验证栏顶公式 6、7、8 被完整认领为 equation，且不吸收相邻正文。"""
+    """Verify that formulas 6, 7, and 8 at the top of the column are fully claimed as equation and do not absorb adjacent text."""
     pages, diagnostics = _flash_script_analysis("中文论文2.pdf")
 
     equations = {
@@ -925,7 +925,7 @@ def test_real_flash_pdfs_materialize_confirmed_scripts(
     pdf_name: str,
     expected: tuple[tuple[str, str], ...],
 ) -> None:
-    """验证真实 Flash PDF 的已确认上下标进入最终 InlineSpan。"""
+    """Verification of authentic Flash Confirmed superscripts and subscripts of PDF into final InlineSpan."""
     runs = _flash_script_runs(pdf_name)
 
     assert all(
@@ -934,12 +934,12 @@ def test_real_flash_pdfs_materialize_confirmed_scripts(
 
 
 def test_real_flash_plain_layouts_do_not_gain_scripts() -> None:
-    """验证财经图表样本的旋转和容器文本不会产生 Flash 上下标。"""
+    """Verify that the rotation and container text of the financial chart sample does not produce Flash subscripts and subscripts."""
     assert _flash_script_runs("caibao1.pdf") == []
 
 
 def test_zh2_normal_english_words_stay_plain_in_flash() -> None:
-    """验证中文论文2的普通混合字体英文不会被 Flash 误标上下标。"""
+    """Verify that the ordinary mixed font English of Chinese Paper 2 will not be mislabeled with superscript or subscript by Flash."""
     styled_text = {content for content, _styles in _flash_script_runs("中文论文2.pdf")}
 
     assert styled_text.isdisjoint({"Source", "Hypothesis", "Reference", "BLEU", "ROUGE"})

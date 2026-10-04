@@ -1,4 +1,4 @@
-"""在独立进程验证原生字体回调，避免污染其它测试的 PDFium 全局状态。"""
+"""Verify native font callbacks in a separate process to avoid polluting the PDFium global state of other tests."""
 import os
 import subprocess
 import sys
@@ -9,7 +9,7 @@ from docvortex._compute_backend import get_native
 
 
 def _run_native_font_check(source: str) -> None:
-    """仅在兼容原生扩展可用时启动独立解释器执行字体生命周期场景。"""
+    """Only launch a standalone interpreter to execute font lifecycle scenarios when compatible native extensions are available."""
     native = get_native()
     if native is None or not hasattr(native, "NativeFontProvider"):
         pytest.skip("native font provider extension unavailable")
@@ -23,7 +23,7 @@ def _run_native_font_check(source: str) -> None:
 
 
 def test_native_font_names_and_table_bytes() -> None:
-    """比较全部别名、五编码、子集前缀和 Unicode 变体，验证表复制与错误隔离。"""
+    """Compares all aliases, five encodings, subset prefixes, and Unicode variants to verify table replication and error isolation."""
     _run_native_font_check(r'''
 import ctypes as c
 import pypdfium2.raw as raw
@@ -69,7 +69,7 @@ assert p.released
 
 
 def test_native_font_runtime_allows_serial_thread_transfer() -> None:
-    """全局锁允许调用线程变化，不应被 PyO3 的 unsendable 线程检查阻断。"""
+    """The global lock allows the calling thread to change and should not be blocked by the unsendable thread check of PyO3."""
     _run_native_font_check(r'''
 from concurrent.futures import ThreadPoolExecutor
 from docvortex.document.pdf.pdfium import initialize_pdfium_runtime, pdfium_guard
@@ -87,7 +87,7 @@ with ThreadPoolExecutor(max_workers=2) as pool:
 
 
 def test_native_font_default_delegation_and_enumeration() -> None:
-    """以同 ABI 假默认接口验证重入枚举、系统句柄及单次释放。"""
+    """Verify reentrant enumeration, system handles, and single release with the same ABI false default interface."""
     _run_native_font_check(r'''
 import ctypes as c
 import os
@@ -161,7 +161,7 @@ assert provider.stats()[0]
 
 
 def test_native_font_callback_and_diagnostics_do_not_deadlock() -> None:
-    """原生回调等待 Python 时，另一线程查询诊断必须让出 GIL 后等状态锁。"""
+    """When the native callback waits for Python, another thread querying the diagnosis must give up the GIL post-wait status lock."""
     _run_native_font_check(r'''
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
@@ -195,7 +195,7 @@ with ThreadPoolExecutor(max_workers=2) as pool:
 
 
 def test_native_font_abi_fallback_reports_concrete_reason() -> None:
-    """非标准调用标志必须保留参考路径，并明确记录拒绝的符号。"""
+    """Non-standard call flags must preserve reference paths and explicitly document rejected symbols."""
     _run_native_font_check(r'''
 import ctypes as c
 from types import SimpleNamespace

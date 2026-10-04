@@ -1,4 +1,4 @@
-"""ODT、ODS、ODP 到 DocVortex raw model-list 的原生 converter。"""
+"""ODT, ODS, ODP to DocVortex raw model-list native converter."""
 
 from __future__ import annotations
 
@@ -34,10 +34,10 @@ _PARAGRAPH_TAG_RE = re.compile(r"</?p>")
 
 
 def _singleton_region_plain_text(region: TableGrid) -> str | None:
-    """把无结构的单格区域还原为可降级的纯文本。
+    """Restore unstructured single-cell ranges to degradable plain text.
 
-    对齐 Excel 投影的单格降级条件：1x1、无合并跨度、无媒体公式等结构化
-    HTML；仅由段落包装与换行组成的单元格才视为普通文本。
+    Single cell degradation conditions for alignment Excel projection: 1x1, no merge span, no media formula, etc. structured
+    HTML;Only cells consisting of paragraph wrapping and line breaks are considered normal text.
     """
     if len(region.rows) != 1 or region.width != 1 or (0, 0) in region.covered:
         return None
@@ -54,7 +54,7 @@ def _singleton_region_plain_text(region: TableGrid) -> str | None:
 
 @dataclass(frozen=True, slots=True)
 class _OdfContext:
-    """保存 converter 一次调用内共享的包、内容树、样式和正文。"""
+    """Save package, content tree, styles and body shared within a single call to converter."""
 
     package: OdfPackage
     content_root: etree._Element
@@ -64,7 +64,7 @@ class _OdfContext:
 
 @dataclass(frozen=True, slots=True)
 class _PositionedBlocks:
-    """保存幻灯片对象的阅读顺序坐标、XML 序号和 raw blocks。"""
+    """Saves the slide object's reading order coordinates, XML sequence number, and raw blocks."""
 
     y: float
     x: float
@@ -74,7 +74,7 @@ class _PositionedBlocks:
 
 
 def _open_context(file_binary: BinaryIO, suffix: OdfSuffix) -> _OdfContext:
-    """读取调用方流并建立已验证 ODF 包、样式和正文上下文。"""
+    """Reads the caller stream and establishes the authenticated ODF package, style, and body context."""
     package = OdfPackage(file_binary.read())
     try:
         content_root = package.validate_document(suffix)
@@ -96,13 +96,13 @@ def _new_page(
     page_masters: list[str | None],
     master_name: str | None,
 ) -> None:
-    """追加一个新逻辑页及其 master-page 归属。"""
+    """Append a new logical page and its master-page ownership."""
     pages.append([])
     page_masters.append(master_name)
 
 
 def _flush_notes(parser: OdfBlockParser, page: list[dict[str, Any]]) -> None:
-    """把解析器累计脚注追加为当前页面的 PAGE_FOOTNOTE blocks。"""
+    """Append the parser cumulative footnote to PAGE_FOOTNOTE blocks of the current page."""
     for note in parser.drain_notes():
         page.append({"type": BlockType.PAGE_FOOTNOTE, "content": text_spans(note)})
 
@@ -113,7 +113,7 @@ def _append_flow_items(
     parser: OdfBlockParser,
     page: list[dict[str, Any]],
 ) -> None:
-    """把段落结果和脚注按统一流语义追加到当前章节页。"""
+    """Append paragraph results and footnotes to the current chapter page according to unified flow semantics."""
     for item in items:
         if isinstance(item, InlineNote):
             parser.notes.append(item.content)
@@ -130,7 +130,7 @@ def _master_auxiliary_blocks(
     text_expansion_budget: OdfTextExpansionBudget,
     table_expansion_budget: OdfTableExpansionBudget,
 ) -> list[dict[str, Any]]:
-    """从 master-page 的 header/footer 中提取页面辅助文本。"""
+    """Extract page auxiliary text from header/footer of master-page."""
     if master_page is None:
         return []
     parser = OdfBlockParser(
@@ -155,7 +155,7 @@ def _master_auxiliary_blocks(
 
 
 def _parse_odt_pages(context: _OdfContext) -> list[list[dict[str, Any]]]:
-    """仅按 master-page 章节变化递归构造 ODT 逻辑页。"""
+    """Recursively construct ODT logical pages only by master-page chapter changes."""
     anchor_targets = collect_emittable_anchor_targets(context.content_root, context.styles)
     text_expansion_budget = OdfTextExpansionBudget()
     parser = OdfBlockParser(
@@ -169,7 +169,7 @@ def _parse_odt_pages(context: _OdfContext) -> list[list[dict[str, Any]]]:
     current_master: str | None = None
 
     def apply_master_page(requested_master: str | None) -> None:
-        """按段落或列表事件切换 ODT 虚拟页及其 master-page。"""
+        """Switches the ODT virtual page and its master-page by paragraph or list event."""
         nonlocal current_master
         master_changed = requested_master is not None and current_master is not None and requested_master != current_master
         if master_changed and pages[-1]:
@@ -180,7 +180,7 @@ def _parse_odt_pages(context: _OdfContext) -> list[list[dict[str, Any]]]:
             page_masters[-1] = current_master
 
     def walk(parent: etree._Element) -> None:
-        """递归遍历 ODT block 容器并维护当前页与 master-page。"""
+        """Recursively traverse the ODT block container and maintain the current page with master-page."""
         for child in parent:
             if not isinstance(child.tag, str):
                 continue
@@ -229,7 +229,7 @@ def _parse_odt_pages(context: _OdfContext) -> list[list[dict[str, Any]]]:
 
 
 def _length_to_points(value: str | None) -> float:
-    """把 ODF SVG 长度转换为用于阅读顺序比较的 point。"""
+    """Convert ODF SVG length to point for reading order comparison."""
     match = _LENGTH_RE.match(value or "")
     if match is None:
         return 0.0
@@ -242,7 +242,7 @@ def _iter_slide_shapes(
     x_offset: float = 0.0,
     y_offset: float = 0.0,
 ) -> Iterator[tuple[etree._Element, float, float]]:
-    """递归展开幻灯片 group，并产出可见 shape 及近似绝对坐标。"""
+    """Recursively expand slide group and output visible shape and approximate absolute coordinates."""
     for child in parent:
         if not isinstance(child.tag, str) or child.tag == qname("presentation", "notes"):
             continue
@@ -266,14 +266,14 @@ def _iter_slide_shapes(
 
 
 def _shape_blocks(shape: etree._Element, parser: OdfBlockParser) -> list[dict[str, Any]]:
-    """把 frame 或带文本 custom-shape 转为页面 raw blocks。"""
+    """Convert frame or custom-shape with text to page raw blocks."""
     if shape.tag == qname("draw", "frame"):
         return parser.parse_frame_blocks(shape)
     return parser.parse_container(shape)
 
 
 def _notes_blocks(page: etree._Element, parser: OdfBlockParser) -> list[dict[str, Any]]:
-    """提取 ODP speaker notes，并聚合为页面脚注。"""
+    """Extract ODP speaker notes and aggregate into page footers."""
     notes = page.find(qname("presentation", "notes"))
     if notes is None:
         return []
@@ -285,7 +285,7 @@ def _notes_blocks(page: etree._Element, parser: OdfBlockParser) -> list[dict[str
 
 
 def _parse_odp_pages(context: _OdfContext) -> list[list[dict[str, Any]]]:
-    """保持一页一 slide，并按坐标和 XML 顺序构造 ODP model-list。"""
+    """Keep one page of slide and construct ODP model-list in order of coordinates and XML."""
     parser = OdfBlockParser(context.package, context.styles)
     pages: list[list[dict[str, Any]]] = []
     document_title_emitted = False
@@ -339,7 +339,7 @@ def _parse_odp_pages(context: _OdfContext) -> list[list[dict[str, Any]]]:
 
 
 def _sheet_blocks(sheet: etree._Element, parser: OdfBlockParser) -> list[dict[str, Any]]:
-    """把一个可见 ODS sheet 拆为数据区域和锚定视觉对象。"""
+    """Split a visible ODS sheet into data regions and anchored visuals."""
     grid = parse_table_grid(sheet, parser.render_cell_html, expansion_budget=parser.table_expansion_budget)
     blocks: list[dict[str, Any]] = []
     for region in split_table_regions(grid):
@@ -361,7 +361,7 @@ def _sheet_blocks(sheet: etree._Element, parser: OdfBlockParser) -> list[dict[st
 
 
 def _parse_ods_pages(context: _OdfContext) -> list[list[dict[str, Any]]]:
-    """保持一页一可见 sheet，并在多表时添加工作表标题。"""
+    """Keep sheet visible on one page and add sheet titles when using multiple sheets."""
     parser = OdfBlockParser(context.package, context.styles, collect_cell_visuals=True)
     sheet_pages: list[tuple[str, list[dict[str, Any]]]] = []
     for sheet in context.body:
@@ -381,14 +381,14 @@ def _parse_ods_pages(context: _OdfContext) -> list[list[dict[str, Any]]]:
 
 
 class OdtConverter:
-    """把 OpenDocument Text 转换为 DocVortex 分页 raw blocks。"""
+    """Convert OpenDocument Text to DocVortex Paging raw blocks."""
 
     def __init__(self) -> None:
-        """初始化空分页结果，等待 convert 填充。"""
+        """Initialize empty paged results, waiting for convert to fill."""
         self.pages: list[list[dict[str, Any]]] = []
 
     def convert(self, file_binary: BinaryIO) -> None:
-        """解析调用方持有的 ODT 流，并保持调用方流打开。"""
+        """Resolve the ODT stream held by the caller and keep the caller stream open."""
         context = _open_context(file_binary, "odt")
         try:
             self.pages = _parse_odt_pages(context)
@@ -397,14 +397,14 @@ class OdtConverter:
 
 
 class OdpConverter:
-    """把 OpenDocument Presentation 转换为逐幻灯片 raw blocks。"""
+    """Convert OpenDocument Presentation to slide-by-slide raw blocks."""
 
     def __init__(self) -> None:
-        """初始化空幻灯片结果，等待 convert 填充。"""
+        """Initialize empty slide result, waiting for convert to fill."""
         self.pages: list[list[dict[str, Any]]] = []
 
     def convert(self, file_binary: BinaryIO) -> None:
-        """解析调用方持有的 ODP 流，并保持调用方流打开。"""
+        """Resolve the ODP stream held by the caller and keep the caller stream open."""
         context = _open_context(file_binary, "odp")
         try:
             self.pages = _parse_odp_pages(context)
@@ -413,14 +413,14 @@ class OdpConverter:
 
 
 class OdsConverter:
-    """把 OpenDocument Spreadsheet 转换为逐可见工作表 raw blocks。"""
+    """Convert OpenDocument Spreadsheet to by-visible worksheets raw blocks."""
 
     def __init__(self) -> None:
-        """初始化空工作表结果，等待 convert 填充。"""
+        """Initialize empty worksheet result, waiting for convert to be filled."""
         self.pages: list[list[dict[str, Any]]] = []
 
     def convert(self, file_binary: BinaryIO) -> None:
-        """解析调用方持有的 ODS 流，并保持调用方流打开。"""
+        """Resolve the ODS stream held by the caller and keep the caller stream open."""
         context = _open_context(file_binary, "ods")
         try:
             self.pages = _parse_ods_pages(context)

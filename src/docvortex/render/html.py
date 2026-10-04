@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到 HTML 的轻量公共门面。"""
+"""Lightweight public facade for strictly MiddleJson to HTML."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ def render_html(
     standalone: bool = True,
     document_title: str | None = None,
 ) -> str:
-    """惰性加载 HTML 实现并渲染严格 MiddleJson。"""
+    """Lazy loading HTML implements and renders strict MiddleJson."""
     from ._internal.html.renderer import render_html as _render_html
 
     return _render_html(

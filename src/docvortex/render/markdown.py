@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到 Markdown 的轻量公共门面。"""
+"""Lightweight public facade for strictly MiddleJson to Markdown."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ def render_markdown(
     image_renderer: ImageRenderer | None = None,
     latex_delimiters: LatexDelimitersConfig | None = None,
 ) -> str:
-    """惰性加载 Markdown 实现并渲染严格 MiddleJson。"""
+    """Lazy loading Markdown implements and renders strict MiddleJson."""
     from ._internal.markdown.renderer import render_markdown as _render_markdown
 
     return _render_markdown(
@@ -34,14 +34,14 @@ def render_single_block(
     asset_base_url: str,
     image_renderer: ImageRenderer | None = None,
 ) -> str:
-    """为文档库等局部读取调用方渲染单个顶层块，不执行文档级合并。"""
+    """Renders a single top-level block for local read callers such as document libraries, and does not perform document-level merging."""
     from ._internal.markdown.blocks import render_single_block as render_block
 
     return render_block(block, delimiters=delimiters, asset_base_url=asset_base_url, image_renderer=image_renderer)
 
 
 def build_markdown_image(source: str, alt: str = "") -> str:
-    """通过公开接口构造转义后的图片引用，避免调用方依赖 renderer 私有文件。"""
+    """Construct the escaped image reference through the public interface to avoid the caller relying on the renderer private file."""
     from ._internal.markdown.assets import build_markdown_image as build_image
 
     return build_image(source, alt)

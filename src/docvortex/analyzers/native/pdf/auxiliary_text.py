@@ -1,4 +1,4 @@
-"""分类页眉、页脚、页码、侧栏和页脚注。"""
+"""Classify headers, footers, page numbers, sidebars and footers."""
 
 from __future__ import annotations
 
@@ -38,12 +38,12 @@ _PAGE_NUMBER_RE = re.compile(
     re.IGNORECASE,
 )
 
-# 页眉或页脚同伴块允许的最大高度占页面高度比例，近整页容器不允许仅凭与页码行重叠改判。
+# The maximum height allowed for a header or footer companion block is a proportion of the page height. A nearly full-page container is not allowed to be changed simply by overlapping the page number line.
 _MARGINAL_ROW_MAX_HEIGHT_RATIO = 0.15
 
 
 def _classify_page_auxiliary_text(prepared: _PreparedPage) -> None:
-    """在容器认领后仅按空间关系标注侧栏文字和页脚注。"""
+    """Only label the sidebar text and footer according to the spatial relationship after the container is claimed."""
 
     _classify_aside_text(prepared.remaining_lines, prepared.page_size)
     _classify_image_footnotes(
@@ -65,7 +65,7 @@ def _classify_page_auxiliary_text(prepared: _PreparedPage) -> None:
 
 
 def _classify_first_page_correspondence_footnotes(source: _PageSource) -> None:
-    """首页通讯字段只认领同一实际栏或跨栏元数据带，字号、连续性及正文屏障共同限制范围。"""
+    """The homepage communication field only claims the same actual column or cross-column metadata band, and the font size, continuity and text barrier jointly limit the scope."""
     width, height = source.page_size
     lower = [line for line in source.lines if line.angle == 0 and line.bbox[1] >= 0.65 * height and line.semantic_type is None]
     contacts = [line for line in lower if metadata_field(line.text) == "contact"]
@@ -115,7 +115,7 @@ def _classify_aside_text(
     lines: list[_LineItem],
     page_size: tuple[float, float],
 ) -> None:
-    """在横排正文占绝对多数时，以边缘带和物理尺寸识别垂直侧栏。"""
+    """When horizontal text dominates, identify vertical sidebars with margins and physical size."""
 
     available = [line for line in lines if line.semantic_type is None]
     upright_lines = [line for line in available if line.angle == 0]
@@ -130,7 +130,7 @@ def _classify_aside_text(
     page_width, page_height = page_size
     if page_width <= 0 or page_height <= 0:
         return
-    # 侧栏必须完整位于 12% 边缘带，且兼具不超过 8% 的窄宽和至少 15% 的物理高度。
+    # Siderails must sit entirely within the 12% edge band and be no more than 8% narrow in width and at least 15% physical in height.
     aside_source_indices = {
         line.source_index
         for line in available
@@ -148,7 +148,7 @@ def _geometric_text_support_by_angle(
     lines: list[_LineItem],
     page_size: tuple[float, float],
 ) -> dict[int, float]:
-    """按局部行宽乘有效行高累计各文字方向的纯几何支持度。"""
+    """The pure geometric support of each text direction is accumulated based on the local line width multiplied by the effective line height."""
 
     support_by_angle: dict[int, float] = {}
     for line in lines:
@@ -170,7 +170,7 @@ def _classify_image_footnotes(
     reference_body_height: float | None = None,
     prepared: _PreparedPage | None = None,
 ) -> None:
-    """用图片、下缘长横线和紧凑小字的联合关系识别图表脚注。"""
+    """Identify chart footnotes using the combined relationship of pictures, long horizontal lines at the bottom margin, and compact small fonts."""
 
     available = [line for line in lines if line.semantic_type is None]
     if not available or not image_bboxes or not drawing_lines:
@@ -198,7 +198,7 @@ def _classify_image_footnotes(
     if not line_geometry:
         return
     if reference_body_height is not None and reference_body_height > 0:
-        # 图片占主导的稀疏页可能只剩图注和脚注，延迟复核时改用全文正文尺度。
+        # Sparse pages dominated by pictures may only have figure captions and footnotes, and full-text text standards may be used when deferred review.
         body_height = max(0.1, reference_body_height)
     else:
         body_samples = [
@@ -216,7 +216,7 @@ def _classify_image_footnotes(
     matched_source_indices: set[int] = set()
     for image_bbox in local_images:
         image_width = max(0.1, image_bbox[2] - image_bbox[0])
-        # 同一视觉行的并排图可能高度略有差异；共享较低下缘可避免把留白误作远距。
+        # Side-by-side images of the same visual row may have slightly different heights; sharing a lower bottom edge avoids mistaking white space for distance.
         row_bottom = max(
             peer_bbox[3] for peer_bbox in local_images if _bbox_axis_overlap_ratio(image_bbox, peer_bbox, axis="y") >= 0.5
         )
@@ -230,7 +230,7 @@ def _classify_image_footnotes(
                 min(axis_line.bbox[2], image_bbox[2]) - max(axis_line.bbox[0], image_bbox[0]),
             )
             >= 0.85 * image_width
-            # 图片外框的底边属于图形本身，不能拿来证明下方文字是图表脚注。
+            # The bottom edge of the picture frame belongs to the figure itself and cannot be used to prove that the text below is the footnote of the chart.
             and 0.0 <= axis_line.bbox[1] - row_bottom <= max(0.01 * local_page_height, 0.75 * body_height)
             and not _rule_belongs_to_confirmed_table(
                 axis_line,
@@ -262,7 +262,7 @@ def _classify_deferred_image_footnotes(
     prepared_pages: list[_PreparedPage],
     body_height: float,
 ) -> None:
-    """在全文正文尺度确定后，仅重试仍未分类的图片脚注候选。"""
+    """After the full text body scale is determined, only the image footnote candidates that have not yet been classified are retried."""
 
     if body_height <= 0:
         return
@@ -284,7 +284,7 @@ def _image_footnote_members(
     body_height: float,
     local_page_height: float,
 ) -> set[int]:
-    """返回长横线下方、位于同一水平走廊内的连续小字号文本行。"""
+    """Returns a contiguous line of small font text below the long horizontal line in the same horizontal corridor."""
 
     first_gap_limit = max(0.025 * local_page_height, 2.0 * body_height)
     horizontal_tolerance = 0.5 * body_height
@@ -319,7 +319,7 @@ def _image_footnote_members(
 def _footnote_visual_rows(
     geometry: list[tuple[_LineItem, BBox]],
 ) -> tuple[list[tuple[_LineItem, BBox]], dict[int, set[int]]]:
-    """按紧邻端点与同基线重建脚注判定用的视觉行，保留原始成员供最终认领。"""
+    """Reconstruct the visual rows used for footnote determination based on the immediate endpoints and the same baseline, retaining the original members for final claim."""
     groups: list[list[tuple[_LineItem, BBox]]] = []
     for item in sorted(geometry, key=lambda item: (_bbox_center_y(item[1]), item[1][0])):
         line, bbox = item
@@ -369,7 +369,7 @@ def _classify_page_footnotes(
     prepared: _PreparedPage | None = None,
     reference_lines: list[_LineItem] | None = None,
 ) -> list[set[int]]:
-    """识别主方向页脚注，并按触发分隔线返回来源编号分组。"""
+    """Identify primary direction footers and return source number grouping by trigger divider."""
 
     available = [line for line in lines if line.semantic_type is None]
     if not available:
@@ -389,7 +389,7 @@ def _classify_page_footnotes(
     if not line_geometry:
         return []
 
-    # 分式证据使用原始墨迹，脚注栏与续行则使用恢复后的整条物理行。
+    # Fractional evidence uses the original ink, and footnote columns and continuation lines use the entire physical line after restoration.
     ink_bboxes = [
         _rotate_bbox_to_upright(line.ink_bbox or line.bbox, page_size, dominant_angle) for line, _bbox in line_geometry
     ]
@@ -405,7 +405,7 @@ def _classify_page_footnotes(
         line_geometry,
         local_page_width,
         median_height,
-        # 脚注分隔线应对齐稳定栏锚点，不能被页眉或跨栏关键词的宽行扩张污染。
+        # Footnote separators should be aligned with stable column anchor points and should not be polluted by wide line expansion of headers or cross-column keywords.
         recalculate_intervals=False,
     )
     if prepared is None:
@@ -424,12 +424,12 @@ def _classify_page_footnotes(
     for axis_line in local_axis_lines:
         if axis_line.orientation != "horizontal":
             continue
-        # 常规短分隔线仍要求进入页面下方 30%；栏宽分隔线可在下方 45% 内
-        # 依靠严格的单栏对齐和字号收缩证据提前触发。
+        # Regular short dividers are still required to go into the lower 30% of the page; column width dividers can be within the lower 45%
+        # Rely on strict single column alignment and font size shrinkage evidence to trigger in advance.
         rule_center_y = _bbox_center_y(axis_line.bbox)
         if rule_center_y < 0.55 * local_page_height:
             continue
-        # 短横线上下紧贴且同宽的两行是分式几何，不能提前认领分母及后续正文为脚注。
+        # The two lines with the same width as the dashed line and the upper and lower lines are fractional geometry. The denominator cannot be claimed in advance and the following text is a footnote.
         rule_width = axis_line.bbox[2] - axis_line.bbox[0]
         compact_neighbors = [
             bbox
@@ -444,7 +444,7 @@ def _classify_page_footnotes(
             and any(0 <= bbox[1] - rule_center_y <= median_height for bbox in compact_neighbors)
         ):
             continue
-        # 表格边界会产生断裂横线；除框内线段外，也排除与其同高且近邻的框外线段。
+        # The table boundary will produce broken horizontal lines; in addition to the line segments inside the frame, line segments outside the frame that are the same height and adjacent to it are also excluded.
         if _rule_belongs_to_confirmed_table(
             axis_line,
             table_lines,
@@ -458,12 +458,12 @@ def _classify_page_footnotes(
             )
             for visual_bbox in visual_bboxes
         ):
-            # 图形坐标轴和外框不能充当页面脚注分隔线。
+            # Figure axes and outlines cannot serve as page footer separators.
             continue
         rule_source_indices: set[int] = set()
         rule_lanes = list(lanes)
         rule_width = axis_line.bbox[2] - axis_line.bbox[0]
-        # 通栏长线自身提供局部栏界；上方双栏布局不能拆散线下的整页脚注。
+        # The long banner line itself provides a partial column boundary; the upper double-column layout cannot break up the entire page of footnotes below.
         if rule_width >= 0.7 * local_page_width:
             corridor = [
                 (line, bbox)
@@ -518,7 +518,7 @@ def _classify_page_footnotes(
 
 
 def _native_note_reference_values(lines: list[_LineItem]) -> set[str]:
-    """读取行内小号且抬高的原生数字，给同字号无线脚注提供编号对应证据。"""
+    """Read the small and raised native digits within the line to provide number correspondence evidence for wireless footnotes of the same font size."""
     values = set()
     for line in lines:
         chars = [char for char in line.chars if str(char.get("char", "")).strip() and char.get("origin")]
@@ -545,7 +545,7 @@ def _native_note_reference_values(lines: list[_LineItem]) -> set[str]:
 
 
 def _chart_referenced_note_groups(line_geometry, visual_bboxes, references, page_size):
-    """图体下方的编号说明须有原生上标对应；同栏同式连续编号延续注释，正文列表和页脚不参与。"""
+    """The numbered descriptions below the body of the figure must have original superscript correspondence; consecutive numbers in the same column and style are continued annotations, and the text list and footer are not involved."""
     height = page_size[1]
     ordered = sorted(line_geometry, key=lambda item: (item[1][1], item[1][0]))
     pattern = re.compile(r"^\s*(\d{1,3})[.)]?\s+\S")
@@ -598,7 +598,7 @@ def _unruled_numbered_footnote_groups(
     line_geometry: list[tuple[_LineItem, BBox]],
     page_size: tuple[float, float],
 ) -> list[set[int]]:
-    """用底部编号、字号收缩与正文净空识别无线注释，同字号跨栏注释另需原生上标对应。"""
+    """Use bottom numbering, font size shrinkage, and text margin to identify wireless annotations. Cross-column annotations of the same font size also require native superscripts."""
     width, height = page_size
     ordered = sorted(line_geometry, key=lambda item: (item[1][1], item[1][0]))
     references = _native_note_reference_values([line for line, _ in ordered])
@@ -625,7 +625,7 @@ def _unruled_numbered_footnote_groups(
         if len(above) < 3:
             continue
         body_height = statistics.median(_line_effective_height(line, box) for line, box in above)
-        # 松字框可能跨越下一行；按最近物理行及有效字高测量净空，避免遗漏重叠的参考文献续行。
+        # Loose text boxes may span the next line; measure headroom by nearest physical line and effective font height to avoid missing overlapping reference continuation lines.
         nearest_above = max(above, key=lambda item: _bbox_center_y(item[1]))
         gap = _effective_text_row_gap(nearest_above, (first, bounds))
         shrunken = first_height <= 0.9 * body_height and gap >= 0.75 * body_height
@@ -652,7 +652,7 @@ def _unruled_numbered_footnote_groups(
                 or not bounds[0] - 0.4 * first_height <= box[0] <= bounds[0] + 2 * first_height
             ):
                 break
-            # 独立页脚可能只比脚注略小；底边窄行及额外净空共同阻止页脚混入。
+            # A stand-alone footer may be only slightly smaller than a footnote; the narrow bottom line and extra headroom combine to prevent the footer from blending in.
             if (
                 box[1] >= 0.92 * height
                 and box[2] - box[0] <= 0.55 * (bounds[2] - bounds[0])
@@ -672,7 +672,7 @@ def _augment_footnote_groups_with_edge_markers(
     line_geometry: list[tuple[_LineItem, BBox]],
     median_height: float,
 ) -> None:
-    """把脚注正文左侧同高的窄编号标记补入对应分隔线分组。"""
+    """Add the same-height narrow numbering markers on the left side of the footnote text to the corresponding dividing line grouping."""
 
     geometry_by_source = {line.source_index: (line, bbox) for line, bbox in line_geometry}
     for group in groups:
@@ -700,7 +700,7 @@ def _prepared_local_axis_table_lines(
     prepared: _PreparedPage,
     dominant_angle: int,
 ) -> tuple[list[_LocalAxisLine], list[_LocalAxisLine]]:
-    """按页和主方向复用轴线变换及确认表格横线，输入身份变化时重新计算。"""
+    """Multiplex axis transformation and confirmation table horizontal lines by page and main direction, and recalculate when the input identity changes."""
 
     key = (dominant_angle, id(prepared.drawing_lines), id(prepared.table_bboxes))
     cached = prepared.local_axis_table_cache.get(key)
@@ -717,7 +717,7 @@ def _confirmed_table_horizontal_lines(
     local_axis_lines: list[_LocalAxisLine],
     table_bboxes: list[BBox],
 ) -> list[_LocalAxisLine]:
-    """按页预计算与确认表格框相交的横线，供所有候选排除判断复用。"""
+    """The horizontal lines that intersect with the confirmation form box are pre-calculated on a page-by-page basis for reuse by all candidate exclusion judgments."""
 
     return [
         table_line
@@ -738,7 +738,7 @@ def _rule_belongs_to_confirmed_table(
     table_lines: list[_LocalAxisLine],
     local_page_width: float,
 ) -> bool:
-    """把表格框内横线及其同高近邻断裂段一并排除，避免框外残段触发脚注。"""
+    """Exclude the horizontal lines in the table frame and the adjacent broken segments at the same height to prevent the fragments outside the frame from triggering footnotes."""
 
     maximum_segment_gap = 0.04 * local_page_width
     for table_line in table_lines:
@@ -751,7 +751,7 @@ def _rule_belongs_to_confirmed_table(
 
 
 def _merge_overlapping_source_groups(groups: list[set[int]]) -> list[set[int]]:
-    """合并共享来源行的分隔线候选组，消除重复绘图线造成的重复分组。"""
+    """Merge separate line candidate groups that share source lines to eliminate duplicate groupings caused by duplicate drawing lines."""
 
     merged: list[set[int]] = []
     for group in groups:
@@ -768,7 +768,7 @@ def _merge_overlapping_source_groups(groups: list[set[int]]) -> list[set[int]]:
 
 
 def _native_lowercase_ink_height(line: _LineItem) -> float | None:
-    """取原生小写字形的稳健高度，用可见字形补充异常字体度量，不引入OCR。"""
+    """Take the robust height of native lowercase glyphs, supplement the exception font metrics with visible glyphs, and do not introduce OCR."""
     heights = []
     for char in line.chars:
         text = str(char.get("char", ""))
@@ -785,7 +785,7 @@ def _single_line_ink_note_evidence(
     page_size: tuple[float, float],
     body_height: float,
 ) -> bool:
-    """页底通栏线、编号净空及相对字形缩小共同确认单行注释，普通编号正文不享受例外。"""
+    """Bottom line, numbered headroom, and relative font reduction jointly confirm single-line comments. No exceptions are made for ordinary numbered text."""
     em = body_height
     if (
         rule_bbox[2] - rule_bbox[0] < 0.7 * page_size[0]
@@ -824,13 +824,13 @@ def _footnote_lane_members(
     allow_column_width_rule: bool = False,
     lower_barrier_y: float | None = None,
 ) -> set[int]:
-    """验证横线与单个栏带的对齐关系，并返回其下连续脚注行的来源编号。"""
+    """Verifies the alignment of a horizontal line with a single column band and returns the source number of consecutive footnote lines below it."""
 
     lane_lines = [item for item in lane.lines if item[0].semantic_type is None]
     if not lane_lines:
         return set()
     lane_lines.sort(key=lambda item: (item[1][1], item[1][0], item[0].source_index))
-    # 显式图题已经在原生行入口标注，图题装饰横线不能重新把该行认领为页面脚注。
+    # The explicit figure title has been marked at the original line entry, and the figure title decorative line cannot re-claim the line as a page footnote.
     if any(
         line.caption_start and bbox[1] >= rule_bbox[1] and bbox[1] <= rule_bbox[3] + 3 * _line_effective_height(line, bbox)
         for line, bbox in lane_lines
@@ -845,7 +845,7 @@ def _footnote_lane_members(
     lane_heights = [_line_effective_height(line, bbox) for line, bbox in lane_lines]
     median_height = statistics.median(lane_heights) if lane_heights else 1.0
     rule_width = max(0.0, rule_bbox[2] - rule_bbox[0])
-    # 同时限制绝对短线、相对长线和左缘偏移，排除图标、公式线及跨栏正文分隔线。
+    # At the same time, the absolute short line, relative long line and left edge offset are restricted, and icons, formula lines and cross-column text separators are excluded.
     requires_short_rule_evidence = rule_width < max(4.0 * median_height, 0.04 * local_page_width)
     if requires_short_rule_evidence and rule_width < max(2.0 * median_height, 0.08 * lane_width):
         return set()
@@ -862,7 +862,7 @@ def _footnote_lane_members(
     marker_body_reference = max(
         median_height, page_median_height or 0, statistics.median(wide_body_heights) if len(wide_body_heights) >= 3 else 0
     )
-    # 正文缩进不能替代脚注栏左缘；线下真实编号与小字正文同行时，由编号补足左缘证据。
+    # The text indentation cannot replace the left margin of the footnote column; when the actual offline numbering is in line with the small text, the numbering should be used to supplement the left margin evidence.
     numbered_left_alignment = any(
         marker.note_marker_value is not None
         and abs(bounds[0] - rule_bbox[0]) <= 0.5 * median_height
@@ -904,7 +904,7 @@ def _footnote_lane_members(
     if not is_regular_short_rule and not is_column_width_rule and not centered_short_alignment:
         return set()
 
-    # 首行采用较宽的 3.5% 页高窗口；命中后仅按紧凑的连续净空向下扩展。
+    # The first row takes a wider 3.5% page height window; only expands downward by tight contiguous headroom after hit.
     first_gap_limit = max(3.0 * median_height, 0.035 * local_page_height)
     first_index: int | None = None
     for index, (_line, bbox) in enumerate(lane_lines):
@@ -924,7 +924,7 @@ def _footnote_lane_members(
         return set()
 
     if is_regular_short_rule:
-        # 与上方正文框交叠的细线属于行内装饰，不是留白中的脚注分隔线；下行字号不能改变线的归属。
+        # The thin line that overlaps the upper text box is an inline decoration, not a footnote separator in the white space; the font size of the lower line cannot change the ownership of the line.
         first_line, first_bbox = lane_lines[first_index]
         if any(
             bounds[1] < rule_center_y < bounds[3] and _bbox_axis_overlap_ratio(bounds, rule_bbox, axis="x") >= 0.5
@@ -933,7 +933,7 @@ def _footnote_lane_members(
             return set()
 
     if requires_short_rule_evidence:
-        # 不直接放宽短线门槛：小字编号、栏缘及上下净空必须同时成立，排除分式和章节线。
+        # Do not directly relax the short-term threshold: small print numbers, column margins, and upper and lower clearances must be established at the same time, excluding fractions and chapter lines.
         first_line, first_bbox = lane_lines[first_index]
         above = [(line, bbox) for line, bbox in lane_lines[:first_index] if bbox[1] < rule_bbox[1]]
         reference_height = max(
@@ -946,7 +946,7 @@ def _footnote_lane_members(
             and _bbox_axis_overlap_ratio(bounds, first_bbox, axis="y") >= 0.6
             for _line, bounds in lane_lines
         )
-        # 跨页续注可能没有当前页首编号；分隔线左端与悬挂正文之间保留一字以上的编号槽。
+        # Cross-page continuation notes may not have the current top-of-page number; more than one word of numbering slot is reserved between the left end of the separator line and the hanging text.
         marker_slot = median_height <= first_bbox[0] - rule_bbox[0] <= 2.25 * median_height
         if (
             not strict_left_alignment
@@ -961,8 +961,8 @@ def _footnote_lane_members(
             return set()
 
     if is_column_width_rule:
-        # 页面中段的栏宽横线只有在下方首行相对上方正文明显收缩时才可触发脚注，
-        # 避免把章节分隔线或普通栏内横线误当成脚注边界。
+        # The column width horizontal line in the middle of the page can only trigger footnotes when the first line below is significantly shrunk relative to the text above.
+        # Avoid mistaking section dividers or ordinary column lines for footnote boundaries.
         body_heights = [
             _line_effective_height(line, bbox) for line, bbox in lane_lines if bbox[3] <= rule_bbox[1] + 0.5 * median_height
         ]
@@ -983,7 +983,7 @@ def _footnote_lane_members(
             statistics.median(bounds[0] for bounds in continuation_boxes) if continuation_boxes else first_bbox[0]
         )
         prefix_bbox = first_line.source_bbox or first_bbox
-        # 同字号通栏脚注须同时有独立编号槽、悬挂续行和正文净空，普通章节分隔线不享受此例外。
+        # Banner footnotes of the same font size must also have independent numbering slots, hanging continuation lines and text margins. Ordinary chapter separators do not enjoy this exception.
         hanging_note = (
             rule_width >= 0.7 * local_page_width
             and rule_center_y >= 0.75 * local_page_height
@@ -1059,7 +1059,7 @@ def _footnote_lane_members(
             if bbox[1] < rule_bbox[1] and overlap >= 0.2 * min(rule_width, row_width):
                 projecting_rows_above.append(bbox)
         if any(bbox[3] > rule_bbox[1] - 0.75 * reference_height for bbox in projecting_rows_above):
-            # 分式横线位于公式成员之间；真正的脚注分隔线上方应保留正文净空。
+            # Fractional bars are placed between formula members; text headroom should be left above true footnote separators.
             return set()
         member_height = statistics.median(_line_effective_height(*member) for member in members)
         if len(members) < 2 or member_height > 0.9 * reference_height:
@@ -1071,7 +1071,7 @@ def _page_footnote_continuation_gap_limit(
     reference_height: float,
     local_page_height: float,
 ) -> float:
-    """统一返回页脚注连续扩展允许的最大有效净空。"""
+    """Maximum effective headroom allowed for uniform return footer contiguous expansion."""
 
     return max(1.25 * reference_height, 0.01 * local_page_height)
 
@@ -1081,7 +1081,7 @@ def _footnote_lane_width_reference(
     lanes: list[_TextLane],
     median_height: float,
 ) -> float:
-    """用下一稳定栏的左缘补偿当前栏因正文右缘参差造成的宽度低估。"""
+    """Use the left edge of the next stable column to compensate for the underestimation of the width of the current column caused by the jagged right edge of the text."""
 
     lane_width = max(0.1, lane.right - lane.left)
     stable_lanes = sorted(
@@ -1102,7 +1102,7 @@ def _footnote_lane_width_reference(
 
 
 def _classify_rule_delimited_headers(pages: list[_PreparedPage]) -> None:
-    """在页码完成跨页判定后，用页首长横线补标其上方未分类文本。"""
+    """After the page number completes the cross-page determination, use a long horizontal line at the top of the page to mark the unclassified text above it."""
 
     for page in pages:
         available = [line for line in page.remaining_lines if line.semantic_type is None]
@@ -1175,8 +1175,8 @@ def _classify_rule_delimited_headers(pages: list[_PreparedPage]) -> None:
         for line, bbox in local_lines:
             if bbox[3] <= separator_y and not line.caption_start:
                 if _line_canonical_style_scale(line, bbox) >= 1.5 * median_scale:
-                    # 装饰横线也会包围真正章节标题；显著大于正文的文字不能仅凭页首横线成为页眉。
-                    # 使用字形校准尺度，避免上下两行包络重叠把小号日期误当作大标题。
+                    # Decorative dashes will also surround actual section titles; text that is significantly larger than the text cannot become a header simply by virtue of the leading dash.
+                    # Use font calibration to prevent the upper and lower envelopes from overlapping and mistaking the small date for a large title.
                     if line.numbered_heading_start:
                         line.semantic_type = "paragraph_title"
                         line.structural_title = True
@@ -1186,7 +1186,7 @@ def _classify_rule_delimited_headers(pages: list[_PreparedPage]) -> None:
 
 
 def _classify_rule_delimited_footers(pages: list[_PreparedPage]) -> None:
-    """用页面底部横线确认双线间页脚或单线下方的小字号栏内页脚。"""
+    """Use the horizontal line at the bottom of the page to confirm the footer between double lines or the small font in-column footer below the single line."""
 
     for page in pages:
         available = [line for line in page.remaining_lines if line.semantic_type is None]
@@ -1293,7 +1293,7 @@ def _single_rule_footer_members(
     lanes: list[_TextLane],
     body_height: float,
 ) -> list[_LineItem]:
-    """返回底部单横线下方、唯一栏内连续的小字号页脚行。"""
+    """Returns the continuous small font footer row in the only column below the single horizontal line at the bottom."""
 
     rule_width = max(0.1, rule.bbox[2] - rule.bbox[0])
     rule_center_x = _bbox_center_x(rule.bbox)
@@ -1352,7 +1352,7 @@ def _rule_overlaps_fixed_container(
     fixed_blocks: list[dict[str, object]],
     page_size: tuple[float, float],
 ) -> bool:
-    """排除落在表格、图片、公式或代码容器内的页首横线。"""
+    """Exclude header bars that fall within tables, images, formulas, or code containers."""
 
     expanded_rule = _expand_bbox(
         rule.original_bbox,
@@ -1370,7 +1370,7 @@ def _rule_overlaps_fixed_container(
 def _classify_page_number_outer_companions(
     pages: list[_PreparedPage],
 ) -> None:
-    """把上下页码外侧的未分类文本和图片标为对应页眉或页脚。"""
+    """Mark the uncategorized text and images outside the upper and lower page numbers as corresponding headers or footers."""
 
     for page in pages:
         page_numbers = [line for line in page.remaining_lines if line.semantic_type == "page_number"]
@@ -1403,7 +1403,7 @@ def _classify_page_number_outer_companions(
                     angle,
                 )
                 is_outward = local_bbox[3] <= outward_limit if target_type == "header" else local_bbox[1] >= outward_limit
-                # 同一边缘行还要求候选自身是窄带对象；近整页的大容器只蹭到页码行边时不算同行。
+                # The same edge row also requires the candidate itself to be a narrow-band object; a large container that touches the entire page is not considered a peer when it only touches the edge of the page number row.
                 same_marginal_row = (
                     _bbox_axis_overlap_ratio(
                         local_bbox,
@@ -1433,7 +1433,7 @@ def _classify_page_number_outer_companions(
                     angle,
                 )
                 is_outward = local_bbox[3] <= outward_limit if target_type == "header" else local_bbox[1] >= outward_limit
-                # 同一边缘行还要求图片自身是窄带对象；近整页的大图只蹭到页码行边时不算同行。
+                # The same edge line also requires that the picture itself be a narrow-band object; a large picture that is nearly the entire page is not considered to be in the same line when it only touches the edge of the page number line.
                 same_marginal_row = (
                     _bbox_axis_overlap_ratio(
                         local_bbox,
@@ -1450,7 +1450,7 @@ def _classify_page_number_outer_companions(
 def _classify_split_marginal_row_companions(
     pages: list[_PreparedPage],
 ) -> None:
-    """把页边缘同一拆分视觉行中的未分类碎片继承为页眉或页脚。"""
+    """Inherit uncategorized fragments in the same split visual line at the edge of the page as headers or footers."""
 
     for page in pages:
         row_groups: dict[tuple[int, int], list[_LineItem]] = {}
@@ -1477,7 +1477,7 @@ def _classify_split_marginal_row_companions(
 
 
 def _classify_raw_page_marginals(sources: list[_PageSource]) -> None:
-    """在视觉容器认领前保护强跨页页码、页眉和页脚文本。"""
+    """Protect strong cross-page numbering, header and footer text before visual container claiming."""
 
     if len(sources) < 2:
         return
@@ -1509,7 +1509,7 @@ def _classify_raw_page_marginals(sources: list[_PageSource]) -> None:
 
 
 def _classify_repeated_page_marginals(pages: list[_PreparedPage]) -> None:
-    """仅用相邻或同奇偶页的重复证据标注页码、页眉和页脚。"""
+    """Label page numbers, headers, and footers only with evidence of duplication on adjacent or same odd-even pages."""
 
     if len(pages) < 2:
         return
@@ -1526,7 +1526,7 @@ def _classify_repeated_page_marginals(pages: list[_PreparedPage]) -> None:
 def _classify_marginal_candidates(
     candidates: list[_MarginalCandidate],
 ) -> None:
-    """复用跨页递增页码和稳定边缘文本的强证据匹配。"""
+    """Reuse cross-page incrementing page numbers and strong evidence matching for stable edge text."""
 
     for left_index, left in enumerate(candidates):
         left_value = _parse_page_number_value(left.line.text)
@@ -1567,7 +1567,7 @@ def _classify_marginal_candidates(
 
 
 def _classify_single_page_compound_headers(pages: list[_PreparedPage]) -> None:
-    """以拆分同行、字号收缩和正文栏右缘共同确认单页复合页眉。"""
+    """The single-page composite header is confirmed by splitting lines, shrinking font size, and the right edge of the text column."""
 
     if len(pages) != 1:
         return
@@ -1636,7 +1636,7 @@ def _classify_single_page_compound_headers(pages: list[_PreparedPage]) -> None:
 def _classify_page_footnote_trailing_footers(
     pages: list[_PreparedPage],
 ) -> None:
-    """把任意页脚注投影下方、已越过续行边界的紧凑尾段标为页脚。"""
+    """Mark the compact tail paragraph below any footer projection and beyond the line continuation boundary as a footer."""
 
     for page in pages:
         line_by_source = {line.source_index: line for line in page.remaining_lines}
@@ -1661,7 +1661,7 @@ def _classify_page_footnote_trailing_footers(
             )
             ranked_groups.append((local_bottom, source_indices))
 
-        # 优先处理页面最下方的脚注组，避免上方脚注跨过下方脚注寻找页脚。
+        # Prioritize the footnote group at the bottom of the page to prevent the upper footnotes from crossing the lower footnotes to find the footer.
         for _local_bottom, source_indices in sorted(
             ranked_groups,
             key=lambda item: item[0],
@@ -1678,7 +1678,7 @@ def _page_footnote_trailing_footer_members(
     page: _PreparedPage,
     source_indices: set[int],
 ) -> list[_LineItem]:
-    """返回脚注水平投影下方唯一、紧凑且小于正文尺度的页脚行。"""
+    """Returns the footer row below the footnote's horizontal projection that is unique, compact, and smaller than the body size."""
 
     line_by_source = {line.source_index: line for line in page.remaining_lines}
     anchor_lines = [
@@ -1742,7 +1742,7 @@ def _page_footnote_trailing_footer_members(
         return []
 
     if any(bbox[1] <= anchor_bbox[3] < bbox[3] for _line, bbox in unresolved_geometry):
-        # 另一栏正文仍跨过脚注底边时，不能把其下方局部文本猜成全页页脚。
+        # When another column of text still spans the bottom edge of the footnote, the partial text below it cannot be guessed as a full-page footer.
         return []
     trailing_geometry = sorted(
         ((line, bbox) for line, bbox in unresolved_geometry if bbox[1] > anchor_bbox[3]),
@@ -1821,7 +1821,7 @@ def _page_footnote_trailing_footer_members(
 
 
 def _classify_isolated_first_page_footer(pages: list[_PreparedPage]) -> None:
-    """用多页首页的极底位置、正文尺度和孤立净空补标唯一页脚。"""
+    """Use a unique footer at the bottom of a multi-page homepage, text size, and isolated headroom."""
 
     if len(pages) < 2:
         return
@@ -1841,7 +1841,7 @@ def _classify_isolated_first_page_footer(pages: list[_PreparedPage]) -> None:
     if len(body_lines) < 4:
         return
     body_height = statistics.median(_line_effective_height(line, line.bbox) for line in body_lines)
-    # 首页刊物编号和版权声明有明确语义，允许略高于普通孤立页脚，并恢复同行碎片。
+    # The front page publication number and copyright statement have clear semantics, allow slightly higher than normal isolated footers, and restore peer fragmentation.
     copyright_lines = [
         line
         for line in page.remaining_lines
@@ -1884,7 +1884,7 @@ def _classify_isolated_first_page_footer(pages: list[_PreparedPage]) -> None:
         and line.bbox[1] - body_bottom >= 1.5 * body_height
         and not any(_bbox_intersects(line.bbox, container_bbox) for container_bbox in container_bboxes)
     ]
-    # 出版编号和版权文字可能被字体拆成多个 run，先按同一视觉行验证整体净空。
+    # Publication number and copyright text may be split into multiple run fonts, verify overall headroom by same visual line first.
     if candidates:
         bbox = _bbox_union_many([line.bbox for line in candidates])
         if (
@@ -1898,11 +1898,11 @@ def _classify_isolated_first_page_footer(pages: list[_PreparedPage]) -> None:
 
 
 def _classify_repeated_visual_headers(pages: list[_PreparedPage]) -> None:
-    """仅按页首位置与跨页重复几何，把整体图片重标为视觉页眉。"""
+    """Only repeat the geometry based on the top position and the cross-page, and relabel the overall image as a visual header."""
 
     candidates: list[tuple[int, dict[str, object], BBox, int]] = []
     for page_index, page in enumerate(pages):
-        # 首页常使用独立封面版式，不参与正文页视觉页眉聚类。
+        # The homepage often uses an independent cover layout and does not participate in the visual header clustering of the text page.
         if page_index == 0:
             continue
         page_width, page_height = page.page_size
@@ -1929,7 +1929,7 @@ def _classify_repeated_visual_headers(pages: list[_PreparedPage]) -> None:
     parents = list(range(len(candidates)))
 
     def find(index: int) -> int:
-        """查找视觉页眉候选所属几何簇的根节点。"""
+        """Find the root node of the geometric cluster to which the visual header candidate belongs."""
 
         while parents[index] != index:
             parents[index] = parents[parents[index]]
@@ -1937,7 +1937,7 @@ def _classify_repeated_visual_headers(pages: list[_PreparedPage]) -> None:
         return index
 
     def union(first_index: int, second_index: int) -> None:
-        """合并跨页距离和归一化几何均匹配的两个候选。"""
+        """Merge two candidates that match both cross-page distance and normalized geometry."""
 
         first_root = find(first_index)
         second_root = find(second_index)
@@ -1970,7 +1970,7 @@ def _classify_repeated_visual_headers(pages: list[_PreparedPage]) -> None:
 
 
 def _visual_header_geometry_matches(first: BBox, second: BBox) -> bool:
-    """比较两个归一化页首图片的 IoU 与宽高尺度。"""
+    """Compare IoU with width and height scale of two normalized header images."""
 
     first_width = first[2] - first[0]
     first_height = first[3] - first[1]
@@ -1995,7 +1995,7 @@ def _build_marginal_candidate(
     line: _LineItem,
     page_size: tuple[float, float],
 ) -> _MarginalCandidate | None:
-    """把页面上下百分之十五内的常规小行转换成跨页比较候选。"""
+    """Convert regular small lines within 15% of the page into cross-page comparison candidates."""
 
     if line.semantic_type not in {None, "page_footnote"}:
         return None
@@ -2007,7 +2007,7 @@ def _build_marginal_candidate(
     normalized_center_y = _bbox_center_y(local_bbox) / local_page_height
     normalized_center_x = _bbox_center_x(local_bbox) / local_page_width
     if line.semantic_type == "page_footnote" and normalized_center_y < 0.94:
-        # 只允许极底部脚注重新参加跨页强证据匹配，正文脚注继续保留原类型。
+        # Only the bottom footnotes are allowed to rejoin cross-page strong evidence matching, and the text footnotes continue to retain their original type.
         return None
     if normalized_center_y <= 0.15:
         region: Literal["header", "footer", "side"] = "header"
@@ -2021,7 +2021,7 @@ def _build_marginal_candidate(
             and (normalized_center_y <= 0.3 or normalized_center_y >= 0.7)
         )
     ):
-        # 仅页码递增逻辑会消费 side；稳定文本不会被侧栏位置猜成页眉页脚。
+        # Only the page number increment logic will consume side; stable text will not be guessed as header or footer by sidebar position.
         region = "side"
     else:
         return None
@@ -2040,7 +2040,7 @@ def _page_number_candidates_match(
     first: _MarginalCandidate,
     second: _MarginalCandidate,
 ) -> bool:
-    """校验连续页码的同边缘几何，横竖版切换时允许边缘位置随版面改变。"""
+    """Verify the same edge geometry of consecutive page numbers, and allow the edge position to change with the layout when switching between horizontal and vertical versions."""
 
     if _marginal_geometry_matches(first, second):
         return True
@@ -2065,7 +2065,7 @@ def _marginal_geometry_matches(
     first: _MarginalCandidate,
     second: _MarginalCandidate,
 ) -> bool:
-    """比较边缘候选的方向、纵向带、字号以及同侧或镜像横向位置。"""
+    """Compare edge candidates for orientation, vertical band, font size, and same-side or mirrored lateral position."""
 
     if first.region != second.region or first.line.angle != second.line.angle:
         return False
@@ -2117,7 +2117,7 @@ def _marginal_geometry_matches(
 
 
 def _parse_page_number_value(text: str) -> int | None:
-    """解析整行阿拉伯、罗马或中文页码；混有稳定正文的行不作为纯页码。"""
+    """Parse entire lines of Arabic, Roman, or Chinese page numbers; lines mixed with stable text are not treated as pure page numbers."""
 
     normalized = unicodedata.normalize("NFKC", str(text or ""))
     match = _PAGE_NUMBER_RE.fullmatch(normalized)
@@ -2132,7 +2132,7 @@ def _parse_page_number_value(text: str) -> int | None:
 
 
 def _roman_number_to_int(value: str) -> int | None:
-    """把页码中的规范罗马数字转换成整数，非法组合返回空。"""
+    """Convert the standard Roman numerals in the page number to integers. Illegal combinations return null."""
 
     roman_values = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
     normalized = value.upper()
@@ -2150,7 +2150,7 @@ def _roman_number_to_int(value: str) -> int | None:
 
 
 def _chinese_page_number_to_int(value: str) -> int | None:
-    """把常见百位以内中文页码转换成整数，供跨页递增校验使用。"""
+    """Convert common Chinese page numbers within hundreds digits into integers for cross-page incremental verification."""
 
     digits = {"〇": 0, "零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
     if all(char in digits for char in value):
@@ -2175,14 +2175,14 @@ def _chinese_page_number_to_int(value: str) -> int | None:
 
 
 def _marginal_text_matches(first_text: str, second_text: str) -> bool:
-    """在屏蔽变化数字后比较边缘稳定文本，短文本只接受完全一致。"""
+    """Marginally stable texts are compared after masking out varying numbers, short texts only accept exact matches."""
 
-    # 年份、卷页和预印本编号是参考条目尾行，不是可复用的刊头文字。
+    # The year, volume, and preprint number are reference entry trailing lines, not reusable masthead text.
     citation_tail = r"(?:\b(?:18|19|20)\d{2}\s*[;,.:]|\barxiv\s*:\s*\d|\d+\s*:\s*\d+\s*[–—-]\s*\d+)"
     if any(re.match(citation_tail, text.strip(), re.IGNORECASE) for text in (first_text, second_text)):
         return False
 
-    # 公式编号在数字屏蔽后都会成为同一标记，不能作为重复页脚的文本证据。
+    # Formula numbers will become the same mark after number masking and cannot be used as textual evidence of repeated footers.
     if any(re.fullmatch(r"[（(﹙]\s*[A-Za-z]?\d+(?:[.\-]\d+)*\s*[)）﹚]", text.strip()) for text in (first_text, second_text)):
         return False
     first = _normalize_marginal_text(first_text)
@@ -2197,7 +2197,7 @@ def _marginal_text_matches(first_text: str, second_text: str) -> bool:
 
 
 def _normalize_marginal_text(text: str) -> str:
-    """统一边缘重复文本的宽窄字符、大小写、空白和可变数字。"""
+    """Unify margin repeating text for wide and narrow characters, upper and lower case, whitespace, and variable numbers."""
 
     normalized = unicodedata.normalize("NFKC", str(text or "")).casefold()
     normalized = re.sub(r"\d+", "#", normalized)

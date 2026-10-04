@@ -1,3 +1,3 @@
-"""原生 PDF 分析实现，复用接口由 shared 模块显式导出。"""
+"""Native PDF analysis implementation, the reuse interface is explicitly exported by the shared module."""
 
 __all__ = []

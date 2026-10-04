@@ -1,4 +1,4 @@
-"""LaTeX renderer 的纯路径 sidecar 图片解析。"""
+"""Pure path of LaTeX renderer sidecar image parsing."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ _FORBIDDEN_TEX_PATH_CHARACTERS = {"%", "{", "}"}
 
 
 def normalize_asset_base_path(asset_base_path: str) -> str:
-    """把调用方路径前缀规范化为 TeX 可跨平台读取的正斜杠形式。"""
+    """Normalizes the caller path prefix to a cross-platform readable forward slash form of TeX."""
     if not isinstance(asset_base_path, str):
         raise TypeError("asset_base_path must be a string")
     if any(character == "\x00" or character in "\r\n" for character in asset_base_path):
@@ -25,14 +25,14 @@ def normalize_asset_base_path(asset_base_path: str) -> str:
 
 
 def resolve_block_image_path(block: ImagePayloadBlock, asset_base_path: str) -> str | None:
-    """只从 block 的安全 sidecar 路径解析 XeLaTeX 可直接读取的图片。"""
+    """Only XeLaTeX directly readable images are resolved from the safe sidecar path of block."""
     if block.image_path is None:
         return None
     return resolve_relative_image_path(block.image_path, asset_base_path)
 
 
 def resolve_html_image_path(source: str, asset_base_path: str) -> str | None:
-    """解析 HTML img 的安全相对路径，拒绝 data URI 与远程地址。"""
+    """Resolving safe relative paths for HTML img, rejecting data URI with remote addresses."""
     if not isinstance(source, str):
         return None
     normalized = source.strip()
@@ -48,7 +48,7 @@ def resolve_html_image_path(source: str, asset_base_path: str) -> str | None:
 
 
 def resolve_relative_image_path(relative_path: str, asset_base_path: str) -> str | None:
-    """拼接安全相对路径，并限制为 XeLaTeX 原生支持的图片扩展名。"""
+    """Splice safe relative paths and restrict to image extensions natively supported by XeLaTeX."""
     safe_path = validate_image_sidecar_path(relative_path)
     if PurePosixPath(safe_path).suffix.casefold() not in _SUPPORTED_IMAGE_EXTENSIONS:
         return None
@@ -66,12 +66,12 @@ def resolve_relative_image_path(relative_path: str, asset_base_path: str) -> str
 
 
 def remote_block_image_url(block: ImagePayloadBlock) -> str | None:
-    """返回 block 已由严格模型校验过的远程图片 URL。"""
+    """Returns block Remote image URL that has been verified by the strict model."""
     return block.image_url
 
 
 def tex_image_path(path: str) -> str:
-    """使用 detokenize 包装已校验路径，保留空格及 TeX 保留字符。"""
+    """Use detokenize to wrap the verified path, retaining spaces and TeX reserved characters."""
     return rf"\detokenize{{{path}}}"
 
 

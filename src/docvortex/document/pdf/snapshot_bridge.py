@@ -1,4 +1,4 @@
-"""核验标准 ABI 后直接创建 Rust 自有文本快照，不先提取 Python 字符字典。"""
+"""After verifying the standard ABI, directly create Rust's own text snapshot without first extracting the Python character dictionary."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ _REASON = "not probed"
 
 
 def snapshot_bridge_info():
-    """报告真实原生快照创建和明确参考选择，空页不伪报字符 FFI 已执行。"""
+    """Reports true native snapshot creation and explicit reference selection, no false positives for empty pages FFI executed."""
     return {
         "native_text_snapshot_calls": _CALLS,
         "native_text_snapshot_empty_pages": _EMPTY,
@@ -27,7 +27,7 @@ def snapshot_bridge_info():
 
 
 def _standard_character_symbols():
-    """核验字符读取所需 ABI，并返回函数强引用和 Rust 可调用的地址。"""
+    """The verification character reads the required ABI and returns a strong reference to the function and the address of the Rust callable."""
     if ct.sizeof(raw.FS_RECTF) != 16 or any(
         getattr(raw.FS_RECTF, name).offset != offset for name, offset in (("left", 0), ("top", 4), ("right", 8), ("bottom", 12))
     ):
@@ -62,7 +62,7 @@ def _standard_character_symbols():
 
 
 def _color_symbols():
-    """核验隐藏文字判定所需的填充和描边颜色函数。"""
+    """Verify the fill and stroke color functions required for hidden text determination."""
     uint_pointer = ct.POINTER(ct.c_uint)
     specs = (
         (
@@ -92,7 +92,7 @@ def _color_symbols():
 
 
 def _ordinary_snapshot_arguments(raw_handle, frame, rotation, extended, visibility):
-    """校验 textpage 快照的类型、数值和可见性输入。"""
+    """Verify type, value, and visibility inputs for textpage snapshot."""
     if (
         not raw_handle
         or type(extended) is not bool
@@ -110,7 +110,7 @@ def _ordinary_snapshot_arguments(raw_handle, frame, rotation, extended, visibili
 
 
 def _record_snapshot_result(snapshot, count):
-    """按原始字符数更新命中诊断；标准算法失败仍由异常直接传播。"""
+    """Hit diagnostics are updated by the original number of characters; standard algorithm failures are still propagated directly by exceptions."""
     global _CALLS, _EMPTY
     if count:
         _CALLS += 1
@@ -120,7 +120,7 @@ def _record_snapshot_result(snapshot, count):
 
 
 def read_text_snapshot(textpage, frame, rotation, extended, visibility=None):
-    """在原锁和 Python textpage 生命周期内读取、规范化与去重。"""
+    """Read, normalize and deduplicate during the lifetime of the original lock and Python textpage."""
     global _REASON
     native = get_native()
     if native is None or not hasattr(native, "read_pdfium_text_snapshot"):
@@ -141,7 +141,7 @@ def read_text_snapshot(textpage, frame, rotation, extended, visibility=None):
     packed_visibility = (
         {0 if key is None else key: value for key, value in visibility.items()} if visibility is not None else None
     )
-    # 函数强引用和 textpage 在整个读取阶段存活，产物不保存任何 PDFium 地址。
+    # Function strong references and textpage survive the entire read phase, and the product does not save any PDFium address.
     with pdfium_guard():
         count = textpage.count_chars()
         if count < 0:

@@ -1,4 +1,4 @@
-"""Flash PDF、EPUB、HTML、OFD、CSV 与 Office 模型公开入口。"""
+"""Flash PDF, EPUB, HTML, OFD, CSV and Office model public entrance."""
 
 from .models import (
     CsvModel,

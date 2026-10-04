@@ -1,4 +1,4 @@
-"""依据栏带、缩进和排版重置寻找正文行分组边界。"""
+"""Find text line grouping boundaries based on banding, indentation, and layout reset."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from .common import (
 
 
 def _top_marginal_text_break_sources(lane: _TextLane, page_height: float) -> set[int]:
-    """顶边独立编号或较小文字与稳定正文之间保留净空边界，不依赖跨页信息强制分类页眉。"""
+    """Keep headroom between independently numbered or smaller text on the top edge and stable text, and do not rely on cross-page information to force classified headers."""
     rows = sorted(lane.lines, key=lambda item: (item[1][1], item[1][0]))
     output: set[int] = set()
     for index in range(1, len(rows) - 2):
@@ -69,7 +69,7 @@ def _top_marginal_text_break_sources(lane: _TextLane, page_height: float) -> set
 
 
 def _repeated_bullet_break_sources(line_geometry: list[tuple[_LineItem, BBox]]) -> set[int]:
-    """同左缘重复圆点形成独立项目起点；分离的圆点同时保护其唯一同排正文，条目长短不影响边界。"""
+    """Repeating the dots on the left edge forms the starting point of an independent item; the separated dots also protect its only co-row text, and the length of the entry does not affect the boundary."""
     candidates: list[tuple[_LineItem, BBox, _LineItem | None]] = []
     for marker, bounds in line_geometry:
         if marker.semantic_type is not None or marker.caption_start or marker.paragraph_group is not None:
@@ -120,7 +120,7 @@ def _repeated_bullet_break_sources(line_geometry: list[tuple[_LineItem, BBox]]) 
                 output.add(body.source_index)
             break
         if marker.source_index not in output:
-            # 左栏首条可接右栏重复项目；必须同时有左栏冒号引导句与右栏至少两个同式圆点。
+            # The first item in the left column can be followed by repeated items in the right column; there must be both a colon introductory sentence in the left column and at least two dots of the same type in the right column.
             peers = [
                 (other, box)
                 for other, box, _ in candidates
@@ -153,7 +153,7 @@ def _repeated_bullet_break_sources(line_geometry: list[tuple[_LineItem, BBox]]) 
 
 
 def _italic_quote_to_body_break_sources(lane: _TextLane) -> set[int]:
-    """两行缩进斜体引文收句后，向左重置的常规正文形成永久段界，防止标题回退后反向粘连。"""
+    """After the two-line indented italicized quotation ends, the regular text reset to the left forms a permanent paragraph boundary to prevent reverse adhesion after the title is rolled back."""
     rows = sorted(lane.lines, key=lambda item: (item[1][1], item[1][0]))
     output: set[int] = set()
     for index in range(2, len(rows) - 1):
@@ -195,7 +195,7 @@ def _italic_quote_to_body_break_sources(lane: _TextLane) -> set[int]:
 
 
 def _caption_to_body_break_sources(lane: _TextLane) -> set[int]:
-    """图注后字号增大且留白重置的正文形成永久边界，避免相同字体家族导致正文被吞入图注。"""
+    """After the legend, the font size is increased and the white space is reset to form a permanent boundary to prevent the text from being swallowed up by the legend due to the same font family."""
     output: set[int] = set()
     active = False
     caption_left = 0.0
@@ -216,8 +216,8 @@ def _caption_to_body_break_sources(lane: _TextLane) -> set[int]:
             and _effective_text_row_gap(previous, current)
             >= 0.5 * max(_line_effective_height(line, bounds), _line_effective_height(following, next_bounds))
         ):
-            # 显式图表编号启动新的注释，不能续接前一图的Source或邻近正文。
-            # 正文续行即使恰从图号开头，也不能仅凭标记制造段界。
+            # An explicit figure number starts a new comment and cannot continue the Source of the previous figure or the adjacent text.
+            # Even if the text continuation begins exactly with the figure number, paragraph boundaries cannot be created solely by marking.
             output.add(following.source_index)
         if line.caption_start:
             active = True
@@ -234,9 +234,9 @@ def _caption_to_body_break_sources(lane: _TextLane) -> set[int]:
             and next_bounds[1] - bounds[3] <= 0.75 * height
             and 0.85 <= next_height / height <= 1.15
         ):
-            # 居中图题各行宽度不同，左缘稍向外伸不应提前丢失图题状态。
+            # The width of each row of the central figure title is different, and the left edge is slightly extended so that the status of the figure title should not be lost in advance.
             caption_left = min(caption_left, next_bounds[0])
-        # 居中署名的短括号尾行结束后，首行缩进加连续满栏行可确认正文重置；单个长图题续行不够。
+        # After the last line of the short parentheses for the central signature ends, the first line is indented and a continuous full column line can confirm the text reset; a single long figure title continuation line is not enough.
         width = lane.right - lane.left
         body_rows = rows[row_index + 2 : row_index + 4]
         centered_credit_to_body = (
@@ -274,7 +274,7 @@ def _local_tight_output_line_bboxes(
     page_size: tuple[float, float],
     angle: int,
 ) -> tuple[list[BBox], bool]:
-    """返回与原行顺序一致的 tight+1pt 局部框及是否存在可靠候选。"""
+    """Returns the tight+1pt local box in the same order as the original row and whether there are reliable candidates."""
 
     output = []
     changed = False
@@ -295,7 +295,7 @@ def _starts_structural_reference_entry(
     previous: tuple[_LineItem, BBox],
     current: tuple[_LineItem, BBox],
 ) -> bool:
-    """仅在编号行相对续行明显左突时确认新的参考文献条目。"""
+    """Acknowledge new reference entries only if the numbered line juts significantly to the left relative to the continuation line."""
 
     if _REFERENCE_ENTRY_RE.match(current[0].text.strip()) is None:
         return False
@@ -313,7 +313,7 @@ def _build_hanging_indent_group_map(
     table_bboxes: list[BBox],
     axis_lines: list[_LocalAxisLine],
 ) -> dict[int, int]:
-    """仅按重复的左突首行和稳定续行缩进识别悬挂缩进条目。"""
+    """Identifies dangling indent entries only by repeated left-breaking first line and stable continuation line indents."""
 
     if len(lane.lines) < 4:
         return {}
@@ -332,7 +332,7 @@ def _build_hanging_indent_group_map(
         previous: tuple[_LineItem, BBox],
         current: tuple[_LineItem, BBox],
     ) -> bool:
-        """检查相邻行的净空和几何障碍是否允许组成同一缩进序列。"""
+        """Check whether the headroom and geometric barriers of adjacent lines allow the same indentation sequence."""
 
         effective_gap = _effective_text_row_gap(previous, current)
         top_pitch = current[1][1] - previous[1][1]
@@ -359,7 +359,7 @@ def _build_hanging_indent_group_map(
         *,
         require_next_start: bool,
     ) -> tuple[int, float] | None:
-        """消费一个左突首行及其续行，并返回下一条首行位置。"""
+        """Consumes a left-burst first row and its continuation row, and returns the position of the next first row."""
 
         lane_width = max(0.1, lane.right - lane.left)
         full_width_midparagraph_entry = (
@@ -376,14 +376,14 @@ def _build_hanging_indent_group_map(
             and abs(rows[start_index - 1][1][0] - start_left) <= start_tolerance
             and not full_width_midparagraph_entry
         ):
-            # 同左缘正文仍在连续时不能从段落中部启动悬挂条目序列。
+            # The hanging entry sequence cannot be started from the middle of the paragraph while the main text is still continuous with the left margin.
             return None
         if (
             start_index > 0
             and is_hyphen_at_line_end(rows[start_index - 1][0].text)
             and rows_are_adjacent(rows[start_index - 1], rows[start_index])
         ):
-            # 排版断词后的下一物理行属于前文，不能被缩进几何误当成新条目首行。
+            # The next physical line after the typesetting word break belongs to the previous text and cannot be mistaken for the first line of a new entry due to indentation geometry.
             return None
         continuation_index = start_index + 1
         if continuation_index >= len(rows):
@@ -467,8 +467,8 @@ def _build_hanging_indent_group_map(
                 require_next_start=False,
             )
             if prospective_entry is None:
-                # 当前条目已经完整确认；后面的普通左对齐段落只作为终止边界，
-                # 不能让它反向使此前所有悬挂缩进条目失效。
+                # The current entry has been fully confirmed; the following ordinary left-aligned paragraph only serves as a terminating boundary.
+                # You cannot reverse it to invalidate all previous dangling indent entries.
                 end_index = next_start_index
                 break
             start_indices.append(next_start_index)
@@ -495,7 +495,7 @@ def _build_hanging_indent_group_map(
 
 
 def _infer_local_text_lane_map(lane: _TextLane) -> dict[int, _TextLane]:
-    """从连续同左缘正文推导局部栏宽，修正跨栏上文污染的全宽栏带。"""
+    """Deriving local column widths from continuous left-edge text corrects for full-width column strips contaminated by cross-column text."""
 
     if lane.is_span or len(lane.lines) < 3:
         return {}
@@ -510,7 +510,7 @@ def _infer_local_text_lane_map(lane: _TextLane) -> dict[int, _TextLane]:
     current_run: list[tuple[_LineItem, BBox]] = []
 
     def submit_run() -> None:
-        """提交当前连续正文行，语义行和明显左缘变化都会结束该局部区段。"""
+        """Commitment of the current continuous text line, semantic lines and significant left edge changes will end the local section."""
 
         nonlocal current_run
         if current_run:
@@ -565,7 +565,7 @@ def _structured_text_break_sources(
     regular_gap: float,
     gap_mad: float,
 ) -> set[int]:
-    """用重复强调首行和前行右侧留白确认结构化正文的新段起点。"""
+    """Use repeated emphasis on the first line and white space on the right side of the previous line to identify the starting point of a new paragraph in the structured text."""
 
     rows = sorted(
         lane.lines,
@@ -616,7 +616,7 @@ def _structured_text_break_sources(
 
 
 def _prose_paragraph_break_sources(lane: _TextLane, regular_gap: float, gap_mad: float) -> set[int]:
-    """用句末、可容纳下一首词的短尾及重复首行缩进确认自然段，保护公式和已有条目归组。"""
+    """Use the end of the sentence, a short tail that can accommodate the next word, and the indentation of the repeated first line to confirm the natural paragraph and protect the grouping of formulas and existing items."""
     rows = sorted(lane.lines, key=lambda item: (item[1][1], item[1][0]))
     width = max(0.1, lane.right - lane.left)
     body = [
@@ -643,7 +643,7 @@ def _prose_paragraph_break_sources(lane: _TextLane, regular_gap: float, gap_mad:
             caption_left = None
         if caption_left is not None and index + 2 < len(rows):
             next_line, next_bbox = rows[index + 2]
-            # 完整小字号图注收句后，留白及两行较大正文共同结束图注保护，恢复后续自然段判定。
+            # After the complete small-size figure annotation ends, the blank space and the two lines of larger text jointly end the annotation protection and restore the subsequent natural paragraph judgment.
             first_height = _line_effective_height(first, fb)
             body_height = _line_effective_height(line, bbox)
             if (
@@ -685,7 +685,7 @@ def _prose_paragraph_break_sources(lane: _TextLane, regular_gap: float, gap_mad:
         first_ink, current_ink = first.ink_bbox or fb, line.ink_bbox or bbox
         if current_ink[1] < first_ink[3] - 0.15 * em:
             continue
-        # 原生段尾证据包含引用上标之前的句点；明显空行必须成为永久段界，不能被块级续行重新合并。
+        # Native end-of-segment evidence consists of periods preceding the quoted superscript; apparently empty lines must become permanent segment boundaries and cannot be re-merged by block-level continuation lines.
         blank_paragraph = (
             max(1.15 * em, regular_gap + 0.85 * em + 3 * gap_mad) <= gap <= 3 * em
             and abs(bbox[0] - lane.left) <= 0.35 * em
@@ -724,7 +724,7 @@ def _prose_paragraph_break_sources(lane: _TextLane, regular_gap: float, gap_mad:
 
 
 def _cjk_prose_break_sources(lane: _TextLane, regular_gap: float, gap_mad: float) -> set[int]:
-    """中文句末后的额外净空证明段界，短冒号标签也保留边界；普通同距续行不拆分。"""
+    """Extra headroom at the end of a Chinese sentence proves paragraph boundaries, and short colon labels also preserve boundaries; ordinary equally-spaced line continuations are not split."""
     rows = sorted(lane.lines, key=lambda item: (item[1][1], item[1][0]))
     width = max(0.1, lane.right - lane.left)
     output = set()
@@ -762,7 +762,7 @@ def _cjk_prose_break_sources(lane: _TextLane, regular_gap: float, gap_mad: float
 
 
 def _cjk_entry_break_sources(lane: _TextLane) -> set[int]:
-    """同左缘连续顿号编号及带日期的重复书名号报告各自起段，不拆叙述中的编号或引用。"""
+    """Numbers with consecutive spaces on the left margin and repeated book title numbers with dates are reported to start in their own paragraphs, without breaking the numbers or references in the narrative."""
     rows = sorted(
         (
             item
@@ -820,7 +820,7 @@ def _isolated_indented_paragraph_break_sources(
     regular_gap: float,
     gap_mad: float,
 ) -> set[int]:
-    """识别短终止尾行之后的缩进首行，并要求下一行回到稳定栏左缘。"""
+    """Recognizes an indented first line after a short terminating trailing line and requires the next line to return to the left edge of the stable column."""
 
     rows = sorted(
         (item for item in lane.lines if item[0].semantic_type is None),
@@ -869,7 +869,7 @@ def _centered_visual_reset_break_sources(
     visual_bboxes: Sequence[BBox],
     local_page_height: float,
 ) -> set[int]:
-    """识别视觉主体下方短居中行到更宽居中行的独立注释重启。"""
+    """Recognize independent annotation restarts from a short centered line to a wider centered line below the visual body."""
 
     if not visual_bboxes:
         return set()
@@ -913,7 +913,7 @@ def _leading_typography_reset_break_sources(
     regular_gap: float,
     gap_mad: float,
 ) -> set[int]:
-    """识别短尾之后以独立行首字体 run 开启的宽行结构段。"""
+    """After identifying the short tail, open the wide line structure segment with the independent line start font run."""
 
     rows = sorted(
         (item for item in lane.lines if item[0].semantic_type is None),
@@ -942,7 +942,7 @@ def _leading_typography_reset_break_sources(
             _line_effective_height(*previous),
             _line_effective_height(*current),
         )
-        # 完整收句后的独立居中句有双侧缩进和明显净空；星号等外围装饰不改变句末证据。
+        # The independent centered sentence after the complete sentence has bilateral indentation and obvious headroom; peripheral decorations such as asterisks do not change the evidence at the end of the sentence.
         if (
             previous_width <= 0.65 * lane_width
             and 0.4 * lane_width <= current_width <= 0.85 * lane_width
@@ -967,7 +967,7 @@ def _leading_typography_reset_break_sources(
         ):
             output.add(current[0].source_index)
             continue
-        # 重复行首字体标签与明显空行共同确认结构段，无需段尾以句点结束；保留普通字体续行和数学屏障。
+        # Repeating line-beginning font tags and obvious blank lines jointly identify structural paragraphs, and there is no need to end the paragraph with a period; normal font continuation lines and mathematical barriers are retained.
         if (
             repeated_typographic_starts
             and current[0].leading_typography_width is not None
@@ -1043,7 +1043,7 @@ def _leading_typography_reset_break_sources(
 def _formula_style_text_row_break_sources(
     lane: _TextLane,
 ) -> set[int]:
-    """按相邻显示行几何拆分被公式检测回退为正文的独立文本行。"""
+    """Split geometrically by adjacent display lines into independent lines of text that are returned to text by formula detection."""
 
     rows = sorted(
         (item for item in lane.lines if item[0].semantic_type is None),
@@ -1086,7 +1086,7 @@ def _formula_style_text_row_break_sources(
         output.add(rows[index][0].source_index)
         output.add(rows[index + 1][0].source_index)
         if index + 2 < len(rows):
-            # 同时保护显示行组后的正文起点，避免上下文恢复阶段重新跨界合并。
+            # At the same time, the starting point of the text after the displayed line group is protected to avoid cross-border merging again during the context recovery phase.
             output.add(rows[index + 2][0].source_index)
     return output
 
@@ -1096,7 +1096,7 @@ def _front_matter_keyword_break_sources(
     local_page_height: float,
     page_index: int | None,
 ) -> set[int]:
-    """把首页关键词和文献元数据行固定为独立文本块起点。"""
+    """Fix the homepage keywords and document metadata lines as the starting points of independent text blocks."""
 
     if page_index != 0:
         return set()
@@ -1112,7 +1112,7 @@ def _front_matter_keyword_break_sources(
 def _component_starts_with_emphasized_row(
     lines: list[_LineItem],
 ) -> bool:
-    """识别行内强调或首行字重显著高于后续正文的组件起点。"""
+    """Identify in-line emphasis or the starting point of a component where the first line's font weight is significantly higher than that of the subsequent body text."""
 
     if not lines:
         return False
@@ -1129,7 +1129,7 @@ def _component_starts_with_emphasized_row(
 def _explicit_text_break_sources(
     lane: _TextLane,
 ) -> set[int]:
-    """用通用列表标记和 E-mail 元数据确认正文中的显式硬分段。"""
+    """Confirm explicit hard segmentation in the body with generic list tags and E-mail metadata."""
 
     rows = sorted(
         (item for item in lane.lines if item[0].semantic_type is None),

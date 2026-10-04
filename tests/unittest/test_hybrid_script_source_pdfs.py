@@ -1,4 +1,4 @@
-"""真实 PDF 输入归引擎维护；宿主 Hybrid 仅消费冻结的字符快照。"""
+"""The real PDF input is maintained by the engine; the host Hybrid only consumes frozen character snapshots."""
 
 import hashlib
 from pathlib import Path
@@ -16,7 +16,7 @@ _SOURCE_HASHES = {
 
 
 def _source_lines(filename: str, page_index: int) -> tuple[int, list[dict]]:
-    """校验版本化 PDF 身份后返回真实页旋转及物理行，避免只验证宿主快照。"""
+    """Returns real page rotation and physical rows after verifying versioned PDF identity to avoid verifying only the host snapshot."""
     source = _PDF_ROOT / filename
     assert hashlib.sha256(source.read_bytes()).hexdigest() == _SOURCE_HASHES[filename]
     with PDFDocument(source.read_bytes()) as document:
@@ -34,7 +34,7 @@ def _source_lines(filename: str, page_index: int) -> tuple[int, list[dict]]:
     ],
 )
 def test_synthetic_cjk_source_preserves_mixed_font_probes(probe: str, minimum_fonts: int) -> None:
-    """四个原始探针必须仍可从真实 PDF 提取，且保留原有混合字体证据。"""
+    """The four original probes must still be extractable from the real PDF with original mixed font evidence retained."""
     _, lines = _source_lines("native_cjk_layout_synthetic.pdf", 2)
     matches = [line for line in lines if probe in "".join(span["text"] for span in line["spans"])]
     assert len(matches) == 1
@@ -45,7 +45,7 @@ def test_synthetic_cjk_source_preserves_mixed_font_probes(probe: str, minimum_fo
 
 
 def test_rotated_powerpoint_source_preserves_page_and_physical_lines() -> None:
-    """真实旋转页仍有相同旋转、标题、行数和指定字体，宿主快照不能掩盖提取退化。"""
+    """A real rotated page still has the same rotation, title, line count, and specified font, and host snapshots cannot mask extraction degradation."""
     rotation, lines = _source_lines("metabolic_pathway_page_3.pdf", 0)
     assert rotation == 90
     assert len(lines) == 33

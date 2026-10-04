@@ -1,4 +1,4 @@
-"""Flash 各格式构造 Middle JSON 2.0 行内 Span 的轻量工具。"""
+"""Flash Each format constructor Middle JSON 2.0 A lightweight tool inline for Span."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from ..schema import (
 
 
 def append_text_span(output: list[dict[str, Any]], content: str, styles: Iterable[str] = ()) -> None:
-    """追加非空 TextSpan，并合并相邻同样式文字。"""
+    """Append non-empty TextSpan and merge adjacent text of the same style."""
     if not content:
         return
     style_set = set(styles)
@@ -32,27 +32,27 @@ def append_text_span(output: list[dict[str, Any]], content: str, styles: Iterabl
 
 
 def text_spans(content: str, styles: Iterable[str] = ()) -> list[dict[str, Any]]:
-    """把一段文字构造成零个或一个规范 TextSpan。"""
+    """Construct a text into zero or one specification TextSpan."""
     output: list[dict[str, Any]] = []
     append_text_span(output, content, styles)
     return output
 
 
 def append_equation_span(output: list[dict[str, Any]], latex: str) -> None:
-    """追加非空行内公式 Span。"""
+    """Append non-blank inline formula Span."""
     normalized = latex.strip()
     if normalized:
         output.append({"type": "equation_inline", "content": normalized})
 
 
 def append_code_span(output: list[dict[str, Any]], content: str) -> None:
-    """追加非空行内代码 Span。"""
+    """Append non-blank inline code Span."""
     if content:
         output.append({"type": "code_inline", "content": content})
 
 
 def append_hyperlink_span(output: list[dict[str, Any]], children: list[dict[str, Any]], url: str | None) -> None:
-    """追加安全超链接；目标缺失时把标签子 Span 直接降级为普通内容。"""
+    """Add safe hyperlinks; when the target is missing, directly downgrade the tag Span to normal content."""
     if not children:
         return
     normalized_url = (url or "").strip()
@@ -66,7 +66,7 @@ def append_hyperlink_span(output: list[dict[str, Any]], children: list[dict[str,
 
 
 def extend_inline_spans(output: list[dict[str, Any]], spans: Iterable[dict[str, Any]]) -> None:
-    """追加 Span 序列，并在边界合并同样式文字。"""
+    """Append the Span sequence and merge the same style text at the border."""
     for span in spans:
         if span.get("type") == "text" and isinstance(span.get("content"), str):
             append_text_span(output, str(span["content"]), span.get("styles", []))
@@ -75,7 +75,7 @@ def extend_inline_spans(output: list[dict[str, Any]], spans: Iterable[dict[str, 
 
 
 def normalize_span_dicts(spans: Iterable[dict[str, Any] | InlineSpan]) -> list[dict[str, Any]]:
-    """严格校验 Span 并返回确定性的 JSON 字典列表。"""
+    """Strictly validate Span and return a deterministic dictionary list of JSON."""
     parsed = parse_inline_spans(list(spans))
     output: list[dict[str, Any]] = []
     for span in parsed:
@@ -88,7 +88,7 @@ def normalize_span_dicts(spans: Iterable[dict[str, Any] | InlineSpan]) -> list[d
 
 
 def inline_span_plain_text(spans: Iterable[dict[str, Any]]) -> str:
-    """从 raw Span 字典中提取可见文本。"""
+    """Extract visible text from the raw Span dictionary."""
     parts: list[str] = []
     for span in spans:
         span_type = span.get("type")
@@ -106,7 +106,7 @@ def inline_span_plain_text(spans: Iterable[dict[str, Any]]) -> str:
 def slice_span_dicts(
     spans: Iterable[dict[str, Any] | InlineSpan], start: int = 0, end: int | None = None
 ) -> list[dict[str, Any]]:
-    """按可见字符偏移裁剪 raw Span，并保留样式和链接。"""
+    """Crop raw Span by visible character offset, preserving styles and links."""
     parsed = parse_inline_spans(list(spans))
     visible_length = len(_typed_plain_text(parsed))
     resolved_start = min(max(start, 0), visible_length)
@@ -129,7 +129,7 @@ def slice_span_dicts(
 
 
 def strip_span_dicts(spans: Iterable[dict[str, Any] | InlineSpan]) -> list[dict[str, Any]]:
-    """裁剪 Span 首尾空白，并保持内部样式与链接结构。"""
+    """Cut the leading and trailing blanks of Span and keep the internal style and link structure."""
     parsed = parse_inline_spans(list(spans))
     visible = _typed_plain_text(parsed)
     start = len(visible) - len(visible.lstrip())
@@ -138,7 +138,7 @@ def strip_span_dicts(spans: Iterable[dict[str, Any] | InlineSpan]) -> list[dict[
 
 
 def _typed_plain_text(spans: Iterable[InlineSpan]) -> str:
-    """提取已验证 Span 的可见文本。"""
+    """Extract the visible text of verified Span."""
     parts: list[str] = []
     for span in spans:
         if isinstance(span, (TextSpan, EquationInlineSpan, CodeInlineSpan)):
@@ -149,7 +149,7 @@ def _typed_plain_text(spans: Iterable[InlineSpan]) -> str:
 
 
 def _slice_typed_span(span: InlineSpan, start: int, end: int) -> InlineSpan | None:
-    """裁剪一个已验证 Span 的局部区间。"""
+    """Clip a local interval of verified Span."""
     if start >= end:
         return None
     if isinstance(span, TextSpan):

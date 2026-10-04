@@ -1,6 +1,6 @@
 # Portions derived from pdftext 0.7.1, Copyright Vik Paruchuri, Apache-2.0.
 # Changed in DocVortex: direct PDFium extraction collects character and extended geometry together.
-"""在一次 PDFium 字符遍历内收集原始码值、字体及可选几何。"""
+"""Collects source code values, fonts, and optional geometry within a PDFium character pass."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from ...._compute_backend import get_native
 def transform_point(
     point: tuple[float, float], page_bbox: tuple[float, float, float, float], rotation: int
 ) -> tuple[float, float]:
-    """保留浮点页面框，将 PDF 原始坐标转换到视觉页面坐标。"""
+    """Preserve the floating point page box and convert PDF raw coordinates to visual page coordinates."""
     left, bottom, right, top = page_bbox
     width, height = abs(right - left), abs(top - bottom)
     x, y = point[0] - min(left, right), max(bottom, top) - point[1]
@@ -35,7 +35,7 @@ def transform_point(
 def visual_bbox(
     box: tuple[float, float, float, float], page_bbox: tuple[float, float, float, float], rotation: int
 ) -> tuple[float, float, float, float] | None:
-    """转换原始矩形，几何缺失或零面积时返回空值而非伪造坐标。"""
+    """Converts the original rectangle and returns null instead of fake coordinates when the geometry is missing or has zero area."""
     left, bottom, right, top = box
     points = [
         transform_point(point, page_bbox, rotation) for point in ((left, bottom), (left, top), (right, bottom), (right, top))
@@ -45,7 +45,7 @@ def visual_bbox(
 
 
 def _font_name(handle: Any, index: int, buffer: Any, flags: c_int) -> tuple[str, int]:
-    """复用字体缓冲区，超长名称按 PDFium 返回长度重新读取。"""
+    """The font buffer is reused, and overlong names are re-read according to the return length of PDFium."""
     try:
         length = raw.FPDFText_GetFontInfo(handle, index, buffer, len(buffer), byref(flags))
         if length > len(buffer):
@@ -57,7 +57,7 @@ def _font_name(handle: Any, index: int, buffer: Any, flags: c_int) -> tuple[str,
 
 
 def _assign_writing_angles(chars: list[Char]) -> None:
-    """从同对象的原点推进取得书写方向，避免将斜体剪切角误当成基线旋转。"""
+    """Advance the writing direction from the origin of the same object to avoid mistaking the italic shear angle for baseline rotation."""
     start = 0
     while start < len(chars):
         end = start + 1
@@ -83,7 +83,7 @@ def _assign_writing_angles(chars: list[Char]) -> None:
 
 
 def _mark_visible_objects(chars: list[Char], handle: Any) -> None:
-    """仅在有隐藏文字的页面读取透明度，防止透明文字成为可见对应内容。"""
+    """Only read transparency on pages with hidden text to prevent transparent text from becoming visible corresponding content."""
     if not any(char.get("text_render_mode") == 3 for char in chars):
         return
     visibility: dict[int | None, bool] = {None: False}
@@ -112,7 +112,7 @@ def _mark_visible_objects(chars: list[Char], handle: Any) -> None:
 
 
 def _native_visibility_supported(visibility):
-    """只重排普通不可执行的可见性数据，特殊映射及数值保留参考路径的访问时序。"""
+    """Only ordinary non-executable visibility data is rearranged, special mappings and values retain the access timing of the reference path."""
     if visibility is None:
         return True
     if type(visibility) is not dict:
@@ -142,7 +142,7 @@ def get_chars(
     include_geometry: bool = False,
     visibility_by_object: dict[int, tuple[bool, tuple[float, float, float, float] | None]] | None = None,
 ) -> list[Char]:
-    """普通页面使用同库字符批量读取，特殊运行时保留完整 ctypes 参考路径。"""
+    """Ordinary pages are read in batches using the same library characters, and the complete ctypes reference path is retained during special operations."""
     if (
         type(page_rotation) is int
         and page_rotation in (0, 90, 180, 270)
@@ -165,14 +165,14 @@ def get_chars(
 
 
 def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visibility_by_object):
-    """物化已批量读取的记录，保持字体共享、页内对象编号、裁剪和写入方向语义。"""
+    """Materialize records that have been read in batches, preserving font sharing, in-page object numbering, clipping, and write direction semantics."""
     from ._pdfium_bridge import read_native_chars
 
     batch = read_native_chars(textpage, include_geometry, frame=page_bbox, rotation=page_rotation)
     if batch is None:
         return None
     records, raw_fonts = batch
-    # 空快照不再构造字体映射或调用空几何批次，仍保持普通列表返回契约。
+    # Empty snapshots no longer construct font maps or call empty geometry batches, and still maintain the normal list return contract.
     if type(records) in (tuple, list) and not records and type(raw_fonts) in (tuple, list) and not raw_fonts:
         return []
     decoded_fonts = [(bytes(name).decode("utf-8", errors="replace"), flags) for name, flags in raw_fonts]
@@ -182,7 +182,7 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
     last_font_index = last_size = last_weight = last_font = None
     last_address = last_object_id = None
     for index, (code, rotation, font_index, size, weight, address, mode, layout, loose, tight, origin) in enumerate(records):
-        # 读取桥按固定上限逐批物化记录，已消费批次不与整页最终字符长期重叠。
+        # The reading bridge materializes records batch by batch according to a fixed upper limit, and the consumed batches do not overlap with the final characters of the entire page for a long time.
         if (
             type(font_index) is int
             and type(size) is float
@@ -243,7 +243,7 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
 
 
 def _materialize_native_char_batch(chars, raw_geometry, pending_clips, page_bbox, page_size, page_rotation, include_geometry):
-    """有界批次完成独立坐标变换和裁剪；字体、来源编号与书写方向仍在整页范围处理。"""
+    """Bounded batches complete independent coordinate transformation and cropping; fonts, source numbers and writing directions are still processed within the entire page."""
     prepared = get_native().materialize_geometry(raw_geometry, page_bbox, page_size, page_rotation)
     retained = []
     for char, (layout, loose, tight, origin), clip in zip(chars, prepared, pending_clips, strict=True):
@@ -264,7 +264,7 @@ def _get_chars_python(
     include_geometry: bool = False,
     visibility_by_object: dict[int, tuple[bool, tuple[float, float, float, float] | None]] | None = None,
 ) -> list[Char]:
-    """读取原始字符记录；原始码值始终保留，随后统一解码和去重。"""
+    """Read the original character record; the original code value is always retained, and is subsequently decoded and deduplicated uniformly."""
     handle = textpage.raw
     left, bottom, right, top = page_bbox
     width, height = math.ceil(abs(right - left)), math.ceil(abs(top - bottom))
@@ -303,7 +303,7 @@ def _get_chars_python(
         box = None
         if native is None:
             x0, y0, x1, y1 = selected
-            # 布局框保留基线的整数页面高度，原始扩展几何另用浮点页面框。
+            # The layout box retains the integer page height of the baseline, and the original expanded geometry uses a floating point page box.
             ys = (height - (y0 - bottom), height - (y1 - bottom))
             box = Bbox([min(x0, x1) - left, min(ys), max(x0, x1) - left, max(ys)])
             if page_rotation:
@@ -327,7 +327,7 @@ def _get_chars_python(
             "writing_angle": math.radians(page_rotation) - rotation,
             "origin": None,
         }
-        # 只在当前提取期间持有地址键，输出使用页内整数编号，不保存原生句柄。
+        # The address key is only held during the current fetch, the output uses integer numbers within the page, and the native handle is not saved.
         address = None
         try:
             obj = raw.FPDFText_GetTextObject(handle, index)
@@ -338,7 +338,7 @@ def _get_chars_python(
                 char["text_object_id"], char["text_render_mode"] = objects[address]
         except Exception:
             pass
-        # 两种提取入口都需要原点来区分一字形多码值与独立重复绘制。
+        # Both extraction entries require an origin to distinguish between multi-coded values of a single glyph and independent repeated drawings.
         raw_origin = None
         try:
             if raw.FPDFText_GetCharOrigin(handle, index, origin_x, origin_y):
@@ -360,7 +360,7 @@ def _get_chars_python(
             if native is None and clip is not None and not _clip_visible_character(char, clip):
                 continue
         if native is not None:
-            # 只暂存数值；仍在原 textpage 和锁作用域内完成物化及裁剪。
+            # Only values are temporarily stored; materialization and clipping are still completed within the original textpage and lock scope.
             raw_geometry.append(
                 (selected, loose if include_geometry else None, tight if include_geometry else None, raw_origin)
             )
@@ -384,10 +384,10 @@ def _get_chars_python(
 
 
 def _clip_visible_character(char: Char, clip: tuple[float, float, float, float]) -> bool:
-    """只裁剪实际被截断的字形；原点与字符索引保持不变，完全在裁剪区外的文字不进入 Flash。"""
+    """Only the actual truncated glyphs are cropped; the origin and character index remain unchanged, and text completely outside the cropping area does not enter Flash."""
     ink = char.get("tight_bbox") or char["bbox"]
     if char["char"].isspace():
-        # PDFium 的空格可能没有墨迹面积，仍须保留可见词之间的原始分隔符。
+        # PDFium Spaces may not have inked areas, and the original separators between visible words must still be retained.
         return clip[0] <= (ink[0] + ink[2]) / 2 <= clip[2] and clip[1] <= (ink[1] + ink[3]) / 2 <= clip[3]
     visible = (max(ink[0], clip[0]), max(ink[1], clip[1]), min(ink[2], clip[2]), min(ink[3], clip[3]))
     if visible[2] <= visible[0] or visible[3] <= visible[1]:
@@ -398,7 +398,7 @@ def _clip_visible_character(char: Char, clip: tuple[float, float, float, float])
             if bbox is not None:
                 clipped = (max(bbox[0], clip[0]), max(bbox[1], clip[1]), min(bbox[2], clip[2]), min(bbox[3], clip[3]))
                 if clipped[2] <= clipped[0] or clipped[3] <= clipped[1]:
-                    # 损坏的 loose 框不能推翻有效墨迹证据，使用已确认的可见字形范围。
+                    # Broken loose box cannot override valid ink evidence, using confirmed visible glyph range.
                     clipped = visible
                 char[key] = Bbox(list(clipped)) if key == "bbox" else clipped
     return True

@@ -1,4 +1,4 @@
-"""无框线混合数据表的表题、列、分组表头和单行续表证据。"""
+"""Evidence of table titles, columns, group headers and single-row continuation tables for borderless mixed data tables."""
 
 import pytest
 
@@ -15,7 +15,7 @@ from docvortex.analyzers.native.pdf.models import _AxisLine, _TableCandidate
 @pytest.mark.parametrize('scale,left,width',[(.7,20,220),(1,50,280),(1.6,90,340)])
 @pytest.mark.parametrize('kind',['table','stacked','amount_header','duplicate_year','reverse_year','no_rule','drift','few_rows','non_numeric','excluded'])
 def test_year_header_table_requires_sequential_years_complete_numeric_rows_and_separate_stacked_headers(scale,left,width,kind):
-    """改变位置、字号和栏宽验证独立年份表；现金金额、重复年份及不稳定列不能冒充表头。"""
+    """Change the position, font size and column width to verify the independent year table; cash amount, repeated years and unstable columns cannot pretend to be table headers."""
     h=10*scale; lines=[]; rules=[]
     for offset in ([0,120] if kind=='stacked' else [0]):
         y=(50+offset)*scale
@@ -45,7 +45,7 @@ def test_year_header_table_requires_sequential_years_complete_numeric_rows_and_s
 @pytest.mark.parametrize('scale,left,width',[(.7,20,220),(1,50,280),(1.6,90,340)])
 @pytest.mark.parametrize('kind',['table','one_text','few_rows','no_rule','ordinary_title','drift','narrow_gap','text_values','excluded'])
 def test_ruled_metric_pairs_require_repeated_labels_numeric_values_and_a_short_native_heading(scale,left,width,kind):
-    """短题名加长横线和稳定两列方可成表；正文题名、窄缝或多数文字值保留文本。"""
+    """Short titles must be extended with long horizontal lines and two stable columns to form a table; main text titles, narrow gaps, or most text values should be retained as text."""
     h=10*scale; lines=[_metric_fixture_line('独立基本数据' if kind!='ordinary_title' else 'Ordinary report title',
           (left,30*scale,left+60*scale,45*scale),0,effective_height=1.5*h)]
     rules=[] if kind=='no_rule' else [_AxisLine((left+60*scale,45*scale,left+width*scale,45.2*scale),.2*scale,'horizontal')]
@@ -67,9 +67,9 @@ def test_ruled_metric_pairs_require_repeated_labels_numeric_values_and_a_short_n
 @pytest.mark.parametrize('scale',[.7,1,1.6])
 @pytest.mark.parametrize('kind',['complete','stacked','partial','duplicate_partial'])
 def test_partial_table_detection_cannot_replace_or_double_claim_an_existing_complete_table(scale,kind):
-    """局部年份行不得吞掉旧表；完整上下两张可替代长表，重复覆盖不能伪造完整面积。"""
+    """Partial year rows must not swallow up the old table; complete upper and lower tables can replace the long table, and repeated coverage cannot falsify the complete area."""
     def candidate(bounds):
-        """用明确范围构造待合并候选，保持几何缩放一致。"""
+        """Construct candidates to be merged using explicit ranges to keep geometric scaling consistent."""
         box=tuple(value*scale for value in bounds)
         return _TableCandidate(box,box,0,14,core_bbox=box)
     old=candidate((10,20,210,220))
@@ -86,7 +86,7 @@ def test_partial_table_detection_cannot_replace_or_double_claim_an_existing_comp
 @pytest.mark.parametrize('scale,left',[(.7,20),(1,50),(1.6,90)])
 @pytest.mark.parametrize('kind',['table','group_header','units','no_caption','two_rows','drifting','overlapping','non_numeric','no_header','far_caption','excluded'])
 def test_captioned_mixed_numeric_table_requires_repeated_columns_short_labels_and_independent_caption(scale,left,kind):
-    """三列数值加短文字首列必须稳定且有独立表题，多层表头和单位不改变成员；位置扰动验证泛化。"""
+    """The first column of three columns of numerical values plus short text must be stable and have an independent table title. Multi-layer table headers and units do not change members; position perturbation verifies generalization."""
     h=10*scale;rows=[]
     labels=['Place','First value','Second value']
     for column,(label,offset) in enumerate(zip(labels,[0,70,140])):
@@ -119,7 +119,7 @@ def test_captioned_mixed_numeric_table_requires_repeated_columns_short_labels_an
 @pytest.mark.parametrize('scale,left',[(.7,20),(1,50),(1.6,90)])
 @pytest.mark.parametrize('kind',['years','ranges','two','mixed','no_chars'])
 def test_header_year_row_uses_native_glyph_positions_only_when_every_word_is_a_year_label(scale,left,kind):
-    """年份行按原生字符定位独立列；两词、混合文字和缺字形的行不允许猜拆。"""
+    """The year row is positioned in an independent column based on native characters; rows with two words, mixed characters and missing glyphs are not allowed to be split."""
     text='2002-2006 2006-2010 2010-2014' if kind=='ranges' else '2002 2006' if kind=='two' else 'Ordinary 2006 2010' if kind=='mixed' else '2002 2006 2010'
     h=10*scale;chars=[] if kind=='no_chars' else _native_chars(text,left,50*scale,h)
     line=_metric_fixture_line(text,(left,50*scale,left+200*scale,60*scale),7,chars=chars,effective_height=h)
@@ -134,7 +134,7 @@ def test_header_year_row_uses_native_glyph_positions_only_when_every_word_is_a_y
 @pytest.mark.parametrize('scale,left',[(.7,20),(1,50),(1.6,90)])
 @pytest.mark.parametrize('kind',['source','star','chinese','numeric_star','ordinary','far','duplicate','following_header'])
 def test_native_table_note_needs_clear_marker_and_proximity_and_stops_at_a_separated_header(scale,left,kind):
-    """明确来源或星号自然语言才是表注，数值星号、普通正文、远距和歧义标记不能认领。"""
+    """Unambiguous source or asterisk natural language are table annotations. Numeric asterisks, plain text, remote and ambiguous markers cannot be claimed."""
     h=10*scale
     text='*Change these quantities for a larger container.' if kind=='star' else '来源：独立来源和注释说明' if kind=='chinese' else '*12 ml' if kind=='numeric_star' else 'Ordinary explanation of the measurements.' if kind=='ordinary' else 'Source: Alternative collection of measurements'
     y=(140 if kind=='far' else 110)*scale

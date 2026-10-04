@@ -1,4 +1,4 @@
-"""解析 Word STSH/STD 样式表并解析继承链。"""
+"""Parse the Word STSH/STD style sheet and parse the inheritance chain."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ ISTD_NIL = 0x0FFF
 
 @dataclass(frozen=True, slots=True)
 class ResolvedStyle:
-    """一个样式继承完成后的可见属性。"""
+    """Visible attributes after a style inheritance is completed."""
 
     name: str = ""
     character: DocCharStyle = DocCharStyle()
@@ -30,7 +30,7 @@ class ResolvedStyle:
 
 @dataclass(frozen=True, slots=True)
 class _RawStyle:
-    """STSH 内尚未解析继承的 STD。"""
+    """The inherited STD has not yet been resolved within STSH."""
 
     sti: int
     name: str
@@ -41,22 +41,22 @@ class _RawStyle:
 
 
 class Stylesheet:
-    """按 istd 提供解析后样式的只读集合。"""
+    """Press istd to provide a read-only collection of parsed styles."""
 
     def __init__(self, styles: dict[int, ResolvedStyle] | None = None) -> None:
-        """保存已解析样式并准备默认样式。"""
+        """Save parsed styles and prepare default styles."""
 
         self._styles = styles or {}
         self._default = ResolvedStyle()
 
     def get(self, style_id: int) -> ResolvedStyle:
-        """返回指定样式，不存在时使用空默认值。"""
+        """Return the specified style, and use the empty default value when it does not exist."""
 
         return self._styles.get(style_id, self._default)
 
 
 def _style_semantics(sti: int, name: str) -> tuple[int | None, bool, int | None, bool]:
-    """从内建 ID 与样式名识别标题、目录和代码语义。"""
+    """Identify title, table of contents and code semantics from built-in ID and style names."""
 
     normalized = re.sub(r"\s+", " ", name.strip()).casefold()
     heading_level = sti if 1 <= sti <= 9 else None
@@ -74,7 +74,7 @@ def _style_semantics(sti: int, name: str) -> tuple[int | None, bool, int | None,
 
 
 def _parse_std(record: bytes, base_size: int) -> _RawStyle | None:
-    """解析一条 STD 的名称、继承和 UPX 内容。"""
+    """Parse the name, inheritance and UPX content of a STD."""
 
     if len(record) < max(base_size, 10):
         return None
@@ -136,7 +136,7 @@ def parse_stylesheet(
     size: int,
     budget: DocBudget,
 ) -> Stylesheet:
-    """解析 STSH，并在循环样式链处安全截断继承。"""
+    """Parse STSH and safely truncate inheritance at circular style chains."""
 
     payload = bounded_slice(table_stream, offset, size)
     if payload is None or len(payload) < 8:
@@ -167,7 +167,7 @@ def parse_stylesheet(
     memo: dict[int, ResolvedStyle] = {}
 
     def resolve(style_id: int) -> ResolvedStyle:
-        """迭代解析一个样式的 based-on 链。"""
+        """Iteratively parse the based-on chain of a pattern."""
 
         if style_id in memo:
             return memo[style_id]

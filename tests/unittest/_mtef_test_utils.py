@@ -1,4 +1,4 @@
-"""构造结果已知的 Equation Editor 3.x MTEF/OLE/DOC 测试对象。"""
+"""Construct Equation Editor 3.x MTEF/OLE/DOC test objects with known results."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ _TINY_PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADU
 
 
 def mtef_char(value: str, *, embellishments: tuple[int, ...] = ()) -> bytes:
-    """构造一个 Unicode CHAR 及可选 embellishment 列表。"""
+    """Constructs a list of Unicode CHAR and optionally embellishment."""
 
     if len(value) != 1 or ord(value) > 0xFFFF:
         raise ValueError("MTEF v3 CHAR fixture requires one BMP character")
@@ -24,19 +24,19 @@ def mtef_char(value: str, *, embellishments: tuple[int, ...] = ()) -> bytes:
 
 
 def mtef_text(value: str) -> bytes:
-    """把短文本构造成连续 CHAR records。"""
+    """Construct short text into contiguous CHAR records."""
 
     return b"".join(mtef_char(character) for character in value)
 
 
 def mtef_line(*records: bytes) -> bytes:
-    """构造一个以 END 结束的非空 LINE slot。"""
+    """Constructs a non-empty LINE slot ending in END."""
 
     return b"\x01" + b"".join(records) + b"\x00"
 
 
 def mtef_null_line() -> bytes:
-    """构造不带 END 的 NULL LINE slot。"""
+    """Construct NULL LINE slot without END."""
 
     return b"\x11"
 
@@ -47,13 +47,13 @@ def mtef_template(
     variation: int = 0,
     options: int = 0,
 ) -> bytes:
-    """构造一个 TMPL 及其 LINE slots。"""
+    """Construct a TMPL and its LINE slots."""
 
     return bytes([0x03, selector, variation, options]) + b"".join(slots) + b"\x00"
 
 
 def mtef_matrix(rows: list[list[bytes]]) -> bytes:
-    """构造无分隔线的 MATRIX record。"""
+    """Construct MATRIX record without dividers."""
 
     if not rows or not rows[0] or any(len(row) != len(rows[0]) for row in rows):
         raise ValueError("matrix fixture must be rectangular")
@@ -66,14 +66,14 @@ def mtef_matrix(rows: list[list[bytes]]) -> bytes:
 
 
 def mtef_equation(*records: bytes) -> bytes:
-    """构造完整 MTEF v3 头、FULL size 和根 LINE。"""
+    """Constructed complete MTEF v3 header, FULL size and root LINE."""
 
     header = bytes([3, 1, 1, 3, 0])
     return header + b"\x0a" + mtef_line(*records) + b"\x00"
 
 
 def equation_native(mtef: bytes) -> bytes:
-    """为 MTEF 添加 28 字节 EQNOLEFILEHDR。"""
+    """Added 28 bytes EQNOLEFILEHDR for MTEF."""
 
     return (
         struct.pack(
@@ -92,7 +92,7 @@ def equation_native(mtef: bytes) -> bytes:
 
 
 def formula_corpus() -> list[tuple[str, bytes, str]]:
-    """返回覆盖常见 Equation Editor 结构的名称、MTEF 和期望 LaTeX。"""
+    """Returns names covering the common Equation, Editor structures, MTEF and the expected LaTeX."""
 
     fraction = mtef_template(
         14,
@@ -171,7 +171,7 @@ def _directory_entry(
     size: int,
     clsid: bytes = b"\x00" * 16,
 ) -> bytes:
-    """构造一个支持 storage 层级的 CFB directory entry。"""
+    """Constructs a CFB directory entry that supports the storage hierarchy."""
 
     raw_name = name.encode("utf-16le") + b"\x00\x00"
     if len(raw_name) > 64:
@@ -188,7 +188,7 @@ def _directory_entry(
 
 
 def _build_nested_cfb(entries: list[dict[str, object]]) -> bytes:
-    """生成所有 stream 使用常规 FAT sector 的层级 CFB v3。"""
+    """Generate all stream hierarchies using the regular FAT sector CFB v3."""
 
     sector_size = 512
     end_of_chain = 0xFFFF_FFFE
@@ -198,7 +198,7 @@ def _build_nested_cfb(entries: list[dict[str, object]]) -> bytes:
     sectors: list[bytes] = []
 
     def add_chain(data: bytes) -> int:
-        """追加 FAT chain 并返回首 sector。"""
+        """Append FAT chain and return the first sector."""
 
         if not data:
             return end_of_chain
@@ -279,7 +279,7 @@ def build_equation_object(
     *,
     prog_id: str = "Equation.3",
 ) -> bytes:
-    """构造含 Equation Native 和指定 ProgID 的独立公式 OLE 对象。"""
+    """Constructs a stand-alone formula OLE object containing Equation Native and the specified ProgID."""
 
     none = 0xFFFF_FFFF
     equation_clsid = uuid.UUID("0002CE02-0000-0000-C000-000000000046").bytes_le
@@ -298,7 +298,7 @@ def build_equation_object(
 
 
 def _piece_table(text_fc: int, cp_count: int) -> bytes:
-    """构造单一 Unicode piece 的 CLX。"""
+    """Construct CLX of single Unicode piece."""
 
     plc = struct.pack("<II", 0, cp_count)
     plc += b"\x00\x00" + struct.pack("<I", text_fc) + b"\x00\x00"
@@ -310,7 +310,7 @@ def _chpx_fkp(
     cp_count: int,
     anchors: list[tuple[int, int, bool]],
 ) -> tuple[bytes, int, int]:
-    """构造仅在字段分隔符上携带 OLE storage id 的 ChpxFkp。"""
+    """Constructs ChpxFkp carrying OLE storage id only on the field delimiter."""
 
     end_fc = text_fc + cp_count * 2
     boundaries = [text_fc]
@@ -349,7 +349,7 @@ def _chpx_fkp(
 
 
 def _png_picf(png: bytes) -> bytes:
-    """把 PNG 包装成最小 PICFAndOfficeArtData。"""
+    """Packaging PNG into the smallest PICFAndOfficeArtData."""
 
     blip_body = b"\x00" * 16 + b"\x00" + png
     blip = struct.pack("<HHI", 0, 0xF01E, len(blip_body)) + blip_body
@@ -360,7 +360,7 @@ def _png_picf(png: bytes) -> bytes:
 
 
 def _raw_picf(payload: bytes) -> bytes:
-    """把可由 magic fallback 识别的原始图片放入最小 PICF。"""
+    """Put the original picture recognized by magic fallback into the smallest PICF."""
 
     header_size = 68
     header = bytearray(header_size)
@@ -381,7 +381,7 @@ def build_equation_doc(
     preview_payloads: dict[int, bytes] | None = None,
     prog_id: str = "Equation.3",
 ) -> bytes:
-    """构造多个 ObjectPool 公式字段的最小 DOC 集成 fixture。"""
+    """Construct a minimal DOC integration fixture for multiple ObjectPool formula fields."""
 
     text_parts: list[str] = []
     anchors: list[tuple[int, int, bool]] = []

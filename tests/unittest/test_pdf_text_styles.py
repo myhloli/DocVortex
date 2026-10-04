@@ -40,7 +40,7 @@ def apply_pdf_text_links(
     lines: Sequence[PDFTextLinkLine],
     page_size: tuple[float, float],
 ) -> None:
-    """在测试中保留链接区间阶段，等待样式区间一并物化。"""
+    """Keep the link interval stage in the test and wait for the style interval to be materialized together."""
     _apply_pdf_text_links(blocks, lines, page_size)
 
 
@@ -49,13 +49,13 @@ def apply_pdf_text_styles(
     lines: Sequence[PDFTextStyleLine],
     page_size: tuple[float, float],
 ) -> None:
-    """在测试中追加样式区间后执行生产环境的一次性 Span 物化。"""
+    """Execute one-time Span materialization of production environment after appending style range in test."""
     _apply_pdf_text_styles(blocks, lines, page_size)
     materialize_pdf_inline_spans(blocks)
 
 
 def _span_snapshot(content: Any) -> str:
-    """把结构化 Span 序列化为便于沿用既有精确区间断言的只读快照。"""
+    """Serialize structured Span into a read-only snapshot that facilitates inheritance of existing precise range assertions."""
     if isinstance(content, str):
         return content
     if not isinstance(content, list):
@@ -84,7 +84,7 @@ def _span_snapshot(content: Any) -> str:
 
 
 def _model_json(pages: list[list[dict[str, Any]]]) -> ModelJson:
-    """为 PDF 文本样式渲染测试构造最小严格 ModelJson。"""
+    """Construct the minimally stringent ModelJson for the PDF text style rendering test."""
     return ModelJson(
         pages=pages,
         page_index_map=[],
@@ -94,9 +94,9 @@ def _model_json(pages: list[list[dict[str, Any]]]) -> ModelJson:
 
 
 def _build_native_text_style_pdf() -> bytes:
-    """构造包含字体、删除线、下划线及其反例的单页原生 PDF。"""
+    """Construct a single-page native PDF containing font, strikethrough, underline, and their counterexamples."""
 
-    # 字体样例放在普通正文行内，避免未嵌入字体的跨平台几何差异触发标题识别。
+    # Font samples are placed within ordinary text lines to avoid cross-platform geometric differences in unembedded fonts from triggering title recognition.
     content = b"""0.8 w
 BT /F1 12 Tf 50 250 Td (strike: alpha ) Tj (deleted) Tj ( omega) Tj ET
 150.8 254 m 201.2 254 l S
@@ -153,7 +153,7 @@ def _text_line(
     font_weight: object = None,
     rotation_degrees: float = 0.0,
 ) -> SimpleNamespace:
-    """构造带真实字符 bbox 的轻量视觉文本行。"""
+    """Construct a lightweight visual text line with real characters bbox."""
 
     chars = []
     cursor = x
@@ -190,7 +190,7 @@ def _drawing(
     width: float = 1.0,
     orientation: str = "horizontal",
 ) -> SimpleNamespace:
-    """构造文本装饰线检测使用的轻量 drawing。"""
+    """Constructs lightweight drawing used for text decoration line detection."""
 
     return SimpleNamespace(
         bbox=(x0, y - width / 2, x1, y + width / 2),
@@ -200,7 +200,7 @@ def _drawing(
 
 
 def _char_span(line: SimpleNamespace, start: int, end: int) -> tuple[float, float]:
-    """返回指定字符区间的左右边缘。"""
+    """Returns the left and right edges of the specified character range."""
 
     return line.chars[start]["bbox"][0], line.chars[end - 1]["bbox"][2]
 
@@ -213,7 +213,7 @@ def _link_evidence_line(
     start: int = 0,
     end: int | None = None,
 ) -> PDFTextLinkLine:
-    """构造跨行合并测试使用的轻量链接证据。"""
+    """Construct lightweight link evidence for use in cross-row merge tests."""
 
     resolved_end = len(text) if end is None else end
     top = 10.0 + (source_index % 10) * 10.0
@@ -226,7 +226,7 @@ def _link_evidence_line(
 
 
 def test_resplit_text_evidence_partitions_ranges_by_character_identity() -> None:
-    """验证重复字符、空白和连字不会让跨栏 evidence 按文本搜索错配。"""
+    """Verify that repeated characters, whitespace, and ligatures do not cause cross-column mismatches evidence Search by text."""
 
     chars = [
         {"char": char, "char_idx": char_idx}
@@ -316,7 +316,7 @@ def test_resplit_text_evidence_partitions_ranges_by_character_identity() -> None
 def test_resplit_text_evidence_preserves_identity_and_unsafe_mapping(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证无重切时保持原列表，映射不一致时保留粗行 evidence 并记录诊断。"""
+    """Keep the original list when verifying that there is no recut, keep the thick row evidence and record the diagnosis if the mapping is inconsistent."""
 
     source = models._LineItem(
         text="AB",
@@ -376,7 +376,7 @@ def test_resplit_text_evidence_preserves_identity_and_unsafe_mapping(
 
 
 def test_repaired_text_evidence_realigns_only_changed_unsplit_lines() -> None:
-    """验证 X/Y 修复后的普通行更新 bbox，未修复 evidence 保持对象身份和顺序。"""
+    """Verify normal row updates for X/Y fixed bbox, unfixed evidence maintain object identity and order."""
 
     untouched_style = PDFTextStyleLine((10.0, 210.0, 50.0, 220.0), "plain", (), 0)
     x_style = PDFTextStyleLine(
@@ -465,7 +465,7 @@ def test_repaired_text_evidence_realigns_only_changed_unsplit_lines() -> None:
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_detect_and_apply_pdf_text_link_ranges_with_styles(angle: int) -> None:
-    """验证标准方向链接映射、内部空格、URL 转义、样式顺序和幂等性。"""
+    """Verifies standard directional link mapping, internal whitespace, URL escaping, style order, and idempotence."""
 
     line = _text_line("alpha beta", angle=angle)
     annotation = PDFLinkAnnotation(
@@ -530,7 +530,7 @@ def test_detect_and_apply_pdf_text_link_ranges_with_styles(angle: int) -> None:
 
 
 def test_pdf_underline_keeps_only_non_link_overlap() -> None:
-    """验证同一下划线跨越普通文本和链接时，仅保留链接外的真实下划线。"""
+    """When validating that the same underline spans normal text and links, only the true underline outside the link is retained."""
 
     line = _text_line("under hyperlink")
     annotation = PDFLinkAnnotation(
@@ -571,7 +571,7 @@ def test_pdf_underline_keeps_only_non_link_overlap() -> None:
 
 
 def test_detect_pdf_text_links_keeps_partial_ranges_and_drops_conflicts() -> None:
-    """验证局部字符链接可保留，而不同目标重叠字符按歧义丢弃。"""
+    """Verify that local character links are preserved, while overlapping characters of different targets are discarded as ambiguities."""
 
     line = _text_line("alpha")
     partial_bbox = (
@@ -606,7 +606,7 @@ def test_detect_pdf_text_links_keeps_partial_ranges_and_drops_conflicts() -> Non
 
 
 def test_apply_pdf_text_links_splits_formula_gaps_and_maps_repeated_labels() -> None:
-    """验证链接不跨公式包装，并按物理行顺序定位重复标签。"""
+    """Verify that links do not wrap across formulas and position duplicate labels in physical row order."""
 
     formula_blocks = [
         {
@@ -666,7 +666,7 @@ def test_apply_pdf_text_links_splits_formula_gaps_and_maps_repeated_labels() -> 
 
 
 def test_apply_pdf_text_links_merges_three_line_visible_url() -> None:
-    """验证三行同 href URL 合成一个标签，并吸收边界点号且不插入空格。"""
+    """Verify that three lines are combined into one label with href URL, and absorb boundary point numbers without inserting spaces."""
 
     target = "https://github.com/google-research/tapas/blob/master/TABLEFORMER.md"
     blocks = [
@@ -753,7 +753,7 @@ def test_apply_pdf_text_links_maps_dehyphenated_first_fragment(
     second_end: int,
     label: str,
 ) -> None:
-    """验证同 href 相邻行的首段断词符被回填删除后仍能完整映射。"""
+    """Verify that the first segment of word breakers in adjacent lines with href can still be mapped completely after being backfilled and deleted."""
 
     target = "https://doi.org/10.18653/v1/example"
     blocks = [
@@ -788,7 +788,7 @@ def test_apply_pdf_text_links_maps_dehyphenated_first_fragment(
 
 
 def test_apply_pdf_text_links_maps_dehyphenated_middle_fragment() -> None:
-    """验证三行链接中间行的行末断词符不再阻断同 href 合并。"""
+    """Verify that the end-of-line break in the middle line of a three-line link no longer blocks merging with href."""
 
     target = "https://doi.org/10.18653/v1/N19-1423"
     label = "BERT: Pre-training of deep bidirectional transformers for language understanding"
@@ -873,7 +873,7 @@ def test_apply_pdf_text_links_rejects_unsafe_dehyphenated_boundaries(
     first_line: PDFTextLinkLine,
     second_line: PDFTextLinkLine,
 ) -> None:
-    """验证不同 href、非相邻行或非行首行尾链接不会启用断词投影。"""
+    """Verify that different href, non-adjacent lines, or non-line first and last links do not enable word break projection."""
 
     blocks = [
         {
@@ -894,7 +894,7 @@ def test_apply_pdf_text_links_rejects_unsafe_dehyphenated_boundaries(
 
 
 def test_apply_pdf_text_links_preserves_hyphen_before_uppercase_continuation() -> None:
-    """验证下一行以大写字母开头时保留可见连字符并正常合并链接。"""
+    """Verify that visible hyphens are preserved when the next line starts with a capital letter and links are merged normally."""
 
     target = "https://same.test"
     blocks = [
@@ -919,7 +919,7 @@ def test_apply_pdf_text_links_preserves_hyphen_before_uppercase_continuation() -
 
 
 def test_apply_pdf_text_links_skips_ambiguous_dehyphenated_occurrence() -> None:
-    """验证断词候选在 block 中重复时不会把前后片段错误桥接。"""
+    """Verify that word segmentation candidates do not incorrectly bridge preceding and following segments when repeated in block."""
 
     blocks = [
         {
@@ -961,7 +961,7 @@ def test_apply_pdf_text_links_merges_title_and_preserves_non_underline_styles(
     second_styles: tuple[str, ...],
     expected_label: str,
 ) -> None:
-    """验证普通英文标签保留空格，并仅保留链接内非下划线样式。"""
+    """Verify that normal English tags retain spaces and only retain non-underline styles within links."""
 
     target = "https://doi.org/10.18653/v1/2020.emnlp-main.19"
     first_text = "ETC:Encodinglongandstructuredinputs"
@@ -1013,7 +1013,7 @@ def test_apply_pdf_text_links_does_not_cross_invalid_merge_boundaries(
     second_source: int,
     second_target: str,
 ) -> None:
-    """验证无 href 正文、公式、非相邻行或不同目标都会阻断链接合并。"""
+    """Verify None href Text, formulas, non-adjacent lines, or different targets can block link merging."""
 
     first_target = "https://same.test"
     blocks = [
@@ -1062,7 +1062,7 @@ def test_apply_pdf_text_links_only_enriches_natural_language_blocks(
     block_type: str,
     should_link: bool,
 ) -> None:
-    """验证 PDF Link 只进入已批准的自然语言 block 类型。"""
+    """Validation PDF Link Only enters approved natural language block types."""
 
     blocks = [
         {
@@ -1124,7 +1124,7 @@ def test_detects_font_styles_only_from_approved_direct_evidence(
     line_options: dict[str, object],
     expected_styles: tuple[str, ...] | None,
 ) -> None:
-    """验证 PDF 只从批准的直接证据生成粗体，所有斜体证据均被忽略。"""
+    """Validation PDF only generates bold from approved direct evidence, all italicized evidence is ignored."""
 
     line = _text_line("styled", **line_options)
 
@@ -1144,7 +1144,7 @@ def test_detects_font_styles_only_from_approved_direct_evidence(
 
 
 def test_rotated_line_never_uses_local_rotation_as_italic_evidence() -> None:
-    """验证整行非标准方向即使字符角差落入区间也不会标为斜体。"""
+    """Verify that entire lines with non-standard orientations are not italicized even if the character angle difference falls within the range."""
 
     line = _text_line(
         "watermark",
@@ -1168,7 +1168,7 @@ def test_filters_pdf_bold_runs_shorter_than_two_comparable_characters(
     text: str,
     expected_text: str | None,
 ) -> None:
-    """验证单字符粗体被过滤，双字符和展开为双字符的 ligature 保留。"""
+    """Verify single character bold is filtered, double characters and expanded to double characters ligature remain."""
 
     line = _text_line(text, font_name="Helvetica-Bold")
 
@@ -1188,7 +1188,7 @@ def test_filters_pdf_bold_runs_shorter_than_two_comparable_characters(
 
 
 def test_filters_isolated_leading_bold_list_marker_cluster() -> None:
-    """验证达到最小长度的行首项目符号簇仍不会污染普通正文。"""
+    """Verify that head-of-line bullet clusters up to a minimum length do not pollute normal text."""
 
     line = _text_line("•• body")
     for char in line.chars[:2]:
@@ -1202,7 +1202,7 @@ def test_filters_isolated_leading_bold_list_marker_cluster() -> None:
 
 
 def test_filters_bold_bullet_but_keeps_later_bold_list_text() -> None:
-    """验证真实列表形态只移除行首粗体圆点，保留后续粗体正文。"""
+    """To verify the true list form, only the bold dot at the beginning of the line is removed, and the subsequent bold text is retained."""
 
     line = _text_line("• 无序列表项 1：bold 粗体文本")
     bold_indices = {0}
@@ -1226,7 +1226,7 @@ def test_filters_bold_bullet_but_keeps_later_bold_list_text() -> None:
 
 
 def test_keeps_list_marker_when_it_is_part_of_a_full_bold_run() -> None:
-    """验证项目符号与后续正文同属完整粗体 run 时不会被单独删除。"""
+    """Verify that bullets and subsequent text are not deleted individually if they are in full bold run."""
 
     line = _text_line("• bold", font_name="Helvetica-Bold")
 
@@ -1236,7 +1236,7 @@ def test_keeps_list_marker_when_it_is_part_of_a_full_bold_run() -> None:
 
 
 def test_combines_bold_and_strikethrough_styles_per_character() -> None:
-    """验证斜体字体保持普通文本，粗体与删除线仍按字符正确组合。"""
+    """Verify that the italic font remains as normal text and that bold and strikethrough still combine correctly character by character."""
 
     line = _text_line("ABCDEF", height=5.0)
     for char_index in (1, 2):
@@ -1271,7 +1271,7 @@ def test_combines_bold_and_strikethrough_styles_per_character() -> None:
 
 
 def test_detects_long_strikethrough_and_preserves_internal_spaces() -> None:
-    """验证长删除线按字符范围生成单个紧凑样式区间。"""
+    """Validating long strikethroughs produces a single compact style range by character range."""
 
     line = _text_line("alpha deleted text omega")
     start = line.text.index("deleted")
@@ -1290,7 +1290,7 @@ def test_detects_long_strikethrough_and_preserves_internal_spaces() -> None:
 
 @pytest.mark.parametrize("drawing_y", [18.0, 20.0, 22.0])
 def test_detects_underline_inside_strict_bottom_band(drawing_y: float) -> None:
-    """验证主体字符下边界上下 0.20h 内的长横线产生下划线。"""
+    """Verify that long horizontal lines within 0.20h above and below the lower boundary of the subject character produce underlines."""
 
     line = _text_line("alpha underlined omega")
     start = line.text.index("underlined")
@@ -1309,7 +1309,7 @@ def test_detects_underline_inside_strict_bottom_band(drawing_y: float) -> None:
 def test_rejects_underline_outside_strict_bottom_band(
     drawing_y: float,
 ) -> None:
-    """验证超过主体下边界 0.20h 的横线不产生下划线。"""
+    """Verify that horizontal lines that exceed the lower boundary of the body by 0.20h do not generate underlines."""
 
     line = _text_line("alpha underlined omega")
     start = line.text.index("underlined")
@@ -1326,7 +1326,7 @@ def test_rejects_underline_outside_strict_bottom_band(
 
 
 def test_combines_bold_underline_and_strikethrough_in_protocol_order() -> None:
-    """验证同一字符范围的粗体、下划线和删除线按固定顺序合并。"""
+    """Verify that bold, underline, and strikethrough of the same character range are merged in a fixed order."""
 
     line = _text_line("styled", font_name="Helvetica-Bold")
     x0, x1 = _char_span(line, 0, len(line.text))
@@ -1349,7 +1349,7 @@ def test_combines_bold_underline_and_strikethrough_in_protocol_order() -> None:
 
 
 def test_merges_repeated_underline_drawings() -> None:
-    """验证双线或重复共线 drawing 只生成一个下划线语义区间。"""
+    """Verify double or repeated collinearity drawing only generates an underline semantic interval."""
 
     line = _text_line("underlined")
     x0, x1 = _char_span(line, 0, len(line.text))
@@ -1366,7 +1366,7 @@ def test_merges_repeated_underline_drawings() -> None:
 
 
 def test_rejects_fraction_bar_with_tightly_contained_lower_run() -> None:
-    """验证横线下方紧邻且被覆盖的分母 run 会阻止下划线误判。"""
+    """Verifying the covered denominator run immediately below the dash will prevent underline misidentification."""
 
     numerator = _text_line("numerator", source_index=0)
     denominator = _text_line(
@@ -1388,7 +1388,7 @@ def test_rejects_fraction_bar_with_tightly_contained_lower_run() -> None:
 
 
 def test_keeps_underline_when_following_text_is_outside_fraction_gap() -> None:
-    """验证普通下一行即使水平重叠也不会触发分数线排除。"""
+    """Verify that normal next row does not trigger fractional line exclusion even if it overlaps horizontally."""
 
     first = _text_line("underlined", source_index=0)
     second = _text_line(
@@ -1411,7 +1411,7 @@ def test_keeps_underline_when_following_text_is_outside_fraction_gap() -> None:
 
 
 def test_rejects_thick_short_and_column_rules() -> None:
-    """验证粗线、短线和贯穿整栏的分隔线均不产生文本样式。"""
+    """Verify that thick lines, short lines, and separators across columns do not produce text styles."""
 
     line = _text_line("alpha deleted omega")
     start = line.text.index("deleted")
@@ -1444,7 +1444,7 @@ def test_text_decoration_minimum_length_is_one_point_eight_heights(
     drawing_length: float,
     expected_styles: tuple[PDFTextStyleRange, ...],
 ) -> None:
-    """验证文本装饰线长度达到 1.8 倍中位字高时才允许生成样式。"""
+    """Verify that the text decoration line length reaches 1.8 times the median font height before allowing styles to be generated."""
 
     line = _text_line("abc")
     detected = detect_pdf_text_style_lines(
@@ -1459,7 +1459,7 @@ def test_text_decoration_minimum_length_is_one_point_eight_heights(
 
 
 def test_accepts_one_aligned_endpoint_and_merges_adjacent_drawings() -> None:
-    """验证尾部延长 drawing 可由左端点确认，邻接命中区间会合并。"""
+    """Verify that the tail extension drawing is confirmed by the left endpoint and that adjacent hit intervals are merged."""
 
     line = _text_line("alpha deleted text omega")
     deleted_start = line.text.index("deleted")
@@ -1483,7 +1483,7 @@ def test_accepts_one_aligned_endpoint_and_merges_adjacent_drawings() -> None:
 
 
 def test_keeps_two_disjoint_strikethrough_ranges() -> None:
-    """验证同一文本行内被普通字符隔开的两条删除线保持两个样式区间。"""
+    """Verify that two strikethroughs separated by ordinary characters within the same text line maintain two style intervals."""
 
     line = _text_line("alpha deleted middle removed omega")
     deleted_start = line.text.index("deleted")
@@ -1514,7 +1514,7 @@ def test_keeps_two_disjoint_strikethrough_ranges() -> None:
 
 
 def test_drawing_is_assigned_to_the_closest_overlapping_line() -> None:
-    """验证一条 drawing 同时接近两行时只归属中线距离更小的文本行。"""
+    """Verify that when a drawing is close to two lines at the same time, it only belongs to the text line with a smaller midline distance."""
 
     first = _text_line("deleted", y=10.0, source_index=0)
     second = _text_line("deleted", y=11.0, source_index=1)
@@ -1531,7 +1531,7 @@ def test_drawing_is_assigned_to_the_closest_overlapping_line() -> None:
 
 
 def test_rotated_text_is_not_a_style_candidate() -> None:
-    """验证首版忽略真正旋转的视觉文本。"""
+    """Verify first version ignores real rotated visual text."""
 
     line = _text_line("rotated text", angle=90)
 
@@ -1545,7 +1545,7 @@ def test_rotated_text_is_not_a_style_candidate() -> None:
 
 
 def test_invalid_line_and_char_bboxes_are_ignored() -> None:
-    """验证退化 line 或 char bbox 不会进入删除线检测。"""
+    """Verify that degraded line or char bbox does not enter strikethrough detection."""
 
     invalid_line = SimpleNamespace(
         bbox=(10.0, 10.0, 10.0, 20.0),
@@ -1564,7 +1564,7 @@ def test_invalid_line_and_char_bboxes_are_ignored() -> None:
 
 
 def test_applies_style_to_plain_content_and_duplicate_second_line() -> None:
-    """验证物理行顺序可将重复文本的删除线写到第二次出现位置。"""
+    """Verifying physical line order writes strikethrough of repeated text to its second occurrence."""
 
     blocks = [
         {
@@ -1589,7 +1589,7 @@ def test_applies_style_to_plain_content_and_duplicate_second_line() -> None:
 
 
 def test_applies_style_across_dehyphenated_line_boundary() -> None:
-    """验证行末断词符被正文回填删除后，两行粗体仍合并为完整区间。"""
+    """Verify that after the end-of-line word breakers are deleted by text backfill, the two bold lines are still merged into a complete range."""
 
     blocks = [
         {
@@ -1660,7 +1660,7 @@ def test_style_dehyphenation_preserves_safe_boundaries(
     second_source_index: int,
     expected: str,
 ) -> None:
-    """验证保留连字符、大小写、非相邻行和重复候选均不会错误桥接。"""
+    """Verify that hyphens, case, non-adjacent lines, and duplicate candidates are preserved and not incorrectly bridged."""
 
     blocks = [
         {
@@ -1690,7 +1690,7 @@ def test_style_dehyphenation_preserves_safe_boundaries(
 
 
 def test_same_visual_row_style_runs_follow_source_order_despite_bbox_jitter() -> None:
-    """验证同行 run 的细微顶边抖动不会把后方粗体片段提前映射。"""
+    """Verify that the subtle top edge jitter of peer run does not prematurely map rear bold segments."""
 
     attention = _text_line(
         "Attention",
@@ -1738,7 +1738,7 @@ def test_same_visual_row_style_runs_follow_source_order_despite_bbox_jitter() ->
 
 
 def test_applies_style_inside_superscript_without_crossing_tags() -> None:
-    """验证删除线只包装 sup 内的文本叶子，不破坏原有上下标标签。"""
+    """Verify that the strikethrough only wraps the text leaves within sup and does not destroy the original superscript and subscript labels."""
 
     blocks = [
         {
@@ -1769,7 +1769,7 @@ def test_applies_style_inside_superscript_without_crossing_tags() -> None:
     ],
 )
 def test_materializes_owned_script_markup(tag: str, style: str) -> None:
-    """验证 producer-owned 上标与下标标签都转换为结构化 TextSpan 样式。"""
+    """Verify that producer-owned superscript and subscript labels are converted to the structured TextSpan style."""
     block = {
         "type": BlockType.TEXT,
         "content": f"A<{tag}>2</{tag}>B",
@@ -1783,7 +1783,7 @@ def test_materializes_owned_script_markup(tag: str, style: str) -> None:
 
 
 def test_materializes_owned_superscript_with_style_and_hyperlink() -> None:
-    """验证 producer-owned 上标会与删除线和链接语义共同物化。"""
+    """Verify that producer-owned superscripts are co-materialized with strikethrough and link semantics."""
     target = "https://script.example.test"
     blocks = [
         {
@@ -1828,7 +1828,7 @@ def test_materializes_owned_superscript_with_style_and_hyperlink() -> None:
     ],
 )
 def test_malformed_owned_script_markup_remains_literal(content: str) -> None:
-    """验证不平衡或嵌套的 producer-owned 标签按普通字面文本回退。"""
+    """Validation of unbalanced or nested producer-owned tags falls back to normal literal text."""
     block = {
         "type": BlockType.TEXT,
         "content": content,
@@ -1842,7 +1842,7 @@ def test_malformed_owned_script_markup_remains_literal(content: str) -> None:
 
 
 def test_filters_italic_before_merging_overlapping_style_ranges() -> None:
-    """验证过滤斜体后仍正确合并粗体、下划线与删除线区间。"""
+    """Verify that bold, underline, and strikethrough ranges are still correctly merged after filtering italics."""
 
     blocks = [
         {
@@ -1876,7 +1876,7 @@ def test_filters_italic_before_merging_overlapping_style_ranges() -> None:
 
 
 def test_preserves_internal_spaces_and_is_idempotent() -> None:
-    """验证字体样式保留内部空格，重复富化不会增加嵌套标签。"""
+    """Verify that font styles preserve internal whitespace and that repeated enrichment does not increase nested tags."""
 
     blocks = [
         {
@@ -1903,7 +1903,7 @@ def test_preserves_internal_spaces_and_is_idempotent() -> None:
 
 
 def test_underline_does_not_wrap_boundary_spaces() -> None:
-    """验证下划线只保留命中字符之间的内部空格，不扩散到边界空格。"""
+    """Verify that underscores only preserve internal spaces between hit characters and do not spread to boundary spaces."""
 
     blocks = [
         {
@@ -1947,7 +1947,7 @@ def test_underline_does_not_wrap_boundary_spaces() -> None:
 def test_applies_style_specific_scope_to_natural_language_blocks(
     block_type: str,
 ) -> None:
-    """验证正文保留粗体与下划线、目录保留粗体，删除线保持自然语言范围。"""
+    """Verify that the text remains bold and underlined, the table of contents remains bold, and strikethroughs remain within the natural language range."""
 
     blocks = [
         {
@@ -1990,7 +1990,7 @@ def test_applies_style_specific_scope_to_natural_language_blocks(
     ],
 )
 def test_does_not_apply_styles_to_visual_or_code_blocks(block_type: str) -> None:
-    """验证表格、代码、公式和图片 block 不进入 PDF 文本样式富化。"""
+    """Validation of tables, codes, formulas and images block does not enter PDF text style enrichment."""
 
     blocks = [
         {
@@ -2020,7 +2020,7 @@ def test_does_not_apply_styles_to_visual_or_code_blocks(block_type: str) -> None
 
 
 def test_tag_shaped_pdf_text_is_not_interpreted_as_inline_semantics() -> None:
-    """验证 PDF 标签外观原文始终保留为 TextSpan，不会重建旧行内协议。"""
+    """Verify that the original text of the PDF label appearance is always retained as TextSpan and the old inline protocol is not rebuilt."""
 
     first_literal = "A<sup>B</sup><eq>C</eq><hyperlink><text>D</text><url>u</url></hyperlink>"
     second_literal = '<b>A</b><i>B</i><u>C</u><s>D</s><text style="underline">E</text>'
@@ -2074,7 +2074,7 @@ def test_tag_shaped_pdf_text_is_not_interpreted_as_inline_semantics() -> None:
 
 
 def test_formula_style_does_not_fall_back_to_same_plain_character() -> None:
-    """验证公式内字体样式不会误映射到同一 block 的同名普通字符。"""
+    """Verify that font styles within formulas do not mistakenly map to ordinary characters of the same name for the same block."""
 
     blocks = [
         {
@@ -2098,7 +2098,7 @@ def test_formula_style_does_not_fall_back_to_same_plain_character() -> None:
 
 
 def test_unique_long_style_range_survives_omitted_list_marker() -> None:
-    """验证 layout 省略行首项目符号时，较长唯一字体片段仍能安全对齐。"""
+    """Verify layout Long unique font fragments still align safely when the first line bullet is omitted."""
 
     blocks = [
         {
@@ -2125,7 +2125,7 @@ def test_unique_long_style_range_survives_omitted_list_marker() -> None:
 
 
 def test_never_styles_equations_or_excluded_blocks() -> None:
-    """验证公式内容与 table block 不会被 PDF 删除线富化。"""
+    """Verify formula content is consistent with table block is not strikethrough enriched by PDF."""
 
     blocks = [
         {
@@ -2161,7 +2161,7 @@ def test_never_styles_equations_or_excluded_blocks() -> None:
 
 
 def test_flash_native_pdf_styles_reach_model_middle_and_renderers() -> None:
-    """验证真实 PDF 字体和 drawing 样式贯穿 model、MiddleJson 与 renderer。"""
+    """Verified authentic PDF font and drawing style throughout model, MiddleJson and renderer."""
 
     document = PDFDocument(_build_native_text_style_pdf())
     try:

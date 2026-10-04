@@ -1,4 +1,4 @@
-"""按字形来源清理原生 PDF 重复文字，优先保护无法证明重复的内容。"""
+"""Clean native PDF duplicate text by glyph source, giving priority to content that cannot be proven to be duplicated."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ Box = tuple[float, float, float, float]
 
 @dataclass
 class _Glyph:
-    """保留一组可能来自同一字形的字符，组内绝不按相同字母去重。"""
+    """Keep a group of characters that may come from the same glyph, and never deduplicate the same letters within the group."""
 
     chars: list[Char]
     box: Box | None
@@ -34,12 +34,12 @@ class _Glyph:
 
     @property
     def head(self) -> Char:
-        """返回负责几何和绘制来源判断的代表字符。"""
+        """Returns the representative character responsible for geometry and drawing source determination."""
         return self.chars[0]
 
     @property
     def signature(self) -> tuple[Any, ...]:
-        """重复绘制必须具有相同文本、字体、方向和渲染方式。"""
+        """Repeated draws must have the same text, font, orientation, and rendering."""
         font = self.head.get("font") or {}
         return (
             self.text,
@@ -51,7 +51,7 @@ class _Glyph:
 
 
 def _close_values(a: tuple[float, ...] | None, b: tuple[float, ...] | None, tolerance: float) -> bool:
-    """缺失或非有限几何不作为相同位置的证据。"""
+    """Missing or non-finite geometries are not considered evidence of identical locations."""
     return (
         a is not None
         and b is not None
@@ -61,7 +61,7 @@ def _close_values(a: tuple[float, ...] | None, b: tuple[float, ...] | None, tole
 
 
 def _same_mapping(previous: Char, current: Char) -> bool:
-    """以连续源索引、同对象和重合几何保护连字及其他一对多映射。"""
+    """Protect ligatures and other one-to-many mappings with continuous source indexing, same objects, and coincident geometries."""
     return (
         previous.get("text_object_id") is not None
         and previous.get("text_object_id") == current.get("text_object_id")
@@ -77,7 +77,7 @@ def _same_mapping(previous: Char, current: Char) -> bool:
 
 @lru_cache(maxsize=1)
 def _radical_equivalents() -> dict[str, str]:
-    """惰性读取固定 Unicode 数据，仅使用部首区间，不扩展为全局文字替换。"""
+    """Lazy reading of fixed Unicode data, using only radical intervals and not extending to global text replacement."""
     path = Path(__file__).resolve().parents[3] / "resources/unicode/EquivalentUnifiedIdeograph-17.0.0.txt"
     mapping: dict[str, str] = {}
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -93,12 +93,12 @@ def _radical_equivalents() -> dict[str, str]:
 
 
 def _is_han(text: str) -> bool:
-    """仅识别统一汉字，避免把字母、符号或多字符文本当作汉字变体。"""
+    """Recognize only unified Chinese characters and avoid treating letters, symbols, or multi-character text as Chinese character variants."""
     return len(text) == 1 and unicodedata.name(text, "").startswith("CJK UNIFIED IDEOGRAPH-")
 
 
 def _canonical_han(text: str) -> str:
-    """对局部映射组中的单字符查询部首或兼容汉字等价关系。"""
+    """Query radicals or compatible Chinese character equivalence relationships for single characters in local mapping groups."""
     if len(text) != 1:
         return text
     if 0x2E80 <= ord(text) <= 0x2FDF:
@@ -107,12 +107,12 @@ def _canonical_han(text: str) -> str:
 
 
 def _source_indices(chars: list[Char]) -> tuple[int, ...]:
-    """稳定合并原始索引，不依赖集合遍历顺序。"""
+    """Stable merging of original indexes, independent of collection traversal order."""
     return tuple(sorted({i for char in chars for i in char.get("source_indices", (char["char_idx"],))}))
 
 
 def _mapping_char_groups_python(chars):
-    """完整保留原迭代协议、短路检查和异常顺序。"""
+    """The original iteration protocol, short-circuit checks, and exception order are kept intact."""
     groups = []
     for char in chars:
         if groups and _same_mapping(groups[-1][-1], char):
@@ -123,7 +123,7 @@ def _mapping_char_groups_python(chars):
 
 
 def _native_mapping_ranges(chars, native):
-    """仅打包自有常规字符；字体强引用和等价类只存在于本次去重调用。"""
+    """Only packaged regular characters; font strong references and equivalent classes only exist in this deduplication call."""
     records, font_cache, font_ids = [], {}, {}
     for char in chars:
         if type(char) is not dict or not {"bbox", "font", "char", "rotation", "char_idx"} <= char.keys():
@@ -170,7 +170,7 @@ def _native_mapping_ranges(chars, native):
 
 
 def _mapping_groups(chars: list[Char]) -> list[_Glyph]:
-    """Rust 直接借用普通字符完成保护组和框准备；特殊输入保留完整参考路径。"""
+    """Rust directly borrows ordinary characters to complete protection group and frame preparation; special input retains the complete reference path."""
     native = get_native()
     if native is not None and type(chars) is list:
         rows = native.mapping_glyph_rows(chars, Bbox)
@@ -192,8 +192,8 @@ def _mapping_groups(chars: list[Char]) -> list[_Glyph]:
 
 
 def _mapping_groups_reference(chars: list[Char]) -> list[_Glyph]:
-    """先建立保护组，仅合并不同编码指向同一个汉字的异常映射。"""
-    # 整页入口实测中，原生前置分组的输入打包成本超过计算收益；保留内核差分但不默认启用。
+    """First create a protection group and only merge the abnormal mappings with different codes pointing to the same Chinese character."""
+    # In the actual measurement of the full-page entrance, the input packaging cost of native pre-grouping exceeds the calculation benefit; the kernel difference is retained but not enabled by default.
     groups = _mapping_char_groups_python(chars)
     result: list[_Glyph] = []
     for group in groups:
@@ -216,25 +216,25 @@ def _mapping_groups_reference(chars: list[Char]) -> list[_Glyph]:
 
 
 def _overlap(a: Box, b: Box) -> float:
-    """计算交集占较小框面积比例，零面积不能成为删除依据。"""
+    """Calculate the proportion of the intersection to the area of the smaller frame, and zero area cannot be the basis for deletion."""
     area = min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1]))
     return max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1])) / area if area > 0 else 0.0
 
 
 def _project(box: Box, angle: float) -> Box:
-    """将页面框投影到文字书写轴，统一处理横排和旋转文字。"""
+    """Project the page frame to the text writing axis and handle horizontal and rotated text uniformly."""
     co, si = math.cos(angle), math.sin(angle)
     points = [(co * x + si * y, -si * x + co * y) for x in (box[0], box[2]) for y in (box[1], box[3])]
     return min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)
 
 
 def _bucket(box: Box, size: float) -> tuple[int, int]:
-    """按左上角索引局部重复候选。"""
+    """Local duplicate candidates indexed by upper left corner."""
     return math.floor(box[0] / size), math.floor(box[1] / size)
 
 
 def _paint_pairs(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], list[tuple[int, int, float, float]]]:
-    """批量筛选重复绘制，异常来源类型与巨大坐标保留参考路径。"""
+    """Batch filtering and repeated drawing, abnormal source types and huge coordinates retain reference paths."""
     native = get_native()
     if native is not None:
         signatures, objects, records = {}, {}, []
@@ -266,7 +266,7 @@ def _paint_pairs(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], list[tupl
 
 
 def _paint_pairs_python(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], list[tuple[int, int, float, float]]]:
-    """只比较不同文本对象，生成精确重复及待连续证据确认的平移候选。"""
+    """Only different text objects are compared, generating exact duplicates and translation candidates to be confirmed by continuous evidence."""
     buckets: dict[tuple[Any, ...], list[int]] = defaultdict(list)
     exact: list[tuple[int, int]] = []
     offsets: list[tuple[int, int, float, float]] = []
@@ -284,7 +284,7 @@ def _paint_pairs_python(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], li
         for x in range(bx - 1, bx + 2):
             for y in range(by - 1, by + 2):
                 candidates = buckets.get((signature, x, y), ())
-                # 病态叠层保守保留，限制同位置候选以免退化成全页二次方比较。
+                # Pathological stacking is conservatively preserved, limiting candidates at the same position to avoid degenerating into full-page quadratic comparisons.
                 if len(candidates) >= _MAX_BUCKET_CANDIDATES:
                     continue
                 for other in candidates:
@@ -316,7 +316,7 @@ def _paint_pairs_python(glyphs: list[_Glyph]) -> tuple[list[tuple[int, int]], li
 
 
 def _components(count: int, pairs: list[tuple[int, int]]) -> list[int]:
-    """把候选或已确认的绘制关联归入最早来源，避免把多层副本计作多个字形。"""
+    """Attribute candidate or confirmed draw associations to the earliest source to avoid counting multiple layers of copies as multiple glyphs."""
     native = get_native()
     if native is not None:
         return native.dedup_components(count, pairs)
@@ -324,7 +324,7 @@ def _components(count: int, pairs: list[tuple[int, int]]) -> list[int]:
 
 
 def _components_python(count: int, pairs: list[tuple[int, int]]) -> list[int]:
-    """保留最早来源并查集的 Python 参考实现。"""
+    """Keep the earliest source and lookup the Python reference implementation."""
     parents = list(range(count))
     for a, b in pairs:
         while parents[a] != a:
@@ -340,7 +340,7 @@ def _components_python(count: int, pairs: list[tuple[int, int]]) -> list[int]:
 
 
 def _only_endpoint_copies(glyphs: list[_Glyph], roots: list[int], start: int, end: int) -> bool:
-    """连续证据中间只允许空格和端点字形的副本，不能跳过不匹配的正文。"""
+    """Only spaces and copies of endpoint glyphs are allowed in the middle of consecutive evidence, and unmatched text cannot be skipped."""
     if end - start > 2 * _MAX_BUCKET_CANDIDATES:
         return False
     endpoints = {roots[start], roots[end]}
@@ -350,7 +350,7 @@ def _only_endpoint_copies(glyphs: list[_Glyph], roots: list[int], start: int, en
 def _confirmed_offsets(
     glyphs: list[_Glyph], pairs: list[tuple[int, int, float, float]], exact: list[tuple[int, int]]
 ) -> list[tuple[int, int]]:
-    """以 Python 数学函数预计算方向，再批量确认原顺序的平移证据。"""
+    """Use the Python mathematical function to precalculate the direction, and then confirm the translation evidence of the original sequence in batches."""
     native = get_native()
     if not pairs:
         return []
@@ -375,7 +375,7 @@ def _confirmed_offsets(
 def _confirmed_offsets_python(
     glyphs: list[_Glyph], pairs: list[tuple[int, int, float, float]], exact: list[tuple[int, int]]
 ) -> list[tuple[int, int]]:
-    """以同基线、同平移且连续的多字形证据确认阴影，拒绝孤立近重合字符。"""
+    """Confirm shadows with evidence of polyglyphs with the same baseline, same translation, and continuity, and reject isolated near-coinciding characters."""
     if not pairs:
         return []
     roots = _components(len(glyphs), exact + [(p[0], p[1]) for p in pairs])
@@ -429,7 +429,7 @@ def _confirmed_offsets_python(
                     prev = runs[-1][-1]
                     pb = _project(glyphs[prev[0]].box, glyphs[prev[0]].angle)
                     cb = _project(glyphs[pair[0]].box, glyphs[pair[0]].angle)
-                    # 间隔最多相当于一个正常空格，并要求两份内容均沿源索引前进。
+                    # The gap is equal to at most one normal space and requires both content to advance along the source index.
                     continuous = (
                         pair[0] > prev[0]
                         and pair[1] > prev[1]
@@ -450,7 +450,7 @@ def _confirmed_offsets_python(
 
 
 def _merge_sources(retained: _Glyph, duplicate: _Glyph) -> None:
-    """复制代表字符后合并来源，避免修改调用方的原始字符记录。"""
+    """Copy the representative characters and then merge the sources to avoid modifying the caller's original character record."""
     if len(retained.chars) == len(duplicate.chars):
         merged = []
         for a, b in zip(retained.chars, duplicate.chars):
@@ -464,7 +464,7 @@ def _merge_sources(retained: _Glyph, duplicate: _Glyph) -> None:
 
 
 def _collapse_paints(glyphs: list[_Glyph]) -> list[_Glyph]:
-    """按连通的重复关系保留最早来源，传递合并三层以上的重复绘制。"""
+    """The earliest source is retained according to the connected repetition relationship, and repeated drawings of more than three layers are merged."""
     exact, offsets = _paint_pairs(glyphs)
     parents = _components(len(glyphs), exact + _confirmed_offsets(glyphs, offsets, exact))
     for index in range(len(glyphs) - 1, -1, -1):
@@ -475,7 +475,7 @@ def _collapse_paints(glyphs: list[_Glyph]) -> list[_Glyph]:
 
 
 def _retained_glyphs(glyphs: list[_Glyph], removed: set[int]) -> list[_Glyph]:
-    """清除两侧内容都已删除的孤立空白，保留正常正文之间的空格与换行。"""
+    """Clears out isolated whitespace where content has been removed on both sides, leaving spaces and line breaks between normal text."""
     if not removed:
         return glyphs
     trailing_removed = [True] * len(glyphs)
@@ -496,12 +496,12 @@ def _retained_glyphs(glyphs: list[_Glyph], removed: set[int]) -> list[_Glyph]:
 
 
 def _comparison_text(text: str) -> str:
-    """仅在副本比较中统一空格和宽度形式，输出仍使用可见原文。"""
+    """Only the spacing and width forms are unified in copy comparisons, and the output still uses the visible original text."""
     return "".join(unicodedata.normalize("NFKC", text).split())
 
 
 def _matches_hidden(hidden: str, visible: str) -> bool:
-    """允许少量等长汉字 OCR 替换，数字、字母、增删内容均须严格一致。"""
+    """A small number of equal-length Chinese characters OCR are allowed to be replaced, and numbers, letters, additions and deletions must be strictly consistent."""
     a, b = _comparison_text(hidden), _comparison_text(visible)
     if not a or len(a) != len(b):
         return False
@@ -512,12 +512,12 @@ def _matches_hidden(hidden: str, visible: str) -> bool:
 
 
 def _union_boxes(boxes: list[Box]) -> Box:
-    """合并片段范围，仅用于候选比较，不改变输出几何。"""
+    """Merge fragment ranges, only for candidate comparison, without changing the output geometry."""
     return min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes)
 
 
 def _visible_candidates(grid: dict[tuple[int, int], list[int]], box: Box, margin: float, cell: float) -> Iterator[int]:
-    """仅访问局部网格；异常巨框改为扫描已占用网格，避免遍历海量空格子。"""
+    """Only access local grids; abnormal giant frames scan occupied grids instead to avoid traversing massive empty grids."""
     x0, x1 = math.floor((box[0] - margin) / cell), math.floor((box[2] + margin) / cell)
     y0, y1 = math.floor((box[1] - margin) / cell), math.floor((box[3] + margin) / cell)
     if (x1 - x0 + 1) * (y1 - y0 + 1) > 4 * len(grid):
@@ -529,7 +529,7 @@ def _visible_candidates(grid: dict[tuple[int, int], list[int]], box: Box, margin
 
 
 def _suppress_hidden(glyphs: list[_Glyph]) -> list[_Glyph]:
-    """在 Rust 中筛选隐藏文本几何，Python 保持原 Unicode 匹配与复制规则。"""
+    """Filter hidden text geometries in Rust, Python keeping original Unicode match and copy rules."""
     native = get_native()
     if not any(g.head.get("text_render_mode") == 3 for g in glyphs):
         return glyphs
@@ -587,10 +587,10 @@ def _suppress_hidden(glyphs: list[_Glyph]) -> list[_Glyph]:
 
 
 def _suppress_hidden_python(glyphs: list[_Glyph]) -> list[_Glyph]:
-    """只在同位置存在明确可见原文时抑制隐藏 OCR，保留扫描页唯一文本层。"""
+    """Suppress hiding OCR only if there is clearly visible original text at the same location, retaining the only text layer of the scanned page."""
     if not any(g.head.get("text_render_mode") == 3 for g in glyphs):
         return glyphs
-    # 索引可见字符中心；单元尺寸只影响速度，不作为文本删除阈值。
+    # Indexes visible character centers; cell size only affects speed and does not serve as text deletion threshold.
     cell = 32.0
     visible: dict[tuple[int, int], list[int]] = defaultdict(list)
     hidden_runs: list[list[int]] = []
@@ -649,7 +649,7 @@ def _suppress_hidden_python(glyphs: list[_Glyph]) -> list[_Glyph]:
             continue
         if _matches_hidden("".join(glyphs[i].text for i in run), "".join(glyphs[i].text for i in candidates)):
             removed.update(run)
-            # 一对一的相同字形可精确继承来源；错字片段来源统一附在代表字符上。
+            # One-to-one identical glyphs can accurately inherit their sources; the sources of typo fragments are uniformly attached to the representative characters.
             if len(run) == len(candidates) and all(
                 len(glyphs[a].chars) == len(glyphs[b].chars) for a, b in zip(run, candidates)
             ):
@@ -665,7 +665,7 @@ def _suppress_hidden_python(glyphs: list[_Glyph]) -> list[_Glyph]:
 
 
 def deduplicate_chars(chars: list[Char]) -> list[Char]:
-    """统一入口：保护字形映射，再处理重复绘制及有可见对应的隐藏副本。"""
+    """Unified entrance: protect glyph mapping, and then handle repeated drawings and hidden copies with visible correspondences."""
     if not chars:
         return []
     glyphs = _suppress_hidden(_collapse_paints(_mapping_groups(chars)))

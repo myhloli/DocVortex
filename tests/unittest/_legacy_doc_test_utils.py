@@ -1,4 +1,4 @@
-"""构造不依赖 Word 的最小 Word 97–2003 测试文件。"""
+"""Construct a minimal Word 97–2003 test file that does not depend on Word."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from _legacy_ppt_test_utils import _build_cfb
 
 
 def _piece_table(text_fc: int, cp_count: int, *, compressed: bool) -> bytes:
-    """构造只含一个 piece 的 CLX。"""
+    """Construct CLX containing only one piece."""
 
     fc_raw = text_fc * 2 | 0x4000_0000 if compressed else text_fc
     plc = struct.pack("<II", 0, cp_count)
@@ -17,7 +17,7 @@ def _piece_table(text_fc: int, cp_count: int, *, compressed: bool) -> bytes:
 
 
 def _section_plc(section_ends: list[int]) -> bytes:
-    """构造只提供 CP 边界、Sed 使用零值的 PlcfSed。"""
+    """Constructs PlcfSed providing only CP bounds, Sed using zero values."""
 
     starts = [0, *section_ends]
     return struct.pack(f"<{len(starts)}I", *starts) + b"\x00" * (12 * len(section_ends))
@@ -34,7 +34,7 @@ def build_doc(
     codec: str = "cp1252",
     lid: int = 0x0409,
 ) -> bytes:
-    """构造带 CLX 和 PlcfSed 的最小 DOC OLE 文件。"""
+    """Construct a minimal DOC OLE file with CLX and PlcfSed."""
 
     main_encoded = text.encode(codec) if compressed else text.encode("utf-16le")
     main_cp_count = len(main_encoded) if compressed else len(main_encoded) // 2
@@ -62,7 +62,7 @@ def build_doc(
         pairs[3] = (len(table), len(footnote_ranges))
         table += footnote_ranges
     else:
-        # 合法空脚注 reference PLC：仅保留终止 CP。
+        # Legal empty footnote reference PLC: Only terminated CP is reserved.
         pairs[2] = (len(table), 4)
         table += struct.pack("<I", 0)
 
@@ -96,6 +96,6 @@ def build_doc(
 
 
 def utf16_cp(text: str) -> int:
-    """返回字符串占用的 UTF-16 code unit 数。"""
+    """Returns the number of UTF-16 code unit occupied by the string."""
 
     return len(text.encode("utf-16le")) // 2

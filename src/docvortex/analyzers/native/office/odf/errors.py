@@ -1,18 +1,18 @@
-"""OpenDocument 内部稳定错误类型。"""
+"""OpenDocument Internal stability error type."""
 
 from __future__ import annotations
 
 
 class OdfParseError(ValueError):
-    """表示 OpenDocument 包或语义结构不可解析。"""
+    """Indicates OpenDocument The package or semantic structure cannot be parsed."""
 
 
 class OdfResourceLimitError(OdfParseError):
-    """表示 OpenDocument 输入超过固定安全边界。"""
+    """Indicates that the OpenDocument input exceeds the fixed safety margin."""
 
 
 class OdfEncryptedError(OdfParseError):
-    """表示 OpenDocument 包包含不支持的加密成员。"""
+    """Indicates that the OpenDocument package contains unsupported cryptographic members."""
 
 
 __all__ = ["OdfEncryptedError", "OdfParseError", "OdfResourceLimitError"]

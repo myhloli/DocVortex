@@ -1,4 +1,4 @@
-"""按照 WIRIS 规范安全读取 MathType MTEF v5 record tree。"""
+"""Safe reading of MathType MTEF v5 record tree in compliance with WIRIS specifications."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ _PREDEFINED_ENCODINGS = {
     4: "MTExtra",
 }
 
-# Adobe Symbol/MathType Symbol 编码中常见且语义稳定的字符。
+# Adobe Symbol/MathType Symbol A common and semantically stable character in the encoding.
 _SYMBOL_FONT_POSITION_TO_UNICODE = {
     0x41: 0x0391,
     0x42: 0x0392,
@@ -97,7 +97,7 @@ _SYMBOL_FONT_POSITION_TO_UNICODE = {
     0xF2: 0x222B,
 }
 
-# MathType v5 常见私有 MTCode；未列出的 PUA 继续整体回退，避免猜测字符。
+# MathType v5 Common private MTCode; unlisted PUA Continue the overall fallback to avoid guessing characters.
 _MTCODE_PUA_TO_LATEX = {
     0xE90B: r"\supseteqq ",
     0xE90C: r"\subseteqq ",
@@ -153,7 +153,7 @@ _MTEXTRA_FONT_POSITION_TO_UNICODE = {
 
 @dataclass(frozen=True, slots=True)
 class _FontDefinition:
-    """记录一个 FONT_DEF 的 encoding 索引和字体名称。"""
+    """Record the encoding index and font name of a FONT_DEF."""
 
     encoding_index: int
     name: str
@@ -161,17 +161,17 @@ class _FontDefinition:
 
 @dataclass(frozen=True, slots=True)
 class _FontStyleDefinition:
-    """记录一个 FONT_STYLE_DEF 的字体引用和粗斜体位。"""
+    """Records a font reference and bold italic bit for FONT_STYLE_DEF."""
 
     font_definition_index: int
     style_bits: int
 
 
 class _MtefV5Reader:
-    """有界读取 MTEF v5 header、定义记录和公式对象树。"""
+    """Bounded reads MTEF v5 header, definition records, and formula object trees."""
 
     def __init__(self, data: bytes) -> None:
-        """校验 v5 header 并初始化 definition tables 与安全计数器。"""
+        """Verify v5 header and initialize definition tables and safety counters."""
 
         if len(data) < 7 or data[0] != 5:
             raise _MtefError("Equation Native does not contain MTEF v5")
@@ -194,26 +194,26 @@ class _MtefV5Reader:
             raise _MtefError("MTEF v5 equation options are invalid")
 
     def _charge(self) -> None:
-        """计入一条 record，超过共享上限时抛稳定资源错误。"""
+        """A record is included, and a stable resource error is thrown when the sharing upper limit is exceeded."""
 
         self.records += 1
         if self.records > MAX_RECORDS:
             raise LegacyOfficeResourceLimitError(f"MTEF record count exceeds max_records={MAX_RECORDS}")
 
     def _enter(self) -> None:
-        """进入嵌套 object list 并限制共享深度。"""
+        """Go into nested object list and limit share depth."""
 
         self.depth += 1
         if self.depth > MAX_RECORD_DEPTH:
             raise LegacyOfficeResourceLimitError(f"MTEF nesting exceeds max_record_depth={MAX_RECORD_DEPTH}")
 
     def _leave(self) -> None:
-        """离开当前 object list。"""
+        """Leave the current object list."""
 
         self.depth -= 1
 
     def _u8(self) -> int:
-        """有界读取一个无符号字节。"""
+        """Bounded read of an unsigned byte."""
 
         if self.pos >= len(self.data):
             raise _MtefError("MTEF v5 record is truncated")
@@ -222,7 +222,7 @@ class _MtefV5Reader:
         return value
 
     def _u16(self) -> int:
-        """有界读取一个小端 u16。"""
+        """Bounded read a little endian u16."""
 
         if self.pos + 2 > len(self.data):
             raise _MtefError("MTEF v5 u16 is truncated")
@@ -231,7 +231,7 @@ class _MtefV5Reader:
         return value
 
     def _bytes(self, size: int) -> bytes:
-        """按显式长度有界读取 payload。"""
+        """Read payload bounded by explicit length."""
 
         if size < 0 or self.pos + size < self.pos or self.pos + size > len(self.data):
             raise _MtefError("MTEF v5 payload length is invalid")
@@ -240,7 +240,7 @@ class _MtefV5Reader:
         return value
 
     def _cstring(self, *, max_bytes: int) -> str:
-        """读取有长度上限的零结尾单字节字符串。"""
+        """Reads a zero-terminated single-byte string with an upper bound on length."""
 
         end_limit = min(len(self.data), self.pos + max_bytes + 1)
         end = self.data.find(b"\x00", self.pos, end_limit)
@@ -254,7 +254,7 @@ class _MtefV5Reader:
             return raw.decode("latin-1")
 
     def _signed(self) -> int:
-        """读取 MTEF v5 紧凑有符号整数。"""
+        """Read MTEF v5 compact signed integer."""
 
         first = self._u8()
         if first == 0xFF:
@@ -262,13 +262,13 @@ class _MtefV5Reader:
         return first - 0x80
 
     def _unsigned(self) -> int:
-        """读取 MTEF v5 紧凑无符号整数。"""
+        """Read MTEF v5 compact unsigned integer."""
 
         first = self._u8()
         return self._u16() if first == 0xFF else first
 
     def _variation(self) -> int:
-        """读取一或两字节 template variation。"""
+        """Read one or two bytes template variation."""
 
         first = self._u8()
         if first & 0x80:
@@ -276,7 +276,7 @@ class _MtefV5Reader:
         return first
 
     def _skip_nudge(self) -> None:
-        """跳过短或长格式 nudge。"""
+        """Skip short or long format nudge."""
 
         dx = self._u8()
         dy = self._u8()
@@ -285,7 +285,7 @@ class _MtefV5Reader:
             self._u16()
 
     def _skip_ruler(self) -> None:
-        """解析并跳过 RULER record 的 tab stops。"""
+        """Parse and skip RULER record tab stops."""
 
         count = self._u8()
         for _ in range(count):
@@ -295,7 +295,7 @@ class _MtefV5Reader:
             self._u16()
 
     def _skip_size(self) -> None:
-        """解析并跳过 SIZE record 的三种编码。"""
+        """Parse and skip three encodings of SIZE record."""
 
         first = self._u8()
         if first == 100:
@@ -311,14 +311,14 @@ class _MtefV5Reader:
             self._u8()
 
     def _dimension_array(self) -> None:
-        """有界消费 EQN_PREFS 中按 nibble 编码的 dimension array。"""
+        """dimension array encoded by nibble in bounded consumption EQN_PREFS."""
 
         count = self._u8()
         current = 0
         use_low = False
 
         def next_nibble() -> int:
-            """按高四位优先顺序读取一个 nibble。"""
+            """Read a nibble in high nibble order."""
 
             nonlocal current, use_low
             if not use_low:
@@ -342,7 +342,7 @@ class _MtefV5Reader:
             raise _MtefError("MTEF v5 dimension padding nibble is invalid")
 
     def _parse_font_style_definition(self) -> _Node:
-        """读取 FONT_STYLE_DEF 并验证先前 FONT_DEF 引用。"""
+        """Read FONT_STYLE_DEF and verify previous FONT_DEF reference."""
 
         font_index = self._unsigned()
         style_bits = self._u8()
@@ -354,7 +354,7 @@ class _MtefV5Reader:
         return _Node("metadata")
 
     def _parse_color_definition(self) -> _Node:
-        """读取 COLOR_DEF，颜色只校验结构而不进入现有 schema。"""
+        """Reading COLOR_DEF, the color only checks the structure without entering the existing schema."""
 
         options = self._u8()
         if options & ~0x07:
@@ -369,7 +369,7 @@ class _MtefV5Reader:
         return _Node("metadata")
 
     def _parse_font_definition(self) -> _Node:
-        """读取 FONT_DEF 并绑定已声明 encoding。"""
+        """Reads FONT_DEF and binds declared encoding."""
 
         encoding_index = self._unsigned()
         if encoding_index not in self.encoding_definitions:
@@ -381,7 +381,7 @@ class _MtefV5Reader:
         return _Node("metadata")
 
     def _parse_equation_preferences(self) -> _Node:
-        """读取 EQN_PREFS 的尺寸、间距和 style definition 数组。"""
+        """Read the dimensions, spacing of EQN_PREFS and style definition arrays."""
 
         if self._u8() != 0:
             raise _MtefError("MTEF v5 equation preference options are invalid")
@@ -404,7 +404,7 @@ class _MtefV5Reader:
         return _Node("metadata")
 
     def _parse_encoding_definition(self) -> _Node:
-        """读取自定义 ENCODING_DEF 并按出现顺序从索引 5 编号。"""
+        """Read custom ENCODING_DEF and number from index 5 in order of occurrence."""
 
         name = self._cstring(max_bytes=4096)
         if not name:
@@ -414,7 +414,7 @@ class _MtefV5Reader:
         return _Node("metadata")
 
     def _character_style(self, typeface: int) -> int:
-        """从显式字体或 EQN_PREFS style 解析粗斜体位。"""
+        """Parse bold italic bits from explicit fonts or EQN_PREFS style."""
 
         definition: _FontStyleDefinition | None = None
         if typeface < 0:
@@ -426,7 +426,7 @@ class _MtefV5Reader:
         return definition.style_bits if definition is not None else 0
 
     def _character_encoding(self, typeface: int) -> str:
-        """解析无 MTCode 字符所引用的字体 encoding。"""
+        """Resolving font encoding referenced by no MTCode character."""
 
         definition: _FontStyleDefinition | None = None
         if typeface < 0:
@@ -447,7 +447,7 @@ class _MtefV5Reader:
 
     @staticmethod
     def _mtcode_character(code: int) -> int | str:
-        """把可验证的 MTCode 转为 Unicode/LaTeX，未知 PUA 整体回退。"""
+        """Convert verifiable MTCode to Unicode/LaTeX, unknown PUA overall fallback."""
 
         if 0xD800 <= code <= 0xDFFF or code < 0x20:
             raise _MtefError("MTEF v5 MTCode character is invalid")
@@ -468,7 +468,7 @@ class _MtefV5Reader:
 
     @staticmethod
     def _font_position_character(encoding: str, position: int) -> int | str:
-        """从已知 encoding 的 font position 恢复 Unicode/LaTeX。"""
+        """Restore Unicode/LaTeX from font position known as encoding."""
 
         normalized = encoding.strip().casefold()
         if normalized == "mtcode":
@@ -497,7 +497,7 @@ class _MtefV5Reader:
         raise _MtefError(f"unsupported MTEF v5 font encoding: {encoding}")
 
     def _parse_embellishments(self) -> tuple[int, ...]:
-        """读取 CHAR 后以 END 终止的 EMBELL 列表。"""
+        """List of EMBELLs that terminate with END after reading CHAR."""
 
         values: list[int] = []
         while True:
@@ -518,7 +518,7 @@ class _MtefV5Reader:
             values.append(embellishment)
 
     def _parse_character(self) -> _Node:
-        """读取 CHAR 的 typeface、MTCode/font position 和 embellishments。"""
+        """Read typeface, MTCode/font, position and embellishments for CHAR."""
 
         options = self._u8()
         allowed = _OPT_NUDGE | _CHAR_EMBELL | _CHAR_FUNC_START | _CHAR_ENC_8 | _CHAR_ENC_16 | _CHAR_NO_MTCODE
@@ -566,7 +566,7 @@ class _MtefV5Reader:
         )
 
     def _parse_line(self) -> _Node:
-        """读取 LINE options、可选 ruler 和内部 object list。"""
+        """Read LINE options, optional ruler and internal object list."""
 
         options = self._u8()
         if options & ~(_OPT_NUDGE | _LINE_NULL | _LINE_RULER | _LINE_LSPACE):
@@ -588,7 +588,7 @@ class _MtefV5Reader:
         return _Node("sequence", children=children)
 
     def _parse_pile(self) -> _Node:
-        """读取 PILE alignment、ruler 和逐行 object list。"""
+        """Read PILE alignment, ruler and progressive object list."""
 
         options = self._u8()
         if options & ~(_OPT_NUDGE | _PILE_RULER):
@@ -612,7 +612,7 @@ class _MtefV5Reader:
         return _Node("pile", children=children)
 
     def _parse_matrix(self) -> _Node:
-        """读取 MATRIX 维度、partition bits 和逐格 LINE。"""
+        """Read MATRIX dimensionally, partition bits and framewise LINE."""
 
         options = self._u8()
         if options & ~_OPT_NUDGE:
@@ -639,7 +639,7 @@ class _MtefV5Reader:
         return _Node("matrix", (rows, cols), cells)
 
     def _parse_template(self) -> _Node:
-        """读取 TMPL selector、variation、options 并转换为语义 AST。"""
+        """Read TMPL selector, variation, options and convert to semantic AST."""
 
         record_options = self._u8()
         if record_options & ~_OPT_NUDGE:
@@ -655,7 +655,7 @@ class _MtefV5Reader:
         return _semantic_template(selector, variation, template_options, slots)
 
     def _parse_record(self, record_type: int) -> _Node:
-        """解析一条已读取 type 的 v5 record。"""
+        """Parse a v5 record that has read type."""
 
         if record_type == 1:
             return self._parse_line()
@@ -699,7 +699,7 @@ class _MtefV5Reader:
 
     @staticmethod
     def _group_character_runs(nodes: list[_Node]) -> tuple[_Node, ...]:
-        """把连续 TEXT 字符和 FUNC_START 函数字符折叠为语义节点。"""
+        """Collapse consecutive TEXT characters and FUNC_START function characters into semantic nodes."""
 
         grouped: list[_Node] = []
         index = 0
@@ -745,7 +745,7 @@ class _MtefV5Reader:
         return tuple(grouped)
 
     def _parse_list(self) -> tuple[_Node, ...]:
-        """解析以 END 终止的 v5 object list。"""
+        """Parse v5 object list terminated by END."""
 
         nodes: list[_Node] = []
         while True:
@@ -758,7 +758,7 @@ class _MtefV5Reader:
                 nodes.append(node)
 
     def parse(self) -> _Node:
-        """解析根 object list，要求完整消费且产生可见公式。"""
+        """Parse root object list, requires complete consumption and produces a visible formula."""
 
         children = self._parse_list()
         if self.pos != len(self.data):
@@ -770,7 +770,7 @@ class _MtefV5Reader:
 
 
 def _slot_node(slots: tuple[_Node, ...], index: int) -> _Node:
-    """返回一个 template slot，不存在时补空 sequence。"""
+    """Return a template slot, fill in the blank sequence if it does not exist."""
 
     return slots[index] if index < len(slots) else _Node("sequence")
 
@@ -781,7 +781,7 @@ def _semantic_template(
     options: int,
     slots: tuple[_Node, ...],
 ) -> _Node:
-    """把 MTEF v5 selector/variation 转换为版本无关语义节点。"""
+    """Convert MTEF v5 selector/variation into version-independent semantic nodes."""
 
     if 0 <= selector <= 8:
         if variation & ~0x03 or options not in {0, 1, 2}:
@@ -923,7 +923,7 @@ def _semantic_template(
 
 
 def decode_mtef_v5(data: bytes) -> str | None:
-    """把 MTEF v5 字节流转换为 LaTeX，损坏或不支持时整体返回空。"""
+    """Convert the MTEF v5 byte stream to LaTeX. If it is damaged or not supported, the entire stream will be empty."""
 
     try:
         latex = _render_node(_MtefV5Reader(data).parse()).strip()

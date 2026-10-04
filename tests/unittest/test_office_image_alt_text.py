@@ -1,4 +1,4 @@
-"""图片替代文本（pptx cNvPr/descr、docx docPr/descr、odf svg:title+desc）进入图片块 content 的测试。"""
+"""Image alt text (pptx cNvPr/descr, docx docPr/descr, odf svg:title+desc) goes into the test of image block content."""
 
 from __future__ import annotations
 
@@ -13,14 +13,14 @@ from pptx.util import Inches
 from docvortex.analyzers.native import DocxModel, OdtModel, PptxModel
 from docvortex.schema import BlockType
 
-# 1x1 透明 PNG
+# 1x1 transparent PNG
 PIXEL_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
 )
 
 
 def _image_blocks(pages: list[list[dict]]) -> list[dict]:
-    """收集转换输出中的图片块（含 image_body 子类型）。"""
+    """Collect picture blocks (with image_body subtype) from the conversion output."""
     return [
         block
         for page in pages
@@ -30,7 +30,7 @@ def _image_blocks(pages: list[list[dict]]) -> list[dict]:
 
 
 def _build_pptx_with_descr() -> bytes:
-    """构造带 cNvPr descr 替代文本的单图演示文稿。"""
+    """Construct a single-figure presentation with cNvPr descr alternative text."""
     prs = Presentation()
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     picture = slide.shapes.add_picture(BytesIO(PIXEL_PNG), 0, 0, width=Inches(4), height=Inches(3))
@@ -41,7 +41,7 @@ def _build_pptx_with_descr() -> bytes:
 
 
 def _build_docx_with_descr() -> bytes:
-    """构造带 wp:docPr descr 替代文本的单图文档。"""
+    """Constructs a single image document with wp:docPr descr alternative text."""
     document = Document()
     document.add_picture(BytesIO(PIXEL_PNG))
     document.inline_shapes[-1]._inline.docPr.set("descr", "A cute mascot")
@@ -51,7 +51,7 @@ def _build_docx_with_descr() -> bytes:
 
 
 def _build_odt_with_alt() -> bytes:
-    """构造 svg:title/svg:desc 替代文本随 draw:frame 存储的最小 ODT 包。"""
+    """Constructs a minimal ODT package of svg:title/svg:desc replacement text stored with draw:frame."""
     content_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <office:document-content
     xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -77,7 +77,7 @@ def _build_odt_with_alt() -> bytes:
 </manifest:manifest>"""
     output = BytesIO()
     with ZipFile(output, "w") as package:
-        # mimetype 必须是首个成员且不压缩，ODF 规范要求。
+        # mimetype must be the first member and not compressed, as required by the ODF specification.
         package.writestr(_stored_info("mimetype"), b"application/vnd.oasis.opendocument.text")
         package.writestr("META-INF/manifest.xml", manifest)
         package.writestr("content.xml", content_xml)
@@ -85,7 +85,7 @@ def _build_odt_with_alt() -> bytes:
 
 
 def _stored_info(name: str):
-    """构造 STORED 存储方式的 zip 成员信息。"""
+    """Construct the zip member information of the STORED storage method."""
     from zipfile import ZipInfo
 
     info = ZipInfo(name)
@@ -94,7 +94,7 @@ def _stored_info(name: str):
 
 
 def test_pptx_descr_becomes_image_content() -> None:
-    """pptx 图片 cNvPr 的 descr 应写入图片块 content。"""
+    """pptx picture cNvPr's descr should be written to picture block content."""
     pages = PptxModel().predict(BytesIO(_build_pptx_with_descr()))
     image_blocks = _image_blocks(pages)
     assert image_blocks
@@ -102,7 +102,7 @@ def test_pptx_descr_becomes_image_content() -> None:
 
 
 def test_docx_descr_becomes_image_content() -> None:
-    """docx DrawingML wp:docPr 的 descr 应写入图片块 content。"""
+    """docx DrawingML descr of wp:docPr should be written to picture block content."""
     pages = DocxModel().predict(BytesIO(_build_docx_with_descr()))
     image_blocks = _image_blocks(pages)
     assert image_blocks
@@ -110,7 +110,7 @@ def test_docx_descr_becomes_image_content() -> None:
 
 
 def test_odt_alt_becomes_image_content() -> None:
-    """odt draw:frame 的 svg:title+svg:desc 应写入图片块 content。"""
+    """odt draw:frame of svg:title+svg:desc should be written to picture block content."""
     pages = OdtModel().predict(BytesIO(_build_odt_with_alt()))
     image_blocks = _image_blocks(pages)
     assert image_blocks

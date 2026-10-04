@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到 TeX Live XeLaTeX 完整文档的渲染实现。"""
+"""Strictly MiddleJson to TeX Live XeLaTeX Rendering implementation of full documentation."""
 
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ _PREAMBLE_LINES = (
 
 
 class _LatexRenderer:
-    """保存一次完整 LaTeX 文档渲染所需的确定性状态。"""
+    """Save the deterministic state required for a complete LaTeX document rendering."""
 
     def __init__(
         self,
@@ -90,7 +90,7 @@ class _LatexRenderer:
         asset_base_path: str,
         document_title: str | None,
     ) -> None:
-        """初始化共享 planner、anchor、表格与代码环境上下文。"""
+        """Initialize shared planner, anchor, table and code environment contexts."""
         self.middle_json = middle_json
         self.asset_base_path = normalize_asset_base_path(asset_base_path)
         self.document_title = _resolve_document_title(middle_json, document_title)
@@ -99,7 +99,7 @@ class _LatexRenderer:
         self.verbatim_counter = 0
 
     def render(self) -> str:
-        """生成包含固定 TeX Live 导言区与正文环境的完整源码。"""
+        """Generate complete source code including fixed TeX Live preamble area and text environment."""
         rendered_blocks: list[str] = []
         for page in build_render_plan(self.middle_json):
             for planned in page:
@@ -116,7 +116,7 @@ class _LatexRenderer:
         return "\n".join(lines) + "\n"
 
     def _render_planned_block(self, planned: PlannedBlock) -> str:
-        """按严格 PageBlock 具体类型分发 LaTeX 渲染。"""
+        """Distributes LaTeX renderings as strictly PageBlock specific types."""
         block = planned.block
         if isinstance(block, TextBlock):
             content = render_joined_inline_contents(planned.text_contents or [block.content], self.anchors)
@@ -145,14 +145,14 @@ class _LatexRenderer:
         raise TypeError(f"Unsupported PageBlock type: {type(block).__name__}")
 
     def _anchored_paragraph(self, content: str, anchor: str | None) -> str:
-        """给可见正文添加首次出现的文档级 hypertarget。"""
+        """Adds first occurrence of document-level hypertarget to visible text."""
         if not content.strip():
             return ""
         target = self.anchors.emit_target(anchor)
         return "\n".join(part for part in (target, _paragraph(content)) if part)
 
     def _render_title(self, block: DocTitleBlock | ParagraphTitleBlock) -> str:
-        """把全局标题层级映射为无编号 LaTeX 标题命令。"""
+        """Map the global title hierarchy to the unnumbered LaTeX title command."""
         content = render_inline_spans(block.content, self.anchors)
         if not content.strip():
             return ""
@@ -168,7 +168,7 @@ class _LatexRenderer:
         return "\n".join(part for part in (target, heading) if part)
 
     def _render_page_footnote(self, block: PageFootnoteBlock) -> str:
-        """把页面脚注保留为可寻址的小字号灰色正文块。"""
+        """Keep page footers as addressable blocks of gray text in small font size."""
         content = render_inline_spans(block.content, self.anchors)
         if not content.strip():
             return ""
@@ -177,7 +177,7 @@ class _LatexRenderer:
         return "\n".join(part for part in (target, footnote) if part)
 
     def _render_equation(self, block: EquationBlock) -> str:
-        """原样输出块级 LaTeX；空公式按 sidecar 与占位顺序回退。"""
+        """Output block-level LaTeX as is; empty formulas are rolled back in sidecar and occupancy order."""
         content = block.content.strip()
         if content:
             return _wrap_display_formula(content)
@@ -186,7 +186,7 @@ class _LatexRenderer:
         return self._render_image_payload(block, alt_text="formula")
 
     def _render_list(self, block: ListBlock) -> str:
-        """按共享 marker 分类递归输出原生或显式标记列表。"""
+        """Recursively output a list of native or explicit tags sorted by shared marker."""
         parsed_leaves = [
             parse_list_item_marker(child.content)
             for child in block.content
@@ -221,7 +221,7 @@ class _LatexRenderer:
         return "\n".join(lines) if has_item else ""
 
     def _render_index(self, block: IndexBlock) -> str:
-        """递归输出正文内目录，并仅链接真实 anchor target。"""
+        """Recursively output the in-text directories and link only the real anchor target."""
         lines = [r"\begin{itemize}[leftmargin=*,nosep]"]
         has_item = False
         for child in block.content:
@@ -246,7 +246,7 @@ class _LatexRenderer:
         return "\n".join(lines) if has_item else ""
 
     def _render_image_block(self, block: ImageBlock) -> str:
-        """按原始子块顺序输出图片主体及说明文本。"""
+        """Output the image body and description text in original sub-block order."""
         parts: list[str] = []
         for child in block.content:
             if isinstance(child, ImageBodyBlock):
@@ -259,7 +259,7 @@ class _LatexRenderer:
         return _join_parts(parts)
 
     def _render_table_block(self, block: TableBlock) -> str:
-        """优先输出原生 longtable，再回退图片、可见文本或占位。"""
+        """Prioritize output of native longtable, and then fall back to images, visible text or placeholders."""
         parts: list[str] = []
         for child in block.content:
             if isinstance(child, TableBodyBlock):
@@ -271,7 +271,7 @@ class _LatexRenderer:
         return _join_parts(parts)
 
     def _render_table_body(self, block: TableBodyBlock) -> str:
-        """执行结构化表格到 sidecar、文本、占位的固定回退链。"""
+        """Fixed fallback chain for executing structured tables to sidecar, text, placeholders."""
         content = block.content.strip()
         if content and _HTML_TABLE_RE.search(content):
             try:
@@ -292,7 +292,7 @@ class _LatexRenderer:
         return self._render_image_payload(block, alt_text="table")
 
     def _render_chart_block(self, block: ChartBlock) -> str:
-        """保留 chart 图片，并继续输出可物化的结构化表格。"""
+        """Retain the chart image and continue outputting the materializable structured table."""
         parts: list[str] = []
         for child in block.content:
             if isinstance(child, ChartBodyBlock):
@@ -324,7 +324,7 @@ class _LatexRenderer:
         return _join_parts(parts)
 
     def _render_code_block(self, block: CodeBlock) -> str:
-        """输出保留空白的代码或包含公式的算法正文及说明。"""
+        """Output blank code or algorithm text containing formulas and descriptions."""
         parts: list[str] = []
         for child in block.content:
             if isinstance(child, CodeBodyBlock):
@@ -346,7 +346,7 @@ class _LatexRenderer:
         self,
         block: ImageAnnotationBlock | TableAnnotationBlock | ChartAnnotationBlock | CodeAnnotationBlock,
     ) -> str:
-        """按 caption/footnote discriminator 输出弱化说明样式。"""
+        """Press caption/footnote discriminator to output the weakening description style."""
         content = render_inline_spans(block.content, self.anchors)
         if not content.strip():
             return ""
@@ -355,7 +355,7 @@ class _LatexRenderer:
         return rf"{{\footnotesize\color{{DocVortexGray}} {content}\par}}"
 
     def _render_image_payload(self, block: ImagePayloadBlock, *, alt_text: str) -> str:
-        """输出本地 sidecar；其它来源降级为链接或可见占位。"""
+        """Output local sidecar; other sources are demoted to links or visible placeholders."""
         local = self._render_local_image(block)
         if local:
             return local
@@ -366,7 +366,7 @@ class _LatexRenderer:
         return label + r"\par"
 
     def _render_local_image(self, block: ImagePayloadBlock) -> str:
-        """若存在 XeLaTeX 支持的安全 sidecar，则生成有界 includegraphics。"""
+        """If there is a safe sidecar supported by XeLaTeX, a bounded includegraphics is generated."""
         path = resolve_block_image_path(block, self.asset_base_path)
         if path is None:
             return ""
@@ -376,11 +376,11 @@ class _LatexRenderer:
         )
 
     def _placeholder(self, message: str) -> str:
-        """生成不暴露二进制载荷的稳定可见占位。"""
+        """Generate stable visible placeholders that do not expose binary payloads."""
         return rf"\DocVortexPlaceholder{{{escape_latex_text(message, preserve_newlines=False)}}}"
 
     def _render_verbatim(self, content: str) -> str:
-        """为每个预格式块选择正文无法提前闭合的唯一 fvextra 环境。"""
+        """Select a unique fvextra environment for each preformatted block where the text cannot be closed early."""
         normalized = content.replace("\r\n", "\n").replace("\r", "\n")
         while True:
             self.verbatim_counter += 1
@@ -400,7 +400,7 @@ def render_latex(
     asset_base_path: str = "",
     document_title: str | None = None,
 ) -> str:
-    """把严格 MiddleJson 纯函数式渲染为 TeX Live XeLaTeX 完整源码。"""
+    """Render strictly pure functional MiddleJson into TeX Live XeLaTeX complete source code."""
     if not isinstance(middle_json, MiddleJson):
         raise TypeError("render_latex expects a MiddleJson instance")
     if not isinstance(asset_base_path, str):
@@ -415,7 +415,7 @@ def render_latex(
 
 
 def _resolve_document_title(middle_json: MiddleJson, explicit: str | None) -> str:
-    """按显式标题、首个文档标题和固定回退值解析 metadata title。"""
+    """Parses metadata title by explicit title, first document title, and fixed fallback value."""
     if explicit is not None and explicit.strip():
         return explicit.strip()
     for page in middle_json.pages:
@@ -428,7 +428,7 @@ def _resolve_document_title(middle_json: MiddleJson, explicit: str | None) -> st
 
 
 def _collect_anchor_targets(middle_json: MiddleJson) -> set[str]:
-    """收集真实可见的正文、标题和页面脚注 anchor。"""
+    """Collect actual visible text, titles and page footers anchor."""
     targets: set[str] = set()
     for page in middle_json.pages:
         for block in page.blocks:
@@ -441,7 +441,7 @@ def _collect_anchor_targets(middle_json: MiddleJson) -> set[str]:
 
 
 def _classify_list(items: list[ListItem], add_reference_bullets: bool) -> tuple[str, str]:
-    """根据直属 marker 选择 LaTeX 列表环境和内容策略。"""
+    """Select the LaTeX list environment and content policy based on the direct marker selection."""
     if add_reference_bullets:
         return "itemize", "reference"
     if items and all(item.kind == "unordered" for item in items):
@@ -461,7 +461,7 @@ def _list_item_content(
     kind: str,
     add_reference_bullets: bool,
 ) -> tuple[list[InlineSpan], str | None]:
-    """决定列表项应剥离、保留还是显式显示源 marker。"""
+    """Determines whether list items should be stripped, retained, or the source marker should be shown explicitly."""
     if add_reference_bullets:
         return (item.body, None) if item.kind == "unordered" else (original, None)
     if kind == "unordered":
@@ -474,12 +474,12 @@ def _list_item_content(
 
 
 def _paragraph(content: str) -> str:
-    """把非空行内源码收束为一个普通 LaTeX 段落。"""
+    """Consolidate the source code in non-blank lines into an ordinary LaTeX paragraph."""
     return f"{content}\\par" if content.strip() else ""
 
 
 def _wrap_display_formula(content: str) -> str:
-    """保留完整 AMS display 环境，其它裸公式统一放入 equation*。"""
+    """Keep the complete AMS display environment, and put other bare formulas into equation*."""
     match = _TOP_LEVEL_DISPLAY_ENV_RE.match(content)
     if match is not None and content.rstrip().endswith(rf"\end{{{match.group('name')}}}"):
         return content
@@ -487,19 +487,19 @@ def _wrap_display_formula(content: str) -> str:
 
 
 def _join_parts(parts: list[str]) -> str:
-    """按子块源顺序连接全部非空 LaTeX 片段。"""
+    """Concatenate all non-empty LaTeX clips in subchunk source order."""
     return "\n\n".join(part for part in parts if part and part.strip())
 
 
 def _plain_html_text(content: str) -> str:
-    """从 HTML 或普通字符串提取可见文本供替代信息使用。"""
+    """Extract visible text from HTML or a normal string for use by alternative information."""
     if not content:
         return ""
     return BeautifulSoup(content, "html.parser").get_text("\n", strip=True)
 
 
 def _has_image_payload(block: ImagePayloadBlock) -> bool:
-    """判断 block 是否声明任一种图片来源。"""
+    """Determine whether block declares any kind of image source."""
     return bool(block.image_path or block.image_base64 or block.image_url)
 
 

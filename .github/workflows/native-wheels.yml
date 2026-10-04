@@ -1,7 +1,7 @@
 name: Native wheels
 
-# 仅由 Publish 工作流在发布时（workflow_call）或手动触发运行；
-# push/PR 的 Rust 构建与测试已由 ci.yml 覆盖，不再重复跑轮子矩阵。
+# Run only when called by the Publish workflow during a release, or when triggered manually;
+# ci.yml already covers Rust builds and tests for pushes and PRs, so avoid repeating the wheel matrix.
 on:
   workflow_dispatch:
     inputs:
@@ -18,7 +18,7 @@ on:
 permissions:
   contents: read
 
-# 测试样本可能包含中文文件名；Windows 重定向日志也必须使用 UTF-8。
+# Test samples may contain Chinese file names; Windows redirection logs must also use UTF-8.
 env:
   PYTHONUTF8: '1'
 
@@ -36,7 +36,7 @@ jobs:
           - {os: ubuntu-24.04-arm, arch: aarch64, name: linux-aarch64, deployment: '', smoke: '3.14'}
           - {os: windows-latest, arch: AMD64, name: windows-x86_64, deployment: '', smoke: '3.14'}
           - {os: macos-15, arch: arm64, name: macos-arm64, deployment: '11.0', smoke: '3.14'}
-          # 现有 magika/onnxruntime 依赖尚无 Intel macOS 的 cp314 包；另做 3.14 ABI 检查。
+          # magika/onnxruntime do not yet provide cp314 packages for Intel macOS; check the Python 3.14 ABI separately.
           - {os: macos-15-intel, arch: x86_64, name: macos-x86_64, deployment: '10.13', smoke: '3.13'}
     runs-on: ${{ matrix.os }}
     steps:
@@ -84,7 +84,7 @@ jobs:
           uv run --no-project --python ${{ matrix.smoke }} python tools/generate_dense_pdf.py dense-table.pdf
           uv run --no-project --python ${{ matrix.smoke }} python tools/verify_native_wheel.py dense-table.pdf
           uv run --no-project --python ${{ matrix.smoke }} python -m pytest tests/test_native_inline_styles.py tests/test_native_bitmap_crops.py tests/test_pdfium_bridge.py tests/test_pdf_object_bridge.py tests/test_pdf_classify_page_loading.py tests/test_pdf_classify_resource_graph.py tests/test_pdf_drawing_lines_extraction.py tests/test_pdf_native_graphics_components.py tests/unittest/test_flash_pdf_auxiliary_text.py tests/test_pdf_snapshot.py tests/test_pdf_render_session.py tests/test_native_font_runtime.py tests/test_native_text_pipeline.py tests/test_native_text_snapshot.py tests/test_native_classification.py tests/unittest/test_flash_pdf_char_geometry.py tests/test_native_table_candidates.py tests/test_native_round3.py tests/test_native_round4.py tests/test_native_round5.py tests/test_native_round6.py tests/test_native_round7.py -q
-      # 性能对比仅在本机执行；平台矩阵保留构建、ABI、安装和正确性检查。
+      # Performance comparisons are performed locally only; the platform matrix retains build, ABI, installation and correctness checks.
       - uses: actions/upload-artifact@v6
         with:
           name: dist-${{ matrix.name }}

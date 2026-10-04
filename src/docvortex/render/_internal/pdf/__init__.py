@@ -1,3 +1,3 @@
-"""PDF 私有渲染实现。"""
+"""PDF private rendering implementation."""
 
 __all__: list[str] = []

@@ -1,4 +1,4 @@
-"""隔离参数与恢复分支的影响；只在实验进程内替换对象，不增加产品配置。"""
+"""Isolate the impact of parameters and recovery branches; only replace objects within the experimental process and do not increase product configuration."""
 
 from __future__ import annotations
 import argparse
@@ -28,7 +28,7 @@ from loguru import logger
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# 门槛消融替身对应冻结版本 b4afb58，不能在实现已变化时冒充单因素对照。
+# The threshold ablation surrogate corresponds to the frozen version b4afb58 and cannot pretend to be a single-factor control when the implementation has changed.
 _GATE_REFERENCE_SHA256 = "73939259140dbd056d709a9334d8a7bb1df466ffefed8ce627d44b6f4db8bb56"
 
 VARIANTS: dict[str, dict[str, Any]] = {
@@ -63,7 +63,7 @@ VARIANTS: dict[str, dict[str, Any]] = {
 
 
 def visible_text(value: Any) -> str:
-    """按原生语义金标的约定提取嵌套文本，不引入符号归一化后的比较偏差。"""
+    """Extract nested text according to the conventions of the native semantic gold standard without introducing comparison bias after symbol normalization."""
     if isinstance(value, str):
         return value
     if isinstance(value, (list, tuple)):
@@ -79,17 +79,17 @@ def visible_text(value: Any) -> str:
 
 
 def digest(value: Any) -> str:
-    """为完整公开输出记录稳定摘要。"""
+    """Record stable summaries for full public output."""
     return sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
 def gold_errors(pages: list[list[dict[str, Any]]], expectation: dict[str, Any] | None) -> list[str]:
-    """不修改既有金标，记录库存、精确文本、分组与禁止类型的全部失败。"""
+    """Record all failures of inventory, exact text, grouping and prohibited types without modifying existing gold labels."""
     if expectation is None:
         return []
 
     def norm(value: Any) -> str:
-        """保持原金标的空白与可选 NFKC 比较规则。"""
+        """Keep the original gold label blank with the optional NFKC comparison rule."""
         text = re.sub(r"\s+", "", visible_text(value))
         return unicodedata.normalize("NFKC", text) if expectation.get("normalize_nfkc") is True else text
 
@@ -125,7 +125,7 @@ def gold_errors(pages: list[list[dict[str, Any]]], expectation: dict[str, Any] |
 
 
 def style_errors(pages: list[list[dict[str, Any]]], path: str) -> list[str]:
-    """补查原文本金标无法发现的作者名下伸部误判，允许机构编号的真实上标。"""
+    """The misjudgment of the extension of the author's name that could not be discovered by additional checking of the original text's gold label allows for the true superscript of the institution number."""
     if path != "demo/pdfs/中文论文4.pdf":
         return []
     authors = [block for block in pages[4] if "TangJiaping" in re.sub(r"\s+", "", visible_text(block))]
@@ -144,7 +144,7 @@ def style_errors(pages: list[list[dict[str, Any]]], path: str) -> list[str]:
 
 
 def configure(stack: ExitStack, config: dict[str, Any]) -> None:
-    """在显式实验配置内控制一组参数，离开上下文后恢复所有函数与常量。"""
+    """Control a set of parameters within an explicit experiment configuration and restore all functions and constants when leaving the context."""
     if config.get("source") is False:
         stack.enter_context(patch.object(line_merging, "_consecutive_source_row", return_value=False))
     if config.get("prose") is False:
@@ -156,7 +156,7 @@ def configure(stack: ExitStack, config: dict[str, Any]) -> None:
     if "gap" in config:
 
         def touching(first_bbox: Any, first_height: float, second_bbox: Any, second_height: float) -> bool:
-            """仅改变原紧贴分支的最大水平距离，其余原始条件逐项保留。"""
+            """Only the maximum horizontal distance of the original clinging branch is changed, and the remaining original conditions are retained one by one."""
             height = max(first_height, second_height)
             overlap = max(0.0, min(first_bbox[3], second_bbox[3]) - max(first_bbox[1], second_bbox[1]))
             smaller = max(0.1, min(first_bbox[3] - first_bbox[1], second_bbox[3] - second_bbox[1]))
@@ -171,7 +171,7 @@ def configure(stack: ExitStack, config: dict[str, Any]) -> None:
     if "omit_gate" in config:
 
         def source_row(first: Any, second: Any) -> bool:
-            """逐一去除恢复路径中的门槛，其余条件保持原样。"""
+            """The thresholds in the recovery path are removed one by one, leaving the remaining conditions as they are."""
             import statistics
 
             if first.angle != 0 or second.angle != 0 or first.baseline is None or second.baseline is None:
@@ -214,7 +214,7 @@ def configure(stack: ExitStack, config: dict[str, Any]) -> None:
         original = geometry._build_x_char_repair
 
         def cell(*args: Any, **kwargs: Any) -> Any:
-            """实验保留字符 origin 左边界，而不采用正向字形侧边距。"""
+            """The experiment preserves the left margin of the character origin without using forward glyph side margins."""
             kwargs["left_bearing"] = min(kwargs["left_bearing"], 0.0)
             return original(*args, **kwargs)
 
@@ -222,7 +222,7 @@ def configure(stack: ExitStack, config: dict[str, Any]) -> None:
 
 
 def package_source_digest() -> str:
-    """对整个解析包取源码指纹，发现实验期间其它任务的源码变动。"""
+    """Take the source code fingerprint of the entire parsing package and discover the source code changes of other tasks during the experiment."""
     package = Path(docvortex.__file__).parent
     return digest(
         {str(path.relative_to(package)): sha256(path.read_bytes()).hexdigest() for path in sorted(package.rglob("*.py"))}
@@ -230,7 +230,7 @@ def package_source_digest() -> str:
 
 
 def read_pdf(path: Path) -> bytes:
-    """读取完整版本化语料，XOR 样例只在内存中解码。"""
+    """To read the full versioned corpus, the XOR sample is only decoded in memory."""
     data = path.read_bytes()
     if path.suffix == ".xor":
         key = b"MinerU flash layout fixture"
@@ -239,7 +239,7 @@ def read_pdf(path: Path) -> bytes:
 
 
 def main() -> None:
-    """冻结运行信息并执行可复现实验，不修改生产代码、默认参数或既有金标。"""
+    """Freeze run information and perform reproducible experiments without modifying production code, default parameters, or existing gold standards."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--variants", nargs="+", choices=sorted(VARIANTS), default=list(VARIANTS))
@@ -299,7 +299,7 @@ def main() -> None:
                 original_analyze = pipeline._analyze_native_document
 
                 def analyze_with_checks(document: PDFDocument) -> list[list[dict[str, Any]]]:
-                    """在公共符号归一化之前检查原生金标，公开输出仍完整经过 PdfModel。"""
+                    """Checking native gold labels before public symbol normalization, public output still passes PdfModel intact."""
                     raw_pages = original_analyze(document)
                     raw_checks.extend(gold_errors(raw_pages, expectations.get(path)))
                     return raw_pages

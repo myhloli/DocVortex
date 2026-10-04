@@ -1,4 +1,4 @@
-"""有界读取 MS-PPT 与 OfficeArt 记录流。"""
+"""Bounded read MS-PPT and OfficeArt record streams."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ ROUNDTRIP_OPAQUE_MAX = 1064
 
 @dataclass(frozen=True, slots=True)
 class PptRecord:
-    """一条已验证边界的 PPT/OfficeArt 记录。"""
+    """A PPT/OfficeArt record with verified boundaries."""
 
     offset: int
     version: int
@@ -27,12 +27,12 @@ class PptRecord:
 
 @dataclass(slots=True)
 class RecordBudget:
-    """跨解析阶段累计记录访问次数。"""
+    """The number of visits is recorded cumulatively across parsing stages."""
 
     count: int = 0
 
     def charge(self) -> None:
-        """计入一条记录，超过固定上限时硬失败。"""
+        """Counted as one record, hard failure occurs when a fixed upper limit is exceeded."""
 
         self.count += 1
         if self.count > MAX_RECORDS:
@@ -47,7 +47,7 @@ def record_at(
     strict: bool = False,
     budget: RecordBudget | None = None,
 ) -> PptRecord | None:
-    """读取指定偏移的单条记录；严格模式下把坏边界转换为稳定错误。"""
+    """Read a single record at the specified offset; convert bad boundaries into stable errors in strict mode."""
 
     limit = len(data) if end is None else min(end, len(data))
     if offset < 0 or offset + 8 > limit:
@@ -80,7 +80,7 @@ def iter_records(
     budget: RecordBudget | None = None,
     strict_first: bool = False,
 ) -> Iterator[PptRecord]:
-    """按顺序遍历同一容器内的记录，允许尾部生产器填充字节。"""
+    """Traverse records within the same container sequentially, allowing the tail producer to fill bytes."""
 
     limit = len(data) if end is None else min(end, len(data))
     cursor = start
@@ -105,7 +105,7 @@ def iter_descendants(
     *,
     budget: RecordBudget | None = None,
 ) -> Iterator[PptRecord]:
-    """用显式栈深度优先遍历容器，跳过不可递归的 round-trip blob。"""
+    """Traverse the container using explicit stack depth first, skipping non-recursive round-trip blob."""
 
     if record.version != CONTAINER_VERSION:
         return
@@ -125,7 +125,7 @@ def iter_descendants(
 
 
 def utf16_text(payload: bytes) -> str:
-    """容错解码 UTF-16LE 文本并移除末尾 NUL。"""
+    """Tolerantly decode UTF-16LE text and remove trailing NUL."""
 
     usable = payload[: len(payload) - (len(payload) % 2)]
     return usable.decode("utf-16le", "replace").rstrip("\x00")

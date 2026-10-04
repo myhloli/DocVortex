@@ -1,4 +1,4 @@
-"""读取 OpenDocument meta.xml 与结构页数。"""
+"""Read OpenDocument meta.xml with structure page number."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ MAX_ODT_METADATA_PAGE_COUNT: Final = 10_000
 
 
 def _first_text(root: etree._Element | None, *tags: str) -> str | None:
-    """返回多个候选标签中首个非空文本。"""
+    """Returns the first non-empty text among multiple candidate tags."""
     if root is None:
         return None
     for tag in tags:
@@ -31,14 +31,14 @@ def _first_text(root: etree._Element | None, *tags: str) -> str | None:
 
 
 def _all_text(root: etree._Element | None, tag: str) -> list[str]:
-    """保留文档内重复声明的多值属性，顺序和去重由共享类型维护。"""
+    """Multi-valued properties that are declared repeatedly within the document are preserved, with order and deduplication maintained by the shared type."""
     if root is None:
         return []
     return [value for element in root.iter(tag) if (value := "".join(element.itertext()).strip())]
 
 
 def _odt_page_count(meta_root: etree._Element | None) -> int | None:
-    """读取 ODT 生产者记录的布局页数，缺失或非法时返回空。"""
+    """Read the layout page number recorded by ODT producer, and return null if it is missing or illegal."""
     if meta_root is None:
         return None
     statistic = meta_root.find(f".//{qname('meta', 'document-statistic')}")
@@ -52,7 +52,7 @@ def _odt_page_count(meta_root: etree._Element | None) -> int | None:
 
 
 def _visible_sheet_count(body: etree._Element, styles: OdfStyles) -> int:
-    """统计未被 table:display 或表格样式隐藏的 ODS 工作表。"""
+    """Counts ODS sheets that are not hidden by table:display or table styles."""
     count = 0
     for sheet in body:
         if sheet.tag != qname("table", "table"):
@@ -65,7 +65,7 @@ def _visible_sheet_count(body: etree._Element, styles: OdfStyles) -> int:
 
 
 def read_odf_properties(data: bytes, suffix: OdfSuffix) -> tuple[DocumentProperties, list[str]]:
-    """提取 ODF 标题作者等元数据及稳定文档页数。"""
+    """Extract metadata such as ODF title author and stable document page number."""
     package = OdfPackage(data)
     warnings: list[str] = []
     try:
@@ -118,7 +118,7 @@ def read_odf_properties(data: bytes, suffix: OdfSuffix) -> tuple[DocumentPropert
 
 
 def extract_odf_metadata(file_binary: BinaryIO, suffix: OdfSuffix) -> dict[str, object | None]:
-    """保留既有基础属性接口的分页回退，源属性本身不补造页数。"""
+    """The paging fallback of the existing basic attribute interface is retained, and the source attribute itself does not create new pages."""
     properties, _ = read_odf_properties(file_binary.read(), suffix)
     values = legacy_properties(properties)
     values["page_count"] = properties.page_count or 1

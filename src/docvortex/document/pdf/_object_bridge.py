@@ -1,4 +1,4 @@
-"""只借用当前 PDFium 页面和经过 ABI 核验的函数，不加载或缓存原生句柄。"""
+"""Only borrow the current PDFium page and functions verified by ABI, and do not load or cache native handles."""
 
 import ctypes as ct
 from itertools import chain
@@ -20,7 +20,7 @@ _TEXT_VISIBILITY_UNAVAILABLE_REASON = "not probed"
 
 
 def bridge_info():
-    """报告真实完成的对象树读取，不能仅凭扩展存在判定原生路径已执行。"""
+    """Reports the actual completed object tree read. It cannot be judged that the native path has been executed based on the existence of the extension alone."""
     return {
         "pdfium_object_bridge_calls": _CALLS,
         "pdfium_object_bridge_unavailable_reason": _UNAVAILABLE_REASON,
@@ -34,7 +34,7 @@ def bridge_info():
 
 
 def read_clipped_objects(page, kind, max_depth):
-    """标准运行时在 Rust 内完成树遍历，特殊 ctypes 替身保持 Python 参考路径。"""
+    """The standard runtime completes the tree traversal within Rust, the special ctypes stand-in maintains the Python reference path."""
     global _CALLS, _UNAVAILABLE_REASON
     native = get_native()
     if native is None or type(page) is not pdfium.PdfPage or not page.raw:
@@ -80,7 +80,7 @@ def read_clipped_objects(page, kind, max_depth):
 
 
 def read_text_visibility(page, page_bbox, rotation, max_depth):
-    """标准 ABI 下一次遍历 TEXT 对象并返回可见性与视觉裁剪。"""
+    """Standard ABI Next traverses the TEXT object and returns visibility and visual clipping."""
     global _TEXT_VISIBILITY_CALLS, _TEXT_VISIBILITY_UNAVAILABLE_REASON
     native = get_native()
     reader = getattr(native, "read_pdfium_text_visibility", None)
@@ -146,7 +146,7 @@ def read_text_visibility(page, page_bbox, rotation, max_depth):
 
 
 def read_drawing_lines(page, page_bbox, rotation):
-    """仅对兼容 ABI 的简单描边页执行 Rust 轴线提取，复杂页返回参考路径。"""
+    """Only Rust axis extraction is performed for simple stroke pages compatible with ABI, and the reference path is returned for complex pages."""
     global _DRAWING_CALLS, _DRAWING_UNAVAILABLE_REASON
     native = get_native()
     if native is None or type(page) is not pdfium.PdfPage or not page.raw:
@@ -206,7 +206,7 @@ def read_drawing_lines(page, page_bbox, rotation):
 
 
 def read_path_subpaths(raw_object):
-    """标准 ABI 使用原生路径解码，替身或未升级扩展保留显式参考路径。"""
+    """Standard ABI uses native path decoding, aliases or non-upgraded extensions retain explicit reference paths."""
     native = get_native()
     if native is None or type(raw_object) is not raw.FPDF_PAGEOBJECT or not raw_object:
         return None
@@ -235,7 +235,7 @@ def read_path_subpaths(raw_object):
 
 
 def read_path_evidence(page, page_bbox, rotation, max_depth, *, want_lines, want_path_infos):
-    """一次原生遍历同时生成 Path 绘图线与摘要，供标准参考路径差分。"""
+    """A native pass simultaneously generates Path plot lines and summaries for standard reference path differentiation."""
     global _PATH_EVIDENCE_CALLS, _PATH_EVIDENCE_UNAVAILABLE_REASON
     native = get_native()
     reader = getattr(native, "read_pdfium_path_evidence", None)

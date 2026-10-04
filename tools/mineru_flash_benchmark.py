@@ -1,4 +1,4 @@
-"""双仓真实 MinerU Flash 自动分类入口基准，计时与进程树 RSS 使用独立进程。"""
+"""Dual warehouse real MinerU Flash Automatic classification entry benchmark, timing and process tree RSS uses independent processes."""
 
 from __future__ import annotations
 
@@ -15,45 +15,45 @@ import subprocess
 import sys
 import time
 
-# 宿主集成工具放在 tools；只复用独立基准采样器，不给引擎测试引入 MinerU 依赖。
+# The host integration tool is placed in tools; it only reuses the independent benchmark sampler and does not introduce MinerU dependency to the engine test.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests" / "benchmarks"))
 
 
 class OutsideFlashText(RuntimeError):
-    """自动分类走 OCR 时中止模型初始化，显式排除该样本。"""
+    """When automatically classifying OCR, the model initialization is stopped and the sample is explicitly excluded."""
 
 
 class RejectLocalModels:
-    """替代模型工厂的保护边界，不修改分类或 Flash 文本路径。"""
+    """Overrides the protection boundary of the model factory without modifying the classification or Flash text path."""
 
     def get_model(self, *args, **kwargs):
-        """Flash 自动分类进入模型分支时直接拒绝，绝不加载真实模型。"""
+        """Flash directly rejects automatic classification when entering the model branch, and never loads the real model."""
         raise OutsideFlashText("Automatic classification selected OCR; outside the Flash text chain")
 
 
 def reject_vlm(*args, **kwargs):
-    """Flash 基准若异常请求 VLM，明确失败，防止模型下载或网络推理。"""
+    """If the Flash benchmark abnormally requests VLM, it will explicitly fail to prevent model downloading or network inference."""
     raise RuntimeError("Flash benchmark must not initialize a VLM predictor")
 
 
 def utc_now():
-    """记录 UTC 边界，供调度器审计与其他计时的重叠。"""
+    """Logs the UTC boundary for the scheduler to audit for overlap with other timings."""
     return datetime.now(timezone.utc).isoformat()
 
 
 def write_json(path, value):
-    """在被测入口之外保存完整协议，禁止非有限数字悄悄进入摘要。"""
+    """Save the complete protocol outside the entrance under test, prohibiting non-finite numbers from creeping into the summary."""
     Path(path).write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
 def digest(value):
-    """完整保留正文、素材、几何和字段顺序语义，生成确定性 JSON 摘要。"""
+    """Generate deterministic JSON summaries with text, material, geometry, and field order semantics fully preserved."""
     data = json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False).encode()
     return hashlib.sha256(data).hexdigest()
 
 
 def read_payload(path):
-    """读取 PDF 或既有 XOR 语料，同时返回编码文件与解码载荷的摘要。"""
+    """Read PDF or existing XOR corpus and return a summary of the encoded file and decoded payload."""
     source = Path(path).read_bytes()
     payload = source
     encoding = "pdf"
@@ -69,7 +69,7 @@ def read_payload(path):
 
 
 def repository_identity(root, package_relative, *, native=False):
-    """分别冻结两仓实际包源码与构建声明，不把 MinerU 的根目录误认成 src 布局。"""
+    """Freeze the actual package source code and build statement of the two warehouses respectively, and do not mistake the root directory of MinerU for the layout of src."""
     root = Path(root).resolve()
     package = root / package_relative
     if not (package / "__init__.py").is_file():
@@ -100,7 +100,7 @@ def repository_identity(root, package_relative, *, native=False):
 
 
 def source_identities(config):
-    """以各仓真实布局生成独立摘要，适用于当前 checkout 和冻结基线。"""
+    """Generate independent summaries based on the true layout of each bin, applicable to current checkout and frozen baselines."""
     return {
         "docvortex": repository_identity(config["docvortex_source"], "src/docvortex", native=True),
         "mineru": repository_identity(config["mineru_source"], "mineru"),
@@ -108,7 +108,7 @@ def source_identities(config):
 
 
 def runtime(config):
-    """导入实际入口并验证两仓来源；只封锁模型工厂，不替换自动分类或解析逻辑。"""
+    """Import the actual entrance and verify the sources of the two warehouses; only block the model factory and do not replace the automatic classification or parsing logic."""
     started = time.perf_counter()
     import docvortex
     import mineru
@@ -154,7 +154,7 @@ def runtime(config):
 
 
 def stable_compute(backend_info, initial):
-    """确认实际加载扩展的身份在本进程采样期间未改变，只允许调用计数增长。"""
+    """Verify that the identity of the actual loaded extension does not change during the sampling period of this process, only allowing the call count to grow."""
     actual = backend_info()
     for field in ("backend", "protocol", "extension_sha256"):
         if actual.get(field) != initial.get(field):
@@ -163,7 +163,7 @@ def stable_compute(backend_info, initial):
 
 
 def shutdown_renderers(config):
-    """退出 worker 前释放实际选择的渲染池，兼容没有 session 模块的旧基线。"""
+    """Releases the actual selected render pool before exiting worker, compatible with older baselines without the session module."""
     from docvortex.document.pdf.images import shutdown_pdf_render_executor
 
     try:
@@ -176,7 +176,7 @@ def shutdown_renderers(config):
 
 
 def frozen_payload(config):
-    """每个独立进程只消费冻结副本，并验证原始文件及解码内容未变化。"""
+    """Each independent process only consumes the frozen copy and verifies that the original file and decoded content have not changed."""
     payload, identity = read_payload(config["frozen_input"])
     if identity != config["input_identity"]:
         raise AssertionError("Frozen input differs from the scheduled document")
@@ -184,7 +184,7 @@ def frozen_payload(config):
 
 
 def semantic_output(result):
-    """序列化完整 AnalysisResult，仅排除顶层 elapsed，保留全部 model_list 和 geometry。"""
+    """Serialize the complete AnalysisResult, excluding only the top-level elapsed, retaining all model_list and geometry."""
     if not is_dataclass(result):
         raise TypeError("Unsupported AnalysisResult contract")
     if result.parse_mode != "txt" or result.effort != "flash":
@@ -197,14 +197,14 @@ def semantic_output(result):
 
 
 def call_entry(analyze_pdf, payload):
-    """计时包含分类、补图、几何及清理，不使用 result.elapsed 代替完整入口耗时。"""
+    """Timing includes classification, patching, geometry, and cleaning. Do not use result.elapsed to replace the complete entry time."""
     started = time.perf_counter()
     result = analyze_pdf(payload, effort="flash", parse_mode="auto")
     return result, time.perf_counter() - started
 
 
 def timing_worker(config, output):
-    """新进程首调用同时作为唯一预热，再测五次热调用，摘要与输出写盘均在计时外。"""
+    """The first call of the new process is also used as the only warm-up, and then five hot calls are tested. The summary and output writing to disk are outside the timing."""
     started_at = utc_now()
     analyze_pdf, backend_info, metadata = runtime(config)
     payload = frozen_payload(config)
@@ -280,7 +280,7 @@ def timing_worker(config, output):
 
 
 def memory_worker(config, output):
-    """独立预热后仅采样一次真实入口 RSS，结束采样后才构造完整输出摘要。"""
+    """The real inlet RSS is sampled only once after independent warm-up, and the complete output summary is constructed after the sampling is completed."""
     from pdf_memory import EntryMemorySampler
 
     timed = json.loads((output / "timing.json").read_text())
@@ -330,7 +330,7 @@ def memory_worker(config, output):
 
 
 def spawn_worker(args, kind):
-    """显式设置双仓 import 路径与后端，等待前一进程退出后才允许下一次采样。"""
+    """Explicitly set the path and backend of the dual warehouse import, and wait for the previous process to exit before allowing the next sampling."""
     environment = dict(os.environ)
     environment.update(
         {
@@ -351,7 +351,7 @@ def spawn_worker(args, kind):
 
 
 def main():
-    """冻结单份输入和两个源码树；允许分开调度计时与后续内存 worker。"""
+    """Freezes single input and two source trees; allows separate scheduling timing and subsequent memory worker."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--path", type=Path, required=True)
     parser.add_argument("--docvortex-source", type=Path, required=True)

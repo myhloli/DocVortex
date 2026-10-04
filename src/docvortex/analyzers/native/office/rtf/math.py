@@ -1,4 +1,4 @@
-"""把 RTF Office Math destination 规范化为 OMML 并复用现有 LaTeX 转换器。"""
+"""Normalize RTF Office Math destination to OMML and reuse existing LaTeX converters."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .lexer import RtfClose, RtfControlWord, RtfHexByte, RtfLexer, RtfOpen, RtfT
 _MATH_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
 _MATH_PREFIX = f"{{{_MATH_NS}}}"
 
-# RTF Office Math control words为 OMML local name 增加一个 m 前缀；映射保留 XML 所需大小写。
+# RTF Office Math control words adds a m prefix to OMML local name; the mapping preserves the required case of XML.
 _OMML_LOCAL_NAMES = (
     "acc",
     "accPr",
@@ -172,7 +172,7 @@ _SCR_VALUES = {
 
 @dataclass(slots=True)
 class _MathGroup:
-    """保存一个 RTF group 对应的 Office Math 局部树。"""
+    """Save a Office Math local tree corresponding to RTF group."""
 
     local: str | None = None
     text: list[str] = field(default_factory=list)
@@ -181,7 +181,7 @@ class _MathGroup:
 
 
 def _append_unicode(group: _MathGroup, value: int | None, surrogate: list[int | None]) -> int:
-    """解码有符号 UTF-16 code unit，并返回需要跳过的 fallback 字符数占位。"""
+    """Decode signed UTF-16 code unit and return the number of fallback characters that need to be skipped."""
     if value is None:
         return 0
     unit = value + 65536 if value < 0 else value
@@ -203,7 +203,7 @@ def _append_unicode(group: _MathGroup, value: int | None, surrogate: list[int | 
 
 
 def _parse_math_groups(data: bytes, encoding: str) -> _MathGroup:
-    """把 math destination token 流构造成与 RTF group 同构的轻量树。"""
+    """Construct the math destination token stream into a lightweight tree isomorphic to RTF group."""
     root = _MathGroup(local="math")
     stack = [root]
     uc_skip = 1
@@ -255,12 +255,12 @@ def _parse_math_groups(data: bytes, encoding: str) -> _MathGroup:
 
 
 def _value_text(group: _MathGroup) -> str:
-    """返回属性 group 的规范化直接文本。"""
+    """Returns the normalized literal text of attribute group."""
     return "".join(group.text).strip()
 
 
 def _build_omml_element(group: _MathGroup) -> etree._Element | None:
-    """把一个已命名 math group 转换为规范 OMML element。"""
+    """Converts a named math group to the canonical OMML element."""
     if group.local is None or group.local == "math":
         return None
     element = etree.Element(f"{_MATH_PREFIX}{group.local}", nsmap={"m": _MATH_NS})
@@ -300,7 +300,7 @@ def _build_omml_element(group: _MathGroup) -> etree._Element | None:
 
 
 def _find_groups(group: _MathGroup, local: str) -> list[_MathGroup]:
-    """按深度优先顺序收集指定 OMML local name 的 group。"""
+    """Collects group for the specified OMML local name in depth-first order."""
     result: list[_MathGroup] = []
     pending = [group]
     while pending:
@@ -312,7 +312,7 @@ def _find_groups(group: _MathGroup, local: str) -> list[_MathGroup]:
 
 
 def parse_rtf_math(data: bytes, *, encoding: str = "cp1252") -> tuple[list[str], bool]:
-    """解析一个 ``mmath`` group，返回 LaTeX 公式列表和行间公式标记。"""
+    """Parses a ``mmath`` group, returning the LaTeX formula list and inline formula markers."""
     try:
         root = _parse_math_groups(data, encoding)
         paragraphs = _find_groups(root, "oMathPara")

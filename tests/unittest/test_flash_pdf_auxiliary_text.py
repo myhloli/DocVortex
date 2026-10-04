@@ -12,7 +12,7 @@ from docvortex.analyzers.native.pdf import auxiliary_text, models, pipeline, tex
 
 
 def test_prepared_table_lines_reuse_by_angle_and_input_identity(monkeypatch) -> None:
-    """同页同方向只转换一次轴线，更换方向或线集合时重新计算。"""
+    """Axis lines are only converted once on the same page and in the same direction, and will be recalculated when the direction or line set is changed."""
 
     page = _prepared_text_page(page_size=(1000.0, 1000.0))
     page.drawing_lines = [models._AxisLine(bbox=(10.0, 20.0, 90.0, 21.0), width=1.0, orientation="horizontal")]
@@ -21,7 +21,7 @@ def test_prepared_table_lines_reuse_by_angle_and_input_identity(monkeypatch) -> 
     calls = []
 
     def counting(drawing_lines, page_size, angle):
-        """记录真实轴线变换次数，同时保留变换结果。"""
+        """Record the number of real axis transformations while retaining the transformation results."""
         calls.append(angle)
         return original(drawing_lines, page_size, angle)
 
@@ -36,7 +36,7 @@ def test_prepared_table_lines_reuse_by_angle_and_input_identity(monkeypatch) -> 
 
 
 def test_page_footnote_uses_separator_and_stops_before_distant_footer_text() -> None:
-    """验证单栏页脚注由页底横线触发，并在较大行间隙前停止扩展。"""
+    """Verify that single-column footers are triggered by a horizontal line at the bottom of the page and stop expanding before a larger line gap."""
 
     lines = [
         _text_line("body one", (100.0, 100.0, 900.0, 110.0), 0),
@@ -83,7 +83,7 @@ def test_page_footnote_trailing_footer_applies_on_any_page(
     page_index: int,
     page_count: int,
 ) -> None:
-    """验证单页或非首页脚注投影内、越过续行阈值的紧凑尾段可标为页脚。"""
+    """Verify that a compact tail segment within the footer projection of a single page or non-home page that crosses the line continuation threshold can be marked as a footer."""
 
     body_lines = [
         _text_line(
@@ -161,7 +161,7 @@ def test_page_footnote_trailing_footer_applies_on_any_page(
     ],
 )
 def test_page_footnote_trailing_footer_rejects_weak_geometry(case: str) -> None:
-    """验证跨栏正文、弱分隔、正文尺度、多尾段和容器重叠均不能猜成页脚。"""
+    """Verify that cross-column text, weak separation, text scale, multiple tail paragraphs and container overlap cannot be guessed as footers."""
 
     body_lines = [
         _text_line(
@@ -238,7 +238,7 @@ def test_page_footnote_trailing_footer_rejects_weak_geometry(case: str) -> None:
 
 
 def test_image_footnote_requires_image_rule_and_smaller_text() -> None:
-    """验证图表脚注必须同时具备图片、下缘长横线和字号收缩证据。"""
+    """Verification of chart footnotes must include pictures, long horizontal lines at the bottom, and evidence of font size shrinkage."""
 
     lines = [
         _text_line(
@@ -274,7 +274,7 @@ def test_image_footnote_requires_image_rule_and_smaller_text() -> None:
 
 
 def test_sparse_image_footnotes_retry_with_document_body_height() -> None:
-    """验证稀疏图片页可用全文正文尺度恢复两个被自身字号污染的图表脚注。"""
+    """Verify that sparse image pages can recover two figure footnotes contaminated by their own font sizes using full text text size."""
 
     caption = _text_line(
         "chart caption",
@@ -326,7 +326,7 @@ def test_sparse_image_footnotes_retry_with_document_body_height() -> None:
 def test_image_footnote_rejects_incomplete_visual_evidence(
     missing_evidence: str,
 ) -> None:
-    """验证缺少任一联合证据时普通图下文字不会晋升为图表脚注。"""
+    """When verifying that any joint evidence is missing, ordinary text below the figure will not be promoted to figure footnotes."""
 
     body = [
         _text_line(
@@ -365,7 +365,7 @@ def test_image_footnote_rejects_incomplete_visual_evidence(
 
 
 def test_page_footnote_supports_independent_column_rules() -> None:
-    """验证左右栏各自的短横线只认领本栏连续页脚注。"""
+    """Verify that the respective dashes in the left and right columns only claim consecutive footnotes in this column."""
 
     lines = [
         *[
@@ -399,7 +399,7 @@ def test_page_footnote_supports_independent_column_rules() -> None:
 
 
 def test_page_footnote_accepts_slightly_left_shifted_rule_with_two_small_rows() -> None:
-    """验证轻微早于栏左缘的短横线可凭高覆盖和连续小字号行确认脚注。"""
+    """Verify that a dash slightly earlier than the left edge of the column confirms footnotes by high coverage and continuous lines of small font size."""
 
     body = [
         _text_line(
@@ -445,7 +445,7 @@ def test_page_footnote_accepts_slightly_left_shifted_rule_with_two_small_rows() 
 
 
 def test_page_footnote_rejects_left_shifted_rule_with_single_or_body_size_row() -> None:
-    """验证轻微左偏横线缺少两行或字号收缩证据时不触发脚注。"""
+    """Verify that footnotes are not triggered when a slightly left-skewed horizontal line is missing two lines or there is evidence of font size shrinkage."""
 
     for note_rows, note_height in ((1, 8.0), (2, 10.0)):
         lines = [
@@ -487,7 +487,7 @@ def test_page_footnote_rejects_left_shifted_rule_with_single_or_body_size_row() 
 
 
 def test_page_footnote_accepts_centered_short_rule_with_small_rows() -> None:
-    """验证栏内居中短横线可凭页面位置和小字号连续行确认脚注。"""
+    """A short horizontal line in the center of the verification column can confirm the footnote based on the page position and small font size in continuous lines."""
 
     body = [
         _text_line(
@@ -533,7 +533,7 @@ def test_page_footnote_accepts_centered_short_rule_with_small_rows() -> None:
 
 
 def test_page_footnote_rejects_centered_fraction_rule_without_upper_clearance() -> None:
-    """验证夹在上下公式层级之间的居中横线不会触发页脚注。"""
+    """Verify that centered horizontal lines sandwiched between upper and lower formula levels do not trigger footers."""
 
     body = [
         _text_line(
@@ -584,7 +584,7 @@ def test_page_footnote_rejects_centered_fraction_rule_without_upper_clearance() 
 
 
 def test_page_footnote_accepts_lower_half_column_width_rule_with_smaller_text() -> None:
-    """验证页面下半部的栏宽横线可凭字号收缩识别单栏脚注。"""
+    """Verify that the column width horizontal lines in the lower half of the page can be used to identify single-column footnotes by shrinking the font size."""
 
     lines = [
         _text_line(
@@ -625,7 +625,7 @@ def test_page_footnote_accepts_lower_half_column_width_rule_with_smaller_text() 
 
 
 def test_page_footnote_stops_at_next_aligned_column_rule() -> None:
-    """验证同栏第二条分隔线会把贡献说明和作者单位拆成两个脚注组。"""
+    """Verify that the second dividing line in the same column will split the contribution statement and authorship into two footnote groups."""
 
     lines = [
         *[
@@ -675,7 +675,7 @@ def test_page_footnote_stops_at_next_aligned_column_rule() -> None:
 
 
 def test_page_footnote_rejects_column_width_rule_without_size_contraction() -> None:
-    """验证栏宽横线下的正常字号正文不会仅凭下半页位置变成脚注。"""
+    """Verify that the normal font size text below the column width horizontal line does not become a footnote simply by virtue of its position on the bottom half of the page."""
 
     lines = [
         _text_line(
@@ -703,7 +703,7 @@ def test_page_footnote_rejects_column_width_rule_without_size_contraction() -> N
 
 
 def test_page_footnote_unions_aligned_regular_and_span_lanes_only() -> None:
-    """验证同左缘 regular/span 栏可联合认领，但不会吞掉右侧正文栏。"""
+    """Verify that the regular/span column on the same left edge can be claimed jointly, but it will not swallow up the right text column."""
 
     lines = [
         *[
@@ -742,7 +742,7 @@ def test_page_footnote_unions_aligned_regular_and_span_lanes_only() -> None:
 
 
 def test_page_footnote_entries_split_first_line_indent_without_text() -> None:
-    """验证首行缩进模式把两个脚注起始行拆开，并吸收左对齐续行。"""
+    """Verify that the first line indentation pattern separates the two footnote starting lines and absorbs left-justified continuation lines."""
 
     lines = [
         _text_line("first", (87.0, 732.0, 245.0, 742.0), 0, effective_height=8.0, median_glyph_width=4.5),
@@ -763,7 +763,7 @@ def test_page_footnote_entries_split_first_line_indent_without_text() -> None:
 
 
 def test_page_footnote_entries_keep_same_left_compact_continuation() -> None:
-    """验证同左缘的次满首行与紧邻续行仍保留在同一脚注块。"""
+    """Verify that the sub-full first line and the immediately following line on the same left edge remain in the same footnote block."""
 
     lines = [
         _text_line(
@@ -797,7 +797,7 @@ def test_page_footnote_entries_keep_same_left_compact_continuation() -> None:
 
 
 def test_page_footnote_single_geometric_marker_keeps_group_together() -> None:
-    """验证 row id 缺失的单个窄编号首行仍可聚合整组连续脚注。"""
+    """Verification row id A missing single narrowly numbered first line still aggregates the entire set of consecutive footnotes."""
 
     note_font = ("NoteFont", 0)
     lines = [
@@ -856,7 +856,7 @@ def test_page_footnote_single_geometric_marker_keeps_group_together() -> None:
 
 
 def test_page_footnote_entries_split_hanging_indent_and_tighten_boxes() -> None:
-    """验证 Boosting 型续行缩进拆成四条脚注，且异常高字符框不再互相覆盖。"""
+    """Verify that Boosting type continuation indentation is split into four footnotes and that abnormally tall character boxes no longer cover each other."""
 
     page_size = (612.2833862304688, 858.8975830078125)
     lines = [
@@ -934,7 +934,7 @@ def test_page_footnote_rejects_decorative_formula_table_and_missing_rules(
     rule_bbox: tuple[float, float, float, float] | None,
     table_bboxes: list[tuple[float, float, float, float]],
 ) -> None:
-    """验证装饰短线、居中公式线、表格线和无横线页底正文均不触发脚注。"""
+    """Verify that decorative short lines, centered formula lines, table lines, and bottom text without horizontal lines do not trigger footnotes."""
 
     lines = [
         _text_line("body one", (100.0, 100.0, 900.0, 110.0), 0),
@@ -953,7 +953,7 @@ def test_page_footnote_rejects_decorative_formula_table_and_missing_rules(
 
 
 def test_page_footnote_rejects_collinear_rule_segment_next_to_table() -> None:
-    """验证表格框外的同高近邻断裂横线不会独立触发页脚注。"""
+    """Verify that adjacent broken lines of the same height outside the table box do not trigger footers independently."""
 
     lines = [
         _text_line("body one", (100.0, 100.0, 900.0, 110.0), 0),
@@ -985,7 +985,7 @@ def test_aside_text_accepts_tall_vertical_text_in_either_edge_band(
     angle: int,
     bbox: tuple[float, float, float, float],
 ) -> None:
-    """验证横排正文占主导时，左右边缘的高占比垂直文字均标为侧栏。"""
+    """Verify that when horizontal text dominates, the high proportion of vertical text on the left and right edges are marked as sidebars."""
 
     lines = [
         *[_text_line(f"body {index}", (100.0, 100.0 + 30.0 * index, 900.0, 110.0 + 30.0 * index), index) for index in range(6)],
@@ -1000,7 +1000,7 @@ def test_aside_text_accepts_tall_vertical_text_in_either_edge_band(
 
 
 def test_aside_text_rejects_short_internal_wide_and_non_dominant_rotated_text() -> None:
-    """验证短旋转行、页内旋转行、过宽边缘行及旋转正文均不误报侧栏。"""
+    """Verify that short rotated lines, in-page rotated lines, excessively wide margin lines, and rotated text do not falsely report sidebars."""
 
     upright_lines = [
         _text_line(f"body {index}", (100.0, 100.0 + 30.0 * index, 900.0, 110.0 + 30.0 * index), index) for index in range(10)
@@ -1024,7 +1024,7 @@ def test_aside_text_rejects_short_internal_wide_and_non_dominant_rotated_text() 
 
 
 def test_auxiliary_text_classification_is_content_independent() -> None:
-    """验证替换全部行文本不会改变页脚注空间分类结果。"""
+    """Verify that replacing an entire line of text does not change the footer space classification results."""
 
     geometries = [
         (100.0, 100.0, 900.0, 110.0),
@@ -1046,7 +1046,7 @@ def test_auxiliary_text_classification_is_content_independent() -> None:
 
 
 def test_auxiliary_text_classifiers_do_not_read_line_text() -> None:
-    """静态守卫侧栏和页脚注分类函数不访问文本内容。"""
+    """Static guard sidebar and footer classification functions do not access text content."""
 
     source = "\n".join(
         inspect.getsource(function)
@@ -1075,7 +1075,7 @@ def test_auxiliary_text_classifiers_do_not_read_line_text() -> None:
 
 
 def test_finalize_preserves_preclassified_auxiliary_text_types() -> None:
-    """验证单页终结阶段不会丢失已标注的侧栏和页脚注。"""
+    """Verify that marked side columns and footers will not be lost during the single-page finalization phase."""
 
     page = _prepared_text_page(
         _text_line("note", (10.0, 80.0, 40.0, 90.0), 0, semantic_type="page_footnote"),
@@ -1100,7 +1100,7 @@ def test_finalize_preserves_preclassified_auxiliary_text_types() -> None:
 
 
 def test_repeated_marginals_require_cross_page_evidence_and_separate_page_numbers() -> None:
-    """验证重复页眉页脚与递增镜像页码被标注，孤立边缘行和正文不变。"""
+    """Verify that duplicate headers and footers with incremental mirror page numbers are marked, and isolated edge lines and body text remain unchanged."""
 
     margin_font = ("Margin", 0)
     pages = [
@@ -1138,7 +1138,7 @@ def test_repeated_marginals_require_cross_page_evidence_and_separate_page_number
 
 
 def test_top_rule_marks_only_unclassified_text_above_it_as_header() -> None:
-    """验证页码先保留类型，长横线上方其余文本补标页眉且线下正文不变。"""
+    """Verify that the page number is retained first, and the remaining text above the long horizontal line is supplemented with the header and the offline text remains unchanged."""
 
     page_number = _text_line(
         "7",
@@ -1169,7 +1169,7 @@ def test_top_rule_marks_only_unclassified_text_above_it_as_header() -> None:
 
 
 def test_top_rule_uses_first_separator_before_later_section_rule() -> None:
-    """验证页首多条长横线只采用最上方有效页眉分隔线。"""
+    """Verify that multiple long horizontal lines at the top of the page only use the top valid header separator line."""
 
     header = _text_line("header", (100.0, 30.0, 300.0, 40.0), 0)
     section = _text_line("section", (100.0, 90.0, 300.0, 110.0), 1)
@@ -1201,7 +1201,7 @@ def test_top_rule_uses_first_separator_before_later_section_rule() -> None:
 
 
 def test_top_decorative_rule_does_not_precede_real_header_separator() -> None:
-    """验证顶部无上方文字的装饰线不会抢占刊头文字下方的真实分隔线。"""
+    """Verify that the decorative line at the top without text above does not preempt the real divider line below the masthead text."""
 
     header = _text_line("letterhead", (100.0, 30.0, 400.0, 40.0), 0)
     body = _text_line("body", (100.0, 80.0, 700.0, 90.0), 1)
@@ -1230,7 +1230,7 @@ def test_top_decorative_rule_does_not_precede_real_header_separator() -> None:
 
 
 def test_top_rule_uses_ink_bbox_when_loose_bbox_crosses_separator() -> None:
-    """验证 loose 框穿过页首横线时仍按真实字形区分线上日期和线下 DOI。"""
+    """Verify that when the loose box crosses the top horizontal line, it still distinguishes the online date and offline DOI according to the true font."""
 
     date = _text_line(
         "2026 年 4 月",
@@ -1274,7 +1274,7 @@ def test_top_rule_uses_ink_bbox_when_loose_bbox_crosses_separator() -> None:
 
 
 def test_top_rule_inside_graphic_does_not_mark_header() -> None:
-    """验证图形容器内的页首长横线不会把其上方普通文本误标为页眉。"""
+    """Verify that the long horizontal line in the header of the graphics container does not mistakenly mark the normal text above it as the header."""
 
     upper_text = _text_line("upper text", (100.0, 30.0, 600.0, 40.0), 0)
     body = _text_line("body", (100.0, 80.0, 700.0, 90.0), 1)
@@ -1300,7 +1300,7 @@ def test_top_rule_inside_graphic_does_not_mark_header() -> None:
 
 
 def test_page_number_outer_companions_classify_top_and_bottom_text_and_images() -> None:
-    """验证上下页码外侧的文本和空内容图片对称转换为页眉页脚。"""
+    """Verify that the text and empty content images outside the upper and lower page numbers are symmetrically converted into headers and footers."""
 
     top_page = _prepared_text_page(
         _text_line("top visual", (20.0, 1.0, 80.0, 5.0), 0),
@@ -1359,7 +1359,7 @@ def test_page_number_outer_companions_classify_top_and_bottom_text_and_images() 
 
 
 def test_page_number_sequence_survives_portrait_to_landscape_edge_change() -> None:
-    """验证横竖版切换时连续页码可从底边迁移到侧边，且后续侧边序列继续命中。"""
+    """Verify that the consecutive page numbers can be moved from the bottom to the side when switching between horizontal and vertical versions, and that subsequent side sequences continue to hit."""
 
     pages = [
         _prepared_text_page(
@@ -1382,7 +1382,7 @@ def test_page_number_sequence_survives_portrait_to_landscape_edge_change() -> No
 
 
 def test_single_page_marginal_content_remains_text() -> None:
-    """验证单页顶部和底部文字不会仅凭位置被猜成页眉、页脚或页码。"""
+    """Verify that text at the top and bottom of a single page cannot be guessed as a header, footer, or page number based solely on its position."""
 
     page = _prepared_text_page(
         _text_line("Page 7", (45.0, 3.0, 55.0, 8.0), 0),
@@ -1395,7 +1395,7 @@ def test_single_page_marginal_content_remains_text() -> None:
 
 
 def test_extreme_page_footnotes_can_be_overridden_by_repeated_marginals() -> None:
-    """验证只有极底脚注可凭跨页重复和递增证据改判为页脚、页码。"""
+    """Verify that only bottom footnotes can be changed to footers and page numbers based on evidence of cross-page repetition and increment."""
 
     pages = []
     for page_index in range(3):
@@ -1436,7 +1436,7 @@ def test_extreme_page_footnotes_can_be_overridden_by_repeated_marginals() -> Non
 
 
 def test_single_page_compound_header_requires_small_split_row_and_body_edge() -> None:
-    """验证单页顶部的小字号拆分同行可由正文栏右缘确认为页眉。"""
+    """Verify that the small font split line at the top of the single page can be identified as the header by the right edge of the text column."""
 
     header_name = _text_line(
         "journal",
@@ -1477,10 +1477,10 @@ def test_single_page_compound_header_requires_small_split_row_and_body_edge() ->
 
 
 def test_isolated_first_page_footer_uses_multi_page_geometry_only() -> None:
-    """验证多页首页唯一极底短行可补标页脚，而单页相同布局保持正文。"""
+    """Verify that the only short line at the bottom of the multi-page home page can be used to add the footer, while the single page has the same layout as the main text."""
 
     def build_page() -> tuple[models._PreparedPage, models._LineItem]:
-        """构造带四行下延正文和一个孤立极底候选的页面。"""
+        """Construct a page with four lines of descending text and an isolated bottom candidate."""
 
         footer = _text_line(
             "neutral notice",
@@ -1515,7 +1515,7 @@ def test_isolated_first_page_footer_uses_multi_page_geometry_only() -> None:
 
 
 def test_repeated_visual_headers_use_geometry_and_skip_first_page() -> None:
-    """验证重复页首图片仅按几何重标，空 content 也可保留为 header。"""
+    """Verify that duplicate header images are relabeled by geometry only, and that an empty content can also be left as header."""
 
     pages = [_prepared_text_page(page_size=(100.0, 100.0)) for _ in range(5)]
     contents = ["cover", "", "beta", "", "delta"]
@@ -1536,7 +1536,7 @@ def test_repeated_visual_headers_use_geometry_and_skip_first_page() -> None:
 
 
 def test_repeated_visual_headers_require_three_top_geometry_matches() -> None:
-    """验证两页重复、非页首图片和明显漂移的 bbox 均不形成视觉页眉。"""
+    """Verify that two-page duplicates, non-top-of-page images, and significantly drifting bbox do not form a visual header."""
 
     pages = [_prepared_text_page(page_size=(100.0, 100.0)) for _ in range(6)]
     bboxes = [
@@ -1563,7 +1563,7 @@ def test_repeated_visual_headers_require_three_top_geometry_matches() -> None:
 
 
 def test_repeated_visual_headers_support_alternating_pages() -> None:
-    """验证同奇偶页间隔为二的重复图片仍可形成视觉页眉簇。"""
+    """Verify that duplicate images spaced two from the same odd-even page can still form visual header clusters."""
 
     pages = [_prepared_text_page(page_size=(100.0, 100.0)) for _ in range(7)]
     for page_index, page in enumerate(pages):
@@ -1583,7 +1583,7 @@ def test_repeated_visual_headers_support_alternating_pages() -> None:
 
 
 def test_repeated_visual_headers_require_matching_orientation() -> None:
-    """验证 bbox 相同但方向不一致的三页图片不会形成同一视觉页眉簇。"""
+    """Verification bbox Three pages of identical images with inconsistent orientations do not form the same visual header cluster."""
 
     pages = [_prepared_text_page(page_size=(100.0, 100.0)) for _ in range(4)]
     for page_index, page in enumerate(pages[1:], start=1):
@@ -1602,7 +1602,7 @@ def test_repeated_visual_headers_require_matching_orientation() -> None:
 
 
 def test_image_bottom_border_does_not_create_image_or_page_footnote() -> None:
-    """验证图片下沿自身的坐标轴横线不会把紧邻图中文字判成脚注。"""
+    """Verify that the horizontal line along its own coordinate axis under the picture does not judge the text next to the picture as a footnote."""
 
     body = [
         _text_line(
@@ -1647,7 +1647,7 @@ def test_image_bottom_border_does_not_create_image_or_page_footnote() -> None:
 
 
 def test_two_bottom_rules_classify_centered_url_as_footer() -> None:
-    """验证页面底部两条同跨度横线把其间居中网址标为页脚。"""
+    """Verify that the two horizontal lines with the same span at the bottom of the page mark the URL in the middle as the footer."""
 
     body = [
         _text_line(
@@ -1680,7 +1680,7 @@ def test_two_bottom_rules_classify_centered_url_as_footer() -> None:
 
 
 def test_single_bottom_rule_classifies_small_right_lane_rows_as_footer() -> None:
-    """验证底部单横线下方的右栏连续小字被标为页脚。"""
+    """Verify that the continuous small text in the right column below the single horizontal line at the bottom is marked as the footer."""
 
     body = [
         _text_line(
@@ -1723,7 +1723,7 @@ def test_single_bottom_rule_classifies_small_right_lane_rows_as_footer() -> None
 def test_single_bottom_rule_rejects_body_sized_or_container_rows(
     inside_image: bool,
 ) -> None:
-    """验证正文大小的行和图片内部横线均不能触发单横线页脚。"""
+    """Verify that neither text-size lines nor horizontal lines within images can trigger single-line footers."""
 
     body = [
         _text_line(
@@ -1765,7 +1765,7 @@ def test_single_bottom_rule_rejects_body_sized_or_container_rows(
 
 
 def test_single_bottom_rule_rejects_formula_fragments_with_unstable_left_edges() -> None:
-    """验证分数线下横向起点离散的公式碎片不能被误判为页脚。"""
+    """Verify that formula fragments with discrete horizontal starting points under the score line cannot be misjudged as footers."""
 
     body = [
         _text_line(
@@ -1804,7 +1804,7 @@ def test_single_bottom_rule_rejects_formula_fragments_with_unstable_left_edges()
 
 
 def test_split_footer_row_fragments_inherit_stable_anchor_type() -> None:
-    """验证同一页脚视觉行的左右碎片从稳定锚点继承 footer 类型。"""
+    """Verify that left and right fragments of the same footer visual row inherit type footer from stable anchors."""
 
     fragments = [
         _text_line(
@@ -1841,7 +1841,7 @@ def test_split_footer_row_fragments_inherit_stable_anchor_type() -> None:
 
 
 def test_distant_same_row_text_inherits_top_page_number_header_type() -> None:
-    """验证页码与远距运行标题同基线时不依赖水平距离也能标为页眉。"""
+    """Verify that the page number can be marked as a header without relying on horizontal distance when it is the same baseline as the running title."""
 
     page_number = _text_line(
         "8",
@@ -1867,7 +1867,7 @@ def test_distant_same_row_text_inherits_top_page_number_header_type() -> None:
 
 
 def test_near_page_sized_image_overlapping_page_number_stays_image() -> None:
-    """验证与底部页码行轻微重叠的近整页大图不会被改判成页脚。"""
+    """Verify that nearly full-page images that slightly overlap the bottom page number line are not converted into footers."""
 
     page = _prepared_text_page(
         _text_line(

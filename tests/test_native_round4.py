@@ -1,4 +1,4 @@
-"""第四轮密集候选优化的逐前缀数值与完整表注差分。"""
+"""Prefix-by-prefix numerical and full table annotation differences for the fourth round of dense candidate optimization."""
 
 import math
 import random
@@ -14,7 +14,7 @@ from docvortex.analyzers.native.pdf import table_rules as rules
 
 @pytest.fixture
 def native():
-    """纯 Python 安装跳过内核专用断言，强制 Rust 的加载错误不得吞掉。"""
+    """A pure Python installation skips kernel-specific assertions, forcing load errors for Rust not to be swallowed."""
     value = get_native()
     if value is None:
         pytest.skip("native backend is not selected")
@@ -22,18 +22,18 @@ def native():
 
 
 def visual_rows(values):
-    """创建只含聚类所需数值的行，保留传入坐标类型以验证特殊输入回退。"""
+    """Creates rows containing only the values required for clustering, retaining the type of the incoming coordinates to validate special input fallbacks."""
     return [SimpleNamespace(fragments=[SimpleNamespace(local_bbox=(a, 0.0, b, 1.0)) for a, b in row]) for row in values]
 
 
 def bits(value):
-    """保留正负零并逐位比较浮点计算结果。"""
+    """Positive and negative zeros are retained and floating point calculation results are compared bit by bit."""
     return struct.pack("d", value)
 
 
 @pytest.mark.parametrize("seed", range(24))
 def test_stable_columns_every_prefix(native, seed):
-    """逐前缀核对首命中、均值、求和、重复成员行和三类对齐覆盖率。"""
+    """Prefix-by-prefix checking for first hit, mean, sum, duplicate member rows, and three-category alignment coverage."""
     rng = random.Random(seed)
     values = [
         [
@@ -65,7 +65,7 @@ def test_stable_columns_every_prefix(native, seed):
     "values", [[-0.0, -0.0, 0.0], [1e16, 1.0, -1e16, 1.0], [5e-324, -5e-324, 1e-323], [1e200, -1e200, 1e-100]]
 )
 def test_stable_sum_cancellation(native, values):
-    """巨大阈值强制同簇，验证抵消和次正规数且读取不破坏累计补偿。"""
+    """Huge thresholds force homo-clustering, verify cancellation and subnormality and reads without destroying cumulative compensation."""
     state = native.StableColumnClusters(sys.version_info >= (3, 12))
     for end, value in enumerate(values, 1):
         assert state.extend([[(value, value)]], 1e300) is not None
@@ -76,7 +76,7 @@ def test_stable_sum_cancellation(native, values):
 
 @pytest.mark.parametrize("value", [0, math.inf, math.nan, 1e308])
 def test_stable_columns_special_values(native, value):
-    """特殊输入或中心溢出必须整体回退，不能留下部分更新的可复用状态。"""
+    """Special input or center overflow must be rolled back as a whole and cannot leave partially updated reusable state."""
     rows = visual_rows([[(value, value)], [(value, value)]])
     cache = rules._StableColumnCache()
     assert rules._count_stable_columns(rows, 4.0, cache, allow_prefix_reuse=True) == rules._count_stable_columns_python(
@@ -85,7 +85,7 @@ def test_stable_columns_special_values(native, value):
 
 
 def test_stable_columns_nonprefix_identity(native):
-    """缩短、交换和重复行引用分别重算，同时不改写输入成员或坐标对象。"""
+    """Shortening, swapping, and duplicate row references are recalculated individually without overwriting input members or coordinate objects."""
     rows = visual_rows([[(0.0, 4.0)], [(3.0, 8.0)], [(8.0, 12.0)]])
     coordinates = [r.fragments[0].local_bbox for r in rows]
     cache = rules._StableColumnCache()
@@ -98,7 +98,7 @@ def test_stable_columns_nonprefix_identity(native):
 
 @pytest.mark.parametrize("seed", range(24))
 def test_note_rank_tree_and_member_ranges(native, seed):
-    """比较秩树和精确成员回退，覆盖重复来源、边界相等、样本不足与奇偶分位数。"""
+    """Compare rank trees and exact member fallback, covering duplicate sources, bounded equality, undersampling, and odd and even quantiles."""
     import statistics
 
     rng = random.Random(seed)
@@ -124,7 +124,7 @@ def test_note_rank_tree_and_member_ranges(native, seed):
 
 
 def test_core_interval_reference_and_marker_index(native):
-    """连续引用可查询，交换行不得误用；通用标记索引与原始核心行判断相同。"""
+    """Continuous references can be queried, and swapped rows must not be misused; the universal tag index is judged the same as the original core row."""
     from docvortex.analyzers.native.pdf import table_annotations as notes
     from docvortex.analyzers.native.pdf.models import _LineItem
 
@@ -150,7 +150,7 @@ def test_core_interval_reference_and_marker_index(native):
 
 
 def test_marker_index_duplicate_sources_and_existing_cache(native):
-    """来源重复时遵循首行缓存语义，已有缓存不能被预计算覆盖。"""
+    """When the source is repeated, the first row cache semantics are followed, and the existing cache cannot be overwritten by precomputation."""
     from docvortex.analyzers.native.pdf import table_annotations as notes
     from docvortex.analyzers.native.pdf.models import _LineItem
 
@@ -166,7 +166,7 @@ def test_marker_index_duplicate_sources_and_existing_cache(native):
 
 
 def test_marker_line_context_is_reused_across_corridors(native, monkeypatch):
-    """同一候选上下文只做一次 marker 输入校验，多个走廊复用来源行索引。"""
+    """The same candidate context only performs marker input verification once, and multiple corridors reuse the source row index."""
     from docvortex.analyzers.native.pdf import table_annotations as notes
     from docvortex.analyzers.native.pdf.models import _LineItem
 
@@ -184,7 +184,7 @@ def test_marker_line_context_is_reused_across_corridors(native, monkeypatch):
     original = notes._prepare_marker_line_context
 
     def counted(values):
-        """仅统计上下文准备次数，不改变普通输入判定。"""
+        """Only the number of context preparation times is counted and ordinary input judgment is not changed."""
         nonlocal calls
         calls += 1
         return original(values)
@@ -217,7 +217,7 @@ def test_marker_line_context_is_reused_across_corridors(native, monkeypatch):
 
 
 def test_marker_queries_are_lazy_and_bounded(native, monkeypatch):
-    """小候选只检查自身所需来源，重复查询复用位图，标记淘汰不影响判定。"""
+    """Small candidates only check the sources they need, repeatedly query the reused bitmap, and mark elimination does not affect the decision."""
     from docvortex.analyzers.native.pdf import table_annotations as notes
     from docvortex.analyzers.native.pdf.models import _LineItem
 
@@ -233,7 +233,7 @@ def test_marker_queries_are_lazy_and_bounded(native, monkeypatch):
     calls = []
 
     def record(marker, selected, *args, **kwargs):
-        """记录实际执行的来源而不替换判定语义，避免全走廊预计算回归。"""
+        """Record the source of actual execution without replacing decision semantics, avoiding full-corridor precomputation regression."""
         calls.extend(line.source_index for line in selected)
         return original(marker, selected, *args, **kwargs)
 
@@ -254,7 +254,7 @@ def test_marker_queries_are_lazy_and_bounded(native, monkeypatch):
 
 @pytest.mark.parametrize("seed", range(12))
 def test_row_geometry_order_and_coordinate_identity(native, seed):
-    """穷举区间极值与非单调下边界，负零及坐标来源引用必须与左折叠一致。"""
+    """Exhaustive interval extrema and non-monotone lower bounds, negative zero and coordinate source references must be consistent with left folding."""
     from docvortex.analyzers.native.pdf.geometry import _bbox_union_many
     from docvortex.analyzers.native.pdf import table_annotations as notes
 
@@ -279,7 +279,7 @@ def test_row_geometry_order_and_coordinate_identity(native, seed):
 
 
 def test_note_prefix_skip_preserves_chain(native):
-    """只有确定不参与的前缀可以跳过，后续表注的间距和字体停止规则保持原样。"""
+    """Only prefixes that are determined not to participate can be skipped, and the spacing and font stopping rules of subsequent table notes remain unchanged."""
     from docvortex.analyzers.native.pdf import table_annotations as notes
     from docvortex.analyzers.native.pdf.models import _LineItem, _VisualRow, _Fragment
 
@@ -306,7 +306,7 @@ def test_note_prefix_skip_preserves_chain(native):
 
 @pytest.mark.parametrize("fail", [False, True])
 def test_visual_worker_releases_recent_cycles(monkeypatch, fail):
-    """成功和异常任务均回收近期闭环载荷，不依赖自动 GC 计数或改变编码结果。"""
+    """Both successful and abnormal tasks recycle recent closed-loop payloads without relying on automatic GC counting or changing encoding results."""
     import gc
     import weakref
     from docvortex.document.pdf import images, visuals
@@ -317,20 +317,20 @@ def test_visual_worker_releases_recent_cycles(monkeypatch, fail):
     collect = gc.collect
 
     def record_collection(generation=2):
-        """确认异常清理也到达回收边界，成功路径另外验证载荷确实已释放。"""
+        """Confirm that the exception cleanup has also reached the recycling boundary, and the successful path also verifies that the payload has indeed been released."""
         generations.append(generation)
         return collect(generation)
 
     class Payload:
-        """模拟已关闭 PDF 包装对象仍持有输入数据的循环引用。"""
+        """Simulation turned off PDF The wrapper object still holds a circular reference to the input data."""
 
         def __init__(self):
-            """创建仅循环 GC 可回收的载荷，不保留测试侧强引用。"""
+            """Creates a loop-only GC recyclable payload, without retaining test-side strong references."""
             self.self_ref = self
             self.data = b"x" * 100_000
 
     def load(*args):
-        """模拟渲染期间产生的近期环，异常时也不得在 worker 中一直积累。"""
+        """Recent rings generated during simulation rendering must not be accumulated in worker when abnormal."""
         payload = Payload()
         references.append(weakref.ref(payload))
         if fail:

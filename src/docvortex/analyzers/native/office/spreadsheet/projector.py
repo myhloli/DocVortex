@@ -1,4 +1,4 @@
-"""XLS 与 XLSX 复用的中立工作表投影器。"""
+"""XLS Neutral worksheet projector multiplexed with XLSX."""
 
 from __future__ import annotations
 
@@ -26,10 +26,10 @@ from .region_discovery import (
 
 
 class _MergedCellLookup:
-    """按行缓存合并单元格范围，避免解析时反复扫描 openpyxl 合并区域。"""
+    """Cache the merged cell range by row to avoid repeatedly scanning the openpyxl merged area during parsing."""
 
     def __init__(self, sheet: Worksheet):
-        """从工作表合并区域构建 0-based 坐标索引。"""
+        """Build the 0-based coordinate index from the merged area of the worksheet."""
         self._merged_row_intervals: dict[int, list[tuple[int, int]]] = collections.defaultdict(list)
         self._hidden_row_intervals: dict[int, list[tuple[int, int]]] = collections.defaultdict(list)
         self._anchor_spans: dict[tuple[int, int], tuple[int, int]] = {}
@@ -62,7 +62,7 @@ class _MergedCellLookup:
         row: int,
         col: int,
     ) -> bool:
-        """判断 0-based 坐标是否落入指定行的任一列区间。"""
+        """Determine whether the coordinates of 0-based fall into any column range of the specified row."""
         for start_col, end_col in row_intervals.get(row, []):
             if start_col <= col <= end_col:
                 return True
@@ -71,20 +71,20 @@ class _MergedCellLookup:
         return False
 
     def contains_merged_cell(self, row: int, col: int) -> bool:
-        """判断 0-based 坐标是否属于任一合并区域。"""
+        """Determine whether the coordinates of 0-based belong to any merged area."""
         return self._contains_interval(self._merged_row_intervals, row, col)
 
     def is_hidden_merged_cell(self, row: int, col: int) -> bool:
-        """判断 0-based 坐标是否为合并区域内非左上角的隐藏格。"""
+        """Determine whether the 0-based coordinate is a hidden grid in the merged area other than the upper left corner."""
         return self._contains_interval(self._hidden_row_intervals, row, col)
 
     def get_anchor_span(self, row: int, col: int) -> tuple[int, int]:
-        """返回合并区域左上角坐标对应的 rowspan/colspan，非合并锚点返回 1x1。"""
+        """Returns rowspan/colspan corresponding to the coordinates of the upper left corner of the merged area, and returns 1x1 for non-merged anchor points."""
         return self._anchor_spans.get((row, col), (1, 1))
 
 
 class SpreadsheetProjector:
-    """把 openpyxl 工作表投影为稳定的分页 model-list。"""
+    """Project openpyxl worksheet to stable paged model-list."""
 
     def __init__(
         self,
@@ -93,14 +93,14 @@ class SpreadsheetProjector:
         gap_tolerance: int | None = None,
         include_hidden_sheets: bool = False,
     ) -> None:
-        """保存工作表投影配置并初始化无格式专属依赖的运行状态。"""
+        """Saves the worksheet projection configuration and initializes the running state of unformatted proprietary dependencies."""
         self.treat_singleton_as_text = treat_singleton_as_text
         self.gap_tolerance = gap_tolerance
         self.include_hidden_sheets = include_hidden_sheets
         self._reset_projection_state()
 
     def _reset_projection_state(self) -> None:
-        """重置工作簿、分页和逐 sheet 的共享投影状态。"""
+        """Reset workbook, pagination, and shared projection state by sheet."""
         self.workbook: Workbook | None = None
         self.pages: list[list[dict[str, Any]]] = []
         self.cur_page: list[dict[str, Any]] = []
@@ -110,7 +110,7 @@ class SpreadsheetProjector:
         self._merged_cell_lookup_cache: dict[int, _MergedCellLookup] = {}
 
     def _prepare_sheet_assets(self, sheet: Worksheet) -> None:
-        """准备普通公式和图片，并构建表格单元格使用的媒体映射。"""
+        """Prepare common formulas and images, and build media maps used by table cells."""
         self.math_map = self._map_math_formulas_to_cells(sheet)
         self.sheet_images = self._collect_sheet_images(sheet)
         self.table_image_map = collections.defaultdict(list)
@@ -124,7 +124,7 @@ class SpreadsheetProjector:
                 self.table_image_map[(row, col)].append(f'<img src="{image.image_base64}" />')
 
     def _convert_sheet(self, sheet: Worksheet) -> None:
-        """按表格、图表、附加素材和独立图片的稳定顺序投影一个工作表。"""
+        """Project a worksheet in a stable sequence of tables, charts, additional assets, and stand-alone images."""
         self._prepare_sheet_assets(sheet)
         used_cells, visual_artifacts = self._find_tables_in_sheet(sheet)
         visual_artifacts.extend(self._find_charts_in_sheet(sheet))
@@ -137,30 +137,30 @@ class SpreadsheetProjector:
         self._find_images_in_sheet(used_cells)
 
     def _map_math_formulas_to_cells(self, sheet: Worksheet) -> FormulaMap:
-        """返回当前工作表按 0-based cell anchor 分组的公式。"""
+        """Returns formulas for the current worksheet grouped by 0-based cell anchor."""
         return {}
 
     def _collect_sheet_images(self, sheet: Worksheet) -> list[SheetImage]:
-        """返回当前工作表按 anchor 排序的图片或图片公式。"""
+        """Returns the picture or picture formula of the current worksheet sorted by anchor."""
         return []
 
     def _find_charts_in_sheet(self, sheet: Worksheet) -> list[AnchoredBlock]:
-        """返回当前工作表的格式专属图表 blocks。"""
+        """Returns the format-specific chart blocks for the current worksheet."""
         return []
 
     def _find_additional_visual_artifacts(
         self,
         used_cells: set[tuple[int, int]],
     ) -> list[AnchoredBlock]:
-        """返回未被表格吸收的格式专属公式或图片 blocks。"""
+        """Returns a format-specific formula or image that has not been absorbed by the table blocks."""
         return []
 
     def _resolve_cell_image(self, raw_cell_text: str) -> str:
-        """解析格式专属的单元格图片函数，默认不产生媒体。"""
+        """Parse format-specific cell image function, which does not generate media by default."""
         return ""
 
     def _iter_sheets_to_convert(self) -> Iterator[Worksheet]:
-        """按工作簿顺序遍历允许输出的可见工作表。"""
+        """Traverse visible worksheets in workbook order allowing output."""
         if self.workbook is None:
             return
 
@@ -172,7 +172,7 @@ class SpreadsheetProjector:
 
     @staticmethod
     def _build_sheet_title_block(sheet_title: str) -> dict:
-        """构造工作表标题块，复用 Office 标题渲染链路输出 Markdown 标题。"""
+        """Construct the worksheet title block and reuse the Office title rendering link to output the Markdown title."""
         return {
             "type": BlockType.PARAGRAPH_TITLE,
             "level": 2,
@@ -181,24 +181,24 @@ class SpreadsheetProjector:
 
     @staticmethod
     def _should_emit_sheet_titles(pages: list[list[dict]]) -> bool:
-        """仅当存在多个非空输出 sheet 时才添加标题，避免单表或空表噪声。"""
+        """Add header only if there are multiple non-empty outputs sheet to avoid single table or empty table noise."""
         return sum(1 for page in pages if page) > 1
 
     def _prepend_sheet_titles(self, sheet_pages: list[tuple[str, list[dict]]]) -> None:
-        """将 sheet 标题插入每个非空 page 开头，不参与表格/图表视觉排序。"""
+        """Inserts the sheet title at the beginning of each non-empty page and does not participate in the visual ordering of the Table/Graph."""
         for sheet_title, page in sheet_pages:
             if not page:
                 continue
             page.insert(0, self._build_sheet_title_block(sheet_title))
 
     def _get_block_sort_anchor(self, row: int | None, col: int | None) -> tuple[int, int]:
-        """把缺失 anchor 稳定放到全部有效工作表坐标之后。"""
+        """Place missing anchor stable after all valid worksheet coordinates."""
         if row is None or col is None:
             return (10**9, 10**9)
         return row, col
 
     def _build_block_from_excel_table(self, excel_table: ExcelTable) -> dict:
-        """按 singleton 规则把表格 IR 投影为文本或表格 block。"""
+        """Project table IR to text or table block according to singleton rules."""
         if self.treat_singleton_as_text and len(excel_table.data) == 1 and self._can_render_singleton_as_text(excel_table):
             return {
                 "type": BlockType.TEXT,
@@ -211,11 +211,11 @@ class SpreadsheetProjector:
         }
 
     def _find_tables_in_sheet(self, sheet: Worksheet) -> tuple[set[tuple[int, int]], list[tuple[tuple[int, int], int, dict]]]:
-        """发现当前 sheet 表格并返回已吸收 cell 与锚定 blocks。"""
+        """Discovers the current sheet table and returns the absorbed cell and anchored blocks."""
         used_cells = set()
         visual_artifacts = []
         if self.workbook is not None:
-            tables = self._find_data_tables(sheet)  # 检测工作表中的所有数据表格
+            tables = self._find_data_tables(sheet)  # Detect all data tables in a worksheet
 
             for order, excel_table in enumerate(tables):
                 # Record used cells
@@ -247,7 +247,7 @@ class SpreadsheetProjector:
         row_span: int = 1,
         col_span: int = 1,
     ) -> ExcelCell:
-        """把源工作表单元格完整物化为中立 ExcelCell。"""
+        """Materialize the source worksheet cell completely to neutral ExcelCell."""
         cell = sheet.cell(row=source_row + 1, column=source_col + 1)
         raw_cell_text = str(cell.value) if cell.value is not None else ""
         cell_text = ""
@@ -276,7 +276,7 @@ class SpreadsheetProjector:
         )
 
     def _build_synthetic_table_from_sheet_selection(self, sheet: Worksheet, rows: list[int], cols: list[int]) -> ExcelTable:
-        """把指定源行列选择物化为紧凑的表格 IR。"""
+        """Materializes the specified source row and column selection into a compact table IR."""
         selected_coords = {(row, col) for row in rows for col in cols}
         hidden_merge_cells = set()
         merge_spans = {}
@@ -330,7 +330,7 @@ class SpreadsheetProjector:
         row: int | None = None,
         col: int | None = None,
     ) -> tuple[int, int]:
-        """优先使用显式源坐标，否则通过表格 anchor 还原源坐标。"""
+        """Explicit source coordinates are preferred, otherwise source coordinates are restored via table anchor."""
         if excel_cell is not None:
             if excel_cell.source_row is not None and excel_cell.source_col is not None:
                 return excel_cell.source_row, excel_cell.source_col
@@ -343,16 +343,16 @@ class SpreadsheetProjector:
         return table_anchor[1] + row, table_anchor[0] + col
 
     def _can_render_singleton_as_text(self, excel_table: ExcelTable) -> bool:
-        """判断单格表是否可安全降级为普通文本 block。"""
+        """Determine whether a single-cell table can be safely downgraded to plain text block."""
         cell = excel_table.data[0]
         return cell.row_span == 1 and cell.col_span == 1 and not cell.media and not cell.text_is_html and not cell.equations
 
     def _cell_has_semantic_content(self, excel_table: ExcelTable, cell: ExcelCell) -> bool:
-        """判断单元格是否包含文本、媒体或公式语义。"""
+        """Determine whether the cell contains text, media or formula semantics."""
         return bool(cell.text.strip() or any(media.strip() for media in cell.media) or cell.equations)
 
     def _get_table_semantic_positions(self, excel_table: ExcelTable) -> set[tuple[int, int]]:
-        """返回表格内具有语义内容的源工作表坐标。"""
+        """Returns the coordinates of the source worksheet with semantic content within the table."""
         semantic_positions = set()
         for cell in excel_table.data:
             if not self._cell_has_semantic_content(excel_table, cell):
@@ -366,22 +366,22 @@ class SpreadsheetProjector:
         return semantic_positions
 
     def _filter_semantic_subset_tables(self, tables: list[ExcelTable]) -> list[ExcelTable]:
-        """删除语义坐标严格包含于其它候选的重复表格。"""
+        """Remove duplicate tables whose semantic coordinates are strictly contained in other candidates."""
         semantic_sets = [self._get_table_semantic_positions(table) for table in tables]
         return [tables[index] for index in keep_maximal_by_semantic_sets(semantic_sets)]
 
     def _sheet_semantic_predicates(
         self, sheet: Worksheet
     ) -> tuple[Callable[[int, int], bool], Callable[[int, int], tuple[int, int]]]:
-        """构造 gap 评分使用的语义内容与合并跨度查询。
+        """Construct gap score using semantic content and merge span query.
 
-        语义判断与 _build_excel_cell 物化结果保持一致：普通值取非空白文本，
-        DISPIMG 公式仅在解析出媒体时算内容，另叠加锚定图片与公式映射。
+        The semantic judgment is consistent with the materialization result of _build_excel_cell: the ordinary value is non-blank text,
+        The DISPIMG formula only counts the content when parsing out the media, and the anchor image and formula mapping are also superimposed.
         """
         merged_lookup = self._get_merged_cell_lookup(sheet)
 
         def has_semantic_content(row: int, col: int) -> bool:
-            """判断源坐标是否含文本、媒体或公式语义。"""
+            """Determine whether the source coordinates contain text, media or formula semantics."""
             cell = sheet._cells.get((row + 1, col + 1))
             if cell is not None and cell.value is not None:
                 raw_text = str(cell.value)
@@ -398,7 +398,7 @@ class SpreadsheetProjector:
         return has_semantic_content, merged_lookup.get_anchor_span
 
     def _select_best_gap_candidate(self, sheet: Worksheet) -> tuple[int, float, list[ExcelTable]]:
-        """按固定候选与偏好顺序选择最稳定的 gap tolerance。"""
+        """Select the most stable gap tolerance in fixed candidate and preference order."""
         bounds: DataRegion = self._find_true_data_bounds(sheet)
         has_semantic_content, span_at = self._sheet_semantic_predicates(sheet)
         gap_tolerance, penalty, best_regions = select_best_gap_candidate(
@@ -413,7 +413,7 @@ class SpreadsheetProjector:
         return gap_tolerance, penalty, tables
 
     def _select_best_tables(self, sheet: Worksheet) -> list[ExcelTable]:
-        """选择并记录当前工作表的最佳表格候选集合。"""
+        """Selects and records the best set of table candidates for the current worksheet."""
         gap_tolerance, penalty, tables = self._select_best_gap_candidate(sheet)
         logger.debug(
             "Selected gap_tolerance={} for sheet '{}' with penalty={:.4f}",
@@ -424,7 +424,7 @@ class SpreadsheetProjector:
         return tables
 
     def _find_images_in_sheet(self, used_cells: set[tuple[int, int]] | None = None) -> None:
-        """输出没有被表格吸收且不是公式载体的独立图片。"""
+        """Outputs independent images that are not absorbed by the table and are not formula carriers."""
         if self.workbook is not None:
             for image in self.sheet_images:
                 r, c = image.anchor
@@ -442,25 +442,25 @@ class SpreadsheetProjector:
                     )
 
     def _find_data_tables(self, sheet: Worksheet) -> list[ExcelTable]:
-        """在 Excel 工作表中查找所有紧凑的矩形数据表格。
+        """Find all compact rectangular data tables in the Excel worksheet.
 
-        参数：
-            sheet: 待解析的 Excel 工作表。
+        parameter:
+            sheet: Excel worksheet to be parsed.
 
-        返回：
-            表示所有数据表格的 ExcelTable 对象列表。
+        return:
+            A list of ExcelTable objects representing all data tables.
         """
         if self.gap_tolerance is None:
             return self._select_best_tables(sheet)
         return self._find_data_tables_with_gap(sheet, self.gap_tolerance)
 
     def _find_data_tables_with_gap(self, sheet: Worksheet, gap_tolerance: int) -> list[ExcelTable]:
-        """按固定 gap 发现表格并移除语义子集候选。"""
+        """Discover tables and remove semantic subset candidates by fixed gap."""
         return self._filter_semantic_subset_tables(self._find_data_tables_with_gap_raw(sheet, gap_tolerance))
 
     def _find_data_tables_with_gap_raw(self, sheet: Worksheet, gap_tolerance: int) -> list[ExcelTable]:
-        """在固定 gap_tolerance 下查找工作表中的所有数据表格。"""
-        bounds: DataRegion = self._find_true_data_bounds(sheet)  # 获取真实数据边界
+        """Find all data tables in the worksheet under fixed gap_tolerance."""
+        bounds: DataRegion = self._find_true_data_bounds(sheet)  # Get real data boundaries
         merged_lookup = self._get_merged_cell_lookup(sheet)
         return [
             self._materialize_region(sheet, region, merged_lookup)
@@ -473,18 +473,18 @@ class SpreadsheetProjector:
         bounds: DataRegion,
         gap_tolerance: int,
     ) -> list[ConnectedRegion]:
-        """对当前工作表按 gap_tolerance 洪水填充发现连通数据区域。"""
+        """Floods the discovered connected data region by gap_tolerance on the current worksheet."""
         merged_lookup = self._get_merged_cell_lookup(sheet)
         max_row, max_col = bounds.max_row - 1, bounds.max_col - 1
 
         def has_content(row: int, col: int) -> bool:
-            """检查指定单元格（0-based索引）是否有内容（有值或属于合并区域）。"""
+            """Check whether the specified cell (0-based index) has content (has a value or belongs to the merged area)."""
             cell = sheet._cells.get((row + 1, col + 1))
             if cell is not None and cell.value is not None:
                 return True
             return merged_lookup.contains_merged_cell(row, col)
 
-        # 仅遍历已存在且有值的单元格，避免 iter_rows 在稀疏大表上创建大量空单元格。
+        # Iterate only over cells that already exist and have values to avoid iter_rows creating a large number of empty cells on large sparse tables.
         return discover_connected_regions(
             has_content,
             self._get_non_empty_cell_positions(sheet, bounds),
@@ -499,19 +499,19 @@ class SpreadsheetProjector:
         region: ConnectedRegion,
         merged_lookup: _MergedCellLookup,
     ) -> ExcelTable:
-        """把连通区域包围盒物化为紧凑的表格 IR，正确处理合并单元格。
+        """Materialize the connected area bounding box into a compact table IR, and correctly handle merged cells.
 
-        遍历发现区域的边界框（bbox 内部的空格作为空单元格保留，维持矩形布局），
-        跳过被合并单元格遮蔽的坐标并把跨度挂到合并锚点上。
+        Traverse the bounding box of the discovery area (the spaces inside bbox are retained as empty cells, maintaining the rectangular layout),
+        Skips coordinates obscured by merged cells and hooks the span to the merge anchor point.
         """
         data: list[ExcelCell] = []
         for source_row in range(region.row_start, region.row_end + 1):
             for source_col in range(region.col_start, region.col_end + 1):
-                # 跳过被合并单元格遮蔽的单元格（非左上角）。
+                # Skip cells obscured by merged cells (not the upper left corner).
                 if merged_lookup.is_hidden_merged_cell(source_row, source_col):
                     continue
 
-                # 计算合并跨度（默认为 1x1）。
+                # Calculate merge span (default is 1x1).
                 row_span, col_span = merged_lookup.get_anchor_span(source_row, source_col)
 
                 data.append(
@@ -538,7 +538,7 @@ class SpreadsheetProjector:
         sheet: Worksheet,
         bounds: DataRegion,
     ) -> list[tuple[int, int]]:
-        """按行列顺序返回真实边界内已有值单元格的 0-based 坐标。"""
+        """Returns the 0-based coordinates of cells with existing values within the true bounds in row and column order."""
         positions = []
         for cell in sheet._cells.values():
             if cell.value is None:
@@ -549,22 +549,22 @@ class SpreadsheetProjector:
         return sorted(positions)
 
     def _find_true_data_bounds(self, sheet: Worksheet) -> DataRegion:
-        """查找工作表中真实的数据边界（最小/最大行列）。
+        """Find the true data boundaries (min/max rows and columns) in a worksheet.
 
-        该函数扫描所有单元格，找到包含所有非空单元格或合并单元格区域的
-        最小矩形范围，返回边界的行列索引。
+        This function scans all cells and finds all non-empty cells or merged cell ranges.
+        Minimum rectangular range, returns the row and column index of the boundary.
 
-        参数：
-            sheet: 待分析的工作表。
+        parameter:
+            sheet: Worksheet to be analyzed.
 
-        返回：
-            覆盖所有数据和合并单元格的最小矩形区域 DataRegion。
-            若工作表为空，则默认返回 (1, 1, 1, 1)。
+        return:
+            Minimum rectangular area covering all data and merged cells DataRegion.
+            If the worksheet is empty, (1, 1, 1, 1) is returned by default.
         """
         min_row, min_col = None, None
         max_row, max_col = 0, 0
 
-        # 遍历所有有值的单元格，动态更新边界
+        # Traverse all cells with values and dynamically update the boundaries
         for cell in sheet._cells.values():
             if cell.value is not None:
                 r, c = cell.row, cell.column
@@ -573,21 +573,21 @@ class SpreadsheetProjector:
                 max_row = max(max_row, r)
                 max_col = max(max_col, c)
 
-        # 将合并单元格的范围也纳入边界计算
+        # Include the range of merged cells into boundary calculations
         for merged in sheet.merged_cells.ranges:
             min_row = merged.min_row if min_row is None else min(min_row, merged.min_row)
             min_col = merged.min_col if min_col is None else min(min_col, merged.min_col)
             max_row = max(max_row, merged.max_row)
             max_col = max(max_col, merged.max_col)
 
-        # 若工作表中没有任何数据，默认返回 (1, 1, 1, 1)
+        # If there is no data in the worksheet, the default value is (1, 1, 1, 1)
         if min_row is None or min_col is None:
             min_row = min_col = max_row = max_col = 1
 
         return DataRegion(min_row, max_row, min_col, max_col)
 
     def _get_merged_cell_lookup(self, sheet: Worksheet) -> _MergedCellLookup:
-        """获取工作表合并单元格缓存，同一轮转换内每个 sheet 只构建一次。"""
+        """Get the worksheet merged cell cache, which is only built once for each sheet in the same round of conversion."""
         cache_key = id(sheet)
         lookup = self._merged_cell_lookup_cache.get(cache_key)
         if lookup is None:
@@ -597,12 +597,12 @@ class SpreadsheetProjector:
 
     @staticmethod
     def _escape_text_with_line_breaks(text: str) -> str:
-        """转义文本并把平台换行统一投影为 HTML 换行。"""
+        """Escape text and uniformly project platform newlines to HTML newlines."""
         return html.escape(text).replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br>")
 
     @staticmethod
     def _get_cell_hyperlink_target(cell: Any) -> str:
-        """读取单元格外链或工作簿内 location。"""
+        """Read location outside the cell or within the workbook."""
         hyperlink = getattr(cell, "hyperlink", None)
         if not hyperlink:
             return ""
@@ -619,7 +619,7 @@ class SpreadsheetProjector:
 
     @staticmethod
     def _apply_inline_font_tags(text_html: str, inline_font: Any) -> str:
-        """按 openpyxl 行内字体顺序包装可见 HTML 标签。"""
+        """Wrap visible HTML labels in openpyxl inline font order."""
         if not text_html or inline_font is None:
             return text_html
 
@@ -644,7 +644,7 @@ class SpreadsheetProjector:
         return wrapped
 
     def _cell_value_to_html(self, cell: Any) -> tuple[str, bool]:
-        """把普通或富文本单元格转换为安全 HTML 与内容类型标记。"""
+        """Convert normal or rich text cells to safe HTML with content-type tag."""
         if cell.value is None:
             return "", False
 
@@ -683,7 +683,7 @@ class SpreadsheetProjector:
         return plain_text, False
 
     def _extract_cell_style(self, cell: Any) -> dict[str, Any]:
-        """从 openpyxl 单元格提取当前 IR 保留的可见样式。"""
+        """Extracts the visible styles currently reserved for IR from the openpyxl cell."""
         style: dict[str, Any] = {}
         if cell.font:
             if cell.font.b:
@@ -708,7 +708,7 @@ class SpreadsheetProjector:
             if cell.alignment.vertical:
                 style["vertical-align"] = cell.alignment.vertical
 
-        # 渐变填充没有 patternType；只提取既有纯色背景，其他填充仍保留内容及其余样式。
+        # Gradient fills do not have patternType; only the existing solid color background is extracted, other fills retain content and the rest of the style.
         fill = cell.fill
         if getattr(fill, "patternType", None) == "solid" and fill.fgColor:
             color = fill.fgColor.rgb

@@ -1,5 +1,5 @@
 # ruff: noqa: E402
-"""对两组真实表格分别测量结构与样式，并比较完整结果及候选诊断。"""
+"""The structure and style of the two sets of real forms were measured separately, and the complete results and candidate diagnoses were compared."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from loguru import logger
 os.environ["ORT_DISABLE_TELEMETRY"] = "1"
 import onnxruntime
 
-# 不让外部 SDK 的后台上传参与结构/样式基准或进程退出。
+# Do not allow background upload of external SDK to participate in structure/style benchmarks or process exits.
 onnxruntime.disable_telemetry_events()
 
 from docvortex.analyzers.native.pdf._table_recovery import (
@@ -37,7 +37,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _cases(group: str) -> list[tuple[dict, NativeTableInput, dict, dict]]:
-    """沿各 manifest 原有坐标约定读取字符几何，页面原语只提取一次。"""
+    """The character geometry is read along each manifest original coordinate convention, and the page primitive is only extracted once."""
     demo = group == "demo"
     manifest = json.loads(
         (ROOT / "tests/fixtures" / f"native_pdf_table_{'demo' if demo else 'cross_page'}_manifest.json").read_text()
@@ -84,7 +84,7 @@ def _cases(group: str) -> list[tuple[dict, NativeTableInput, dict, dict]]:
 
 
 def _external_cases(path: Path, baseline: Path) -> list:
-    """以带指纹的本地 PDF 和冻结 Flash 区域构造外部表格，不写入版本化语料。"""
+    """Construct external tables from local PDF and frozen Flash regions with fingerprints, without writing versioned corpus."""
     source_hash = hashlib.sha256(path.read_bytes()).hexdigest()
     report = json.loads((baseline / "report.json").read_text())
     entry = next(item for item in report["documents"] if item["source_sha256"] == source_hash)
@@ -115,7 +115,7 @@ def _external_cases(path: Path, baseline: Path) -> list:
 
 
 def _run_group(group: str, runs: int, cases: list | None = None) -> tuple[dict, list[dict]]:
-    """预热后分阶段计时，完整诊断与序列化均在计时之外执行。"""
+    """Timing is performed in stages after warm-up, and complete diagnostics and serialization are performed outside of timing."""
     cases = _cases(group) if cases is None else cases
     core_times = [[] for _ in cases]
     style_times = [[] for _ in cases]
@@ -156,7 +156,7 @@ def _run_group(group: str, runs: int, cases: list | None = None) -> tuple[dict, 
 
 
 def main() -> None:
-    """写出可重放比较的完整基线，差异存在时返回失败。"""
+    """Writes a complete baseline for replayable comparisons, returning failure if differences exist."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--baseline", type=Path)

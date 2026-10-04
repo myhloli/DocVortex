@@ -264,8 +264,8 @@ def get_extreme_aspect_ratio_page_pdfium(
 ) -> tuple[Any, Any]:
     with pdfium_guard():
         for page_index in page_indices:
-            # FPDF_GetPageSizeByIndexF 直接按索引取 MediaBox 尺寸，不加载页面、
-            # 不解析内容流；矢量密集页一次 FPDF_LoadPage 可达数秒。
+            # FPDF_GetPageSizeByIndexF directly retrieves the MediaBox size by index without loading the page.
+            # Content stream not parsed; vector-dense pages FPDF_LoadPage for several seconds at a time.
             page_width, page_height = pdf_doc.get_page_size(page_index)
             if page_width <= 0 or page_height <= 0:
                 continue
@@ -278,13 +278,13 @@ def get_extreme_aspect_ratio_page_pdfium(
 
 
 def _collect_pdfium_text_sample_from_page(page_index: int, page: Any) -> dict[str, Any]:
-    """从单页 PDFium 对象提取纯 Python 文本统计，并在调用方释放子对象。"""
+    """Extracts plain Python text statistics from a single page PDFium object and releases the child object on the caller."""
     text_page = None
     try:
         text_page = page.get_textpage()
         text = text_page.get_text_bounded()
         char_count = text_page.count_chars()
-        # 分类消费去重前原始字符，不用 canonical 字符数或字体名解码替代旧统计。
+        # Classified consumption of original characters before deduplication, without canonical character count or font name decoding to replace old statistics.
         from .classification_bridge import read_classification_snapshot
 
         functions = (_is_disallowed_control_unicode, _is_cjk_unicode_code, _get_pdfium_char_font_name, _normalize_pdf_font_name)
@@ -367,7 +367,7 @@ def _collect_pdfium_text_sample_from_page(page_index: int, page: Any) -> dict[st
 
 
 def _collect_pdfium_text_samples(pdf_doc: pdfium.PdfDocument, page_indices: list[int]) -> list[dict[str, Any]]:
-    """一次性收集抽样页文本统计，返回纯 Python 数据，避免缓存 PDFium 子对象。"""
+    """Collect sampling page text statistics at one time, return pure Python data, and avoid caching PDFium sub-objects."""
     text_samples = []
 
     with pdfium_guard():
@@ -376,7 +376,7 @@ def _collect_pdfium_text_samples(pdf_doc: pdfium.PdfDocument, page_indices: list
             try:
                 page = pdf_doc[page_index]
                 sample = _collect_pdfium_text_sample_from_page(page_index, page)
-                # 同一次页面加载顺带统计图像覆盖率，末尾的覆盖检查不再重新加载页面。
+                # The same page load also counts image coverage, and the coverage check at the end no longer reloads the page.
                 sample["image_coverage_ratio"] = _page_image_coverage_ratio(page)
                 text_samples.append(sample)
             finally:
@@ -386,7 +386,7 @@ def _collect_pdfium_text_samples(pdf_doc: pdfium.PdfDocument, page_indices: list
 
 
 def _get_high_image_coverage_ratio_from_samples(text_samples: list[dict[str, Any]]) -> float:
-    """基于已缓存抽样页的图像覆盖率统计高覆盖页占比。"""
+    """The proportion of high-coverage pages is calculated based on the image coverage of cached sample pages."""
 
     if not text_samples:
         return 0.0
@@ -397,7 +397,7 @@ def _get_high_image_coverage_ratio_from_samples(text_samples: list[dict[str, Any
 
 
 def _get_avg_cleaned_chars_per_page_from_samples(text_samples: list[dict[str, Any]]) -> float:
-    """基于已缓存的抽样页文本计算平均有效字符数。"""
+    """Calculates the average number of valid characters based on cached sample page text."""
     cleaned_total_chars = 0
 
     for text_sample in text_samples:
@@ -409,7 +409,7 @@ def _get_avg_cleaned_chars_per_page_from_samples(text_samples: list[dict[str, An
 
 
 def _get_text_quality_signal_from_samples(text_samples: list[dict[str, Any]]) -> dict[str, Any]:
-    """基于已缓存的抽样页字符计数统计异常字符质量信号。"""
+    """Abnormal character quality signals are counted based on cached sample page character counts."""
     total_chars = 0
     null_char_count = 0
     replacement_char_count = 0
@@ -440,7 +440,7 @@ def _get_text_quality_signal_from_samples(text_samples: list[dict[str, Any]]) ->
 
 
 def _get_unicode_map_error_signal_from_samples(text_samples: list[dict[str, Any]]) -> dict[str, Any]:
-    """统计 PDFium 字符级 Unicode 映射失败比例，用于识别无法可靠抽取的乱码文本。"""
+    """Statistics PDFium Character-level Unicode mapping failure ratio, used to identify garbled text that cannot be reliably extracted."""
     total_chars = 0
     unicode_map_error_count = 0
 
@@ -460,12 +460,12 @@ def _get_unicode_map_error_signal_from_samples(text_samples: list[dict[str, Any]
 
 
 def _is_cjk_unicode_code(unicode_code: int) -> bool:
-    """判断 Unicode 码点是否属于分类器认可的 CJK 文本范围。"""
+    """Determine whether the Unicode code point belongs to the CJK text range recognized by the classifier."""
     return any(start <= unicode_code <= end for start, end in CJK_TEXT_RANGES)
 
 
 def _get_cjk_glyph_name_code(glyph_name: str) -> int | None:
-    """解析 uniXXXX/uXXXXX 形式的 CJK glyph name，其他名称返回 None。"""
+    """Parses CJK in the form uniXXXX/uXXXXX glyph name, other names return None."""
     match = re.fullmatch(
         r"(?:uni([0-9A-Fa-f]{4,6})|u([0-9A-Fa-f]{4,6}))",
         glyph_name,
@@ -479,7 +479,7 @@ def _get_cjk_glyph_name_code(glyph_name: str) -> int | None:
 
 
 def _get_empty_latin_charset_with_to_unicode_signal() -> dict[str, Any]:
-    """构造未触发的 Type1 Latin CharSet 字体候选信号。"""
+    """Constructs the untriggered Type1 Latin CharSet font candidate signal."""
     return {
         "triggered": False,
         "charset_glyph_count": 0,
@@ -491,7 +491,7 @@ def _get_empty_latin_charset_with_to_unicode_signal() -> dict[str, Any]:
 
 
 def _get_latin_charset_with_to_unicode_signal(font: Any) -> dict[str, Any]:
-    """识别带 ToUnicode 且 CharSet 明显为 Latin 的 Type1 字体候选。"""
+    """Identifies the Type1 font candidate with ToUnicode and CharSet is an obvious candidate for Latin."""
     signal = _get_empty_latin_charset_with_to_unicode_signal()
     if str(font.get("/Subtype")) != "/Type1":
         return signal
@@ -530,7 +530,7 @@ def _get_latin_charset_with_to_unicode_signal(font: Any) -> dict[str, Any]:
 
 
 def _normalize_pdf_font_name(font_name: Any) -> str:
-    """规范化 PDF 字体名，统一 pypdf 的 NameObject 和 PDFium 返回值格式。"""
+    """Standardize the PDF font name and unify the NameObject and PDFium return value formats of pypdf."""
     if font_name is None:
         return ""
     normalized_name = str(font_name).strip().lstrip("/")
@@ -538,7 +538,7 @@ def _normalize_pdf_font_name(font_name: Any) -> str:
 
 
 def _get_pdfium_char_font_name(text_page: Any, char_index: int) -> str:
-    """读取 PDFium 字符级字体名，用于统计可疑 CID 字体的实际使用比例。"""
+    """Read the PDFium character-level font name to count the actual usage ratio of the suspicious CID font."""
     flags = c_int()
     buffer_length = pdfium_c.FPDFText_GetFontInfo(
         text_page,
@@ -567,7 +567,7 @@ def _get_pdfium_char_font_name(text_page: Any, char_index: int) -> str:
 def _get_cid_font_usage_signal_from_samples(
     text_samples: list[dict[str, Any]], cid_font_usage: dict[int, dict[str, Any]]
 ) -> dict[str, Any]:
-    """结合内容流精确计数与 PDFium 总字符数计算可疑 CID 字体使用比例。"""
+    """Combining the content stream exact count with the PDFium total character count calculates the suspect CID font usage ratio."""
     best_signal = {
         "triggered": False,
         "page_index": None,
@@ -619,7 +619,7 @@ def _get_latin_font_cjk_usage_signal_from_samples(
     usage_ratio_threshold: float,
     cjk_ratio_threshold: float,
 ) -> dict[str, Any]:
-    """按单个 Latin 候选字体统计实际使用量及 PDFium 解码后的 CJK 比例。"""
+    """Statistics on actual usage of a single Latin candidate font and the proportion of CJK after decoding of PDFium."""
     best_signal = {
         "triggered": False,
         "page_index": None,
@@ -683,7 +683,7 @@ def _get_latin_font_cjk_usage_signal_from_samples(
 
 
 def _get_u72xx_text_signal_from_samples(text_samples: list[dict[str, Any]]) -> dict[str, Any]:
-    """基于已缓存的抽样页文本统计扣除常用字后的 U+7280-U+72DF 字符占比。"""
+    """Based on the cached sample page text statistics, the U+7280-U+72DF character ratio after deducting common words."""
     cjk_chars = 0
     u72xx_count = 0
 
@@ -710,19 +710,19 @@ def _get_u72xx_text_signal_from_samples(text_samples: list[dict[str, Any]]) -> d
 
 
 def _get_sample_cleaned_text(text_sample: Any) -> str:
-    """兼容 dict 和测试替身对象，读取抽样页的 cleaned_text 字段。"""
+    """Compatible with dict and test double objects, reads the cleaned_text field of the sample page."""
     if isinstance(text_sample, dict):
         return str(text_sample.get("cleaned_text", ""))
     return str(getattr(text_sample, "cleaned_text", ""))
 
 
 def _is_cjk_text_char(char: str) -> bool:
-    """判断字符是否属于中文文档中可接受的 CJK 文字范围。"""
+    """Determine whether the character belongs to the acceptable CJK text range in Chinese documents."""
     return _is_cjk_unicode_code(ord(char))
 
 
 def _get_cross_script_name(char: str) -> str | None:
-    """识别中文文档乱码中常见的跨脚本字符块名称。"""
+    """Identify common cross-script character block names in garbled Chinese documents."""
     unicode_code = ord(char)
     for start, end, script_name in SUSPICIOUS_CROSS_SCRIPT_RANGES:
         if start <= unicode_code <= end:
@@ -731,7 +731,7 @@ def _get_cross_script_name(char: str) -> str | None:
 
 
 def _get_cross_script_text_signal_from_samples(text_samples: list[Any]) -> dict[str, Any]:
-    """统计中文文档文本层中大比例跨脚本混入信号，用于识别合法 Unicode 错码。"""
+    """Statistics on a large proportion of cross-script mixed signals in the text layer of Chinese documents are used to identify legitimate Unicode error codes."""
     total_chars = 0
     cjk_chars = 0
     suspicious_chars = 0
@@ -779,7 +779,7 @@ def _get_cross_script_text_signal_from_samples(text_samples: list[Any]) -> dict[
 
 
 def _count_ascii_punct_run_chars(text: str) -> int:
-    """统计连续 ASCII 标点字符数，仅累计长度达到阈值的 run。"""
+    """Count the number of consecutive ASCII punctuation characters, and only accumulate run whose length reaches the threshold."""
     run_chars = 0
     current_run = 0
     current_run_types: set[str] = set()
@@ -802,7 +802,7 @@ def _count_ascii_punct_run_chars(text: str) -> int:
 
 
 def _get_sampled_ascii_punct_signal_from_samples(text_samples: list[dict[str, Any]]) -> dict[str, Any]:
-    """检查所有抽样页的 ASCII 标点密集度，用于识别无 ToUnicode 的乱码文本。"""
+    """Check the ASCII punctuation density of all sampled pages to identify garbled text without ToUnicode."""
     best_signal = {
         "triggered": False,
         "page_index": None,
@@ -843,7 +843,7 @@ def _get_sampled_ascii_punct_signal_from_samples(text_samples: list[dict[str, An
             signal["triggered"] = True
             return signal
 
-        # 未触发时保留最可疑的抽样页指标，方便日志扩展和后续排查阈值边界。
+        # When not triggered, the most suspicious sampling page indicators are retained to facilitate log expansion and subsequent troubleshooting of threshold boundaries.
         if (
             signal["punct_run_ratio"],
             signal["ascii_punct_ratio"],
@@ -859,7 +859,7 @@ def _get_sampled_ascii_punct_signal_from_samples(text_samples: list[dict[str, An
 
 
 def _get_pdf_object_cache_key(obj_ref: Any, obj: Any) -> tuple[Any, ...]:
-    """为 pypdf 间接或直接对象生成可复用的身份键。"""
+    """Generates reusable identity keys for pypdf indirect or direct objects."""
     idnum = getattr(obj_ref, "idnum", None)
     generation = getattr(obj_ref, "generation", None)
     if idnum is not None:
@@ -871,7 +871,7 @@ def _get_font_resource_analysis(
     font_ref: Any,
     font_analysis_cache: dict[tuple[Any, ...], dict[str, bool]],
 ) -> tuple[Any, dict[str, bool]]:
-    """按字体资源对象身份缓存 CID 与 Type1 字体语义分析结果。"""
+    """Cache CID and Type1 font semantic analysis results by font resource object identity."""
     font = _resolve_pdf_object(font_ref)
     if not font:
         raise ValueError("Unable to resolve PDF font resource")
@@ -897,7 +897,7 @@ def _get_font_resource_analysis(
 
 
 def _get_pdf_string_raw_bytes(value: Any) -> bytes:
-    """读取 pypdf 字符串对象的原始字节，禁止用已解码文本替代。"""
+    """Read the raw bytes of a pypdf string object, disabling substitution with decoded text."""
     raw_bytes = getattr(value, "original_bytes", None)
     if isinstance(raw_bytes, bytes):
         return raw_bytes
@@ -907,7 +907,7 @@ def _get_pdf_string_raw_bytes(value: Any) -> bytes:
 
 
 def _count_identity_cid_string(value: Any) -> int:
-    """按 Identity-H/V 的双字节编码统计文本字符串中的 CID 数量。"""
+    """Counts the number of CIDs in a text string by double-byte encoding of Identity-H/V."""
     raw_bytes = _get_pdf_string_raw_bytes(value)
     if len(raw_bytes) % 2:
         raise ValueError("Identity CID text string has an odd byte length")
@@ -920,10 +920,10 @@ def _resource_graph_has_cid_without_to_unicode(
     visited_form_keys: set[tuple[Any, ...]] | None = None,
     visited_resource_keys: set[tuple[Any, ...]] | None = None,
 ) -> bool:
-    """递归检查页面及 Form 资源图中是否存在缺少 ToUnicode 的 Identity CID 字体。
+    """Recursively check the page and Form resource map for Identity CID fonts that are missing ToUnicode.
 
-    结果与路径无关，Form 和资源字典按对象身份各展开一次；此去重仅用于
-    资源可达性检查，不影响实际绘制实例或字形使用次数统计。
+    The result is independent of the path. Form and the resource dictionary are each expanded once according to the object identity; this deduplication is only used for
+    Resource reachability check does not affect actual drawing instances or glyph usage statistics.
     """
     resource_ref = resources
     resources = _resolve_pdf_object(resources)
@@ -980,7 +980,7 @@ def _count_cid_font_usage_in_content(
     inherited_font: tuple[str, bool] | None = None,
     active_form_keys: frozenset[tuple[Any, ...]] = frozenset(),
 ) -> Counter[str]:
-    """按实际 Tf 资源递归统计内容流中缺少 ToUnicode 的 Identity CID 字形。"""
+    """Identity CID glyphs for ToUnicode are missing from the content stream by recursive counting of actual Tf resources."""
     counts: Counter[str] = Counter()
     if content is None:
         return counts
@@ -1071,7 +1071,7 @@ def _get_font_resource_signals_pypdf(
     pdf_bytes: bytes,
     page_indices: list[int],
 ) -> dict[str, Any]:
-    """一次扫描抽样页字体资源，收集 CID 缺映射和 Type1 Latin 候选字体。"""
+    """Scan the sample page font resources in one pass to collect CID missing mappings and Type1 Latin candidate fonts."""
     reader = PdfReader(BytesIO(pdf_bytes))
     cid_page_fonts: dict[int, set[str]] = {}
     cid_page_usage: dict[int, dict[str, Any]] = {}
@@ -1086,7 +1086,7 @@ def _get_font_resource_signals_pypdf(
 
         fonts = _resolve_pdf_object(resources.get("/Font")) or {}
 
-        # Type1 Latin 信号仍按字体名使用 PDFium 统计；CID 用量在后续按资源对象精确计算。
+        # Type1 Latin signals still use PDFium statistics according to font names; CID usage will be accurately calculated according to resource objects in the future.
         page_latin_font_resources: dict[str, dict[tuple[Any, ...], bool]] = {}
         for font_key, font_ref in fonts.items():
             font, analysis = _get_font_resource_analysis(
@@ -1143,7 +1143,7 @@ def _resolve_pdf_object(obj: Any) -> Any:
 
 
 def _page_image_coverage_ratio(page: Any) -> float:
-    """统计单页图像覆盖率：类型过滤的原生 walk，不逐对象构建 Python 包装。"""
+    """Statistical single page image coverage: Type-filtered native walk, no Python wrapper built per object."""
     from .native_objects import _clipped_objects_of_type
 
     page_bbox = page.get_bbox()
@@ -1152,7 +1152,7 @@ def _page_image_coverage_ratio(page: Any) -> float:
         return 0.0
 
     image_area = 0.0
-    # 深度 3 等价旧 page.get_objects(max_depth=3)：页面与两层嵌套 Form 内的图像。
+    # Depth 3 is equivalent to old page.get_objects (max_depth=3): page with two levels of nested images within Form.
     for member in _clipped_objects_of_type(page, pdfium_c.FPDF_PAGEOBJ_IMAGE, 3):
         values = [c_float() for _ in range(4)]
         if not pdfium_c.FPDFPageObj_GetBounds(member.raw, *(byref(value) for value in values)):
@@ -1190,7 +1190,7 @@ if __name__ == "__main__":
         pdf_doc = PDFDocument(p_bytes)
         logger.info(f"PDF classify result: {pdf_doc.classify()}")
 
-# 自定义统计规则保留原调用次序与异常语义，不由内核悄然覆盖。
+# Custom statistical rules retain the original calling order and exception semantics and are not quietly overwritten by the kernel.
 _STANDARD_CLASSIFICATION_FUNCTIONS = (
     _is_disallowed_control_unicode,
     _is_cjk_unicode_code,

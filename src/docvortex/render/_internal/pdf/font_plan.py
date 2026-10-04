@@ -1,4 +1,4 @@
-"""一次原布局导出的标题字号分组、测量计划与内部验收统计。"""
+"""Title font size grouping, measurement plan and internal acceptance statistics exported from the original layout."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from ....schema import BlockBase
 
 @dataclass
 class BlockFit:
-    """保存实际测量结果，正文测量一次后直接按相同换行与比例绘制。"""
+    """Save the actual measurement results. After measuring once, the text will be drawn directly with the same line breaks and proportions."""
 
     scale: float
     width: float
@@ -28,7 +28,7 @@ class BlockFit:
 
 @dataclass
 class PreparedBlock:
-    """保存只物化一次的内容对象及原框，不持有或修改输入协议的派生字段。"""
+    """Save the content object and original frame that are only materialized once, and do not hold or modify the derived fields of the input protocol."""
 
     page_idx: int
     block: BlockBase
@@ -52,13 +52,13 @@ class PreparedBlock:
 
     @property
     def original_rect(self) -> tuple[float, float, float, float]:
-        """返回 point 单位、左上原点的原始占用范围，不回写输入 bbox。"""
+        """Returns the original occupied range of the point unit and the upper left origin without writing back the input bbox."""
         return self.x, self.page_height - self.y - self.height, self.x + self.width, self.page_height - self.y
 
 
 @dataclass
 class FontGroupPlan:
-    """记录组内基础字号及实际覆盖情况，供测试和本地对比工具使用。"""
+    """Record the basic font size and actual coverage within the group for testing and local comparison tools."""
 
     group: str
     default_font_size: float
@@ -76,7 +76,7 @@ _statistics: ContextVar[list[FontGroupPlan] | None] = ContextVar("pdf_font_stati
 
 @contextmanager
 def collect_font_plans() -> Iterator[list[FontGroupPlan]]:
-    """隔离本次验收统计，不改变公开接口，也不让并发导出的字号计划相互污染。"""
+    """Isolate this acceptance statistics, do not change the public interface, and do not allow concurrently exported font size plans to contaminate each other."""
     plans: list[FontGroupPlan] = []
     token = _statistics.set(plans)
     try:
@@ -86,19 +86,19 @@ def collect_font_plans() -> Iterator[list[FontGroupPlan]]:
 
 
 def record_font_plans(plans: list[FontGroupPlan]) -> None:
-    """仅在成功绘制后向当前内部验收上下文提交统计。"""
+    """Submit statistics to the current internal acceptance context only after a successful draw."""
     collected = _statistics.get()
     if collected is not None:
         collected.extend(plans)
 
 
 def _ceil_font_size(size: float) -> float:
-    """向上取整到 0.1 pt，保证标题不因小数截断低于正文加字号增量。"""
+    """Round up to 0.1 pt to ensure that the title is not truncated due to decimal truncation and is lower than the text plus font size increment."""
     return ceil(size * 10 - 1e-8) / 10
 
 
 def _reference_body(title: PreparedBlock, bodies: list[PreparedBlock], order: dict[int, int]) -> PreparedBlock | None:
-    """优先选择同页同栏的后续正文；没有后续正文时选择最近的同栏正文。"""
+    """Priority will be given to selecting subsequent text on the same page and in the same column; if there is no subsequent text, the nearest text in the same column will be selected."""
     x0, y0, x1, y1 = title.original_rect
     candidates = []
     for body in bodies:
@@ -106,7 +106,7 @@ def _reference_body(title: PreparedBlock, bodies: list[PreparedBlock], order: di
             continue
         bx0, by0, bx1, by1 = body.original_rect
         overlap = min(x1, bx1) - max(x0, bx0)
-        # 小范围左缘差异允许首行缩进；不借用另一栏或仅擦边的段落判断栏宽。
+        # Small left margin differences allow the first line to be indented; column width is not determined by borrowing from another column or just an edged paragraph.
         if bx0 - 6 <= x0 < bx1 and overlap >= 0.5 * min(x1 - x0, bx1 - bx0):
             candidates.append(body)
     following = [body for body in candidates if order[id(body)] > order[id(title)] and body.original_rect[1] >= y0]
@@ -120,7 +120,7 @@ def _reference_body(title: PreparedBlock, bodies: list[PreparedBlock], order: di
 
 
 def plan_font_sizes(blocks: list[PreparedBlock]) -> list[FontGroupPlan]:
-    """从实际正文字号制定标题目标，不再根据原框容量或九成覆盖率压低整组标题。"""
+    """Set the title target based on the actual text size, and no longer reduce the entire group of titles based on the original frame capacity or 90% coverage rate."""
     bodies = [block for block in blocks if block.body_font_size is not None]
     fallback = median(body.body_font_size for body in bodies) if bodies else 10.5
     order = {id(block): index for index, block in enumerate(blocks)}

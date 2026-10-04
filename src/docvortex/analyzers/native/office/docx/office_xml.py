@@ -1,4 +1,4 @@
-"""DOCX Mammoth 兼容层使用的 Office XML 解析辅助函数。"""
+"""DOCX Mammoth Office XML parsing helper function used by the compatibility layer."""
 
 import xml.dom.minidom
 

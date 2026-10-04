@@ -1,4 +1,4 @@
-"""Markdown 与 Content List 共用的 block 级序列化。"""
+"""Markdown block level serialization common to Content List."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def render_planned_block(
     anchor_targets: set[str] | None = None,
     emitted_anchors: set[str] | None = None,
 ) -> str:
-    """按具体 Pydantic block 类型分发 Markdown 渲染。"""
+    """Distributes Markdown renderings by specific Pydantic block type."""
     block = planned.block
     if isinstance(block, TextBlock):
         content = render_joined_inline_contents(planned.text_contents or [block.content], delimiters)
@@ -95,7 +95,7 @@ def render_planned_block(
 
 
 def _claim_markdown_anchor(anchor: str | None, emitted_anchors: set[str] | None) -> str:
-    """规范化 Markdown 目标，并在文档级集合中只登记首次出现的 anchor。"""
+    """Normalize the Markdown target and register only the first occurrence of anchor in the document-level collection."""
     normalized = (anchor or "").strip()
     if not normalized:
         return ""
@@ -107,7 +107,7 @@ def _claim_markdown_anchor(anchor: str | None, emitted_anchors: set[str] | None)
 
 
 def _prepend_markdown_anchor(content: str, anchor: str | None, emitted_anchors: set[str] | None) -> str:
-    """给非空 Markdown 正文添加独立 HTML anchor，避免污染正文文本。"""
+    """Add independent HTML anchor to the non-empty Markdown body to avoid contaminating the body text."""
     if not content.strip():
         return content
     normalized = _claim_markdown_anchor(anchor, emitted_anchors)
@@ -121,7 +121,7 @@ def _render_page_footnote(
     delimiters: LatexDelimitersConfig,
     emitted_anchors: set[str] | None = None,
 ) -> str:
-    """用非折叠的小字号浅色 HTML 标识输出页面脚注。"""
+    """Output page footers are identified with HTML, a small, non-folded, light-colored font."""
     content = escape_text_block_markdown_prefix(render_inline_content(block.content, delimiters))
     rendered = escape_standalone_marker_rule(content)
     if not rendered.strip():
@@ -145,7 +145,7 @@ def render_single_block(
     asset_base_url: str,
     image_renderer: ImageRenderer | None = None,
 ) -> str:
-    """不执行续段合并或页面过滤，直接渲染一个顶层 block。"""
+    """No continuation merging or page filtering is performed, and a top-level block is rendered directly."""
     text_contents = [block.content] if isinstance(block, (TextBlock, RefTextBlock)) else []
     planned = PlannedBlock(page_idx=0, block=block, text_contents=text_contents)
     return render_planned_block(
@@ -161,7 +161,7 @@ def _render_title(
     delimiters: LatexDelimitersConfig,
     emitted_anchors: set[str] | None = None,
 ) -> str:
-    """渲染带可选 HTML anchor 的 Markdown 标题。"""
+    """Renders Markdown title with optional HTML anchor."""
     level = min(max(block.level, 1), 6)
     title = f"{'#' * level} {render_title_inline_content(block, delimiters)}"
     anchor = _claim_markdown_anchor(block.anchor, emitted_anchors)
@@ -174,7 +174,7 @@ def render_title_inline_content(
     block: DocTitleBlock | ParagraphTitleBlock,
     delimiters: LatexDelimitersConfig,
 ) -> str:
-    """只渲染标题的行内语义，不添加 heading 标记或 HTML anchor。"""
+    """Only the inline semantics of the title are rendered, without adding the heading tag or HTML anchor."""
     return render_inline_content(block.content, delimiters)
 
 
@@ -184,7 +184,7 @@ def _render_equation(
     asset_base_url: str,
     image_renderer: ImageRenderer | None,
 ) -> str:
-    """优先渲染行间 LaTeX，空公式内容回退到 image_renderer 或公式图片。"""
+    """Priority is given to rendering LaTeX between lines, and empty formula content falls back to image_renderer or formula pictures."""
     latex = block.content.strip()
     if latex:
         return f"{delimiters.display.left}\n{latex}\n{delimiters.display.right}"
@@ -197,7 +197,7 @@ def _render_equation(
 
 
 def _render_list(block: ListBlock, delimiters: LatexDelimitersConfig, depth: int = 0) -> str:
-    """递归渲染列表，并给多数条目无数字前缀的参考文献补无序标记。"""
+    """Render the list recursively and add an out-of-order mark to references where most entries do not have a numeric prefix."""
     add_ref_bullets = reference_list_needs_bullets(block)
     lines: list[str] = []
     for child in block.content:
@@ -227,7 +227,7 @@ def _render_index(
     *,
     anchor_targets: set[str] | None = None,
 ) -> str:
-    """递归渲染目录列表，并给标题叶子添加内部 anchor 链接。"""
+    """Render the directory listing recursively and add an internal anchor link to the title leaf."""
     lines: list[str] = []
     for child in block.content:
         if isinstance(child, IndexBlock):
@@ -252,7 +252,7 @@ def _render_image_block(
     asset_base_url: str,
     image_renderer: ImageRenderer | None,
 ) -> str:
-    """按原始子块顺序渲染图片主体及说明文本。"""
+    """Render the image body and description text in original sub-block order."""
     parts: list[str] = []
     for child in block.content:
         if isinstance(child, ImageBodyBlock):
@@ -278,7 +278,7 @@ def _render_chart_block(
     asset_base_url: str,
     image_renderer: ImageRenderer | None,
 ) -> str:
-    """按原始子块顺序渲染图表图片、结构内容和说明文本。"""
+    """Render diagram images, structural content, and explanatory text in original sub-block order."""
     parts: list[str] = []
     for child in block.content:
         if isinstance(child, ChartBodyBlock):
@@ -307,7 +307,7 @@ def _render_media_body(
     image_renderer: ImageRenderer | None,
     parent_block: ImageBlock,
 ) -> str:
-    """渲染图片载荷，并将识别内容放入折叠详情。image_renderer 优先于 image_path。"""
+    """Render the image payload and place the recognized content into the collapsed details. image_renderer takes precedence over image_path."""
     rendered_content = _render_media_content(block, delimiters, asset_base_url)
     if image_renderer is not None:
         image_ref = image_renderer(parent_block)
@@ -325,7 +325,7 @@ def _render_media_content(
     delimiters: LatexDelimitersConfig,
     asset_base_url: str,
 ) -> str:
-    """渲染图片识别内容，不添加图片语法或折叠详情包装。"""
+    """Render image recognition content without adding image syntax or folding detail packaging."""
     content = block.content.strip()
     if not content:
         return ""
@@ -341,7 +341,7 @@ def _render_chart_body(
     image_renderer: ImageRenderer | None,
     parent_block: ChartBlock,
 ) -> str:
-    """渲染 chart 图片，并统一转换其 HTML 表格内容。内容为空时回退到 image_renderer 或图片。"""
+    """Render chart images and uniformly convert their HTML table contents. Fallback to image_renderer or picture when content is empty."""
     rendered_content = _render_chart_content(block.content, delimiters, asset_base_url)
     if rendered_content:
         return _render_chart_with_details(rendered_content, block, asset_base_url, summary)
@@ -359,7 +359,7 @@ def _render_chart_with_details(
     asset_base_url: str,
     summary: str,
 ) -> str:
-    """chart 有结构化内容时，附上图片与折叠详情。"""
+    """chart When there is structured content, attach pictures and folding details."""
     source = resolve_image_source(block, asset_base_url)
     if source:
         parts = [build_markdown_image(source), _render_details(rendered_content, summary)]
@@ -372,7 +372,7 @@ def _render_chart_content(
     delimiters: LatexDelimitersConfig,
     asset_base_url: str,
 ) -> str:
-    """把 chart 内容中的简单 HTML 表格转为 GFM，其他内容保持原表示。"""
+    """Convert the simple HTML table in the chart content to GFM, and keep the other content as it is."""
     normalized = content.strip()
     if not normalized:
         return ""
@@ -387,7 +387,7 @@ def _render_chart_content(
 
 
 def _render_details(content: str, summary: str) -> str:
-    """构造保留已渲染视觉内容的折叠 HTML 详情块。"""
+    """Constructs a collapsed HTML detail block that retains rendered visual content."""
     safe_summary = html.escape(summary, quote=False)
     return f"<details>\n<summary>{safe_summary}</summary>\n\n{content.strip()}\n</details>"
 
@@ -398,7 +398,7 @@ def _render_table_block(
     asset_base_url: str,
     image_renderer: ImageRenderer | None,
 ) -> str:
-    """按原始子块顺序渲染表格主体及说明文本。"""
+    """Render the table body and description text in original sub-block order."""
     parts: list[str] = []
     for child in block.content:
         if isinstance(child, TableBodyBlock):
@@ -425,7 +425,7 @@ def _render_table_body(
     image_renderer: ImageRenderer | None,
     parent_block: TableBlock,
 ) -> str:
-    """按 HTML、空间投影文本、image_renderer、图片的优先级渲染表格主体。"""
+    """Render the table body according to the priority of HTML, spatially projected text, image_renderer, and picture."""
     rendered_content = _render_table_content(
         block,
         delimiters,
@@ -449,7 +449,7 @@ def _render_table_content(
     *,
     strip_embedded_images: bool = False,
 ) -> str:
-    """渲染表格结构内容，不执行空内容时的图片回退。"""
+    """Render table structure content and do not perform image rollback when empty content is used."""
     content = _strip_embedded_images(block.content) if strip_embedded_images else block.content
     if not content:
         return ""
@@ -464,7 +464,7 @@ def _render_table_content(
 
 
 def _render_code_block(block: CodeBlock, delimiters: LatexDelimitersConfig) -> str:
-    """按父块 subtype 渲染普通代码或支持公式的算法。"""
+    """Render normal code or algorithm supporting formulas by parent block subtype."""
     parts: list[str] = []
     for child in block.content:
         if isinstance(child, (CodeBodyBlock, AlgorithmBodyBlock)):
@@ -490,7 +490,7 @@ def render_visual_body_content(
     delimiters: LatexDelimitersConfig,
     asset_base_url: str,
 ) -> str:
-    """查找视觉父块唯一 body，并只渲染可结构化消费的语义内容。"""
+    """Finds the visual parent block unique body and only renders semantic content that can be structured for consumption."""
     for child in block.content:
         if isinstance(block, ImageBlock) and isinstance(child, ImageBodyBlock):
             return _render_media_content(child, delimiters, asset_base_url)
@@ -511,7 +511,7 @@ def _render_visual_body_child(
     asset_base_url: str,
     image_renderer: ImageRenderer | None = None,
 ) -> str:
-    """按视觉父子类型组合渲染一个 body 子块。"""
+    """Renders a body child block by visual parent-child type combination."""
     if isinstance(block, ImageBlock) and isinstance(child, ImageBodyBlock):
         return _render_media_body(
             child,
@@ -541,7 +541,7 @@ def render_visual_annotation(
     block: ImageAnnotationBlock | TableAnnotationBlock | ChartAnnotationBlock | CodeAnnotationBlock,
     delimiters: LatexDelimitersConfig,
 ) -> str:
-    """把一个视觉说明子块渲染为独立 Markdown 字符串。"""
+    """Render a visual description subchunk as a separate Markdown string."""
     return escape_standalone_marker_rule(render_inline_content(block.content, delimiters))
 
 
@@ -550,7 +550,7 @@ def _render_code_body(
     child: CodeBodyBlock | AlgorithmBodyBlock,
     delimiters: LatexDelimitersConfig,
 ) -> str:
-    """依据父块 subtype 渲染代码或算法 body。"""
+    """Rendering code or algorithm body based on parent block subtype."""
     if block.sub_type == RAW_ALGORITHM:
         if not isinstance(child, AlgorithmBodyBlock):
             raise TypeError("algorithm subtype requires AlgorithmBodyBlock")
@@ -563,7 +563,7 @@ def _render_code_semantic_content(
     child: CodeBodyBlock | AlgorithmBodyBlock,
     delimiters: LatexDelimitersConfig,
 ) -> str:
-    """把代码或算法 body 渲染为 Structured Content 可消费的类 Markdown 字符串。"""
+    """Render code or algorithm body to Structured Content consumable string of class Markdown."""
     if block.sub_type == BlockType.CODE:
         if not isinstance(child, CodeBodyBlock):
             raise TypeError("code subtype requires CodeBodyBlock")
@@ -576,7 +576,7 @@ def _render_code_semantic_content(
 
 
 def _normalize_code_language(language: str | None) -> str:
-    """校验 fenced code info string，非法值统一回退 txt。"""
+    """Verification fenced code info string, illegal values fall back to txt."""
     normalized = (language or "").strip()
     if not normalized or _VALID_CODE_LANGUAGE_RE.fullmatch(normalized) is None:
         return "txt"
@@ -584,7 +584,7 @@ def _normalize_code_language(language: str | None) -> str:
 
 
 def _render_fenced_content(content: str, language: str | None = None) -> str:
-    """使用长于正文反引号游程的围栏包裹原始内容。"""
+    """Wrap the original content with a fence longer than the body backtick run."""
     longest = max((len(match.group(0)) for match in re.finditer(r"`+", content)), default=0)
     fence = "`" * max(3, longest + 1)
     opening = f"{fence}{language or ''}"
@@ -593,7 +593,7 @@ def _render_fenced_content(content: str, language: str | None = None) -> str:
 
 
 def _render_algorithm_html(content: list[InlineSpan], delimiters: LatexDelimitersConfig) -> str:
-    """参考 dev 实现渲染保留空白、上下标和行内公式的算法 HTML。"""
+    """Refer to dev to implement the algorithm for rendering preserving whitespace, superscripts and subscripts, and inline formulas HTML."""
     parts: list[str] = []
     previous_equation = False
     for span in content:
@@ -609,7 +609,7 @@ def _render_algorithm_html(content: list[InlineSpan], delimiters: LatexDelimiter
 
 
 def _render_algorithm_markdown(content: list[InlineSpan], delimiters: LatexDelimitersConfig) -> str:
-    """把算法 Span 渲染为类 Markdown 内容，并分隔相邻行内公式。"""
+    """Renders the algorithm Span as content of class Markdown and separates formulas in adjacent lines."""
     parts: list[str] = []
     previous_equation = False
     for span in content:
@@ -622,7 +622,7 @@ def _render_algorithm_markdown(content: list[InlineSpan], delimiters: LatexDelim
 
 
 def _join_visual_parts(parts: list[str]) -> str:
-    """使用安全空行连接同一视觉父块中的有序子块。"""
+    """Use safe blank lines to connect ordered subblocks within the same visual parent block."""
     return "\n\n".join(part.strip("\n") for part in parts if part and part.strip())
 
 

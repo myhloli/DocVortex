@@ -1,4 +1,4 @@
-"""验证共享 PDF 布局标注的语义、页面映射与实际显示坐标。"""
+"""Verify the semantics, page mapping and actual display coordinates of the shared PDF layout annotation."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def _source_pdf(
     media: tuple[int, int, int, int] = (0, 0, 300, 400),
     crop: tuple[int, int, int, int] = (0, 0, 200, 300),
 ) -> bytes:
-    """生成带原文与链接的 PDF，并独立设置页面框和旋转标记。"""
+    """Generate PDF with original text and links, and set the page frame and rotation mark independently."""
     buffer = BytesIO()
     painter = canvas.Canvas(buffer, pagesize=(300, 400))
     for index in range(page_count):
@@ -46,7 +46,7 @@ def _source_pdf(
 
 
 def _text_block(index: int = 0, **updates: Any) -> dict[str, Any]:
-    """建立有固定归一化 bbox 的文字块，允许针对具体语义覆盖字段。"""
+    """Create text blocks with fixed normalization bbox, allowing fields to be overridden for specific semantics."""
     return {
         "type": "text",
         "index": index,
@@ -57,12 +57,12 @@ def _text_block(index: int = 0, **updates: Any) -> dict[str, Any]:
 
 
 def _page(page_idx: int = 0, blocks: list[dict[str, Any]] | None = None) -> PageInfo:
-    """通过正式 schema 校验测试页面，防止用旧字段绕过真实契约。"""
+    """Prevent the use of old fields from bypassing the real contract through the official schema verification test page."""
     return PageInfo.model_validate({"page_idx": page_idx, "blocks": [_text_block()] if blocks is None else blocks})
 
 
 def _outlines(data: bytes, page_idx: int = 0) -> list[tuple[tuple[float, ...], tuple[float, ...]]]:
-    """从实际输出内容流提取描边矩形与颜色，忽略 PDF 合并的裁剪矩形。"""
+    """Extract the stroked rectangle and color from the actual output content stream, ignoring the PDF merged cropping rectangle."""
     page = PdfReader(BytesIO(data)).pages[page_idx]
     content = page.get_contents()
     result = []
@@ -83,7 +83,7 @@ def _outlines(data: bytes, page_idx: int = 0) -> list[tuple[tuple[float, ...], t
 
 
 def _label_backgrounds(data: bytes) -> list[tuple[float, ...]]:
-    """读取标签底板，确认只有白色的小矩形被填充。"""
+    """Read the label base and confirm that only the small white rectangle is filled."""
     operations = PdfReader(BytesIO(data)).pages[0].get_contents().operations
     rectangles = []
     color = ()
@@ -101,7 +101,7 @@ def _label_backgrounds(data: bytes) -> list[tuple[float, ...]]:
 
 
 def _render_pixels(data: bytes) -> np.ndarray:
-    """实际渲染第一页并复制 RGB 像素，确保关闭 PDFium 资源后仍可比较。"""
+    """Actually render the first page and copy the RGB pixels, making sure it's still comparable after closing the PDFium resource."""
     with pdfium.PdfDocument(data) as document:
         page = document[0]
         bitmap = page.render(scale=2)
@@ -125,7 +125,7 @@ def _render_pixels(data: bytes) -> np.ndarray:
     ],
 )
 def test_outline_styles_preserve_source_and_add_colored_labels(kind: str, extra: dict[str, Any], color: tuple) -> None:
-    """验证正文、脚注和辅助块配色，只增加标签白底并保留原文和空心边框。"""
+    """Verify the color matching of the main text, footnotes and auxiliary blocks, only add a white background to the labels and retain the original text and hollow borders."""
     source = _source_pdf()
     result = render_layout_pdf(source, [_page(blocks=[_text_block(type=kind, **extra)])])
     assert _outlines(result)[0][0] == pytest.approx(color, abs=1e-6)
@@ -152,7 +152,7 @@ def test_outline_styles_preserve_source_and_add_colored_labels(kind: str, extra:
     ],
 )
 def test_visual_parent_draws_only_positioned_children(kind: str, color: tuple) -> None:
-    """图表和代码父块不重复画框，缺少 bbox 的子块安全跳过。"""
+    """Chart and code parent blocks do not repeat frames, child blocks missing bbox are safely skipped."""
     body = {"type": f"{kind}_body", "index": 0, "bbox": (0.1, 0.2, 0.6, 0.4), "content": ""}
     caption = _text_block(1, type=f"{kind}_caption", bbox=(0.1, 0.5, 0.6, 0.6))
     footnote = _text_block(2, type=f"{kind}_footnote", bbox=None)
@@ -174,7 +174,7 @@ def test_visual_parent_draws_only_positioned_children(kind: str, color: tuple) -
 
 @pytest.mark.parametrize("kind", ["list", "index"])
 def test_nested_lists_and_indices_keep_hierarchy(kind: str) -> None:
-    """保留列表和索引的父子框，并可穿过无 bbox 的中间节点。"""
+    """Preserves parent-child boxes for lists and indexes, and traverses intermediate nodes without bbox."""
     nested = {"type": kind, "content": [_text_block(bbox=(0.2, 0.25, 0.5, 0.35))]}
     parent = {"type": kind, "index": 0, "bbox": (0.1, 0.2, 0.6, 0.4), "content": [nested]}
     outlines = _outlines(render_layout_pdf(_source_pdf(), [_page(blocks=[parent])]))
@@ -182,7 +182,7 @@ def test_nested_lists_and_indices_keep_hierarchy(kind: str) -> None:
 
 
 def test_labels_keep_sparse_indices_missing_children_and_algorithm_body() -> None:
-    """保留零值、跳号和父子重复编号；缺失子项编号不继承，算法主体保留真实类型。"""
+    """Zero values, skip numbers, and parent-child duplicate numbers are retained; missing child numbers are not inherited, and the main body of the algorithm retains the true type."""
     blocks = [
         {
             "type": "list",
@@ -222,7 +222,7 @@ def test_labels_keep_sparse_indices_missing_children_and_algorithm_body() -> Non
 
 @pytest.mark.parametrize("top", [0, 0.2])
 def test_labels_stay_at_block_top_with_only_page_edge_clamping(top: float) -> None:
-    """相同框的标签保持同一高度，页顶和右侧仅就近收拢，不再跨行避让。"""
+    """Labels in the same box remain at the same height, and the top and right sides of the page are only condensed to the nearest location and no longer avoid crossing lines."""
     bbox = (0.95, top, 1.0, top + 0.1)
     children = [_text_block(index=index, bbox=bbox) for index in range(3)]
     parent = {"type": "list", "index": 0, "bbox": bbox, "content": children}
@@ -239,11 +239,11 @@ def test_labels_stay_at_block_top_with_only_page_edge_clamping(top: float) -> No
 
 @pytest.mark.parametrize("reverse", [False, True])
 def test_dense_labels_remain_attached_to_each_block_regardless_of_order(reverse: bool) -> None:
-    """密集短段落的标签即使互相重叠也保持对应上边界，输入顺序不能改变锚点。"""
+    """Even if the tags of dense short paragraphs overlap each other, they maintain the corresponding upper boundary, and the input order cannot change the anchor point."""
     blocks = [_text_block(index=index, bbox=(0.1, 0.2 + index * 0.015, 0.6, 0.21 + index * 0.015)) for index in range(30)]
     if reverse:
         blocks.reverse()
-        # Schema 要求 index 递增；倒置的是物理位置，重新编号后仍覆盖反向绘制顺序。
+        # Schema requires index to be incremented; the inversion is the physical position, and renumbering still overrides the reverse draw order.
         for index, block in enumerate(blocks):
             block["index"] = index
     output = render_layout_pdf(_source_pdf(), [_page(blocks=blocks)])
@@ -256,7 +256,7 @@ def test_dense_labels_remain_attached_to_each_block_regardless_of_order(reverse:
 
 @pytest.mark.parametrize("blocks", [[], [_text_block(bbox=None)]])
 def test_unmarked_pages_preserve_original_content(blocks: list[dict[str, Any]]) -> None:
-    """空页面和缺失 bbox 的页面保留原文内容流。"""
+    """Empty pages and pages missing bbox retain the original content stream."""
     source = _source_pdf()
     output = render_layout_pdf(source, [_page(blocks=blocks)])
     assert not _outlines(output)
@@ -267,7 +267,7 @@ def test_unmarked_pages_preserve_original_content(blocks: list[dict[str, Any]]) 
 
 
 def test_mapping_matches_original_indices_and_never_falls_back() -> None:
-    """完整 PDF 按原始页号定位，重排抽页显式映射，缺失结果不借用相邻页。"""
+    """Complete PDF is positioned according to the original page number, rearranges the extracted pages and maps them explicitly, and missing results do not borrow adjacent pages."""
     source = _source_pdf(3)
     pages = [_page(1), _page(4, [_text_block(bbox=(0.2, 0.5, 0.4, 0.8))])]
     full = render_layout_pdf(source, pages)
@@ -282,13 +282,13 @@ def test_mapping_matches_original_indices_and_never_falls_back() -> None:
 
 @pytest.mark.parametrize("indices", [(), (0, 1), (-1,), (True,), ("0",)])
 def test_invalid_mapping_is_rejected(indices: tuple) -> None:
-    """拒绝页数不匹配或非法原始页号，避免静默生成错误标注。"""
+    """Reject mismatched page numbers or illegal original page numbers to avoid silently generating erroneous annotations."""
     with pytest.raises(ValueError, match="page_indices"):
         render_layout_pdf(_source_pdf(), [_page()], page_indices=indices)
 
 
 def test_page_sequence_requires_current_unique_page_info() -> None:
-    """公共入口拒绝原始字典和重复页号，避免歧义。"""
+    """The public entrance rejects original dictionaries and duplicate page numbers to avoid ambiguity."""
     with pytest.raises(TypeError, match="PageInfo"):
         render_layout_pdf(_source_pdf(), [{}])
     with pytest.raises(ValueError, match="unique"):
@@ -305,7 +305,7 @@ def test_page_sequence_requires_current_unique_page_info() -> None:
     ],
 )
 def test_rendered_pixels_match_display_bbox_for_rotations_and_offsets(rotation: int, media: tuple, crop: tuple) -> None:
-    """用 PDFium 实际渲染测量边框位置，独立验证四种旋转与正负裁剪偏移。"""
+    """Measure the border position using actual rendering with PDFium, and independently verify four rotations and positive and negative cropping offsets."""
     source = _source_pdf(rotation=rotation, media=media, crop=crop)
     page_info = _page()
     before = page_info.model_dump(mode="json")
@@ -321,7 +321,7 @@ def test_rendered_pixels_match_display_bbox_for_rotations_and_offsets(rotation: 
     red, green, blue = pixels[:, :, 0], pixels[:, :, 1], pixels[:, :, 2]
     mask = (red > 100) & (red < 220) & (green < 70) & (blue > 40) & (blue < 160)
     width, height = pixels.shape[1], pixels.shape[0]
-    # 标签在框上方，边框像素范围单独测量，避免新增文字改变几何回归的外接框。
+    # The label is placed above the box, and the pixel range of the border is measured separately to avoid adding text that changes the bounding box of the geometric regression.
     outline_mask = mask.copy()
     outline_mask[: round(height * 0.2) - 2] = False
     y, x = np.where(outline_mask)
@@ -332,7 +332,7 @@ def test_rendered_pixels_match_display_bbox_for_rotations_and_offsets(rotation: 
     assert lx.size > 0
     assert lx.min() == pytest.approx(width * 0.1 + 2, abs=2)
     assert ly.max() < height * 0.2 - 3
-    # 同一个标签在所有 Rotate/CropBox 下应得到同向字形，而非仅仅出现彩色像素。
+    # The same label should get the same glyph under all Rotate/CropBoxs, not just colored pixels.
     reference = _render_pixels(render_layout_pdf(_source_pdf(), [_page()]))
     r, g, b = reference[:, :, 0], reference[:, :, 1], reference[:, :, 2]
     reference_mask = ((r > 100) & (r < 220) & (g < 70) & (b > 40) & (b < 160))[:117]
@@ -344,7 +344,7 @@ def test_rendered_pixels_match_display_bbox_for_rotations_and_offsets(rotation: 
 
 
 def test_pdf_document_wrapper_matches_public_renderer(tmp_path: Path) -> None:
-    """旧公开方法消费新版 PageInfo，并与字节接口保持相同页面和描边内容。"""
+    """The old public method consumes the new version of PageInfo and keeps the same page and stroke content as the byte interface."""
     source = _source_pdf(rotation=90, crop=(20, 30, 220, 330))
     pages = [_page(4)]
     expected = render_layout_pdf(source, pages, page_indices=(4,))

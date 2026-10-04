@@ -1,4 +1,4 @@
-"""提供标题分类共享的几何与文本规则。"""
+"""Provides geometric and textual rules shared by title categories."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ _UNNUMBERED_SECTION_HEADING_RE = re.compile(
 def _build_physical_title_gap_map(
     line_geometry: list[tuple[_LineItem, BBox]],
 ) -> dict[int, tuple[float | None, float | None]]:
-    """按本次只读行快照批量计算净空，特殊数值与自定义对象保留参考实现。"""
+    """Headroom is calculated in batches based on this read-only row snapshot, and special values and custom objects are retained for reference implementation."""
     from ....._compute_backend import get_native
 
     native = get_native()
@@ -69,7 +69,7 @@ def _build_physical_title_gap_map(
 def _build_physical_title_gap_map_python(
     line_geometry: list[tuple[_LineItem, BBox]],
 ) -> dict[int, tuple[float | None, float | None]]:
-    """为每行记录同方向且水平投影相交的最近上、下物理行净空。"""
+    """For each row, the nearest upper and lower physical row clearances in the same direction and intersecting horizontal projections are recorded."""
 
     output: dict[int, tuple[float | None, float | None]] = {}
     for line, bbox in line_geometry:
@@ -80,7 +80,7 @@ def _build_physical_title_gap_map_python(
             if other_line is line:
                 continue
             if _bbox_axis_overlap_ratio(bbox, other_bbox, axis="x") < 0.1:
-                # 双栏同高度正文并非当前行的物理上下文，不能抹掉真实标题留白。
+                # The double-column text of the same height is not the physical context of the current row and cannot erase the real title space.
                 continue
             if line.visual_row_id is not None and other_line.visual_row_id == line.visual_row_id:
                 continue
@@ -116,7 +116,7 @@ def _line_inside_visual_container(
     line_bbox: BBox,
     container_bboxes: list[BBox],
 ) -> bool:
-    """检查文本行中心是否落入视觉容器，容器内标签不得借标题原型晋升。"""
+    """Check whether the center of the text line falls into the visual container. The label within the container must not be promoted by the title prototype."""
 
     center_x = _bbox_center_x(line_bbox)
     center_y = _bbox_center_y(line_bbox)
@@ -128,7 +128,7 @@ def _line_near_visual_container(
     container_bboxes: list[BBox],
     body_height: float,
 ) -> bool:
-    """检查短行是否紧邻图、表等容器，以纯几何方式抑制 caption 误判。"""
+    """Check whether short rows are immediately adjacent to containers such as graphs and tables to suppress caption false positives in a purely geometric manner."""
 
     for container_bbox in container_bboxes:
         if _bbox_axis_overlap_ratio(line_bbox, container_bbox, axis="x") < 0.35:

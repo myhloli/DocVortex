@@ -1,4 +1,4 @@
-"""编排 Flash 原生 PDF 的页面准备、语义处理和输出归一化。"""
+"""Coordinate page preparation, semantic processing, and output normalization for Flash native PDF analysis."""
 
 from __future__ import annotations
 
@@ -184,7 +184,7 @@ def _is_large_raster_image(
     image_info: PDFImageInfo,
     page_size: tuple[float, float],
 ) -> bool:
-    """判断点阵图裁剪后面积是否达到页面面积的 8%。"""
+    """Check whether the cropped raster image covers at least 8% of the page area."""
 
     bbox = _coerce_bbox(image_info.bbox)
     page_area = max(0.0, page_size[0]) * max(0.0, page_size[1])
@@ -195,7 +195,7 @@ def _detect_repeated_raster_watermark_fingerprints(
     page_image_infos: list[list[PDFImageInfo]],
     page_sizes: list[tuple[float, float]],
 ) -> set[str]:
-    """按大图指纹统计不同页号，出现至少三页时判为跨页图片水印。"""
+    """Count distinct pages for each large-image fingerprint; classify images repeated on at least three pages as watermarks."""
 
     page_indices_by_fingerprint: dict[str, set[int]] = {}
     for page_idx, (image_infos, page_size) in enumerate(zip(page_image_infos, page_sizes, strict=True)):
@@ -215,7 +215,7 @@ def _filter_repeated_raster_watermark_bboxes(
     page_size: tuple[float, float],
     watermark_fingerprints: set[str],
 ) -> list[tuple[float, float, float, float]]:
-    """仅删除命中跨页水印指纹且面积达标的 bbox，小尺寸同图继续保留。"""
+    """Remove only bboxes matching repeated-watermark fingerprints and meeting the area threshold; keep smaller copies."""
 
     return [
         image_info.bbox
@@ -228,7 +228,7 @@ def _table_detection_drawing_lines(
     source: _PageSource,
     confirmed_header_separators: set[BBox] | None = None,
 ) -> list[_AxisLine]:
-    """从表格候选路径中移除已确认页眉下方的通栏分隔线。"""
+    """Remove confirmed full-width separators below headers from table candidate paths."""
 
     confirmed = confirmed_header_separators or set()
     return [drawing_line for drawing_line in source.drawing_lines if drawing_line.bbox not in confirmed]
@@ -237,7 +237,7 @@ def _table_detection_drawing_lines(
 def _detect_repeated_header_separator_bboxes(
     sources: list[_PageSource],
 ) -> list[set[BBox]]:
-    """用重复刊头文本和非表格横线共同确认跨页页眉分隔线。"""
+    """Use repeated running-header text and non-table horizontal lines to confirm header separators across pages."""
 
     candidates_by_signature: dict[
         tuple[float, float, float],
@@ -284,7 +284,7 @@ def _repeated_header_evidence_pages(
     sources: list[_PageSource],
     separator_members: list[tuple[int, BBox]],
 ) -> set[int]:
-    """返回具有已分类或跨页重复刊头文本证据的页号集合。"""
+    """Return page indices with classified or repeated running-header text evidence."""
 
     supported_pages: set[int] = set()
     candidates: list[tuple[int, _MarginalCandidate]] = []
@@ -323,7 +323,7 @@ _STANDARD_STYLE_DETECTOR = detect_pdf_text_style_lines
 
 @dataclass(slots=True)
 class _DocumentSources:
-    """持有跨页校准前的原始页面，以及最终物化仍需的紧凑样式证据。"""
+    """Hold original pages before cross-page calibration and compact style evidence needed for final materialization."""
 
     page_sources: list[_PageSource]
     page_text_geometries: list[PDFPageTextGeometry]
@@ -336,7 +336,7 @@ class _DocumentSources:
 
 
 def _prepare_owned_geometry_evidence(owner, chars):
-    """一次准备全文风险所需的页面级 Rust 几何记录和原字符身份表。"""
+    """Prepare page-level Rust geometry records and original character identity maps for document-wide risk analysis."""
     if not hasattr(owner, "prepare_geometry_evidence"):
         return None
     evidence = owner.prepare_geometry_evidence()
@@ -346,7 +346,7 @@ def _prepare_owned_geometry_evidence(owner, chars):
 
 
 def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
-    """逐页收集原生证据，局部快照与字符引用在收集阶段退出时释放。"""
+    """Collect native evidence page by page, releasing local snapshots and character references when collection finishes."""
 
     from .inline.spacing import prepare_spacing_lines
 
@@ -382,14 +382,14 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
         space_before = set(native_text.tight_space_indices()) if native_text is not None else None
         page_spacing_lines.append(prepare_spacing_lines(lines, space_before))
         chars = text_geometry.chars
-        # 只保留纯 Rust 脚本/几何记录与本页身份映射，不延长 PDFium 页面或文档句柄生命周期。
+        # Keep only Rust script/geometry records and page-local identity maps without extending PDFium handle lifetimes.
         page_owned_scripts.append(_prepare_owned_script_evidence(native_text, chars) if native_text is not None else None)
         page_geometry_evidence.append(_prepare_owned_geometry_evidence(native_text, chars) if native_text is not None else None)
         drawing_lines = _coerce_pdf_drawing_lines(snapshot.drawing_lines)
         raster_em = sorted(line.em_height for line in lines if line.em_height > 0)
         if raster_em:
             em = raster_em[len(raster_em) // 2]
-            # 原生 PDF 可用一像素图片画分隔线；仅转投极薄水平图的几何，不识别其文字。
+            # The native PDF can use one-pixel images to draw dividing lines; it only converts the geometry of extremely thin horizontal images and does not recognize its text.
             drawing_lines.extend(
                 _coerce_pdf_drawing_lines(
                     [
@@ -452,7 +452,7 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
     watermark_fingerprints = _detect_repeated_raster_watermark_fingerprints(page_image_infos, page_sizes)
     for source, image_infos in zip(page_sources, page_image_infos, strict=True):
         if len(source.lines) >= 3 and sum(len(line.text.strip()) for line in source.lines) >= 60:
-            # 低纹理整页图只是底色，原生文字和内容图片仍由独立规则处理；无原生文字的图页保留。
+            # Low-texture full-page images are just background colors, and native text and content images are still processed by independent rules; image pages without native text are retained.
             image_infos = [info for info in image_infos if not info.smooth_background]
         source.image_bboxes = _filter_repeated_raster_watermark_bboxes(
             image_infos,
@@ -486,7 +486,7 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
 
 
 def _exclude_proven_blank_top_under_display_title(source, image_infos):
-    """仅当大字号文字与图像自身白边相交时裁去空白顶边，保留原生图片内容及标题独立性。"""
+    """Only when the large text intersects with the white edge of the image itself, the blank top edge is cropped, retaining the original image content and title independence."""
     heights = [line.effective_height for line in source.lines if line.angle == 0 and line.effective_height > 0]
     if not heights:
         return source.image_bboxes
@@ -515,7 +515,7 @@ def _prepare_document_sources(
     *,
     geometry_diagnostics: list[dict[str, Any]] | None = None,
 ) -> list[_PreparedPage]:
-    """先完成全文几何和页眉判定，再按顺序消费原始页面并释放已用证据。"""
+    """Resolve document-wide geometry and headers, then consume original pages in order and release used evidence."""
 
     geometry_plan = build_document_geometry_plan(
         [source.lines for source in sources.page_sources],
@@ -524,7 +524,7 @@ def _prepare_document_sources(
         owned_geometry_inputs=sources.page_geometry_evidence,
     )
     for page_index, source in enumerate(sources.page_sources):
-        # 容器认领前只允许 X 修复，表格和图形认领后再启用 Y trim。
+        # Allow only X repairs before container assignment; enable Y trimming after tables and graphics claim their content.
         apply_line_geometry_repairs(source.lines, page_index=page_index, plan=geometry_plan, allow_y_trim=False)
     if geometry_diagnostics is not None:
         geometry_diagnostics.append(geometry_plan.to_dict())
@@ -562,14 +562,14 @@ def _prepare_document_sources(
                 _owned_script_inputs=owned_script,
             )
         )
-        # 删除对象所有者引用，不清空共享字符容器，公式重建副本仍可安全使用。
+        # Remove owner references without clearing shared character containers, so formula reconstruction copies remain usable.
         del source, geometry, owned_script
     return prepared_pages
 
 
 @dataclass(frozen=True, slots=True)
 class _DocumentTextProfiles:
-    """分别保存原始正文尺度、规范正文尺度及全文标题原型。"""
+    """Store the original body scale, canonical body scale, and document-wide title profile separately."""
 
     body: _DocumentBodyProfile | None
     canonical_body: _DocumentBodyProfile | None
@@ -577,7 +577,7 @@ class _DocumentTextProfiles:
 
 
 def _classify_document_text(prepared_pages: list[_PreparedPage]) -> _DocumentTextProfiles:
-    """按既有顺序分类跨页辅助文本，再统计正文并确认结构标题。"""
+    """Classify auxiliary text across pages in the existing order, then profile body text and confirm structural headings."""
 
     _classify_repeated_visual_headers(prepared_pages)
     _classify_repeated_page_marginals(prepared_pages)
@@ -618,7 +618,7 @@ def _materialize_document_inline(
     sources: _DocumentSources,
     script_diagnostics: list[dict[str, Any]] | None,
 ) -> None:
-    """在页面归一化后按链接、样式、上下标顺序物化最终行内语义。"""
+    """After page normalization, materialize final inline semantics in link, style, and superscript/subscript order."""
 
     from .inline.spacing import apply_spacing_lines
 
@@ -654,7 +654,7 @@ def _analyze_native_document(
     script_diagnostics: list[dict[str, Any]] | None = None,
     geometry_diagnostics: list[dict[str, Any]] | None = None,
 ) -> list[list[dict[str, Any]]]:
-    """逐页读取数字 PDF，并在轻量页面上完成跨页文本类型判定。"""
+    """Read a digital PDF page by page and classify text across pages using lightweight page representations."""
 
     sources = _collect_document_sources(pdf_doc)
     prepared_pages = _prepare_document_sources(sources, geometry_diagnostics=geometry_diagnostics)
@@ -699,7 +699,7 @@ def _analyze_native_document(
 
 
 def _build_caption_supported_graphics(source: _PageSource) -> tuple[list[dict[str, Any]], set[int]]:
-    """在流水线汇总图题、表格和真实代码屏障，图形领域不反向依赖其他领域分类器。"""
+    """Combine caption, table, and actual code barriers in the pipeline without making graphics depend on other classifiers."""
     from .table_detection import _detect_table_candidates, has_native_closed_grid
 
     caption_indices = {line.source_index for line in source.lines if _is_strong_caption_text(line.text)}
@@ -729,7 +729,7 @@ def _build_caption_supported_graphics(source: _PageSource) -> tuple[list[dict[st
 
 
 def _mark_native_caption_starts(lines: list[_LineItem]) -> None:
-    """保存图题首行身份以阻止向左吞并邻栏正文，完整图题仍由后续绑定流程分类。"""
+    """Track caption first-line identities to prevent absorbing text from the left column; classify full captions during binding."""
     for line in lines:
         if line.angle == 0 and _is_strong_caption_text(line.text):
             line.caption_start = True
@@ -748,11 +748,11 @@ def _prepare_page_source(
     repaired_char_bboxes: dict[int, BBox] | None = None,
     _owned_script_inputs=None,
 ) -> _PreparedPage:
-    """先认领视觉容器，再标注辅助文本并留下可跨页比较的轻量文本行。"""
+    """Assign content to visual containers, then label auxiliary text and retain lightweight lines for cross-page comparison."""
 
     if page_index == 0:
         _classify_first_page_correspondence_footnotes(source)
-    # 在表格认领前保留有明确目录题名的稳定页码列，避免目录横线被误当数据网格。
+    # Preserve stable page-number columns with explicit TOC headings before table assignment to avoid misclassifying TOC rules.
     early_index_blocks, _ = _extract_index_blocks(
         source.lines,
         source.page_size,
@@ -801,8 +801,8 @@ def _prepare_page_source(
         )
         if not any(_form_supersedes_nested_bbox(form_bbox, candidate.bbox) for form_bbox in form_bboxes)
     ]
-    # 候选检测仍避开预分类边缘文本；已确认表格物化时回到原始行，
-    # 让 core_bbox 内的误标页脚可被重新认领，表格外边缘文本不会被矩形扩张带入。
+    # Candidate detection still excludes preclassified marginal text; materialize confirmed tables from the original lines,
+    # allowing mislabeled footers within core_bbox to be reclaimed without pulling external marginal text into expanded bounds.
     table_blocks, table_annotation_blocks, claimed_line_indices = _materialize_table_blocks(
         source,
         candidates,
@@ -896,7 +896,7 @@ def _prepare_page_source(
     if geometry_plan is not None:
         repaired_line_bboxes = {line.source_index: line.bbox for line in source.lines}
         if repaired_char_bboxes is None:
-            # 单页内部入口保留独立调用能力；文档主链路已提前按页建立索引。
+            # Keep the internal single-page entry point independently callable; the document pipeline has already indexed each page.
             repaired_char_bboxes = {
                 char_idx: repair.layout_bbox
                 for (repair_page_index, char_idx), repair in geometry_plan.char_repairs.items()
@@ -934,8 +934,8 @@ def _prepare_page_source(
         source.page_size,
         source_index_start=next_source_index,
     )
-    # 跨栏原生 run 在 X 校准后才能正确拆开，补认领这时才暴露出的图内标签。
-    # 所有已确认内容图共享成员补认领：几何校准后才进入点阵图/矢量图的原生标签也不能重复输出。
+    # Split native runs spanning columns after X calibration, then claim newly exposed labels within graphics.
+    # All confirmed content image sharing members are required to claim: Native tags that enter bitmap/vector images after geometric calibration cannot be output repeatedly.
     image_containers = caption_graphics + form_image_blocks + graphic_blocks + raster_image_blocks
     reclaimed = set()
     reclaimed_by_owner: dict[int, list[_LineItem]] = {}
@@ -950,7 +950,7 @@ def _prepare_page_source(
             if _bbox_overlap_in_first(ink, block["bbox"]) >= 0.98
             and (
                 _form_region_allows_line(source, line, block["bbox"])
-                # 柱图等强绘图证据确认整体容器，允许由外部文本对象叠加的刻度/图例归入该图。
+                # Strong plotting evidence such as bar graphs confirms the overall container, allowing ticks/legends overlaid by external text objects to be subsumed into the figure.
                 or sum(
                     _bbox_area(core) for core in strong_graphic_bboxes if _bbox_overlap_in_first(core, block["bbox"]) >= 0.95
                 )
@@ -966,7 +966,7 @@ def _prepare_page_source(
     for owner in image_containers:
         members = reclaimed_by_owner.get(id(owner), [])
         if members:
-            # 整批补认领的图内标签须按原生位置投影，不能沿 PDF 对象序逐条追加。
+            # The labels in the image that are claimed in batches must be projected according to their original positions and cannot be appended one by one along the PDF object sequence.
             projected = _image_members_to_content(members, source.page_size, spatial=True)
             owner["content"] = "\n".join(filter(None, [original_image_content[id(owner)], projected]))
     remaining_lines = [line for line in remaining_lines if line.source_index not in reclaimed]
@@ -1071,12 +1071,12 @@ def _compact_prepared_lines(
     lines: list[_LineItem],
     page_size: tuple[float, float],
 ) -> None:
-    """缓存后续仍需的字符尺度并释放字符字典，限制跨页阶段内存占用。"""
+    """Cache character scales needed later and release character dictionaries to limit memory during cross-page processing."""
 
     for line in lines:
         if line.median_glyph_width is None:
             line.median_glyph_width = _median_native_glyph_width(line, page_size)
-        # 释放字符前冻结脚注首标的几何证据，供后续分项使用。
+        # Freeze geometry evidence for initial footnote markers before releasing characters, for later item splitting.
         line.footnote_marker_start = line.footnote_marker_start or _has_leading_footnote_superscript(line)
         line.native_math_words = _native_math_word_fragments(line)
         _freeze_wrapped_bold_title_evidence(line, page_size)
@@ -1087,7 +1087,7 @@ def _rebuild_canonical_formula_blocks(
     prepared: _PreparedPage,
     excluded_source_indices: set[int],
 ) -> list[dict[str, Any]]:
-    """从容器认领后的未合并行重放 canonical 公式路径，避免 loose 行高改变公式成员顺序。"""
+    """Replay the canonical formula path from unmerged lines after container assignment, preserving member order despite loose line heights."""
 
     replay_lines = [
         replace(
@@ -1138,7 +1138,7 @@ def _rebuild_canonical_formula_blocks(
 def _formula_block_inventory(
     blocks: list[dict[str, Any]],
 ) -> list[tuple[float, float, float, float]]:
-    """返回公式重放与正常路径可比较的稳定 bbox 库存。"""
+    """Return a stable bbox inventory for comparing formula replay with the normal path."""
 
     return sorted(
         tuple(float(value) for value in block["bbox"])
@@ -1151,7 +1151,7 @@ def _apply_post_aggregation_tight_bboxes(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> None:
-    """在 block 聚合完成后应用 tight+1pt 框，并同步最终公开行框。"""
+    """Apply tight+1pt bounds after block aggregation and synchronize the final public line bounds."""
 
     for block in blocks:
         candidate_bbox = _coerce_bbox(
@@ -1194,7 +1194,7 @@ def _finalize_prepared_page(
     document_body_profile: _DocumentBodyProfile | None = None,
     document_title_profile: _DocumentTitleProfile | None = None,
 ) -> list[dict[str, Any]]:
-    """按预分类语义、公式、标题、正文的优先级完成单页文本并排序。"""
+    """Finalize and sort page text, prioritizing preclassified semantics, formulas, headings, and body text in that order."""
 
     semantic_lines = [line for line in prepared.remaining_lines if line.semantic_type is not None]
     unresolved_lines = [line for line in prepared.remaining_lines if line.semantic_type is None]
@@ -1388,7 +1388,7 @@ def _finalize_prepared_page(
     )
     sorted_blocks = _preserve_narrow_graphic_column_order(sorted_blocks, prepared.page_size)
     sorted_blocks = order_body_above_reference_band(sorted_blocks, prepared)
-    # 首页机构编号按物理行排列，避免长机构行使 XY-cut 将短机构先后顺序交错。
+    # Order first-page affiliation numbers by physical line so long affiliations do not make XY-cut interleave shorter ones.
     front_matter = iter(
         sorted(
             (block for block in sorted_blocks if (block.get("_reference_group") or 0) < 0),
@@ -1402,7 +1402,7 @@ def _finalize_prepared_page(
 
 
 def _preserve_narrow_graphic_column_order(blocks: list[dict[str, Any]], page_size: tuple[float, float]) -> list[dict[str, Any]]:
-    """同栏子图合并不应把另一栏的图表插进连续正文；跨栏页面继续使用原排序。"""
+    """Keep graphics from other columns out of continuous body text when merging same-column subfigures; retain ordering on multicolumn pages."""
     if not any(block.get("_caption_graphic") for block in blocks):
         return blocks
     width = page_size[0]
@@ -1420,7 +1420,7 @@ def _preserve_narrow_graphic_column_order(blocks: list[dict[str, Any]], page_siz
 
 
 def _analyze_page_source(source: _PageSource) -> list[dict[str, Any]]:
-    """兼容单页测试入口；单页不凭边缘位置猜测页眉、页脚或页码。"""
+    """Support the single-page test entry point without inferring headers, footers, or page numbers from marginal position alone."""
 
     if not source.lines and not source.image_bboxes and not source.signature_bboxes:
         return []
@@ -1430,7 +1430,7 @@ def _analyze_page_source(source: _PageSource) -> list[dict[str, Any]]:
 def _numbered_panel_row_regions(
     regions: list[list[dict[str, Any]]], body_blocks: list[dict[str, Any]]
 ) -> list[list[dict[str, Any]]]:
-    """连续图号及重复行列位置共同证明逐行面板网格；夹有正文或编号按栏排列时保留原栏序。"""
+    """Continuous figure numbers and repeated column and column positions jointly prove the line-by-line panel grid; retain the original column order when text is included or numbers are arranged in columns."""
     panels = []
     for region in regions:
         captions = [member for member in region if member.get("type") == "caption"]
@@ -1488,7 +1488,7 @@ def _sort_blocks_with_visual_row_groups(
     *,
     visual_annotation_regions: list[list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
-    """把视觉注释区域和拆分粗行包装成虚拟项排序，再按各自局部顺序展开。"""
+    """Sort visual annotation regions and split coarse lines as virtual items, then expand each in its local order."""
 
     top_marginals: list[dict[str, Any]] = []
     bottom_marginals: list[dict[str, Any]] = []
@@ -1558,8 +1558,8 @@ def _sort_blocks_with_visual_row_groups(
         sorting_bbox = region_bbox
         if len(body_layout.lanes) == 1:
             lane = body_layout.lanes[0]
-            # 单栏独立小图占据整段阅读流；只扩展排序投影，真实裁图及成员边界不变。
-            # 同高度仍有环绕正文时继续按局部几何切栏。
+            # The single-column independent small picture occupies the entire reading flow; only the sorting projection is expanded, and the real cropping and member boundaries remain unchanged.
+            # If there is still surrounding text at the same height, continue to cut columns according to local geometry.
             if lane.left <= region_bbox[0] < region_bbox[2] <= lane.right and not any(
                 other not in members
                 and other.get("type") in {"text", "paragraph_title", "image", "table", "code"}
@@ -1645,7 +1645,7 @@ def _collect_inline_image_text_groups(
     *,
     excluded_indices: set[int] | None = None,
 ) -> dict[int, list[int]]:
-    """把复合图片与包含同一首行的正文块组成专用排序组。"""
+    """Group composite images with body blocks sharing the same first line for dedicated sorting."""
 
     excluded_indices = excluded_indices or set()
     image_indices_by_row: dict[int, list[int]] = {}
@@ -1679,7 +1679,7 @@ def _inline_visual_group_member_sort_key(
     block: dict[str, Any],
     page_size: tuple[float, float],
 ) -> tuple[float, float, int]:
-    """按图片位置或正文首个局部行位置确定复合视觉行的组内顺序。"""
+    """Order members of composite visual rows by image position or the first local body-line position."""
 
     local_line_bboxes = block.get("_local_line_bboxes")
     if block.get("type") == "text" and isinstance(local_line_bboxes, list) and local_line_bboxes:
@@ -1702,11 +1702,11 @@ def _sort_marginal_blocks(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """先按视觉中心聚合边缘同排块，再按行内 x 排序以消除字体框顶边抖动。"""
+    """Group same-row marginal blocks by visual center, then sort by x to avoid jitter from font-box top edges."""
 
     notes = [block for block in blocks if block.get("type") == "page_footnote"]
     if len(notes) >= 2 and len(notes) == len(blocks):
-        # 脚注是连续条目，沿不相交栏带读完一栏再换栏；页眉/页脚仍保持同排从左到右。
+        # Read consecutive footnote entries one nonoverlapping column at a time; keep headers and footers left-to-right within each row.
         return sort_entries(notes)
     if notes and len(notes) < len(blocks):
         ordered_notes = iter(_sort_marginal_blocks(notes, page_size))
@@ -1755,7 +1755,7 @@ def _stabilize_overlapping_lane_order(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """对同栏轻微重叠块按视觉中心纠正局部逆序，不改变跨栏主阅读顺序。"""
+    """Correct local inversions among slightly overlapping same-column blocks by visual center, preserving cross-column reading order."""
 
     output = list(blocks)
     for _pass_index in range(len(output)):
@@ -1777,7 +1777,7 @@ def _overlapping_lane_pair_is_inverted(
     second: dict[str, Any],
     page_size: tuple[float, float],
 ) -> bool:
-    """判断相邻块是否属于同一内部栏带且视觉中心顺序与当前结果相反。"""
+    """Check whether adjacent blocks share an internal column band and their visual centers reverse the current order."""
 
     if first.get("_visual_annotation_region_member") or second.get("_visual_annotation_region_member"):
         return False
@@ -1829,7 +1829,7 @@ def _normalize_output_block(
     block: dict[str, Any],
     page_size: tuple[float, float],
 ) -> dict[str, Any] | None:
-    """在排序完成后将绝对 bbox 裁剪并归一化为 model_list 坐标。"""
+    """After sorting, clip absolute bboxes and normalize them to model_list coordinates."""
 
     page_width, page_height = page_size
     bbox = _clip_bbox(_coerce_bbox(block.get("bbox")), page_size)
@@ -1877,7 +1877,7 @@ def _normalize_output_line_items(
     block: dict[str, Any],
     page_size: tuple[float, float],
 ) -> list[dict[str, list[float]]]:
-    """将 Flash 正向局部行框逆变换为页面坐标并归一化输出。"""
+    """Transform Flash forward-local line bounds back to page coordinates and normalize the output."""
 
     local_line_bboxes = block.get("_local_line_bboxes")
     if not isinstance(local_line_bboxes, list):

@@ -1,4 +1,4 @@
-//! 将原字符对象读入自有数据，连续组行后一次性构造兼容 Python 输出。
+//! Read the original character object into its own data, and construct a compatible Python output in one go after consecutive grouping of lines.
 use docvortex_core::text_pipeline::{self, TextChar, UnicodeProperties};
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
@@ -7,7 +7,7 @@ use std::sync::{Mutex, OnceLock};
 
 static UNICODE_CACHE: OnceLock<Mutex<HashMap<char, u8>>> = OnceLock::new();
 
-/// 为页面中不同的非 ASCII 字符读取解释器版本对应的 Unicode 属性。
+/// Read the Unicode attribute corresponding to the interpreter version for different non-ASCII characters in the page.
 pub(crate) fn unicode_properties(
     py: Python<'_>,
     chars: &[TextChar],
@@ -16,7 +16,7 @@ pub(crate) fn unicode_properties(
     let cache = UNICODE_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
     let mut missing = Vec::new();
     {
-        // 仅缓存有界的码点属性，绝不持有 Python 或页面对象。
+        // Only bounded code point attributes are cached, never Python or page objects are held.
         let cached = cache.lock().unwrap_or_else(|error| error.into_inner());
         for record in chars {
             for ch in record.text.chars().filter(|ch| !ch.is_ascii()) {
@@ -54,7 +54,7 @@ pub(crate) fn unicode_properties(
     Ok(properties)
 }
 
-/// 仅接收自有普通记录；自定义映射、几何或数值在执行算法前返回参考路径。
+/// Only ordinary records are received; custom mapping, geometry or numerical values are returned to the reference path before executing the algorithm.
 fn read_chars(py: Python<'_>, chars: &Bound<'_, PyList>) -> PyResult<Option<Vec<TextChar>>> {
     if !chars.is_exact_instance_of::<PyList>() {
         return Ok(None);
@@ -94,7 +94,7 @@ fn read_chars(py: Python<'_>, chars: &Bound<'_, PyList>) -> PyResult<Option<Vec<
             return Ok(None);
         }
         for i in 0..4 {
-            // 原参考实现保留框坐标的 int/bool 类型；只让原生 PDF 的 float 坐标进入计算。
+            // The original reference implementation retains the int/bool type of box coordinates; only the float coordinates of the native PDF are allowed to enter the calculation.
             if !coordinates.get_item(i)?.is_exact_instance_of::<PyFloat>() {
                 return Ok(None);
             }
@@ -105,7 +105,7 @@ fn read_chars(py: Python<'_>, chars: &Bound<'_, PyList>) -> PyResult<Option<Vec<
         let Ok(raw_bbox) = coordinates.extract::<[f64; 4]>() else {
             return Ok(None);
         };
-        // 小整数可精确进入双精度计算，大整数在任何转换前交回参考路径。
+        // Small integers can be entered into double precision calculations accurately, and large integers are returned to the reference path before any conversion.
         if !rotation.is_exact_instance_of::<PyFloat>() && rotation.extract::<i32>().is_err() {
             return Ok(None);
         }
@@ -141,7 +141,7 @@ fn read_chars(py: Python<'_>, chars: &Bound<'_, PyList>) -> PyResult<Option<Vec<
     Ok(Some(records))
 }
 
-/// 检查字体嵌套值，避免提前比较用户自定义对象引入额外副作用。
+/// Check font nesting values to avoid comparing user-defined objects in advance to introduce additional side effects.
 fn plain_font_value(value: &Bound<'_, PyAny>, depth: usize) -> PyResult<bool> {
     if value.is_none() || plain_number(value) || value.is_exact_instance_of::<PyString>() {
         return Ok(true);
@@ -168,14 +168,14 @@ fn plain_font_value(value: &Bound<'_, PyAny>, depth: usize) -> PyResult<bool> {
     Ok(false)
 }
 
-/// 区分原生数值与用户定义的转换、比较行为。
+/// Distinguish between native numerical values and user-defined conversion and comparison behaviors.
 fn plain_number(value: &Bound<'_, PyAny>) -> bool {
     value.is_exact_instance_of::<PyFloat>()
         || value.is_exact_instance_of::<PyInt>()
         || value.is_exact_instance_of::<PyBool>()
 }
 
-/// 直接消费原字符列表，保留字符、字体引用和所有可选来源字段。
+/// Directly consume the original character list, retaining characters, font references and all optional source fields.
 #[pyfunction]
 pub fn group_text_lines<'py>(
     py: Python<'py>,
@@ -192,7 +192,7 @@ pub fn group_text_lines<'py>(
     materialize_grouped_lines(py, chars, lines).map(Some)
 }
 
-/// 共用基础行输出物化逻辑，保证组行成员引用同次物化的字符与字体。
+/// Sharing the basic row output materialization logic ensures that group row members refer to the same materialized characters and fonts.
 pub(crate) fn materialize_grouped_lines<'py>(
     py: Python<'py>,
     chars: &Bound<'py, PyList>,
@@ -205,7 +205,7 @@ pub(crate) fn materialize_grouped_lines<'py>(
     for line in lines {
         let line_value = PyDict::new(py);
         let spans = PyList::empty(py);
-        // 公共字典保留参考实现的键插入顺序，避免 JSON 和迭代行为改变。
+        // The public dictionary preserves the key insertion order of the reference implementation, avoiding JSON and iteration behavior changes.
         line_value.set_item("spans", &spans)?;
         line_value.set_item("bbox", bbox_type.call1((line.bbox.to_vec(),))?)?;
         let line_first = chars.get_item(line.spans[0].start)?;
@@ -231,7 +231,7 @@ pub(crate) fn materialize_grouped_lines<'py>(
     Ok(output)
 }
 
-/// 连续完成基础组行和 Flash 视觉切分，只物化最终 run 与原字符引用。
+/// The basic group rows and Flash visual segmentation are completed continuously, and only the final run and original character references are materialized.
 #[pyfunction]
 pub fn prepare_visual_lines<'py>(
     py: Python<'py>,
@@ -263,7 +263,7 @@ pub fn prepare_visual_lines<'py>(
     materialize_visual_runs(py, chars, runs, &signatures).map(Some)
 }
 
-/// 仅在最终边界联合物化视觉 run，供普通列表入口及自有 Rust 快照共用。
+/// The materialized vision run is only combined at the final boundary for common list entry and self-owned Rust snapshots.
 pub(crate) fn materialize_visual_runs<'py>(
     py: Python<'py>,
     chars: &Bound<'py, PyList>,
@@ -307,7 +307,7 @@ pub(crate) fn materialize_visual_runs<'py>(
     Ok(output)
 }
 
-/// 按字体对象去重读取签名，字体族归一化只在签名首次出现时调用既有规则。
+/// The signature is deduplicated and read according to the font object, and the font family normalization only calls the existing rules when the signature appears for the first time.
 fn prepare_fonts(
     py: Python<'_>,
     chars: &Bound<'_, PyList>,

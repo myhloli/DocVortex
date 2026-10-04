@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""生成不含真实文档内容的 Flash PDF 单元测试夹具。"""
+"""Generates Flash PDF unit test fixture without real document content."""
 
 from __future__ import annotations
 
@@ -26,14 +26,14 @@ PAGE_WIDTH, PAGE_HEIGHT = A4
 
 
 def _register_fonts() -> None:
-    """注册无需读取原文或本机私有字体文件的标准 CJK 字体。"""
+    """Register the standard CJK font without reading the original text or native private font files."""
 
     if CJK_FONT_NAME not in pdfmetrics.getRegisteredFontNames():
         pdfmetrics.registerFont(cidfonts.UnicodeCIDFont(CJK_FONT_NAME))
 
 
 def _new_canvas(output_path: Path) -> Canvas:
-    """创建具有固定元数据和确定性对象编号的 A4 PDF 画布。"""
+    """Creates a A4 PDF canvas with fixed metadata and deterministic object numbers."""
 
     canvas = Canvas(
         str(output_path),
@@ -51,7 +51,7 @@ def _new_canvas(output_path: Path) -> Canvas:
 
 
 def _draw_page_heading(canvas: Canvas, title: str, subtitle: str = "") -> None:
-    """绘制统一的合成页面标题和可选副标题。"""
+    """Draw a unified composite page title and optional subtitle."""
 
     canvas.setFillColor(black)
     canvas.setFont("Helvetica-Bold", 15)
@@ -62,7 +62,7 @@ def _draw_page_heading(canvas: Canvas, title: str, subtitle: str = "") -> None:
 
 
 def _draw_page_number(canvas: Canvas, page_number: int) -> None:
-    """在页面底部中央绘制独立页码。"""
+    """Draw individual page numbers at the bottom center of the page."""
 
     canvas.setFillColor(black)
     canvas.setFont("Helvetica", 9)
@@ -78,7 +78,7 @@ def _draw_table(
     row_height: float,
     rows: list[list[str]],
 ) -> tuple[float, float, float, float]:
-    """用矢量线和中性单元格文本绘制稳定的规则表格。"""
+    """Draw stable regular tables with vector lines and neutral cell text."""
 
     column_count = len(rows[0])
     height = row_height * len(rows)
@@ -103,7 +103,7 @@ def _draw_table(
 
 
 def _solid_image_reader(color: tuple[int, int, int]) -> ImageReader:
-    """创建仅用于图像和 footer 几何回归的内存 PNG。"""
+    """Create memory PNG used only for image and footer geometric regression."""
 
     image = Image.new("RGB", (80, 50), color=color)
     buffer = BytesIO()
@@ -113,7 +113,7 @@ def _solid_image_reader(color: tuple[int, int, int]) -> ImageReader:
 
 
 def _draw_flash_fixture(output_path: Path) -> None:
-    """生成八页表格、注释、跨页和 footer 行为合成夹具。"""
+    """Generates eight-page tables, notes, spreads, and footer behavioral synthetic fixtures."""
 
     canvas = _new_canvas(output_path)
 
@@ -269,7 +269,7 @@ def _draw_flash_fixture(output_path: Path) -> None:
 
 
 def _draw_safe_watermark_grid(canvas: Canvas) -> None:
-    """在当前页底层绘制四乘四个安全旋转文本水印。"""
+    """Draws a four by four safe rotation text watermark on the bottom layer of the current page."""
 
     canvas.saveState()
     canvas.setFillColor(HexColor("#D9DEE7"))
@@ -285,7 +285,7 @@ def _draw_safe_watermark_grid(canvas: Canvas) -> None:
 
 
 def _draw_cjk_page_heading(canvas: Canvas, title: str) -> None:
-    """用标准 CJK 字体绘制合成中文页面标题。"""
+    """Draw synthetic Chinese page titles using standard CJK font."""
 
     canvas.setFillColor(black)
     canvas.setFont(CJK_FONT_NAME, 15)
@@ -299,7 +299,7 @@ def _draw_mixed_line(
     cjk_prefix: str,
     latin_suffix: str,
 ) -> None:
-    """在同一基线绘制 CJK 与西文字体混排的物理行。"""
+    """Draw physical lines of CJK mixed with Western fonts on the same baseline."""
 
     line_x = 72.0
     if cjk_prefix.startswith("• "):
@@ -322,7 +322,7 @@ def _draw_link_text(
     visible_text: str,
     target: str,
 ) -> float:
-    """绘制带精确 URI 注解的西文文本并返回其右边界。"""
+    """Draws Spanish text with exact URI annotation and returns its right border."""
 
     font_name = "Helvetica"
     font_size = 9
@@ -339,7 +339,7 @@ def _draw_link_text(
 
 
 def _draw_cjk_fixture(output_path: Path) -> None:
-    """生成四页目录、字体、URL 和安全水印合成夹具。"""
+    """Generates four page table of contents, font, URL and secure watermark composite fixture."""
 
     _register_fonts()
     canvas = _new_canvas(output_path)
@@ -421,7 +421,7 @@ def _draw_cjk_fixture(output_path: Path) -> None:
 
 
 def generate_fixtures(output_dir: Path) -> tuple[Path, Path]:
-    """生成两份合成 PDF 并返回稳定输出路径。"""
+    """Generate two copies of the synthetic PDF and return a stable output path."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
     flash_path = output_dir / FLASH_FIXTURE_NAME
@@ -432,7 +432,7 @@ def generate_fixtures(output_dir: Path) -> tuple[Path, Path]:
 
 
 def _check_committed_fixtures() -> None:
-    """重新生成夹具并逐字节校验仓库产物未发生漂移。"""
+    """Regenerate the fixture and verify byte by byte that the warehouse product has not drifted."""
 
     with TemporaryDirectory(prefix="mineru-synthetic-pdf-") as temporary_directory:
         generated_paths = generate_fixtures(Path(temporary_directory))
@@ -445,7 +445,7 @@ def _check_committed_fixtures() -> None:
 
 
 def main() -> None:
-    """解析命令行参数并执行生成或一致性检查。"""
+    """Parse command line arguments and perform build or consistency checks."""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(

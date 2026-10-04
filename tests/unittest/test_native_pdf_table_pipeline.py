@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""验证 Native PDF 表格结构恢复和 Flash OCR 表格投影。"""
+"""Verify Native PDF table structure recovery and Flash OCR table projection."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from docvortex.analyzers.native.pdf import tables as flash_tables
 def test_flash_materialization_prefers_native_html_and_keeps_claims(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 Flash 只替换表体 content，不改变候选认领语义。"""
+    """Verify that Flash only replaces the table body content and does not change the candidate claim semantics."""
 
     source = flash_models._PageSource(
         page_size=(100.0, 100.0),

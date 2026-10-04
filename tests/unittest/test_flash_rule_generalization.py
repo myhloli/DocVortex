@@ -1,4 +1,4 @@
-"""以中性内容及布局变换验证规则类型，避免真实论文成为生产判断条件。"""
+"""Change the verification rule type with neutral content and layout to prevent real papers from becoming a production judgment condition."""
 
 from dataclasses import replace
 
@@ -11,13 +11,13 @@ from docvortex.analyzers.native.pdf.text_assembly.assembly import _restore_capti
 
 
 def _line(text, bbox, index=0):
-    """构造保留墨迹与来源的中性文字行。"""
+    """Construct neutral lines of text that preserve ink and source."""
     return _LineItem(text, bbox, 0, index, ink_bbox=bbox, effective_height=10, em_height=10)
 
 
 @pytest.mark.parametrize("names", [("VarWin", "VarEnd"), ("FooWin", "FooEnd"), ("WindowStatistic", "TailStatistic")])
 def test_custom_math_identifiers_do_not_depend_on_names(names):
-    """等几何表达式只替换标识符，恢复结果和编号成员必须一致。"""
+    """Isogeometric expressions only replace identifiers, and the restored results and numbered members must be consistent."""
     lines = [_line(f"{names[0]} + {names[1]} + signal = 0", (100, 100, 260, 110)), _line("(1)", (270, 100, 285, 110), 1)]
     blocks, claimed = _recover_detached_display_components(lines, [], (600, 800))
     assert len(blocks) == 1 and claimed == {0, 1}
@@ -26,7 +26,7 @@ def test_custom_math_identifiers_do_not_depend_on_names(names):
 @pytest.mark.parametrize("right", [False, True])
 @pytest.mark.parametrize("tails", [1, 2, 4])
 def test_wrapped_prose_is_symmetric_and_accepts_multiple_tail_rows(right, tails):
-    """镜像及多行宽尾不改变同一类环绕正文的区域恢复。"""
+    """Mirroring and multi-line wide-tailing do not change the area recovery of the same type of surrounding text."""
     boxes = [(50, 180, 280, 190), (50, 195, 280, 205), (50, 210, 280, 220)]
     boxes += [(50, 225 + 15 * i, 500, 235 + 15 * i) for i in range(tails)]
     cb, image = (300, 200, 500, 220), (300, 100, 500, 195)
@@ -53,7 +53,7 @@ def test_wrapped_prose_is_symmetric_and_accepts_multiple_tail_rows(right, tails)
 @pytest.mark.parametrize("heading", ["Article Info", "Article Information", "文章信息"])
 @pytest.mark.parametrize("right", [False, True])
 def test_front_panel_uses_roles_and_not_exact_heading_pair(heading, right):
-    """同义标题和左右互换仍识别元数据与连续摘要两种角色。"""
+    """Synonymous titles and left-right interchanges still recognize the roles of metadata and sequential abstracts."""
     items = [(heading, (50, 200, 180, 210)), ("Abstract", (250, 200, 500, 210))]
     items += [
         (value, (50, 220 + i * 15, 190, 230 + i * 15))
@@ -68,7 +68,7 @@ def test_front_panel_uses_roles_and_not_exact_heading_pair(heading, right):
 
 
 def test_front_panel_does_not_relabel_later_pages():
-    """缺少首页角色证据时不修改候选和成员。"""
+    """Candidates and members are not modified when homepage role evidence is missing."""
     line = _line("Article Information", (50, 200, 180, 210))
     source = _PageSource((600, 800), [line], [], [], page_index=1)
     assert not _restore_front_matter_text_panel(source, (40, 180, 550, 300))
@@ -79,7 +79,7 @@ def test_front_panel_does_not_relabel_later_pages():
     "text", ["The temperature value T=Delta", "温度可以表示为T=Delta", "These are ordinary words", "where Window(x)=Tail(y)"]
 )
 def test_natural_language_remains_prose(text):
-    """数学结构之外的正文仍提供宿主证据，函数调用不能吞掉前导自然语言。"""
+    """The text outside the mathematical structure still provides host evidence, and the function call cannot swallow the leading natural language."""
     from docvortex.analyzers.native.pdf.formulas import _has_sentence_words
 
     assert _has_sentence_words(text)
@@ -88,7 +88,7 @@ def test_natural_language_remains_prose(text):
 @pytest.mark.parametrize("name", ["VarWin", "FooWin", "WindowStatistic"])
 @pytest.mark.parametrize("scale", [0.75, 1.0, 1.5])
 def test_pdf_entry_preserves_named_formula_under_scaling(name, scale):
-    """真实 PDF 经字符提取和 Flash 编排后，换名及等比例缩放仍只生成一个完整公式。"""
+    """After character extraction and Flash editing of the real PDF, renaming and proportional scaling still only generate a complete formula."""
     from io import BytesIO
     from reportlab.pdfgen.canvas import Canvas
     from docvortex.document.pdf import PDFDocument
@@ -114,7 +114,7 @@ def test_pdf_entry_preserves_named_formula_under_scaling(name, scale):
 
 @pytest.mark.parametrize("intervals", [[(40, 500)], [(40, 210), (260, 550)], [(20, 170), (210, 370), (410, 570)]])
 def test_layout_evidence_uses_actual_asymmetric_columns(intervals):
-    """单栏、非对称双栏及三栏都由重复文字边缘确定，不依赖页面中线。"""
+    """Single column, asymmetric double column, and triple column are all defined by repeated text edges and do not rely on the center line of the page."""
     from docvortex.analyzers.native.pdf.layout_evidence import build_layout_evidence
 
     lines = [
@@ -132,7 +132,7 @@ def test_layout_evidence_uses_actual_asymmetric_columns(intervals):
 
 @pytest.mark.parametrize("count", [1, 2, 4])
 def test_front_matter_handles_any_number_of_affiliations(count):
-    """机构数量不是分类条件，编号和机构角色才构成分组证据。"""
+    """The number of institutions is not a classification condition; the number and institutional role constitute evidence of grouping."""
     from docvortex.analyzers.native.pdf.text_assembly.continuity import group_front_matter_lines
 
     lines = [
@@ -146,7 +146,7 @@ def test_front_matter_handles_any_number_of_affiliations(count):
 
 @pytest.mark.parametrize("heading", ["Affiliations", "作者单位"])
 def test_affiliation_role_does_not_merge_independent_numbered_notes(heading):
-    """即使有机构标题，明确独立编号条目仍分别输出。"""
+    """Even if there is an institution title, explicitly numbered entries are still output separately."""
     from docvortex.analyzers.native.pdf.text_assembly.footnotes import _split_page_footnote_entries
 
     lines = [
@@ -160,7 +160,7 @@ def test_affiliation_role_does_not_merge_independent_numbered_notes(heading):
 
 @pytest.mark.parametrize("heading", ["Affiliations", "作者单位", ""])
 def test_inline_affiliation_markers_stay_in_continuous_note(heading):
-    """连贯机构文本中的行内编号不会因短标题或语言变化被拆散。"""
+    """Inline numbering in coherent institutional text is not broken up by short headings or language changes."""
     from docvortex.analyzers.native.pdf.text_assembly.footnotes import _split_page_footnote_entries
 
     lines = [_line(heading, (40, 600, 160, 610), 0)] if heading else []
@@ -173,7 +173,7 @@ def test_inline_affiliation_markers_stay_in_continuous_note(heading):
 
 @pytest.mark.parametrize("color", [(0, 0, 0, 255), (0, 80, 200, 255)])
 def test_vector_formula_color_does_not_change_semantics(color):
-    """普通矢量公式换颜色后仍为公式，装饰判断不能只依赖颜色。"""
+    """Ordinary vector formulas are still formulas after changing colors. Decoration judgment cannot rely solely on color."""
     from test_flash_pdf_formulas import _vector_formula_source, _vector_formula_body_paths
     from docvortex.analyzers.native.pdf.formulas import _build_vector_formula_blocks
 
@@ -183,7 +183,7 @@ def test_vector_formula_color_does_not_change_semantics(color):
 
 
 def test_repeated_decoration_requires_shape_and_geometry():
-    """只有结构和相对位置同时重复的装饰候选才重标，位置相同不是充分证据。"""
+    """Only decoration candidates whose structure and relative position are repeated at the same time are remarked, and the same position is not sufficient evidence."""
     from docvortex.analyzers.native.pdf.formulas import classify_repeated_vector_decorations
     from docvortex.analyzers.native.pdf.models import _PreparedPage
 
@@ -198,7 +198,7 @@ def test_repeated_decoration_requires_shape_and_geometry():
 
 @pytest.mark.parametrize("language", ["en", "zh"])
 def test_front_panel_without_exact_titles_and_with_short_abstract(language):
-    """元数据字段和摘要角色足以确认短摘要，不依赖文章信息标题或固定正文行数。"""
+    """Metadata fields and abstract roles are sufficient to validate short abstracts without relying on article information titles or a fixed number of text lines."""
     english = [
         "Received yesterday",
         "Keywords: example",
@@ -213,7 +213,7 @@ def test_front_panel_without_exact_titles_and_with_short_abstract(language):
 
 
 def test_front_panel_preserves_actual_grid_and_insufficient_fields():
-    """相同文字落在可信单元格网格时不撤销表格，重复同类字段也不构成多角色证据。"""
+    """The table will not be revoked when the same text falls in the trusted cell grid, and duplicate fields of the same type will not constitute evidence of multiple roles."""
     from docvortex.analyzers.native.pdf.models import _AxisLine
 
     values = [
@@ -237,7 +237,7 @@ def test_front_panel_preserves_actual_grid_and_insufficient_fields():
 
 @pytest.mark.parametrize("stop", ["Appendix", "Acknowledgements"])
 def test_reference_context_stops_inside_the_same_page(stop):
-    """同页参考文献后的独立章节终止上下文，后文与下一页不被参考条目归组。"""
+    """An independent section after a reference on the same page terminates the context, and the following paragraphs and the next page are not grouped by reference entries."""
     from docvortex.analyzers.native.pdf.models import _PreparedPage
     from docvortex.analyzers.native.pdf.text_assembly.continuity import mark_document_reference_regions
 
@@ -255,7 +255,7 @@ def test_reference_context_stops_inside_the_same_page(stop):
 
 
 def test_local_caption_column_is_not_hidden_by_full_width_body():
-    """上方通栏和图注短尾不抹掉图旁局部栏，明确栏沟不需要位于页面中线。"""
+    """The upper banner and the short tail of the figure do not erase the partial column next to the figure, and it is clear that the column groove does not need to be located in the center line of the page."""
     from docvortex.analyzers.native.pdf.layout_evidence import build_layout_evidence
 
     lines = [_line("Wide prose occupies the page.", (40, 100 + i * 15, 560, 110 + i * 15), i) for i in range(4)]
@@ -271,7 +271,7 @@ def test_local_caption_column_is_not_hidden_by_full_width_body():
 
 
 def test_math_fragment_merge_does_not_cross_explicit_geometry_boundary():
-    """内部几何断点阻止再次扩框，同时不需要伪造语义段界。"""
+    """Internal geometry breakpoints prevent further expansion of the frame without the need to fake semantic segment boundaries."""
     from docvortex.analyzers.native.pdf.text_assembly.continuity import merge_overlapping_member_blocks
 
     first = _line("a neutral unfinished sentence-", (40, 200, 240, 210), 0)
@@ -284,7 +284,7 @@ def test_math_fragment_merge_does_not_cross_explicit_geometry_boundary():
 @pytest.mark.parametrize("color", [(0, 0, 0, 255), (0, 90, 160, 255)])
 @pytest.mark.parametrize("numbered", [False, True])
 def test_publication_wordmark_needs_context_and_math_wins(color, numbered):
-    """页边多行字标依靠出版角色识别，灰度行为相同，独立公式编号优先。"""
+    """Multi-line wordmarks in the margin rely on publishing role recognition, grayscale behavior is the same, and independent formula numbers take precedence."""
     from docvortex.document.pdf.native_contracts import PDFPathInfo
     from docvortex.analyzers.native.pdf.formulas import _build_vector_formula_blocks
 
@@ -309,7 +309,7 @@ def test_publication_wordmark_needs_context_and_math_wins(color, numbered):
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 @pytest.mark.parametrize("scale,offset", [(0.75, 10), (1.0, 0), (1.5, 20)])
 def test_layout_evidence_and_math_recovery_use_upright_coordinates(angle, scale, offset):
-    """缩放、平移及四种页面方向下，栏归属和二维公式成员保持不变。"""
+    """Column ownership and two-dimensional formula members remain unchanged under zooming, panning, and four page orientations."""
     from docvortex.analyzers.native.pdf.geometry import _rotate_bbox_from_upright
     from docvortex.analyzers.native.pdf.layout_evidence import build_layout_evidence
 
@@ -318,7 +318,7 @@ def test_layout_evidence_and_math_recovery_use_upright_coordinates(angle, scale,
         page = page[::-1]
 
     def transformed(box):
-        """以同一仿射变换构造页面中的真实框，避免只修改角度标签。"""
+        """Construct the real box in the page with the same affine transformation to avoid modifying only the angle label."""
         return _rotate_bbox_from_upright(tuple(v * scale + offset for v in box), page, angle)
 
     lines = [
@@ -344,7 +344,7 @@ def test_layout_evidence_and_math_recovery_use_upright_coordinates(angle, scale,
 
 
 def test_actual_full_width_runin_prompts_and_numbered_start():
-    """在真实通栏论文验证类规则纠错，粗体提示归正文且独立起行编号保留段界。"""
+    """Correct errors in the verification rules of the real general paper, bold prompts should be returned to the main text, and independent line numbers should be maintained to retain paragraph boundaries."""
     from test_flash_manual_annotations import _model
     from tools.review_flash_annotations import visible
 

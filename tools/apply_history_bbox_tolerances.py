@@ -1,4 +1,4 @@
-"""依据诊断差异报告把按坐标冻结的 bbox 容差写入历史夹具，不重新批准基线。"""
+"""Write the bbox tolerance frozen by coordinates to the historical fixture based on the Diagnostic Difference Report, without re-approving the baseline."""
 
 from __future__ import annotations
 
@@ -13,13 +13,13 @@ _COORD_NAMES = ("x0", "y0", "x1", "y1")
 
 
 def _load(path: Path) -> object:
-    """以显式 UTF-8 读取 JSON，工具产物不依赖平台区域设置。"""
+    """Read JSON with explicit UTF-8, tool product independent of platform locale."""
 
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _verify_reference_matches_fixture(fixture: dict, reference: list[dict]) -> None:
-    """参考捕获必须与夹具逐页指纹一致，防止借补字段重新批准基线。"""
+    """Reference capture must be consistent with the fixture's page-by-page fingerprint, preventing borrowed fields from re-approving the baseline."""
 
     by_name = index_summary(reference)
     assert by_name.keys() == index_summary(fixture["documents"]).keys(), "reference document set differs from fixture"
@@ -44,7 +44,7 @@ def _verify_reference_matches_fixture(fixture: dict, reference: list[dict]) -> N
 
 
 def _verify_existing_platform(fixture: dict, platform: str) -> None:
-    """当前夹具只支持单平台容差；拒绝覆盖或删除其他平台已冻结的配置。"""
+    """The current fixture only supports single-platform tolerance; it refuses to overwrite or delete frozen configurations of other platforms."""
     for document in fixture["documents"]:
         for page in document["pages"]:
             tolerance = page.get("bbox_tolerance")
@@ -55,7 +55,7 @@ def _verify_existing_platform(fixture: dict, platform: str) -> None:
 
 
 def _verify_reports(reference: list[dict], reports: list[dict], platform: str) -> None:
-    """写入前绑定报告来源并重算逐坐标差，拒绝陈旧报告、内容变化及错误页面或块索引。"""
+    """Bind the report source and recalculate coordinate-by-coordinate differences before writing, rejecting stale reports, content changes, and incorrect pages or block indexes."""
     captures = index_summary(reference)
     reference_hash = summary_fingerprint(captures)
     environment = reference[0]["environment"]
@@ -115,7 +115,7 @@ def _verify_reports(reference: list[dict], reports: list[dict], platform: str) -
 
 
 def _collect_allowances(reports: list[dict]) -> dict[tuple[str, int], dict[str, dict[str, int]]]:
-    """汇总各诊断矩阵的逐块坐标最大实测刻度差；出现内容变化立即拒绝。"""
+    """Summarize the maximum measured scale difference of block-by-block coordinates of each diagnostic matrix; reject immediately if content changes."""
 
     collected: dict[tuple[str, int], dict[int, dict[str, int]]] = {}
     for report in reports:
@@ -134,7 +134,7 @@ def _collect_allowances(reports: list[dict]) -> dict[tuple[str, int], dict[str, 
 
 
 def main() -> None:
-    """把冻结容差写入夹具并升级 schema；容差取最大实测刻度差，不加余量。"""
+    """Write the frozen tolerance into the fixture and upgrade it to schema; the tolerance is based on the maximum measured scale difference, without adding any margin."""
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("fixture", type=Path)

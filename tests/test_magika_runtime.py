@@ -1,4 +1,4 @@
-"""验证两个真实识别入口的 ONNX 线程限制与惰性加载边界。"""
+"""Verify ONNX thread limit and lazy loading bounds for two real recognition entries."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 
 
 def test_detection_and_language_use_bounded_cpu_sessions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """真实文件检测及语言识别均须使用 4/1 CPU 会话，文件检测仍复用同一实例。"""
+    """Both real file detection and language recognition must use the 4/1 CPU session, and file detection still reuses the same instance."""
     import magika
     import onnxruntime as ort
 
@@ -25,7 +25,7 @@ def test_detection_and_language_use_bounded_cpu_sessions(tmp_path: Path, monkeyp
         sess_options: ort.SessionOptions | None = None,
         providers: list[str] | None = None,
     ) -> ort.InferenceSession:
-        """执行真实模型构造并采集会话，核验两个业务入口实际传入的运行参数。"""
+        """Execute real model construction and collect sessions, and verify the actual operating parameters passed in by the two business portals."""
         session = original_session(model_path, sess_options=sess_options, providers=providers)
         sessions.append(session)
         return session
@@ -49,7 +49,7 @@ def test_detection_and_language_use_bounded_cpu_sessions(tmp_path: Path, monkeyp
 
 
 def test_detection_and_language_imports_keep_magika_lazy() -> None:
-    """仅导入检测与语言工具时，不应加载 Magika 或 ONNX Runtime。"""
+    """When importing only detection and language tools, Magika or ONNX Runtime should not be loaded."""
     code = """
 import sys
 import docvortex.document.detection

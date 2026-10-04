@@ -1,4 +1,4 @@
-"""只根据相邻字形的可靠墨迹留白补一个空格，不改写源字符。"""
+"""Only fill a space based on the reliable ink margins of adjacent glyphs, without overwriting the source characters."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from functools import lru_cache
 
 @lru_cache(maxsize=2048)
 def _ordinary_non_cjk(text: str) -> bool:
-    """仅接受单个普通字母或十进制数字，排除中日韩文字及兼容字形。"""
+    """Only a single ordinary letter or decimal number is accepted, excluding Chinese, Japanese and Korean characters and compatible glyphs."""
     if len(text) != 1:
         return False
     code = ord(text)
@@ -29,7 +29,7 @@ def _ordinary_non_cjk(text: str) -> bool:
 
 
 def _local_box(box, angle):
-    """只旋转坐标轴而不平移；相邻间隙不依赖页面尺寸。"""
+    """Only the coordinate axis is rotated without translation; the adjacent gap does not depend on the page size."""
     x0, y0, x1, y1 = box
     if angle == 90:
         return y0, -x1, y1, -x0
@@ -42,20 +42,20 @@ def _local_box(box, angle):
 
 @lru_cache(maxsize=512)
 def _font_allows_spacing(name: str, flags: int) -> bool:
-    """等宽字体的窄字形有天然大留白，缺少 advance 证据时不新增词界。"""
+    """Narrow fonts in monospaced fonts have naturally large white spaces, and no word boundaries are added when advance evidence is lacking."""
     name = name.lower()
     return not flags & 1 and not any(token in name for token in ("mono", "courier", "consolas", "menlo", "typewriter", "fixed"))
 
 
 def needs_tight_space(left, right, *, tight_bboxes=None, origins=None) -> bool:
-    """判定同向相邻非 CJK 字符是否具有超过四分之一字号的墨迹间隙。"""
+    """Determines whether adjacent non-CJK characters in the same direction have an ink gap of more than one-quarter font size."""
     if not _ordinary_non_cjk(str(left.get("char", ""))) or not _ordinary_non_cjk(str(right.get("char", ""))):
         return False
-    # 连续数字中的窄字形（如 11）也会产生大墨迹留白，保守保持数字原样。
+    # Narrow glyphs in consecutive numbers (such as 11) will also produce large ink margins, conservatively leaving the numbers as they are.
     if left["char"].isdecimal() and right["char"].isdecimal():
         return False
     li, ri = left.get("char_idx"), right.get("char_idx")
-    # 不跨被过滤字符、显式空白、其他 span 或容器认领的字符补词界。
+    # Do not cross filtered characters, explicit whitespace, other span or container-claimed character complement boundaries.
     if not isinstance(li, int) or not isinstance(ri, int) or ri != li + 1:
         return False
     try:
@@ -66,7 +66,7 @@ def needs_tight_space(left, right, *, tight_bboxes=None, origins=None) -> bool:
         if not math.isfinite(ls) or not math.isfinite(rs) or min(ls, rs) <= 0:
             return False
         em = max(ls, rs)
-        # 字号显著不同通常是上下标，证据不足时不额外补空格。
+        # Significantly different font sizes are usually superscript and subscript. If there is insufficient evidence, no additional spaces will be added.
         if min(ls, rs) < 0.8 * em:
             return False
         la, ra = float(left["writing_angle"]), float(right["writing_angle"])
@@ -87,7 +87,7 @@ def needs_tight_space(left, right, *, tight_bboxes=None, origins=None) -> bool:
         a, b = _local_box(lb, angle), _local_box(rb, angle)
         if a[2] <= a[0] or b[2] <= b[0] or a[3] <= a[1] or b[3] <= b[1]:
             return False
-        # 有些 PDF 把字号写成 1 再用文字矩阵放大；不拿源字号和页面墨迹强行比较。
+        # Some PDF write the font size as 1 and then use the text matrix to enlarge it; there is no forced comparison between the source font size and the page ink.
         if a[3] - a[1] > 1.5 * ls or b[3] - b[1] > 1.5 * rs:
             return False
         if b[0] - a[2] <= 0.25 * em:
@@ -111,7 +111,7 @@ def needs_tight_space(left, right, *, tight_bboxes=None, origins=None) -> bool:
 
 
 def join_tight_text(chars, *, tight_bboxes=None, origins=None) -> str:
-    """按现有成员顺序重建短行，仅在相邻可靠词界插入单个空格。"""
+    """Rebuild short lines in order of existing members, inserting only single spaces at adjacent reliable word boundaries."""
     parts = []
     previous = None
     for char in chars:

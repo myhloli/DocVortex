@@ -55,19 +55,19 @@ from docvortex.schema import BlockType
 
 
 def _equation_contents(pages: list[list[dict]]) -> list[str]:
-    """按分页顺序收集独立 equation block 内容。"""
+    """Collects stand-alone equation block content in paginated order."""
 
     return [block["content"] for page in pages for block in page if block.get("type") == BlockType.EQUATION]
 
 
 def _has_image(pages: list[list[dict]]) -> bool:
-    """判断 model-list 是否至少保留一个图片 block。"""
+    """Determine whether model-list retains at least one picture block."""
 
     return any(block.get("type") == BlockType.IMAGE for page in pages for block in page)
 
 
 def _wmf_formula(mtef: bytes) -> bytes:
-    """把 MTEF 包装为跨 chunk AppsMFCC WMF。"""
+    """Wrap MTEF across chunk AppsMFCC WMF."""
 
     return build_wmf(
         apps_mfcc_comments(
@@ -79,7 +79,7 @@ def _wmf_formula(mtef: bytes) -> bytes:
 
 
 def test_legacy_doc_ppt_xls_recover_wmf_comment_after_bad_native() -> None:
-    """验证旧三格式 Native 失败后用同一预览 WMF comment 恢复公式。"""
+    """Recover formulas with same preview WMF comment after failure to validate old three formats Native."""
 
     _name, mtef, expected = v5_formula_corpus()[1]
     preview = _wmf_formula(mtef)
@@ -116,7 +116,7 @@ def test_legacy_doc_ppt_xls_recover_wmf_comment_after_bad_native() -> None:
 
 
 def test_legacy_doc_direct_gif_comment_recovers_after_bad_native() -> None:
-    """验证 DOC PICF magic fallback 保留并解析原始 GIF/001。"""
+    """Verify DOC PICF magic fallback Preserves and parses the original GIF/001."""
 
     _name, mtef, expected = v5_formula_corpus()[0]
     image = build_gif_with_mtef(mtef, chunk_size=3)
@@ -135,7 +135,7 @@ def test_legacy_doc_direct_gif_comment_recovers_after_bad_native() -> None:
 
 
 def test_legacy_native_mtef_precedes_conflicting_wmf_comment() -> None:
-    """验证旧三格式有效 Native 优先于内容不同的 WMF comment。"""
+    """Validate that the old three formats Native take precedence over WMF with different content comment."""
 
     _native_name, native, expected = formula_corpus()[0]
     _image_name, image_mtef, _image_expected = v5_formula_corpus()[1]
@@ -164,7 +164,7 @@ def test_legacy_native_mtef_precedes_conflicting_wmf_comment() -> None:
 
 
 def test_xls_wmf_comment_equation_enters_table_cell() -> None:
-    """验证 XLS 图片 comment 公式进入 cell HTML 且不重复输出。"""
+    """Verify that the XLS picture comment formula enters cell HTML and does not repeat the output."""
 
     _name, mtef, expected = v5_formula_corpus()[0]
     pages = XlsModel().predict(
@@ -184,7 +184,7 @@ def test_xls_wmf_comment_equation_enters_table_cell() -> None:
 
 
 def test_doc_image_comment_equation_enters_nested_table_html() -> None:
-    """验证 DOC 段落图片与独立图片在嵌套表格中都写入 eq。"""
+    """Verify that DOC paragraph pictures and independent pictures are written as eq in the nested table."""
 
     payload = DocImagePayload(
         data=b"",
@@ -215,7 +215,7 @@ def test_doc_image_comment_equation_enters_nested_table_html() -> None:
 
 
 def test_docx_picture_comment_flows_inline_table_header_and_standalone() -> None:
-    """验证 DOCX 普通 WMF/GIF 图片进入统一公式 token 重建链路。"""
+    """Verification DOCX Common WMF/GIF picture enters the unified formula token to rebuild the link."""
 
     first = v5_formula_corpus()[0]
     second = v5_formula_corpus()[1]
@@ -249,7 +249,7 @@ def test_docx_picture_comment_flows_inline_table_header_and_standalone() -> None
 
 
 def test_docx_picture_comment_flows_title_and_list() -> None:
-    """验证 DOCX 图片公式在标题和列表中保持 eq 行内语义。"""
+    """Verify that DOCX picture formulas maintain eq inline semantics in titles and lists."""
 
     _name, mtef, expected = v5_formula_corpus()[0]
     image = build_gif_with_mtef(mtef)
@@ -283,7 +283,7 @@ def test_docx_picture_comment_flows_title_and_list() -> None:
 
 @pytest.mark.parametrize("carrier", ["wmf", "gif"])
 def test_pptx_picture_comment_equation_keeps_shape_order(carrier: str) -> None:
-    """验证 PPTX 普通图片 comment 以原 shape 顺序输出 equation。"""
+    """Verify PPTX normal picture comment output equation in the order of original shape."""
 
     _name, mtef, expected = v5_formula_corpus()[2]
     image = _wmf_formula(mtef) if carrier == "wmf" else build_gif_with_mtef(mtef, chunk_size=7)
@@ -295,7 +295,7 @@ def test_pptx_picture_comment_equation_keeps_shape_order(carrier: str) -> None:
 
 
 def test_pptx_ordinary_gif_over_formula_limit_keeps_image(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证普通 GIF 超出公式预算后，PPTX 仍保留与原序列化逻辑一致的静态图片。"""
+    """Verify that after ordinary GIF exceeds the formula budget, PPTX still retains static images consistent with the original serialization logic."""
     image = build_baseline_only_gif()
     expected = serialize_office_image(image, content_type="image/gif")
     assert expected is not None
@@ -314,7 +314,7 @@ def test_pptx_ordinary_gif_over_formula_limit_keeps_image(monkeypatch: pytest.Mo
 def test_pptx_notes_picture_comment_becomes_page_footnote(
     carrier: str,
 ) -> None:
-    """验证 PPTX notes 中的 WMF/GIF 图片公式输出 page_footnote。"""
+    """Verify the WMF/GIF picture formula in PPTX notes outputs page_footnote."""
 
     _name, mtef, expected = v5_formula_corpus()[0]
     image = _wmf_formula(mtef) if carrier == "wmf" else build_gif_with_mtef(mtef)
@@ -338,7 +338,7 @@ def test_pptx_notes_picture_comment_becomes_page_footnote(
 
 
 def test_pptx_notes_bad_ole_native_uses_wmf_preview_comment() -> None:
-    """验证 notes 中 OLE Native 失败时继续解析同对象 WMF preview。"""
+    """Verify notes in OLE Native continues parsing the same object WMF preview when it fails."""
 
     _name, mtef, expected = v5_formula_corpus()[0]
     pages = PptxModel().predict(
@@ -365,7 +365,7 @@ def test_pptx_notes_bad_ole_native_uses_wmf_preview_comment() -> None:
 def test_xlsx_image_comment_equation_enters_visual_and_table_paths(
     carrier: str,
 ) -> None:
-    """验证 XLSX 普通 WMF/GIF comment 按 anchor 输出或进入表格 cell。"""
+    """Verify XLSX Normal WMF/GIF comment Press anchor to export or enter table cell."""
 
     _name, mtef, expected = v5_formula_corpus()[0]
     image = _wmf_formula(mtef) if carrier == "wmf" else build_gif_with_mtef(mtef, chunk_size=3)
@@ -379,7 +379,7 @@ def test_xlsx_image_comment_equation_enters_visual_and_table_paths(
 
 
 def test_xlsx_cell_image_comment_returns_eq_html() -> None:
-    """验证 XLSX cellimages media 在返回 img 前尝试 comment 公式。"""
+    """Verify XLSX cellimages media Try the comment formula before returning img."""
 
     _name, mtef, expected = v5_formula_corpus()[0]
     image = build_gif_with_mtef(mtef)
@@ -410,7 +410,7 @@ def test_ooxml_bad_native_recovers_from_wmf_preview_comment(
     model: DocxModel | PptxModel | XlsxModel,
     builder: Callable[..., bytes],
 ) -> None:
-    """验证现代三格式 OLE Native 失败后升级有效 WMF preview。"""
+    """Verification of modern three formats OLE Native failed and the upgrade worked after failure to WMF preview."""
 
     _name, mtef, expected = v5_formula_corpus()[1]
     pages = model.predict(
@@ -440,7 +440,7 @@ def test_ooxml_native_precedes_conflicting_wmf_preview_comment(
     model: DocxModel | PptxModel | XlsxModel,
     builder: Callable[..., bytes],
 ) -> None:
-    """验证现代三格式有效 OLE Native 优先于图片 comment。"""
+    """Verify that modern three formats are valid OLE Native takes precedence over image comment."""
 
     _native_name, native, expected = formula_corpus()[0]
     _image_name, image_mtef, _image_expected = v5_formula_corpus()[1]
@@ -458,7 +458,7 @@ def test_ooxml_native_precedes_conflicting_wmf_preview_comment(
 
 
 def test_docx_equationxml_and_ooxml_omml_precede_image_comment() -> None:
-    """验证 equationxml/OMML 继续高于同对象图片 comment。"""
+    """Verify that equationxml/OMML continues to be higher than the same object picture, comment."""
 
     _name, image_mtef, _expected = v5_formula_corpus()[0]
     preview = _wmf_formula(image_mtef)
@@ -498,7 +498,7 @@ def test_docx_equationxml_and_ooxml_omml_precede_image_comment() -> None:
 
 
 def test_bad_image_comment_keeps_original_picture_or_placeholder() -> None:
-    """验证 baseline-only WMF 不升级公式并继续输出图片。"""
+    """Verification baseline-only WMF does not upgrade the formula and continues to output pictures."""
 
     image = build_wmf([baseline_wmf_comment(0)], placeable=True)
     cases = [
@@ -513,7 +513,7 @@ def test_bad_image_comment_keeps_original_picture_or_placeholder() -> None:
 
 
 def test_bad_image_comment_preview_exports_to_sidecar(tmp_path: Path) -> None:
-    """验证未升级的图片导出后 sidecar 完整且 JSON 不残留 base64。"""
+    """Verify that sidecar is complete and JSON does not retain base64 after exporting the non-upgraded image."""
 
     middle, _model = analyze_native_test_document(build_image_docx(build_baseline_only_gif()), file_suffix="docx")
 
@@ -525,7 +525,7 @@ def test_bad_image_comment_preview_exports_to_sidecar(tmp_path: Path) -> None:
 
 
 def test_modern_converter_reuse_resets_image_comment_decoder() -> None:
-    """验证现代 converter 复用时图片公式缓存和资源预算不会串文档。"""
+    """Verified that image formula caching and resource budgeting do not string documents when reusing modern converter."""
 
     first = v5_formula_corpus()[0]
     second = v5_formula_corpus()[1]

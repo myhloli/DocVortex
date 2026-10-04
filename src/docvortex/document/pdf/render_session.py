@@ -1,4 +1,4 @@
-"""可选的定向 PDF 渲染会话；输入文件共享一次，页图直接传输原始位图。"""
+"""Optional directed PDF rendering session; input files are shared once and page images are transferred directly to the original bitmap."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ _legacy_render_users = 0
 
 
 def _get_worker_budget():
-    """所有新会话共享租约额度，避免同时处理多文档时各自扩满进程池。"""
+    """All new sessions share the lease quota to avoid filling up the process pool when processing multiple documents at the same time."""
     global _worker_budget
     from .images import _get_pdf_render_pool_capacity
 
@@ -39,7 +39,7 @@ def _get_worker_budget():
 
 
 def _dispose_worker(worker):
-    """终止故障或退出中的 worker，确保共享输入句柄关闭后再删除文件。"""
+    """Terminate worker on failure or exit and make sure the shared input handle is closed before deleting the file."""
     process, connection = worker
     connection.close()
     process.join(timeout=0.1)
@@ -53,7 +53,7 @@ def _dispose_worker(worker):
 
 
 def _release_cached_input(worker, acknowledgement):
-    """在池锁内记录输入释放；缓存归属与当前任务租约归属可以不同。"""
+    """Record the input release in the pool lock; the cache ownership and the current task lease ownership can be different."""
     owner = _cached_workers.pop(worker, None)
     if owner is not None:
         owner.close_diagnostics.append(acknowledgement)
@@ -61,7 +61,7 @@ def _release_cached_input(worker, acknowledgement):
 
 
 def shutdown_pdf_render_sessions():
-    """进程退出或显式重置时回收持久定向池；活动会话会检测断连并失败。"""
+    """The persistent orientation pool is recycled when the process exits or is explicitly reset; active sessions detect disconnections and fail."""
     with _worker_available:
         workers = list(_all_workers)
         _all_workers.clear()
@@ -72,7 +72,7 @@ def shutdown_pdf_render_sessions():
                 owner._cancelled.set()
                 owner._worker_budget.release()
             result = {"input_released": True, "pid": worker[0].pid, "worker_terminated": True}
-            # 活动管道由租用者读取，强制关闭不能向其中插入另一条协议命令。
+            # An active pipe is read by the lessee, and another protocol command cannot be inserted into it by force-closing it.
             if owner is None:
                 try:
                     worker[1].send((0, "shutdown", None))
@@ -88,7 +88,7 @@ def shutdown_pdf_render_sessions():
 
 
 def prepare_legacy_render_pool():
-    """切回旧入口前释放新池的空闲进程，拒绝两种后端同时占满预算。"""
+    """Release the idle processes in the new pool before switching back to the old entry, and prevent both backends from filling up the budget at the same time."""
     with _worker_budget_lock:
         if len(_all_workers) != len(_idle_workers):
             raise RuntimeError("Close active PDF render sessions before using the legacy render pool")
@@ -97,7 +97,7 @@ def prepare_legacy_render_pool():
 
 @contextmanager
 def legacy_render_scope():
-    """整个旧任务窗口登记并发占用，阻止新会话在 submit 前回收旧池。"""
+    """The entire old task window registers concurrent occupancy, preventing new sessions from reclaiming the old pool before submit."""
     global _legacy_render_users
     with _worker_budget_lock:
         prepare_legacy_render_pool()
@@ -110,7 +110,7 @@ def legacy_render_scope():
 
 
 def _prepare_session_render_pool():
-    """租用新池前回收旧空闲池；旧池仍有任务时明确拒绝叠加并发。"""
+    """Recycle the old free pool before renting the new pool; explicitly refuse superimposed concurrency when there are still tasks in the old pool."""
     from . import images
 
     if _legacy_render_users:
@@ -127,10 +127,10 @@ atexit.register(shutdown_pdf_render_sessions)
 
 
 class _RenderPdfDocument:
-    """由 PDFium 持有共享输入文件，避免新文件跨进程 mmap 的同步开销。"""
+    """Shared input files are held by PDFium to avoid the synchronization overhead of new files across process mmap."""
 
     def __init__(self, path):
-        """直接使用现有 PDFium 文件加载入口，所有权持续到显式关闭。"""
+        """The entry is loaded directly using the existing PDFium file, ownership persists until explicitly closed."""
         import pypdfium2 as pdfium
         from .pdfium import pdfium_guard
 
@@ -139,7 +139,7 @@ class _RenderPdfDocument:
             self.document = pdfium.PdfDocument(Path(path))
 
     def close(self):
-        """原生文档成功关闭后才清除引用；失败由会话终止 worker 并回收文件。"""
+        """References are cleared only after the native document is successfully closed; failure results in session termination worker and file recycling."""
         from .pdfium import close_pdfium_document
 
         if self.document is not None:
@@ -148,7 +148,7 @@ class _RenderPdfDocument:
 
 
 def _render_session_worker(connection):
-    """串行处理定向协议，文档与文件读取器持续到显式关闭或连接断开。"""
+    """Serial processing directed protocol, document and file readers continue until explicitly closed or the connection is lost."""
     from .images import _initialize_pdf_render_worker, pdf_page_to_image
     from .pdfium import close_pdfium_child, pdfium_guard
     from ..._compute_backend import get_native
@@ -229,10 +229,10 @@ def _render_session_worker(connection):
 
 
 class PDFRenderSession:
-    """持有文档输入，按任务租用 worker；空闲文档缓存可被其他会话立即替换。"""
+    """Holds document input, renting worker on a per-task basis; idle document cache can be immediately replaced by another session."""
 
     def __init__(self, pdf_bytes: bytes, *, threads: int | None = None, timeout: float | None = None):
-        """保存一次 PDF 输入，惰性创建至多既有并发预算数量的 worker。"""
+        """Save the PDF input once and lazily create up to the existing concurrency budget number of workers."""
         from .images import MAX_PDF_RENDER_PROCESSES, get_load_images_threads, get_load_images_timeout
 
         if not pdf_bytes:
@@ -257,26 +257,26 @@ class PDFRenderSession:
         atexit.register(self.close)
 
     def validate_input(self, pdf_bytes):
-        """拒绝把另一文档的页号提交到现有会话，常规路径仅比较对象身份。"""
+        """Refuse to commit page numbers of another document to an existing session, regular paths only compare object identities."""
         if pdf_bytes is not self._pdf_bytes and pdf_bytes != self._pdf_bytes:
             raise ValueError("PDF render session input does not match")
 
     def __enter__(self):
-        """返回可显式释放资源的上下文会话。"""
+        """Returns a context session that can explicitly release resources."""
         return self
 
     def __exit__(self, *_):
-        """退出上下文时关闭全部定向 worker。"""
+        """Turn off all targeting when exiting context worker."""
         self.close()
 
     def _send(self, worker, operation, payload):
-        """发送具有递增标识的命令，防止读取错配的确认。"""
+        """Send a command with an incrementing ID to prevent mismatched acknowledgments from being read."""
         self._request_id += 1
         worker[1].send((self._request_id, operation, payload))
         return self._request_id
 
     def _receive(self, worker, request_id, deadline, *, closing=False):
-        """短轮询等待确认，同时检测截止时间、取消和 worker 崩溃。"""
+        """Short polling awaits confirmation while detecting deadlines, cancellations, and worker crashes."""
         process, connection = worker
         while True:
             if not closing and self._cancelled.is_set():
@@ -284,7 +284,7 @@ class PDFRenderSession:
             with _worker_budget_lock:
                 if _leased_workers.get(worker) is not self:
                     raise RuntimeError("PDF render worker lease was revoked")
-            # 先确认活动租约内的进程仍存活，避免消费崩溃前遗留的最后一个确认。
+            # First confirm that the process within the active lease is still alive to avoid consuming the last confirmation left before the crash.
             if not process.is_alive():
                 raise RuntimeError(f"PDF render worker exited: {process.exitcode}")
             remaining = deadline - time.monotonic()
@@ -299,13 +299,13 @@ class PDFRenderSession:
                     raise RuntimeError("PDF render protocol acknowledgement mismatch")
                 if status != "ack":
                     raise RuntimeError(f"PDF render worker {value[0]}: {value[1]}")
-                # 确认写入后进程也必须保持存活；worker 不应在响应后自行退出。
+                # The process must also remain alive after the write is acknowledged; worker should not exit itself after responding.
                 if not process.is_alive():
                     raise RuntimeError(f"PDF render worker exited: {process.exitcode}")
                 return value
 
     def _ensure_workers(self, count, deadline):
-        """按 FIFO 租用空闲进程，优先命中文档缓存，切换输入不占用池锁。"""
+        """Press FIFO to rent the idle process, hit the document cache first, and switch input without occupying the pool lock."""
         context = multiprocessing.get_context("spawn")
         with _worker_available:
             _prepare_session_render_pool()
@@ -320,14 +320,14 @@ class PDFRenderSession:
                     if _worker_waiters[0] is self and self._worker_budget.acquire(blocking=False):
                         break
                     _worker_available.wait(remaining)
-                # 有其他排队请求时仅先取得一个槽位；任务不会持有部分槽位再等待更多。
+                # Only one slot is obtained first when there are other queued requests; tasks will not hold partial slots and wait for more.
                 limit = 1 if len(_worker_waiters) > 1 else count
                 for index in range(limit):
                     if index and not self._worker_budget.acquire(blocking=False):
                         break
                     worker = None
                     try:
-                        # 等待期间旧后端可能开始工作，取得额度后必须重新检查互斥边界。
+                        # The old backend may start working during the waiting period, and the mutual exclusion boundary must be rechecked after the credit is obtained.
                         if index == 0:
                             _prepare_session_render_pool()
                         while _idle_workers:
@@ -390,7 +390,7 @@ class PDFRenderSession:
             with _worker_budget_lock:
                 if _leased_workers.get(worker) is not self:
                     raise RuntimeError("PDF render worker lease was revoked")
-                # 在发送前登记，打开失败也必须先回收输入句柄再删除临时文件。
+                # Register before sending. If the opening fails, the input handle must be recycled first and then the temporary file must be deleted.
                 _cached_workers[worker] = self
             pending.append((worker, self._send(worker, "open", str(self._input))))
         for worker, request_id in pending:
@@ -399,7 +399,7 @@ class PDFRenderSession:
             self.worker_diagnostics.append(result)
 
     def _release_workers(self):
-        """任务完成即归还使用权并唤醒等待者，保留可随时替换的单文档缓存。"""
+        """When the task is completed, the usage rights are returned and the waiters are awakened, leaving a single-document cache that can be replaced at any time."""
         with _worker_available:
             for worker in self._workers:
                 if _leased_workers.get(worker) is self:
@@ -411,7 +411,7 @@ class PDFRenderSession:
 
     @contextmanager
     def _task_lock(self, deadline):
-        """同会话并发请求的锁等待计入截止时间，超时不终止另一个任务。"""
+        """Lock waits for concurrent requests in the same session are included in the deadline, and the timeout does not terminate another task."""
         acquired = self._lock.acquire(blocking=False)
         while not acquired:
             remaining = deadline - time.monotonic()
@@ -428,7 +428,7 @@ class PDFRenderSession:
             self._lock.release()
 
     def render(self, start_page_id=0, end_page_id=0, *, dpi=200, image_type="pil_img", timeout=None, prepared_crops=None):
-        """按原顺序返回页图或裁图；整页像素不经过进程管道序列化。"""
+        """Return the page image or crop in the original order; the entire page pixels are not serialized through the pipeline."""
         from .images import MAX_PDF_RENDER_PROCESSES, _calculate_render_process_count
 
         if end_page_id < start_page_id:
@@ -451,7 +451,7 @@ class PDFRenderSession:
             collected = []
             try:
                 count = _calculate_render_process_count(end_page_id - start_page_id + 1, self.threads)
-                # 完整页按至少四页分配轻量会话 worker，仍受全局预算约束；裁图保留既有策略。
+                # Full pages allocate lightweight session worker by at least four pages, still subject to the global budget; cropping retains the existing policy.
                 if prepared_crops is None:
                     count = min(
                         MAX_PDF_RENDER_PROCESSES,
@@ -499,17 +499,17 @@ class PDFRenderSession:
                 raise
 
     def cancel(self):
-        """通知当前任务中止，随后关闭整个会话而非留下待处理协议消息。"""
+        """Notifies that the current task is aborted and then closes the entire session rather than leaving a pending protocol message."""
         self._cancelled.set()
         self.close()
 
     def _shutdown(self, *, graceful):
-        """仅清理自己的租约和缓存；其他会话切换旧输入时等待其释放确认。"""
+        """Only cleans its own leases and caches; other sessions wait for their release confirmation when switching old inputs."""
         if self._closed:
             return
         self._closed = True
         with _worker_available:
-            # 空闲缓存先原子预留，避免关闭输入时又被其他任务借走。
+            # The free cache is reserved atomically first to avoid being borrowed by other tasks when the input is closed.
             for worker in list(_idle_workers):
                 if _cached_workers.get(worker) is self:
                     if not self._worker_budget.acquire(blocking=False):
@@ -551,7 +551,7 @@ class PDFRenderSession:
                 self._worker_budget.release()
             self._workers.clear()
             _worker_available.notify_all()
-            # 借用者先关闭旧输入再打开新文档，不获取旧会话锁；等待不会形成会话锁环。
+            # The borrower first closes the old input and then opens the new document without acquiring the old session lock; waiting will not form a session lock loop.
             while any(owner is self for owner in _cached_workers.values()):
                 _worker_available.wait()
         self._directory.cleanup()
@@ -559,7 +559,7 @@ class PDFRenderSession:
         atexit.unregister(self.close)
 
     def close(self):
-        """取消自己的等待或任务，确认本输入不再被任何 worker 持有后删除文件。"""
+        """Cancel your own waiting or tasks and delete the file after confirming that this input is no longer held by any worker."""
         self._cancelled.set()
         with _worker_available:
             _worker_available.notify_all()

@@ -44,7 +44,7 @@ from docvortex.schema import (
 
 
 def _public_block_payloads() -> dict[str, dict[str, object]]:
-    """构造 29 个公开 discriminator 的最小合法载荷。"""
+    """Construct 29 minimum legal payloads exposing discriminator."""
     text_leaf = {"type": "text", "content": _inline("item")}
     payloads: dict[str, dict[str, object]] = {
         "aside_text": {"type": "aside_text", "content": _inline("aside")},
@@ -90,7 +90,7 @@ def _public_block_payloads() -> dict[str, dict[str, object]]:
 
 
 def test_all_29_public_discriminators_parse_to_concrete_models() -> None:
-    """验证公开类型集合与 discriminated union 完整一致。"""
+    """Verify that the public type collection is completely consistent with discriminated union."""
     payloads = _public_block_payloads()
 
     assert set(payloads) == BLOCK_TYPES
@@ -101,7 +101,7 @@ def test_all_29_public_discriminators_parse_to_concrete_models() -> None:
 
 
 def test_public_block_type_declarations_match_block_union() -> None:
-    """验证 BlockType、BlockTypes 和 BLOCK_TYPES 只公开 Block 联合的 discriminator。"""
+    """Verify that BlockType, BlockTypes and BLOCK_TYPES expose only Block combined with discriminator."""
     class_values = {value for name, value in vars(BlockType).items() if name.isupper()}
 
     assert class_values == BLOCK_TYPES
@@ -110,7 +110,7 @@ def test_public_block_type_declarations_match_block_union() -> None:
 
 
 def test_shared_models_preserve_all_discriminator_values() -> None:
-    """验证同结构 discriminator 共用模型，但仍保留原始 type 语义。"""
+    """Verification shares the same structural model as discriminator, but still retains the original type semantics."""
     assert isinstance(parse_block({"type": "header", "content": _inline("h")}), PageAuxTextBlock)
     assert isinstance(parse_block({"type": "image_caption", "content": _inline("c")}), ImageAnnotationBlock)
     assert isinstance(parse_block({"type": "table_footnote", "content": _inline("f")}), TableAnnotationBlock)
@@ -119,7 +119,7 @@ def test_shared_models_preserve_all_discriminator_values() -> None:
 
 
 def test_inline_span_models_normalize_styles_and_merge_adjacent_text() -> None:
-    """验证 TextSpan 样式顺序去重、空白保真和相邻同样式合并。"""
+    """Verify TextSpan style order deduplication, whitespace fidelity, and adjacent style merging."""
     spans = normalize_inline_spans(
         [
             {"type": "text", "content": "A", "styles": ["underline", "bold", "bold"]},
@@ -140,7 +140,7 @@ def test_inline_span_models_normalize_styles_and_merge_adjacent_text() -> None:
 
 
 def test_inline_equation_code_and_hyperlink_are_strict_and_safe() -> None:
-    """验证非文字 Span 的空值、嵌套链接、危险 URL 和额外字段均被拒绝。"""
+    """Validate non-literal Span NULL values, nested links, dangerous URL and extra fields are rejected."""
     valid = parse_inline_spans(
         [
             {"type": "equation_inline", "content": "x<y"},
@@ -171,7 +171,7 @@ def test_inline_equation_code_and_hyperlink_are_strict_and_safe() -> None:
 
 
 def test_inline_text_preserves_markup_entities_and_unicode_verbatim() -> None:
-    """验证符号、实体外观、引号、Unicode 和完整标签字面量不被解释。"""
+    """Validation symbols, entity appearances, quotes, Unicode and full label literals are not interpreted."""
     content = 'A&B / 1<2 / 3>2 / &amp; / "quote" / 中文🙂 / <eq>x</eq> / <script>alert(1)</script>'
     spans = parse_inline_spans(_inline(content))
 
@@ -180,7 +180,7 @@ def test_inline_text_preserves_markup_entities_and_unicode_verbatim() -> None:
 
 
 def test_model_json_rejects_legacy_inline_string_with_page_and_block_location() -> None:
-    """验证 ModelJson 对旧字符串 content 给出页号和块号定位。"""
+    """Verification ModelJson gives the page number and block number location for the old string content."""
     with pytest.raises(ValidationError, match=r"pages\[0\]\[0\].*type=text"):
         ModelJson(
             pages=[[{"type": BlockType.TEXT, "content": "legacy string"}]],
@@ -191,7 +191,7 @@ def test_model_json_rejects_legacy_inline_string_with_page_and_block_location() 
 
 
 def test_page_footnote_uses_independent_model_and_exclusive_anchor() -> None:
-    """验证页面脚注使用独立模型，页面辅助块不再接受 anchor。"""
+    """Validate page footer using standalone model, page helper block no longer accepts anchor."""
     footnote = parse_block(
         {
             "type": "page_footnote",
@@ -209,7 +209,7 @@ def test_page_footnote_uses_independent_model_and_exclusive_anchor() -> None:
 
 
 def test_title_levels_follow_global_hierarchy() -> None:
-    """验证文档标题固定为一级，段落标题严格限制在二至六级。"""
+    """Verify that document titles are fixed at level one, and paragraph titles are strictly limited to levels two to six."""
     doc_title = parse_block({"type": "doc_title", "content": _inline("doc"), "level": 1})
     paragraph_title = parse_block({"type": "paragraph_title", "content": _inline("section"), "level": 2})
     deepest_title = parse_block({"type": "paragraph_title", "content": _inline("deep"), "level": 6})
@@ -230,13 +230,13 @@ def test_title_levels_follow_global_hierarchy() -> None:
 
 @pytest.mark.parametrize("block_type", ["equation", "image_body", "table_body", "chart_body"])
 def test_image_payload_content_must_be_string(block_type: str) -> None:
-    """验证所有图片载荷块在严格 Middle JSON 中都拒绝 null content。"""
+    """Verify that all image payload blocks reject null content in strict Middle JSON."""
     with pytest.raises(ValidationError):
         parse_block({"type": block_type, "content": None})
 
 
 def test_cell_merge_belongs_only_to_table_root() -> None:
-    """验证 cell_merge 只允许位于 table 根块。"""
+    """Verify that cell_merge is only allowed in the table root block."""
     table_payload = deepcopy(_public_block_payloads()["table"])
     table_payload["cell_merge"] = [1, 0]
 
@@ -249,20 +249,20 @@ def test_cell_merge_belongs_only_to_table_root() -> None:
 
 @pytest.mark.parametrize("raw_type", sorted(RAW_ONLY_BLOCK_TYPES))
 def test_raw_only_types_are_rejected(raw_type: str) -> None:
-    """验证 Analyze 私有 raw type 不能越过公开对象边界。"""
+    """Validation Analyze Private raw type Cannot cross public object boundaries."""
     assert raw_type in RAW_ONLY_BLOCK_TYPES
     with pytest.raises(ValidationError):
         parse_block({"type": raw_type, "content": "raw"})
 
 
 def test_legacy_interline_equation_discriminator_is_rejected() -> None:
-    """验证旧 interline_equation 不提供兼容入口，严格对象只接受 equation。"""
+    """Verification old interline_equation does not provide a compatible entry, strict objects only accept equation."""
     with pytest.raises(ValidationError):
         parse_block({"type": "interline_equation", "content": "x=1"})
 
 
 def test_equation_schema_uses_only_canonical_discriminator() -> None:
-    """验证生成的 JSON Schema 只公开 equation 与 EquationBlock。"""
+    """Verify that the generated JSON Schema only exposes equation and EquationBlock."""
     schema = BLOCK_ADAPTER.json_schema()
     mapping = schema["discriminator"]["mapping"]
     legacy_model_name = "Interline" + "EquationBlock"
@@ -274,7 +274,7 @@ def test_equation_schema_uses_only_canonical_discriminator() -> None:
 
 
 def test_formula_number_is_rejected_by_middle_json_boundary_and_schema() -> None:
-    """验证 formula_number 仅属于 Analyze raw 阶段，不能进入公开 Block 或 Middle JSON。"""
+    """Verify that formula_number belongs only to the Analyze raw stage and cannot enter the public Block or Middle JSON."""
     schema = BLOCK_ADAPTER.json_schema()
     mapping = schema["discriminator"]["mapping"]
 
@@ -295,7 +295,7 @@ def test_formula_number_is_rejected_by_middle_json_boundary_and_schema() -> None
 
 
 def test_continuable_text_models_share_marker_and_keep_text_anchor_strict() -> None:
-    """验证 Text 独有 anchor、Text/RefText 续接字段及未知字段校验。"""
+    """Verify Text unique anchor, Text/RefText continuation fields and unknown field verification."""
     text = parse_block({"type": "text", "content": _inline("x"), "continues_prev": True})
     anchored_text = parse_block({"type": "text", "content": _inline("x"), "anchor": "a"})
     ref_text = parse_block({"type": "ref_text", "content": _inline("r"), "continues_prev": True})
@@ -314,7 +314,7 @@ def test_continuable_text_models_share_marker_and_keep_text_anchor_strict() -> N
 
 
 def test_every_public_block_rejects_removed_merge_field() -> None:
-    """验证已废弃合并字段不会被任一公开 block 静默接收。"""
+    """Verify that obsolete merge fields are not silently received by either public block."""
     for payload in _public_block_payloads().values():
         invalid_payload = deepcopy(payload)
         invalid_payload["merge_prev"] = False
@@ -323,7 +323,7 @@ def test_every_public_block_rejects_removed_merge_field() -> None:
 
 
 def test_removed_block_classes_are_not_exposed() -> None:
-    """验证未采用的旧 block 类没有重新进入公开对象体系。"""
+    """Verify that the old unadopted block class does not re-enter the public object hierarchy."""
     legacy_equation_model_name = "Interline" + "EquationBlock"
     removed_names = (
         "TitleBlock",
@@ -361,13 +361,13 @@ def test_removed_block_classes_are_not_exposed() -> None:
     [(-0.1, 0.1, 0.8, 0.8), (0.1, 0.1, 1.1, 0.8), (0.5, 0.1, 0.5, 0.8), (0.1, 0.8, 0.5, 0.2)],
 )
 def test_bbox_must_be_normalized_and_positive(bbox: tuple[float, ...]) -> None:
-    """验证 bbox 必须有限、归一化且具有正面积。"""
+    """Verification bbox must be finite, normalized, and have positive area."""
     with pytest.raises(ValidationError):
         parse_block({"type": "text", "content": _inline("x"), "bbox": bbox})
 
 
 def test_recursive_list_and_index_round_trip() -> None:
-    """验证四层 List 与递归 Index 的顺序和具体类型可无损恢复。"""
+    """Verify that the order and specific type of four-layer List and recursive Index are recoverable without loss."""
     list_payload: dict[str, object] = {"type": "text", "content": _inline("leaf")}
     for _ in range(4):
         list_payload = {"type": "list", "content": [{"type": "text", "content": _inline("item")}, list_payload]}
@@ -390,7 +390,7 @@ def test_recursive_list_and_index_round_trip() -> None:
 
 
 def test_list_subtype_allows_mixed_direct_text_children() -> None:
-    """验证 List subtype 是子项类型的统计结果，不约束每个直接子项。"""
+    """Validation List subtype is a statistical result of the child type and does not constrain each direct child."""
     block = parse_block(
         {
             "type": "list",
@@ -417,7 +417,7 @@ def test_list_subtype_allows_mixed_direct_text_children() -> None:
 
 @pytest.mark.parametrize("visual_type", ["image", "table", "chart", "code"])
 def test_visual_parent_requires_exactly_one_body(visual_type: str) -> None:
-    """验证视觉父块必须且只能包含一个对应 body。"""
+    """The verification visual parent block must contain exactly one corresponding body."""
     payload = deepcopy(_public_block_payloads()[visual_type])
     payload["content"] = []
     with pytest.raises(ValidationError, match="exactly one"):
@@ -425,7 +425,7 @@ def test_visual_parent_requires_exactly_one_body(visual_type: str) -> None:
 
 
 def test_visual_parent_body_location_contract() -> None:
-    """验证视觉 parent/body 的 index 和同时存在的 bbox 必须一致。"""
+    """Verify that the index of the visual parent/body and the concurrent bbox must be consistent."""
     with pytest.raises(ValidationError, match="index"):
         parse_block(
             {
@@ -445,7 +445,7 @@ def test_visual_parent_body_location_contract() -> None:
 
 
 def test_visual_parent_rejects_other_family_annotation() -> None:
-    """验证合并 annotation 模型后仍禁止视觉父块接收其他家族子块。"""
+    """Verified that merging the annotation model still disables the visual parent block from receiving other family child blocks."""
     with pytest.raises(ValidationError):
         parse_block(
             {
@@ -459,7 +459,7 @@ def test_visual_parent_rejects_other_family_annotation() -> None:
 
 
 def test_code_subtype_controls_guess_language() -> None:
-    """验证 code 必须有语言，而 algorithm 禁止语言字段。"""
+    """Verification code must have language, while algorithm disallows the language field."""
     with pytest.raises(ValidationError):
         parse_block({"type": "code", "sub_type": "code", "content": [{"type": "code_body", "content": "x"}]})
     with pytest.raises(ValidationError):
@@ -480,7 +480,7 @@ def test_code_subtype_controls_guess_language() -> None:
 
 
 def test_page_info_requires_unique_strictly_increasing_top_indices() -> None:
-    """验证顶层 index 必填、唯一、严格递增，但允许缺号。"""
+    """Verify top level index Required, unique, strictly increasing, but missing numbers are allowed."""
     page = PageInfo(
         page_idx=0,
         blocks=[
@@ -503,7 +503,7 @@ def test_page_info_requires_unique_strictly_increasing_top_indices() -> None:
 
 @pytest.mark.parametrize("block_type", ["image_body", "table_caption", "code_footnote"])
 def test_page_info_rejects_visual_child_as_top_level(block_type: str) -> None:
-    """验证视觉 body/caption/footnote 只能出现在对应父块内部。"""
+    """Verification visual body/caption/footnote can only appear inside the corresponding parent block."""
     with pytest.raises(ValidationError):
         PageInfo.model_validate(
             {
@@ -514,7 +514,7 @@ def test_page_info_rejects_visual_child_as_top_level(block_type: str) -> None:
 
 
 def test_page_info_accepts_all_page_root_discriminators() -> None:
-    """验证 PAGE_BLOCK_TYPES 中的全部页面根类型都能进入 PageInfo。"""
+    """Verify that all page root types in PAGE_BLOCK_TYPES can enter PageInfo."""
     payloads = _public_block_payloads()
     for block_type in PAGE_BLOCK_TYPES:
         payload = deepcopy(payloads[block_type])
@@ -531,7 +531,7 @@ def test_page_info_accepts_all_page_root_discriminators() -> None:
 @pytest.mark.parametrize("child_type", [BlockType.TEXT, BlockType.REF_TEXT])
 @pytest.mark.parametrize("continues_prev", [True, None])
 def test_nested_continues_prev_is_rejected_by_page_tree(child_type: str, continues_prev: bool | None) -> None:
-    """验证 continues_prev 只能出现在页面顶层 text/ref_text/list/table。"""
+    """Verify that continues_prev can only appear at the top level of the page, text/ref_text/list/table."""
     with pytest.raises(ValidationError, match="nested"):
         PageInfo.model_validate(
             {
@@ -548,7 +548,7 @@ def test_nested_continues_prev_is_rejected_by_page_tree(child_type: str, continu
 
 
 def test_middle_json_pdf_requires_top_level_bbox_and_round_trips() -> None:
-    """验证 PDF 顶层 bbox 约束及 MiddleJson JSON 往返。"""
+    """Verify PDF top level bbox constraints and MiddleJson JSON round trip."""
     with pytest.raises(ValidationError, match="requires bbox"):
         MiddleJson(
             pages=[PageInfo(page_idx=0, blocks=[TextBlock(type="text", index=0, content=_inline("x"))])],

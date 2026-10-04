@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到 PDF bytes 的轻量公共门面。"""
+"""Lightweight public facade for strictly MiddleJson to PDF bytes."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ def render_pdf(
     document_title: str | None = None,
     layout: PdfLayout = PdfLayout.AUTO,
 ) -> bytes:
-    """惰性加载 PDF 实现并渲染严格 MiddleJson。"""
+    """Lazy loading PDF implements and renders strict MiddleJson."""
     from ._internal.pdf.renderer import render_pdf as _render_pdf
 
     return _render_pdf(

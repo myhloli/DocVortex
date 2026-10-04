@@ -1,4 +1,4 @@
-"""从 Excel.Chart 或 MSGraph.Chart OLE 对象恢复 HTML 数据表。"""
+"""Restore HTML data tables from Excel.Chart or MSGraph.Chart OLE objects."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ GRAPH_MAX_COLS = 256
 
 @dataclass(frozen=True, slots=True)
 class EmbeddedChartData:
-    """嵌入式 chart 已解析出的工作簿和唯一表格选择。"""
+    """Embedded chart Resolved workbook and unique table selection."""
 
     workbook: XlsWorkbook
     sheet_name: str
@@ -45,7 +45,7 @@ class EmbeddedChartData:
 
 
 def _nonempty_selection(sheet: XlsSheet) -> tuple[tuple[int, ...], tuple[int, ...]] | None:
-    """返回工作表非空单元格覆盖的稳定行列集合。"""
+    """Returns a stable set of rows and columns covered by non-empty cells in the worksheet."""
 
     if not sheet.cells:
         return None
@@ -57,7 +57,7 @@ def _nonempty_selection(sheet: XlsSheet) -> tuple[tuple[int, ...], tuple[int, ..
 
 
 def _excel_chart_data(workbook_stream: bytes) -> EmbeddedChartData | None:
-    """解析 Excel.Chart 工作簿中的活动独立 chart sheet。"""
+    """Resolve Excel.Chart activity independent chart sheet in workbook."""
 
     workbook = parse_xls_workbook(workbook_stream)
     visible_charts = [chart for chart in workbook.chart_sheets if chart.visible]
@@ -98,7 +98,7 @@ def _excel_chart_data(workbook_stream: bytes) -> EmbeddedChartData | None:
 
 
 def _decode_short_unicode(payload: bytes, offset: int) -> str | None:
-    """读取 MS-OGRAPH ShortXLUnicodeString。"""
+    """Read MS-OGRAPH ShortXLUnicodeString."""
 
     if offset < 0 or offset + 2 > len(payload):
         return None
@@ -119,7 +119,7 @@ def _decode_short_unicode(payload: bytes, offset: int) -> str | None:
 
 
 def _decode_unicode_min2(payload: bytes, offset: int) -> str | None:
-    """读取带 u16 长度的 MS-OGRAPH XLUnicodeStringMin2。"""
+    """Read MS-OGRAPH XLUnicodeStringMin2 with length u16."""
 
     count = get_u16(payload, offset)
     if count is None or offset + 3 > len(payload):
@@ -143,7 +143,7 @@ def _graph_included_indices(
     candidates: tuple[int, ...],
     payload: bytes | None,
 ) -> tuple[int, ...]:
-    """按 MS-OGRAPH 交替边界筛选 chart 实际包含的行或列。"""
+    """Filters by MS-OGRAPH alternating boundaries the rows or columns that chart actually contains."""
 
     if not payload:
         return candidates
@@ -159,7 +159,7 @@ def _graph_included_indices(
 
 
 def _graph_chart_data(workbook_stream: bytes) -> EmbeddedChartData | None:
-    """解析 MS-OGRAPH chart sheet 内嵌的 datasheet。"""
+    """Parse MS-OGRAPH chart sheet embedded datasheet."""
 
     records = list(iter_records(workbook_stream))
     bof_records = [record for record in records if record.record_type == BOF]
@@ -249,7 +249,7 @@ def _graph_chart_data(workbook_stream: bytes) -> EmbeddedChartData | None:
 
 
 def extract_embedded_chart_data(workbook_stream: bytes) -> EmbeddedChartData | None:
-    """按 BOF 版本选择 Excel BIFF 或 MS-OGRAPH chart 解析器。"""
+    """Select Excel BIFF or MS-OGRAPH chart parser by BOF version."""
 
     first = record_at(workbook_stream, 0)
     if first is None or first.record_type != BOF:
@@ -268,7 +268,7 @@ def extract_embedded_chart_data(workbook_stream: bytes) -> EmbeddedChartData | N
 
 
 def extract_embedded_chart_html(workbook_stream: bytes) -> str | None:
-    """从 Workbook/Book stream 恢复一个可渲染的 HTML 数据表。"""
+    """Restore a renderable HTML data table from Workbook/Book stream."""
 
     chart = extract_embedded_chart_data(workbook_stream)
     if chart is None:
@@ -282,7 +282,7 @@ def extract_embedded_chart_html(workbook_stream: bytes) -> str | None:
 
 
 def extract_embedded_chart_html_from_storage(storage: bytes) -> str | None:
-    """从独立 OLE CFB 对象中读取 Workbook/Book 并恢复数据表。"""
+    """Read Workbook/Book from the standalone OLE CFB object and restore the data table."""
 
     try:
         with BoundedOleReader(storage) as ole:

@@ -66,7 +66,7 @@ class ValidationIssue:
 
 
 def validate_pages(pages: list[PageInfo]) -> list[ValidationIssue]:
-    """检查测试页面树并返回带位置的结构问题。"""
+    """Examine the test page tree and return structural questions with position."""
     issues: list[ValidationIssue] = []
     if not isinstance(pages, list):
         return [
@@ -107,7 +107,7 @@ def _validate_block_list(
     path: str,
     issues: list[ValidationIssue],
 ) -> None:
-    """递归检查块列表类型、顺序及嵌套结构。"""
+    """Recursively check block list types, order, and nested structures."""
     seen_indexes: set[int] = set()
     previous_index: int | None = None
     for block_index, block in enumerate(blocks):
@@ -142,7 +142,7 @@ def _validate_block_list(
 
 
 def _validate_block(block: BlockBase, path: str, issues: list[ValidationIssue]) -> None:
-    """按块类型验证必须字段与内容约束。"""
+    """Verify required fields and content constraints by block type."""
     block_type = getattr(block, "type", None)
     if not _has_field(block, "type"):
         issues.append(_missing(f"{path}.type"))
@@ -183,7 +183,7 @@ def _validate_block(block: BlockBase, path: str, issues: list[ValidationIssue]) 
 
 
 def _validate_string_content(block: BlockBase, path: str, issues: list[ValidationIssue]) -> None:
-    """验证文字与行内内容的结构约束。"""
+    """Verify structural constraints on text and inline content."""
     content = getattr(block, "content", None)
     block_type = getattr(block, "type", None)
     if content is None:
@@ -204,7 +204,7 @@ def _validate_string_content(block: BlockBase, path: str, issues: list[Validatio
 
 
 def _validate_inline_content(block: InlineContentBlock, path: str, issues: list[ValidationIssue]) -> None:
-    """验证行内内容是非空 Span 列表。"""
+    """Verify that the inline content is a non-empty Span list."""
     content = getattr(block, "content", None)
     if not isinstance(content, list):
         issues.append(_invalid_type(path, "list[InlineSpan]"))
@@ -221,7 +221,7 @@ def _validate_inline_content(block: InlineContentBlock, path: str, issues: list[
 
 
 def _validate_visual_block_children(block: BlockBase, path: str, issues: list[ValidationIssue]) -> None:
-    """验证视觉父块恰有一个主体，且主体索引与父块索引一致。"""
+    """Verify that the visual parent block has exactly one body, and that the body index is consistent with the parent block index."""
     content = getattr(block, "content", None)
     block_type = getattr(block, "type", None)
     if not isinstance(content, list):
@@ -261,7 +261,7 @@ def _validate_bbox(
     path: str,
     issues: list[ValidationIssue],
 ) -> None:
-    """验证边界框数值、范围和正面积。"""
+    """Validate bounding box values, extents, and frontal areas."""
     if not _is_bbox(bbox):
         issues.append(
             ValidationIssue(
@@ -296,7 +296,7 @@ def _validate_bbox(
 
 
 def _validate_title_level(block: BlockBase, path: str, issues: list[ValidationIssue]) -> None:
-    """校验标题层级的类型与允许范围。"""
+    """Verify the type and allowed range of title levels."""
     level = getattr(block, "level", None)
     if level is None:
         issues.append(
@@ -320,7 +320,7 @@ def _validate_title_level(block: BlockBase, path: str, issues: list[ValidationIs
 
 
 def _is_bbox(bbox: object) -> bool:
-    """判断对象是否为四个数值组成的边界框。"""
+    """Determine whether the object is a bounding box composed of four values."""
     return (
         isinstance(bbox, tuple | list)
         and len(bbox) == 4
@@ -329,17 +329,17 @@ def _is_bbox(bbox: object) -> bool:
 
 
 def _is_int(value: object) -> bool:
-    """区分整数与布尔值，匹配严格类型约束。"""
+    """Distinguish between integers and Boolean values, matching strict type constraints."""
     return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _has_field(obj: object, name: str) -> bool:
-    """判断测试对象是否包含指定字段。"""
+    """Determine whether the test object contains the specified field."""
     return hasattr(obj, name)
 
 
 def _missing(path: str) -> ValidationIssue:
-    """构造缺失字段的可定位诊断。"""
+    """Construct locatable diagnostics for missing fields."""
     return ValidationIssue(
         severity="error",
         code="missing_required_field",
@@ -349,7 +349,7 @@ def _missing(path: str) -> ValidationIssue:
 
 
 def _invalid_type(path: str, expected: str) -> ValidationIssue:
-    """构造字段类型错误的可定位诊断。"""
+    """Locatable diagnostics for constructed field type errors."""
     return ValidationIssue(
         severity="error",
         code="invalid_type",
@@ -359,7 +359,7 @@ def _invalid_type(path: str, expected: str) -> ValidationIssue:
 
 
 def _invalid_value(path: str, message: str) -> ValidationIssue:
-    """构造字段取值错误的可定位诊断。"""
+    """Locatable diagnostics for construction field value errors."""
     return ValidationIssue(
         severity="error",
         code="invalid_value",
@@ -369,12 +369,12 @@ def _invalid_value(path: str, message: str) -> ValidationIssue:
 
 
 def _issue_keys(issues):
-    """提取稳定的诊断键供断言比较。"""
+    """Extract stable diagnostic keys for assertion comparison."""
     return {(issue.severity, issue.code, issue.path) for issue in issues}
 
 
 def _valid_page() -> PageInfo:
-    """构造完整合法的最小页面树。"""
+    """Construct a complete and legal minimum page tree."""
     return PageInfo(
         page_idx=0,
         blocks=[
@@ -384,12 +384,12 @@ def _valid_page() -> PageInfo:
 
 
 def test_validate_pages_accepts_valid_page_tree() -> None:
-    """合法页面树应通过验证且没有诊断。"""
+    """The legal page tree should pass validation and have no diagnostics."""
     assert validate_pages([_valid_page()]) == []
 
 
 def test_validate_pages_reports_missing_required_page_and_block_fields() -> None:
-    """缺失页面或块必填字段时返回准确位置。"""
+    """Returns the exact location when a page or block required field is missing."""
     page = _valid_page()
     page_no_idx = PageInfo.model_construct(blocks=page.blocks)
     block_no_type = TextBlock.model_construct(index=0, content="hello", bbox=(0.1, 0.1, 0.2, 0.2))
@@ -402,7 +402,7 @@ def test_validate_pages_reports_missing_required_page_and_block_fields() -> None
 
 
 def test_validate_pages_distinguishes_unknown_and_invalid_bbox() -> None:
-    """验证 bbox 坐标 x1 <= x0 或 y1 <= y0 时报 error。"""
+    """Verify that bbox coordinates x1 <= x0 or y1 <= y0 times error."""
     invalid_bbox_block = TextBlock.model_construct(
         type=BlockType.TEXT,
         index=0,
@@ -417,7 +417,7 @@ def test_validate_pages_distinguishes_unknown_and_invalid_bbox() -> None:
 
 
 def test_validate_pages_reports_bbox_out_of_bounds() -> None:
-    """验证 bbox 值超出 [0, 1] 范围时报 warning。"""
+    """warning is reported when verifying that the bbox value exceeds the range [0, 1]."""
     out_of_bounds_block = TextBlock.model_construct(
         type=BlockType.TEXT,
         index=0,
@@ -432,7 +432,7 @@ def test_validate_pages_reports_bbox_out_of_bounds() -> None:
 
 
 def test_validate_pages_recurses_into_child_blocks() -> None:
-    """验证 visual parent block 的 content 子块也会被递归校验。"""
+    """Verification The content sub-block of visual parent block is also recursively verified."""
     image_block = ImageBlock(
         type=BlockType.IMAGE,
         index=0,
@@ -450,12 +450,12 @@ def test_validate_pages_recurses_into_child_blocks() -> None:
 
     issues = validate_pages([page])
 
-    # image_body 允许空 content，不应产生 content 警告
+    # image_body Null content is allowed, content warning should not be generated
     assert ("warning", "block_content_missing", "pages[0].blocks[0].content[0].content") not in _issue_keys(issues)
 
 
 def test_validate_pages_reports_wrong_node_types() -> None:
-    """页面与块节点类型错误时给出明确诊断。"""
+    """Provide clear diagnosis when page and block node types are wrong."""
     page = _valid_page()
     page.blocks.append(object())  # type: ignore[arg-type]
 
@@ -466,7 +466,7 @@ def test_validate_pages_reports_wrong_node_types() -> None:
 
 
 def test_validate_pages_reports_unknown_block_type_and_bad_title_level() -> None:
-    """未知块类型与非法标题层级分别生成诊断。"""
+    """Separate diagnostics are generated for unknown block types and illegal header levels."""
     bad_type_block = TextBlock.model_construct(type="unknown_type", index=0, content="hello", bbox=(0.1, 0.1, 0.2, 0.2))
     bad_level_block = ParagraphTitleBlock.model_construct(
         type=BlockType.PARAGRAPH_TITLE,
@@ -484,10 +484,10 @@ def test_validate_pages_reports_unknown_block_type_and_bad_title_level() -> None
 
 
 def test_validate_pages_reports_block_index_order_and_duplicates() -> None:
-    """验证 block index 乱序和重复会被报告。
+    """Verification block index Out-of-order and duplicates will be reported.
 
-    PageInfo 顶层 index 在构造时已强制 unique+ascending，这里用 model_construct 绕过
-    Pydantic 校验来测试 validator 自身的检测能力。
+    PageInfo The top-level index has been forced to unique+ascending during construction. Use model_construct to bypass it here.
+    Pydantic calibration to test the detection capability of validator itself.
     """
     page = PageInfo.model_construct(
         page_idx=0,
@@ -505,7 +505,7 @@ def test_validate_pages_reports_block_index_order_and_duplicates() -> None:
 
 
 def test_validate_pages_reports_inline_content_contracts() -> None:
-    """验证 Span 内容 block 的空 content 会触发 warning。"""
+    """Verify Span Contents block An empty content triggers warning."""
     empty_text = TextBlock.model_construct(type=BlockType.TEXT, index=0, content=[], bbox=(0.1, 0.1, 0.2, 0.2))
     page = PageInfo(page_idx=0, blocks=[empty_text])
 
@@ -515,9 +515,9 @@ def test_validate_pages_reports_inline_content_contracts() -> None:
 
 
 def test_validate_pages_reports_visual_block_body_count_mismatch() -> None:
-    """验证视觉父块必须有且仅有一个 body。
+    """Verify that the visual parent block must have one and only one body.
 
-    ImageBlock 构造时已强制 exactly-one-body，用 model_construct 绕过以测试 validator。
+    ImageBlock was constructed with exactly-one-body forced, bypassed with model_construct to test validator.
     """
     image_block = ImageBlock.model_construct(
         type=BlockType.IMAGE,
@@ -540,9 +540,9 @@ def test_validate_pages_reports_visual_block_body_count_mismatch() -> None:
 
 
 def test_validate_pages_reports_visual_block_body_index_mismatch() -> None:
-    """验证视觉父块 body index 必须等于 parent index。
+    """Verify that the visual parent block body index must equal parent index.
 
-    ImageBlock 构造时已强制 body index == parent index，用 model_construct 绕过以测试 validator。
+    ImageBlock was constructed with body forced index == parent index, bypassed with model_construct to test validator.
     """
     image_block = ImageBlock.model_construct(
         type=BlockType.IMAGE,

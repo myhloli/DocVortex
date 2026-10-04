@@ -1,4 +1,4 @@
-//! 只在唯一 Unicode/字体值和最终样式行边界访问 Python，字符几何直接来自快照。
+//! Python is only accessed at unique Unicode/font values and final style line boundaries, with character geometry directly from the snapshot.
 use docvortex_core::{
     geometry::Box4,
     inline_styles::{self, Character, Drawing, Line, Payload},
@@ -11,7 +11,7 @@ use std::{
 };
 static CALLS: AtomicU64 = AtomicU64::new(0);
 
-/// 读取解释器定义的 Unicode 与字体样式，按批次索引执行完整样式阶段。
+/// Read the Unicode and font style defined by the interpreter, and execute the complete style phase according to the batch index.
 pub(super) fn detect(
     py: Python<'_>,
     data: &TextSnapshot,
@@ -99,7 +99,7 @@ pub(super) fn detect(
     Ok(output)
 }
 
-/// 报告真正完成的样式批次数，避免用配置代替原生路径命中证据。
+/// Report the number of truly completed style batches to avoid replacing native path hit evidence with configuration.
 #[pyfunction]
 pub fn inline_style_stats() -> u64 {
     CALLS.load(Ordering::Relaxed)

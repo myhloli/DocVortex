@@ -1,4 +1,4 @@
-"""验证发布门禁：自身绿灯直接通过；借用绿灯祖先须在 main 上、仅差版本文件且只改顶层 __version__ 字面量。"""
+"""Verify the release access control: the own green light passes directly; the borrowed green light ancestor must be on main, only the version file is different, and only the top-level __version__ literal is changed."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def _bump(repo: Path, version: str = "0.4.8") -> None:
 
 
 def _push_main(repo: Path) -> None:
-    """模拟把 main 当前 HEAD 推送到远端，同步 origin/main 引用。"""
+    """Simulate pushing main and current HEAD to the remote end and synchronize the reference of origin/main."""
     _git(repo, "update-ref", "refs/remotes/origin/main", "main")
 
 

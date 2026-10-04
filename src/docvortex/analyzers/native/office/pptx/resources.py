@@ -1,4 +1,4 @@
-"""PPTX 图片、图表与公式资源，复用当前转换器的单文档状态。"""
+"""PPTX picture, chart and formula resources, reuse the single document state of the current converter."""
 
 from typing import Any, Optional
 from loguru import logger
@@ -12,11 +12,11 @@ from .context import DRAWINGML_NS, RELATIONSHIP_NS, SVG_BLIP_NS, OMML_NS
 
 
 class _PptxResources:
-    """集中维护图片、图表与公式资源，不改变文档生命周期和公开入口。"""
+    """Centrally maintain pictures, charts and formula resources without changing the document life cycle and public access."""
 
     @staticmethod
     def _pptx_ole_format(shape: Any) -> Any | None:
-        """安全返回 PPTX graphic-frame 的 OLE format。"""
+        """Safe return of PPTX graphic-frame OLE format."""
 
         try:
             return shape.ole_format
@@ -24,13 +24,13 @@ class _PptxResources:
             return None
 
     def _is_equation_ole_shape(self, shape: Any) -> bool:
-        """判断 PPTX OLE shape 的 ProgID 是否为 MathType/Equation 公式。"""
+        """Determine whether the ProgID of PPTX OLE shape is the MathType/Equation formula."""
 
         ole_format = self._pptx_ole_format(shape)
         return bool(ole_format is not None and is_mathtype_equation_prog_id(getattr(ole_format, "prog_id", None)))
 
     def _decode_pptx_ole_equation(self, shape: Any) -> str | None:
-        """解码 PPTX 内嵌公式 OLE；链接、图标和坏对象返回空。"""
+        """Decoding PPTX Inline formula OLE; links, icons, and bad objects return null."""
 
         ole_format = self._pptx_ole_format(shape)
         if ole_format is None:
@@ -67,7 +67,7 @@ class _PptxResources:
         return None
 
     def _pptx_ole_shape_omml(self, shape: Any) -> list[str]:
-        """提取 OLE 兼容容器内可表达的 OMML，作为 MTEF 的高优先级分支。"""
+        """Extract expressable OMML within the OLE compatible container as a high-priority branch of MTEF."""
 
         element = getattr(shape, "_element", None)
         if element is None:
@@ -80,17 +80,17 @@ class _PptxResources:
         return equations
 
     def _handle_tables(self, shape):
-        """将PowerPoint表格转换为HTML格式。
+        """Convert PowerPoint table to HTML format.
 
         Args:
-            shape: 包含表格的形状对象。
-            parent_slide: 父幻灯片组。
-            slide_ind: 当前幻灯片索引。
-            doc: 文档对象(此实现中未使用)。
-            slide_size: 幻灯片尺寸。
+            shape: Shape object containing a table.
+            parent_slide: Parent slide group.
+            slide_ind: Current slide index.
+            doc: Document object (not used in this implementation).
+            slide_size: Slide size.
 
         Returns:
-            str: 表格的HTML字符串，如果没有表格则返回None。
+            str: The HTML string of the table. If there is no table, None is returned.
         """
         if not shape.has_table:
             return None
@@ -98,21 +98,21 @@ class _PptxResources:
         table = shape.table
         table_xml = shape._element
 
-        # 开始构建HTML表格
+        # Start building the HTML table
         html_parts = ['<table border="1">']
 
-        # 跟踪已被合并单元格占用的位置
-        # 格式: {(row, col): True}
+        # Track positions already occupied by merged cells
+        # Format: {(row, col): True}
         occupied_cells = {}
 
         for row_idx, row in enumerate(table.rows):
             html_parts.append("  <tr>")
 
             for col_idx, cell in enumerate(row.cells):
-                # 跳过被合并占用的单元格
+                # Skip merged cells
                 if (row_idx, col_idx) in occupied_cells:
                     continue
-                # 获取单元格XML以读取跨度信息
+                # Get cell XML to read span information
                 cell_xml = table_xml.xpath(f".//a:tbl/a:tr[{row_idx + 1}]/a:tc[{col_idx + 1}]")
 
                 if not cell_xml:
@@ -120,23 +120,23 @@ class _PptxResources:
 
                 cell_xml = cell_xml[0]
 
-                # 解析行跨度和列跨度
+                # Parse row spans and column spans
                 row_span = cell_xml.get("rowSpan")
                 col_span = cell_xml.get("gridSpan")
 
                 row_span = int(row_span) if row_span else 1
                 col_span = int(col_span) if col_span else 1
 
-                # 标记被此单元格占用的位置
+                # Mark the position occupied by this cell
                 for r in range(row_idx, row_idx + row_span):
                     for c in range(col_idx, col_idx + col_span):
                         if (r, c) != (row_idx, col_idx):
                             occupied_cells[(r, c)] = True
 
-                # 确定标签类型：第一行使用<th>，其他使用<td>
+                # Determine the tag type: use <th> for the first line, <td> for the others
                 tag = "th" if row_idx == 0 else "td"
 
-                # 构建属性字符串
+                # Build attributed string
                 attrs = []
                 if row_span > 1:
                     attrs.append(f'rowspan="{row_span}"')
@@ -145,9 +145,9 @@ class _PptxResources:
 
                 attr_str = " " + " ".join(attrs) if attrs else ""
 
-                # 获取单元格文本内容
+                # Get cell text content
                 cell_text = cell.text.strip() if cell.text else ""
-                # 转义HTML特殊字符，防止XSS
+                # Escape HTML special characters to prevent XSS
                 cell_text = cell_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
                 html_parts.append(f"    <{tag}{attr_str}>{cell_text}</{tag}>")
@@ -166,7 +166,7 @@ class _PptxResources:
         return None
 
     def _handle_chart(self, shape) -> None:
-        """按原有图片、图表与公式资源规则执行 _handle_chart，保持输入顺序与降级行为。"""
+        """Execute _handle_chart according to the original picture, chart and formula resource rules, maintaining the input order and degradation behavior."""
         try:
             chart_part = shape.chart.part
             chart_xml = chart_part.blob
@@ -200,7 +200,7 @@ class _PptxResources:
         )
 
     def _handle_pictures(self, shape):
-        """按原有图片、图表与公式资源规则执行 _handle_pictures，保持输入顺序与降级行为。"""
+        """Execute _handle_pictures according to the original picture, chart and formula resource rules, maintaining the input order and degradation behavior."""
         image_data = self._get_shape_image_data(shape)
         if image_data is None:
             return
@@ -223,7 +223,7 @@ class _PptxResources:
         if content_type == "image/svg+xml":
             img_base64 = serialize_office_image(image_bytes, content_type=content_type)
             if img_base64 is None:
-                # SVG 光栅化失败时回退到 PowerPoint 为 SVG 原生伴随存储的栅量 blip。
+                # SVG falls back to PowerPoint when rasterization fails and blip natively stores the raster volume for SVG.
                 fallback_data = self._get_shape_image_data(shape, include_svg=False)
                 if fallback_data is not None and fallback_data[1] != "image/svg+xml":
                     img_base64 = serialize_office_image(fallback_data[0], content_type=fallback_data[1])
@@ -241,7 +241,7 @@ class _PptxResources:
         self.cur_page.append(self._build_image_block(img_base64, shape))
 
     def _build_image_block(self, img_base64: str, shape) -> dict:
-        """构造图片块，形状 cNvPr 的 descr（替代文本）作为识别内容输出。"""
+        """Construct a picture block, descr (alternative text) of shape cNvPr and output it as the recognized content."""
         image_block = {
             "type": BlockType.IMAGE,
             "image_base64": img_base64,
@@ -253,7 +253,7 @@ class _PptxResources:
 
     @staticmethod
     def _pptx_shape_alt_text(shape) -> str:
-        """读取形状非可视属性 cNvPr 上的 descr 替代文本，兼容各形状包装元素。"""
+        """Read the descr alternative text on the shape non-visual property cNvPr, compatible with each shape wrapper element."""
         element = getattr(shape, "_element", None)
         if element is None:
             element = getattr(shape, "element", None)
@@ -268,7 +268,7 @@ class _PptxResources:
         return ""
 
     def _decode_pptx_shape_image_equation(self, shape: Any) -> str | None:
-        """从普通 picture 或 OLE preview 的 WMF/GIF comment 恢复公式。"""
+        """Recover formulas from normal picture or OLE preview to WMF/GIF comment."""
 
         image_data = self._get_shape_image_data(shape)
         if image_data is None:
@@ -281,7 +281,7 @@ class _PptxResources:
 
     @staticmethod
     def _find_first_embedded_image_rid(shape, *, include_svg: bool = True) -> Optional[str]:
-        """按原有图片、图表与公式资源规则执行 _find_first_embedded_image_rid，保持输入顺序与降级行为。"""
+        """Execute _find_first_embedded_image_rid according to the original picture, chart and formula resource rules, maintaining the input order and degradation behavior."""
         if include_svg:
             svg_blips = shape._element.findall(f".//{{{SVG_BLIP_NS}}}svgBlip")
             for svg_blip in svg_blips:
@@ -299,7 +299,7 @@ class _PptxResources:
 
     @staticmethod
     def _has_blip_without_relationship(shape) -> bool:
-        """判断图片节点是否只有空blip，避免把空fallback误报为图片资源缺失。"""
+        """Determine whether the image node only has empty blip to avoid falsely reporting empty fallback as missing image resources."""
         if not hasattr(shape, "_element"):
             return False
 
@@ -316,7 +316,7 @@ class _PptxResources:
         return True
 
     def _get_shape_image_data(self, shape, *, include_svg: bool = True) -> Optional[tuple[bytes, Optional[str]]]:
-        """按原有图片、图表与公式资源规则执行 _get_shape_image_data，保持输入顺序与降级行为。"""
+        """Execute _get_shape_image_data according to the original picture, chart and formula resource rules, maintaining the input order and degradation behavior."""
         relationship_id = None
         if hasattr(shape, "_element"):
             relationship_id = self._find_first_embedded_image_rid(shape, include_svg=include_svg)

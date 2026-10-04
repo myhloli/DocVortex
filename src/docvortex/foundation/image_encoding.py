@@ -1,4 +1,4 @@
-"""Flash 各格式复用的轻量图片编码能力。"""
+"""Flash lightweight image encoding capability for multiplexing of various formats."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ _IMAGE_FORMATS: dict[ImageFormat, tuple[str, str, str]] = {
 
 @dataclass(frozen=True, slots=True)
 class ImageArtifact:
-    """持有独立编码字节和尺寸，不依赖已关闭的图像或源文档。"""
+    """Holds independent encoding bytes and dimensions and does not depend on the closed image or source document."""
 
     data: bytes
     image_format: ImageFormat
@@ -29,23 +29,23 @@ class ImageArtifact:
     height: int
 
     def __post_init__(self) -> None:
-        """拒绝未支持的格式，保证派生 MIME 与扩展名一致。"""
+        """Unsupported formats are rejected and the derived MIME is guaranteed to be consistent with the extension."""
         if self.image_format not in _IMAGE_FORMATS:
             raise ValueError(f"Unsupported image format: {self.image_format}")
 
     @property
     def mime_type(self) -> str:
-        """返回编码格式对应的标准 MIME 类型。"""
+        """Returns the standard MIME type corresponding to the encoding format."""
         return _IMAGE_FORMATS[self.image_format][1]
 
     @property
     def extension(self) -> str:
-        """返回不带点的扩展名，JPEG 统一使用 jpg。"""
+        """Return the extension without the dot, JPEG uniformly uses jpg."""
         return _IMAGE_FORMATS[self.image_format][2]
 
 
 def encode_image(image: Image.Image, *, image_format: ImageFormat = "jpeg") -> ImageArtifact:
-    """编码调用者持有的图像，仅关闭本函数创建的颜色转换副本。"""
+    """Encodes the image held by the caller, turning off only the color-converted copy created by this function."""
     if image_format not in _IMAGE_FORMATS:
         raise ValueError(f"Unsupported image format: {image_format}")
     output_image = image.convert("RGB") if image_format == "jpeg" and image.mode != "RGB" else image
@@ -58,7 +58,7 @@ def encode_image(image: Image.Image, *, image_format: ImageFormat = "jpeg") -> I
 
 
 def transcode_image(data: bytes, *, image_format: ImageFormat = "jpeg") -> ImageArtifact:
-    """解码内存图片并转为目标格式，在成功或失败时均释放解码图像。"""
+    """Decode the memory image and convert it to the target format, releasing the decoded image on success or failure."""
     from PIL import Image
 
     with BytesIO(data) as buffer:
@@ -73,7 +73,7 @@ def image_to_bytes(
     image: Image.Image,
     image_format: str = "JPEG",
 ) -> bytes:
-    """按指定格式把 Pillow 图片编码为字节。"""
+    """Encode the Pillow picture into bytes in the specified format."""
     with BytesIO() as image_buffer:
         image.save(image_buffer, format=image_format)
         return image_buffer.getvalue()
@@ -83,7 +83,7 @@ def image_to_b64str(
     image: Image.Image,
     image_format: str = "JPEG",
 ) -> str:
-    """按指定格式把 Pillow 图片编码为 data URI。"""
+    """Encode Pillow pictures into data and URI according to the specified format."""
     image_bytes = image_to_bytes(image, image_format)
     return f"data:image/{image_format.lower()};base64,{base64.b64encode(image_bytes).decode('utf-8')}"
 

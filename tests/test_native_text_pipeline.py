@@ -1,4 +1,4 @@
-"""连续原生组行与 Python 参考实现的契约差分。"""
+"""Contract difference between the continuous native group row and the Python reference implementation."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from docvortex.document.pdf.text._contracts import Bbox
 
 
 def _char(text, box, index, font=None, rotation=0.0):
-    """构造含可选来源字段的独立字符。"""
+    """Constructs a standalone character with an optional source field."""
     return {
         "char": text,
         "bbox": Bbox([float(value) for value in box]),
@@ -26,7 +26,7 @@ def _char(text, box, index, font=None, rotation=0.0):
 
 
 def _plain(value):
-    """仅转换矩形用于结构比较，不抹去原始字段。"""
+    """Only the rectangle is converted for structure comparison, the original fields are not erased."""
     if isinstance(value, Bbox):
         return value.bbox
     if isinstance(value, dict):
@@ -37,7 +37,7 @@ def _plain(value):
 
 
 def _assert_equivalent(chars, threshold=0.7, distance=0.1):
-    """比较全部字段并验证字符与字体引用未被重建。"""
+    """Compare all fields and verify that character and font references have not been rebuilt."""
     native = pytest.importorskip("docvortex._native")
     actual = native.group_text_lines(chars, threshold, distance)
     expected = _get_lines_from_chars_python(chars, threshold, distance)
@@ -56,7 +56,7 @@ def _assert_equivalent(chars, threshold=0.7, distance=0.1):
 
 @pytest.mark.parametrize("marker", ["2", "²", "٣", "Ⅳ", "⅓", "∑", "α", "𝟙", "中", "12", "²³", "", "\x1c", "\x0b"])
 def test_unicode_script_equivalence(marker):
-    """覆盖数码、数学符号、Python 特有空白和多字符上下标。"""
+    """Covers numbers, mathematical symbols, Python-specific whitespace and multi-character superscripts and subscripts."""
     chars = [
         _char("body", (0, 5, 30, 15), 0),
         _char(marker, (31, 0, 36, 6), 1, {"name": "small", "size": 6}),
@@ -66,7 +66,7 @@ def test_unicode_script_equivalence(marker):
 
 
 def test_source_reference_and_mutation_isolation():
-    """片段框独立累加，返回字符保持原身份及附加元数据。"""
+    """Fragment boxes are accumulated independently, and the returned characters retain their original identity and additional metadata."""
     font = {"name": "test", "size": 10, "flags": [1, 2]}
     chars = [_char("a", (0, 0, 10, 10), 5, font), _char("b", (10, 0, 20, 10), 99, dict(font))]
     actual = _assert_equivalent(chars)
@@ -77,7 +77,7 @@ def test_source_reference_and_mutation_isolation():
 
 
 def test_breaks_empty_and_rotations():
-    """覆盖换行、空输入、垂直文本及负尺度造成的半周旋转。"""
+    """Covers half-rotations caused by line breaks, empty input, vertical text, and negative scaling."""
     _assert_equivalent([])
     for rotation in [0, math.pi / 4, math.pi / 2, math.pi, 1.5 * math.pi, -math.pi]:
         chars = [
@@ -90,7 +90,7 @@ def test_breaks_empty_and_rotations():
 
 
 def test_seeded_geometry_differential():
-    """随机多字体和几何组合验证连续阶段保持全部分支行为。"""
+    """Random multi-font and geometry combinations verify that sequential phases maintain full branching behavior."""
     rng = random.Random(915)
     alphabet = ["a", " ", "²", "∑", "⅓", "\n", "\x02", "\u2009", "٣", "12"]
     fonts = [{"name": name, "size": size} for name in ["A", "B"] for size in [5, 10]]
@@ -111,7 +111,7 @@ def test_seeded_geometry_differential():
 
 
 def _line_records(items):
-    """展开视觉行全部字段，避免只比较文本掩盖排版差异。"""
+    """Expand all fields in the visual row to avoid comparing text alone to cover up typographical differences."""
     from dataclasses import fields
 
     return [{field.name: _plain(getattr(item, field.name)) for field in fields(item) if field.compare} for item in items]
@@ -119,7 +119,7 @@ def _line_records(items):
 
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
 def test_fused_visual_lines(rotation):
-    """对比融合管线与先物化粗行路径，包括公式及多个视觉 run。"""
+    """Comparing the fusion pipeline with first materialized rough paths, including formulas and multiple visuals run."""
     pytest.importorskip("docvortex._native")
     from docvortex.analyzers.native.pdf.native_text import (
         _build_native_line_items,
@@ -140,7 +140,7 @@ def test_fused_visual_lines(rotation):
 
 
 def test_fused_seeded_differential():
-    """覆盖多字体、字符方向与分隔几何的完整视觉行差分。"""
+    """Complete visual line differentiation covering multiple fonts, character orientations and separation geometries."""
     pytest.importorskip("docvortex._native")
     from docvortex.analyzers.native.pdf.native_text import (
         _build_native_line_items,
@@ -171,15 +171,15 @@ def test_fused_seeded_differential():
 
 
 def test_explicit_special_object_fallback():
-    """自定义映射与框在进入原生算法前明确返回参考路径。"""
+    """Custom maps and boxes explicitly return the reference path before entering the native algorithm."""
     native = pytest.importorskip("docvortex._native")
     from docvortex.document.pdf.text import get_lines_from_chars
 
     class CustomChar(dict):
-        """代表调用方自定义的字符映射。"""
+        """Represents a caller-defined character map."""
 
     class CustomBbox(Bbox):
-        """代表调用方自定义的几何对象。"""
+        """Represents a caller-defined geometric object."""
 
     original = _char("a", (0, 0, 10, 10), 0)
     for char in [CustomChar(original), {**original, "bbox": CustomBbox([0, 0, 10, 10])}, {**original, "char": "\ud800"}]:
@@ -188,7 +188,7 @@ def test_explicit_special_object_fallback():
 
 
 def test_custom_supported_sequence_and_empty_input():
-    """空页、自定义方向序列和空白字符遵守参考入口行为。"""
+    """Empty pages, custom orientation sequences, and whitespace characters obey reference entry behavior."""
     pytest.importorskip("docvortex._native")
     from docvortex.analyzers.native.pdf.native_text import (
         _build_native_line_items,
@@ -204,7 +204,7 @@ def test_custom_supported_sequence_and_empty_input():
 
 @pytest.mark.parametrize("separator", ["\t", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x1f", " "])
 def test_python_ascii_whitespace_soft_gap(separator):
-    """包括 Rust 标准空白表缺少的 VT，验证 Python 空白触发软间隙拆分。"""
+    """Includes VT missing from Rust standard blank table, verifies Python blank triggers soft gap splitting."""
     pytest.importorskip("docvortex._native")
     from docvortex.analyzers.native.pdf.native_text import (
         _build_native_line_items,
@@ -220,7 +220,7 @@ def test_python_ascii_whitespace_soft_gap(separator):
 
 @pytest.mark.parametrize("rotation", [False, True, 0, 1, -1, 0.0, -0.0, 0.125])
 def test_rotation_type_and_source_identity(rotation):
-    """原生输出复用源 rotation，保留 bool/int/float 及其序列化类型。"""
+    """Native output mux source rotation, retaining bool/int/float and its serialized type."""
     import json
 
     chars = [_char("a", (0, 0, 10, 10), 0, rotation=rotation), _char("b", (10, 0, 20, 10), 1, rotation=rotation)]
@@ -235,7 +235,7 @@ def test_rotation_type_and_source_identity(rotation):
     "coordinates", [[0, 0, 10, 10], [False, False, True, True], [0.0, 0, 10.0, 10.0], [0, 0, 10**400, 10**400]]
 )
 def test_nonfloat_geometry_explicit_fallback(coordinates):
-    """整数、布尔与超大整数框保持参考类型，不能先转换双精度再回退。"""
+    """Integer, Boolean, and very large integer boxes remain reference types and cannot be converted to double and then rolled back."""
     import json
     from docvortex.document.pdf.text import get_lines_from_chars
 
@@ -250,7 +250,7 @@ def test_nonfloat_geometry_explicit_fallback(coordinates):
 
 
 def test_large_rotation_explicit_fallback():
-    """单字符超大方向值无需算术，原入口必须保留而非提前浮点溢出。"""
+    """No arithmetic is required for single-character large direction values, and the original entry must be retained instead of floating point overflow in advance."""
     from docvortex.document.pdf.text import get_lines_from_chars
 
     native = pytest.importorskip("docvortex._native")
@@ -260,21 +260,21 @@ def test_large_rotation_explicit_fallback():
 
 
 def test_threshold_objects_do_not_trigger_eager_native_conversion(monkeypatch):
-    """自定义阈值在参考计算真正需要它时才求值，空输入不触发类型转换。"""
+    """Custom thresholds are evaluated only when reference calculations actually require it, and empty inputs do not trigger type conversions."""
     from docvortex.document.pdf.text import get_lines_from_chars
 
     class NativeMustNotRun:
-        """拒绝被自定义数值路径调用，防止回退测试误用原生转换。"""
+        """Reject calls from custom numerical paths to prevent fallback tests from misusing native conversions."""
 
         def group_text_lines(self, *args):
-            """若包装器提前调用原生入口，则立即暴露兼容性错误。"""
+            """If the wrapper calls the native entry point in advance, a compatibility error will be exposed immediately."""
             raise AssertionError("custom threshold reached native conversion")
 
     class Threshold(float):
-        """允许原有浮点运算，但禁止新的显式 float 转换。"""
+        """Legacy floating point operations are allowed, but new explicit float conversions are disabled."""
 
         def __float__(self):
-            """拒绝新增的提前转换。"""
+            """Reject new early conversions."""
             raise AssertionError("eager conversion")
 
     monkeypatch.setattr("docvortex._compute_backend.get_native", lambda: NativeMustNotRun())
@@ -296,7 +296,7 @@ def test_threshold_objects_do_not_trigger_eager_native_conversion(monkeypatch):
 
 
 def test_real_pdf_still_uses_native_float_path():
-    """真实 PDF 提取字符必须直接命中 Rust，防止保守类型边界导致全页回退。"""
+    """True PDF extracted characters must directly hit Rust to prevent conservative type boundaries from causing full page rollback."""
     from pathlib import Path
     from docvortex.document.pdf import PDFDocument
 
@@ -313,7 +313,7 @@ def test_real_pdf_still_uses_native_float_path():
 
 
 def test_line_rotation_comes_from_first_span_when_equal_values_have_different_types():
-    """同值 bool/float 可合行，但各片段及行保留各自首字符的原类型。"""
+    """The same value as bool/float can be combined into lines, but each segment and line retains the original type of its first character."""
     import json
 
     chars = [
@@ -358,7 +358,7 @@ def test_line_rotation_comes_from_first_span_when_equal_values_have_different_ty
     ],
 )
 def test_run_normalization_matches_reference_order(raw):
-    """覆盖清洗步骤先后依赖、Unicode 空白和软断词的上下文断言。"""
+    """Overrides contextual assertions for cleaning step sequential dependencies, Unicode whitespace, and soft word breaking."""
     native = pytest.importorskip("docvortex._native")
     from docvortex.analyzers.native.pdf.native_text import (
         _build_native_line_items,
@@ -379,7 +379,7 @@ def test_run_normalization_matches_reference_order(raw):
 
 
 def _terminal_chars(text, reference_count, reference_height, angle):
-    """构造保持字符记录粒度的水平或竖排句尾引用样本。"""
+    """Construct horizontal or vertical end-of-sentence quotation samples that maintain the granularity of character records."""
     chars = []
     for index, ch in enumerate(text):
         height = reference_height if reference_count and index >= len(text) - reference_count else 10.0
@@ -413,7 +413,7 @@ def _terminal_chars(text, reference_count, reference_height, angle):
 )
 @pytest.mark.parametrize("angle", [0, 90, 270])
 def test_native_sentence_terminal_parity(text, count, height, terminal, angle):
-    """保留十进制引用、字高阈值、闭合标点和竖排轴选择的精确判断。"""
+    """Preserves precise judgment of decimal references, word-height thresholds, closed punctuation, and vertical axis selection."""
     native = pytest.importorskip("docvortex._native")
     from docvortex.analyzers.native.pdf.native_text import (
         _build_native_line_items,
@@ -430,7 +430,7 @@ def test_native_sentence_terminal_parity(text, count, height, terminal, angle):
 
 
 def test_sentence_reference_length_counts_records_not_text_codepoints():
-    """多码点字符记录不得被错误拆成多个引用字形。"""
+    """Multi-codepoint character records must not be incorrectly split into multiple reference glyphs."""
     native = pytest.importorskip("docvortex._native")
     from docvortex.analyzers.native.pdf.native_text import (
         _build_native_line_items,
@@ -446,7 +446,7 @@ def test_sentence_reference_length_counts_records_not_text_codepoints():
 
 
 def test_initial_native_run_finalization_does_not_call_python_reference(monkeypatch):
-    """原生初次物化无需再调用 Python 清洗和句尾规则，后继合并仍保留原入口。"""
+    """There is no need to call Python cleaning and sentence ending rules for native initial materialization, and subsequent merging still retains the original entry."""
     native = pytest.importorskip("docvortex._native")
     monkeypatch.setattr("docvortex._compute_backend.get_native", lambda: native)
     from docvortex.analyzers.native.pdf import native_text
@@ -455,7 +455,7 @@ def test_initial_native_run_finalization_does_not_call_python_reference(monkeypa
     expected = native_text._build_native_line_items(_get_lines_from_chars_python(chars), (100, 100))
 
     def forbidden(*args, **kwargs):
-        """捕获本应在 Rust 完成的初次 run 规则回调。"""
+        """Captures the initial run rule callback that should have completed at Rust."""
         raise AssertionError("initial native finalization called Python reference")
 
     monkeypatch.setattr(native_text, "_normalize_native_run_text", forbidden)
@@ -465,7 +465,7 @@ def test_initial_native_run_finalization_does_not_call_python_reference(monkeypa
 
 
 def test_seeded_native_run_normalization_differential():
-    """组合随机控制字符验证删除、替换与空白折叠的顺序不变。"""
+    """Combining random control characters verifies that the order of deletions, substitutions, and whitespace folding remains unchanged."""
     native = pytest.importorskip("docvortex._native")
     from docvortex.analyzers.native.pdf.native_text import _normalize_native_run_text
 
@@ -503,7 +503,7 @@ def test_seeded_native_run_normalization_differential():
 
 
 def test_empty_coarse_run_filter_preserves_source_row_ids():
-    """粗行清洗后为空时只过滤该行，保留后续来源行号与 coarse 句尾默认值。"""
+    """If the coarse row is empty after cleaning, only the row will be filtered, and the subsequent source row number and the default value of coarse at the end of the sentence will be retained."""
     native = pytest.importorskip("docvortex._native")
     from docvortex.analyzers.native.pdf.native_text import (
         _build_native_line_items,
@@ -528,7 +528,7 @@ def test_empty_coarse_run_filter_preserves_source_row_ids():
 
 
 def test_empty_split_run_filter_preserves_run_index_and_split_flag():
-    """已产生视觉分段后过滤空文本，不能重编号或抹去原拆分标记。"""
+    """Empty text is filtered after visual segmentation has been generated, and the original split mark cannot be renumbered or erased."""
     native = pytest.importorskip("docvortex._native")
     from docvortex.analyzers.native.pdf.native_text import (
         _build_native_line_items,

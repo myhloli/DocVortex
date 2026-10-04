@@ -1,4 +1,4 @@
-"""验证页面 Form 展开、真实整图保护和调用实例的成员隔离。"""
+"""Verify page Form expansion, true whole image protection, and member isolation of the calling instance."""
 
 from collections import Counter
 from io import BytesIO
@@ -16,13 +16,13 @@ FIXTURES = Path(__file__).parent / "pdfs/form_containers"
 
 
 def _predict(data: bytes | Path) -> list[list[dict]]:
-    """通过真实原生入口解析原件，保留全文上下文。"""
+    """Parse the original through a true native portal, retaining full-text context."""
     with PDFDocument(str(data) if isinstance(data, Path) else data) as document:
         return PdfModel().predict(document)
 
 
 def _visible(value) -> str:
-    """提取样式包装中的可见文字，以便核对成员而非块计数。"""
+    """Extract visible text in style wrappers so that member rather than block counts are checked."""
     if isinstance(value, str):
         return value
     if isinstance(value, list):
@@ -33,7 +33,7 @@ def _visible(value) -> str:
 def _body_pdf(
     depth: int, *, rotation: int = 0, shift: float = 0, font: str = "Helvetica", size: float = 11, columns: bool = False
 ) -> bytes:
-    """生成直接绘制或多层 Form 包装的同一正文、图形和表格页面。"""
+    """Generate the same page of text, figures, and tables drawn directly or with a multi-layer Form wrapper."""
     stream = BytesIO()
     canvas = Canvas(stream, pagesize=(600, 800))
     canvas.setFont(font, size)
@@ -82,7 +82,7 @@ def _body_pdf(
 
 
 def _wrap_page(data: bytes, depth: int) -> bytes:
-    """把真实页面内容封装为多层调用，避免 ReportLab 不支持嵌套 beginForm 的限制。"""
+    """Encapsulate the real page content into multi-layer calls to avoid the limitation that ReportLab does not support nested beginForm."""
     if depth == 0:
         return data
     writer = PdfWriter(clone_from=PdfReader(BytesIO(data)))
@@ -112,7 +112,7 @@ def _wrap_page(data: bytes, depth: int) -> bytes:
 
 @pytest.mark.parametrize("depth", [1, 2, 3])
 def test_page_form_wrapping_preserves_semantic_blocks(depth: int) -> None:
-    """页面包装不得改变正文、整图、表格、图注或成员的公开模型。"""
+    """Page packaging must not alter the text, entire figures, tables, legends, or members' public models."""
     direct = _predict(_body_pdf(0))
     wrapped = _predict(_body_pdf(depth))
     assert wrapped == direct
@@ -124,14 +124,14 @@ def test_page_form_wrapping_preserves_semantic_blocks(depth: int) -> None:
     "rotation,shift,font", [(0, 20, "Courier"), (90, 0, "Helvetica"), (180, 0, "Times-Roman"), (270, 0, "Helvetica")]
 )
 def test_page_form_wrapping_generalizes_layout(rotation: int, shift: float, font: str) -> None:
-    """独立改变字体、位置和旋转后，页面包装仍与直接绘制等价。"""
+    """After independently changing the font, position, and rotation, page wrapping is still equivalent to direct drawing."""
     assert _predict(_body_pdf(2, rotation=rotation, shift=shift, font=font)) == _predict(
         _body_pdf(0, rotation=rotation, shift=shift, font=font)
     )
 
 
 def test_issue23_report_keeps_six_charts_and_native_tables() -> None:
-    """六张独立图和原生正文表格恢复，原本栅格化的表格仍是一张图。"""
+    """The six independent pictures and the original text table are restored, and the original rasterized table is still one picture."""
     pages = _predict(FIXTURES / "research-report.pdf")
     assert len(pages) == 5
     assert sum(block["type"] == "image" for block in pages[1]) == 6
@@ -145,7 +145,7 @@ def test_issue23_report_keeps_six_charts_and_native_tables() -> None:
         if number == 4:
             assert any(block["type"] == "text" for block in page)
         else:
-            # 年份表头已归入完整表格，不能再用原先游离表头的 text 数量作为正文存在性断言。
+            # The year header has been included in the complete table, and the text quantity in the original free header can no longer be used as a text existence assertion.
             assert any(block["type"] == "paragraph_title" and "财务预测与估值" in _visible(block["content"]) for block in page)
             tables = [block for block in page if block["type"] == "table"]
             assert len(tables) == 4
@@ -154,7 +154,7 @@ def test_issue23_report_keeps_six_charts_and_native_tables() -> None:
 
 
 def test_issue23_paper_preserves_body_tables_and_real_figures() -> None:
-    """全文不再整页认领为图，三个图形页的真实图形保持完整。"""
+    """The full text no longer claims full pages as figures, and the actual figures on the three figure pages remain intact."""
     pages = _predict(FIXTURES / "2022.emnlp-main.614.pdf")
     assert len(pages) == 18
     for page in pages:
@@ -167,7 +167,7 @@ def test_issue23_paper_preserves_body_tables_and_real_figures() -> None:
 
 
 def _dense_figure_pdf(kind: str) -> bytes:
-    """生成具有整页声明框和连续长标签的图，验证标签不能充当展开正文。"""
+    """Generates a figure with a full-page declaration box and a continuous long label, verifying that the label cannot act as an expanded body."""
     from PIL import Image
     from reportlab.lib.utils import ImageReader
 
@@ -212,14 +212,14 @@ def _dense_figure_pdf(kind: str) -> bytes:
     "kind", ["plot", "flowchart", "raster", "panels", "full_plot", "full_flowchart", "full_raster", "conflict"]
 )
 def test_full_page_graphic_with_dense_labels_stays_whole(kind: str) -> None:
-    """统一绘图核心、多栅格图和共同图题均优先保护，满页图不能凭长标签拆分。"""
+    """Unified drawing core, multi-raster figures and common figure titles are all protected with priority, and full-page figures cannot be split by long tags."""
     page = _predict(_dense_figure_pdf(kind))[0]
     assert sum(block["type"] == "image" for block in page) == 1
     assert not any(block["type"] == "text" and "Dense figure label" in _visible(block["content"]) for block in page)
 
 
 def _repeated_figure_pdf() -> bytes:
-    """同一资源调用两次，并在图内空间叠放不属于 Form 的外部正文。"""
+    """The same resource is called twice, and external text that does not belong to Form is superimposed in the space in the picture."""
     stream = BytesIO()
     canvas = Canvas(stream, pagesize=(600, 800))
     canvas.beginForm("Reusable", 0, 0, 180, 100)
@@ -240,7 +240,7 @@ def _repeated_figure_pdf() -> bytes:
 
 
 def test_repeated_calls_have_disjoint_owned_members_after_close() -> None:
-    """重复 Do 的字符和路径编号独立，快照在文档关闭后仍可安全读取。"""
+    """Duplicate Do's character and path numbers are independent and the snapshot remains safe for reading after the document is closed."""
     with PDFDocument(_repeated_figure_pdf()) as document:
         forms = document._extract_native_page(0).form_infos
     assert len(forms) == 2
@@ -253,7 +253,7 @@ def test_repeated_calls_have_disjoint_owned_members_after_close() -> None:
 
 
 def test_external_overlap_is_not_claimed_by_form_image() -> None:
-    """对象之外的叠放正文即使完全位于图框内，也不能被空间规则吞并。"""
+    """Stacked text outside the object cannot be swallowed up by space rules even if it is completely within the frame."""
     page = _predict(_repeated_figure_pdf())[0]
     assert sum(block["type"] == "image" for block in page) == 2
     assert "External body overlaps" in "".join(_visible(block["content"]) for block in page if block["type"] == "text")
@@ -261,7 +261,7 @@ def test_external_overlap_is_not_claimed_by_form_image() -> None:
 
 @pytest.mark.parametrize("clipped,scale", [(False, 1), (True, 1), (False, 0.75)])
 def test_page_form_crop_scale_and_clip_preserve_direct_output(clipped: bool, scale: float) -> None:
-    """CropBox、缩放与显式剪裁下仍与直接绘制等价，不重新引入框外成员。"""
+    """CropBox, scaling and explicit clipping are still equivalent to direct drawing, without reintroducing out-of-box members."""
     from pypdf import Transformation
 
     variants = []
@@ -284,7 +284,7 @@ def test_page_form_crop_scale_and_clip_preserve_direct_output(clipped: bool, sca
 
 
 def test_broken_resources_disable_expansion_without_losing_native_content() -> None:
-    """未解析资源令结构关联失败时保留整图，PDFium 恢复的内容仍参与旧流程。"""
+    """Unresolved resources retain the entire image when structure association fails, and PDFium restored content still participates in the old process."""
     writer = PdfWriter(clone_from=PdfReader(BytesIO(_body_pdf(1))))
     page = writer.pages[0]
     stream = DecodedStreamObject()
@@ -299,7 +299,7 @@ def test_broken_resources_disable_expansion_without_losing_native_content() -> N
 
 
 def test_python_and_rust_character_ownership_are_equivalent() -> None:
-    """真实重复调用页的 Rust 批量关联与逐字符参考路径得到相同自有证据。"""
+    """Rust batch correlation of real repeated call pages with character-by-character reference paths yields the same self-evident evidence."""
     from unittest.mock import patch
 
     from docvortex._compute_backend import get_native
@@ -315,7 +315,7 @@ def test_python_and_rust_character_ownership_are_equivalent() -> None:
 
 
 def test_underlay_rectangle_is_removed_but_public_geometry_is_preserved() -> None:
-    """确认底层简单填色无需输出图片，原始 Form 查询仍保留该矩形。"""
+    """Confirming that the underlying simple coloring does not require outputting the image, the original Form query still retains the rectangle."""
     stream = BytesIO()
     canvas = Canvas(stream, pagesize=(600, 800))
     canvas.beginForm("Underlay", 0, 0, 600, 800)
@@ -338,7 +338,7 @@ def test_underlay_rectangle_is_removed_but_public_geometry_is_preserved() -> Non
 
 @pytest.mark.parametrize("size,columns", [(8, False), (12, False), (9, True)])
 def test_font_size_and_columns_do_not_define_container_role(size: float, columns: bool) -> None:
-    """字号和栏宽独立改变后仍保持原生页面包装等价，资源名称仅用于解析 Do。"""
+    """The font size and column width remain equivalent to native page packaging after being changed independently, and the resource name is only used to parse Do."""
     direct = _body_pdf(0, size=size, columns=columns)
     wrapped = _body_pdf(2, size=size, columns=columns)
     assert _predict(direct) == _predict(wrapped)
@@ -356,7 +356,7 @@ def test_font_size_and_columns_do_not_define_container_role(size: float, columns
 
 
 def test_sparse_page_needs_matching_layout_framework() -> None:
-    """同文档仅有相同整页声明框不足以展开位置和栏缘都不同的稀疏内容。"""
+    """Having the same full-page declaration box in the same document is not enough to expand sparse content with different positions and column margins."""
     stream = BytesIO()
     canvas = Canvas(stream, pagesize=(600, 800))
     canvas.setFont("Helvetica", 9)

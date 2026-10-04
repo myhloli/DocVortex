@@ -1,4 +1,4 @@
-"""视觉主体、标题和脚注的 raw block 关联与分组。"""
+"""raw block Association and grouping of visual bodies, titles, and footers."""
 
 from __future__ import annotations
 
@@ -41,27 +41,27 @@ BlockDict = dict[str, Any]
 
 
 def _get_block_field(block: BlockDict, field_name: str, default: Any = None) -> Any:
-    """读取 raw dict block 字段。"""
+    """Read the raw dict block field."""
     return block.get(field_name, default)
 
 
 def _set_block_field(block: BlockDict, field_name: str, value: Any) -> None:
-    """回写 raw dict block 字段。"""
+    """Write back the raw dict block field."""
     block[field_name] = value
 
 
 def _block_index(block: BlockDict) -> int:
-    """读取 block 顺序索引，缺失时沿用原有的零值排序语义。"""
+    """Read the block sequential index. If missing, the original zero-value sorting semantics will be used."""
     return int(_get_block_field(block, "index", 0) or 0)
 
 
 def _block_type(block: BlockDict) -> str:
-    """读取 block 类型。"""
+    """Read block type."""
     return str(_get_block_field(block, "type", "") or "")
 
 
 def _bbox_for_calculation(bbox: BBox) -> BBox:
-    """返回仅用于计算的 bbox 副本，归一化坐标临时放大一千倍。"""
+    """Returns a copy of bbox used only for calculations, with normalized coordinates temporarily magnified by a factor of one thousand."""
     x0, y0, x1, y1 = bbox
     if all(value <= 1 for value in (x0, y0, x1, y1)):
         return x0 * 1000, y0 * 1000, x1 * 1000, y1 * 1000
@@ -69,12 +69,12 @@ def _bbox_for_calculation(bbox: BBox) -> BBox:
 
 
 def _block_bbox(block: BlockDict) -> BBox:
-    """读取参与视觉关系判断的 block bbox。"""
+    """Read block bbox involved in visual relationship judgment."""
     return _bbox_for_calculation(block["bbox"])
 
 
 def _block_line_items(block: BlockDict) -> list[Any]:
-    """读取 raw block 的临时行级元数据。"""
+    """Read temporary row-level metadata for raw block."""
     return list(block.get("lines") or [])
 
 
@@ -82,7 +82,7 @@ def fallback_inline_caption_fragments(
     blocks: list[BlockDict],
     visual_main_types: dict[str, str] | set[str],
 ) -> None:
-    """将紧贴视觉主体上方的同行 text/footnote 片段兜底为通用 caption。"""
+    """Convert the peer text/footnote clip immediately above the visual subject into the universal caption."""
     if len(blocks) < 3:
         return
 
@@ -114,7 +114,7 @@ def fallback_no_bbox_caption_fragments(
     blocks: list[BlockDict],
     visual_main_types: dict[str, str],
 ) -> None:
-    """将无坐标视觉主体后紧邻且带标题前缀的 text 兜底为 caption。"""
+    """The text immediately after the coordinateless visual subject and with the title prefix is classified as caption."""
     caption_prefixes = {
         BlockType.TABLE: ("表", "table"),
         BlockType.IMAGE: ("图", "fig"),
@@ -140,11 +140,11 @@ def fallback_leading_table_continuation_captions(
     blocks: list[BlockDict],
     visual_main_types: dict[Any, Any] | set[Any],
 ) -> None:
-    """将页首紧贴表格的续表文本兜底为通用 caption。
+    """The continuation text at the top of the page immediately following the table reads generic caption.
 
-    该规则只处理页面有效块开头的 text，避免正文中出现“续表”时被误挂。
-    后续 regroup_visual_blocks() 会根据表格主体类型将通用 caption 落成
-    table_caption 子块。
+    This rule only processes text at the beginning of the valid block of the page to avoid being mistakenly hung when "table continuation" appears in the text.
+    Subsequent regroup_visual_blocks() will complete the general caption according to the table body type.
+    table_caption subblock.
     """
     table_main_types = get_table_main_types(visual_main_types)
     if not table_main_types:
@@ -180,7 +180,7 @@ def fallback_leading_table_continuation_captions(
 
 
 def _is_leading_continuation_text_block(block: BlockDict) -> bool:
-    """判断页首候选块是否是单行续表文本。"""
+    """Determine whether the top candidate block is a single-line continuation text."""
     return (
         _block_type(block) in INLINE_CAPTION_FRAGMENT_TYPES
         and is_single_line_caption_fragment(block)
@@ -189,7 +189,7 @@ def _is_leading_continuation_text_block(block: BlockDict) -> bool:
 
 
 def _block_text_content(block: BlockDict) -> str:
-    """提取视觉块中的可见文本，用于续表 marker 判断。"""
+    """Extract visible text in the visual block for continued table marker judgment."""
     content = _get_block_field(block, "content", "")
     if isinstance(content, list):
         return inline_span_plain_text(item for item in content if isinstance(item, dict))
@@ -197,7 +197,7 @@ def _block_text_content(block: BlockDict) -> str:
 
 
 def is_transparent_visual_relation_block(block: BlockDict) -> bool:
-    """判断视觉关系中可忽略的结构性空块。"""
+    """Determining ignorable structural empty patches in visual relationships."""
     if _block_type(block) != BlockType.LIST:
         return False
 
@@ -213,7 +213,7 @@ def _is_leading_continuation_cluster_near_table(
     leading_blocks: list[BlockDict],
     table_block: BlockDict,
 ) -> bool:
-    """判断页首续表文本簇是否与后续 table 在几何上相邻。"""
+    """Determine whether the text cluster of the top continuation table is geometrically adjacent to the subsequent table."""
     next_top = _block_bbox(table_block)[1]
     max_child_height = 1
 
@@ -239,7 +239,7 @@ def fallback_stacked_table_caption_fragments(
     blocks: list[BlockDict],
     visual_main_types: dict[str, str] | set[str],
 ) -> None:
-    """将 table 上方紧贴标题簇里的 text/footnote 片段兜底为 caption。"""
+    """Rename the text/footnote clip immediately above table in the title cluster to caption."""
     table_main_types = get_table_main_types(visual_main_types)
     if not table_main_types:
         return
@@ -262,7 +262,7 @@ def fallback_stacked_table_caption_fragments(
 
 
 def get_table_main_types(visual_main_types: dict[str, str] | set[str]) -> set[str]:
-    """根据调用方传入的视觉主体类型，找出 table 对应的主体类型。"""
+    """According to the visual subject type passed in by the caller, find the subject type corresponding to table."""
     if isinstance(visual_main_types, dict):
         return {block_type for block_type, visual_type in visual_main_types.items() if visual_type == BlockType.TABLE}
 
@@ -274,7 +274,7 @@ def find_stacked_table_caption_cluster(
     table_block: BlockDict,
     blocks: list[BlockDict],
 ) -> list[BlockDict]:
-    """按几何位置收集紧贴 table 上方的 caption/text/footnote 标题簇。"""
+    """The caption/text/footnote header cluster immediately above table is collected geometrically."""
     table_bbox = _block_bbox(table_block)
     table_top = table_bbox[1]
     above_candidates = [
@@ -311,7 +311,7 @@ def find_stacked_table_caption_cluster(
 
 
 def find_last_caption_position(caption_cluster: list[BlockDict]) -> int | None:
-    """定位标题簇里的最后一个 caption，避免吸收上一张表的尾注。"""
+    """Locate the last caption in the title cluster to avoid absorbing the endnotes of the previous table."""
     for pos in range(len(caption_cluster) - 1, -1, -1):
         if _block_type(caption_cluster[pos]) == RAW_CAPTION:
             return pos
@@ -319,7 +319,7 @@ def find_last_caption_position(caption_cluster: list[BlockDict]) -> int | None:
 
 
 def is_horizontally_near_table(block: BlockDict, table_block: BlockDict) -> bool:
-    """判断标题簇候选块是否横向落在 table 范围附近。"""
+    """Determine whether the title cluster candidate block falls laterally near the table range."""
     table_bbox = _block_bbox(table_block)
     block_bbox = _block_bbox(block)
     table_width = max(table_bbox[2] - table_bbox[0], 1)
@@ -328,17 +328,17 @@ def is_horizontally_near_table(block: BlockDict, table_block: BlockDict) -> bool
 
 
 def is_single_line_caption_fragment(block: BlockDict) -> bool:
-    """判断待兜底片段是否是单行块，避免吞掉多行正文。"""
+    """Determine whether the fragment to be covered is a single-line block to avoid swallowing up multiple lines of text."""
     return len(_block_line_items(block) or [None]) <= 1
 
 
 def stacked_caption_max_gap(block_height: float) -> float:
-    """计算堆叠标题簇允许的最大纵向间距。"""
+    """Calculate the maximum vertical spacing allowed for stacked header clusters."""
     return max(12, block_height * 1.5)
 
 
 def find_previous_effective_block(ordered_blocks: list[BlockDict], pos: int) -> BlockDict | None:
-    """向前查找参与视觉关系判断的有效块，跳过页眉页脚等外围块。"""
+    """Search forward for valid blocks involved in visual relationship judgment, skipping peripheral blocks such as headers and footers."""
     for index in range(pos - 1, -1, -1):
         block = ordered_blocks[index]
         if _block_type(block) not in VISUAL_RELATION_IGNORED_TYPES:
@@ -347,7 +347,7 @@ def find_previous_effective_block(ordered_blocks: list[BlockDict], pos: int) -> 
 
 
 def find_next_effective_block(ordered_blocks: list[BlockDict], pos: int) -> BlockDict | None:
-    """向后查找参与视觉关系判断的有效块，跳过页眉页脚等外围块。"""
+    """Search backwards for valid blocks involved in visual relationship judgment, skipping peripheral blocks such as headers and footers."""
     for index in range(pos + 1, len(ordered_blocks)):
         block = ordered_blocks[index]
         if _block_type(block) not in VISUAL_RELATION_IGNORED_TYPES:
@@ -360,7 +360,7 @@ def is_inline_caption_fragment(
     text_block: BlockDict,
     next_visual: BlockDict,
 ) -> bool:
-    """判断当前块是否是前一 caption 的同行补充片段。"""
+    """Determine whether the current block is a peer supplementary segment of the previous caption."""
     caption_bbox = _block_bbox(previous_caption)
     text_bbox = _block_bbox(text_block)
     visual_bbox = _block_bbox(next_visual)
@@ -385,7 +385,7 @@ def regroup_visual_blocks(
     *,
     use_bbox: bool = True,
 ) -> tuple[dict[Any, list[BlockDict]], list[BlockDict]]:
-    """按 bbox 或纯阅读顺序将通用 caption/footnote 归入视觉主体。"""
+    """Classify generic caption/footnote into visual subjects by bbox or pure reading order."""
     ordered_blocks = sorted(blocks, key=_block_index)
     if use_bbox:
         visual_relation_blocks = [block for block in ordered_blocks if not is_transparent_visual_relation_block(block)]
@@ -495,7 +495,7 @@ def find_best_visual_parent(
     type_by_index: dict[int, str] | None = None,
     use_bbox: bool = True,
 ) -> BlockDict | None:
-    """为通用 caption/footnote 查找最合适的视觉主体。"""
+    """Find the most suitable visual subject for the universal caption/footnote."""
     if main_type_to_visual_type is None:
         main_type_to_visual_type = VISUAL_MAIN_TYPES
     candidates = []
@@ -515,7 +515,7 @@ def find_best_visual_parent(
     if not candidates:
         return None
 
-    # 原生视觉证据已确认父框时，仅在合法邻居中唯一匹配，不能被通用距离规则重新绑定。
+    # When native visual evidence has confirmed the parent box, it is only uniquely matched among legal neighbors and cannot be rebound by universal distance rules.
     native_parent = child_block.get("_native_annotation_parent_bbox")
     if (
         use_bbox
@@ -579,11 +579,11 @@ def find_best_visual_parent(
         main_type_to_visual_type.get(block_type(main_block, type_by_index)) == BlockType.TABLE
         for main_block in closest_index_candidates
     ):
-        # 表格 caption 位于两个表之间且距离接近时，优先归属后一个表。
+        # When table caption is located between two tables and is close to each other, it will belong to the latter table first.
         return max(closest_index_candidates, key=_block_index)
 
     if child_kind == "footnote":
-        # 视觉脚注位于两个主体之间且距离接近时，优先归属前一个主体。
+        # When a visual footnote is located between two subjects and the distance is close, it is given priority to the former subject.
         return min(closest_index_candidates, key=_block_index)
 
     return min(
@@ -604,7 +604,7 @@ def effective_visual_index_diff(
     ordered_blocks: list[BlockDict],
     type_by_index: dict[int, str] | None = None,
 ) -> int:
-    """按有效块序列计算视觉子块与主体距离，吸收的 image 子成员视为零成本。"""
+    """The distance between the visual sub-block and the subject is calculated according to the valid block sequence, and the absorbed image sub-member is considered to have zero cost."""
     position_by_index = {_block_index(block): position for position, block in enumerate(ordered_blocks)}
     child_pos = position_by_index[_block_index(child_block)]
     main_pos = position_by_index[_block_index(main_block)]
@@ -628,7 +628,7 @@ def is_visual_neighbor(
     type_by_index: dict[int, str] | None = None,
     use_bbox: bool = True,
 ) -> bool:
-    """判断视觉标题或脚注与主体之间是否仅隔着允许跳过的关联块。"""
+    """Determines whether a visual title or footer is separated from the main body by only an associated block that allows skipping."""
     child_kind = child_kind_from_type(block_type(child_block, type_by_index))
     child_index = _block_index(child_block)
     main_index = _block_index(main_block)
@@ -666,7 +666,7 @@ def is_block_outside_visual_gap(
     child_block: BlockDict,
     main_block: BlockDict,
 ) -> bool:
-    """判断阅读顺序夹在中间的块是否没有落入视觉父子块的垂直间隔。"""
+    """Determine whether blocks sandwiched in reading order do not fall within the vertical separation of visual parent-child blocks."""
     visual_gap = vertical_gap_between_blocks(child_block, main_block)
     if visual_gap is None:
         return False
@@ -688,7 +688,7 @@ def vertical_gap_between_blocks(
     first_block: BlockDict,
     second_block: BlockDict,
 ) -> tuple[float, float] | None:
-    """计算两个块上下分离时的垂直间隔；发生纵向重叠时保持严格阻断。"""
+    """Calculate the vertical separation between two blocks when they are separated top and bottom; maintain strict blocking when vertical overlap occurs."""
     first_bbox = _block_bbox(first_block)
     second_bbox = _block_bbox(second_block)
     if first_bbox[3] <= second_bbox[1]:
@@ -699,19 +699,19 @@ def vertical_gap_between_blocks(
 
 
 def is_bbox_intersecting_vertical_gap(bbox: BBox, vertical_gap: tuple[float, float]) -> bool:
-    """判断 bbox 是否与视觉父子块之间的垂直间隔相交。"""
+    """Determines whether bbox intersects the vertical interval between visual parent and child blocks."""
     bbox = _bbox_for_calculation(bbox)
     gap_top, gap_bottom = vertical_gap
     return bbox[1] < gap_bottom and bbox[3] > gap_top
 
 
 def is_bbox_overlapping_visual_relation_block(bbox: BBox, child_bbox: BBox, main_bbox: BBox) -> bool:
-    """判断 bbox 是否覆盖到父子块本身；覆盖时不能当作普通 index 噪声跳过。"""
+    """Determine whether bbox covers the parent-child block itself; when overwritten, it cannot be skipped as ordinary index noise."""
     return are_bboxes_overlapping(bbox, child_bbox) or are_bboxes_overlapping(bbox, main_bbox)
 
 
 def are_bboxes_overlapping(first_bbox: BBox, second_bbox: BBox) -> bool:
-    """判断两个 bbox 是否存在二维相交。"""
+    """Determine whether two bboxs intersect in two dimensions."""
     first_bbox = _bbox_for_calculation(first_bbox)
     second_bbox = _bbox_for_calculation(second_bbox)
     return not (
@@ -723,13 +723,13 @@ def are_bboxes_overlapping(first_bbox: BBox, second_bbox: BBox) -> bool:
 
 
 def block_type(block: BlockDict, type_by_index: dict[int, str] | None = None) -> str:
-    """读取块类型；本地 Hybrid 会传入改写前的原始类型映射。"""
+    """Read block type; local Hybrid will pass in the original type mapping before overwriting."""
     if type_by_index is not None:
         return type_by_index[_block_index(block)]
     return _block_type(block)
 
 
 def child_kind_from_type(block_type: str) -> str | None:
-    """读取通用或已分类视觉子块的 caption/footnote 角色。"""
+    """Reads the caption/footnote role of a generic or classified visual subblock."""
     child_mapping = VISUAL_CHILD_TYPE_MAPPING.get(block_type)
     return child_mapping[1] if child_mapping else None

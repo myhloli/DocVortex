@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-# ruff: noqa: E501 -- 测试夹具保留紧凑 XML，便于直接核对 ODF 结构。
+# ruff: noqa: E501 -- The test fixture retains the compact XML, allowing for direct verification of the ODF structure.
 
 import base64
 from io import BytesIO
@@ -26,7 +26,7 @@ def build_odf_package(
     extra_parts: dict[str, bytes] | None = None,
     encrypted: bool = False,
 ) -> bytes:
-    """构造 mimetype 位于首项且不压缩的最小 ODF 测试包。"""
+    """Construct the minimal ODF test package with mimetype as the first item and not compressed."""
     mime = _MIME_BY_SUFFIX[suffix]
     manifest_entries = [
         f'<manifest:file-entry manifest:full-path="/" manifest:media-type="{mime}"/>',
@@ -66,7 +66,7 @@ def build_odf_package(
 
 
 def build_odt_fixture() -> bytes:
-    """构造覆盖标题、分页、列表、表格、脚注、公式和图片的 ODT。"""
+    """Constructs ODT covering titles, pagination, lists, tables, footnotes, formulas, and pictures."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -117,7 +117,7 @@ def build_odt_fixture() -> bytes:
 
 
 def _chart_object_xml() -> bytes:
-    """返回带精确 series 引用和内嵌数据表的 ODF chart 子文档。"""
+    """Returns the ODF chart subdocument with the exact series reference and embedded data table."""
     return b"""<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"
@@ -129,7 +129,7 @@ def _chart_object_xml() -> bytes:
 
 
 def build_odp_fixture() -> bytes:
-    """构造覆盖空 slide、图表预览和 speaker notes 的 ODP。"""
+    """Constructs ODP overriding empty slide, chart preview, and speaker notes."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"
@@ -151,7 +151,7 @@ def build_odp_fixture() -> bytes:
 
 
 def build_ods_fixture() -> bytes:
-    """构造覆盖可见/隐藏 sheet、离散数据区、合并和图表的 ODS。"""
+    """Constructs ODS covering visible/hidden sheet, discrete data areas, merges and charts."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"

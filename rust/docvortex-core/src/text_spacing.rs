@@ -1,15 +1,15 @@
-//! 与 Python 参考实现相同的相邻非 CJK 字形词界判定。
+//! Implement the same adjacent non-CJK glyph boundary determination as the Python reference.
 use crate::{geometry::Box4, text_snapshot::TextSnapshot};
 use std::collections::HashSet;
 
-/// 排除汉字扩展、假名、韩文及兼容字形，不以所在整行的语言决定词界。
+/// Excluding Chinese character extensions, kana, Korean and compatible glyphs, word boundaries are not determined by the language of the entire line.
 pub fn is_cjk(ch: char) -> bool {
     matches!(ch as u32,
         0x1100..=0x11ff | 0x2e80..=0xa4cf | 0xa960..=0xa97f | 0xac00..=0xd7ff |
         0xf900..=0xfaff | 0xff66..=0xff9f | 0x1aff0..=0x1b16f | 0x20000..=0x323af)
 }
 
-/// 墨迹框只转换坐标轴；相邻间隙与页面原点平移无关。
+/// The ink frame only converts the coordinate axis; the adjacent gaps have nothing to do with the page origin translation.
 fn local(b: Box4, angle: i32) -> Box4 {
     match angle {
         90 => [b[1], -b[2], b[3], -b[0]],
@@ -19,14 +19,14 @@ fn local(b: Box4, angle: i32) -> Box4 {
     }
 }
 
-/// 只接受解释器确认的普通单字形，避免两端标点或连字展开改变语义。
+/// Only accept common single glyphs confirmed by the interpreter to avoid punctuation at both ends or ligature expansion changing the semantics.
 fn ordinary(text: &str, letters: &HashSet<char>) -> bool {
     let mut chars = text.chars();
     let Some(ch) = chars.next() else { return false };
     chars.next().is_none() && !is_cjk(ch) && (ch.is_ascii_alphanumeric() || letters.contains(&ch))
 }
 
-/// 使用真实源编号、方向和基线保护，只为可靠的大墨迹间隙返回一个词界。
+/// Return only one word boundary for reliable large ink gaps using true source numbering, orientation, and baseline protection.
 pub fn needs_space(
     data: &TextSnapshot,
     first: usize,

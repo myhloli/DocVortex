@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到兼容 HTML 的公共渲染实现。"""
+"""Strictly MiddleJson to a public rendering implementation compatible with HTML."""
 
 from __future__ import annotations
 
@@ -104,7 +104,7 @@ _PRISM_LANGUAGE_ALIASES = {
 
 
 class _HtmlRenderer:
-    """维护一次 HTML 渲染所需的 anchor、公式与代码资源状态。"""
+    """Maintain the state of anchor, formulas and code resources required for a HTML rendering."""
 
     def __init__(
         self,
@@ -115,7 +115,7 @@ class _HtmlRenderer:
         standalone: bool,
         document_title: str | None,
     ) -> None:
-        """保存严格输入和调用选项，并预收集真实正文标题 anchor。"""
+        """Save strict input and recall options and pre-collect real text title anchor."""
         self.middle_json = middle_json
         self.mode = mode
         self.asset_base_url = asset_base_url
@@ -128,7 +128,7 @@ class _HtmlRenderer:
         self.has_mermaid = False
 
     def render(self) -> str:
-        """生成 fragment article，并按需包装完整 HTML 文档。"""
+        """Generates fragment article and packages complete HTML documentation on demand."""
         planned_pages = build_render_plan(self.middle_json, self.mode)
         if self.mode is RenderMode.FULL:
             body = self._render_full_pages(planned_pages)
@@ -140,7 +140,7 @@ class _HtmlRenderer:
         )
         if not self.standalone:
             return article
-        # 最终依赖以真实 DOM 为准，避免回退分支或普通文本中的 class 字样误触发。
+        # The final dependency is based on the real DOM to avoid false triggering of the words class in rollback branches or ordinary text.
         article_soup = BeautifulSoup(article, "html.parser")
         self.has_math = article_soup.select_one(".docvortex-math") is not None
         self.has_prism = any(
@@ -152,7 +152,7 @@ class _HtmlRenderer:
         return self._render_standalone(article)
 
     def _render_default_pages(self, planned_pages: list[list[PlannedBlock]]) -> str:
-        """把 DEFAULT 计划展平为无页面边界的连续阅读内容。"""
+        """Flatten the DEFAULT plan into continuous reading without page boundaries."""
         rendered: list[str] = []
         for page in planned_pages:
             for planned in page:
@@ -162,7 +162,7 @@ class _HtmlRenderer:
         return "\n".join(rendered)
 
     def _render_full_pages(self, planned_pages: list[list[PlannedBlock]]) -> str:
-        """为 FULL 计划保留所有页面 section 和相邻页面分隔。"""
+        """Reserve all pages for FULL schedule section and adjacent page separators."""
         sections: list[str] = []
         for page in planned_pages:
             page_idx = page[0].page_idx if page else None
@@ -175,7 +175,7 @@ class _HtmlRenderer:
         return f'\n<hr class="{WIRE_PAGE_BREAK_CLASS}" aria-hidden="true">\n'.join(sections)
 
     def _render_planned_block(self, planned: PlannedBlock) -> str:
-        """过滤计划块、分派类型 visitor，并添加稳定来源元数据。"""
+        """Filter plan block, dispatch type visitor, and add stable source metadata."""
         if planned.removed:
             return ""
         block = planned.block
@@ -192,7 +192,7 @@ class _HtmlRenderer:
         return f"<div {' '.join(attrs)}>\n{content}\n</div>"
 
     def _render_block_content(self, planned: PlannedBlock) -> str:
-        """按严格 PageBlock 具体类型返回对应语义 HTML。"""
+        """Returns the corresponding semantic HTML according to the strict PageBlock concrete type."""
         block = planned.block
         if isinstance(block, TextBlock):
             rendered = render_joined_inline_contents_html(
@@ -245,7 +245,7 @@ class _HtmlRenderer:
         raise TypeError(f"Unsupported PageBlock type: {type(block).__name__}")
 
     def _render_title(self, block: DocTitleBlock | ParagraphTitleBlock) -> str:
-        """渲染标题，并保证正文 anchor 只在首次出现时生成 id。"""
+        """Renders the header and ensures that the body anchor only generates id on its first occurrence."""
         rendered = render_inline_content_html(block.content, anchor_targets=self.anchor_targets)
         self._observe_inline(rendered)
         if not rendered.html:
@@ -262,7 +262,7 @@ class _HtmlRenderer:
         *,
         block_type: str,
     ) -> None:
-        """给标题或页面脚注追加唯一 HTML id，重复目标只保留首次输出。"""
+        """Append unique HTML id to the title or page footer. Only the first output of repeated targets is retained."""
         normalized = _anchor_key(anchor)
         if not normalized:
             return
@@ -275,7 +275,7 @@ class _HtmlRenderer:
         self.emitted_anchors.add(normalized)
 
     def _render_equation(self, block: EquationBlock) -> str:
-        """优先输出行间公式，空 LaTeX 时回退到安全图片来源。"""
+        """Priority is given to outputting interline formulas, and falling back to the safe image source when LaTeX is empty."""
         if block.content.strip():
             rendered = render_math_html(block.content, display=True)
             self._observe_inline(rendered)
@@ -284,7 +284,7 @@ class _HtmlRenderer:
         return self._render_image(source, alt="formula", class_name="docvortex-equation-image") if source else ""
 
     def _render_list(self, block: ListBlock) -> str:
-        """按直属 marker 类型渲染一层列表，并递归挂接嵌套列表。"""
+        """Render one level of lists by the immediate marker type, and hook nested lists recursively."""
         parsed_leaves = [
             parse_list_item_marker(child.content)
             for child in block.content
@@ -371,7 +371,7 @@ class _HtmlRenderer:
         return f"<{container_tag} {' '.join(container_attrs)}>{''.join(rendered_items)}</{container_tag}>"
 
     def _render_index(self, block: IndexBlock) -> str:
-        """递归渲染目录，并仅链接到真实正文标题 anchor。"""
+        """Render the table of contents recursively and link only to the real text title anchor."""
         items: list[dict[str, object]] = []
         for child in block.content:
             if isinstance(child, IndexBlock):
@@ -391,7 +391,7 @@ class _HtmlRenderer:
         return f"<nav {' '.join(attrs)}><ul>{inner}</ul></nav>" if inner else ""
 
     def _render_index_list(self, block: IndexBlock) -> str:
-        """渲染一个嵌套 IndexBlock 为可挂接到父项的 ul。"""
+        """Renders a nested IndexBlock into a ul hookable to the parent."""
         items: list[dict[str, object]] = []
         for child in block.content:
             if isinstance(child, IndexBlock):
@@ -410,7 +410,7 @@ class _HtmlRenderer:
         return f"<ul {' '.join(attrs)}>{inner}</ul>" if inner else ""
 
     def _render_index_leaf(self, block: TextBlock | TitleBlockBase) -> tuple[str, list[str]]:
-        """渲染目录叶子，并在 anchor 命中正文标题时生成内部链接。"""
+        """Renders the table of contents leaves and generates internal links when anchor hits the body title."""
         content = strip_index_page_tail(block.content)
         rendered = render_inline_content_html(content, anchor_targets=self.anchor_targets)
         self._observe_inline(rendered)
@@ -423,7 +423,7 @@ class _HtmlRenderer:
         return rendered.html, _wire_block_attributes(block)
 
     def _render_image_block(self, block: ImageBlock) -> str:
-        """按原始子块顺序渲染图片主体及重复说明。"""
+        """Render the body of the image and its duplicate caption in original sub-chunk order."""
         parts: list[str] = []
         for child in block.content:
             if isinstance(child, ImageBodyBlock):
@@ -437,7 +437,7 @@ class _HtmlRenderer:
         return f'<figure class="docvortex-figure docvortex-figure--image">{"".join(parts)}</figure>' if parts else ""
 
     def _render_image_body(self, parent: ImageBlock, block: ImageBodyBlock) -> str:
-        """渲染图片，并把并存的识别内容放入原生 details。"""
+        """Render the image and put the coexisting recognition content into the native details."""
         if parent.sub_type == "flowchart":
             mermaid_source = _extract_mermaid_flowchart_source(block.content)
             if mermaid_source is not None:
@@ -455,7 +455,7 @@ class _HtmlRenderer:
         return _wrap_visual_body("".join(parts), block, "image")
 
     def _render_flowchart_body(self, block: ImageBodyBlock, mermaid_source: str) -> str:
-        """原图作为主视图，折叠区展示 Mermaid 图；无原图时保留失败源码回退。"""
+        """The original image is used as the main view, and the folded area displays the Mermaid image; if there is no original image, the failed source code is retained and returned."""
         source = self._safe_block_image_source(block)
         escaped_source = html.escape(_replace_html_controls(mermaid_source), quote=False)
         image = self._render_image(source, alt="flowchart", class_name="docvortex-image") if source else ""
@@ -473,7 +473,7 @@ class _HtmlRenderer:
         )
 
     def _render_table_block(self, block: TableBlock) -> str:
-        """按原始子块顺序渲染表格主体、标题与脚注。"""
+        """Render table body, title, and footer in original sub-block order."""
         parts: list[str] = []
         for child in block.content:
             if isinstance(child, TableBodyBlock):
@@ -487,7 +487,7 @@ class _HtmlRenderer:
         return f'<figure class="docvortex-figure docvortex-figure--table">{"".join(parts)}</figure>' if parts else ""
 
     def _render_table_body(self, block: TableBodyBlock) -> str:
-        """优先保留安全 HTML table，空间文本和整体图片依次回退。"""
+        """Preserve safety first HTML table, space text and overall picture fall back in turn."""
         normalized_content = _replace_html_controls(block.content)
         content = normalized_content.strip()
         if content:
@@ -508,7 +508,7 @@ class _HtmlRenderer:
         return _wrap_visual_body(rendered_image, block, "table")
 
     def _render_chart_block(self, block: ChartBlock) -> str:
-        """按原始子块顺序渲染 chart 图片、结构内容及说明。"""
+        """Renders the chart image, structural content, and description in original subchunk order."""
         parts: list[str] = []
         for child in block.content:
             if isinstance(child, ChartBodyBlock):
@@ -522,7 +522,7 @@ class _HtmlRenderer:
         return f'<figure class="docvortex-figure docvortex-figure--chart">{"".join(parts)}</figure>' if parts else ""
 
     def _render_chart_body(self, parent: ChartBlock, block: ChartBodyBlock) -> str:
-        """渲染 chart 图片，并将并存结构内容放入 details。"""
+        """Render the chart image and place the coexisting structure contents into details."""
         source = self._safe_block_image_source(block)
         content = self._render_chart_content(block.content)
         parts = (
@@ -536,7 +536,7 @@ class _HtmlRenderer:
         return _wrap_visual_body("".join(parts), block, "chart")
 
     def _render_chart_content(self, content: str) -> HtmlInlineResult:
-        """按 HTML、严格 GFM 表格、普通行内内容的顺序渲染 chart content。"""
+        """Renders chart content in the order HTML, strict GFM table, normal inline content."""
         normalized = content.strip()
         if not normalized:
             return HtmlInlineResult("")
@@ -553,7 +553,7 @@ class _HtmlRenderer:
         return rendered
 
     def _render_code_block(self, block: CodeBlock) -> str:
-        """按原始子块顺序渲染代码或算法及其说明。"""
+        """Render the code or algorithm and its description in original sub-block order."""
         parts: list[str] = []
         for child in block.content:
             if isinstance(child, (CodeBodyBlock, AlgorithmBodyBlock)):
@@ -567,7 +567,7 @@ class _HtmlRenderer:
         return f'<figure class="docvortex-figure docvortex-figure--code">{"".join(parts)}</figure>' if parts else ""
 
     def _render_code_body(self, parent: CodeBlock, block: CodeBodyBlock | AlgorithmBodyBlock) -> str:
-        """代码使用 Prism class，算法直接使用结构化 Span 保留空白。"""
+        """The code uses Prism class and the algorithm directly uses the structured Span leaving blanks."""
         if parent.sub_type == BlockType.CODE:
             if not isinstance(block, CodeBodyBlock):
                 raise TypeError("code subtype requires CodeBodyBlock")
@@ -599,7 +599,7 @@ class _HtmlRenderer:
         self,
         block: ImageAnnotationBlock | TableAnnotationBlock | ChartAnnotationBlock | CodeAnnotationBlock,
     ) -> str:
-        """把视觉说明渲染为保持原类型的独立段落。"""
+        """Render the visual description as a separate paragraph maintaining the original type."""
         rendered = render_inline_content_html(block.content, anchor_targets=self.anchor_targets)
         self._observe_inline(rendered)
         if not rendered.html:
@@ -611,7 +611,7 @@ class _HtmlRenderer:
         return f"<p {' '.join(attrs)}>{rendered.html}</p>"
 
     def _render_embedded_content(self, content: str, *, linkify_text: bool = True) -> HtmlInlineResult:
-        """安全处理 body 富 HTML；普通字符串始终按字面文本渲染。"""
+        """Safe handling body Rich HTML; normal strings are always rendered as literal text."""
         normalized = content.strip()
         if not normalized:
             return HtmlInlineResult("")
@@ -625,7 +625,7 @@ class _HtmlRenderer:
         return rendered
 
     def _replace_safe_equations(self, markup: str) -> HtmlInlineResult:
-        """把 sanitizer 保留的 eq 标签替换为可信 MathJax carrier。"""
+        """Replace the reserved eq tag sanitizer with the trusted MathJax carrier."""
         if not markup:
             return HtmlInlineResult("")
         soup = BeautifulSoup(markup, "html.parser")
@@ -641,7 +641,7 @@ class _HtmlRenderer:
         return HtmlInlineResult(str(soup), has_math)
 
     def _safe_block_image_source(self, block: EquationBlock | ImageBodyBlock | TableBodyBlock | ChartBodyBlock) -> str | None:
-        """解析 block 图片来源，并应用 HTML renderer 的 URL 安全策略。"""
+        """Parse the block image source and apply the URL security policy for HTML renderer."""
         if block.image_path:
             return sanitize_image_source(block.image_path, asset_base_url=self.asset_base_url)
         if block.image_base64:
@@ -651,25 +651,25 @@ class _HtmlRenderer:
         return None
 
     def _render_image(self, source: str, *, alt: str, class_name: str) -> str:
-        """构造属性已转义的安全 img 元素。"""
+        """Constructs a safe img element with escaped attributes."""
         return (
             f'<img class="{class_name}" src="{html.escape(source, quote=True)}" '
             f'alt="{html.escape(_replace_html_controls(alt), quote=True)}">'
         )
 
     def _render_details(self, content: str, summary: str) -> str:
-        """构造浏览器原生折叠详情，不引入额外脚本。"""
+        """Construct browser native folding details without introducing additional scripts."""
         return (
             '<details class="docvortex-details">'
             f"<summary>{html.escape(_replace_html_controls(summary), quote=False)}</summary>{content}</details>"
         )
 
     def _observe_inline(self, rendered: HtmlInlineResult) -> None:
-        """累计当前文档是否需要加载 MathJax。"""
+        """Accumulate whether the current document needs to be loaded MathJax."""
         self.has_math = rendered.has_math or self.has_math
 
     def _render_standalone(self, article: str) -> str:
-        """用固定 CSS 和按需 CDN 资源包装完整 HTML 文档。"""
+        """Complete HTML documentation packaged with fixed CSS and on-demand CDN resources."""
         title = html.escape(
             _replace_html_controls(_resolve_document_title(self.middle_json, self.document_title)),
             quote=False,
@@ -708,7 +708,7 @@ def render_html(
     standalone: bool = True,
     document_title: str | None = None,
 ) -> str:
-    """把严格 MiddleJson 无副作用地渲染为 HTML 文档或单根 fragment。"""
+    """Render a strict MiddleJson to a HTML document or a single fragment without side effects."""
     if not isinstance(middle_json, MiddleJson):
         raise TypeError("render_html expects a MiddleJson instance")
     if not isinstance(mode, RenderMode):
@@ -729,7 +729,7 @@ def render_html(
 
 
 def _classify_list(items: list[ListItem], add_reference_bullets: bool) -> tuple[str, str | None, str]:
-    """根据直属 marker 选择原生列表类型或显式 marker 模式。"""
+    """Select native list type or explicit marker mode based on direct marker."""
     if add_reference_bullets:
         return "ul", None, "docvortex-list--reference"
     if items and all(item.kind == "unordered" for item in items):
@@ -756,7 +756,7 @@ def _list_item_content(
     *,
     explicit_markers: bool,
 ) -> tuple[list[InlineSpan], str | None]:
-    """决定一个列表项应剥离、保留还是显式显示源 marker。"""
+    """Determines whether a list item should be stripped, retained, or explicitly displayed as source marker."""
     if add_reference_bullets:
         if item.kind == "unordered":
             return item.body, None
@@ -771,7 +771,7 @@ def _list_item_content(
 
 
 def _serialize_index_items(items: list[dict[str, object]]) -> str:
-    """把目录项及其已挂接的嵌套 ul 序列化为 li。"""
+    """Serializes a directory entry and its mounted nested ul to li."""
     rendered: list[str] = []
     for item in items:
         nested = item["nested"]
@@ -787,7 +787,7 @@ def _serialize_index_items(items: list[dict[str, object]]) -> str:
 
 
 def _wire_block_attributes(block: BlockBase) -> list[str]:
-    """把统一 block 身份和可往返元数据编码为版本化 HTML data 属性。"""
+    """Encode unified block identity and round-tripping metadata into versioned HTML data attributes."""
     attrs = [f'data-block-type="{html.escape(str(block.type), quote=True)}"']
     if block.index is not None:
         attrs.append(f'data-block-index="{block.index}"')
@@ -811,13 +811,13 @@ def _wrap_visual_body(
     block: ImageBodyBlock | TableBodyBlock | ChartBodyBlock | CodeBodyBlock | AlgorithmBodyBlock,
     kind: str,
 ) -> str:
-    """为视觉主体添加不参与 CSS 类型推断的精确机器容器。"""
+    """Add an exact machine container for visual agents that does not participate in CSS type inference."""
     attrs = [f'class="{WIRE_VISUAL_BODY_CLASS} {WIRE_VISUAL_BODY_CLASS}--{kind}"', *_wire_block_attributes(block)]
     return f"<div {' '.join(attrs)}>{content}</div>"
 
 
 def _collect_document_anchor_ids(middle_json: MiddleJson) -> dict[str, str]:
-    """为正文、标题和页面脚注的首次非空 anchor 分配文档级唯一 HTML id。"""
+    """Assign document-level unique HTML id to first non-empty anchor for body text, titles, and page footers."""
     anchor_ids: dict[str, str] = {}
     used_ids: set[str] = set()
     for page in middle_json.pages:
@@ -843,7 +843,7 @@ def _collect_document_anchor_ids(middle_json: MiddleJson) -> dict[str, str]:
 
 
 def _plain_content_text(content: str) -> str:
-    """从 body 内容提取安全 img alt 所需的可见纯文本。"""
+    """Extract visible plain text required for secure img alt from body content."""
     if not content:
         return ""
     if is_supported_html_markup(content):
@@ -852,7 +852,7 @@ def _plain_content_text(content: str) -> str:
 
 
 def _extract_mermaid_flowchart_source(content: str) -> str | None:
-    """提取受限 Mermaid flowchart fence，拒绝其他图类型和可改写配置的语法。"""
+    """Extraction restricted Mermaid flowchart fence, rejecting other graph types and overridable configured syntax."""
     normalized = _replace_html_controls(content).replace("\r\n", "\n").replace("\r", "\n").strip()
     if not normalized:
         return None
@@ -880,18 +880,18 @@ def _extract_mermaid_flowchart_source(content: str) -> str | None:
 
 
 def _contains_usable_table(markup: str) -> bool:
-    """确认清洗后的 markup 至少保留一个含单元格的 table。"""
+    """Confirm that the cleaned markup retains at least one table containing cells."""
     soup = BeautifulSoup(markup, "html.parser")
     return any(table.find(("td", "th")) is not None for table in soup.find_all("table"))
 
 
 def _render_raw_fallback(content: str) -> str:
-    """把无法安全结构化的原内容转义为可见 pre，避免静默丢失。"""
+    """Escape original content that cannot be safely structured into visible pre to avoid silent loss."""
     return f'<pre class="docvortex-raw-fallback">{html.escape(_replace_html_controls(content), quote=False)}</pre>'
 
 
 def _normalize_prism_language(language: str | None) -> str | None:
-    """把模型语言名归一化为不可构造路径穿越的 Prism component 名。"""
+    """Normalize model language names to Prism component names that cannot be traversed by paths."""
     normalized = (language or "").strip().lower()
     normalized = _PRISM_LANGUAGE_ALIASES.get(normalized, normalized.replace("_", "-"))
     if not normalized or normalized in _BLOCKED_PRISM_LANGUAGE_NAMES:
@@ -900,7 +900,7 @@ def _normalize_prism_language(language: str | None) -> str | None:
 
 
 def _resolve_document_title(middle_json: MiddleJson, explicit_title: str | None) -> str:
-    """按显式参数、首个正文文档标题、固定回退值解析 HTML title。"""
+    """Parse HTML title by explicit parameters, first text document title, fixed fallback value."""
     if explicit_title and explicit_title.strip():
         return explicit_title.strip()
     for page in middle_json.pages:
@@ -913,29 +913,29 @@ def _resolve_document_title(middle_json: MiddleJson, explicit_title: str | None)
 
 
 def _anchor_key(anchor: str | None) -> str:
-    """保留 producer anchor 身份，仅去除首尾空白供标题与目录精确匹配。"""
+    """The identity of producer anchor is retained, with only leading and trailing whitespace removed for an exact match of the title and table of contents."""
     return (anchor or "").strip()
 
 
 def _html_anchor_base(anchor: str) -> str:
-    """把原始 anchor 转成无空白的 HTML id 基值，碰撞由 document registry 处理。"""
+    """Convert original anchor to HTML id base value without whitespace, collisions are handled by document registry."""
     return re.sub(r"\s+", "-", _replace_html_controls(anchor))
 
 
 def _replace_html_controls(content: str) -> str:
-    """替换 HTML 不允许的 C0 控制字符与不可编码的孤立 surrogate。"""
+    """Replace HTML The disallowed C0 control character with the unencodable orphan surrogate."""
     return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\ud800-\udfff]", "\ufffd", content)
 
 
 @lru_cache(maxsize=1)
 def _load_html_styles() -> str:
-    """从包资源读取并缓存压缩后的独立 HTML 样式。"""
+    """Reads and caches the compressed stand-alone HTML style from the package resource."""
     root = resources.files("docvortex").joinpath("resources", "html")
     return root.joinpath(_STYLE_RESOURCE_NAME).read_text(encoding="utf-8")
 
 
 def _mathjax_head() -> str:
-    """返回固定、收紧公式输入能力的 MathJax 4.1.2 head 片段。"""
+    """Return MathJax 4.1.2 head snippet that fixed, tightened formula entry capabilities."""
     return f"""<script>
 window.MathJax = {{
   loader: {{load: ['ui/safe']}},
@@ -969,7 +969,7 @@ window.MathJax = {{
 
 
 def _prism_head() -> str:
-    """返回固定 Prism core、Autoloader 和当前文档局部高亮脚本。"""
+    """Returns fixed Prism core, Autoloader and current document local highlighting scripts."""
     return f"""<script defer data-manual src="{_PRISM_CORE_URL}"
   integrity="{_PRISM_CORE_INTEGRITY}" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script defer src="{_PRISM_AUTOLOADER_URL}"
@@ -985,7 +985,7 @@ document.addEventListener('DOMContentLoaded', function () {{
 
 
 def _mermaid_head() -> str:
-    """返回固定 Mermaid 入口和折叠展开后按需安全渲染脚本。"""
+    """Return fixed Mermaid entry and on-demand safe rendering script after collapse expansion."""
     return f"""<script defer src="{_MERMAID_URL}"
   integrity="{_MERMAID_INTEGRITY}" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>

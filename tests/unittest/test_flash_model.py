@@ -13,7 +13,7 @@ from docvortex.document.pdf._document import PDFDocument
 def test_pdf_model_predict_returns_native_model_list_without_owning_document(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证模型传递同一 PDFDocument，且不负责分类或关闭调用方文档。"""
+    """The validation model is passed the same PDFDocument and is not responsible for classifying or closing the caller document."""
 
     pdf_doc = MagicMock(spec=PDFDocument)
     expected_model_list = [[{"type": "text", "content": "native"}]]
@@ -29,7 +29,7 @@ def test_pdf_model_predict_returns_native_model_list_without_owning_document(
 
 
 def test_pdf_model_is_public_and_old_flash_model_is_removed() -> None:
-    """验证 PdfModel 公开可用，旧 FlashModel 名称不再兼容。"""
+    """Verify that PdfModel is publicly available, the old FlashModel name is no longer compatible."""
 
     flash_module = importlib.import_module("docvortex.analyzers.native")
     assert flash_module.PdfModel is PdfModel

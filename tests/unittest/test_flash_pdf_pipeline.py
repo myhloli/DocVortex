@@ -37,7 +37,7 @@ def _image_info(
     fingerprint: str | None,
     bbox: tuple[float, float, float, float],
 ) -> PDFImageInfo:
-    """构造跨页图片水印规则使用的轻量图片信息。"""
+    """Construct lightweight image information used by cross-page image watermark rules."""
 
     return PDFImageInfo(bbox=bbox, fingerprint=fingerprint)
 
@@ -45,7 +45,7 @@ def _image_info(
 def test_prepare_page_materializes_table_against_original_semantic_lines(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证表格检测避开预分类行，但物化阶段可看到 core 内误标页脚。"""
+    """The validation form detection avoids the pre-categorization row, but the mislabeled footer within core can be seen during the materialization stage."""
 
     body = _text_line("body", (10.0, 10.0, 90.0, 20.0), 0)
     footer = _text_line(
@@ -67,7 +67,7 @@ def test_prepare_page_materializes_table_against_original_semantic_lines(
         *,
         excluded_bboxes: list[tuple[float, float, float, float]],
     ) -> list[models._TableCandidate]:
-        """记录候选检测阶段可见的来源行。"""
+        """Record the source lines visible during the candidate detection phase."""
 
         assert excluded_bboxes == []
         observed["detect"] = [line.source_index for line in analysis_source.lines]
@@ -78,7 +78,7 @@ def test_prepare_page_materializes_table_against_original_semantic_lines(
         candidates: list[models._TableCandidate],
         **_kwargs: object,
     ) -> tuple[list[dict[str, object]], list[dict[str, object]], set[int]]:
-        """记录表格物化阶段可见的来源行。"""
+        """Record the source rows visible during the materialization phase of the table."""
 
         assert candidates == []
         observed["materialize"] = [line.source_index for line in materialization_source.lines]
@@ -95,7 +95,7 @@ def test_prepare_page_materializes_table_against_original_semantic_lines(
 def test_prepare_page_uses_only_table_body_bbox_and_keeps_annotations_fixed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 Pipeline 仅用表体框作容器屏障，同时把预分类注释送入固定块。"""
+    """Verify that Pipeline only uses the table body frame as a container barrier and sends pre-categorization comments into the fixed block."""
 
     source = models._PageSource(
         page_size=(100.0, 100.0),
@@ -139,7 +139,7 @@ def test_prepare_page_uses_only_table_body_bbox_and_keeps_annotations_fixed(
 def test_prepare_page_resplits_repaired_cross_column_row_before_text_classification(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证生产页面准备会按修复字符框重切跨栏粗行并分配唯一来源序号。"""
+    """Verify that the production page is ready to re-cut the column thick lines according to the repair character box and assign a unique source serial number."""
 
     positions = (0.0, 6.0, 12.0, 18.0, 62.0, 68.0, 74.0, 80.0)
     chars = [
@@ -234,7 +234,7 @@ def test_prepare_page_resplits_repaired_cross_column_row_before_text_classificat
         *_args: object,
         source_index_start: int,
     ) -> list[models._LineItem]:
-        """记录跨栏重切后传给后续 graphic split 的下一来源序号。"""
+        """Record the next source sequence number passed to the subsequent graphic split after hurdle re-cutting."""
 
         observed_next_indices.append(source_index_start)
         return lines
@@ -331,7 +331,7 @@ def test_prepare_page_resplits_repaired_cross_column_row_before_text_classificat
 
 
 def test_prepare_page_realigns_unsplit_repaired_text_evidence() -> None:
-    """验证普通修复行未重切时，样式和链接 evidence 仍使用最终布局框。"""
+    """Styles and links evidence still use the final layout box when verifying normal fix lines are not recut."""
 
     line = _text_line("linked", (0.0, 80.0, 200.0, 100.0), 5)
     source = models._PageSource(
@@ -391,7 +391,7 @@ def _repeated_separator_source(
     *,
     connected_grid: bool = False,
 ) -> models._PageSource:
-    """构造重复页首横线，并可把该横线作为闭合表格的真实顶边。"""
+    """Construct a repeated top horizontal line, and use this horizontal line as the real top edge of the closed table."""
 
     lines = [
         _text_line(header_text, (20.0, 15.0, 180.0, 25.0), 0),
@@ -428,7 +428,7 @@ def _repeated_separator_source(
 
 
 def test_repeated_header_separator_requires_repeated_header_text() -> None:
-    """验证只有横线重复、而上方普通文本不重复时不会移除表格规则。"""
+    """The table rule will not be removed if it is verified that only the horizontal lines are repeated and the normal text above is not repeated."""
 
     sources = [_repeated_separator_source(text) for text in ("alpha banner", "beta notice", "gamma heading")]
 
@@ -436,7 +436,7 @@ def test_repeated_header_separator_requires_repeated_header_text() -> None:
 
 
 def test_repeated_header_separator_supports_alternating_headers() -> None:
-    """验证奇偶页各自重复的刊头可以共同确认同一页眉分隔线。"""
+    """Verify that duplicate mastheads on odd and even pages can jointly confirm the same header separator."""
 
     sources = [_repeated_separator_source("even journal" if page_index % 2 == 0 else "odd article") for page_index in range(4)]
     expected = {(10.0, 50.0, 190.0, 50.1)}
@@ -445,7 +445,7 @@ def test_repeated_header_separator_supports_alternating_headers() -> None:
 
 
 def test_repeated_table_top_rule_is_not_header_separator() -> None:
-    """验证重复表单的闭合网格顶边不会因上方重复标题而被删除。"""
+    """Verify that the top edge of the closed grid of the repeating form is not removed by the repeating header above."""
 
     sources = [_repeated_separator_source("repeated form", connected_grid=True) for _page_index in range(3)]
 
@@ -454,7 +454,7 @@ def test_repeated_table_top_rule_is_not_header_separator() -> None:
 
 
 def test_table_detection_excludes_confirmed_masthead_separator() -> None:
-    """验证页首通栏分隔线不与下方真表格边界组成巨型候选。"""
+    """Verify that the header column divider does not form a giant candidate with the real table boundary below."""
 
     source = models._PageSource(
         page_size=(200.0, 300.0),
@@ -487,7 +487,7 @@ def test_table_detection_excludes_confirmed_masthead_separator() -> None:
 
 
 def test_repeated_large_image_requires_three_distinct_pages() -> None:
-    """验证同页重复只计一次，面积恰好 8% 且跨三页时才命中水印。"""
+    """Verify that the watermark will be hit only if the same page is repeated only once, the area is exactly 8%, and spans three pages."""
 
     page_sizes = [(100.0, 100.0)] * 4
     page_image_infos = [
@@ -510,7 +510,7 @@ def test_repeated_large_image_requires_three_distinct_pages() -> None:
 
 
 def test_repeated_watermark_filter_keeps_small_or_unfingerprinted_images() -> None:
-    """验证已命中指纹也只删除大图，小图和指纹读取失败的图片继续进入现有流程。"""
+    """Only large images will be deleted after verifying that the fingerprint has been hit. Small images and images that failed to read the fingerprint will continue to enter the existing process."""
 
     image_infos = [
         _image_info("watermark", (0.0, 0.0, 40.0, 20.0)),
@@ -533,7 +533,7 @@ def test_repeated_watermark_filter_keeps_small_or_unfingerprinted_images() -> No
 
 
 def test_flash_extractor_has_no_local_ocr_runtime_logic() -> None:
-    """守卫 Flash extractor 不再引入或实现本地 OCR 运行时逻辑。"""
+    """Guard Flash extractor no longer introduces or implements native OCR runtime logic."""
 
     source = "\n".join(
         inspect.getsource(module)
@@ -575,7 +575,7 @@ def test_flash_extractor_has_no_local_ocr_runtime_logic() -> None:
 
 
 def test_native_pdf_domain_modules_do_not_import_each_other() -> None:
-    """守卫领域处理器只依赖共享层，跨领域组合统一留在 pipeline。"""
+    """The guard domain processor only relies on the shared layer, and the cross-domain combination remains unified in pipeline."""
 
     domain_modules = (
         auxiliary_text,
@@ -616,7 +616,7 @@ def test_native_pdf_domain_modules_do_not_import_each_other() -> None:
     ],
 )
 def test_output_normalization_preserves_new_flash_types(block_type: str) -> None:
-    """验证 Flash 文本语义类型和公式类型不会在归一化阶段退回 text。"""
+    """Verify that Flash text semantic types and formula types do not fall back text during the normalization phase."""
 
     block = pipeline._normalize_output_block(
         {"type": block_type, "bbox": (10.0, 20.0, 40.0, 50.0), "angle": 0, "content": "value"},
@@ -628,7 +628,7 @@ def test_output_normalization_preserves_new_flash_types(block_type: str) -> None
 
 
 def test_output_normalization_keeps_empty_equation_but_drops_empty_text() -> None:
-    """验证纯矢量公式可保留空 content，普通空文本仍不会进入 model_list。"""
+    """Verify that pure vector formulas retain empty content, and normal empty text still does not go into model_list."""
 
     equation = pipeline._normalize_output_block(
         {"type": "equation", "bbox": (10.0, 20.0, 40.0, 50.0), "angle": 0, "content": ""},
@@ -649,7 +649,7 @@ def test_output_normalization_keeps_empty_equation_but_drops_empty_text() -> Non
 
 
 def test_output_normalization_applies_unicode_content_safety_net() -> None:
-    """验证最终 model_list 归一化会兜底清理排版空格和安全零宽字符。"""
+    """Verify that final model_list normalization cleans up typographic whitespace and safe zero-width characters."""
 
     block = pipeline._normalize_output_block(
         {
@@ -666,7 +666,7 @@ def test_output_normalization_applies_unicode_content_safety_net() -> None:
 
 
 def test_index_is_claimed_before_formula_anchor_growth() -> None:
-    """验证目录右缘页码先形成完整 index，不再扩张为重叠公式。"""
+    """Verify that the page numbers on the right edge of the table of contents first form a complete index and no longer expand into overlapping formulas."""
 
     heading = _text_line(
         "contents",
@@ -712,7 +712,7 @@ def test_index_is_claimed_before_formula_anchor_growth() -> None:
 
 
 def test_numbered_formula_rows_are_not_claimed_as_index() -> None:
-    """验证连续编号公式先保留公式语义，不被无标题目录候选吞并。"""
+    """Verify that consecutively numbered formulas first retain formula semantics and are not swallowed up by untitled directory candidates."""
 
     body_font = ("Body", 0)
     lines = [
@@ -769,15 +769,15 @@ def test_document_preparation_releases_sources_but_keeps_formula_evidence(
     monkeypatch: pytest.MonkeyPatch,
     retain_formula: bool,
 ) -> None:
-    """页面准备释放原始字符所有者，同时保留公式重建明确持有的独立副本。"""
+    """Page preparation releases the original character owner while retaining an independent copy explicitly held by the formula reconstruction."""
 
     class TrackedChar(dict):
-        """允许弱引用观察字符字典的实际存活期。"""
+        """Allow weak references to observe the actual lifetime of the character dictionary."""
 
     references: list[weakref.ReferenceType[TrackedChar]] = []
 
     def sources() -> pipeline._DocumentSources:
-        """在独立作用域构建字符来源，避免测试局部变量额外延长存活期。"""
+        """Construct character sources in independent scopes to avoid testing local variables to extend the lifetime."""
 
         chars = [TrackedChar(char="x", char_idx=0, bbox=(10.0, 20.0, 20.0, 30.0))]
         references.append(weakref.ref(chars[0]))
@@ -790,7 +790,7 @@ def test_document_preparation_releases_sources_but_keeps_formula_evidence(
         )
 
     def prepare(source: models._PageSource, **kwargs: object) -> models._PreparedPage:
-        """仅保留模拟公式重建需要的字符副本，其它原始引用应被释放。"""
+        """Only copies of the characters required for reconstruction of the simulation formula are retained; other original references should be released."""
 
         prepared = models._PreparedPage(source.page_size, [], [], [], [])
         if retain_formula:

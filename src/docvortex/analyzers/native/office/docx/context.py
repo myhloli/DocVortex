@@ -1,4 +1,4 @@
-"""DOCX 转换共享的 XML 常量和字段栈契约。"""
+"""DOCX converts the shared XML constant and field stack contracts."""
 
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -15,7 +15,7 @@ _ParagraphElement: TypeAlias = tuple[str, Optional[Formatting], _ParagraphHyperl
 
 @dataclass(slots=True)
 class _DocxComplexFieldFrame:
-    """保存一个 DOCX 复杂字段的指令、阶段与已解析结果元素。"""
+    """Save the command, stage and parsed result elements of a DOCX complex field."""
 
     instruction_parts: list[str] = field(default_factory=list)
     phase: str = "instr"
@@ -23,7 +23,7 @@ class _DocxComplexFieldFrame:
 
 
 class _DocxConstants:
-    """保存跨职责使用的固定命名空间与公式载体优先级。"""
+    """Save the fixed namespace and formula carrier priority used across responsibilities."""
 
     _BLIP_NAMESPACES: Final = {
         "a": "http://schemas.openxmlformats.org/drawingml/2006/main",

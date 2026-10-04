@@ -26,7 +26,7 @@ from docvortex.schema import BlockType
 
 
 def test_odt_recovers_structure_and_all_renderers() -> None:
-    """验证 ODT 标题、富文本、列表、合并表、连续排版、脚注、公式和图片。"""
+    """Validate ODT titles, rich text, lists, merged tables, running sequences, footnotes, formulas, and images."""
     middle, model = analyze_native_test_document(build_odt_fixture(), file_suffix="odt")
     raw_blocks = [block for page in model.pages for block in page]
     raw_types = [block["type"] for block in raw_blocks]
@@ -65,7 +65,7 @@ def test_odt_recovers_structure_and_all_renderers() -> None:
 
 
 def test_odt_promotes_numbered_heading_inside_list() -> None:
-    """验证 LibreOffice 编码在 list-item 中的 text:h 恢复为编号章节标题。"""
+    """Verify that LibreOffice encoded in list-item reverts to numbered chapter headings for text:h."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -83,7 +83,7 @@ def test_odt_promotes_numbered_heading_inside_list() -> None:
 
 
 def test_odt_inherits_document_title_semantics_from_parent_style() -> None:
-    """验证自定义段落样式沿 parent-style-name 继承标准文档标题语义。"""
+    """Verify that custom paragraph styles inherit standard document title semantics along with parent-style-name."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
@@ -104,7 +104,7 @@ def test_odt_inherits_document_title_semantics_from_parent_style() -> None:
 
 
 def test_odt_preserves_explicit_space_count() -> None:
-    """验证 text:s 的显式重复空格不会被普通 XML 空白规则折叠。"""
+    """Verify that explicit repeated spaces for text:s are not collapsed by normal XML whitespace rules."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
@@ -117,14 +117,14 @@ def test_odt_preserves_explicit_space_count() -> None:
 
 
 def test_odt_bounds_overlong_explicit_space_count_before_integer_conversion() -> None:
-    """验证超长 text:c 在整数转换前按单节点上限截断，不依赖解释器数字保护。"""
+    """Verify that overlong text:c is truncated at the single node limit before integer conversion, without relying on interpreter number protection."""
     assert odf_text_module._positive_space_count("9" * 100_000) == 10_000
     assert odf_text_module._positive_space_count("+0004") == 4
     assert odf_text_module._positive_space_count("-4") == 1
 
 
 def test_odt_explicit_space_expansion_uses_document_budget(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证多个 text:s 共享文档级预算，并在超限分配前稳定失败。"""
+    """Verify that multiple text:ss share document-level budgets and fail reliably before over-allocation."""
     monkeypatch.setattr(odf_text_module, "MAX_EXPANSION_TEXT_BYTES", 5)
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -139,7 +139,7 @@ def test_odt_explicit_space_expansion_uses_document_budget(monkeypatch: pytest.M
 
 
 def test_odt_list_lifts_visual_blocks_outside_strict_list() -> None:
-    """验证列表段落图片保留原类型并提升为 LIST 的有序兄弟块。"""
+    """Verify that the list paragraph image retains its original type and is promoted to an ordered sibling block of LIST."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -166,7 +166,7 @@ def test_odt_list_lifts_visual_blocks_outside_strict_list() -> None:
 
 
 def test_odt_ordered_list_normalizes_marker_format_and_item_restarts() -> None:
-    """验证 ODF 列表只保留列表级 start，并连续输出阿拉伯序号。"""
+    """Verify that the ODF list retains only list-level start and outputs Arabic serial numbers continuously."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -197,7 +197,7 @@ def test_odt_ordered_list_normalizes_marker_format_and_item_restarts() -> None:
 
 
 def test_odt_list_item_joins_multiple_paragraphs_before_markers() -> None:
-    """验证一个源 list-item 的多个段落只生成一个 LIST 文本叶子和一个 marker。"""
+    """Verifying multiple paragraphs of a source list-item produces only one LIST text leaf and one marker."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
@@ -219,7 +219,7 @@ def test_odt_list_item_joins_multiple_paragraphs_before_markers() -> None:
 
 
 def test_odt_unmarked_list_style_renders_items_as_plain_text() -> None:
-    """验证引用空列表样式（无可见标记）的列表按普通段落输出，样式缺失时保持 LIST。"""
+    """Verify that lists referencing empty list styles (no visible markup) are output as normal paragraphs, retaining LIST when the style is missing."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -242,7 +242,7 @@ def test_odt_unmarked_list_style_renders_items_as_plain_text() -> None:
 
 
 def test_odt_table_cell_renders_inline_image_once() -> None:
-    """验证 ODT/ODP 单元格内联图片不会再被对应段外 image block 重复输出。"""
+    """Verify that the inline picture in the ODT/ODP cell will no longer be output repeatedly by image block outside the corresponding segment."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -261,7 +261,7 @@ def test_odt_table_cell_renders_inline_image_once() -> None:
 
 
 def test_odt_table_cell_unmarked_list_renders_as_plain_paragraphs() -> None:
-    """验证空列表样式的单元格列表解包为 <p>，全空列表行不再因 <ul> 骨架残留。"""
+    """Verify that empty list style cell lists are unpacked as <p>, and all-empty list rows are no longer left with <ul> skeletons."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -290,11 +290,11 @@ def test_odt_table_cell_unmarked_list_renders_as_plain_paragraphs() -> None:
     assert "<ul><li>Bulleted</li></ul>" in table_html
     assert table_html.count("<ul") == 1
     assert "<li></li>" not in table_html
-    assert table_html.count("<tr>") == 1  # 全空列表行整体折叠
+    assert table_html.count("<tr>") == 1  # All empty list rows are collapsed as a whole
 
 
 def test_odt_table_cell_unmarked_list_keeps_styled_nested_list() -> None:
-    """验证无标记列表解包时，带真实样式的嵌套列表保留 ul，继承空样式的嵌套继续解包。"""
+    """When verifying unpacking of unmarked lists, nested lists with true styles retain ul, and nested lists that inherit empty styles continue to unpack."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -321,7 +321,7 @@ def test_odt_table_cell_unmarked_list_keeps_styled_nested_list() -> None:
 
 
 def test_odp_table_cells_from_pptx_save_as_skip_bullet_wrappers() -> None:
-    """验证 PPTX 另存 ODP 的表格单元格（每段被包进空样式 text:list）不再输出 ul。"""
+    """Verify PPTX Table cells saved as ODP (each paragraph is wrapped into an empty style text:list) no longer output ul."""
     cell = (
         '<text:list text:style-name="a1"><text:list-item><text:p text:style-name="a2"'
         ' text:class-names="" text:cond-style-name=""><text:span text:style-name="a3"'
@@ -349,7 +349,7 @@ def test_odp_table_cells_from_pptx_save_as_skip_bullet_wrappers() -> None:
 
 
 def test_odt_soft_page_break_is_ignored_with_inline_visual() -> None:
-    """验证 soft-page-break 不拆页、不换行且段内视觉块继续保留。"""
+    """Verify that soft-page-break does not break pages, does not wrap lines, and visual blocks within segments continue to be retained."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -367,7 +367,7 @@ def test_odt_soft_page_break_is_ignored_with_inline_visual() -> None:
 
 
 def test_odt_list_ignores_soft_page_break_and_keeps_note_on_current_page() -> None:
-    """验证列表软分页不拆页，连续文本与脚注仍保留在当前章节页。"""
+    """Verify that the soft paging of the list does not split the page, and the continuous text and footnotes remain on the current chapter page."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
@@ -388,7 +388,7 @@ def test_odt_list_ignores_soft_page_break_and_keeps_note_on_current_page() -> No
 
 
 def test_odt_ignores_physical_breaks_and_pages_only_on_master_change() -> None:
-    """验证普通分页样式无效，只有 master-page 章节变化形成虚拟页。"""
+    """Verify that the normal paging style is invalid and only master-page chapter changes form virtual pages."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -426,7 +426,7 @@ def test_odt_ignores_physical_breaks_and_pages_only_on_master_change() -> None:
 
 
 def test_odt_list_master_changes_split_pages_and_preserve_numbering_notes() -> None:
-    """验证列表条目中的 master 变化会切页并保持编号、脚注和页眉归属。"""
+    """master changes in verification list entries will cut pages and maintain numbering, footer, and header attribution."""
     content = """<office:document-content
      xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
      xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
@@ -479,7 +479,7 @@ def test_odt_list_master_changes_split_pages_and_preserve_numbering_notes() -> N
 
 
 def test_odt_list_can_select_nondefault_master_on_first_page() -> None:
-    """验证文档从列表开始时使用首个列表段落请求的 master-page。"""
+    """Verify that the document starts with the list using the master-page requested for the first list paragraph."""
     content = """<office:document-content
      xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
      xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
@@ -511,7 +511,7 @@ def test_odt_list_can_select_nondefault_master_on_first_page() -> None:
 
 
 def test_odf_covered_placeholder_reuses_colspan_coordinate() -> None:
-    """验证 colspan 后的 covered placeholder 不会额外扩宽表格。"""
+    """covered after verifying colspan placeholder does not additionally widen the table."""
     table = etree.fromstring(
         """<table:table xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
@@ -537,7 +537,7 @@ def test_odf_covered_placeholder_reuses_colspan_coordinate() -> None:
 
 
 def test_odt_note_after_soft_page_break_stays_on_current_page() -> None:
-    """验证 soft-page-break 被忽略后 note reference 和正文仍归属当前章节页。"""
+    """Verify that after soft-page-break is ignored, note, reference and the text still belong to the current chapter page."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">
@@ -557,7 +557,7 @@ def test_odt_note_after_soft_page_break_stays_on_current_page() -> None:
 
 
 def test_ods_cell_note_emits_page_footnote() -> None:
-    """验证 ODS cell citation 对应的 note body 在当前 sheet 页末输出。"""
+    """Verify that the note body corresponding to ODS cell citation is output at the end of the current sheet page."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -575,7 +575,7 @@ def test_ods_cell_note_emits_page_footnote() -> None:
 
 
 def test_odp_slide_inline_note_emits_page_footnote() -> None:
-    """验证 ODP slide 正文中的 note body 不会被 presentation notes 路径遗漏。"""
+    """Verify that note body in the body of ODP slide is not missed by the presentation notes path."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"
@@ -597,7 +597,7 @@ def test_odp_slide_inline_note_emits_page_footnote() -> None:
 
 
 def test_odp_preserves_empty_slide_chart_preview_and_notes() -> None:
-    """验证 ODP 空 slide 不丢失，图表同时保留数据和预览，备注归属原页。"""
+    """Verify that ODP is empty and slide is not lost. The chart retains data and preview at the same time. Notes belong to the original page."""
     middle, model = analyze_native_test_document(build_odp_fixture(), file_suffix="odp")
     assert len(model.pages) == 3
     assert model.pages[1] == []
@@ -613,7 +613,7 @@ def test_odp_preserves_empty_slide_chart_preview_and_notes() -> None:
 
 
 def test_ods_skips_hidden_sheet_and_emits_tables_images_and_charts() -> None:
-    """验证 ODS 可见 sheet 边界、typed value、合并结构和图表对象。"""
+    """Verify that ODS is visible sheet boundaries, typed value, merged structures, and chart objects."""
     middle, model = analyze_native_test_document(build_ods_fixture(), file_suffix="ods")
     assert len(model.pages) == 2
     assert [inline_text(page[0]["content"]) for page in model.pages] == ["Visible A", "Visible B"]
@@ -626,7 +626,7 @@ def test_ods_skips_hidden_sheet_and_emits_tables_images_and_charts() -> None:
 
 
 def test_ods_resolves_inherited_table_visibility_with_child_override() -> None:
-    """验证 table display 沿父样式继承，且子样式显式显示可以覆盖隐藏。"""
+    """Verify that table display is inherited along the parent style, and the explicit display of the child style can be overridden and hidden."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
@@ -675,7 +675,7 @@ def test_odf_content_detection_precedes_csv_extension(
     suffix: str,
     payload: bytes,
 ) -> None:
-    """验证 ODF 强内容身份覆盖伪装扩展名和 CSV 无签名兜底。"""
+    """Verify ODF Strong Content Identity Coverage masquerades extensions and CSV Signature-less cover."""
     disguised = tmp_path / "disguised.csv"
     disguised.write_bytes(payload)
     assert guess_suffix_by_bytes(payload, str(disguised)) == suffix
@@ -683,7 +683,7 @@ def test_odf_content_detection_precedes_csv_extension(
 
 
 def test_rtf_signature_still_precedes_odf_extension(tmp_path: Path) -> None:
-    """验证新增 ZIP 探测不改变 RTF 强签名的最高优先级。"""
+    """Verify that adding the ZIP probe does not change the highest priority of the RTF strong signature."""
     source = tmp_path / "disguised.odt"
     source.write_bytes(rb"{\rtf1\ansi visible}")
     assert guess_suffix_by_path(source) == "rtf"
@@ -691,7 +691,7 @@ def test_rtf_signature_still_precedes_odf_extension(tmp_path: Path) -> None:
 
 
 def test_plain_text_renamed_to_odf_is_not_accepted(tmp_path: Path) -> None:
-    """验证 ODF 扩展名本身不能把普通文本升级为结构化文档。"""
+    """Verification The ODF extension by itself cannot upgrade ordinary text to a structured document."""
     source = tmp_path / "fake.odt"
     source.write_text("a,b\n1,2\n", encoding="utf-8")
     assert guess_suffix_by_path(source) not in {"odt", "ods", "odp"}
@@ -700,7 +700,7 @@ def test_plain_text_renamed_to_odf_is_not_accepted(tmp_path: Path) -> None:
 
 
 def test_odf_rejects_mismatched_encrypted_and_expanding_packages() -> None:
-    """验证格式错配、manifest 加密和超大重复行在分配前稳定失败。"""
+    """Validation format mismatch, manifest encryption, and oversize duplicate rows fail stably before allocation."""
     with pytest.raises(OdfParseError, match="expected"):
         OdtModel().predict(BytesIO(build_ods_fixture()))
 
@@ -730,11 +730,11 @@ def test_odf_rejects_oversized_cell_spans_before_grid_materialization(
     monkeypatch: pytest.MonkeyPatch,
     span_attribute: str,
 ) -> None:
-    """验证超大行列跨度在渲染单元格或扩容网格前立即失败。"""
+    """Validation of very large row and column spans fails immediately before rendering the cell or expanding the grid."""
     monkeypatch.setattr(odf_table_module, "MAX_GRID_SLOTS", 4)
 
     def unexpected_materialization(*_args: object, **_kwargs: object) -> None:
-        """超限 span 不得进入单元格渲染或网格扩容。"""
+        """Overrun span No cell rendering or grid expansion allowed."""
         pytest.fail("oversized span reached grid materialization")
 
     monkeypatch.setattr(odf_table_module, "_ensure_row", unexpected_materialization)
@@ -749,13 +749,13 @@ def test_odf_rejects_oversized_cell_spans_before_grid_materialization(
 
 
 def test_odf_rejects_projected_span_extent_before_extending_existing_row(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证单个 span 合法但累计宽度超限时不会先扩展现有行。"""
+    """Verifies that a single span is legal but the cumulative width exceeds the limit without first extending the existing row."""
     monkeypatch.setattr(odf_table_module, "MAX_GRID_SLOTS", 4)
     original_ensure_row = odf_table_module._ensure_row
     observed_widths: list[int] = []
 
     def tracking_ensure_row(grid: object, row_index: int, width: int = 0) -> object:
-        """记录实际扩容宽度，确保失败前未越过共享预算。"""
+        """Record the actual expansion width to ensure that the shared budget is not exceeded before failure."""
         observed_widths.append(width)
         return original_ensure_row(grid, row_index, width)  # type: ignore[arg-type]
 
@@ -773,11 +773,11 @@ def test_odf_rejects_projected_span_extent_before_extending_existing_row(monkeyp
 
 
 def test_odf_rejects_overlong_repeat_before_integer_conversion(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证超长 repeat 计数在 int 和单元格渲染前触发网格预算。"""
+    """Verify overlong repeat count triggers grid budget before int and cell rendering."""
     monkeypatch.setattr(odf_table_module, "MAX_GRID_SLOTS", 4)
 
     def unexpected_render(_cell: object) -> str:
-        """超限 repeat 不得进入单元格渲染。"""
+        """Overrun repeat Cell rendering must not be entered."""
         pytest.fail("oversized ODF repeat reached cell rendering")
 
     table = etree.fromstring(
@@ -794,7 +794,7 @@ def test_odf_rejects_overlong_repeat_before_integer_conversion(monkeypatch: pyte
 
 
 def test_odf_skips_trailing_repeated_empty_filler_rows() -> None:
-    """验证 LibreOffice 全网格声明的尾部空 filler 行不消耗网格预算。"""
+    """Verify that trailing empty filler rows for LibreOffice full grid declarations do not consume the grid budget."""
     table_xml = (
         '<table:table xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
         'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">'
@@ -819,7 +819,7 @@ def test_odf_skips_trailing_repeated_empty_filler_rows() -> None:
 
 
 def test_odf_skips_wide_empty_filler_rows_between_content_regions() -> None:
-    """验证内容区域之间的全宽空行带只按已物化宽度计入网格预算。"""
+    """Validate that full-width blank lines between content areas count against the grid budget only by their materialized width."""
     table_xml = (
         '<table:table xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
         'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">'
@@ -838,7 +838,7 @@ def test_odf_skips_wide_empty_filler_rows_between_content_regions() -> None:
 
 
 def test_odf_column_offset_region_drops_leading_empty_rows() -> None:
-    """验证列错位数据区域的包围盒不携带整行带的前导空行。"""
+    """Verify that the bounding box of a column-shifted data region does not carry an entire row with a leading blank line."""
 
     def cell(text: str) -> str:
         return f'<table:table-cell><text:p>{text}</text:p></table:table-cell>'
@@ -864,7 +864,7 @@ def test_odf_column_offset_region_drops_leading_empty_rows() -> None:
 
 
 def test_odf_single_blank_column_splits_overlapping_side_by_side_tables() -> None:
-    """验证隔一列空位且行范围重叠的并排表格按连通域拆分。"""
+    """Verify that side-by-side tables with every other column empty and overlapping row ranges are split by connected domains."""
 
     def cell(text: str) -> str:
         return f'<table:table-cell><text:p>{text}</text:p></table:table-cell>'
@@ -892,7 +892,7 @@ def test_odf_single_blank_column_splits_overlapping_side_by_side_tables() -> Non
 
 
 def test_odf_single_blank_row_splits_like_excel_gap_selection() -> None:
-    """验证单空行分隔的数据带与 Excel 投影一致选择零容忍拆分。"""
+    """Verify that single-blank-line-delimited data bands are consistent with the Excel projection and select zero-tolerance splitting."""
 
     def cell(text: str) -> str:
         return f'<table:table-cell><text:p>{text}</text:p></table:table-cell>'
@@ -915,7 +915,7 @@ def test_odf_single_blank_row_splits_like_excel_gap_selection() -> None:
 
 
 def test_ods_singleton_regions_downgrade_to_text_blocks() -> None:
-    """验证无结构单格区域降级为文本块，结构化单格仍按表格输出。"""
+    """Verify that the unstructured cell area is downgraded to a text block, and the structured cells are still output as a table."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
@@ -937,7 +937,7 @@ def test_ods_singleton_regions_downgrade_to_text_blocks() -> None:
 
 
 def test_ods_demo_workbook_splits_regions_like_excel_workbook() -> None:
-    """验证真实 ODS 工作簿的区域拆分与 Excel 投影一致且无前导空行。"""
+    """Verify that the region split of the real ODS workbook is consistent with the Excel projection and has no leading blank lines."""
     demo_path = Path(__file__).resolve().parents[2] / "demo" / "open_office_docs" / "xlsx_01.ods"
     with demo_path.open("rb") as handle:
         pages = OdsModel().predict(handle)
@@ -955,7 +955,7 @@ def test_ods_demo_workbook_splits_regions_like_excel_workbook() -> None:
 
 
 def test_odf_document_grid_budget_is_shared_across_tables(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证多个独立表格共同消耗同一个文档网格预算。"""
+    """Verify that multiple independent tables consume the same document grid budget."""
     monkeypatch.setattr(odf_table_module, "MAX_GRID_SLOTS", 4)
     budget = odf_table_module.OdfTableExpansionBudget()
     table_xml = (
@@ -980,7 +980,7 @@ def test_odf_document_grid_budget_is_shared_across_tables(monkeypatch: pytest.Mo
 
 
 def test_odf_document_text_expansion_budget_is_shared_across_tables(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证多个表格的重复单元格文本共同消耗文档级字节预算。"""
+    """Verify that duplicate cell text across multiple tables collectively consumes the document-level byte budget."""
     monkeypatch.setattr(odf_table_module, "MAX_GRID_SLOTS", 100)
     monkeypatch.setattr(odf_table_module, "MAX_EXPANSION_TEXT_BYTES", 4)
     budget = odf_table_module.OdfTableExpansionBudget()
@@ -1004,7 +1004,7 @@ def test_odf_document_text_expansion_budget_is_shared_across_tables(monkeypatch:
 
 
 def test_odt_parser_wires_one_table_budget_across_document(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 ODT 中多个普通表格通过 parser 共享同一文档预算。"""
+    """Verify that multiple common tables in ODT share the same document budget via parser."""
     monkeypatch.setattr(odf_table_module, "MAX_GRID_SLOTS", 4)
     table = """<table:table><table:table-row table:number-rows-repeated="2">
      <table:table-cell table:number-columns-repeated="2"><text:p>x</text:p></table:table-cell>
@@ -1021,7 +1021,7 @@ def test_odt_parser_wires_one_table_budget_across_document(monkeypatch: pytest.M
 
 
 def test_odf_rejects_overlong_chart_columns_before_bigint_conversion(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 chart A1 列名在大整数转换前受共享网格预算约束。"""
+    """Validation chart A1 column name subject to shared grid budget before big integer conversion."""
     monkeypatch.setattr(odf_table_module, "MAX_GRID_SLOTS", 4)
 
     assert odf_table_module.parse_cell_range_bounds("local-table.D1:D2") == (0, 1, 3, 3)
@@ -1030,7 +1030,7 @@ def test_odf_rejects_overlong_chart_columns_before_bigint_conversion(monkeypatch
 
 
 def test_odf_rejects_overlong_chart_rows_before_bigint_conversion(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 chart A1 行号在 int 转换前受共享网格预算约束。"""
+    """Verification chart A1 row number is subject to shared grid budget before int conversion."""
     monkeypatch.setattr(odf_table_module, "MAX_GRID_SLOTS", 4)
 
     assert odf_table_module.parse_cell_range_bounds("local-table.A4:B4") == (3, 3, 0, 1)
@@ -1052,7 +1052,7 @@ def test_odf_rejects_overlong_chart_rows_before_bigint_conversion(monkeypatch: p
     ],
 )
 def test_odf_rejects_unsafe_hyperlinks_before_shared_renderers(target: str) -> None:
-    """验证危险 ODF 链接在 Raw 阶段降级，Markdown 与 DOCX 不再携带目标。"""
+    """Verification Danger ODF link degraded during Raw stage, Markdown and DOCX no longer carry targets."""
     content = f'''<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -1082,7 +1082,7 @@ def test_odf_rejects_unsafe_hyperlinks_before_shared_renderers(target: str) -> N
     ],
 )
 def test_odf_preserves_allowed_external_and_relative_hyperlinks(target: str) -> None:
-    """验证允许协议、相对地址和 fragment 直接进入 HyperlinkSpan。"""
+    """Verification allows the protocol, relative address, and fragment to go directly to HyperlinkSpan."""
     content = f'''<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -1100,7 +1100,7 @@ def test_odf_preserves_allowed_external_and_relative_hyperlinks(target: str) -> 
 
 
 def test_odf_preserves_title_fragment_and_drops_unemittable_text_fragment() -> None:
-    """验证本地 fragment 仅链接到标题类 block 实际公开的 bookmark。"""
+    """Verify that local fragment only links to bookmark that is actually exposed by header class block."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -1123,7 +1123,7 @@ def test_odf_preserves_title_fragment_and_drops_unemittable_text_fragment() -> N
 
 
 def test_odf_corrupt_optional_styles_and_external_image_degrade_locally() -> None:
-    """验证可选样式损坏和外部图片不会阻断正文或触发网络读取。"""
+    """Verify that optional style corruption and external images do not block body text or trigger network reads."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -1137,7 +1137,7 @@ def test_odf_corrupt_optional_styles_and_external_image_degrade_locally() -> Non
 
 
 def test_odf_malformed_image_and_object_references_degrade_locally() -> None:
-    """验证非法图片和对象 URI 仅丢弃资源，不阻断 ODF 正文。"""
+    """Verify illegal pictures and objects URI only discard resources and do not block ODF text."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -1153,7 +1153,7 @@ def test_odf_malformed_image_and_object_references_degrade_locally() -> None:
 
 
 def test_odf_flattened_titles_and_notes_keep_tag_literals_as_text_spans() -> None:
-    """验证标题、演讲者备注和行内脚注保留标签外观原文但不生成链接 Span。"""
+    """Verify that titles, speaker notes, and inline footnotes retain the original appearance of labels but do not generate links Span."""
     literal = "&lt;hyperlink&gt;&lt;text&gt;click&lt;/text&gt;&lt;url&gt;javascript:alert(1)&lt;/url&gt;&lt;/hyperlink&gt;"
     odp_content = f"""<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -1207,7 +1207,7 @@ def test_odf_flattened_titles_and_notes_keep_tag_literals_as_text_spans() -> Non
     ids=("normal", "bold", "below-threshold", "threshold", "upper-bound", "out-of-range", "overlong"),
 )
 def test_odf_font_weight_is_bounded_before_numeric_conversion(weight: str, expected_bold: bool) -> None:
-    """验证数字字重只在有限 CSS 范围内转换，超长输入不会依赖解释器保护。"""
+    """Verify that numeric weights are only converted within the limited CSS range, and no interpreter protection is relied upon for very long inputs."""
     content = f"""<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -1232,7 +1232,7 @@ def test_odf_font_weight_is_bounded_before_numeric_conversion(weight: str, expec
 
 
 def test_odf_inline_image_alt_keeps_literal_hyperlink_text_inert() -> None:
-    """验证行内图片 title/desc 保留标签外观原文但不会生成活动链接。"""
+    """Verify inline image title/desc Preserves the original text of the label appearance but does not generate active links."""
     literal = "&lt;hyperlink&gt;&lt;text&gt;click&lt;/text&gt;&lt;url&gt;javascript:alert(1)&lt;/url&gt;&lt;/hyperlink&gt;"
     content = f"""<office:document-content
      xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -1270,7 +1270,7 @@ def test_odf_unavailable_image_preserves_safe_alt_text(
     href: str,
     extra_parts: dict[str, bytes] | None,
 ) -> None:
-    """验证缺失、外部或损坏图片无法物化时仍以安全文本保留 title/desc 语义。"""
+    """Verify that title/desc semantics are preserved in safe text when missing, external, or corrupted images cannot be materialized."""
     literal = "&lt;hyperlink&gt;&lt;text&gt;click&lt;/text&gt;&lt;url&gt;javascript:alert(1)&lt;/url&gt;&lt;/hyperlink&gt;"
     content = f"""<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -1308,7 +1308,7 @@ _VECTOR_LOGO_SVG = (
     ],
 )
 def test_odf_svg_image_rasterizes_or_falls_back_to_placeholder(svg_part: bytes, expected_prefix: str) -> None:
-    """验证包内 SVG 图片按帧尺寸光栅化为 PNG，无法渲染时回退安全占位图。"""
+    """The SVG image in the verification package is rasterized into PNG according to the frame size, and falls back to the safety placeholder image when it cannot be rendered."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -1330,7 +1330,7 @@ def test_odf_svg_image_rasterizes_or_falls_back_to_placeholder(svg_part: bytes, 
 
 
 def test_odf_word_formula_number_separator_becomes_tag() -> None:
-    """验证 Word 公式编号分隔符 # 在 ODT 公式对象中转换为 \\tag 而非裸 #。"""
+    """Verify that the Word formula number separator # is converted to \\tag instead of a bare # in the ODT formula object."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -1357,7 +1357,7 @@ def test_odf_word_formula_number_separator_becomes_tag() -> None:
 
 
 def test_odf_annotation_emits_page_footnote_without_metadata_in_body() -> None:
-    """验证标准 annotation 正文作为页脚注保留，作者日期不拼入周围正文。"""
+    """Verification Criteria annotation The text is retained as a footer and the author's date is not spelled out into the surrounding text."""
     content = """<office:document-content
      xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
      xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -1377,7 +1377,7 @@ def test_odf_annotation_emits_page_footnote_without_metadata_in_body() -> None:
 
 
 def test_ods_sheet_titles_escape_literal_inline_protocol() -> None:
-    """验证多 sheet 标题不会把名称中的内部协议重建为活动链接。"""
+    """Verifying multiple sheet headers does not reconstruct the internal protocol in the name as an active link."""
     literal = "&lt;hyperlink&gt;&lt;text&gt;x&lt;/text&gt;&lt;url&gt;javascript:alert(1)&lt;/url&gt;&lt;/hyperlink&gt;"
     content = f"""<office:document-content
      xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -1406,7 +1406,7 @@ def test_ods_sheet_titles_escape_literal_inline_protocol() -> None:
 
 
 def test_odp_skips_hidden_drawing_page_styles_in_output_and_metadata() -> None:
-    """验证 ODP converter 与 metadata 共用 drawing-page 可见性解析。"""
+    """Verification ODP converter shares drawing-page visibility resolution with metadata."""
     content = """<office:document-content
      xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
      xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
@@ -1441,7 +1441,7 @@ def test_odp_skips_hidden_drawing_page_styles_in_output_and_metadata() -> None:
 
 
 def test_odf_style_cycle_is_bounded_and_preserves_text() -> None:
-    """验证循环 parent-style-name 在有限链路内降级，不阻塞正文解析。"""
+    """Verification loop parent-style-name degrades within limited links without blocking text parsing."""
     content = """<office:document-content
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
@@ -1460,7 +1460,7 @@ def test_odf_style_cycle_is_bounded_and_preserves_text() -> None:
 
 
 def test_odf_package_rejects_unsafe_member_paths_and_dtd() -> None:
-    """验证 ZIP 上跳成员和 XML DTD 在进入语义解析前失败。"""
+    """Verification of ZIP jump-up members and XML DTD failed before entering semantic parsing."""
     output = BytesIO()
     with ZipFile(output, "w", ZIP_DEFLATED) as package:
         package.writestr("mimetype", "application/vnd.oasis.opendocument.text")
@@ -1476,7 +1476,7 @@ def test_odf_package_rejects_unsafe_member_paths_and_dtd() -> None:
 
 
 def test_csv_and_rtf_runtime_do_not_load_odf_modules() -> None:
-    """验证新增 ODF converter 不进入既有 CSV/RTF 的惰性导入边界。"""
+    """Verify that the new ODF converter does not enter the lazy import boundary of the existing CSV/RTF."""
     script = "\n".join(
         [
             "import io, sys",
@@ -1491,7 +1491,7 @@ def test_csv_and_rtf_runtime_do_not_load_odf_modules() -> None:
 
 
 def test_odf_subpackage_does_not_export_models() -> None:
-    """验证 ODF 模型只从 Flash 根包公开，不形成第二套公共路径。"""
+    """Verify that the ODF model is only exposed from the Flash root package and does not form a second set of public paths."""
     assert importlib.util.find_spec("docvortex.analyzers.native.office.odf.model") is None
     package = __import__("docvortex.analyzers.native.office.odf", fromlist=["__all__"])
     assert package.__all__ == []

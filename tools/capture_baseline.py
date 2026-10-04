@@ -1,4 +1,4 @@
-"""捕获指定引擎的真实文档与渲染产物，供跨仓库迁移差分验证。"""
+"""Capture the real documents and rendering products of the specified engine for differential verification of cross-warehouse migration."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from typing import Any
 
 
 def json_value(value: Any) -> Any:
-    """将字符几何的纯数据对象规范化为可独立读取的 JSON。"""
+    """Normalize a pure data object of character geometry into an independently readable JSON."""
     if is_dataclass(value):
         return json_value(asdict(value))
     if isinstance(value, dict):
@@ -29,7 +29,7 @@ def json_value(value: Any) -> Any:
 
 
 def main() -> None:
-    """按明确输入清单保存中间协议、分类、字符和全部 renderer 结果。"""
+    """Save intermediate protocols, classes, characters and all renderer results as explicit input lists."""
     parser = argparse.ArgumentParser()
     parser.add_argument("source_root", type=Path)
     parser.add_argument("output_root", type=Path)

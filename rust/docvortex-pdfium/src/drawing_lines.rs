@@ -1,4 +1,4 @@
-//! 在受支持的简单描边页上批量提取轴向线，复杂对象交由 Python 参考实现。
+//! Axial lines are extracted in batches on supported simple stroke pages, and complex objects are implemented by Python reference.
 
 use crate::{objects, ReadError};
 use std::ffi::{c_float, c_int, c_uint, c_void};
@@ -8,7 +8,7 @@ use std::time::Instant;
 pub type Line = ((f64, f64), (f64, f64), (f64, f64, f64, f64), f64, i32);
 static LAST_STAGE_NS: Mutex<(u64, u64, u64)> = Mutex::new((0, 0, 0));
 
-/// 返回最近一次启用绘图线剖析后的对象读取、线段读取和几何计算纳秒数。
+/// Returns the number of nanoseconds since the last time drawing line profiling was enabled for object reading, line segment reading, and geometry calculation.
 pub fn stage_stats() -> (u64, u64, u64) {
     *LAST_STAGE_NS
         .lock()
@@ -37,7 +37,7 @@ struct Api {
     stroke_width: StrokeWidthFn,
 }
 
-/// 按 Python 页面视觉坐标规则变换点，运算顺序与参考路径一致。
+/// Transform points according to Python page visual coordinate rules, and the order of operations is consistent with the reference path.
 fn visual_point(point: (f64, f64), bbox: [f64; 4], rotation: i32) -> (f64, f64) {
     let (x, y) = point;
     let [left, bottom, right, top] = bbox;
@@ -49,7 +49,7 @@ fn visual_point(point: (f64, f64), bbox: [f64; 4], rotation: i32) -> (f64, f64) 
     }
 }
 
-/// 对单个线段应用与 Python `_make_axis_drawing_line` 相同的轴线和页面裁剪判断。
+/// Apply the same axis and page cropping judgments to individual line segments as Python `_make_axis_drawing_line`.
 fn axis_line(
     raw_start: (f64, f64),
     raw_end: (f64, f64),
@@ -124,7 +124,7 @@ fn axis_line(
     None
 }
 
-/// 仅在显式剖析时测量轴线判定，常规路径不增加计时器开销。
+/// Axis determination is only measured during explicit profiling, and conventional paths do not increase timer overhead.
 fn measured_axis_line(
     start: (f64, f64),
     end: (f64, f64),
@@ -143,10 +143,10 @@ fn measured_axis_line(
     result
 }
 
-/// 只在所有 Path 都是无矩阵、无裁剪、无填充的描边时返回原生线；其他页整体回退。
+/// Only return to the original line when all Path are strokes without matrix, no clipping, and no filling; other pages will be rolled back as a whole.
 ///
 /// # Safety
-/// 调用方须验证全部 PDFium ABI，持有页面及同库函数引用，并在全局锁内调用。
+/// The caller must verify all PDFium and ABI, hold page and library function references, and call them within the global lock.
 pub unsafe fn read_fast_lines(
     addresses: Vec<usize>,
     handle: usize,

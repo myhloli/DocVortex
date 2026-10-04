@@ -1,4 +1,4 @@
-"""严格 ModelJson 到 PageInfo 列表的唯一转换边界。"""
+"""The sole conversion boundary from validated ModelJson to a list of PageInfo objects."""
 
 from __future__ import annotations
 
@@ -17,14 +17,14 @@ PAGE_INFO_LIST_ADAPTER = TypeAdapter(list[PageInfo])
 
 
 def _document_uses_bbox(model_list: list[list[dict[str, Any]]]) -> bool:
-    """按整份文档是否出现 bbox 判定 PDF/Office，避免空白首页误判。"""
+    """Distinguish PDF from Office input using bboxes anywhere in the document, avoiding misclassification on a blank first page."""
     return any(
         block.get("bbox") is not None for page_model_list in model_list for block in page_model_list if isinstance(block, dict)
     )
 
 
 def _remove_private_block_metadata(block: dict[str, Any]) -> None:
-    """递归清除对象化边界之前仅供 Analyze 计算使用的临时字段。"""
+    """Recursively remove temporary analysis fields before constructing typed objects."""
     for field_name in (
         "lines",
         "_lines",
@@ -49,7 +49,7 @@ def _blocks_to_raw_page_info(
     page_idx: int,
     use_bbox: bool,
 ) -> dict[str, Any]:
-    """运行单页后处理流水线并保留 raw dict，供跨页处理继续消费。"""
+    """Run single-page postprocessing and retain a raw dictionary for subsequent cross-page processing."""
     page_blocks = process_page_blocks(page_model_list, use_bbox=use_bbox)
     page_blocks.sort(key=lambda block: block["index"])
     return {"page_idx": page_idx, "blocks": page_blocks}
@@ -61,7 +61,7 @@ def blocks_to_page_info(
     page_idx: int = 0,
     use_bbox: bool | None = None,
 ) -> PageInfo:
-    """无副作用地把单页 raw blocks 转换为严格 PageInfo 对象。"""
+    """Convert a page's raw blocks into a validated PageInfo object without side effects."""
     copied_blocks = deepcopy(page_model_list)
     resolved_use_bbox = _document_uses_bbox([copied_blocks]) if use_bbox is None else use_bbox
     if not resolved_use_bbox:
@@ -78,7 +78,7 @@ def blocks_to_page_info(
 
 
 def model_json_to_pages(model_json: ModelJson) -> list[PageInfo]:
-    """从严格 ModelJson 无副作用地构造可递归序列化的 PageInfo。"""
+    """Build recursively serializable PageInfo objects from validated ModelJson without side effects."""
     page_indices = model_json.resolved_page_indices
     copied_model_list = deepcopy(model_json.pages)
     use_bbox = _document_uses_bbox(copied_model_list)

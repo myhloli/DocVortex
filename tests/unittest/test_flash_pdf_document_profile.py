@@ -6,7 +6,7 @@ from docvortex.analyzers.native.pdf import models, titles
 
 
 def test_document_body_profile_prefers_cross_page_body_and_regular_fonts() -> None:
-    """验证全文画像优先跨页正文行高，并排除反复出现的明显粗体字体。"""
+    """Verify that full text portraits are prioritized across page body line heights, and repeated and obvious bold fonts are excluded."""
 
     body_font = ("BodyRegular", 0)
     mono_font = ("MonoRegular", 0)
@@ -64,12 +64,12 @@ def test_document_body_profile_prefers_cross_page_body_and_regular_fonts() -> No
     assert profile is not None
     assert profile.body_height == 10.0
     assert profile.body_weight == 400.0
-    # 正文字体画像只统计正文高度带，较矮的等宽和斜体样本不再进入 regular_fonts。
+    # The text font portrait only counts text height bands, and shorter monospaced and italic samples no longer enter regular_fonts.
     assert profile.regular_fonts == frozenset({body_font})
 
 
 def test_sparse_repeated_font_is_not_document_regular_style() -> None:
-    """验证只在多页短标题中反复出现的字体不会被并入全文常规字体。"""
+    """Verify that fonts that are repeated only in short headings across multiple pages are not merged into the full-text regular font."""
 
     body_font = ("BodyRegular", 0)
     sparse_font = ("SparseHeading", 1)
@@ -103,7 +103,7 @@ def test_sparse_repeated_font_is_not_document_regular_style() -> None:
 
 
 def test_document_regular_font_suppresses_code_page_false_title() -> None:
-    """验证代码页中的全文常规字体说明保持正文，粗体步骤标签仍识别为标题。"""
+    """Verify that full-text regular font instructions in code pages remain text and bold step labels are still recognized as titles."""
 
     mono_font = ("MonoRegular", 0)
     regular_font = ("BodyRegular", 0)
@@ -192,7 +192,7 @@ def test_document_regular_font_suppresses_code_page_false_title() -> None:
 
 
 def test_document_title_profile_promotes_table_adjacent_style_but_not_container_label() -> None:
-    """验证跨页标题原型可越过邻表抑制，但容器内部同样式标签仍保持正文。"""
+    """Verify that the cross-page title prototype can bypass neighbor list suppression, but the same style tag inside the container still maintains the text."""
 
     heading_font = ("Heading", 0)
     heading = _text_line(
@@ -247,7 +247,7 @@ def test_document_title_profile_promotes_table_adjacent_style_but_not_container_
 
 
 def test_document_title_profile_promotes_body_height_centered_section() -> None:
-    """验证与正文同字体字号的居中章节行可凭重复标题原型和邻表关系晋升。"""
+    """Verify that the centered chapter line with the same font size as the main text can be promoted based on the duplicate title prototype and neighbor list relationship."""
 
     regular_font = ("Body", 0)
     heading = _text_line(
@@ -302,7 +302,7 @@ def test_document_title_profile_promotes_body_height_centered_section() -> None:
 
 
 def test_document_title_profile_infers_repeated_large_left_aligned_style() -> None:
-    """验证两页重复的大字号左对齐样式可形成文档级标题原型。"""
+    """Verify that a large left-aligned style repeated on two pages forms a document-level heading prototype."""
 
     body_font = ("Body", 0)
     heading_font = ("RepeatedHeading", 0)
@@ -358,7 +358,7 @@ def test_document_title_profile_infers_repeated_large_left_aligned_style() -> No
 
 
 def test_regular_pitch_style_change_does_not_become_title() -> None:
-    """验证仅有字体变化、但没有额外段间净空的正文续行不会误判标题。"""
+    """Verify that text continuations with only font changes but no extra paragraph headroom do not misinterpret titles."""
 
     body_font = ("Body", 0)
     alternate_font = ("Alternate", 0)
@@ -403,7 +403,7 @@ def test_regular_pitch_style_change_does_not_become_title() -> None:
 
 
 def test_title_font_at_body_size_does_not_override_document_size_profile() -> None:
-    """验证标题字体落入正文字号带时不会仅凭大留白继续误判为标题。"""
+    """Verify that when the title font falls into the text size band, it will not be misjudged as a title simply by large white space."""
 
     heading_font = ("Heading", 0)
     lines = [
@@ -464,7 +464,7 @@ def test_title_font_at_body_size_does_not_override_document_size_profile() -> No
 
 
 def test_smaller_recurrent_regular_font_does_not_gain_title_style_signal() -> None:
-    """验证较小的跨页常规代码字体即使留白较大，也不会仅凭字体切换升为标题。"""
+    """Verify that the smaller cross-page regular code font will not be promoted to the title simply by font switching, even with large margins."""
 
     body_font = ("BodyRegular", 0)
     mono_font = ("MonoRegular", 0)
@@ -533,7 +533,7 @@ def test_smaller_recurrent_regular_font_does_not_gain_title_style_signal() -> No
 
 
 def test_document_profile_finds_cover_title_without_promoting_bottom_metadata() -> None:
-    """验证全文正文基准可识别纯封面标题，底部版本元数据仍保持普通文本。"""
+    """Verify that the full-text text benchmark recognizes plain cover titles, with bottom version metadata remaining as plain text."""
 
     title_font = ("TitleBold", 1)
     metadata_font = ("MetadataBold", 1)

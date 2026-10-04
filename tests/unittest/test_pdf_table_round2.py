@@ -1,4 +1,4 @@
-"""验证第二轮表格优化的资格判断、数值等价性和候选状态隔离。"""
+"""Validating eligibility judgments, numerical equivalence, and candidate state isolation for the second round of table optimization."""
 
 from copy import deepcopy
 
@@ -11,26 +11,26 @@ from test_pdf_structured_tables import _middle, _RecordingRenderer, _table
 
 
 def _renderer(html):
-    """构造不含原图干扰的单表测试上下文。"""
+    """Construct a single-table test context without the interference of the original image."""
     renderer = _RecordingRenderer(_middle([_table(10, (40, 60, 350, 200), html, image=False)]))
     return renderer, renderer.middle_json.pages[0].blocks[0].content[0]
 
 
 def _build(renderer, block, size, width=310, spatial=True):
-    """经过真实表格构建入口获取当前候选，不绕过共享段落构造。"""
+    """Get the current candidate through the real table construction entry, without bypassing the shared paragraph structure."""
     return renderer._html_tables(
         block.content, page_idx=0, block=block, available_width=width, spatial=SpatialTableOptions(size) if spatial else None
     )[0]
 
 
 def test_plain_fragments_are_parsed_once_across_font_sizes(monkeypatch):
-    """字号改变不重复解析裸文本，并且候选仍具有独立片段和正确字号。"""
+    """Font size changes do not reparse the bare text, and candidates still have independent fragments and the correct font size."""
     renderer, block = _renderer("<table><tr><td>中文 Alpha 123 &amp; 数据</td></tr></table>")
     calls = []
     original = _PdfParaParser.parse
 
     def parse(self, *args, **kwargs):
-        """统计真实 markup 解析次数，检验跨字号复用是否生效。"""
+        """Count the actual number of markup parsing and check whether cross-font size reuse is effective."""
         calls.append(1)
         return original(self, *args, **kwargs)
 
@@ -50,7 +50,7 @@ def test_plain_fragments_are_parsed_once_across_font_sizes(monkeypatch):
 
 
 def test_fragment_template_follows_font_and_color_changes():
-    """模板复用不覆盖字体、颜色或后续样式更新。"""
+    """Template reuse does not cover fonts, colors, or subsequent style updates."""
     renderer, block = _renderer("<table><tr><td>Alpha 中文</td></tr></table>")
     before = _build(renderer, block, 8.5)._cellvalues[0][0][0]
     renderer.styles.table_cell.fontName = "Courier"
@@ -77,7 +77,7 @@ def test_fragment_template_follows_font_and_color_changes():
     ],
 )
 def test_complex_cells_and_reflow_do_not_use_cross_size_templates(html, spatial):
-    """富文本及重排保持既有构造规则，不进入仅限 ORIGINAL 的跨字号路径。"""
+    """Rich text and reflow maintain existing construction rules and do not enter the cross-font size path that is limited to ORIGINAL."""
     renderer, block = _renderer(f"<table><tr><td>{html}</td></tr></table>")
     before = deepcopy(renderer.middle_json)
     for size in (8.5, 6):
@@ -92,7 +92,7 @@ def test_complex_cells_and_reflow_do_not_use_cross_size_templates(html, spatial)
 )
 @pytest.mark.parametrize("size", [6.0, 6.1, 7.3, 8.5])
 def test_simple_cjk_widths_exactly_match_reportlab(text, size):
-    """直接测宽必须与原生自然宽度的浮点结果完全相等，而非仅近似相等。"""
+    """The direct width measurement must be exactly equal to the floating point result of the native natural width, not just approximately equal."""
     from docvortex.render._internal.pdf.table import _simple_cjk_widths, _paragraph_minimum_width
 
     renderer, block = _renderer(f"<table><tr><td>{text}</td></tr></table>")
@@ -105,7 +105,7 @@ def test_simple_cjk_widths_exactly_match_reportlab(text, size):
 
 @pytest.mark.parametrize("option", ["linebreak", "indent", "callback", "dots", "bullet", "oversized", "latin"])
 def test_width_fast_path_rejects_unsupported_paragraphs(option):
-    """强制换行、缩进、回调等不满足等价前提时保守回退。"""
+    """Forced line breaks, indentations, callbacks, etc. will be conservatively rolled back when the equivalence conditions are not met."""
     from docvortex.render._internal.pdf.table import _simple_cjk_widths
 
     text = {"linebreak": "中文<br>第二行", "callback": "中文<eq>x^2</eq>", "latin": "English"}.get(option, "中文 Alpha")
@@ -123,7 +123,7 @@ def test_width_fast_path_rejects_unsupported_paragraphs(option):
 
 
 def test_character_width_cache_is_bounded():
-    """大量字符和字号组合不能让单表的字宽缓存无限增长。"""
+    """A large number of character and font size combinations cannot allow the word width cache of a single table to grow indefinitely."""
     renderer, block = _renderer("<table><tr><td>中文</td></tr></table>")
     prepared = renderer._table_content(block, block.content)
     for i in range(4200):
@@ -134,7 +134,7 @@ def test_character_width_cache_is_bounded():
 
 
 def test_trial_cache_reuses_measurements_but_materializes_independent_winners(monkeypatch):
-    """不同高度区域复用同宽测量，仍保留各自独立的获选表格与预绘制。"""
+    """Different height areas reuse the same width measurement, and still retain their independent selection tables and pre-drawings."""
     from docvortex.render._internal.pdf.table_layout import SpatialTableContent
 
     renderer, block = _renderer("<table>" + "<tr><td>中文数据 Alpha</td></tr>" * 15 + "</table>")
@@ -144,7 +144,7 @@ def test_trial_cache_reuses_measurements_but_materializes_independent_winners(mo
     original = flow.build
 
     def build(width, size):
-        """只统计真实 Table 物化，不改变确定性内容。"""
+        """Only the real Table materializations are counted and the deterministic content is not changed."""
         calls.append((width, size))
         return original(width, size)
 
@@ -170,7 +170,7 @@ def test_trial_cache_reuses_measurements_but_materializes_independent_winners(mo
 
 
 def test_trial_cache_follows_content_and_style_changes():
-    """内容和样式变化后不能使用旧试排摘要作出字号决策。"""
+    """After the content and style change, the old trial layout summary cannot be used to make font size decisions."""
     renderer, block = _renderer("<table><tr><td>MMMM 中文</td></tr></table>")
     flow = renderer._structured_table(block, 0)
     flow.fit(100, 30)
@@ -191,12 +191,12 @@ def test_trial_cache_follows_content_and_style_changes():
 
 
 def test_trial_summary_cache_is_bounded_and_failures_are_not_cached():
-    """摘要缓存最多 128 项，不记录构造异常，并支持显式释放。"""
+    """The digest cache has a maximum of 128 entries, does not log construction exceptions, and supports explicit release."""
     from reportlab.platypus import Table
     from docvortex.render._internal.pdf.table_layout import SpatialTableContent
 
     def build(width, size):
-        """用确定尺寸的原生表格隔离摘要缓存行为。"""
+        """Isolate summary caching behavior with deterministically sized native tables."""
         if width < 0:
             raise ValueError("rejected")
         return [Table([["cell"]], colWidths=[width], rowHeights=[size])]
@@ -216,7 +216,7 @@ def test_trial_summary_cache_is_bounded_and_failures_are_not_cached():
 @pytest.mark.parametrize("height", [5, 100, 130, 130.0009, 129.9989, 500])
 @pytest.mark.parametrize("width", [12, 300])
 def test_height_pruning_preserves_font_scale_and_selected_geometry(height, width):
-    """临界高度、极窄框及 6 pt 以下缩放必须与禁用剪枝的原流程完全一致。"""
+    """Critical heights, extremely narrow boxes, and scaling below 6 pt must be exactly the same as the original process with pruning disabled."""
     html = "<table>" + "<tr><td>中文数据</td><td>12345</td></tr>" * 10 + "</table>"
     renderer, block = _renderer(html)
     flow = renderer._structured_table(block, 0)
@@ -238,14 +238,14 @@ def test_height_pruning_preserves_font_scale_and_selected_geometry(height, width
 
 
 def test_height_pruning_keeps_full_six_point_measurement(monkeypatch):
-    """不可能放下的高字号可以跳过，6 pt 的完整度量必须用于初始化缩放搜索。"""
+    """Impossibly high font sizes can be skipped, and the full measure of 6 pt must be used to initialize the zoom search."""
     renderer, block = _renderer("<table>" + "<tr><td>Visible 中文</td></tr>" * 20 + "</table>")
     flow = renderer._structured_table(block, 0)
     sizes = []
     original = flow.build
 
     def build(width, size):
-        """统计实际构造字号，保留其原生度量结果。"""
+        """Count the actual constructed font size and retain its native measurement results."""
         sizes.append(size)
         return original(width, size)
 
@@ -267,21 +267,21 @@ def test_height_pruning_keeps_full_six_point_measurement(monkeypatch):
     ],
 )
 def test_height_lower_bound_is_conservative_for_empty_and_complex_cells(html, expected):
-    """空白行不假定存在正文；合并行或富文本没有可证明下界时停用剪枝。"""
+    """Empty lines do not assume the presence of text; pruning is disabled when merged lines or rich text have no provable lower bound."""
     renderer, block = _renderer(f"<table>{html}</table>")
     prepared = renderer._table_content(block, block.content)
     assert prepared.minimum_height(8.5, renderer.styles) == expected
 
 
 def test_custom_table_builder_does_not_enable_trial_cache_or_pruning(monkeypatch):
-    """替换底层构造回调后不假定其纯函数性质，必须沿用真实构造与预绘制。"""
+    """After replacing the underlying construction callback, its purely functional nature is not assumed, and the real construction and pre-drawing must be used."""
     from docvortex.render._internal.pdf.renderer import _PdfRenderer
 
     renderer, block = _renderer("<table><tr><td>中文</td></tr></table>")
     original = _PdfRenderer._html_tables
 
     def build(self, *args, **kwargs):
-        """模拟调用方替换构造方法，而非修改输入协议。"""
+        """Mock the caller replacement constructor instead of modifying the input protocol."""
         return original(self, *args, **kwargs)
 
     monkeypatch.setattr(_PdfRenderer, "_html_tables", build)
@@ -293,7 +293,7 @@ def test_custom_table_builder_does_not_enable_trial_cache_or_pruning(monkeypatch
 
 
 def test_finished_page_releases_trial_summaries():
-    """实际导出结束后即使测试持有布局对象，也不继续保留试排摘要和模板。"""
+    """After the actual export is completed, even if the test holds the layout object, the trial layout summary and template will not be retained."""
     from docvortex.render._internal.pdf.table_layout import SpatialTableContent
 
     renderer, _ = _renderer("<table>" + "<tr><td>中文数据</td></tr>" * 20 + "</table>")

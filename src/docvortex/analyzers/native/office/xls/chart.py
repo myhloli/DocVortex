@@ -1,4 +1,4 @@
-"""解析 BIFF chart BRAI 中的简单单元格引用。"""
+"""Resolving simple cell references in BIFF chart BRAI."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ BRAI = 0x1051
 
 @dataclass(frozen=True, slots=True)
 class ChartSourceSelection:
-    """一个 chart 引用到的唯一源工作表及行列集合。"""
+    """A unique source worksheet and collection of rows and columns referenced by a chart."""
 
     sheet_index: int
     rows: tuple[int, ...]
@@ -23,7 +23,7 @@ def _extern_sheet_index(
     extern_sheets: list[int | None],
     extern_index: int,
 ) -> int | None:
-    """把 ixti 解析为内部工作表索引。"""
+    """Resolve ixti as an internal worktable index."""
 
     if 0 <= extern_index < len(extern_sheets):
         return extern_sheets[extern_index]
@@ -36,7 +36,7 @@ def _reference_from_tokens(
     current_sheet_index: int,
     extern_sheets: list[int | None],
 ) -> tuple[int, list[int], list[int]] | None:
-    """解析单一 PtgRef/PtgArea 及其 3D 变体和源工作表。"""
+    """Parse a single PtgRef/PtgArea and its 3D variant and source sheet."""
 
     if not tokens:
         return None
@@ -78,7 +78,7 @@ def chart_source_selection(
     current_sheet_index: int,
     extern_sheets: list[int | None],
 ) -> ChartSourceSelection | None:
-    """合并 chart 名称、分类、数值与气泡引用并要求唯一源工作表。"""
+    """Merge chart name, category, value and bubble references and require unique source worksheet."""
 
     rows: set[int] = set()
     cols: set[int] = set()
@@ -120,7 +120,7 @@ def chart_source_axes(
     current_sheet_index: int,
     extern_sheets: list[int | None],
 ) -> tuple[list[int], list[int]] | None:
-    """兼容 worksheet 内嵌 chart，仅接受引用当前工作表的数据。"""
+    """Compatible with worksheet Embedded chart, only accepts data referencing the current worksheet."""
 
     selection = chart_source_selection(
         records,

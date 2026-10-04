@@ -1,4 +1,4 @@
-"""守卫共享能力的归属、类型身份与轻量输入契约。"""
+"""Guard ownership, type identity, and lightweight input contracts for shared capabilities."""
 
 from __future__ import annotations
 
@@ -11,12 +11,12 @@ import docvortex
 
 
 def test_shared_layers_do_not_import_native_implementations() -> None:
-    """基础、内容、codec 和文档操作不反向依赖原生实现；识别分派单独保留。"""
+    """Base, content, codec, and document operations do not rely back on the native implementation; identification dispatches are kept separately."""
     root = Path(docvortex.__file__).parent
     offenders = []
     for group in ("foundation", "content", "codecs", "document"):
         for path in (root / group).rglob("*.py"):
-            # 文件识别显式调用格式专用容器校验器，属于保留的格式路由边界。
+            # File recognition explicitly calls the format-specific container validator, which belongs to the reserved format routing boundary.
             if path == root / "document/detection.py":
                 continue
             name = "docvortex." + ".".join(path.relative_to(root).with_suffix("").parts)
@@ -34,7 +34,7 @@ def test_shared_layers_do_not_import_native_implementations() -> None:
 
 
 def test_existing_shared_imports_keep_type_and_function_identity() -> None:
-    """所有历史入口仍重导出同一实现，类型的 pickle 路径能够往返。"""
+    """All historical entries still re-export the same implementation, and paths of type pickle are able to round-trip."""
     from docvortex.analyzers.native._shared.image import image_to_bytes as original_image
     from docvortex.analyzers.native._shared.markup import TextStyle as original_style
     from docvortex.content.markup import TextStyle
@@ -52,7 +52,7 @@ def test_existing_shared_imports_keep_type_and_function_identity() -> None:
 
 
 def test_canonical_type_annotations_work_without_importing_old_facades() -> None:
-    """新入口单独导入时也能解析注解和构造 Pydantic 适配器，不要求预加载旧模块。"""
+    """When the new entry is imported separately, it can also parse annotations and construct the Pydantic adapter, and does not require preloading of the old module."""
     import subprocess
     import sys
 

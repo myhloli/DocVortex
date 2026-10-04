@@ -1,4 +1,4 @@
-"""跨页表格 HTML 内容、行列结构和单元格语义合并。"""
+"""Cross-page table HTML content, row and column structure, and cell semantic merging."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def adjust_table_rows_colspan(
     target_cols: int,
     match_reference_row: Tag,
 ) -> None:
-    """调整表格行的colspan属性以匹配目标列数."""
+    """Adjust the table row's colspan attribute to match the target number of columns."""
     reference_row_copy = deepcopy(match_reference_row)
 
     for row_idx in range(start_idx, end_idx):
@@ -62,7 +62,7 @@ def adjust_table_rows_colspan(
 
 
 def _cell_has_semantic_content(cell: Tag) -> bool:
-    """判断单元格是否仍包含用户可见的语义内容。"""
+    """Determine whether the cell still contains semantic content visible to the user."""
     if cell.get_text(strip=True):
         return True
 
@@ -70,12 +70,12 @@ def _cell_has_semantic_content(cell: Tag) -> bool:
 
 
 def _row_has_semantic_content(row: Tag) -> bool:
-    """判断整行是否仍保留未并回的语义内容。"""
+    """Determine whether the entire line still retains unmerged semantic content."""
     return any(_cell_has_semantic_content(cell) for cell in row.find_all(["td", "th"]))
 
 
 def _insert_cell_before_visual_column(rows: list[Tag], target_row_index: int, start_vcol: int, cell: Tag) -> None:
-    """将单元格插入到目标行中对应视觉列之前。"""
+    """Inserts the cell into the target row before the corresponding visual column."""
     target_row = rows[target_row_index]
     target_cells = target_row.find_all(["td", "th"])
     target_vcol_map = build_visual_col_mapping(rows, target_row_index)
@@ -89,7 +89,7 @@ def _insert_cell_before_visual_column(rows: list[Tag], target_row_index: int, st
 
 
 def _carry_rowspan_structure_to_next_row(rows: list[Tag], row_idx: int) -> None:
-    """下沉空白结构占位单元格，避免删除当前行后破坏后续列对齐。"""
+    """Sink the blank structure placeholder cells to avoid destroying the alignment of subsequent columns after deleting the current row."""
     next_row_idx = row_idx + 1
     if next_row_idx >= len(rows):
         return
@@ -120,12 +120,12 @@ def _clip_overlapped_blank_rowspan_cells(
     rows: list[Tag],
     initial_occupied: dict[int, set[int]],
 ) -> bool:
-    """裁剪被上页 rowspan 覆盖的当前页空白结构占位。
+    """Crop the blank structure occupancy of the current page that is covered by the previous page rowspan.
 
-    跨页表格中，上一页未结束的 rowspan 会通过 initial_occupied 占住
-    当前页开头的视觉列。如果当前页表格识别又生成了同位置的空白
-    rowspan 单元格，这个单元格只是结构占位；直接拼接会把同一视觉列
-    当成两列。这里仅裁剪无语义内容的空白占位，真实内容单元格不处理。
+    In a cross-page table, the unfinished rowspan on the previous page will be occupied by initial_occupied
+    The visual column at the beginning of the current page. If table recognition on the current page generates a blank space at the same position
+    rowspan cell, this cell is just a structure placeholder; direct splicing will result in the same visual column
+    As two columns. Here, only blank placeholders without semantic content are cropped, and cells with real content are not processed.
     """
     if not rows or not initial_occupied:
         return False
@@ -191,15 +191,15 @@ def _apply_cell_merge(
     current_state: TableMergeState,
     header_count: int,
 ) -> bool:
-    """应用 cell_merge 语义合并。
+    """Apply cell_merge semantic merging.
 
-    当 cell_merge 中的值为 1 时，将下表第一数据行对应单元格的内容
-    追加到上表最后一行对应单元格中。全部为 1 时删除该数据行，
-    混合时清空已合并单元格的内容但保留行。
+    When the value in cell_merge is 1, the contents of the cell corresponding to the first data row in the following table
+    Append to the corresponding cell in the last row of the table above. Delete the data row when all are 1,
+    Clears the contents of merged cells but retains rows when blending.
 
-    cell_merge 按视觉列索引对齐，通过构建视觉列映射来正确匹配
-    两个表格中可能因 rowspan 而具有不同 <td> 元素数量的行。
-    元数据从当前页 table 根块读取，HTML 与列结构仍由唯一 table body 提供。
+    cell_merge align by visual column index, build visual column map to match correctly
+    Two tables may have different numbers of rows due to rowspan <td> elements.
+    Metadata is read from the root block of the current page table, HTML and the column structure is still provided by the only table body.
     """
     current_table_block = current_state.owner_block
     if not isinstance(current_table_block, dict):
@@ -221,7 +221,7 @@ def _apply_cell_merge(
     cells1 = last_row.find_all(["td", "th"])
     cells2 = first_data_row.find_all(["td", "th"])
 
-    # 构建视觉列到单元格索引的映射
+    # Construct a visual column to cell index mapping
     last_row_idx = len(previous_state.rows) - 1
     vcol_map1 = build_visual_col_mapping(previous_state.rows, last_row_idx)
     current_merge_rows = rows2[header_count:]
@@ -231,7 +231,7 @@ def _apply_cell_merge(
         initial_occupied=previous_state.tail_occupied,
     )
 
-    # 构建视觉列 -> 单元格索引的反向映射（展开 colspan）
+    # Build a reverse mapping of visual columns -> cell indexes (expand colspan)
     vcol_to_cell1: dict[int, int] = {}
     for ci, start_vcol in enumerate(vcol_map1):
         colspan = int(cells1[ci].get("colspan", 1))
@@ -243,7 +243,7 @@ def _apply_cell_merge(
         for c in range(start_vcol, start_vcol + colspan):
             vcol_to_cell2[c] = ci
 
-    # 按唯一 (src_cell_idx, dst_cell_idx) 对执行一次转移，避免 colspan 重复处理
+    # Execute a transfer by unique (src_cell_idx, dst_cell_idx) pair to avoid repeated processing of colspan
     transferred_pairs: set[tuple[int, int]] = set()
     for vi, merge_flag in enumerate(cell_merge):
         if merge_flag == 1:
@@ -256,7 +256,7 @@ def _apply_cell_merge(
                         cells1[ci1].append(child.extract())
                     transferred_pairs.add(pair)
 
-    # 只清空确实成功转移过的源单元格
+    # Only clear source cells that have been successfully transferred
     cleared_ci2: set[int] = set()
     for vi, merge_flag in enumerate(cell_merge):
         if merge_flag == 1:
@@ -281,7 +281,7 @@ def _perform_table_content_merge(
     previous_table_block: BlockDict,
     current_table_block: BlockDict,
 ) -> bool:
-    """在两个克隆表格上执行 HTML、单元格和 footnote 的内容合并。"""
+    """Perform a merge of the contents of HTML, cells, and footnote on the two cloned tables."""
     header_count, _, _ = detect_table_headers(previous_state, current_state)
     header_count = _expand_header_count_by_rowspan(current_state.rows, header_count)
 
@@ -390,10 +390,10 @@ def _perform_table_content_merge(
 
 
 def merge_table_content(previous_table: BlockDict, current_table: BlockDict) -> BlockDict | None:
-    """纯函数式合并两张跨页表格的内容，失败时返回 ``None``。
+    """Purely functional method to merge the contents of two cross-page tables, returning ``None`` when failed.
 
-    两个输入都会先深拷贝；返回块保留前表外层信息，只改克隆表体 HTML
-    并用当前表 footnote 替换前表 footnote，不会修改任何输入对象。
+    Both inputs will be deeply copied first; the returned block retains the outer information of the previous table and only changes the cloned table body HTML
+    And replaces the previous table footnote with the current table footnote, without modifying any input objects.
     """
     if (
         not isinstance(previous_table, dict)

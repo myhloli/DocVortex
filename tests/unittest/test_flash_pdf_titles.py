@@ -13,7 +13,7 @@ from docvortex.analyzers.native.pdf import line_layout, line_merging, models, te
 
 @pytest.mark.parametrize("heading_text", ["1. INTRODUCTION", "completely unrelated words"])
 def test_paragraph_title_classification_is_independent_of_heading_content(heading_text: str) -> None:
-    """验证相同版式和字体的不同内容得到完全相同的段落标题类型。"""
+    """Verify that different content with the same layout and font results in the exact same paragraph heading type."""
 
     body_font = ("Body", 0)
     heading_font = ("Heading", 1)
@@ -32,7 +32,7 @@ def test_paragraph_title_classification_is_independent_of_heading_content(headin
 
 
 def test_heading_like_content_with_body_layout_remains_text() -> None:
-    """验证标题式字符串在正文几何、正文字体和常规行距下仍保持普通文本。"""
+    """Verify that title-style strings remain normal text with body geometry, body fonts, and regular line spacing."""
 
     body_font = ("Body", 0)
     lines = [
@@ -53,7 +53,7 @@ def test_heading_like_content_with_body_layout_remains_text() -> None:
 
 
 def test_explicit_section_number_rejects_century_and_decimal_sentence() -> None:
-    """验证通用章节编号补标标题，同时排除世纪年代和小数正文。"""
+    """Validates generic section number supplementary titles while excluding century chronology and decimal text."""
 
     body_font = ("Body", 0)
     lines = [
@@ -84,7 +84,7 @@ def test_explicit_section_number_rejects_century_and_decimal_sentence() -> None:
 
 
 def test_document_regular_fonts_only_use_body_height_band() -> None:
-    """验证跨页重复的大字号标题字体不会进入全文常规正文字体集合。"""
+    """Verify that large title fonts that are repeated across pages do not enter the full-text regular body font collection."""
 
     body_font = ("Body", 0)
     heading_font = ("RepeatedHeading", 0)
@@ -118,7 +118,7 @@ def test_document_regular_fonts_only_use_body_height_band() -> None:
 
 
 def test_noninitial_document_title_requires_paragraph_title_candidate() -> None:
-    """验证非首页文档标题只能从已确认的段落标题候选升档。"""
+    """Verify that non-front page document titles can only be upgraded from confirmed paragraph title candidates."""
 
     title_font = ("Title", 0)
     body_font = ("Body", 0)
@@ -203,7 +203,7 @@ def test_noninitial_document_title_requires_paragraph_title_candidate() -> None:
 
 
 def test_noninitial_document_titles_support_multiple_articles_without_metadata() -> None:
-    """验证杂志中的多篇文章可在各自起始页仅凭稳定标题版式成为 doc_title。"""
+    """Multiple articles in a verified magazine can become doc_title on their respective start pages with just a stable title layout."""
 
     title_font = ("Title", 0)
     body_font = ("Body", 0)
@@ -312,7 +312,7 @@ def test_noninitial_document_titles_support_multiple_articles_without_metadata()
 
 
 def test_document_body_profile_prefers_width_support_over_footer_page_count() -> None:
-    """验证窄页脚覆盖更多页面时，累计行宽更大的正文高度仍优先。"""
+    """When verifying that a narrow footer covers more pages, the body height with a larger cumulative line width still takes precedence."""
 
     body_font = ("Body", 0)
     footer_font = ("Footer", 0)
@@ -350,7 +350,7 @@ def test_document_body_profile_prefers_width_support_over_footer_page_count() ->
 
 
 def test_body_height_section_titles_mark_only_repeated_short_anchors() -> None:
-    """验证同字号短章节锚点独立成标题，明细、联系方式和版权行保持正文。"""
+    """Verify that the anchor points of short chapters of the same font size are independently formed into titles, and the details, contact information, and copyright lines remain in the main text."""
 
     body_font = ("Body", 0)
     lines = [
@@ -396,7 +396,7 @@ def test_body_height_section_titles_mark_only_repeated_short_anchors() -> None:
 
 
 def test_physical_title_gap_ignores_disjoint_column_and_keeps_overlapping_row() -> None:
-    """验证物理邻行只在水平投影相交时参与标题留白，避免另一栏正文压缩间距。"""
+    """Verify that physical adjacent rows only participate in title space when horizontal projections intersect, to avoid compressing the spacing of another column of text."""
 
     target = _text_line("target", (0.0, 40.0, 40.0, 50.0), 0)
     disjoint = _text_line("other column", (60.0, 39.0, 100.0, 49.0), 1)
@@ -410,7 +410,7 @@ def test_physical_title_gap_ignores_disjoint_column_and_keeps_overlapping_row() 
 
 
 def test_grid_title_suppression_requires_two_distinct_parallel_bands() -> None:
-    """验证单个三栏短首行带不足以抑制标题，重复两带才形成信息网格证据。"""
+    """To verify that a single three-column short first-row strip is not enough to suppress the title, repeating two strips forms evidence of an information grid."""
 
     lanes = []
     source_index = 0
@@ -465,7 +465,7 @@ def test_grid_title_suppression_requires_two_distinct_parallel_bands() -> None:
 
 
 def test_centered_smaller_paragraph_title_uses_layout_contrast_only() -> None:
-    """验证同字体的小字号居中标题可由栏宽和上下留白识别。"""
+    """Verify that small-sized, centered titles in the same font can be identified by column width and top and bottom margins."""
 
     body_font = ("Body", 0)
     lines = [
@@ -490,7 +490,7 @@ def test_centered_smaller_paragraph_title_uses_layout_contrast_only() -> None:
 
 
 def test_centered_smaller_paragraph_title_accepts_compact_text_section() -> None:
-    """验证小字号居中标题可由紧随其后的连续小字号正文区段支撑。"""
+    """Verify that a small, centered title can be supported by a continuous small font body section immediately following it."""
 
     body_font = ("Body", 0)
     lines = [
@@ -528,7 +528,7 @@ def test_centered_smaller_paragraph_title_accepts_compact_text_section() -> None
 def test_centered_smaller_paragraph_title_rejects_incomplete_compact_section(
     failure_mode: str,
 ) -> None:
-    """验证不足三行、行宽不足或行距中断的小字号区段不能放宽标题。"""
+    """Validate that small font size sections that are less than three lines long, have insufficient line width, or have broken line spacing cannot relax the title."""
 
     body_font = ("Body", 0)
     lines = [
@@ -570,7 +570,7 @@ def test_centered_smaller_paragraph_title_rejects_incomplete_compact_section(
 
 
 def test_multiline_document_title_does_not_absorb_author_line() -> None:
-    """验证首页两行大字号标题合并为文档标题，较小作者行保持普通文本。"""
+    """Verify that the two large title lines on the homepage are merged into the document title, and the smaller author line remains as normal text."""
 
     body_font = ("Body", 0)
     title_font = ("Title", 0)
@@ -610,7 +610,7 @@ def test_multiline_document_title_does_not_absorb_author_line() -> None:
 
 
 def test_multiline_document_title_accepts_uncertain_mixed_dominant_font() -> None:
-    """验证混排标题主字体覆盖不稳定时仍可按字号、居中和字重合并。"""
+    """Verify that when the main font coverage of the mixed title is unstable, it can still be merged according to font size, centering and font weight."""
 
     lines = [
         _text_line(
@@ -660,7 +660,7 @@ def test_multiline_document_title_accepts_uncertain_mixed_dominant_font() -> Non
 
 
 def test_compact_left_heading_accepts_one_body_height_following_gap() -> None:
-    """验证短标题与后继正文相隔约一行时仍可由局部样式过渡确认。"""
+    """Verify that the short title and subsequent body text can still be confirmed by local style transitions when they are about one line apart."""
 
     body_font = ("Body", 0)
     heading = _text_line(
@@ -721,7 +721,7 @@ def test_compact_left_heading_accepts_one_body_height_following_gap() -> None:
 
 
 def test_same_font_body_tail_with_moderate_gap_is_not_title() -> None:
-    """验证同字体满行之后的短正文尾行不会因中等间距被升级为标题。"""
+    """Verify that the last line of short text after a full line of the same font will not be upgraded to a title due to medium spacing."""
 
     body_font = ("Body", 0)
     lines = [
@@ -756,7 +756,7 @@ def test_same_font_body_tail_with_moderate_gap_is_not_title() -> None:
 
 
 def test_subset_font_visual_row_continues_into_short_body_tail() -> None:
-    """验证同一满行的拆分片段归一化子集字体后，短尾仍优先判为正文续行。"""
+    """After verifying the normalized subset fonts of the split fragments of the same full line, short tails are still prioritized as text continuation lines."""
 
     first = _text_line(
         "prefix",
@@ -796,7 +796,7 @@ def test_subset_font_visual_row_continues_into_short_body_tail() -> None:
 
 
 def test_normal_body_font_needs_precise_centering_for_layout_title_fallback() -> None:
-    """验证普通正文样式只有精确居中且紧邻正文时才能使用版式标题兜底。"""
+    """Verify that the common text style can only use the layout title when it is accurately centered and adjacent to the main text."""
 
     body_font = ("Body", 0)
     imprecise_lines = [
@@ -832,7 +832,7 @@ def test_normal_body_font_needs_precise_centering_for_layout_title_fallback() ->
 
 
 def test_first_page_centered_body_style_metadata_does_not_use_title_fallback() -> None:
-    """验证首页上部普通字号居中元数据不会仅凭留白升级为段落标题。"""
+    """Verify that the normal font size and centered metadata in the upper part of the home page will not be upgraded to a paragraph title simply by leaving blank space."""
 
     body_font = ("Body", 0)
     lines = [
@@ -853,7 +853,7 @@ def test_first_page_centered_body_style_metadata_does_not_use_title_fallback() -
 
 
 def test_first_page_centered_small_regular_metadata_requires_emphasis() -> None:
-    """验证首页正文区的小字号常规字体元数据不会仅凭居中和留白晋升。"""
+    """Verify that the metadata of small fonts in the main text area of the homepage is not improved by centering and white space alone."""
 
     body_font = ("Body", 0)
     lines = [
@@ -923,7 +923,7 @@ def test_first_page_centered_small_regular_metadata_requires_emphasis() -> None:
 
 
 def test_first_page_hanging_title_rows_demote_to_text_geometry() -> None:
-    """验证近满栏缩进首行接栏左续行的标题组在首页降回正文。"""
+    """Verify that the indented first line of a nearly full column and the continuation line from the left of the column lead to a title group that returns to the main text on the homepage."""
 
     heading_font = ("Heading", 0)
     first = _text_line(
@@ -969,7 +969,7 @@ def test_first_page_hanging_title_rows_demote_to_text_geometry() -> None:
 
 
 def test_inline_typography_reset_promotes_only_distinct_middle_row() -> None:
-    """验证短段尾、异字体短行和缩进正文的三行结构只提升中间行。"""
+    """Verify that short paragraph endings, short lines in different fonts, and three-line structures of indented text only promote the middle line."""
 
     body_font = ("Body", 0)
     heading_font = ("Heading", 0)
@@ -1034,7 +1034,7 @@ def test_inline_typography_reset_promotes_only_distinct_middle_row() -> None:
 
 
 def test_cross_column_document_title_uses_thirteen_tenths_body_height_fallback() -> None:
-    """验证首页跨栏居中标题达到正文 1.30 倍时可命中，作者行保持正文类型。"""
+    """Verify that the cross-column center title on the home page can be hit when it reaches 1.30 times the text, and the author row maintains the text type."""
 
     body_font = ("Body", 0)
     title_font = ("Title", 0)
@@ -1088,7 +1088,7 @@ def test_cross_column_document_title_uses_thirteen_tenths_body_height_fallback()
 
 
 def test_complete_visual_row_promotes_number_and_demotes_inline_body() -> None:
-    """验证同字体编号整行晋升，标题字体与正文同排时整行降级并重新合并。"""
+    """Verify that the entire line with the same font number is promoted. If the title font is in the same row as the main text, the entire line is demoted and re-merged."""
 
     body_font = ("Body", 0)
     title_font = ("Title", 0)
@@ -1155,7 +1155,7 @@ def test_complete_visual_row_promotes_number_and_demotes_inline_body() -> None:
 
 
 def test_low_coverage_mixed_weight_visual_row_demotes_inline_title() -> None:
-    """验证低字体覆盖率的同一视觉行仍按字重冲突识别为行内粗体正文。"""
+    """Verify that the same visual line with low font coverage is still recognized as inline bold text by weight conflict."""
 
     body_font = ("Body", 0)
     lines = [
@@ -1228,7 +1228,7 @@ def test_low_coverage_mixed_weight_visual_row_demotes_inline_title() -> None:
 
 
 def test_full_width_normal_height_inline_heading_merges_with_body_continuation() -> None:
-    """验证满栏正常字号粗体行降为正文，并只与其下方常规正文续接。"""
+    """Verify that full column bold lines with normal font sizes are reduced to text and continue only with the regular text below them."""
 
     body_font = ("Body", 0)
     heading_font = ("Heading", 1)
@@ -1271,7 +1271,7 @@ def test_full_width_normal_height_inline_heading_merges_with_body_continuation()
 
 
 def test_dense_same_font_two_run_row_requires_complete_high_occupancy_geometry() -> None:
-    """验证双 run 正文仅在同字体、同基线、连续编号且占用充分时恢复。"""
+    """Verify that the double run text is restored only if it has the same font, same baseline, consecutive numbering and sufficient occupancy."""
 
     body_font = ("Body", 0)
     dense_members = [
@@ -1368,7 +1368,7 @@ def test_dense_same_font_two_run_row_requires_complete_high_occupancy_geometry()
 
 
 def test_preserved_split_boundary_blocks_dense_and_title_row_restoration() -> None:
-    """验证空间分栏保护同时阻止密集正文恢复和段落标题同行恢复。"""
+    """Verify space column protection blocks both dense body text recovery and paragraph header peer recovery."""
 
     body_font = ("Body", 0)
     protected_members = [
@@ -1431,7 +1431,7 @@ def test_preserved_split_boundary_blocks_dense_and_title_row_restoration() -> No
 
 
 def test_paragraph_title_detector_does_not_read_line_text() -> None:
-    """守卫段落标题候选、打分和邻行扩展不读取文本内容。"""
+    """Guard paragraph title candidates, scoring, and adjacent line expansion do not read the text content."""
 
     source = "\n".join(
         inspect.getsource(function)
@@ -1479,7 +1479,7 @@ def test_paragraph_title_detector_does_not_read_line_text() -> None:
 
 
 def test_cross_lane_title_expansion_accepts_only_wide_leading_line() -> None:
-    """验证较宽首行可并入下方窄标题锚点，反向的正文续行不会被扩成标题。"""
+    """Verify that the wider first line can be merged into the narrow title anchor below, and the reversed text continuation line will not be expanded into a title."""
 
     heading_font = ("Heading", 0)
     leading = _text_line(

@@ -34,12 +34,12 @@ _PNG_HEX = (
 
 
 def _complex_rtf() -> bytes:
-    """读取覆盖标题、列表、表格、公式、注释、链接和图片的确定性 RTF。"""
+    """Reads deterministic RTF covering titles, lists, tables, formulas, notes, links and images."""
     return _SEMANTIC_RTF.read_bytes()
 
 
 def test_rtf_lexer_bin_payload_is_position_explicit() -> None:
-    """验证 bin 中的花括号和反斜杠不改变 lexer group 结构。"""
+    """Verify that the curly braces and backslashes in bin do not change the lexer group structure."""
     tokens = list(RtfLexer(rb"{\rtf1 before\bin5 }}{\x after}"))
     binaries = [token for token in tokens if isinstance(token, RtfBinary)]
 
@@ -47,7 +47,7 @@ def test_rtf_lexer_bin_payload_is_position_explicit() -> None:
 
 
 def test_rtf_lexer_rejects_truncated_bin_payload() -> None:
-    """验证截断 bin 在游标失去可信边界前立即失败。"""
+    """Validation truncation bin failed immediately before the cursor lost trusted boundaries."""
     with pytest.raises(LegacyOfficeMalformedError, match="truncated"):
         list(RtfLexer(rb"{\rtf1\bin9 ab}"))
 
@@ -62,13 +62,13 @@ def test_rtf_lexer_rejects_truncated_bin_payload() -> None:
     ],
 )
 def test_rtf_lexer_rejects_control_parameters_before_unbounded_int(control: bytes) -> None:
-    """验证超长或越界 control parameter 在整数转换和 bin 定位前失败。"""
+    """Validation overlong or out-of-bounds control parameter failed before integer conversion and bin positioning."""
     with pytest.raises(LegacyOfficeResourceLimitError, match="control parameter"):
         list(RtfLexer(b"{\\rtf1" + control + b"}"))
 
 
 def test_rtf_lexer_accepts_signed_32_bit_control_parameter_boundaries() -> None:
-    """验证十位词法限制仍允许有符号 32 位参数边界。"""
+    """Verify that the ten-bit lexical limit still allows signed 32-bit parameter boundaries."""
     tokens = list(RtfLexer(rb"{\rtf1\foo2147483647\bar-2147483648}"))
     controls = [token for token in tokens if isinstance(token, lexer_module.RtfControlWord)]
 
@@ -79,7 +79,7 @@ def test_rtf_lexer_accepts_signed_32_bit_control_parameter_boundaries() -> None:
 
 
 def test_rtf_font_codepages_and_unicode_surrogates_are_exact() -> None:
-    """验证 per-font CP1251/CP932、多字节 hex 和 UTF-16 代理对恢复。"""
+    """Verify per-font, CP1251/CP932, multibyte hex, and UTF-16 agent pair recovery."""
     russian = b"".join(f"\\'{value:02x}".encode("ascii") for value in "Привет".encode("cp1251"))
     japanese = b"".join(f"\\'{value:02x}".encode("ascii") for value in "こんにちは".encode("cp932"))
     source = b"".join(
@@ -99,7 +99,7 @@ def test_rtf_font_codepages_and_unicode_surrogates_are_exact() -> None:
 
 
 def test_rtf_metadata_decodes_consecutive_multibyte_hex_as_one_run() -> None:
-    """验证 metadata 定义组中的连续 GB18030 hex byte 按完整代码页序列解码。"""
+    """Verify that metadata contiguous GB18030 hex byte in the definition group decodes in full code page sequence."""
     encoded_title = b"".join(f"\\'{value:02x}".encode("ascii") for value in "中文".encode("gb18030"))
     source = b"".join(
         [
@@ -117,7 +117,7 @@ def test_rtf_metadata_decodes_consecutive_multibyte_hex_as_one_run() -> None:
 
 
 def test_rtf_unicode_controls_buffer_adjacent_text_without_repeated_run_copy() -> None:
-    """验证逐字符 Unicode control 只在边界处物化文本 run。"""
+    """Validate character by character Unicode control Materialize text only at boundaries run."""
     count = 5_000
     source = b"{\\rtf1\\ansi\\uc1 " + b"\\u20013?" * count + b"\\par}"
 
@@ -134,7 +134,7 @@ def test_rtf_unicode_controls_buffer_adjacent_text_without_repeated_run_copy() -
 
 
 def test_rtf_upr_prefers_unicode_branch_without_leaking_ansi_fallback() -> None:
-    """验证 Unicode-aware parser 在 upr 中只输出 ud 分支。"""
+    """Verify that Unicode-aware parser only outputs the ud branch in upr."""
     source = rb"{\rtf1\ansi Before {\upr{?}{\*\ud{\u20013?}}} After\par}"
 
     pages = RtfModel().predict(BytesIO(source))
@@ -143,7 +143,7 @@ def test_rtf_upr_prefers_unicode_branch_without_leaking_ansi_fallback() -> None:
 
 
 def test_rtf_inherited_style_honors_explicit_formatting_resets() -> None:
-    """验证 derived stylesheet 的 b0/i0/ul0/strike0 覆盖基样式开启值。"""
+    """Verify that derived stylesheet and b0/i0/ul0/strike0 override the base style on value."""
     source = (
         rb"{\rtf1\ansi{\stylesheet{\s0\b\i\ul\strike Base;}{\s1\sbasedon0\b0\i0\ul0\strike0 Derived;}}\pard\s1 Reset text\par}"
     )
@@ -154,7 +154,7 @@ def test_rtf_inherited_style_honors_explicit_formatting_resets() -> None:
 
 
 def test_rtf_large_roman_list_start_falls_back_to_decimal() -> None:
-    """验证超出规范范围的 Roman 起始值直接回退十进制而不线性扩张。"""
+    """Verify that Roman starting values outside the specification range are directly rolled back to decimal without linear expansion."""
     source = b"".join(
         [
             rb"{\rtf1\ansi{\*\listtable{\list{\listlevel\levelnfc1\levelstartat2147483647}\listid7}}",
@@ -170,7 +170,7 @@ def test_rtf_large_roman_list_start_falls_back_to_decimal() -> None:
 
 
 def test_rtf_model_recovers_unicode_styles_and_structures() -> None:
-    """验证完整 typed RTF 链路生成稳定单页 raw blocks。"""
+    """Verify that the complete typed RTF link generates a stable single page raw blocks."""
     stream = BytesIO(_complex_rtf())
 
     pages = RtfModel().predict(stream)
@@ -209,7 +209,7 @@ def test_rtf_model_recovers_unicode_styles_and_structures() -> None:
 
 
 def test_rtf_page_controls_remain_inside_one_semantic_page() -> None:
-    """验证 page/column 只保留换行，sect 只结束段落。"""
+    """Verify that page/column only retains line breaks, and sect only ends paragraphs."""
     pages = RtfModel().predict(BytesIO(rb"{\rtf1\ansi A\page B\column C\sect D\par}"))
 
     assert len(pages) == 1
@@ -220,7 +220,7 @@ def test_rtf_page_controls_remain_inside_one_semantic_page() -> None:
 
 
 def test_rtf_nested_and_merged_tables_preserve_content() -> None:
-    """验证 nested table、cellx 投影及纵向 continuation 不丢可见文本。"""
+    """Verify that nested table, cellx projection and portrait continuation do not lose visible text."""
     source = rb"""{\rtf1\ansi
 \trowd\clvmgf\cellx1000\cellx2000 A\cell B\cell\row
 \trowd\clvmrg\cellx1000\cellx2000 \cell C\cell\row
@@ -239,7 +239,7 @@ def test_rtf_nested_and_merged_tables_preserve_content() -> None:
 
 
 def test_rtf_math_picture_is_only_used_when_formula_conversion_fails() -> None:
-    """验证 Office Math 成功时去重预览，失败时保留首个安全 fallback 图片。"""
+    """Verify Office Math Deduplicate preview on success, keep first safe fallback image on failure."""
     valid = b"".join(
         [
             rb"{\rtf1{\mmath{\*\moMath{\mr x}}{\mmathPict{\pict\pngblip ",
@@ -263,7 +263,7 @@ def test_rtf_math_picture_is_only_used_when_formula_conversion_fails() -> None:
 
 
 def test_rtf_unknown_destination_and_unbalanced_tail_recover_visible_text() -> None:
-    """验证未知 ignorable destination 不泄漏，缺尾括号仍保留已恢复正文。"""
+    """Verification Unknown ignorable destination Not leaked, missing trailing brackets remain Recovered text."""
     source = rb"{\rtf1\ansi{\*\unknown hidden}\pard visible\par"
 
     pages = RtfModel().predict(BytesIO(source))
@@ -272,7 +272,7 @@ def test_rtf_unknown_destination_and_unbalanced_tail_recover_visible_text() -> N
 
 
 def test_rtf_source_html_is_rendered_as_inert_text() -> None:
-    """验证源文档中的活动 HTML 外观不会进入 HTML renderer DOM。"""
+    """Verify that the active HTML appearance in the source document does not go into HTML renderer DOM."""
     middle, _ = analyze_native_test_document(
         b"{\\rtf1\\ansi visible <script>alert(1)</script> and x < y\\par}", file_suffix="rtf"
     )
@@ -286,7 +286,7 @@ def test_rtf_source_html_is_rendered_as_inert_text() -> None:
 
 
 def test_rtf_literal_tag_protocol_remains_inert_text() -> None:
-    """验证普通 RTF 标签外观原文只生成 TextSpan，不能注入公式或链接。"""
+    """To verify the original text of ordinary RTF label appearance, only TextSpan is generated, and formulas or links cannot be injected."""
     source = (
         rb"{\rtf1\ansi literal <eq>x</eq> and "
         rb"<hyperlink><text>click</text><url>javascript:alert(1)</url></hyperlink>\par}"
@@ -304,7 +304,7 @@ def test_rtf_literal_tag_protocol_remains_inert_text() -> None:
 
 
 def test_rtf_footnote_literal_tag_protocol_remains_inert_text() -> None:
-    """验证 RTF 脚注标签外观原文只生成 TextSpan，不能注入公式或链接。"""
+    """Verify that the original text of RTF footnote label appearance only generates TextSpan, and cannot inject formulas or links."""
     source = (
         rb"{\rtf1\ansi Body{\footnote <eq>x</eq> and "
         rb"<hyperlink><text>click</text><url>javascript:alert(1)</url></hyperlink>}\par}"
@@ -325,7 +325,7 @@ def test_rtf_footnote_literal_tag_protocol_remains_inert_text() -> None:
 
 
 def test_rtf_annotation_preserves_comment_as_page_footnote() -> None:
-    """验证 annotation 正文进入页脚注块且不会生成虚假的正文脚注引用。"""
+    """Verify that annotation text goes into the footer block and does not generate spurious text footnote references."""
     source = rb"{\rtf1\ansi Before {\*\annotation Review comment} After\par}"
 
     pages = RtfModel().predict(BytesIO(source))
@@ -337,7 +337,7 @@ def test_rtf_annotation_preserves_comment_as_page_footnote() -> None:
 
 
 def test_rtf_hidden_annotation_preserves_body_and_suppresses_metadata() -> None:
-    """验证隐藏批注可恢复正文，同时作者和标识元数据不会泄漏。"""
+    """Verifying hidden annotations restores the body text without leaking author and identification metadata."""
     source = (
         rb"{\rtf1\ansi Body {\v {\*\atnauthor Alice}{\*\atnid AB}\chatn"
         rb"{\*\annotation Review <eq>x</eq> comment}} end\par}"
@@ -353,7 +353,7 @@ def test_rtf_hidden_annotation_preserves_body_and_suppresses_metadata() -> None:
 
 
 def test_rtf_equation_only_paragraph_preserves_note_reference() -> None:
-    """验证纯公式段落仍保留脚注引用，不生成孤立脚注正文。"""
+    """Verify that pure formula paragraphs still retain footnote references and do not generate orphan footnote text."""
     source = rb"{\rtf1\ansi\pard {\mmath{\*\moMath{\mr x}}}{\footnote Foot.}\par}"
 
     pages = RtfModel().predict(BytesIO(source))
@@ -365,14 +365,14 @@ def test_rtf_equation_only_paragraph_preserves_note_reference() -> None:
 
 
 def test_rtf_object_keeps_safe_result_and_suppresses_objdata() -> None:
-    """验证对象载荷不执行不泄漏，但显式 result 文本仍可恢复。"""
+    """Verify that the object payload is not executed and is not leaked, but the explicit result text is still recoverable."""
     pages = RtfModel().predict(BytesIO(rb"{\rtf1 before {\object{\*\objdata 41424344}{\result Visible object}} after\par}"))
 
     assert pages == [[{"type": BlockType.TEXT, "content": inline("before Visible object after")}]]
 
 
 def test_rtf_malformed_vector_picture_is_locally_dropped() -> None:
-    """验证伪装 WMF 的 bin 字节不会生成占位图或破坏周围正文。"""
+    """Verify that the bin bytes masquerading as WMF do not generate a placeholder image or corrupt the surrounding text."""
     pages = RtfModel().predict(BytesIO(rb"{\rtf1 before {\pict\wmetafile8\bin5 abcde} after\par}"))
 
     assert pages == [
@@ -384,14 +384,14 @@ def test_rtf_malformed_vector_picture_is_locally_dropped() -> None:
 
 
 def test_rtf_valid_empty_and_invalid_header_have_distinct_results() -> None:
-    """合法空 RTF 返回空逻辑页，非 RTF 输入返回稳定 malformed 错误。"""
+    """Legally empty RTF returns an empty logical page, non-RTF input returns a stable malformed error."""
     assert RtfModel().predict(BytesIO(rb"{\rtf1}")) == [[]]
     with pytest.raises(LegacyOfficeMalformedError, match="not an RTF"):
         RtfModel().predict(BytesIO(b"plain text"))
 
 
 def test_rtf_resource_limits_are_fixed_and_non_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 token、group、input、asset、grid 和 nested-table 上限均硬失败。"""
+    """Verification hard failed for token, group, input, asset, grid and nested-table caps."""
     monkeypatch.setattr(lexer_module, "MAX_RECORDS", 3)
     with pytest.raises(LegacyOfficeResourceLimitError, match="max_tokens"):
         list(RtfLexer(rb"{\rtf1 text}"))
@@ -420,7 +420,7 @@ def test_rtf_resource_limits_are_fixed_and_non_configurable(monkeypatch: pytest.
 
 
 def test_rtf_cell_definitions_enforce_budget_before_row_materialization(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 cellx 在定义列表增长阶段即执行 RTF 专用 cell 预算。"""
+    """Verify that cellx executes the RTF dedicated cell budget during the definition list growth phase."""
     monkeypatch.setattr(parser_module, "MAX_RTF_TABLE_CELLS", 3)
     source = rb"{\rtf1\trowd\cellx1\cellx2\cellx3\cellx4}"
 
@@ -429,7 +429,7 @@ def test_rtf_cell_definitions_enforce_budget_before_row_materialization(monkeypa
 
 
 def test_rtf_prelude_nested_groups_do_not_materialize_overlapping_slices() -> None:
-    """验证 prelude 扫描深层 group 时峰值内存保持为输入规模常数倍。"""
+    """Verification prelude Peak memory remains a constant multiple of the input size when scanning deep group."""
     payload_size = 256 * 1024
     depth = 64
     source = b"{\\rtf1" + b"{" * depth + b"x" * payload_size + b"}" * depth + b"}"
@@ -445,7 +445,7 @@ def test_rtf_prelude_nested_groups_do_not_materialize_overlapping_slices() -> No
 
 
 def test_rtf_runtime_has_no_anydoc_dependency() -> None:
-    """验证依赖清单、源码导入和惰性模型加载均不包含 anydoc。"""
+    """Verify that dependency manifests, source imports, and lazy model loads do not contain anydoc."""
     assert "firecrawl-anydoc" not in (_PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8").lower()
     assert all(
         "import anydoc" not in path.read_text(encoding="utf-8") for path in (_PROJECT_ROOT / "src" / "docvortex").rglob("*.py")

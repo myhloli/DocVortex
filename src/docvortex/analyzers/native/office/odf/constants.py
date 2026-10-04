@@ -1,4 +1,4 @@
-"""OpenDocument 命名空间、MIME 与固定资源上限。"""
+"""OpenDocument namespace, MIME and fixed resource caps."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ MAX_ASSET_TOTAL_BYTES: Final = 128 * 1024 * 1024
 
 
 def qname(prefix: str, local_name: str) -> str:
-    """返回指定 ODF 命名空间下的 Clark notation 标签名。"""
+    """Returns the Clark notation tag name under the specified ODF namespace."""
     return f"{{{NS[prefix]}}}{local_name}"
 
 

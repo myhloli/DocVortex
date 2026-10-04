@@ -1,4 +1,4 @@
-"""重放实际 layout 表格框及公共导出，保存原生恢复和整本解析的独立证据。"""
+"""Replay actual layout table frames and public exports, preserving independent evidence of native recovery and full resolution."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from docvortex.schema import ModelJson
 
 
 def main() -> None:
-    """通过固定源指纹和真实导入路径生成一次不可覆盖的验收输出。"""
+    """Generate one-time non-overridable acceptance output with fixed source fingerprints and true import paths."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--layout-records", type=Path, required=True)
@@ -59,7 +59,7 @@ def main() -> None:
             for block in record["initial_blocks"]:
                 bbox = tuple(value * prepared.page_size[index % 2] for index, value in enumerate(block["bbox"]))
                 if block["type"] != "table":
-                    # 保留实际相邻正文和表注，避免裸表导出产生伪跨页合并。
+                    # Preserve the actual adjacent text and table notes to avoid pseudo cross-page merging caused by bare table export.
                     contextual = deepcopy(block)
                     projected = project_pdf_table_text(prepared.geometry.chars, bbox)
                     contextual["content"] = (

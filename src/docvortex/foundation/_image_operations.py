@@ -1,4 +1,4 @@
-"""无 PDF 句柄依赖的图像裁剪、旋转及编码。"""
+"""No PDF handle dependent image cropping, rotation and encoding."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from ._geometry import normalize_to_int_bbox
 
 
 def rotate_image_to_upright(image: np.ndarray, angle: int) -> np.ndarray:
-    """按 layout 视觉块角度把裁图旋转至正向，角度语义与方向分类模型保持一致。"""
+    """Rotate the cutout to the forward direction according to the layout visual block angle, and the angle semantics are consistent with the direction classification model."""
     if angle == 270:
         return cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
     if angle == 90:
@@ -27,7 +27,7 @@ def encode_crop_as_jpeg_data_uri(
     page_bbox: BBox,
     angle: int,
 ) -> str:
-    """从页面原图按像素框裁剪，按视觉块方向回正后编码为 JPEG data URI。"""
+    """Crop the original image of the page according to the pixel frame, straighten it according to the direction of the visual block, and encode it as JPEG data URI."""
     image_h, image_w = np_image.shape[:2]
     image_bbox = normalize_to_int_bbox(page_bbox, image_size=(image_h, image_w))
     if image_bbox is None:

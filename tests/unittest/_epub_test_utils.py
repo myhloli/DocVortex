@@ -28,7 +28,7 @@ def build_epub_fixture(
     unclosed_br_first_chapter: bool = False,
     unclosed_br_second_chapter: bool = False,
 ) -> bytes:
-    """构造覆盖 XHTML、SVG、CSS、公式、表格、列表和图片的最小 EPUB 3。"""
+    """Constructs minimum EPUB 3 covering XHTML, SVG, CSS, formulas, tables, lists and pictures."""
     container = """<?xml version="1.0" encoding="UTF-8"?>
 <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
   <rootfiles><rootfile full-path="EPUB/package.opf" media-type="application/oebps-package+xml"/></rootfiles>
@@ -171,7 +171,7 @@ def build_epub_fixture(
 
 
 def build_epub2_fixture() -> bytes:
-    """构造带 NCX manifest 的最小 EPUB 2，正文仍由 spine XHTML 提供。"""
+    """Construction of minimum EPUB 2 with NCX manifest, text still provided by spine XHTML."""
     output = BytesIO()
     with ZipFile(output, "w") as package:
         package.writestr("mimetype", "application/epub+zip", compress_type=ZIP_STORED)
@@ -208,7 +208,7 @@ def build_epub2_fixture() -> bytes:
 
 
 def build_epub_notes_fixture() -> bytes:
-    """构造覆盖 Footnote、Endnote、ARIA role、重复 ID 和复杂子块的 EPUB 3。"""
+    """Construction covers Footnote, Endnote, ARIA role, repeating ID and EPUB 3 of complex sub-blocks."""
     container = (
         '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles>'
         '<rootfile full-path="EPUB/package.opf" media-type="application/oebps-package+xml"/>'
@@ -262,7 +262,7 @@ def build_epub_notes_fixture() -> bytes:
 
 
 def build_epub_table_toc_fixture() -> bytes:
-    """构造标题内部 fragment 与保守整行目录表格扩展的最小 EPUB。"""
+    """Construct the header internal fragment with the minimal EPUB conservatively extending the entire row of table of contents."""
     container = (
         '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles>'
         '<rootfile full-path="EPUB/package.opf" media-type="application/oebps-package+xml"/>'

@@ -1,6 +1,6 @@
-"""把宿主调度测试的旧页图替身接到第三轮裁图 worker 边界，不修改宿主代码或断言。
+"""Connect the old page image avatar of the host scheduled test to the third round of cutting worker boundary without modifying the host code or assertions.
 
-仅通过 pytest -p tools.mineru_render_test_adapter 显式启用；不参与生产解析。
+Only explicitly enabled via pytest -p tools.mineru_render_test_adapter; does not participate in production parsing.
 """
 
 import pytest
@@ -8,7 +8,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def adapt_legacy_render_mock(request, monkeypatch):
-    """只适配旧调度测试的注入点，真实渲染仍由引擎自己的回归和完整输出验证覆盖。"""
+    """Only injection points for old scheduled tests are adapted, real rendering is still covered by the engine's own regressions and full output verification."""
     if request.node.path.name != "test_flash_pdf_render_scheduling.py":
         return
     from docvortex.document.pdf import images, visuals
@@ -17,7 +17,7 @@ def adapt_legacy_render_mock(request, monkeypatch):
     current = images._load_visual_crops_from_pdf_bytes_range
 
     def load(pdf_bytes, prepared_pages, start_page_id, end_page_id, timeout, threads):
-        """调用宿主测试安装的 raster 替身，保持裁图、原块编号和图片关闭断言。"""
+        """Call the raster stand-in installed by the host test, keeping the crop, original block number, and image off assertions."""
         if images.load_images_from_pdf_bytes_range is legacy:
             return current(pdf_bytes, prepared_pages, start_page_id, end_page_id, timeout, threads)
         rendered = images.load_images_from_pdf_bytes_range(

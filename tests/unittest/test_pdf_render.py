@@ -45,7 +45,7 @@ from docvortex.schema import (
 
 
 def _middle(*pages: PageInfo) -> MiddleJson:
-    """构造无需源坐标布局的严格测试 MiddleJson。"""
+    """Construct MiddleJson, a rigorous test that does not require source coordinate layout."""
     return MiddleJson(
         pages=list(pages),
         is_full_document=True,
@@ -55,35 +55,35 @@ def _middle(*pages: PageInfo) -> MiddleJson:
 
 
 def _page(page_idx: int, *blocks: PageBlock) -> PageInfo:
-    """按调用方顺序构造一页测试内容。"""
+    """Construct a page of test content in caller order."""
     return PageInfo(page_idx=page_idx, blocks=list(blocks))
 
 
 def _png_bytes(size: tuple[int, int] = (20, 10)) -> bytes:
-    """生成可由 Pillow、ReportLab 与 pypdf 测试读取的 PNG。"""
+    """Generates a PNG that can be read by the Pillow, ReportLab and pypdf tests."""
     output = BytesIO()
     Image.new("RGB", size, (30, 80, 130)).save(output, format="PNG")
     return output.getvalue()
 
 
 def _png_uri() -> str:
-    """返回有效 PNG data URI。"""
+    """Returns valid PNG data URI."""
     return f"data:image/png;base64,{base64.b64encode(_png_bytes()).decode('ascii')}"
 
 
 def _reader(payload: bytes) -> PdfReader:
-    """从内存 bytes 打开 PDF 并先验证固定签名。"""
+    """Open PDF from memory bytes and verify the fixed signature first."""
     assert payload.startswith(b"%PDF-")
     return PdfReader(BytesIO(payload))
 
 
 def _page_text(reader: PdfReader, page_index: int) -> str:
-    """提取指定 PDF 页的可搜索文字。"""
+    """Extracts the searchable text of the specified PDF page."""
     return reader.pages[page_index].extract_text() or ""
 
 
 def test_pdf_uses_default_planner_without_source_page_boundaries() -> None:
-    """验证固定默认 PDF 合并续段、隐藏辅助块、折叠空源页且输入不变。"""
+    """Verify fixed default PDF merges continuations, hides auxiliary blocks, collapses empty source pages and input unchanged."""
     middle = _middle(
         _page(
             0,
@@ -112,7 +112,7 @@ def test_pdf_uses_default_planner_without_source_page_boundaries() -> None:
 
 
 def test_pdf_renders_inline_and_display_formulas_as_vector_paths_with_links() -> None:
-    """验证行内/行间公式矢量化、标签、中文混排及内外部链接。"""
+    """Verify in-line/inter-line formula vectorization, labels, Chinese mixing, and internal and external links."""
     middle = _middle(
         _page(
             0,
@@ -148,7 +148,7 @@ def test_pdf_renders_inline_and_display_formulas_as_vector_paths_with_links() ->
 
 
 def test_pdf_unicode_fallback_and_script_styles_avoid_black_squares() -> None:
-    """验证 Latin Extended、独立重音、希腊文和西里尔文使用确定性字体回退。"""
+    """Validation Latin Extended, independent accent, Greek and Cyrillic use deterministic font fallback."""
     middle = _middle(
         _page(
             0,
@@ -173,7 +173,7 @@ def test_pdf_unicode_fallback_and_script_styles_avoid_black_squares() -> None:
 
 
 def test_pdf_formula_failures_fall_back_to_visible_latex(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 ZiaMath 失败时行内与行间公式均保留可见 LaTeX。"""
+    """Both inline and interline formulas remain visible in LaTeX when validating ZiaMath fails."""
     original_render = FormulaRenderer.render
 
     def fail_bad_formula(
@@ -184,7 +184,7 @@ def test_pdf_formula_failures_fall_back_to_visible_latex(monkeypatch: pytest.Mon
         font_size: float,
         color: str = "#1f2937",
     ) -> object:
-        """仅让测试公式进入稳定回退，其余公式沿用真实实现。"""
+        """Only let the test formula enter the stable fallback, and the other formulas follow the real implementation."""
         if latex == "bad":
             raise PdfFormulaError("synthetic formula failure")
         return original_render(self, latex, inline=inline, font_size=font_size, color=color)
@@ -222,7 +222,7 @@ def test_pdf_formula_failures_fall_back_to_visible_latex(monkeypatch: pytest.Mon
     ],
 )
 def test_ziamath_vector_corpus_covers_inline_and_display_constructs(source: str, inline: bool) -> None:
-    """验证分数、根式、积分、矩阵、aligned 与颜色均能生成有效矢量几何。"""
+    """Verify that fractions, radicals, integrals, matrices, aligned, and colors all produce valid vector geometry."""
     vector = FormulaRenderer().render(source, inline=inline, font_size=12)
 
     assert vector.width > 0 and vector.height > 0
@@ -231,11 +231,11 @@ def test_ziamath_vector_corpus_covers_inline_and_display_constructs(source: str,
 
 
 def test_formula_cache_is_bounded_and_rejects_oversized_entries(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证超长公式在 ZiaMath 前失败，唯一项超过预算时不扩张缓存。"""
+    """Validation of overlong formula fails before ZiaMath, cache is not expanded when unique items exceed budget."""
     calls: list[str] = []
 
     def fake_render(latex: str, *, inline: bool, font_size: float, color: str) -> FormulaVector:
-        """返回固定矢量并记录实际转换次数。"""
+        """Returns a fixed vector and records the actual number of conversions."""
         calls.append(latex)
         return FormulaVector(Drawing(1, 1), width=1, height=1, ascent=1, descent=0)
 
@@ -252,7 +252,7 @@ def test_formula_cache_is_bounded_and_rejects_oversized_entries(monkeypatch: pyt
 
 
 def test_long_formulas_scale_or_wrap_without_hiding_surrounding_text() -> None:
-    """验证超宽行内与行间公式缩放后仍保留前后可搜索正文。"""
+    """Verify that super-wide inline and interline formulas retain searchable text before and after scaling."""
     formula = "+".join(f"x_{index}^2" for index in range(45))
     middle = _middle(
         _page(
@@ -278,11 +278,11 @@ def test_long_formulas_scale_or_wrap_without_hiding_surrounding_text() -> None:
 
 
 def test_pdf_uses_asset_resolver_and_replaces_missing_or_remote_images_with_placeholders() -> None:
-    """验证 sidecar 优先级、有效图片、损坏素材和远程 URL 的宽松占位策略。"""
+    """Verify sidecar priority, valid images, corrupt footage, and relaxed placeholder policy for remote URL."""
     requested: list[str] = []
 
     def resolve_asset(path: str) -> bytes:
-        """记录图片请求，并分别返回有效或损坏字节。"""
+        """Log image requests and return valid or corrupted bytes respectively."""
         requested.append(path)
         return _png_bytes() if path == "images/ok.png" else b"broken"
 
@@ -356,7 +356,7 @@ def test_pdf_uses_asset_resolver_and_replaces_missing_or_remote_images_with_plac
 
 
 def test_pdf_oversized_image_uses_placeholder_before_pixel_decode(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 PDF 超限 raster 在 load 前转为现有宽松 placeholder。"""
+    """Verify that PDF out-of-limit raster is converted to existing relaxed placeholder before load."""
     image = MagicMock()
     image.__enter__.return_value = image
     image.format = "PNG"
@@ -388,7 +388,7 @@ def test_pdf_oversized_image_uses_placeholder_before_pixel_decode(monkeypatch: p
 
 
 def test_pdf_oversized_image_bytes_are_rejected_before_pillow(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 PDF 在 Pillow 识别前拒绝超过固定字节预算的图片。"""
+    """Verify that PDF rejects images that exceed a fixed byte budget before being recognized by Pillow."""
     open_image = MagicMock(side_effect=AssertionError("oversized image must not reach Pillow"))
     monkeypatch.setattr(pdf_assets, "MAX_IMAGE_PAYLOAD_BYTES", 8)
     monkeypatch.setattr(pdf_assets.Image, "open", open_image)
@@ -400,7 +400,7 @@ def test_pdf_oversized_image_bytes_are_rejected_before_pillow(monkeypatch: pytes
 
 
 def test_pdf_table_parser_preserves_standard_inline_style_tags() -> None:
-    """验证 PDF 表格解析器把标准 HTML 标签恢复为结构化文字样式。"""
+    """Verify that the PDF table parser reverts standard HTML tags to structured text style."""
     soup = BeautifulSoup(
         "<td><strong>bold</strong><em>italic</em><u>under</u><s>strike</s><sup>sup</sup><sub>sub</sub></td>",
         "html.parser",
@@ -421,7 +421,7 @@ def test_pdf_table_parser_preserves_standard_inline_style_tags() -> None:
 
 
 def test_pdf_renders_tables_lists_indices_code_algorithm_and_annotations() -> None:
-    """验证原生表格合并、嵌套表、目录、列表、代码算法与说明的组合输出。"""
+    """Verify the combined output of native table merges, nested tables, directories, lists, code algorithms and instructions."""
     table = TableBlock.model_validate(
         {
             "type": "table",
@@ -512,7 +512,7 @@ def test_pdf_renders_tables_lists_indices_code_algorithm_and_annotations() -> No
 
 
 def test_pdf_formula_configuration_is_restored_across_parallel_renders() -> None:
-    """验证并行 PDF 公式渲染不会泄漏 ZiaMath 的进程级 svg2 配置。"""
+    """Verify that parallel PDF formula rendering does not leak the process-level svg2 configuration of ZiaMath."""
     previous_svg2 = ziamath.config.svg2
     middle = _middle(
         _page(
@@ -530,7 +530,7 @@ def test_pdf_formula_configuration_is_restored_across_parallel_renders() -> None
 
 
 def test_pdf_public_arguments_remain_strict() -> None:
-    """验证专用 PDF 门面拒绝旧 dict、已删除 mode 与错误参数类型。"""
+    """Validation-specific PDF facade rejects old dict, deleted mode with wrong parameter types."""
     middle = _middle(_page(0))
 
     with pytest.raises(TypeError, match="MiddleJson"):

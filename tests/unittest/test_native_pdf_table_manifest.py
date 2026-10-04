@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""验证仓库内 Native PDF Table 真实语料、隐私和结构发布门。"""
+"""Verification warehouse Native PDF Table Real corpus, privacy and structure release gate."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ _SENSITIVE_PROBE_HASHES = (
 
 
 def _load_evaluator_module() -> Any:
-    """按文件路径加载 Native Table evaluator，供内部调用次数单测使用。"""
+    """Load Native Table evaluator according to the file path for single measurement of internal call times."""
 
     spec = importlib.util.spec_from_file_location(
         "_native_pdf_table_manifest_evaluator",
@@ -64,7 +64,7 @@ def _load_evaluator_module() -> Any:
 
 
 def _contains_sensitive_probe_hash(text: str) -> bool:
-    """使用不可逆摘要检查已知敏感片段，避免把原文写入仓库。"""
+    """Use irreversible digests to check known sensitive fragments to avoid writing the original text to the warehouse."""
 
     for length, expected_digest in _SENSITIVE_PROBE_HASHES:
         if any(
@@ -78,13 +78,13 @@ def _contains_sensitive_probe_hash(text: str) -> bool:
 def test_native_table_skip_performance_runs_recovery_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 pytest 功能模式只恢复一次，不执行预热或计时。"""
+    """Verify that pytest functional mode is restored only once and does not perform warm-up or timing."""
 
     evaluator = _load_evaluator_module()
     recover_calls: list[object] = []
 
     def fake_recover(table_input: object) -> dict[str, int]:
-        """记录一次恢复并返回可识别结果。"""
+        """Records a recovery and returns identifiable results."""
 
         recover_calls.append(table_input)
         return {"call": len(recover_calls)}
@@ -105,14 +105,14 @@ def test_native_table_skip_performance_runs_recovery_once(
 def test_native_table_performance_mode_warms_and_times_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证显式性能模式保留一次预热和一次正式计时恢复。"""
+    """Verify that explicit performance mode retains a warm-up and a formal timing recovery."""
 
     evaluator = _load_evaluator_module()
     recover_calls: list[object] = []
     counter = iter((10.0, 12.5))
 
     def fake_recover(table_input: object) -> dict[str, int]:
-        """记录预热和正式恢复。"""
+        """Record warm-up and formal resume."""
 
         recover_calls.append(table_input)
         return {"call": len(recover_calls)}
@@ -134,13 +134,13 @@ def test_native_table_performance_mode_warms_and_times_once(
 def test_native_table_diagnostics_are_lazy(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证候选诊断仅在显式请求或结果不匹配时执行。"""
+    """Validation candidate diagnostics are only performed when explicitly requested or when the results do not match."""
 
     evaluator = _load_evaluator_module()
     diagnose_calls: list[object] = []
 
     def fake_diagnose(table_input: object) -> dict[str, bool]:
-        """记录惰性诊断调用。"""
+        """Logging lazy diagnostic calls."""
 
         diagnose_calls.append(table_input)
         return {"diagnosed": True}
@@ -170,7 +170,7 @@ def test_native_table_diagnostics_are_lazy(
 
 
 def test_repository_native_table_manifest_matches_all_fixtures() -> None:
-    """验证仓库内 133 表真值及六个 Flash 精确目标全部匹配。"""
+    """Verify that all 133 table truth values and six Flash precision targets in the warehouse match."""
 
     completed = subprocess.run(
         [
@@ -205,7 +205,7 @@ def test_repository_native_table_manifest_matches_all_fixtures() -> None:
 
 
 def test_repository_native_table_fixtures_are_sanitized() -> None:
-    """验证文件清单、页数、文档信息和污染物敏感字段均符合提交边界。"""
+    """Verify that the file list, page count, document information, and contaminant-sensitive fields comply with submission boundaries."""
 
     fixture_paths = sorted(_FIXTURE_ROOT.glob("*.pdf"))
     assert {path.name for path in fixture_paths} == set(_EXPECTED_PAGE_COUNTS)

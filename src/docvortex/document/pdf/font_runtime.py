@@ -1,4 +1,4 @@
-"""固定 CJK 字体资源与 PDFium 字体提供器；导入时不读取字体或初始化 PDFium。"""
+"""Fixed CJK font resources with PDFium font provider; fonts are not read or initialized by PDFium on import."""
 
 from __future__ import annotations
 
@@ -91,12 +91,12 @@ _logger = logging.getLogger(__name__)
 
 
 class PdfiumFontError(RuntimeError):
-    """固定字体资源或字体提供器失效，不能作为文档损坏而静默降级。"""
+    """Fixed font resource or font provider failure not being silently downgraded as document corruption."""
 
 
 @dataclass(frozen=True, slots=True)
 class PdfiumRuntimeInfo:
-    """记录当前进程采用的 PDFium 与固定字体身份，不表示每份文档都发生了替代。"""
+    """Recording the PDFium and fixed font identity adopted by the current process does not mean that every document has been replaced."""
 
     pdfium_version: str
     font_policy: str
@@ -105,12 +105,12 @@ class PdfiumRuntimeInfo:
 
 
 def _cjk_charset(face: bytes, charset: int) -> int | None:
-    """优先按字符集识别 CJK，仅用明确族名和编码标记补充未指定字符集的请求。"""
+    """Prefer CJK to be identified by character set, supplementing requests without character set only with explicit family name and encoding tags."""
     if charset in _CJK_CHARSETS:
         return charset
     if charset not in (0, 1):
         return None
-    # 明确的符号/其他语言字符集不会被字体名覆盖；不做任意汉字或子串猜测。
+    # Explicit symbols/other language character sets are not overridden by font names; no arbitrary Chinese character or substring guessing is done.
     for encoding in ("utf-8", "gb18030", "big5", "cp932", "cp949"):
         try:
             name = face.decode(encoding)
@@ -132,7 +132,7 @@ def _cjk_charset(face: bytes, charset: int) -> int | None:
 
 
 def _load_font() -> tuple[bytes, dict[int, tuple[int, int]]]:
-    """校验发行资源身份并读取 SFNT 索引；各表保留偏移，避免复制整份字库。"""
+    """Verify the identity of the issued resource and read the SFNT index; each table retains offsets to avoid duplicating the entire font."""
     try:
         root = resources.files("docvortex").joinpath("resources", "fonts")
         manifest = json.loads(root.joinpath("manifest.json").read_text(encoding="utf-8"))
@@ -157,17 +157,17 @@ def _load_font() -> tuple[bytes, dict[int, tuple[int, int]]]:
 
 @dataclass(frozen=True, slots=True)
 class _FontHandle:
-    """区分 Python 管理的固定字库句柄与默认提供器的原生句柄。"""
+    """Distinguish between the fixed font handle managed by Python and the native handle of the default provider."""
 
     kind: Literal["bundled", "system"]
     value: int
 
 
 class _FontProvider:
-    """包装原生默认提供器，强制 CJK 映射并保持 ABI 回调及字节的进程级所有权。"""
+    """Wraps the native default provider, forcing CJK mapping and maintaining process-level ownership of ABI callbacks and bytes."""
 
     def __new__(cls, raw: Any, pdfium_version: str) -> Any:
-        """标准同库 ABI 使用原生回调，测试替身与 Python 后端保留参考实现。"""
+        """The standard library ABI uses native callbacks, and the test double and Python backend retain the reference implementation."""
         bridge = _native_font_bridge(raw)
         if bridge is not None:
             native, functions, callback_type = bridge
@@ -175,7 +175,7 @@ class _FontProvider:
         return super().__new__(cls)
 
     def __init__(self, raw: Any, pdfium_version: str) -> None:
-        """先完整验证资源，再分配默认提供器及回调，避免半初始化状态。"""
+        """Completely verify resources before assigning default providers and callbacks to avoid semi-initialization states."""
         self.data, self.tables = _load_font()
         self.raw = raw
         self.pid = os.getpid()
@@ -208,10 +208,10 @@ class _FontProvider:
             raise PdfiumFontError("PDFium did not provide its default system font interface")
 
     def _bind(self, callback_type: Any, function: Callable[..., Any], failure_value: Any) -> Any:
-        """使用当前平台绑定声明的 ABI，并把异常留到原生调用返回后处理。"""
+        """Use the ABI declared by the current platform binding and leave the exception to be handled after the native call returns."""
 
         def invoke(*args: Any) -> Any:
-            """C 回调只能返回 ABI 约定的值，异常不得越过原生栈。"""
+            """The C callback can only return the value agreed by ABI, and the exception must not cross the native stack."""
             try:
                 return function(*args)
             except BaseException as exc:
@@ -222,7 +222,7 @@ class _FontProvider:
         return callback_type(invoke)
 
     def install(self) -> None:
-        """在首次字体使用前注册接口，不重建 PDFium 或修改系统字体。"""
+        """Register the interface before first font use without rebuilding PDFium or modifying system fonts."""
         try:
             self.raw.FPDF_SetSystemFontInfo(ctypes.byref(self.interface))
         except BaseException:
@@ -231,7 +231,7 @@ class _FontProvider:
         self.raise_if_failed()
 
     def raise_if_failed(self) -> None:
-        """原生调用返回后报告永久故障，避免复用可能已降级的字体缓存。"""
+        """Report a permanent failure after native calls return to avoid reusing potentially degraded font caches."""
         if self.failure is not None:
             name, error = self.failure
             if not isinstance(error, Exception):
@@ -241,13 +241,13 @@ class _FontProvider:
             raise PdfiumFontError("The PDFium font runtime has already been released")
 
     def _allocate(self, kind: Literal["bundled", "system"], value: int) -> int:
-        """分配不与系统地址混淆的 opaque ID，使用后统一交给 DeleteFont。"""
+        """Allocate opaque ID that is not confused with the system address, and hand it over to DeleteFont after use."""
         self.next_handle += 1
         self.handles[self.next_handle] = _FontHandle(kind, value)
         return self.next_handle
 
     def _release(self, _info: Any) -> None:
-        """由 PDFium 清理接口时释放默认提供器，不重新安装或销毁整个运行时。"""
+        """By PDFium Release the default provider when cleaning up the interface without reinstalling or destroying the entire runtime."""
         if self.released:
             return
         self.released = True
@@ -260,7 +260,7 @@ class _FontProvider:
                 self.default = None
 
     def _enum_fonts(self, _info: Any, mapper: Any) -> None:
-        """默认枚举负责初始化 Linux 字库；枚举中读取原始名称表，不替换其元数据。"""
+        """The default enumeration is responsible for initializing the Linux font; the original name table is read in the enumeration and its metadata is not replaced."""
         if not self.default or not self.default.contents.EnumFonts:
             return
         self.enum_depth += 1
@@ -270,7 +270,7 @@ class _FontProvider:
             self.enum_depth -= 1
 
     def _map_font(self, _info: Any, weight: int, italic: int, charset: int, pitch: int, face: Any, exact: Any) -> int | None:
-        """实际 CJK 字体请求优先命中固定字体，其他请求保持默认提供器语义。"""
+        """Actual CJK font requests hit the fixed font first, and other requests maintain default provider semantics."""
         name = ctypes.string_at(face) if face else b""
         if not self.enum_depth:
             self.request_charsets[name] = charset
@@ -288,7 +288,7 @@ class _FontProvider:
         return None
 
     def _get_font(self, _info: Any, face: Any) -> int | None:
-        """显式字体名查询采用同一替代规则，枚举期间始终读取原系统字体。"""
+        """Explicit font name queries use the same substitution rules, and the original system font is always read during enumeration."""
         name = ctypes.string_at(face) if face else b""
         selected = _cjk_charset(name, self.request_charsets.get(name, 1)) if not self.enum_depth else None
         if selected is not None or (not self.enum_depth and name == self.cache_name):
@@ -301,7 +301,7 @@ class _FontProvider:
         return None
 
     def _get_font_data(self, _info: Any, handle: int, table: int, buffer: Any, size: int) -> int:
-        """遵守查询长度/复制字节的接口约定；未知 SFNT 表返回零。"""
+        """Follows interface convention for query length/copy bytes; unknown SFNT table returns zero."""
         font = self.handles[handle]
         if font.kind == "system":
             return self.default.contents.GetFontData(self.default, font.value, table, buffer, size)
@@ -313,7 +313,7 @@ class _FontProvider:
         return length
 
     def _get_face_name(self, _info: Any, handle: int, buffer: Any, size: int) -> int:
-        """用含哈希的稳定缓存身份复用 Droid，避免命中系统中的同名不同版本字库。"""
+        """Reuse Droid with a hashed stable cache identity to avoid hitting different versions of fonts with the same name in the system."""
         font = self.handles[handle]
         if font.kind == "system":
             if self.default.contents.GetFaceName:
@@ -325,7 +325,7 @@ class _FontProvider:
         return len(value)
 
     def _get_font_charset(self, _info: Any, handle: int) -> int:
-        """返回请求对应的 CJK 字符集，系统字体则委托原查询。"""
+        """The CJK character set corresponding to the request is returned, and the system font is delegated to the original query."""
         font = self.handles[handle]
         if font.kind == "system":
             if self.default.contents.GetFontCharset:
@@ -334,7 +334,7 @@ class _FontProvider:
         return font.value
 
     def _delete_font(self, _info: Any, handle: int) -> None:
-        """仅向原提供器释放系统句柄，固定字体字节保留到进程结束。"""
+        """Only the system handle is released to the original provider, and the fixed font bytes are retained until the end of the process."""
         font = self.handles.pop(handle)
         if font.kind == "system" and self.default and self.default.contents.DeleteFont:
             self.default.contents.DeleteFont(self.default, font.value)
@@ -346,7 +346,7 @@ _NATIVE_FONT_INSTALLED = False
 
 
 def native_font_runtime_info() -> dict[str, Any]:
-    """区分扩展可用、ABI 已匹配与接口已安装，不能将扩展存在当作原生回调已启用。"""
+    """To distinguish between extensions being available, ABI matched and interfaces installed, the existence of extensions cannot be regarded as native callbacks being enabled."""
     return {
         "native_font_provider_installed": _NATIVE_FONT_INSTALLED,
         "native_font_provider_unavailable_reason": _NATIVE_FONT_UNAVAILABLE_REASON,
@@ -354,14 +354,14 @@ def native_font_runtime_info() -> dict[str, Any]:
 
 
 def _font_bridge_unavailable(reason: str) -> None:
-    """记录确切的参考路径原因，特别保留 Windows 调用约定不匹配信息。"""
+    """Document the exact reference path cause, specifically retaining the Windows calling convention mismatch message."""
     global _NATIVE_FONT_UNAVAILABLE_REASON
     _NATIVE_FONT_UNAVAILABLE_REASON = reason
     return None
 
 
 def _native_font_bridge(raw: Any) -> Any:
-    """严格验证结构布局、每个回调和三个入口的 ABI 后才传递原生地址。"""
+    """Strictly verify the structure layout, ABI of each callback and three entries before passing the native address."""
     from ..._compute_backend import get_native
 
     global _NATIVE_FONT_UNAVAILABLE_REASON
@@ -426,10 +426,10 @@ def _native_font_bridge(raw: Any) -> Any:
 
 
 class _NativeFontProvider:
-    """保留运行时公开身份；资源校验在 Python，句柄与常见回调在 Rust。"""
+    """Preserve runtime public identity; resource verification is in Python, handles and common callbacks are in Rust."""
 
     def __init__(self, raw: Any, pdfium_version: str, native: Any, functions: list[Any], callback_type: Any) -> None:
-        """在原生接口取得资源前完成哈希校验并保活低频 Unicode 规范化回调。"""
+        """Complete hash verification and keep alive the low-frequency Unicode standardized callback before obtaining resources through the native interface."""
         data, tables = _load_font()
         self.raw = raw
         self.pid = os.getpid()
@@ -453,7 +453,7 @@ class _NativeFontProvider:
             raise PdfiumFontError(f"Unable to create native PDFium font runtime: {exc}") from exc
 
     def _classify_legacy(self, face: Any, size: int, charset: int) -> int:
-        """少量非 ASCII 名称沿用精确 Python 编码语义，异常保留到退出 C 栈后处理。"""
+        """A small number of non-ASCII names follow the exact Python encoding semantics, and exceptions are retained until exiting the C stack post-processing."""
         try:
             selected = _cjk_charset(ctypes.string_at(face, size), charset)
             return -1 if selected is None else selected
@@ -463,7 +463,7 @@ class _NativeFontProvider:
             return -1
 
     def install(self) -> None:
-        """全进程保留函数与低频回调，防止宿主提前回收仍被 PDFium 引用的资源。"""
+        """The whole process retains functions and low-frequency callbacks to prevent the host from early recycling of resources that are still referenced by PDFium."""
         global _NATIVE_FONT_INSTALLED
         if self not in _NATIVE_KEEPALIVE:
             _NATIVE_KEEPALIVE.append(self)
@@ -475,7 +475,7 @@ class _NativeFontProvider:
         _NATIVE_FONT_INSTALLED = True
 
     def raise_if_failed(self) -> None:
-        """将原生与低频规范化错误统一转换为现有永久故障契约。"""
+        """Unified conversion of native and low-frequency normalized errors into existing permanent fault contracts."""
         if self.failure is not None:
             name, error = self.failure
             if not isinstance(error, Exception):
@@ -488,17 +488,17 @@ class _NativeFontProvider:
 
     @property
     def released(self) -> bool:
-        """查询原生接口是否已由 PDFium 释放。"""
+        """Query whether the native interface has been released by PDFium."""
         return self.native.stats()[0]
 
     @property
     def bundled_requests(self) -> int:
-        """返回真正发生的固定字库映射次数。"""
+        """Returns the actual number of fixed font mappings that occurred."""
         return self.native.stats()[1]
 
     @property
     def full_font_copies(self) -> int:
-        """返回完整字库复制次数，用于诊断 PDFium 缓存复用。"""
+        """Returns the number of complete font copy times, used to diagnose PDFium cache reuse."""
         return self.native.stats()[2]
 
 

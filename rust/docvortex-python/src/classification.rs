@@ -1,4 +1,4 @@
-//! 原始分类统计的独立快照，字体规范化只跨边界执行一次/字体。
+//! Independent snapshots of raw classification statistics, font normalization is only performed once across boundaries/font.
 use docvortex_core::text_classification::{self, Counts};
 use docvortex_pdfium::ReadError;
 use pyo3::{
@@ -21,7 +21,7 @@ pub struct NativeClassificationSnapshot {
 
 #[pymethods]
 impl NativeClassificationSnapshot {
-    /// 输出独立可变字典，保持原始字体出现顺序，并合并规范化后相同的字体名称。
+    /// Output an independent variable dictionary, maintain the original font appearance order, and merge the same font names after normalization.
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let output = PyDict::new(py);
         for (name, value) in [
@@ -39,7 +39,7 @@ impl NativeClassificationSnapshot {
             ("font_non_generated_cjk_char_counts", 2),
         ] {
             let values = PyDict::new(py);
-            // 各统计字典按各自首次满足条件的字符排序，不能共用字体首次出现顺序。
+            // Each statistical dictionary is sorted by the characters that meet the conditions for the first time, and the order of first appearance of fonts cannot be shared.
             let mut indices: Vec<_> = (0..self.names.len()).collect();
             indices.sort_by_key(|&index| self.counts.font_first[index][position]);
             for index in indices {
@@ -65,7 +65,7 @@ impl NativeClassificationSnapshot {
     }
 }
 
-/// 借用同库文本页读取全部原始记录后释放 PDFium 依赖，再进行纯 Rust 汇总。
+/// Use the same library text page to read all the original records, release the PDFium dependency, and then perform pure Rust summary.
 #[pyfunction]
 pub fn read_pdfium_classification(
     py: Python<'_>,
@@ -100,7 +100,7 @@ pub fn read_pdfium_classification(
     Ok(NativeClassificationSnapshot { counts, names })
 }
 
-/// 统计真实原始分类读取次数，与 canonical 字符提取计数分开报告。
+/// Count the number of real original classification reads and report them separately from the canonical character extraction count.
 #[pyfunction]
 pub fn classification_snapshot_stats() -> u64 {
     CALLS.load(Ordering::Relaxed)

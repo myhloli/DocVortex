@@ -1,4 +1,4 @@
-"""DOCX 表格图片的矢量转换与位图保真回归测试。"""
+"""DOCX Vector conversion and bitmap fidelity regression testing of table images."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from docvortex.render.contracts import RenderFormat
 
 
 def _image_bytes(image_format: str) -> bytes:
-    """生成同时可验证原始字节与透明度的微型位图。"""
+    """Generates a tiny bitmap that verifies both raw bytes and transparency."""
     image = Image.new("RGBA" if image_format == "PNG" else "RGB", (4, 3), (60, 120, 180, 80))
     output = BytesIO()
     image.save(output, format=image_format)
@@ -36,7 +36,7 @@ def _docx_with_image(
     nested: bool = False,
     next_table: bool = False,
 ) -> bytes:
-    """从合法位图图片关系构造带指定 MIME 和图片载荷的 DOCX。"""
+    """Constructs a DOCX with the specified MIME and image payload from a legal bitmap image relationship."""
     document = Document()
     table = document.add_table(rows=1, cols=2)
     table.cell(0, 1).text = "right cell"
@@ -78,14 +78,14 @@ def _docx_with_image(
 
 
 def _parse_document(data: bytes, *, fallback: bool, monkeypatch: pytest.MonkeyPatch, keep_model_json: bool = False):
-    """按真实公共入口解析，必要时强制表格进入完整上下文回退。"""
+    """Parse according to the real public entry, forcing the table to enter the full context fallback if necessary."""
     if fallback:
         monkeypatch.setattr(DocxConverter, "_preparse_tables_with_mammoth", lambda _self, _bytes: [])
     return parse(data, file_suffix="docx", keep_model_json=keep_model_json)
 
 
 def _table_content(result) -> list[str]:
-    """提取物化后的表格 HTML，用于验证图片路径与文字。"""
+    """Extract the materialized form HTML, which is used to verify the image path and text."""
     return [
         child["content"]
         for page in result.to_dict()["pages"]
@@ -109,7 +109,7 @@ def _table_content(result) -> list[str]:
 def test_table_metafile_survives_parse_and_materialization(
     monkeypatch: pytest.MonkeyPatch, content_type: str, extension: str, payload: bytes, fallback: bool
 ) -> None:
-    """四种 MIME 均经两条表格路径生成可物化 SVG，并保留单元格文字。"""
+    """All four MIMEs generate materializable SVGs via two table paths and retain cell text."""
     document = _docx_with_image(payload, content_type=content_type, extension=extension)
     result = _parse_document(document, fallback=fallback, monkeypatch=monkeypatch)
     table = BeautifulSoup(_table_content(result)[0], "html.parser")
@@ -134,7 +134,7 @@ def test_table_metafile_survives_parse_and_materialization(
 def test_table_metafile_recognized_by_mime_or_payload(
     monkeypatch: pytest.MonkeyPatch, content_type: str, extension: str, fallback: bool
 ) -> None:
-    """别名及错误 MIME 下的真实 WMF 载荷仍生成 SVG。"""
+    """The real WMF payload under alias and error MIME still generates SVG."""
     result = _parse_document(
         _docx_with_image(basic_wmf(), content_type=content_type, extension=extension),
         fallback=fallback,
@@ -147,7 +147,7 @@ def test_table_metafile_recognized_by_mime_or_payload(
 @pytest.mark.parametrize("fallback", [False, True], ids=["preparse", "fallback"])
 @pytest.mark.parametrize("image_format", ["PNG", "JPEG"])
 def test_table_raster_bytes_and_alt_are_preserved(monkeypatch: pytest.MonkeyPatch, image_format: str, fallback: bool) -> None:
-    """普通位图不重编码，透明 PNG 与替代文字原样保留。"""
+    """Ordinary bitmaps are not re-encoded, and transparent PNG and alternative text are retained as they are."""
     payload = _image_bytes(image_format)
     extension = "png" if image_format == "PNG" else "jpg"
     mime = "image/png" if image_format == "PNG" else "image/jpeg"
@@ -169,12 +169,12 @@ def test_table_raster_bytes_and_alt_are_preserved(monkeypatch: pytest.MonkeyPatc
 def test_unrenderable_table_vector_uses_placeholder_and_keeps_next_table(
     monkeypatch: pytest.MonkeyPatch, failure: str, fallback: bool
 ) -> None:
-    """损坏矢量图与渲染异常只影响该图片，后续表格仍输出。"""
+    """Corrupted vector images and rendering exceptions only affect this image, and subsequent tables are still output."""
     if failure == "render":
         from docvortex.analyzers.native.office import image as office_image
 
         def fail_render(*_args, **_kwargs):
-            """模拟 metafile-render 无法处理输入载荷。"""
+            """Simulation metafile-render cannot handle input load."""
             raise MetafileError("test render failure")
 
         monkeypatch.setattr(office_image, "render_metafile", fail_render)
@@ -193,7 +193,7 @@ def test_unrenderable_table_vector_uses_placeholder_and_keeps_next_table(
 
 @pytest.mark.parametrize("fallback", [False, True], ids=["preparse", "fallback"])
 def test_nested_table_metafile_and_export_roundtrip(monkeypatch: pytest.MonkeyPatch, tmp_path, fallback: bool) -> None:
-    """嵌套表格的矢量素材可保存结果包，并在 HTML 与 DOCX 中使用。"""
+    """Vector material of nested tables can be saved in the results package and used in HTML and DOCX."""
     result = _parse_document(
         _docx_with_image(basic_wmf(), content_type="image/x-wmf", extension="wmf", nested=True),
         fallback=fallback,

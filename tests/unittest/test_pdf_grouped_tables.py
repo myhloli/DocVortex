@@ -1,4 +1,4 @@
-"""验证正文跨列分组标题的物理证据、逐格内容和保守回退。"""
+"""Verify physical evidence of text across column grouping headings, case-by-case content, and conservative fallbacks."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ SOURCE = ROOT / "tests/unittest/pdfs/grouped_tables/emnlp2022_grouped_tables.pdf
 
 
 def _grouped_input(cols: int = 6, col_width: float = 44.0, angle: int = 0, short_title: bool = True) -> NativeTableInput:
-    """构造含长短分组标题、空首列和独立可变栏宽的少线表。"""
+    """Construct a long-line table with long and short group headers, an empty first column, and independent variable column widths."""
     width, height = cols * col_width, 144.0
     page_width, page_height = (height, width) if angle in {90, 270} else (width, height)
     entries = []
@@ -67,7 +67,7 @@ def _grouped_input(cols: int = 6, col_width: float = 44.0, angle: int = 0, short
 
 @pytest.mark.parametrize("cols,col_width,angle", [(3, 44, 0), (6, 44, 0), (6, 60, 0), (6, 44, 90), (6, 44, 180), (6, 44, 270)])
 def test_grouped_titles_preserve_spans_and_empty_stub(cols: int, col_width: float, angle: int) -> None:
-    """验证独立栏宽、平移、字体和四种方向不改变分组归属。"""
+    """Verify that independent column width, translation, font, and four directions do not change grouping ownership."""
     result = recover_native_pdf_table(_grouped_input(cols, col_width, angle))
     assert result is not None
     assert (result.rows, result.cols) == (9, cols)
@@ -83,7 +83,7 @@ def test_grouped_titles_preserve_spans_and_empty_stub(cols: int, col_width: floa
 
 @pytest.mark.parametrize("region", TRUTH["regions"], ids=lambda r: f"page-{r['page']}-{r['bbox'][0]:.0f}")
 def test_real_grouped_tables_match_source_rows(region: dict) -> None:
-    """逐行核对原件字符证据，不能以候选生成的内容充当金标。"""
+    """Verify the original character evidence line by line, and do not use candidate generated content as a gold standard."""
     assert hashlib.sha256(SOURCE.read_bytes()).hexdigest() == TRUTH["source_sha256"]
     with PDFDocument(SOURCE.read_bytes()) as document:
         page = prepare_table_page(document[region["page"] - 1])
@@ -110,7 +110,7 @@ def test_real_grouped_tables_match_source_rows(region: dict) -> None:
     "damage", ["missing_rule", "partial_rule", "crossing_data", "vertical_group", "empty_middle", "tall_formula", "body_prose"]
 )
 def test_grouped_candidate_rejects_unproven_spans(damage: str) -> None:
-    """分组边线不足、数据穿列或组内竖线时不能豁免安全门。"""
+    """The safety gate cannot be exempted when there are insufficient side lines in the group, data crossing or vertical lines in the group."""
     table = _grouped_input(short_title=False)
     rules = list(table.drawing_lines)
     if damage == "missing_rule":
@@ -120,20 +120,20 @@ def test_grouped_candidate_rejects_unproven_spans(damage: str) -> None:
     elif damage == "vertical_group":
         rules.append(NativeTableRule((50.8, 33, 51.2, 49), 0.4, "vertical"))
     elif damage == "empty_middle":
-        # 只允许首列明确为空，普通数据列缺失不能被误当成分组。
+        # Only the first column is allowed to be explicitly empty, and missing ordinary data columns cannot be mistaken for grouping.
         table = replace(
             table,
             chars=tuple(char for char in table.chars if not (69 <= char["bbox"][1] <= 72 and 107 <= char["bbox"][0] < 151)),
         )
     elif damage == "body_prose":
-        # 普通正文行横跨数据列，但没有包围该行的横线，不能借分组豁免越界。
+        # An ordinary text line spans a data column, but there is no horizontal line surrounding the line, and the grouping exemption cannot be used to cross the boundary.
         chars = tuple(char for char in table.chars if not 69 <= char["bbox"][1] <= 72)
         prose = _char_items([("This ordinary prose crosses several columns", (19, 69, 220, 77))])
         table = replace(table, chars=chars + tuple(prose))
     else:
         chars = list(table.chars)
         char = next(i for i, value in enumerate(chars) if value["char"] == "r")
-        # 变宽但保持该物理数据行的原高度，独立制造真正穿列字符。
+        # Widen but maintain the original height of the physical data row, independently creating true column-crossing characters.
         left, top, _, bottom = chars[char]["bbox"]
         chars[char] = {
             **chars[char],
@@ -148,7 +148,7 @@ def test_grouped_candidate_rejects_unproven_spans(damage: str) -> None:
 
 
 def test_grouped_recovery_does_not_depend_on_literal_text() -> None:
-    """独立改变所有字母及数值，确认规则依赖几何证据而非标题词汇。"""
+    """Change all letters and values independently, confirming that rules rely on geometric evidence rather than title words."""
     table = _grouped_input()
     translation = str.maketrans(
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
@@ -165,7 +165,7 @@ def test_grouped_recovery_does_not_depend_on_literal_text() -> None:
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_group_title_preserves_explicit_space_with_degenerate_bbox(angle: int) -> None:
-    """PDF 显式空格可以只有定位点，四个方向均须保留词界而不增加可见字符来源。"""
+    """PDF Explicit spaces can only have anchor points, and word boundaries must be preserved in all four directions without increasing the source of visible characters."""
     table = _grouped_input(angle=angle)
     chars = []
     for char in table.chars:

@@ -1,4 +1,4 @@
-//! 按当前 CPython 的求和顺序增量聚类，不重排锚点或首命中簇。
+//! Incremental clustering according to the summation order of the current CPython, without rearranging anchor points or first hit clusters.
 
 #[derive(Clone)]
 pub struct Column {
@@ -18,7 +18,7 @@ pub struct Columns {
 }
 
 impl Columns {
-    /// 首个锚点的均值保持原值；累计器模拟 Python 整数零加首个浮点值。
+    /// The mean of the first anchor point remains at the original value; the accumulator simulates Python integer zero plus the first floating point value.
     pub fn new(compensated: bool) -> Self {
         Self {
             groups: Default::default(),
@@ -28,7 +28,7 @@ impl Columns {
         }
     }
 
-    /// 单调追加行并保持每簇去重后的行覆盖量，溢出后丢弃整个原生状态。
+    /// Monotonically append rows and maintain the row coverage after deduplication of each cluster, and discard the entire native state after overflow.
     pub fn extend(&mut self, rows: &[Vec<(f64, f64)>], tolerance: f64) -> Option<(usize, f64)> {
         if !self.valid || !tolerance.is_finite() || tolerance < 0.0 {
             return None;

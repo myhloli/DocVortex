@@ -1,4 +1,4 @@
-"""纯 Python 解析 Excel 97–2003 Workbook BIFF stream。"""
+"""Pure Python Resolution Excel 97–2003 Workbook BIFF stream."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ OBJ_CHECKBOX = 0x000B
 
 @dataclass(frozen=True, slots=True)
 class _BoundSheet:
-    """BoundSheet8 目录项。"""
+    """BoundSheet8 directory entry."""
 
     name: str
     offset: int
@@ -85,7 +85,7 @@ class _BoundSheet:
 
 @dataclass(frozen=True, slots=True)
 class _CellFormat:
-    """XF 解析后的字体索引和数值格式代码。"""
+    """XF Parsed font index and numeric format code."""
 
     font_index: int
     format_code: str | None
@@ -93,7 +93,7 @@ class _CellFormat:
 
 @dataclass(slots=True)
 class _Globals:
-    """Workbook Globals Substream 中供所有工作表共享的状态。"""
+    """Workbook Globals Substream A state shared by all worksheets."""
 
     biff8: bool
     date1904: bool = False
@@ -113,14 +113,14 @@ class _Globals:
         short: bool,
         rich: bool = False,
     ) -> DecodedString | None:
-        """按当前 BIFF 版本和 codepage 读取字符串。"""
+        """Read strings by current BIFF version and codepage."""
 
         if self.biff8:
             return read_biff8_string(reader, short=short, rich=rich)
         return read_byte_string(reader, short=short, encoding=self.encoding)
 
     def cell_format(self, index: int) -> _CellFormat:
-        """解析越界 XF 时返回 General 与无字体的稳定默认值。"""
+        """Returns General with the stable default of no font when parsing out-of-bounds XF."""
 
         if 0 <= index < len(self.formats):
             return self.formats[index]
@@ -129,7 +129,7 @@ class _Globals:
 
 @dataclass(slots=True)
 class _SheetObject:
-    """一个 OBJ 记录及其后续 TXO 可见文本。"""
+    """A OBJ record and its subsequent TXO visible text."""
 
     object_type: int
     object_id: int
@@ -140,7 +140,7 @@ class _SheetObject:
 
 
 def _error_literal(code: int) -> str | None:
-    """把 BIFF error code 转成 Excel 可见错误文本。"""
+    """Convert BIFF error code to Excel visible error text."""
 
     return {
         0x00: "#NULL!",
@@ -155,7 +155,7 @@ def _error_literal(code: int) -> str | None:
 
 
 def _rk_number(value: int) -> float:
-    """解码 RK 压缩整数或截断双精度数。"""
+    """Decoding RK Packed integer or truncated double."""
 
     if value & 0x02:
         signed = struct.unpack("<i", struct.pack("<I", value))[0]
@@ -166,7 +166,7 @@ def _rk_number(value: int) -> float:
 
 
 def _read_font(payload: bytes, *, biff8: bool) -> XlsFontStyle:
-    """提取 FONT 中可映射为 DocVortex 行内标签的字符属性。"""
+    """Extract character attributes in FONT that can be mapped to DocVortex inline labels."""
 
     if len(payload) < 11:
         return XlsFontStyle()
@@ -185,7 +185,7 @@ def _read_font(payload: bytes, *, biff8: bool) -> XlsFontStyle:
 
 
 def _read_boundsheet(payload: bytes, globals_: _Globals) -> _BoundSheet | None:
-    """解析 sheet 偏移、可见性、类型和名称。"""
+    """Resolve sheet offset, visibility, type and name."""
 
     if len(payload) < 8:
         return None
@@ -205,7 +205,7 @@ def _read_boundsheet(payload: bytes, globals_: _Globals) -> _BoundSheet | None:
 
 
 def _read_sst(segments: list[bytes]) -> list[DecodedString]:
-    """读取共享字符串表，并允许损坏尾部保留已完成的 strings。"""
+    """Read shared string table and allow corruption tail to remain completed strings."""
 
     reader = SegmentReader(segments)
     total = reader.u32()
@@ -226,7 +226,7 @@ def _read_sst(segments: list[bytes]) -> list[DecodedString]:
 
 
 def _read_supbook(payload: bytes) -> bool:
-    """判断 SUPBOOK 是否表示当前工作簿内部 sheet 集合。"""
+    """Determine whether SUPBOOK represents the sheet collection inside the current workbook."""
 
     return len(payload) >= 4 and get_u16(payload, 2) == 0x0401
 
@@ -235,7 +235,7 @@ def _read_extern_sheets(
     payload: bytes,
     internal_supbooks: list[bool],
 ) -> list[int | None]:
-    """把 XTI entries 解析为内部工作表索引。"""
+    """Resolve XTI entries as an internal worktable index."""
 
     count = min(int(get_u16(payload, 0) or 0), max(0, (len(payload) - 2) // 6))
     result: list[int | None] = []
@@ -255,7 +255,7 @@ def _read_extern_sheets(
 
 
 def _read_globals(data: bytes, budget: RecordBudget) -> _Globals:
-    """解析 Workbook Globals Substream 及共享图片资源。"""
+    """Parse Workbook Globals Substream and shared image resources."""
 
     first = record_at(data, 0, budget=budget)
     if first is None or first.record_type != BOF:
@@ -340,7 +340,7 @@ def _read_globals(data: bytes, budget: RecordBudget) -> _Globals:
 
 
 def _cell_ref(payload: bytes) -> tuple[int, int, int] | None:
-    """读取 cell header，并拒绝超出 BIFF8 网格的列。"""
+    """Read cell header and reject columns beyond the BIFF8 grid."""
 
     if len(payload) < 6:
         return None
@@ -355,7 +355,7 @@ def _resolved_rich_text(
     globals_: _Globals,
     xf_index: int,
 ) -> XlsRichText:
-    """应用 text number format，并在原文未变时保留 rich runs。"""
+    """Apply text number format and retain rich runs if the original text is unchanged."""
 
     cell_format = globals_.cell_format(xf_index)
     formatted = format_text(decoded.text, cell_format.format_code)
@@ -370,7 +370,7 @@ def _put_cell(
     col: int,
     value: XlsRichText,
 ) -> None:
-    """仅保存非空文本，并覆盖同坐标较早的缓存记录。"""
+    """Only non-empty text is saved and older cached records with the same coordinates are overwritten."""
 
     if not value.text:
         return
@@ -383,7 +383,7 @@ def _append_cell_text(
     col: int,
     value: XlsRichText,
 ) -> None:
-    """把 drawing/control 文本追加到 anchor 单元格且平移 rich runs。"""
+    """Append drawing/control text to anchor cell and translate rich to runs."""
 
     if not value.text:
         return
@@ -413,7 +413,7 @@ def _read_label_string(
     *,
     rich_record: bool,
 ) -> DecodedString | None:
-    """读取 LABEL/RSTRING 的字符串并恢复 RSTRING formatting runs。"""
+    """Read the string of LABEL/RSTRING and restore RSTRING formatting runs."""
 
     if not segments or len(segments[0]) < 6:
         return None
@@ -436,11 +436,11 @@ def _read_label_string(
 
 
 def _pict_embedding_storage(payload: bytes, picture_flags: int | None) -> str | None:
-    """从 FtPictFmla 读取嵌入对象的 MBD storage 名称。"""
+    """Reads the MBD storage name of the embedded object from FtPictFmla."""
 
     if picture_flags is None:
         return None
-    # DDE、ActiveX、controls stream 与 camera picture 都不是内嵌公式 OLE 对象。
+    # DDE, ActiveX, controls stream and camera picture are not embedded formula OLE objects.
     if picture_flags & (0x0002 | 0x0010 | 0x0020 | 0x0080):
         return None
     if len(payload) < 10:
@@ -452,7 +452,7 @@ def _pict_embedding_storage(payload: bytes, picture_flags: int | None) -> str | 
     formula = payload[2:formula_end]
     if len(formula) < 7 or int(get_u16(formula, 0) or 0) & 0x7FFF != 5:
         return None
-    # ObjectParsedFormula 的四字节 unused 在部分生产器中省略，因此兼容两个合法落点。
+    # ObjectParsedFormula The four-byte unused is omitted in some producers, so it is compatible with both legal landing points.
     if not any(offset + 5 <= len(formula) and formula[offset] == 0x02 for offset in (6, 2)):
         return None
     location = get_u32(payload, formula_end)
@@ -460,7 +460,7 @@ def _pict_embedding_storage(payload: bytes, picture_flags: int | None) -> str | 
 
 
 def _read_obj(payload: bytes) -> _SheetObject | None:
-    """解析 OBJ subrecords 中的对象类型、id、状态与嵌入 storage。"""
+    """Parse object types, id, status and embedding in OBJ subrecords storage."""
 
     cursor = 0
     object_type: int | None = None
@@ -498,7 +498,7 @@ def _read_obj(payload: bytes) -> _SheetObject | None:
 
 
 def _read_hyperlink_unicode(payload: bytes, cursor: int) -> tuple[str | None, int]:
-    """读取 Hyperlink Object 中含末尾 NUL 的 UTF-16 字符串。"""
+    """Read the UTF-16 string containing NUL at the end of Hyperlink Object."""
 
     if cursor + 4 > len(payload):
         return None, len(payload)
@@ -512,7 +512,7 @@ def _read_hyperlink_unicode(payload: bytes, cursor: int) -> tuple[str | None, in
 
 
 def _read_url_moniker(payload: bytes, cursor: int) -> tuple[str | None, int]:
-    """读取 URL Moniker 的 UTF-16 URL，忽略可选尾部元数据。"""
+    """Read UTF-16 URL of URL Moniker, ignoring optional trailing metadata."""
 
     if cursor + 4 > len(payload):
         return None, len(payload)
@@ -527,7 +527,7 @@ def _read_url_moniker(payload: bytes, cursor: int) -> tuple[str | None, int]:
 
 
 def _read_file_moniker(payload: bytes, cursor: int) -> tuple[str | None, int]:
-    """尽力读取 File Moniker 的 ANSI 或 Unicode 路径。"""
+    """Best effort to read File Moniker ANSI or Unicode path."""
 
     if cursor + 6 > len(payload):
         return None, len(payload)
@@ -543,7 +543,7 @@ def _read_file_moniker(payload: bytes, cursor: int) -> tuple[str | None, int]:
 
 
 def _read_hyperlink_target(payload: bytes) -> str | None:
-    """解析 HLink 中的 Hyperlink Object 并返回经过白名单过滤的目标。"""
+    """Parses Hyperlink Object in HLink and returns whitelist filtered targets."""
 
     if len(payload) < 32:
         return None
@@ -593,7 +593,7 @@ def _apply_hlink(
     payload: bytes,
     pending: dict[tuple[int, int], str],
 ) -> None:
-    """把 HLink 范围目标暂存到所有覆盖单元格。"""
+    """Stages the HLink range target to all covered cells."""
 
     if len(payload) < 8:
         return
@@ -607,7 +607,7 @@ def _apply_hlink(
 
 
 def _shape_anchor(shape: OfficeArtShape | None) -> tuple[int, int] | None:
-    """返回 shape 左上角 cell anchor。"""
+    """Return to upper left corner of shape cell anchor."""
 
     if shape is None or shape.anchor is None:
         return None
@@ -615,7 +615,7 @@ def _shape_anchor(shape: OfficeArtShape | None) -> tuple[int, int] | None:
 
 
 def _serialize_payload(payload: OfficeImagePayload) -> str | None:
-    """使用共享 Office 图片策略序列化 BLIP。"""
+    """Serialize BLIP using the shared Office picture policy."""
 
     return serialize_office_image(
         payload.data,
@@ -637,7 +637,7 @@ def _bind_objects(
     image_equation_decoder: OfficeImageEquationDecoder,
     budget: RecordBudget,
 ) -> None:
-    """按 drawing/OBJ 顺序绑定文本框、复选框、图片与嵌入图表。"""
+    """Bind text boxes, check boxes, pictures and embedded charts in the order of drawing/OBJ."""
 
     shapes = extract_excel_shapes(drawing_data, charge=budget.charge) if drawing_data else []
     if len(shapes) != len(objects):
@@ -753,7 +753,7 @@ def _read_sheet(
     image_equation_decoder: OfficeImageEquationDecoder,
     budget: RecordBudget,
 ) -> XlsSheet | None:
-    """解析一个 worksheet substream 并绑定其 drawing/chart 对象。"""
+    """Parses a worksheet substream and binds its drawing/chart object."""
 
     first = record_at(data, offset, budget=budget)
     if first is None or first.record_type != BOF or get_u16(first.payload, 2) != WORKSHEET_SUBSTREAM:
@@ -949,7 +949,7 @@ def _read_sheet(
                 decoded = globals_.read_string(reader, short=False)
                 if decoded is not None:
                     if decoded.text.lstrip().upper().startswith(("=DISPIMG(", "=_XLFN.DISPIMG(")):
-                        # 旧版文件无法携带现代 DISPIMG 计算语义，按 Office 回存结果稳定降级。
+                        # The old version of the file cannot carry the modern DISPIMG calculation semantics, and the results stored back according to Office are stably degraded.
                         decoded = DecodedString("#NAME?")
                     row, col, xf_index = pending_formula
                     _put_cell(sheet, row, col, _resolved_rich_text(decoded, globals_, xf_index))
@@ -972,7 +972,7 @@ def _read_sheet(
         elif record.record_type == HLINK:
             _apply_hlink(sheet, record.payload, pending_links)
         elif record.record_type in {ROW, COLINFO, CONTINUE}:
-            # 用户明确要求隐藏行列中的内容仍参与表格重建。
+            # The user explicitly requests that the content in hidden rows and columns still participate in table reconstruction.
             pass
 
     for coordinate, target in pending_links.items():
@@ -994,7 +994,7 @@ def _read_sheet(
 
 
 def _worksheet_bof_offsets(data: bytes) -> list[int]:
-    """扫描所有可识别 worksheet BOF 偏移，供坏目录恢复使用。"""
+    """Scans all recognized worksheet BOF offsets for use in bad directory recovery."""
 
     return [
         record.offset
@@ -1004,7 +1004,7 @@ def _worksheet_bof_offsets(data: bytes) -> list[int]:
 
 
 def _is_worksheet_offset(data: bytes, offset: int) -> bool:
-    """判断 BoundSheet offset 是否精确指向 worksheet BOF。"""
+    """Determine whether BoundSheet offset accurately points to worksheet BOF."""
 
     record = record_at(data, offset)
     return bool(record is not None and record.record_type == BOF and get_u16(record.payload, 2) == WORKSHEET_SUBSTREAM)
@@ -1016,7 +1016,7 @@ def _parse_chart_sheets(
     *,
     budget: RecordBudget,
 ) -> list[XlsChartSheet]:
-    """解析独立 chart sheet，并把 BRAI 引用绑定到唯一 worksheet。"""
+    """Resolve the independent chart sheet and bind the BRAI reference to the unique worksheet."""
 
     worksheet_names = {
         index: descriptor.name for index, descriptor in enumerate(globals_.sheets) if descriptor.sheet_type == 0x00
@@ -1060,7 +1060,7 @@ def parse_xls_workbook(
     *,
     native_equations: dict[str, str] | None = None,
 ) -> XlsWorkbook:
-    """解析 Workbook/Book stream，并按目录顺序恢复 worksheets 与原生公式。"""
+    """Parse Workbook/Book stream and restore worksheets with native formulas in catalog order."""
 
     if not data:
         raise LegacyOfficeMalformedError("empty Workbook stream")

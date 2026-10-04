@@ -1,4 +1,4 @@
-//! 保序行框聚合与最大下边界查询，返回来源位置以共享 Python 原坐标。
+//! Order-preserving row frame aggregation and maximum lower boundary query return the source position to share the original coordinates of Python.
 
 pub struct RowGeometry {
     boxes: Vec<[f64; 4]>,
@@ -7,7 +7,7 @@ pub struct RowGeometry {
 }
 
 impl RowGeometry {
-    /// 拒绝非有限几何，平局选较早来源，避免改变负零及原坐标身份。
+    /// Non-finite geometries are rejected, and the earlier source is selected to avoid changing negative zero and original coordinate identity.
     pub fn new(boxes: Vec<[f64; 4]>) -> Option<Self> {
         if boxes.iter().flatten().any(|x| !x.is_finite()) {
             return None;
@@ -27,7 +27,7 @@ impl RowGeometry {
         Some(result)
     }
 
-    /// 合并保序区间的极值来源，严格比较使相等值始终保留左侧对象。
+    /// Merge the extreme value sources of the order-preserving interval, and strictly compare the equal values to always retain the left object.
     fn combine(&self, a: [usize; 4], b: [usize; 4]) -> [usize; 4] {
         let mut output = a;
         for k in 0..4 {
@@ -47,7 +47,7 @@ impl RowGeometry {
         output
     }
 
-    /// 使用左右独立累计器，查询树拆分不能改变原始行的比较顺序。
+    /// Using left and right independent accumulators, query tree splitting cannot change the comparison order of the original rows.
     pub fn union_indices(&self, start: usize, end: usize) -> Option<[usize; 4]> {
         if start >= end || end > self.boxes.len() {
             return None;
@@ -69,7 +69,7 @@ impl RowGeometry {
         Some(self.combine(left, right))
     }
 
-    /// 找到原顺序中首个下边界严格超过表底的行，不要求边界单调。
+    /// Find the first row in the original sequence whose lower boundary strictly exceeds the bottom of the table, and the boundary is not required to be monotonous.
     pub fn first_after(&self, bottom: f64) -> usize {
         if self.boxes.is_empty() {
             return 0;

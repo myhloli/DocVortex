@@ -1,4 +1,4 @@
-"""将分隔符文本 CSV 转换为 DocVortex 单页表格 model-list。"""
+"""Convert delimiter text CSV to DocVortex single page table model-list."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from ...schema import BlockType
 MAX_CSV_BYTES: Final = 200 * 1024 * 1024
 MAX_CSV_ROWS: Final = 1_048_576
 MAX_CSV_COLUMNS: Final = 16_384
-# CSV 会把每个槽位实体化为 HTML/DOM 节点，预算需显著低于稀疏电子表格投影上限。
+# CSV will materialize each slot into a HTML/DOM node, and the budget needs to be significantly lower than the upper limit of the sparse spreadsheet projection.
 MAX_CSV_GRID_SLOTS: Final = 250_000
 MAX_CSV_RENDERED_BYTES: Final = 256 * 1024 * 1024
 
@@ -36,13 +36,13 @@ CsvValueKind: TypeAlias = Literal["number", "boolean", "date", "text"]
 
 
 def _text_quality_score(text: str) -> int:
-    """计算候选解码文本的异常字符分数，分数越低越可信。"""
+    """Calculate the abnormal character score of the candidate decoded text, the lower the score, the more credible it is."""
     control_penalty = len(_DISALLOWED_CONTROL_RE.findall(text)) * 10
     return badness(text) + control_penalty
 
 
 def _decode_csv_bytes(file_bytes: bytes) -> str:
-    """按 BOM、UTF-8、GB18030、Windows-1252 的固定顺序严格解码 CSV。"""
+    """Strictly decode CSV in the fixed order of BOM, UTF-8, GB18030, Windows-1252."""
     if file_bytes.startswith((codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE)):
         raise ValueError("Unsupported CSV encoding: UTF-32")
     if file_bytes.startswith(codecs.BOM_UTF8):
@@ -72,7 +72,7 @@ def _decode_csv_bytes(file_bytes: bytes) -> str:
 
 
 def _extract_sep_directive(text: str) -> tuple[str, str | None]:
-    """提取 Excel 风格的 sep 指令，并从后续 CSV 数据中移除该物理行。"""
+    """Extract the sep instruction in Excel style and remove the physical row from subsequent CSV data."""
     match = _SEP_DIRECTIVE_RE.match(text)
     if match is None:
         return text, None
@@ -80,7 +80,7 @@ def _extract_sep_directive(text: str) -> tuple[str, str | None]:
 
 
 def _sample_record_widths(text: str, delimiter: str) -> list[int]:
-    """用候选分隔符读取有限个完整逻辑记录并返回每条记录的字段数。"""
+    """Read a limited number of complete logical records using candidate delimiters and return the number of fields in each record."""
     reader = csv_module.reader(
         StringIO(text, newline=""),
         delimiter=delimiter,
@@ -101,7 +101,7 @@ def _sample_record_widths(text: str, delimiter: str) -> list[int]:
 
 
 def _sniff_delimiter(text: str) -> str:
-    """按逻辑记录列宽的一致性选择分隔符，并在完全平局时优先逗号。"""
+    """Select delimiters for consistency in logical record column widths, with commas preferred in the event of a complete tie."""
     best_delimiter = ","
     best_score = (0, 0, 0)
     for preference, delimiter in enumerate(_DELIMITER_CANDIDATES):
@@ -120,7 +120,7 @@ def _sniff_delimiter(text: str) -> str:
 
 
 def _read_csv_rows(text: str, delimiter: str) -> list[list[str]]:
-    """严格读取全部 CSV 记录，同时执行行数、列数与网格规模限制。"""
+    """Strictly read all CSV records while enforcing row number, column number and grid size restrictions."""
     reader = csv_module.reader(
         StringIO(text, newline=""),
         delimiter=delimiter,
@@ -150,7 +150,7 @@ def _read_csv_rows(text: str, delimiter: str) -> list[list[str]]:
 
 
 def _classify_value(value: str) -> CsvValueKind | None:
-    """把非空字段粗分为数字、布尔、日期或文本，供表头投票使用。"""
+    """The non-empty fields are roughly divided into numbers, Boolean, dates or text for header voting."""
     normalized = value.strip()
     if not normalized:
         return None
@@ -171,7 +171,7 @@ def _classify_value(value: str) -> CsvValueKind | None:
 
 
 def _dominant_kind(values: list[str]) -> CsvValueKind | None:
-    """返回至少覆盖九成非空主体值的字段类型，没有优势类型时返回空。"""
+    """Return the field type that covers at least 90% of the non-empty subject values, and return empty when there is no advantage type."""
     kinds = [kind for value in values if (kind := _classify_value(value)) is not None]
     if not kinds:
         return None
@@ -183,12 +183,12 @@ def _dominant_kind(values: list[str]) -> CsvValueKind | None:
 
 
 def _fold_header_value(value: str) -> str:
-    """生成忽略首尾空白和大小写的表头比较值。"""
+    """Generate header comparison values that ignore leading and trailing blanks and case."""
     return value.strip().casefold()
 
 
 def _modal_row_width(rows: list[list[str]]) -> int:
-    """返回行宽众数，频次相同时选择更宽的记录。"""
+    """Return the row width mode, and select a wider record when the frequency is the same."""
     if not rows:
         return 0
     counts = Counter(len(row) for row in rows)
@@ -196,7 +196,7 @@ def _modal_row_width(rows: list[list[str]]) -> int:
 
 
 def _infer_header_row(rows: list[list[str]]) -> bool:
-    """根据首行标签形态和主体列类型保守判断 CSV 是否具有一行表头。"""
+    """Conservatively judge whether CSV has a row of headers based on the first row label form and body column type."""
     if len(rows) < 2:
         return False
     body = rows[1 : _HEADER_SAMPLE_ROWS + 1]
@@ -241,7 +241,7 @@ def _infer_header_row(rows: list[list[str]]) -> bool:
 
 
 def _normalize_row_widths(rows: list[list[str]]) -> list[list[str]]:
-    """在不改变已有字段内容的前提下，把短记录补齐到最大列宽。"""
+    """On the premise of not changing the existing field content, short records are filled to the maximum column width."""
     if not rows:
         return []
     max_columns = max(len(row) for row in rows)
@@ -249,14 +249,14 @@ def _normalize_row_widths(rows: list[list[str]]) -> list[list[str]]:
 
 
 def _render_field_html(value: str) -> str:
-    """转义一个 CSV 字段，规范换行并替换 HTML 不允许的控制字符。"""
+    """Escape a CSV field, normalize line breaks and replace control characters not allowed by HTML."""
     normalized = value.replace("\r\n", "\n").replace("\r", "\n")
     normalized = _DISALLOWED_CONTROL_RE.sub("\ufffd", normalized)
     return html.escape(normalized, quote=True).replace("\n", "<br>")
 
 
 def _rendered_field_utf8_bytes(value: str, remaining_budget: int) -> int:
-    """在不创建转义字符串的前提下计算字段渲染后的 UTF-8 字节数。"""
+    """Calculate the number of UTF-8 bytes after field rendering without creating an escape string."""
     rendered_bytes = 0
     index = 0
     while index < len(value):
@@ -294,14 +294,14 @@ def _rendered_field_utf8_bytes(value: str, remaining_budget: int) -> int:
 
 
 def _charge_rendered_bytes(used_bytes: int, additional_bytes: int) -> int:
-    """累计 CSV HTML 输出预算，并在写入 StringIO 前拒绝超限内容。"""
+    """Accumulate CSV HTML output budget, and reject over-limit content before writing to StringIO."""
     if additional_bytes < 0 or used_bytes > MAX_CSV_RENDERED_BYTES - additional_bytes:
         raise ValueError(f"CSV exceeds max_rendered_bytes={MAX_CSV_RENDERED_BYTES}")
     return used_bytes + additional_bytes
 
 
 def _rows_to_html(rows: list[list[str]], *, has_header: bool) -> str:
-    """增量构造安全表格 HTML，避免为每个单元格保留独立字符串对象。"""
+    """Incrementally construct the security table HTML to avoid retaining separate string objects for each cell."""
     output = StringIO()
     rendered_bytes = 0
     rendered_bytes = _charge_rendered_bytes(rendered_bytes, len("<table>"))
@@ -331,7 +331,7 @@ def _rows_to_html(rows: list[list[str]], *, has_header: bool) -> str:
 
 
 def convert_csv(file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-    """读取 CSV 二进制流并返回单逻辑页的表格 model-list。"""
+    """Read the CSV binary stream and return the single logical page table model-list."""
     file_bytes = file_binary.read(MAX_CSV_BYTES + 1)
     if len(file_bytes) > MAX_CSV_BYTES:
         raise ValueError(f"CSV exceeds max_bytes={MAX_CSV_BYTES}")

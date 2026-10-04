@@ -1,4 +1,4 @@
-"""锁定 cefa1208 重放并逐页审阅后的历史输出；旧几何清单的陈旧条目不整体覆盖。"""
+"""Lock cefa1208 Historical output after replay and page-by-page review; stale entries from old geometry lists are not overwritten in their entirety."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ MANIFEST = json.loads((ROOT / "tests/fixtures/flash_reviewed_history.json").read
 
 @pytest.mark.parametrize("document", MANIFEST["documents"], ids=lambda document: document["name"])
 def test_reviewed_historical_pages_keep_content_order_types_and_bounds(document: dict) -> None:
-    """覆盖 19 份 168 页的逐页类型、内容、阅读顺序和边界，公式文本使用既有检测证据辅助器。"""
+    """Covering page-by-page type, content, reading order and boundaries in 19 copies of 168 pages, Formula Text uses established detection evidence aids."""
     payload = _read_pdf_fixture(ROOT / document["path"])
     assert hashlib.sha256(payload).hexdigest() == document["sha256"]
     with PDFDocument(payload) as pdf, formula_detection_evidence():

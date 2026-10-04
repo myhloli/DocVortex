@@ -1,4 +1,4 @@
-"""OFD 资源文件索引与作用域合并。"""
+"""OFD resource file index and scope merge."""
 
 from __future__ import annotations
 
@@ -13,12 +13,12 @@ from .package import OfdPackage, element_text, first_child, local_name, namespac
 
 
 def _bool_attr(value: str | None) -> bool:
-    """把 OFD 布尔属性解析为确定值。"""
+    """Parse the OFD Boolean attribute into a definite value."""
     return (value or "").strip().casefold() in {"true", "1"}
 
 
 def _resource_asset_part(package: OfdPackage, resource_part: str, base_loc: str, location: str) -> str | None:
-    """把资源 BaseLoc 与资源内相对路径组合成包成员。"""
+    """Combine the resource BaseLoc and the relative path within the resource into a package member."""
     base_part = package.resolve_reference(resource_part, base_loc) if base_loc else posix_parent(resource_part)
     if base_part is None:
         return None
@@ -27,12 +27,12 @@ def _resource_asset_part(package: OfdPackage, resource_part: str, base_loc: str,
 
 
 def posix_parent(part_name: str) -> str:
-    """返回包成员的 POSIX 父目录。"""
+    """Returns the POSIX parent directory of the package member."""
     return part_name.rsplit("/", 1)[0] if "/" in part_name else ""
 
 
 def merge_drawing_attributes(base: dict[str, str], overlay: dict[str, str]) -> dict[str, str]:
-    """颜色子元素按整体覆盖，避免新颜色继承旧渐变或色空间标记。"""
+    """Color sub-elements are covered as a whole to prevent new colors from inheriting old gradients or color space markers."""
     result = dict(base)
     for prefix in ("FillColor.", "StrokeColor."):
         if any(key.startswith(prefix) for key in overlay):
@@ -42,7 +42,7 @@ def merge_drawing_attributes(base: dict[str, str], overlay: dict[str, str]) -> d
 
 
 def drawing_attributes(element: etree._Element) -> dict[str, str]:
-    """保留绘制属性及直接颜色子元素，使资源继承不会丢失背景与描边颜色。"""
+    """Retain drawing attributes and direct color sub-elements so that resource inheritance does not lose background and stroke colors."""
     attributes = {str(key): str(value) for key, value in element.attrib.items()}
     for child in element:
         name = local_name(child.tag)
@@ -56,7 +56,7 @@ def drawing_attributes(element: etree._Element) -> dict[str, str]:
 
 
 def parse_resource_part(package: OfdPackage, resource_part: str | None) -> ResourceRegistry:
-    """解析单个 PublicRes、DocumentRes 或 PageRes。"""
+    """Parse a single PublicRes, DocumentRes or PageRes."""
     registry = ResourceRegistry()
     if resource_part is None:
         return registry
@@ -106,7 +106,7 @@ def parse_resource_part(package: OfdPackage, resource_part: str | None) -> Resou
 
 
 def merge_registries(*registries: ResourceRegistry) -> ResourceRegistry:
-    """按 Public→Document→Page 顺序合并资源并记录重复 ID。"""
+    """Merge resources in the order of Public→Document→Page and record duplicate ID."""
     merged = ResourceRegistry()
     for registry in registries:
         for field_name in ("fonts", "media", "composites", "draw_params"):
@@ -120,7 +120,7 @@ def merge_registries(*registries: ResourceRegistry) -> ResourceRegistry:
 
 
 def resolve_draw_param(registry: ResourceRegistry, resource_id: int | None) -> dict[str, str]:
-    """迭代解析 DrawParam Relative 继承，并限制深度、检测循环。"""
+    """Iteratively parse DrawParam Relative inheritance, and limit the depth and detection loop."""
     if resource_id is None:
         return {}
     inheritance_chain: list[dict[str, str]] = []

@@ -1,4 +1,4 @@
-"""解析 Word PlfLst/PlfLfo 并维护九级列表编号状态。"""
+"""Parse Word PlfLst/PlfLfo and maintain the nine-level list numbering status."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ LEVELS = 9
 
 @dataclass(frozen=True, slots=True)
 class NumberToken:
-    """编号模板中的层级引用或普通文本。"""
+    """Hierarchical references or plain text in numbered templates."""
 
     level: int | None = None
     text: str = ""
@@ -21,7 +21,7 @@ class NumberToken:
 
 @dataclass(frozen=True, slots=True)
 class LevelDefinition:
-    """一个 Word 列表层级的编号规则。"""
+    """A Word list level numbering convention."""
 
     marker: str = "bullet"
     start: int = 1
@@ -31,7 +31,7 @@ class LevelDefinition:
 
 @dataclass(frozen=True, slots=True)
 class ListDefinition:
-    """一个 LFO 解析后的完整列表定义。"""
+    """A complete list definition after parsing LFO."""
 
     lsid: int
     levels: tuple[LevelDefinition, ...]
@@ -40,24 +40,24 @@ class ListDefinition:
 
 @dataclass(slots=True)
 class _ListCounter:
-    """同一 lsid 的多级编号运行状态。"""
+    """Multi-level number running status of the same lsid."""
 
     values: list[int] = field(default_factory=lambda: [0] * LEVELS)
     started: list[bool] = field(default_factory=lambda: [False] * LEVELS)
 
 
 class ListTables:
-    """按 ilfo 查询列表定义并生成逐段落可见编号。"""
+    """Press ilfo to query the list definition and generate paragraph-by-paragraph visible numbers."""
 
     def __init__(self, definitions: dict[int, ListDefinition] | None = None) -> None:
-        """初始化列表定义及空计数器。"""
+        """Initialization list definition and empty counter."""
 
         self._definitions = definitions or {}
         self._counters: dict[int, _ListCounter] = {}
         self._override_used: set[tuple[int, int]] = set()
 
     def paragraph_info(self, ilfo: int, level: int) -> DocListInfo | None:
-        """推进指定列表层级并返回当前段落的标签。"""
+        """Advance the specified list level and return the tag of the current paragraph."""
 
         if ilfo in {0, 0xF801}:
             return None
@@ -101,7 +101,7 @@ class ListTables:
 
 
 def _roman(value: int) -> str:
-    """把正整数格式化为常用 Roman 编号。"""
+    """Format positive integers into commonly used Roman numbers."""
 
     if value <= 0:
         return str(value)
@@ -130,7 +130,7 @@ def _roman(value: int) -> str:
 
 
 def _alpha(value: int) -> str:
-    """把正整数格式化为 Excel 风格字母序号。"""
+    """Format positive integers into Excel style alphabetical numbers."""
 
     if value <= 0:
         return str(value)
@@ -143,7 +143,7 @@ def _alpha(value: int) -> str:
 
 
 def _format_marker(marker: str, value: int) -> str:
-    """按 Word nfc 对应的 marker 类型格式化整数。"""
+    """Format the integer according to the marker type corresponding to Word nfc."""
 
     if marker == "upper_roman":
         return _roman(value)
@@ -157,7 +157,7 @@ def _format_marker(marker: str, value: int) -> str:
 
 
 def _render_label(definition: ListDefinition, counter: _ListCounter, level: int) -> str:
-    """用当前各层编号替换 LVL 模板中的占位符。"""
+    """Replace the placeholders in the LVL template with the current layer numbers."""
 
     level_def = definition.levels[level]
     if not level_def.tokens:
@@ -175,7 +175,7 @@ def _render_label(definition: ListDefinition, counter: _ListCounter, level: int)
 
 
 def _marker_for_nfc(nfc: int) -> str:
-    """把常见 MS-OSHARED 编号格式映射为内部 marker。"""
+    """Map common MS-OSHARED numbering format to internal marker."""
 
     return {
         0: "decimal",
@@ -189,7 +189,7 @@ def _marker_for_nfc(nfc: int) -> str:
 
 
 def _parse_level(data: bytes, offset: int) -> tuple[LevelDefinition, int] | None:
-    """解析一个 LVL 及其 PAPX/CHPX 后的编号文本。"""
+    """Parse a LVL and the numbered text after PAPX/CHPX."""
 
     header = bounded_slice(data, offset, 28)
     if header is None:
@@ -243,7 +243,7 @@ def _parse_list_definitions(
     size: int,
     budget: DocBudget,
 ) -> dict[int, tuple[LevelDefinition, ...]]:
-    """解析 PlfLst 的 LSTF 数组及后续 LVL。"""
+    """Parse the LSTF array of PlfLst and the subsequent LVL."""
 
     data = table_stream[offset:] if 0 <= offset < len(table_stream) else b""
     count = get_u16(data, 0)
@@ -290,7 +290,7 @@ def parse_list_tables(
     override_size: int,
     budget: DocBudget,
 ) -> ListTables:
-    """解析 PlfLst/PlfLfo 并建立一基 ilfo 查找表。"""
+    """Parse PlfLst/PlfLfo and build a base ilfo lookup table."""
 
     by_lsid = _parse_list_definitions(
         table_stream,

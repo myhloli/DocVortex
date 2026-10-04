@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到可编辑 DOCX bytes 的公共渲染实现。"""
+"""Strict MiddleJson to editable DOCX Public rendering implementation of bytes."""
 
 from __future__ import annotations
 
@@ -106,12 +106,12 @@ _ANNOTATION_FOOTNOTE_TYPES = {
 
 
 def _has_block_image_payload(block: ImagePayloadBlock) -> bool:
-    """判断统一图片载荷是否包含 sidecar、data URI 或远程 URL。"""
+    """Determine whether the unified image payload contains sidecar, data URI or remote URL."""
     return block.image_path is not None or block.image_base64 is not None or block.image_url is not None
 
 
 class _DocxRenderer:
-    """持有单次 DOCX 渲染所需的 document、素材解析器和书签状态。"""
+    """Holds the document, material parser and bookmark state required for a single DOCX render."""
 
     def __init__(
         self,
@@ -119,7 +119,7 @@ class _DocxRenderer:
         *,
         asset_resolver: AssetResolver | None,
     ) -> None:
-        """初始化 renderer，并预注册标题与默认可见页面脚注 anchor。"""
+        """Initializes renderer and pre-registers the title and default visible page footer anchor."""
         self.middle_json = middle_json
         self.asset_resolver = asset_resolver
         self.document = Document()
@@ -129,7 +129,7 @@ class _DocxRenderer:
         self.usable_width_twips = usable_width_twips(self.document)
 
     def render(self) -> bytes:
-        """执行逐页 visitor，并把 python-docx document 序列化为 bytes。"""
+        """Execute page-by-page visitor and serialize python-docx document to bytes."""
         planned_pages = build_render_plan(self.middle_json)
         for planned_blocks in planned_pages:
             for planned in planned_blocks:
@@ -144,7 +144,7 @@ class _DocxRenderer:
         return output.getvalue()
 
     def _render_planned_block(self, planned: PlannedBlock) -> None:
-        """按严格 PageBlock 具体类型分派 Word 写入逻辑。"""
+        """The Word write logic is dispatched according to the strict PageBlock concrete type."""
         block = planned.block
         context = self._context(planned.page_idx, block)
         if isinstance(block, (TextBlock, RefTextBlock)):
@@ -189,7 +189,7 @@ class _DocxRenderer:
         raise TypeError(f"Unsupported PageBlock type: {type(block).__name__}")
 
     def _context(self, page_idx: int, block: BlockBase) -> InlineRenderContext:
-        """为当前 block 构造行内渲染上下文。"""
+        """Constructs an inline rendering context for the current block."""
         return InlineRenderContext(
             bookmarks=self.bookmarks,
             page_idx=page_idx,
@@ -202,14 +202,14 @@ class _DocxRenderer:
         block: DocTitleBlock | ParagraphTitleBlock,
         context: InlineRenderContext,
     ) -> None:
-        """用 Heading 1–6 写严格标题，并在段落内容外添加 bookmark。"""
+        """Write a strict title using Heading 1–6 and add bookmark outside the paragraph content."""
         level = min(max(block.level, 1), 9)
         paragraph = self.document.add_paragraph(style=f"Heading {level}")
         append_inline_content(paragraph, block.content, context=context)
         self.bookmarks.attach(paragraph, block.anchor)
 
     def _render_equation(self, block: EquationBlock, context: InlineRenderContext) -> None:
-        """优先写可编辑 OMML，失败时按图片、可见 LaTeX 的顺序回退。"""
+        """Write the editable OMML first. If it fails, fall back in the order of pictures and visible LaTeX."""
         content = block.content.strip()
         if content:
             formula, tag = split_formula_tag(content)
@@ -242,7 +242,7 @@ class _DocxRenderer:
         *,
         context: InlineRenderContext,
     ) -> None:
-        """把块公式居中写入；带 tag 时使用中心与右对齐 tab。"""
+        """Write block formulas centered; with tag use center and right alignment tab."""
         if tag is None:
             properties = OxmlElement("m:oMathParaPr")
             justification = OxmlElement("m:jc")
@@ -283,7 +283,7 @@ class _DocxRenderer:
         *,
         depth: int,
     ) -> None:
-        """保留叶子原 marker，并仅用缩进表达递归列表层级。"""
+        """Keep the leaf original marker, and use indentation only to express recursive list levels."""
         for child in block.content:
             if isinstance(child, ListBlock):
                 self._render_list(child, context, depth=depth + 1)
@@ -304,7 +304,7 @@ class _DocxRenderer:
         *,
         depth: int,
     ) -> None:
-        """递归输出目录项，并把标题叶子链接到预注册 bookmark。"""
+        """Recursively output directory entries and link title leaves to preregistered bookmark."""
         for child in block.content:
             if isinstance(child, IndexBlock):
                 self._render_index(child, context, depth=depth + 1)
@@ -319,7 +319,7 @@ class _DocxRenderer:
             append_internal_link(paragraph, content, anchor=child.anchor, context=context)
 
     def _render_image_block(self, block: ImageBlock, context: InlineRenderContext) -> None:
-        """按原始子块顺序写图片主体、caption 与 footnote。"""
+        """Write the picture body, caption and footnote in original sub-block order."""
         for child in block.content:
             if isinstance(child, ImageBodyBlock):
                 alt_text = _plain_html_text(child.content) or block.sub_type or "image"
@@ -330,7 +330,7 @@ class _DocxRenderer:
                 raise TypeError(f"Unsupported image child: {type(child).__name__}")
 
     def _render_table_block(self, block: TableBlock, context: InlineRenderContext) -> None:
-        """按原始子块顺序写原生 HTML table 或预格式空间投影文本。"""
+        """Writes native HTML table or preformatted spatially projected text in original sub-block order."""
         for child in block.content:
             if isinstance(child, TableBodyBlock):
                 if _HTML_TABLE_RE.search(child.content):
@@ -361,7 +361,7 @@ class _DocxRenderer:
                 raise TypeError(f"Unsupported table child: {type(child).__name__}")
 
     def _render_chart_block(self, block: ChartBlock, context: InlineRenderContext) -> None:
-        """先写图表图片，再把 HTML 结构化数据追加为原生表格。"""
+        """First write the chart image, and then append the HTML structured data as a native table."""
         for child in block.content:
             if isinstance(child, ChartBodyBlock):
                 has_image = _has_block_image_payload(child)
@@ -389,7 +389,7 @@ class _DocxRenderer:
                 raise TypeError(f"Unsupported chart child: {type(child).__name__}")
 
     def _render_code_block(self, block: CodeBlock, context: InlineRenderContext) -> None:
-        """按原始子块顺序写代码或算法主体及说明。"""
+        """Write the code or algorithm body and description in original sub-block order."""
         for child in block.content:
             if isinstance(child, (CodeBodyBlock, AlgorithmBodyBlock)):
                 paragraph = self.document.add_paragraph(style=CODE_STYLE)
@@ -413,7 +413,7 @@ class _DocxRenderer:
         block: ImageAnnotationBlock | TableAnnotationBlock | ChartAnnotationBlock | CodeAnnotationBlock,
         context: InlineRenderContext,
     ) -> None:
-        """根据说明类型选择 Caption 或 Footnote 样式并写入行内内容。"""
+        """Select the Caption or Footnote style depending on the description type and write the content inline."""
         if block.type in _ANNOTATION_CAPTION_TYPES:
             style = CAPTION_STYLE
         elif block.type in _ANNOTATION_FOOTNOTE_TYPES:
@@ -430,7 +430,7 @@ class _DocxRenderer:
         context: InlineRenderContext,
         alt_text: str,
     ) -> None:
-        """安全加载 block 图片，并按 bbox/自然尺寸限制到可用页面范围。"""
+        """Safely load block images and limit to available page range by bbox/natural size."""
         if block.image_base64 is None and block.image_path is None and block.image_url:
             paragraph = self.document.add_paragraph(style=BODY_STYLE)
             append_inline_spans(
@@ -467,7 +467,7 @@ class _DocxRenderer:
         context: InlineRenderContext,
         paragraph: Paragraph | None = None,
     ) -> None:
-        """把准备好的图片按比例插入居中段落并写入 alt description。"""
+        """Insert the prepared picture proportionally into the centered paragraph and write alt description."""
         target_paragraph = paragraph or self.document.add_paragraph(style=BODY_STYLE)
         target_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         natural_width = round(prepared.width_px / 96 * 914400)
@@ -497,7 +497,7 @@ class _DocxRenderer:
 
     @staticmethod
     def _attach_native_svg(inline: etree._Element, target_part: Part, svg_data: bytes) -> None:
-        """为 fallback PNG 的 a:blip 添加 Office 2016 原生 SVG relationship。"""
+        """Added Office 2016 native SVG relationship to a:blip for fallback PNG."""
         package = target_part.package
         svg_part = Part(
             package.next_partname("/word/media/image%d.svg"),
@@ -531,7 +531,7 @@ class _DocxRenderer:
         depth: int,
         container: DocumentType | _Cell | None = None,
     ) -> None:
-        """物化 HTML 表格，并通过共享行内/素材逻辑填充 origin cell。"""
+        """Materializes the HTML table and populates origin cell via shared inline/material logic."""
         if depth >= 4:
             raise self._render_error("Nested HTML table depth exceeds 4", context)
         target_container = container or self.document
@@ -541,7 +541,7 @@ class _DocxRenderer:
         existing_relationship_ids = set(self.document.part.rels)
 
         def fill_cell(cell: _Cell, source: Tag, write_nested: NestedTableWriter) -> None:
-            """填充一个 origin cell，并在遇到 nested table 时调用递归 writer。"""
+            """Fills a origin cell and calls the recursive writer when nested table is encountered."""
             self._fill_html_cell(
                 cell,
                 source,
@@ -581,7 +581,7 @@ class _DocxRenderer:
         insertion_index: int,
         existing_relationship_ids: set[str],
     ) -> None:
-        """回滚本轮表格新增的 XML 根节点和 relationship，避免残留半成品。"""
+        """Roll back the XML root node and relationship added in this round of tables to avoid remaining semi-finished products."""
         while len(target_xml) > existing_child_count:
             target_xml.remove(target_xml[insertion_index])
         for relationship_id in tuple(self.document.part.rels):
@@ -596,7 +596,7 @@ class _DocxRenderer:
         write_nested: NestedTableWriter,
         context: InlineRenderContext,
     ) -> None:
-        """按源顺序填充单元格文本、图片和任意包装层中的嵌套表格。"""
+        """Populates cell text, images, and nested tables in any wrapper layer in source order."""
         cell.text = ""
         cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
         _set_cell_margins(cell, top=100, start=120, bottom=100, end=120)
@@ -634,7 +634,7 @@ class _DocxRenderer:
         inherited_styles: tuple[str, ...],
         max_image_width_emu: int,
     ) -> tuple[Paragraph, bool]:
-        """按 HTML 源顺序写入单元格行内文本、样式、公式和图片。"""
+        """Write in-line text, styles, formulas and pictures to cells in the order of HTML source."""
         if isinstance(node, NavigableString):
             text = str(node)
             if not text:
@@ -752,7 +752,7 @@ class _DocxRenderer:
         alt_text: str,
         max_width_emu: int,
     ) -> None:
-        """安全加载表格单元格 img，并限制到紧凑的单元格宽度。"""
+        """Safely load table cell img and limit to compact cell width."""
         try:
             remote_source = validate_remote_image_url(source)
         except ValueError:
@@ -784,7 +784,7 @@ class _DocxRenderer:
         )
 
     def _render_error(self, message: str, context: InlineRenderContext) -> DocxRenderError:
-        """用当前 context 构造带 page/block 定位的公共异常。"""
+        """Construct a public exception with page/block location using the current context."""
         return DocxRenderError(
             message,
             page_idx=context.page_idx,
@@ -798,7 +798,7 @@ def render_docx(
     *,
     asset_resolver: AssetResolver | None = None,
 ) -> bytes:
-    """把严格 MiddleJson 无副作用地渲染为完整 DOCX bytes。"""
+    """Render strict MiddleJson to full DOCX bytes without side effects."""
     if not isinstance(middle_json, MiddleJson):
         raise TypeError("render_docx expects a MiddleJson instance")
     return _DocxRenderer(
@@ -808,7 +808,7 @@ def render_docx(
 
 
 def _iter_document_anchors(middle_json: MiddleJson) -> Iterable[str]:
-    """遍历正文、标题和默认可见页面脚注实际会写入的 bookmark anchor。"""
+    """Traverse the bookmark anchor that will actually be written to the text, title, and default visible page footer."""
     for page in middle_json.pages:
         for block in page.blocks:
             if isinstance(block, (TextBlock, TitleBlockBase)) and block.anchor:
@@ -818,14 +818,14 @@ def _iter_document_anchors(middle_json: MiddleJson) -> Iterable[str]:
 
 
 def _plain_html_text(content: str) -> str:
-    """把图片或图表 body 内容收敛为适合 alt description 的纯文本。"""
+    """Converg the content of a picture or diagram body into plain text suitable for alt description."""
     if not content.strip():
         return ""
     return BeautifulSoup(content, "html.parser").get_text(" ", strip=True)
 
 
 def _html_inline_spans(node: Tag, *, inherited_styles: tuple[str, ...] = ()) -> list[InlineSpan]:
-    """把表格单元格中的安全 HTML 行内标签转换为结构化 Span。"""
+    """Convert secure HTML inline labels in table cells to structured Span."""
     spans: list[InlineSpan] = []
     for child in node.children:
         if isinstance(child, NavigableString):
@@ -875,7 +875,7 @@ def _set_cell_margins(
     bottom: int,
     end: int,
 ) -> None:
-    """用 DXA 为 Word 单元格写入四边内边距。"""
+    """Use DXA to write four-sided padding to the Word cell."""
     cell_properties = cell._tc.get_or_add_tcPr()
     margins = cell_properties.find(qn("w:tcMar"))
     if margins is None:
@@ -891,14 +891,14 @@ def _set_cell_margins(
 
 
 def _cell_content_width_emu(cell: _Cell, *, horizontal_margin_twips: int) -> int:
-    """从当前物理或合并单元格 tcW 计算扣除左右内边距后的可用宽度。"""
+    """Calculates the available width after subtracting left and right padding from the current physical or merged cell tcW."""
     cell_width = cell._tc.get_or_add_tcPr().get_or_add_tcW().w
     width_twips = int(cell_width) if cell_width is not None else 1
     return int(Twips(max(1, width_twips - horizontal_margin_twips)))
 
 
 def _paragraph_has_content(paragraph: Paragraph) -> bool:
-    """判断段落是否包含 pPr 之外的 run、公式、链接或 drawing。"""
+    """Determines whether the paragraph contains run, formulas, links, or drawing other than pPr."""
     return any(child.tag != qn("w:pPr") for child in paragraph._p)
 
 

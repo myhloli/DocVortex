@@ -54,7 +54,7 @@ def test_mtef_v5_corpus_decodes_to_exact_latex(
     mtef: bytes,
     expected: str,
 ) -> None:
-    """验证常见 MTEF v5 字符、模板、PILE 和 MATRIX 精确输出。"""
+    """Verifies accurate output of common MTEF v5 characters, templates, PILE and MATRIX."""
 
     assert name
     assert decode_mtef_v5(mtef) == expected
@@ -71,14 +71,14 @@ def test_mtef_v5_template_selectors_decode_to_exact_latex(
     mtef: bytes,
     expected: str,
 ) -> None:
-    """验证标准 fence、bar、big-op、script、vector 和 box templates。"""
+    """Validation standards fence, bar, big-op, script, vector and box templates."""
 
     assert name
     assert decode_mtef_v5(mtef) == expected
 
 
 def test_mtef_dispatch_keeps_v3_and_rejects_v4() -> None:
-    """验证通用入口只按 header 分派 v3/v5，v3 输出保持不变。"""
+    """Verify that the universal entry only dispatches v3/v5 by header, the v3 output remains unchanged."""
 
     _name, v3, expected = formula_corpus()[1]
 
@@ -88,7 +88,7 @@ def test_mtef_dispatch_keeps_v3_and_rejects_v4() -> None:
 
 
 def test_wiris_mathtype_7_quadratic_golden_decodes_exactly() -> None:
-    """验证 WIRIS 公布的真实 MathType 7 v5 字节流恢复二次公式。"""
+    """Verification of the true MathType 7 v5 byte stream recovery quadratic formula published by WIRIS."""
 
     assert decode_mtef_v5(_WIRIS_QUADRATIC_MTEF) == (
         r"\frac{-\mathit{b}\pm \sqrt{\mathit{b}^{2}-4"
@@ -97,7 +97,7 @@ def test_wiris_mathtype_7_quadratic_golden_decodes_exactly() -> None:
 
 
 def test_equation_native_and_ole_object_decode_mtef_v5() -> None:
-    """验证 EQNOLEFILEHDR 与独立 OLE 对象均按首字节解码 v5。"""
+    """Verify that both EQNOLEFILEHDR and standalone OLE objects decode v5 on a first-byte basis."""
 
     _name, mtef, expected = v5_formula_corpus()[1]
 
@@ -106,7 +106,7 @@ def test_equation_native_and_ole_object_decode_mtef_v5() -> None:
 
 
 def test_mtef_v5_known_symbol_font_position_and_style_definitions() -> None:
-    """验证无 MTCode 的 Symbol position 及显式 FONT_STYLE_DEF 粗体。"""
+    """Verify Symbol without MTCode position and explicit FONT_STYLE_DEF bold."""
 
     symbol = v5_char(
         "x",
@@ -146,7 +146,7 @@ def test_mtef_v5_common_private_mtcode_mapping(
     mtcode: int,
     expected: str,
 ) -> None:
-    """验证常见 MathType PUA 关系符和数学字母可稳定映射。"""
+    """Verify that common MathType PUA relational symbols and mathematical letters map stably."""
 
     record = b"\x02\x00\x83" + struct.pack("<H", mtcode)
 
@@ -168,13 +168,13 @@ def test_mtef_v5_extended_embellishment_mapping(
     embellishment: int,
     expected: str,
 ) -> None:
-    """验证 v5 新增的反向 prime、harpoon、strike 和下方修饰符。"""
+    """Verify v5 New reverse prime, harpoon, strike and modifiers below."""
 
     assert decode_mtef_v5(v5_equation(v5_char("x", embellishments=(embellishment,)))) == expected
 
 
 def test_mtef_v5_16bit_font_position_and_large_future_record() -> None:
-    """验证 16 位 font position 和三字节 future length 保持同步。"""
+    """Verify that the 16-bit font position and the three-byte future length are synchronized."""
 
     definitions = (
         v5_font_definition(1, "MTCode Font"),
@@ -196,7 +196,7 @@ def test_mtef_v5_16bit_font_position_and_large_future_record() -> None:
 
 
 def test_mtef_v5_color_and_size_metadata_stays_synchronized() -> None:
-    """验证 COLOR_DEF、COLOR 和 SIZE 只校验结构而不改变公式内容。"""
+    """Verification COLOR_DEF, COLOR and SIZE only verify the structure without changing the formula content."""
 
     color_definition = b"\x10\x00" + struct.pack("<HHH", 0, 0, 0)
     color_reference = b"\x0f\x01"
@@ -215,7 +215,7 @@ def test_mtef_v5_color_and_size_metadata_stays_synchronized() -> None:
 
 
 def test_mtef_v5_function_start_groups_function_style_characters() -> None:
-    """验证 FUNC_START 将连续 FUNCTION 字符恢复为 LaTeX operator。"""
+    """Verifying FUNC_START returns consecutive FUNCTION characters to LaTeX operator."""
 
     function = (
         v5_char("s", typeface=2, function_start=True) + v5_char("i", typeface=2) + v5_char("n", typeface=2) + v5_char("x")
@@ -225,7 +225,7 @@ def test_mtef_v5_function_start_groups_function_style_characters() -> None:
 
 
 def test_mtef_v5_text_style_groups_and_escapes_visible_text() -> None:
-    """验证 TEXT/TEXT_FE 连续字符使用单一 text 节点并安全转义。"""
+    """Verify that TEXT/TEXT_FE consecutive characters use a single text node and are safely escaped."""
 
     assert decode_mtef_v5(v5_equation(v5_text("rate_1 & rate_2", typeface=1))) == r"\text{rate\_1 \& rate\_2}"
 
@@ -251,13 +251,13 @@ def test_mtef_v5_text_style_groups_and_escapes_visible_text() -> None:
 def test_mtef_v5_invalid_or_unsupported_payload_fails_closed(
     payload: bytes,
 ) -> None:
-    """验证坏 header、未知语义、PUA、MTExtra 和尾随字节不生成残缺 LaTeX。"""
+    """Verify that bad header, unknown semantics, PUA, MTExtra and trailing bytes do not generate a broken LaTeX."""
 
     assert decode_mtef_v5(payload) is None
 
 
 def test_every_strict_prefix_of_mtef_v5_fails_closed() -> None:
-    """验证任意位置截断的 v5 对象都不会输出部分公式。"""
+    """Verify that a v5 object truncated anywhere does not output partial formulas."""
 
     _name, mtef, _expected = v5_formula_corpus()[1]
 
@@ -265,7 +265,7 @@ def test_every_strict_prefix_of_mtef_v5_fails_closed() -> None:
 
 
 def test_mtef_v5_invalid_equation_native_lengths_fail_closed() -> None:
-    """验证 v5 仍受 EQNOLEFILEHDR 对象边界约束。"""
+    """Verify that v5 is still bounded by the EQNOLEFILEHDR object boundaries."""
 
     _name, mtef, _expected = v5_formula_corpus()[0]
     native = bytearray(equation_native(mtef))
@@ -277,7 +277,7 @@ def test_mtef_v5_invalid_equation_native_lengths_fail_closed() -> None:
 def test_mtef_v5_record_and_depth_limits_raise_stable_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 v5 record/depth 超限抛稳定 resource-limit 错误。"""
+    """Verification v5 record/depth Over-limit throwing stability resource-limit error."""
 
     monkeypatch.setattr(mtef_v5_module, "MAX_RECORDS", 2)
     with pytest.raises(LegacyOfficeResourceLimitError, match="max_records"):
@@ -293,7 +293,7 @@ def test_mtef_v5_record_and_depth_limits_raise_stable_error(
 def test_mtef_v3_record_and_depth_limits_also_raise_stable_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证共享资源超限语义同时覆盖原有 v3 reader。"""
+    """Verify that the shared resource overrun semantics also overwrite the original v3 reader."""
 
     _name, mtef, _expected = formula_corpus()[1]
     monkeypatch.setattr(mtef_module, "MAX_RECORDS", 2)
@@ -307,7 +307,7 @@ def test_mtef_v3_record_and_depth_limits_also_raise_stable_error(
 
 
 def test_mtef_v5_equation_preferences_style_reference_is_validated() -> None:
-    """验证 EQN_PREFS style 引用不存在的 FONT_DEF 时整体回退。"""
+    """Global rollback when verifying EQN_PREFS style references non-existent FONT_DEF."""
 
     invalid_preferences = v5_equation_preferences([(1, 0)])
 

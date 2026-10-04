@@ -76,7 +76,7 @@ class XlsxConverter(SpreadsheetProjector):
             self._retry_convert_package_bytes_after_normalization(file_bytes, exc)
 
     def _reset_state(self) -> None:
-        """重置解析状态，确保失败重试时不会残留上一次半解析结果。"""
+        """Reset the parsing status to ensure that the last semi-parsed result will not remain when retrying after failure."""
         if self.zf:
             self.zf.close()
         self._reset_projection_state()
@@ -92,11 +92,11 @@ class XlsxConverter(SpreadsheetProjector):
         self._image_equation_decoder = OfficeImageEquationDecoder()
 
     def _convert_package_bytes(self, file_bytes: bytes) -> None:
-        """用独立字节流解析 XLSX 包，便于原始包失败后用规范化包重试。"""
+        """Parse the XLSX packet with a separate byte stream to facilitate retrying with the normalized packet if the original packet fails."""
         self._convert_package_stream(BytesIO(file_bytes))
 
     def _convert_package_stream(self, file_stream: BinaryIO) -> None:
-        """直接使用可复位的 XLSX 流解析正常路径，避免提前复制完整包字节。"""
+        """Directly use the resettable XLSX stream to parse the normal path, avoiding early copying of full packet bytes."""
         self._reset_state()
         try:
             self.zf = zipfile.ZipFile(file_stream)
@@ -121,7 +121,7 @@ class XlsxConverter(SpreadsheetProjector):
                 rich_text=True,
             )
             if self.workbook is not None:
-                # 遍历需要参与转换的工作表，避免为隐藏表或尾部空页生成无效页面。
+                # Traverse the worksheet that needs to participate in the conversion to avoid generating invalid pages for hidden tables or trailing empty pages.
                 sheet_pages = []
                 for idx, sheet in enumerate(self._iter_sheets_to_convert(), start=1):
                     logger.debug(f"正在处理第 {idx} 个工作表：{sheet.title}")
@@ -143,7 +143,7 @@ class XlsxConverter(SpreadsheetProjector):
         file_bytes: bytes,
         exc: Exception,
     ) -> None:
-        """首次解析失败后，仅在包规范化确实产生变化时使用规范化字节重试。"""
+        """After the first parse failure, retry using normalized bytes only if packet normalization does make a difference."""
         normalized_bytes = normalize_xlsx_package(file_bytes)
         if normalized_bytes == file_bytes:
             raise exc
@@ -151,7 +151,7 @@ class XlsxConverter(SpreadsheetProjector):
         self._convert_package_bytes(normalized_bytes)
 
     def _prepare_sheet_assets(self, sheet: Worksheet) -> None:
-        """准备 XLSX 公式、图片与 OLE 素材，并保持既有预览抑制优先级。"""
+        """Prepare XLSX formulas, pictures and OLE materials, and maintain existing preview suppression priorities."""
         self.math_map = self._map_math_formulas_to_cells(sheet)
         self._ole_artifacts = self._read_ole_equation_artifacts(sheet)
         self._suppressed_ole_previews = {
@@ -193,7 +193,7 @@ class XlsxConverter(SpreadsheetProjector):
         self,
         used_cells: set[tuple[int, int]],
     ) -> list[AnchoredBlock]:
-        """输出未被表格吸收的 XLSX 公式、OLE 预览和图片公式。"""
+        """Outputs XLSX formulas, OLE preview and picture formulas that are not absorbed by the table."""
         return [
             *self._find_equation_artifacts_in_sheet(used_cells),
             *self._find_image_equation_artifacts_in_sheet(used_cells),
@@ -203,7 +203,7 @@ class XlsxConverter(SpreadsheetProjector):
         self,
         sheet: Worksheet,
     ) -> list[XlsxOleEquationArtifact]:
-        """从当前 worksheet part 读取 MathType/Equation 公式和预览。"""
+        """Reads the MathType/Equation formula and preview from the current worksheet part."""
 
         if self.zf is None:
             return []
@@ -221,7 +221,7 @@ class XlsxConverter(SpreadsheetProjector):
         self,
         used_cells: set[tuple[int, int]],
     ) -> list[tuple[tuple[int, int], int, dict]]:
-        """输出未被表格吸收的 OMML/MTEF 公式或缓存预览。"""
+        """Output OMML/MTEF formulas or cached previews that are not absorbed by the table."""
 
         artifacts: list[tuple[tuple[int, int], int, dict]] = []
         for row, col, latex, order in self._omml_artifacts:
@@ -263,7 +263,7 @@ class XlsxConverter(SpreadsheetProjector):
         self,
         used_cells: set[tuple[int, int]],
     ) -> list[tuple[tuple[int, int], int, dict]]:
-        """按原始 drawing anchor 输出未被表格吸收的图片 comment 公式。"""
+        """Press original drawing anchor to output pictures not absorbed by the table comment formula."""
 
         artifacts: list[tuple[tuple[int, int], int, dict]] = []
         for image in self.sheet_images:
@@ -286,7 +286,7 @@ class XlsxConverter(SpreadsheetProjector):
         return artifacts
 
     def _read_xlsx_image_member(self, part_name: str) -> bytes | None:
-        """从原始 XLSX ZIP 有界读取 media member。"""
+        """Bounded read media member from original XLSX ZIP."""
 
         if self.zf is None:
             return None
@@ -306,7 +306,7 @@ class XlsxConverter(SpreadsheetProjector):
         self,
         image: XlsImage,
     ) -> tuple[bytes, str | None, str | None] | None:
-        """优先从原 ZIP 读取 openpyxl 图片的未转码原始字节。"""
+        """Prioritize reading the untranscoded raw bytes of the openpyxl image from the original ZIP."""
 
         part_name = str(getattr(image, "path", "") or "") or None
         payload = self._read_xlsx_image_member(part_name) if part_name is not None else None
@@ -322,7 +322,7 @@ class XlsxConverter(SpreadsheetProjector):
         return payload, part_name, content_type
 
     def _collect_sheet_images(self, sheet: Worksheet) -> list[SheetImage]:
-        """读取当前工作表的原始图片并识别图片公式。"""
+        """Read the original picture of the current worksheet and identify the picture formula."""
         images: list[SheetImage] = []
         if self.workbook is None:
             return images
@@ -401,7 +401,7 @@ class XlsxConverter(SpreadsheetProjector):
         return images
 
     def _map_math_formulas_to_cells(self, sheet: Worksheet) -> FormulaMap:
-        """从 worksheet drawing 恢复按 cell anchor 分组的 OMML 公式。"""
+        """Restore OMML formulas grouped by cell anchor from worksheet drawing."""
         math_map = collections.defaultdict(list)
         self._omml_shape_ids = set()
         self._omml_artifacts = []
@@ -611,7 +611,7 @@ class XlsxConverter(SpreadsheetProjector):
         return chart_artifacts
 
     def _resolve_cell_image(self, text: str) -> str:
-        """解析 WPS DISPIMG 单元格函数并返回图片或公式 HTML。"""
+        """Parses the WPS DISPIMG cell function and returns the picture or formula HTML."""
         match = re.search(r'"([^"]+)"', text)
         if match:
             image_id = match.group(1)
@@ -703,14 +703,14 @@ class XlsxConverter(SpreadsheetProjector):
 
     @staticmethod
     def _get_sheet_content_layer(sheet: Worksheet):
-        """根据工作表的可见性返回对应的内容层。
+        """Returns the corresponding content layer based on the visibility of the worksheet.
 
-        若工作表可见，返回 None（默认层）；否则返回 INVISIBLE 层。
+        If the worksheet is visible, return None (default layer); otherwise return INVISIBLE layer.
 
-        参数：
-            sheet: 待检查的工作表。
+        parameter:
+            sheet: Worksheet to be checked.
 
-        返回：
-            ContentLayer.INVISIBLE 或 None。
+        return:
+            ContentLayer.INVISIBLE or None.
         """
         return None if sheet.sheet_state == Worksheet.SHEETSTATE_VISIBLE else "INVISIBLE"

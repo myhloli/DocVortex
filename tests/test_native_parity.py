@@ -1,4 +1,4 @@
-"""对原生内核作独立差分，覆盖几何阈值、Unicode 和公开对象只读契约。"""
+"""Independent diffing of the native kernel, covering geometry thresholds, Unicode and public object read-only contracts."""
 
 import pickle
 import random
@@ -15,7 +15,7 @@ from docvortex.document.pdf.text import Bbox
 
 @pytest.fixture
 def native():
-    """纯 Python 任务允许跳过，强制 Rust 任务缺失扩展时必须失败。"""
+    """Pure Python tasks are allowed to be skipped, forcing Rust tasks must fail when missing extensions."""
     extension = get_native()
     if extension is None:
         pytest.skip("native backend is not selected")
@@ -23,7 +23,7 @@ def native():
 
 
 def test_native_registration_contract(native):
-    """约束重构前的平面扩展接口、签名和类型身份，防止拆分模块时漏注册或改名。"""
+    """Constrain the flat extension interface, signature and type identity before reconstruction to prevent missing registration or name changes when splitting modules."""
     functions = {
         "inline_style_stats": "()",
         "crop_bitmap_bgr": "(data, width, height, stride, mode, bbox, angle)",
@@ -134,7 +134,7 @@ def test_native_registration_contract(native):
 
 @pytest.mark.parametrize("seed", range(40))
 def test_script_geometry_random_parity(native, seed):
-    """随机改变字体、尺寸、基线和字符类别，覆盖组件分组及角色精炼。"""
+    """Randomly change fonts, sizes, baselines and character categories, covering component grouping and character refinement."""
     rng = random.Random(seed)
     alphabet = "Ab09０９中文 αβ²₃,-—/⁄()\n\t\ufffd"
     for _ in range(12):
@@ -168,7 +168,7 @@ def test_script_geometry_random_parity(native, seed):
 
 @pytest.mark.parametrize("name", ["caibao1", "demo1", "demo2"])
 def test_real_page_script_parity(native, name):
-    """逐页比较真实字符和 side-map，源文件和输入对象保持不变。"""
+    """Real characters and side-map are compared page by page, source file and input object remain unchanged."""
     path = Path(__file__).parents[1] / "demo/pdfs" / f"{name}.pdf"
     with PDFDocument(str(path)) as document:
         for index in range(len(document)):
@@ -184,11 +184,11 @@ def test_real_page_script_parity(native, name):
 
 
 def test_native_script_path_is_exercised(native, monkeypatch):
-    """确认普通输入真实执行扩展，不能用参考实现冒充原生通过。"""
+    """Confirm that the normal input actually executes the extension, and cannot use the reference implementation to pretend to be native."""
     chars = [{"char": "a", "char_idx": 0, "bbox": Bbox([0, 0, 5, 10])}]
 
     def reject(*args, **kwargs):
-        """阻止本测试悄悄使用参考计算。"""
+        """Prevents this test from silently using reference calculations."""
         raise AssertionError("reference path executed")
 
     monkeypatch.setattr(scripts, "_classify_char_script_roles_python", reject)
@@ -197,7 +197,7 @@ def test_native_script_path_is_exercised(native, monkeypatch):
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_visual_runs_and_typography_parity(native, monkeypatch, angle):
-    """随机字距、空白、反向框及字体权重下比较完整行对象和引用关系。"""
+    """Compare complete line objects and reference relationships under random kerning, white space, reverse box and font weight."""
     from docvortex import _compute_backend
     from docvortex.analyzers.native.pdf import native_text
     from docvortex.analyzers.native.pdf.models import _LineItem
@@ -228,7 +228,7 @@ def test_visual_runs_and_typography_parity(native, monkeypatch, angle):
 
 @pytest.mark.parametrize("seed", range(20))
 def test_dedup_layers_and_hidden_parity(native, monkeypatch, seed):
-    """对混合重复绘制、平移阴影和隐藏副本逐值比较，并检查来源引用不被改写。"""
+    """Value-by-value comparisons of blended repeat draw, pan shadow, and hidden copies, and check that source references are not overwritten."""
     from docvortex.document.pdf.text import dedup
     from test_pdf_text_dedup import _char, _indexed
 
@@ -250,7 +250,7 @@ def test_dedup_layers_and_hidden_parity(native, monkeypatch, seed):
 
 
 def test_table_coverage_batch_parity(native):
-    """区间乱序、反向端点、重复线和精确相接端点的覆盖率必须逐值一致。"""
+    """Coverage for interval shuffles, reverse endpoints, duplicate lines, and exact-connection endpoints must be consistent value-for-value."""
     from docvortex.analyzers.native.pdf._table_recovery.geometry import covered_interval_ratio
 
     rng = random.Random(93)
@@ -270,7 +270,7 @@ def test_table_coverage_batch_parity(native):
 
 @pytest.mark.parametrize("indexed", [False, True])
 def test_cell_assignment_batch_parity(native, indexed):
-    """覆盖边界平局、出界和跨格字符，保持现有索引路径的选择与歧义位。"""
+    """Covers boundary draw, out-of-bounds, and span characters, preserving the selection and ambiguity bits of existing index paths."""
     from docvortex.analyzers.native.pdf._table_recovery import candidate as c
     from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableGlyph
 
@@ -300,14 +300,14 @@ def test_cell_assignment_batch_parity(native, indexed):
 
 
 def test_invalid_parent_cycle_is_rejected(native):
-    """损坏的私有数组不能让 Rust 陷入无限循环。"""
+    """A corrupted private array cannot trap Rust in an infinite loop."""
     with pytest.raises(ValueError, match="cyclic"):
         native.component_specs([1, 0], 1, 2)
 
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_canonical_coordinate_sharing(native, angle):
-    """长期存活的 canonical 样本复用未变坐标，旋转输出仍逐值匹配 Python。"""
+    """The long-lived canonical sample reuses unchanged coordinates, and the rotated output still matches Python value-by-value."""
     from docvortex.analyzers.native.pdf import char_geometry as geometry
 
     raw = tuple(float(str(v)) for v in (1.25, 2.5, 6.75, 8.5))

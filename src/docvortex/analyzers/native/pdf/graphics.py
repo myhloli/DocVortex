@@ -1,4 +1,4 @@
-"""检测 Form、矢量图形和栅格图片并认领内部文本。"""
+"""Detect Form, vector graphics and raster images and claim internal text."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ _FIGURE_CAPTION_LINE_RE = re.compile(
 
 
 def _caption_graphic_display_heading_floor(source: _PageSource, caption_bbox: BBox, em: float) -> float:
-    """照片上方独立居中大字号标题形成屏障，连同短续行阻止正文下划线和文字向图体扩框。"""
+    """The independently centered large font title above the photo forms a barrier, and together with the short continuation lines prevents the text from being underlined and the text from expanding into the body of the picture."""
     floor = 0.0
     for image in source.image_bboxes:
         if not (
@@ -78,7 +78,7 @@ def _caption_graphic_display_heading_floor(source: _PageSource, caption_bbox: BB
             ):
                 continue
             end = heading.bbox[3]
-            # 同字体居中短尾行可以是括号日期或缩写，不凭长度把它降为图片标签。
+            # A short trailing line centered in the same font can be a bracketed date or abbreviation, without reducing it to an image label based on length.
             for tail in sorted(source.lines, key=lambda line: line.bbox[1]):
                 if (
                     tail.angle == 0
@@ -96,7 +96,7 @@ def _caption_graphic_display_heading_floor(source: _PageSource, caption_bbox: BB
 def _build_caption_graphic_blocks(
     source: _PageSource, *, caption_line_indices: set[int], table_bboxes: list[BBox], code_bboxes: list[BBox]
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """用独立图题、正文屏障和实际绘图证据恢复整图，允许标签全部是矢量字形。"""
+    """Recover the entire figure with independent figure titles, text barriers, and actual drawing evidence, allowing labels to be all vector glyphs."""
     width, height = source.page_size
     heights = [_line_effective_height(line, line.bbox) for line in source.lines if line.angle == 0]
     em = statistics.median(heights) if heights else 10.0
@@ -108,7 +108,7 @@ def _build_caption_graphic_blocks(
         and line.source_index in caption_line_indices
         and not any(_owned_form_member_bbox(source, line, form) is not None for form in source.retained_page_forms)
     ]
-    # 即使图题候选被邻栏正文屏障拒绝，照片旁已确认的连续段仍要跨局部栏宽保持同一成员组。
+    # Even if the figure title candidate is rejected by the adjacent column text barrier, the confirmed contiguous segments next to the photo must still maintain the same member group across the local column width.
     raster_prose = (
         _raster_outside_prose_sources(
             source,
@@ -154,7 +154,7 @@ def _build_caption_graphic_blocks(
             claimed.update(line.source_index for line in side_members)
             continue
         cb = caption.bbox
-        # 图题中的数学上下标会拆开同一物理行，使用整行投影决定是否跨栏。
+        # The mathematical superscripts and subscripts in the figure title will split the same physical row and use the projection of the entire row to determine whether to cross the hurdle.
         companions = [
             line.bbox
             for line in source.lines
@@ -170,7 +170,7 @@ def _build_caption_graphic_blocks(
         if corridor is None:
             continue
         left, right = corridor
-        # 同排独立编号图题建立横向边界，不能因上方没有正文栏带而把两张图分别扩成同一大框。
+        # Independently numbered figure titles in the same row establish a horizontal boundary. The two figures cannot be expanded into the same large frame because there is no text column above.
         peers = [
             line for line in captions if line is not caption and abs(_bbox_center_y(line.bbox) - _bbox_center_y(cb)) <= 1.5 * em
         ]
@@ -223,7 +223,7 @@ def _build_caption_graphic_blocks(
         bottom = max(bbox[3] for bbox in candidates)
         if cb[1] - bottom > 8 * em:
             continue
-        # 同一图题上方直到正文、表格或前一图题的空白带属于同一绘图区域。
+        # The blank area above the same figure title up to the text, table, or previous figure title belongs to the same drawing area.
         selected = candidates
         bbox = _bbox_union_many(selected)
         raster_cores = [
@@ -289,7 +289,7 @@ def _build_caption_graphic_blocks(
 
 
 def _framed_side_caption_members(source: _PageSource, caption: _LineItem) -> list[_LineItem]:
-    """邻图旁的裸编号及同式多行说明有完整细线框时属于装饰图注卡，不能当作新图。"""
+    """Bare numbers next to adjacent pictures and multi-line descriptions of the same style with complete thin-line frames are considered decorative drawing annotation cards and cannot be regarded as new pictures."""
     if not re.fullmatch(r"\s*(?:figure|fig\.)\s*\d+\s*", caption.text, re.I) or caption.font_signature is None:
         return []
     em = _line_effective_height(caption, caption.bbox)
@@ -357,7 +357,7 @@ def _framed_side_caption_members(source: _PageSource, caption: _LineItem) -> lis
 
 
 def _graphic_members_are_numeric_grid(members: list[_LineItem]) -> bool:
-    """四排以上重复三列数字证明是原生数据网格，防止图题把电子表格误作折线图父对象。"""
+    """Repeating three columns of numbers in more than four rows proves that it is a native data grid, preventing the chart title from mistaking the spreadsheet as the parent object of the line chart."""
     numeric = [line for line in members if re.fullmatch(r"\s*[-+]?\d+(?:[,.]\d+)*%?\s*", line.text)]
     if len(numeric) < 12:
         return False
@@ -377,7 +377,7 @@ def _graphic_members_are_numeric_grid(members: list[_LineItem]) -> bool:
 
 
 def _raster_outside_prose_sources(source, raster_bboxes, caption_indices, em):
-    """图片外同栏连续自然语言正文保持独立；短收句和同排强调碎片也不能被图题扩框认领。"""
+    """The continuous natural language text in the same column outside the picture remains independent; short closing sentences and emphasis fragments in the same row cannot be recognized by the picture title expansion frame."""
     free = [
         line
         for line in source.lines
@@ -418,7 +418,7 @@ def _raster_outside_prose_sources(source, raster_bboxes, caption_indices, em):
             if not followers:
                 break
             row = min(followers, key=lambda members: min(line.bbox[1] for line in members))
-            # 明确短收句后恢复常规宽度属于新段，不能用照片旁连续排版抹掉原生段界。
+            # It is clear that returning to the normal width after a short closing sentence belongs to a new paragraph, and the original paragraph boundaries cannot be erased by continuous typesetting next to the photo.
             following_box = _bbox_union_many([line.bbox for line in row])
             if (
                 len(run) >= 2
@@ -455,7 +455,7 @@ def _raster_outside_prose_sources(source, raster_bboxes, caption_indices, em):
 
 
 def _form_supersedes_nested_bbox(form_bbox: BBox, nested_bbox: BBox) -> bool:
-    """判断 Form 是否应整体吞并其内部面积明显更小的候选容器。"""
+    """Determine whether Form should engulf a candidate container whose interior area is significantly smaller."""
 
     form_area = _bbox_area(form_bbox)
     nested_area = _bbox_area(nested_bbox)
@@ -463,7 +463,7 @@ def _form_supersedes_nested_bbox(form_bbox: BBox, nested_bbox: BBox) -> bool:
 
 
 def _form_member_bbox(line: _LineItem, form_bbox: BBox) -> BBox | None:
-    """优先保持既有行框，仅在 Form 边缘用完整的可见字形证据补回成员。"""
+    """Prioritize keeping existing line boxes, and only fill in members with complete visible glyph evidence at the edges of Form."""
 
     if _bbox_overlap_in_first(line.bbox, form_bbox) >= 0.9:
         return line.bbox
@@ -478,7 +478,7 @@ def _form_member_bbox(line: _LineItem, form_bbox: BBox) -> BBox | None:
 
 
 def _owned_form_member_bbox(source: _PageSource, line: _LineItem, form_bbox: BBox) -> BBox | None:
-    """有效结构同时要求字符来源属于该 Form；旧快照和未知结构保持原有空间判断。"""
+    """The valid structure also requires that the character source belongs to the Form; old snapshots and unknown structures maintain the original space judgment."""
     members = source.form_member_sources.get(form_bbox)
     if members is not None:
         from .form_roles import form_owns_line
@@ -489,7 +489,7 @@ def _owned_form_member_bbox(source: _PageSource, line: _LineItem, form_bbox: BBo
 
 
 def _form_region_allows_line(source: _PageSource, line: _LineItem, region: BBox) -> bool:
-    """图题合并和后续补认领也检查 Form 归属，图外图题仍可按正常空间证据处理。"""
+    """The ownership of Form is also checked for the merging of map titles and subsequent claims, and the map titles outside the map can still be processed as normal space evidence."""
     containing = [
         bbox
         for bbox in source.form_member_sources
@@ -502,7 +502,7 @@ def _tighten_form_image_bbox(
     source: _PageSource,
     form_bbox: BBox,
 ) -> BBox:
-    """用充分的 Form 内部矢量与文本证据收紧空白容器，证据不足时保留原框。"""
+    """Tighten the empty container with sufficient Form internal vector and text evidence, and retain the original frame when the evidence is insufficient."""
 
     internal_paths = [
         path_info.bbox
@@ -516,7 +516,7 @@ def _tighten_form_image_bbox(
         for drawing_line in source.drawing_lines
         if _bbox_overlap_in_first(drawing_line.bbox, form_bbox) >= 0.9
     ]
-    # 至少两个嵌套 Path 和四个矢量元素，避免只凭普通边框或少量文本裁剪 Form。
+    # At least two nested Path and four vector elements to avoid clipping the Form with just plain borders or small amounts of text.
     if len(internal_paths) < 2 or len(internal_paths) + len(internal_drawing_lines) < 4:
         return form_bbox
     internal_text = [bbox for line in source.lines if (bbox := _owned_form_member_bbox(source, line, form_bbox)) is not None]
@@ -553,7 +553,7 @@ def _tighten_form_image_bbox(
 
 
 def _select_form_image_bboxes(source: _PageSource) -> list[BBox]:
-    """按页面占比、行高和内部视觉证据筛选矢量 Form 图片候选。"""
+    """Filter vector Form image candidates by page size, line height, and internal visual evidence."""
 
     page_area = max(0.0, source.page_size[0]) * max(0.0, source.page_size[1])
     if page_area <= 0 or not source.form_bboxes:
@@ -568,7 +568,7 @@ def _select_form_image_bboxes(source: _PageSource) -> list[BBox]:
         width = bbox[2] - bbox[0]
         height = bbox[3] - bbox[1]
         area_ratio = _bbox_area(bbox) / page_area
-        # 实际调用树已确认这是保留的 Form；满页真实图形不能被旧面积上限排除。
+        # The actual call tree has confirmed that this is reserved Form; full page real graphics cannot be excluded by the old area cap.
         retained_form = any(form.bbox == raw_bbox for form in source.form_infos)
         if not (
             _MIN_FORM_IMAGE_PAGE_AREA_RATIO <= area_ratio
@@ -602,7 +602,7 @@ def _build_form_image_blocks(
     form_bboxes: list[BBox],
     claimed_line_indices: set[int],
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """把 Form 及其完整内含文本输出为 image，并保持 source_index 唯一认领。"""
+    """Export Form and its complete contained text as image, keeping source_index uniquely claimed."""
 
     if not form_bboxes:
         return [], set()
@@ -644,7 +644,7 @@ def _build_graphic_like_blocks(
     claimed_line_indices: set[int],
     strong_core_bboxes: list[BBox] | None = None,
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """在表格认领后把紧凑绘图组件及其短标签聚成内部图形文本块。"""
+    """Group compact drawing components and their short labels into inner graphic text blocks after table claiming."""
 
     from .isolated_graphics import isolated_vector_components
 
@@ -677,7 +677,7 @@ def _build_graphic_like_blocks(
         for line in lines
     ]
     median_height = statistics.median(effective_heights)
-    # 已有复杂填充容器可容许外框角落擦过长正文行，但不认领该正文或近旁标签。
+    # There are already complex padding containers that allow the corners of the outer frame to graze long text lines, but do not claim the text or adjacent labels.
     isolated.extend(
         box
         for box in _detect_complex_path_containers(source.path_infos, source.page_size, median_height)
@@ -693,8 +693,8 @@ def _build_graphic_like_blocks(
         table_bboxes,
         component_summaries=_drawing_component_summaries(source, max(2.0, 0.75 * median_height)),
     )
-    # 复杂 Path 或成对坐标轴形成的强图形核心优先于普通绘图线组件，
-    # 避免同一图表被拆成多个相互重叠的 image。
+    # Complex Path or strong graphics cores formed by pairs of coordinate axes take precedence over ordinary plot line components,
+    # Avoid the same chart being split into multiple overlapping images.
     raster_axis_cores = _detect_native_raster_axis_graphics(source)
     candidates = [
         candidate
@@ -772,7 +772,7 @@ def _build_graphic_like_blocks(
                 )
                 for line in row_lines
             ]
-            # 同一 pdftext 视觉行必须整体归属或整体保留，避免只吞掉 caption 的短碎片。
+            # The same pdftext visual line must be owned or retained as a whole to avoid swallowing up only short fragments of caption.
             if not all(member_flags):
                 continue
             inside_count = sum(
@@ -823,7 +823,7 @@ def _parallel_graphic_rule_pairs(
     page_size: tuple[float, float],
     median_height: float,
 ) -> list[tuple[BBox, BBox]]:
-    """筛选分别贴近两个并排图形上沿的同高长横线。"""
+    """Filter out long horizontal lines of the same height that are close to the upper edges of two side-by-side graphics."""
 
     minimum_rule_width = max(8.0 * median_height, 0.18 * page_size[0])
     long_rules = [
@@ -897,7 +897,7 @@ def _parallel_graphic_row_split_boundary(
     page_size: tuple[float, float],
     median_height: float,
 ) -> float | None:
-    """用横线栏沟和字符投影确认并排图形上方文本的安全切分点。"""
+    """Use horizontal lines and character projections to confirm safe separation points for text above side-by-side graphics."""
 
     if not members or any(member.angle != 0 for member in members) or len({member.semantic_type for member in members}) != 1:
         return None
@@ -950,7 +950,7 @@ def _split_parallel_graphic_rule_rows(
     *,
     source_index_start: int | None = None,
 ) -> list[_LineItem]:
-    """按成对图形、独立顶边横线和栏沟字符投影拆分并排图形上方文本。"""
+    """Split text above side-by-side shapes by paired shapes, independent top lines, and channel character projection."""
 
     horizontal_lines = [line for line in lines if line.angle == 0 and line.effective_height > 0]
     if len(horizontal_lines) < 1 or len(image_bboxes) < 2:
@@ -1086,7 +1086,7 @@ def _graphic_caption_line_indices_to_preserve(
     candidates: list[_GraphicCandidate],
     median_height: float,
 ) -> set[int]:
-    """保护图形上下沿的图注及其同字体续行，避免图题末行被图片容器认领。"""
+    """Protect the captions on the upper and lower edges of the figure and their continuation lines in the same font to prevent the last line of the figure title from being claimed by the image container."""
 
     protected: set[int] = set()
     ordered_lines = sorted(
@@ -1096,7 +1096,7 @@ def _graphic_caption_line_indices_to_preserve(
     for seed_index, seed in enumerate(ordered_lines):
         if not _FIGURE_CAPTION_LINE_RE.match(seed.text):
             continue
-        # 多行图题应以最后一行计算到图体的距离；首行较远不能让末行落入引线标签区。
+        # For multi-line figures, the distance from the last line to the figure body should be calculated; the first line is too far away to allow the last line to fall into the leader label area.
         wrapped = [seed]
         if seed.font_signature is not None:
             for tail in ordered_lines[seed_index + 1 :]:
@@ -1159,7 +1159,7 @@ def _graphic_caption_line_indices_to_preserve(
                 break
             if _bbox_center_y(candidate_line.bbox) <= _bbox_center_y(previous.bbox):
                 continue
-            # 上方图题续行允许缩进，但必须留在种子行横向范围内，并排除紧邻的轴值和新标签。
+            # Indentation is allowed in the title continuation line above, but must stay within the horizontal scope of the seed line and exclude immediately adjacent axis values and new labels.
             above = any(seed.bbox[3] <= candidate.core_bbox[1] + 0.25 * median_height for candidate in matching_candidates)
             inset_tail = (
                 above
@@ -1191,7 +1191,7 @@ def _graphic_body_tail_line_indices_to_preserve(
     lanes: list[_TextLane],
     median_height: float,
 ) -> set[int]:
-    """保护贴近图形上沿但延续上方满栏正文排版的短尾行。"""
+    """Protect the short tail line that is close to the top edge of the graphic but continues the full column text layout above."""
 
     protected: set[int] = set()
     horizontal_lines = [line for line in lines if line.angle == 0]
@@ -1262,7 +1262,7 @@ def _graphic_body_tail_line_indices_to_preserve(
 
 
 def _detect_strong_graphic_bboxes(source: _PageSource) -> list[BBox]:
-    """仅按复杂 Path、容器尺度与成对坐标轴识别高置信图形核心。"""
+    """Identifies high-confidence graphic cores only by complex Path, container scale, and paired axes."""
 
     from .isolated_graphics import isolated_vector_components
 
@@ -1298,7 +1298,7 @@ def _detect_strong_graphic_bboxes(source: _PageSource) -> list[BBox]:
     for bbox in sorted(candidates, key=_bbox_area, reverse=True):
         if any(_bbox_overlap_in_first(bbox, accepted) >= 0.9 for accepted in output):
             continue
-        # 坐标轴候选与多系列柱核心可能只部分包含彼此；重叠的同一图体只输出一份。
+        # Axis candidates and multi-series column cores may only partially contain each other; only one copy of the same plot overlapping is output.
         overlapping = [accepted for accepted in output if _bbox_overlap_in_smaller(bbox, accepted) >= 0.75]
         if overlapping:
             output = [accepted for accepted in output if accepted not in overlapping]
@@ -1308,7 +1308,7 @@ def _detect_strong_graphic_bboxes(source: _PageSource) -> list[BBox]:
 
 
 def _detect_native_raster_axis_graphics(source: _PageSource) -> list[BBox]:
-    """等差数值刻度与贴邻栅格图共同证明坐标图；完整聚合标签和小图例，独立大标题及远距脚注不扩框。"""
+    """Arithmetic numerical scales and adjacent raster plots jointly prove coordinate plots; complete aggregation of labels and small legends, independent large titles and remote footnotes without expanding the frame."""
     numeric = [
         line
         for line in source.lines
@@ -1373,7 +1373,7 @@ def _detect_native_raster_axis_graphics(source: _PageSource) -> list[BBox]:
             if not matches:
                 continue
             image = max(matches, key=_bbox_area)
-            # 纵轴图下方可有两层类别和场景标签；横轴图的左侧类别与右侧图例都受刻度字号约束。
+            # There can be two layers of categories and scene labels below the vertical axis chart; the categories on the left and the legend on the right of the horizontal axis chart are both constrained by the scale font size.
             window = (
                 (axis[0] - 0.4 * em if vertical else image[0] - 10 * em),
                 image[1] - 1.5 * em,
@@ -1404,7 +1404,7 @@ def _detect_native_raster_axis_graphics(source: _PageSource) -> list[BBox]:
 
 
 def group_native_raster_chart_descriptions(source: _PageSource) -> None:
-    """刻度证明的图上方同式说明续行成组；短尾行须紧贴同栏长行，独立标题、列表和图注不参与。"""
+    """The continuation lines of the same description above the scale proof figures are grouped; the short tail lines must be close to the long lines in the same column, and independent titles, lists, and legends are not included."""
     cores = _detect_native_raster_axis_graphics(source)
     next_group = max((line.paragraph_group for line in source.lines if line.paragraph_group is not None), default=0) + 1
     for core in cores:
@@ -1442,7 +1442,7 @@ def group_native_raster_chart_descriptions(source: _PageSource) -> None:
 
 
 def _detect_captioned_concentric_path_graphics(source: _PageSource, em: float) -> list[BBox]:
-    """同心二维轮廓、百分比标签及邻近编号图题共同确认环图，连接引线也属于完整图体。"""
+    """Concentric two-dimensional outlines, percentage labels, and adjacent numbered figures collectively identify the ring figure, and the connecting leads also belong to the complete figure body."""
     captions = [line for line in source.lines if line.angle == 0 and _FIGURE_CAPTION_LINE_RE.match(line.text)]
     if not captions:
         return []
@@ -1498,7 +1498,7 @@ def _detect_captioned_concentric_path_graphics(source: _PageSource, em: float) -
 
 
 def _bar_zero_axis_bboxes(source: _PageSource, bounds: BBox, horizontal: bool, baseline: float, em: float) -> list[BBox]:
-    """柱组已确认后补入共同零轴两端，拒绝浮动装饰线和明显超出图宽的跨栏横线。"""
+    """After the column group has been confirmed, fill in both ends of the common zero axis, and reject floating decorative lines and hurdle horizontal lines that obviously exceed the width of the picture."""
     result = []
     for line in source.drawing_lines:
         box = line.bbox
@@ -1513,7 +1513,7 @@ def _bar_zero_axis_bboxes(source: _PageSource, bounds: BBox, horizontal: bool, b
             and 0.8 * length <= end - start <= 2 * length
             and max(0, min(end, high) - max(start, low)) >= 0.8 * length
         ):
-            # 路径端点沿主轴再包含半个线宽，避免裁去可见线帽。
+            # The path endpoints include an additional half line width along the main axis to avoid clipping visible line caps.
             padding = max(0.0, line.width) / 2
             result.append(
                 (box[0], box[1] - padding, box[2], box[3] + padding)
@@ -1524,10 +1524,10 @@ def _bar_zero_axis_bboxes(source: _PageSource, bounds: BBox, horizontal: bool, b
 
 
 def _detect_native_bar_graphics(source: _PageSource, em: float) -> list[BBox]:
-    """重复矩形的共同基线、不同长度及图外数值提供柱图证据，排除等宽表格底色。"""
+    """The common baseline, different lengths and off-chart values of repeated rectangles provide column chart evidence and exclude the background color of the same-width table."""
 
     def compound_baseline_is_shared(path, horizontal=None):
-        """复合路径整体须有稳定零轴，不能只取彩色表格某一行或某一列伪造柱组。"""
+        """The entire composite path must have a stable zero axis, and you cannot just take a certain row or column of the color table to forge a column group."""
         boxes = path.rectangle_bboxes
         if len(boxes) <= 1:
             return True
@@ -1562,7 +1562,7 @@ def _detect_native_bar_graphics(source: _PageSource, em: float) -> list[BBox]:
         pending = set(range(len(bars)))
         while pending:
             seed = min(pending)
-            # 正负值以同一零轴为起点；择共同边最多的一侧，避免仅按柱底拆散负柱。
+            # The positive and negative values start from the same zero axis; choose the side with the most common sides to avoid splitting the negative columns just by the bottom of the column.
             edges = (0, 2) if horizontal else (3, 1)
             baseline, _ = max(
                 ((bars[seed].bbox[edge], edge) for edge in edges),
@@ -1591,7 +1591,7 @@ def _detect_native_bar_graphics(source: _PageSource, em: float) -> list[BBox]:
                 axis_edges = (1, 3) if horizontal else (0, 2)
                 intervals = sorted({(box[axis_edges[0]], box[axis_edges[1]]) for box in members})
                 if not any(second[0] - first[1] > 0.1 * em for first, second in zip(intervals, intervals[1:])):
-                    # 连续相接的色块是单元格或整片底色，柱组须在分类方向具有真实间隔。
+                    # Continuously connected color blocks are cells or the entire background color, and column groups must have real intervals in the classification direction.
                     continue
                 bounds = _bbox_union_many(members)
                 numeric = [
@@ -1610,10 +1610,10 @@ def _detect_native_bar_graphics(source: _PageSource, em: float) -> list[BBox]:
                 caption_indices = _graphic_caption_line_indices_to_preserve(
                     source.lines, [_GraphicCandidate(core_bbox=label_anchor, lane_index=-1)], em
                 )
-                # 同基线堆叠柱的其他色段与已确认图体相交，按真实接触关系补入整根柱。
+                # The other color segments of the stacked column with the baseline intersect with the confirmed figure body and fill in the entire column according to the true contact relationship.
                 for _ in range(2):
                     additions = [path.bbox for path in paths if _bbox_overlap_in_smaller(path.bbox, bounds) >= 0.25]
-                    # 某些PDF把斜排国家标签输出成字形轮廓；只补入已确认柱图下沿附近的短小复杂墨迹。
+                    # Some PDF output diagonal country labels as glyph outlines; only short, complex ink marks near the lower edge of the confirmed column are added.
                     outlined_labels = [
                         path.bbox
                         for path in source.path_infos
@@ -1629,7 +1629,7 @@ def _detect_native_bar_graphics(source: _PageSource, em: float) -> list[BBox]:
                             for line in source.lines
                         )
                     ]
-                    # 混合栅格和原生柱体时，以已确认柱图的接触关系补全系列，整页背景不参与。
+                    # When mixing raster and native cylinder, the series will be completed with the confirmed contact relationship of the cylinder, and the background of the entire page will not be involved.
                     image_parts = [
                         image
                         for image in source.image_bboxes
@@ -1670,7 +1670,7 @@ def _detect_complex_path_containers(
     page_size: tuple[float, float],
     median_height: float,
 ) -> list[BBox]:
-    """筛选包含多个内部 Path 且至少含一个二维复杂轮廓的大容器。"""
+    """Screen for large containers containing multiple internal Paths and at least one 2D complex profile."""
 
     page_area = max(0.1, page_size[0] * page_size[1])
     output: list[BBox] = []
@@ -1707,7 +1707,7 @@ def _detect_axis_path_graphics(
     page_size: tuple[float, float],
     median_height: float,
 ) -> list[BBox]:
-    """用相交的长横纵轴和内部二维复杂路径补充无外框图表。"""
+    """Supplement frameless charts with intersecting long horizontal and vertical axes and interior 2D complex paths."""
 
     thin_limit = max(1.0, 0.5 * median_height)
     minimum_axis_length = 6.0 * median_height
@@ -1728,17 +1728,17 @@ def _detect_axis_path_graphics(
         and item.bbox[3] - item.bbox[1] >= minimum_axis_length
     ]
     tolerance = max(2.0, median_height)
-    # 复杂路径判定只依赖路径自身与 median_height，提到轴对循环外只算一次。
+    # Complex path determination only relies on the path itself and median_height, and the mention of the axis outside the loop is only counted once.
     complex_candidates = [item for item in path_infos if _is_two_dimensional_complex_path(item, median_height)]
     indexed_vertical_axes = sorted((_bbox_center_x(item.bbox), index) for index, item in enumerate(vertical_axes))
     vertical_centers = [center for center, _index in indexed_vertical_axes]
     output: list[BBox] = []
     for horizontal in horizontal_axes:
         horizontal_y = _bbox_center_y(horizontal.bbox)
-        # 命中横轴两个端点附近的纵轴，再恢复原输入顺序以维持候选顺序。
+        # Hit the vertical axis near the two endpoints of the horizontal axis, and then restore the original input order to maintain the candidate order.
         candidate_indices: set[int] = set()
         for endpoint in (horizontal.bbox[0], horizontal.bbox[2]):
-            # 扩一 ULP 只影响候选集合；最终相交判断仍使用原始距离条件。
+            # The expansion of ULP only affects the candidate set; the final intersection judgment still uses the original distance condition.
             start = bisect_left(vertical_centers, math.nextafter(endpoint - tolerance, -math.inf))
             end = bisect_right(vertical_centers, math.nextafter(endpoint + tolerance, math.inf))
             candidate_indices.update(index for _center, index in indexed_vertical_axes[start:end])
@@ -1782,7 +1782,7 @@ def _is_two_dimensional_complex_path(
     path_info: PDFPathInfo,
     median_height: float,
 ) -> bool:
-    """排除细轴线，只保留横纵均有尺寸且段数较多的图形轮廓。"""
+    """Exclude thin axes and retain only graphic outlines that have both horizontal and vertical dimensions and a large number of segments."""
 
     width = path_info.bbox[2] - path_info.bbox[0]
     height = path_info.bbox[3] - path_info.bbox[1]
@@ -1801,7 +1801,7 @@ def _detect_complex_drawing_components(
     median_height: float,
     component_summaries: list[_DrawingComponentSummary] | None = None,
 ) -> list[BBox]:
-    """以横纵绘图线组件和内部二维复杂 Path 识别坐标图或嵌入式图表。"""
+    """Recognize coordinate plots or embedded charts with horizontal and vertical plot line components and internal 2D complex Path."""
 
     tolerance = max(2.0, 0.75 * median_height)
     complex_candidates = [item for item in path_infos if _is_two_dimensional_complex_path(item, median_height)]
@@ -1845,7 +1845,7 @@ def _infer_graphic_text_lanes(
     page_size: tuple[float, float],
     median_height: float,
 ) -> list[_TextLane]:
-    """用横排正文推断页内栏带，供不同角度的图形标签共享栏归属。"""
+    """Use horizontal text to infer in-page column bands for graphic labels from different angles to share column attributes."""
 
     line_geometry = [(line, line.bbox) for line in lines if line.angle == 0]
     if not line_geometry:
@@ -1865,7 +1865,7 @@ def _infer_graphic_text_lanes(
 
 
 def _graphic_lane_index(bbox: BBox, lanes: list[_TextLane]) -> int:
-    """按中心点、水平覆盖和距离为 bbox 选择唯一栏带。"""
+    """Select unique bands for bbox by center point, horizontal coverage and distance."""
 
     center_x = _bbox_center_x(bbox)
     best_index = 0
@@ -1889,7 +1889,7 @@ def _strong_graphic_lane_index(
     lanes: list[_TextLane],
     median_height: float,
 ) -> int:
-    """仅把几乎完整落入唯一栏带的强图形核心绑定到该栏。"""
+    """Only the strong graphics core that falls almost completely into the only bar band is tied to that bar."""
 
     core_width = max(0.1, core_bbox[2] - core_bbox[0])
     tolerance = max(1.0, median_height)
@@ -1912,7 +1912,7 @@ def _detect_graphic_candidates(
     table_bboxes: list[BBox],
     component_summaries: list[_DrawingComponentSummary] | None = None,
 ) -> list[_GraphicCandidate]:
-    """从非表格绘图线连通分量中筛选尺寸受限的图形容器。"""
+    """Filter size-restricted graphics containers from non-table plot line connected components."""
 
     tolerance = max(2.0, 0.75 * median_height)
     candidates: list[_GraphicCandidate] = []
@@ -1951,12 +1951,12 @@ def _connected_drawing_line_components(
     drawing_lines: list[_AxisLine],
     tolerance: float,
 ) -> list[list[_AxisLine]]:
-    """按 bbox 间距连接相邻绘图线，并返回互不重叠的连通分量。"""
+    """Connects adjacent plot lines by bbox spacing and returns non-overlapping connected components."""
 
     parents = list(range(len(drawing_lines)))
 
     def find(index: int) -> int:
-        """查找绘图线连通分量的根节点。"""
+        """Finds the root node of the connected components of the plot line."""
 
         while parents[index] != index:
             parents[index] = parents[parents[index]]
@@ -1964,15 +1964,15 @@ def _connected_drawing_line_components(
         return index
 
     def union(first_index: int, second_index: int) -> None:
-        """合并两个距离满足条件的绘图线分量。"""
+        """Merges two plot line components whose distance satisfies the condition."""
 
         first_root = find(first_index)
         second_root = find(second_index)
         if first_root != second_root:
             parents[second_root] = first_root
 
-    # 扫描线剪枝：按左缘升序排列后，第二条线起点超过第一条线右缘加容差时，
-    # 水平净空已超容差，其后所有配对必然不连通，无需再算欧氏距离。
+    # Scan line pruning: After arranging in ascending order by the left edge, when the starting point of the second line exceeds the right edge of the first line plus a tolerance,
+    # The horizontal clearance has exceeded the tolerance, and all subsequent pairs must be disconnected, so there is no need to calculate the Euclidean distance.
     order = sorted(range(len(drawing_lines)), key=lambda index: drawing_lines[index].bbox[0])
     for position, first_index in enumerate(order):
         first = drawing_lines[first_index].bbox
@@ -1992,7 +1992,7 @@ def _connected_drawing_line_components(
 
 
 def _summarize_drawing_components(drawing_lines: list[_AxisLine], tolerance: float) -> list[_DrawingComponentSummary]:
-    """一次计算分量、包围框及横纵线数量，保持原始分量顺序。"""
+    """Calculate the number of components, bounding boxes, and horizontal and vertical lines at once, keeping the original component order."""
 
     summaries = []
     for component in _connected_drawing_line_components(drawing_lines, tolerance):
@@ -2009,7 +2009,7 @@ def _summarize_drawing_components(drawing_lines: list[_AxisLine], tolerance: flo
 
 
 def _drawing_component_summaries(source: _PageSource, tolerance: float) -> list[_DrawingComponentSummary]:
-    """仅在同一页、同一绘图线对象及同一容差下复用分量统计。"""
+    """Only reuse component statistics on the same page, the same plot line object, and the same tolerance."""
 
     for lines, cached_tolerance, summaries in source.drawing_component_cache:
         if lines is source.drawing_lines and cached_tolerance == tolerance:
@@ -2026,7 +2026,7 @@ def _is_graphic_label_member(
     *,
     margin_scale: float = 2.5,
 ) -> bool:
-    """判断短文本是否位于图形核心内部或对应轴向的邻近标签区。"""
+    """Determine whether the short text is located inside the graphics core or adjacent to the label area in the corresponding axis direction."""
 
     if re.match(r"^\s*(?:sources?|notes?|资料来源|数据来源|来源|注)\s*[:：]", line.text, re.I):
         return False
@@ -2051,7 +2051,7 @@ def _is_graphic_label_member(
 
     horizontal_gap = max(core_bbox[0] - line.bbox[2], line.bbox[0] - core_bbox[2], 0.0)
     vertical_gap = max(core_bbox[1] - line.bbox[3], line.bbox[1] - core_bbox[3], 0.0)
-    # 横排坐标轴标题允许比刻度标签略长，但必须与图宽、行高和上下间距同时相容。
+    # Horizontal axis titles are allowed to be slightly longer than tick labels, but they must be compatible with the plot width, line height, and top and bottom spacing.
     is_horizontal_axis_title = (
         line.angle in {0, 180}
         and (
@@ -2090,7 +2090,7 @@ def _image_members_to_content(
     *,
     spatial: bool = False,
 ) -> str:
-    """按视觉行和页内位置生成图片内部文本，保留不同视觉行之间的换行。"""
+    """Generate text within images by visual line and page position, preserving line breaks between different visual lines."""
 
     row_groups: dict[tuple[int, int, int], list[_LineItem]] = {}
     for line in members:
@@ -2100,13 +2100,13 @@ def _image_members_to_content(
             row_kind, row_identity = 0, line.visual_row_id
         row_groups.setdefault((line.angle, row_kind, row_identity), []).append(line)
 
-    # 原生数值图同时包含旋转日期标签；斜置文本不能按轻微字框差异改变横轴顺序。
+    # Native numeric plots also include rotated date labels; italic text cannot change the horizontal axis order due to slight font differences.
     numeric_count = sum(re.fullmatch(r"[\d.,%+/−-]+", line.text.strip()) is not None for line in members)
     numeric_chart = numeric_count >= 6 and numeric_count >= 0.45 * len(members)
     if spatial and numeric_chart and all(line.angle == 0 for line in members):
         from .spatial_text import _SpatialTextItem, _project_spatial_items
 
-        # 整批补认领的数值图保留横向列位置，避免原 PDF 文本对象顺序把图例插入数据。
+        # The whole batch of newly claimed numerical charts retains the horizontal column position to prevent the original PDF text object from sequentially inserting the legend into the data.
         return _sanitize_pdf_control_text(
             _project_spatial_items([_SpatialTextItem(line.text, line.bbox) for line in members]),
             preserve_newlines=True,
@@ -2123,7 +2123,7 @@ def _image_members_to_content(
             rows.append((row_bbox, content))
             if numeric_chart and angle in {90, 270}:
                 rotated_rows.append((len(rows) - 1, row_bbox, content, angle, row_lines[0].effective_height))
-    # 同一轴上的旋转短标签用共同纵向带排序，避免文本长度让年份组越过左侧年份。
+    # Rotated short labels on the same axis are sorted with a common vertical band to avoid text length such that year groups extend past the years on the left.
     for index, bounds, _, angle, em in rotated_rows:
         peers = [
             (i, box, value)
@@ -2146,7 +2146,7 @@ def _graphic_members_to_block(
     members: list[_LineItem],
     page_size: tuple[float, float],
 ) -> dict[str, Any] | None:
-    """生成含内部文本的矢量图 image block，并合并绘图核心与标签 bbox。"""
+    """Generates a vector drawing image block with internal text and merges the drawing core with the label bbox."""
 
     content = _image_members_to_content(members, page_size)
     if not content:
@@ -2166,7 +2166,7 @@ def _inline_raster_gap_member(
     claimed_line_indices: set[int],
     median_height: float,
 ) -> _LineItem | None:
-    """查找恰好填充两张同行图片间隙的唯一拆分文本 run。"""
+    """Find the unique split text run that exactly fills the gap between two pictures of the same pair."""
 
     left_height = max(0.1, left_bbox[3] - left_bbox[1])
     right_height = max(0.1, right_bbox[3] - right_bbox[1])
@@ -2210,7 +2210,7 @@ def _inline_raster_group_has_only_expected_text(
     group_bbox: BBox,
     claimed_line_indices: set[int],
 ) -> bool:
-    """确认复合图片框内没有图片内部文本和间隔符之外的正文。"""
+    """Make sure there is no text inside the image and no text outside of the spacer in the composite picture frame."""
 
     gap_member_indices = {line.source_index for line in gap_members}
     for line in source.lines:
@@ -2233,7 +2233,7 @@ def _merge_inline_raster_image_candidates(
     container_bboxes: list[BBox],
     claimed_line_indices: set[int],
 ) -> list[tuple[BBox, int | None]]:
-    """把由同一视觉行间隔符连接的已准入图片合成为单一候选。"""
+    """Combines admitted images connected by the same visual line separator into a single candidate."""
 
     if len(candidate_bboxes) < 3:
         return [(bbox, None) for bbox in candidate_bboxes]
@@ -2321,7 +2321,7 @@ def _merge_inline_raster_image_candidates(
 
 
 def _image_bboxes_are_near_equal(first: BBox, second: BBox) -> bool:
-    """用亚 point 边界容差识别同一图片框，避免签名与点阵来源重复输出。"""
+    """Use sub-point boundary tolerance to identify the same picture frame to avoid repeated output of signatures and dot matrix sources."""
 
     return all(
         abs(first_value - second_value) <= _SIGNATURE_IMAGE_BBOX_DEDUP_TOLERANCE
@@ -2333,7 +2333,7 @@ def _merge_vertical_raster_tiles(
     bboxes: list[BBox],
     page_size: tuple[float, float],
 ) -> list[BBox]:
-    """把同宽且纵向连续的点阵切片合成一张完整图片。"""
+    """Combine lattice slices of the same width and continuous lengthwise into a complete picture."""
 
     page_width, page_height = page_size
     page_area = max(0.0, page_width) * max(0.0, page_height)
@@ -2411,7 +2411,7 @@ def _build_raster_image_blocks(
     container_blocks: list[dict[str, Any]],
     claimed_line_indices: set[int],
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """过滤点阵图并接纳签名框，避让高优先级容器后唯一认领内部文本。"""
+    """Filter bitmaps and accept signature boxes to avoid only claiming internal text after high-priority containers."""
 
     page_area = max(0.0, source.page_size[0]) * max(0.0, source.page_size[1])
     if page_area <= 0:
@@ -2429,7 +2429,7 @@ def _build_raster_image_blocks(
         ):
             continue
         if not any(_image_bboxes_are_near_equal(bbox, existing_bbox) for existing_bbox in signature_bboxes):
-            # 已由注释可见性和 /AP 严格确认的签名不再套用普通点阵图面积门槛。
+            # Signatures that have been strictly confirmed by annotation visibility and /AP no longer have the normal bitmap area threshold applied.
             signature_bboxes.append(bbox)
 
     clipped_raster_bboxes = [
@@ -2480,7 +2480,7 @@ def _build_raster_image_blocks(
         ]
         if not matching_indices:
             continue
-        # 重叠点阵图共享内部文本时归属最小容器，避免 content 重复。
+        # When overlapping bitmaps share internal text, they belong to the smallest container to avoid duplication of content.
         candidate_index = min(
             matching_indices,
             key=lambda index: (_bbox_area(candidate_bboxes[index]), index),
@@ -2508,7 +2508,7 @@ def _build_raster_image_blocks(
 
 
 def _deduplicate_contained_photo_frames(source, bboxes):
-    """近乎等大的照片和阴影边框合为一幅；独立内嵌小图及边框中的原生文字继续保留。"""
+    """Nearly equal-sized photos and shadow borders are combined into one; independent embedded small images and native text in the border continue to be retained."""
     consumed = set()
     for index, outer in enumerate(bboxes):
         width, height = outer[2] - outer[0], outer[3] - outer[1]

@@ -1,4 +1,4 @@
-//! 在文档内连续累积 X、Y 和跨页样式风险，不回传逐字符中间对象。
+//! X, Y and cross-page style risks are continuously accumulated in the document without returning character-by-character intermediate objects.
 use std::collections::{HashMap, HashSet};
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
 pub type Entry = (usize, Box4, Box4, Size, f64);
 pub type RunKey = (String, u64, i32, i32, i32, String);
 
-/// 保留线性插值分位数，不复用其他模块的取整采样规则。
+/// The linear interpolation quantile is retained and the rounding sampling rules of other modules are not reused.
 pub(crate) fn quantile(mut values: Vec<f64>, fraction: f64) -> f64 {
     if values.is_empty() {
         return 0.0;
@@ -43,7 +43,7 @@ pub struct Risk {
 }
 
 impl Risk {
-    /// 消费一行原始锚点；校验失败返回 None，由边界选择显式参考计算。
+    /// Consume a row of original anchor points; if the verification fails, return None, and the explicit reference calculation is selected by the boundary.
     pub fn add_line(
         &mut self,
         page: usize,
@@ -70,7 +70,7 @@ impl Risk {
             .into_iter()
             .filter(|e| e.2[3] - e.2[1] >= 0.38 * q75)
             .collect();
-        // 先验证相邻对；任何后续拒绝都会要求边界丢弃整个累积器。
+        // Adjacent pairs are verified first; any subsequent rejection will require the boundary to discard the entire accumulator.
         let pairs = anchor_pairs(anchors.clone(), false)?;
         for (index, _, ratio, overlap) in pairs {
             let run = self.runs.entry(anchors[index].0).or_default();
@@ -112,7 +112,7 @@ impl Risk {
             self.split = true;
             return Some(true);
         }
-        // Python max 在并列时选择首簇，不能使用选择末项的 max_by_key。
+        // Python max selects the first cluster when paralleling, and max_by_key that selects the last item cannot be used.
         let mut dominant = &groups[0];
         for group in &groups[1..] {
             if group.len() > dominant.len() {
@@ -160,7 +160,7 @@ impl Risk {
         Some(false)
     }
 
-    /// 汇总完整文档统计，保留 split 提前返回时 style 为 false 的语义。
+    /// Summarize complete document statistics, retaining the semantics of style being false when split returns early.
     pub fn finish(&self) -> (bool, bool) {
         if self.split {
             return (true, false);

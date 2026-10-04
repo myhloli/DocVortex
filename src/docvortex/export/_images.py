@@ -1,4 +1,4 @@
-"""各导出入口共享的图片命名、冲突分配与引用改写。"""
+"""Image naming, conflict allocation and reference rewriting shared by each export portal."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def _register_image(
     owner: BlockBase,
     ordinal: int | None = None,
 ) -> str:
-    """按原始页和视觉父块命名，冲突后缀独立于正文图片序号。"""
+    """Named according to the original page and visual parent block, the conflict suffix is independent of the text image sequence number."""
     extension = extension.lower().lstrip(".") or "jpg"
     if extension not in _IMAGE_EXTENSIONS:
         raise ValueError(f"Unsupported image extension: {extension}")
@@ -70,11 +70,11 @@ def _materialize_markup(
     owner: BlockBase,
     asset_resolver: Callable[[str], bytes] | None,
 ) -> str:
-    """按所有 img src 的出现顺序编号，仅替换图片引用的值。"""
+    """Number all img src in order of occurrence, replacing only the values referenced by the picture."""
     ordinal = 0
 
     def replace_source(match: re.Match[str]) -> str:
-        """保留外链及原 HTML 属性，外链同样占用正文图片序号。"""
+        """The external link and the original HTML attribute are retained. The external link also occupies the text image serial number."""
         nonlocal ordinal
         ordinal += 1
         group = "quoted" if match.group("quote") else "unquoted"
@@ -102,7 +102,7 @@ def _materialize_images(
     image_resolver: Callable[[ImagePayloadBlock, int], tuple[bytes, str] | None] | None = None,
     asset_resolver: Callable[[str], bytes] | None = None,
 ) -> tuple[MiddleJson, AssetStore]:
-    """复制文档及素材索引，在同一次树遍历中完成命名和引用回填。"""
+    """Copy document and material indexes, complete naming and reference backfilling in the same tree traversal."""
     document = middle_json.model_copy(deep=True)
     result = assets.copy() if assets is not None else AssetStore()
     for page in document.pages:

@@ -1,20 +1,20 @@
-"""EPUB 解析器内部使用的稳定错误类型。"""
+"""EPUB Stable error type used internally by the parser."""
 
 
 class EpubError(ValueError):
-    """所有 EPUB 解析错误的共同基类。"""
+    """Common base class for all EPUB parsing errors."""
 
 
 class EpubParseError(EpubError):
-    """表示 EPUB 容器或正文结构不可用。"""
+    """Indicates EPUB The container or body structure is unavailable."""
 
 
 class EpubEncryptedError(EpubError):
-    """表示解析所需的 EPUB 资源已加密。"""
+    """Indicates that the EPUB resource required for parsing has been encrypted."""
 
 
 class EpubResourceLimitError(EpubError):
-    """表示 EPUB 输入超过固定资源预算。"""
+    """Indicates that the EPUB input exceeds the fixed resource budget."""
 
 
 __all__ = ["EpubEncryptedError", "EpubError", "EpubParseError", "EpubResourceLimitError"]

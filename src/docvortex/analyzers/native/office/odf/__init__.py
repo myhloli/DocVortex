@@ -1,3 +1,3 @@
-"""OpenDocument 内部解析实现。"""
+"""OpenDocument internal parsing implementation."""
 
 __all__: list[str] = []

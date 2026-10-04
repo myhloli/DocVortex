@@ -1,4 +1,4 @@
-"""文件输入准备与有效页范围，不包含档位或 OCR 路由。"""
+"""File input prepared with valid page range, not including stalls or OCR routing."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class PreparedSource:
-    """保存输入字节、有效页面映射及底层文档的资源所有权。"""
+    """Saves input bytes, valid page mappings, and resource ownership of the underlying document."""
 
     data: bytes
     file_suffix: FileSuffix
@@ -37,7 +37,7 @@ def prepare_source(
     page_range: str = "",
     source_context: HtmlSourceContext | None = None,
 ) -> PreparedSource:
-    """准备原生解析输入，调用者持有的 PDFDocument 不由引擎关闭。"""
+    """Prepare native parsing input, PDFDocument held by the caller is not closed by the engine."""
     from .page_range import normalize_page_range_input, parse_page_range
 
     document = None

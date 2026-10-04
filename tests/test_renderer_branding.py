@@ -1,4 +1,4 @@
-"""验证非 HTML 生成标识与用户显式标题的品牌边界。"""
+"""Validate brand boundaries for non-HTML generated logos with user-explicit titles."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from docvortex.schema import MiddleJson, PageInfo, TextBlock, TextSpan
 
 
 def test_non_html_renderers_use_new_owned_identifiers() -> None:
-    """PDF 元数据、DOCX 样式和 LaTeX 宏统一新品牌，用户标题则保持原文。"""
+    """PDF metadata, DOCX styles, and LaTeX macros are unified into the new brand, while user titles remain original."""
     document = MiddleJson(
         pages=[PageInfo(page_idx=0, blocks=[TextBlock(type="text", index=0, content=[TextSpan(type="text", content="Body")])])],
         metadata={"file_suffix": "html", "producer": {"name": "docvortex", "version": "0.2.0"}},

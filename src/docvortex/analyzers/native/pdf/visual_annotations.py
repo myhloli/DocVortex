@@ -1,4 +1,4 @@
-"""识别独立视觉块的强规则 caption/footnote，并构造局部阅读区域。"""
+"""Strong rules caption/footnote for identifying independent visual patches and constructing local reading areas."""
 
 from __future__ import annotations
 
@@ -59,18 +59,18 @@ _TextBlockGroupMerger = Callable[
 
 @dataclass(frozen=True)
 class _VisualParent:
-    """记录单个视觉块或只用于关联的多图片组件。"""
+    """Record single visual chunks or just for associated multi-picture components."""
 
     member_indices: tuple[int, ...]
     angle: int
     local_bbox: BBox
-    # 数字网格证据只参与父对象选择，不加入公开输出schema。
+    # Digital grid evidence only participates in parent object selection and does not participate in the public output schema.
     native_numeric_grid: bool = False
 
 
 @dataclass(frozen=True)
 class _AnnotationRelation:
-    """记录注释与候选父块之间的方向和归一化几何代价。"""
+    """Record the orientation and normalized geometric cost between the annotation and the candidate parent patch."""
 
     parent: _VisualParent
     direction: _Direction
@@ -81,10 +81,10 @@ class _AnnotationRelation:
 
 
 def _is_strong_footnote_text(text: str) -> bool:
-    """判断文本是否以带冒号的来源或注释强标记开头。"""
+    """Determines whether the text begins with a source or comment strong tag with a colon."""
 
     normalized = _normalize_annotation_text(text)
-    # 缩写解释可能和来源合成一块；解释本身必须有等号，来源仍须明确标记。
+    # The abbreviated explanation may be combined with the source; the explanation itself must have an equal sign, and the source must still be clearly marked.
     definition_with_source = re.match(
         r"^[A-Za-z][A-Za-z0-9 -]{0,30}\s*=\s*\S.+?\s+Source(?:s)?\s*:\s*\S", normalized, re.I | re.S
     )
@@ -96,7 +96,7 @@ def _is_strong_footnote_text(text: str) -> bool:
 
 
 def _block_angle(block: dict[str, Any]) -> int:
-    """将块角度规范到四个正交方向。"""
+    """Normalize block angles to four orthogonal directions."""
 
     return int(block.get("angle", 0) or 0) % 360
 
@@ -106,7 +106,7 @@ def _block_local_bbox(
     page_size: tuple[float, float],
     angle: int | None = None,
 ) -> BBox | None:
-    """读取有效 bbox 并转换到指定文本方向的局部坐标。"""
+    """Reads a valid bbox and converts it to local coordinates specifying the text direction."""
 
     bbox = _coerce_bbox(block.get("bbox"))
     if bbox is None:
@@ -122,7 +122,7 @@ def _block_median_line_height(
     block: dict[str, Any],
     page_size: tuple[float, float],
 ) -> float:
-    """优先使用原生行高，缺失时按局部块高和行框数量保守估计。"""
+    """Priority is given to using the native line height, and when missing, it is conservatively estimated based on the local block height and the number of line boxes."""
 
     heights = [
         float(height) for height in block.get("_line_heights", []) if isinstance(height, (int, float)) and float(height) > 0
@@ -140,7 +140,7 @@ def _block_median_line_height(
 def _collect_annotation_candidates(
     blocks: list[dict[str, Any]],
 ) -> dict[int, _AnnotationKind]:
-    """从独立 text 及预分类 caption/footnote 中收集视觉绑定候选。"""
+    """Collect visual binding candidates from stand-alone text and pre-classified caption/footnote."""
 
     output: dict[int, _AnnotationKind] = {}
     for index, block in enumerate(blocks):
@@ -157,7 +157,7 @@ def _collect_annotation_candidates(
             output[index] = "footnote"
         elif block_type == "text" and _is_adjacent_unlabelled_italic_caption(index, blocks):
             output[index] = "caption"
-    # 紧贴强来源标记的同字号解释先成为候选，否则解释行会被当作阻隔而使整个注释带无法绑定。
+    # Explanations of the same font size that are close to strong source tags are candidates first, otherwise the explanation line will be regarded as a blocker and the entire annotation band cannot be bound.
     for anchor_index, kind in list(output.items()):
         anchor = blocks[anchor_index]
         if kind != "footnote" or _block_angle(anchor) != 0 or not _is_strong_footnote_text(str(anchor.get("content", ""))):
@@ -210,7 +210,7 @@ def _collect_annotation_candidates(
 
 
 def _is_adjacent_unlabelled_italic_caption(index: int, blocks: list[dict[str, Any]]) -> bool:
-    """无编号图注需要单行斜体、紧贴大图和后续正文留白共同证明，不能只凭短句认领。"""
+    """Unnumbered figure captions need to be supported by a single line of italics, close to the larger figure, and a blank space in the subsequent text. They cannot be claimed based on short sentences."""
     block = blocks[index]
     box = _coerce_bbox(block.get("bbox"))
     fonts = block.get("_font_signatures")
@@ -255,7 +255,7 @@ def _is_adjacent_unlabelled_italic_caption(index: int, blocks: list[dict[str, An
 
 
 def _coerce_lane_interval(value: object) -> tuple[float, float] | None:
-    """读取内部栏带区间，拒绝缺失、逆序或非数值元数据。"""
+    """Read internal column ranges, rejecting missing, reversed, or non-numeric metadata."""
 
     if not isinstance(value, (list, tuple)) or len(value) != 2:
         return None
@@ -273,7 +273,7 @@ def _block_first_local_row_bbox(
     page_size: tuple[float, float],
     angle: int,
 ) -> BBox | None:
-    """返回块在指定方向局部坐标中的首个文本行框。"""
+    """Returns the first text line box of the block in local coordinates in the specified direction."""
 
     rows = block.get("_local_line_bboxes")
     local_rows = [bbox for row in rows if (bbox := _coerce_bbox(row)) is not None] if isinstance(rows, list) else []
@@ -287,7 +287,7 @@ def _blocks_share_table_footnote_lane(
     candidate: dict[str, Any],
     line_height: float,
 ) -> bool:
-    """要求表注锚点与续块来自同一内部栏带和 span 层级。"""
+    """It is required that the table note anchor and the continuation block be from the same inner band and span level."""
 
     if anchor.get("_lane_is_span") != candidate.get("_lane_is_span"):
         return False
@@ -308,7 +308,7 @@ def _block_overlaps_table_footnote_lane(
     page_size: tuple[float, float],
     angle: int,
 ) -> bool:
-    """判断任意块是否横穿表注栏带，用于保证收集过程不跨越障碍。"""
+    """Determine whether any block crosses the table and note column band to ensure that the collection process does not cross obstacles."""
 
     local_bbox = _block_local_bbox(block, page_size, angle)
     if local_bbox is None:
@@ -331,7 +331,7 @@ def _table_footnote_fonts_are_compatible(
     previous: dict[str, Any],
     candidate: dict[str, Any],
 ) -> bool:
-    """仅在两侧都有可靠字体信息且完全不相交时拒绝续块。"""
+    """Reject continuation blocks only if both sides have reliable font information and are completely disjoint."""
 
     previous_fonts = previous.get("_font_signatures")
     candidate_fonts = candidate.get("_font_signatures")
@@ -349,7 +349,7 @@ def _table_footnote_candidate_fits_parent(
     parent_bbox: BBox,
     line_height: float,
 ) -> bool:
-    """要求续块位于父表格下方并保持既有横向投影覆盖标准。"""
+    """Requires continuation blocks to be positioned below the parent table and maintain existing horizontal projection coverage standards."""
 
     if _bbox_center_y(candidate_bbox) < _bbox_center_y(parent_bbox):
         return False
@@ -371,7 +371,7 @@ def _table_footnote_continuation_is_compatible(
     angle: int,
     continuation_left: float | None,
 ) -> tuple[bool, float | None]:
-    """按栏带、字体、行高、净空和悬挂缩进确认单个表注续块。"""
+    """Acknowledge individual table note continuation blocks by banding, font, line height, headroom, and hanging indent."""
 
     previous_bbox = _block_local_bbox(previous, page_size, angle)
     candidate_bbox = _block_local_bbox(candidate, page_size, angle)
@@ -419,7 +419,7 @@ def _collect_table_footnote_continuation_indices(
     annotation_indices: set[int],
     consumed_indices: set[int],
 ) -> list[int]:
-    """从表注锚点向下连续收集同栏悬挂缩进文本，不跨越首个障碍。"""
+    """Collect hanging indented text in the same column continuously from the table note anchor point downwards, without crossing the first barrier."""
 
     anchor = blocks[anchor_index]
     angle = relation.parent.angle
@@ -482,7 +482,7 @@ def _merge_table_footnote_continuations(
     page_size: tuple[float, float],
     merge_text_block_group: _TextBlockGroupMerger | None,
 ) -> set[int]:
-    """合并已绑定单表格的强标记脚注及其页内续块，并返回被消费索引。"""
+    """Merges the strongly marked footnote of a bound single table and its in-page continuation block, and returns the consumed index."""
 
     if merge_text_block_group is None:
         return set()
@@ -531,7 +531,7 @@ def _axis_overlap_metrics(
     axis: Literal["x", "y"],
     float_margin: float,
 ) -> tuple[float, float, float]:
-    """在正交轴允许一行高浮动后计算较短投影、注释覆盖和中心偏移。"""
+    """Shorter projections, annotation coverage and center offsets are calculated after allowing one line of height float on the orthogonal axis."""
 
     if axis == "x":
         annotation_start, annotation_end = annotation_bbox[0], annotation_bbox[2]
@@ -562,7 +562,7 @@ def _direction_relation(
     direction: _Direction,
     max_gap_in_line_heights: float,
 ) -> _AnnotationRelation | None:
-    """按一个方向检查边缘距离、深入量和正交投影约束。"""
+    """Check edge distance, depth, and orthogonal projection constraints in one direction."""
 
     parent_bbox = parent.local_bbox
     if direction == "above":
@@ -622,7 +622,7 @@ def _best_parent_relation(
     line_height: float,
     kind: _AnnotationKind,
 ) -> _AnnotationRelation | None:
-    """为单个父块选择几何代价最小的合法注释方向。"""
+    """Select the legal annotation direction with the least geometric cost for a single parent block."""
 
     directions: tuple[_Direction, ...]
     if kind == "footnote":
@@ -663,7 +663,7 @@ def _image_blocks_form_component(
     second_bbox: BBox,
     line_height: float,
 ) -> bool:
-    """判断两张图片是否以小净空和足够正交投影组成相邻面板。"""
+    """Determine whether two images form adjacent panels with small headroom and sufficient orthogonal projection."""
 
     horizontal_gap = max(first_bbox[0] - second_bbox[2], second_bbox[0] - first_bbox[2], 0.0)
     vertical_gap = max(first_bbox[1] - second_bbox[3], second_bbox[1] - first_bbox[3], 0.0)
@@ -681,7 +681,7 @@ def _build_visual_parents(
     page_size: tuple[float, float],
     component_line_height: float,
 ) -> list[_VisualParent]:
-    """构造单视觉块父候选，并为相邻图片补充只用于关联的连通组件。"""
+    """Construct monovisual patch parent candidates and supplement adjacent images with connected components only for association."""
 
     parents: list[_VisualParent] = []
     image_indices_by_angle: dict[int, list[int]] = {}
@@ -738,7 +738,7 @@ def _add_caption_supported_table_panel_parents(
     parents: list[_VisualParent],
     candidates: dict[int, _AnnotationKind],
 ) -> None:
-    """同高双表、各自a/b说明及跨栏总表题共同确认面板组；保持两个表体与总说明各出现一次。"""
+    """Double tables of the same height, respective a/b instructions and hurdle general table questions jointly confirm the panel group; keep the two table bodies and the general description appearing once each."""
     tables = [
         parent
         for parent in parents
@@ -814,7 +814,7 @@ def _relation_has_intervening_block(
     page_size: tuple[float, float],
     annotation_indices: set[int],
 ) -> bool:
-    """检查注释与父块净空走廊内是否横隔正文或另一个视觉块。"""
+    """Check if the annotation is within a clear corridor between the parent block and the parent block, separated by text or another visual block."""
 
     if relation.normalized_gap <= 0:
         return False
@@ -855,7 +855,7 @@ def _component_relation_is_materially_better(
     relation: _AnnotationRelation,
     single_relations: list[_AnnotationRelation],
 ) -> bool:
-    """仅当图片并集明显提高注释覆盖时允许组件替代单图父块。"""
+    """Allow components to override single-image parent blocks only if image union significantly improves annotation coverage."""
 
     if len(relation.parent.member_indices) < 2:
         return True
@@ -879,7 +879,7 @@ def _choose_annotation_relation(
     parents: list[_VisualParent],
     annotation_indices: set[int],
 ) -> _AnnotationRelation | None:
-    """先过滤空间、组件收益和阻挡关系，再按距离、覆盖和居中选父块。"""
+    """First filter the space, component income and blocking relationship, and then select the parent block by distance, coverage and center."""
 
     annotation = blocks[annotation_index]
     angle = _block_angle(annotation)
@@ -902,7 +902,7 @@ def _choose_annotation_relation(
         is not None
     ]
     if kind == "caption" and not relations and _is_strong_caption_text(str(annotation.get("content", ""))):
-        # 编号图题可沿正文栏外悬于居中图体；仅接纳唯一近邻且有多数横向覆盖的单图。
+        # Numbered figure titles can be hung in the center figure body along the outside of the text column; only single figures with a single nearest neighbor and substantial horizontal coverage will be accepted.
         outdented = []
         for parent in parents:
             if (
@@ -926,7 +926,7 @@ def _choose_annotation_relation(
         if len(outdented) == 1:
             relations.extend(outdented)
     if kind == "footnote":
-        # 图题提供所属区域，允许短来源在图体左侧有限外悬；正文阻隔仍由统一走廊检查拒绝。
+        # The figure title provides the area it belongs to, and short sources are allowed to have limited overhang on the left side of the figure body; text obstruction is still rejected by the unified corridor inspection.
         for parent in parents:
             if (
                 parent.angle != angle
@@ -971,7 +971,7 @@ def _choose_annotation_relation(
     ]
     if not relations:
         return None
-    # 图题明确描述曲线图且下方真实图像合法时，重复数字网格不能以较近距离抢占父关系。
+    # When the figure title clearly describes the graph and the real image below is legal, the repeating number grid cannot preempt the parent relationship at a closer distance.
     if kind == "caption" and re.search(r"\b(?:graph|chart|plot)\b", str(annotation.get("content", "")), re.I):
         alternatives = [
             relation for relation in relations if not relation.parent.native_numeric_grid and relation.direction == "above"
@@ -995,7 +995,7 @@ def _caption_blocks_use_distinct_regular_lanes(
     anchor: dict[str, Any],
     candidate: dict[str, Any],
 ) -> bool:
-    """确认两个标题块分别属于互不重叠的普通栏带。"""
+    """Confirm that the two title blocks belong to common columns that do not overlap each other."""
 
     if anchor.get("_lane_is_span") is not False or candidate.get("_lane_is_span") is not False:
         return False
@@ -1011,7 +1011,7 @@ def _caption_blocks_have_compatible_typography(
     candidate: dict[str, Any],
     page_size: tuple[float, float],
 ) -> bool:
-    """用行高和字体交集确认跨栏标题块来自同一排版层级。"""
+    """Use line height and font intersection to confirm that cross-column title blocks are from the same typography hierarchy."""
 
     anchor_height = _block_median_line_height(anchor, page_size)
     candidate_height = _block_median_line_height(candidate, page_size)
@@ -1042,7 +1042,7 @@ def _cross_lane_caption_companion_relation(
     parents: list[_VisualParent],
     annotation_indices: set[int],
 ) -> _AnnotationRelation | None:
-    """仅凭空间、栏带和排版信息确认一个跨栏标题同伴。"""
+    """Identify a cross-heading companion based solely on spacing, banding, and typography information."""
 
     if anchor_relation.direction not in {"above", "below"}:
         return None
@@ -1097,7 +1097,7 @@ def _expand_cross_lane_caption_assignments(
     candidates: dict[int, _AnnotationKind],
     assignments: dict[int, _AnnotationRelation],
 ) -> dict[int, _AnnotationRelation]:
-    """从原始已绑定标题出发，保守补标唯一的跨栏空间同伴。"""
+    """Starting from the original bound title, conservatively fill in the only hurdle space partner."""
 
     annotation_indices = set(candidates)
     proposals: dict[int, list[_AnnotationRelation]] = {}
@@ -1128,7 +1128,7 @@ def _expand_cross_lane_caption_assignments(
 
     output: dict[int, _AnnotationRelation] = {}
     for index, relations in proposals.items():
-        # 同伴同时被多个锚点认领时归属不唯一，保守地维持正文分类。
+        # When a companion is claimed by multiple anchors at the same time, the ownership is not unique, and the text classification is conservatively maintained.
         if len(relations) == 1:
             output[index] = relations[0]
     return output
@@ -1137,7 +1137,7 @@ def _expand_cross_lane_caption_assignments(
 def _merge_parent_assignment_groups(
     assignments: dict[int, _AnnotationRelation],
 ) -> list[tuple[set[int], dict[int, _AnnotationRelation]]]:
-    """合并共享视觉成员的父候选，防止组件与单图重复展开同一主体。"""
+    """Merge parent candidates of shared visual members to prevent components from repeatedly expanding the same body with a single image."""
 
     groups: list[tuple[set[int], dict[int, _AnnotationRelation]]] = []
     for annotation_index, relation in assignments.items():
@@ -1158,7 +1158,7 @@ def _sort_visual_body_members(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """在共同局部方向内用 XYCut++ 排列区域中的视觉主体成员。"""
+    """Arrange visual subject members in a region within a common local direction with XYCut++."""
 
     if not member_indices:
         return []
@@ -1177,7 +1177,7 @@ def _annotation_local_sort_key(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> tuple[float, float, int]:
-    """按注释自身方向的局部上、左坐标提供稳定排序键。"""
+    """Provides stable sorting keys by local top and left coordinates in the annotation's own direction."""
 
     block = blocks[index]
     if "_legend_sort_band" in block:
@@ -1194,7 +1194,7 @@ def _sort_annotation_indices_by_visual_rows(
     page_size: tuple[float, float],
     relations: dict[int, _AnnotationRelation],
 ) -> list[int]:
-    """先聚合首行对齐的标题视觉行，再按行内左到右稳定排序。"""
+    """First, aggregate the first row of aligned title visual rows, and then sort them stably from left to right within the row."""
 
     positioned: list[tuple[int, BBox, float]] = []
     fallback: list[int] = []
@@ -1262,7 +1262,7 @@ def _build_visual_annotation_regions(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[list[dict[str, Any]]]:
-    """按前置标题、主体、后置标题、脚注顺序展开每个虚拟小区域。"""
+    """Expand each virtual small area in order of pre-title, main body, post-title, and footnote."""
 
     regions: list[list[dict[str, Any]]] = []
     for parent_indices, relations in _merge_parent_assignment_groups(assignments):
@@ -1277,7 +1277,7 @@ def _build_visual_annotation_regions(
             if blocks[index].get("type") == "caption" and relation.direction in {"below", "right"}
         ]
         footnotes = [index for index in relations if blocks[index].get("type") == "footnote"]
-        # 双面板说明紧随自己的表体，保证公共归属阶段不因另一栏表体更近而误绑定。
+        # The double-panel description follows its own table body to ensure that the public attribution stage is not mistakenly bound because the table body of another column is closer.
         ordered_bodies = []
         panel_notes = set()
         for body in _sort_visual_body_members(parent_indices, blocks, page_size):
@@ -1339,7 +1339,7 @@ def _classify_and_bind_visual_annotations(
     *,
     merge_text_block_group: _TextBlockGroupMerger | None = None,
 ) -> list[list[dict[str, Any]]]:
-    """重分类强规则独立注释，并返回供全局 XYCut++ 使用的有序视觉区域。"""
+    """Reclassifies strong rule independent annotations and returns an ordered visual region for use by global XYCut++."""
 
     candidates = _collect_annotation_candidates(blocks)
     if not candidates:
@@ -1380,7 +1380,7 @@ def _classify_and_bind_visual_annotations(
         )
         if parent is not None:
             previous = assignments.get(index)
-            # 装饰分隔线建立的旧图注带不能推翻已由数据网格与曲线图语义确认的父关系。
+            # Old legend bands established by decorative dividers cannot override the parent relationship already established by the data grid and graph semantics.
             if (
                 candidates[index] == "caption"
                 and parent.native_numeric_grid
@@ -1418,7 +1418,7 @@ def _classify_and_bind_visual_annotations(
     for index, relation in assignments.items():
         blocks[index]["type"] = candidates[index]
         blocks[index]["_visual_annotation_direction"] = relation.direction
-        # 原生数据网格证据胜过近距父对象时，保留内部关联供公共MiddleJson转换消费，随后清除。
+        # When native data grid evidence outperforms the nearest parent object, the internal association is retained for consumption by the public MiddleJson transformation and subsequently cleared.
         if (
             candidates[index] == "caption"
             and len(relation.parent.member_indices) == 1
@@ -1439,7 +1439,7 @@ def _expand_stacked_bilingual_caption_assignments(
     candidates: dict[int, _AnnotationKind],
     assignments: dict[int, _AnnotationRelation],
 ) -> dict[int, _AnnotationRelation]:
-    """把紧邻且编号相同的中英文双语图题绑定到同一视觉主体。"""
+    """Bind Chinese and English bilingual picture titles that are adjacent and numbered the same to the same visual subject."""
 
     output: dict[int, _AnnotationRelation] = {}
     assigned_captions = [index for index in assignments if candidates.get(index) == "caption"]

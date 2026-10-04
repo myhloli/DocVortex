@@ -1,4 +1,4 @@
-"""OFD 二进制流到分页 raw model-list 的转换入口。"""
+"""OFD binary stream to paged raw model-list conversion entry."""
 
 from __future__ import annotations
 
@@ -15,15 +15,15 @@ from .vector import render_vector_page, UnsupportedVector
 
 
 class OfdConverter:
-    """编排 OFD 包读取、场景构建和阅读顺序投影。"""
+    """Orchestrate OFD package reading, scene construction and reading sequence projection."""
 
     def __init__(self) -> None:
-        """初始化空的分页输出。"""
+        """Initialize empty paged output."""
         self.pages: list[list[dict[str, object]]] = []
         self.diagnostics: list[dict[str, object]] = []
 
     def convert(self, file_binary: BinaryIO) -> None:
-        """读取整份 OFD 并更新分页 model-list。"""
+        """Read the entire OFD and update the paged model-list."""
         self.pages = []
         self.diagnostics = []
         file_bytes = file_binary.read(MAX_TOTAL_BYTES + 1)

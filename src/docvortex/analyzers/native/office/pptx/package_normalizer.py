@@ -23,7 +23,7 @@ PRESENTATIONML_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 PACKAGE_RELATIONSHIPS_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 
 PRESENTATION_MAIN_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
-# 关系类型尾段到 part 内容类型的映射，用于按关系图补全 [Content_Types].xml Override。
+# Mapping of relationship type tail segment to part content type for completion by relationship diagram [Content_Types].xml Override.
 PPTX_REL_CONTENT_TYPES = {
     "officeDocument": PRESENTATION_MAIN_CONTENT_TYPE,
     "slide": "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
@@ -63,7 +63,7 @@ KNOWN_NAMESPACE_DECLARATIONS = {
 
 
 def normalize_pptx_package(file_bytes: bytes) -> bytes:
-    """在进入 python-pptx 前修复常见包级兼容问题，避免修复逻辑散落到形状解析阶段。"""
+    """Fix common package-level compatibility issues before entering python-pptx to avoid repair logic being scattered into the shape parsing stage."""
     if file_bytes.startswith(LEGACY_PPT_MAGIC):
         raise ValueError("Legacy binary PPT files are not supported; convert the file to PPTX before parsing.")
 
@@ -112,7 +112,7 @@ def normalize_pptx_package(file_bytes: bytes) -> bytes:
 
 
 def _read_member_best_effort(source: ZipFile, info: ZipInfo) -> bytes | None:
-    """读取 ZIP 成员；损坏的媒体资源可跳过，关键 XML/关系文件仍保持失败。"""
+    """Reading ZIP member; corrupted media resources skipped, critical XML/relationship files remain failed."""
     try:
         return source.read(info.filename)
     except BadZipFile as exc:
@@ -123,7 +123,7 @@ def _read_member_best_effort(source: ZipFile, info: ZipInfo) -> bytes | None:
 
 
 def _is_skippable_corrupt_member(filename: str) -> bool:
-    """判断损坏成员是否属于可降级丢弃的媒体资源。"""
+    """Determine whether the damaged member is a media resource that can be degraded and discarded."""
     return filename.startswith("ppt/media/")
 
 
@@ -132,7 +132,7 @@ def _normalize_member_xml(
     member_data: bytes,
     skipped_members: set[str] | None = None,
 ) -> bytes:
-    """仅对 XML/关系成员做文本级和结构级规范化，二进制资源保持原样。"""
+    """Only text-level and structure-level normalization is done on XML/relationship members, and binary resources remain as is."""
     if not (filename.endswith(".xml") or filename.endswith(".rels")):
         return member_data
 
@@ -154,7 +154,7 @@ def _remove_relationships_to_skipped_members(
     rels_xml: bytes,
     skipped_members: set[str],
 ) -> bytes:
-    """删除指向已跳过媒体成员的内部关系，避免归一化包保留悬空引用。"""
+    """Remove internal relationships pointing to skipped media members to avoid normalization packages retaining dangling references."""
     if not skipped_members:
         return rels_xml
 
@@ -192,7 +192,7 @@ def _remove_relationships_to_skipped_members(
 
 
 def _resolve_relationship_target(rels_filename: str, target: str) -> str:
-    """把关系文件中的 Target 解析成 ZIP 包内的规范成员路径。"""
+    """Parse Target in the relationship file into the canonical member path in the ZIP package."""
     target = target.replace("\\", "/")
     if target.startswith("/"):
         return target.lstrip("/")
@@ -204,7 +204,7 @@ def _resolve_relationship_target(rels_filename: str, target: str) -> str:
 
 
 def _relationship_source_base_dir(rels_filename: str) -> str:
-    """根据 .rels 成员路径推导源 part 的基础目录。"""
+    """Deduces the base directory of the source part based on the .rels member path."""
     shared_base_dir = relationship_source_base_dir(rels_filename)
     if shared_base_dir is not None:
         return shared_base_dir
@@ -223,12 +223,12 @@ def _relationship_source_base_dir(rels_filename: str) -> str:
 
 
 def _translate_strict_ooxml_uris(xml_bytes: bytes) -> bytes:
-    """把 Strict OOXML URI 转为 python-pptx 能识别的 Transitional URI。"""
+    """Convert Strict OOXML URI to Transitional URI that python-pptx can recognize."""
     return translate_strict_ooxml_uris(xml_bytes, STRICT_OOXML_REPLACEMENTS)
 
 
 def _add_missing_known_namespaces(xml_bytes: bytes) -> bytes:
-    """为实际使用但未声明的已知前缀补齐命名空间，修复轻微损坏的 XML。"""
+    """Fix slightly broken XML by patching namespaces for known prefixes that are actually used but not declared."""
     declarations = []
     for prefix, declaration in KNOWN_NAMESPACE_DECLARATIONS.items():
         if prefix + b":" in xml_bytes and b"xmlns:" + prefix + b"=" not in xml_bytes:
@@ -254,7 +254,7 @@ def _add_missing_known_namespaces(xml_bytes: bytes) -> bytes:
 
 
 def _replace_content_part_alternate_content_with_fallback(xml_bytes: bytes) -> bytes:
-    """将 python-pptx 不支持的 p:contentPart 优先分支替换为可解析的 fallback 图形。"""
+    """Replaced the unsupported p:contentPart priority branch by python-pptx with the parsable fallback graph."""
     if b"AlternateContent" not in xml_bytes or b"contentPart" not in xml_bytes:
         return xml_bytes
 
@@ -282,7 +282,7 @@ def _replace_content_part_alternate_content_with_fallback(xml_bytes: bytes) -> b
 
 
 def _replace_single_alternate_content(alternate_content: etree._Element) -> bool:
-    """替换单个 AlternateContent 节点，优先保留 fallback 中的可见图形。"""
+    """Replace a single AlternateContent node, preferring to preserve visible graphics in fallback."""
     choice = alternate_content.find(f"{{{MARKUP_COMPATIBILITY_NS}}}Choice")
     fallback = alternate_content.find(f"{{{MARKUP_COMPATIBILITY_NS}}}Fallback")
     if choice is None or fallback is None:

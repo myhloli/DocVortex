@@ -1,3 +1,3 @@
-"""XLS 与 XLSX 复用的内部工作表投影能力。"""
+"""Internal worksheet projection capability multiplexed by XLS and XLSX."""
 
 __all__: list[str] = []

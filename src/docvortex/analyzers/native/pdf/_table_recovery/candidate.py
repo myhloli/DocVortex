@@ -1,4 +1,4 @@
-"""Native PDF 表格候选的网格校验、字符落格和 HTML 序列化。"""
+"""Native PDF Grid check, character dropout and HTML serialization of table candidates."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ MIN_TEXT_CAPTURE = 0.98
 
 @dataclass(frozen=True, slots=True)
 class GridCellSpec:
-    """保存尚未回填文本的逻辑网格单元格。"""
+    """Save logical grid cells that have not been backfilled with text."""
 
     row: int
     col: int
@@ -28,7 +28,7 @@ class GridCellSpec:
 
 @dataclass(frozen=True, slots=True)
 class _GridSpecIndex:
-    """保存规则网格的原子轨道和原子格到逻辑单元格映射。"""
+    """Save atomic orbitals and atomic lattice to logical cell mappings of regular grids."""
 
     x_tracks: tuple[float, ...]
     y_tracks: tuple[float, ...]
@@ -43,7 +43,7 @@ def _validate_grid_specs(
     allow_single_row: bool = False,
     allow_single_column: bool = False,
 ) -> bool:
-    """校验逻辑单元格完整覆盖矩形网格且没有重叠。"""
+    """Verify that the logical cells completely cover the rectangular grid and do not overlap."""
 
     minimum_rows = 1 if allow_single_row else 2
     minimum_cols = 1 if allow_single_column else 2
@@ -74,7 +74,7 @@ def _choose_cell_for_glyph(
     glyph: NativeTableGlyph,
     specs: tuple[GridCellSpec, ...],
 ) -> tuple[int | None, bool]:
-    """按字符面积交叠选择唯一单元格，并标记近似平局的边界歧义。"""
+    """Unique cells are selected by character area overlap and border ambiguities that approximate ties are marked."""
 
     overlaps = [(glyph_overlap_ratio(glyph, spec.bbox), index) for index, spec in enumerate(specs)]
     overlaps.sort(reverse=True)
@@ -96,7 +96,7 @@ def _build_grid_spec_index(
     cols: int,
     specs: tuple[GridCellSpec, ...],
 ) -> _GridSpecIndex | None:
-    """从完整矩形网格规格恢复原子轨道，供大表快速落格。"""
+    """Recover atomic orbitals from complete rectangular grid specifications for rapid placement of large tables."""
 
     x_values: list[list[float]] = [[] for _ in range(cols + 1)]
     y_values: list[list[float]] = [[] for _ in range(rows + 1)]
@@ -129,7 +129,7 @@ def _choose_cell_for_glyph_indexed(
     specs: tuple[GridCellSpec, ...],
     index: _GridSpecIndex,
 ) -> tuple[int | None, bool]:
-    """只在字符覆盖的邻近原子格中选择逻辑单元格。"""
+    """Select logical cells only within adjacent atoms covered by the character."""
 
     cols = len(index.x_tracks) - 1
     rows = len(index.y_tracks) - 1
@@ -144,7 +144,7 @@ def _choose_cell_for_glyph_indexed(
         min(rows - 1, bisect_left(index.y_tracks, glyph.bbox[3]) - 1),
     )
     if left_col == right_col and top_row == bottom_row:
-        # 只覆盖一个原子格时仍执行原面积/中心判定，省去候选集合与排序。
+        # When only one atomic grid is covered, the original area/center determination is still performed, eliminating the need for candidate collection and sorting.
         cell_index = index.owners[top_row][left_col]
         bbox = specs[cell_index].bbox
         if glyph_overlap_ratio(glyph, bbox) > 0:
@@ -177,7 +177,7 @@ def _order_consistency(
     assignments: dict[int, int],
     specs: tuple[GridCellSpec, ...],
 ) -> float:
-    """衡量每条视觉行中的字符单元格序号是否保持从左到右单调。"""
+    """Measures whether the character cell numbers in each visual row remain monotonous from left to right."""
 
     comparable = 0
     ordered_pairs = 0
@@ -203,7 +203,7 @@ def _count_split_tokens(
     text: NativeTableText,
     assignments: dict[int, int],
 ) -> int:
-    """统计字符被分配到多个逻辑单元格的原子 token。"""
+    """Statistics characters are assigned to atoms token in multiple logical cells."""
 
     split_count = 0
     for row in text.rows:
@@ -231,7 +231,7 @@ def build_candidate(
     use_grid_index: bool = False,
     diagnostics: dict[str, object] | None = None,
 ) -> NativeTableCandidate | None:
-    """校验网格、唯一分配字符并计算统一质量分。"""
+    """Verify the grid, uniquely assign characters, and calculate a uniform quality score."""
 
     if not _validate_grid_specs(
         rows,
@@ -338,7 +338,7 @@ def build_candidate(
 
 
 def serialize_candidate_html(candidate: NativeTableCandidate) -> str:
-    """把合法候选序列化为稳定、转义且不猜测表头语义的 HTML。"""
+    """Serialize legal candidates into HTML that is stable, escaped, and does not guess header semantics."""
 
     return serialize_native_table_html(candidate.rows, candidate.cells)
 
@@ -349,7 +349,7 @@ def serialize_native_table_html(
     *,
     render_cell: Callable[[NativeTableCell], str] | None = None,
 ) -> str:
-    """按稳定拓扑序列化表格，并允许调用方提供已安全转义的 cell 内容。"""
+    """Serializes the table in a stable topology and allows callers to provide safely escaped cell content."""
 
     cells_by_row: dict[int, list[NativeTableCell]] = {}
     for cell in cells:

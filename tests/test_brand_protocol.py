@@ -1,4 +1,4 @@
-"""验证 DocVortex 独立命名和已明确移除的旧品牌协议。"""
+"""Verify that DocVortex is independently named and the old branding agreement has been explicitly removed."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from docvortex.schema import MiddleJson, ModelJson
 
 
 def test_only_new_package_and_protocol_names_are_available() -> None:
-    """包和原生协议仅使用新品牌，不提供旧导入名。"""
+    """Packages and native protocols only use the new branding and do not provide the old import names."""
     assert util.find_spec("docgale") is None
     model = ModelJson(
         pages=[], page_index_map=[], metadata={"file_suffix": "pdf", "producer": {"name": "docvortex", "version": "0.2.0"}}
@@ -35,7 +35,7 @@ def test_only_new_package_and_protocol_names_are_available() -> None:
 
 
 def test_old_bundle_schema_is_rejected_without_rewriting(tmp_path: Path) -> None:
-    """旧结果包明确拒绝，读取失败不得重写清单或尝试隐式迁移。"""
+    """Old result packages are explicitly rejected and failed reads must not rewrite the manifest or attempt an implicit migration."""
     result = DocumentResult(
         MiddleJson(
             pages=[],
@@ -57,7 +57,7 @@ def test_old_bundle_schema_is_rejected_without_rewriting(tmp_path: Path) -> None
 
 
 def test_old_producer_and_user_text_are_not_rebranded_on_load() -> None:
-    """新协议中的真实生产者与用户文字不因品牌名相同而被字符串替换。"""
+    """The real producer and user text in the new protocol will not be replaced by strings because the brand name is the same."""
     model = ModelJson(
         pages=[
             [{"type": "text", "content": [{"type": "text", "content": "DocGale docgale-file https://example.com/docgale/"}]}]

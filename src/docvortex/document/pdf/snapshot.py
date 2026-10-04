@@ -1,4 +1,4 @@
-"""可脱离 PDFium 生命周期的页面证据；可变字符仅在兼容边界物化。"""
+"""Evidence of pages that can escape the PDFium life cycle; mutable characters materialize only at compatibility boundaries."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from .native_contracts import PDFLinkAnnotation, PDFPageTextGeometry, PDFPageVec
 
 @dataclass(frozen=True, eq=False)
 class PDFPageSnapshot:
-    """持有一页独立证据；公开字符访问返回副本，不把可变对象泄漏给后续消费者。"""
+    """Holds a page of independent evidence; public character access returns a copy and does not leak mutable objects to subsequent consumers."""
 
     page_index: int
     page_size: tuple[float, float]
@@ -24,13 +24,13 @@ class PDFPageSnapshot:
 
     @property
     def text_geometry(self) -> PDFPageTextGeometry:
-        """兼容 Python 字符字典的可变约定，同时隔离消费者之间的修改。"""
+        """Compatible with the mutability conventions of the Python character dictionary while isolating modifications between consumers."""
         if self._native_text is not None:
             return self._native_text.materialize_geometry()
         return deepcopy(self._geometry)
 
     def get_lines(self, superscript_height_threshold: float = 0.7, line_distance_threshold: float = 0.1):
-        """直接从原生快照生成基础文本行，特殊阈值保留原 Python 参数语义。"""
+        """Generate base text lines directly from native snapshots, with special thresholds retaining original Python parameter semantics."""
         if (
             self._native_text is not None
             and type(superscript_height_threshold) is float
@@ -43,16 +43,16 @@ class PDFPageSnapshot:
 
     @property
     def vector_geometry(self) -> PDFPageVectorGeometry:
-        """返回独立矢量记录，防止调用方修改嵌套坐标后污染缓存。"""
+        """Return independent vector records to prevent the caller from polluting the cache after modifying nested coordinates."""
         return deepcopy(self._vectors)
 
     @property
     def link_annotations(self) -> tuple[PDFLinkAnnotation, ...]:
-        """返回独立链接证据，不访问已关闭的页面或文档。"""
+        """Return independent link evidence without visiting closed pages or documents."""
         return deepcopy(self._links)
 
     def validate_page(self, page: object) -> None:
-        """拒绝将另一份文档或另一页的快照用于当前页面。"""
+        """Deny using a snapshot of another document or page for the current page."""
         document = getattr(page, "pdf_doc", None)
         if getattr(document, "_snapshot_owner", None) is not self._owner or getattr(page, "_idx", None) != self.page_index:
             raise ValueError("snapshot belongs to a different PDF page")

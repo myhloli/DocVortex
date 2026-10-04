@@ -1,4 +1,4 @@
-"""为文件类型和代码语言识别提供限制线程数的 Magika。"""
+"""Magika provides a limited number of threads for file type and code language recognition."""
 
 import time
 
@@ -8,10 +8,10 @@ from magika import __version__ as _MAGIKA_VERSION
 
 
 class Magika(BaseMagika):
-    """仅将 Magika 的 CPU 会话固定为 4/1，保留模型与识别行为。"""
+    """Fixed CPU session to 4/1 only for Magika, preserving model and recognition behavior."""
 
     def _init_onnx_session(self) -> ort.InferenceSession:
-        """Magika 尚无公开会话参数入口，在此集中限制算子内和算子间线程数。"""
+        """Magika There is no public session parameter entry yet, and the number of threads within and between operators is limited in this centralized setting."""
         started = time.perf_counter()
         ort.disable_telemetry_events()
         options = ort.SessionOptions()
@@ -23,7 +23,7 @@ class Magika(BaseMagika):
         return session
 
     def get_module_version(self) -> str:
-        """保持上游版本标识，避免基类根据子类模块名误报 DocVortex 版本。"""
+        """Maintain the upstream version identification to prevent the base class from falsely reporting the DocVortex version based on the subclass module name."""
         return _MAGIKA_VERSION
 
 

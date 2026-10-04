@@ -1,4 +1,4 @@
-"""原生分析的内部结构契约；公开 ModelJson 的 wire shape 保持不变。"""
+"""Internal structure contract of native analysis; wire shape exposing ModelJson remains unchanged."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class RawBlock(TypedDict, total=False):
-    """描述 raw 阶段共有字段，格式特有证据仍可附加在普通字典中。"""
+    """Description raw stage common fields, format-specific evidence can still be attached to the ordinary dictionary."""
 
     type: str
     bbox: BBox | list[float] | None
@@ -24,21 +24,21 @@ class RawBlock(TypedDict, total=False):
 
 
 class NativeBinaryAnalyzer(Protocol):
-    """限定 API 分派需要的二进制流预测能力，不创建统一继承框架。"""
+    """Limit the binary stream prediction capabilities required for API dispatch and do not create a unified inheritance framework."""
 
     def predict(self, file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-        """读取调用者持有的流并返回原生页面，不关闭该流。"""
+        """Read the stream held by the caller and return to the native page without closing the stream."""
 
 
 class NativePdfSource(Protocol):
-    """限定原生 PDF 编排所需的页面数量与一次性证据快照。"""
+    """Limit the number of pages and one-time evidence snapshots required for native PDF orchestration."""
 
     @property
     def page_count(self) -> int:
-        """返回当前所选 PDF 的物理页数。"""
+        """Returns the physical page number of the currently selected PDF."""
 
     def _extract_native_page(self, page_idx: int) -> _PDFPageSnapshot:
-        """在单个页面生命周期内收集原生证据。"""
+        """Collect native evidence during the lifetime of a single page."""
 
 
 __all__ = ["RawBlock", "NativeBinaryAnalyzer", "NativePdfSource"]

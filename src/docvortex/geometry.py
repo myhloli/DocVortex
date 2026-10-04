@@ -1,4 +1,4 @@
-"""稳定的几何 SDK；不加载 PDFium 或图像编解码实现。"""
+"""Stable geometry SDK; does not load PDFium or image codec implementation."""
 
 from .foundation._coordinates import (
     bbox_center,

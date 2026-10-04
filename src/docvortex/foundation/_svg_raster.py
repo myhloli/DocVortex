@@ -1,4 +1,4 @@
-"""把外部 SVG 图片资源受控光栅化为 PNG data URI 的共享能力。"""
+"""Sharing capability for controlled rasterization of external SVG image resources into PNG data URI."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from ._image_payload import (
 
 SVG_MEDIA_TYPE: Final = "image/svg+xml"
 SVG_IMAGE_EXTENSION: Final = ".svg"
-# 小尺寸 logo 按固有像素直出会明显发虚，统一放大到最小可视长边。
+# The small size logo will be obviously blurry when viewed straight out according to the inherent pixels, and it will be uniformly enlarged to the minimum visible long side.
 _MIN_RENDER_LONG_EDGE: Final = 512
 _SVG_LENGTH_RE = re.compile(r"^([0-9]*\.?[0-9]+)\s*(px|pt|pc|mm|cm|in|q|%)?$", re.IGNORECASE)
 _LENGTH_TO_PX: Final = {
@@ -37,7 +37,7 @@ _SVG_PAYLOAD_SNIFF_WINDOW: Final = 4096
 
 
 def is_svg_image_part(part_name: object | None = None, content_type: str | None = None) -> bool:
-    """根据部件扩展名和声明媒体类型判断是否为 SVG 图片部件。"""
+    """Determine whether it is a SVG picture component based on the component extension and declared media type."""
     normalized_type = (content_type or "").split(";", 1)[0].strip().casefold()
     if normalized_type == SVG_MEDIA_TYPE:
         return True
@@ -46,7 +46,7 @@ def is_svg_image_part(part_name: object | None = None, content_type: str | None 
 
 
 def looks_like_svg_payload(image_data: bytes) -> bool:
-    """按载荷前缀嗅探 SVG 根节点，兜底识别被错误标注的图片部件。"""
+    """Sniff the SVG root node according to the payload prefix to identify incorrectly labeled image components."""
     head = image_data[:_SVG_PAYLOAD_SNIFF_WINDOW].lstrip()
     if head.startswith(b"<svg") or head.startswith(b"<svg:"):
         return True
@@ -54,7 +54,7 @@ def looks_like_svg_payload(image_data: bytes) -> bool:
 
 
 def _length_to_px(value: str | None) -> float | None:
-    """把 SVG width/height 长度解析为像素值，百分比等上下文相关单位返回 None。"""
+    """Parse the SVG width/height length into pixel values, percentages and other context-sensitive units and return None."""
     match = _SVG_LENGTH_RE.match((value or "").strip())
     if match is None:
         return None
@@ -65,7 +65,7 @@ def _length_to_px(value: str | None) -> float | None:
 
 
 def _intrinsic_size(root: ElementTree.Element) -> tuple[int, int] | None:
-    """从 svg 根元素解析固有像素尺寸，width/height 不可用时回退 viewBox。"""
+    """Resolve intrinsic pixel dimensions from the svg root element, falling back to viewBox when width/height is not available."""
     width = _length_to_px(root.get("width"))
     height = _length_to_px(root.get("height"))
     if width is not None and height is not None and width > 0 and height > 0:
@@ -82,7 +82,7 @@ def _intrinsic_size(root: ElementTree.Element) -> tuple[int, int] | None:
 
 
 def _clamped_size(width: int, height: int) -> tuple[int, int]:
-    """按光栅单边与总像素预算等比收缩目标尺寸。"""
+    """Shrink the target size proportionally to the total pixel budget per side of the raster."""
     scale = min(
         1.0,
         MAX_DECODED_RASTER_DIMENSION / width,
@@ -98,7 +98,7 @@ def _render_size(
     intrinsic: tuple[int, int] | None,
     size_hint: tuple[int, int] | None,
 ) -> tuple[int, int] | None:
-    """解析渲染目标尺寸：显式提示优先，其次固有尺寸并放大到最小长边。"""
+    """Resolve render target dimensions: explicit hints take precedence, intrinsic dimensions second and scaled to the smallest long side."""
     if size_hint is not None and size_hint[0] > 0 and size_hint[1] > 0:
         return _clamped_size(max(1, round(size_hint[0])), max(1, round(size_hint[1])))
     if intrinsic is None:
@@ -112,7 +112,7 @@ def _render_size(
 
 
 def _is_fully_transparent(png: bytes) -> bool:
-    """检测光栅化结果是否全透明，用于让无视觉内容的 SVG 走调用方降级。"""
+    """Detects whether the rasterization result is fully transparent, used to degrade SVG callers without visual content."""
     from PIL import Image
 
     with Image.open(BytesIO(png)) as image:
@@ -122,11 +122,11 @@ def _is_fully_transparent(png: bytes) -> bool:
 
 
 def serialize_svg_image(image_data: bytes, *, size_hint: tuple[int, int] | None = None) -> str | None:
-    """把外部 SVG 字节光栅化为透明 PNG data URI，无法安全渲染时返回 None。
+    """Rasterize external SVG bytes to transparent PNG data URI, returning None when rendering cannot be done safely.
 
-    resvg 不执行脚本也不加载外部资源，是外部 SVG 进入输出的安全净化边界；
-    ``skip_system_fonts=True`` 保证跨平台输出确定，代价是未转路径的 ``<text>``
-    不渲染文字。DTD、实体声明和超预算载荷在解析阶段即被拒绝。
+    resvg neither executes scripts nor loads external resources, providing a sanitization boundary for external SVG output;
+    ``skip_system_fonts=True`` makes output deterministic across platforms, but ``<text>`` not converted to paths
+    will not render text. Reject DTDs, entity declarations, and payloads exceeding resource limits during parsing.
     """
     try:
         root = _parse_svg_root_strict(image_data)
@@ -137,7 +137,7 @@ def serialize_svg_image(image_data: bytes, *, size_hint: tuple[int, int] | None 
     import resvg_py
 
     target_size = _render_size(_intrinsic_size(root), size_hint)
-    # 严格解析后的树重序列化为 UTF-8，避免原始声明的非 UTF-8 编码干扰渲染输入。
+    # The strictly parsed tree is reserialized to UTF-8 to avoid the originally declared non-UTF-8 encoding interfering with rendering input.
     markup = ElementTree.tostring(root, encoding="unicode")
     render_options: dict[str, int] = {}
     if target_size is not None:
@@ -150,7 +150,7 @@ def serialize_svg_image(image_data: bytes, *, size_hint: tuple[int, int] | None 
         if _is_fully_transparent(png):
             logger.debug("Rasterized SVG image is fully transparent; degrading to caller fallback")
             return None
-    except Exception as exc:  # noqa: BLE001 - resvg 异常面未定型，统一降级由调用方兜底
+    except Exception as exc:  # noqa: BLE001 - resvg The exception surface has not been finalized, and the unified downgrade will be covered by the caller.
         logger.warning(f"SVG image cannot be rasterized: {exc}")
         return None
 

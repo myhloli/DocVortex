@@ -1,4 +1,4 @@
-"""OFD 命名空间、版本与安全资源上限。"""
+"""OFD Namespace, version and security resource limits."""
 
 from __future__ import annotations
 

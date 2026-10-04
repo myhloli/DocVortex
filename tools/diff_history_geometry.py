@@ -1,4 +1,4 @@
-"""比较两份历史几何捕获的逐块 bbox，报告坐标刻度差与内容指纹差异，不修改任何基线。"""
+"""Compares block-by-block bbox of two historical geometry captures, reporting coordinate scale differences and content fingerprint differences without modifying any baselines."""
 
 from __future__ import annotations
 
@@ -14,26 +14,26 @@ _GRID = 1000
 
 
 def _read_summary(directory: Path) -> dict[str, dict]:
-    """按文档名索引捕获 summary，缺失即视为捕获不完整。"""
+    """Capture summary by document name index. If it is missing, the capture is considered incomplete."""
     documents = json.loads((directory / "summary.json").read_text(encoding="utf-8"))
     return index_summary(documents)
 
 
 def index_summary(documents: list[dict]) -> dict[str, dict]:
-    """拒绝空捕获和重复文档名，避免索引时静默丢失诊断记录。"""
+    """Reject empty captures and duplicate document names to avoid silent loss of diagnostic records during indexing."""
     indexed = {document["name"]: document for document in documents}
     assert indexed and len(indexed) == len(documents), "empty capture or duplicate document names"
     return indexed
 
 
 def summary_fingerprint(documents: dict[str, dict]) -> str:
-    """绑定完整参考捕获，忽略 JSON 排版及文档排列，保留版本、指纹与坐标身份。"""
+    """Bind to complete reference capture, ignore JSON typesetting and document arrangement, retain version, fingerprint and coordinate identity."""
     payload = json.dumps(documents, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _steps(bbox: list[float]) -> list[int]:
-    """按 0.001 输出量化网格取整数刻度，避免浮点表示差造成边界误判。"""
+    """The output quantization grid is an integer scale based on 0.001 to avoid boundary misjudgments caused by floating point representation differences."""
     assert isinstance(bbox, (list, tuple)) and len(bbox) == 4, "bbox must hold four coordinates"
     assert all(type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 1 for value in bbox), "invalid bbox"
     assert all(math.isclose(value * _GRID, round(value * _GRID), rel_tol=0, abs_tol=1e-8) for value in bbox), "bbox is off grid"
@@ -41,12 +41,12 @@ def _steps(bbox: list[float]) -> list[int]:
 
 
 def _coordinate_points(delta_steps: dict[str, int], page_size: list[float]) -> dict[str, float]:
-    """把刻度差换算为 PDF point，横向用页宽、纵向用页高。"""
+    """To convert the scale difference to PDF point, use the page width in the horizontal direction and the page height in the vertical direction."""
     return {name: round(delta_steps[name] / _GRID * page_size[0 if name.startswith("x") else 1], 3) for name in _COORD_NAMES}
 
 
 def compare_document(reference: dict, candidate: dict) -> dict:
-    """逐页比较内容指纹与整数刻度 bbox；内容差异与几何差异分开归因。"""
+    """Page-by-page comparison of content fingerprints with integer scale bbox; content differences are attributed separately from geometric differences."""
     assert reference["sha256"] == candidate["sha256"], ("source differs", reference["name"])
     pages = []
     max_steps = 0
@@ -91,7 +91,7 @@ def compare_document(reference: dict, candidate: dict) -> dict:
 
 
 def build_report(reference: dict[str, dict], candidate: dict[str, dict]) -> dict:
-    """生成可回溯到完整参考捕获的报告，并检查各文档来自同一运行环境。"""
+    """Generate reports that trace back to the complete reference capture and check that each document comes from the same runtime environment."""
     assert reference and reference.keys() == candidate.keys(), "captured document sets differ"
     reference_environment = next(iter(reference.values()))["environment"]
     candidate_environment = next(iter(candidate.values()))["environment"]
@@ -111,7 +111,7 @@ def build_report(reference: dict[str, dict], candidate: dict[str, dict]) -> dict
 
 
 def main() -> None:
-    """输出参考/候选的逐块差异报告；仅内容指纹变化视为回归并以非零码退出。"""
+    """Output a block-by-block diff report for references/candidates; only content fingerprint changes are considered regressions and exit with a non-zero code."""
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("reference", type=Path)

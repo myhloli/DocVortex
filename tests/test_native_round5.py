@@ -1,4 +1,4 @@
-"""第五轮候选超集、配对顺序及几何物化的独立差分。"""
+"""Independent differencing of fifth-round candidate supersets, pairing orders, and geometric materializations."""
 
 import math
 import random
@@ -12,7 +12,7 @@ from docvortex.analyzers.native.pdf.models import _LineItem
 
 
 def make_lines(seed, count=80):
-    """生成含来源框、旋转、同分及表格边界的稳定随机文本行。"""
+    """Generate stable random text lines with source boxes, rotations, divisions and table boundaries."""
     rng = random.Random(seed)
     lines = []
     for i in range(count):
@@ -35,7 +35,7 @@ def make_lines(seed, count=80):
 
 @pytest.mark.parametrize("seed", range(24))
 def test_pair_prefilters_preserve_every_accepted_edge(seed):
-    """与全配对原判定比较完整有效边，不以新索引自身作为预期。"""
+    """Compare the complete valid edges with the original decision of full pairing, and do not use the new index itself as an expectation."""
     lines = make_lines(seed)
     boxes = [merging._rotate_bbox_to_upright(line.bbox, (100.0, 100.0), line.angle) for line in lines]
     groups = {}
@@ -50,7 +50,7 @@ def test_pair_prefilters_preserve_every_accepted_edge(seed):
             assert partners == sorted(set(partners))
 
             def accepted(j):
-                """通过未改写的业务判定计算独立真值。"""
+                """Compute independent truth values from unwritten business decisions."""
                 if mode == "baseline":
                     return merging._can_merge_same_baseline_pair(lines[i], boxes[i], lines[j], boxes[j], tables)
                 return merging._overlapping_inline_cluster_pair_is_connected(
@@ -61,7 +61,7 @@ def test_pair_prefilters_preserve_every_accepted_edge(seed):
 
 
 def test_overlap_closure_matches_exhaustive(monkeypatch):
-    """比较完整闭包对象，防止有效边相同但顺序或物化改变。"""
+    """Compare complete closure objects to prevent valid edges from being the same but changing order or materialization."""
     lines = make_lines(11)
     actual = merging.merge_text_line_clusters(deepcopy(lines), (100.0, 100.0), [])
     monkeypatch.setattr(merging, "_overlapping_candidate_pairs", lambda members: None)
@@ -72,7 +72,7 @@ def test_overlap_closure_matches_exhaustive(monkeypatch):
 
 @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf, 1e200, 10**400])
 def test_overlap_special_geometry_falls_back(value):
-    """异常几何不进入有限索引，不改变参考路径处理方式。"""
+    """Abnormal geometries are not entered into finite indexes and do not change the way reference paths are handled."""
     lines = make_lines(2)
     boxes = [line.bbox for line in lines]
     boxes[0] = (value, 0.0, 10.0, 10.0)
@@ -81,7 +81,7 @@ def test_overlap_special_geometry_falls_back(value):
 
 @pytest.mark.parametrize("dense", [False, True])
 def test_overlap_storage_is_bounded_without_truncation(dense):
-    """分离行只产生空批次，极密行保留全量候选且不缓存整页矩阵。"""
+    """Split rows only produce empty batches, extremely dense rows retain the full number of candidates and do not cache the entire page of the matrix."""
     lines = [_LineItem("x", (0.0, 0.0 if dense else i * 3.0, 1.0, 1.0 if dense else i * 3.0 + 1.0), 0, i) for i in range(300)]
     candidates = merging._overlapping_candidate_pairs([(line, line.bbox) for line in lines])
     assert candidates is not None
@@ -90,7 +90,7 @@ def test_overlap_storage_is_bounded_without_truncation(dense):
 
 
 def test_native_baseline_geometry_is_used():
-    """强制检查已加载的私有内核，避免参考实现冒充 Rust 路径。"""
+    """Force checking of loaded private kernels to avoid reference implementation impersonating Rust paths."""
     if get_native() is None:
         pytest.skip("native backend is not selected")
     lines = make_lines(2)
@@ -102,7 +102,7 @@ def test_native_baseline_geometry_is_used():
 
 @pytest.mark.parametrize("seed", range(40))
 def test_inline_matches_and_materialization_match_python(seed, monkeypatch):
-    """对同分候选、前后缀及多级标记比较完整物化结果与原实现。"""
+    """Compare the complete materialization results with the original implementation for identical candidates, suffixes and multi-level tags."""
     from docvortex import _compute_backend
     from docvortex.analyzers.native.pdf import native_text
 
@@ -119,14 +119,14 @@ def test_inline_matches_and_materialization_match_python(seed, monkeypatch):
 
 
 def test_inline_kernel_is_used(monkeypatch):
-    """普通批次不得绕过已加载内核，匹配列表空也需要真正执行原生函数。"""
+    """Ordinary batches must not bypass the loaded kernel, and even if the matching list is empty, the native function must actually be executed."""
     from docvortex.analyzers.native.pdf import native_text
 
     if get_native() is None:
         pytest.skip("native backend is not selected")
 
     def forbidden(*args):
-        """使错误的静默 Python 回退明确失败。"""
+        """Silencing error Python fallback fails explicitly."""
         raise AssertionError("reference path executed")
 
     monkeypatch.setattr(native_text, "_inline_script_matches_python", forbidden)
@@ -135,11 +135,11 @@ def test_inline_kernel_is_used(monkeypatch):
 
 @pytest.mark.parametrize("size", [0, 1, 16, 200])
 def test_inline_ties_keep_first_source(size):
-    """完全重合的候选不能因 Rust 排序平局而改选后面的来源。"""
+    """Completely overlapping candidates cannot be reselected to a later source due to a Rust ranking tie."""
     native = get_native()
     if native is None:
         pytest.skip("native backend is not selected")
-    # 前一个小行及主体应赢得所有相同度量的竞争。
+    # The previous row and body should win all competitions of the same metric.
     small = ((10.0, 0.0, 12.0, 4.0), 4.0, 4.0, 1, False, 0, 0)
     base = ((0.0, 2.0, 10.0, 12.0), 10.0, 10.0, 1, False, 1, 0)
     records = [small, base] * size
@@ -148,7 +148,7 @@ def test_inline_ties_keep_first_source(size):
 
 @pytest.mark.parametrize("seed", range(24))
 def test_annotation_geometry_matches_ordered_reference(seed):
-    """覆盖重复来源、片段重排、排除和正负零，逐位保留原坐标。"""
+    """Covers duplicate sources, segment rearrangements, exclusions, and positive and negative zeros, preserving original coordinates bit by bit."""
     import struct
     from types import SimpleNamespace
     from docvortex.analyzers.native.pdf import table_annotations as notes
@@ -180,7 +180,7 @@ def test_annotation_geometry_matches_ordered_reference(seed):
 
 
 def test_annotation_keeps_single_fragment_bbox_identity():
-    """单片段来源保留框对象，重复选中的来源则保留原来的坐标引用。"""
+    """Single-segment sources retain box objects, and sources that are repeatedly selected retain their original coordinate references."""
     from types import SimpleNamespace
     from docvortex.analyzers.native.pdf import table_annotations as notes
 
@@ -202,7 +202,7 @@ def test_annotation_keeps_single_fragment_bbox_identity():
 
 
 def test_rule_bounds_noncontiguous_and_repeated_rows():
-    """只允许完全连续的原行身份查询，其余输入不借用区间极值。"""
+    """Only completely continuous original row identity queries are allowed, and the remaining inputs do not borrow interval extreme values."""
     from types import SimpleNamespace
     from docvortex.analyzers.native.pdf.table_rules import _RuleRowBounds
 
@@ -217,7 +217,7 @@ def test_rule_bounds_noncontiguous_and_repeated_rows():
 
 
 def test_original_source_geometry_survives_ordinary_rejection():
-    """原始字符连续分支可跨修复后的 ink 间距，普通框不能提前否决。"""
+    """Original character continuation branches can span the repaired ink spacing, and normal boxes cannot be vetoed in advance."""
     lines = make_lines(0, 32)
     first = _LineItem("a", (0.0, 0.0, 1.0, 1.0), 0, 0, chars=[{"source_indices": (0,)}])
     second = _LineItem("b", (50.0, 0.0, 51.0, 1.0), 0, 1, chars=[{"source_indices": (1,)}])
@@ -233,7 +233,7 @@ def test_original_source_geometry_survives_ordinary_rejection():
 
 
 def test_annotation_cache_is_bounded_and_not_mutated_by_consumers():
-    """缓存只读快照，单个候选修改不能污染重用结果，淘汰不能删候选。"""
+    """Cache read-only snapshots, single candidate modifications cannot pollute the reuse results, and candidates cannot be deleted for elimination."""
     from types import SimpleNamespace
     from docvortex.analyzers.native.pdf import table_annotations as notes
 
@@ -267,7 +267,7 @@ def test_annotation_cache_is_bounded_and_not_mutated_by_consumers():
 
 @pytest.mark.parametrize("value", [0, 2**53 + 1, -(2**53) - 1])
 def test_integer_arithmetic_is_not_coerced_to_native_float(value, monkeypatch):
-    """整数坐标保留 Python 精确减法，不能因传入 f64 改变边缘判定。"""
+    """The integer coordinates retain the precise subtraction of Python and cannot change the edge determination due to the incoming f64."""
     from docvortex.analyzers.native.pdf import native_text
 
     lines = make_lines(4)
@@ -277,12 +277,12 @@ def test_integer_arithmetic_is_not_coerced_to_native_float(value, monkeypatch):
     original = native_text._inline_script_matches_python
 
     def reference(*args):
-        """记录确实沿用原数值语义，不通过静默转换绕过回退。"""
+        """The record does retain the original value semantics and does not bypass fallback through silent conversion."""
         calls.append(True)
         return original(*args)
 
     monkeypatch.setattr(native_text, "_inline_script_matches_python", reference)
-    # 显式用零方向保留坐标类型，不在旋转阶段先发生合法的浮点转换。
+    # Explicitly preserve the coordinate type with zero orientation, without requiring a legal floating-point conversion to occur first during the rotation phase.
     lines[0].angle = 0
     native_text._native_inline_script_matches(lines, (100.0, 100.0))
     assert calls == [True]
@@ -290,13 +290,13 @@ def test_integer_arithmetic_is_not_coerced_to_native_float(value, monkeypatch):
 
 @pytest.mark.parametrize("count", [2, 18])
 def test_inline_merge_releases_consumed_lines_without_gc(count):
-    """递归闭包必须及时释放已消费行，不能把前一阶段对象留给后续 GC。"""
+    """The recursive closure must release the consumed rows in time and cannot leave the objects of the previous stage to the subsequent GC."""
     import gc
     import weakref
     from docvortex.analyzers.native.pdf import native_text
 
     class ObservableLine(_LineItem):
-        """用弱引用观察内部消费对象，不改变行的合并规则。"""
+        """Use weak references to observe internal consumption objects without changing the merging rules of rows."""
 
     lines = [
         ObservableLine("body", (0.0, 2.0, 10.0, 12.0), 0, 0, visual_row_id=0, effective_height=10.0),

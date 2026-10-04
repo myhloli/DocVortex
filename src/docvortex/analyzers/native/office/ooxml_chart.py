@@ -1,4 +1,4 @@
-"""Flash Office 文档中的 OOXML 图表解析与表格化渲染。"""
+"""Flash Office OOXML Chart parsing and tabular rendering in documentation."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ _PLOT_TAGS: Final = (
 
 @dataclass
 class SeriesSpec:
-    """保存单个 OOXML 图表序列的公式引用、名称和缓存数据。"""
+    """Saves formula references, names, and cached data for a single OOXML chart series."""
 
     name_formula: str | None = None
     literal_name: str | None = None
@@ -59,7 +59,7 @@ class SeriesSpec:
 
 @dataclass
 class ChartSpec:
-    """保存图表类型、坐标轴信息和全部序列的规范化描述。"""
+    """Saves the chart type, axis information, and standardized description of all series."""
 
     chart_type: str
     plot_kind: str
@@ -73,7 +73,7 @@ class ChartSpec:
 
 
 def html_table_from_excel_bytes(excel_bytes: bytes) -> str:
-    """将嵌入工作簿中第一个非空工作表转换为 HTML 表格。"""
+    """Converts the first non-empty worksheet in the embedded workbook to a HTML table."""
     if not excel_bytes:
         return ""
 
@@ -98,7 +98,7 @@ def html_table_from_excel_bytes(excel_bytes: bytes) -> str:
 
 
 def _extract_non_empty_worksheet_rows(worksheet: Worksheet) -> list[list[str]]:
-    """提取工作表中首尾有内容的行，避免空 sheet 或尾部空列撑大兜底表格。"""
+    """Extract rows with content at the beginning and end of the worksheet to avoid empty sheet or empty tail columns from enlarging the table."""
     raw_rows: list[list[str]] = []
     for row in worksheet.iter_rows(values_only=True):
         stringified_row = [_stringify_cell_value(value) for value in row]
@@ -119,7 +119,7 @@ def _extract_non_empty_worksheet_rows(worksheet: Worksheet) -> list[list[str]]:
 
 
 def _trim_trailing_empty_values(values: list[str]) -> list[str]:
-    """移除行尾空值，保留中间空单元格的位置。"""
+    """Remove empty values at the end of rows, leaving empty cells in the middle."""
     end = len(values)
     while end > 0 and values[end - 1] == "":
         end -= 1
@@ -127,7 +127,7 @@ def _trim_trailing_empty_values(values: list[str]) -> list[str]:
 
 
 def _find_first_non_empty_row(rows: list[list[str]]) -> int | None:
-    """返回第一行非空行的索引，未找到时返回 None。"""
+    """Returns the index of the first non-empty row, or None if not found."""
     for idx, row in enumerate(rows):
         if any(value != "" for value in row):
             return idx
@@ -135,7 +135,7 @@ def _find_first_non_empty_row(rows: list[list[str]]) -> int | None:
 
 
 def _find_last_non_empty_row(rows: list[list[str]]) -> int | None:
-    """返回最后一行非空行的索引。"""
+    """Returns the index of the last non-empty row."""
     for idx in range(len(rows) - 1, -1, -1):
         if any(value != "" for value in rows[idx]):
             return idx
@@ -143,7 +143,7 @@ def _find_last_non_empty_row(rows: list[list[str]]) -> int | None:
 
 
 def _render_embedded_workbook_table(rows: list[list[str]]) -> str:
-    """将嵌入 workbook 的二维数据渲染为紧凑 HTML 表格，首行作为表头。"""
+    """Render the 2D data embedded in workbook into a compact HTML table, with the first row as the header."""
     if not rows:
         return ""
 
@@ -165,7 +165,7 @@ def _render_embedded_workbook_table(rows: list[list[str]]) -> str:
 
 
 def extract_chart_html_from_ooxml(chart_xml: bytes, workbook_bytes: bytes | None) -> str:
-    """解析 OOXML 图表并按工作簿、缓存和普通表格的优先级生成 HTML。"""
+    """Parses OOXML charts and generates HTML by priority for workbooks, caches, and normal tables."""
     spec = parse_chart_spec_from_ooxml(chart_xml)
     if spec is None or not spec.series:
         if workbook_bytes:
@@ -188,7 +188,7 @@ def extract_chart_html_from_ooxml(chart_xml: bytes, workbook_bytes: bytes | None
 
 
 def parse_chart_spec_from_ooxml(chart_xml: bytes) -> ChartSpec | None:
-    """解析图表 XML，生成统一的图表类型、坐标轴和序列描述。"""
+    """Parse chart XML and generate unified chart type, axis and series descriptions."""
     try:
         root = etree.fromstring(
             chart_xml,
@@ -287,7 +287,7 @@ def parse_chart_spec_from_ooxml(chart_xml: bytes) -> ChartSpec | None:
 
 
 def render_chart_html_from_workbook(spec: ChartSpec, workbook_bytes: bytes) -> str:
-    """根据图表公式从嵌入工作簿读取数据并渲染 HTML 表格。"""
+    """Read data from the embedded workbook and render the HTML table based on chart formulas."""
     try:
         workbook = load_workbook(
             filename=BytesIO(workbook_bytes),
@@ -310,7 +310,7 @@ def render_chart_html_from_workbook(spec: ChartSpec, workbook_bytes: bytes) -> s
 
 
 def render_chart_html_from_cache(spec: ChartSpec) -> str:
-    """在工作簿不可用时使用 OOXML 图表缓存数据渲染 HTML 表格。"""
+    """The HTML table is rendered using the OOXML chart cache data when the workbook is unavailable."""
     if spec.plot_kind in {"category", "date"}:
         categories = []
         for series in spec.series:
@@ -345,7 +345,7 @@ def render_chart_html_from_cache(spec: ChartSpec) -> str:
 
 
 def _render_category_like_chart_from_workbook(spec: ChartSpec, workbook: Workbook) -> str:
-    """从工作簿渲染分类轴或日期轴图表的二维 HTML 表格。"""
+    """Render a 2D HTML table for category axis or date axis charts from a workbook."""
     categories = []
 
     for series in spec.series:
@@ -390,7 +390,7 @@ def _render_category_like_chart_from_workbook(spec: ChartSpec, workbook: Workboo
 
 
 def _render_scatter_like_chart_from_workbook(spec: ChartSpec, workbook: Workbook) -> str:
-    """读取工作簿中的散点图横纵轴数据并渲染 HTML 表格。"""
+    """Read the horizontal and vertical axis data of the scatter plot in the workbook and render the HTML table."""
     x_sequences, series_names, series_y_values = _read_scatter_axes_from_workbook(
         spec,
         workbook,
@@ -404,7 +404,7 @@ def _render_scatter_like_chart_from_workbook(spec: ChartSpec, workbook: Workbook
 
 
 def _render_bubble_chart_from_workbook(spec: ChartSpec, workbook: Workbook) -> str:
-    """读取工作簿中的气泡图横纵轴和尺寸数据并渲染 HTML 表格。"""
+    """Read the horizontal and vertical axis and size data of the bubble chart in the workbook and render the HTML table."""
     x_sequences, series_names, series_y_values, series_sizes = _read_bubble_axes_from_workbook(
         spec,
         workbook,
@@ -419,7 +419,7 @@ def _render_bubble_chart_from_workbook(spec: ChartSpec, workbook: Workbook) -> s
 
 
 def _render_scatter_like_chart_from_cache(spec: ChartSpec) -> str:
-    """使用 OOXML 缓存的横纵轴数据渲染散点图 HTML 表格。"""
+    """Render a scatterplot HTML table using the horizontal and vertical axis data cached by OOXML."""
     x_sequences = []
     series_names = []
     series_y_values = []
@@ -439,7 +439,7 @@ def _render_scatter_like_chart_from_cache(spec: ChartSpec) -> str:
 
 
 def _render_bubble_chart_from_cache(spec: ChartSpec) -> str:
-    """使用 OOXML 缓存的横纵轴和尺寸数据渲染气泡图 HTML 表格。"""
+    """Render a bubble chart HTML table using the horizontal and vertical axis and dimension data cached by OOXML."""
     x_sequences = []
     series_names = []
     series_y_values = []
@@ -464,7 +464,7 @@ def _render_bubble_chart_from_cache(spec: ChartSpec) -> str:
 def _read_scatter_axes_from_workbook(
     spec: ChartSpec, workbook: Workbook
 ) -> tuple[list[list[float]] | None, list[str], list[list[float]]]:
-    """按序列公式读取散点图的 X 轴、序列名称和 Y 轴数据。"""
+    """Reads the X axis, series name, and Y axis data of a scatter plot by sequence formula."""
     x_sequences = []
     series_names = []
     series_y_values = []
@@ -492,7 +492,7 @@ def _read_scatter_axes_from_workbook(
 def _read_bubble_axes_from_workbook(
     spec: ChartSpec, workbook: Workbook
 ) -> tuple[list[list[float]] | None, list[str], list[list[float]], list[list[float]]]:
-    """按序列公式读取气泡图的 X/Y 轴、名称和气泡尺寸数据。"""
+    """Read X/Y axis, name and bubble size data for a bubble chart by sequence formula."""
     x_sequences = []
     series_names = []
     series_y_values = []
@@ -521,7 +521,7 @@ def _read_bubble_axes_from_workbook(
 
 
 def _read_formula_vector(workbook: Workbook, formula: str) -> tuple[str, list[Any]] | None:
-    """解析单行或单列单元格公式，并从工作簿读取对应的一维数据。"""
+    """Parse single-row or single-column cell formulas and read the corresponding one-dimensional data from the workbook."""
     parsed = _parse_formula(formula)
     if parsed is None:
         return None
@@ -548,7 +548,7 @@ def _read_formula_vector(workbook: Workbook, formula: str) -> tuple[str, list[An
 
 
 def _read_formula_scalar(workbook: Workbook, formula: str) -> str | None:
-    """读取公式引用区域的首个有效值并转换为字符串。"""
+    """Read the first valid value of the range referenced by the formula and convert it to a string."""
     read_result = _read_formula_vector(workbook, formula)
     if read_result is None:
         return None
@@ -564,7 +564,7 @@ def _read_formula_scalar(workbook: Workbook, formula: str) -> str | None:
 
 
 def _parse_formula(formula: str) -> tuple[str, int, int, int, int] | None:
-    """将工作表区域公式解析为工作表名称和规范化单元格边界。"""
+    """Resolve worksheet range formulas into worksheet names and normalized cell boundaries."""
     formula = formula.strip()
     if not formula:
         return None
@@ -584,12 +584,12 @@ def _parse_formula(formula: str) -> tuple[str, int, int, int, int] | None:
 
 
 def _unescape_formula_sheet_name(sheet_name: str) -> str:
-    """还原 OOXML 公式中以双单引号转义的工作表名称。"""
+    """Restore double single quote escaped worksheet names in OOXML formulas."""
     return sheet_name.replace("''", "'")
 
 
 def _extract_reference_formula(container: etree._Element) -> str | None:
-    """从字符串、数字或多级字符串引用容器中提取公式文本。"""
+    """Extract formula text from a string, number, or multi-level string reference container."""
     ref_element = _find_reference_element(container)
     if ref_element is None:
         return None
@@ -605,7 +605,7 @@ def _extract_reference_cache(
     date_hint: bool = False,
     date_1904: bool = False,
 ) -> list[str]:
-    """从图表引用容器提取缓存数据，并按日期提示规范化值。"""
+    """Extracts cached data from chart reference containers and prompts normalized values by date."""
     ref_element = _find_reference_element(container)
     if ref_element is None:
         return []
@@ -633,7 +633,7 @@ def _extract_cache_points(
     date_hint: bool = False,
     date_1904: bool = False,
 ) -> list[str]:
-    """按缓存点索引还原连续序列，并拒绝异常大的稀疏索引范围。"""
+    """Restore contiguous sequences by cache point index and reject unusually large sparse index ranges."""
     points = {}
     for point in cache_element.findall("c:pt", namespaces=_NS):
         raw_index = point.get("idx")
@@ -663,7 +663,7 @@ def _extract_cache_points(
 
 
 def _extract_multilevel_string_cache(ref_element: etree._Element) -> list[str]:
-    """合并多级分类缓存的同索引文本，生成扁平分类标签序列。"""
+    """Merge text with the same index in multi-level classification caches to generate a flat classification label sequence."""
     level_maps = []
     max_index = -1
     for level in ref_element.findall("c:multiLvlStrCache/c:lvl", namespaces=_NS):
@@ -695,7 +695,7 @@ def _extract_multilevel_string_cache(ref_element: etree._Element) -> list[str]:
 
 
 def _extract_tx_formula(tx_element: etree._Element) -> str | None:
-    """从图表序列名称节点提取字符串引用公式。"""
+    """Extracts the string reference formula from the chart series name node."""
     if tx_element is None:
         return None
     str_ref = tx_element.find("c:strRef", namespaces=_NS)
@@ -708,7 +708,7 @@ def _extract_tx_formula(tx_element: etree._Element) -> str | None:
 
 
 def _extract_tx_text(tx_element: etree._Element) -> str | None:
-    """从图表序列名称节点提取缓存文本或直接文本。"""
+    """Extract cached text or direct text from chart sequence name nodes."""
     if tx_element is None:
         return None
 
@@ -725,7 +725,7 @@ def _extract_tx_text(tx_element: etree._Element) -> str | None:
 
 
 def _extract_title_text(title_element: etree._Element) -> str:
-    """拼接图表标题节点中的全部富文本片段。"""
+    """Splice all rich text fragments in the chart title node."""
     if title_element is None:
         return ""
     texts = title_element.findall(".//a:t", namespaces=_NS)
@@ -733,7 +733,7 @@ def _extract_title_text(title_element: etree._Element) -> str:
 
 
 def _find_reference_element(container: etree._Element) -> object | None:
-    """在容器中查找受支持的字符串、数字或多级字符串引用节点。"""
+    """Find supported string, number, or multi-level string reference nodes in the container."""
     if container is None:
         return None
     for tag_name in ("strRef", "numRef", "multiLvlStrRef"):
@@ -744,7 +744,7 @@ def _find_reference_element(container: etree._Element) -> object | None:
 
 
 def _first_non_none(*values: Any) -> object | None:
-    """返回参数序列中的第一个非空对象。"""
+    """Returns the first non-null object in the argument sequence."""
     for value in values:
         if value is not None:
             return value
@@ -752,7 +752,7 @@ def _first_non_none(*values: Any) -> object | None:
 
 
 def _collect_plot_elements(plot_area: etree._Element) -> list[tuple[str, etree._Element]]:
-    """收集绘图区中受支持的图表节点及其局部标签名。"""
+    """Collects supported graph nodes and their local label names in the drawing area."""
     plot_elements = []
     for child in plot_area:
         if not isinstance(child.tag, str):
@@ -764,7 +764,7 @@ def _collect_plot_elements(plot_area: etree._Element) -> list[tuple[str, etree._
 
 
 def _plot_kind_from_tag_name(tag_name: str, has_date_axis: bool) -> str:
-    """根据 OOXML 图表标签和日期轴信息归一化绘图类别。"""
+    """Normalize plot categories based on OOXML chart labels and date axis information."""
     if tag_name == "scatterChart":
         return "scatter"
     if tag_name == "bubbleChart":
@@ -775,7 +775,7 @@ def _plot_kind_from_tag_name(tag_name: str, has_date_axis: bool) -> str:
 
 
 def _chart_uses_date_1904(root: etree._Element) -> bool:
-    """判断图表是否使用以 1904 年为起点的 Excel 日期系统。"""
+    """Determines whether the chart uses the Excel date system starting in 1904."""
     date_1904 = root.find("c:date1904", namespaces=_NS)
     if date_1904 is None:
         return False
@@ -783,7 +783,7 @@ def _chart_uses_date_1904(root: etree._Element) -> bool:
 
 
 def _resolve_series_name(series: SeriesSpec, index: int, workbook: Workbook | None = None) -> str:
-    """按工作簿引用、缓存名称和默认序号依次解析序列名称。"""
+    """Resolve sequence names by workbook reference, cache name, and default sequence number."""
     if workbook is not None and series.name_formula:
         workbook_name = _read_formula_scalar(workbook, series.name_formula)
         if workbook_name:
@@ -794,7 +794,7 @@ def _resolve_series_name(series: SeriesSpec, index: int, workbook: Workbook | No
 
 
 def _get_shared_axis_values(sequences: list[list[Any]]) -> list[Any] | None:
-    """判断多个序列是否共享相同轴值，并在一致时返回首个序列。"""
+    """Determine whether multiple sequences share the same axis value, and return the first sequence if they are consistent."""
     if not sequences:
         return None
 
@@ -806,7 +806,7 @@ def _get_shared_axis_values(sequences: list[list[Any]]) -> list[Any] | None:
 
 
 def _normalize_sequence(sequence: list[Any]) -> list[str]:
-    """将轴值序列统一转换为可比较的字符串列表。"""
+    """Converts a sequence of axis values uniformly into a list of comparable strings."""
     return [_stringify_cell_value(value) for value in sequence]
 
 
@@ -817,7 +817,7 @@ def _render_scatter_like_chart_table(
     *,
     x_axis_title: str,
 ) -> str:
-    """按共享或独立 X 轴布局，将散点图序列渲染为 HTML 表格。"""
+    """Renders a scatterplot series to a HTML table in a shared or independent X axis layout."""
     if not x_sequences or not series_names or len(x_sequences) != len(series_names):
         return ""
 
@@ -858,7 +858,7 @@ def _render_bubble_chart_table(
     *,
     x_axis_title: str,
 ) -> str:
-    """按共享或独立 X 轴布局，将气泡图三维序列渲染为 HTML 表格。"""
+    """Render bubble chart 3D series to a HTML table in shared or independent X axis layout."""
     if (
         not x_sequences
         or not series_names
@@ -913,7 +913,7 @@ def _stringify_series_values(
     date_hint: bool = False,
     date_1904: bool = False,
 ) -> list[str]:
-    """将图表序列值批量转换为适合 HTML 输出的文本。"""
+    """Batch convert chart series values to text suitable for HTML output."""
     return [
         _stringify_cell_value(
             value,
@@ -930,7 +930,7 @@ def _stringify_cache_value(
     date_hint: bool = False,
     date_1904: bool = False,
 ) -> str:
-    """规范化 OOXML 缓存值，并在需要时转换 Excel 日期序列号。"""
+    """Normalizes the OOXML cache value and converts the Excel date serial number if needed."""
     if value in (None, ""):
         return ""
 
@@ -950,7 +950,7 @@ def _stringify_cell_value(
     date_hint: bool = False,
     date_1904: bool = False,
 ) -> str:
-    """将工作簿单元格值转换为稳定文本，并保留日期时间语义。"""
+    """Convert workbook cell values to stable text, preserving datetime semantics."""
     if value in (None, ""):
         return ""
 
@@ -970,7 +970,7 @@ def _stringify_cell_value(
 
 
 def _excel_serial_to_iso(serial: float, *, date_1904: bool = False) -> str | None:
-    """把 Excel 日期序列号转换为 ISO 文本，无效数值返回空结果。"""
+    """Convert Excel date serial number to ISO text. Invalid values return empty results."""
     if not math.isfinite(serial):
         return None
     try:
@@ -989,14 +989,14 @@ def _excel_serial_to_iso(serial: float, *, date_1904: bool = False) -> str | Non
 
 
 def _stringify_non_date_value(value: Any) -> str:
-    """将非日期值转换为文本，并去除整数浮点值末尾的小数部分。"""
+    """Converts non-date values to text, stripping off the decimal part at the end of integer floating point values."""
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value)
 
 
 def _render_html_table(headers: list[str], columns: list[list[str]], row_count: int) -> str:
-    """按表头、列数据和行数生成已转义的紧凑 HTML 表格。"""
+    """Generates an escaped, compact HTML table by header, column data, and row number."""
     if row_count <= 0 or len(headers) != len(columns):
         return ""
 

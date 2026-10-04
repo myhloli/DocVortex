@@ -1,4 +1,4 @@
-//! 在自有样本上连续计算行字形、主基线与最终 Y 风险，避免 Python 字符往返。
+//! Continuously calculate line glyphs, main baselines and final Y risks on own samples to avoid Python character round-trips.
 use crate::{
     geometry::Box4, geometry_risk::quantile, geometry_style::Prepared, median,
     statistics::ordered_clusters,
@@ -13,7 +13,7 @@ pub struct World {
 
 pub type Summary = (Vec<((i64, i64), Box4)>, Vec<((i64, i64), f64)>, bool);
 
-/// 保持 Python min/max 首见值，包括相等坐标及有符号零。
+/// Keep Python min/max First seen value, including equal coordinates and signed zeros.
 fn union(boxes: impl Iterator<Item = Box4>) -> Option<Box4> {
     let mut boxes = boxes;
     let mut result = boxes.next()?;
@@ -27,7 +27,7 @@ fn union(boxes: impl Iterator<Item = Box4>) -> Option<Box4> {
     Some(result)
 }
 
-/// 模拟 CPython 3.12 起的补偿求和；旧版本仍按原顺序普通相加。
+/// Simulates compensation summation from CPython 3.12 onwards; older versions still add normally in the original order.
 fn width_sum(values: impl Iterator<Item = f64>, compensated: bool) -> Option<f64> {
     let (mut hi, mut lo) = (0.0_f64, 0.0_f64);
     for value in values {
@@ -52,7 +52,7 @@ fn width_sum(values: impl Iterator<Item = f64>, compensated: bool) -> Option<f64
     total.is_finite().then_some(total)
 }
 
-/// 共享基线聚类，但 canonical 按宽度优先、Y 风险按成员数优先，保留不同裁决语义。
+/// Shared baseline clustering, but canonical is prioritized by width and Y risk is prioritized by number of members, retaining different ruling semantics.
 pub fn summarize(prepared: &Prepared, world: &[World], compensated: bool) -> Option<Summary> {
     if world.len() != prepared.samples.len()
         || world.iter().any(|w| w.tight.iter().any(|v| !v.is_finite()))
@@ -132,7 +132,7 @@ pub fn summarize(prepared: &Prepared, world: &[World], compensated: bool) -> Opt
             y_risk = true;
             continue;
         }
-        // max_by_key 会选最后一个并列项；显式比较以保持 Python max 的首见顺序。
+        // max_by_key will select the last tie; explicit comparison maintains first-seeing order of Python max.
         let mut dominant = &groups[0];
         for group in &groups[1..] {
             if group.len() > dominant.len() {
@@ -178,7 +178,7 @@ mod tests {
     use super::*;
 
     #[test]
-    /// 保留 Python 3.10/3.11 与 3.12+ 的不同求和结果，避免并列主基线改变。
+    /// Preserve the different summation results of Python 3.10/3.11 and 3.12+ to avoid parallel main baseline changes.
     fn width_sum_matches_python_versions() {
         assert_eq!(width_sum([1e16, 1.0, 1.0].into_iter(), false), Some(1e16));
         assert_eq!(
@@ -189,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    /// 并集保留首次出现的有符号零，不用浮点 min/max 改写坐标位模式。
+    /// The union retains the first occurrence of signed zero without floating point min/max overwriting the coordinate bit pattern.
     fn union_preserves_first_equal_coordinate() {
         let result = union([[0.0, -0.0, 1.0, 2.0], [-0.0, 0.0, 1.0, 2.0]].into_iter()).unwrap();
         assert_eq!(result[0].to_bits(), 0.0_f64.to_bits());

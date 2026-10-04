@@ -1,4 +1,4 @@
-"""保留既有入口的 Flash PDF 门面，内部实现按职责显式组织。"""
+"""The Flash PDF facade of the existing entrance is retained, and the internal implementation is explicitly organized by responsibility."""
 
 from .title_analysis.body_profile import (
     _infer_document_body_profile as _infer_document_body_profile,

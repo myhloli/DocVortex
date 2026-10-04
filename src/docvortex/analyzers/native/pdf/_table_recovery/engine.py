@@ -1,4 +1,4 @@
-"""编排 Native PDF 表格多候选生成、欠分割诊断和高置信仲裁。"""
+"""Orchestration Native PDF tabular multi-candidate generation, under-segmentation diagnostics, and high-confidence arbitration."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ _VERIFIED_SCORE_BY_SOURCE = {
 
 @dataclass(frozen=True, slots=True)
 class _CandidateEvaluation:
-    """保存一次生产决策及调试工具需要的中间候选。"""
+    """Save intermediate candidates needed for production decisions and debugging tools."""
 
     primitive_count: int
     text: NativeTableText | None
@@ -58,7 +58,7 @@ class _CandidateEvaluation:
 
 
 def _is_verified_line_candidate(candidate: NativeTableCandidate) -> bool:
-    """判断候选是否由无歧义 drawing 网格独立验证。"""
+    """Determine if a candidate is independently verified by the unambiguous drawing grid."""
 
     return (
         candidate.source == "vector_grid"
@@ -69,7 +69,7 @@ def _is_verified_line_candidate(candidate: NativeTableCandidate) -> bool:
 
 
 def _is_verified_rect_candidate(candidate: NativeTableCandidate) -> bool:
-    """判断候选是否由无歧义矩形晶格独立验证。"""
+    """Determine whether a candidate is independently verified by an unambiguous rectangular lattice."""
 
     return (
         candidate.source == "vector_grid"
@@ -82,7 +82,7 @@ def _is_verified_rect_candidate(candidate: NativeTableCandidate) -> bool:
 def _has_line_rect_topology_conflict(
     candidates: Iterable[NativeTableCandidate],
 ) -> bool:
-    """判断两类独立物理证据是否给出不同拓扑。"""
+    """Determine whether two types of independent physical evidence give different topologies."""
 
     materialized = list(candidates)
     line_candidates = [candidate for candidate in materialized if _is_verified_line_candidate(candidate)]
@@ -93,7 +93,7 @@ def _has_line_rect_topology_conflict(
 def _has_attempted_line_rect_grid_conflict(
     attempts: Iterable[dict[str, Any]],
 ) -> bool:
-    """判断已恢复轨道的 line/rect 物理假设是否在行列数上冲突。"""
+    """Determine whether the line/rect physics assumptions for the recovered orbit conflict in the number of rows and columns."""
 
     materialized = list(attempts)
     line_grids = [attempt.get("grid") for attempt in materialized if attempt.get("evidence") == "line_grid"]
@@ -112,7 +112,7 @@ def _resolved_rect_undercount_candidate(
     attempts: Iterable[dict[str, Any]],
     text: NativeTableText,
 ) -> NativeTableCandidate | None:
-    """在线网格明确漏行且矩形晶格逐行吻合时允许 rect 独立胜出。"""
+    """The rect is allowed to win on its own when the online grid clearly misses rows and the rectangular lattice fits row by row."""
 
     rect_candidates = [candidate for candidate in candidates if _is_verified_rect_candidate(candidate)]
     if len(rect_candidates) != 1:
@@ -134,13 +134,13 @@ def _resolved_rect_undercount_candidate(
 
 
 def _passes_verified_threshold(candidate: NativeTableCandidate) -> bool:
-    """按候选来源应用独立校准的 verified 可靠度门槛。"""
+    """Apply independently calibrated verified reliability thresholds by candidate source."""
 
     return candidate.score >= _VERIFIED_SCORE_BY_SOURCE[candidate.source]
 
 
 def _read_value(item: object, name: str, default: Any = None) -> Any:
-    """同时读取普通对象属性和字典字段，供页面原语适配使用。"""
+    """At the same time, common object attributes and dictionary fields are read for use in page primitive adaptation."""
 
     if isinstance(item, dict):
         return item.get(name, default)
@@ -150,7 +150,7 @@ def _read_value(item: object, name: str, default: Any = None) -> Any:
 def coerce_native_table_rules(
     drawing_lines: Iterable[object],
 ) -> tuple[NativeTableRule, ...]:
-    """把 PDFDocument 或 Flash drawing 结果转换成共享横竖线契约。"""
+    """Convert PDFDocument or Flash drawing results into a shared horizontal and vertical line contract."""
 
     rules: list[NativeTableRule] = []
     for drawing_line in drawing_lines:
@@ -175,7 +175,7 @@ def coerce_native_table_rules(
 def coerce_native_table_rectangles(
     path_infos: Iterable[object],
 ) -> tuple[NativeTableRectangle, ...]:
-    """把 PDF Path 摘要转换成共享矩形路径契约。"""
+    """Convert PDF Path digest into a shared rectangular path contract."""
 
     rectangles: list[NativeTableRectangle] = []
     for path_info in path_infos:
@@ -202,7 +202,7 @@ def coerce_native_table_rectangles(
 def _remove_undercounted_vector_candidates(
     candidates: list[NativeTableCandidate],
 ) -> list[NativeTableCandidate]:
-    """当稳定文本候选显著多出行列时，剔除欠分割矢量候选。"""
+    """When stable text candidates are significantly more in rows and columns, under-segmented vector candidates are eliminated."""
 
     text_candidates = [
         candidate
@@ -231,7 +231,7 @@ def _remove_undercounted_vector_candidates(
 def _has_alias_affected_physical_blank_row(
     vector_attempts: tuple[dict[str, Any], ...],
 ) -> bool:
-    """判断强线框空白行是否因自身 alias 风险而禁止文本候选绕过。"""
+    """Determine whether strong wireframe blank lines prohibit text candidate bypass due to their own alias risk."""
 
     for attempt in vector_attempts:
         if attempt.get("evidence") != "line_grid":
@@ -250,7 +250,7 @@ def _has_alias_affected_physical_blank_row(
 def _has_physical_row_undercount(
     vector_attempts: tuple[dict[str, Any], ...],
 ) -> bool:
-    """判断 line-grid 及其有限轨道假设是否已发现物理行欠分割。"""
+    """Determine whether line-grid and its finite orbit hypothesis have discovered physical row undersegmentation."""
 
     for attempt in vector_attempts:
         if attempt.get("evidence") != "line_grid":
@@ -262,7 +262,7 @@ def _has_physical_row_undercount(
 
 
 def _table_primitive_count(table_input: NativeTableInput) -> int:
-    """统计实际与目标表格相交的 drawing 和矩形数量。"""
+    """Count the number of drawing and rectangles that actually intersect the target table."""
 
     table_bbox = normalize_bbox(table_input.table_bbox)
     if table_bbox is None:
@@ -278,7 +278,7 @@ def _table_primitive_count(table_input: NativeTableInput) -> int:
 def _select_candidate(
     candidates: list[NativeTableCandidate],
 ) -> NativeTableCandidate | None:
-    """选择达到生产门槛且未与近分异构候选冲突的最佳结果。"""
+    """The best result that meets the production threshold and does not conflict with near-isomeric candidates is selected."""
 
     accepted = [candidate for candidate in candidates if _passes_verified_threshold(candidate)]
     if not accepted:
@@ -307,7 +307,7 @@ def _select_candidate(
 def _evaluate_native_pdf_table(
     table_input: NativeTableInput,
 ) -> _CandidateEvaluation:
-    """执行共享生产判定，并保留候选生成到仲裁的完整阶段结果。"""
+    """Performs shared production decisions and retains complete stage results from candidate generation to arbitration."""
 
     table_bbox = normalize_bbox(table_input.table_bbox)
     page_width, page_height = table_input.page_size
@@ -451,7 +451,7 @@ def _evaluate_native_pdf_table(
 
 
 def diagnose_native_pdf_table(table_input: NativeTableInput) -> dict[str, Any]:
-    """返回仅供测试评测使用、不会进入用户结果的候选诊断。"""
+    """Returns candidate diagnoses that are used only for test evaluation and will not enter the user's results."""
 
     evaluation = _evaluate_native_pdf_table(table_input)
     vector_attempts = (
@@ -530,7 +530,7 @@ def diagnose_native_pdf_table(table_input: NativeTableInput) -> dict[str, Any]:
     def candidate_record(
         candidate: NativeTableCandidate,
     ) -> dict[str, Any]:
-        """把内部候选转换成稳定且不包含单元格全文的诊断记录。"""
+        """Convert internal candidates into diagnostic records that are stable and do not contain the full text of the cell."""
 
         return {
             "source": candidate.source,
@@ -591,7 +591,7 @@ def diagnose_native_pdf_table(table_input: NativeTableInput) -> dict[str, Any]:
 def recover_native_pdf_table(
     table_input: NativeTableInput,
 ) -> NativeTableResult | None:
-    """对一个已知表格区域运行全部候选并返回高置信 HTML 结果。"""
+    """Runs all candidates against a known table range and returns a high confidence HTML result."""
 
     evaluation = _evaluate_native_pdf_table(table_input)
     selected = evaluation.selected

@@ -1,4 +1,4 @@
-"""原始版式结构表格的区域适配、旋转及安全空白分配。"""
+"""Region adaptation, rotation and safe whitespace allocation of original layout structure tables."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ Rect = tuple[float, float, float, float]
 
 @dataclass(frozen=True)
 class _TableMeasurement:
-    """持有一次试排独占的实际表格与标量，不复制已经完成测量的行布局。"""
+    """Holds the actual tables and scalars exclusive to a trial layout, and does not copy the row layout that has been measured."""
 
     tables: list[Table]
     heights: list[float]
@@ -34,14 +34,14 @@ class _TableMeasurement:
 
 @dataclass(frozen=True, slots=True)
 class _TrialSummary:
-    """只缓存不可变几何，不保存可变 Table、Paragraph 或画布。"""
+    """Only immutable geometry is cached, not mutable Table, Paragraph or canvas."""
 
     heights: tuple[float, ...]
     width_ratio: float
 
 
 class SpatialTableContent(Flowable):
-    """保存结构表格的构造回调，所有试排均从目标逻辑宽度重新物化。"""
+    """A construction callback that saves the structure table and all layouts are rematerialized from the target logical width."""
 
     def __init__(
         self,
@@ -55,7 +55,7 @@ class SpatialTableContent(Flowable):
         trial_key: Callable[[], tuple | None] | None = None,
         minimum_height: Callable[[float], float | None] | None = None,
     ) -> None:
-        """绑定本表上下文和已物化素材来源，不读取源 PDF 或修改语义树。"""
+        """Binds the context of this table to the materialized material source, without reading the source PDF or modifying the semantic tree."""
         super().__init__()
         self.build = build
         self.fallback = fallback
@@ -77,7 +77,7 @@ class SpatialTableContent(Flowable):
         self._trial_cache: OrderedDict[tuple, _TrialSummary] = OrderedDict()
 
     def fork(self) -> SpatialTableContent:
-        """为另一候选区域创建独立布局状态，只复用只读内容构造回调。"""
+        """Create an independent layout state for another candidate area, and only reuse the read-only content to construct the callback."""
         candidate = SpatialTableContent(
             self.build,
             self.fallback,
@@ -88,33 +88,33 @@ class SpatialTableContent(Flowable):
             trial_key=self.trial_key,
             minimum_height=self.minimum_height,
         )
-        # 已确认的结构或绘制错误继续沿用既有按块回退契约。
+        # Confirmed structural or drawing errors continue to use the existing block-wise fallback contract.
         candidate.failure = self.failure
         candidate._trial_cache = self._trial_cache
         return candidate
 
     def clear_trials(self) -> None:
-        """页面绘制完成后释放同一表格各区域共享的几何摘要。"""
+        """After the page drawing is completed, the geometric summary shared by each area of the same table is released."""
         self._trial_cache.clear()
         self._measurement_context = None
 
     def _snapshot(self) -> _TableMeasurement:
-        """保留当前成功测量结果，后续试排会重新构造自己的 Table。"""
+        """The current successful measurement results are retained, and subsequent test runs will reconstruct your own Table."""
         return _TableMeasurement(self.tables, self.heights, self.font_size, self.scale, self.width_ratio)
 
     def _restore(self, measurement: _TableMeasurement) -> float:
-        """直接恢复最佳候选，保持原数值计算顺序而不再次构造或测量。"""
+        """Directly restore the best candidate, keeping the original numerical calculation order without re-constructing or measuring."""
         self.tables, self.heights = measurement.tables, measurement.heights
         self.font_size, self.scale, self.width_ratio = measurement.font_size, measurement.scale, measurement.width_ratio
         return (sum(self.heights) + 2 * (len(self.heights) - 1)) * self.scale
 
     @property
     def effective_font_size(self) -> float:
-        """返回当前区域内经过最终缩放后的表格基准字号。"""
+        """Returns the base font size of the table after final scaling in the current area."""
         return self.font_size * self.scale
 
     def _measure(self, width: float, font_size: float, scale: float = 1.0, *, materialize: bool = False) -> float:
-        """重新计算列宽和行高；即使低于 6 pt，缩放后的表宽也仍覆盖目标宽度。"""
+        """Column widths and row heights are recalculated; even below 6 pt, the scaled table width still covers the target width."""
         key = (self._measurement_context, width, font_size, scale) if self._measurement_context is not None else None
         cached = self._trial_cache.get(key) if key is not None and not materialize else None
         if cached is not None:
@@ -141,7 +141,7 @@ class SpatialTableContent(Flowable):
         return (sum(self.heights) + 2 * (len(self.heights) - 1)) * scale
 
     def fit(self, width: float, height: float) -> None:
-        """先寻找最大可用字号，再在 6 pt 基础上缩放；排版或绘制失败才回退素材。"""
+        """First find the maximum available font size, and then scale based on 6 pt; only roll back the material if typesetting or drawing fails."""
         width, height = max(0.001, width), max(0.001, height)
         if self.failure is not None:
             self._fit_fallback(width, height)
@@ -149,10 +149,10 @@ class SpatialTableContent(Flowable):
         logical_width, logical_height = (height, width) if self.angle in (90, 270) else (width, height)
         try:
             self._measurement_context = self.trial_key() if self.trial_key is not None else None
-            # 候选只有 26 档，逐档测量可避免列宽重分配导致高度非单调时漏掉最大字号。
+            # There are only 26 candidates, and the step-by-step measurement can avoid missing the maximum font size when the height is non-monotonic due to column width redistribution.
             for size in range(85, 59, -1):
                 lower_bound = self.minimum_height(size / 10) if size > 60 and self.minimum_height is not None else None
-                # 给浮点下界留出额外余量；6 pt 必须完整测量以保留缩放搜索的原始初始区间。
+                # Allow extra margin for floating point lower bound; 6 pt must be measured completely to preserve the original initial interval of the scaled search.
                 if lower_bound is not None and lower_bound > logical_height + 0.001 + 1e-8:
                     continue
                 content_height = self._measure(logical_width, size / 10)
@@ -172,7 +172,7 @@ class SpatialTableContent(Flowable):
                         high = candidate
                 content_height = self._restore(best)
             if not self.tables:
-                # 摘要命中不借用另一区域的可变对象；获选字号仍需真实物化和预绘制。
+                # Summary hits do not borrow mutable objects from another region; the selected font size still needs to be physically materialized and pre-rendered.
                 content_height = self._measure(logical_width, self.font_size, self.scale, materialize=True)
             self.width, self.height = (
                 (content_height, logical_width) if self.angle in (90, 270) else (logical_width, content_height)
@@ -183,18 +183,18 @@ class SpatialTableContent(Flowable):
             self._fit_fallback(width, height)
 
     def _fit_fallback(self, width: float, height: float) -> None:
-        """使用调用方提供的按块兜底，并将文字兜底完整适配进区域。"""
+        """Use the block template provided by the caller and fully fit the text template into the area."""
         self.fallback_flow = self.fallback(width, height, self.failure or "unavailable HTML")
         measured_width, measured_height = self.fallback_flow.wrap(width, 1e9)
         self.scale = min(1.0, width / max(measured_width, 0.001), height / max(measured_height, 0.001))
         self.width, self.height = measured_width * self.scale, measured_height * self.scale
 
     def wrap(self, availWidth: float, availHeight: float) -> tuple[float, float]:
-        """返回最后一次区域适配结果，不在绘制阶段重复试排。"""
+        """Returns the last regional adaptation result and does not repeat the trial arrangement during the drawing phase."""
         return self.width, self.height
 
     def draw(self) -> None:
-        """恢复源方向后绘制原生表格，图片兜底已经包含方向变换。"""
+        """After restoring the source direction, the original table is drawn, and the bottom of the picture already contains the direction transformation."""
         self.canv.saveState()
         try:
             if self.fallback_flow is not None:
@@ -221,13 +221,13 @@ class SpatialTableContent(Flowable):
 
 
 def has_spatial_table(item: PreparedBlock) -> bool:
-    """识别独立表格及缺子框时包含表格的父框组合。"""
+    """The parent box combination of the table is included when identifying independent tables and missing child boxes."""
     return any(isinstance(flow, SpatialTableContent) for flow in item.flowables)
 
 
 def _fit_group(item: PreparedBlock, area: Rect, canvas: Canvas) -> BlockFit:
-    """为表题表注预留空间；父框极小时同步缩放组合并重新按补偿宽度测量。"""
-    # 候选持有独立的段落、图片和表格状态，原框胜出时无需撤销另一区域的试排。
+    """Reserve space for table titles and notes; when the parent frame is extremely small, scale the combination synchronously and re-measure according to the compensation width."""
+    # Candidates have independent paragraph, picture and table status, and there is no need to cancel the trial arrangement in another area when the original frame wins.
     item.flowables = [flow.fork() if isinstance(flow, SpatialTableContent) else deepcopy(flow) for flow in item.flowables]
     width, height = area[2] - area[0], area[3] - area[1]
     scale = 1.0
@@ -260,7 +260,7 @@ def _fit_group(item: PreparedBlock, area: Rect, canvas: Canvas) -> BlockFit:
 
 
 def _quality(item: PreparedBlock, fit: BlockFit) -> float:
-    """以组合内最小表格字号比较候选区域，失败回退不参与可读字号竞争。"""
+    """Compare the candidate areas with the smallest table font size in the combination, and fall back on failure without participating in the readable font size competition."""
     return min(
         flow.effective_font_size * fit.scale if flow.failure is None else 8.5
         for flow in item.flowables
@@ -269,7 +269,7 @@ def _quality(item: PreparedBlock, fit: BlockFit) -> float:
 
 
 def place_tables(blocks: list[PreparedBlock], page_width: float, canvas: Canvas) -> None:
-    """在正文、标题和公式冻结后安排表格，优先原框，必要时才借用同栏安全空白。"""
+    """Arrange the table after freezing the text, titles, and formulas, giving priority to the original frames, and borrowing safe white space in the same column only when necessary."""
     bodies = _body_candidates(blocks)
     content_rects = [item.original_rect for item in blocks if item.block.type not in PAGE_AUXILIARY_BLOCK_TYPES]
     content_top = min((rect[1] for rect in content_rects), default=0.0)
@@ -287,7 +287,7 @@ def place_tables(blocks: list[PreparedBlock], page_width: float, canvas: Canvas)
             right = max(original[2], median(body.original_rect[2] for body in column)) if column else original[2]
             safe = _safe_area(item, blocks, max(0.0, left), min(page_width, right))
             if safe is not None:
-                # 安全空白不包括原页面外边距，尤其避免旋转表格把整列拉到纸张边缘。
+                # The safe margin does not include the original page margins, especially to avoid rotating the table and pulling the entire column to the edge of the paper.
                 safe = (safe[0], max(safe[1], content_top), safe[2], min(safe[3], content_bottom))
                 if safe[3] <= safe[1]:
                     safe = None

@@ -83,7 +83,7 @@ def test_resolve_text_line_boundary_keeps_conservative_joining_rules(
     next_content: str,
     expected: str,
 ) -> None:
-    """验证 URL、普通西文、断词和 CJK 的物理行边界规则互不干扰。"""
+    """Verify that the physical line boundary rules of URL, plain Spanish, word breakers, and CJK do not interfere with each other."""
     processed_previous, separator = resolve_text_line_boundary(
         previous_content,
         next_content=next_content,
@@ -93,7 +93,7 @@ def test_resolve_text_line_boundary_keeps_conservative_joining_rules(
 
 
 def test_merge_text_line_contents_keeps_accumulated_url_context() -> None:
-    """验证三行 URL 使用完整累计前缀，而普通标题和独立 URL 保留自然空格。"""
+    """Verify that the three-line URL uses the full cumulative prefix, while the normal header and stand-alone URL retain natural spaces."""
 
     assert merge_text_line_contents(
         [

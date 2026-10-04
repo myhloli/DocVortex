@@ -15,7 +15,7 @@ def _span(
     *,
     chars: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """构造只包含方向、文本和 bbox 的最小 pdftext span。"""
+    """Constructs a minimal pdftext span containing only orientation, text, and bbox."""
 
     return {
         "text": text,
@@ -29,7 +29,7 @@ def _char(
     value: str,
     bbox: tuple[float, float, float, float],
 ) -> dict[str, Any]:
-    """构造字符基线方向测试使用的最小 pdftext 字符。"""
+    """Constructs the minimum pdftext character used for character baseline orientation testing."""
 
     return {"char": value, "bbox": bbox}
 
@@ -39,7 +39,7 @@ def _line(
     angle_degrees: float,
     bbox: tuple[float, float, float, float] = (0.0, 0.0, 100.0, 100.0),
 ) -> dict[str, Any]:
-    """构造测试混合方向拆分使用的最小 pdftext line。"""
+    """Construct the minimum pdftext line used to test mixed orientation splits."""
 
     return {
         "spans": spans,
@@ -49,7 +49,7 @@ def _line(
 
 
 def test_inline_script_scale_cache_is_linear_and_local_to_each_pass(monkeypatch: pytest.MonkeyPatch) -> None:
-    """每轮字号计算随行数线性增长，后续轮次重新读取已变化的字符字号。"""
+    """Each round of font size calculation increases linearly with the number of lines, and subsequent rounds re-read the changed character font sizes."""
 
     lines = [
         models._LineItem(
@@ -67,7 +67,7 @@ def test_inline_script_scale_cache_is_linear_and_local_to_each_pass(monkeypatch:
     original = native_text._native_typographic_scale
 
     def record_scale(line: models._LineItem) -> float:
-        """记录真实字号计算，验证缓存不跨越行变更边界。"""
+        """Record actual font size calculations and verify that the cache does not cross line change boundaries."""
 
         value = original(line)
         observed.append(value)
@@ -83,7 +83,7 @@ def test_inline_script_scale_cache_is_linear_and_local_to_each_pass(monkeypatch:
 
 
 def test_native_typographic_cache_skips_python_character_scan() -> None:
-    """Rust 预计算的字号中位数优先复用，异常缓存仍回退原实现。"""
+    """Rust The precalculated median font size is reused first, and the exception cache still falls back to the original implementation."""
 
     cached = models._LineItem("body", (0, 0, 10, 10), 0, 0, effective_height=10.0)
     cached.native_typographic_scale = 7.0
@@ -94,7 +94,7 @@ def test_native_typographic_cache_skips_python_character_scan() -> None:
 
 
 def test_private_use_decorative_rule_becomes_axis_line() -> None:
-    """验证页首宽幅私用区重复字形不再进入文本输出。"""
+    """Verify that repeated glyphs in the header wide private area no longer enter the text output."""
 
     decorative = models._LineItem(
         text="\ue123" * 24,
@@ -119,7 +119,7 @@ def test_private_use_decorative_rule_becomes_axis_line() -> None:
 
 
 def test_mixed_footer_and_315_degree_watermark_are_split_before_filtering() -> None:
-    """验证接近 315 度的 span 不会继续借用父行 0 度方向与巨型 bbox。"""
+    """Verify that span close to 315 degrees does not continue to borrow parent row 0 degree orientation with giant bbox."""
 
     pdf_line = _line(
         [
@@ -142,7 +142,7 @@ def test_mixed_footer_and_315_degree_watermark_are_split_before_filtering() -> N
 
 
 def test_small_oblique_span_stays_inside_standard_direction_line() -> None:
-    """验证约 19 度的仿斜体 span 不触发方向拆分且沿用父行 0 度。"""
+    """Verify that faux italic span at about 19 degrees does not trigger directional splitting and follows parent row 0 degrees."""
 
     pdf_line = _line(
         [
@@ -161,7 +161,7 @@ def test_small_oblique_span_stays_inside_standard_direction_line() -> None:
 
 
 def test_sheared_horizontal_line_uses_char_baseline_and_splits_far_sidecar() -> None:
-    """验证仿斜体粗行可由水平字符基线恢复，并继续拆开远端页码。"""
+    """Verify that faux-italic bold lines can be recovered from the horizontal character baseline and continue to break up remote page numbers."""
 
     chars = [_char(value, (10.0 + index * 5.0, 80.0, 14.0 + index * 5.0, 88.0)) for index, value in enumerate("NOTICE")]
     chars.append(_char("2", (90.0, 80.2, 94.0, 88.2)))
@@ -188,7 +188,7 @@ def test_sheared_horizontal_line_uses_char_baseline_and_splits_far_sidecar() -> 
 
 
 def test_true_diagonal_char_baseline_is_not_recovered_as_horizontal() -> None:
-    """验证真实斜向字符中心不会因字符数量和长宽比被恢复为水平正文。"""
+    """Verify that true slanted character centers are not reverted to horizontal text due to character count and aspect ratio."""
 
     chars = [
         _char(value, (10.0 + index * 8.0, 70.0 - index * 6.0, 14.0 + index * 8.0, 78.0 - index * 6.0))
@@ -211,7 +211,7 @@ def test_true_diagonal_char_baseline_is_not_recovered_as_horizontal() -> None:
 
 
 def test_small_shear_formula_line_is_retained_as_formula_only() -> None:
-    """验证带数学运算符的小角度多基线粗行只进入 formula-only 流。"""
+    """Verify that small angle multi-baseline thick lines with math operators only go into the formula-only stream."""
     chars = [
         _char("x", (10.0, 20.0, 15.0, 28.0)),
         _char("=", (18.0, 24.0, 24.0, 30.0)),
@@ -228,7 +228,7 @@ def test_small_shear_formula_line_is_retained_as_formula_only() -> None:
 
 
 def test_formula_only_rows_do_not_shift_existing_source_indices() -> None:
-    """验证新增公式候选使用尾部 source index，不改变既有自然文本身份。"""
+    """Verify that the new formula candidate uses the tail source and index without changing the existing natural text identity."""
     first = _line([_span("first", (10.0, 10.0, 35.0, 18.0), 0.0)], 0.0)
     formula = _line([_span("x=", (10.0, 20.0, 24.0, 30.0), 10.0)], 10.0)
     second = _line([_span("second", (10.0, 32.0, 40.0, 40.0), 0.0)], 0.0)
@@ -239,7 +239,7 @@ def test_formula_only_rows_do_not_shift_existing_source_indices() -> None:
 
 
 def test_small_true_diagonal_without_formula_evidence_stays_rejected() -> None:
-    """验证缺少公式证据的短斜向文字不会借 formula-only 流回到正文。"""
+    """Verify that short italic text lacking formula evidence does not flow back into the text by formula-only."""
     chars = [
         _char(value, (10.0 + index * 5.0, 30.0 - index * 2.0, 14.0 + index * 5.0, 38.0 - index * 2.0))
         for index, value in enumerate("mark")
@@ -270,7 +270,7 @@ def test_only_supported_visual_line_directions_are_retained(
     page_rotation: int,
     expected_angle: int | None,
 ) -> None:
-    """验证方向白名单在页面旋转后生效，且不会先把斜向行归一为 0 度。"""
+    """Verify that the orientation whitelist takes effect after the page is rotated, and does not normalize diagonal rows to 0 degrees first."""
 
     pdf_line = _line([_span("value", (10.0, 20.0, 40.0, 30.0), line_angle)], line_angle)
 
@@ -284,7 +284,7 @@ def test_only_supported_visual_line_directions_are_retained(
 
 
 def test_native_line_builder_can_opt_in_to_180_degree_visual_runs() -> None:
-    """验证 Low/TXT 可显式扩展方向白名单且不改变 Flash 默认行为。"""
+    """Verified that Low/TXT can explicitly extend the direction whitelist without changing the Flash default behavior."""
 
     pdf_line = _line(
         [_span("upside down", (10.0, 20.0, 60.0, 30.0), 180.0)],
@@ -328,7 +328,7 @@ def test_native_line_builder_can_opt_in_to_180_degree_visual_runs() -> None:
     ],
 )
 def test_pdf_unicode_separator_spaces_are_normalized_to_ascii(separator: str) -> None:
-    """验证所有 Unicode Zs 排版空格均转换为普通 ASCII 空格。"""
+    """Verify that all Unicode Zs typographic spaces are converted to normal ASCII spaces."""
 
     assert (
         native_text._sanitize_pdf_control_text(
@@ -340,7 +340,7 @@ def test_pdf_unicode_separator_spaces_are_normalized_to_ascii(separator: str) ->
 
 
 def test_pdf_unicode_line_separators_follow_newline_policy() -> None:
-    """验证 NEXT LINE、行分隔符和段分隔符统一遵循物理换行保留策略。"""
+    """Verify that NEXT LINE, line delimiters, and segment delimiters follow the physical line break retention policy."""
 
     content = "first\u0085second\u2028third\u2029fourth"
 
@@ -361,7 +361,7 @@ def test_pdf_unicode_line_separators_follow_newline_policy() -> None:
 
 
 def test_pdf_safe_invisible_and_control_characters_are_removed_idempotently() -> None:
-    """验证无正文语义的零宽字符和 C0/C1 控制字符被稳定删除。"""
+    """Verify that zero-width characters with no body semantics and C0/C1 control characters are stably removed."""
 
     content = "A\u200bB\u2060C\ufeffD\x00E\x07F\x7fG\x80H\x9fI"
     normalized = native_text._sanitize_pdf_control_text(
@@ -380,7 +380,7 @@ def test_pdf_safe_invisible_and_control_characters_are_removed_idempotently() ->
 
 
 def test_pdf_soft_hyphens_keep_only_latin_line_end_breaks() -> None:
-    """验证两类 PDF 软断词仅在拉丁字母行末转成 ASCII hyphen。"""
+    """Verify that two types of PDF soft-hyphenation words are converted to ASCII hyphen only at the end of lines with Latin letters."""
 
     assert native_text._normalize_native_run_text("inter\u00ad") == "inter-"
     assert native_text._normalize_native_run_text("co\u00adoperate") == "cooperate"
@@ -389,7 +389,7 @@ def test_pdf_soft_hyphens_keep_only_latin_line_end_breaks() -> None:
 
 
 def test_pdf_semantic_joiners_and_decode_markers_are_preserved() -> None:
-    """验证语言连接符、私用区字形和解码占位符不会被通用清理静默删除。"""
+    """Verify that language connectors, private area glyphs, and decoding placeholders are not silently removed by universal cleanup."""
 
     content = "a\u200cb\u200dc\uf8f1d\ufffde"
 

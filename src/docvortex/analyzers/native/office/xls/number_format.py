@@ -1,4 +1,4 @@
-"""Excel 数值格式解析与稳定显示文本生成。"""
+"""Excel Numeric format parsing and stable display text generation."""
 
 from __future__ import annotations
 
@@ -55,13 +55,13 @@ _CONDITION_RE = re.compile(r"^(<=|>=|<>|=|<|>)([-+]?(?:\d+(?:\.\d*)?|\.\d+))$")
 
 @dataclass(frozen=True, slots=True)
 class _Condition:
-    """一个数值格式 section 的比较条件。"""
+    """A comparison condition of numeric format section."""
 
     operator: str
     operand: float
 
     def matches(self, value: float) -> bool:
-        """判断数值是否满足当前比较条件。"""
+        """Determine whether the value meets the current comparison conditions."""
 
         return {
             "<": value < self.operand,
@@ -75,20 +75,20 @@ class _Condition:
 
 @dataclass(frozen=True, slots=True)
 class _Section:
-    """一个已拆分但仍保留 Excel 格式语法的 section。"""
+    """A section that has been split but still retains the Excel format syntax."""
 
     pattern: str
     condition: _Condition | None
 
 
 def builtin_number_format(format_id: int) -> str | None:
-    """返回确定的内建格式代码，地区相关格式不做猜测。"""
+    """Returns the determined built-in format code, no guessing is required for region-related formats."""
 
     return BUILTIN_NUMBER_FORMATS.get(int(format_id))
 
 
 def format_general(value: float) -> str:
-    """按 Excel 15 位有效数字输出无格式浮点数。"""
+    """Press Excel to output an unformatted floating point number with 15 significant digits."""
 
     if not math.isfinite(value):
         return str(value)
@@ -101,7 +101,7 @@ def format_general(value: float) -> str:
 
 
 def _split_sections(code: str) -> list[str] | None:
-    """在不切开引号、转义和方括号的前提下拆分分号 sections。"""
+    """Split semicolons without cutting quotes, escapes, and square brackets sections."""
 
     sections: list[str] = []
     current: list[str] = []
@@ -139,7 +139,7 @@ def _split_sections(code: str) -> list[str] | None:
 
 
 def _strip_brackets(pattern: str) -> tuple[str, _Condition | None, bool]:
-    """移除颜色/条件/地区标记，同时识别 elapsed 时间格式。"""
+    """Removed color/condition/region markers while recognizing elapsed time format."""
 
     output: list[str] = []
     condition: _Condition | None = None
@@ -172,7 +172,7 @@ def _strip_brackets(pattern: str) -> tuple[str, _Condition | None, bool]:
 
 
 def _parse_sections(code: str) -> list[_Section] | None:
-    """拆分格式并提取每个 section 的可选条件。"""
+    """Split the format and extract the optional conditions for each section."""
 
     raw_sections = _split_sections(code)
     if raw_sections is None or not raw_sections:
@@ -190,7 +190,7 @@ def _choose_numeric_section(
     sections: list[_Section],
     value: float,
 ) -> tuple[_Section, float, bool] | None:
-    """按条件或正负零位置选择用于渲染的数值 section。"""
+    """section Selects a numerical value for rendering by condition or positive and negative zero position."""
 
     numeric = sections[:-1] if len(sections) == 4 else sections
     if not numeric:
@@ -212,7 +212,7 @@ def _choose_numeric_section(
 
 
 def _literalize(pattern: str) -> str:
-    """把引号、转义、下划线和填充语法还原为显示字面量。"""
+    """Revert quote, escape, underscore, and fill syntax to display literals."""
 
     output: list[str] = []
     cursor = 0
@@ -240,7 +240,7 @@ def _literalize(pattern: str) -> str:
 
 
 def _syntax_view(pattern: str) -> str:
-    """移除字面量后返回仅供格式类型判定的语法视图。"""
+    """After removing the literal, a syntax view that only determines the format type is returned."""
 
     output: list[str] = []
     cursor = 0
@@ -261,7 +261,7 @@ def _syntax_view(pattern: str) -> str:
 
 
 def _date_parts(pattern: str) -> tuple[bool, bool, bool] | None:
-    """判断格式是否表示日期、时间或 elapsed 时长。"""
+    """Determines whether the format represents a date, time, or elapsed duration."""
 
     syntax = _syntax_view(pattern).casefold()
     elapsed = bool(re.search(r"\[(?:h+|m+|s+)\]", syntax))
@@ -288,7 +288,7 @@ def _date_parts(pattern: str) -> tuple[bool, bool, bool] | None:
 
 
 def _render_serial(value: float, *, date1904: bool, parts: tuple[bool, bool, bool]) -> str:
-    """把 Excel serial 按确定的 ISO 日期/时间策略输出。"""
+    """Output Excel serial according to the determined ISO date/time policy."""
 
     has_date, has_time, elapsed = parts
     if elapsed:
@@ -320,7 +320,7 @@ def _render_serial(value: float, *, date1904: bool, parts: tuple[bool, bool, boo
 
 
 def _decimal_quantize(value: float, places: int) -> Decimal:
-    """以 Excel 接近的 half-up 规则按指定位数舍入。"""
+    """The half-up rule to Excel rounds to the specified number of digits."""
 
     decimal_value = Decimal(format(value, ".15g"))
     quantum = Decimal(1).scaleb(-places)
@@ -328,7 +328,7 @@ def _decimal_quantize(value: float, places: int) -> Decimal:
 
 
 def _extract_number_span(pattern: str) -> tuple[str, str, str]:
-    """拆出数字占位主体及其前后字面量。"""
+    """Remove the number placeholder body and its surrounding literals."""
 
     literalized = _literalize(pattern)
     general_match = re.search("general", literalized, re.I)
@@ -351,7 +351,7 @@ def _extract_number_span(pattern: str) -> tuple[str, str, str]:
 
 
 def _render_scientific(value: float, pattern: str) -> str | None:
-    """按 Excel 科学计数占位符输出 mantissa 与 exponent。"""
+    """Press the Excel scientific notation placeholder to output mantissa and exponent."""
 
     match = re.search(r"([0#?]+)(?:\.([0#?]+))?[Ee]([+-])([0#?]+)", pattern)
     if match is None:
@@ -379,7 +379,7 @@ def _render_scientific(value: float, pattern: str) -> str | None:
 
 
 def _render_fraction(value: float, pattern: str) -> str | None:
-    """按固定或占位 denominator 输出最接近的分数。"""
+    """Outputs the nearest fraction by fixed or placeholder denominator."""
 
     match = re.search(r"([#0?]*)\s*([0#?]+)\/([0-9#?]+)", pattern)
     if match is None:
@@ -410,7 +410,7 @@ def _render_fraction(value: float, pattern: str) -> str | None:
 
 
 def _render_decimal(value: float, pattern: str) -> str:
-    """按整数、小数、分组、缩放与百分号占位符输出数值。"""
+    """Output values as integers, decimals, grouping, scaling, and percent sign placeholders."""
 
     percent_count = pattern.count("%")
     core = pattern.replace("%", "")
@@ -460,7 +460,7 @@ def _render_decimal(value: float, pattern: str) -> str:
 
 
 def _render_pattern(pattern: str, value: float, auto_minus: bool) -> str:
-    """渲染一个已经选定的数值 section。"""
+    """Renders a selected value section."""
 
     if not pattern:
         return ""
@@ -484,7 +484,7 @@ def _render_pattern(pattern: str, value: float, auto_minus: bool) -> str:
 
 
 def format_number(value: float, format_code: str | None, *, date1904: bool) -> str:
-    """使用 Excel format code 渲染数值，无法解析时退回 General。"""
+    """Use Excel format code to render the value, and return to General if it cannot be parsed."""
 
     if format_code is None or not math.isfinite(value):
         return format_general(value)
@@ -506,7 +506,7 @@ def format_number(value: float, format_code: str | None, *, date1904: bool) -> s
 
 
 def format_text(text: str, format_code: str | None) -> str:
-    """应用第四个文本 section；没有文本 section 时保持原文。"""
+    """The fourth text section is applied; without text section the original text is retained."""
 
     if format_code is None:
         return text

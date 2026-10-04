@@ -1,4 +1,4 @@
-"""原生视觉块折叠、方向归一化与页面裁图。"""
+"""Native visual block folding, direction normalization and page cropping."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def _attach_visual_block_images(
     images_list: list[dict[str, Any]],
     page_start_index: int = 0,
 ) -> None:
-    """在窗口页图释放前，为最终 model_list 视觉块写入回正后的页面裁图。"""
+    """Before the window page image is released, the page crop after the final model_list visual block is written back into alignment."""
     if len(model_list) != len(images_list):
         raise ValueError(f"Hybrid visual crop page count mismatch: model_list={len(model_list)}, images={len(images_list)}")
 
@@ -39,7 +39,7 @@ def _attach_visual_block_images(
 
 
 def _prepare_page_visual_blocks(page_model_list: list[dict[str, Any]]) -> list[tuple[int, dict[str, Any]]]:
-    """先折叠视觉容器，再记录原始块索引，供按需页图任务复用。"""
+    """The visual container is collapsed first, and then the original block index is recorded for reuse by on-demand page mapping tasks."""
     _collapse_image_blocks(page_model_list)
     return [(index, block) for index, block in enumerate(page_model_list) if block.get("type") in MODEL_JSON_VISUAL_BLOCK_TYPES]
 
@@ -50,7 +50,7 @@ def _visual_page_ranges(
     *,
     window_size: int = 64,
 ) -> list[tuple[int, int]]:
-    """在指定窗口和 32MiB 像素预算内合并需裁图页，不改变单页清晰度。"""
+    """Merge pages that need to be cropped within the specified window and 32MiB pixel budget without changing the resolution of a single page."""
     ranges: list[tuple[int, int]] = []
     batch_bytes = 0
     for page_index, blocks in enumerate(prepared_pages):
@@ -80,7 +80,7 @@ def attach_visual_block_images_from_pdf(
     threads: int | None = None,
     session=None,
 ) -> None:
-    """按当前 PDF 全部物理页的视觉块需求原地补图；页图由本函数释放，文档仍归调用方。"""
+    """The image is added in place according to the visual block requirements of all physical pages of the current PDF; the page image is released by this function, and the document still belongs to the caller."""
     from .images import _load_visual_crops_from_pdf_bytes_range, get_pdf_render_backend
     from .raster import estimate_page_image_bytes
 
@@ -123,7 +123,7 @@ def _attach_prepared_visual_block_images(
     images_list: list[dict[str, Any]],
     page_start_index: int = 0,
 ) -> None:
-    """按所选 PDF 的物理页索引裁图，输入块已经整理且无需再次折叠。"""
+    """Cropping according to the physical page index of the selected PDF, the input block has been organized and does not need to be folded again."""
     if len(prepared_pages) != len(images_list):
         raise ValueError(f"Hybrid visual crop page count mismatch: model_list={len(prepared_pages)}, images={len(images_list)}")
     for page_offset, (visual_blocks, image_dict) in enumerate(zip(prepared_pages, images_list)):
@@ -180,7 +180,7 @@ __all__ = [
 
 
 def _bbox_to_pixel_bbox(bbox: BBox | None, page_size: tuple[int, int]) -> BBox | None:
-    """在 DocVortex 原生 ModelJson 边界解释归一化或像素框，再调用共享的显式坐标转换。"""
+    """Interpret normalization or pixel boxes at DocVortex native ModelJson boundaries before invoking shared explicit coordinate transformations."""
     if bbox is None or len(bbox) != 4:
         return None
     try:
@@ -195,7 +195,7 @@ def _collapse_image_blocks(
     page_model_list: list[dict[str, Any]],
     containment_threshold: float = IMAGE_BLOCK_CONTAINMENT_THRESHOLD,
 ) -> None:
-    """将 image_block 折叠为单个图片，并删除面积上被其包裹的非容器子块。"""
+    """Collapse image_block into a single image and delete the non-container subblocks in the area it wraps."""
     image_blocks = [block for block in page_model_list if block.get("type") == "image_block"]
     if not image_blocks:
         return
@@ -224,7 +224,7 @@ def _collapse_image_blocks(
 
 
 def _attach_owned_bitmap_crops(visual_blocks, bitmap, native, page_index):
-    """直接裁剪独立位图，复用原框归一化与 JPEG 编码；原生计算错误明确传播。"""
+    """Crop individual bitmaps directly, reusing original frame normalization and JPEG encoding; native calculation errors are clearly propagated."""
     import base64
     import cv2
 
@@ -241,7 +241,7 @@ def _attach_owned_bitmap_crops(visual_blocks, bitmap, native, page_index):
         except Exception as exc:
             logger.warning(f"Skipping invalid model visual block crop: page={page_index}, block={block_idx}, error={exc}")
             continue
-        # 计算异常不能被无效输入的兼容跳过逻辑吞掉，也不能静默切回 Python。
+        # Computational exceptions cannot be swallowed by compatible skip logic for invalid inputs, nor can they silently switch back to Python.
         pixels, crop_width, crop_height = native.crop_bitmap_bgr(data, width, height, stride, mode, bbox, angle)
         crop_bgr = np.frombuffer(pixels, dtype=np.uint8).reshape(crop_height, crop_width, 3)
         try:

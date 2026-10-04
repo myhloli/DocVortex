@@ -1,4 +1,4 @@
-"""DOCX 富文本与样式处理；共享当前 Converter 的单文档状态。"""
+"""DOCX Rich text and style processing; shares the current single document status of Converter."""
 
 from pathlib import Path
 from typing import Any, Iterator, Optional, Union
@@ -30,7 +30,7 @@ from .context import _DocxConstants, _ParagraphElement
 
 
 class _DocxStyles:
-    """集中维护富文本与样式，不自行创建文档或持有跨文档缓存。"""
+    """Centrally maintain rich text and styles without creating documents yourself or holding cross-document caches."""
 
     def _get_style_id_from_property(
         self,
@@ -38,7 +38,7 @@ class _DocxStyles:
         property_tag: str,
         style_tag: str,
     ) -> Optional[str]:
-        """从段落或 run 的直接属性节点读取样式 ID，避免触发 python-docx 样式查找。"""
+        """Read style ID from the direct attribute node of paragraph or run to avoid triggering python-docx style lookup."""
         if xml_element is None:
             return None
 
@@ -64,7 +64,7 @@ class _DocxStyles:
         style_id: Optional[str],
         style_type: Any,
     ) -> Any:
-        """按 style id 和类型缓存 python-docx 样式对象，避免大 styles.xml 被反复线性扫描。"""
+        """Cache style id and python-docx style objects by type to avoid large styles.xml being repeatedly linearly scanned."""
         if part is None:
             return None
 
@@ -77,7 +77,7 @@ class _DocxStyles:
         return self._style_lookup_cache[cache_key]
 
     def _get_paragraph_style(self, paragraph: Optional[Paragraph]) -> Any:
-        """读取段落样式；无显式 pStyle 时缓存默认段落样式查询结果。"""
+        """Read paragraph styles; caches default paragraph style query results when no explicit pStyle is specified."""
         if paragraph is None:
             return None
         style_id = self._get_style_id_from_property(
@@ -92,7 +92,7 @@ class _DocxStyles:
         )
 
     def _get_run_style(self, run: Optional[Run]) -> Any:
-        """读取 run 字符样式；无显式 rStyle 时缓存默认字符样式查询结果。"""
+        """Read run character style; cache default character style query results when no explicit rStyle is specified."""
         if run is None:
             return None
         style_id = self._get_style_id_from_property(
@@ -109,68 +109,68 @@ class _DocxStyles:
     @staticmethod
     def _escape_hyperlink_text(text: str) -> str:
         """
-        转义超链接文本中的方括号。
+        Escape square brackets in hyperlink text.
 
         Args:
-            text: 要转义的文本
+            text: text to escape
 
         Returns:
-            str: 转义后的文本
+            str: escaped text
         """
         if not text:
             return text
-        # 转义方括号
+        # Escape square brackets
         text = text.replace("[", "\\[").replace("]", "\\]")
         return text
 
     @staticmethod
     def _escape_hyperlink_url(url: str) -> str:
         """
-        转义超链接 URL 中的括号。
+        Escape brackets in hyperlink URL.
 
         Args:
-            url: 要转义的 URL
+            url: URL to escape
 
         Returns:
-            str: 转义后的 URL
+            str: escaped URL
         """
         if not url:
             return url
-        # 对括号进行 URL 编码
+        # URL encoding of brackets
         url = url.replace("(", "%28").replace(")", "%29")
         return url
 
     @staticmethod
     def _get_style_str_from_format(format_obj) -> Optional[str]:
         """
-        从 Formatting 对象提取样式字符串。
+        Extracts the style string from the Formatting object.
 
         Args:
-            format_obj: Formatting 对象
+            format_obj: Formatting object
 
         Returns:
-            Optional[str]: 样式字符串（如 "bold,italic"），无样式时返回 None
+            Optional[str]: style string (such as "bold,italic"), if there is no style, return None
         """
         return formatting_to_style_str(format_obj)
 
     @staticmethod
     def _has_visible_style(format_obj) -> bool:
         """
-        检查格式是否包含可见样式（下划线或删除线）。
+        Check if the formatting contains visible styles (underline or strikethrough).
 
-        空白文本在有这些样式时仍然是可见的，应当保留。
+        Blank text is still visible with these styles and should be preserved.
 
         Args:
-            format_obj: Formatting 对象
+            format_obj: Formatting object
 
         Returns:
-            bool: 是否包含可见样式
+            bool: Whether to include visible styles
         """
         return has_visible_style(format_obj)
 
     @staticmethod
     def _has_non_visible_text_style(format_obj) -> bool:
-        """判断格式是否只有空白文本不可见的字形样式。"""
+        """Determines whether the format only has invisible text glyph styles."""
         return has_non_visible_text_style(format_obj)
 
     @classmethod
@@ -181,10 +181,10 @@ class _DocxStyles:
         *,
         preserve_blank_non_visible_style: bool = False,
     ) -> Optional[Formatting]:
-        """按文本内容收敛 run 格式，避免空白 run 把不可见样式传给输出。
+        """Converg run formatting by text content, avoid whitespace run Pass invisible styles to output.
 
-        preserve_blank_non_visible_style 用于保留同一文本片段内空白 run 的
-        bold/italic：这些样式自身不让空格可见，但可能是连续同样式文本的一部分。
+        preserve_blank_non_visible_style for preserving whitespace within the same text fragment run
+        bold/italic: These styles themselves do not make spaces visible, but may be part of consecutive style text.
         """
         return normalize_format_for_text(
             format_obj,
@@ -198,11 +198,11 @@ class _DocxStyles:
         current_index: int,
         step: int,
     ) -> Optional[Formatting]:
-        """查找相邻方向上最近的非空白普通 run 格式，用于判断空白 run 是否属于同一段样式文本。"""
+        """Find the nearest non-blank common run format in the adjacent direction, used to determine whether the blank run belongs to the same paragraph of style text."""
         index = current_index + step
         while 0 <= index < len(inline_contents):
             content = inline_contents[index]
-            # 超链接是独立输出边界，不跨越超链接借用样式上下文。
+            # Hyperlinks are independent output boundaries and do not borrow style context across hyperlinks.
             if isinstance(content, Hyperlink):
                 return None
             if not isinstance(content, Run):
@@ -224,7 +224,7 @@ class _DocxStyles:
         text: str,
         format_obj: Optional[Formatting],
     ) -> bool:
-        """判断空白 run 的 bold/italic 是否应保留，以便连续同样式文本合并成一个 span。"""
+        """Determines whether the bold/italic of the blank run should be retained so that consecutive text of the same style is merged into one span."""
         if not text or text.strip():
             return False
         if not self._has_non_visible_text_style(format_obj):
@@ -253,7 +253,7 @@ class _DocxStyles:
         *,
         preserve_plain_blank: bool = False,
     ) -> bool:
-        """判断当前累积 run 是否需要输出，保留夹在可见样式之间的普通空白。"""
+        """Determine whether the current accumulated run needs to be output, retaining ordinary white space sandwiched between visible styles."""
         return should_keep_group_text(
             text,
             format_obj,
@@ -267,14 +267,14 @@ class _DocxStyles:
         format_obj: Optional[Formatting],
         hyperlink: Optional[Union[AnyUrl, Path, str]],
     ) -> None:
-        """追加段落元素；相邻同超链接且同格式的 run 合并为一个元素。"""
+        """Append paragraph elements; adjacent run with the same hyperlink and the same format are merged into one element."""
         append_rich_text_element(paragraph_elements, text, format_obj, hyperlink)
 
     @staticmethod
     def _normalize_hyperlink_group_boundaries(
         paragraph_elements: list[_ParagraphElement],
     ) -> list[_ParagraphElement]:
-        """把链接组边界空白移为普通文本，仅裁剪整段首尾并保留组内空白。"""
+        """Move the link group boundary blank to normal text, cut only the beginning and end of the entire paragraph, and retain the blank space within the group."""
 
         output: list[_ParagraphElement] = []
         index = 0
@@ -349,7 +349,7 @@ class _DocxStyles:
         cls,
         paragraph_elements: list[tuple[str, Optional[Formatting], Optional[Union[AnyUrl, Path, str]]]],
     ) -> list[dict[str, Any]]:
-        """按连续同 URL hyperlink 分组，直接生成结构化 Span。"""
+        """Group by consecutive URL hyperlink to directly generate structured Span."""
         return build_spans_from_elements(paragraph_elements)
 
     def _build_text_from_elements(
@@ -357,22 +357,22 @@ class _DocxStyles:
         paragraph_elements: list[tuple[str, Optional[Formatting], Optional[Union[AnyUrl, Path, str]]]],
     ) -> list[dict[str, Any]]:
         """
-        从 paragraph_elements 重组文本，应用超链接格式和字体样式。
+        Restructure text from paragraph_elements, applying hyperlink formatting and font styles.
 
         Args:
-            paragraph_elements: 段落元素列表
+            paragraph_elements: List of paragraph elements
 
         Returns:
-            list[dict]: 重组后的 Span
+            list[dict]: Reorganized Span
         """
         return self._build_spans_from_elements(paragraph_elements)
 
     @staticmethod
     def _normalize_text_block_content(content: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
-        规范化普通文本块导出内容。
+        Normalize plain text block export content.
 
-        DOCX 常用段首/段尾空格模拟版式对齐，导出普通文本块前去除这些前后空白。
+        DOCX Commonly used spaces at the beginning and end of paragraphs simulate layout alignment, and remove these leading and trailing spaces before exporting ordinary text blocks.
         """
         return strip_span_dicts(content)
 
@@ -383,15 +383,15 @@ class _DocxStyles:
         equations: list[tuple[str, str]],
     ) -> list[dict[str, Any]]:
         """
-        构建同时包含公式、超链接和字体样式的文本。
+        Construct text that includes formulas, hyperlinks, and font styles.
 
         Args:
-            paragraph_elements: 段落元素列表，包含格式和超链接信息
-            text_with_equations: 不含公式的原始可见文本
-            equations: 按源顺序排列的 text/equation token
+            paragraph_elements: List of paragraph elements, including formatting and hyperlink information
+            text_with_equations: Original visible text without formulas
+            equations: text/equation token in order of source
 
         Returns:
-            list[dict]: 包含公式、超链接和字体样式的 Span
+            list[dict]: Span containing formulas, hyperlinks and font styles
         """
         if not equations:
             return self._build_text_from_elements(paragraph_elements)
@@ -428,7 +428,7 @@ class _DocxStyles:
         style_obj,
         attr_name: str,
     ) -> Optional[bool]:
-        """从样式继承链中解析布尔字体属性。"""
+        """Resolve boolean font properties from the style inheritance chain."""
         if style_obj is None:
             return None
 
@@ -443,7 +443,7 @@ class _DocxStyles:
             style_element = getattr(style, "_element", None)
             style_id = getattr(style, "style_id", None)
             style_type = getattr(style, "type", None)
-            # DOCX 可能存在 basedOn 自引用或环形引用，记录已访问样式避免继承链死循环。
+            # DOCX There may be basedOn self-reference or circular reference, record the accessed style to avoid inheritance chain infinite loop.
             style_marker = (
                 id(style_element) if style_element is not None else id(style),
                 style_type,
@@ -473,7 +473,7 @@ class _DocxStyles:
         run: Run,
         attr_name: str,
     ) -> bool:
-        """解析 run 的字体属性，支持 run/字符样式/段落样式继承。"""
+        """Parse the font attributes of run and support run/character style/paragraph style inheritance."""
         if attr_name == "underline":
             direct_value = run.underline
         elif attr_name == "strikethrough":
@@ -484,8 +484,8 @@ class _DocxStyles:
         if direct_value is not None:
             return bool(direct_value)
 
-        # 先看 run 级字符样式链（跳过 Hyperlink 默认字符样式，避免把默认下划线
-        # 误当作正文强调样式注入到解析结果中）
+        # First look at the run level character style chain (skip the Hyperlink default character style to avoid using the default underline
+        # Mistakenly regarded as text emphasis style and injected into the parsing result)
         run_style = self._get_run_style(run)
         run_style_id = str(getattr(run_style, "style_id", "") or "").lower()
         run_style_name = str(getattr(run_style, "name", "") or "").lower()
@@ -495,7 +495,7 @@ class _DocxStyles:
             if inherited is not None:
                 return inherited
 
-        # 再看所在段落样式链
+        # Look at the paragraph style chain
         parent = getattr(run, "_parent", None)
         inherited = self._resolve_style_chain_bool(
             self._get_paragraph_style(parent),
@@ -508,7 +508,7 @@ class _DocxStyles:
 
     @staticmethod
     def _get_direct_underline_style(run: Run) -> str:
-        """读取 run 级下划线类型，用于区分 words 这类不作用于空格的下划线。"""
+        """Read the run level underline type, used to distinguish words type of underline that does not act on spaces."""
         _W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
         rPr = run._element.find(f"{{{_W}}}rPr")
         if rPr is None:
@@ -520,13 +520,13 @@ class _DocxStyles:
 
     def _get_format_from_run(self, run: Run) -> Optional[Formatting]:
         """
-        从 Run 对象获取格式信息。
+        Get format information from the Run object.
 
         Args:
-            run: Run 对象
+            run: Run object
 
         Returns:
-            Optional[Formatting]: 格式对象
+            Optional[Formatting]: format object
         """
         is_bold = self._resolve_run_bool_with_inheritance(run, "bold")
         is_italic = self._resolve_run_bool_with_inheritance(run, "italic")
@@ -534,7 +534,7 @@ class _DocxStyles:
         is_underline = self._resolve_run_bool_with_inheritance(run, "underline")
         underline_style = self._get_direct_underline_style(run)
 
-        # 检测着重符号 (w:em)：独立保留为 emphasis，避免和真实下划线混淆。
+        # Detect underscores (w:em): Reserved independently as emphasis to avoid confusion with real underscores.
         is_emphasis = False
         _W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
         rPr = run._element.find(f"{{{_W}}}rPr")
@@ -567,15 +567,15 @@ class _DocxStyles:
         part: Any | None = None,
     ) -> tuple[str, list[tuple[str, str]]]:
         """
-        处理文本中的公式。
+        Manipulate formulas in text.
 
         Args:
-            element: 元素对象
-            text: 文本内容
-            part: 当前段落所属的 OOXML part，用于解析局部 relationship
+            element: element object
+            text: Text content
+            part: OOXML part to which the current paragraph belongs, used to parse local relationship
 
         Returns:
-            tuple: (原始可见文本, 含公式时的有序 text/equation token)
+            tuple: (original visible text, ordered with formulas text/equation token)
         """
         source_part = part or self._require_document_part()
         only_texts: list[str] = []
@@ -593,21 +593,21 @@ class _DocxStyles:
             return text, []
 
         if "".join(only_texts) != text:
-            # 如果我们无法重构初始原始文本
-            # 不要尝试解析公式并返回原始文本
+            # If we cannot reconstruct the initial raw text
+            # Don't try to parse the formula and return the original text
             return text, []
 
         return text, tokens
 
     def _get_label_and_level(self, paragraph: Paragraph) -> tuple[str, Optional[int]]:
         """
-        获取段落的标签和层级。
+        Get the paragraph label and level.
 
         Args:
-            paragraph: 段落对象
+            paragraph: paragraph object
 
         Returns:
-            tuple[str, Optional[int]]: (标签, 层级) 元组
+            tuple[str, Optional[int]]: (label, level) tuple
         """
         paragraph_style = self._get_paragraph_style(paragraph)
         if paragraph_style is None:

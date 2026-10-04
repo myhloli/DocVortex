@@ -1,3 +1,3 @@
-"""Flash 各文档格式复用的轻量叶子能力。"""
+"""Flash lightweight leaf capability for multiplexing of each document format."""
 
 __all__: list[str] = []

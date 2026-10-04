@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          # 门禁脚本沿第一父链回溯最近绿灯 commit，需要完整历史
+          # The CI gate follows first-parent history to the latest passing commit, so it needs the full history.
           fetch-depth: 0
       - uses: astral-sh/setup-uv@v7
         with:
@@ -65,7 +65,7 @@ jobs:
           merge-multiple: true
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
-      # 使用工作流令牌发布草稿，避免再次触发 release 发布流程。
+      # Publish the draft using the workflow token to avoid triggering the release workflow again.
       - name: Publish GitHub release after manual distribution
         if: ${{ github.event_name == 'workflow_dispatch' }}
         env:

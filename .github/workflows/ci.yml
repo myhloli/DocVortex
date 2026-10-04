@@ -3,8 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
-    # 纯版本号 bump 的发布提交复用祖先绿灯（见 tools/verify_release_ci_gate.py），
-    # 不再重复触发全量 CI；混合改动的 push 不受影响。
+    # Version-only release commits reuse passing ancestor CI (see tools/verify_release_ci_gate.py);
+    # skip duplicate full CI runs, while pushes containing other changes still trigger CI.
     paths-ignore: ['src/docvortex/version.py']
   pull_request:
   workflow_call:
@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        # ABI3 轮子只需验证最低 cp310 与最新 3.14 两个端点。
+        # ABI3 wheels need validation only at the supported endpoints: cp310 and the latest Python 3.14.
         python: ['3.10', '3.14']
         backend: [python, rust]
     runs-on: ${{ matrix.os }}
@@ -75,7 +75,7 @@ jobs:
       - run: uvx ruff==0.14.2 check src
       - run: uvx ruff==0.14.2 format --check src
 
-  # native-wheels.yml 不再随 push/PR 触发后，Rust 静态检查与单元测试由本工作流把守。
+  # This workflow runs Rust static checks and unit tests now that native-wheels.yml no longer runs on pushes or PRs.
   rust-checks:
     runs-on: ubuntu-latest
     steps:

@@ -1,4 +1,4 @@
-"""验证页面原语复用、源数据只读和行对筛选的保守等价性。"""
+"""Verify conservative equivalence of page primitive reuse, source data read-only, and row pair filtering."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from docvortex.document.pdf import _document
 
 
 def _pdf() -> bytes:
-    """生成含链接、旋转文本、上下标和矢量线的独立 PDF。"""
+    """Generates a standalone PDF with links, rotated text, superscripts and subscripts, and vector lines."""
     buffer = BytesIO()
     canvas = Canvas(buffer, pagesize=(400, 600))
     for index in range(25):
@@ -43,7 +43,7 @@ def _pdf() -> bytes:
 
 
 def test_vector_snapshot_matches_independent_queries_and_outlives_document(monkeypatch: pytest.MonkeyPatch) -> None:
-    """一次组合遍历与旧查询逐值一致，文档关闭后仍可安全使用。"""
+    """A combined pass is value-for-value consistent with the old query and remains safe to use after the document is closed."""
     with PDFDocument(_pdf()) as document:
         page = document[0]
         drawings, paths = page.get_drawing_lines(), page.get_path_infos()
@@ -56,7 +56,7 @@ def test_vector_snapshot_matches_independent_queries_and_outlives_document(monke
 
 
 def test_shared_primitives_preserve_characters_and_text_evidence() -> None:
-    """共享字符与矢量几何不改动源对象，并保留区域相关的最终证据。"""
+    """Sharing character and vector geometry leaves the source object unchanged and preserves the final evidence of area dependence."""
     with PDFDocument(_pdf()) as document:
         page = document[0]
         geometry = page.get_chars_with_geometry()
@@ -79,7 +79,7 @@ def test_shared_primitives_preserve_characters_and_text_evidence() -> None:
 
 
 def _groups(lines: list[_LineItem]) -> dict[tuple[int, bool, str | None], list[int]]:
-    """按原合并规则的必要分类条件建立索引。"""
+    """Create an index based on the necessary classification conditions of the original merge rule."""
     groups: dict[tuple[int, bool, str | None], list[int]] = {}
     for index, line in enumerate(lines):
         groups.setdefault((line.angle, line.formula_candidate_only, line.semantic_type), []).append(index)
@@ -87,7 +87,7 @@ def _groups(lines: list[_LineItem]) -> dict[tuple[int, bool, str | None], list[i
 
 
 def test_candidate_screening_never_drops_original_acceptance() -> None:
-    """覆盖来源框偏移和字体尺度大于可见框的情况，逐对验证原判定的接受超集。"""
+    """Covering the situation where the source box offset and font scale are larger than the visible box, the accepted superset of the original decision is verified pair by pair."""
     rng = random.Random(918)
     accepted = 0
     for _ in range(30):
@@ -125,14 +125,14 @@ def test_candidate_screening_never_drops_original_acceptance() -> None:
 
 @pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -float("inf")])
 def test_invalid_geometry_uses_exhaustive_fallback(invalid: float) -> None:
-    """异常源框不能悄悄缩小候选，交回已有算法处理。"""
+    """The abnormal source box cannot quietly narrow down the candidates and is returned to the existing algorithm for processing."""
     lines = [_LineItem("a", (0, 0, 20, 10), 0, 0), _LineItem("b", (21, 0, 40, 10), 0, 1)]
     lines[1].source_bbox = (0, invalid, 40, 10)
     assert merging._same_baseline_candidate_pairs(lines, [line.bbox for line in lines], _groups(lines)) is None
 
 
 def test_dense_page_bounds_candidate_storage() -> None:
-    """区间查询不截断成员；附加几何预筛只允许删除原规则拒绝的行对。"""
+    """Range queries do not truncate members; additional geometric prefiltering only allows deletion of row pairs that are rejected by the original rule."""
     from docvortex.analyzers.native.pdf._interval_candidates import IntervalCandidates
 
     lines = [_LineItem("a", (0, 0, 20, 10), 0, index) for index in range(128)]
@@ -159,7 +159,7 @@ def test_dense_page_bounds_candidate_storage() -> None:
 
 
 def test_bottom_edge_tolerance_is_included() -> None:
-    """可见框不交叠但有效字体尺度允许底边对齐时仍保留原规则候选。"""
+    """The original rule candidate remains when the visible boxes do not overlap but the effective font scale allows for bottom edge alignment."""
     lines = [
         _LineItem("a", (0, 0, 10, 1), 0, 0, effective_height=40, font_signature=("font", 0), font_coverage=1),
         _LineItem("b", (11, 10, 21, 11), 0, 1, effective_height=40, font_signature=("font", 0), font_coverage=1),
@@ -171,7 +171,7 @@ def test_bottom_edge_tolerance_is_included() -> None:
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 @pytest.mark.parametrize("tables", [[], [(0, 100, 400, 180)]])
 def test_merged_output_matches_exhaustive_order(monkeypatch: pytest.MonkeyPatch, angle: int, tables: list) -> None:
-    """比较完整行对象，确认筛选不会改变并查集认领、字符或结果排序。"""
+    """Compares complete row objects, confirms that filtering does not change the set of claims, characters, or result ordering."""
     with PDFDocument(_pdf()) as document:
         page = document[0]
         lines = _build_native_line_items(get_lines_from_chars(page.get_chars_with_geometry().chars), page.size)

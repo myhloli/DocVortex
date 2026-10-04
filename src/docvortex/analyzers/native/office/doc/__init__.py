@@ -1,3 +1,3 @@
-"""Word 97–2003 二进制文档解析实现。"""
+"""Word 97–2003 binary document parsing implementation."""
 
 __all__: list[str] = []

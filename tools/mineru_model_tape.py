@@ -1,4 +1,4 @@
-"""仅供本机可信录制的模型边界回放；不缓存 PDF 分析、渲染或素材结果。"""
+"""Model boundary playback for natively trusted recordings only; PDF analysis, rendering, or footage results are not cached."""
 
 from __future__ import annotations
 
@@ -11,12 +11,12 @@ import time
 
 
 def input_digest(value):
-    """按值冻结模型输入，覆盖数组/PIL 像素、容器类型与标量；未知类型明确拒绝。"""
+    """Freeze model input by value, overrides array/PIL pixels, container types and scalars; unknown types are explicitly rejected."""
     import numpy as np
     from PIL.Image import Image
 
     def normalize(item):
-        """将输入转换为无对象地址的稳定结构，保留字典键类型及序列顺序。"""
+        """Convert the input into a stable structure without object addresses, preserving dictionary key types and sequence order."""
         if isinstance(item, np.ndarray):
             return ["array", str(item.dtype), item.shape, hashlib.sha256(item.tobytes()).hexdigest()]
         if isinstance(item, Image):
@@ -43,7 +43,7 @@ def input_digest(value):
 
 
 def mutation_patches(before, after, path=(), seen=None):
-    """记录模型输入上的可见修改，按路径更新以保留表格任务与结果字典之间的别名。"""
+    """Record visible modifications on model inputs, updated by path to preserve aliases between table tasks and results dictionaries."""
     import numpy as np
     from PIL.Image import Image
 
@@ -87,7 +87,7 @@ def mutation_patches(before, after, path=(), seen=None):
 
 
 def apply_mutations(root, patches):
-    """重放原地修改，而非替换整个参数树，防止丢失分析器持有的引用关系。"""
+    """Replay modifications in place rather than replacing the entire parameter tree to prevent losing references held by the parser."""
     for operation, path, value in patches:
         target = root
         for key in path[:-1]:
@@ -111,10 +111,10 @@ def apply_mutations(root, patches):
 
 
 class ModelTape:
-    """只录制最外层模型调用、返回值及输入修改，递归模型调用包含在外层边界内。"""
+    """Only the outermost model calls, return values, and input modifications are recorded, and recursive model calls are included within the outer boundaries."""
 
     def __init__(self, *, record=False, data=None, verify_inputs=False):
-        """计时回放关闭像素摘要，正确性回放单独开启严格输入校验。"""
+        """Turn off pixel summarization for timing playback, and turn on strict input verification separately for correctness playback."""
         self.record = record
         self.data = data if data is not None else {"version": 1, "calls": [], "signatures": {}}
         if self.data["version"] != 1:
@@ -128,7 +128,7 @@ class ModelTape:
         self.failed_calls = []
 
     def reset(self):
-        """每次文档重新从第一条模型结果开始，不保留上一轮分析产物。"""
+        """Each time the document starts from the first model result, the previous round of analysis products will not be retained."""
         self.position = 0
         self.callback_seconds = 0.0
         self.model_seconds = 0.0
@@ -136,14 +136,14 @@ class ModelTape:
         self.failed_calls.clear()
 
     def complete(self):
-        """必须消费全部模型事件，防止静默跳过模型调用后伪报加速。"""
+        """All model events must be consumed to prevent false report acceleration after silently skipping model calls."""
         if self.failed_calls:
             raise AssertionError(f"Model tape has failed or unsupported calls: {self.failed_calls}")
         if not self.record and self.position != len(self.data["calls"]):
             raise AssertionError((self.position, len(self.data["calls"])))
 
     def bind(self, name, resolve):
-        """按需加载录制模型，回放仅使用已保存签名，不实例化任何模型。"""
+        """The recorded model is loaded on demand, and playback only uses the saved signature, without instantiating any model."""
         if self.record:
             try:
                 original = resolve()
@@ -157,7 +157,7 @@ class ModelTape:
                 raise AssertionError(f"Unrecorded model method: {name}")
 
         def call(*values, **options):
-            """冻结边界包含返回值和原地副作用，异常不转为空结果或静默降级。"""
+            """Freeze boundaries include return values and in-place side effects, and exceptions are not converted to empty results or silently degraded."""
             if self.depth:
                 if original is None:
                     raise AssertionError("Unexpected nested replay")
@@ -206,22 +206,22 @@ class ModelTape:
 
 
 class ModelProxy:
-    """按属性名惰性连接模型方法，避免录制时无条件加载未使用的大模型。"""
+    """Lazy connection model method by attribute name to avoid unconditional loading of unused large models during recording."""
 
     def __init__(self, tape, name, resolve):
-        """解析函数仅在真实录制访问模型时执行，回放不触碰模型工厂。"""
+        """The parsing function is only executed when the actual recording accesses the model, and playback does not touch the model factory."""
         self._tape = tape
         self._name = name
         self._resolve = resolve
         self._cache = {}
 
     def __getattr__(self, name):
-        """只允许已明确的模型方法和 OCR 子模型；未知访问立即报错。"""
+        """Only specified model methods and OCR submodels are allowed; unknown access will result in an error immediately."""
         if name in self._cache:
             return self._cache[name]
 
         def resolve():
-            """延迟取到真实模型成员，保留现有模型的内部调用与配置。"""
+            """Delayed retrieval of real model members, retaining the internal calls and configuration of existing models."""
             return getattr(self._resolve(), name)
 
         qualified = f"{self._name}.{name}"
@@ -236,10 +236,10 @@ class ModelProxy:
 
 
 class ContextProxy:
-    """仅代理模型边界，PDF 窗口、表格恢复、文本证据与素材路径保持真实执行。"""
+    """Only proxy model boundaries, PDF windows, table restoration, text evidence and material paths remain true to execution."""
 
     def __init__(self, tape, original=None):
-        """保存设备配置使生命周期行为一致，回放使用录制时的轻量元数据。"""
+        """Save device configuration for consistent lifecycle behavior, and playback uses lightweight metadata at the time of recording."""
         self._tape = tape
         self._original = original
         self._cache = {}
@@ -248,7 +248,7 @@ class ContextProxy:
         self.device = tape.data["context"]["device"]
 
     def __getattr__(self, name):
-        """为实际用到的模型属性创建代理，不替换分析阶段函数。"""
+        """Create proxies for the actual model attributes used, without replacing the analysis phase functions."""
         if name not in {
             "ocr_model",
             "layout_model",
@@ -263,19 +263,19 @@ class ContextProxy:
         if name not in self._cache:
 
             def resolve():
-                """仅录制时访问对应真实模型属性。"""
+                """The corresponding real model properties are only accessed during recording."""
                 return getattr(self._original, name)
 
             self._cache[name] = ModelProxy(self._tape, name, resolve)
         return self._cache[name]
 
     def get_ocr_model(self, *args, **kwargs):
-        """不同 OCR 配置使用不同事件名，避免表格 OCR 和正文 OCR 错配。"""
+        """Different OCR configurations use different event names to avoid mismatch between table OCR and text OCR."""
         name = "configured_ocr:" + input_digest((args, kwargs))
         if name not in self._cache:
 
             def resolve():
-                """保留真实 OCR 工厂参数，仅在录制模型调用时初始化。"""
+                """Keep the real OCR factory parameters and only initialize when recording model calls."""
                 return self._original.get_ocr_model(*args, **kwargs)
 
             self._cache[name] = ModelProxy(self._tape, name, resolve)

@@ -15,7 +15,7 @@ from docvortex.schema import BlockType, MiddleJson, PageFootnoteBlock, TextBlock
 
 
 def build_backlinks_epub(*, notes_first: bool = False) -> bytes:
-    """构造同段别名、图片分段、跨章节返回和无效目标的真实 EPUB 包。"""
+    """Construct real EPUB packages for same-segment aliases, image segments, cross-chapter returns, and invalid targets."""
     chapter = """<html xmlns="http://www.w3.org/1999/xhtml"
         xmlns:epub="http://www.idpf.org/2007/ops"><body>
       <h1 id="chapter">Backlink chapter</h1>
@@ -73,18 +73,18 @@ def build_backlinks_epub(*, notes_first: bool = False) -> bytes:
 
 
 def _blocks(middle: MiddleJson) -> list[PageBlock]:
-    """按源顺序展平页面，便于断言真实物化目标。"""
+    """Flatten pages in source order to facilitate assertion of true materialized targets."""
     return [block for page in middle.pages for block in page.blocks]
 
 
 def _links(block: TextBlock | PageFootnoteBlock) -> dict[str, str]:
-    """以保留的链接文字建立目标映射。"""
+    """Create target mapping with preserved link text."""
     return {inline_text(span.content): span.url for span in block.content if span.type == "hyperlink"}
 
 
 @pytest.mark.parametrize("notes_first", [False, True])
 def test_epub_backlinks_bind_actual_text_segments(notes_first: bool) -> None:
-    """验证跨章节解析顺序不影响正文、别名、分段和无效目标的链接语义。"""
+    """Verify that cross-section parsing order does not affect the link semantics of body, aliases, segments, and invalid targets."""
     middle, model = analyze_native_test_document(build_backlinks_epub(notes_first=notes_first), file_suffix="epub")
     blocks = _blocks(middle)
     texts = [block for block in blocks if isinstance(block, TextBlock)]
@@ -124,7 +124,7 @@ def test_epub_backlinks_bind_actual_text_segments(notes_first: bool) -> None:
 
 
 def _assert_fragment_targets(document: str) -> None:
-    """验证所有输出内部链接都命中文档中唯一的实际 DOM 目标。"""
+    """Verify that all output internal links hit the only actual DOM target in the document."""
     soup = BeautifulSoup(document, "html.parser")
     for link in soup.select('a[href^="#"]'):
         target = unquote(link["href"][1:])
@@ -132,7 +132,7 @@ def _assert_fragment_targets(document: str) -> None:
 
 
 def test_epub_backlinks_survive_render_and_protocol_roundtrips() -> None:
-    """验证 HTML、Markdown、EPUB 输出及 JSON/HTML/EPUB 重读都保留双向链接。"""
+    """Verify that HTML, Markdown, EPUB outputs, and JSON/HTML/EPUB rereads all retain bidirectional links."""
     middle, _ = analyze_native_test_document(build_backlinks_epub(), file_suffix="epub")
     original = [
         (" ".join(inline_text(block.content).split()), _links(block))
@@ -175,11 +175,11 @@ def test_epub_backlinks_survive_render_and_protocol_roundtrips() -> None:
 
 
 def test_html_hyperlinks_use_allocated_ids_without_mutating_semantics() -> None:
-    """验证空白编码及 ID 碰撞时使用最终分配目标，渲染不改写原始语义树。"""
+    """Verify that whitespace encoding and ID collisions use the final allocation target and rendering does not overwrite the original semantic tree."""
     middle, _ = analyze_native_test_document(build_backlinks_epub(), file_suffix="epub")
 
     def text(value: str) -> list[dict[str, str]]:
-        """构造不带额外样式的最小行内文字。"""
+        """Constructs minimal inline text without additional styling."""
         return [{"type": "text", "content": value}]
 
     middle.pages[0].blocks = [

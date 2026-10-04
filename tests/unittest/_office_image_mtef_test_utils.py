@@ -1,4 +1,4 @@
-"""把带 MTEF comment 的图片注入确定性 DOCX/PPTX/XLSX。"""
+"""Inject image with MTEF comment into deterministic DOCX/PPTX/XLSX."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def _replace_media_parts(
     prefix: str,
     payload: bytes,
 ) -> bytes:
-    """把指定 OOXML media 目录下的图片成员替换为原始测试载荷。"""
+    """Replace the image members in the specified OOXML media directory with the original test load."""
 
     with ZipFile(BytesIO(package)) as source:
         replacements = {name: payload for name in source.namelist() if name.startswith(prefix)}
@@ -48,7 +48,7 @@ def build_image_docx(
     header: bool = False,
     paragraph_style: str | None = None,
 ) -> bytes:
-    """构造正文、表格或页眉含单张图片的 DOCX。"""
+    """Construct DOCX with a single image in the body, table, or header."""
 
     document = Document()
     if table:
@@ -74,7 +74,7 @@ def build_image_docx(
 
 
 def _move_pptx_picture_to_notes(package: bytes) -> bytes:
-    """把单页 PPTX 的 picture shape 移到 notesSlide 并重绑图片关系。"""
+    """Move the picture shape of the single page PPTX to notesSlide and rebind the picture relationship."""
 
     replacements: dict[str, bytes] = {}
     with ZipFile(BytesIO(package)) as source:
@@ -139,7 +139,7 @@ def build_image_pptx(
     *,
     notes: bool = False,
 ) -> bytes:
-    """构造一页含单张图片 shape 或 notes 图片的 PPTX。"""
+    """Construct a page containing a single picture shape or notes picture PPTX."""
 
     presentation = Presentation()
     slide = presentation.slides.add_slide(presentation.slide_layouts[6])
@@ -169,7 +169,7 @@ def build_image_xlsx(
     *,
     cell_value: str | None = None,
 ) -> bytes:
-    """构造 A1 anchor 图片及可选单元格内容的 XLSX。"""
+    """Construct A1 anchor picture and optional cell content XLSX."""
 
     workbook = Workbook()
     worksheet = workbook.active

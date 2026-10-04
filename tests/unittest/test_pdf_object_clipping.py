@@ -1,4 +1,4 @@
-"""验证裁剪链使用所属坐标系，覆盖嵌套平移、非等比缩放、旋转和空交集。"""
+"""Verify that the clipping chain uses the owning coordinate system, covering nested translations, non-proportional scaling, rotations and empty intersections."""
 
 from io import BytesIO
 
@@ -10,7 +10,7 @@ from docvortex.document.pdf import PDFDocument
 
 
 def _nested_clipping_pdf(rotation: int, *, form_rotation: int = 0, inner_offset: float = 10) -> bytes:
-    """构造大背景超出内层 Form 且内层又超出外层 Form 的原生矢量样本。"""
+    """Construct native vector samples where the background extends beyond the inner Form and the inner layer extends beyond the outer Form."""
     buffer = BytesIO()
     canvas = Canvas(buffer, pagesize=(200, 200))
     canvas.beginForm("inner", 0, 0, 50, 40)
@@ -54,7 +54,7 @@ def _nested_clipping_pdf(rotation: int, *, form_rotation: int = 0, inner_offset:
     ],
 )
 def test_nested_form_clip_uses_parent_coordinates(rotation: int, expected: tuple) -> None:
-    """同一 clip 不能重复乘内部平移；所有可见叶子均落入解析出来的 Form 边界。"""
+    """The same clip cannot be multiplied by internal translations repeatedly; all visible leaves fall within the bounds of the resolved Form."""
     with PDFDocument(_nested_clipping_pdf(rotation)) as pdf:
         forms = pdf.get_page_form_bboxes(0)
         assert len(forms) == 1 and forms[0] == pytest.approx(expected, abs=0.01)
@@ -65,7 +65,7 @@ def test_nested_form_clip_uses_parent_coordinates(rotation: int, expected: tuple
 
 
 def test_rendered_color_stays_inside_clipped_form() -> None:
-    """以独立渲染的红色墨迹验证变换方向，几何实现不能自己证明自己。"""
+    """Verify transformation direction with independently rendered red ink, geometry implementation cannot prove itself."""
     with PDFDocument(_nested_clipping_pdf(0)) as pdf:
         image = pdf.render_page(0, scale=4).pil_image.convert("RGB")
         points = [
@@ -81,7 +81,7 @@ def test_rendered_color_stays_inside_clipped_form() -> None:
 
 @pytest.mark.parametrize("rotation", [90, 180, 270])
 def test_rotated_form_matrix_matches_rendered_ink(rotation: int) -> None:
-    """直接旋转内层 Form 矩阵，独立比较红色路径与渲染墨迹，区别于页面旋转。"""
+    """Directly rotate the inner Form matrix to compare the red path and rendered ink independently, distinct from page rotation."""
     with PDFDocument(_nested_clipping_pdf(0, form_rotation=rotation)) as pdf:
         paths = [path for path in pdf.get_page_path_infos(0) if path.fill_rgba and path.fill_rgba[:3] == (255, 0, 0)]
         assert len(paths) == 1
@@ -103,7 +103,7 @@ def test_rotated_form_matrix_matches_rendered_ink(rotation: int) -> None:
 
 
 def test_disjoint_parent_clip_keeps_empty_intersection() -> None:
-    """空裁剪交集不能退化为无裁剪，使完全不可见的 Form 又产生巨型框。"""
+    """Empty clipping intersections cannot degenerate into no clipping, making Form completely invisible and creating giant boxes."""
     with PDFDocument(_nested_clipping_pdf(0, inner_offset=200)) as pdf:
         assert pdf.get_page_path_infos(0) == []
         assert pdf.get_page_form_bboxes(0) == []

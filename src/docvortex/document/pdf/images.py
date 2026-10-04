@@ -25,14 +25,14 @@ from .raster import page_to_image
 
 
 class ImageType:
-    """限定 PDF 页面渲染支持的两种图像返回形态。"""
+    """Limit the two image return forms supported by PDF page rendering."""
 
     PIL = "pil_img"
     BASE64 = "base64_img"
 
 
 def _positive_int_env(name: str, default: int) -> int:
-    """读取正整数环境变量，缺失或非法时返回默认值。"""
+    """Read a positive integer environment variable, and return the default value if it is missing or illegal."""
     raw_value = os.getenv(name)
     if raw_value is None:
         return default
@@ -44,7 +44,7 @@ def _positive_int_env(name: str, default: int) -> int:
 
 
 def get_pdf_render_backend() -> str:
-    """默认 auto 解析为 session；会话按计算后端优先使用 Rust，错误不触发旧渲染重试。"""
+    """By default, auto is resolved to session; the session uses Rust first according to the calculation backend, and errors do not trigger old rendering retries."""
     backend = os.environ.get("DOCVORTEX_PDF_RENDER_BACKEND", "auto").strip().lower()
     if backend not in {"auto", "legacy", "session"}:
         raise ValueError("DOCVORTEX_PDF_RENDER_BACKEND must be auto, legacy or session")
@@ -52,12 +52,12 @@ def get_pdf_render_backend() -> str:
 
 
 def get_load_images_timeout() -> int:
-    """返回 PDF 批量渲染的超时秒数。"""
+    """Returns PDF batch rendering timeout seconds."""
     return _positive_int_env("DOCVORTEX_PDF_RENDER_TIMEOUT", 300)
 
 
 def get_load_images_threads() -> int:
-    """返回 PDF 批量渲染允许使用的进程数。"""
+    """Returns PDF The number of processes allowed for batch rendering."""
     return _positive_int_env("DOCVORTEX_PDF_RENDER_THREADS", 3)
 
 
@@ -82,7 +82,7 @@ def pdf_page_to_image(
     dpi: int = DEFAULT_PDF_IMAGE_DPI,
     image_type: Literal["pil_img", "base64_img"] = ImageType.PIL,
 ) -> dict[str, Any]:
-    """将单个 PDFium 页面渲染为 Pillow 图像或 base64 载荷。"""
+    """Render a single PDFium page to a Pillow image or base64 payload."""
     pil_img, scale = page_to_image(page, dpi=dpi)
     image_dict: dict[str, Any] = {"scale": scale}
     if image_type == ImageType.BASE64:
@@ -103,7 +103,7 @@ def _load_images_from_pdf_worker(
     end_page_id: int,
     image_type: Literal["pil_img", "base64_img"],
 ) -> list[dict[str, Any]]:
-    """用于进程池的包装函数"""
+    """Wrapper functions for process pools"""
     started_at = time.monotonic()
     worker_pid = os.getpid()
     page_range = f"{start_page_id + 1}-{end_page_id + 1}"
@@ -126,7 +126,7 @@ def _load_images_from_pdf_worker(
 
 
 def _close_image_dicts(images_list: list[dict[str, Any]] | None) -> None:
-    """关闭 image dict 中的 PIL 图片，供异常清理路径释放已生成的图像资源。"""
+    """Close the PIL picture in image dict for the exception cleanup path to release the generated image resources."""
     for image_dict in images_list or []:
         pil_img = image_dict.get("img_pil")
         if pil_img is None:
@@ -138,7 +138,7 @@ def _close_image_dicts(images_list: list[dict[str, Any]] | None) -> None:
 
 
 def _load_visual_crops_worker(pdf_bytes, dpi, start_page_id, end_page_id, prepared_pages):
-    """在渲染进程内裁剪并编码视觉素材，只向父进程传递原块索引和 JPEG。"""
+    """Crops and encodes the visual material within the rendering process, passing only the original chunk index and JPEG to the parent process."""
     from .visuals import _attach_prepared_visual_block_images
 
     images = None
@@ -148,15 +148,15 @@ def _load_visual_crops_worker(pdf_bytes, dpi, start_page_id, end_page_id, prepar
         return [[(index, block.get("image_base64")) for index, block in page] for page in prepared_pages]
     finally:
         _close_image_dicts(images)
-        # PDFium 句柄已关闭，但 PdfDocument/PdfPage 的近期循环引用仍可持有整份
-        # PDF 输入。每个 worker 任务回收年轻代，避免依赖自动 GC 时机累积大载荷。
+        # The PDFium handle has been closed, but a recent circular reference to PdfDocument/PdfPage can still hold the entire copy
+        # PDF input. Each worker task recycles the young generation to avoid relying on automatic GC timing to accumulate large loads.
         gc.collect(0)
 
 
 def _load_visual_crops_from_pdf_bytes_range(
     pdf_bytes, prepared_pages, start_page_id, end_page_id, timeout, threads, *, session=None
 ):
-    """沿原进程池、窗口预算和超时路径获取已编码素材，不更改公共页图接口。"""
+    """Obtain the encoded material along the original process pool, window budget and timeout path, without changing the public page map interface."""
     if session is not None:
         session.validate_input(pdf_bytes)
         return session.render(start_page_id, end_page_id, timeout=timeout, prepared_crops=prepared_pages)
@@ -178,7 +178,7 @@ def _load_visual_crops_from_pdf_bytes_range(
 
 
 def _calculate_render_process_count(total_pages: int, threads: int, cpu_count: int | None = None) -> int:
-    """按页数、配置和 CPU 数量计算实际渲染进程数。"""
+    """Calculate the actual number of render processes by page count, configuration, and CPU count."""
     requested_threads = max(1, threads)
     available_cpus = max(1, cpu_count if cpu_count is not None else (os.cpu_count() or 1))
     page_limited_threads = max(1, total_pages // MIN_PAGES_PER_RENDER_PROCESS)
@@ -195,7 +195,7 @@ def _build_render_page_ranges(
     end_page_id: int,
     process_count: int,
 ) -> list[tuple[int, int]]:
-    """把闭区间页范围均匀拆分为指定数量的子范围。"""
+    """Splits a closed page range evenly into a specified number of subranges."""
     total_pages = end_page_id - start_page_id + 1
     base_pages, remainder = divmod(total_pages, process_count)
     page_ranges = []
@@ -216,14 +216,14 @@ def _get_render_process_plan(
     threads: int,
     cpu_count: int | None = None,
 ) -> tuple[int, list[tuple[int, int]]]:
-    """同时返回实际进程数及其页面分片计划。"""
+    """Also returns the actual number of processes and their page fragmentation plan."""
     total_pages = end_page_id - start_page_id + 1
     actual_threads = _calculate_render_process_count(total_pages, threads, cpu_count)
     return actual_threads, _build_render_page_ranges(start_page_id, end_page_id, actual_threads)
 
 
 def _get_pdf_render_pool_capacity(cpu_count: int | None = None) -> int:
-    """返回持久 PDF 渲染进程池的最大容量。"""
+    """Returns the maximum capacity of the persistent PDF render process pool."""
     available_cpus = max(1, cpu_count if cpu_count is not None else (os.cpu_count() or 1))
     configured_threads = max(1, get_load_images_threads())
     return min(
@@ -234,7 +234,7 @@ def _get_pdf_render_pool_capacity(cpu_count: int | None = None) -> int:
 
 
 def _exit_pdf_render_worker_when_parent_exits() -> None:
-    """等待父进程退出后立即终止孤立渲染 worker。"""
+    """Terminate orphan rendering immediately after waiting for parent process to exit worker."""
     parent = multiprocessing.parent_process()
     if parent is None:
         return
@@ -243,7 +243,7 @@ def _exit_pdf_render_worker_when_parent_exits() -> None:
 
 
 def _install_pdf_render_parent_exit_watcher() -> None:
-    """在渲染 worker 中安装父进程退出监听线程。"""
+    """Installing the parent process in rendering worker exits the listener thread."""
     watcher = threading.Thread(
         target=_exit_pdf_render_worker_when_parent_exits,
         name="docvortex-pdf-render-parent-exit-watcher",
@@ -253,13 +253,13 @@ def _install_pdf_render_parent_exit_watcher() -> None:
 
 
 def _initialize_pdf_render_worker() -> None:
-    """保留父进程退出监控，并在本 worker 首次处理文档前安装固定字体。"""
+    """Leave the parent process to exit monitoring and install fixed fonts before this worker document is processed for the first time."""
     _install_pdf_render_parent_exit_watcher()
     initialize_pdfium_runtime()
 
 
 def _create_pdf_render_executor(max_workers: int) -> ProcessPoolExecutor:
-    """使用安全 multiprocessing 上下文创建 PDF 渲染进程池。"""
+    """Create a PDF render process pool using the secure multiprocessing context."""
     if platform.system() == "Windows":
         return ProcessPoolExecutor(max_workers=max_workers, initializer=_initialize_pdf_render_worker)
 
@@ -276,13 +276,13 @@ def _create_pdf_render_executor(max_workers: int) -> ProcessPoolExecutor:
 
 
 def _is_pdf_render_pool_still_spawning_workers(executor: ProcessPoolExecutor) -> bool:
-    """判断渲染进程池是否还可能因为 submit 而继续创建新的 worker。"""
+    """Determine whether the rendering process pool may continue to create new worker due to submit."""
     max_workers = getattr(executor, "_max_workers", None)
     if max_workers is None or max_workers <= 1:
         return False
 
-    # ProcessPoolExecutor 优先复用空闲 worker；未达到容量不等于本次会创建进程。
-    # 只探测并立即归还信号量，避免小批量任务永久重复支付冷启动的 100ms 等待。
+    # ProcessPoolExecutor gives priority to reuse idle worker; if the capacity is not reached, it does not mean that a process will be created this time.
+    # Only probe and return the semaphore immediately, avoiding small-batch tasks permanently paying the 100ms wait of a cold start.
     idle_workers = getattr(executor, "_idle_worker_semaphore", None)
     if idle_workers is not None and idle_workers.acquire(blocking=False):
         idle_workers.release()
@@ -299,7 +299,7 @@ def _submit_pdf_render_task(
     *args: Any,  # noqa: ANN401
     **kwargs: Any,  # noqa: ANN401
 ) -> Any:  # noqa: ANN401
-    """提交 PDF 渲染任务；冷启动补 worker 时串行 submit 并错开 100ms。"""
+    """Submit the PDF rendering task; when cold-starting worker, serialize submit and stagger 100ms."""
     global _pdf_render_spawn_submit_executor_id, _pdf_render_spawn_submit_count
 
     with _pdf_render_spawn_submit_lock:
@@ -323,7 +323,7 @@ def _submit_pdf_render_task(
 def _get_pdf_render_future_states(
     future_to_range: dict[Future[Any], tuple[int, int]],
 ) -> list[dict[str, Any]]:
-    """汇总每个渲染 Future 的页面范围和运行状态。"""
+    """Summarizes page range and run status for each render Future."""
     states = []
     for future, (range_start, range_end) in future_to_range.items():
         try:
@@ -347,7 +347,7 @@ def _get_pdf_render_future_states(
 
 
 def _get_pdf_render_worker_states(executor: ProcessPoolExecutor) -> list[dict[str, Any]]:
-    """读取进程池 worker 的 pid、存活状态和退出码。"""
+    """Read pid, survival status, and exit code of process pool worker."""
     try:
         process_map = getattr(executor, "_processes", None) or {}
         processes = list(process_map.values())
@@ -379,7 +379,7 @@ def _get_pdf_render_worker_states(executor: ProcessPoolExecutor) -> list[dict[st
 
 
 def _get_pdf_render_executor() -> ProcessPoolExecutor:
-    """惰性创建并复用持久 PDF 渲染进程池。"""
+    """Lazy creation and reuse of a persistent PDF rendering process pool."""
     global _pdf_render_atexit_registered, _pdf_render_executor
 
     from .render_session import prepare_legacy_render_pool
@@ -401,7 +401,7 @@ def _recycle_pdf_render_executor(
     *,
     terminate_processes: bool,
 ) -> None:
-    """从全局缓存移除指定进程池并按需终止 worker。"""
+    """Removes the specified process pool from the global cache and terminates worker on demand."""
     global _pdf_render_executor
 
     if executor is None:
@@ -423,7 +423,7 @@ def _recycle_pdf_render_executor(
 
 
 def shutdown_pdf_render_executor() -> None:
-    """关闭当前持久 PDF 渲染进程池。"""
+    """Close the current persistent PDF rendering process pool."""
     global _pdf_render_executor
 
     with _pdf_render_executor_lock:
@@ -448,7 +448,7 @@ def load_images_from_pdf_bytes_range(
     *,
     session=None,
 ) -> list[dict[str, Any]]:
-    """批量渲染指定闭区间页面，可显式复用文档级渲染会话。"""
+    """Batch rendering of specified closed range pages can explicitly reuse document-level rendering sessions."""
     if session is not None:
         session.validate_input(pdf_bytes)
         return session.render(start_page_id, end_page_id, dpi=dpi, image_type=image_type, timeout=timeout)
@@ -461,7 +461,7 @@ def load_images_from_pdf_bytes_range(
 
 
 def _load_pdf_render_tasks(pdf_bytes, dpi, start_page_id, end_page_id, image_type, timeout, threads, prepared_crops=None):
-    """将旧池的整个任务窗口登记到共享并发预算。"""
+    """Enlist the entire task window of the old pool to the shared concurrency budget."""
     from .render_session import legacy_render_scope
 
     if end_page_id < start_page_id:
@@ -473,7 +473,7 @@ def _load_pdf_render_tasks(pdf_bytes, dpi, start_page_id, end_page_id, image_typ
 
 
 def _load_pdf_render_tasks_core(pdf_bytes, dpi, start_page_id, end_page_id, image_type, timeout, threads, prepared_crops=None):
-    """共享任务提交、结果顺序和异常回收，裁图任务使用相同的进程数与超时规则。"""
+    """Sharing task submission, result order and exception recovery, the cropping task uses the same number of processes and timeout rules."""
     if end_page_id < start_page_id:
         return []
 
@@ -579,8 +579,8 @@ def _load_pdf_render_tasks_core(pdf_bytes, dpi, start_page_id, end_page_id, imag
 
 
 def _terminate_executor_processes(executor: ProcessPoolExecutor) -> None:
-    """强制终止 ProcessPoolExecutor 中的所有子进程"""
-    # executor.shutdown() 后 _processes 会被置空，重复回收时直接视为无进程。
+    """Force terminate all child processes in ProcessPoolExecutor"""
+    # _processes will be empty after executor.shutdown(), and will be directly regarded as no process when recycling repeatedly.
     process_map = getattr(executor, "_processes", None) or {}
     processes = list(process_map.values())
     if not processes:
@@ -632,7 +632,7 @@ def load_images_from_pdf_core(
     end_page_id: int | None = None,
     image_type: Literal["pil_img", "base64_img"] = ImageType.PIL,
 ) -> list[dict[str, Any]]:
-    """在当前进程中依次渲染 PDF 页面范围。"""
+    """Renders the PDF page range sequentially in the current process."""
     images_list = []
     pdf_doc = None
     try:
@@ -659,7 +659,7 @@ def load_images_from_pdf_core(
 
 
 def _model_input_bbox(item: dict[str, Any]) -> IntBBox:
-    """把模型输入项的 bbox 向外取整为裁图整数坐标。"""
+    """Round the bbox of the model input item to the integer coordinate of the crop."""
     bbox = item["bbox"]
     assert bbox is not None
     xmin, ymin, xmax, ymax = [float(value) for value in bbox]
@@ -672,7 +672,7 @@ def crop_img(
     crop_paste_x: int = 0,
     crop_paste_y: int = 0,
 ) -> tuple[Image.Image | np.ndarray, list[int]]:
-    """按模型 bbox 裁图并在四周补白，返回坐标回投所需参数。"""
+    """Cut the image according to the model bbox and fill in the surrounding areas to return the parameters required for coordinate return projection."""
     crop_xmin, crop_ymin, crop_xmax, crop_ymax = _model_input_bbox(input_res)
     crop_new_width = crop_xmax - crop_xmin + crop_paste_x * 2
     crop_new_height = crop_ymax - crop_ymin + crop_paste_y * 2
@@ -701,7 +701,7 @@ def crop_img(
 
 
 def get_crop_img(bbox: BBox, pil_img: Image.Image, scale: float = 2.0) -> Image.Image:
-    """按缩放 bbox 裁剪 Pillow 图像。"""
+    """Crop Pillow image by zoom bbox."""
     scale_bbox = normalize_to_int_bbox([float(v) * scale for v in bbox])
     if scale_bbox is None:
         return pil_img.crop((0, 0, 0, 0))
@@ -709,7 +709,7 @@ def get_crop_img(bbox: BBox, pil_img: Image.Image, scale: float = 2.0) -> Image.
 
 
 def get_crop_np_img(bbox: BBox, input_img: Image.Image | np.ndarray, scale: float = 2.0) -> np.ndarray:
-    """按缩放 bbox 裁剪 Pillow 或 NumPy 图像并返回数组。"""
+    """Crops the Pillow or NumPy image by scale bbox and returns an array."""
     if isinstance(input_img, Image.Image):
         np_img = np.asarray(input_img)
     elif isinstance(input_img, np.ndarray):

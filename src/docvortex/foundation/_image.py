@@ -1,4 +1,4 @@
-"""跨模型共享的轻量图像统计与裁剪原语。"""
+"""Lightweight image statistics and cropping primitives shared across models."""
 
 import cv2
 import numpy as np
@@ -10,31 +10,31 @@ from ._geometry import normalize_to_int_bbox
 
 def calculate_contrast(img: np.ndarray, img_mode: str) -> float:
     """
-    计算给定图像的对比度。
-    :param img: 图像，类型为numpy.ndarray
-    :Param img_mode = 图像的色彩通道，'rgb' 或 'bgr'
-    :return: 图像的对比度值
+    Calculate the contrast of a given image.
+    :param img: Image, type numpy.ndarray
+    :Param img_mode = color channel of the image, 'rgb' or 'bgr'
+    :return: Contrast value of the image
     """
     if img_mode == "rgb":
-        # 将RGB图像转换为灰度图
+        # Convert RGB image to grayscale
         gray_img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
     elif img_mode == "bgr":
-        # 将BGR图像转换为灰度图
+        # Convert BGR image to grayscale
         gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     else:
         raise ValueError("Invalid image mode. Please provide 'rgb' or 'bgr'.")
 
-    # 计算均值和标准差
+    # Calculate mean and standard deviation
     mean_value = np.mean(gray_img)
     std_dev = np.std(gray_img)
-    # 对比度定义为标准差除以平均值（加上小常数避免除零错误）
+    # Contrast is defined as the standard deviation divided by the mean (plus a small constant to avoid divide-by-zero errors)
     contrast = std_dev / (mean_value + 1e-6)
     # logger.debug(f"contrast: {contrast}")
     return round(float(contrast), 2)
 
 
 def crop_pil_image(bbox: BBox, image: Image.Image) -> Image.Image:
-    """按 0-1 归一化 bbox 裁剪 Pillow 图像。"""
+    """Normalize bbox by 0-1 Crop Pillow image."""
     width, height = image.size
     scaled_bbox = normalize_to_int_bbox(
         [bbox[0] * width, bbox[1] * height, bbox[2] * width, bbox[3] * height],

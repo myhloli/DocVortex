@@ -1,4 +1,4 @@
-//! 连续生成全文字体 run 统计，保留样本成员、相邻对和同族传播顺序。
+//! Continuously generate full-text font run statistics, retaining sample members, adjacent pairs and homogeneous propagation order.
 use crate::{
     geometry::{anchor_pairs, Box4, Size},
     geometry_risk::quantile,
@@ -29,7 +29,7 @@ pub struct Run {
     pub sibling: bool,
 }
 
-/// 校验样本并保留成员和 bearing，供样式判断及后续 run 计算连续复用。
+/// Verify the sample and retain members and bearing for continuous multiplexing in pattern judgment and subsequent run calculations.
 pub fn group(samples: &[Sample], families: &[usize]) -> Option<Vec<Run>> {
     if samples.iter().any(|s| {
         s.run >= families.len()
@@ -54,7 +54,7 @@ pub fn group(samples: &[Sample], families: &[usize]) -> Option<Vec<Run>> {
     Some(runs)
 }
 
-/// 在最终 source 确定后计算相邻对与同族传播，避免样式恢复前后重复计算。
+/// After the final source is determined, adjacent pairs and homogeneous propagation are calculated to avoid repeated calculations before and after pattern recovery.
 pub fn complete(
     samples: &[Sample],
     lines: &[Vec<usize>],

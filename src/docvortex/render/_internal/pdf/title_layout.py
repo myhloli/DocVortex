@@ -1,4 +1,4 @@
-"""在固定正文之外为标题寻找同栏安全空白，保留原始输入坐标。"""
+"""Finds co-column safe space for titles outside of fixed text, retaining original input coordinates."""
 
 from __future__ import annotations
 
@@ -17,10 +17,10 @@ _EPS = 0.001
 
 
 class TitleContent(Flowable):
-    """仅为标题保留上下标与矢量公式外伸范围，避免它们越过安全绘制框。"""
+    """Reserve superscripts, subscripts, and vector formula extensions only for titles to prevent them from crossing the safe drawing box."""
 
     def __init__(self, paragraph: Paragraph) -> None:
-        """保存已物化段落，使用实际行高但不修改正文的样式或全局 ReportLab 设置。"""
+        """Saves the materialized paragraph using the actual line height but without modifying the style of the body or the global ReportLab setting."""
         super().__init__()
         self.paragraph = paragraph
         paragraph.autoLeading = "max"
@@ -29,7 +29,7 @@ class TitleContent(Flowable):
         self.bottom_padding = 0.0
 
     def wrap(self, width: float, height: float) -> tuple[float, float]:
-        """按 ReportLab 的基线规则补足字形和公式上下外伸空间，保留原有行距。"""
+        """According to the baseline rules of ReportLab, fill in the upper and lower extending spaces of glyphs and formulas, and retain the original line spacing."""
         paragraph = self.paragraph
         self.width, paragraph_height = paragraph.wrap(width, height)
         layout = paragraph.blPara
@@ -62,12 +62,12 @@ class TitleContent(Flowable):
         return self.width, self.height
 
     def draw(self) -> None:
-        """在预留的外伸空间内绘制同一个段落，不重新构建公式或锚点。"""
+        """Draw the same paragraph within the reserved overhang space without rebuilding formulas or anchor points."""
         self.paragraph.drawOn(self.canv, 0, self.bottom_padding)
 
 
 def _overlaps(first: Rect, second: Rect, gap: float = 0.0) -> bool:
-    """判断占用矩形是否相交，或是否侵入需要保留的安全间距。"""
+    """Determine whether the occupied rectangles intersect or invade the safe distance that needs to be retained."""
     return (
         min(first[2], second[2]) > max(first[0], second[0]) - gap + _EPS
         and min(first[3], second[3]) > max(first[1], second[1]) - gap + _EPS
@@ -75,7 +75,7 @@ def _overlaps(first: Rect, second: Rect, gap: float = 0.0) -> bool:
 
 
 def _right_limit(title: PreparedBlock, page_width: float) -> float:
-    """依据匹配正文确定栏内右边界；不能判断栏宽时只保留标题原宽。"""
+    """Determine the right boundary of the column based on the matching text; if the column width cannot be determined, only the original width of the title is retained."""
     right = title.original_rect[2]
     if title.reference_block is not None:
         right = max(right, title.reference_block.original_rect[2])
@@ -83,7 +83,7 @@ def _right_limit(title: PreparedBlock, page_width: float) -> float:
 
 
 def _safe_areas(title: PreparedBlock, others: list[PreparedBlock], page_width: float) -> list[Rect]:
-    """根据原始占用范围和标题间隙中线，计算不同候选宽度的安全竖向区域。"""
+    """Calculate safe vertical areas of different candidate widths based on the original occupancy range and the centerline of the title gap."""
     x0, y0, x1, y1 = title.original_rect
     right = _right_limit(title, page_width)
     rights = {right, x1}
@@ -97,7 +97,7 @@ def _safe_areas(title: PreparedBlock, others: list[PreparedBlock], page_width: f
         valid = edge > x0
         for other in others:
             bx0, by0, bx1, by1 = other.original_rect
-            # 相邻标题按潜在扩展后的横向范围共同分配空白，避免各自试排后相互覆盖。
+            # Adjacent titles are jointly allocated blanks according to the potential expanded horizontal range to avoid overwriting each other after respective trials.
             if other.group is not None:
                 bx1 = _right_limit(other, page_width)
             if min(edge, bx1) <= max(x0, bx0) - _GAP + _EPS:
@@ -117,12 +117,12 @@ def _safe_areas(title: PreparedBlock, others: list[PreparedBlock], page_width: f
 
 
 def _fits(fit: BlockFit, area: Rect) -> bool:
-    """完整行高和宽度都在安全区域中时才接受目标字号。"""
+    """The target font size is only accepted if the full line height and width are within the safe area."""
     return fit.width <= area[2] - area[0] + _EPS and fit.height <= area[3] - area[1] + _EPS
 
 
 def _place(title: PreparedBlock, area: Rect, fit: BlockFit) -> None:
-    """优先保留原顶边，必要时向上借空白，并将本次实际绘制范围保存在上下文。"""
+    """Priority is given to retaining the original top edge, borrowing space upwards if necessary, and saving the actual drawing range in the context."""
     top = min(max(title.original_rect[1], area[1]), area[3] - fit.height)
     title.draw_rect = (area[0], top, area[2], top + fit.height)
     title.fit = fit
@@ -135,7 +135,7 @@ def place_title(
     measure: Callable[[PreparedBlock, float, float], BlockFit],
     fit_small: Callable[[PreparedBlock, Rect], BlockFit],
 ) -> None:
-    """目标字号优先利用安全空白，只有当前标题放不下时才按 0.1 pt 精度缩小。"""
+    """The target font size prioritizes the use of safe margins, and is reduced by 0.1 pt precision only when the current title cannot fit."""
     original = title.original_rect
     others = [other for other in page_blocks if other is not title]
     title.geometry_conflict = any(_overlaps(original, other.original_rect) for other in others)
@@ -144,7 +144,7 @@ def place_title(
     if _fits(fit, original) and not any(_overlaps(original, other.original_rect, _GAP) for other in others):
         title.fit, title.draw_rect = fit, original
         return
-    # 输入已冲突时不扩大原有占用；安全间距本来不足且无可用区域时同样保守兜底。
+    # When inputs conflict, the original occupancy will not be expanded; when the safety distance is insufficient and there is no available area, the same precautions will be taken.
     areas = [] if title.geometry_conflict else _safe_areas(title, others, page_width)
     if not areas:
         title.clearance_unavailable = not title.geometry_conflict
@@ -171,6 +171,6 @@ def place_title(
         size, area = best
         _place(title, area, measure(title, size / 10, area[2] - area[0]))
         return
-    # 连 6 pt 都放不下时沿用完整块缩放；最终重新测量所选区域，避免保留其它试排的段落状态。
+    # Use full block scaling when even 6 pt cannot fit; eventually re-measure the selected area to avoid retaining the paragraph status of other trial layouts.
     area = max(areas, key=lambda candidate: fit_small(title, candidate).scale)
     _place(title, area, fit_small(title, area))

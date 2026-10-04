@@ -1,4 +1,4 @@
-"""基于 OFD 原生横竖线与文字框恢复高置信全线表。"""
+"""Based on OFD native horizontal and vertical lines and text boxes, the high-confidence full-line table is restored."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ _MAX_TABLE_AXIS_LINES = 2_000
 
 @dataclass(frozen=True, slots=True)
 class OfdTableCell:
-    """记录逻辑单元格占据的基础格范围，结束索引不包含在内。"""
+    """Record the basic cell range occupied by logical cells, and the end index is not included."""
 
     row: int
     column: int
@@ -30,7 +30,7 @@ class OfdTableCell:
 
 @dataclass(frozen=True, slots=True)
 class OfdTableRegion:
-    """保存一个已物化 OFD 表格及其消耗的文字行。"""
+    """Save a materialized OFD table and its consumed text lines."""
 
     bbox: BBox
     html: str
@@ -45,12 +45,12 @@ class OfdTableRegion:
 
 @dataclass(slots=True)
 class OfdTableBudget:
-    """累计限制整份 OFD 的表格线段相交比较次数。"""
+    """Cumulatively limit the number of intersection comparisons of table line segments of the entire OFD."""
 
     intersection_check_count: int = 0
 
     def charge_intersection_check(self) -> None:
-        """累计一次线段相交比较并在超限时失败。"""
+        """Accumulate one line segment intersection comparison and fail when it exceeds the limit."""
         self.intersection_check_count += 1
         if self.intersection_check_count > MAX_TABLE_INTERSECTION_CHECKS:
             raise OfdResourceLimitError(
@@ -59,19 +59,19 @@ class OfdTableBudget:
 
 
 def _line_coord(line: AxisLine) -> float:
-    """返回轴向线段在垂直方向上的中心坐标。"""
+    """Returns the center coordinate of the axial line segment in the vertical direction."""
     if line.orientation == "horizontal":
         return (line.bbox[1] + line.bbox[3]) / 2.0
     return (line.bbox[0] + line.bbox[2]) / 2.0
 
 
 def _line_interval(line: AxisLine) -> tuple[float, float]:
-    """返回轴向线段沿自身方向的区间。"""
+    """Return the interval of the axial line segment along its own direction."""
     return (line.bbox[0], line.bbox[2]) if line.orientation == "horizontal" else (line.bbox[1], line.bbox[3])
 
 
 def _touches(first: AxisLine, second: AxisLine) -> bool:
-    """判断两条轴向线段是否相交或共线连接。"""
+    """Determine whether two axial line segments intersect or are connected collinearly."""
     if first.orientation == second.orientation:
         if abs(_line_coord(first) - _line_coord(second)) > _COORD_TOLERANCE:
             return False
@@ -91,7 +91,7 @@ def _touches(first: AxisLine, second: AxisLine) -> bool:
 
 
 def _normalize_axis_lines(lines: list[AxisLine]) -> list[AxisLine]:
-    """按轴向和近邻轨道合并重复及相接片段，在线性扫描前先排序。"""
+    """Merge repeated and adjacent segments according to axial and adjacent orbits, and sort them before linear scanning."""
     tracks: list[list[AxisLine]] = []
     for line in sorted(lines, key=lambda item: (item.orientation, _line_coord(item), _line_interval(item))):
         if (
@@ -123,18 +123,18 @@ def _normalize_axis_lines(lines: list[AxisLine]) -> list[AxisLine]:
 
 
 def _components(lines: list[AxisLine], budget: OfdTableBudget) -> list[list[AxisLine]]:
-    """按线段相交关系构造确定性的连通分量。"""
+    """Construct deterministic connected components according to the intersection relationship of line segments."""
     parents = list(range(len(lines)))
 
     def find(index: int) -> int:
-        """查找并压缩一个并查集根节点。"""
+        """Find and compress a union-find root node."""
         while parents[index] != index:
             parents[index] = parents[parents[index]]
             index = parents[index]
         return index
 
     def union(first: int, second: int) -> None:
-        """合并两个线段分量。"""
+        """Merge two line segment components."""
         first_root = find(first)
         second_root = find(second)
         if first_root != second_root:
@@ -152,7 +152,7 @@ def _components(lines: list[AxisLine], budget: OfdTableBudget) -> list[list[Axis
 
 
 def _cluster_coordinates(values: list[float]) -> list[float]:
-    """把近邻线坐标聚合为稳定网格轨道。"""
+    """Aggregate neighbor line coordinates into stable grid orbits."""
     clusters: list[list[float]] = []
     for value in sorted(values):
         if not clusters or value - clusters[-1][-1] > _COORD_TOLERANCE:
@@ -163,7 +163,7 @@ def _cluster_coordinates(values: list[float]) -> list[float]:
 
 
 def _covers_interval(lines: list[AxisLine], start: float, end: float) -> bool:
-    """判断共线片段是否基本覆盖给定区间。"""
+    """Determine whether the collinear segments basically cover a given interval."""
     intervals = sorted(_line_interval(line) for line in lines)
     cursor = start
     for left, right in intervals:
@@ -178,7 +178,7 @@ def _covers_interval(lines: list[AxisLine], start: float, end: float) -> bool:
 
 
 def _component_grid(component: list[AxisLine]) -> tuple[list[float], list[float], BBox] | None:
-    """从线段分量恢复有完整外框的网格轨道。"""
+    """Recover grid tracks with complete outer frames from line segment components."""
     horizontal = [line for line in component if line.orientation == "horizontal"]
     vertical = [line for line in component if line.orientation == "vertical"]
     if len(horizontal) < 2 or len(vertical) < 2:
@@ -215,7 +215,7 @@ def _component_grid(component: list[AxisLine]) -> tuple[list[float], list[float]
 
 
 def _cell_index(values: list[float], coordinate: float) -> int | None:
-    """返回坐标所在的相邻轨道区间索引。"""
+    """Return the adjacent track interval index where the coordinates are located."""
     for index, (start, end) in enumerate(zip(values[:-1], values[1:], strict=True)):
         if start - _COORD_TOLERANCE <= coordinate <= end + _COORD_TOLERANCE:
             return index
@@ -225,19 +225,19 @@ def _cell_index(values: list[float], coordinate: float) -> int | None:
 def _logical_cells(
     xs: list[float], ys: list[float], lines: list[AxisLine], budget: OfdTableBudget
 ) -> tuple[OfdTableCell, ...] | None:
-    """按真实分隔边连通基础格，拒绝局部断边和非矩形合并区域。"""
+    """Connect the basic grid according to the real dividing edges, and reject local broken edges and non-rectangular merged areas."""
     rows, columns = len(ys) - 1, len(xs) - 1
     parents = list(range(rows * columns))
 
     def root(index: int) -> int:
-        """查找并压缩基础格所属连通区域。"""
+        """Find and compress the connected area to which the basic grid belongs."""
         while parents[index] != index:
             parents[index] = parents[parents[index]]
             index = parents[index]
         return index
 
     def boundary_state(orientation: str, coordinate: float, start: float, end: float) -> int:
-        """返回完整边、缺失边或不确定的局部边，并累计比较预算。"""
+        """Return complete edges, missing edges, or uncertain partial edges, and compare budgets cumulatively."""
         aligned = []
         for line in lines:
             budget.charge_intersection_check()
@@ -285,7 +285,7 @@ def _logical_cells(
 
 
 def _image_cell(table: OfdTableRegion, image: ImageItem) -> tuple[int, int] | None:
-    """仅认领完整落入唯一逻辑单元格的可解码图片，允许跨过该格内部的虚拟轨道。"""
+    """Only claim decodable pictures that completely fall into a unique logical cell, allowing you to cross the virtual track inside the cell."""
     if image.image_base64 is None:
         return None
     x0, y0, x1, y1 = image.bbox
@@ -301,7 +301,7 @@ def _image_cell(table: OfdTableRegion, image: ImageItem) -> tuple[int, int] | No
 
 
 def _cell_lines(table: OfdTableRegion) -> dict[tuple[int, int], list[TextLine]]:
-    """先按单元格分配原始文字片段，避免跨越表格边界拼接。"""
+    """First, allocate original text fragments according to cells to avoid splicing across table boundaries."""
     cells: dict[tuple[int, int], list[TextLine]] = {}
     occupancy = {
         (r, c): (cell.row, cell.column)
@@ -319,7 +319,7 @@ def _cell_lines(table: OfdTableRegion) -> dict[tuple[int, int], list[TextLine]]:
 
 
 def _serialize_grid(table: OfdTableRegion, images: list[ImageItem]) -> OfdTableRegion:
-    """按单元格内空间顺序输出文字及图片，并返回成功认领的图片集合。"""
+    """Output text and pictures according to the spatial order within the cell, and return the successfully claimed picture collection."""
     cells: dict[tuple[int, int], list[tuple[BBox, int, str]]] = {}
     for key, lines in _cell_lines(table).items():
         cells[key] = [(line.bbox, line.paint_order, line_html(line)) for line in lines if line.text.strip()]
@@ -361,7 +361,7 @@ def recover_tables(
     *,
     images: list[ImageItem] | None = None,
 ) -> list[OfdTableRegion]:
-    """从页面轴向线段中恢复互不重叠的高置信表格。"""
+    """Recover non-overlapping high-confidence tables from page axial line segments."""
     axis_lines = _normalize_axis_lines(axis_lines)
     if len(axis_lines) < 4 or len(text_lines) < 2 or len(axis_lines) > _MAX_TABLE_AXIS_LINES:
         return []

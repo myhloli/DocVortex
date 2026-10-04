@@ -1,4 +1,4 @@
-"""独立文档引擎的分阶段 API 与完整转换入口。"""
+"""Staged API and complete conversion entry point for the standalone document engine."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def extract_metadata(
     file_suffix: FileSuffix | None = None,
     source_context: HtmlSourceContext | None = None,
 ) -> MetadataResult:
-    """读取完整源文档的声明属性，不运行正文分析或 PDF 分类。"""
+    """Read declared properties of the complete source without body analysis or PDF classification."""
     from .metadata import extract_metadata as extract
 
     return extract(source, file_suffix=file_suffix, source_context=source_context)
@@ -40,7 +40,7 @@ def analyze(
     page_range: str = "",
     source_context: HtmlSourceContext | None = None,
 ) -> AnalysisResult:
-    """执行原生分析，显式调用者选择不会被隐式分类或 OCR 改写。"""
+    """Run native analysis without overriding explicit caller choices through implicit classification or OCR."""
     from .analyzers.native import models
 
     started = time.perf_counter()
@@ -60,7 +60,7 @@ def analyze(
                 properties = extracted.metadata.document
                 metadata_diagnostics = extracted.diagnostics
             except DocumentError as exc:
-                # 正文读取器仍负责输入有效性；可选属性提取失败不能阻断正文解析。
+                # The body reader validates input; optional property extraction failures must not block body parsing.
                 metadata_diagnostics = (Diagnostic(exc.code, str(exc)),)
         if prepared.file_suffix == "pdf":
             from .document.pdf.layout import LAYOUT_EXTENSION, attach_layout_image_rotations, extract_layout_geometry
@@ -131,7 +131,7 @@ def analyze(
 def postprocess(
     analysis: AnalysisResult | ModelJson, *, assets: AssetStore | None = None, keep_model_json: bool = False
 ) -> DocumentResult:
-    """执行确定性后处理并物化结果素材，智能增强由上层显式调用。"""
+    """Run deterministic postprocessing and materialize assets; callers explicitly request intelligent enhancements."""
     from .export.files import materialize_middle
     from .postprocess.document import model_json_to_middle_json
 
@@ -160,7 +160,7 @@ def parse(
     source_context: HtmlSourceContext | None = None,
     keep_model_json: bool = False,
 ) -> DocumentResult:
-    """完成输入、分析及后处理，返回可脱离原文件使用的结果。"""
+    """Prepare, analyze, and postprocess input into a result usable without the source file."""
     return postprocess(
         analyze(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context),
         keep_model_json=keep_model_json,
@@ -174,7 +174,7 @@ def render(
     assets: AssetStore | None = None,
     options: RenderOptions | None = None,
 ) -> RenderArtifact:
-    """把同一语义文档编码为目标文件，返回值不产生文件系统副作用。"""
+    """Encode the semantic document into the target format without filesystem side effects."""
     from .export.files import materialize_middle
     from .render._internal.common.context import owned_render_document
     from .render.api import render as render_value
@@ -236,7 +236,7 @@ def convert(
     options: RenderOptions | None = None,
     overwrite: bool = False,
 ) -> ExportResult:
-    """使用完整原生流程进行一次转换，并返回实际写出的文件路径。"""
+    """Run the complete native conversion pipeline and return the paths of the files written."""
     result = parse(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context)
     return result.export(output_path, output_format=output_format, options=options, overwrite=overwrite)
 

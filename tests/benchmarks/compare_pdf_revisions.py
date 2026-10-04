@@ -1,4 +1,4 @@
-"""按文档交替比较冻结版本和当前版本的两个后端，保存完整输出与进程树 RSS。"""
+"""Alternately compare frozen and current versions of two backends by document, saving full output with process tree RSS."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def measure(path, folder, source, backend, args):
-    """每次测量使用独立解释器，检查真实源码与输入；已完成记录可直接续跑。"""
+    """Each measurement uses an independent interpreter to check the real source code and input; once the recording is completed, you can continue running directly."""
     package = (source / "src/docvortex/__init__.py").resolve()
     if not (folder / "report.json").is_file():
         command = [
@@ -45,7 +45,7 @@ def measure(path, folder, source, backend, args):
     assert record["source_code_sha256"] == source_identity(package)["source_code_sha256"]
     assert all(len(values) == args.runs for values in record["seconds"].values())
     if record.get("memory_method") != "isolated-entry-after-one-warmup":
-        # 已完成的耗时与输出不重写；用同一源码单独审计 RSS，并保留原校验进程的内存值。
+        # The completed time consumption and output are not rewritten; the same source code is used to audit RSS separately, and the memory value of the original verification process is retained.
         from pdf_memory import measure as measure_memory
 
         memory = measure_memory(
@@ -64,7 +64,7 @@ def measure(path, folder, source, backend, args):
 
 
 def compare(measurements):
-    """输出摘要必须全等，分别计算同版本后端差异及跨版本时间和内存变化。"""
+    """The output summaries must be congruent, and the backend differences of the same version and the time and memory changes across versions are calculated separately."""
     assert len({item["source_sha256"] for item in measurements.values()}) == 1
     assert len({item["region_input_sha256"] for item in measurements.values()}) == 1
     assert len({item["page_count"] for item in measurements.values()}) == 1
@@ -89,7 +89,7 @@ def compare(measurements):
 
 
 def main():
-    """交替四个实现，超过退化门槛时反序复测；不覆盖产物或刷新输出金标。"""
+    """Alternate four implementations, and retest in reverse order when the degradation threshold is exceeded; do not cover the product or refresh the output gold standard."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--reference-source", type=Path, required=True)

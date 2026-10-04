@@ -1,4 +1,4 @@
-"""用完整原件验证人工标注，定位依赖物理页和区域而不是修复后的块序号。"""
+"""Verification of manual annotations with complete originals, localization relies on physical pages and regions rather than repaired block sequence numbers."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ DOCUMENTS = {document["name"]: document for document in MANIFEST["documents"]}
 
 @lru_cache(maxsize=None)
 def _model(name: str) -> list[list[dict]]:
-    """每份完整原件仅解析一次，保留页眉、字体及参考文献所需的跨页上下文。"""
+    """Each complete original is parsed only once, preserving the cross-page context required for headers, fonts, and references."""
     document = DOCUMENTS[name]
     source = ROOT / document["path"]
     assert hashlib.sha256(source.read_bytes()).hexdigest() == document["sha256"]
@@ -35,7 +35,7 @@ def _model(name: str) -> list[list[dict]]:
 
 @pytest.mark.parametrize("name,page", [("frames_v1", 13), ("frames_v1", 14), ("frames_v2", 13), ("frames_v2", 14)])
 def test_appendix_numbered_list_does_not_absorb_figure_description(name: str, page: int) -> None:
-    """数字列表位于参考文献之后时，页下图说明仍必须独立于列表正文。"""
+    """When a numerical list follows a reference, the figure description below the page must still be independent of the main text of the list."""
     blocks = _model(name)[page - 1]
     descriptions = [block for block in blocks if "Figure " in visible(block.get("content"))]
     assert descriptions
@@ -45,7 +45,7 @@ def test_appendix_numbered_list_does_not_absorb_figure_description(name: str, pa
 
 
 def test_numeric_comparison_rows_are_not_joined_as_justified_prose():
-    """原件中数值表的两条比较记录不因宽空格恢复而合为一个自然段。"""
+    """The two comparison records in the value table in the original file are not merged into one natural segment due to wide space recovery."""
     blocks = _model("nougat")[16]
     assert not any(
         "Language model" in visible(block["content"]) and "Hierarchical Model" in visible(block["content"]) for block in blocks
@@ -70,7 +70,7 @@ def test_numeric_comparison_rows_are_not_joined_as_justified_prose():
     ],
 )
 def test_annotation_members_have_expected_owner(name: str, case: dict) -> None:
-    """逐项检查所标原始成员的类型和完整归属，不能只靠总块数通过。"""
+    """Check the type and complete ownership of the marked original members item by item, and cannot pass by relying solely on the total number of blocks."""
     result = check_case(case, _model(name)[case["page"] - 1])
     assert result["status"] == "geometry_pass", result
 
@@ -91,7 +91,7 @@ def test_annotation_members_have_expected_owner(name: str, case: dict) -> None:
     ],
 )
 def test_whole_figure_covers_ink_and_excludes_body(name: str, page: int, allowed: list, required: list) -> None:
-    """同时限制最小覆盖和最大范围，不能靠扩大整页图片来满足成员归属。"""
+    """Limit the minimum coverage and maximum range at the same time, and you cannot rely on expanding the full-page image to meet membership requirements."""
     blocks = _model(name)[page - 1]
     images = [block for block in blocks if block["type"] == "image" and contains(block["bbox"], required)]
     assert len(images) == 1
@@ -120,7 +120,7 @@ def test_whole_figure_covers_ink_and_excludes_body(name: str, page: int, allowed
     ],
 )
 def test_caption_survives_final_visual_grouping(name: str, page: int, prefix: str) -> None:
-    """caption 在最终严格协议中仍有正确父容器，不能在后处理阶段退回普通正文。"""
+    """caption Still has the correct parent container in the final strict protocol and cannot fall back to normal text in the post-processing phase."""
     model = _model(name)
     pages = model_json_to_pages(
         ModelJson(
@@ -141,7 +141,7 @@ def test_caption_survives_final_visual_grouping(name: str, page: int, prefix: st
 
 
 def test_table_description_rows_are_complete() -> None:
-    """两版长描述表均保留表头和五种推理类型，逐格恢复不只扩大表框。"""
+    """Both versions of the long description table retain the table header and five inference types, and cell-by-cell recovery not only expands the table frame."""
     for name in ("frames_v1", "frames_v2"):
         tables = [block for block in _model(name)[3] if block["type"] == "table"]
         assert len(tables) == 1
@@ -156,7 +156,7 @@ def test_table_description_rows_are_complete() -> None:
 
 
 def test_repeated_bold_prompts_form_five_paragraphs() -> None:
-    """紧排行距中的五个粗体引导段单独成段，粗体仍由行内样式表达。"""
+    """The five bold lead paragraphs in tightly spaced lines form separate paragraphs, and the boldness is still expressed by the inline style."""
     paragraphs = [block for block in _model("mmlu_redux")[6] if block["type"] == "text" and 0.41 < block["bbox"][1] < 0.58]
     assert len(paragraphs) == 5
     assert all(
@@ -165,7 +165,7 @@ def test_repeated_bold_prompts_form_five_paragraphs() -> None:
 
 
 def test_reference_entries_do_not_merge_or_turn_into_equations() -> None:
-    """参考条目边界、年份及 DOI 普通尾行不会被误合并或公式化。"""
+    """Reference entry boundaries, years, and DOI common trailing lines are not accidentally merged or formulated."""
     page = _model("frames_v2")[8]
     references = [block for block in page if block["type"] == "text" and block["bbox"][0] > 0.5 and block["bbox"][1] > 0.27]
     google = [block for block in references if visible(block["content"]).startswith("Google.")]
@@ -179,7 +179,7 @@ def test_reference_entries_do_not_merge_or_turn_into_equations() -> None:
 
 
 def test_page_footnote_does_not_capture_neighboring_column() -> None:
-    """短脚注线只认领同栏文字；同高度的右栏正文仍保持正文身份。"""
+    """The short footnote line only claims the text in the same column; the text in the right column of the same height still maintains the identity of the main text."""
     page = _model("fornax")[5]
     notes = [block for block in page if block["type"] == "page_footnote"]
     assert notes and all(block["bbox"][2] < 0.5 for block in notes)
@@ -189,7 +189,7 @@ def test_page_footnote_does_not_capture_neighboring_column() -> None:
 
 
 def test_numbered_discussion_items_keep_separate_members() -> None:
-    """两个编号论点各自包含续行，第二项的解释不能留在第一项或另成一块。"""
+    """Each of the two numbered arguments contains a continuation line, and the explanation of the second argument cannot be left in the first argument or be separated into another block."""
     page = _model("fornax")[10]
     first = [block for block in page if block["type"] == "text" and visible(block["content"]).startswith("1. Two")]
     second = [block for block in page if block["type"] == "text" and visible(block["content"]).startswith("2. ")]
@@ -210,7 +210,7 @@ def test_numbered_discussion_items_keep_separate_members() -> None:
     ],
 )
 def test_vector_chart_labels_stay_in_the_figure(page: int, top: float, bottom: float, count: int) -> None:
-    """图例、坐标文字和子图标题不能残留为正文、页眉或伪代码。"""
+    """Legends, coordinate text, and subfigure titles cannot remain as text, headers, or pseudocode."""
     blocks = _model("k2_treap")[page - 1]
     assert sum(block["type"] == "image" for block in blocks) == count
     assert not [
@@ -221,7 +221,7 @@ def test_vector_chart_labels_stay_in_the_figure(page: int, top: float, bottom: f
 
 
 def test_independent_matrix_figures_are_not_joined_across_captions() -> None:
-    """同页三个矩阵和一张树图各有独立图题，不能一并扩成整页图片。"""
+    """Three matrices and a tree diagram on the same page each have independent diagram titles and cannot be expanded into a full page picture."""
     page = _model("k2_treap")[2]
     assert sum(block["type"] == "image" for block in page) == 4
     captions = [visible(block["content"]) for block in page if block["type"] == "caption"]
@@ -229,7 +229,7 @@ def test_independent_matrix_figures_are_not_joined_across_captions() -> None:
 
 
 def test_inline_bold_titles_keep_emphasis_and_real_section_titles() -> None:
-    """段首强调并入正文后保持粗体，独立节标题仍按标题输出。"""
+    """The emphasis at the beginning of the paragraph remains bold after being incorporated into the main text, and the independent section headings are still output as titles."""
     page = _model("nougat")[1]
     for prefix in ("Encoder", "Decoder"):
         blocks = [block for block in page if visible(block["content"]).startswith(prefix)]
@@ -243,7 +243,7 @@ def test_inline_bold_titles_keep_emphasis_and_real_section_titles() -> None:
 
 
 def test_reference_tail_is_not_a_repeated_header() -> None:
-    """同一位置的不同卷页编号仍归属于各自参考条目。"""
+    """Different volume page numbers at the same location still belong to their respective reference entries."""
     for page_index, number, year in ((13, 97, "2013;190"), (14, 138, "2015;63")):
         page = _model("nash_review")[page_index]
         entry = next(block for block in page if block["type"] == "text" and visible(block["content"]).startswith(f"[{number}]"))
@@ -252,7 +252,7 @@ def test_reference_tail_is_not_a_repeated_header() -> None:
 
 
 def test_public_parse_materializes_formula_images_and_bold_html() -> None:
-    """通过真实公共入口及 HTML 导出验证图片载荷与行内粗体，不使用检测金标补丁。"""
+    """Verify image payload and inline bold via real public entrance and HTML export, without using detection gold patch."""
     from docvortex import parse, render_artifact
     from docvortex.schema import EquationBlock
 
@@ -268,7 +268,7 @@ def test_public_parse_materializes_formula_images_and_bold_html() -> None:
 
 
 def test_front_matter_institutions_keep_numbers_order_and_email() -> None:
-    """首页机构逐条归组，分离上标编号仍归入机构，日期不会进入最后一个机构。"""
+    """The institutions on the homepage are grouped one by one. The separated superscript numbers are still grouped into the institutions, and the date will not be entered into the last institution."""
     blocks = _model("fornax")[0]
     institutions = [block for block in blocks if block["type"] == "text" and 0.21 < block["bbox"][1] < 0.36]
     assert [re.match(r"^\d+", visible(block["content"])).group() for block in institutions] == list(map(str, range(1, 10)))
@@ -278,7 +278,7 @@ def test_front_matter_institutions_keep_numbers_order_and_email() -> None:
 
 
 def test_hanging_references_mix_single_and_wrapped_entries() -> None:
-    """紧排参考文献依靠悬挂缩进成条，续行年份与期刊尾行不能游离。"""
+    """Tightly arranged references rely on hanging indentation, and the continuation year and the last line of the journal cannot be separated."""
     blocks = _model("fornax")[12]
     references = [block for block in blocks if block["type"] == "text" and (block["bbox"][0] > 0.5 or block["bbox"][1] > 0.44)]
     assert len(references) == 82
@@ -295,7 +295,7 @@ def test_hanging_references_mix_single_and_wrapped_entries() -> None:
 
 
 def test_fraction_bar_does_not_claim_denominator_or_body_as_footnote() -> None:
-    """编号分式完整包含分子与分母，分数线下方正文不被误认成脚注。"""
+    """Numbered fractions include the complete numerator and denominator, and the text below the fraction line will not be mistaken for footnotes."""
     blocks = _model("fornax")[4]
     equations = [block for block in blocks if block["type"] == "equation"]
     assert len(equations) == 1 and contains(equations[0]["bbox"], [0.538, 0.716, 0.614, 0.744], 0.001)

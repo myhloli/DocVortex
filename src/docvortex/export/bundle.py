@@ -1,4 +1,4 @@
-"""保存及读取不依赖源文件、网络或宿主缓存的结果包。"""
+"""Save and read result packets without relying on source files, network or host cache."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from .middle import _commit_export_files, _resolve_export_target, _validate_expo
 
 
 def _externalize_model(value: Any, assets: AssetStore) -> Any:
-    """在原始分析副本中外置图片及 HTML 内嵌素材，保持可独立重放。"""
+    """External images and HTML embedded material are included in the original analysis copy to remain independently replayable."""
     if isinstance(value, list):
         return [_externalize_model(item, assets) for item in value]
     if isinstance(value, dict):
@@ -33,7 +33,7 @@ def _externalize_model(value: Any, assets: AssetStore) -> Any:
 
 
 def _add_image(data_uri: str, assets: AssetStore) -> str:
-    """按内容摘要登记分析阶段素材，避免产生不稳定文件名。"""
+    """Register analysis phase materials by content summary to avoid unstable file names."""
     payload, extension = parse_image_data_uri_strict(data_uri)
     path = f"images/{sha256(payload).hexdigest()}.{extension}"
     assets.add(path, payload)
@@ -41,11 +41,11 @@ def _add_image(data_uri: str, assets: AssetStore) -> str:
 
 
 def _serializable_middle(middle: Any) -> dict[str, Any]:
-    """保留完整协议默认值，仅移除嵌套块中不允许出现的空续段字段以支持结果包回读。"""
+    """Keep the full protocol defaults and only remove empty continuation fields that are not allowed in nested blocks to support result packet readback."""
     value = middle.to_dict(skip_defaults=False)
 
     def visit(block: dict[str, Any], nested: bool = False) -> None:
-        """沿语义子树清理序列化补入的空默认值，顶层续段信息原样保留。"""
+        """The empty default values added by serialization are cleaned up along the semantic subtree, and the top-level continuation information is retained as is."""
         if nested and block.get("continues_prev") is None:
             block.pop("continues_prev", None)
         if isinstance(block.get("content"), list):
@@ -60,7 +60,7 @@ def _serializable_middle(middle: Any) -> dict[str, Any]:
 
 
 def save_bundle(result: DocumentResult, path: Path, *, overwrite: bool = False) -> ExportResult:
-    """将中间协议与素材清单放入同一文件事务。"""
+    """Put the intermediate agreement and the bill of materials into the same file transaction."""
     middle, assets = materialize_middle(result.middle_json, result.assets)
     validate_materialized_assets(middle, assets)
     files: dict[str, bytes] = {"middle.json": json.dumps(_serializable_middle(middle), ensure_ascii=False).encode("utf-8")}
@@ -88,7 +88,7 @@ def save_bundle(result: DocumentResult, path: Path, *, overwrite: bool = False) 
 
 
 def load_bundle(path: str | Path) -> DocumentResult:
-    """校验结果包版本、路径及素材摘要后恢复可渲染结果。"""
+    """Verify the result package version, path and material summary before restoring the renderable results."""
     root = Path(path).absolute()
     manifest = json.loads(_resolve_export_target(root, "manifest.json").read_text(encoding="utf-8"))
     if manifest.get("schema") != "docvortex.bundle" or manifest.get("schema_version") != "2.0":

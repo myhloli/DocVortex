@@ -31,13 +31,13 @@ from docvortex.schema import BlockType
 
 
 def _equation_contents(pages: list[list[dict]]) -> list[str]:
-    """按分页顺序提取独立公式 block 的 LaTeX 内容。"""
+    """Extract the contents of LaTeX of the independent formula block in paginated order."""
 
     return [block["content"] for page in pages for block in page if block["type"] == BlockType.EQUATION]
 
 
 def _invalid_equationxml_with_multiple_math() -> str:
-    """构造包含两个 ``m:oMath`` 的非规范 Equation XML。"""
+    """Constructs a non-canonical Equation XML containing two ``m:oMath``."""
 
     root = etree.fromstring(build_word_2003_equation_xml("x").encode())
     math_paragraph = root.find(f".//{{{M_NS}}}oMathPara")
@@ -49,7 +49,7 @@ def _invalid_equationxml_with_multiple_math() -> str:
 
 
 def _doctype_equationxml() -> str:
-    """构造带外部实体声明的 Equation XML，验证解析器不会读取实体。"""
+    """Constructs Equation XML with external entity declaration, validation parser will not read the entity."""
 
     return (
         '<!DOCTYPE w:wordDocument [<!ENTITY probe SYSTEM "file:///etc/passwd">]>'
@@ -60,7 +60,7 @@ def _doctype_equationxml() -> str:
 
 
 def _equationxml_with_forbidden_pict() -> str:
-    """构造包含 Word 2003 ``pict`` 的不可恢复 Equation XML。"""
+    """Constructing an unrecoverable Equation XML containing Word 2003 ``pict``."""
 
     root = etree.fromstring(build_word_2003_equation_xml("x").encode())
     run = root.find(f".//{{{M_NS}}}r")
@@ -70,7 +70,7 @@ def _equationxml_with_forbidden_pict() -> str:
 
 
 def _fallback_shape_text_docx(text: str) -> bytes:
-    """构造只可由 shape-text fallback 读取文字的 DOCX。"""
+    """Construct DOCX that can only read text from shape-text fallback."""
     document = Document()
     document.add_paragraph("before")
     source_buffer = BytesIO()
@@ -103,7 +103,7 @@ def _fallback_shape_text_docx(text: str) -> bytes:
 
 
 def test_equationxml_decoder_converts_spec_document_and_fraction() -> None:
-    """验证规范 Word 2003 XML 包装可复用现有 OMML 转换器。"""
+    """Validation Specification Word 2003 XML packaging reuses existing OMML converters."""
 
     decoder = DocxEquationXmlDecoder()
 
@@ -112,7 +112,7 @@ def test_equationxml_decoder_converts_spec_document_and_fraction() -> None:
 
 
 def test_docx_fallback_shape_text_uses_inline_spans() -> None:
-    """验证非标准 shape 文字 fallback 输出 Span 而不会中断整份解析。"""
+    """Verify non-standard shape text fallback outputs Span without interrupting the entire parsing."""
     pages = DocxModel().predict(BytesIO(_fallback_shape_text_docx("  shape text  ")))
 
     assert pages[0][-1] == {
@@ -139,7 +139,7 @@ def test_equationxml_decoder_reuses_omml_formula_coverage(
     source_latex: str,
     expected_latex: str,
 ) -> None:
-    """验证根式、脚本、积分、定界符、矩阵和 Unicode 沿用 OMML 能力。"""
+    """Verify radicals, scripts, integrals, delimiters, matrices, and Unicode inherited OMML capabilities."""
 
     equation = latex_to_omml(source_latex, display=False)
     equation_xml = build_word_2003_equation_xml_from_omml(equation)
@@ -161,7 +161,7 @@ def test_equationxml_decoder_reuses_omml_formula_coverage(
 def test_equationxml_decoder_rejects_malformed_or_unsafe_documents(
     payload: str,
 ) -> None:
-    """验证损坏、裸 OMML、多公式和实体文档整体回退。"""
+    """Validation of corrupted, bare OMML, multi-formula and entity document overall rollbacks."""
 
     assert DocxEquationXmlDecoder().decode(payload) is None
 
@@ -169,7 +169,7 @@ def test_equationxml_decoder_rejects_malformed_or_unsafe_documents(
 def test_equationxml_decoder_enforces_entry_total_and_cache_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证单属性、累计资源限制及相同 payload 缓存不重复计费。"""
+    """Verify that single attributes, cumulative resource limits, and the same payload cache are not billed repeatedly."""
 
     first = build_word_2003_equation_xml("x")
     second = build_word_2003_equation_xml("y")
@@ -188,7 +188,7 @@ def test_equationxml_decoder_enforces_entry_total_and_cache_budget(
 
 
 def test_docx_equationxml_standalone_inline_table_and_textbox_flows() -> None:
-    """验证正文独立、行内、表格和文本框 Equation XML 输出语义。"""
+    """Verify text-free, inline, table, and text box Equation XML output semantics."""
 
     equation_xml = build_word_2003_equation_xml()
     standalone = DocxModel().predict(BytesIO(build_equationxml_docx([equation_xml])))
@@ -212,7 +212,7 @@ def test_docx_equationxml_standalone_inline_table_and_textbox_flows() -> None:
 
 
 def test_docx_equationxml_title_list_header_and_footer_flows() -> None:
-    """验证标题、列表及页眉页脚沿用现有公式内容重建路径。"""
+    """Verify that titles, lists, and headers and footers follow existing formula content reconstruction paths."""
 
     first = build_word_2003_equation_xml("x")
     second = build_word_2003_fraction_equation_xml()
@@ -275,7 +275,7 @@ def test_docx_equationxml_title_list_header_and_footer_flows() -> None:
 
 
 def test_docx_equationxml_precedence_and_preview_fallback() -> None:
-    """验证 OMML、Equation XML、MTEF 和预览图片的确定优先级。"""
+    """Verify prioritization of OMML, Equation XML, MTEF and preview images."""
 
     equation_xml = build_word_2003_equation_xml("x")
     _name, mtef, mtef_latex = formula_corpus()[1]
@@ -317,7 +317,7 @@ def test_docx_equationxml_precedence_and_preview_fallback() -> None:
 
 
 def test_docx_equationxml_same_payload_is_not_semantically_deduplicated() -> None:
-    """验证缓存只减少解码成本，不合并两个独立公式 shape。"""
+    """Verification caching only reduces decoding costs and does not merge two independent formulas shape."""
 
     equation_xml = build_word_2003_equation_xml("x")
     pages = DocxModel().predict(BytesIO(build_equationxml_docx([equation_xml, equation_xml])))
@@ -326,7 +326,7 @@ def test_docx_equationxml_same_payload_is_not_semantically_deduplicated() -> Non
 
 
 def test_docx_equationxml_shared_preview_is_suppressed_per_shape() -> None:
-    """验证共享图片关系只抑制有效公式所属 shape，不全局删除图片。"""
+    """Verifying the shared image relationship only suppresses the shape belonging to the valid formula and does not delete the image globally."""
 
     pages = DocxModel().predict(
         BytesIO(
@@ -345,7 +345,7 @@ def test_docx_equationxml_shared_preview_is_suppressed_per_shape() -> None:
 
 
 def test_docx_equationxml_attribute_is_unescaped_exactly_once() -> None:
-    """验证外层属性和内层 XML 实体各解码一次，不发生二次展开。"""
+    """Verify that the outer attributes and inner XML entities are each decoded once, and no secondary expansion occurs."""
 
     pages = DocxModel().predict(BytesIO(build_equationxml_docx([build_word_2003_equation_xml("x&y")])))
 
@@ -353,7 +353,7 @@ def test_docx_equationxml_attribute_is_unescaped_exactly_once() -> None:
 
 
 def test_docx_equationxml_converter_reuse_resets_decoder_state() -> None:
-    """验证 converter 复用时页、缓存、资源预算和告警状态均重置。"""
+    """Verify that page, cache, resource budget, and alarm status are all reset when converter is reused."""
 
     converter = DocxConverter()
     converter.convert(BytesIO(build_equationxml_docx([build_word_2003_equation_xml("x")])))
@@ -366,7 +366,7 @@ def test_docx_equationxml_converter_reuse_resets_decoder_state() -> None:
 def test_invalid_docx_equationxml_preview_exports_to_sidecar(
     tmp_path: Path,
 ) -> None:
-    """验证坏 Equation XML 的图片回退导出后无 base64 JSON 残留。"""
+    """Verify that no base64 or JSON remains after exporting the image of bad Equation XML."""
 
     middle, _model = analyze_native_test_document(build_equationxml_docx(["<broken"]), file_suffix="docx")
 

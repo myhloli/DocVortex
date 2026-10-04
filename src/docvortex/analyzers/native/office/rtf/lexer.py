@@ -1,4 +1,4 @@
-"""二进制安全、位置显式的 RTF lexer。"""
+"""Binary-safe, position-explicit RTF lexer."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ MAX_RTF_CONTROL_PARAMETER = 2**31 - 1
 
 @dataclass(frozen=True, slots=True)
 class RtfOpen:
-    """表示一个左花括号。"""
+    """Represents an opening curly brace."""
 
     start: int
     end: int
@@ -24,7 +24,7 @@ class RtfOpen:
 
 @dataclass(frozen=True, slots=True)
 class RtfClose:
-    """表示一个右花括号。"""
+    """Represents a right curly brace."""
 
     start: int
     end: int
@@ -32,7 +32,7 @@ class RtfClose:
 
 @dataclass(frozen=True, slots=True)
 class RtfControlWord:
-    """表示一个可带有有符号整数参数的 control word。"""
+    """Represents a control word that can take a signed integer argument."""
 
     name: str
     param: int | None
@@ -42,7 +42,7 @@ class RtfControlWord:
 
 @dataclass(frozen=True, slots=True)
 class RtfControlSymbol:
-    """表示反斜杠后的单字符 control symbol。"""
+    """Represents a single character after the backslash control symbol."""
 
     symbol: str
     start: int
@@ -51,7 +51,7 @@ class RtfControlSymbol:
 
 @dataclass(frozen=True, slots=True)
 class RtfHexByte:
-    """表示一个 ``\'hh`` 十六进制字节。"""
+    """Represents a ``\'hh`` hexadecimal byte."""
 
     value: int
     start: int
@@ -60,7 +60,7 @@ class RtfHexByte:
 
 @dataclass(frozen=True, slots=True)
 class RtfTextBytes:
-    """表示不含 RTF 结构字符的连续原始文本字节。"""
+    """Represents contiguous bytes of raw text without characters in the RTF structure."""
 
     data: bytes
     start: int
@@ -69,7 +69,7 @@ class RtfTextBytes:
 
 @dataclass(frozen=True, slots=True)
 class RtfBinary:
-    """表示由 ``\binN`` 声明长度的原始二进制载荷。"""
+    """Represents a raw binary payload of the length declared by ``\binN``."""
 
     data: bytes
     start: int
@@ -88,24 +88,24 @@ RtfToken: TypeAlias = Union[
 
 
 def _is_ascii_letter(value: int) -> bool:
-    """判断一个字节是否是 RTF control word 使用的 ASCII 字母。"""
+    """Determine whether a byte is RTF control word using ASCII letters."""
     return 65 <= value <= 90 or 97 <= value <= 122
 
 
 def _is_ascii_digit(value: int) -> bool:
-    """判断一个字节是否是 ASCII 十进制数字。"""
+    """Determine whether a byte is a ASCII decimal number."""
     return 48 <= value <= 57
 
 
 class RtfLexer:
-    """按字节位置迭代 RTF token，并对二进制长度和资源上限负责。"""
+    """Iterates RTF token by byte position and is responsible for binary length and resource caps."""
 
     def __init__(self, data: bytes) -> None:
-        """保存不可变输入，真正的扫描在迭代时执行。"""
+        """Immutable input is saved and the actual scan is performed during iteration."""
         self._data = data
 
     def __iter__(self) -> Iterator[RtfToken]:
-        """按源顺序生成 token，允许 parser 自行恢复不平衡根组。"""
+        """Generate token in source order, allowing parser to recover unbalanced root groups on its own."""
         data = self._data
         cursor = 0
         depth = 0

@@ -1,4 +1,4 @@
-"""验证来源感知去重不会损坏连字、独立字符及唯一隐藏 OCR 文本。"""
+"""Verify that source-aware deduplication does not corrupt ligatures, standalone characters, and unique hidden OCR text."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from docvortex.document.pdf.text.dedup import deduplicate_chars
 def _char(
     text: str, x: float = 0, y: float = 0, *, obj: int | None = 0, mode: int | None = 0, width: float = 10, angle: float = 0
 ) -> Char:
-    """构造有真实来源语义的字符，可模拟不同对象和渲染模式。"""
+    """Construct characters with true-source semantics to simulate different objects and rendering modes."""
     return {
         "char": text,
         "char_idx": 0,
@@ -35,23 +35,23 @@ def _char(
 
 
 def _line(text: str, x: float = 0, y: float = 0, *, obj: int = 0, mode: int = 0) -> list[Char]:
-    """生成连续字形，书写推进与源索引分别由各层保持。"""
+    """Continuous glyphs are generated, and writing advancement and source index are maintained by each layer."""
     return [_char(c, x + i * 10, y, obj=obj, mode=mode) for i, c in enumerate(text)]
 
 
 def _indexed(chars: list[Char]) -> list[Char]:
-    """为完整字符流分配连续源索引，不让测试辅助数据伪造同一字形。"""
+    """Assign continuous source indexes to complete character streams and do not allow test auxiliary data to fake the same glyph."""
     return [dict(c, char_idx=i, source_indices=(i,)) for i, c in enumerate(chars)]
 
 
 def _text(chars: list[Char]) -> str:
-    """提取结果中的完整字符序列。"""
+    """Extract the complete character sequence from the result."""
     return "".join(c["char"] for c in chars)
 
 
 @pytest.mark.parametrize("text", ["ff", "ffi", "ffl", "fi", "fl", "a\u0301", "人人", "𝜃𝜃", "AB"])
 def test_same_glyph_mapping_is_preserved(text: str) -> None:
-    """同字形的多码值默认全部保留，不通过重复字母或汉字白名单删字。"""
+    """Multiple code values of the same glyph are all retained by default, and characters are not deleted through repeated letters or Chinese character whitelists."""
     chars = _indexed([_char(c) for c in text])
     assert _text(deduplicate_chars(chars)) == text
 
@@ -70,7 +70,7 @@ def test_same_glyph_mapping_is_preserved(text: str) -> None:
     ],
 )
 def test_only_equivalent_han_mapping_is_collapsed(text: str, expected: str) -> None:
-    """不同编码须全部等价，合并后仍可追溯所有原始字符。"""
+    """Different encodings must all be equivalent, and all original characters can still be traced after merging."""
     chars = _indexed([_char(c) for c in text])
     before = copy.deepcopy(chars)
     result = deduplicate_chars(chars)
@@ -82,13 +82,13 @@ def test_only_equivalent_han_mapping_is_collapsed(text: str, expected: str) -> N
 
 @pytest.mark.parametrize("text", ["人人", "年年", "ff", "llll", "==", "∑∑", "⻓长"])
 def test_distinct_origins_are_not_mapping_duplicates(text: str) -> None:
-    """紧排字符即使框近重合，独立原点仍须保留。"""
+    """Even if the boxes of kerned characters nearly overlap, the independent origins must still be retained."""
     chars = _indexed([_char(c, i * 0.3, width=1) for i, c in enumerate(text)])
     assert _text(deduplicate_chars(chars)) == text
 
 
 def test_missing_provenance_keeps_identical_characters() -> None:
-    """缺失来源、原点或有效几何时不能恢复旧的猜测删除逻辑。"""
+    """Old guess deletion logic cannot be restored when source, origin or valid geometry is missing."""
     chars = _indexed([_char("f", obj=None), _char("f", obj=None), _char("年", obj=1), _char("年", obj=1)])
     for c in chars[2:]:
         c["origin"] = None
@@ -99,7 +99,7 @@ def test_missing_provenance_keeps_identical_characters() -> None:
 @pytest.mark.parametrize("layers", [2, 3])
 @pytest.mark.parametrize("offset", [(0, 0), (2.04, 2.04), (1.5, 0), (0, 1.5)])
 def test_repeated_paint_layers_keep_one_complete_sequence(interleaved: bool, layers: int, offset: tuple[float, float]) -> None:
-    """整段与逐字交错的两层、三层绘制均保留完整的一份文字。"""
+    """The two- and three-layer drawings interlaced with whole paragraphs and verbatim retain a complete copy of the text."""
     lines = [_line("ABCABC", n * offset[0], n * offset[1], obj=n) for n in range(layers)]
     chars = _indexed([c for group in (zip(*lines) if interleaved else lines) for c in group])
     result = deduplicate_chars(chars)
@@ -110,7 +110,7 @@ def test_repeated_paint_layers_keep_one_complete_sequence(interleaved: bool, lay
 
 
 def test_repeated_layers_with_ligatures_preserve_each_piece() -> None:
-    """同一连字的三段码值必须共同参与重复层匹配。"""
+    """Three-segment code values of the same ligature must participate in repeat level matching together."""
     first = [_char(c) for c in "ffi"] + [_char("c", 10), _char("e", 20)]
     second = [dict(c, text_object_id=1) for c in first]
     result = deduplicate_chars(_indexed(first + second))
@@ -121,20 +121,20 @@ def test_repeated_layers_with_ligatures_preserve_each_piece() -> None:
 
 @pytest.mark.parametrize("text", ["A", "AA", "AB"])
 def test_offset_requires_continuous_varied_text(text: str) -> None:
-    """孤立同字、单调重复和不足三个字形的偏移不构成阴影证据。"""
+    """Isolated homographies, monotonous repetitions, and shifts of less than three glyphs do not constitute shadow evidence."""
     chars = _indexed(_line(text) + _line(text, 2, 2, obj=1))
     assert _text(deduplicate_chars(chars)) == text * 2
 
 
 def test_non_contiguous_offset_candidates_are_preserved() -> None:
-    """分散的相同字符不能拼成一条虚假的阴影序列。"""
+    """Scattered identical characters cannot form a false shadow sequence."""
     a = [_char(c, i * 80) for i, c in enumerate("ABC")]
     b = [_char(c, i * 80 + 2, 2, obj=1) for i, c in enumerate("ABC")]
     assert _text(deduplicate_chars(_indexed(a + b))) == "ABCABC"
 
 
 def test_unique_hidden_text_is_preserved() -> None:
-    """扫描页唯一隐藏 OCR 层以及不同位置的同文不能删除。"""
+    """The only hidden OCR layer on the scanned page and the same text in different locations cannot be deleted."""
     chars = _indexed(_line("OCR only", mode=3) + _line("Visible", y=100, obj=1))
     assert _text(deduplicate_chars(chars)) == "OCR onlyVisible"
 
@@ -153,8 +153,8 @@ def test_unique_hidden_text_is_preserved() -> None:
     ],
 )
 def test_hidden_requires_visible_content_and_conservative_match(visible: str, hidden: str, removed: bool) -> None:
-    """隐藏副本允许明确的汉字 OCR 替换，不允许数字、字母或增删内容差异。"""
-    # 空格不占字形，模拟隐藏 OCR 和可见文字的空格编码差异。
+    """Hidden copies allow explicit Chinese character OCR substitutions and do not allow differences in numbers, letters, or additions or deletions."""
+    # Spaces do not occupy glyphs, simulating the difference in space encoding between hidden OCR and visible text.
     visible_chars = _line(visible.replace(" ", ""))
     hidden_chars = _line(hidden.replace(" ", ""), obj=1, mode=3)
     for c in hidden_chars:
@@ -164,14 +164,14 @@ def test_hidden_requires_visible_content_and_conservative_match(visible: str, hi
 
 
 def test_hidden_partial_overlap_and_adjacent_cells_are_preserved() -> None:
-    """覆盖不足以及旁边单元格的同文不能抑制隐藏内容。"""
+    """Undercoverage and the same text in adjacent cells cannot suppress hidden content."""
     for x in (7, 100):
         chars = _indexed(_line("ABC") + _line("ABC", x=x, obj=1, mode=3))
         assert _text(deduplicate_chars(chars)) == "ABCABC"
 
 
 def test_rotated_hidden_duplicate_and_page_regions() -> None:
-    """文字轴投影支持旋转副本，同时保留另一个位置上的正文。"""
+    """Text axis projection supports rotating a copy while preserving the main text in another position."""
     chars = _indexed(_line("ABCD") + _line("ABCD", obj=1, mode=3) + _line("ABCD", y=100, obj=2))
     for c in chars:
         x0, y0, x1, y1 = c["bbox"]
@@ -184,7 +184,7 @@ def test_rotated_hidden_duplicate_and_page_regions() -> None:
 
 
 def _mapping_pdf(mapping: str) -> bytes:
-    """构造真实 ToUnicode 一对多映射，验证 PDFium 提取与两种公开字符入口。"""
+    """Construct a real ToUnicode one-to-many mapping and verify PDFium extraction with two public character entries."""
     output = BytesIO()
     canvas = Canvas(output, pagesize=(200, 100))
     canvas.drawString(20, 50, "X")
@@ -208,7 +208,7 @@ def _mapping_pdf(mapping: str) -> bytes:
     "mapping,expected", [("ffi", "ffi"), ("ﬃ", "ffi"), ("ff", "ff"), ("⼒力力", "力"), ("⻓长", "长"), ("𝜃", "𝜃")]
 )
 def test_real_pdfium_mapping_and_geometry_interfaces(mapping: str, expected: str) -> None:
-    """基础和扩展接口输出相同语义，连字每段与代理对来源均被保留。"""
+    """The base and extended interfaces output the same semantics, ligatures per segment and surrogate source pairs are preserved."""
     with PDFDocument(_mapping_pdf(mapping)) as document:
         base = document.get_page_chars(0)
         extended = document.get_page_chars_with_geometry(0)
@@ -222,11 +222,11 @@ def test_real_pdfium_mapping_and_geometry_interfaces(mapping: str, expected: str
 
 
 def test_recorded_badcase_characters() -> None:
-    """重放五个真实样例的最小字符片段，无需外接硬盘或完整业务文档。"""
+    """Replay minimal character snippets of five real-life examples without the need for an external hard drive or full business documentation."""
     import json
     from pathlib import Path
 
-    # 固定 UTF-8，避免 Windows 默认编码将单个汉字解码成多个字符。
+    # Fixed UTF-8 to prevent Windows default encoding from decoding a single Chinese character into multiple characters.
     fixtures = json.loads((Path(__file__).parents[1] / "fixtures/pdf_char_dedup.json").read_text(encoding="utf-8"))
     for case in fixtures:
         chars = [{**c, "bbox": Bbox(c["bbox"]), "source_indices": tuple(c["source_indices"])} for c in case["chars"]]
@@ -234,7 +234,7 @@ def test_recorded_badcase_characters() -> None:
 
 
 def test_pdfium_shear_angle_does_not_change_writing_direction() -> None:
-    """真实 PDF 人工斜体剪切不应被当成书写基线的旋转。"""
+    """True PDF Artificial italic clipping should not be treated as a rotation of the writing baseline."""
     output = BytesIO()
     canvas = Canvas(output, pagesize=(300, 150))
     canvas.transform(1, 0, 1 / 3, 1, 0, 0)
@@ -247,7 +247,7 @@ def test_pdfium_shear_angle_does_not_change_writing_direction() -> None:
 
 
 def test_removed_hidden_paragraph_leaves_no_orphaned_lines() -> None:
-    """已删除副本之间的空白被清除，原有正文段落分隔仍保留。"""
+    """The white space between deleted copies is cleared, and the original text paragraph separation remains."""
     chars = _indexed(
         _line("ABC") + [_char("\r"), _char("\n")] + _line("ABC", obj=1, mode=3) + [_char("\r", obj=None), _char("\n", obj=None)]
     )
@@ -255,7 +255,7 @@ def test_removed_hidden_paragraph_leaves_no_orphaned_lines() -> None:
 
 
 def test_transparent_text_cannot_suppress_unique_hidden_ocr() -> None:
-    """填充模式但透明度为零的文字不能被当作可见原文。"""
+    """Text in fill mode but with zero transparency cannot be treated as visible original text."""
     visible = _line("ABCD")
     for c in visible:
         c["text_is_visible"] = False
@@ -264,7 +264,7 @@ def test_transparent_text_cannot_suppress_unique_hidden_ocr() -> None:
 
 
 def test_pdfium_reports_transparent_objects_without_losing_ocr() -> None:
-    """从真实 PDF 读取对象透明度，并保留其旁边的唯一隐藏文本。"""
+    """Read object transparency from real PDF and keep unique hidden text next to it."""
     output = BytesIO()
     canvas = Canvas(output, pagesize=(300, 150))
     canvas.setFillAlpha(0)
@@ -282,7 +282,7 @@ def test_pdfium_reports_transparent_objects_without_losing_ocr() -> None:
 
 
 def test_shadow_evidence_cannot_skip_different_interior_characters() -> None:
-    """三个相同字母之间有不同正文时，不能跳过差异并删除一部分原文。"""
+    """When there are different texts between three identical letters, you cannot skip the differences and delete part of the original text."""
     chars = _indexed(_line("AxBxC") + _line("AyByC", 1, 1, obj=1))
     for c in chars:
         b = c["bbox"]
@@ -293,14 +293,14 @@ def test_shadow_evidence_cannot_skip_different_interior_characters() -> None:
 
 
 def test_three_layers_of_two_glyphs_are_still_insufficient_evidence() -> None:
-    """三层叠字仍只有两个独立字形，不能靠副本数量凑足连续证据。"""
+    """Three-layered characters still only have two independent glyphs, so the number of copies cannot be relied upon to provide continuous evidence."""
     layers = [_line("AB", i * 1.5, obj=i) for i in range(3)]
     chars = _indexed([c for group in zip(*layers) for c in group])
     assert len(deduplicate_chars(chars)) == 6
 
 
 def test_invalid_and_extreme_geometry_is_conservatively_preserved() -> None:
-    """非有限方向、零面积及极大隐藏框不会误删正文或枚举无限空网格。"""
+    """Non-limited directions, zero area, and extremely large hidden boxes will not accidentally delete text or enumerate infinite empty grids."""
     cases = [_char("A", obj=1, mode=3), _char("A", obj=1, mode=3), _char("A", obj=1, mode=3)]
     cases[0]["writing_angle"] = float("nan")
     cases[1]["bbox"] = Bbox([0, 0, 0, 0])

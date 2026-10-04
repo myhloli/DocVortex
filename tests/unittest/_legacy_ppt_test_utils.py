@@ -1,4 +1,4 @@
-"""构造不依赖 Office 的最小 PowerPoint 97–2003 测试文件。"""
+"""Construct a minimal PowerPoint 97–2003 test file that does not depend on Office."""
 
 from __future__ import annotations
 
@@ -9,13 +9,13 @@ from _mtef_test_utils import _TINY_PNG, build_equation_object
 
 
 def _ppt_record(version_instance: int, record_type: int, payload: bytes) -> bytes:
-    """构造一条 PPT record。"""
+    """Construct a PPT record."""
 
     return struct.pack("<HHI", version_instance, record_type, len(payload)) + payload
 
 
 def _ppt_container(instance: int, record_type: int, payload: bytes) -> bytes:
-    """构造 recVer=0xF 的 PPT container。"""
+    """Construct PPT container with recVer=0xF."""
 
     return _ppt_record((instance << 4) | 0xF, record_type, payload)
 
@@ -27,13 +27,13 @@ def _officeart_record(
     version: int = 0,
     instance: int = 0,
 ) -> bytes:
-    """构造一条可嵌入 PPT record tree 的 OfficeArt record。"""
+    """Construct a OfficeArt record that can be embedded in PPT record tree."""
 
     return _ppt_record((instance << 4) | version, record_type, payload)
 
 
 def _equation_preview_bse(preview_payload: bytes | None = None) -> bytes:
-    """构造一个内嵌 PNG 或 WMF 的 OfficeArt BSE。"""
+    """Constructs a OfficeArt BSE embedded with PNG or WMF."""
 
     if preview_payload is None:
         blip = _officeart_record(0xF01E, b"\x00" * 17 + _TINY_PNG)
@@ -51,7 +51,7 @@ def _equation_preview_bse(preview_payload: bytes | None = None) -> bytes:
 
 
 def _equation_shape(object_id: int, *, preview: bool) -> bytes:
-    """构造带 ExObjRefAtom、坐标及可选 pib 的 PPT shape。"""
+    """Constructs PPT shape with ExObjRefAtom, coordinates and optional pib."""
 
     fsp = _officeart_record(
         0xF00A,
@@ -93,13 +93,13 @@ def build_equation_ppt(
     prog_id: str = "Equation.3",
     preview_payload: bytes | None = None,
 ) -> bytes:
-    """构造每页一个 Equation Editor OLE 对象的 PPT persist fixture。"""
+    """Constructs PPT persist fixture of one Equation Editor OLE object per page."""
 
     if not formulas:
         raise ValueError("equation PPT fixture requires at least one formula")
 
     def persist_atom(persist_ref: int, slide_id: int) -> bytes:
-        """构造 SlidePersistAtom。"""
+        """Construct SlidePersistAtom."""
 
         return _ppt_record(
             0,
@@ -215,7 +215,7 @@ def build_equation_ppt(
 
 
 def _build_cfb(streams: list[tuple[str, bytes]]) -> bytes:
-    """生成所有 stream 均使用常规 FAT sector 的最小 CFB v3。"""
+    """Minimum CFB v3 that generates all stream using regular FAT sector."""
 
     sector_size = 512
     end_of_chain = 0xFFFF_FFFE
@@ -225,7 +225,7 @@ def _build_cfb(streams: list[tuple[str, bytes]]) -> bytes:
     sectors: list[bytes] = []
 
     def add_chain(data: bytes) -> int:
-        """把字节追加为 FAT chain 并返回首 sector。"""
+        """Append bytes as FAT chain and return first sector."""
 
         if not data:
             return end_of_chain
@@ -245,7 +245,7 @@ def _build_cfb(streams: list[tuple[str, bytes]]) -> bytes:
         start: int,
         size: int,
     ) -> bytes:
-        """构造一个 128 字节 CFB directory entry。"""
+        """Constructs a 128-byte CFB directory entry."""
 
         none = 0xFFFF_FFFF
         raw_name = name.encode("utf-16-le") + b"\x00\x00"
@@ -321,10 +321,10 @@ def _build_cfb(streams: list[tuple[str, bytes]]) -> bytes:
 
 
 def build_sparse_notes_ppt() -> bytes:
-    """构造仅第二页含 speaker notes 的两页 PPT。"""
+    """Construct a two-page PPT containing speaker notes only on the second page."""
 
     def slide(text: str) -> bytes:
-        """构造含一段直接文本的 slide container。"""
+        """Constructs slide container containing a direct text."""
 
         slide_atom = _ppt_record(2, 0x03EF, struct.pack("<I", 0) + b"\x00" * 8 + struct.pack("<IIHH", 0, 0, 0, 0))
         text_header = _ppt_record(0, 0x0F9F, struct.pack("<I", 1))
@@ -332,7 +332,7 @@ def build_sparse_notes_ppt() -> bytes:
         return _ppt_container(0, 0x03EE, slide_atom + text_header + text_bytes)
 
     def notes(slide_ref: int, text: str) -> bytes:
-        """构造绑定到指定 slide id 的 notes container。"""
+        """Constructs notes container bound to the specified slide id."""
 
         notes_atom = _ppt_record(1, 0x03F1, struct.pack("<IHH", slide_ref, 0, 0))
         text_header = _ppt_record(0, 0x0F9F, struct.pack("<I", 2))
@@ -340,7 +340,7 @@ def build_sparse_notes_ppt() -> bytes:
         return _ppt_container(0, 0x03F0, notes_atom + text_header + text_bytes)
 
     def persist_atom(persist_ref: int, slide_id: int) -> bytes:
-        """构造 SlidePersistAtom。"""
+        """Construct SlidePersistAtom."""
 
         return _ppt_record(0, 0x03F3, struct.pack("<IIIII", persist_ref, 0, 0, slide_id, 0))
 
@@ -368,17 +368,17 @@ def build_sparse_notes_ppt() -> bytes:
 
 
 def build_multimaster_ppt() -> bytes:
-    """构造两页分别继承不同母版 bullet/粗斜体默认值的 PPT。"""
+    """Construct two pages of PPT that inherit different master bullet/bold italic default values."""
 
     def master_style(bullet_on: bool, character_mask: int, character_style: int) -> bytes:
-        """构造一个层级的 TextMasterStyleAtom。"""
+        """Construct a hierarchical TextMasterStyleAtom."""
 
         paragraph = struct.pack("<IH", 0x0001, 0x0001 if bullet_on else 0x0000)
         character = struct.pack("<IH", character_mask, character_style)
         return _ppt_record(1 << 4, 0x0FA3, struct.pack("<H", 1) + paragraph + character)
 
     def slide(master_id: int, text: str) -> bytes:
-        """构造引用指定 master id 的 slide。"""
+        """Constructs slide that references master and id."""
 
         slide_atom = _ppt_record(
             2,
@@ -390,7 +390,7 @@ def build_multimaster_ppt() -> bytes:
         return _ppt_container(0, 0x03EE, slide_atom + text_header + text_bytes)
 
     def persist_atom(persist_ref: int, stable_id: int) -> bytes:
-        """构造 slide/master 共用的 persist atom。"""
+        """Construct persist atom common to slide/master."""
 
         return _ppt_record(0, 0x03F3, struct.pack("<IIIII", persist_ref, 0, 0, stable_id, 0))
 
@@ -425,7 +425,7 @@ def build_multimaster_ppt() -> bytes:
 
 
 def build_deep_nested_ppt() -> bytes:
-    """构造超过固定 record depth 的攻击形状。"""
+    """Construct attack shapes beyond fixed record depth."""
 
     nested = _ppt_record(0, 0x0FA8, b"deep")
     for _ in range(200):

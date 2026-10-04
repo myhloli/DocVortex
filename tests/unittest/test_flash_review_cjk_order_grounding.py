@@ -1,4 +1,4 @@
-"""中文段界、原生条目、短题名与编号面板网格的尺度和反例验证。"""
+"""Scaling and counterexample verification of Chinese segment boundaries, native terms, short titles, and numbered panel grids."""
 
 import pytest
 
@@ -12,7 +12,7 @@ from docvortex.analyzers.native.pdf.pipeline import _numbered_panel_row_regions
 @pytest.mark.parametrize('scale,left,width', [(.7,15,260),(1,55,360),(1.6,110,500)])
 @pytest.mark.parametrize('kind', ['paragraph','label','same_gap','open','foreign','font','offset','member','caption','short'])
 def test_cjk_sentence_and_extra_native_space_confirm_paragraph_boundary_without_splitting_wraps(scale,left,width,kind):
-    """变换字号、栏宽与位置后中文句末仍由额外净空分段，普通续行和不完整句不拆。"""
+    """After changing the font size, column width and position, the end of the Chinese sentence will still be segmented by extra space, and ordinary continuation lines and incomplete sentences will not be separated."""
     h=10*scale
     first=_metric_fixture_line('前一段经过完整说明后结束。' if kind!='open' else '前一段还有未完成的说明',
                                (left,100*scale,left+.85*width,110*scale),1,effective_height=h,font_coverage=1,font_signature=('GenericA',0))
@@ -31,7 +31,7 @@ def test_cjk_sentence_and_extra_native_space_confirm_paragraph_boundary_without_
 @pytest.mark.parametrize('scale,left,width', [(.7,15,260),(1,55,360),(1.6,110,500)])
 @pytest.mark.parametrize('kind', ['numbered','dated','two','nonsequential','offset','font','no_date','embedded'])
 def test_repeated_cjk_entries_require_stable_native_starts_and_structural_sequence_or_dates(scale,left,width,kind):
-    """连续顿号编号或带日期书名号才提供条目边界，段内引用、缺日期及不齐列不能认领。"""
+    """Only consecutive comma numbers or dated book title numbers provide entry boundaries. In-paragraph references, missing dates, and uneven columns cannot be claimed."""
     rows=[]; h=10*scale
     count=2 if kind=='two' else 3
     dated=kind in {'dated','no_date'}
@@ -55,7 +55,7 @@ def test_repeated_cjk_entries_require_stable_native_starts_and_structural_sequen
 @pytest.mark.parametrize('scale,left,width', [(.7,15,260),(1,55,360),(1.6,110,500)])
 @pytest.mark.parametrize('kind', ['heading','dated','nested','tail','colon','long','far','small','font','caption'])
 def test_isolated_short_cjk_heading_requires_two_native_body_rows_and_no_nearby_predecessor(scale,left,width,kind):
-    """短中文题名只在独立章节起点晋升；段尾、冒号引导和异式正文不充当标题。"""
+    """Short Chinese titles are only promoted at the beginning of independent chapters; paragraph endings, colon guides, and heterogeneous text do not serve as titles."""
     h=10*scale
     text='测量结果说明'
     if kind=='colon': text+='：'
@@ -82,7 +82,7 @@ def test_isolated_short_cjk_heading_requires_two_native_body_rows_and_no_nearby_
 @pytest.mark.parametrize('scale,left,width', [(.7,15,260),(1,55,360),(1.6,110,500)])
 @pytest.mark.parametrize('kind', ['grid','six','column_numbers','nonconsecutive','offset','body','below','single_row','single_column','missing'])
 def test_numbered_panel_grid_uses_visual_rows_only_when_native_numbers_confirm_row_order(scale,left,width,kind):
-    """面板位置和连续图号同时成立才逐行排序，非逐行编号、正文屏障及不齐列保留原分组。"""
+    """Line-by-line sorting occurs only when panel position and continuous figure number are both established. Non-line-by-line numbering, text barriers, and uneven columns retain the original grouping."""
     rows=3 if kind=='six' else 1 if kind=='single_row' else 4 if kind=='single_column' else 2
     columns=1 if kind=='single_column' else 2
     regions=[]; h=10*scale

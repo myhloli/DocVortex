@@ -1,4 +1,4 @@
-"""Middle JSON 2.0 行内 Span 到安全 HTML 的序列化。"""
+"""Middle JSON 2.0 Inline serialization of Span to secure HTML."""
 
 from __future__ import annotations
 
@@ -77,21 +77,21 @@ _AUTOLINK_COMMON_BARE_TLDS = frozenset(
 
 @dataclass(frozen=True, slots=True)
 class HtmlInlineResult:
-    """保存一段行内 HTML 及其是否包含需由 MathJax 处理的公式。"""
+    """Saves an inline HTML and whether it contains a formula that needs to be processed by MathJax."""
 
     html: str
     has_math: bool = False
 
 
 def render_inline_content_html(content: list[InlineSpan], *, anchor_targets: dict[str, str] | None = None) -> HtmlInlineResult:
-    """把一段 MiddleJson 行内内容渲染为安全 HTML。"""
+    """Render a MiddleJson inline content as safe HTML."""
     return render_inline_spans_html(content, anchor_targets=anchor_targets)
 
 
 def render_joined_inline_contents_html(
     contents: list[list[InlineSpan]], *, anchor_targets: dict[str, str] | None = None
 ) -> HtmlInlineResult:
-    """按共享物理段落边界规则合并多段内容后渲染 HTML。"""
+    """Rendering HTML after merging multiple paragraphs of content according to shared physical paragraph boundary rules."""
     return render_inline_spans_html(join_inline_spans(contents), anchor_targets=anchor_targets)
 
 
@@ -103,7 +103,7 @@ def render_inline_spans_html(
     separate_adjacent_math: bool = False,
     preserve_newlines: bool = False,
 ) -> HtmlInlineResult:
-    """渲染行内 Span，可分隔相邻公式或给 pre-wrap 容器保留原始换行。"""
+    """Renders an inline Span, either to separate adjacent formulas or to preserve the original line wrapping of the pre-wrap container."""
     parts: list[str] = []
     has_math = False
     previous_was_math = False
@@ -126,7 +126,7 @@ def render_inline_spans_html(
 
 
 def render_math_html(latex: str, *, display: bool) -> HtmlInlineResult:
-    """把裸 LaTeX 放入只由 MathJax 扫描的行内或行间公式载体。"""
+    """Place the bare LaTeX into an inline or interline formula carrier scanned only by MathJax."""
     normalized = latex.strip()
     if not normalized:
         return HtmlInlineResult("")
@@ -153,7 +153,7 @@ def _render_inline_span_html(
     preserve_newlines: bool,
     anchor_targets: dict[str, str] | None,
 ) -> HtmlInlineResult:
-    """把一个结构化行内 Span 映射为 HTML。"""
+    """Maps a structured inline Span to HTML."""
     if isinstance(span, TextSpan):
         rendered = HtmlInlineResult(
             _render_text_html(
@@ -198,7 +198,7 @@ def _render_text_html(
     linkify_text: bool,
     preserve_newlines: bool,
 ) -> str:
-    """转义普通文本，并按需把安全 URL-like 候选转换为链接。"""
+    """Escape normal text and convert safe URL-like candidates into links as needed."""
     if not linkify_text:
         return _escape_text_with_breaks(content, preserve_newlines=preserve_newlines)
 
@@ -222,7 +222,7 @@ def _render_text_html(
 
 
 def _trim_autolink_candidate(candidate: str) -> tuple[str, str]:
-    """去除 URL 尾部句读和不平衡右括号，并返回应保留的原文后缀。"""
+    """Remove URL trailing sentence reading and unbalanced closing brackets, and return original suffixes that should be retained."""
     end = len(candidate)
     while end and candidate[end - 1] in _AUTOLINK_TRAILING_PUNCTUATION:
         end -= 1
@@ -242,7 +242,7 @@ def _is_embedded_autolink_candidate(
     match: re.Match[str],
     candidate: str,
 ) -> bool:
-    """拒绝未知协议、相对路径和裸 IP 内部的模糊候选。"""
+    """Reject unknown protocols, relative paths, and ambiguous candidates inside naked IP."""
     if match.group("explicit") is not None:
         return False
     prefix = content[max(0, match.start() - 32) : match.start()]
@@ -261,7 +261,7 @@ def _is_embedded_autolink_candidate(
 
 
 def _autolink_href(match: re.Match[str], candidate: str) -> str | None:
-    """把候选转换为显式安全 href，并验证端口和显式 IP 地址。"""
+    """Convert the candidate to explicit secure href and verify the port and explicit IP address."""
     if match.group("email") is not None:
         if ".." in candidate.rsplit("@", 1)[0]:
             return None
@@ -283,7 +283,7 @@ def _autolink_href(match: re.Match[str], candidate: str) -> str | None:
 
 
 def _is_allowed_bare_domain(candidate: str) -> bool:
-    """仅允许工程常用 TLD 的无协议裸域名，减少文件名和股票代码误判。"""
+    """Only non-protocol naked domain names of TLD commonly used in projects are allowed to reduce misjudgments in file names and stock codes."""
     authority = re.split(r"[/?#]", candidate, maxsplit=1)[0]
     host = authority.rsplit(":", 1)[0]
     tld = host.rsplit(".", 1)[-1].lower()
@@ -291,13 +291,13 @@ def _is_allowed_bare_domain(candidate: str) -> bool:
 
 
 def _escape_text_with_breaks(content: str, *, preserve_newlines: bool) -> str:
-    """转义文本，并按调用方要求把换行转换为 HTML br。"""
+    """Escape text and convert newlines to HTML br as requested by the caller."""
     escaped = _escape_text(content)
     return escaped if preserve_newlines else escaped.replace("\n", "<br>\n")
 
 
 def _apply_html_styles(content: str, styles: list[str]) -> str:
-    """按 Markdown renderer 的稳定顺序应用共享富文本样式。"""
+    """Applies shared rich text styles in a stable order of Markdown renderer."""
     if not content:
         return content
     if "superscript" in styles:
@@ -318,27 +318,27 @@ def _apply_html_styles(content: str, styles: list[str]) -> str:
 
 
 def _escape_text(content: str) -> str:
-    """转义普通文本，并替换 HTML 不允许的 C0 控制字符。"""
+    """Escapes normal text and replaces C0 control characters not allowed by HTML."""
     return html.escape(_normalize_html_text(content), quote=False)
 
 
 def _normalize_html_text(content: str) -> str:
-    """统一换行并替换 HTML 属性和正文都不允许的控制字符。"""
+    """Uniform line breaks and replacements for HTML Control characters not allowed in neither the attribute nor the body."""
     normalized = content.replace("\r\n", "\n").replace("\r", "\n")
     return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\ud800-\udfff]", "\ufffd", normalized)
 
 
 def _needs_whitespace_preservation(content: str) -> bool:
-    """判断富文本是否包含浏览器默认会折叠的有效空白。"""
+    """Determines whether rich text contains valid whitespace, which browsers collapse by default."""
     return bool(content and (content != content.strip(" \t\n") or "  " in content or "\t" in content or "\n" in content))
 
 
 def _neutralize_math_closing_delimiter(latex: str, closing: str) -> str:
-    """把公式体内奇数反斜杠引出的结束定界符改写为等价 TeX，防止提前闭合。"""
+    """Rewrite the end delimiter caused by an odd number of backslashes in the formula body to the equivalent TeX to prevent premature closure."""
     token = re.escape(closing)
 
     def _replace(match: re.Match[str]) -> str:
-        """保留成对反斜杠，并把最后一个定界反斜杠改为 mathclose。"""
+        """Keep the paired backslashes and change the last delimiting backslash to mathclose."""
         slashes = match.group("slashes")
         if len(slashes) % 2 == 0:
             return match.group(0)

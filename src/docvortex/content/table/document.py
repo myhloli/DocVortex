@@ -1,4 +1,4 @@
-"""文档页边界上的跨页表格识别与延续标记编排。"""
+"""Cross-page table recognition and continuation mark arrangement on document page boundaries."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ TABLE_BOUNDARY_IGNORED_TYPES = set(MERGE_TRANSPARENT_BLOCK_TYPES)
 
 
 def _clear_table_continuation_marker(table_block: BlockDict) -> None:
-    """递归清除 table 根块及其子块中过期的 ``continues_prev``。"""
+    """Recursively purge expired ``continues_prev`` in the table root block and its sub-blocks."""
     table_block.pop("continues_prev", None)
     content = table_block.get("content")
     if not isinstance(content, list):
@@ -26,7 +26,7 @@ def _clear_table_continuation_marker(table_block: BlockDict) -> None:
 
 
 def _clear_nested_continuation_markers(block: BlockDict) -> None:
-    """清除表格子树中的旧延续标记，避免标记落到嵌套子块。"""
+    """Clear old continuation markers in table subtrees to avoid markers falling into nested subblocks."""
     content = block.get("content")
     if not isinstance(content, list):
         return
@@ -37,7 +37,7 @@ def _clear_nested_continuation_markers(block: BlockDict) -> None:
 
 
 def _find_boundary_table(blocks: list[Any], *, from_end: bool) -> BlockDict | None:
-    """从页边界扫描 table；噪声块可跳过，其他语义块立即阻断。"""
+    """Scan table from page boundary; noise blocks can be skipped, other semantic blocks are blocked immediately."""
     ordered_blocks = reversed(blocks) if from_end else iter(blocks)
     for block in ordered_blocks:
         if not isinstance(block, dict):
@@ -52,14 +52,14 @@ def _find_boundary_table(blocks: list[Any], *, from_end: bool) -> BlockDict | No
 
 
 def _is_consecutive_page_pair(previous_page: PageInfoDict, current_page: PageInfoDict) -> bool:
-    """按显式零基 page_idx 判断页面在文档中是否严格连续。"""
+    """Determine whether pages are strictly continuous in the document by explicit zero-based page_idx."""
     previous_page_idx = previous_page.get("page_idx")
     current_page_idx = current_page.get("page_idx")
     return type(previous_page_idx) is int and type(current_page_idx) is int and current_page_idx == previous_page_idx + 1
 
 
 def merge_table(page_info_list: list[PageInfoDict]) -> None:
-    """倒序识别连续页边界表格，并只在后表写入延续标记。"""
+    """Recognizes consecutive page boundary tables in reverse order and writes continuation markers only in the later tables."""
     if not isinstance(page_info_list, list):
         return
 

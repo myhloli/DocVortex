@@ -1,4 +1,4 @@
-"""PDF 字符去重及原始文字几何提取，保持原生提取算法与资源语义。"""
+"""PDF character deduplication and geometric extraction of original text, maintaining the native extraction algorithm and resource semantics."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def _restore_pdfium_surrogate_pairs(
     *,
     raw_codes: dict[int, int] | None = None,
 ) -> list[Char]:
-    """利用 PDFium 原始 UTF-16 code unit 恢复 pdftext 丢失的补充平面字符。"""
+    """Utilizes PDFium original UTF-16 code unit to restore the missing supplementary flat characters of pdftext."""
     if not any(
         len(text := str(char.get("char", ""))) == 1 and (text == "\ufffd" or 0xD800 <= ord(text) <= 0xDFFF) for char in chars
     ):
@@ -44,7 +44,7 @@ def _restore_pdfium_surrogate_pairs(
     consumed_char_indices: set[int] = set()
 
     def get_unicode(handle: object, index: int) -> int:
-        """优先复用首次读取的原始码值，仅为独立辅助调用读取原生接口。"""
+        """Prioritize reusing the original code value read for the first time, and only read the native interface for independent auxiliary calls."""
         return raw_codes[index] if raw_codes is not None else int(pdfium_c.FPDFText_GetUnicode(handle, index))
 
     for char in chars:
@@ -109,7 +109,7 @@ def _restore_pdfium_surrogate_pairs(
 
 
 def _page_to_image(page: pdfium.PdfPage, scale: float, max_edge: int) -> PDFPageImage:
-    """按原缩放与长边上限复制页面像素，并返回独立持有的图片。"""
+    """Duplicates the page pixels at the original scale and long edge cap, and returns the image as a separate holding."""
     long_edge_length = max(*page.get_size())
     if (long_edge_length * scale) > max_edge:
         scale = max_edge / long_edge_length
@@ -134,7 +134,7 @@ def _extract_page_text_geometry(
     compact_only: bool = False,
     paint_page_reader=None,
 ) -> PDFPageTextGeometry | None:
-    """在调用方持有的页面和锁内读取字符，使批量提取与独立接口共用实现。"""
+    """Read characters within the page and lock held by the caller, making batch extraction a common implementation with independent interfaces."""
     textpage = None
     try:
         raw_page_bbox: list[float] = list(page.get_bbox())
@@ -150,7 +150,7 @@ def _extract_page_text_geometry(
         if compact:
             from .snapshot_bridge import read_text_snapshot
 
-            # 消融未显示稳定收益，恢复由 Python 包装持有 textpage 的原快照入口。
+            # Ablation shows no stable gains, restoring the original snapshot entry of textpage held by the Python wrapper.
             snapshot = read_text_snapshot(textpage, raw_page_bbox, page_rotation, include_extended_geometry, visibility)
             if snapshot is not None:
                 return snapshot

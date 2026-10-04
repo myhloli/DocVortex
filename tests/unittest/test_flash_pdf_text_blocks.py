@@ -14,7 +14,7 @@ def _span_text_block(
     content: str,
     bbox: tuple[float, float, float, float],
 ) -> dict[str, object]:
-    """构造全宽 span 正文回并测试使用的最小内部文本块。"""
+    """Construct a full-width span text back and test using the smallest inner text block."""
 
     return {
         "type": "text",
@@ -37,7 +37,7 @@ def _span_text_block(
 
 
 def test_hanging_indent_groups_neutral_entries_and_ignores_centered_heading() -> None:
-    """验证不含序号的重复悬挂缩进逐条分组，且居中标题不参与条目。"""
+    """Verify that repeated hanging indents without serial numbers are grouped item by item, and that centered titles do not participate in entries."""
 
     body_font = ("Body", 0)
     italic_font = ("BodyItalic", 1)
@@ -83,7 +83,7 @@ def test_hanging_indent_groups_neutral_entries_and_ignores_centered_heading() ->
 
 
 def test_nested_columns_ignore_intervening_full_width_metadata_band() -> None:
-    """验证左右栏行交错时，中间全宽元数据簇不阻断局部双栏推断。"""
+    """Verify that when left and right column rows are interleaved, the middle full-width metadata cluster does not block local double-column inference."""
 
     lines = [
         _text_line("full width", (0.0, 0.0, 100.0, 10.0), 0),
@@ -129,13 +129,13 @@ def test_nested_columns_ignore_intervening_full_width_metadata_band() -> None:
 
 
 def test_paragraph_formula_context_merges_dense_same_lane_text() -> None:
-    """验证复杂行内分式及其同栏前后正文恢复为一个文本块。"""
+    """Verify that complex inline fractions and the text before and after the same column are restored to a text block."""
 
     def block(
         content: str,
         bbox: tuple[float, float, float, float],
     ) -> dict[str, object]:
-        """构造含栏带和行框的最小文本块。"""
+        """Constructs a minimal text block with columns and line boxes."""
 
         return {
             "type": "text",
@@ -178,7 +178,7 @@ def test_paragraph_formula_context_merges_dense_same_lane_text() -> None:
 def test_rotated_paragraph_formula_context_uses_upright_gap(
     angle: int,
 ) -> None:
-    """验证旋转公式上下文只合并正向坐标中真正相邻的同栏正文。"""
+    """Verify that the rotation formula context only merges text in the same column that are truly adjacent in forward coordinates."""
 
     page_size = (200.0, 200.0)
 
@@ -188,7 +188,7 @@ def test_rotated_paragraph_formula_context_uses_upright_gap(
         *,
         formula_context: bool = False,
     ) -> dict[str, object]:
-        """构造页面框与正向行框分离的旋转文本块。"""
+        """Constructs a rotated text block that separates the page frame from the forward line frame."""
 
         return {
             "type": "text",
@@ -253,7 +253,7 @@ def test_rotated_paragraph_formula_context_uses_upright_gap(
 
 
 def test_full_width_span_text_merges_without_terminal_punctuation_dependency() -> None:
-    """验证同栏满宽 span 正文可跨句号连续回并，并沿用英文断词恢复。"""
+    """Verify that the same column is full width span The text can be merged continuously across periods, and English word segmentation can be used to restore it."""
 
     blocks = [
         _span_text_block(
@@ -311,7 +311,7 @@ def test_full_width_span_text_merges_without_terminal_punctuation_dependency() -
 def test_full_width_span_text_respects_structural_barriers(
     barrier: str,
 ) -> None:
-    """验证 span 回并仍受硬边界、栏带、字体、宽度和阻隔块约束。"""
+    """Verify that span returns and is still constrained by hard borders, bands, fonts, widths, and blockers."""
 
     first = _span_text_block(
         "First sentence.",
@@ -365,7 +365,7 @@ def test_full_width_span_text_respects_structural_barriers(
 
 
 def test_hanging_indent_accepts_reference_spacing_and_italic_tail() -> None:
-    """验证 1.25 倍行高的参考文献间距不会拆掉前一条斜体尾行。"""
+    """Verify that reference spacing of 1.25 line height does not break the previous italicized trailing line."""
 
     body_font = ("Body", 0)
     lines = [
@@ -437,7 +437,7 @@ def test_hanging_indent_accepts_reference_spacing_and_italic_tail() -> None:
 
 
 def test_first_line_indent_and_large_gap_do_not_form_hanging_indent_groups() -> None:
-    """验证普通首行缩进及跨越大间距的行不会误触发悬挂缩进模式。"""
+    """Verify that normal first-line indentation and lines spanning large gaps do not accidentally trigger hanging indent mode."""
 
     lines = [
         _text_line("First paragraph", (15.0, 0.0, 100.0, 10.0), 0),
@@ -457,7 +457,7 @@ def test_first_line_indent_and_large_gap_do_not_form_hanging_indent_groups() -> 
 
 
 def test_hanging_indent_keeps_confirmed_entries_before_plain_trailing_paragraph() -> None:
-    """验证尾随普通左对齐段落不会让此前已确认的悬挂缩进条目整体失效。"""
+    """Verify that trailing ordinary left-justified paragraphs do not invalidate previously confirmed dangling indent entries as a whole."""
 
     lines = [
         _text_line("entry one", (0.0, 0.0, 100.0, 10.0), 0),
@@ -483,7 +483,7 @@ def test_hanging_indent_keeps_confirmed_entries_before_plain_trailing_paragraph(
 
 
 def test_full_width_hanging_entries_can_start_after_aligned_prose() -> None:
-    """验证近满栏的重复悬挂条目可在同左缘正文之后启动，普通单行仍留在前文。"""
+    """Verify that duplicate hanging entries in nearly full columns can be started after the same left-margin text, with ordinary single lines remaining in the front text."""
 
     lines = [
         _text_line("plain disclosure", (0.0, 0.0, 100.0, 10.0), 0),
@@ -507,7 +507,7 @@ def test_full_width_hanging_entries_can_start_after_aligned_prose() -> None:
 
 
 def test_bullet_rows_remain_independent_text_blocks() -> None:
-    """验证近满栏项目符号为显式段界，连续披露条目不会在后处理阶段串联。"""
+    """Verify that near-full column bullets are explicit segment boundaries and that consecutive disclosure items are not concatenated in the post-processing stage."""
 
     lines = [
         _text_line("• first disclosure.", (0.0, 0.0, 100.0, 10.0), 0),
@@ -525,7 +525,7 @@ def test_bullet_rows_remain_independent_text_blocks() -> None:
 
 
 def test_compact_bullet_rows_keep_one_list_block() -> None:
-    """验证短项目符号列表继续按紧凑列表成块，不套用近满栏披露条目的边界。"""
+    """Validates that short bulleted lists continue to be chunked into compact lists and do not apply bounds on nearly full columns of disclosed items."""
 
     lines = [
         _text_line("• first tool", (0.0, 0.0, 45.0, 10.0), 0),
@@ -542,7 +542,7 @@ def test_compact_bullet_rows_keep_one_list_block() -> None:
 
 
 def test_adjacent_compact_label_rows_remain_separate() -> None:
-    """验证连续的短键值元数据行形成独立块，不因缺少句末标点而串联。"""
+    """Verify that consecutive short key-value metadata rows form independent blocks and are not concatenated due to missing end-of-sentence punctuation."""
 
     lines = [
         _text_line("递交截止时间：09:30", (0.0, 0.0, 55.0, 10.0), 0),
@@ -558,7 +558,7 @@ def test_adjacent_compact_label_rows_remain_separate() -> None:
 
 
 def test_twelve_point_gutter_keeps_two_text_lanes_and_paragraphs_separate() -> None:
-    """验证约 12pt 行高和栏沟仍识别为双栏，左右正文不会交叉拼接。"""
+    """Verify that the line height and column grooves of about 12pt are still recognized as double columns, and the left and right text will not be cross-spliced."""
 
     lines: list[models._LineItem] = []
     for row_index, top in enumerate((100.0, 112.0, 124.0)):
@@ -587,7 +587,7 @@ def test_twelve_point_gutter_keeps_two_text_lanes_and_paragraphs_separate() -> N
 
 
 def test_cross_column_caption_tail_stays_in_span_lane_and_one_text_block() -> None:
-    """验证仅占单栏宽的短 caption 尾行仍回收到连续跨栏 caption。"""
+    """Verify that a short caption trailing row that is only a single column wide is still recycled into a continuous span of caption."""
 
     lines: list[models._LineItem] = [
         _text_line("caption line one", (0.0, 10.0, 200.0, 20.0), 0),
@@ -627,7 +627,7 @@ def test_cross_column_caption_tail_stays_in_span_lane_and_one_text_block() -> No
 
 
 def test_slight_bbox_overlap_contributes_to_gap_estimate_and_separates_caption() -> None:
-    """验证轻微纵向重叠按零净空统计，短图例不会与后续长 caption 合并。"""
+    """Verify that slight vertical overlap counts as zero headroom and the short legend does not merge with the subsequent long caption."""
 
     body_lines = [
         _text_line("body-0", (312.0, 0.0, 563.0, 12.0), 0),
@@ -661,7 +661,7 @@ def test_slight_bbox_overlap_contributes_to_gap_estimate_and_separates_caption()
 
 
 def test_local_previous_left_edge_exposes_first_line_indent() -> None:
-    """验证局部版心左移后仍能识别下一行相对前一物理行的首行缩进。"""
+    """Verify that after the local layout center is moved to the left, the indentation of the first line of the next line relative to the previous physical line can still be recognized."""
 
     previous = _text_line(
         "previous paragraph without punctuation",
@@ -691,7 +691,7 @@ def test_local_previous_left_edge_exposes_first_line_indent() -> None:
 
 
 def test_terminal_full_lane_row_breaks_after_abnormal_clearance() -> None:
-    """验证满栏句末行后的净空超过常规间距半行高时强制另起段落。"""
+    """Verify that if the headroom after the last line of a full-column sentence exceeds half a line height of the normal spacing, a new paragraph will be forced."""
 
     previous = _text_line("Figure caption ends.", (0.0, 0.0, 100.0, 10.0), 0)
     current = _text_line("new paragraph fills the lane", (0.0, 17.0, 100.0, 27.0), 1)
@@ -713,7 +713,7 @@ def test_terminal_full_lane_row_breaks_after_abnormal_clearance() -> None:
 
 
 def test_effective_height_connects_body_line_after_tall_math_glyph() -> None:
-    """验证高数学字形拉长原始 bbox 时仍按有效行高连接下一正文行。"""
+    """Verify that the high math glyph stretches the original bbox while still concatenating the next text line by a valid line height."""
 
     previous = _text_line(
         "support window Ωp centered at the pixel",
@@ -750,7 +750,7 @@ def test_effective_height_connects_body_line_after_tall_math_glyph() -> None:
 
 
 def test_body_row_gap_uses_canonical_baseline_without_changing_semantic_gap() -> None:
-    """验证正文连接使用 baseline 节奏，而其它语义路径仍保留 bbox 净空。"""
+    """Verify that body connections use baseline cadence, while other semantic paths still retain bbox headroom."""
 
     previous = _text_line(
         "previous full body row",
@@ -800,7 +800,7 @@ def test_body_row_gap_uses_canonical_baseline_without_changing_semantic_gap() ->
 
 
 def test_cross_lane_short_tail_returns_to_unique_preceding_lane() -> None:
-    """验证完整落在唯一正文栏内的短尾不会继续停留在 span lane。"""
+    """Verify that short tails that fall completely within the only text column do not continue to stay at span lane."""
 
     previous = _text_line(
         "full preceding row",
@@ -843,7 +843,7 @@ def test_cross_lane_short_tail_returns_to_unique_preceding_lane() -> None:
 
 
 def test_inline_scripts_and_touching_low_coverage_runs_are_recovered() -> None:
-    """验证紧贴上下标与低覆盖率同行后缀恢复，同时保留外置公式编号。"""
+    """Verify that tight upper and lower subscripts are recovered with low-coverage peer suffixes while preserving external formula numbering."""
 
     script_lines = [
         _text_line("O(ω", (0.0, 0.0, 100.0, 18.8), 0, visual_row_id=0, effective_height=12.0),
@@ -903,7 +903,7 @@ def test_inline_scripts_and_touching_low_coverage_runs_are_recovered() -> None:
 
 
 def test_title_resolved_visual_row_merges_sparse_short_prefix() -> None:
-    """验证同视觉行的短前缀与远端宽正文按字体族和基线恢复。"""
+    """Verify that short prefixes of the same visual line as far as wide body text are restored by font family and baseline."""
 
     lines = [
         _text_line(
@@ -949,7 +949,7 @@ def test_title_resolved_visual_row_merges_sparse_short_prefix() -> None:
 def test_title_resolved_visual_row_rejects_weak_sparse_prefix(
     failure_mode: str,
 ) -> None:
-    """验证字体、行身份、保护边界或前缀宽度不符时保留拆分。"""
+    """Preserve splits when validating font, line identity, guard boundaries, or prefix widths."""
 
     prefix_bbox = (0.0, 0.0, 40.0, 10.0) if failure_mode == "two-wide-runs" else (0.0, 0.0, 15.0, 10.0)
     lines = [
@@ -988,7 +988,7 @@ def test_title_resolved_visual_row_rejects_weak_sparse_prefix(
 
 
 def test_canonical_reference_scale_merges_bracket_marker_but_not_plain_number() -> None:
-    """验证 loose 高度相同的括号引用可按 PDF 字号并入宿主，普通数字保持独立。"""
+    """Verify loose Bracket references of the same height can be merged into hosts by PDF font size, ordinary numbers remain independent."""
 
     def sized_line(
         text: str,
@@ -996,7 +996,7 @@ def test_canonical_reference_scale_merges_bracket_marker_but_not_plain_number() 
         source_index: int,
         font_size: float,
     ) -> models._LineItem:
-        """构造带 PDF 字号证据的单字符原生行。"""
+        """Constructs a single-character native line with PDF font size evidence."""
 
         line = _text_line(
             text,
@@ -1065,7 +1065,7 @@ def test_canonical_reference_scale_merges_bracket_marker_but_not_plain_number() 
 
 
 def test_same_repeated_indent_continues_after_terminal_punctuation() -> None:
-    """验证同一悬挂缩进锚点的紧邻尾行不会因前行句号被再次切开。"""
+    """Verify that the immediately trailing line of the same hanging indent anchor is not cut again by a preceding period."""
 
     previous = _text_line(
         "first indented line.",
@@ -1097,7 +1097,7 @@ def test_same_repeated_indent_continues_after_terminal_punctuation() -> None:
 
 
 def test_sparse_lane_terminal_gap_remains_paragraph_boundary() -> None:
-    """验证稀疏页不会把唯一的句号后大间距反向估计成常规行距。"""
+    """Verify that sparse pages do not reversely estimate large spacing after a unique period into regular line spacing."""
 
     previous = _text_line(
         "first generated paragraph.",
@@ -1129,7 +1129,7 @@ def test_sparse_lane_terminal_gap_remains_paragraph_boundary() -> None:
 
 
 def test_list_intro_chain_splits_before_item_and_keeps_intro_together() -> None:
-    """验证列表前的连续引导段与冒号短尾合并，而编号项保持硬边界。"""
+    """Continuous boot segments before the verification list are merged with the colon tail, while numbered entries remain hard bounded."""
 
     lines = [
         _text_line("paragraph continues", (0.0, 0.0, 100.0, 10.0), 0),
@@ -1153,7 +1153,7 @@ def test_list_intro_chain_splits_before_item_and_keeps_intro_together() -> None:
 
 
 def test_single_numbered_tail_merges_back_into_colon_line() -> None:
-    """验证没有续行的单个编号尾项回并冒号行，不被稀疏页段界永久拆开。"""
+    """Verify that single numbered trailing entries without continuation lines are merged into colon lines and are not permanently separated by sparse page boundaries."""
 
     lines = [
         _text_line("scope includes:", (0.0, 0.0, 90.0, 10.0), 0),
@@ -1168,7 +1168,7 @@ def test_single_numbered_tail_merges_back_into_colon_line() -> None:
 
 
 def test_multiline_component_absorbs_aligned_short_tail() -> None:
-    """验证多行正文吸收同左缘的单行短尾，不要求短尾达到正文满栏宽度。"""
+    """Verify that multi-line text absorbs a single-line short tail on the same left edge, and does not require the short tail to reach the full column width of the text."""
 
     lines = [
         _text_line("body starts", (0.0, 0.0, 100.0, 10.0), 0),
@@ -1184,7 +1184,7 @@ def test_multiline_component_absorbs_aligned_short_tail() -> None:
 
 
 def test_url_rows_continue_colon_introduction() -> None:
-    """验证冒号引导后的 URL 行继续属于前一正文块，即使 URL 自身不满栏。"""
+    """Verify that URL lines after the colon lead continue to belong to the previous text block, even if URL itself does not fill the column."""
 
     lines = [
         _text_line("reference link:", (0.0, 0.0, 80.0, 10.0), 0),
@@ -1199,7 +1199,7 @@ def test_url_rows_continue_colon_introduction() -> None:
 
 
 def test_low_overlap_detached_script_preserves_following_row_gap() -> None:
-    """验证低重叠外置字形按几何归入主体，且抬高的顶边不会拆断后继行。"""
+    """Verify that low-overlapping external glyphs fit geometrically into the main body and that the raised top edge does not break the line."""
 
     base = _text_line(
         "Alpha",
@@ -1250,7 +1250,7 @@ def test_detached_script_geometry_rejects_ambiguous_small_runs(
     small_text: str,
     small_bbox: tuple[float, float, float, float],
 ) -> None:
-    """验证宽文本、远距文本和同行小单元格不能仅凭小字号并入主体。"""
+    """Validate that wide text, distant text, and small cells in the same row cannot be merged into the body based on small font size alone."""
 
     base = _text_line(
         "Base",
@@ -1274,7 +1274,7 @@ def test_detached_script_geometry_rejects_ambiguous_small_runs(
 
 
 def test_full_lane_large_height_mismatch_only_recovers_aligned_continuation() -> None:
-    """验证满栏混合字体 URL 可续接，而短公式与显式字体样式边界仍分离。"""
+    """Verify that full-column mixed font URL can be continued while short formulas remain separated from explicit font style boundaries."""
 
     previous = _text_line(
         "video sequences have been made avail-",
@@ -1340,7 +1340,7 @@ def test_full_lane_large_height_mismatch_only_recovers_aligned_continuation() ->
 
 
 def test_pdf_subset_font_variants_keep_full_rows_and_short_tail_connected() -> None:
-    """验证同字体族的 PDF 子集签名差异不会拆断满栏正文及其短尾行。"""
+    """Verify that PDF subset signature differences for the same font family do not break full column text and its short tail lines."""
 
     first = _text_line(
         "first full row",
@@ -1386,7 +1386,7 @@ def test_pdf_subset_font_variants_keep_full_rows_and_short_tail_connected() -> N
 
 
 def test_pdf_subset_font_short_tail_keeps_significant_weight_barrier() -> None:
-    """验证字体族相同但字重显著变化时，短尾续行仍保持硬分段。"""
+    """When verifying that the font family is the same but the weight changes significantly, short tail continuation lines remain hard segmented."""
 
     body = _text_line(
         "full body row",
@@ -1418,7 +1418,7 @@ def test_pdf_subset_font_short_tail_keeps_significant_weight_barrier() -> None:
 
 
 def test_smaller_footnote_after_abnormal_gap_forces_text_block_break() -> None:
-    """验证字号不足前行 88% 且净空偏大时，正文与脚注强制分块。"""
+    """When the verification font size is less than 88% of the front line and the headroom is too large, the main text and footnotes are forced to be separated into blocks."""
 
     body = _text_line(
         "body continuation",
@@ -1454,7 +1454,7 @@ def test_smaller_footnote_after_abnormal_gap_forces_text_block_break() -> None:
 
 
 def test_overlapping_fraction_fragments_merge_with_ha_and_nb_body_hosts() -> None:
-    """验证 Ha、Nb 的上下分式碎片并回正文宿主，且普通后续行保持独立。"""
+    """Verify that the upper and lower fraction fragments of Ha and Nb are returned to the text host, and ordinary subsequent lines remain independent."""
 
     body_font = ("Body", 0)
     math_font = ("Math", 1)
@@ -1558,7 +1558,7 @@ def test_overlapping_fraction_fragments_merge_with_ha_and_nb_body_hosts() -> Non
 
 
 def test_overlapping_delta_fraction_and_tail_form_one_text_block() -> None:
-    """验证同一物理行的分子分母恢复后可与下一行幅值说明组成单块。"""
+    """Verify that the numerator and denominator of the same physical row can be combined with the amplitude description of the next row to form a single block after recovery."""
 
     body_font = ("Body", 0)
     lines = [
@@ -1603,7 +1603,7 @@ def test_overlapping_delta_fraction_and_tail_form_one_text_block() -> None:
 
 
 def test_overlapping_inline_pair_respects_table_and_physical_row_gap() -> None:
-    """验证二维碎片连接不会跨表格，也不会连接普通上下相邻正文行。"""
+    """Verify that 2D fragment joins do not span tables, nor join ordinary upper and lower adjacent body lines."""
 
     first = _text_line("left", (0.0, 0.0, 40.0, 10.0), 0, effective_height=10.0)
     same_row = _text_line("right", (60.0, 0.0, 100.0, 10.0), 1, effective_height=10.0)
@@ -1624,7 +1624,7 @@ def test_overlapping_inline_pair_respects_table_and_physical_row_gap() -> None:
 
 
 def test_hyphen_continuation_cannot_start_false_hanging_indent_entry() -> None:
-    """验证断词续行优先归前段，后续首行缩进说明和紧凑公式仍各自分块。"""
+    """Verify that line breaks and continuations are given priority in the previous paragraph, and the indented instructions and compact formulas in the subsequent first line are still separated into separate blocks."""
 
     body_font = ("Body", 0)
     lines = [
@@ -1683,7 +1683,7 @@ def test_hyphen_continuation_cannot_start_false_hanging_indent_entry() -> None:
 
 
 def test_local_two_column_band_survives_full_width_body_below() -> None:
-    """验证页面顶部局部双栏不会被下方通栏正文覆盖。"""
+    """Verify that the partial double columns at the top of the page are not covered by the text of the banner below."""
 
     lines: list[models._LineItem] = []
     for row_index, top in enumerate((0.0, 12.0, 24.0, 36.0)):
@@ -1711,7 +1711,7 @@ def test_local_two_column_band_survives_full_width_body_below() -> None:
 
 
 def test_nested_lane_accepts_wider_one_sided_rows_and_expands_interval() -> None:
-    """验证窄图注推断的局部栏仍可接纳未进入另一栏的宽正文行。"""
+    """Verify that partial columns of narrow legend inference can still accept wide text lines that do not go into another column."""
 
     lines: list[models._LineItem] = []
     for row_index, top in enumerate((0.0, 10.0, 20.0, 30.0, 40.0)):
@@ -1760,7 +1760,7 @@ def test_nested_lane_accepts_wider_one_sided_rows_and_expands_interval() -> None
 
 
 def test_regular_lanes_accept_wider_one_sided_rows_but_keep_gutter_crossing_span() -> None:
-    """验证普通双栏会扩展单侧栏宽，同时不吸收越过栏沟的通栏行。"""
+    """Verify that normal double columns will expand the width of one side column without absorbing the column rows that cross the column gap."""
 
     lines: list[models._LineItem] = []
     for row_index, top in enumerate((0.0, 10.0, 20.0, 30.0, 40.0)):
@@ -1800,7 +1800,7 @@ def test_regular_lanes_accept_wider_one_sided_rows_but_keep_gutter_crossing_span
 
 
 def test_short_span_tail_reattaches_before_later_cross_layout_region() -> None:
-    """验证局部通栏段的短尾行不会因页面后续另有通栏行而留在单栏。"""
+    """Verify that the short tail row of the partial banner section will not remain in a single column due to another banner row later on the page."""
 
     first = _text_line("wide one", (10.0, 0.0, 190.0, 10.0), 0)
     second = _text_line("wide two", (10.0, 10.0, 190.0, 20.0), 1)
@@ -1826,7 +1826,7 @@ def test_short_span_tail_reattaches_before_later_cross_layout_region() -> None:
 
 
 def test_repeated_indented_span_tails_reattach_and_form_separate_entries() -> None:
-    """验证重复的跨栏首行与缩进尾行迁回 span 后仍逐条分组。"""
+    """Verify that the duplicate cross-column first line and indented last line are still grouped one by one after being moved back to span."""
 
     body_font = ("Body", 0)
     first = _text_line(
@@ -1886,7 +1886,7 @@ def test_repeated_indented_span_tails_reattach_and_form_separate_entries() -> No
 
 
 def test_single_indented_span_tail_does_not_reattach() -> None:
-    """验证缺少重复结构支持时单个缩进行不会被猜测为跨栏续行。"""
+    """Verify that a single indented line is not guessed as a cross-column continuation in the absence of repeat structure support."""
 
     first = _text_line("wide", (10.0, 0.0, 190.0, 10.0), 0)
     tail = _text_line("tail", (25.0, 10.0, 80.0, 20.0), 1)
@@ -1909,7 +1909,7 @@ def test_single_indented_span_tail_does_not_reattach() -> None:
 
 
 def test_aligned_fallback_fonts_merge_but_style_conflict_stays_separate() -> None:
-    """验证紧邻地址与联系方式可跨字体族续接，而样式位变化仍形成边界。"""
+    """Verify that adjacent addresses and contact information can be continued across font families, while style bit changes still form a boundary."""
 
     address = _text_line(
         "address",
@@ -1949,7 +1949,7 @@ def test_aligned_fallback_fonts_merge_but_style_conflict_stays_separate() -> Non
 
 
 def test_hanging_indent_uses_top_pitch_when_terminal_glyph_height_is_abnormal() -> None:
-    """验证异常偏高末字符不会把已重复的参考文献悬挂缩进拆开。"""
+    """Verify that abnormally high-end characters will not break up the hanging indent of duplicate references."""
 
     lines = [
         _text_line("entry one", (0.0, 0.0, 100.0, 10.0), 0),
@@ -1976,7 +1976,7 @@ def test_hanging_indent_uses_top_pitch_when_terminal_glyph_height_is_abnormal() 
 
 
 def test_spatial_post_merge_connects_short_opener_wide_body_and_tail() -> None:
-    """验证跨栏拆开的短首行、满宽正文和紧邻尾行仅按空间关系重新连接。"""
+    """Verify that short first lines, full-width text, and immediate last lines split across columns are rejoined in spatial relationships only."""
 
     blocks = [
         {
@@ -2023,7 +2023,7 @@ def test_spatial_post_merge_connects_short_opener_wide_body_and_tail() -> None:
 
 
 def test_spatial_post_merge_uses_compatible_local_lane_width() -> None:
-    """验证半页栏内的短首行可连接多段正文，并在下一分组起点停止。"""
+    """Verify that the short first line in a half-page column connects multiple paragraphs of text and stops at the beginning of the next grouping."""
 
     lane_metadata = {
         "_lane_interval": (40.0, 370.0),
@@ -2114,7 +2114,7 @@ def test_spatial_post_merge_uses_compatible_local_lane_width() -> None:
 
 
 def test_spatial_post_merge_does_not_share_incompatible_lane_width() -> None:
-    """验证左右栏区间不兼容时仍使用页面宽度，不能放宽首段合并。"""
+    """When verifying that the left and right column intervals are incompatible, the page width is still used, and the first paragraph merging cannot be relaxed."""
 
     blocks = [
         {
@@ -2156,7 +2156,7 @@ def test_spatial_post_merge_does_not_share_incompatible_lane_width() -> None:
 
 
 def test_spatial_post_merge_does_not_join_span_caption_to_column_body() -> None:
-    """验证跨栏图注即使紧邻单栏正文也不会在二次阶段合并。"""
+    """Verify that cross-column legends are not merged in the secondary stage even if they are immediately adjacent to single-column text."""
 
     blocks = [
         {
@@ -2199,7 +2199,7 @@ def test_spatial_post_merge_does_not_join_span_caption_to_column_body() -> None:
 
 
 def test_image_caption_marker_only_attaches_same_font_spatial_tail() -> None:
-    """验证通用图注标记仅确认图像邻近候选，并把同字体续行接回对应图注。"""
+    """Verification of universal legend markers only confirms image proximity candidates and connects continuation lines in the same font back to the corresponding legend."""
 
     common = {
         "type": "text",
@@ -2252,7 +2252,7 @@ def test_image_caption_marker_only_attaches_same_font_spatial_tail() -> None:
 
 
 def test_fragmented_center_header_merges_but_remote_volume_stays_separate() -> None:
-    """验证等距窄页眉字形形成一个逻辑块，远端卷期块不被吸收。"""
+    """Verify that isometric narrow header glyphs form a logical block and that far-end volume blocks are not absorbed."""
 
     blocks = []
     for index, left in enumerate((40.0, 60.0, 80.0, 100.0)):
@@ -2297,7 +2297,7 @@ def test_fragmented_center_header_merges_but_remote_volume_stays_separate() -> N
 
 
 def test_spatial_post_merge_cannot_skip_intervening_title_block() -> None:
-    """验证二次组件合并不能越过同一水平流中的中间标题块。"""
+    """Verify that secondary component merges cannot cross the middle title block in the same horizontal flow."""
 
     common = {
         "angle": 0,
@@ -2346,7 +2346,7 @@ def test_spatial_post_merge_cannot_skip_intervening_title_block() -> None:
 
 
 def test_exaggerated_bbox_short_tail_stays_with_full_width_previous_row() -> None:
-    """验证同左边界短尾行不会因异常字体框高度而从正文段落脱落。"""
+    """Verify that the short trailing line with the same left margin does not fall off the body paragraph due to abnormal font box height."""
 
     previous = _text_line(
         "full width previous row",
@@ -2382,7 +2382,7 @@ def test_exaggerated_bbox_short_tail_stays_with_full_width_previous_row() -> Non
 
 
 def test_indented_reference_colon_keeps_safe_short_tail_with_abnormal_height() -> None:
-    """验证参考文献续行相对编号左缘缩进时，冒号后的异常高短尾仍保持同块。"""
+    """Verify that when reference continuation lines are indented relative to the left edge of the number, the unusually tall short tail after the colon remains in the same block."""
 
     previous = _text_line(
         "full continuation：",
@@ -2428,7 +2428,7 @@ def test_indented_reference_colon_keeps_safe_short_tail_with_abnormal_height() -
 
 
 def test_indented_list_row_can_return_to_lane_left_for_short_tail() -> None:
-    """验证列表首行轻度缩进时，回到栏左边的同字体短尾行仍可续接。"""
+    """When the first line of the verification list is slightly indented, the short trailing line of the same font back to the left of the column can still be continued."""
 
     body_font = ("Body", 0)
     previous = _text_line(
@@ -2463,7 +2463,7 @@ def test_indented_list_row_can_return_to_lane_left_for_short_tail() -> None:
 
 
 def test_outdented_reference_number_starts_new_structural_entry() -> None:
-    """验证通用参考文献编号仅在左突几何成立时切开上一条续行。"""
+    """Verify that the universal reference number only cuts the previous continuation line if the left-hand geometry holds."""
 
     previous = _text_line("previous continuation", (25.0, 0.0, 100.0, 10.0), 0)
     current = _text_line("［23］ next reference", (0.0, 10.0, 100.0, 20.0), 1)
@@ -2480,7 +2480,7 @@ def test_outdented_reference_number_starts_new_structural_entry() -> None:
 
 
 def test_spatial_post_merge_limits_tapered_tail_to_parallel_information_grid() -> None:
-    """验证略大间距的递减尾行只在并列信息网格中并回其左对齐主体。"""
+    """Verify that the slightly larger spaced descending trailing row is only aligned back to its left-aligned body in the side-by-side information grid."""
 
     blocks = [
         {
@@ -2533,7 +2533,7 @@ def test_spatial_post_merge_limits_tapered_tail_to_parallel_information_grid() -
 
 
 def test_repeated_leading_emphasis_and_tail_gap_split_structured_text() -> None:
-    """验证重复行首强调只在前行留白充分时形成结构化正文边界。"""
+    """Verify that repeated line-first emphasis only forms a structured body boundary when there is sufficient whitespace in the preceding line."""
 
     lines = [
         _text_line(
@@ -2577,7 +2577,7 @@ def test_repeated_leading_emphasis_and_tail_gap_split_structured_text() -> None:
 
 
 def test_native_typography_caches_leading_emphasis_before_chars_are_cleared() -> None:
-    """验证字符释放前缓存短粗体前缀宽度，后续文本分块仍可读取。"""
+    """The short bold prefix width is cached before verifying characters are released, and subsequent text chunks can still be read."""
 
     chars = []
     for index, char in enumerate("Lead"):
@@ -2612,7 +2612,7 @@ def test_native_typography_caches_leading_emphasis_before_chars_are_cleared() ->
 
 
 def test_native_typography_caches_leading_font_family_run_without_weight_change() -> None:
-    """验证同字重的独立行首字体 run 仍缓存为视觉排版宽度。"""
+    """Verify that standalone line starter font run of the same weight is still cached as the visual typesetting width."""
 
     chars = []
     for index, char in enumerate("Lead"):
@@ -2648,7 +2648,7 @@ def test_native_typography_caches_leading_font_family_run_without_weight_change(
 
 
 def test_image_adjacent_centered_short_to_wide_rows_split_without_text_markers() -> None:
-    """验证图片下方短居中行到宽居中行按纯视觉关系形成独立块。"""
+    """Verify that the short centered row to the wide centered row below the image form independent blocks in a purely visual relationship."""
 
     first = _text_line("alpha", (35.0, 62.0, 65.0, 72.0), 0)
     second = _text_line("beta", (10.0, 74.0, 90.0, 84.0), 1)
@@ -2670,7 +2670,7 @@ def test_image_adjacent_centered_short_to_wide_rows_split_without_text_markers()
 
 
 def test_short_tail_and_leading_typography_run_split_structured_text() -> None:
-    """验证短尾之后的宽行仅在存在独立行首字体 run 时形成新块。"""
+    """Validate that wide lines after a short tail form new blocks only if the independent line start font run is present."""
 
     previous = _text_line("tail", (0.0, 0.0, 35.0, 10.0), 0)
     opener = _text_line(
@@ -2696,7 +2696,7 @@ def test_short_tail_and_leading_typography_run_split_structured_text() -> None:
 
 
 def test_same_baseline_merge_preserves_paragraph_formula_context() -> None:
-    """验证公式回退上下文在同行碎片合并后不会丢失。"""
+    """Verify that formula fallback context is not lost after peer shard merge."""
 
     fragments = [
         _text_line(
@@ -2730,7 +2730,7 @@ def test_same_baseline_merge_preserves_paragraph_formula_context() -> None:
 def test_formula_style_text_rows_split_pairwise_without_count_gate(
     row_count: int,
 ) -> None:
-    """验证两行起任意长度的独立公式样式文本均按相邻行拆分。"""
+    """Verifies that independent formula style text of any length starting from two lines is split on adjacent lines."""
 
     rows = [
         _text_line(
@@ -2765,7 +2765,7 @@ def test_formula_style_text_rows_split_pairwise_without_count_gate(
 def test_formula_style_text_rows_keep_connected_math_fragments(
     second_bbox: tuple[float, float, float, float],
 ) -> None:
-    """验证窄分母和垂直重叠层级不会被拆成独立正文块。"""
+    """Verify that narrow denominators and vertically overlapping hierarchies are not broken into independent text blocks."""
 
     rows = [
         _text_line(
@@ -2794,7 +2794,7 @@ def test_formula_style_text_rows_keep_connected_math_fragments(
 
 
 def test_native_typography_separates_loose_height_from_canonical_em() -> None:
-    """验证异常 loose 字符高度不会覆盖 PDF 字号形成的 canonical 尺度。"""
+    """Validation exception loose character height does not cover the canonical scale formed by the PDF font size."""
 
     chars = [
         {
@@ -2829,7 +2829,7 @@ def test_native_typography_separates_loose_height_from_canonical_em() -> None:
 
 
 def test_canonical_visual_resplit_separates_cross_column_coarse_row() -> None:
-    """验证 repaired/tight 字符间隙可把跨栏粗行重切成唯一视觉 run。"""
+    """Verify that repaired/tight character gaps can recut thick columns into unique visual run."""
 
     positions = (0.0, 6.0, 12.0, 18.0, 62.0, 68.0, 74.0, 80.0)
     chars = [
@@ -2874,7 +2874,7 @@ def test_canonical_visual_resplit_separates_cross_column_coarse_row() -> None:
 
 
 def test_two_leading_emphasis_rows_do_not_activate_structured_text_split() -> None:
-    """验证不足三个重复强调首行时不会把普通混排正文切碎。"""
+    """Verify that less than three repetitions of the first line will not shred ordinary mixed text."""
 
     lines = [
         _text_line(
@@ -2899,7 +2899,7 @@ def test_two_leading_emphasis_rows_do_not_activate_structured_text_split() -> No
 
 
 def test_leading_emphasis_count_does_not_cross_semantic_title_boundary() -> None:
-    """验证不同语义区段的强调首行数量不能合并触发结构化正文模式。"""
+    """Verify that the number of emphasized first lines of different semantic sections cannot be combined to trigger structured body mode."""
 
     lines = [
         _text_line("first opener", (0.0, 0.0, 100.0, 10.0), 0, leading_emphasis_width=10.0),
@@ -2923,7 +2923,7 @@ def test_leading_emphasis_count_does_not_cross_semantic_title_boundary() -> None
 
 
 def test_page_footnote_visual_markers_attach_six_affiliation_entries() -> None:
-    """验证同行窄编号与右侧单位首行、续行分别组成独立脚注条目。"""
+    """Verify that the narrow number of the same row and the first and continuation lines of the unit on the right form independent footnote entries."""
 
     lines = [
         _text_line("contact name", (10.0, 0.0, 48.0, 10.0), 0, semantic_type="page_footnote"),
@@ -2985,7 +2985,7 @@ def test_page_footnote_visual_markers_attach_six_affiliation_entries() -> None:
 
 
 def test_local_aligned_column_replaces_polluted_full_width_lane() -> None:
-    """验证跨栏上文不会使后续稳定单栏正文被首行缩进规则拆开。"""
+    """Verify that the cross-column text will not cause subsequent stable single-column text to be split by the first line indentation rule."""
 
     lines = [
         _text_line("wide row one", (0.0, 0.0, 200.0, 10.0), 0),
@@ -3013,7 +3013,7 @@ def test_local_aligned_column_replaces_polluted_full_width_lane() -> None:
 
 
 def test_typographic_gap_splits_caption_body_without_image_geometry() -> None:
-    """验证异常净空与行高层级变化可独立于图片位置形成段落硬边界。"""
+    """Verify that unusual headroom and line height changes can create paragraph hard boundaries independent of image position."""
 
     caption = _text_line(
         "caption ends without punctuation",
@@ -3045,7 +3045,7 @@ def test_typographic_gap_splits_caption_body_without_image_geometry() -> None:
 
 
 def test_typographic_gap_requires_both_spacing_and_typography_evidence() -> None:
-    """验证单独字号变化或单独中等净空都不会触发新增段落屏障。"""
+    """Verify that neither font size change alone nor medium headroom alone triggers the new paragraph barrier."""
 
     base = _text_line("base", (0.0, 0.0, 100.0, 10.0), 0, effective_height=10.0)
     larger_nearby = _text_line(
@@ -3083,7 +3083,7 @@ def test_typographic_gap_requires_both_spacing_and_typography_evidence() -> None
 
 
 def test_hyphenated_row_bypasses_typographic_gap_barrier() -> None:
-    """验证排版断词仍可在现有近距离上限内跨过字号和净空变化。"""
+    """Verify that typesetting hyphenation still works across font size and headroom changes within the existing proximity cap."""
 
     previous = _text_line("hyphen-", (0.0, 0.0, 100.0, 10.0), 0, effective_height=10.0)
     current = _text_line("ated", (0.0, 19.0, 100.0, 30.5), 1, effective_height=11.5)
@@ -3101,7 +3101,7 @@ def test_hyphenated_row_bypasses_typographic_gap_barrier() -> None:
 
 
 def test_caption_post_merge_respects_typographic_gap_barrier() -> None:
-    """验证图片邻接后处理不能跨过已确认的图注正文排版边界。"""
+    """Verify that the image adjacency post-processing cannot cross the confirmed legend text layout boundary."""
 
     common = {
         "type": "text",
@@ -3140,7 +3140,7 @@ def test_caption_post_merge_respects_typographic_gap_barrier() -> None:
 
 
 def test_repeated_compact_title_continuations_merge_across_font_switch() -> None:
-    """验证重复两行弱标题可与紧邻异字体续行合并并恢复为正文。"""
+    """Verify that two repeated lines of weak headings can be merged with the immediately following continuation lines in different fonts and restored to the main text."""
 
     blocks: list[dict[str, object]] = []
     for offset, label in ((0.0, "first"), (45.0, "second")):
@@ -3193,7 +3193,7 @@ def test_repeated_compact_title_continuations_merge_across_font_switch() -> None
 
 
 def test_compact_title_continuation_requires_repetition_and_font_switch() -> None:
-    """验证单组结构或相同字体续行不会越过真正的标题边界。"""
+    """Verify that a single set of structures or continuation lines in the same font do not cross true heading boundaries."""
 
     title = {
         "type": "paragraph_title",
@@ -3253,7 +3253,7 @@ def test_compact_title_continuation_requires_repetition_and_font_switch() -> Non
 
 
 def test_caption_neighbor_uses_union_of_aligned_image_row() -> None:
-    """验证三张并排图片会额外形成统一图注邻接使用的联合 bbox。"""
+    """Verification that three side-by-side images additionally form the union bbox for unified caption adjacency use."""
 
     grouped = text_blocks._caption_image_group_bboxes(
         [
@@ -3268,7 +3268,7 @@ def test_caption_neighbor_uses_union_of_aligned_image_row() -> None:
 
 
 def test_inline_math_fragments_merge_into_wide_split_text_row() -> None:
-    """验证宽正文行上下叠放的多个小数学块收敛为一个文本块。"""
+    """Verify that multiple small math blocks stacked on top of a wide text line converge into one text block."""
 
     host = {
         "type": "text",
@@ -3314,7 +3314,7 @@ def test_inline_math_fragments_merge_into_wide_split_text_row() -> None:
 
 
 def test_residual_narrow_math_fragment_merges_into_unique_wide_host() -> None:
-    """验证单个窄数学碎片与宽正文行重叠时会收回唯一宿主。"""
+    """Verify that a single narrow math fragment retracts a unique host when it overlaps a wide text line."""
 
     host = {
         "type": "text",
@@ -3346,7 +3346,7 @@ def test_residual_narrow_math_fragment_merges_into_unique_wide_host() -> None:
 
 
 def test_hostless_inline_math_fragments_keep_recovery_marker() -> None:
-    """验证无宽宿主的数学碎片合并后也保留内部恢复标记。"""
+    """Verify that math shards for non-wide hosts also retain internal recovery markers after merging."""
 
     fragments = [
         {
@@ -3380,7 +3380,7 @@ def test_hostless_inline_math_fragments_keep_recovery_marker() -> None:
 def _inline_math_paragraph_test_blocks(
     marker_indices: tuple[int, ...] = (0, 2),
 ) -> list[dict[str, object]]:
-    """构造同一栏内连续的五个宽正文块，供数学段落闭合测试复用。"""
+    """Construct five consecutive wide text blocks in the same column for reuse in the mathematics paragraph closure test."""
 
     bboxes = (
         (20.0, 40.0, 172.0, 70.0),
@@ -3409,7 +3409,7 @@ def _inline_math_paragraph_test_blocks(
 
 
 def test_inline_math_paragraph_continuations_merge_five_wide_blocks() -> None:
-    """验证至少两个数学恢复块可带动同栏五段正文闭合为一个块。"""
+    """Verify that at least two mathematical recovery blocks can drive five paragraphs of text in the same column to be closed into one block."""
 
     merged = text_blocks._merge_inline_math_paragraph_continuations(
         _inline_math_paragraph_test_blocks(),
@@ -3423,7 +3423,7 @@ def test_inline_math_paragraph_continuations_merge_five_wide_blocks() -> None:
 
 
 def test_inline_math_paragraph_does_not_merge_ordinary_paragraphs() -> None:
-    """验证缺少两个数学恢复锚点时不合并普通连续段落。"""
+    """Verify that ordinary continuous paragraphs are not merged when two math recovery anchors are missing."""
 
     merged = text_blocks._merge_inline_math_paragraph_continuations(
         _inline_math_paragraph_test_blocks(marker_indices=(0,)),
@@ -3437,7 +3437,7 @@ def test_inline_math_paragraph_does_not_merge_ordinary_paragraphs() -> None:
 def test_inline_math_paragraph_rejects_geometry_or_font_conflict(
     variant: str,
 ) -> None:
-    """验证跨栏、过大间距或字体冲突会切断数学正文段落链。"""
+    """Verify that crossing columns, excessive spacing, or font conflicts can break math body paragraph chains."""
 
     blocks = _inline_math_paragraph_test_blocks()
     if variant == "different_lane":
@@ -3466,7 +3466,7 @@ def test_inline_math_paragraph_rejects_geometry_or_font_conflict(
 
 
 def test_inline_math_paragraph_does_not_cross_footer_boundary() -> None:
-    """验证位于相邻正文块之间的 footer 会阻断数学段落闭合。"""
+    """Verification footer located between adjacent text blocks blocks math paragraph closure."""
 
     blocks = _inline_math_paragraph_test_blocks()
     footer_bbox = (20.0, 95.0, 172.0, 98.0)
@@ -3492,7 +3492,7 @@ def test_inline_math_paragraph_does_not_cross_footer_boundary() -> None:
 
 
 def test_overlapping_wide_text_rows_merge_without_broad_page_line_merge() -> None:
-    """验证同左沿宽正文的重叠行可在块级合并，且不依赖全页行合并。"""
+    """Verify that overlapping lines with left-edge wide text can be merged at the block level and do not rely on full-page line merging."""
 
     first = {
         "type": "text",
@@ -3528,7 +3528,7 @@ def test_overlapping_wide_text_rows_merge_without_broad_page_line_merge() -> Non
 
 
 def test_boundary_visual_row_merges_two_and_three_row_text_blocks() -> None:
-    """验证前块末行与后块首行拼接时可合并二行块和三行块。"""
+    """Verify that two-line blocks and three-line blocks can be merged when the last line of the previous block and the first line of the following block are spliced."""
 
     first = {
         "type": "text",
@@ -3574,7 +3574,7 @@ def test_boundary_visual_row_rejects_large_gap_or_font_conflict(
     boundary_left: float,
     second_font: tuple[str, int],
 ) -> None:
-    """验证边界行横向间隔过大或字体集合冲突时不合并正文块。"""
+    """Text blocks are not merged when the horizontal spacing of verification boundary lines is too large or the font collection conflicts."""
 
     first = {
         "type": "text",
@@ -3611,7 +3611,7 @@ def test_boundary_visual_row_rejects_large_gap_or_font_conflict(
 
 
 def test_front_matter_grid_merges_each_author_column_independently() -> None:
-    """验证标题后的四列规则前置信息按列合并且不横向串列。"""
+    """The four-column rule preamble information after the verification title is merged by columns and not serialized horizontally."""
 
     title = {
         "type": "doc_title",

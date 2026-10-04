@@ -16,7 +16,7 @@ def _formula_member(
     bbox: tuple[float, float, float, float],
     source_index: int,
 ) -> tuple[models._LineItem, tuple[float, float, float, float]]:
-    """构造公式块序列化测试使用的文本行及其局部几何。"""
+    """Constructs a line of text and its local geometry used by the formula block serialization test."""
 
     return (
         models._LineItem(
@@ -31,7 +31,7 @@ def _formula_member(
 
 
 def test_formula_members_expose_union_of_tight_bboxes_with_one_point_padding() -> None:
-    """验证文本公式聚合后保留全部成员的 tight+1pt 输出包络。"""
+    """Verify that the text formula retains the tight+1pt output envelope for all members after aggregation."""
 
     body, body_bbox = _formula_member(
         "x=1",
@@ -72,7 +72,7 @@ def test_formula_members_expose_union_of_tight_bboxes_with_one_point_padding() -
     ids=["chinese-with-unit", "chinese-without-punctuation", "english-without-keyword"],
 )
 def test_formula_component_rejects_left_aligned_prose_prefix(text: str) -> None:
-    """验证同栏左缘带通用正文前缀的复杂行内分式不升级为行间公式。"""
+    """Verify that complex inline fractions with a common text prefix on the left margin of the same column are not upgraded to interline formulas."""
 
     prose = _text_line(
         text,
@@ -129,7 +129,7 @@ def test_formula_component_rejects_left_aligned_prose_prefix(text: str) -> None:
     ],
 )
 def test_formula_component_keeps_left_aligned_formula_identifiers(text: str) -> None:
-    """验证变量、符号表达式、无空白标识符和纯括号单位仍保留为独立公式。"""
+    """Validation variables, symbolic expressions, whitespace-free identifiers, and pure bracket units remain as independent formulas."""
 
     formula = _text_line(
         text,
@@ -160,7 +160,7 @@ def test_formula_component_keeps_left_aligned_formula_identifiers(text: str) -> 
 
 
 def test_inline_prose_formula_component_returns_to_paragraph_context() -> None:
-    """验证同行正文公式不生成公式块，并标记为后续正文聚合上下文。"""
+    """Verify that peer body formulas do not generate formula blocks and mark them as subsequent body aggregation contexts."""
 
     body_font = ("Body", 0)
     prose_formula = _text_line(
@@ -211,7 +211,7 @@ def test_inline_prose_formula_component_returns_to_paragraph_context() -> None:
 
 
 def test_isolated_numbered_fraction_overrides_left_prose_shape() -> None:
-    """验证带分数线和上下净空的编号多层公式不被变量名误判为正文。"""
+    """Verify that numbered multi-level formulas with fractional lines and upper and lower margins are not misjudged as text by variable names."""
 
     body_font = ("Body", 0)
     lines = [
@@ -280,7 +280,7 @@ def _vector_path(
     stroke_visible: bool = False,
     form_depth: int = 0,
 ) -> PDFPathInfo:
-    """构造矢量公式检测测试使用的 Path 信息。"""
+    """Path information used to construct vector formula detection tests."""
 
     return PDFPathInfo(
         bbox=bbox,
@@ -298,7 +298,7 @@ def _vector_formula_body_paths(
     top: float = 50.0,
     source_start: int = 0,
 ) -> list[PDFPathInfo]:
-    """构造满足复杂度和尺寸约束的六字形矢量公式主体。"""
+    """Construct a six-shaped vector formula body that satisfies complexity and size constraints."""
 
     return [
         _vector_path(
@@ -314,7 +314,7 @@ def _vector_formula_source(
     page_size: tuple[float, float] = (100.0, 120.0),
     extra_lines: list[models._LineItem] | None = None,
 ) -> models._PageSource:
-    """构造具有稳定正文栏带且公式所在高度留白的页面源。"""
+    """Construct a page source with a stable text column and high white space where formulas are located."""
 
     body_font = ("Body", 0)
     lines = [
@@ -339,7 +339,7 @@ def _vector_formula_source(
 
 
 def test_single_line_formula_requires_numeric_trailing_marker() -> None:
-    """验证同行公式只把数字编号识别为 tag，不把函数参数当编号。"""
+    """Verify that the peer formula only recognizes the numeric number as tag, and does not treat the function parameters as numbers."""
 
     numbered = _text_line(
         "score=f(x) (3)",
@@ -377,7 +377,7 @@ def test_single_line_formula_requires_numeric_trailing_marker() -> None:
 
 
 def test_single_line_numbered_formula_absorbs_connected_math_sidecars() -> None:
-    """验证带编号公式核心吸收等号前缀和窄分子，但不吸收后续正文。"""
+    """Verify that the numbered formula core absorbs the equal sign prefix and the narrow numerator, but not the subsequent body text."""
 
     core = _text_line(
         "|Bm| sum(yi) (1)",
@@ -439,7 +439,7 @@ def test_single_line_numbered_formula_absorbs_connected_math_sidecars() -> None:
 
 
 def test_vector_formula_paths_and_detached_path_number_form_one_empty_equation() -> None:
-    """验证矢量主体与远距栏右缘路径编号形成一个空内容公式。"""
+    """Verify that the vector body and the distance column right edge path number form an empty content formula."""
 
     body_paths = _vector_formula_body_paths()
     number_paths = [_vector_path((91.0 + index * 3.0, 51.0, 93.0 + index * 3.0, 60.0), 10 + index) for index in range(3)]
@@ -461,7 +461,7 @@ def test_vector_formula_paths_and_detached_path_number_form_one_empty_equation()
 
 
 def test_vector_formula_claims_text_number_but_keeps_content_empty() -> None:
-    """验证可提取的独立编号并入路径公式并唯一认领，但不充当公式正文。"""
+    """Verify that the extractable independent number is incorporated into the path formula and uniquely claimed, but does not serve as the body of the formula."""
 
     number = _text_line("(12)", (91.0, 51.0, 99.0, 60.0), 20, effective_height=9.0)
     blocks, claimed = formulas._build_vector_formula_blocks(
@@ -477,7 +477,7 @@ def test_vector_formula_claims_text_number_but_keeps_content_empty() -> None:
 
 
 def test_vector_formula_rejects_unmatched_number_rules_strokes_forms_and_inline_paths() -> None:
-    """验证无主体编号、细规则、描边、Form 图标和正文同行路径均不会误报。"""
+    """Verify that no subject number, thin rules, strokes, Form icon and text peer path will not cause false positives."""
 
     unmatched_number = [_vector_path((91.0 + index * 3.0, 51.0, 93.0 + index * 3.0, 60.0), index) for index in range(3)]
     rules = [
@@ -499,7 +499,7 @@ def test_vector_formula_rejects_unmatched_number_rules_strokes_forms_and_inline_
 
 
 def test_vector_formula_respects_columns_and_existing_containers() -> None:
-    """验证同高双栏主体不互连，且高优先级容器覆盖的主体被排除。"""
+    """Verify that double-column subjects with the same height are not interconnected, and subjects covered by high-priority containers are excluded."""
 
     left_lines = [
         _text_line(f"left-{index}", (0.0, top, 100.0, top + 10.0), index, effective_height=10.0)
@@ -546,7 +546,7 @@ def test_vector_formula_respects_columns_and_existing_containers() -> None:
 
 
 def test_detached_formula_sidecar_sharing_middle_row_moves_to_trailing_line() -> None:
-    """验证纯 bbox 规则会后置与正文共享中间视觉行的远距窄幅 sidecar。"""
+    """Verify that the pure bbox rule will post the long distance narrow sidecar that shares the middle visual line with the main text."""
 
     members = [
         _formula_member("numerator", (20.0, 0.0, 60.0, 10.0), 0),
@@ -572,7 +572,7 @@ def test_detached_formula_sidecar_sharing_middle_row_moves_to_trailing_line() ->
 
 @pytest.mark.parametrize("marker", ["(4)", "（4）", "﹙4﹚", "(4）"])
 def test_adjacent_parenthesized_formula_number_serializes_as_tag(marker: str) -> None:
-    """验证贴近公式主体的多种圆括号序号转为 tag，且前导逗号留在正文。"""
+    """Verify that the various parentheses sequence numbers close to the body of the formula are converted to tag, and the leading commas remain in the text."""
 
     members = [
         _formula_member("numerator", (20.0, 0.0, 90.0, 10.0), 0),
@@ -597,7 +597,7 @@ def test_adjacent_parenthesized_formula_number_serializes_as_tag(marker: str) ->
 
 
 def test_adjacent_square_bracket_formula_sidecar_keeps_visual_order() -> None:
-    """验证方括号内容不触发圆括号公式序号规则。"""
+    """Verify that the content of square brackets does not trigger the round bracket formula sequence number rule."""
 
     members = [
         _formula_member("numerator", (20.0, 0.0, 90.0, 10.0), 0),
@@ -622,7 +622,7 @@ def test_adjacent_square_bracket_formula_sidecar_keeps_visual_order() -> None:
 
 
 def test_detached_formula_sidecar_on_middle_row_moves_after_denominator() -> None:
-    """验证独占中间视觉行的远距窄幅 sidecar 排到分母后且不留下空行。"""
+    """Verify that the far narrow range sidecar that exclusives the middle visual line lines up after the denominator and leaves no empty lines."""
 
     members = [
         _formula_member("numerator", (20.0, 0.0, 70.0, 10.0), 0),
@@ -646,7 +646,7 @@ def test_detached_formula_sidecar_on_middle_row_moves_after_denominator() -> Non
 
 
 def test_detached_formula_sidecar_already_at_end_keeps_visual_row() -> None:
-    """验证已经处于内容末尾的离散 sidecar 保持原视觉行格式。"""
+    """Verify that discrete sidecar already at the end of content maintains the original visual line format."""
 
     members = [
         _formula_member("formula", (10.0, 0.0, 40.0, 10.0), 0),
@@ -669,7 +669,7 @@ def test_detached_formula_sidecar_already_at_end_keeps_visual_row() -> None:
 
 
 def test_attached_formula_sidecar_keeps_visual_order() -> None:
-    """验证与公式主体净空不足的右侧锚点保持原视觉顺序。"""
+    """Verify that the right anchor point with insufficient headroom on the body of the formula maintains the original visual order."""
 
     members = [
         _formula_member("numerator", (20.0, 0.0, 60.0, 10.0), 0),
@@ -694,7 +694,7 @@ def test_attached_formula_sidecar_keeps_visual_order() -> None:
 
 
 def test_wide_formula_sidecar_keeps_visual_order() -> None:
-    """验证宽度超过中位行高限制的远距锚点不会被后置。"""
+    """Verify that distant anchors whose width exceeds the median row height limit are not pushed behind."""
 
     members = [
         _formula_member("numerator", (20.0, 0.0, 60.0, 10.0), 0),
@@ -719,7 +719,7 @@ def test_wide_formula_sidecar_keeps_visual_order() -> None:
 
 
 def test_non_rightmost_formula_sidecar_keeps_visual_order() -> None:
-    """验证未处于公式分量最右侧的锚点不会被后置。"""
+    """Verify that anchor points that are not on the rightmost side of a formula component are not postfixed."""
 
     members = [
         _formula_member("numerator", (20.0, 0.0, 120.0, 10.0), 0),
@@ -744,7 +744,7 @@ def test_non_rightmost_formula_sidecar_keeps_visual_order() -> None:
 
 
 def test_detached_formula_anchor_collects_multiline_formula_but_not_body_prefix() -> None:
-    """验证低位右缘锚点上溯多行公式，并排除左对齐正文与靠右句点。"""
+    """Verify that the low right edge anchor point traces back to the multi-line formula, and excludes left-aligned text and right-sided periods."""
 
     body_font = ("Body", 0)
     body_lines = [
@@ -807,7 +807,7 @@ def test_detached_formula_anchor_collects_multiline_formula_but_not_body_prefix(
 
 
 def test_formula_above_dense_body_collects_math_but_stops_at_title_barrier() -> None:
-    """验证正文密集区上方的公式可聚合，且不会吸收紧邻的章节标题。"""
+    """Verify that formulas above text-heavy areas aggregate and do not absorb immediately adjacent section headings."""
 
     body_font = ("Body", 0)
     formula_lines = [
@@ -882,7 +882,7 @@ def test_formula_above_dense_body_collects_math_but_stops_at_title_barrier() -> 
 
 
 def test_formula_number_cannot_upgrade_ordinary_body_row() -> None:
-    """验证括号编号缺少独立公式主体时不能把普通正文升级为公式。"""
+    """When the verification bracket number lacks an independent formula body, ordinary text cannot be upgraded to a formula."""
 
     body_font = ("Body", 0)
     lines = [
@@ -918,7 +918,7 @@ def test_formula_number_cannot_upgrade_ordinary_body_row() -> None:
 
 
 def test_overlapping_denominator_cannot_become_short_formula_anchor() -> None:
-    """验证与正文横向重叠的右缘分母字符不会成为非编号公式锚点。"""
+    """Verify that right-edge denominator characters that overlap laterally with the text do not become non-numbered formula anchors."""
 
     body_font = ("Body", 0)
     body_lines = [
@@ -962,7 +962,7 @@ def test_overlapping_denominator_cannot_become_short_formula_anchor() -> None:
 
 
 def test_compact_multiline_cluster_becomes_one_isolated_equation() -> None:
-    """验证可提取的紧凑 F/G 多行簇形成单个公式块且不进入前后正文。"""
+    """Verify that extractable compact F/G multi-line clusters form a single formula block and do not enter the surrounding text."""
 
     body_font = ("Body", 0)
     body_lines = [
@@ -1063,7 +1063,7 @@ def test_compact_formula_accepts_deliberate_indent_but_rejects_flush_left(
     candidate_bbox: tuple[float, float, float, float],
     expected_equation_count: int,
 ) -> None:
-    """验证正文间紧凑公式可按明确左缩进升级，贴栏短文本仍保留为正文。"""
+    """Verify that compact formulas in the main text can be upgraded by clear left indentation, and the short text in the column remains as the main text."""
 
     body_font = ("Body", 0)
     candidate = replace(
@@ -1108,7 +1108,7 @@ def test_compact_formula_accepts_deliberate_indent_but_rejects_flush_left(
 
 
 def test_hanging_indent_reference_tail_is_not_unnumbered_equation() -> None:
-    """验证同字体续行后接左突新条目的短尾行不会因偶然居中升级为公式。"""
+    """Verify that a short-tailed line with a continuation line in the same font followed by a new entry with a left burst will not be accidentally centered and upgraded to a formula."""
 
     body_font = ("Body", 0)
     reference_font = ("Reference", 0)
@@ -1175,7 +1175,7 @@ def _build_compact_margin_case(
     list[dict[str, object]],
     list[models._LineItem],
 ]:
-    """构造上下都有稳定正文行的紧凑公式页边用例。"""
+    """Construct a compact formula margin use case with stable text lines above and below."""
 
     body_font = ("Body", 0)
     above = _text_line(
@@ -1221,7 +1221,7 @@ def _build_text_formula_margin_case(
     ],
     body_tops: tuple[float, float, float, float],
 ) -> tuple[list[dict[str, object]], list[models._LineItem]]:
-    """构造带右缘编号和稳定正文栏带的文本公式页边用例。"""
+    """Construct text formula margin use case with right edge numbering and stable body column band."""
 
     body_font = ("Body", 0)
     formula_lines = [
@@ -1278,7 +1278,7 @@ def test_compact_formula_fully_in_page_margin_remains_text(
     above_bbox: tuple[float, float, float, float],
     below_bbox: tuple[float, float, float, float],
 ) -> None:
-    """验证紧凑公式簇整体落入顶部或底部 5% 时不升级为公式。"""
+    """Verify that clusters of compact formulas are not promoted to formulas when they fall overall into the top or bottom 5%."""
 
     candidate, blocks, remaining = _build_compact_margin_case(
         candidate_bbox,
@@ -1291,7 +1291,7 @@ def test_compact_formula_fully_in_page_margin_remains_text(
 
 
 def test_compact_formula_crossing_page_margin_boundary_remains_equation() -> None:
-    """验证跨过顶部 5% 分界的紧凑真公式仍能输出公式块。"""
+    """Verify that compact true formulas that cross the top 5% boundary still output formula blocks."""
 
     candidate, blocks, remaining = _build_compact_margin_case(
         (25.0, 45.0, 65.0, 55.0),
@@ -1340,7 +1340,7 @@ def test_text_formula_fully_in_page_margin_remains_text(
     ],
     body_tops: tuple[float, float, float, float],
 ) -> None:
-    """验证文本公式空间分量整体落入页边 5% 时不认领原文本行。"""
+    """Verify that the original text line is not claimed when the entire space component of the text formula falls within 5% of the page margin."""
 
     blocks, remaining = _build_text_formula_margin_case(
         formula_bboxes,
@@ -1384,7 +1384,7 @@ def test_text_formula_crossing_page_margin_boundary_remains_equation(
     body_tops: tuple[float, float, float, float],
     expected_bbox: tuple[float, float, float, float],
 ) -> None:
-    """验证跨过顶部或底部 5% 分界的文本真公式仍能输出。"""
+    """Verify that textual true formulas that cross the top or bottom 5% boundaries are still output."""
 
     blocks, remaining = _build_text_formula_margin_case(
         formula_bboxes,
@@ -1398,7 +1398,7 @@ def test_text_formula_crossing_page_margin_boundary_remains_equation(
 
 
 def test_justified_mixed_font_visual_row_before_body_is_not_formula_anchor() -> None:
-    """验证粗体短语与常规字体混排的满栏同行不会因右缘短词误判公式。"""
+    """Verify that full-column counterparts with bold phrases mixed with regular fonts will not misjudge formulas due to short words on the right edge."""
 
     body_font = ("Body", 0)
     heading_font = ("Heading", 1)
@@ -1497,7 +1497,7 @@ def test_justified_mixed_font_visual_row_before_body_is_not_formula_anchor() -> 
 
 
 def test_split_visual_row_with_right_number_forms_one_equation() -> None:
-    """验证多字体同行公式及其右侧编号在栏推断前合成一个公式块。"""
+    """Verify that multi-font peer formulas and their right-hand numbers are combined into a formula block before column inference."""
 
     body_font = ("Body", 0)
     math_font = ("Math", 0)
@@ -1564,7 +1564,7 @@ def test_split_visual_row_with_right_number_forms_one_equation() -> None:
 
 
 def test_split_visual_row_formula_tail_defers_to_spatial_growth() -> None:
-    """验证分式尾部同行时延后认领，并由空间锚点收齐完整公式。"""
+    """Verify that the tail of the fraction is claimed after a delay, and the complete formula is collected by the spatial anchor point."""
 
     body_font = ("Body", 0)
     math_font = ("Math", 0)
@@ -1695,7 +1695,7 @@ def test_split_visual_row_formula_tail_defers_to_spatial_growth() -> None:
 
 
 def test_centered_low_body_font_line_forms_unnumbered_equation() -> None:
-    """验证上下正文之间居中且低正文覆盖的数学字体行形成无编号公式。"""
+    """Verify that lines of math font centered between upper and lower body text and covered by lower body text form unnumbered equations."""
 
     body_font = ("Body", 0)
     lines = [
@@ -1733,7 +1733,7 @@ def test_centered_low_body_font_line_forms_unnumbered_equation() -> None:
 
 
 def test_punctuated_number_anchor_protects_stacked_formula_member() -> None:
-    """验证右侧短标点编号会阻止分式成员被提前识别成无编号公式。"""
+    """Validating short punctuation numbers on the right prevents fraction members from being recognized prematurely as unnumbered formulas."""
 
     candidate = _text_line(
         "fraction numerator",

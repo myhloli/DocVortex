@@ -1,4 +1,4 @@
-"""DOCX 兼容模式 VML ``equationxml`` 公式解码器。"""
+"""DOCX compatibility mode VML ``equationxml`` formula decoder."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ _FORBIDDEN_EQUATIONXML_ELEMENTS = frozenset(
 
 
 def _has_forbidden_equationxml_content(root: etree._Element) -> bool:
-    """判断 Equation XML 是否包含规范禁止或无法可靠恢复的 Word 2003 节点。"""
+    """Determine whether Equation XML contains Word 2003 nodes that are prohibited by the specification or cannot be reliably restored."""
 
     if root.getroottree().xpath("boolean(//comment())"):
         return True
@@ -48,7 +48,7 @@ def _has_forbidden_equationxml_content(root: etree._Element) -> bool:
 
 
 def _decode_equationxml_document(payload: bytes) -> str | None:
-    """安全解析完整 Word 2003 XML 文档并把唯一 OMML 公式转换为 LaTeX。"""
+    """Safely parse complete Word 2003 XML documents and convert unique OMML formulas to LaTeX."""
 
     parser = etree.XMLParser(
         resolve_entities=False,
@@ -88,13 +88,13 @@ def _decode_equationxml_document(payload: bytes) -> str | None:
 
 @dataclass(slots=True)
 class DocxEquationXmlDecoder:
-    """按共享资源上限缓存并解码 DOCX VML ``equationxml``。"""
+    """Cache and decode DOCX VML ``equationxml`` per shared resource limit."""
 
     total_bytes: int = 0
     _cache: dict[bytes, str | None] = field(default_factory=dict)
 
     def decode(self, equation_xml: object | None) -> str | None:
-        """校验属性类型、资源预算和 Word 2003 XML 结构后返回 LaTeX。"""
+        """LaTeX is returned after verifying the attribute type, resource budget, and Word 2003 XML structure."""
 
         if not isinstance(equation_xml, str) or not equation_xml.strip():
             return None

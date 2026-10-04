@@ -1,4 +1,4 @@
-"""HTML 静态解析使用的固定资源限制。"""
+"""HTML Fixed resource limit used by static analysis."""
 
 from typing import Final
 

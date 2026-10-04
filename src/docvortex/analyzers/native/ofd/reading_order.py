@@ -1,4 +1,4 @@
-"""把 OFD 页面场景投影为带 bbox 的有序 raw model-list。"""
+"""Project the OFD page scene into an ordered raw model-list with bbox."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ _PAGE_NUMBER_RE = re.compile(r"^(?:\d+|[IVXLCDM]+)$", re.IGNORECASE)
 
 
 def _normalized_signature(line: TextLine, scene: OfdPageScene) -> tuple[str, int, int]:
-    """构造跨页重复边缘文字的稳定签名。"""
+    """Construct a stable signature that repeats edge text across pages."""
     width = scene.physical_box[2] - scene.physical_box[0]
     height = scene.physical_box[3] - scene.physical_box[1]
     center_x, center_y = bbox_center(line.bbox)
@@ -30,7 +30,7 @@ def _normalized_signature(line: TextLine, scene: OfdPageScene) -> tuple[str, int
 
 
 def repeated_edge_signatures(scenes: list[OfdPageScene]) -> frozenset[tuple[str, int, int]]:
-    """识别至少跨两页重复出现的页边缘文字。"""
+    """Identify page edge text that is repeated across at least two pages."""
     pages_by_signature: dict[tuple[str, int, int], set[int]] = {}
     for scene in scenes:
         height = scene.physical_box[3] - scene.physical_box[1]
@@ -46,7 +46,7 @@ def repeated_edge_signatures(scenes: list[OfdPageScene]) -> frozenset[tuple[str,
 
 
 def _auxiliary_type(line: TextLine, scene: OfdPageScene, repeated: frozenset[tuple[str, int, int]]) -> BlockType | None:
-    """利用 ContentBox、页边缘和跨页重复性识别辅助文字。"""
+    """Utilize ContentBox, page edges and cross-page repeatability to identify auxiliary text."""
     physical = scene.physical_box
     width = physical[2] - physical[0]
     height = physical[3] - physical[1]
@@ -71,7 +71,7 @@ def _auxiliary_type(line: TextLine, scene: OfdPageScene, repeated: frozenset[tup
 
 
 def _upright_bbox(bbox: list[float], scene: OfdPageScene, angle: int) -> list[float]:
-    """把直角旋转对象的 bbox 转到共享 XYCut 使用的正向坐标。"""
+    """Transfer the bbox of the Cartesian object to the forward coordinate used by the shared XYCut."""
     physical = scene.physical_box
     width = physical[2] - physical[0]
     height = physical[3] - physical[1]
@@ -91,10 +91,10 @@ def _upright_bbox(bbox: list[float], scene: OfdPageScene, angle: int) -> list[fl
 
 
 class OfdReadingOrderProjector:
-    """执行表格认领、辅助类型判定和 OFD-aware XYCut++。"""
+    """Perform table claiming, auxiliary type determination and OFD-aware XYCut++."""
 
     def __init__(self, scenes: list[OfdPageScene]) -> None:
-        """缓存跨页重复签名和正文字号基线。"""
+        """Cache duplicate signature and text number baselines across pages."""
         self.scenes = scenes
         self.repeated = repeated_edge_signatures(scenes)
         body_sizes = [line.font_size for scene in scenes for line in scene.text_lines if line.font_size > 0]
@@ -103,7 +103,7 @@ class OfdReadingOrderProjector:
         self.table_budget = OfdTableBudget()
 
     def _text_block(self, line: TextLine, scene: OfdPageScene) -> dict[str, Any]:
-        """把 TextLine 转换为尚未归一化的 raw block。"""
+        """Convert TextLine to raw which has not yet been normalized block."""
         auxiliary = _auxiliary_type(line, scene, self.repeated)
         block_type: BlockType = auxiliary or BlockType.TEXT
         level: int | None = None
@@ -136,7 +136,7 @@ class OfdReadingOrderProjector:
         return block
 
     def _table_block(self, table: OfdTableRegion) -> dict[str, Any]:
-        """把表格区域转换为尚未归一化的 raw block。"""
+        """Convert the table area to raw block that has not yet been normalized."""
         return {
             "type": BlockType.TABLE,
             "content": table.html,
@@ -146,7 +146,7 @@ class OfdReadingOrderProjector:
         }
 
     def _image_block(self, image: object) -> dict[str, Any]:
-        """把 ImageItem 转换为 raw block或内部占位原子。"""
+        """Convert ImageItem to raw block or internal placeholder atoms."""
         payload = getattr(image, "image_base64", None)
         block: dict[str, Any] = {
             "type": BlockType.IMAGE,
@@ -161,7 +161,7 @@ class OfdReadingOrderProjector:
         return block
 
     def project_page(self, scene: OfdPageScene) -> list[dict[str, Any]]:
-        """把一页场景投影为最终阅读顺序 raw model-list。"""
+        """Project a page of scenes into final reading order raw model-list."""
         tables = recover_tables(scene.axis_lines, scene.text_lines, self.table_budget, images=scene.images)
         consumed = {line_id for table in tables for line_id in table.consumed_line_ids}
         consumed_images = {image_id for table in tables for image_id in table.consumed_image_ids}
@@ -217,7 +217,7 @@ class OfdReadingOrderProjector:
         return output
 
     def project(self) -> list[list[dict[str, Any]]]:
-        """投影全部页面并保持原始页树顺序。"""
+        """Project all pages and maintain the original page tree order."""
         return [self.project_page(scene) for scene in self.scenes]
 
 

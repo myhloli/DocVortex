@@ -1,4 +1,4 @@
-"""Flash EPUB 与 HTML 共用的静态标记文档投影能力。"""
+"""Flash Static markup document projection capabilities shared by EPUB and HTML."""
 
 from docvortex.content.markup.anchors import (
     AnchorTextNormalization,

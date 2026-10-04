@@ -1,4 +1,4 @@
-"""PDF 表格与注释输出物化；保留原有认领顺序与判定规则。"""
+"""PDF The table and comment output are materialized; the original claiming order and judgment rules are retained."""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ def _recover_native_table_html(
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
     preserve_font_styles: bool = False,
 ) -> str:
-    """使用共享原生字符与绘图原语恢复高置信表格 HTML。"""
+    """Recovering high-confidence table HTML using shared native characters and drawing primitives."""
 
     table_input = NativeTableInput(
         table_bbox=table_bbox,
@@ -83,13 +83,13 @@ def _materialize_table_blocks(
     calibrated_char_bboxes: dict[int, BBox] | None = None,
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], set[int]]:
-    """原子物化表体及其独立注释，仅认领整组成功输出的文本行。"""
+    """The atomic materialized table body and its independent comments only claim the entire set of successfully output text lines."""
 
     table_blocks: list[dict[str, Any]] = []
     annotation_blocks: list[dict[str, Any]] = []
     accepted_candidate_bboxes: list[BBox] = []
     claimed: set[int] = set()
-    # 只复制已有强证据校准的字符，保持原始来源记录及字符身份不变；未校准文档继续原路径。
+    # Only characters for which there is strong evidence of calibration are copied, keeping the original source record and character identity unchanged; uncalibrated documents continue on the original path.
     calibrated = calibrated_char_bboxes or {}
     native_chars = (
         tuple(
@@ -103,7 +103,7 @@ def _materialize_table_blocks(
     native_rectangles = coerce_native_table_rectangles(source.path_infos)
     for candidate in sorted(candidates, key=lambda item: item.score, reverse=True):
         _separate_embedded_table_notes(source, candidate)
-        # 候选去重仍使用包含注释的完整框，不能因输出表体收缩而放行重复表格。
+        # Candidate deduplication still uses the complete box containing the annotation, and duplicate tables cannot be released due to shrinkage of the output table body.
         if any(_bbox_overlap_in_smaller(candidate.bbox, bbox) >= 0.5 for bbox in accepted_candidate_bboxes):
             continue
         output_angle = candidate.angle
@@ -143,18 +143,18 @@ def _materialize_table_blocks(
         if content:
             logger.debug(f"Flash native table recovery accepted: bbox={body_bbox}, angle={candidate.angle}")
         elif _restore_front_matter_text_panel(source, body_bbox):
-            # 只有结构恢复失败的弱候选才撤销；已验证的 HTML 单元格表保持原判定。
+            # Only weak candidates that failed structural recovery are withdrawn; the verified HTML cell table retains its original verdict.
             continue
         try:
             if not content:
-                # 使用完整原始字符流保留 PDF 物理换行；行索引仅负责表体与注释的所有权认领。
+                # PDF physical line wrapping is preserved using the full raw character stream; the row index is only responsible for ownership claiming of the table body and comments.
                 content = project_pdf_table_text(
                     source.chars,
                     body_bbox,
                     angle=candidate.angle,
                 )
         except Exception as exc:
-            # 表体投影异常时同时撤销预构造注释，保持整组不输出、不认领。
+            # When the surface body projection is abnormal, the pre-constructed annotation will be canceled at the same time, and the entire group will not be output or claimed.
             logger.warning(f"Flash table projection failed and rolled back: bbox={candidate.bbox}, error={exc}")
             continue
         if not content or not content.strip():
@@ -169,7 +169,7 @@ def _materialize_table_blocks(
         )
         annotation_blocks.extend(candidate_annotation_blocks)
         accepted_candidate_bboxes.append(candidate.bbox)
-        # 表体和成功外置的注释行在同一事务中各认领一次。
+        # The table body and successfully externalized comment lines are each claimed once in the same transaction.
         claimed.update(projection_line_indices | externalized_line_indices)
     table_blocks.sort(key=lambda block: (block["bbox"][1], block["bbox"][0]))
     annotation_blocks.sort(key=lambda block: (block["bbox"][1], block["bbox"][0]))
@@ -177,7 +177,7 @@ def _materialize_table_blocks(
 
 
 def _separate_embedded_table_notes(source: _PageSource, candidate: _TableCandidate) -> None:
-    """表内横线的规则单元行结束后，将外围框包住的连续表注外置。"""
+    """After the regular unit row of the horizontal line in the table ends, the continuous table notes enclosed by the outer frame are placed outside."""
     if candidate.angle or any(annotation.kind == "footnote" for annotation in candidate.annotations):
         return
     core = candidate.core_bbox or candidate.bbox
@@ -204,7 +204,7 @@ def _separate_embedded_table_notes(source: _PageSource, candidate: _TableCandida
         notes = [line for line in members if line.bbox[1] >= first.bbox[1] - 0.2 * em]
         if len(notes) < 2 or any(rule < core[3] - em for rule in rules if rule > first.bbox[3]):
             continue
-        # 注释为全宽说明行，不应再出现多列单元格的反复水平分隔。
+        # Comments should be full-width description lines and should no longer have repeated horizontal separation of multiple columns of cells.
         if any(abs(line.bbox[0] - first.bbox[0]) > em for line in notes):
             continue
         boxes = {line.source_index: line.bbox for line in notes}
@@ -215,7 +215,7 @@ def _separate_embedded_table_notes(source: _PageSource, candidate: _TableCandida
 
 
 def _restore_front_matter_text_panel(source: _PageSource, bbox: BBox) -> bool:
-    """结构恢复失败后，以独立元数据和连续正文角色撤销首页弱表；可信网格优先。"""
+    """After the structure recovery fails, the weak table on the homepage will be revoked with independent metadata and continuous text roles; the trusted grid takes priority."""
     if source.page_index != 0:
         return False
     lines = [
@@ -252,7 +252,7 @@ def _restore_front_matter_text_panel(source: _PageSource, bbox: BBox) -> bool:
         return False
     if max(field_box[1], prose_box[1]) - min(field_box[3], prose_box[3]) > em:
         return False
-    # 内部分格线与重复横线共同构成真网格；外边框或单独分区线不足以证明数据表。
+    # Internal dividing lines and repeating horizontal lines together form a true grid; outer borders or dividing lines alone are not sufficient to document a data table.
     rules = [
         rule for rule in source.drawing_lines if _point_in_bbox((_bbox_center_x(rule.bbox), _bbox_center_y(rule.bbox)), bbox)
     ]
@@ -275,7 +275,7 @@ def _materialize_table_annotations(
     source: _PageSource,
     candidate: _TableCandidate,
 ) -> tuple[list[dict[str, Any]], set[int], list[_TableAnnotation]]:
-    """构造候选注释块，并返回成功外置行与需回退到表体的注释记录。"""
+    """Construct candidate comment blocks and return successful external rows and comment records that need to be rolled back to the table body."""
 
     blocks: list[dict[str, Any]] = []
     externalized_line_indices: set[int] = set()
@@ -313,7 +313,7 @@ def _materialize_table_annotations(
 def _split_table_annotation_visual_groups(
     line_geometry: list[tuple[_LineItem, BBox]],
 ) -> list[list[tuple[_LineItem, BBox]]]:
-    """用短尾后的字体或字号重启拆分独立表格注释段。"""
+    """Use the font or font size after the short tail to restart the splitting of independent table comment sections."""
 
     if len(line_geometry) < 2:
         return [line_geometry] if line_geometry else []
@@ -369,7 +369,7 @@ def _build_table_annotation_blocks(
     candidate: _TableCandidate,
     annotation: _TableAnnotation,
 ) -> list[dict[str, Any]]:
-    """按视觉重启切分原生行，并生成保留排版元数据的独立注释块。"""
+    """Split native lines by visual restart and generate independent comment blocks that preserve typographic metadata."""
 
     line_geometry = [
         (
@@ -383,7 +383,7 @@ def _build_table_annotation_blocks(
         for line in source.lines
         if line.source_index in annotation.line_indices
     ]
-    # 原生来源顺序可抵抗旋转文字同一基线上的字形顶边抖动。
+    # Native source order resists glyph top edge jitter on the same baseline as rotated text.
     line_geometry.sort(key=lambda item: item[0].source_index)
     blocks = []
     for group in _split_table_annotation_visual_groups(line_geometry):
@@ -433,7 +433,7 @@ def _build_table_annotation_blocks(
                     for line, _bbox in group
                     if line.font_signature is not None and line.font_coverage >= 0.5
                 },
-                # 已由表格检测器给出完整边界，禁止通用表注规则继续向下扩张。
+                # The complete bounds have been given by the table detector, prohibiting further downward expansion of the general table annotation rules.
                 "_table_annotation_complete": True,
             }
         )
@@ -441,7 +441,7 @@ def _build_table_annotation_blocks(
 
 
 def _merge_table_annotation_content(line_texts: list[str]) -> str:
-    """按正文一致的语言与行末断词规则折叠表格注释原生行。"""
+    """Fold table annotation native lines according to the same language and end-of-line word breaking rules as the main text."""
 
     normalized_lines = [normalized for text in line_texts if (normalized := _normalize_native_run_text(str(text or "")))]
     if not normalized_lines:
@@ -453,7 +453,7 @@ def _table_body_materialization_bbox(
     candidate: _TableCandidate,
     failed_annotations: list[_TableAnnotation],
 ) -> BBox:
-    """返回排除有效注释后的表体框，并把无效注释边界保守并回表体。"""
+    """Returns the table body box after excluding valid comments, and preserves the boundaries of invalid comments and merges them back into the table body."""
 
     if not candidate.annotations or len(failed_annotations) == len(candidate.annotations):
         return candidate.bbox
@@ -467,7 +467,7 @@ def _candidate_projection_line_indices(
     source: _PageSource,
     candidate: _TableCandidate,
 ) -> set[int]:
-    """合并核心成员、同基线续段及非零角度表格的表头文本。"""
+    """Merge header text of core members, same-baseline continuations, and non-zero angle tables."""
 
     line_indices = set(candidate.line_indices)
     if candidate.core_bbox is not None:
@@ -518,7 +518,7 @@ def _expand_candidate_same_baseline_members(
     candidate: _TableCandidate,
     line_indices: set[int],
 ) -> None:
-    """迭代吸收完整候选框内与已认领成员同基线相邻的 angle=0 续段。"""
+    """Iteratively absorb the angle=0 continuation segments in the complete candidate box that are adjacent to the claimed member and the baseline."""
 
     local_bboxes = {
         line.source_index: _rotate_bbox_to_upright(
@@ -571,7 +571,7 @@ def recover_table_result(
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
     preserve_font_styles: bool = False,
 ) -> tuple[str, NativeTableResult] | None:
-    """统一表格恢复和上下标物化，保留调用方接受或回退的决策权。"""
+    """Unify table recovery and materialization of superscripts and subscripts, retaining the caller's decision-making power to accept or roll back."""
     try:
         result = recover_native_pdf_table(table_input)
     except Exception as error:

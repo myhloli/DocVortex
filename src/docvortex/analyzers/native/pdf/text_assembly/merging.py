@@ -1,4 +1,4 @@
-"""合并正文、公式上下文和列表引导块的空间组件。"""
+"""Merge spatial components of body text, formula context, and list leader blocks."""
 
 from __future__ import annotations
 
@@ -35,14 +35,14 @@ def _merge_short_same_baseline_prefix_blocks(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """合并括号序号或时刻等短前缀与右侧同基线正文。"""
+    """Merge short prefixes such as bracket numbers or times with the same baseline text as the right side."""
 
     replacements: dict[int, dict[str, Any]] = {}
     consumed: set[int] = set()
     for prefix_index, prefix in enumerate(blocks):
         prefix_rows = prefix.get("_local_line_bboxes")
         prefix_content = str(prefix.get("content") or "").strip()
-        # 已由重复圆点和唯一同排正文确认的游离标记，允许跨越常见项目缩进接回文字。
+        # Free tags, confirmed by repeated dots and unique co-text, allow indented text to be returned across common items.
         bullet_prefix = prefix_content in {"•", "●", "▪"} and prefix.get("_protected_hard_break_before") is True
         if (
             prefix_index in consumed
@@ -111,7 +111,7 @@ def _blocks_share_boundary_visual_row(
     second: dict[str, Any],
     pair_height: float,
 ) -> bool:
-    """检查前块末行与后块首行是否为被错误切开的同一视觉行。"""
+    """Check whether the last row of the front block and the first row of the back block are the same visual row that was mistakenly cut."""
 
     first_rows = first.get("_local_line_bboxes")
     second_rows = second.get("_local_line_bboxes")
@@ -153,7 +153,7 @@ def _merge_overlapping_same_line_text_blocks(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """合并块体或边界视觉行重叠的宽正文块，修复错误分栏。"""
+    """Merge wide text blocks with overlapping block or border visual lines and fix incorrect column splitting."""
 
     consumed: set[int] = set()
     replacements: dict[int, dict[str, Any]] = {}
@@ -254,7 +254,7 @@ def _merge_inline_math_fragment_text_blocks(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """把同一宽正文行上下叠放的多个小数学碎片收回一个文本块。"""
+    """Gather multiple small math fragments stacked one on top of the same wide text line into one text block."""
 
     consumed: set[int] = set()
     replacements: dict[int, dict[str, Any]] = {}
@@ -325,7 +325,7 @@ def _merge_inline_math_fragment_text_blocks(
 def _component_local_union_bbox(
     block: dict[str, Any],
 ) -> BBox | None:
-    """合并正文组件持有的正向行框，非法或缺失元数据时返回空。"""
+    """Merge the forward line box held by the text component, and return empty if it is illegal or missing metadata."""
 
     rows = block.get("_local_line_bboxes")
     if not isinstance(rows, list):
@@ -347,7 +347,7 @@ def _merge_paragraph_formula_context_blocks(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """把误似行间公式的复杂行内分式与同栏前后正文恢复成一个块。"""
+    """Restore complex inline fractions that mistakenly look like interline formulas and the text before and after the same column into one block."""
 
     terminal_re = re.compile(
         r"[.!?。！？][\]\)}）】》”’'\"]*$",
@@ -433,7 +433,7 @@ def _merge_paragraph_formula_context_blocks(
         )
         body_rows = [bbox for bbox in local_rows if bbox[2] - bbox[0] >= 0.75 * maximum_width]
         if len(body_rows) >= 2:
-            # 复杂分式可能比正文左缘多探出少量 glyph；公开框按重复满行边界稳定收口。
+            # Complex fractions may have a small amount of glyph protruding from the left edge of the text; the open box is closed stably by repeating the full line boundary.
             local_merged_bbox = _bbox_union_many(local_rows)
             local_output_bbox = (
                 min(bbox[0] for bbox in body_rows),
@@ -457,7 +457,7 @@ def _merge_residual_narrow_math_text_blocks(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """把仍嵌在宽正文行范围内的单个窄数学碎片吸收到唯一宿主块。"""
+    """Assimilate a single narrow mathematical fragment still embedded within a wide text line into a unique host block."""
 
     consumed: set[int] = set()
     replacements: dict[int, dict[str, Any]] = {}
@@ -535,7 +535,7 @@ def _merge_hostless_inline_math_fragment_blocks(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """把没有单一宽宿主但在一栏内二维密集排列的数学碎片合成文本块。"""
+    """Synthesize text blocks from mathematical fragments that do not have a single wide host but are densely packed in two dimensions within a column."""
 
     grouped_indices: list[list[int]] = []
     for angle in sorted({int(block.get("angle", 0) or 0) % 360 for block in blocks if block.get("type") == "text"}):
@@ -647,7 +647,7 @@ def _merge_inline_math_recovery_group(
     blocks: list[dict[str, Any]],
     indices: list[int],
 ) -> dict[str, Any]:
-    """合并数学碎片并保留仅供后续段落闭合使用的内部标记。"""
+    """Merge mathematical fragments and retain internal markup for subsequent paragraph closure only."""
     member_bboxes = [blocks[index]["bbox"] for index in indices]
     widths = [bbox[2] - bbox[0] for bbox in member_bboxes]
     maximum_width = max(widths, default=0.0)
@@ -669,7 +669,7 @@ def _merge_inline_math_paragraph_continuations(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """在数学碎片恢复后，合并同栏连续且足够宽的正文段落块。"""
+    """After the mathematical fragmentation is restored, contiguous and sufficiently wide text paragraph blocks in the same column are merged."""
 
     if sum(block.get(_INLINE_MATH_RECOVERY_MARKER) is True for block in blocks) < 2:
         return blocks
@@ -803,12 +803,12 @@ def _merge_spatial_text_components(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """按短首行、紧邻续行和双栏递减尾行二次连接被栏带拆开的正文块。"""
+    """The text blocks separated by column strips are connected twice by short first line, immediate continuation line and double column descending last line."""
 
     parents = list(range(len(blocks)))
 
     def find(index: int) -> int:
-        """查找正文组件所属合并组的根节点。"""
+        """Find the root node of the merge group to which the body component belongs."""
 
         while parents[index] != index:
             parents[index] = parents[parents[index]]
@@ -816,7 +816,7 @@ def _merge_spatial_text_components(
         return index
 
     def union(first_index: int, second_index: int) -> None:
-        """合并两个已经通过空间连续性校验的正文组件。"""
+        """Merge two text components that have passed the spatial continuity check."""
 
         first_root = find(first_index)
         second_root = find(second_index)
@@ -922,7 +922,7 @@ def _merge_spatial_text_components(
 def _merge_list_intro_text_components(
     blocks: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """在编号列表硬边界前合并被误拆的连续引导段和冒号短尾。"""
+    """Merge accidentally split contiguous boot segments and colon stubs before numbered list hard boundaries."""
 
     blocks = list(blocks)
     for boundary in list(blocks):
@@ -1065,7 +1065,7 @@ def _merge_list_intro_text_components(
 def _merge_unterminated_text_components(
     blocks: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """合并普通栏未终止正文，以及满足严格结构约束的满宽 span 正文。"""
+    """Merges normal column unterminated text, and full-width span text that satisfies strict structural constraints."""
 
     output = list(blocks)
     terminal_re = re.compile(
@@ -1200,7 +1200,7 @@ def _merge_unterminated_text_components(
             ):
                 continue
             interval = _component_lane_interval(first)
-            # 邻图结束可能改变推断栏带；实际两端行宽及边缘恒定的未终止正文仍是同一段。
+            # The end of the adjacent image may change the inferred column band; the actual unterminated text with constant line width and edges at both ends is still the same paragraph.
             actual_row_continuation = (
                 first.get("_lane_is_span") is False
                 and second.get("_lane_is_span") is False

@@ -1,4 +1,4 @@
-"""Native PDF 表格字符选择、视觉组行和单元格文本重建。"""
+"""Native PDF Table character selection, visual group rows, and cell text reconstruction."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from .geometry import bbox_center, bbox_intersection, bbox_union, normalize_angl
 
 @dataclass(frozen=True, slots=True)
 class _PendingGlyph:
-    """保存尚未分配视觉行的局部 PDF 字符。"""
+    """Save local PDF characters that have not been assigned a visual line."""
 
     glyph_id: int
     source_index: int
@@ -28,7 +28,7 @@ class _PendingGlyph:
 
 
 def _select_pending_glyphs(table_input: NativeTableInput) -> list[_PendingGlyph]:
-    """批量筛选区域字符，保留 Python 的源索引排序、空白及文本规范化。"""
+    """Batch filter regional characters, preserving source index ordering, whitespace, and text normalization of Python."""
     from ....._compute_backend import get_native
     from .._native_geometry import raw_bbox
 
@@ -77,7 +77,7 @@ def _select_pending_glyphs(table_input: NativeTableInput) -> list[_PendingGlyph]
 
 
 def _select_pending_glyphs_python(table_input: NativeTableInput) -> list[_PendingGlyph]:
-    """按字符中心选择表格内可见字符，并转换到正向局部坐标。"""
+    """Select visible characters in the table according to the character center and convert them to positive local coordinates."""
 
     table_bbox = normalize_bbox(table_input.table_bbox)
     if table_bbox is None:
@@ -139,7 +139,7 @@ def _select_pending_glyphs_python(table_input: NativeTableInput) -> list[_Pendin
 
 
 def _vertical_overlap_ratio(first: BBox, second: BBox) -> float:
-    """返回两个字符框相对较小高度的垂直交叠比例。"""
+    """Returns the vertical overlap ratio of the relative smaller heights of two character boxes."""
 
     overlap = min(first[3], second[3]) - max(first[1], second[1])
     minimum_height = min(first[3] - first[1], second[3] - second[1])
@@ -149,7 +149,7 @@ def _vertical_overlap_ratio(first: BBox, second: BBox) -> float:
 
 
 def _assign_visual_rows(pending: list[_PendingGlyph], median_height: float) -> list[list[_PendingGlyph]]:
-    """整表批量返回成员索引，原 Python 字形和其来源记录保持共享。"""
+    """The entire table is returned to the member index in batches, and the original Python glyph and its source record remain shared."""
     from ....._compute_backend import get_native
 
     native = get_native()
@@ -164,7 +164,7 @@ def _assign_visual_rows_python(
     pending: list[_PendingGlyph],
     median_height: float,
 ) -> list[list[_PendingGlyph]]:
-    """按垂直交叠和中心距离把字符聚成稳定视觉行。"""
+    """Group characters into stable visual rows based on vertical overlap and center distance."""
 
     sorted_glyphs = sorted(
         pending,
@@ -208,7 +208,7 @@ def _assign_visual_rows_python(
             )
         else:
             rows[best_index].append(glyph)
-            # 两框合并保持原 min/max 顺序，避免为每个字符建立通用迭代器。
+            # Merging the two boxes maintains the original min/max order and avoids building a universal iterator for each character.
             previous_bbox = row_bboxes[best_index]
             row_bboxes[best_index] = (
                 min(previous_bbox[0], glyph.bbox[0]),
@@ -230,9 +230,9 @@ def _assign_visual_rows_python(
 
 
 def _contains_cjk(text: str) -> bool:
-    """判断文本是否包含常见中日韩统一表意字符。"""
+    """Determine whether the text contains common Chinese, Japanese and Korean unified ideographic characters."""
 
-    # 组行热路径通常只传入相邻两个字符，直接遍历避免逐次创建生成器。
+    # The group line hot path usually only passes in two adjacent characters, traversing directly to avoid creating generators one after another.
     for char in text:
         if "\u3400" <= char <= "\u9fff":
             return True
@@ -243,13 +243,13 @@ def _join_glyph_line(
     glyphs: list[NativeTableGlyph] | list[_PendingGlyph],
     median_height: float,
 ) -> str:
-    """按字符间距重建单行文本，避免在中文字符之间强插空格。"""
+    """Reconstruct single lines of text according to character spacing to avoid forcing spaces between Chinese characters."""
 
     return "".join(text for text, _source_index in _glyph_line_parts(glyphs, median_height))
 
 
 def _nearest_alphabetic_char(text: str, *, reverse: bool) -> str:
-    """从物理行边界向内查找最近的 Unicode 字母。"""
+    """Finds the nearest Unicode letter from the physical row boundary inwards."""
 
     normalized = text.rstrip() if reverse else text.lstrip()
     characters = reversed(normalized) if reverse else iter(normalized)
@@ -257,7 +257,7 @@ def _nearest_alphabetic_char(text: str, *, reverse: bool) -> str:
 
 
 def _is_latin_letter(char: str) -> bool:
-    """判断单个 Unicode 字符规范化后是否只由 Latin 字母组成。"""
+    """Determine whether a single Unicode character only consists of Latin letters after normalization."""
 
     if len(char) != 1:
         return False
@@ -269,19 +269,19 @@ def _looks_like_compact_unit_or_identifier(
     previous_line: str,
     next_line: str,
 ) -> bool:
-    """识别不应因视觉换行插入空格的紧凑单位或标识符片段。"""
+    """Identifies compact units or identifier fragments where spaces should not be inserted due to visual wrapping."""
 
     combined = previous_line.strip() + next_line.strip()
     if not combined or any(char.isspace() for char in combined):
         return False
-    # 带单位后缀的长英文标题仍有词界，不能仅因末尾 /% 就把相邻单词粘连。
+    # Long English titles with unit suffixes still have word boundaries, and adjacent words cannot be glued together just because of the final /%.
     if re.fullmatch(r"[A-Za-z]{4,}", previous_line.strip()) and re.match(r"[A-Za-z]{4,}(?:/|%)", next_line.strip()):
         return False
     return any(char.isdigit() or char in "/_^%°µμ" for char in combined)
 
 
 def _starts_with_url(text: str) -> bool:
-    """判断下一物理行是否自身以完整 URL 前缀开始。"""
+    """Determines whether the next physical line itself begins with the full URL prefix."""
 
     normalized = text.lstrip().casefold()
     return normalized.startswith(("http://", "https://", "ftp://", "www."))
@@ -292,9 +292,9 @@ def _cell_row_separator(
     previous_line: str,
     next_line: str,
 ) -> str:
-    """按相邻行边界词元返回安全分隔符，非 Latin 边界保持直连。"""
+    """Safe delimiters are returned by adjacent line boundary tokens, non-Latin boundaries remain direct."""
 
-    # 日期或自然短语在逗号后续接数字仍有词界；纯数字、短变量与单位断行保持原紧凑规则。
+    # Dates or natural phrases still have word boundaries when numbers follow a comma; pure numbers, short variables, and unit line breaks maintain the original compact rules.
     if (
         previous_line.rstrip().endswith((",", ";"))
         and re.search(r"[A-Za-z]{3,}", previous_line)
@@ -311,7 +311,7 @@ def _cell_row_separator(
         next_content=next_line,
     )
     if separator != " ":
-        # 表格 HTML 保留原始连字符，只复用正文规则的 URL/连字符直连判定。
+        # Table HTML retains the original hyphen and only reuses the URL/hyphen direct determination of the text rule.
         return separator
     if not _starts_with_url(next_line) and _looks_like_compact_unit_or_identifier(
         previous_line,
@@ -327,7 +327,7 @@ def _glyph_line_parts(
     *,
     presorted: bool = False,
 ) -> list[tuple[str, int | None]]:
-    """重建单行文本片段，并保留每个可见片段的原字符索引。"""
+    """Reconstruct single-line text fragments, preserving the original character index of each visible fragment."""
 
     if not glyphs:
         return []
@@ -357,7 +357,7 @@ def _tokenize_row(
     median_width: float,
     median_height: float,
 ) -> tuple[NativeTableToken, ...]:
-    """按显著水平间隙把视觉行拆成供列推断使用的文本项。"""
+    """Split visual rows into text items for column inference by significant horizontal gaps."""
 
     if not glyphs:
         return ()
@@ -370,7 +370,7 @@ def _tokenize_row(
             groups[-1].append(glyph)
     tokens: list[NativeTableToken] = []
     for group in groups:
-        # group 是视觉行按同一排序键切出的连续片段，不必再次排序。
+        # group is a continuous segment of the visual line cut out by the same sort key and does not have to be sorted again.
         content = "".join(text for text, _source_index in _glyph_line_parts(group, median_height, presorted=True))
         if not content:
             continue
@@ -386,7 +386,7 @@ def _tokenize_row(
 
 
 def build_native_table_text(table_input: NativeTableInput) -> NativeTableText | None:
-    """把原生 PDF 字符转换为正向表格字形、视觉行和文本项。"""
+    """Convert native PDF characters to forward table glyphs, visual lines, and text items."""
 
     pending = _select_pending_glyphs(table_input)
     if not pending:
@@ -434,7 +434,7 @@ def build_cell_text(
     glyphs: list[NativeTableGlyph],
     median_height: float,
 ) -> str:
-    """按视觉行和局部横向顺序重建文本，并将同一单元格内的多行直接拼接。"""
+    """Reconstruct text in visual line and local horizontal order, and directly splice multiple lines within the same cell."""
 
     return "".join(text for text, _source_index in build_cell_text_parts(glyphs, median_height))
 
@@ -443,19 +443,19 @@ def build_cell_text_parts(
     glyphs: list[NativeTableGlyph],
     median_height: float,
 ) -> list[tuple[str, int | None]]:
-    """按视觉行重建 cell 文本片段，供安全插入字符级语义标签。"""
+    """Reconstruction of cell text fragments by visual lines for safe insertion of character-level semantic tags."""
 
     if not glyphs:
         return []
     grouped: dict[int, list[NativeTableGlyph]] = {}
     for glyph in glyphs:
         grouped.setdefault(glyph.visual_row, []).append(glyph)
-    # 整表聚行可能被其他列的垂直居中文字接桥；只细分有多个足高文字行的原组，保留已确认行和上下标。
+    # Clustered rows in the entire table may be bridged by vertically centered text in other columns; only original groups with multiple full-height text rows are subdivided, retaining confirmed rows and superscripts and subscripts.
     refined = []
     for index in sorted(grouped):
         original = grouped[index]
         local_rows = _assign_visual_rows(original, median_height)
-        # 松字框可跨越真实行距；要求每条行内字框中心共线，排除斜穿单元格的水印字串。
+        # The loose text box can span the real line spacing; the center of the text box in each line is required to be collinear, and watermark strings that cross the cells diagonally are excluded.
         coherent = all(
             max(bbox_center(g.bbox)[1] for g in row) - min(bbox_center(g.bbox)[1] for g in row) <= 0.3 * median_height
             for row in local_rows
@@ -495,7 +495,7 @@ def build_cell_text_parts(
 
 
 def glyph_overlap_ratio(glyph: NativeTableGlyph, bbox: BBox) -> float:
-    """返回字符框面积被目标单元格覆盖的比例。"""
+    """Returns the proportion of the character box area covered by the target cell."""
 
     intersection = bbox_intersection(glyph.bbox, bbox)
     glyph_area = (glyph.bbox[2] - glyph.bbox[0]) * (glyph.bbox[3] - glyph.bbox[1])

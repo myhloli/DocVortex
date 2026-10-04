@@ -16,7 +16,7 @@ from docvortex.schema import BlockType, ChartBlock
 
 
 def _boundsheet(offset: int, name: str, sheet_type: int, *, visible: bool = True) -> bytes:
-    """构造带指定工作表类型的 BoundSheet8。"""
+    """Constructs BoundSheet8 with the specified worksheet type."""
 
     encoded = name.encode("utf-16le")
     payload = struct.pack("<IBB", offset, 0 if visible else 1, sheet_type)
@@ -25,7 +25,7 @@ def _boundsheet(offset: int, name: str, sheet_type: int, *, visible: bool = True
 
 
 def _chart_brai(row_last: int, col_last: int) -> bytes:
-    """构造引用第二个 BoundSheet 数据范围的 PtgArea3d BRAI。"""
+    """Constructs PtgArea3d BRAI that references the second BoundSheet data range."""
 
     tokens = struct.pack("<BH4H", 0x3B, 0, 0, row_last, 0, col_last)
     payload = struct.pack("<BBHHH", 1, 2, 0, 0, len(tokens)) + tokens
@@ -33,7 +33,7 @@ def _chart_brai(row_last: int, col_last: int) -> bytes:
 
 
 def _excel_chart_workbook() -> bytes:
-    """构造一个独立 Chart1 引用 Sheet1!A1:B3 的 BIFF8 Workbook。"""
+    """Constructs a standalone Chart1 that references Sheet1! BIFF8 Workbook of A1:B3."""
 
     prefix = biff_bof(0x0005)
     prefix += biff_record(0x0042, struct.pack("<H", 1200))
@@ -66,7 +66,7 @@ def _excel_chart_workbook() -> bytes:
 
 
 def _graph_label(row: int, col: int, text: str) -> bytes:
-    """构造 MS-OGRAPH Label datasheet 单元格。"""
+    """Construct MS-OGRAPH Label datasheet cells."""
 
     encoded = text.encode("utf-16le")
     payload = struct.pack("<HHBHBB", row, col, 0, 0, len(text), 1) + encoded
@@ -74,13 +74,13 @@ def _graph_label(row: int, col: int, text: str) -> bytes:
 
 
 def _graph_number(row: int, col: int, value: float) -> bytes:
-    """构造 MS-OGRAPH Number datasheet 单元格。"""
+    """Construct MS-OGRAPH Number datasheet cells."""
 
     return biff_record(0x0003, struct.pack("<HHBHd", row, col, 0, 0, value))
 
 
 def _graph_chart_workbook(*, exclude_last_row: bool = False) -> bytes:
-    """构造一个含两行两列 datasheet 的 MS-OGRAPH Workbook。"""
+    """Construct a MS-OGRAPH Workbook containing two rows and two columns of datasheet."""
 
     globals_stream = biff_bof(0x0005, version=0x0680) + biff_record(0x000A)
     datasheet = (
@@ -98,7 +98,7 @@ def _graph_chart_workbook(*, exclude_last_row: bool = False) -> bytes:
 
 
 def _table_rows(content: str) -> list[list[str]]:
-    """把 chart HTML 归一化为二维文本矩阵。"""
+    """Normalize chart HTML into a two-dimensional text matrix."""
 
     soup = BeautifulSoup(content, "html.parser")
     return [
@@ -107,7 +107,7 @@ def _table_rows(content: str) -> list[list[str]]:
 
 
 def test_excel_chart_workbook_uses_chart_sheet_brai_selection() -> None:
-    """验证 Excel.Chart 独立 chart sheet 精确恢复引用范围。"""
+    """Verification Excel.Chart Standalone chart sheet Exact recovery reference range."""
 
     content = extract_embedded_chart_html(_excel_chart_workbook())
 
@@ -116,7 +116,7 @@ def test_excel_chart_workbook_uses_chart_sheet_brai_selection() -> None:
 
 
 def test_msgraph_chart_workbook_recovers_embedded_datasheet() -> None:
-    """验证 MS-OGRAPH 专用 Label/Number 记录恢复为 HTML 表格。"""
+    """Verify that the MS-OGRAPH-specific Label/Number record is restored to the HTML table."""
 
     content = extract_embedded_chart_html(_graph_chart_workbook())
 
@@ -125,7 +125,7 @@ def test_msgraph_chart_workbook_recovers_embedded_datasheet() -> None:
 
 
 def test_msgraph_chart_applies_excluded_row_boundaries() -> None:
-    """验证 MS-OGRAPH ExcludeRows 不把未参与 chart 的 datasheet 行输出。"""
+    """Verify MS-OGRAPH ExcludeRows does not output datasheet lines that are not involved in chart."""
 
     content = extract_embedded_chart_html(_graph_chart_workbook(exclude_last_row=True))
 
@@ -134,7 +134,7 @@ def test_msgraph_chart_applies_excluded_row_boundaries() -> None:
 
 
 def test_xls_standalone_chart_sheet_keeps_workbook_order() -> None:
-    """验证独立 Chart Sheet 按 BoundSheet 顺序输出单独逻辑页。"""
+    """Verify that independent Chart Sheet outputs separate logical pages in sequence BoundSheet."""
 
     middle, model = analyze_native_test_document(_build_cfb([("Workbook", _excel_chart_workbook())]), file_suffix="xls")
 
@@ -153,7 +153,7 @@ def test_xls_standalone_chart_sheet_keeps_workbook_order() -> None:
 
 
 def test_excel_chart_single_visible_sheet_fallback_uses_nonempty_extent() -> None:
-    """验证没有可解析 chart sheet 时仅对唯一可见 worksheet 使用安全回退。"""
+    """Verify that there is no resolvable chart sheet and only use safe fallback for the only visible worksheet."""
 
     workbook = _excel_chart_workbook().replace(_chart_brai(2, 1), biff_record(0x1051, b"\x00" * 8))
     content = extract_embedded_chart_html(workbook)
@@ -163,7 +163,7 @@ def test_excel_chart_single_visible_sheet_fallback_uses_nonempty_extent() -> Non
 
 
 def test_ppt_sync_flush_chart_storage_is_accepted_only_at_declared_cfb_size() -> None:
-    """验证真实 Office 风格无 trailer 压缩流在严格 CFB 门下恢复。"""
+    """Verify true Office style without trailer compressed stream recovered under strict CFB gate."""
 
     storage = _build_cfb([("Workbook", _excel_chart_workbook())])
     compressor = zlib.compressobj()

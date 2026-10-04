@@ -1,4 +1,4 @@
-"""PDF 文档访问、显式分类及共享文本契约。"""
+"""PDF Document access, explicit classification, and shared text contracts."""
 
 from ._document import PDFDocument, PDFPage, PDFPageTextGeometry, PDFPageVectorGeometry, get_lines_from_chars
 from .pdfium import PdfiumFontError, PdfiumRuntimeInfo, initialize_pdfium_runtime
@@ -24,7 +24,7 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    """仅显式请求渲染会话时加载进程编排模块，保持文档导入边界。"""
+    """The process orchestration module is only loaded when a render session is explicitly requested, maintaining document import boundaries."""
     if name == "PDFRenderSession":
         from .render_session import PDFRenderSession
 

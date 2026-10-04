@@ -37,13 +37,13 @@ _PNG_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAA
 
 
 def _image_body(middle: MiddleJson) -> ImageBodyBlock:
-    """返回文档中首个严格图片 body。"""
+    """Returns the first strict image in the document, body."""
     image = next(block for block in middle.pages[0].blocks if isinstance(block, ImageBlock))
     return next(child for child in image.content if isinstance(child, ImageBodyBlock))
 
 
 def _wire_contract_middle() -> MiddleJson:
-    """构造覆盖全部顶层类型、visual child、列表和目录叶子的严格文档。"""
+    """Constructs a strict document covering all top-level types, visual child, lists and directory leaves."""
     return MiddleJson.model_validate(
         {
             "pages": [
@@ -159,7 +159,7 @@ def _wire_contract_middle() -> MiddleJson:
 
 
 def _semantic_block_signature(block: object) -> tuple[object, ...]:
-    """提取往返测试关心的类型、元数据和递归 child 类型。"""
+    """Extract types, metadata, and recursive child types that round-trip testing cares about."""
     content = getattr(block, "content", None)
     children = (
         tuple(_semantic_block_signature(child) for child in content if isinstance(child, BlockBase))
@@ -177,7 +177,7 @@ def _semantic_block_signature(block: object) -> tuple[object, ...]:
 
 
 def test_html_charsetless_utf8_preserves_non_ascii_text() -> None:
-    """验证无 charset 的 UTF-8 字节不会被 lxml 按单字节旧编码解释。"""
+    """Verify that UTF-8 bytes without charset are not interpreted by lxml as a single-byte legacy encoding."""
     payload = "<html><body><p>中文内容 café</p></body></html>".encode()
 
     markdown = render_markdown(analyze_native_test_document(payload, file_suffix="html")[0])
@@ -194,7 +194,7 @@ def test_html_charsetless_utf8_preserves_non_ascii_text() -> None:
     ids=["comment", "script"],
 )
 def test_html_charsetless_utf8_ignores_inert_encoding_declarations(inert_markup: str) -> None:
-    """验证注释和脚本中的伪编码声明不会绕过无 charset UTF-8 回退。"""
+    """Verify that pseudo-encoding declarations in comments and scripts do not bypass the no charset UTF-8 fallback."""
     payload = f"{inert_markup}<html><body><p>中文内容 café</p></body></html>".encode()
 
     markdown = render_markdown(analyze_native_test_document(payload, file_suffix="html")[0])
@@ -203,7 +203,7 @@ def test_html_charsetless_utf8_ignores_inert_encoding_declarations(inert_markup:
 
 
 def test_html_declared_legacy_charset_remains_supported() -> None:
-    """验证显式声明的旧编码仍交由 lxml 按声明解码。"""
+    """Verification of explicitly declared old encodings is still handed over to lxml for decoding as declared."""
     payload = '<html><head><meta charset="windows-1252"></head><body><p>café</p></body></html>'.encode("windows-1252")
 
     markdown = render_markdown(analyze_native_test_document(payload, file_suffix="html")[0])
@@ -212,7 +212,7 @@ def test_html_declared_legacy_charset_remains_supported() -> None:
 
 
 def test_html_auto_selection_preserves_all_repeated_forum_posts() -> None:
-    """验证重复 article 场景不会只保留论坛中的首个帖子。"""
+    """Verifying duplicate article scenarios does not retain only the first post in the forum."""
     payload = b"""<html><body><header>Forum</header><main>
       <article class="post"><h2>First post</h2><p>First body with enough useful discussion text.</p></article>
       <article class="post"><h2>Second post</h2><p>Second body with another useful discussion answer.</p></article>
@@ -225,7 +225,7 @@ def test_html_auto_selection_preserves_all_repeated_forum_posts() -> None:
 
 
 def test_html_auto_selection_preserves_ancestor_text_styles() -> None:
-    """验证正文候选复制后仍继承 body 与外层容器的受支持文字样式。"""
+    """Verify that the body candidate still inherits body and the outer container's supported text styles after copying."""
     detail = "Inherited text " * 20
     payload = f"""<html><body style="font-weight:bold"><aside style="font-style:italic;text-decoration:underline">
       <main><p>{detail}</p></main></aside></body></html>""".encode()
@@ -237,7 +237,7 @@ def test_html_auto_selection_preserves_ancestor_text_styles() -> None:
 
 
 def test_html_auto_selection_handles_colonized_candidate_ancestor() -> None:
-    """验证正文候选位于 Office 冒号标签下时可复制祖先链且不会抛出非法标签异常。"""
+    """Verify that the ancestor chain can be copied without throwing an illegal label exception when the text candidate is under the Office colon label."""
     detail = "Colonized ancestor content " * 20
     payload = f"""<html><body><o:smarttag style="font-style:italic">
       <main><p>{detail}</p></main></o:smarttag></body></html>""".encode()
@@ -249,7 +249,7 @@ def test_html_auto_selection_handles_colonized_candidate_ancestor() -> None:
 
 
 def test_html_auto_selection_rejects_single_section_from_document_index() -> None:
-    """验证多个同级 section 构成的文档索引会保留全部章节而非选择最长一节。"""
+    """Verify that a document index consisting of multiple siblings section retains all sections rather than selecting the longest section."""
     detail = b" useful explanatory content with enough words to qualify as an independent scored candidate" * 4
     payload = (
         b"<html><body><h1>Review index</h1>"
@@ -272,13 +272,13 @@ def test_html_auto_selection_rejects_single_section_from_document_index() -> Non
 
 
 def test_html_auto_selection_precomputes_repeated_candidate_groups(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证大量异构重复候选只线性计算同级 token，不为每个候选重扫全部兄弟节点。"""
+    """To verify a large number of heterogeneous duplicate candidates, only the token of the same level is calculated linearly, and all sibling nodes are not rescanned for each candidate."""
     item_count = 200
     original_tokens = html_selector_module._tokens
     token_calls = 0
 
     def counted_tokens(element: etree._Element) -> frozenset[str]:
-        """统计正文选择期间的 token 计算次数。"""
+        """Counts the number of token calculations during text selection."""
         nonlocal token_calls
         token_calls += 1
         return original_tokens(element)
@@ -294,14 +294,14 @@ def test_html_auto_selection_precomputes_repeated_candidate_groups(monkeypatch: 
 
 
 def test_html_auto_selection_precomputes_nested_subtree_penalties(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证嵌套候选共享子树的短同级惩罚只线性统计文本。"""
+    """Validating short sibling penalties for nested candidate shared subtrees only linear statistical text."""
     depth = 20
     leaf_count = 500
     original_normalized_text = html_selector_module._normalized_text
     normalization_calls = 0
 
     def counted_normalized_text(value: str | None) -> str:
-        """统计正文选择期间的文本规范化次数。"""
+        """Count the number of text normalizations during text selection."""
         nonlocal normalization_calls
         normalization_calls += 1
         return original_normalized_text(value)
@@ -317,7 +317,7 @@ def test_html_auto_selection_precomputes_nested_subtree_penalties(monkeypatch: p
 
 
 def test_html_soft_prune_precomputes_deep_subtree_text(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 soft prune 只线性扫描深层候选中的大段文本。"""
+    """Verification soft prune Only linearly scans large blocks of text in deep candidates."""
     depth = 200
     text = "x" * 4096
     root = lxml_html.fromstring("<main>" + "<div>" * depth + f"<p>{text}</p>" + "</div>" * depth + "</main>")
@@ -325,7 +325,7 @@ def test_html_soft_prune_precomputes_deep_subtree_text(monkeypatch: pytest.Monke
     normalized_input_chars = 0
 
     def counted_normalized_text(value: str | None) -> str:
-        """累计送入文本规范化函数的原始字符数。"""
+        """Cumulative number of raw characters fed into the text normalization function."""
         nonlocal normalized_input_chars
         normalized_input_chars += len(value or "")
         return original_normalized_text(value)
@@ -339,7 +339,7 @@ def test_html_soft_prune_precomputes_deep_subtree_text(monkeypatch: pytest.Monke
 
 
 def test_html_referenced_external_footnote_keeps_anchor_and_content() -> None:
-    """验证正文候选外但被引用的 HTML footnote 会追加并生成可兑现 anchor。"""
+    """HTML that is not a candidate for verification but is referenced footnote is appended and generates a redeemable anchor."""
     payload = b"""<html><body><article><h1>Notes</h1>
       <p>Claim <a href="#note-1">[1]</a>.</p></article>
       <footer><aside id="note-1" role="doc-footnote"><p>Footnote body.</p></aside></footer>
@@ -357,7 +357,7 @@ def test_html_referenced_external_footnote_keeps_anchor_and_content() -> None:
 
 
 def test_html_structured_only_footnote_does_not_create_dangling_anchor() -> None:
-    """验证只投影为结构化 block 的脚注不会把正文引用改写为悬空 fragment。"""
+    """Verify that footnotes projected only as structured block do not rewrite text references as dangling fragment."""
     payload = b"""<html><body><main><p>Claim <a href="#fn">[1]</a>.</p>
       <aside id="fn" role="doc-footnote"><ul><li>Only item</li></ul></aside></main></body></html>"""
 
@@ -377,7 +377,7 @@ def test_html_structured_only_footnote_does_not_create_dangling_anchor() -> None
     ['style="display:none"', 'style="opacity:0"', "hidden", 'aria-hidden="true"'],
 )
 def test_html_referenced_external_footnote_respects_hidden_ancestor(ancestor_attributes: str) -> None:
-    """验证正文外引用脚注不会脱离原始整树隐藏祖先后泄漏到输出。"""
+    """Verify that out-of-text reference footnotes do not leak into the output after hiding ancestors from the original whole tree."""
     detail = "Useful main article text " * 20
     payload = f"""<html><body><main><h1>Title</h1><p>{detail}<a href="#fn1">[1]</a></p></main>
       <aside {ancestor_attributes}><div id="fn1" role="doc-footnote">HIDDEN NOTE</div></aside>
@@ -391,7 +391,7 @@ def test_html_referenced_external_footnote_respects_hidden_ancestor(ancestor_att
 
 
 def test_html_referenced_external_footnote_preserves_inherited_visibility() -> None:
-    """验证复制脚注保留祖先 visibility:hidden，同时允许后代显式恢复可见。"""
+    """Verify that the copied footnote retains the ancestor visibility:hidden while allowing descendants to be explicitly restored to visibility."""
     detail = "Useful main article text " * 20
     payload = f"""<html><body><main><h1>Title</h1><p>{detail}<a href="#fn1">[1]</a></p></main>
       <aside style="visibility:hidden"><div id="fn1" role="doc-footnote">HIDDEN NOTE
@@ -407,7 +407,7 @@ def test_html_referenced_external_footnote_preserves_inherited_visibility() -> N
 
 
 def test_html_referenced_external_footnote_preserves_inherited_text_styles() -> None:
-    """验证正文外引用脚注复制后仍携带祖先提供的受支持文字样式。"""
+    """Verify that out-of-text reference footnotes still carry the supported text styles provided by their ancestors when copied."""
     detail = "Useful main article text " * 20
     payload = f"""<html><body><main><p>{detail}<a href="#fn1">[1]</a></p></main>
       <aside style="font-weight:bold;font-style:italic;text-decoration:underline line-through">
@@ -431,7 +431,7 @@ def test_html_referenced_external_footnote_preserves_inherited_text_styles() -> 
     ],
 )
 def test_html_auto_selection_appends_notes_for_all_same_document_url_forms(href: str) -> None:
-    """验证 auto 正文外脚注可由纯 fragment、相对或绝对同文档 URL 引用。"""
+    """Validation auto Out-of-text footnotes can be referenced by pure fragment, relative or absolute same-document URL."""
     detail = "Useful main article text " * 20
     payload = f"""<html><body><main><article><h1>Title</h1><p>{detail}
       <a href="{href}">[1]</a></p></article></main>
@@ -457,7 +457,7 @@ def test_html_auto_selection_appends_notes_for_all_same_document_url_forms(href:
     ],
 )
 def test_html_auto_selection_decodes_same_document_note_fragments(href: str, note_id: str) -> None:
-    """验证数字、空格与非 ASCII fragment 解码后可关联正文外脚注。"""
+    """Verify numbers, spaces and non-ASCII fragment can be decoded to associate footnotes outside the text."""
     detail = "Useful main article text " * 20
     payload = f"""<html><head><meta charset="utf-8"></head><body><main><article><h1>Title</h1><p>{detail}
       <a href="{href}">[1]</a></p></article></main>
@@ -483,7 +483,7 @@ def test_html_auto_selection_decodes_same_document_note_fragments(href: str, not
     ],
 )
 def test_html_auto_selection_does_not_append_notes_for_other_documents(href: str, expected_target: str) -> None:
-    """验证不同 path、origin 或 query 的 URL 不会借 fragment 追加当前文档脚注。"""
+    """Verify that URL, which is different from path, origin, or query, does not append the current document footnote to fragment."""
     detail = "Useful main article text " * 20
     payload = f"""<html><body><main><article><h1>Title</h1><p>{detail}
       <a href="{href}">[1]</a></p></article></main>
@@ -507,7 +507,7 @@ def test_html_auto_selection_does_not_append_notes_for_other_documents(href: str
     ],
 )
 def test_html_same_document_note_resolution_honors_base_href(base_href: str, expected_note: bool) -> None:
-    """验证 base href 参与相对脚注 URL 的文档身份判定。"""
+    """Verify that base href participates in document identity determination relative to the footnote URL."""
     detail = "Useful main article text " * 20
     payload = f"""<html><head><base href="{base_href}"></head><body><main><article><h1>Title</h1>
       <p>{detail}<a href="page.html#fn1">[1]</a></p></article></main>
@@ -521,7 +521,7 @@ def test_html_same_document_note_resolution_honors_base_href(base_href: str, exp
 
 
 def test_html_fragment_only_link_honors_external_base_document() -> None:
-    """验证 fragment-only 链接按外部 base 解析，不会误关联当前 DOM 中同名脚注。"""
+    """Verify that the fragment-only link is resolved according to the external base and will not be mistakenly associated with the footnote of the same name in the current DOM."""
     detail = "Useful main article text " * 20
     payload = f"""<html><head><base href="other.html"></head><body><main><article><h1>Title</h1>
       <p>{detail}<a href="#fn1">[1]</a></p></article></main>
@@ -538,7 +538,7 @@ def test_html_fragment_only_link_honors_external_base_document() -> None:
 
 
 def test_html_ignores_base_inside_discarded_template() -> None:
-    """验证惰性 template 中的 base 不会改写正文相对链接。"""
+    """base in validation lazy template does not overwrite body-relative links."""
     payload = b"""<html><head><template><base href="https://discarded.example/assets/"></template></head>
       <body><main><h1>Title</h1><p><a href="article.html">Relative link</a></p></main></body></html>"""
     context = HtmlSourceContext(source_uri="https://origin.example/docs/page.html")
@@ -550,13 +550,13 @@ def test_html_ignores_base_inside_discarded_template() -> None:
 
 
 def test_html_formula_wrapper_stops_after_second_non_nested_carrier(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证通用公式 wrapper 发现第二个并列 carrier 后立即失败，不继续扫描全部公式。"""
+    """The verification of the general formula wrapper fails immediately after discovering the second parallel carrier and does not continue to scan all formulas."""
     wrapper = lxml_html.fromstring('<div class="math">' + "<math></math>" * 1_000 + "</div>")
     original_is_carrier = html_document_module._is_formula_carrier
     carrier_checks = 0
 
     def counted_is_carrier(element: etree._Element) -> bool:
-        """统计 wrapper 唯一 carrier 判定次数。"""
+        """Statistics wrapper unique carrier determination times."""
         nonlocal carrier_checks
         carrier_checks += 1
         return original_is_carrier(element)
@@ -568,7 +568,7 @@ def test_html_formula_wrapper_stops_after_second_non_nested_carrier(monkeypatch:
 
 
 def test_html_local_self_url_appends_referenced_note(tmp_path: Path) -> None:
-    """验证本地 HTML 使用自身文件名 fragment 时同样保留正文选择外脚注。"""
+    """Verify that the local HTML uses its own file name fragment to also retain the footnotes outside the text selection."""
     detail = "Useful main article text " * 20
     source = tmp_path / "page.html"
     source.write_text(
@@ -587,7 +587,7 @@ def test_html_local_self_url_appends_referenced_note(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("href", ["javascript:alert(1)#fn1", "http://["])
 def test_html_unsafe_or_malformed_note_urls_do_not_append_notes(href: str) -> None:
-    """验证危险协议与畸形 URL 不参与同文档脚注关联，且不会中断正文解析。"""
+    """Verify that dangerous protocols and malformations URL do not participate in the same document footnote association and do not interrupt text parsing."""
     detail = "Useful main article text " * 20
     payload = f"""<html><body><main><article><h1>Title</h1><p>{detail}
       <a href="{href}">[1]</a></p></article></main>
@@ -603,7 +603,7 @@ def test_html_unsafe_or_malformed_note_urls_do_not_append_notes(href: str) -> No
 
 
 def test_html_formula_sources_are_normalized_without_duplicate_katex_text() -> None:
-    """验证 MathML、公式生成器 wrapper 与 data-expr 按统一公式协议输出且不重复。"""
+    """Verify that MathML, formula generator wrapper and data-expr output according to the unified formula protocol and are not duplicated."""
     payload = rb"""<html><body><h1>Math</h1><p>Inline
       <math><semantics><mi>x</mi><annotation encoding="application/x-tex">x+1</annotation></semantics></math>
       <span class="katex"><span class="katex-mathml"><math><semantics><mi>y</mi>
@@ -626,7 +626,7 @@ def test_html_formula_sources_are_normalized_without_duplicate_katex_text() -> N
 
 
 def test_html_generic_formula_class_wrappers_preserve_mixed_content() -> None:
-    """验证通用公式 class 只规范化真实 carrier，不吞掉外层说明内容。"""
+    """Verification general formula class only normalizes the real carrier and does not swallow the outer description content."""
     payload = b"""<html><body><main>
       <div class="math"><p>Before explanation.</p><math><mi>x</mi></math><p>After explanation.</p></div>
       <div class="formula">Prefix <span><math data-tex="y"></math></span> suffix.</div>
@@ -670,7 +670,7 @@ def test_html_generic_formula_class_wrappers_preserve_mixed_content() -> None:
 
 
 def test_html_mineru_page_footnote_marker_roundtrips_as_page_footnote() -> None:
-    """验证 DocVortex HTML renderer 的轻量脚注 marker 可恢复统一 page_footnote block。"""
+    """Verification Lightweight footnote for DocVortex HTML renderer marker Recoverable unity page_footnote block."""
     payload = b"""<html><body><h1>Footnote</h1>
       <div class="docvortex-page-footnote" data-block-type="page_footnote">Rendered footnote.</div>
     </body></html>"""
@@ -682,7 +682,7 @@ def test_html_mineru_page_footnote_marker_roundtrips_as_page_footnote() -> None:
 
 
 def test_html_malformed_urls_degrade_without_aborting_document() -> None:
-    """验证 urlsplit 无法解析的链接与图片只降级标签文本，不中断整份 HTML。"""
+    """Verify that links and images that cannot be resolved by urlsplit only downgrade the label text and do not break the entire HTML."""
     payload = (
         b'<html><body><h1>URLs</h1><p><a href="http://[">Broken link</a></p>'
         b'<img src="http://[" alt="Broken image"></body></html>'
@@ -695,7 +695,7 @@ def test_html_malformed_urls_degrade_without_aborting_document() -> None:
 
 
 def test_html_arbitrary_svg_data_image_degrades_to_alt_text() -> None:
-    """验证来源 HTML 不能把可能含活动内容的任意 SVG data URI带入输出。"""
+    """Verification Source HTML Do not bring any SVG data URI into the output that may contain active content."""
     svg = base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>').decode()
     payload = f'<html><body><h1>SVG</h1><img src="data:image/svg+xml;base64,{svg}" alt="Safe alt"></body></html>'.encode()
 
@@ -707,7 +707,7 @@ def test_html_arbitrary_svg_data_image_degrades_to_alt_text() -> None:
 
 
 def test_html_svg_data_image_rasterizes_to_png() -> None:
-    """验证来源 HTML 的 SVG data URI 光栅化为 PNG 内嵌，而不是整图丢弃。"""
+    """Verified SVG from HTML data URI rasterized to PNG inline instead of discarding the entire image."""
     svg = base64.b64encode(
         b'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20">'
         b'<rect width="40" height="20" fill="red"/></svg>'
@@ -723,7 +723,7 @@ def test_html_svg_data_image_rasterizes_to_png() -> None:
 
 
 def test_html_local_svg_image_rasterizes_to_png(tmp_path: Path) -> None:
-    """验证本地 .svg 图片引用光栅化为 PNG sidecar 资产。"""
+    """Verify that local .svg image references are rasterized to PNG sidecar assets."""
     assets = tmp_path / "assets"
     assets.mkdir()
     (assets / "logo.svg").write_bytes(
@@ -744,7 +744,7 @@ def test_html_local_svg_image_rasterizes_to_png(tmp_path: Path) -> None:
 
 
 def test_html_mineru_figure_keeps_real_caption_without_exposing_alt_as_caption() -> None:
-    """验证 MinerU renderer 图片只恢复真实 caption，不重复显示用于无障碍的长 alt。"""
+    """Verification MinerU renderer pictures only restore the true caption and do not duplicate the long alt used for accessibility."""
     payload = b"""<html><body><h1>Figure</h1><figure class="docvortex-figure docvortex-figure--image">
       <img src="https://example.com/image.png" alt="Long internal image description">
       <p class="docvortex-caption">Visible figure caption</p></figure></body></html>"""
@@ -756,7 +756,7 @@ def test_html_mineru_figure_keeps_real_caption_without_exposing_alt_as_caption()
 
 
 def test_html_mineru_table_figure_rebinds_renderer_caption() -> None:
-    """验证 MinerU table figure 的独立 caption 恢复为 table_caption 且只输出一次。"""
+    """Verify MinerU table figure standalone caption reverts to table_caption and outputs only once."""
     payload = b"""<html><body><h1>Table figure</h1><figure class="docvortex-figure docvortex-figure--table">
       <table><tr><th>A</th></tr><tr><td>1</td></tr></table>
       <p class="docvortex-caption">Visible table caption</p></figure></body></html>"""
@@ -770,7 +770,7 @@ def test_html_mineru_table_figure_rebinds_renderer_caption() -> None:
 
 
 def test_html_figure_preserves_direct_and_inline_text_around_visuals() -> None:
-    """验证 figure 的直属文本、行内容器和 child tail 按 visual 前后顺序进入 raw blocks。"""
+    """Verify the immediate text of figure, the in-line container and child tail and enter raw blocks in order before and after visual."""
     payload = b"""<html><body><figure>Before<span>Inline</span>
       <a href="https://example.com/full"><img src="https://example.com/a.png"></a>After
       <figcaption>Cap</figcaption>Tail</figure></body></html>"""
@@ -791,7 +791,7 @@ def test_html_figure_preserves_direct_and_inline_text_around_visuals() -> None:
 
 
 def test_html_colonized_office_svg_and_math_tags_preserve_visible_content() -> None:
-    """验证 legacy HTML 冒号标签不会触发 QName 异常，并按本地名恢复正文、SVG 与公式。"""
+    """Verify that the legacy HTML colon tag does not trigger the QName exception and restore the text, SVG and formulas by local name."""
     payload = b"""<html><body><o:p>Legacy Office text</o:p>
       <svg:svg><svg:text>Visible SVG text</svg:text></svg:svg>
       <m:math><m:mi>x</m:mi></m:math></body></html>"""
@@ -809,7 +809,7 @@ def test_html_colonized_office_svg_and_math_tags_preserve_visible_content() -> N
 
 
 def test_html_interleaved_figure_captions_bind_to_each_nearest_image() -> None:
-    """验证同一 figure 的多张图片分别保留其相邻 caption，不会全部归到末图。"""
+    """Verify that multiple pictures of the same figure retain their adjacent caption, and will not all be merged into the last picture."""
     payload = b"""<html><body><figure>
       <img src="https://example.com/a.png"><figcaption>Caption A</figcaption>
       <img src="https://example.com/b.png"><figcaption>Caption B</figcaption>
@@ -830,7 +830,7 @@ def test_html_interleaved_figure_captions_bind_to_each_nearest_image() -> None:
 
 
 def test_html_figure_annotation_targets_use_one_batched_scan() -> None:
-    """验证大量 figure 说明通过一次批量绑定保持最近前序 visual 关系。"""
+    """Verifying a large number of figure instructions maintains the nearest-preceded visual relationship through a batch bind."""
     pair_count = 1_000
     figure = etree.Element("figure")
     annotations: set[etree._Element] = set()
@@ -891,7 +891,7 @@ def test_html_figure_block_children_keep_visual_annotation_relationship(
     annotation_markup: str,
     annotation_type: BlockType,
 ) -> None:
-    """验证 figure 中的块级说明文本仍按目标 visual 类型保留 caption/footnote 关系。"""
+    """Verify that the block-level description text in figure still retains the caption/footnote relationship as per the target visual type."""
     payload = f"<html><body><figure>{visual_markup}{annotation_markup}</figure></body></html>".encode()
 
     middle, model = analyze_native_test_document(payload, file_suffix="html")
@@ -906,7 +906,7 @@ def test_html_figure_block_children_keep_visual_annotation_relationship(
 
 
 def test_html_auto_selected_contextual_div_keeps_figure_caption_relation() -> None:
-    """验证 auto 直接选中 visual wrapper div 时仍执行根节点 caption 关联。"""
+    """Verify that root node caption association is still performed when auto directly selects visual wrapper div."""
     payload = b"""<html><body><div><figure><img src="https://example.com/a.png"></figure>
       <p class="caption">Div caption</p></div></body></html>"""
 
@@ -921,7 +921,7 @@ def test_html_auto_selected_contextual_div_keeps_figure_caption_relation() -> No
 
 
 def test_html_caption_does_not_cross_unrelated_parent_container() -> None:
-    """验证 caption 与 visual 不共享明确语义父容器时不会跨容器猜测归属。"""
+    """Verify that caption and visual do not guess ownership across containers when they do not share an explicit semantic parent container."""
     detail = b"Useful main article text " * 20
     payload = (
         b'<html><body><main><div><figure><img src="https://example.com/a.png"></figure></div>'
@@ -936,7 +936,7 @@ def test_html_caption_does_not_cross_unrelated_parent_container() -> None:
 
 
 def test_html_alt_caption_fallback_policy_distinguishes_generic_and_mineru_figures() -> None:
-    """验证普通图片可用 alt 兜底，但显式 caption 与 MinerU figure 不重复提升 alt。"""
+    """alt can be used to verify ordinary pictures, but explicit caption and MinerU figure do not repeatedly increase alt."""
     payload = b"""<html><body>
       <figure><img src="https://example.com/a.png" alt="Generic alt"></figure>
       <figure><img src="https://example.com/b.png" alt="Hidden alt"><figcaption>Explicit caption</figcaption></figure>
@@ -956,7 +956,7 @@ def test_html_alt_caption_fallback_policy_distinguishes_generic_and_mineru_figur
 
 
 def test_html_inline_visual_splits_paragraph_text_in_dom_order() -> None:
-    """验证段落内 visual 会切开前后文本，而不是把图片移到合并文本之后。"""
+    """visual within a verification paragraph will cut the text before and after it, instead of moving the image after the merged text."""
     payload = b'<html><body><p>Before<img src="https://example.com/a.png">After</p></body></html>'
 
     middle, model = analyze_native_test_document(payload, file_suffix="html")
@@ -970,7 +970,7 @@ def test_html_inline_visual_splits_paragraph_text_in_dom_order() -> None:
 
 
 def test_html_inline_visual_splits_ordered_list_without_renumbering_following_items() -> None:
-    """验证列表项内 visual 提升为页面兄弟，并保持前后阅读顺序及后续有序编号。"""
+    """Verify that visual in the list item is promoted to a page sibling, and the reading order and subsequent sequential numbering are maintained."""
     payload = b"""<html><body><ol start="3"><li>Before<img src="https://example.com/a.png">After</li>
       <li>Next</li></ol></body></html>"""
 
@@ -993,7 +993,7 @@ def test_html_inline_visual_splits_ordered_list_without_renumbering_following_it
 
 
 def test_html_list_block_children_keep_semantic_text_boundaries() -> None:
-    """验证一个列表项内的多个块级段落不会粘连成错误单词边界。"""
+    """Verify that multiple block-level paragraphs within a list item don't stick together at wrong word boundaries."""
     payload = b"<html><body><ul><li><p>First paragraph.</p><p>Second paragraph.</p></li></ul></body></html>"
 
     middle, model = analyze_native_test_document(payload, file_suffix="html")
@@ -1006,7 +1006,7 @@ def test_html_list_block_children_keep_semantic_text_boundaries() -> None:
 
 
 def test_html_local_base_images_styles_and_escape_are_bounded(tmp_path: Path) -> None:
-    """验证本地 base、CSS、栅格图可读取，但父目录逃逸图片只保留说明。"""
+    """Verify that the local base, CSS, and raster images can be read, but the parent directory escape image only retains the description."""
     assets = tmp_path / "assets"
     assets.mkdir()
     image_path = assets / "pixel.png"
@@ -1039,7 +1039,7 @@ def test_html_local_base_images_styles_and_escape_are_bounded(tmp_path: Path) ->
 
 
 def test_html_local_base_resolves_relative_links(tmp_path: Path) -> None:
-    """验证本地 HTML 的普通相对链接同样按安全 base 目录解析。"""
+    """Verify that normal relative links to the local HTML also resolve to the secure base directory."""
     (tmp_path / "subdir").mkdir()
     source = tmp_path / "sample.html"
     source.write_text(
@@ -1053,7 +1053,7 @@ def test_html_local_base_resolves_relative_links(tmp_path: Path) -> None:
 
 
 def test_html_remote_source_resolves_relative_links_without_fetching_images() -> None:
-    """验证 URL 来源只把相对链接与图片规范为绝对 URL，不下载远程图片。"""
+    """Verify that the URL source only normalizes relative links and images to absolute URL, and does not download remote images."""
     context = HtmlSourceContext(source_uri="https://example.com/news/page.html")
     payload = b'<html><body><h1 id="top">Remote</h1><p><a href="next.html">Next</a></p><img src="../img/a.png"></body></html>'
 
@@ -1066,7 +1066,7 @@ def test_html_remote_source_resolves_relative_links_without_fetching_images() ->
 
 
 def test_html_remote_source_resolves_protocol_relative_links() -> None:
-    """验证远程来源按其安全协议补全协议相对链接。"""
+    """Verify that the remote source completes protocol-relative links according to its security protocol."""
     context = HtmlSourceContext(source_uri="https://example.com/news/page.html")
     payload = b'<html><body><p><a href="//cdn.example/path">Protocol link</a></p></body></html>'
 
@@ -1076,7 +1076,7 @@ def test_html_remote_source_resolves_protocol_relative_links() -> None:
 
 
 def test_html_local_image_symlink_cannot_escape_resource_root(tmp_path: Path) -> None:
-    """验证本地图片 symlink resolve 到根目录外时只保留 alt 文本。"""
+    """Verify local image symlink resolve only retains alt text when outside the root directory."""
     outside = tmp_path.parent / "outside-symlink-image.png"
     Image.new("RGB", (1, 1), "black").save(outside)
     link = tmp_path / "linked.png"
@@ -1094,7 +1094,7 @@ def test_html_local_image_symlink_cannot_escape_resource_root(tmp_path: Path) ->
 
 
 def test_html_model_empty_document_keeps_one_logical_page() -> None:
-    """验证空 HTML 仍返回确定的一页，不制造伪 bbox 或标题。"""
+    """Verifying an empty HTML still returns an ok page and does not create spurious bbox or headers."""
     assert HtmlModel().predict(BytesIO(b"")) == [[]]
     middle, model = analyze_native_test_document(b"", file_suffix="html")
     assert model.pages == [[]]
@@ -1102,7 +1102,7 @@ def test_html_model_empty_document_keeps_one_logical_page() -> None:
 
 
 def test_html_comments_count_toward_dom_node_budget(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 comment 等非元素 DOM 节点同样受总节点预算约束。"""
+    """Verify that non-element DOM nodes such as comment are also subject to the total node budget."""
     monkeypatch.setattr(html_document_module, "MAX_HTML_NODES", 4)
 
     with pytest.raises(HtmlResourceLimitError, match="max_html_nodes"):
@@ -1111,7 +1111,7 @@ def test_html_comments_count_toward_dom_node_budget(monkeypatch: pytest.MonkeyPa
 
 @pytest.mark.parametrize("container", ["template", "form"])
 def test_html_ignores_stylesheets_beneath_discarded_active_subtrees(container: str) -> None:
-    """验证待删除活动子树内的 stylesheet 不会污染正文样式。"""
+    """Verify that stylesheet within the active subtree to be deleted does not pollute the body style."""
     payload = f"<html><body><{container}><style>p{{display:none}}</style></{container}><p>Visible</p></body></html>".encode()
 
     markdown = render_markdown(analyze_native_test_document(payload, file_suffix="html")[0])
@@ -1138,7 +1138,7 @@ def test_html_inline_stylesheets_enforce_resource_budgets(
     expected_limit: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证内联 CSS 同时受单份和整文档 stylesheet 字节预算约束。"""
+    """Verify that inline CSS is subject to both the single copy and the whole document stylesheet byte budget."""
     monkeypatch.setattr(html_resources_module, "MAX_HTML_STYLESHEET_BYTES", single_limit)
     monkeypatch.setattr(html_resources_module, "MAX_HTML_STYLESHEET_TOTAL_BYTES", total_limit)
     payload = f"<html><head>{styles}</head><body><p>Visible</p></body></html>".encode()
@@ -1148,7 +1148,7 @@ def test_html_inline_stylesheets_enforce_resource_budgets(
 
 
 def test_html_inline_and_local_stylesheets_share_total_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证内联与本地外链 CSS 按文档顺序共享累计 stylesheet 预算。"""
+    """Verify inline and local outlink CSS share cumulative stylesheet budget in document order."""
     (tmp_path / "styles.css").write_text(".a{display:none}", encoding="utf-8")
     monkeypatch.setattr(html_resources_module, "MAX_HTML_STYLESHEET_BYTES", 16)
     monkeypatch.setattr(html_resources_module, "MAX_HTML_STYLESHEET_TOTAL_BYTES", 24)
@@ -1170,13 +1170,13 @@ def test_html_inline_and_local_stylesheets_share_total_budget(tmp_path: Path, mo
     ],
 )
 def test_html_remote_image_url_contract_rejects_unsafe_sources(image_url: str) -> None:
-    """验证 image_url 公共字段只接受无凭据 HTTP(S) 绝对地址。"""
+    """Verify that the image_url public field only accepts absolute addresses without credentials HTTP (S)."""
     with pytest.raises(ValueError):
         ImageBodyBlock(type=BlockType.IMAGE_BODY, content="", image_url=image_url)
 
 
 def test_html_versioned_wire_roundtrips_empty_code_body() -> None:
-    """验证空代码主体仍携带 wire marker，并在 HTML 往返后保留代码块元数据。"""
+    """Verify that the empty code body still carries wire marker and retains code block metadata after the HTML round trip."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1212,7 +1212,7 @@ def test_html_versioned_wire_roundtrips_empty_code_body() -> None:
 
 
 def test_html_versioned_wire_roundtrips_all_semantic_types() -> None:
-    """验证新版 DocVortex HTML 在 DEFAULT/FULL 中精确恢复公开类型和关键元数据。"""
+    """Verify that new version DocVortex HTML accurately restores public types and key metadata in DEFAULT/FULL."""
     source = _wire_contract_middle()
     default_html = render_html(source, standalone=False)
     full_html = render_html(source, mode=RenderMode.FULL, standalone=False)
@@ -1248,7 +1248,7 @@ def test_html_versioned_wire_roundtrips_all_semantic_types() -> None:
 
 
 def test_html_wire_decode_distinguishes_absent_empty_and_noncanonical() -> None:
-    """验证单一 decode 入口区分普通 HTML、合法空 wire 与非 canonical v1。"""
+    """Verify that a single decode entry distinguishes between normal HTML, legal empty wire and non-canonical v1."""
     source = MiddleJson.model_validate(
         {
             "pages": [{"page_idx": 0, "blocks": []}],
@@ -1283,7 +1283,7 @@ def test_html_versioned_wire_preserves_visual_rich_content(
     body_type: str,
     with_main_image: bool,
 ) -> None:
-    """验证 visual 富内容及嵌套图片按语义往返且不升级为主图片载荷。"""
+    """Verify that visual rich content and nested images are round-tripped semantically and not upgraded to the main image payload."""
     body: dict[str, object] = {
         "type": body_type,
         "index": 0,
@@ -1324,7 +1324,7 @@ def test_html_versioned_wire_preserves_visual_rich_content(
 
 
 def test_html_versioned_wire_roundtrips_canonical_visual_body_variants() -> None:
-    """验证 flowchart 与 table 的固定载荷分支都通过 exact typed plan 往返。"""
+    """Verify that the fixed load legs of flowchart and table are routed to and from exact typed plan."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1384,7 +1384,7 @@ def test_html_versioned_wire_roundtrips_canonical_visual_body_variants() -> None
 
 
 def test_html_versioned_wire_decodes_legacy_flowchart_shell_exactly() -> None:
-    """验证旧外壳（canvas 宿主在 details 外、raster 为回退图）仍走 exact 解码。"""
+    """Verify that the old shell (canvas host is outside details, raster is a fallback image) still uses exact decoding."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1414,7 +1414,7 @@ def test_html_versioned_wire_decodes_legacy_flowchart_shell_exactly() -> None:
         }
     )
     soup = BeautifulSoup(render_html(source, standalone=False), "html.parser")
-    # 把当前外壳重排回旧外壳：canvas 宿主移出 details，原图降级为宿主内回退图。
+    # Rearrange the current shell back to the old shell: canvas The host is moved out of details, and the original image is downgraded to the fallback image in the host.
     details = soup.select_one("details.docvortex-flowchart-details")
     host = details.select_one(".docvortex-flowchart")
     image = soup.select_one("img.docvortex-image")
@@ -1437,7 +1437,7 @@ def test_html_versioned_wire_decodes_legacy_flowchart_shell_exactly() -> None:
 
 
 def test_html_versioned_wire_distinguishes_index_carrier_from_inline_link() -> None:
-    """验证未链接目录项中的普通 anchor 不会被误认为 renderer 目录外壳。"""
+    """Verify that a plain anchor in an unlinked directory entry is not mistaken for a renderer directory shell."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1470,7 +1470,7 @@ def test_html_versioned_wire_distinguishes_index_carrier_from_inline_link() -> N
 
 @pytest.mark.parametrize("edit_kind", ["index_sibling", "visual_sibling"])
 def test_html_noncanonical_wire_structural_edits_use_generic_fallback(edit_kind: str) -> None:
-    """验证 carrier 外结构统一触发 generic fallback，而不是增加逐 case 物化兼容。"""
+    """Verify that the carrier external structure uniformly triggers generic and fallback, rather than adding case materialization compatibility one by one."""
     if edit_kind == "index_sibling":
         source = MiddleJson.model_validate(
             {
@@ -1531,7 +1531,7 @@ def test_html_noncanonical_wire_structural_edits_use_generic_fallback(edit_kind:
 
 @pytest.mark.parametrize("outside_kind", ["text", "inline"])
 def test_html_versioned_list_content_outside_carrier_falls_back_without_loss(outside_kind: str) -> None:
-    """验证列表 carrier 外的编辑内容触发通用投影并完整保留。"""
+    """Edits outside the verification list carrier trigger the universal projection and remain intact."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1565,7 +1565,7 @@ def test_html_versioned_list_content_outside_carrier_falls_back_without_loss(out
 
 
 def test_html_invalid_versioned_markers_fallback_without_partial_results() -> None:
-    """验证未知版本和多类非法 marker 都整体回退，且可见正文不会重复。"""
+    """Verify that unknown versions and multiple types of illegal marker are rolled back as a whole, and the visible text is not repeated."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1645,7 +1645,7 @@ def test_html_versioned_wire_multiple_owned_images_fall_back_without_loss(
     sub_type: str,
     owned_class: str,
 ) -> None:
-    """验证普通图片和图表 body 被追加 renderer 图片时回退并保留全部载荷。"""
+    """Verify that normal images and charts body are appended when renderer images are appended and the entire payload is retained."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1688,7 +1688,7 @@ def test_html_versioned_wire_multiple_owned_images_fall_back_without_loss(
 
 
 def test_html_versioned_wire_visible_structural_text_falls_back_without_loss() -> None:
-    """验证机器结构容器中新增的可见文本会整体回退，并保留编辑内容。"""
+    """Verify that newly added visible text in the machine structure container will be fully rolled back and the edited content will be retained."""
     source = MiddleJson.model_validate(
         {
             "pages": [{"page_idx": 0, "blocks": [{"type": "text", "index": 0, "content": inline("Original wire text")}]}],
@@ -1726,7 +1726,7 @@ def test_html_versioned_wire_visible_structural_text_falls_back_without_loss() -
 
 @pytest.mark.parametrize("position", ["before", "after"])
 def test_html_versioned_wire_visible_sibling_falls_back_without_loss(position: str) -> None:
-    """验证 wire 根前后的可见兄弟会整体回退，避免精确物化静默丢弃正文。"""
+    """Verify visible fraternity overall fallback before and after wire root to avoid exact materialization silently discarding the body."""
     source = MiddleJson.model_validate(
         {
             "pages": [{"page_idx": 0, "blocks": [{"type": "text", "index": 0, "content": inline("Original wire text")}]}],
@@ -1752,7 +1752,7 @@ def test_html_versioned_wire_visible_sibling_falls_back_without_loss(position: s
 
 
 def test_html_versioned_wire_markerless_block_child_falls_back_without_crash() -> None:
-    """验证行内容器内新增的无 marker 块节点会事务式回退，而不是在物化阶段抛错。"""
+    """Verify that newly added block nodes without marker in the row container will be rolled back transactionally instead of throwing an error during the materialization phase."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1779,7 +1779,7 @@ def test_html_versioned_wire_markerless_block_child_falls_back_without_crash() -
 
 
 def test_html_versioned_wire_edited_code_body_falls_back_without_loss() -> None:
-    """验证普通代码 body 中新增可见节点会整体回退并保留代码与编辑内容。"""
+    """Verify that newly added visible nodes in the normal code body will be fully rolled back and the code and editing content will be retained."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1814,7 +1814,7 @@ def test_html_versioned_wire_edited_code_body_falls_back_without_loss() -> None:
 
 
 def test_html_versioned_wire_edited_algorithm_body_falls_back_without_loss() -> None:
-    """验证 algorithm body 中新增可见节点会整体回退并保留算法与编辑内容。"""
+    """Verify that new visible nodes added to algorithm body will be fully rolled back and the algorithm and editing content will be retained."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1850,7 +1850,7 @@ def test_html_versioned_wire_edited_algorithm_body_falls_back_without_loss() -> 
 
 
 def test_html_versioned_wire_edited_table_body_falls_back_without_loss() -> None:
-    """验证表格 body 中新增可见节点会整体回退并保留表格与编辑内容。"""
+    """Adding visible nodes to the verification table body will roll back the entire table and retain the table and edited content."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1883,7 +1883,7 @@ def test_html_versioned_wire_edited_table_body_falls_back_without_loss() -> None
 
 
 def test_html_versioned_wire_edited_flowchart_body_falls_back_without_loss() -> None:
-    """验证流程图 body 中新增可见节点会整体回退并保留源码与编辑内容。"""
+    """The newly added visible nodes in the verification flow chart body will be rolled back as a whole and the source code and editing content will be retained."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1917,7 +1917,7 @@ def test_html_versioned_wire_edited_flowchart_body_falls_back_without_loss() -> 
 
 
 def test_html_marker_fallback_does_not_double_resolve_images(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证结构校验先于资源物化，非法 marker 回退只解析一次图片。"""
+    """Verification structure check precedes resource materialization, illegal marker fallback only parses the image once."""
     source = MiddleJson.model_validate(
         {
             "pages": [
@@ -1947,7 +1947,7 @@ def test_html_marker_fallback_does_not_double_resolve_images(monkeypatch: pytest
     calls: list[str] = []
 
     def counted_resolve_image(self: HtmlResourceContext, image_source: str, *, alt: str = "") -> object:
-        """记录图片解析次数后调用真实安全实现。"""
+        """The real security implementation is called after recording the number of image parsing times."""
         calls.append(image_source)
         return original(self, image_source, alt=alt)
 
@@ -1959,7 +1959,7 @@ def test_html_marker_fallback_does_not_double_resolve_images(monkeypatch: pytest
 
 
 def test_html_generic_div_soup_attaches_contextual_caption_and_footnote() -> None:
-    """验证非标准 div visual 容器按完整 token 和父子上下文恢复 caption/footnote。"""
+    """Verify non-standard div visual container recovers caption/footnote by full token and parent-child context."""
     payload = b"""<html><body><main><h1>Soup</h1>
       <div class="photo-card"><img src="https://example.com/a.png" alt="Alt only">
       <p id="caption">Context caption</p><div class="footnote">Context footnote</div></div>
@@ -1981,7 +1981,7 @@ def test_html_generic_div_soup_attaches_contextual_caption_and_footnote() -> Non
 
 
 def test_html_formula_priority_delimiters_and_supported_mathml_are_normalized() -> None:
-    """验证所有受支持公式来源按统一优先级输出裸 LaTeX，并保留内部 tag。"""
+    """Verify that all supported formula sources output bare LaTeX with uniform priority and retain internal tag."""
     payload = rb"""<html><body><h1>Formula matrix</h1><p>
       <span class="formula"><span data-docvortex-latex="\(producer\)" data-tex="data-low"><math alttext="alt-low">
       <annotation encoding="application/x-tex">annotation-low</annotation></math></span></span>
@@ -2017,7 +2017,7 @@ def test_html_formula_priority_delimiters_and_supported_mathml_are_normalized() 
     ids=["hidden", "aria-hidden", "inline-style", "stylesheet-class"],
 )
 def test_html_formula_normalization_preserves_direct_visibility(attributes: str, stylesheet: str) -> None:
-    """验证公式 carrier 归一化后仍保留直接声明的隐藏语义。"""
+    """The verification formula carrier retains the hidden semantics of the direct statement after normalization."""
     payload = (
         f"<html><head>{stylesheet}</head><body><p>Before <math {attributes} data-tex='x'></math> After</p></body></html>"
     ).encode()
@@ -2030,7 +2030,7 @@ def test_html_formula_normalization_preserves_direct_visibility(attributes: str,
 
 
 def test_html_block_formulas_nested_in_text_containers_preserve_dom_order() -> None:
-    """验证文本容器内的 display 公式切成独立 Equation，并保留前后阅读顺序。"""
+    """Verify that the display formula within the text container is cut into independent Equations, and the reading order of the previous and later is preserved."""
     payload = b"""<html><body><p>Before<script type="math/tex; mode=display">x</script>Between
       <span><math display="block" data-tex="y"></math></span>After</p>
       <ul><li>Item before<math display="block" data-tex="z"></math>Item after</li></ul></body></html>"""
@@ -2067,7 +2067,7 @@ def test_html_block_formulas_nested_in_text_containers_preserve_dom_order() -> N
 
 
 def test_html_invalid_mathml_and_asciimath_remain_visible_text() -> None:
-    """验证未知 MathML 与本轮未支持 AsciiMath 不会伪装为 Equation 或被静默删除。"""
+    """Verify that unknown MathML and AsciiMath not supported in this cycle will not masquerade as Equation or be silently deleted."""
     payload = b"""<html><body><h1>Fallback math</h1>
       <math><unknown>not-latex</unknown></math>
       <script type="math/asciimath">sqrt(2)</script></body></html>"""
@@ -2080,7 +2080,7 @@ def test_html_invalid_mathml_and_asciimath_remain_visible_text() -> None:
 
 
 def _tiny_png_bytes() -> bytes:
-    """构造 1x1 红色像素的最小合法 PNG。"""
+    """Constructs 1x1 The smallest legal PNG for red pixels."""
     buffer = BytesIO()
     Image.new("RGB", (1, 1), (255, 0, 0)).save(buffer, format="PNG")
     return buffer.getvalue()
@@ -2088,7 +2088,7 @@ def _tiny_png_bytes() -> bytes:
 
 @contextmanager
 def _local_image_server(routes: dict[str, bytes]) -> Iterator[tuple[str, list[str]]]:
-    """在回环地址启动按路径返回固定字节的计数服务，退出时关闭。"""
+    """Start the counting service that returns fixed bytes by path at the loopback address, and close it when exiting."""
     hits: list[str] = []
 
     class Handler(BaseHTTPRequestHandler):
@@ -2113,7 +2113,7 @@ def _local_image_server(routes: dict[str, bytes]) -> Iterator[tuple[str, list[st
 
 
 def _remote_chart_middle(url: str) -> MiddleJson:
-    """构造主图片指向远程 URL 的 chart wire 文档，复现导出 HTML 回灌场景。"""
+    """Construct the chart wire document that the main picture points to the remote URL to reproduce the export HTML recharge scenario."""
     return MiddleJson.model_validate(
         {
             "pages": [
@@ -2137,7 +2137,7 @@ def _remote_chart_middle(url: str) -> MiddleJson:
 
 
 def test_html_remote_images_stay_external_and_offline(tmp_path: Path) -> None:
-    """远程图片永不下载：保持外链、零网络请求，save_bundle 保留外链且可重新加载。"""
+    """Remote pictures will never be downloaded: keep external links and have zero network requests. save_bundle retains external links and can be reloaded."""
     with _local_image_server({"/chart.png": _tiny_png_bytes()}) as (base, hits):
         url = f"{base}/chart.png"
         default = HtmlResourceContext(HtmlSourceContext())

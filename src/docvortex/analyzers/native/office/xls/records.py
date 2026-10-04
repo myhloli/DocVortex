@@ -1,4 +1,4 @@
-"""有界读取 Excel 97–2003 BIFF 记录流。"""
+"""Bounded read Excel 97–2003 BIFF record stream."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ CONTINUE = 0x003C
 
 @dataclass(frozen=True, slots=True)
 class BiffRecord:
-    """一条已完成边界校验的 BIFF 记录。"""
+    """A BIFF record that has completed boundary verification."""
 
     offset: int
     record_type: int
@@ -28,12 +28,12 @@ class BiffRecord:
 
 @dataclass(slots=True)
 class RecordBudget:
-    """跨 globals、worksheet 与 OfficeArt 共享记录访问预算。"""
+    """Record access budgets are shared across globals, worksheet and OfficeArt."""
 
     count: int = 0
 
     def charge(self) -> None:
-        """计入一条记录并在超过固定上限时硬失败。"""
+        """Counts one record and hard fails when a fixed limit is exceeded."""
 
         self.count += 1
         if self.count > MAX_RECORDS:
@@ -46,7 +46,7 @@ def record_at(
     *,
     budget: RecordBudget | None = None,
 ) -> BiffRecord | None:
-    """读取指定偏移的 BIFF 记录，截断 header 或 body 返回空值。"""
+    """Read the BIFF record at the specified offset, truncate header or body and return a null value."""
 
     if offset < 0 or offset + 4 > len(data):
         return None
@@ -72,7 +72,7 @@ def iter_records(
     stop_at_eof: bool = False,
     budget: RecordBudget | None = None,
 ) -> Iterator[BiffRecord]:
-    """顺序遍历 BIFF 记录，并在截断尾部保留已经完成的记录。"""
+    """Traverse the BIFF records sequentially, retaining completed records at the truncated tail."""
 
     cursor = start
     while cursor < len(data):
@@ -97,7 +97,7 @@ def collect_continues(
     *,
     budget: RecordBudget,
 ) -> tuple[list[bytes], int]:
-    """收集紧随 base 的 CONTINUE bodies，并返回下一条非延续记录偏移。"""
+    """Collects CONTINUE bodies immediately following base and returns the next non-continuation record offset."""
 
     segments = [base.payload]
     cursor = base.next_offset
@@ -111,31 +111,31 @@ def collect_continues(
 
 
 class SegmentReader:
-    """在基础记录及其 CONTINUE segments 上执行有界顺序读取。"""
+    """Performs a bounded sequential read on the underlying record and its CONTINUE segments."""
 
     def __init__(self, segments: list[bytes]) -> None:
-        """保存 segment 列表并把游标置于首段开头。"""
+        """Save the segment list and place the cursor at the beginning of the first paragraph."""
 
         self.segments = segments
         self.segment_index = 0
         self.offset = 0
 
     def remaining_in_segment(self) -> int:
-        """返回当前 segment 尚未消费的字节数。"""
+        """Returns the number of bytes that the current segment has not yet consumed."""
 
         if self.segment_index >= len(self.segments):
             return 0
         return len(self.segments[self.segment_index]) - self.offset
 
     def normalize(self) -> None:
-        """跳过已经耗尽的 segments。"""
+        """Skip exhausted segments."""
 
         while self.segment_index < len(self.segments) and self.offset >= len(self.segments[self.segment_index]):
             self.segment_index += 1
             self.offset = 0
 
     def next_segment(self) -> bool:
-        """显式移动到下一 segment，若不存在则返回 False。"""
+        """Explicitly move to the next segment, or return False if it does not exist."""
 
         if self.segment_index + 1 >= len(self.segments):
             return False
@@ -144,7 +144,7 @@ class SegmentReader:
         return True
 
     def read(self, size: int) -> bytes | None:
-        """只在当前 segment 内读取固定长度字段。"""
+        """Only read fixed length fields within the current segment."""
 
         self.normalize()
         if size < 0 or self.segment_index >= len(self.segments):
@@ -158,7 +158,7 @@ class SegmentReader:
         return output
 
     def read_across(self, size: int) -> bytes | None:
-        """跨 segment 读取普通非字符数据。"""
+        """Read plain non-character data across segment."""
 
         if size < 0:
             return None
@@ -178,24 +178,24 @@ class SegmentReader:
         return bytes(output)
 
     def skip(self, size: int) -> bool:
-        """跨 segments 跳过指定字节数。"""
+        """Skip the specified number of bytes across segments."""
 
         return self.read_across(size) is not None
 
     def u8(self) -> int | None:
-        """读取一个无符号 8 位整数。"""
+        """Read an unsigned 8-bit integer."""
 
         value = self.read(1)
         return int(value[0]) if value is not None else None
 
     def u16(self) -> int | None:
-        """读取一个小端无符号 16 位整数。"""
+        """Reads a little-endian unsigned 16-bit integer."""
 
         value = self.read(2)
         return int(struct.unpack("<H", value)[0]) if value is not None else None
 
     def u32(self) -> int | None:
-        """读取一个小端无符号 32 位整数。"""
+        """Reads a little-endian unsigned 32-bit integer."""
 
         value = self.read(4)
         return int(struct.unpack("<I", value)[0]) if value is not None else None

@@ -1,4 +1,4 @@
-"""恢复没有原生文字成员的独立矢量图形，装饰背景和正文仍由原规则处理。"""
+"""Restores independent vector graphics without native text members, with decorative backgrounds and text still handled by the original rules."""
 
 import statistics
 
@@ -7,7 +7,7 @@ from .line_layout import _line_effective_height
 
 
 def isolated_vector_components(source):
-    """由复杂二维路径组成独立图片，不认领正文；框缘轻微相交可保留完整多色插画。"""
+    """An independent image is composed of complex two-dimensional paths and does not claim the main text; the edges of the frames intersect slightly to retain the complete multi-color illustration."""
     heights = [_line_effective_height(line, line.bbox) for line in source.lines if line.angle == 0]
     em = statistics.median(heights) if heights else 10.0
     width, height = source.page_size
@@ -44,7 +44,7 @@ def isolated_vector_components(source):
         ):
             continue
         edges = sum((box[0] <= 0.2 * em, box[1] <= 0.2 * em, box[2] >= width - 0.2 * em, box[3] >= height - 0.2 * em))
-        # 多个不同填色的复杂轮廓可形成贴页边的完整插画，单一角饰不能借此扩框。
+        # Multiple complex outlines filled with different colors can form a complete illustration that sticks to the edge of the page. A single corner decoration cannot be used to expand the frame.
         colors = {path.fill_rgba for path in group if path.fill_visible}
         if (edges >= 2 and (len(group) < 8 or len(colors) < 3)) or any(
             _bbox_overlap_in_first(line.bbox, box) > 0.1 for line in source.lines
@@ -57,7 +57,7 @@ def isolated_vector_components(source):
 
 
 def meaningful_small_raster(source, box):
-    """小栅格图的两个方向均明显大于正文，且没有覆盖原生字行时保留；薄线及行内字图拒绝。"""
+    """Small grid images that are significantly larger than the main text in both directions and do not cover native text lines are retained; thin line and inline text images are rejected."""
     heights = [_line_effective_height(line, line.bbox) for line in source.lines if line.angle == 0]
     if not heights:
         return False

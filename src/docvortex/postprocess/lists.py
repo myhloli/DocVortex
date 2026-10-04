@@ -1,4 +1,4 @@
-"""PDF 与 Office 的列表、目录和标题编号后处理。"""
+"""List, table of contents and title numbering post-processing for PDF and Office."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .visual import _bbox_for_calculation
 
 
 def fix_office_paragraph_titles(model_list: list[list[dict[str, Any]]]) -> None:
-    """按文档级标题序列内化 Office 自动编号，并清除私有编号元数据。"""
+    """Internalize Office autonumbering by document-level title sequence and clear private numbering metadata."""
     counters: dict[int, int] = {}
     for page_model_list in model_list:
         for block in page_model_list:
@@ -49,7 +49,7 @@ def fix_office_paragraph_titles(model_list: list[list[dict[str, Any]]]) -> None:
 
 
 def fix_office_index_title_blocks(model_list: list[list[dict[str, Any]]]) -> None:
-    """按正文目标 anchor 将 Office 目录文本叶子转换为对应正文或标题类型。"""
+    """By Text Target anchor Converts the Office Table of Contents text leaf to the corresponding body or heading type."""
     target_by_anchor: dict[str, tuple[str, int | None]] = {}
     for page_model_list in model_list:
         for block in page_model_list:
@@ -74,7 +74,7 @@ def _rewrite_office_index_title_leaves(
     index_block: dict[str, Any],
     target_by_anchor: dict[str, tuple[str, int | None]],
 ) -> None:
-    """递归改写目录叶子；未匹配 anchor 时降级为不带 anchor 的普通文本。"""
+    """Recursively overwrite directory leaves; downgrades to plain text without anchor when anchor is not matched."""
     content = index_block.get("content")
     if not isinstance(content, list):
         return
@@ -106,7 +106,7 @@ def fix_pdf_list_blocks(
     text_blocks: list[dict[str, Any]],
     ref_text_blocks: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    """按 bbox 把 PDF text/ref_text 归入 list，并推断列表子类型。"""
+    """Substitute PDF text/ref_text into list by bbox and infer the list subtype."""
     for list_block in list_blocks:
         list_block["content"] = []
     need_remove_blocks = []
@@ -138,7 +138,7 @@ def fix_pdf_list_blocks(
 
 
 def fix_pdf_index_blocks(index_blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """将 PDF 目录块的多行内容拆分为多个文本子块。"""
+    """Split the multi-line contents of the PDF table of contents block into multiple text sub-blocks."""
     for index_block in index_blocks:
         raw_content = index_block.get("content")
         if not isinstance(raw_content, list):
@@ -161,7 +161,7 @@ def fix_pdf_index_blocks(index_blocks: list[dict[str, Any]]) -> list[dict[str, A
 
 
 def fix_office_index_blocks(index_blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """递归移除 Office 目录层级私有字段，保留已规范化的标题叶子。"""
+    """Recursively remove Office directory level private fields, retaining normalized title leaves."""
     pending_blocks = list(index_blocks)
     while pending_blocks:
         block = pending_blocks.pop()
@@ -173,21 +173,21 @@ def fix_office_index_blocks(index_blocks: list[dict[str, Any]]) -> list[dict[str
 
 
 def _clear_deeper_title_counters(counters: dict[int, int], level: int) -> None:
-    """删除当前标题层级之后的旧计数。"""
+    """Delete the old count after the current title level."""
     for counter_level in [value for value in counters if value > level]:
         del counters[counter_level]
 
 
 def _visible_text(content: list[dict[str, Any]]) -> str:
-    """提取结构化 Span 的可见文本，供显式标题编号识别。"""
+    """Extract visible text of structured Span for explicit title number identification."""
     return inline_span_plain_text(content)
 
 
 def fix_office_list_blocks(list_blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """将每层 Office 列表的局部序号写入文本内容，并移除原始元数据。"""
+    """Write the local serial number of each layer of the Office list to the text content and remove the original metadata."""
 
     def get_ordered_list_start(list_block: dict[str, Any]) -> int:
-        """读取有序列表起始编号，保留合法的零值。"""
+        """Read the starting number of the ordered list, retaining legal zero values."""
         start = list_block.get("start")
         if start is None:
             return 1
@@ -198,7 +198,7 @@ def fix_office_list_blocks(list_blocks: list[dict[str, Any]]) -> list[dict[str, 
         return start if start >= 0 else 1
 
     def fix_list_block(list_block: dict[str, Any]) -> None:
-        """递归处理列表树；每个有序列表只维护当前层的独立编号。"""
+        """List trees are processed recursively; each ordered list only maintains a separate number for the current level."""
         is_ordered = list_block.get("attribute") == "ordered"
         ordered_number = get_ordered_list_start(list_block)
         content = list_block.get("content")

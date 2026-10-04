@@ -1,4 +1,4 @@
-"""解析 DOC 字段指令并安全恢复超链接、目录和 caption 语义。"""
+"""Parse DOC field instructions and safely restore hyperlinks, directories, and caption semantics."""
 
 from __future__ import annotations
 
@@ -13,26 +13,26 @@ _TOKEN_RE = re.compile(r'"(?:\\.|[^"\\])*"|\\\S|\S+')
 
 
 def field_keyword(instruction: str) -> str:
-    """返回字段指令的首个关键字大写形式。"""
+    """Return the first keyword capital form of the field instruction."""
 
     tokens = _TOKEN_RE.findall(instruction.strip())
     return tokens[0].strip('"').upper() if tokens else ""
 
 
 def is_toc_field(instruction: str) -> bool:
-    """判断字段是否为多段落 TOC。"""
+    """Determine whether the field is multi-paragraph TOC."""
 
     return field_keyword(instruction) == "TOC"
 
 
 def is_caption_field(instruction: str) -> bool:
-    """判断字段是否为 Word SEQ caption 编号。"""
+    """Determine whether the field is Word SEQ caption number."""
 
     return field_keyword(instruction) == "SEQ"
 
 
 def is_chart_embed_field(instruction: str) -> bool:
-    """判断 EMBED 字段是否声明 Excel.Chart 或 MSGraph.Chart 对象。"""
+    """Determine whether the EMBED field declares a Excel.Chart or MSGraph.Chart object."""
 
     tokens = _TOKEN_RE.findall(instruction.strip())
     if len(tokens) < 2 or _unquote(tokens[0]).casefold() != "embed":
@@ -42,7 +42,7 @@ def is_chart_embed_field(instruction: str) -> bool:
 
 
 def _unquote(token: str) -> str:
-    """解码字段引号内允许的反斜杠转义。"""
+    """Decode backslash escapes allowed within field quotes."""
 
     if len(token) >= 2 and token[0] == token[-1] == '"':
         token = token[1:-1]
@@ -50,7 +50,7 @@ def _unquote(token: str) -> str:
 
 
 def hyperlink_target(instruction: str) -> str | None:
-    """从 HYPERLINK 字段读取 URL 与可选内部书签。"""
+    """Read URL from HYPERLINK field with optional internal bookmark."""
 
     tokens = _TOKEN_RE.findall(instruction.strip())
     if not tokens or _unquote(tokens[0]).casefold() != "hyperlink":
@@ -91,7 +91,7 @@ def hyperlink_target(instruction: str) -> str | None:
 
 
 def apply_field_result(instruction: str, runs: list[DocTextRun]) -> list[DocTextRun]:
-    """把 HYPERLINK 目标绑定到字段结果，其他字段仅保留缓存结果。"""
+    """Bind the HYPERLINK target to the field result, and only keep the cached result for other fields."""
 
     if field_keyword(instruction) != "HYPERLINK":
         return runs

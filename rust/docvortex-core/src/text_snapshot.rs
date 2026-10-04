@@ -1,4 +1,4 @@
-//! 自有 PDF 文本快照；所有字符、字体和来源均为 Rust 数据，不持有 Python 或 PDFium 对象。
+//! Own PDF text snapshot; all characters, fonts and sources are Rust data and does not hold Python or PDFium objects.
 use crate::{
     dedup,
     geometry::{Box4, Size},
@@ -67,14 +67,14 @@ pub struct TextSnapshot {
     pub visible_only: bool,
 }
 
-/// 判断解释器定义的空白，不以 Rust Unicode 版本替换宿主语义。
+/// Judge the interpreter definition blank and do not replace the host semantics with the Rust Unicode version.
 pub fn is_space(text: &str, properties: &HashMap<String, Properties>) -> bool {
     !text.is_empty()
         && text
             .chars()
             .all(|ch| properties.get(&ch.to_string()).is_some_and(|p| p.space))
 }
-/// 严格比较保持 Python min/max 对有符号零的首值语义。
+/// Strict comparison preserves the first-valued semantics of Python min/max for signed zero.
 fn min(a: f64, b: f64) -> f64 {
     if b < a {
         b
@@ -82,7 +82,7 @@ fn min(a: f64, b: f64) -> f64 {
         a
     }
 }
-/// 严格比较保持 Python max 的首值语义。
+/// Strict comparison maintains the first value semantics of Python and max.
 fn max(a: f64, b: f64) -> f64 {
     if b > a {
         b
@@ -90,7 +90,7 @@ fn max(a: f64, b: f64) -> f64 {
         a
     }
 }
-/// 计算可见交集，不重新计算字符原点或来源编号。
+/// The visible intersection is calculated without recalculating the character origin or source number.
 fn intersection(a: Box4, b: Box4) -> Box4 {
     [
         max(a[0], b[0]),
@@ -99,11 +99,11 @@ fn intersection(a: Box4, b: Box4) -> Box4 {
         min(a[3], b[3]),
     ]
 }
-/// 判断矩形是否具有正面积。
+/// Determine whether the rectangle has a positive area.
 fn nonempty(b: Box4) -> bool {
     b[2] > b[0] && b[3] > b[1]
 }
-/// 仅裁剪实际被截断的字形，损坏 loose 框继续使用有效墨迹范围。
+/// Only the actual truncated glyphs are clipped, damaging the loose box to continue using the valid ink range.
 fn clip_character(
     ch: &mut Character,
     clip: Box4,
@@ -131,7 +131,7 @@ fn clip_character(
     }
     true
 }
-/// 在代理对恢复之前按原顺序过滤和赋予书写方向；页内对象 ID 已由绑定层在过滤前分配。
+/// Filtering and assigning writing direction in original order before proxy pair restoration; intra-page object ID has been allocated by binding layer before filtering.
 pub fn initialize(
     input: Vec<InputCharacter>,
     properties: &HashMap<String, Properties>,
@@ -160,7 +160,7 @@ pub struct WritingRun {
     end: usize,
     next: usize,
 }
-/// 只记录有段首原点的连续同对象范围，不把缺失段首替换成后继原点。
+/// Only the continuous same object range with the segment head origin is recorded, and the missing segment head is not replaced with the subsequent origin.
 pub fn writing_runs(chars: &[Character]) -> Vec<WritingRun> {
     let mut start = 0;
     let mut runs = Vec::new();
@@ -182,7 +182,7 @@ pub fn writing_runs(chars: &[Character]) -> Vec<WritingRun> {
     }
     runs
 }
-/// 对每个未完成段请求下一个缺失方向元数据；游标避免退化成重复扫描。
+/// Request the next missing direction metadata for each unfinished segment; the cursor avoids degenerating into repeated scans.
 pub fn advance_writing_angles(
     chars: &mut [Character],
     runs: &mut [WritingRun],
@@ -219,7 +219,7 @@ pub fn advance_writing_angles(
     requested
 }
 
-/// 恢复 PDFium UTF-16 代理对，保持原过滤顺序、代表字符和排序后的来源索引。
+/// Restore the PDFium UTF-16 proxy pair, keeping the original filtering order, representative characters and sorted source index.
 pub fn restore_surrogates(
     chars: Vec<Character>,
     raw_count: usize,
@@ -262,7 +262,7 @@ pub fn restore_surrogates(
     }
     Ok(output)
 }
-/// 判断同对象的连续来源映射，保护连字的一对多输出。
+/// Determine the continuous source mapping of the same object and protect the one-to-many output of ligatures.
 fn same_mapping(a: &Character, b: &Character, properties: &HashMap<String, Properties>) -> bool {
     a.object.is_some()
         && a.object == b.object
@@ -276,11 +276,11 @@ fn same_mapping(a: &Character, b: &Character, properties: &HashMap<String, Prope
         && !is_space(&a.text, properties)
         && !is_space(&b.text, properties)
 }
-/// 缺失几何不能作为来源等价证据。
+/// Missing geometry cannot be used as evidence of source equivalence.
 fn close<const N: usize>(a: Option<[f64; N]>, b: Option<[f64; N]>) -> bool {
     matches!((a, b), (Some(a), Some(b)) if a.iter().zip(b).all(|(x,y)| x.is_finite() && y.is_finite() && (*x-y).abs() <= 0.001))
 }
-/// 合并来源索引但不改变代表字形的几何、字体及原始代码。
+/// Merge source index but do not change the geometry, font and original code representing the glyph.
 fn sources<'a>(chars: impl IntoIterator<Item = &'a Character>) -> Vec<usize> {
     let mut values: Vec<usize> = chars
         .into_iter()
@@ -290,7 +290,7 @@ fn sources<'a>(chars: impl IntoIterator<Item = &'a Character>) -> Vec<usize> {
     values.dedup();
     values
 }
-/// 仅为实际一对多且文本不同的映射请求汉字规范化，普通字符不触发固定部首资源读取。
+/// Only the actual one-to-many mapping with different texts requires Chinese character normalization, and ordinary characters do not trigger fixed radical resource reading.
 pub fn mapping_metadata(
     chars: &[Character],
     properties: &HashMap<String, Properties>,
@@ -318,7 +318,7 @@ pub fn mapping_metadata(
     }
     output
 }
-/// 建立完整映射保护组，只折叠已由宿主 Unicode 数据证明等价的单个汉字。
+/// Create a complete mapping protection group, folding only single Chinese characters that have been proven equivalent by the host Unicode data.
 pub fn mapping_groups(
     chars: Vec<Character>,
     properties: &HashMap<String, Properties>,
@@ -373,7 +373,7 @@ pub fn mapping_groups(
         })
         .collect()
 }
-/// 合并重复字形来源，长度不同时全部来源归于代表字符。
+/// The sources of repeated glyphs are merged, and all sources of different lengths are attributed to representative characters.
 fn merge_sources(retained: &mut Glyph, duplicate: &Glyph) {
     if retained.chars.len() == duplicate.chars.len() {
         for (a, b) in retained.chars.iter_mut().zip(&duplicate.chars) {
@@ -383,7 +383,7 @@ fn merge_sources(retained: &mut Glyph, duplicate: &Glyph) {
         retained.chars[0].sources = sources(retained.chars.iter().chain(&duplicate.chars));
     }
 }
-/// 删除两侧内容均被移除的孤立空白，保留正文之间的空格和换行。
+/// Delete the isolated blanks with content on both sides removed, and retain the spaces and line breaks between the text.
 fn retained(
     glyphs: Vec<Glyph>,
     removed: &HashSet<usize>,
@@ -414,7 +414,7 @@ fn retained(
         })
         .collect()
 }
-/// 复用原 Rust 数值内核，连续完成重复绘制候选、平移证据、连通分量和来源归并。
+/// The original Rust numerical kernel is reused to continuously complete repeated drawing candidates, translation evidence, connected components and source merging.
 pub fn collapse_paints(
     mut glyphs: Vec<Glyph>,
     angles: &HashMap<u64, Angle>,
@@ -497,10 +497,10 @@ pub fn collapse_paints(
         .collect();
     Ok(retained(glyphs, &removed, properties))
 }
-/// 隐藏文本与可见文本的有序字符索引配对。
+/// Hidden text is paired with an ordered character index of visible text.
 pub type HiddenPairs = Vec<(Vec<usize>, Vec<usize>)>;
 
-/// 生成隐藏副本配对，宿主随后只需为不同整段字符串准备 NFKC 比较元数据。
+/// To generate a hidden copy pair, the host then only needs to prepare the NFKC comparison metadata for the different entire strings.
 pub fn hidden_pairs(
     glyphs: &[Glyph],
     angles: &HashMap<u64, Angle>,
@@ -535,7 +535,7 @@ pub fn hidden_pairs(
     dedup::hidden_candidates(records)
         .ok_or(SnapshotError::Invalid("unsupported hidden-text geometry"))
 }
-/// 按预先准备的宿主 Unicode 结果判定整段配对，保留现有少量汉字 OCR 容错门槛。
+/// Determine the entire pairing according to the pre-prepared host Unicode result, and retain the existing small number of Chinese character OCR fault tolerance thresholds.
 pub fn suppress_hidden(
     mut glyphs: Vec<Glyph>,
     pairs: HiddenPairs,

@@ -1,4 +1,4 @@
-"""验证标题利用空白扩大、保持正文层次且不覆盖相邻内容。"""
+"""Verify that titles use white space to expand, maintain text hierarchy, and do not overlap adjacent content."""
 
 from copy import deepcopy
 
@@ -11,7 +11,7 @@ from test_pdf_title_font_plan import _render, _sizes
 
 
 def _block(text, rect, *, title=False, index=0, **kwargs):
-    """用 point 坐标定义合成页面，避免归一化数值遮蔽间距边界。"""
+    """Use point coordinates to define composition pages to avoid normalized values from obscuring spacing boundaries."""
     x0, y0, x1, y1 = rect
     if title:
         kwargs.update(type="paragraph_title", level=2)
@@ -19,7 +19,7 @@ def _block(text, rect, *, title=False, index=0, **kwargs):
 
 
 def _image(rect, index):
-    """构造真实区域图，使标题扩展必须遵守视觉内容的占用范围。"""
+    """Construct a real area map so that the title extension must respect the footprint of the visual content."""
     x0, y0, x1, y1 = rect
     bbox = (x0 / 400, y0 / 600, x1 / 400, y1 / 600)
     return {
@@ -33,7 +33,7 @@ def _image(rect, index):
 
 
 def _one_page(blocks):
-    """构造单页严格文档，所有测量和绘制仍经过公开入口。"""
+    """Construct a single page strict document, all measurements and drawings still go through public access."""
     blocks = deepcopy(blocks)
     for index, block in enumerate(blocks):
         block["index"] = index
@@ -43,12 +43,12 @@ def _one_page(blocks):
 
 
 def _title(plans, index=0):
-    """读取当前标题的实际字号及安全绘制范围。"""
+    """Read the actual font size and safe drawing range of the current title."""
     return plans["paragraph_title:level=2"].titles[index]
 
 
 def _clear(record, obstacles):
-    """逐项核对页面边界、原左边缘及与其它原框至少 2 pt 的间距。"""
+    """Check page boundaries, original left edge, and at least 2 pt spacing from other original frames."""
     x0, y0, x1, y1 = record["draw_bbox_pt"]
     assert x0 == pytest.approx(record["original_bbox_pt"][0], abs=0.001)
     assert 0 <= x0 < x1 <= 400 and -0.001 <= y0 < y1 <= 600.001
@@ -57,7 +57,7 @@ def _clear(record, obstacles):
 
 
 def test_original_frame_stays_when_it_already_fits():
-    """原框足够时不移动或扩大，标题字号依旧比实际正文大 2 pt。"""
+    """When the original frame is large enough, it will not be moved or expanded, and the title font size will still be 2 pt larger than the actual text."""
     rect = (40, 40, 300, 70)
     artifact, plans = _render(_one_page([_block("TITLE", rect, title=True), _block("BODY", (40, 100, 300, 180), index=1)]))
     record = _title(plans)
@@ -68,7 +68,7 @@ def test_original_frame_stays_when_it_already_fits():
 
 @pytest.mark.parametrize("kind,level,increment", [("paragraph_title", 6, 2), ("doc_title", 1, 4)])
 def test_body_reference_overrides_old_style_caps_and_handles_no_chapters(kind, level, increment):
-    """末级标题可以超过旧样式上限，无章节标题时主标题使用正文加 4 pt。"""
+    """The last-level title can exceed the upper limit of the old style. When there is no chapter title, the main title uses the main text plus 4 pt."""
     artifact, _ = _render(
         _one_page(
             [
@@ -82,7 +82,7 @@ def test_body_reference_overrides_old_style_caps_and_handles_no_chapters(kind, l
 
 
 def test_only_upward_space_is_used_without_moving_body():
-    """下方紧邻正文时向上借空白，正文仍使用原位置和字号。"""
+    """When the text is immediately below, the space is borrowed upward, and the original position and font size are still used for the text."""
     obstacles = [(40, 20, 300, 60), (40, 107, 300, 180)]
     artifact, plans = _render(
         _one_page(
@@ -101,7 +101,7 @@ def test_only_upward_space_is_used_without_moving_body():
 
 
 def test_only_rightward_space_keeps_title_on_one_line():
-    """上下均受阻时利用同栏右侧空白，保留原顶边且不挤压前后正文。"""
+    """When both top and bottom are blocked, use the space on the right side of the same column to retain the original top edge without squeezing the front and rear text."""
     obstacles = [(40, 20, 300, 100), (40, 121, 300, 180)]
     artifact, plans = _render(
         _one_page(
@@ -121,7 +121,7 @@ def test_only_rightward_space_keeps_title_on_one_line():
 
 
 def test_long_title_can_wrap_inside_expanded_column():
-    """长标题可以在安全栏宽内多行排版，而非被压回很矮的原框。"""
+    """Long titles can be formatted on multiple lines within the safe column width, rather than being squeezed back into a short original frame."""
     body = (40, 220, 300, 300)
     _, plans = _render(
         _one_page(
@@ -140,7 +140,7 @@ def test_long_title_can_wrap_inside_expanded_column():
 
 
 def test_consecutive_titles_share_gap_without_double_claiming_it():
-    """相邻标题以间隙中线分配空间，扩展后仍保持原顺序和安全间距。"""
+    """Adjacent titles are allocated space with the center line of the gap, and the original order and safe spacing are maintained after expansion."""
     _, plans = _render(
         _one_page(
             [
@@ -159,7 +159,7 @@ def test_consecutive_titles_share_gap_without_double_claiming_it():
 
 
 def test_two_columns_and_nearby_image_bound_right_expansion():
-    """右栏图像即使旁边有留白，也不能被左栏标题的扩展侵入。"""
+    """Even if there is white space next to the right column image, it cannot be invaded by the expansion of the left column title."""
     obstacles = [(40, 100, 180, 180), (220, 30, 380, 180)]
     _, plans = _render(
         _one_page(
@@ -177,7 +177,7 @@ def test_two_columns_and_nearby_image_bound_right_expansion():
 
 
 def test_existing_spanning_title_preserves_its_span():
-    """原本跨栏的标题保留原跨度，以下方跨栏正文确定安全右边界。"""
+    """The original cross-column title retains the original span, and the following cross-column text determines the safe right boundary."""
     obstacles = [(40, 20, 170, 60), (220, 20, 360, 60), (40, 130, 360, 210)]
     _, plans = _render(
         _one_page(
@@ -196,7 +196,7 @@ def test_existing_spanning_title_preserves_its_span():
 
 
 def test_unknown_column_does_not_borrow_the_whole_page_width():
-    """只有另一栏正文时用全篇正文字号兜底，但不据此猜测标题所在栏的宽度。"""
+    """When there is only one column of text, use the entire text number, but do not use this to guess the width of the column where the title is located."""
     _, plans = _render(
         _one_page(
             [
@@ -211,7 +211,7 @@ def test_unknown_column_does_not_borrow_the_whole_page_width():
 
 
 def test_title_at_page_edge_stays_inside_page_and_clear_of_images():
-    """页面顶部的标题只能向下借空白，不能越出页面或侵入右侧图片。"""
+    """The title at the top of the page can only borrow space downwards and cannot cross the page or invade the image on the right."""
     obstacles = [(40, 40, 170, 100), (200, 0, 390, 50)]
     _, plans = _render(
         _one_page(
@@ -228,7 +228,7 @@ def test_title_at_page_edge_stays_inside_page_and_clear_of_images():
 
 
 def test_insufficient_space_only_shrinks_the_constrained_title():
-    """安全区域只有 4 pt 高时单独缩小当前标题，另一页的同级标题仍达到目标字号。"""
+    """The safe area is only 4. When pt is high, the current title is reduced individually, but the title of the same level on another page still reaches the target font size."""
     obstacles = [(40, 20, 300, 100), (40, 108, 300, 180)]
     middle = _middle(
         [
@@ -257,7 +257,7 @@ def test_insufficient_space_only_shrinks_the_constrained_title():
 
 
 def test_existing_geometry_conflict_does_not_expand_occupied_area():
-    """输入已重叠时报告冲突，标题仍留在自身原框内，不扩大原有重叠范围。"""
+    """Report conflicts when inputs overlap. The title remains within its original frame and does not expand the original overlapping range."""
     original = (40, 80, 180, 90)
     artifact, plans = _render(
         _one_page(
@@ -275,7 +275,7 @@ def test_existing_geometry_conflict_does_not_expand_occupied_area():
 
 
 def test_fallback_uses_only_exported_body_fonts():
-    """没有同栏正文时只参考已导出页面，单独导出标题页时回退到默认正文样式。"""
+    """When there is no body text in the same column, only the exported page will be referenced. When the title page is exported separately, it will fall back to the default text style."""
     middle = _middle(
         [
             {"page_idx": 0, "blocks": [_block("SMALL BODY", (40, 50, 300, 62.2))]},
@@ -291,7 +291,7 @@ def test_fallback_uses_only_exported_body_fonts():
 @pytest.mark.parametrize("formula", ["x^2", r"\frac{\sum_{i=1}^n x_i}{y}"])
 @pytest.mark.parametrize("narrow", [False, True])
 def test_expanded_rich_title_keeps_formula_links_and_anchor_once(formula, narrow):
-    """扩大标题时保留富文本、上下标和公式，链接与锚点只输出一次。"""
+    """Rich text, superscripts, subscripts, and formulas are retained when the title is expanded, and links and anchors are only output once."""
     data = _one_page(
         [
             _block("unused", (40, 80, 100, 85), title=True, anchor="head"),

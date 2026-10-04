@@ -1,4 +1,4 @@
-"""守卫素材复制、按需 PDF 裁图和独立格式输入的行为边界。"""
+"""Guard behavioral boundaries for material duplication, on-demand PDF cropping, and independent format import."""
 
 from __future__ import annotations
 
@@ -11,14 +11,14 @@ from docvortex.assets import AssetStore
 
 
 def test_asset_copy_keeps_independent_indexes_without_rehashing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """已验证的不可变字节可共享，副本增删索引不得污染原集合。"""
+    """Verified immutable bytes can be shared, and replica addition and deletion indexes must not pollute the original collection."""
     from docvortex.assets import store
 
     payload = b"existing immutable image"
     assets = AssetStore({"images/a.png": payload})
 
     def forbidden(_payload: bytes) -> object:
-        """复制已经验证的素材时不应重新读取全部字节计算摘要。"""
+        """The full byte count digest should not be re-read when copying already verified material."""
         raise AssertionError("Existing assets must not be hashed again")
 
     with monkeypatch.context() as scoped:
@@ -34,7 +34,7 @@ def test_asset_copy_keeps_independent_indexes_without_rehashing(monkeypatch: pyt
 
 
 def test_explicit_source_does_not_load_detection_models() -> None:
-    """独立解释器显式准备 CSV 时无需加载文件识别或数值计算依赖。"""
+    """The standalone interpreter explicitly prepares CSV without loading file recognition or numerical calculation dependencies."""
     code = """
 import sys
 from docvortex.document.source import prepare_source

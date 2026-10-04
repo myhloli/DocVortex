@@ -1,4 +1,4 @@
-"""RTF info 属性提取，仅读取前导信息，不构造正文语义树。"""
+"""RTF info Attribute extraction, only the leading information is read, and the text semantic tree is not constructed."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from .parser import _decode_group_text, _named_groups, parse_rtf_prelude, read_r
 
 
 def _rtf_date(group: bytes, warnings: list[str]) -> str | None:
-    """组合 info 日期控件，缺失的月日时间保持缺失。"""
+    """Combined with the info date control, the missing month, day, and time remain missing."""
     fields = dict(re.findall(rb"\\(yr|mo|dy|hr|min|sec)(\d+)", group))
     if b"yr" not in fields:
         return None
@@ -25,7 +25,7 @@ def _rtf_date(group: bytes, warnings: list[str]) -> str | None:
 
 
 def read_rtf_properties(data: bytes) -> tuple[DocumentProperties, list[str]]:
-    """复用 RTF 编码和 info 解析，补充显式日期、软件及声明页数。"""
+    """Reuse RTF encoding and info parsing, and add explicit date, software and declaration page number."""
     warnings: list[str] = []
     data = read_rtf_bytes(BytesIO(data))
     prelude = parse_rtf_prelude(data)

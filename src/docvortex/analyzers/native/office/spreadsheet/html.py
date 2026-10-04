@@ -1,4 +1,4 @@
-"""把完整工作表表格 IR 确定性渲染为 HTML。"""
+"""Deterministically renders the complete worksheet table IR to HTML."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ EQUATION_BOOKENDS = "<eq>{EQ}</eq>"
 
 
 def _contains_block_level_html(content: str) -> bool:
-    """判断单元格内容是否已经包含块级 HTML。"""
+    """Determine whether the cell content already contains block-level HTML."""
     return bool(
         re.search(
             r"<\s*(p|ul|ol|li|div|table|blockquote|pre|h[1-6])\b",
@@ -22,7 +22,7 @@ def _contains_block_level_html(content: str) -> bool:
 
 
 def _render_cell_inner_html(content: str, is_html: bool) -> str:
-    """为普通或行内 HTML 内容补充稳定的段落容器。"""
+    """Supplement stable paragraph containers for normal or inline HTML content."""
     if not content:
         return "<p></p>"
     if is_html and _contains_block_level_html(content):
@@ -35,7 +35,7 @@ def render_spreadsheet_table(
     *,
     equation_bookends: str = EQUATION_BOOKENDS,
 ) -> str:
-    """渲染表头、合并格、媒体和公式均已物化的工作表表格。"""
+    """Render a worksheet table with headers, merge cells, media, and formulas all materialized."""
     cell_map = {(cell.row, cell.col): cell for cell in excel_table.data}
     covered_cells: set[tuple[int, int]] = set()
     lines = ["<table>"]

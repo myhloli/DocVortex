@@ -1,4 +1,4 @@
-"""集中识别静态 HTML/XHTML 公式并归一化为裸 LaTeX。"""
+"""Static HTML/XHTML formulas are collectively identified and normalized to bare LaTeX."""
 
 from __future__ import annotations
 
@@ -81,7 +81,7 @@ _PRESENTATION_ARITIES: dict[str, int] = {
 
 @dataclass(frozen=True, slots=True)
 class FormulaExtraction:
-    """保存一次成功公式识别的裸 LaTeX、显示方式和来源。"""
+    """Save the bare LaTeX, display mode and source of a successful formula identification."""
 
     latex: str
     display: FormulaDisplay
@@ -89,7 +89,7 @@ class FormulaExtraction:
 
 
 def extract_formula(element: etree._Element) -> FormulaExtraction | None:
-    """按固定优先级从公式节点或常见公式包装器中提取裸 LaTeX。"""
+    """Extract bare LaTeX from formula nodes or common formula wrappers with fixed priority."""
     display = _formula_display(element)
 
     if latex := _subtree_attribute(element, "data-docvortex-latex"):
@@ -128,7 +128,7 @@ def extract_formula(element: etree._Element) -> FormulaExtraction | None:
 
 
 def strip_formula_delimiters(value: str) -> str:
-    """重复移除常见外层 TeX 定界符，不改动公式内部结构。"""
+    """Repeatedly remove the common outer TeX delimiter without changing the internal structure of the formula."""
     normalized = value.strip()
     pairs = (("$$", "$$"), (r"\[", r"\]"), (r"\(", r"\)"), ("$", "$"))
     for _ in range(4):
@@ -145,18 +145,18 @@ def strip_formula_delimiters(value: str) -> str:
 
 
 def is_tex_script(element: etree._Element) -> bool:
-    """判断元素是否是受支持的静态 TeX/LaTeX script carrier。"""
+    """Determines whether the element is a supported static TeX/LaTeX script carrier."""
     return local_name(element) == "script" and _MATH_SCRIPT_TYPE_RE.fullmatch((element.get("type") or "").strip()) is not None
 
 
 def _normalized_attribute(element: etree._Element, name: str) -> str | None:
-    """读取并去除外层定界符，空值统一返回 None。"""
+    """Read and remove the outer delimiter, and return None for null values."""
     value = strip_formula_delimiters(element.get(name) or "")
     return value or None
 
 
 def _subtree_attribute(element: etree._Element, name: str) -> str | None:
-    """按文档顺序返回自身或后代首个非空规范公式属性。"""
+    """Returns the first non-null canonical formula attribute of itself or its descendants in document order."""
     for candidate in [element, *element.iterdescendants()]:
         if isinstance(candidate.tag, str) and (value := _normalized_attribute(candidate, name)):
             return value
@@ -164,7 +164,7 @@ def _subtree_attribute(element: etree._Element, name: str) -> str | None:
 
 
 def _tex_annotation(element: etree._Element) -> str | None:
-    """返回节点子树中首个受支持 TeX annotation。"""
+    """Returns the first supported TeX annotation in the node subtree."""
     candidates = [element, *element.iterdescendants()]
     for candidate in candidates:
         if not isinstance(candidate.tag, str) or local_name(candidate) != "annotation":
@@ -179,7 +179,7 @@ def _tex_annotation(element: etree._Element) -> str | None:
 
 
 def _tex_script(element: etree._Element) -> str | None:
-    """返回当前节点或后代中首个受支持 TeX script 内容。"""
+    """Returns the first supported TeX script content in the current node or descendant."""
     candidates = [element, *element.iterdescendants()]
     for candidate in candidates:
         if not isinstance(candidate.tag, str) or not is_tex_script(candidate):
@@ -191,7 +191,7 @@ def _tex_script(element: etree._Element) -> str | None:
 
 
 def _data_formula(element: etree._Element) -> str | None:
-    """按 data-tex、data-expr 顺序读取节点及其后代。"""
+    """Read nodes and their descendants in order data-tex, data-expr."""
     for candidate in [element, *element.iterdescendants()]:
         if not isinstance(candidate.tag, str):
             continue
@@ -202,7 +202,7 @@ def _data_formula(element: etree._Element) -> str | None:
 
 
 def _mathml_alttext(element: etree._Element) -> str | None:
-    """返回首个 MathML alttext 中声明的 LaTeX。"""
+    """Returns the LaTeX declared in the first MathML alttext."""
     for candidate in [element, *element.iterdescendants()]:
         if not isinstance(candidate.tag, str) or local_name(candidate) != "math":
             continue
@@ -212,7 +212,7 @@ def _mathml_alttext(element: etree._Element) -> str | None:
 
 
 def _presentation_mathml(element: etree._Element) -> str | None:
-    """尽力把受支持 Presentation MathML 转换为裸 LaTeX。"""
+    """Try to convert supported Presentation MathML to bare LaTeX."""
     if not _is_supported_presentation_mathml(element):
         return None
     latex = mathml_to_latex(element)
@@ -221,7 +221,7 @@ def _presentation_mathml(element: etree._Element) -> str | None:
 
 
 def _is_supported_presentation_mathml(element: etree._Element) -> bool:
-    """拒绝未知节点和畸形固定元数结构，避免把普通 XML 文本冒充为 LaTeX。"""
+    """Reject unknown nodes and malformed fixed element structures to avoid passing ordinary XML text as LaTeX."""
     if local_name(element) != "math":
         return False
     for candidate in [element, *element.iterdescendants()]:
@@ -241,7 +241,7 @@ def _is_supported_presentation_mathml(element: etree._Element) -> bool:
 
 
 def _formula_display(element: etree._Element, default: FormulaDisplay = "inline") -> FormulaDisplay:
-    """从显式属性、MathML display 和完整 class token 推断显示方式。"""
+    """Display mode inferred from explicit properties, MathML display and full class token."""
     declared = (element.get("data-formula-display") or "").strip().casefold()
     if declared in {"inline", "block"}:
         return declared  # type: ignore[return-value]
@@ -252,7 +252,7 @@ def _formula_display(element: etree._Element, default: FormulaDisplay = "inline"
 
 
 def _script_display(element: etree._Element, default: FormulaDisplay) -> FormulaDisplay:
-    """在脚本来源中识别 mode=display，并保留外层显式显示方式。"""
+    """Recognize mode=display in the script source and preserve the outer explicit display mode."""
     for candidate in [element, *element.iterdescendants()]:
         if not isinstance(candidate.tag, str) or not is_tex_script(candidate):
             continue
@@ -263,7 +263,7 @@ def _script_display(element: etree._Element, default: FormulaDisplay) -> Formula
 
 
 def _class_tokens(element: etree._Element) -> frozenset[str]:
-    """返回不做任意 substring 匹配的完整 class token。"""
+    """Returns the complete class token without any substring matching."""
     return frozenset((element.get("class") or "").casefold().split())
 
 
@@ -276,5 +276,5 @@ __all__ = [
     "strip_formula_delimiters",
 ]
 
-# 保持既有公开类型的 pickle 路径，所有旧、新入口指向同一个类。
+# Keep the existing public type pickle path, with all old and new entries pointing to the same class.
 preserve_type_module(FormulaExtraction, "docvortex.analyzers.native._shared.markup.formula")

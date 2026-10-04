@@ -1,4 +1,4 @@
-"""为重复标题带下的独立正文栏建立PDF局部虚拟项，保留共享XYCut默认规则。"""
+"""Create a PDF local virtual item for the independent text column under the repeated title band, and retain the shared XYCut default rule."""
 
 import statistics
 import re
@@ -7,7 +7,7 @@ from .geometry import _bbox_union_many
 
 
 def parallel_heading_panel_groups(blocks, excluded_indices):
-    """同高同式标题、逐栏左缘和净空栏沟证明独立面板；跨栏正文及缺失主体拒绝分组。"""
+    """Titles of the same height and style, column-by-column left margins, and clear column gaps prove independent panels; cross-column text and missing bodies reject grouping."""
     titles = [
         (index, block)
         for index, block in enumerate(blocks)
@@ -60,7 +60,7 @@ def parallel_heading_panel_groups(blocks, excluded_indices):
                     break
                 accepted.append(item)
                 bottom = item[1]["bbox"][3]
-            # 独立面板的上方指标标题与下方解释共属一栏，避免先遍历所有指标。
+            # The upper indicator title and the lower explanation of the independent panel belong to the same column to avoid traversing all indicators first.
             preceding = [
                 (i, block)
                 for i, block in enumerate(blocks)
@@ -90,7 +90,7 @@ def parallel_heading_panel_groups(blocks, excluded_indices):
 
 
 def numbered_step_member_groups(blocks, excluded_indices):
-    """连续字母子步骤与前后同栏编号共同证明归属，排序时将父步骤和子项作为整体。"""
+    """Consecutive letter sub-steps and numbers in the same column before and after jointly prove ownership. When sorting, the parent step and child items are treated as a whole."""
     available = [
         (i, block)
         for i, block in enumerate(blocks)

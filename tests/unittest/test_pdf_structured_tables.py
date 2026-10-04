@@ -1,4 +1,4 @@
-"""验证原始版式的结构表格、内容列宽、旋转和按块失败兜底。"""
+"""Verify the structure of the original layout table, content column width, rotation and block failure."""
 
 from __future__ import annotations
 
@@ -21,14 +21,14 @@ from docvortex.schema import BlockBase, MiddleJson, PageInfo
 
 
 def _png() -> str:
-    """生成与结构表格可区分的纯色区域图。"""
+    """Generates solid color area plots distinguishable from structural tables."""
     stream = BytesIO()
     Image.new("RGB", (120, 60), "red").save(stream, format="PNG")
     return "data:image/png;base64," + base64.b64encode(stream.getvalue()).decode()
 
 
 def _text(index: int, rect: tuple, text: str, kind: str = "text") -> dict:
-    """用 point 坐标构造具有独立原框的文字块。"""
+    """Use point coordinates to construct a text block with an independent original frame."""
     return {
         "type": kind,
         "index": index,
@@ -38,7 +38,7 @@ def _text(index: int, rect: tuple, text: str, kind: str = "text") -> dict:
 
 
 def _table(index: int, rect: tuple, html: str, *, image: bool = True, caption: bool = False, missing: bool = False) -> dict:
-    """构造可带原图、表题和缺失子框的严格表格。"""
+    """Construct strict tables with original images, table titles, and missing subboxes."""
     bbox = [rect[0] / 400, rect[1] / 600, rect[2] / 400, rect[3] / 600]
     body = {"type": "table_body", "index": index, "bbox": None if missing else bbox, "content": html}
     if image:
@@ -53,7 +53,7 @@ def _table(index: int, rect: tuple, html: str, *, image: bool = True, caption: b
 
 
 def _middle(blocks: list[dict], angle: int = 0) -> MiddleJson:
-    """构造一页测试协议，旋转元数据只绑定编号为 10 的表格主体。"""
+    """Construct a one-page test protocol and rotate the metadata to only bind the table body numbered 10."""
     return MiddleJson(
         pages=[PageInfo.model_validate({"page_idx": 0, "blocks": blocks})],
         is_full_document=True,
@@ -75,10 +75,10 @@ def _middle(blocks: list[dict], angle: int = 0) -> MiddleJson:
 
 
 class _RecordingRenderer(OriginalPdfRenderer):
-    """通过正常渲染链路保存临时绘制计划，验证真实最终几何。"""
+    """Save temporary draw plans through the normal rendering link to verify the true final geometry."""
 
     def __init__(self, middle: MiddleJson) -> None:
-        """创建只属于本次测试的 renderer 与绘制计划索引。"""
+        """Create a renderer and draw plan index that belongs only to this test."""
         super().__init__(middle, asset_resolver=None, document_title="test", page_sizes={0: (400, 600)})
         self.items: dict[int, PreparedBlock] = {}
 
@@ -91,7 +91,7 @@ class _RecordingRenderer(OriginalPdfRenderer):
         *,
         index_entry: bool = False,
     ) -> list[PreparedBlock]:
-        """记录父框或叶子框的实际准备结果，不替换生产布局算法。"""
+        """Record the actual preparation results of the parent box or leaf box, without replacing the production layout algorithm."""
         items = super()._prepare_block(block, page_idx, page_width, page_height, index_entry=index_entry)
         self.items.update({item.block.index: item for item in items})
         return items
@@ -99,7 +99,7 @@ class _RecordingRenderer(OriginalPdfRenderer):
 
 @pytest.mark.parametrize("layout", [PdfLayout.AUTO, PdfLayout.ORIGINAL])
 def test_default_structure_keeps_cells_and_caption_without_region_image(layout: PdfLayout) -> None:
-    """两种原版式入口默认保留合并格、空单元格和表题，且不改变输入数据。"""
+    """The two original format entrances retain merged cells, empty cells, and table titles by default, and do not change the input data."""
     html = "<table><tr><th colspan='2'>HEADER</th></tr><tr><td></td><td>SELECTABLE</td></tr></table>"
     middle = _middle([_table(10, (40, 60, 350, 220), html, caption=True)])
     before = deepcopy(middle)
@@ -115,7 +115,7 @@ def test_default_structure_keeps_cells_and_caption_without_region_image(layout: 
 
 
 def test_content_widths_reserve_name_column_and_respect_colspan() -> None:
-    """长名称列比纯数字列宽，跨列标题不把各数字列单独撑宽。"""
+    """The long name column is wider than the pure number column, and the cross-column header does not expand each number column separately."""
     html = (
         "<table><tr><th rowspan='2'>Catchment</th><th colspan='2'>Percentile</th></tr>"
         "<tr><th>10</th><th>20</th></tr>"
@@ -132,14 +132,14 @@ def test_content_widths_reserve_name_column_and_respect_colspan() -> None:
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_rotated_structured_text_has_correct_direction_and_stays_in_box(angle: int) -> None:
-    """从真实 PDF 文字坐标验证结构表方向，而不只检查 Flowable 的角度字段。"""
+    """Verify structure table orientation from real PDF text coordinates instead of just checking the angle field of Flowable."""
     html = "<table><tr><td>FIRSTROW</td></tr><tr><td>LASTROW</td></tr></table>"
     renderer = _RecordingRenderer(_middle([_table(10, (60, 80, 200, 350), html)], angle))
     payload = renderer.render()
     positions = {}
 
     def visit(text: str, cm: list, tm: list, font: object, size: float) -> None:
-        """把文字局部坐标乘以当前画布矩阵得到页面坐标。"""
+        """Multiply the text local coordinates by the current canvas matrix to get the page coordinates."""
         if text.strip():
             positions[text.strip()] = (tm[4] * cm[0] + tm[5] * cm[2] + cm[4], tm[4] * cm[1] + tm[5] * cm[3] + cm[5])
 
@@ -160,7 +160,7 @@ def test_rotated_structured_text_has_correct_direction_and_stays_in_box(angle: i
 
 
 def test_safe_expansion_respects_frozen_text_and_adjacent_table() -> None:
-    """表格只借用安全空白，预留下一张表的原框，正文的位置不被挪动。"""
+    """The table only uses safe space, leaving the original frame of the table, and the position of the text will not be moved."""
     html = "<table>" + "<tr><td>ROW</td><td>123</td></tr>" * 8 + "</table>"
     middle = _middle(
         [
@@ -182,7 +182,7 @@ def test_safe_expansion_respects_frozen_text_and_adjacent_table() -> None:
 
 
 def test_tiny_region_retains_structure_below_six_points_and_full_width() -> None:
-    """没有可借空白时继续缩小结构表并报告低字号，不因可读性限制回退原图。"""
+    """When there is no available blank space, the structure table will continue to be reduced and a low font size will be reported, without falling back to the original image due to readability limitations."""
     html = "<table>" + "<tr><td>RETAINED</td><td>123</td></tr>" * 16 + "</table>"
     renderer = _RecordingRenderer(
         _middle(
@@ -207,7 +207,7 @@ def test_tiny_region_retains_structure_below_six_points_and_full_width() -> None
 
 
 def test_missing_child_boxes_reserve_caption_inside_parent() -> None:
-    """缺子框的父表组合仍保留完整结构和表题，不把表题覆盖在单元格上。"""
+    """The parent table combination that lacks child boxes still retains the complete structure and table title, and does not cover the table title on the cell."""
     html = "<table>" + "<tr><td>GROUP CELL</td></tr>" * 5 + "</table>"
     renderer = _RecordingRenderer(_middle([_table(10, (40, 60, 240, 150), html, caption=True, missing=True)]))
     page = PdfReader(BytesIO(renderer.render())).pages[0]
@@ -229,7 +229,7 @@ def test_missing_child_boxes_reserve_caption_inside_parent() -> None:
     ],
 )
 def test_missing_or_invalid_html_uses_image_text_or_placeholder(html: str, image: bool) -> None:
-    """HTML 不可用时按块兜底，图片缺失不会中断整本 PDF。"""
+    """When HTML is unavailable, click on the block to find out. Missing pictures will not interrupt the entire PDF."""
     with collect_pdf_diagnostics() as diagnostics:
         payload = render_pdf(_middle([_table(10, (40, 60, 240, 180), html, image=image)]))
     page = PdfReader(BytesIO(payload)).pages[0]
@@ -240,16 +240,16 @@ def test_missing_or_invalid_html_uses_image_text_or_placeholder(html: str, image
 
 
 def test_drawing_failure_is_detected_before_final_canvas(monkeypatch: pytest.MonkeyPatch) -> None:
-    """真实绘制阶段出错时丢弃预绘制画布，不把部分结构内容叠在回退图上。"""
+    """When an error occurs in the actual drawing phase, the pre-drawn canvas is discarded and part of the structural content is not superimposed on the fallback map."""
 
     class BrokenTable(Table):
         def draw(self) -> None:
-            """模拟 ReportLab 在绘制过程中才发现异常。"""
+            """Simulation ReportLab The exception was discovered during the drawing process."""
             self.canv.drawString(0, 0, "PARTIAL TABLE")
             raise ValueError("drawing rejected")
 
     def broken(self: OriginalPdfRenderer, content: str, **kwargs: object) -> list[Table]:
-        """只替换表格物化结果，仍执行真实 fit、预绘制及素材兜底。"""
+        """Only the table materialization result is replaced, and the real fit, pre-drawing and material extraction are still performed."""
         return [BrokenTable([["CELL"]], colWidths=[100])]
 
     monkeypatch.setattr(OriginalPdfRenderer, "_html_tables", broken)
@@ -262,7 +262,7 @@ def test_drawing_failure_is_detected_before_final_canvas(monkeypatch: pytest.Mon
 
 
 def test_rich_nested_cells_and_images_are_preserved() -> None:
-    """嵌套表、上下标、中英混排、公式、链接及单元格图片仍由共享单元格渲染处理。"""
+    """Nested tables, superscripts and subscripts, mixed Chinese and English, formulas, links and cell images are still rendered by shared cells."""
     html = (
         "<table><tr><th colspan='2'>标题 Header</th></tr><tr><td rowspan='2'>"
         "<b>Bold</b> H<sub>2</sub>O <eq>x^2</eq><a href='https://example.com'>LINK</a></td>"
@@ -280,7 +280,7 @@ def test_rich_nested_cells_and_images_are_preserved() -> None:
 
 
 def test_repeated_fit_rebuilds_columns_and_restores_font_size() -> None:
-    """窄矮试排后再次放宽时，列宽、字号和高度恢复到全新物化结果。"""
+    """When the narrow and short layout is relaxed again, the column width, font size and height return to the new materialized results."""
     html = "<table><tr><td>Name</td><td>Value</td></tr><tr><td>Long descriptive name</td><td>12</td></tr></table>"
     renderer = _RecordingRenderer(_middle([_table(10, (40, 60, 360, 400), html)]))
     renderer.render()
@@ -297,7 +297,7 @@ def test_repeated_fit_rebuilds_columns_and_restores_font_size() -> None:
 
 
 def test_spatial_options_do_not_change_reflow_defaults() -> None:
-    """紧凑字号与内容列宽仅由原版式显式启用，共享重排表仍使用等宽列。"""
+    """Compact font size and content column width are only explicitly enabled by the original format, shared reflow tables still use fixed-width columns."""
     html = "<table><tr><td>A long name here</td><td>1</td></tr></table>"
     renderer = _RecordingRenderer(_middle([_table(10, (40, 60, 350, 200), html)]))
     block = renderer.middle_json.pages[0].blocks[0].content[0]
@@ -310,7 +310,7 @@ def test_spatial_options_do_not_change_reflow_defaults() -> None:
 
 
 def test_long_cell_formula_is_measured_at_natural_width_before_region_scaling() -> None:
-    """长公式通过区域缩放容纳，测量用矢量和实际绘制的 Drawing 尺寸保持一致。"""
+    """Long formulas are accommodated by area scaling, and the measured vectors are consistent with the actual drawn Drawing dimensions."""
     formula = "+".join(f"x_{{{index}}}^2" for index in range(40))
     html = f"<table><tr><td><eq>{formula}</eq></td><td>VALUE</td></tr></table>"
     renderer = _RecordingRenderer(_middle([_table(10, (40, 60, 240, 180), html)]))
@@ -325,7 +325,7 @@ def test_long_cell_formula_is_measured_at_natural_width_before_region_scaling() 
 
 
 def test_rotated_table_expansion_preserves_original_page_margins() -> None:
-    """旋转表格不能为了提高字号占满原来属于页边距的留白。"""
+    """Rotating tables cannot occupy the original margin space in order to increase the font size."""
     html = "<table>" + "<tr><td>FIRST</td><td>SECOND</td></tr>" * 14 + "</table>"
     renderer = _RecordingRenderer(_middle([_table(10, (60, 100, 180, 450), html)], 270))
     renderer.render()
@@ -334,7 +334,7 @@ def test_rotated_table_expansion_preserves_original_page_margins() -> None:
 
 
 def test_tall_inline_formula_reserves_its_ink_height_in_table_row() -> None:
-    """单元格内高分数的实际高度必须进入行高，不能穿过相邻行边框。"""
+    """The actual height of the high score within the cell must fit into the row height and cannot cross adjacent row borders."""
     source = r"\frac{\sum_{i=1}^N x_i^2}{\frac{a}{b}}"
     html = f"<table><tr><td><eq>{source}</eq></td></tr><tr><td>NEXT ROW</td></tr></table>"
     renderer = _RecordingRenderer(_middle([_table(10, (40, 60, 360, 300), html)]))
@@ -346,7 +346,7 @@ def test_tall_inline_formula_reserves_its_ink_height_in_table_row() -> None:
 
 
 def test_long_cjk_cell_wraps_without_forcing_entire_table_to_tiny_font() -> None:
-    """连续中文按已有 CJK 规则换行，不能把整段误当最小列宽而缩小全表。"""
+    """Continuous Chinese characters are wrapped according to the existing CJK rules. Do not mistake the entire paragraph for the minimum column width and reduce the entire table."""
     text = "这是用于验证表格换行和字号的中文内容" * 5
     html = f"<table><tr><td>{text}</td><td>123</td></tr></table>"
     renderer = _RecordingRenderer(_middle([_table(10, (40, 60, 260, 350), html)]))
@@ -358,7 +358,7 @@ def test_long_cjk_cell_wraps_without_forcing_entire_table_to_tiny_font() -> None
 
 
 def test_short_nested_table_does_not_claim_entire_parent_width() -> None:
-    """嵌套短表使用内容固有宽度，不把外层分配的空白强制变成最小列宽。"""
+    """Nested short tables use the inherent width of the content and do not force the outer allocated whitespace into the minimum column width."""
     html = "<table><tr><td>LEFT</td><td><table><tr><td>Nested</td></tr></table></td></tr></table>"
     renderer = _RecordingRenderer(_middle([_table(10, (40, 60, 280, 240), html)]))
     renderer.render()

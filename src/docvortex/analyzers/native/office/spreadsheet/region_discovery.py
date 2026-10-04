@@ -1,4 +1,4 @@
-"""电子表格数据区域发现的格式中立洪水填充与 gap 候选评分算法。"""
+"""Format-neutral flood filling of spreadsheet data region discovery with the gap candidate scoring algorithm."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ AUTO_GAP_TOLERANCE_PREFERENCE_MARGIN = 0.15
 
 @dataclass(frozen=True, slots=True)
 class ConnectedRegion:
-    """保存一次洪水填充得到的连通内容格集合及其包围盒。"""
+    """Save the set of connected content cells and their bounding boxes obtained by flooding once."""
 
     cells: frozenset[tuple[int, int]]
     row_start: int
@@ -29,12 +29,12 @@ class ConnectedRegion:
 
     @property
     def num_rows(self) -> int:
-        """返回区域包围盒的行数。"""
+        """Returns the number of rows of the region's bounding box."""
         return self.row_end - self.row_start + 1
 
     @property
     def num_cols(self) -> int:
-        """返回区域包围盒的列数。"""
+        """Returns the number of columns of the region's bounding box."""
         return self.col_end - self.col_start + 1
 
 
@@ -45,7 +45,7 @@ def discover_connected_regions(
     max_col: int,
     gap_tolerance: int,
 ) -> list[ConnectedRegion]:
-    """按阅读顺序对未访问内容格洪水填充，返回各起点的连通区域。"""
+    """Flood-fill the unvisited content cells in reading order and return the connected areas of each starting point."""
     visited: set[tuple[int, int]] = set()
     regions: list[ConnectedRegion] = []
     for start_row, start_col in start_positions:
@@ -65,10 +65,10 @@ def _flood_fill_region(
     max_col: int,
     gap_tolerance: int,
 ) -> ConnectedRegion:
-    """使用洪水填充（BFS）策略确定一个表格区域的连通格与包围盒。
+    """Use the flood filling (BFS) strategy to determine the connected grid and bounding box of a table area.
 
-    四方向邻居在容忍距离内可跨越空白格连接内容，遇到已属于当前区域的
-    坐标立即停止该方向扩展，保证同一方向只桥接最近的内容格。
+    Neighbors in four directions can connect content across blank spaces within the tolerance distance. When encountering content that already belongs to the current area,
+    The coordinates immediately stop expanding in this direction, ensuring that only the closest content cells are bridged in the same direction.
     """
     queue: collections.deque[tuple[int, int]] = collections.deque([(start_row, start_col)])
     table_cells: set[tuple[int, int]] = {(start_row, start_col)}
@@ -77,7 +77,7 @@ def _flood_fill_region(
     min_c, max_c = start_col, start_col
 
     def in_bounds_content(r: int, c: int) -> bool:
-        """先做包围盒级越界拦截，再委托调用方的语义内容判定。"""
+        """First perform bounding box-level out-of-bounds interception, and then entrust the caller with semantic content determination."""
         if r < 0 or c < 0 or r > max_row or c > max_col:
             return False
         return has_content(r, c)
@@ -91,24 +91,24 @@ def _flood_fill_region(
         max_c = max(max_c, curr_c)
 
         directions = [
-            (0, 1),  # 右
-            (0, -1),  # 左
-            (1, 0),  # 下
-            (-1, 0),  # 上
+            (0, 1),  # right
+            (0, -1),  # Left
+            (1, 0),  # Down
+            (-1, 0),  # superior
         ]
 
         for dr, dc in directions:
-            # 在容忍距离范围内逐步检查邻居（优先检查最近的）。
+            # Neighbors are checked incrementally within a tolerated distance (nearest ones first).
             for step in range(1, gap_tolerance + 2):
                 nr, nc = curr_r + (dr * step), curr_c + (dc * step)
 
                 if (nr, nc) in table_cells:
-                    break  # 已属于当前表格，不跨越继续查找。
+                    break  # It already belongs to the current table, so the search will continue without crossing over.
 
                 if in_bounds_content(nr, nc):
                     table_cells.add((nr, nc))
                     queue.append((nr, nc))
-                    # 在该方向找到连接点，停止扩展间隔。
+                    # Find the connection point in that direction and stop extending the interval.
                     break
 
     return ConnectedRegion(
@@ -121,7 +121,7 @@ def _flood_fill_region(
 
 
 def count_max_consecutive_true(flags: Sequence[bool]) -> int:
-    """返回布尔序列中最长连续真值长度。"""
+    """Returns the length of the longest consecutive true value in a Boolean sequence."""
     max_count = 0
     current = 0
     for flag in flags:
@@ -138,7 +138,7 @@ def _build_region_content_mask(
     has_semantic_content: ContentPredicate,
     span_at: SpanLookup,
 ) -> list[list[bool]]:
-    """构造包含合并跨度的区域语义内容掩码。"""
+    """Constructs a region semantic content mask containing merged spans."""
     mask = [[False for _ in range(region.num_cols)] for _ in range(region.num_rows)]
     for row in range(region.row_start, region.row_end + 1):
         for col in range(region.col_start, region.col_end + 1):
@@ -152,7 +152,7 @@ def _build_region_content_mask(
 
 
 def _is_real_singleton_region(region: ConnectedRegion, span_at: SpanLookup) -> bool:
-    """判断候选是否是单格且不可进一步拆分的真实表格。"""
+    """Determine whether the candidate is a real table with a single cell and cannot be further split."""
     if region.num_rows != 1 or region.num_cols != 1:
         return False
     row_span, col_span = span_at(region.row_start, region.col_start)
@@ -164,7 +164,7 @@ def _summarize_single_region(
     has_semantic_content: ContentPredicate,
     span_at: SpanLookup,
 ) -> dict[str, float | int | bool]:
-    """计算 gap 候选评分使用的单区域形态指标。"""
+    """Single-region morphology metric used to calculate gap candidate scores."""
     table_area = region.num_rows * region.num_cols
     content_mask = _build_region_content_mask(region, has_semantic_content, span_at)
     content_area = sum(sum(1 for flag in row if flag) for row in content_mask)
@@ -203,7 +203,7 @@ def summarize_connected_regions(
     has_semantic_content: ContentPredicate,
     span_at: SpanLookup,
 ) -> dict[str, float | int]:
-    """汇总一组 gap 候选区域的惩罚指标。"""
+    """Summarize the penalty metrics for a set of gap candidate regions."""
     table_count = len(regions)
     real_singleton_count = 0
     severe_separator_count = 0
@@ -250,7 +250,7 @@ def summarize_connected_regions(
 
 
 def gap_candidate_penalty(summary: dict[str, float | int]) -> float:
-    """按固定权重把一组区域形态指标折算为 gap 候选惩罚分。"""
+    """A set of regional morphological indicators is converted into gap candidate penalty points according to fixed weights."""
     return (
         6.0 * int(summary["severe_separator_count"])
         + 2.5 * float(summary["interior_blank_line_ratio"])
@@ -266,7 +266,7 @@ def select_best_gap_candidate(
     has_semantic_content: ContentPredicate,
     span_at: SpanLookup,
 ) -> tuple[int, float, list[ConnectedRegion]]:
-    """按固定候选与偏好顺序选择最稳定的 gap tolerance。"""
+    """Select the most stable gap tolerance in fixed candidate and preference order."""
     candidates = []
     for gap_tolerance in AUTO_GAP_TOLERANCE_CANDIDATES:
         regions = discover_with_tolerance(gap_tolerance)
@@ -304,7 +304,7 @@ def select_best_gap_candidate(
 
 
 def region_semantic_positions(region: ConnectedRegion, has_semantic_content: ContentPredicate) -> set[tuple[int, int]]:
-    """返回区域包围盒内具有语义内容的坐标。"""
+    """Returns the coordinates with semantic content within the region's bounding box."""
     return {
         (row, col)
         for row in range(region.row_start, region.row_end + 1)
@@ -314,7 +314,7 @@ def region_semantic_positions(region: ConnectedRegion, has_semantic_content: Con
 
 
 def keep_maximal_by_semantic_sets(semantic_sets: Sequence[set[tuple[int, int]]]) -> list[int]:
-    """返回语义坐标集不被其它候选严格包含的下标。"""
+    """Returns a subscript whose semantic coordinate set is not strictly contained by other candidates."""
     kept_indices: list[int] = []
     for index, semantic_set in enumerate(semantic_sets):
         if any(semantic_set < semantic_sets[other_index] for other_index in range(len(semantic_sets)) if other_index != index):

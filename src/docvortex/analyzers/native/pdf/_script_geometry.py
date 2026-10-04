@@ -1,4 +1,4 @@
-"""提供 PDF 字符 loose/tight/origin 驱动的通用上下标几何分类。"""
+"""Provides PDF character loose/tight/origin driven universal superscript and subscript geometric classification."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ _ScriptFontKey = tuple[str, int | None, int | None]
 
 @dataclass(frozen=True, slots=True)
 class ScriptCharFeature:
-    """保存单个字符参与纯几何上下标判定所需的只读特征。"""
+    """Saves the read-only characteristics required for a single character to participate in pure geometric superscript and subscript determination."""
 
     index: int
     text: str
@@ -53,24 +53,24 @@ class ScriptCharFeature:
 
     @property
     def loose_height(self) -> float:
-        """返回 loose bbox 高度。"""
+        """Returns loose bbox height."""
         return self.loose_bbox[3] - self.loose_bbox[1]
 
     @property
     def loose_center_y(self) -> float:
-        """返回 loose bbox 中心 y。"""
+        """Return to loose bbox Center y."""
         return (self.loose_bbox[1] + self.loose_bbox[3]) / 2
 
     @property
     def tight_height(self) -> float:
-        """返回 tight bbox 高度，无有效框时返回零。"""
+        """Returns tight bbox height, returns zero if there is no valid frame."""
         if self.tight_bbox is None:
             return 0.0
         return self.tight_bbox[3] - self.tight_bbox[1]
 
     @property
     def tight_center_y(self) -> float | None:
-        """返回 tight bbox 中心 y。"""
+        """Return to tight bbox Center y."""
         if self.tight_bbox is None:
             return None
         return (self.tight_bbox[1] + self.tight_bbox[3]) / 2
@@ -78,7 +78,7 @@ class ScriptCharFeature:
 
 @dataclass(frozen=True, slots=True)
 class ScriptBodyBand:
-    """表示当前视觉组件的正文 origin 基线与双 bbox 参考高度。"""
+    """Represents the current visual component's textual origin baseline and dual bbox reference heights."""
 
     baseline: float
     tight_height: float
@@ -88,14 +88,14 @@ class ScriptBodyBand:
 
 @dataclass(frozen=True, slots=True)
 class ScriptBaselineCluster:
-    """表示共享近似字符 origin 的正文或角标基线簇。"""
+    """Represents a cluster of text or subscript baselines that share the approximate character origin."""
 
     baseline: float
     member_indices: tuple[int, ...]
 
 
 def _coerce_finite_bbox(value: Any) -> BBox | None:
-    """把可迭代四元组收敛为合法有限 bbox。"""
+    """Convergence of iterable quadruples to legally finite bbox."""
     try:
         raw_bbox = getattr(value, "bbox", value)
         if raw_bbox is None or len(raw_bbox) != 4:
@@ -109,7 +109,7 @@ def _coerce_finite_bbox(value: Any) -> BBox | None:
 
 
 def _char_geometry_key(char: Char) -> int | None:
-    """返回可用于 side-map 查询的合法 PDFium char_idx。"""
+    """Returns a valid PDFium char_idx that can be used in a side-map query."""
     char_idx = char.get("char_idx")
     if isinstance(char_idx, bool) or not isinstance(char_idx, int):
         return None
@@ -117,7 +117,7 @@ def _char_geometry_key(char: Char) -> int | None:
 
 
 def _script_role(offset: float) -> ScriptMarkRole:
-    """把相对正文 origin 基线的纵向偏移转换为上下标角色。"""
+    """Convert longitudinal offsets relative to the text origin baseline into superscript and subscript characters."""
     return "sub" if offset > 0 else "sup"
 
 
@@ -127,7 +127,7 @@ def build_script_features(
     origins: dict[int, tuple[float, float]],
     protected_body_indices: set[int],
 ) -> list[ScriptCharFeature]:
-    """一次性构造 loose/tight/origin 三类字符几何特征。"""
+    """Construct loose/tight/origin three types of character geometric features at one time."""
     features = []
     for index, char in enumerate(chars):
         text = str(char.get("char", ""))
@@ -159,7 +159,7 @@ def build_script_features(
 
 
 def split_script_visual_components(features: list[ScriptCharFeature]) -> list[list[int]]:
-    """按换行、x 回退和大间隙切分独立视觉组件。"""
+    """Split independent visual components by line wrap, x fallback, and large gaps."""
     valid_heights = [feature.loose_height for feature in features if feature.loose_height > 0]
     scale = statistics.median(valid_heights) if valid_heights else 1.0
     components: list[list[int]] = []
@@ -192,7 +192,7 @@ def split_script_visual_components(features: list[ScriptCharFeature]) -> list[li
 
 
 def _quantile(values: list[float], fraction: float) -> float:
-    """返回适合小样本基线簇的稳定分位数。"""
+    """Returns stable quantiles that fit the small sample baseline cluster."""
     if not values:
         return 0.0
     ordered = sorted(values)
@@ -204,7 +204,7 @@ def _cluster_baselines(
     features: list[ScriptCharFeature],
     component_indices: list[int],
 ) -> tuple[list[ScriptBaselineCluster], float]:
-    """按字符 origin y 聚类当前组件的字母数字基线。"""
+    """By Character origin y Clusters the alphanumeric baseline of the current component."""
     anchors = [features[index] for index in component_indices if features[index].is_body_anchor]
     if not anchors:
         return [], 0.0
@@ -238,30 +238,30 @@ def _cluster_baselines(
 
 
 def _sorted_origin_median(origins: list[float]) -> float:
-    """原始字符已按 origin 排序，直接使用与 statistics.median 相同的中位运算。"""
+    """The original characters have been sorted by origin, directly using the same median operation as statistics.median."""
     middle = len(origins) // 2
     return origins[middle] if len(origins) % 2 else (origins[middle - 1] + origins[middle]) / 2
 
 
 def _cluster_tight_height(features: list[ScriptCharFeature], cluster: ScriptBaselineCluster) -> float:
-    """返回基线簇的高分位 tight 高度。"""
+    """Returns the high quantile tight height of the baseline cluster."""
     return _quantile([height for index in cluster.member_indices if (height := features[index].tight_height) > 0], 0.9)
 
 
 def _cluster_loose_height(features: list[ScriptCharFeature], cluster: ScriptBaselineCluster) -> float:
-    """返回基线簇的高分位 loose 高度。"""
+    """Returns the high quantile loose height of the baseline cluster."""
     return _quantile([height for index in cluster.member_indices if (height := features[index].loose_height) > 0], 0.9)
 
 
 def _cluster_tight_center(features: list[ScriptCharFeature], cluster: ScriptBaselineCluster) -> float:
-    """返回基线簇的 tight bbox 中心中位数。"""
+    """Returns the tight bbox center median of the baseline cluster."""
     return statistics.median(
         features[index].tight_center_y for index in cluster.member_indices if features[index].tight_center_y is not None
     )
 
 
 def _cluster_loose_center(features: list[ScriptCharFeature], cluster: ScriptBaselineCluster) -> float:
-    """返回基线簇的 loose bbox 中心中位数。"""
+    """Returns the loose bbox center median of the baseline cluster."""
     return statistics.median(features[index].loose_center_y for index in cluster.member_indices)
 
 
@@ -271,7 +271,7 @@ def _cluster_has_consistent_displacement(
     body_cluster: ScriptBaselineCluster,
     body_band: ScriptBodyBand,
 ) -> bool:
-    """要求 origin 与双 bbox 至少两项同向，并排除普通混合字体的弱中心偏移。"""
+    """It is required that at least two items of origin and double bbox are in the same direction, and the weak center offset of ordinary mixed fonts is excluded."""
     origin_shift = cluster.baseline - body_band.baseline
     tight_shift = _cluster_tight_center(features, cluster) - _cluster_tight_center(features, body_cluster)
     loose_shift = _cluster_loose_center(features, cluster) - _cluster_loose_center(features, body_cluster)
@@ -292,7 +292,7 @@ def _choose_body_band(
     clusters: list[ScriptBaselineCluster],
     heights: dict[ScriptBaselineCluster, tuple[float, float]] | None = None,
 ) -> tuple[ScriptBodyBand, ScriptBaselineCluster] | None:
-    """在接近最高字形的基线簇中按字符数选择正文基线。"""
+    """Selects the body text baseline by number of characters in the baseline cluster near the highest glyph."""
     if not clusters:
         return None
     if heights is None:
@@ -328,7 +328,7 @@ def _nearest_cluster(
     clusters: list[ScriptBaselineCluster],
     tolerance: float,
 ) -> ScriptBaselineCluster | None:
-    """把非字母数字字符附着到最近 origin 基线簇。"""
+    """Attach non-alphanumeric characters to the nearest origin baseline cluster."""
     if feature.origin is None or not clusters:
         return None
     nearest = min(clusters, key=lambda cluster: abs(feature.origin[1] - cluster.baseline))
@@ -336,7 +336,7 @@ def _nearest_cluster(
 
 
 def _horizontal_gap(first: BBox, second: BBox) -> float:
-    """返回两个字符 tight bbox 的水平间隙。"""
+    """Returns the horizontal gap of two characters tight bbox."""
     return max(0.0, first[0] - second[2], second[0] - first[2])
 
 
@@ -346,7 +346,7 @@ def _drop_unseeded_punctuation(
     roles: list[ScriptRole],
     body_height: float,
 ) -> None:
-    """移除未邻近同类字母数字种子的标点。"""
+    """Remove punctuation that is not adjacent to an alphanumeric seed of the same type."""
     seeded = [
         features[index]
         for index in component_indices
@@ -373,7 +373,7 @@ def _apply_consensus_candidates(
     body_band: ScriptBodyBand,
     roles: list[ScriptRole],
 ) -> None:
-    """用 origin/tight/loose 三证据一致性补充孤立边界字符。"""
+    """Supplement isolated boundary characters with origin/tight/loose three-evidence consistency."""
     body_members = [
         features[index]
         for index in body_band.member_indices
@@ -438,7 +438,7 @@ def _expand_component_neighbors(
     protected_body_indices: set[int],
     roles: list[ScriptRole],
 ) -> None:
-    """把同侧连续字符并入已有角标 run。"""
+    """Merge consecutive characters on the same side into the existing subscript run."""
     component_set = set(component_indices)
     changed = True
     while changed:
@@ -470,7 +470,7 @@ def _expand_component_neighbors(
 
 
 def _script_font_key(char: Char) -> _ScriptFontKey | None:
-    """读取原始字体身份，不合并子集名称，也不把原始字号当作有效字形高度。"""
+    """Reads the original font identity, does not merge subset names, and does not treat the original font size as a valid glyph height."""
     font = char.get("font")
     if not isinstance(font, dict):
         return None
@@ -487,14 +487,14 @@ def _local_font_run(
     component: set[int],
     cluster: ScriptBaselineCluster,
 ) -> set[int]:
-    """限定同一视觉组件内连续的同字体 ASCII/全角英数字串。"""
+    """Limit consecutive ASCII/full-width alphanumeric strings of the same font within the same visual component."""
     keys = {font_keys[index] for index in cluster.member_indices}
     if len(keys) != 1 or None in keys:
         return set()
     key = next(iter(keys))
 
     def belongs(index: int) -> bool:
-        """让空白、括号、运算符、CJK、缺失几何和字体边界阻断局部参考。"""
+        """Let whitespace, parentheses, operators, CJK, missing geometry, and font boundaries block local references."""
         if index not in component or not features[index].is_valid or font_keys[index] != key:
             return False
         text = features[index].text
@@ -521,7 +521,7 @@ def _recheck_weak_clusters_with_local_font_body(
     cluster_roles: dict[ScriptBaselineCluster, ScriptRole],
     heights: dict[ScriptBaselineCluster, tuple[float, float]],
 ) -> None:
-    """用同字体局部正文撤销弱误判；不制造角标，不让撤销结果成为新参考。"""
+    """Use part of the text in the same font to cancel weak misjudgments; do not create subtitles and do not let the cancellation result become a new reference."""
     initial_roles = dict(cluster_roles)
     component = set(component_indices)
     for cluster, role in initial_roles.items():
@@ -569,9 +569,9 @@ def _assign_component(
     roles: list[ScriptRole],
     font_keys: list[_ScriptFontKey | None],
 ) -> None:
-    """在单个视觉组件内按 origin 基线簇和双 bbox 一致性分配角色。"""
+    """Assign roles within a single visual component by origin baseline cluster and dual bbox consistency."""
     clusters, tolerance = _cluster_baselines(features, component_indices)
-    # 基线簇在本次组件判定内不变，高度分位数可供正文选择与各角标规则共享。
+    # The baseline cluster remains unchanged within this component determination, and the height quantile can be selected by the text and shared with each subscript rule.
     heights = {
         cluster: (_cluster_tight_height(features, cluster), _cluster_loose_height(features, cluster)) for cluster in clusters
     }
@@ -629,7 +629,7 @@ def paired_script_roles(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
 ) -> dict[int, ScriptRole]:
-    """确认同一基字符右侧横向叠放的上下标，排除分式和远距邻列。"""
+    """Confirm horizontally stacked superscripts and subscripts on the right side of the same base character, excluding fractions and distant adjacent columns."""
 
     features = build_script_features(chars, tight_bboxes, origins, set())
     visible = [feature for feature in features if feature.text.isprintable() and not feature.text.isspace()]
@@ -660,7 +660,7 @@ def paired_script_roles(
             continue
         if (first.origin[1] - base.origin[1]) * (second.origin[1] - base.origin[1]) >= 0:
             continue
-        # 本补证据只接纳完整单字符角标，不能只给 grid 等多字母角标的首字母加样式。
+        # This supplementary evidence only accepts complete single-character subscripts, and cannot only add styles to the first letters of multi-letter subscripts such as grid.
         following = visible[position + 3] if position + 3 < len(visible) else None
         if (
             following is not None
@@ -683,7 +683,7 @@ def _numeric_superscript_indices(
     roles: list[ScriptRole],
     protected_body_indices: set[int],
 ) -> set[int]:
-    """用左侧同一视觉行的稳定正文确认完整数字上标，允许中间有排版空白。"""
+    """Confirm complete numerical superscripts with stable text on the same visual line to the left, allowing for typographical white space in between."""
     accepted: set[int] = set()
     start = 0
     while start < len(features):
@@ -693,12 +693,12 @@ def _numeric_superscript_indices(
         end = start + 1
         while end < len(features) and (features[end].text.isdecimal() or features[end].text in _NUMERIC_SCRIPT_SEPARATORS):
             end += 1
-        # 尾随标点属于正文，只有数字之间且共享上标基线的分隔符才随引用提升。
+        # Trailing punctuation belongs to the main text, only delimiters between numbers that share a superscript baseline are promoted with citations.
         while end > start and not features[end - 1].text.isdecimal():
             end -= 1
         candidate = features[start:end]
         if any(0 <= neighbor < len(features) and features[neighbor].text in {"/", "⁄"} for neighbor in (start - 1, end)):
-            # 不能把分式的分子或分母独立当成引用，否则会制造仅半个指数带上标的结果。
+            # The numerator or denominator of a fraction cannot be treated as a reference independently, otherwise it will produce a result with only half of the exponent being marked.
             start = end
             continue
         previous = start - 1
@@ -744,7 +744,7 @@ def _numeric_superscript_indices(
             continue
         tight_ratio = max(item.tight_height for item in digits) / band.tight_height
         if tight_ratio > SCRIPT_CONSENSUS_TIGHT_HEIGHT_RATIO:
-            # 纯小写词的 x-height 可接近缩小数字；强基线位移还须有 loose 缩小证据，不能仅放宽 tight 阈值。
+            # A pure lowercase x-height can approach the reduction figure; strong baseline shifts must also have evidence of loose reduction and cannot just relax the tight threshold.
             loose_ratio = max(item.loose_height for item in digits) / band.loose_height
             if not (
                 shift >= SCRIPT_STRONG_SHIFT_RATIO * band.tight_height
@@ -758,14 +758,14 @@ def _numeric_superscript_indices(
             or _cluster_loose_center(features, digit_cluster) >= _cluster_loose_center(features, body_cluster) - 0.05
         ):
             continue
-        # 只补样式，不合并组件或移动字符；下一候选也不能把本次提升结果当作正文。
+        # Only styles are supplemented, components are not merged or characters are moved; the next candidate cannot use this improvement result as the main text.
         accepted.update(item.index for item in candidate)
     return accepted
 
 
 @lru_cache(maxsize=4096)
 def _native_text_flags(text: str) -> int:
-    """缓存 Unicode 字符类别值，不缓存文档对象或可变几何。"""
+    """Cache Unicode character class values, not document objects or variable geometries."""
     local = len(text) == 1 and (
         (text.isascii() and text.isalnum()) or "０" <= text <= "９" or "Ａ" <= text <= "Ｚ" or "ａ" <= text <= "ｚ"
     )
@@ -781,7 +781,7 @@ def _native_text_flags(text: str) -> int:
 
 
 def _native_script_inputs(chars, tight_bboxes, origins, protected):
-    """打包一次调用的几何与 Python 字体等价类，保留异常输入的原校验语义。"""
+    """Packages the geometry and Python font equivalent classes for a single call, preserving the original validation semantics of exception input."""
     loose_boxes, tight_boxes, points, flags_list, font_ids = [], [], [], [], []
     fonts = {}
     for index, char in enumerate(chars):
@@ -815,7 +815,7 @@ def classify_char_script_roles(
     origins: dict[int, tuple[float, float]],
     protected_body_indices: set[int] | None = None,
 ) -> list[ScriptRole]:
-    """按视觉组件、origin 基线簇和双 bbox 一致性识别上下标。"""
+    """Identify superscripts and subscripts by visual component, origin baseline cluster, and dual bbox consistency."""
     native = get_native()
     if native is not None:
         roles = native.script_roles_raw(
@@ -836,7 +836,7 @@ def _classify_char_script_roles_python(
     origins: dict[int, tuple[float, float]],
     protected_body_indices: set[int] | None = None,
 ) -> list[ScriptRole]:
-    """保留原逐字符算法作为差分参考及集合平局的精确处理路径。"""
+    """The original character-by-character algorithm is retained as a precise processing path for differential reference and set draws."""
     protected = protected_body_indices or set()
     features = build_script_features(chars, tight_bboxes, origins, protected)
     font_keys = [_script_font_key(char) for char in chars]

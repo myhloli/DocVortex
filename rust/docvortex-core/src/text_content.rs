@@ -1,4 +1,4 @@
-//! 在自有字符上完成正文片段组装；Unicode 分类和 NFC 组合由绑定层按解释器语义准备。
+//! Complete text fragment assembly on own characters; Unicode classification and NFC combination are prepared by the binding layer according to the interpreter semantics.
 use crate::{geometry::Box4, text_snapshot::TextSnapshot};
 use std::collections::{HashMap, HashSet};
 
@@ -9,7 +9,7 @@ pub struct Content {
     pub private_run: usize,
 }
 
-/// 按原字符顺序收集各 span 的成员，保持 PUA 连续段判定所需的原始顺序。
+/// Collect the members of each span in the original character order, keeping the original order required for PUA continuous segment determination.
 pub fn groups(assignments: &[Option<usize>], span_count: usize) -> Vec<Vec<usize>> {
     let mut output = vec![Vec::new(); span_count];
     for (index, owner) in assignments.iter().enumerate() {
@@ -20,7 +20,7 @@ pub fn groups(assignments: &[Option<usize>], span_count: usize) -> Vec<Vec<usize
     output
 }
 
-/// 与 Python 一样，仅在来源编号乱序时稳定排序，等号不改变成员顺序。
+/// Like Python, the sorting is stable only when the source numbers are out of order, and the equal sign does not change the member order.
 pub fn ordered(data: &TextSnapshot, group: &[usize]) -> Vec<usize> {
     let mut values = group.to_vec();
     if values
@@ -32,7 +32,7 @@ pub fn ordered(data: &TextSnapshot, group: &[usize]) -> Vec<usize> {
     values
 }
 
-/// 计算相对较短边的交集比例，零宽高不组成重叠附加符。
+/// Calculate the intersection ratio of relatively short sides, zero width and height do not form an overlapping appendix.
 fn overlap(a: Box4, b: Box4, axis: usize) -> f64 {
     let denominator = (a[axis + 2] - a[axis]).min(b[axis + 2] - b[axis]);
     if denominator <= 0.0 {
@@ -41,7 +41,7 @@ fn overlap(a: Box4, b: Box4, axis: usize) -> f64 {
     (a[axis + 2].min(b[axis + 2]) - a[axis].max(b[axis])).max(0.0) / denominator
 }
 
-/// 保留当前字符为附加符时的优先分支；不在失败后尝试参考实现未覆盖的反向组合。
+/// Preserve the priority branch when the current character is an appender; do not try to reference the reverse combination that is not covered after failure.
 pub fn composition_pair(
     data: &TextSnapshot,
     first: usize,
@@ -64,7 +64,7 @@ pub fn composition_pair(
         .then_some((base, modifier))
 }
 
-/// 仅替换现有控制字符和七种拉丁连字，不把其他 Unicode 字符擅自做 NFKC 转换。
+/// Only existing control characters and seven Latin ligatures are replaced, and other Unicode characters are not converted to NFKC without authorization.
 fn clean(text: &str) -> String {
     let controls = text.replace("\r\n", "").replace('\u{2}', "-");
     let mut output = String::with_capacity(controls.len());
@@ -83,7 +83,7 @@ fn clean(text: &str) -> String {
     output
 }
 
-/// 连续执行 PUA 信号、重叠附加符合成、词间空格及正文组装；空组保留调用方原文本。
+/// Continuously execute PUA signal, overlap appending, inter-word space and text assembly; the empty group retains the caller's original text.
 pub struct Rules<'a> {
     pub ordinary: &'a HashSet<char>,
     pub decimals: &'a HashSet<char>,
@@ -96,7 +96,7 @@ pub struct Rules<'a> {
     pub private_range: (u32, u32),
 }
 
-/// 使用本次调用固定的字符规则构造所有片段，避免重新读取可变 Python 配置。
+/// Use the fixed character rules of this call to construct all fragments to avoid re-reading the variable Python configuration.
 pub fn build(data: &TextSnapshot, groups: &[Vec<usize>], rules: &Rules<'_>) -> Vec<Content> {
     let Rules {
         ordinary,

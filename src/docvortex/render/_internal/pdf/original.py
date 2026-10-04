@@ -1,4 +1,4 @@
-"""正文按源 PDF 原框独立绘制，标题允许借用同栏空白且不移动其他块。"""
+"""The text is drawn independently according to the original frame of the source PDF, and the title is allowed to borrow the blank space in the same column without moving other blocks."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ _STANDARD_TABLE_BUILDER = _PdfRenderer._html_tables
 
 
 class OriginalPdfRenderer(_PdfRenderer):
-    """复用内容渲染器，单独负责块级布局、局部测量和页面生命周期。"""
+    """Reuse the content renderer, which is solely responsible for block-level layout, local measurements, and page lifecycle."""
 
     def __init__(
         self,
@@ -58,7 +58,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         document_title: str | None,
         page_sizes: dict[int, tuple[float, float]],
     ) -> None:
-        """持有当前结果的源页尺寸，正文和素材仍由既有实现解析。"""
+        """Holds the current result's source page size, text and material are still parsed by the existing implementation."""
         super().__init__(middle_json, asset_resolver=asset_resolver, document_title=document_title)
         self.page_sizes = page_sizes
         self.image_rotations = {
@@ -66,9 +66,9 @@ class OriginalPdfRenderer(_PdfRenderer):
         }
         self.current_page_idx = 0
         self.inline_context.anchors = PdfAnchorRegistry(_original_anchors(middle_json))
-        # 富标题会调整段落墨迹行高；本轮缓存只用于重排路径的普通段落。
+        # Rich titles will adjust the paragraph ink line height; this round of caching is only used for ordinary paragraphs that rearrange paths.
         self.inline_context.cache_paragraphs = False
-        # 固定布局的代码框不增加源文档中不存在的背景、边框和内边距。
+        # Fixed layout code boxes do not add background, borders, and padding that do not exist in the source document.
         self.styles.code.backColor = None
         self.styles.code.borderWidth = 0
         self.styles.code.borderPadding = 0
@@ -77,7 +77,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         self.styles.spatial_table.borderPadding = 0
 
     def render(self) -> bytes:
-        """逐源页绘制所有块并保留空白页，不消费公共逻辑合并计划。"""
+        """Draws all blocks per source page and leaves blank pages, without consuming the common logical merge plan."""
         output = BytesIO()
         canvas = _PdfCanvas(output, document_title=self.document_title)
         canvas.setSubject("Original block layout rendering from MiddleJson")
@@ -97,13 +97,13 @@ class OriginalPdfRenderer(_PdfRenderer):
                     item.body_font_size = item.body_base_font_size * item.fit.scale
 
         def measure_title(item, font_size, width):
-            """只测量当前标题，不修改正文的换行结果或重复物化内容。"""
+            """Only the current title is measured, and the line wrapping results of the text or repeated materialized content are not modified."""
             scale = font_size / item.base_font_size
             measured_width, height, measurements = self._measure(canvas, item.flowables, width / scale)
             return BlockFit(scale, measured_width * scale, height * scale, measurements, font_size < 6 - 0.001)
 
         def fit_small_title(item, rect):
-            """空间极小时保留完整标题，使用既有低字号整体缩放兜底。"""
+            """Keep the complete title when the space is extremely small, and use the existing low font size to scale it down overall."""
             return self._fit_block(
                 canvas,
                 item.flowables,
@@ -190,7 +190,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         *,
         index_entry: bool = False,
     ) -> list[PreparedBlock]:
-        """物化有独立原框的叶子；缺子框的组合整体准备且不参与字号统计。"""
+        """Materialize leaves with independent original frames; the combination of missing subframes is prepared as a whole and does not participate in font size statistics."""
         if isinstance(block, _CONTAINER_TYPES):
             if all(child.bbox is not None for child in block.content):
                 prepared = []
@@ -231,7 +231,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         return [item]
 
     def _block_flowables(self, block: BlockBase, page_idx: int, *, index_entry: bool = False) -> list[Flowable]:
-        """支持固定布局展开后的正文、辅助文字、视觉主体和注释叶子。"""
+        """Supports expanded fixed layout of main text, auxiliary text, visual body and annotation leaves."""
         if index_entry and isinstance(block, (TextBlock, TitleBlockBase)):
             spans = block.content
             if block.anchor and spans:
@@ -263,7 +263,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         if isinstance(block, PageAuxTextBlock):
             return [self._paragraph(block.content, self.styles.footnote, page_idx, block)]
         if isinstance(block, InlineContentBlock) and str(block.type).endswith(("caption", "footnote")):
-            # 页面脚注由原 visitor 处理，以保留其 anchor；这里只处理视觉注释。
+            # Page footnotes are processed by the original visitor to preserve their anchor; only visual annotations are processed here.
             if str(block.type) != "page_footnote":
                 return [self._render_annotation(block, page_idx)]
         if isinstance(block, (ImageBlock, TableBlock, ChartBlock, CodeBlock)):
@@ -275,14 +275,14 @@ class OriginalPdfRenderer(_PdfRenderer):
         return self._render_planned_block(PlannedBlock(page_idx=page_idx, block=block))
 
     def _structured_table(self, block: TableBodyBlock, page_idx: int) -> Flowable:
-        """优先保留 HTML 网格，延迟到正文和公式定位后适配表格区域。"""
+        """Give priority to retaining the HTML grid, and defer fitting the table area until the text and formulas are positioned."""
         try:
             self._table_content(block, block.content)
         except PdfTableError as exc:
             return self._table_fallback(block, page_idx, self.available_width, self.available_height, str(exc))
 
         def build(width: float, font_size: float) -> list[Table]:
-            """用显式逻辑宽度和字号构造本次试排，不改变 renderer 的全局样式。"""
+            """Construct this trial layout with explicit logical width and font size, without changing the global style of renderer."""
             return self._html_tables(
                 block.content,
                 page_idx=page_idx,
@@ -292,16 +292,16 @@ class OriginalPdfRenderer(_PdfRenderer):
             )
 
         def fallback(width: float, height: float, reason: str) -> Flowable:
-            """只在结构物化或实际绘制失败后恢复该表素材。"""
+            """The table material is only restored after the structure materializes or the actual drawing fails."""
             return self._table_fallback(block, page_idx, width, height, reason)
 
         def validate(flowable: Flowable) -> None:
-            """在独立画布预绘制，避免出错的半张表污染最终 PDF。"""
+            """Pre-draw on an independent canvas to avoid erroneous half sheets from contaminating the final PDF."""
             probe = _PdfCanvas(BytesIO(), document_title=self.document_title)
             flowable.drawOn(probe, 0, 0)
 
         def trial_key() -> tuple | None:
-            """按当前内容和样式隔离几何摘要，自定义构造回调继续执行原流程。"""
+            """Isolate the geometry summary according to the current content and style, and customize the construction callback to continue the original process."""
             if getattr(self._html_tables, "__func__", None) is not _STANDARD_TABLE_BUILDER:
                 return None
             prepared = self._table_content(block, block.content)
@@ -310,7 +310,7 @@ class OriginalPdfRenderer(_PdfRenderer):
             return (block.content, repr(vars(self.styles.table_cell)), repr(vars(self.styles.table_header)))
 
         def minimum_height(font_size: float) -> float | None:
-            """仅标准结构表使用可证明的行高下界，自定义构造仍逐档真实测量。"""
+            """Only standard structure tables use provable lower bounds on row heights, custom structures still measure true on a file-by-file basis."""
             if getattr(self._html_tables, "__func__", None) is not _STANDARD_TABLE_BUILDER:
                 return None
             return self._table_content(block, block.content).minimum_height(font_size, self.styles)
@@ -335,7 +335,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         height: float,
         reason: str,
     ) -> Flowable:
-        """按原图、纯文字、占位顺序兜底，图片方向只恢复一次。"""
+        """Follow the order of original image, pure text, and placeholder, and the image orientation will only be restored once."""
         self._diagnostic("pdf_table_fallback", reason, page_idx, block)
         if _has_image_payload(block):
             prepared = self._try_prepared_block_image(block, page_idx)
@@ -366,7 +366,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         *,
         max_width: float | None = None,
     ) -> Flowable:
-        """将区域素材直接映射到块宽度，避免再次乘归一化 bbox 宽度。"""
+        """Map region material directly to block width, avoiding multiplying the normalized bbox width again."""
         width = self.available_width if max_width is None else max_width
         angle = self.image_rotations.get(self.current_page_idx, {}).get(str(block.index), 0) if block is not None else 0
         height = width * (
@@ -384,7 +384,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         width: float | None = None,
         url: str | None = None,
     ) -> Paragraph:
-        """用可测量段落展示缺失内容，避免固定高度的占位表格产生文字外溢。"""
+        """Use measurable paragraphs to display missing content and avoid text overflow from fixed-height placeholder tables."""
         self._diagnostic("pdf_content_placeholder", label, page_idx, block)
         spans = [TextSpan(type="text", content=label[:320] or "content unavailable")]
         if url:
@@ -403,7 +403,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         initial_scale: float = 1.0,
         base_font_size: float | None = None,
     ) -> BlockFit:
-        """沿用既有逐块适配算法，只返回测量结果，供正文冻结和标题低字号兜底。"""
+        """The existing block-by-block adaptation algorithm is used, and only the measurement results are returned for text freezing and low font size for titles."""
         if not flowables:
             return BlockFit(initial_scale, 0, 0, [])
         font_sizes = list(_paragraph_font_sizes(flowables))
@@ -423,7 +423,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         return BlockFit(scale, measured_width * scale, measured_height * scale, measurements, small_text)
 
     def _draw_fitted(self, canvas: _PdfCanvas, item: PreparedBlock) -> None:
-        """只绘制已经确认的测量结果，正文不重新排版，标题使用独立的安全绘制框。"""
+        """Only the confirmed measurement results are drawn, the text is not reformatted, and the title uses an independent safe drawing frame."""
         fit = item.fit
         if fit.small_text:
             self._diagnostic(
@@ -449,7 +449,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         flowables: list[Flowable],
         width: float,
     ) -> tuple[float, float, list[tuple[Flowable, float, float, float]]]:
-        """测量同一组内容的换行结果，忽略块外边距并保留组内间距。"""
+        """Measures the wrapping results for the same group of content, ignoring block margins and preserving intra-group spacing."""
         measurements: list[tuple[Flowable, float, float, float]] = []
         height = max_width = previous_after = 0.0
         for index, flowable in enumerate(flowables):
@@ -463,7 +463,7 @@ class OriginalPdfRenderer(_PdfRenderer):
 
 
 def _paragraph_base_font_sizes(flowables: Iterable[Flowable]) -> Iterable[float]:
-    """只统计真实文字的基础样式字号，排除空段、占位符和上下标相对字号。"""
+    """Only the basic style font sizes of real text are counted, and empty paragraphs, placeholders, and relative font sizes of superscripts and subscripts are excluded."""
     for flowable in _paragraphs(flowables):
         has_inline_visual = any(getattr(getattr(fragment, "cbDefn", None), "width", 0) for fragment in flowable.frags)
         if not getattr(flowable, "_pdf_layout_placeholder", False) and (
@@ -473,7 +473,7 @@ def _paragraph_base_font_sizes(flowables: Iterable[Flowable]) -> Iterable[float]
 
 
 def _paragraphs(flowables: Iterable[Flowable]) -> Iterable[Paragraph]:
-    """遍历段落及嵌套表格单元格，供基础字号和低可读性检查共同使用。"""
+    """Traverse paragraphs and nested table cells for use with base font size and low readability checks."""
     for flowable in flowables:
         if isinstance(flowable, Paragraph):
             yield flowable
@@ -488,7 +488,7 @@ def _paragraphs(flowables: Iterable[Flowable]) -> Iterable[Paragraph]:
 
 
 def _paragraph_font_sizes(flowables: Iterable[Flowable]) -> Iterable[float]:
-    """读取段落及表格内的实际文字字号，用于判断局部缩放后的可读性。"""
+    """Read the actual text size in paragraphs and tables to determine the readability after partial scaling."""
     for flowable in _paragraphs(flowables):
         yield flowable.style.fontSize
         for fragment in flowable.frags:
@@ -498,7 +498,7 @@ def _paragraph_font_sizes(flowables: Iterable[Flowable]) -> Iterable[float]:
 
 
 def _original_anchors(middle: MiddleJson) -> Iterable[str]:
-    """收集实际正文目标而不把目录中的引用误注册为目标。"""
+    """Collect actual text targets without mistakenly registering references in the table of contents as targets."""
     pending = [block for page in middle.pages for block in page.blocks][::-1]
     while pending:
         block = pending.pop()
@@ -512,17 +512,17 @@ def _original_anchors(middle: MiddleJson) -> Iterable[str]:
 
 
 class _RegionImage(Flowable):
-    """保留既有转正素材，通过 Canvas 变换恢复源页方向，避免再次编码图片。"""
+    """Keep the existing converted material and restore the source page orientation through Canvas transformation to avoid encoding the image again."""
 
     def __init__(self, data: bytes, width: float, height: float, angle: int) -> None:
-        """保存最终显示尺寸，内部图片尺寸随四分之一转向交换。"""
+        """The final display size is saved, and the internal image dimensions are swapped with the quarter turn."""
         super().__init__()
         self.width, self.height, self.angle = width, height, angle
         image_width, image_height = (height, width) if angle in (90, 270) else (width, height)
         self.image = ReportLabImage(BytesIO(data), width=image_width, height=image_height)
 
     def draw(self) -> None:
-        """撤销裁图转正的角度，显示矩形仍严格位于当前块框内。"""
+        """Undo the angle of crop rotation, and the display rectangle is still strictly within the current block frame."""
         if self.angle == 90:
             self.canv.translate(0, self.height)
             self.canv.rotate(-90)

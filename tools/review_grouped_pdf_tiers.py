@@ -1,4 +1,4 @@
-"""用保存的真实 layout 重放 MinerU 的原生优先决策，不加载后续表格模型。"""
+"""Replay the native priority decision of MinerU with the saved real layout, without loading subsequent tabular models."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from docvortex.document.pdf import PDFDocument
 
 
 def main() -> None:
-    """记录两档任务数、未修改的外围块及复杂内容拦截，供真实入口验收。"""
+    """Record the number of two-level tasks, unmodified peripheral blocks and complex content interception for real entrance acceptance."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--layout-records", type=Path, required=True)
@@ -58,7 +58,7 @@ def main() -> None:
                     pending = sum(block["type"] == "table" for page in vlm for block in page)
                 outputs[tier] = {"summary": asdict(summary), "pending_table_inputs": pending, "blocks": blocks}
             complex_cases = []
-            # 优先验证新命中的跨列区域；基线没有该结果时检查已有表格的前置拦截。
+            # Priority is given to verifying the newly hit cross-column area; when the baseline does not have this result, the pre-interception of the existing table is checked.
             choices = [
                 (index, block)
                 for index, page in enumerate(outputs["basic"]["blocks"])

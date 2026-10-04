@@ -1,4 +1,4 @@
-"""验证 PDF 渲染诊断统一使用 DEBUG 且结构化结果不变。"""
+"""Verify that PDF rendering diagnostics use DEBUG uniformly and the structured results remain unchanged."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ _PDF_RENDER_DIAGNOSTIC_CODES = (
 
 @pytest.mark.parametrize("code", _PDF_RENDER_DIAGNOSTIC_CODES)
 def test_all_pdf_render_diagnostics_use_debug(code: str) -> None:
-    """所有 PDF 渲染诊断均为 DEBUG，重复日志不改变结构化诊断去重结果。"""
+    """All PDF rendering diagnostics are DEBUG, and duplicate logs do not change the structured diagnostic deduplication results."""
     records: list[str] = []
     warnings: list[str] = []
     debug_sink = logger.add(records.append, level="DEBUG", format="{level.name}|{message}")

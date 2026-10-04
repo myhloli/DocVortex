@@ -8,7 +8,7 @@ from tools import build_html_css
 
 
 def test_committed_minified_css_matches_readable_source() -> None:
-    """验证仓库提交的 min 产物始终由当前可读源码确定性生成。"""
+    """Verify that min products submitted by the repository are always deterministically generated from current readable source code."""
     project_root = Path(__file__).resolve().parents[2]
     resource_root = project_root / "src" / "docvortex" / "resources" / "html"
     source = resource_root.joinpath("docvortex.css").read_text(encoding="utf-8")
@@ -18,7 +18,7 @@ def test_committed_minified_css_matches_readable_source() -> None:
 
 
 def test_visual_bodies_captions_and_footnotes_align_left() -> None:
-    """验证视觉主体与说明统一贴正文左边，长说明也保持左对齐。"""
+    """Verify that the visual body and description are posted on the left side of the main text, and long descriptions are also left aligned."""
     project_root = Path(__file__).resolve().parents[2]
     css_path = project_root.joinpath("src", "docvortex", "resources", "html", "docvortex.css")
     source = css_path.read_text(encoding="utf-8")
@@ -55,7 +55,7 @@ def test_visual_bodies_captions_and_footnotes_align_left() -> None:
 
 
 def test_minify_css_preserves_strings_escapes_and_calc_spacing() -> None:
-    """验证压缩过程只删除安全空白，不破坏字符串、转义和 calc 运算符。"""
+    """Verify that the compression process removes only safe whitespace and does not break strings, escapes, and calc operators."""
     source = r"""
 /* removable */
 @media screen and (max-width: 40rem) {
@@ -79,7 +79,7 @@ def test_minify_css_preserves_strings_escapes_and_calc_spacing() -> None:
 
 
 def test_minify_css_preserves_descendant_combinator_before_pseudo_class() -> None:
-    """验证伪类前的后代空格不会被误当作声明冒号旁的冗余空白。"""
+    """Verify that descending spaces before pseudo-classes are not mistaken for redundant spaces next to declaration colons."""
     source = ".root :is(h1, h2) { color: red; } .root:hover { color: blue; }"
 
     assert build_html_css.minify_css(source) == (".root :is(h1,h2){color:red}.root:hover{color:blue}")
@@ -96,7 +96,7 @@ def test_minify_css_preserves_descendant_combinator_before_pseudo_class() -> Non
     ],
 )
 def test_minify_css_rejects_unterminated_or_unbalanced_input(source: str) -> None:
-    """验证生成器拒绝未闭合字符串、注释、转义和规则块。"""
+    """The validation generator rejects unclosed strings, comments, escapes, and rule blocks."""
     with pytest.raises(ValueError):
         build_html_css.minify_css(source)
 
@@ -105,7 +105,7 @@ def test_build_html_css_check_detects_and_repairs_stale_output(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 check 模式无写入地报告过期产物，普通模式再原子修复。"""
+    """Verify that check mode reports expired products without writing, and normal mode repairs them atomically."""
     source_path = tmp_path / "docvortex.css"
     output_path = tmp_path / "docvortex.min.css"
     source_path.write_text(".demo { color: red; }\n", encoding="utf-8")

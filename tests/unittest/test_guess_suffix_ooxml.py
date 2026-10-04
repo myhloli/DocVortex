@@ -1,4 +1,4 @@
-"""OOXML 内容嗅探对非标准包（幽灵 Override、Strict 关系、非惯例路径）的判定测试。"""
+"""OOXML Content sniffing determination test for non-standard packets (ghost Override, Strict relationships, non-conventional paths)."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def _build_ooxml_package(
     main_xml: bytes = b'<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>',
     include_root_rels: bool = True,
 ) -> bytes:
-    """构造可参数化的最小 OOXML zip 包。"""
+    """Constructs a parameterizable minimal OOXML zip package."""
     output = BytesIO()
     with ZipFile(output, "w", ZIP_DEFLATED) as package:
         package.writestr("[Content_Types].xml", content_types)
@@ -54,13 +54,13 @@ def _build_ooxml_package(
 
 
 def test_ghost_override_falls_back_to_main_part_root_element() -> None:
-    """Override 指向不存在 part（幽灵 Override）时按主 part 根元素判型。"""
-    package = _build_ooxml_package()  # rels 指向 content/main.xml，无对应 Override
+    """When Override points to part (ghost Override), the type is determined based on the main part root element."""
+    package = _build_ooxml_package()  # rels points to content/main.xml, no corresponding Override
     assert guess_suffix_by_bytes(package, "handmade-altpath.docx") == "docx"
 
 
 def test_main_part_comment_cannot_spoof_root_element() -> None:
-    """主文档根元素前的 XML 注释不得把 DOCX 错判为 PPTX。"""
+    """The XML comment before the main document root element must not misinterpret DOCX as PPTX."""
     package = _build_ooxml_package(
         main_xml=(
             b'<?xml version="1.0"?><!-- <presentation> -->'
@@ -71,13 +71,13 @@ def test_main_part_comment_cannot_spoof_root_element() -> None:
 
 
 def test_main_part_requires_ooxml_namespace() -> None:
-    """无关 XML 的同名根元素不能被当成 Office 主文档。"""
+    """The root element with the same name as the irrelevant XML cannot be treated as the main document of Office."""
     package = _build_ooxml_package(main_xml=b'<document xmlns="urn:unrelated"/>')
     assert _guess_ooxml_suffix_by_bytes(package) is None
 
 
 def test_ghost_override_presentation_root_detects_pptx() -> None:
-    """主 part 根元素为 p:presentation 时应判为 pptx，不再落到 Magika 兜底。"""
+    """When the main part root element is p:presentation, it should be judged as pptx and no longer fall into the trap of Magika."""
     package = _build_ooxml_package(
         main_xml=(
             b'<?xml version="1.0"?><p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>'
@@ -88,7 +88,7 @@ def test_ghost_override_presentation_root_detects_pptx() -> None:
 
 
 def test_strict_office_relationship_is_accepted() -> None:
-    """ISO Strict 关系类型也应识别为主文档关系并判型。"""
+    """ISO Strict The relationship type should also be recognized and typed as the main document relationship."""
     package = _build_ooxml_package(
         office_rel=STRICT_OFFICE_REL,
         main_xml=(b'<?xml version="1.0"?><w:document xmlns:w="http://purl.oclc.org/ooxml/wordprocessingml/main"/>'),
@@ -97,13 +97,13 @@ def test_strict_office_relationship_is_accepted() -> None:
 
 
 def test_conventional_main_part_path_detects_docx() -> None:
-    """根关系缺失时按惯例路径 word/document.xml 的根元素兜底。"""
+    """When the root relationship is missing, the root element of the conventional path word/document.xml will be used."""
     package = _build_ooxml_package(include_root_rels=False, main_part="word/document.xml")
     assert guess_suffix_by_bytes(package) == "docx"
 
 
 def test_proper_override_still_wins_over_root_element() -> None:
-    """正常包的主文档 Override 判定保持优先，不受兜底逻辑影响。"""
+    """The determination of the main document Override of the normal package remains in priority and is not affected by the cover-up logic."""
     content_types = (
         '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
         '<Default Extension="xml" ContentType="application/xml"/>'
@@ -121,7 +121,7 @@ def test_proper_override_still_wins_over_root_element() -> None:
 
 
 def test_extension_wins_over_conflicting_office_guess() -> None:
-    """Magika 家族级误判与扩展名冲突时以扩展名为准。"""
+    """Magika When a family-level misjudgment conflicts with an extension, the extension shall prevail."""
     assert _prefer_extension_over_office_guess("xlsx", "handmade-altpath.docx") == "docx"
     assert _prefer_extension_over_office_guess("docx", "deck.pptx") == "pptx"
     assert _prefer_extension_over_office_guess("docx", "plain.docx") == "docx"
@@ -130,7 +130,7 @@ def test_extension_wins_over_conflicting_office_guess() -> None:
 
 
 def test_unknown_falls_back_to_office_extension() -> None:
-    """仅真实 Office 容器能在内容嗅探失败后使用扩展名回退。"""
+    """Only real Office containers can use extension fallback after failed content sniffing."""
     package = _build_ooxml_package()
     unknown = b"\xff" * 256
     ordinary_zip = BytesIO()
@@ -149,7 +149,7 @@ def test_unknown_falls_back_to_office_extension() -> None:
 
 
 def test_unknown_path_does_not_fall_back_to_office_extension(tmp_path: Path) -> None:
-    """路径入口也不得把未知二进制仅凭 Office 扩展名识别为文档。"""
+    """Path entries must also not identify unknown binaries as documents based solely on the Office extension."""
     path = tmp_path / "fake.pptx"
     path.write_bytes(b"\xff" * 256)
     assert guess_suffix_by_path(path) == "unknown"

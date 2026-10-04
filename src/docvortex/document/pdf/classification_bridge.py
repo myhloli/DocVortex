@@ -1,4 +1,4 @@
-"""分类读取的同库 ABI 边界；只返回脱离 PDFium 的原始统计快照。"""
+"""Same library ABI boundary for classified reads; only raw statistics snapshots off PDFium are returned."""
 
 from __future__ import annotations
 
@@ -14,16 +14,16 @@ _REASON = "not probed"
 
 
 def classification_bridge_info():
-    """说明原始统计是否使用标准 ABI，不把扩展已安装当作实际走了原生路径。"""
+    """Indicates whether the original statistics use the standard ABI and do not treat the installed extension as actually taking the native path."""
     return {"native_classification_unavailable_reason": _REASON}
 
 
 class NativeClassificationError(RuntimeError):
-    """原生统计失败必须向上报告，不由分类器改判为 OCR。"""
+    """Failure of native statistics must be reported upward and will not be changed to OCR by the classifier."""
 
 
 def read_classification_snapshot(textpage, count, cjk_ranges, allowed_controls, private_range, normalize_font):
-    """保留原文本页所有者与函数强引用，非标准 ABI 或特殊配置显式选用 Python 参考路径。"""
+    """The original text page owner and function strong reference are retained. Non-standard ABI or special configuration explicitly selects the Python reference path."""
     global _REASON
     native = get_native()
     if native is None:

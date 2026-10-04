@@ -1,4 +1,4 @@
-"""不依赖解析器层的安全超链接目标校验。"""
+"""Secure hyperlink target verification that does not rely on the parser layer."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ def sanitize_hyperlink_target(
     allow_fragment: bool = False,
     allow_root_relative: bool = False,
 ) -> str | None:
-    """按调用方策略保留安全外链、相对链接或文档内 fragment。"""
+    """Preserve safe external links, relative links, or within documents by caller policy fragment."""
     if value is None:
         return None
     normalized = str(value).strip()

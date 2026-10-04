@@ -1,4 +1,4 @@
-"""各格式共用的目录页码尾部识别与清理。"""
+"""Identify and clean up the tail of table of contents page numbers common to all formats."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ _INDEX_ROMAN_RE = re.compile(r"[ivxlcdm]+", re.IGNORECASE)
 
 
 def strip_index_page_tail(content: list[InlineSpan]) -> list[InlineSpan]:
-    """删除目录末尾可信页码，并把其余 tab 转换为普通空格。"""
+    """Delete the trusted page number at the end of the directory and convert the remaining tab to normal spaces."""
     content = normalize_inline_spans(content)
     visible_text = inline_plain_text(content)
     if "\t" not in visible_text:
@@ -24,7 +24,7 @@ def strip_index_page_tail(content: list[InlineSpan]) -> list[InlineSpan]:
 
 
 def looks_like_index_page_token(content: str) -> bool:
-    """判断目录 tab 后缀是否为数字、罗马数字或单字母页码。"""
+    """Determine whether the suffix of the directory tab is a number, Roman numeral, or single-letter page number."""
     if not content or len(content) > 12:
         return False
     return bool(content.isdigit() or _INDEX_ROMAN_RE.fullmatch(content) or re.fullmatch(r"[A-Za-z]", content))

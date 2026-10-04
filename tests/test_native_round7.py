@@ -1,4 +1,4 @@
-"""第七轮阶段缓存、普通字符源几何与物化复用的独立差分。"""
+"""Seventh-round stage caching, independent differentiation of common character source geometry and materialized multiplexing."""
 
 from copy import deepcopy
 import math
@@ -17,7 +17,7 @@ from docvortex.analyzers.native.pdf.inline import detection, matching, scripts
 
 
 def _profile_lane(seed):
-    """构造排序、字号、字体平局及混合语义均可变化的栏成员。"""
+    """Construct column members with variable ordering, font size, font layout, and mixed semantics."""
     rng = random.Random(seed)
     rows = []
     for index in range(40):
@@ -34,14 +34,14 @@ def _profile_lane(seed):
 
 
 def test_profile_cache_preserves_first_sort_and_invalidates_semantics(monkeypatch):
-    """第一次排序前后的字体首命中不可混用，语义变化须重算。"""
+    """Font hits before and after the first sorting cannot be mixed, and semantic changes must be recalculated."""
     lane = _profile_lane(7)
     expected_lane = deepcopy(lane)
     original = body_profile._infer_lane_body_profile
     calls = []
 
     def counted(value):
-        """记录真实参考统计调用，检查缓存不会重复扫描稳定栏。"""
+        """Logging real reference statistics calls, check cache does not scan stable bar repeatedly."""
         calls.append(1)
         return original(value)
 
@@ -61,7 +61,7 @@ def test_profile_cache_preserves_first_sort_and_invalidates_semantics(monkeypatc
 
 @pytest.mark.parametrize("change", ["geometry", "font", "order", "members", "boundary"])
 def test_profile_new_stage_rebuilds_mutated_state(change):
-    """新分析阶段不沿用旧几何、字体、成员、栏界或顺序的缓存。"""
+    """The new analysis phase does not inherit the cache of old geometry, fonts, members, column boundaries, or ordering."""
     lane = _profile_lane(3)
     old = body_profile._LaneProfileContext([lane])
     old.profile(lane)
@@ -83,7 +83,7 @@ def test_profile_new_stage_rebuilds_mutated_state(change):
 
 @pytest.mark.parametrize("invalid", [math.nan, math.inf, 10**400])
 def test_profile_abnormal_numeric_uses_reference(invalid):
-    """异常尺度不能因缓存预检查引入额外异常或改变参考路径。"""
+    """The exception scale cannot introduce additional exceptions or change the reference path due to cache pre-checking."""
     lane = _profile_lane(2)
     lane.lines[0][0].effective_height = invalid
     assert not body_profile._LaneProfileContext([lane]).plain
@@ -92,7 +92,7 @@ def test_profile_abnormal_numeric_uses_reference(invalid):
 @pytest.mark.parametrize("seed", range(20))
 @pytest.mark.parametrize("operation", ["centered", "emphasized", "demote"])
 def test_title_decisions_match_uncached_stage(seed, operation, monkeypatch):
-    """原候选遍历与语义写入连续发生时，缓存仍与逐次统计一致。"""
+    """When original candidate traversal and semantic writing occur continuously, the cache remains consistent with the successive statistics."""
     lane = _profile_lane(seed)
     lane.lines.sort(key=lambda row: row[0].source_index)
     if operation == "demote":
@@ -122,7 +122,7 @@ def test_title_decisions_match_uncached_stage(seed, operation, monkeypatch):
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 @pytest.mark.parametrize("seed", range(16))
 def test_plain_source_geometry_matches_reference(angle, seed, monkeypatch):
-    """比较原逐字符源框路径，覆盖旋转、裁剪、无效框和字符筛选。"""
+    """Compare the original character-by-character source frame paths, covering rotation, cropping, invalid frames and character filtering."""
     if get_native() is None:
         pytest.skip("native backend is not selected")
     rng = random.Random(seed)
@@ -150,7 +150,7 @@ def test_plain_source_geometry_matches_reference(angle, seed, monkeypatch):
 
 @pytest.mark.parametrize("value", [1, math.nan, math.inf, 10**400])
 def test_plain_source_rejects_unsupported_coordinates(value):
-    """异常或非浮点坐标返回显式不支持，不能吞掉参考路径的异常。"""
+    """Exceptions or non-floating point coordinate returns are explicitly not supported and cannot swallow exceptions for reference paths."""
     native = get_native()
     if native is None:
         pytest.skip("native backend is not selected")
@@ -161,7 +161,7 @@ def test_plain_source_rejects_unsupported_coordinates(value):
 
 
 def test_plain_source_keeps_zero_bits_and_coordinate_identity():
-    """极值与未旋转结果保持原浮点来源及正负零位。"""
+    """Extreme values and unrotated results retain the original floating point source and positive and negative zero bits."""
     native = get_native()
     if native is None:
         pytest.skip("native backend is not selected")
@@ -179,7 +179,7 @@ def test_plain_source_keeps_zero_bits_and_coordinate_identity():
 
 
 def test_font_cache_is_bounded_and_clears_before_special_conversion():
-    """身份强引用有界，特殊字段回调改变其他字体时不能命中陈旧元数据。"""
+    """The identity strong reference is bounded, and the special field callback cannot hit stale metadata when changing other fonts."""
     cache = char_geometry._ReadOnlyFontCache()
     for index in range(4100):
         cache.metadata({"name": str(index), "size": 10.0})
@@ -188,10 +188,10 @@ def test_font_cache_is_bounded_and_clears_before_special_conversion():
     cache.metadata(font)
 
     class ChangingSize:
-        """模拟特殊字体转换对普通字体的写入。"""
+        """Simulate the writing of special font conversion to ordinary fonts."""
 
         def __float__(self):
-            """保留原转换回调并修改已经准备的字体对象。"""
+            """Keep the original conversion callback and modify the prepared font object."""
             font["size"] = 12.0
             return 8.0
 
@@ -201,7 +201,7 @@ def test_font_cache_is_bounded_and_clears_before_special_conversion():
 
 @pytest.mark.parametrize("seed", range(24))
 def test_stream_mapping_matches_exhaustive_sources(seed):
-    """普通映射流对照原完整分组，包含连字、重复来源和异常汉字映射。"""
+    """The normal mapping stream compares the original complete grouping, including ligatures, duplicate sources and abnormal Chinese character mappings."""
     rng = random.Random(seed)
     font = {"name": "A", "size": 10.0, "flags": 0, "weight": 400.0}
     chars = []
@@ -229,7 +229,7 @@ def test_stream_mapping_matches_exhaustive_sources(seed):
 
 
 def test_mapping_special_object_preserves_error_order():
-    """特殊来源先走原分组，不能提前物化框或吞掉原异常。"""
+    """Special sources go to the original group first, and cannot materialize the frame or swallow the original abnormality in advance."""
     chars = [{"char": "A", "char_idx": 0, "bbox": None, "font": {}, "rotation": None}]
     with pytest.raises(TypeError):
         dedup._mapping_groups(chars)
@@ -239,7 +239,7 @@ def test_mapping_special_object_preserves_error_order():
 
 @pytest.mark.parametrize("seed", range(12))
 def test_style_preparation_matches_original_materialization(seed, monkeypatch):
-    """无绘图线的普通字体分类快路径与原几何、粗体过滤完整输出相同。"""
+    """The normal font classification fast path without plot lines is the same as the original geometry, bold filtered full output."""
     rng = random.Random(seed)
     lines = []
     for number in range(20):
@@ -265,7 +265,7 @@ def test_style_preparation_matches_original_materialization(seed, monkeypatch):
 
 
 def test_projection_cache_tracks_content_and_bounds():
-    """精确内容变化、重复身份、公式与超长文本均保持原投影且容量有界。"""
+    """Precise content changes, duplicate identities, formulas, and very long text remain in the original projection and bounded capacity."""
     cache = matching._ContentProjectionCache()
     block = {"content": "A\\(x\\)B"}
     first = cache.project(block, block["content"])
@@ -284,7 +284,7 @@ def test_projection_cache_tracks_content_and_bounds():
 
 
 def test_native_mapping_geometry_keeps_boundaries_and_float_sources():
-    """融合准备以原相邻成员比较共享阈值，极值框复用首字符浮点来源。"""
+    """The fusion preparation uses the original adjacent members to compare the shared threshold, and the extreme value box reuses the first character floating point source."""
     native = get_native()
     if native is None:
         pytest.skip("native backend is not selected")
@@ -316,7 +316,7 @@ def test_native_mapping_geometry_keeps_boundaries_and_float_sources():
 
 
 def test_stage_profile_special_neighbors_disable_cache():
-    """外部特殊容器、标量及非普通行可能有回调时不能复用普通行状态。"""
+    """External special containers, scalars, and non-ordinary rows may not be able to reuse ordinary row states when they have callbacks."""
     lane = _profile_lane(0)
     assert not body_profile._stage_profile_context([lane], lane.lines, [(object(), 0.0, 1.0, 2.0)]).plain
     assert not body_profile._stage_profile_context([lane], lane.lines, scalars=(math.nan,)).plain
@@ -324,19 +324,19 @@ def test_stage_profile_special_neighbors_disable_cache():
 
 
 def test_empty_script_analysis_preserves_backend_and_truth_callbacks(monkeypatch):
-    """空页省去分类准备，但原参数真值回调和强制后端错误仍需发生。"""
+    """Empty pages eliminate the need for classification preparation, but original parameter true value callbacks and forced backend errors still need to occur."""
     events = []
 
     class Chars:
-        """模拟可观察的外部字符容器。"""
+        """Mocks an observable external character container."""
 
         def __bool__(self):
-            """保留原调用顺序。"""
+            """Keep the original calling order."""
             events.append("chars")
             return False
 
     def backend():
-        """模拟不兼容的强制扩展加载错误。"""
+        """Simulates incompatible forced extension loading errors."""
         events.append("backend")
         raise ImportError("incompatible backend")
 
@@ -347,7 +347,7 @@ def test_empty_script_analysis_preserves_backend_and_truth_callbacks(monkeypatch
 
 
 def test_native_mapping_keeps_mixed_glyph_groups():
-    """异字符保护组不触发全页二次准备，Unicode 及来源仍与穷举路径一致。"""
+    """The heterogeneous character protection group does not trigger full-page secondary preparation, and Unicode and its source are still consistent with the exhaustive path."""
     native = get_native()
     if native is None:
         pytest.skip("native backend is not selected")

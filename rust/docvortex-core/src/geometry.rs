@@ -1,10 +1,10 @@
-//! 按批处理字符框、视觉行分隔和 canonical 几何，保留原始索引顺序。
+//! Preserve original index order by batch character box, visual line separation, and canonical geometry.
 
 use crate::median;
 pub type Box4 = [f64; 4];
 pub type Size = [f64; 2];
 
-/// 共享风险筛查和完整样本的相邻锚点统计，保留两条路径的正宽度准入差异。
+/// Sharing risk screening and adjacent anchor statistics for the complete sample, preserving the positive width admission difference of the two paths.
 pub fn anchor_pairs(
     records: Vec<(usize, Box4, Box4, Size, f64)>,
     positive_source: bool,
@@ -61,7 +61,7 @@ pub fn anchor_pairs(
     Some(result)
 }
 
-/// 规范并验证矩形；strict 模式不交换端点，与脚本几何契约一致。
+/// Normalize and verify rectangles; strict mode does not swap endpoints, consistent with script geometry contract.
 pub fn normalize(raw: Option<Box4>, strict: bool) -> Option<Box4> {
     let mut b = raw?;
     if b.iter().any(|v| !v.is_finite()) {
@@ -82,7 +82,7 @@ pub fn normalize(raw: Option<Box4>, strict: bool) -> Option<Box4> {
     }
 }
 
-/// 按 Python min/max 保留 NaN 和相等值时的首项比较语义。
+/// Press Python min/max to retain NaN and first-term comparison semantics when equal values.
 fn minimum(a: f64, b: f64) -> f64 {
     if b < a {
         b
@@ -90,7 +90,7 @@ fn minimum(a: f64, b: f64) -> f64 {
         a
     }
 }
-/// 按 Python max 保留首项的有符号零。
+/// Press Python max to retain the leading signed zero.
 fn maximum(a: f64, b: f64) -> f64 {
     if b > a {
         b
@@ -99,7 +99,7 @@ fn maximum(a: f64, b: f64) -> f64 {
     }
 }
 
-/// 在已校验矩形上裁剪，不重新交换端点。
+/// Crop on the verified rectangle without re-swapping the endpoints.
 pub fn clip(raw: Option<Box4>, size: Size) -> Option<Box4> {
     let b = raw?;
     let b = [
@@ -115,7 +115,7 @@ pub fn clip(raw: Option<Box4>, size: Size) -> Option<Box4> {
     }
 }
 
-/// 使用既有页面视觉方向变换，不采用三角函数或坐标近似。
+/// Use the existing page visual direction transformation without using trigonometric functions or coordinate approximation.
 pub fn rotate(b: Box4, size: Size, angle: i32) -> Box4 {
     match angle {
         270 => [size[1] - b[3], b[0], size[1] - b[1], b[2]],
@@ -130,7 +130,7 @@ pub fn rotate(b: Box4, size: Size, angle: i32) -> Box4 {
     }
 }
 
-/// 转换 origin，保持现有独立点坐标规则。
+/// Convert origin and maintain the existing independent point coordinate rules.
 pub fn rotate_point(p: Size, size: Size, angle: i32) -> Size {
     match angle {
         270 => [size[1] - p[1], p[0]],
@@ -140,7 +140,7 @@ pub fn rotate_point(p: Size, size: Size, angle: i32) -> Size {
     }
 }
 
-/// 求有限框并集，相等值保留最先出现的输入。
+/// Find the union of finite boxes, and retain the first input for equal values.
 pub fn union(boxes: &[Box4]) -> Option<Box4> {
     let mut b = *boxes.first()?;
     for a in &boxes[1..] {
@@ -154,7 +154,7 @@ pub fn union(boxes: &[Box4]) -> Option<Box4> {
     Some(b)
 }
 
-/// 为视觉 run 一次计算所有框、字距阈值、分隔和输出并集。
+/// Compute all boxes, kerning thresholds, separations and output unions at once for visual run.
 pub fn visual_runs(
     raw: Vec<Option<Box4>>,
     overrides: Vec<Option<Box4>>,
@@ -226,7 +226,7 @@ pub fn visual_runs(
 pub type SourceRow = (Option<Box4>, Option<Box4>, Option<Box4>, Option<Size>, f64);
 pub type PreparedRow = (Box4, Box4, Size, Box4, Box4, Size);
 
-/// 批量实现 source side-map 选择、裁剪及局部坐标，不改变字体或风险规则。
+/// Implement source side-map selection, cropping and local coordinates in batches without changing the font or risk rules.
 pub fn source_rows(rows: Vec<SourceRow>, size: Size, angle: i32) -> Vec<Option<PreparedRow>> {
     rows.into_iter()
         .map(|(raw, side, tight, origin, rotation)| {

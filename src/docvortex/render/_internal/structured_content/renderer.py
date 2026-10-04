@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到树形 Markdown structured_content 的公共渲染实现。"""
+"""Public rendering implementation of strictly MiddleJson to tree Markdown structured_content."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ def render_structured_content(
     asset_base_url: str = "",
     latex_delimiters: LatexDelimitersConfig | None = None,
 ) -> dict[str, Any]:
-    """把严格 MiddleJson 无副作用地渲染为树形 Markdown structured_content。"""
+    """Render strictly MiddleJson to tree Markdown structured_content without side effects."""
     if not isinstance(middle_json, MiddleJson):
         raise TypeError("render_structured_content expects a MiddleJson instance")
 
@@ -95,7 +95,7 @@ def _render_content_block(
     delimiters: LatexDelimitersConfig,
     asset_base_url: str,
 ) -> dict[str, Any]:
-    """保留父块元数据，并把 block 内容收敛为 Markdown 字符串。"""
+    """Preserve parent block metadata and converge block content to Markdown string."""
     payload = block.model_dump(
         mode="json",
         exclude=_REMOVED_BLOCK_FIELDS,
@@ -145,7 +145,7 @@ def _render_annotation_group(
     accepted_types: set[str],
     delimiters: LatexDelimitersConfig,
 ) -> list[dict[str, Any]]:
-    """按源 index 稳定排序视觉说明，并保留可用 bbox 与 Markdown 内容。"""
+    """Stable sorting of visual instructions by source index and preserving available bbox and Markdown content."""
     annotations: list[tuple[int, VisualAnnotationBlock]] = []
     for position, child in enumerate(block.content):
         if (
@@ -170,13 +170,13 @@ def _render_annotation_group(
 def _annotation_sort_key(
     item: tuple[int, VisualAnnotationBlock],
 ) -> tuple[bool, int, int]:
-    """让有 index 的说明升序优先，缺失 index 的说明稳定排在末尾。"""
+    """Let the instructions with index take priority in ascending order, and the instructions without index will be stable at the end."""
     position, block = item
     return block.index is None, block.index if block.index is not None else 0, position
 
 
 def _resolve_visual_image_source(block: VisualBlock, asset_base_url: str) -> str | None:
-    """解析视觉 body 实际选择的图片来源，并返回安全的 Markdown 地址。"""
+    """Parses the visual body actual selected image source and returns the secure Markdown address."""
     for child in block.content:
         if not isinstance(child, (ImageBodyBlock, TableBodyBlock, ChartBodyBlock)):
             continue
@@ -185,7 +185,7 @@ def _resolve_visual_image_source(block: VisualBlock, asset_base_url: str) -> str
 
 
 def _resolve_content_image_source(block: ImagePayloadBlock, asset_base_url: str) -> str | None:
-    """把图片载荷收敛为 structured_content 中唯一且安全的 image_source。"""
+    """Convergence of image payloads to the unique and safe image_source within structured_content."""
     source = resolve_image_source(block, asset_base_url)
     return normalize_image_source(source) if source else None
 

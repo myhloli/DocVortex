@@ -21,7 +21,7 @@ from pydantic import (
 
 from .foundation._hyperlink import OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
 
-# 这些字符串不能作为公开 Block.type discriminator，只用于 raw 阶段或 Block 内部枚举值。
+# These strings are not exposed as Block.type discriminator and are only used in the raw stage or Block internal enumeration values.
 RawBlockType: TypeAlias = Literal[
     "algorithm",
     "caption",
@@ -92,7 +92,7 @@ class BlockType(str, Enum):
     CODE_FOOTNOTE = "code_footnote"
 
     TEXT = "text"
-    EQUATION = "equation"  # 行间公式（独立公式）
+    EQUATION = "equation"  # Interline formula (stand-alone formula)
     LIST = "list"
     INDEX = "index"
 
@@ -214,14 +214,14 @@ PAGE_BLOCK_TYPES = {
     BlockType.PARAGRAPH_TITLE,
 }
 
-# 页面装饰与辅助文本不参与正文、列表和视觉对象之间的语义边界判断。
+# Page decoration and auxiliary text do not participate in the judgment of semantic boundaries between text, lists, and visual objects.
 PAGE_AUXILIARY_BLOCK_TYPES = {
     BlockType.HEADER,
     BlockType.FOOTER,
     BlockType.PAGE_NUMBER,
     BlockType.ASIDE_TEXT,
 }
-# 页面脚注需要参与输出，但不会阻断正文、列表、续表或视觉对象之间的关系判断。
+# Page footers need to participate in the output, but will not block the judgment of relationships between text, lists, continuation tables, or visual objects.
 MERGE_TRANSPARENT_BLOCK_TYPES = {
     *PAGE_AUXILIARY_BLOCK_TYPES,
     BlockType.PAGE_FOOTNOTE,
@@ -262,7 +262,7 @@ IntBBox: TypeAlias = tuple[int, int, int, int]
 
 
 def _remove_block_fields(value: Any, excluded_fields: set[str]) -> Any:
-    """递归删除序列化结果中指定的 block 字段，覆盖任意深度的容器。"""
+    """Recursively removes the specified block field from the serialization result, covering containers of arbitrary depth."""
     if isinstance(value, list):
         return [_remove_block_fields(item, excluded_fields) for item in value]
     if not isinstance(value, dict):
@@ -277,7 +277,7 @@ def _remove_block_fields(value: Any, excluded_fields: set[str]) -> Any:
 
 
 class _StrictMiddleModel(BaseModel):
-    """Model/Middle JSON 严格模型基类，提供无副作用的统一序列化入口。"""
+    """Model/Middle JSON Strict model base class, providing a unified serialization entry without side effects."""
 
     model_config = ConfigDict(extra="forbid", strict=True, validate_assignment=True)
 
@@ -288,7 +288,7 @@ class _StrictMiddleModel(BaseModel):
         exclude_none: bool = False,
         exclude_block_fields: set[str] | None = None,
     ) -> dict[str, Any]:
-        """序列化对象，并按字段名递归排除任意层级的 block 字段。"""
+        """Serialize the object and recursively exclude block fields at any level by field name."""
         payload = self.model_dump(
             mode="json",
             exclude_defaults=skip_defaults,
@@ -306,7 +306,7 @@ class _StrictMiddleModel(BaseModel):
         exclude_block_fields: set[str] | None = None,
         indent: int | None = 4,
     ) -> str:
-        """将对象编码为 UTF-8 友好的 JSON 字符串，不执行图片文件写入。"""
+        """Encode the object into a UTF-8-friendly JSON string, without performing image file writing."""
         return json.dumps(
             self.to_dict(
                 skip_defaults=skip_defaults,
@@ -340,7 +340,7 @@ INLINE_STYLE_ORDER: tuple[InlineStyle, ...] = (
 
 
 class TextSpan(_StrictMiddleModel):
-    """保存普通行内文字及其可见字体样式。"""
+    """Saves normal inline text and its visible font style."""
 
     type: Literal["text"]
     content: str = Field(min_length=1)
@@ -349,7 +349,7 @@ class TextSpan(_StrictMiddleModel):
     @field_validator("styles")
     @classmethod
     def _normalize_styles(cls, value: list[InlineStyle]) -> list[InlineStyle]:
-        """按公开固定顺序去重样式，并禁止同时声明上下标。"""
+        """Deduplicate styles in a fixed public order, and prohibit simultaneous declaration of superscripts and subscripts."""
         unique = set(value)
         if "superscript" in unique and "subscript" in unique:
             raise ValueError("text span cannot be both superscript and subscript")
@@ -357,7 +357,7 @@ class TextSpan(_StrictMiddleModel):
 
 
 class EquationInlineSpan(_StrictMiddleModel):
-    """保存不含外层定界符的行内 LaTeX。"""
+    """Save inline LaTeX without outer delimiter."""
 
     type: Literal["equation_inline"]
     content: str = Field(min_length=1)
@@ -365,14 +365,14 @@ class EquationInlineSpan(_StrictMiddleModel):
     @field_validator("content")
     @classmethod
     def _validate_content(cls, value: str) -> str:
-        """拒绝只包含空白的行内公式，同时保留公式原始空白。"""
+        """Reject inline formulas that contain only whitespace while preserving the original whitespace of the formula."""
         if not value.strip():
             raise ValueError("inline equation content must not be blank")
         return value
 
 
 class CodeInlineSpan(_StrictMiddleModel):
-    """保存需要按字面量显示的行内代码。"""
+    """Save inline code that needs to be displayed literally."""
 
     type: Literal["code_inline"]
     content: str = Field(min_length=1)
@@ -385,7 +385,7 @@ NonLinkInlineSpan: TypeAlias = Annotated[
 
 
 class HyperlinkSpan(_StrictMiddleModel):
-    """保存安全超链接目标及其非链接行内子节点。"""
+    """Saves safe hyperlink targets and their non-linked inline child nodes."""
 
     type: Literal["hyperlink"]
     url: str = Field(min_length=1)
@@ -394,7 +394,7 @@ class HyperlinkSpan(_StrictMiddleModel):
     @field_validator("url")
     @classmethod
     def _validate_url(cls, value: str) -> str:
-        """复用统一策略拒绝危险协议、本地路径、畸形 URL 和控制字符。"""
+        """Reuse unified policies to deny dangerous protocols, local paths, malformed URL, and control characters."""
         normalized = sanitize_hyperlink_target(
             value,
             allowed_schemes=OFFICE_EXTERNAL_HYPERLINK_SCHEMES,
@@ -416,7 +416,7 @@ INLINE_SPAN_LIST_ADAPTER = TypeAdapter(list[InlineSpan])
 
 
 def _normalize_typed_inline_spans(spans: list[InlineSpan]) -> list[InlineSpan]:
-    """递归合并相邻同样式文字及相邻同目标链接。"""
+    """Recursively merge adjacent text of the same style and adjacent links with the same target."""
     normalized: list[InlineSpan] = []
     for span in spans:
         current: InlineSpan
@@ -452,17 +452,17 @@ def _normalize_typed_inline_spans(spans: list[InlineSpan]) -> list[InlineSpan]:
 
 
 def parse_inline_span(value: Any) -> InlineSpan:
-    """把字典或现有模型严格解析为一个公开行内 Span。"""
+    """Resolve a dictionary or existing model strictly as a public inline Span."""
     return INLINE_SPAN_ADAPTER.validate_python(value)
 
 
 def parse_inline_spans(value: Any) -> list[InlineSpan]:
-    """严格解析并规范化完整行内 Span 列表。"""
+    """Strictly parse and normalize the complete inline Span list."""
     return _normalize_typed_inline_spans(INLINE_SPAN_LIST_ADAPTER.validate_python(value))
 
 
 class BlockBase(_StrictMiddleModel):
-    """所有公开 Middle JSON block 的最小公共字段。"""
+    """Minimum common field for all public Middle JSON block."""
 
     type: BlockTypes
     index: int | None = Field(default=None, ge=0)
@@ -471,7 +471,7 @@ class BlockBase(_StrictMiddleModel):
     @field_validator("bbox", mode="before")
     @classmethod
     def _validate_bbox(cls, value: Any) -> BBox | None:
-        """接受 JSON 数组形式的 bbox，并严格校验归一化坐标。"""
+        """Accept bbox in the form of JSON array, and strictly verify the normalized coordinates."""
         if value is None:
             return None
         if not isinstance(value, (list, tuple)) or len(value) != 4:
@@ -487,25 +487,25 @@ class BlockBase(_StrictMiddleModel):
 
 
 class StringContentBlock(BlockBase):
-    """所有字符串内容 block 的共享结构。"""
+    """A shared structure for all string contents block."""
 
     content: str
 
 
 class InlineContentBlock(BlockBase):
-    """所有结构化行内内容 block 的共享结构。"""
+    """Shared structure for all structured inline content block."""
 
     content: list[InlineSpan]
 
     @field_validator("content")
     @classmethod
     def _normalize_content(cls, value: list[InlineSpan]) -> list[InlineSpan]:
-        """在严格对象边界合并相邻同语义 Span。"""
+        """Merging adjacent synonyms at strict object boundaries Span."""
         return _normalize_typed_inline_spans(value)
 
 
 class ContinuableTextBlockBase(InlineContentBlock):
-    """正文与参考文献共享的跨块续接结构。"""
+    """A cross-block continuation structure shared between text and references."""
 
     continues_prev: bool | None = None
 
@@ -520,7 +520,7 @@ class RefTextBlock(ContinuableTextBlockBase):
 
 
 class TitleBlockBase(InlineContentBlock):
-    """文档标题与段落标题的全局层级公共结构。"""
+    """A global hierarchical common structure for document titles and paragraph headings."""
 
     anchor: str | None = None
     level: int
@@ -537,7 +537,7 @@ class ParagraphTitleBlock(TitleBlockBase):
 
 
 class PageAuxTextBlock(InlineContentBlock):
-    """页眉、页脚、页码和边栏的共享文本结构。"""
+    """Shared text structure for headers, footers, page numbers, and sidebars."""
 
     type: Literal[  # type: ignore[reportIncompatibleVariableOverride]
         BlockType.HEADER,
@@ -548,14 +548,14 @@ class PageAuxTextBlock(InlineContentBlock):
 
 
 class PageFootnoteBlock(InlineContentBlock):
-    """保存需要参与默认输出并可被文档内链接引用的页面脚注。"""
+    """Save page footnotes that need to participate in the default output and can be referenced by links within the document."""
 
     type: Literal[BlockType.PAGE_FOOTNOTE]  # type: ignore[reportIncompatibleVariableOverride]
     anchor: str | None = None
 
 
 class ImagePayloadBlock(BlockBase):
-    """统一携带 sidecar、data URI 或远程 URL 的图片 block 基类。"""
+    """The block base class uniformly carries the pictures of sidecar, data, URI or remote URL."""
 
     image_base64: str | None = Field(default=None, repr=False)
     image_path: str | None = None
@@ -564,7 +564,7 @@ class ImagePayloadBlock(BlockBase):
     @field_validator("image_path")
     @classmethod
     def _validate_image_path(cls, value: str | None) -> str | None:
-        """校验已记录的图片路径只能是安全的 POSIX 相对路径。"""
+        """Verify that the recorded image path can only be a safe POSIX relative path."""
         if value is None:
             return None
         from .foundation._image_payload import validate_image_sidecar_path
@@ -574,7 +574,7 @@ class ImagePayloadBlock(BlockBase):
     @field_validator("image_url")
     @classmethod
     def _validate_image_url(cls, value: str | None) -> str | None:
-        """校验远程图片 URL，禁止活动协议、相对地址与内嵌凭据。"""
+        """Verify remote image URL, prohibit active protocols, relative addresses and embedded credentials."""
         if value is None:
             return None
         from .foundation._image_payload import validate_remote_image_url
@@ -583,7 +583,7 @@ class ImagePayloadBlock(BlockBase):
 
 
 class ImagePayloadContentBlock(ImagePayloadBlock):
-    """统一携带字符串内容和图片载荷的 block 结构。"""
+    """block structure that uniformly carries string content and image payload."""
 
     content: str
 
@@ -609,31 +609,31 @@ class CodeBodyBlock(StringContentBlock):
 
 
 class AlgorithmBodyBlock(InlineContentBlock):
-    """保存预格式算法文字与行内公式 Span。"""
+    """Save preformatted algorithm text and inline formulas Span."""
 
     type: Literal[BlockType.ALGORITHM_BODY]  # type: ignore[reportIncompatibleVariableOverride]
 
 
 class ImageAnnotationBlock(InlineContentBlock):
-    """图片标题与图片脚注的共享结构。"""
+    """A shared structure for image titles and image footers."""
 
     type: Literal[BlockType.IMAGE_CAPTION, BlockType.IMAGE_FOOTNOTE]  # type: ignore[reportIncompatibleVariableOverride]
 
 
 class TableAnnotationBlock(InlineContentBlock):
-    """表格标题与表格脚注的共享结构。"""
+    """Shared structure for table titles and table footers."""
 
     type: Literal[BlockType.TABLE_CAPTION, BlockType.TABLE_FOOTNOTE]  # type: ignore[reportIncompatibleVariableOverride]
 
 
 class ChartAnnotationBlock(InlineContentBlock):
-    """图表标题与图表脚注的共享结构。"""
+    """Shared structure for chart titles and chart footers."""
 
     type: Literal[BlockType.CHART_CAPTION, BlockType.CHART_FOOTNOTE]  # type: ignore[reportIncompatibleVariableOverride]
 
 
 class CodeAnnotationBlock(InlineContentBlock):
-    """代码标题与代码脚注的共享结构。"""
+    """Shared structure of code titles and code footnotes."""
 
     type: Literal[BlockType.CODE_CAPTION, BlockType.CODE_FOOTNOTE]  # type: ignore[reportIncompatibleVariableOverride]
 
@@ -663,13 +663,13 @@ class IndexBlock(BlockBase):
 
 
 class _VisualBlockBase(BlockBase):
-    """视觉父块的共享结构约束。"""
+    """Shared structural constraints for the visual parent block."""
 
     _body_types: ClassVar[tuple[str, ...]]
 
     @model_validator(mode="after")
     def _validate_visual_children(self) -> _VisualBlockBase:
-        """校验视觉父块只有一个 body，且父子定位字段保持一致。"""
+        """Verify that the visual parent block has only one body, and the parent-child positioning fields are consistent."""
         children = getattr(self, "content", [])
         bodies = [child for child in children if child.type in self._body_types]
         if len(bodies) != 1:
@@ -738,7 +738,7 @@ class CodeBlock(_VisualBlockBase):
 
     @model_validator(mode="after")
     def _validate_language(self) -> CodeBlock:
-        """代码块要求语言，算法块则禁止携带代码语言猜测结果。"""
+        """Code blocks require language, and algorithm blocks are prohibited from carrying code language guess results."""
         body = next(child for child in self.content if child.type in self._body_types)
         if self.sub_type == BlockType.CODE:
             if body.type != BlockType.CODE_BODY:
@@ -809,12 +809,12 @@ BLOCK_ADAPTER = TypeAdapter(Block)
 
 
 def parse_block(value: Any) -> Block:
-    """将字典或已有模型严格解析成对应的具体 Block 类型。"""
+    """Strictly parse the dictionary or existing model into the corresponding specific Block type."""
     return BLOCK_ADAPTER.validate_python(value)
 
 
 def _iter_child_blocks(block: BlockBase) -> list[BlockBase]:
-    """返回容器 block 的直接子块，叶子 block 返回空列表。"""
+    """Returns the immediate child chunks of container block, leaves block returns an empty list."""
     content = getattr(block, "content", None)
     if not isinstance(content, list):
         return []
@@ -847,7 +847,7 @@ _RAW_INLINE_CONTENT_TYPES = {
 
 
 def _looks_like_raw_inline_span_list(content: list[Any]) -> bool:
-    """区分 PDF 扁平 LIST/INDEX 的 Span 载荷与已经成树的文本子块。"""
+    """Distinguish Span payloads of PDF flattened LIST/INDEX from treed text sub-blocks."""
     if not content:
         return False
     for item in content:
@@ -864,7 +864,7 @@ def _looks_like_raw_inline_span_list(content: list[Any]) -> bool:
 
 
 def _validate_raw_block_inline_content(block: dict[str, Any], *, location: str) -> None:
-    """递归校验 raw block 的自然语言 content 已切换为 Span 列表。"""
+    """Recursive check raw Natural language content for block has been switched to a list of Span."""
     block_type = block.get("type")
     content = block.get("content")
     if block_type in _RAW_INLINE_CONTENT_TYPES:
@@ -889,14 +889,14 @@ def _validate_raw_block_inline_content(block: dict[str, Any], *, location: str) 
 
 
 class Producer(_StrictMiddleModel):
-    """记录语言无关的文档生产者，避免绑定宿主产品元数据。"""
+    """Document language-agnostic document producers to avoid binding host product metadata."""
 
     name: str = Field(min_length=1)
     version: str = Field(min_length=1)
 
 
 class DocumentProperties(_StrictMiddleModel):
-    """保存源文件声明的属性；计数属于完整源文件而非当前解析选页。"""
+    """Saves the properties declared by the source file; the count belongs to the complete source file rather than the current parsed selection."""
 
     title: str | None = None
     authors: list[str] = Field(default_factory=list)
@@ -916,12 +916,12 @@ class DocumentProperties(_StrictMiddleModel):
     @field_validator("authors", "keywords", "languages", "identifiers")
     @classmethod
     def _normalize_values(cls, values: list[str]) -> list[str]:
-        """去除空白项并稳定去重，不猜测单个字符串中的分隔符。"""
+        """Remove whitespace items and robust deduplication without guessing delimiters in individual strings."""
         return list(dict.fromkeys(value.strip() for value in values if value.strip()))
 
 
 class DocumentMetadata(_StrictMiddleModel):
-    """承载文档格式和真实生产者，读取时不补造来源信息。"""
+    """It carries the document format and real producer, and does not modify the source information when reading."""
 
     file_suffix: FileSuffix
     producer: Producer
@@ -929,7 +929,7 @@ class DocumentMetadata(_StrictMiddleModel):
 
 
 def _require_document_wire_identity(schema: dict[str, Any]) -> None:
-    """JSON 文档必须显式携带协议身份；构造器的常量默认值仅便利 Python 调用。"""
+    """JSON documents must explicitly carry the protocol identity; the constructor's constant default value only facilitates Python calls."""
     identity = "schema" if "schema" in schema["properties"] else "schema_id"
     schema["required"] = list(dict.fromkeys([identity, "schema_version", *schema.get("required", [])]))
 
@@ -938,7 +938,7 @@ _DocumentT = TypeVar("_DocumentT", bound="DocumentModel")
 
 
 class DocumentModel(_StrictMiddleModel):
-    """公共文档封装，只持有生产者及可序列化扩展信息。"""
+    """Public document encapsulation, only holds producer and serializable extension information."""
 
     model_config = ConfigDict(serialize_by_alias=True, json_schema_extra=_require_document_wire_identity)
 
@@ -954,7 +954,7 @@ class DocumentModel(_StrictMiddleModel):
         exclude_none: bool = False,
         exclude_block_fields: set[str] | None = None,
     ) -> dict[str, Any]:
-        """只对页面树省略块字段，保护具有同名键的来源和应用扩展。"""
+        """Omit block fields only for page trees, protecting sources and application extensions with keys of the same name."""
         payload = super().to_dict(skip_defaults=skip_defaults, exclude_none=exclude_none)
         if exclude_block_fields and "pages" in payload:
             payload["pages"] = _remove_block_fields(payload["pages"], exclude_block_fields)
@@ -962,8 +962,8 @@ class DocumentModel(_StrictMiddleModel):
 
     @model_serializer(mode="wrap")
     def _serialize_document(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo):
-        """保留已声明的协议默认字段，同时尊重调用方显式的字段筛选。"""
-        # 不声明通用 dict 返回类型，避免 Pydantic 将序列化 Schema 降为任意对象。
+        """Preserves declared protocol default fields while respecting the caller's explicit field filtering."""
+        # Do not declare the generic dict return type to avoid Pydantic reducing the serialized Schema to an arbitrary object.
         payload = handler(self)
         use_alias = info.by_alias is not False
         for field_name in ("schema_id", "schema_version", "extensions"):
@@ -978,7 +978,7 @@ class DocumentModel(_StrictMiddleModel):
 
     @classmethod
     def from_dict(cls: type[_DocumentT], value: dict[str, Any]) -> _DocumentT:
-        """联合校验协议身份及版本后读取文档，不猜测或迁移历史格式。"""
+        """The document is read after jointly verifying the protocol identity and version, without guessing or migrating historical formats."""
         expected_schema = cls.model_fields["schema_id"].default
         expected_version = cls.model_fields["schema_version"].default
         if (
@@ -991,12 +991,12 @@ class DocumentModel(_StrictMiddleModel):
 
     @classmethod
     def from_json(cls: type[_DocumentT], value: str | bytes) -> _DocumentT:
-        """从 JSON 文本恢复共享文档，并复用唯一的协议校验入口。"""
+        """Recover shared documents from JSON text and reuse unique protocol check entries."""
         return cls.from_dict(json.loads(value))
 
 
 class ModelJson(DocumentModel):
-    """Analyze 返回的完整严格 Model JSON 对象。"""
+    """Analyze Returns the complete strict Model JSON object."""
 
     schema_id: Literal["docvortex.model"] = Field(default="docvortex.model", alias="schema")
     pages: list[list[dict[str, Any]]]
@@ -1004,7 +1004,7 @@ class ModelJson(DocumentModel):
 
     @model_validator(mode="after")
     def _validate_page_index_map(self) -> ModelJson:
-        """校验显式抽页映射及每个 raw 文本块的 Span 契约。"""
+        """Verify explicit page mapping and Span contracts for each raw text block."""
         if self.page_index_map:
             if len(self.page_index_map) != len(self.pages):
                 raise ValueError(f"page_index_map length mismatch: pages={len(self.pages)}, mapping={len(self.page_index_map)}")
@@ -1022,26 +1022,26 @@ class ModelJson(DocumentModel):
 
     @property
     def is_full_document(self) -> bool:
-        """返回当前 Model JSON 是否表示整本文档解析。"""
+        """Returns the current Model. JSON indicates whether the entire document is parsed."""
         return not self.page_index_map
 
     @property
     def resolved_page_indices(self) -> list[int]:
-        """返回显式抽页映射或整本文档的顺序页号副本。"""
+        """Returns an explicit page map or a sequential page number copy of the entire document."""
         if self.is_full_document:
             return list(range(len(self.pages)))
         return list(self.page_index_map)
 
 
 class PageInfo(_StrictMiddleModel):
-    """一页的严格 Middle JSON 内容。"""
+    """One page of strictly Middle JSON content."""
 
     page_idx: int = Field(ge=0)
     blocks: list[PageBlock] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_page_tree(self) -> PageInfo:
-        """校验顶层 index 顺序，并禁止嵌套块携带跨块延续标记。"""
+        """Verify top-level index sequence and disable nested blocks from carrying cross-block continuation markers."""
         indices: list[int] = []
         for block in self.blocks:
             if block.index is None:
@@ -1062,7 +1062,7 @@ class PageInfo(_StrictMiddleModel):
 
 
 class MiddleJson(DocumentModel):
-    """Analyze 返回的完整严格 Middle JSON 对象。"""
+    """Analyze Returns the complete strict Middle JSON object."""
 
     schema_id: Literal["docvortex.middle"] = Field(default="docvortex.middle", alias="schema")
     pages: list[PageInfo]
@@ -1070,7 +1070,7 @@ class MiddleJson(DocumentModel):
 
     @model_validator(mode="after")
     def _validate_document(self) -> MiddleJson:
-        """校验页号唯一有序，并要求固定版式文档顶层 block 均具有 bbox。"""
+        """Verify that page numbers are uniquely ordered and require that the top-level block of a fixed-layout document all have bbox."""
         page_indices = [page.page_idx for page in self.pages]
         if len(page_indices) != len(set(page_indices)):
             raise ValueError("page_idx values must be unique")

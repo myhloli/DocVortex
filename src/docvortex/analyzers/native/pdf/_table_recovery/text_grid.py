@@ -1,4 +1,4 @@
-"""基于稀疏规则、行底纹和原生文本对齐恢复少线或无线表格。"""
+"""Restore few-line or wireless tables based on sparsity rules, line shading, and native text alignment."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ MIN_COLUMN_ANCHOR_SUPPORT = 0.60
 
 @dataclass(frozen=True, slots=True)
 class _LogicalRowGrouping:
-    """保存视觉行分组结果及不宜自动合并的稠密行对。"""
+    """Save visual row grouping results and dense row pairs that are not suitable for automatic merging."""
 
     rows: tuple[NativeTableTextRow, ...]
     dense_ambiguities: tuple[tuple[int, int], ...]
@@ -25,7 +25,7 @@ class _LogicalRowGrouping:
 
 
 def _infer_target_column_count(text: NativeTableText) -> int | None:
-    """从多行文本项数量中选择有重复证据的最大叶子列数。"""
+    """Select the maximum number of leaf columns with evidence of duplication from the number of multi-line text items."""
 
     counts = [len(row.tokens) for row in text.rows if len(row.tokens) >= 2]
     if not counts:
@@ -42,7 +42,7 @@ def _infer_column_tracks(
     width: float,
     target_cols: int,
 ) -> tuple[list[float], float, float] | None:
-    """用最稠密视觉行的相邻文本间隙推断全局叶子列边界。"""
+    """Infer global leaf column boundaries using adjacent text gaps of the densest visual rows."""
 
     dense_rows = [row for row in text.rows if len(row.tokens) == target_cols]
     if len(dense_rows) < 2 and len(text.rows) > 3:
@@ -112,7 +112,7 @@ def _infer_row_tracks(
     rows: tuple[NativeTableTextRow, ...],
     height: float,
 ) -> list[float] | None:
-    """用相邻逻辑行中心的中点构造完整行边界。"""
+    """Complete row boundaries are constructed from the midpoints of adjacent logical row centers."""
 
     if len(rows) < 2:
         return None
@@ -128,7 +128,7 @@ def _token_columns(
     row: NativeTableTextRow,
     x_tracks: list[float],
 ) -> list[int] | None:
-    """把一行文本项按中心点单调映射到叶子列。"""
+    """Monotonically map a row of text items to leaf columns based on the center point."""
 
     output: list[int] = []
     for token in row.tokens:
@@ -148,7 +148,7 @@ def _has_horizontal_rule_between(
     previous: NativeTableTextRow,
     current: NativeTableTextRow,
 ) -> bool:
-    """判断两条视觉文本行之间是否存在贯穿多数表宽的物理横线。"""
+    """Determines whether there is a physical horizontal line between two lines of visual text that spans most of the table width."""
 
     table_bbox = normalize_bbox(table_input.table_bbox)
     if table_bbox is None:
@@ -177,7 +177,7 @@ def _group_logical_rows(
     text: NativeTableText,
     x_tracks: list[float],
 ) -> _LogicalRowGrouping:
-    """保守合并同格内紧邻 continuation，避免 baseline 直接等同逻辑行。"""
+    """Conservatively merge the adjacent continuation in the same cell to avoid baseline being directly equivalent to the logical row."""
 
     groups: list[list[NativeTableTextRow]] = []
     group_occupancy: list[set[int]] = []
@@ -241,7 +241,7 @@ def _header_rows_are_representable(
     x_tracks: list[float],
     first_dense_row: int,
 ) -> bool:
-    """校验前导多层表头能否仅用当前 colspan 逻辑完整表达。"""
+    """Verify whether the leading multi-layer header can be fully expressed using only the current colspan logic."""
 
     if first_dense_row < 1:
         return True
@@ -265,7 +265,7 @@ def _single_header_span(
     row: NativeTableTextRow,
     x_tracks: list[float],
 ) -> tuple[int, int] | None:
-    """仅在单文本项确实横跨连续叶子列时返回保守表头 colspan。"""
+    """Return conservative header colspan only if the single text item does span consecutive leaf columns."""
 
     if len(row.tokens) != 1:
         return None
@@ -288,7 +288,7 @@ def _grouped_header_spans(
     next_row: NativeTableTextRow,
     x_tracks: list[float],
 ) -> list[tuple[int, int]] | None:
-    """用下一层表头叶子列为多个分组标题推断连续 colspan。"""
+    """Infer consecutive colspan with multiple group headers using next level header leaf columns."""
 
     if len(row.tokens) < 2:
         single_span = _single_header_span(row, x_tracks)
@@ -329,7 +329,7 @@ def _build_text_grid_specs(
     y_tracks: list[float],
     first_dense_row: int,
 ) -> tuple[tuple[GridCellSpec, ...], float] | None:
-    """为每个逻辑行构造单元格，并允许前导分组表头产生 colspan。"""
+    """Constructing cells for each logical row and allowing leading group headers produces colspan."""
 
     cols = len(x_tracks) - 1
     specs: list[GridCellSpec] = []
@@ -397,7 +397,7 @@ def _physical_sparse_evidence(
     table_input: NativeTableInput,
     text: NativeTableText,
 ) -> float:
-    """统计长横线和重复行底纹，为少线候选提供独立物理证据。"""
+    """Long horizontal lines and repeated row shading are counted to provide independent physical evidence for minor line candidates."""
 
     table_bbox = normalize_bbox(table_input.table_bbox)
     if table_bbox is None:
@@ -433,8 +433,8 @@ def _physical_sparse_evidence(
             3.0 * text.median_glyph_height, 0.50 * height
         ):
             stripe_count += 1
-    # 贯穿竖线只说明 vector 候选应被优先验证，不能关闭其拓扑失败后的
-    # 横线加文本兜底；异构候选最终由 verified 物理网格仲裁。
+    # The vertical lines throughout only indicate that the vector candidate should be verified first, and its topology failure cannot be closed.
+    # Horizontal lines and text are included; heterogeneous candidates are ultimately arbitrated by the verified physical grid.
     return min(
         1.0,
         (long_horizontal_count + stripe_count) / 3.0,
@@ -451,14 +451,14 @@ def _build_aligned_candidate(
     physical_support: float,
     diagnostics: dict[str, Any] | None = None,
 ) -> NativeTableCandidate | None:
-    """按统一文本轨道构造 sparse、wireless 或 key-value 候选。"""
+    """Construct sparse, wireless or key-value candidates by unified text track."""
 
     if diagnostics is not None:
         diagnostics["source"] = source
         diagnostics["raw_visual_rows"] = len(text.rows)
 
     def reject(gate: str) -> None:
-        """记录文本候选的首个拒绝门。"""
+        """Record the first rejection gate of a text candidate."""
 
         if diagnostics is not None:
             diagnostics["first_rejection_gate"] = gate
@@ -548,7 +548,7 @@ def build_text_candidates(
     text: NativeTableText,
     diagnostics: list[dict[str, Any]] | None = None,
 ) -> list[NativeTableCandidate]:
-    """同时生成少线、三列以上无线表和两列 key-value 候选。"""
+    """Simultaneously generate few lines, more than three columns of wireless tables and two columns of key-value candidates."""
 
     candidates: list[NativeTableCandidate] = []
     physical_support = _physical_sparse_evidence(table_input, text)
@@ -604,7 +604,7 @@ def diagnose_text_candidate_builds(
     table_input: NativeTableInput,
     text: NativeTableText,
 ) -> tuple[dict[str, Any], ...]:
-    """重放文本候选构造并返回不含单元格全文的诊断。"""
+    """Replays the text candidate construction and returns the diagnosis without the full text of the cell."""
 
     diagnostics: list[dict[str, Any]] = []
     build_text_candidates(

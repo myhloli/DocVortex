@@ -1,4 +1,4 @@
-"""安全归一化 XML namespace 与 legacy HTML 前缀标签名。"""
+"""Security normalization XML namespace and legacy HTML prefix tag names."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from lxml import etree  # type: ignore[reportMissingImports]
 
 
 def local_name(element: etree._Element) -> str:
-    """返回 Clark notation、普通或冒号前缀标签的小写本地名。"""
+    """Returns Clark notation, plain, or colon-prefixed lowercase local name of the label."""
     tag = element.tag
     if not isinstance(tag, str):
         return ""

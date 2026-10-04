@@ -15,7 +15,7 @@ def _drawing_axis_line(
     orientation: str,
     bbox: tuple[float, float, float, float],
 ) -> models._AxisLine:
-    """构造图形容器测试使用的 PDF 绘图线。"""
+    """Constructs the PDF plot line used by the graphics container test."""
 
     return models._AxisLine(
         bbox=bbox,
@@ -33,7 +33,7 @@ def _path_info(
     stroke_visible: bool = False,
     form_depth: int = 0,
 ) -> PDFPathInfo:
-    """构造强图形核心测试使用的根层 PDF Path。"""
+    """Construct the root layer PDF Path used for strong graphics core testing."""
 
     return PDFPathInfo(
         bbox=bbox,
@@ -46,7 +46,7 @@ def _path_info(
 
 
 def test_vertical_raster_tiles_merge_before_area_filter() -> None:
-    """验证同宽纵向切片先合并成完整图片，再应用单图面积门槛。"""
+    """Verify that vertical slices of the same width are first merged into a complete image, and then a single image area threshold is applied."""
 
     tiles = [(20.0, float(top), 180.0, float(top + 4)) for top in range(20, 60, 4)]
 
@@ -57,7 +57,7 @@ def test_vertical_raster_tiles_merge_before_area_filter() -> None:
 
 
 def test_full_page_raster_tiles_stay_separate() -> None:
-    """验证整页扫描图切片不合成单个容器，保留既有逐片输出。"""
+    """Verify that the whole page scanned image slices are not combined into a single container and the existing slice-by-slice output is retained."""
 
     tiles = [(0.0, float(top), 200.0, float(top + 10)) for top in range(0, 200, 10)]
 
@@ -78,7 +78,7 @@ def _parallel_rule_split_fixture(
     list[models._AxisLine],
     list[tuple[float, float, float, float]],
 ]:
-    """构造无语义文本、成对图形、独立横线和可选栏沟干扰字符。"""
+    """Construct semantic-free text, paired graphics, independent horizontal lines, and optional bar and groove interference characters."""
 
     left_chars = [
         {
@@ -126,7 +126,7 @@ def _parallel_rule_split_fixture(
 
 
 def test_parallel_graphic_rule_rows_split_without_reading_text_content() -> None:
-    """验证完整空间证据把同一视觉行拆成左右两个受保护 run。"""
+    """Verification of complete spatial evidence splits the same visual line into two protected left and right run."""
 
     line, rules, images = _parallel_rule_split_fixture()
 
@@ -167,7 +167,7 @@ def test_parallel_graphic_rule_rows_split_without_reading_text_content() -> None
 def test_parallel_graphic_rule_rows_require_all_spatial_evidence(
     missing_evidence: str,
 ) -> None:
-    """验证横线、图形、栏沟或表格排除任一不成立时都不拆分。"""
+    """Verify that the horizontal lines, graphics, columns, or tables will not be split if any of the exclusions are not established."""
 
     line, rules, images = _parallel_rule_split_fixture(cross_gutter=missing_evidence == "clear_gutter")
     table_bboxes: list[tuple[float, float, float, float]] = []
@@ -192,7 +192,7 @@ def test_parallel_graphic_rule_rows_require_all_spatial_evidence(
 
 
 def _graphic_source_fixture() -> models._PageSource:
-    """构造双框图形、六个标签、拆分 caption 与邻近正文。"""
+    """Construct a double-framed graphic, six labels, split caption and adjacent text."""
 
     lines = [
         _text_line("p = (x, y)", (378.0, 302.0, 421.0, 312.0), 0, visual_row_id=10),
@@ -236,7 +236,7 @@ def _graphic_source_fixture() -> models._PageSource:
 
 
 def test_double_box_graphic_claims_six_labels_but_not_caption_or_body() -> None:
-    """验证双框图形整行聚合六个标签，拆分 caption 和邻近正文均不被部分认领。"""
+    """Verify that the entire row of double-box graphics aggregates six labels, split caption, and adjacent text are not partially claimed."""
 
     blocks, claimed = graphics._build_graphic_like_blocks(
         _graphic_source_fixture(),
@@ -256,7 +256,7 @@ def test_double_box_graphic_claims_six_labels_but_not_caption_or_body() -> None:
 
 
 def test_graphic_label_accepts_only_near_diagonal_corner_text() -> None:
-    """验证无轴向重叠的短标签仅在严格角部距离内归入图形。"""
+    """Verify that short labels with no axial overlap fall into the graph only within strict corner distances."""
 
     core_bbox = (20.0, 20.0, 80.0, 80.0)
     near_corner = _text_line("unit", (5.0, 5.0, 15.0, 15.0), 0)
@@ -285,7 +285,7 @@ def test_graphic_label_accepts_only_near_diagonal_corner_text() -> None:
 
 
 def test_materialized_table_bbox_has_priority_over_graphic_candidate() -> None:
-    """验证绘图组件与成功表格框重叠时跳过图形容器并保留全部文本身份。"""
+    """Validate drawing component skipping the graphics container and retaining full text identity when overlapping the table box."""
 
     blocks, claimed = graphics._build_graphic_like_blocks(
         _graphic_source_fixture(),
@@ -298,7 +298,7 @@ def test_materialized_table_bbox_has_priority_over_graphic_candidate() -> None:
 
 
 def test_complex_path_container_builds_graphic_without_drawing_lines() -> None:
-    """验证大 Path 容器和内部二维复杂轮廓可直接形成图形核心。"""
+    """Verification that large Path containers and internal 2D complex contours directly form the graphical core."""
 
     source = models._PageSource(
         page_size=(100.0, 100.0),
@@ -332,7 +332,7 @@ def test_complex_path_container_builds_graphic_without_drawing_lines() -> None:
 
 
 def test_strong_graphic_core_binds_only_to_unique_containing_lane() -> None:
-    """验证单栏强图形不会吸收邻栏文本，而真正跨栏核心仍保持跨栏。"""
+    """Verify that a strong single-column graphic does not absorb adjacent column text, while the true cross-column core remains cross-column."""
 
     lanes = [
         models._TextLane(left=50.0, right=290.0),
@@ -358,7 +358,7 @@ def test_strong_graphic_core_binds_only_to_unique_containing_lane() -> None:
 
 
 def test_axis_pair_requires_internal_two_dimensional_complex_path() -> None:
-    """验证相交坐标轴须有二维复杂曲线支撑，规则矩形行带不会误报图形。"""
+    """Verify that the intersecting coordinate axes must be supported by two-dimensional complex curves, and that regular rectangular rows will not falsely report graphics."""
 
     source = models._PageSource(
         page_size=(100.0, 100.0),
@@ -388,7 +388,7 @@ def test_axis_pair_requires_internal_two_dimensional_complex_path() -> None:
 
 
 def test_form_image_claims_internal_text_and_small_table_but_not_caption() -> None:
-    """验证有效 Form 吞并图内文字与小表候选，外部 caption 仍保留。"""
+    """Verify that the valid Form annexes the text and small table candidates in the figure, and the external caption is still retained."""
 
     form_bbox = (10.0, 10.0, 90.0, 65.0)
     source = models._PageSource(
@@ -432,7 +432,7 @@ def test_form_image_claims_internal_text_and_small_table_but_not_caption() -> No
 
 
 def test_form_image_bbox_tightens_to_supported_internal_evidence() -> None:
-    """验证含充分嵌套 Path 的 Form 去除空白边缘，文本轻微越界仍纳入证据并裁到页面。"""
+    """Verify that Form with fully nested Path removes whitespace edges, text slightly out of bounds is still included in the evidence and clipped to the page."""
 
     source = models._PageSource(
         page_size=(120.0, 120.0),
@@ -458,7 +458,7 @@ def test_form_image_bbox_tightens_to_supported_internal_evidence() -> None:
 
 
 def test_graphic_label_absorbs_short_axis_title_but_rejects_long_caption() -> None:
-    """验证上下坐标轴标题可放宽到八倍行高，长图注仍被图形容器拒绝。"""
+    """Verified that the upper and lower axis titles can be expanded to eight times the line height, and long legends are still rejected by the graph container."""
 
     core_bbox = (20.0, 30.0, 140.0, 80.0)
     top_axis_title = _text_line(
@@ -501,7 +501,7 @@ def test_graphic_label_absorbs_short_axis_title_but_rejects_long_caption() -> No
 
 
 def _inline_raster_sequence_source() -> models._PageSource:
-    """构造四张点阵图、三个同行间隔符及其右侧三行正文。"""
+    """Construct four bitmaps, three line spacers and three lines of text on the right."""
 
     return models._PageSource(
         page_size=(100.0, 100.0),
@@ -553,7 +553,7 @@ def _inline_raster_sequence_source() -> models._PageSource:
 
 
 def test_raster_image_threshold_accepts_point_38_percent_only() -> None:
-    """验证页面面积达到 0.38% 时准入，略低于阈值的孤立图片仍过滤。"""
+    """Admission is allowed when the verification page area reaches 0.38%, and isolated images slightly below the threshold are still filtered."""
 
     source = models._PageSource(
         page_size=(100.0, 100.0),
@@ -573,7 +573,7 @@ def test_raster_image_threshold_accepts_point_38_percent_only() -> None:
 
 
 def test_signature_images_bypass_raster_threshold_and_deduplicate_same_geometry() -> None:
-    """验证小签名仍输出，且签名间及签名与点阵图的同框候选只保留一次。"""
+    """Verify that small signatures are still output, and candidates in the same frame between signatures and between signatures and bitmaps are only retained once."""
 
     source = models._PageSource(
         page_size=(1000.0, 1000.0),
@@ -598,7 +598,7 @@ def test_signature_images_bypass_raster_threshold_and_deduplicate_same_geometry(
 
 
 def test_inline_raster_images_and_gap_runs_form_one_composite_image() -> None:
-    """验证四张已准入图片与三个同行间隔符合成一个复合 image。"""
+    """Verify that the four admitted pictures and the three peer intervals fit into a composite image."""
 
     source = _inline_raster_sequence_source()
 
@@ -626,7 +626,7 @@ def test_inline_raster_images_and_gap_runs_form_one_composite_image() -> None:
 def test_inline_raster_composite_requires_complete_spatial_sequence(
     failure_mode: str,
 ) -> None:
-    """验证图片或间隔符结构不完整时保留独立图片而不生成复合容器。"""
+    """Preserves independent images without generating composite containers when the validation image or spacer structure is incomplete."""
 
     source = _inline_raster_sequence_source()
     container_blocks: list[dict[str, object]] = []
@@ -664,7 +664,7 @@ def test_inline_raster_composite_requires_complete_spatial_sequence(
 
 
 def test_inline_composite_sorts_before_overlapping_multiline_text() -> None:
-    """验证复合图片与含同行首行的多行正文绑定后始终先输出图片。"""
+    """Verify that when a composite image is bound to a multi-line body containing the first line of the same line, the image is always output first."""
 
     blocks = [
         {
@@ -707,7 +707,7 @@ def test_inline_composite_sorts_before_overlapping_multiline_text() -> None:
 
 
 def test_raster_images_filter_small_objects_avoid_containers_and_claim_text_once() -> None:
-    """验证点阵图过滤、容器优先、空 content 和重叠对象的唯一文本归属。"""
+    """Validates unique text attribution for bitmap filtering, container precedence, empty content, and overlapping objects."""
 
     source = models._PageSource(
         page_size=(100.0, 100.0),
@@ -745,7 +745,7 @@ def test_raster_images_filter_small_objects_avoid_containers_and_claim_text_once
 
 
 def test_raster_image_content_is_removed_from_text_and_empty_image_page_is_kept() -> None:
-    """验证图内文本只进入 image，独立 caption 正确标记，纯图片页仍输出空 content。"""
+    """Verify that the text in the picture only enters image, the independent caption is correctly marked, and the pure picture page still outputs empty content."""
 
     source = models._PageSource(
         page_size=(100.0, 100.0),

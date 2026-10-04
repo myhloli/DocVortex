@@ -1,4 +1,4 @@
-"""行内矢量数学的槽位、上下标和正文连续性正反例。"""
+"""Positive and negative examples of slots, superscripts and subscripts, and text continuity in inline vector mathematics."""
 
 import pytest
 
@@ -12,14 +12,14 @@ from docvortex.analyzers.native.pdf.text_assembly.continuity import group_native
 
 
 def _path(box, index, segments=50, color=(0,0,0,255)):
-    """构造有原生可见填充的矢量字形，不提供文件、页码或特定公式内容。"""
+    """Constructs vector glyphs with native visible padding, without providing file, page number, or specific formula content."""
     return PDFPathInfo(box,segments,True,False,0,index,fill_rgba=color)
 
 
 @pytest.mark.parametrize('scale,left',[(.7,20),(1,50),(1.6,90)])
 @pytest.mark.parametrize('kind',['wide','script','both_scripts','plain_glyphs','colored','container','no_hosts','far_hosts','tall','short_prose','large_gap'])
 def test_inline_vector_math_requires_complexity_script_or_wide_cluster_and_native_prose_slots(scale,left,kind):
-    """字号变化下保留复杂公式及上下标，普通字形、彩色装饰和缺失槽位的图形不能当成行内数学。"""
+    """Complex formulas, superscripts and subscripts are retained under changes in font size. Ordinary fonts, colored decorations and graphics with missing slots cannot be regarded as inline mathematics."""
     h=10*scale;top=100*scale
     start=left+100*scale
     if kind in {'script','both_scripts','plain_glyphs'}:
@@ -50,7 +50,7 @@ def test_inline_vector_math_requires_complexity_script_or_wide_cluster_and_nativ
 @pytest.mark.parametrize('scale,left',[(.7,20),(1,50),(1.6,90)])
 @pytest.mark.parametrize('kind',['equation','numbered','no_flat_glyph','off_center','tall_glyph','far','misaligned','not_wide_rhs','body','different_lane'])
 def test_multiline_vector_equation_requires_short_open_lhs_centered_flat_operator_and_unblocked_long_rhs(scale,left,kind):
-    """扁平末运算字形、缩进、净空和长度共同确认两行等式，编号或中间正文阻止合并。"""
+    """Flattened glyphs, indentation, headroom, and length all work together to confirm the equality of two lines, and numbering or intervening text prevents merging."""
     h=10*scale
     a=(left,100*scale,left+100*scale,112*scale)
     yy=(140 if kind=='far' else 122)*scale
@@ -74,7 +74,7 @@ def test_multiline_vector_equation_requires_short_open_lhs_centered_flat_operato
 @pytest.mark.parametrize('scale,left',[(.7,20),(1,50),(1.6,90)])
 @pytest.mark.parametrize('kind',['body','single_region','two_rows','few_words','font_reset','gap','different_column','marked','different_scale'])
 def test_two_inline_native_formula_slots_group_only_continuous_same_style_prose(scale,left,kind):
-    """至少两处公式和三排同式自然语言才锁定段组，字体重置、栏变、标题及留白均须分段。"""
+    """At least two formulas and three rows of the same natural language are required to lock the paragraph group. Font reset, column changes, titles and white spaces must be divided into paragraphs."""
     h=10*scale;rows=[]
     for index in range(2 if kind=='two_rows' else 4):
         x=left+(180*scale if kind=='different_column' and index>=2 else 0)

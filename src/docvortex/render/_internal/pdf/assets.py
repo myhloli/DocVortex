@@ -1,4 +1,4 @@
-"""PDF renderer 的离线图片解析、签名校验与格式准备。"""
+"""PDF renderer's offline image analysis, signature verification and format preparation."""
 
 from __future__ import annotations
 
@@ -33,12 +33,12 @@ _SVG_START_RE = re.compile(rb"^(?:\xef\xbb\xbf)?\s*(?:<\?xml\b.*?\?>\s*)?<svg\b"
 
 
 class PdfAssetError(ValueError):
-    """表示 PDF renderer 无法离线安全加载或识别图片素材。"""
+    """Indicates PDF renderer Unable to safely load or identify image material offline."""
 
 
 @dataclass(frozen=True, slots=True)
 class PreparedImage:
-    """保存可直接交给 ReportLab 的图片字节与像素尺寸。"""
+    """Save image byte and pixel dimensions that can be passed directly to ReportLab."""
 
     data: bytes
     extension: str
@@ -50,7 +50,7 @@ def prepare_block_image(
     block: ImagePayloadBlock,
     asset_resolver: AssetResolver | None = None,
 ) -> PreparedImage:
-    """按 sidecar、data URI 的固定优先级加载一个图片载荷 block。"""
+    """Load an image payload block with a fixed priority of sidecar, data URI."""
     if not isinstance(block, ImagePayloadBlock):
         raise TypeError("block must be an ImagePayloadBlock")
     if block.image_path is not None:
@@ -66,7 +66,7 @@ def prepare_html_image(
     source: str,
     asset_resolver: AssetResolver | None = None,
 ) -> PreparedImage:
-    """从 HTML img 的 data URI 或安全相对 sidecar 加载图片。"""
+    """Load images from HTML img data URI or safe relative sidecar."""
     if not isinstance(source, str):
         raise TypeError("HTML image source must be a string")
     normalized = source.strip()
@@ -83,7 +83,7 @@ def prepare_html_image(
 
 
 def prepare_image_bytes(data: bytes, *, declared_extension: str | None = None) -> PreparedImage:
-    """严格解码图片字节，并把 WebP 与安全 SVG fallback 转成 PNG。"""
+    """Strictly decode picture bytes and convert WebP and secure SVG to fallback to PNG."""
     if not isinstance(data, bytes):
         raise PdfAssetError("Image resolver must return bytes")
     if not data:
@@ -133,7 +133,7 @@ def prepare_image_bytes(data: bytes, *, declared_extension: str | None = None) -
 
 
 def _prepare_data_uri(data_uri: str) -> PreparedImage:
-    """严格解析图片 data URI 并校验 MIME、签名与完整载荷。"""
+    """Strictly parse the image data URI and verify MIME, signature and complete payload."""
     try:
         data, extension = parse_image_data_uri_strict(data_uri)
     except ValueError as exc:
@@ -142,7 +142,7 @@ def _prepare_data_uri(data_uri: str) -> PreparedImage:
 
 
 def _prepare_relative_asset(image_path: str, asset_resolver: AssetResolver | None) -> PreparedImage:
-    """校验相对 sidecar 路径，并仅通过显式 resolver 获取字节。"""
+    """Verify relative sidecar paths and only get bytes via explicit resolver."""
     parsed = urlsplit(image_path)
     if parsed.scheme or parsed.netloc:
         raise PdfAssetError(f"Remote or scheme-based image source is not supported: {image_path}")
@@ -161,7 +161,7 @@ def _prepare_relative_asset(image_path: str, asset_resolver: AssetResolver | Non
 
 
 def _normalize_extension(extension: str | None) -> str | None:
-    """规范化可识别扩展名，未知扩展不作为签名声明。"""
+    """Normalization recognizes extensions, unknown extensions are not declared as signatures."""
     if extension is None:
         return None
     normalized = extension.lower().lstrip(".").split("+", 1)[0]
@@ -172,12 +172,12 @@ def _normalize_extension(extension: str | None) -> str | None:
 
 
 def _looks_like_svg(data: bytes) -> bool:
-    """识别带可选 BOM 与 XML 声明的 SVG 字节。"""
+    """Identifies the SVG byte with optional BOM and XML declarations."""
     return _SVG_START_RE.match(data[:4096]) is not None
 
 
 def _convert_webp_to_png(image: Image.Image, width_px: int, height_px: int) -> PreparedImage:
-    """在内存中把已解码 WebP 转成 ReportLab 可稳定读取的 PNG。"""
+    """Convert decoded WebP into ReportLab in memory and PNG that can be stably read."""
     output = BytesIO()
     image.save(output, format="PNG")
     return PreparedImage(

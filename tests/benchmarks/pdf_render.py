@@ -1,4 +1,4 @@
-"""隔离 PDF 导出计时，冻结输入、诊断、PDF 字节及逐页视觉签名。"""
+"""Isolate PDF export timing, freeze input, diagnostics, PDF bytes and page-by-page visual signatures."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def source_case(source: str):
-    """读取固定 Bundle，或生成包含矢量公式、链接和重复素材的可移植语料。"""
+    """Read fixed Bundle, or generate portable corpora containing vector formulas, links and repeat material."""
     from docvortex import load_bundle
     from docvortex.assets import AssetStore
     from docvortex.result import DocumentResult
@@ -81,7 +81,7 @@ def source_case(source: str):
 
 
 def input_digest(result) -> str:
-    """校验完整语义树与素材内容，计时外确认 renderer 未修改输入。"""
+    """Verify the complete semantic tree and material content, and confirm that renderer has not modified the input."""
     return digest(
         json.dumps(
             {
@@ -95,7 +95,7 @@ def input_digest(result) -> str:
 
 
 def pdf_signature(payload: bytes) -> dict:
-    """冻结像素、文字、页框及链接目标，允许跨加速后端比较容器外的实际输出。"""
+    """Freezing pixels, text, page frames, and link targets allows comparison of actual output outside the container across accelerated backends."""
     from pypdf import PdfReader
 
     reader = PdfReader(BytesIO(payload))
@@ -116,7 +116,7 @@ def pdf_signature(payload: bytes) -> dict:
 
 
 def worker(args) -> None:
-    """在独立进程中测量单个输入和布局，纯 Python 回退只在此测试进程内模拟。"""
+    """Individual inputs and layouts are measured in separate processes, pure Python fallback is only simulated within this test process."""
     if args.backend == "python":
         sys.modules["_rl_accel"] = None
     import docvortex
@@ -195,7 +195,7 @@ def worker(args) -> None:
 
 
 def main() -> None:
-    """逐个运行文档与布局，并拒绝覆盖基线或忽略输出差异。"""
+    """Run documents and layouts one by one and refuse to overwrite the baseline or ignore output differences."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", action="append", help="Bundle directory or fixture:rich")
     parser.add_argument("--output", type=Path, required=True)

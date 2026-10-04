@@ -1,4 +1,4 @@
-"""重放人工标注语料，保存当前模型、最终标框及逐条几何检查结果。"""
+"""Replay the manual annotation corpus and save the current model, final labeling frame and geometric inspection results one by one."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ MANIFEST = ROOT / "tests/fixtures/flash_manual_annotations.json"
 
 
 def visible(value: object) -> str:
-    """递归提取可见内容，样式和链接包装不改变文本断言。"""
+    """Recursively extract visible content, styles and link wrapping without changing text assertions."""
     if isinstance(value, str):
         return value
     if isinstance(value, list):
@@ -30,12 +30,12 @@ def visible(value: object) -> str:
 
 
 def contains(outer: list, inner: list, tolerance: float = 0.004) -> bool:
-    """按归一化页面坐标检查成员区域被目标块覆盖。"""
+    """Check that the member area is covered by the target block by normalized page coordinates."""
     return all((outer[i] <= inner[i] + tolerance if i < 2 else outer[i] >= inner[i] - tolerance) for i in range(4))
 
 
 def check_case(case: dict, page: list[dict]) -> dict:
-    """检查已定义的结构条件；需要视觉确认的项目明确标记，禁止默认当作通过。"""
+    """Defined structural conditions are checked; items requiring visual confirmation are clearly marked and are not passed by default."""
     operation, anchors = case["operation"], case["anchors"]
     if operation == "table":
         anchors = [anchor for anchor in anchors if anchor["type"] != "caption"]
@@ -70,7 +70,7 @@ def check_case(case: dict, page: list[dict]) -> dict:
     else:
         return {"id": case["id"], "status": "visual_review", "operation": operation}
     if operation == "code" and case.get("body_original_indices") is None:
-        # 算法标题独立保留为 code_caption；code_body 仅覆盖标题后的指令行。
+        # The algorithm title is left alone as code_caption; code_body only overrides the instruction line after the title.
         anchors = anchors[1:]
         if anchors:
             regions[0][1] = min(a["bbox"][1] for a in anchors)
@@ -111,7 +111,7 @@ def check_case(case: dict, page: list[dict]) -> dict:
 
 
 def review_document(document: dict, output: Path) -> list[dict]:
-    """完整解析一份原件，保存可重放证据并执行人工清单的机器检查。"""
+    """Completely parse an original, preserve replayable evidence and perform machine checks of manual inventories."""
     source = ROOT / document["path"]
     data = source.read_bytes()
     assert hashlib.sha256(data).hexdigest() == document["sha256"]
@@ -138,7 +138,7 @@ def review_document(document: dict, output: Path) -> list[dict]:
 
 
 def main() -> None:
-    """提供指定文档重放入口，不自动修改任何期望或历史基线。"""
+    """Provides a designated document re-entry without automatically modifying any expectations or historical baselines."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "output/pdf/flash-manual/current")
     parser.add_argument("--documents", nargs="*")

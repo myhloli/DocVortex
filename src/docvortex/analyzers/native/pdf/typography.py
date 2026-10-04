@@ -1,4 +1,4 @@
-"""提供原生文本与布局共享的字体族归一化。"""
+"""Provides font family normalization shared between native text and layout."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import re
 def _normalized_font_family(
     signature: tuple[str, int] | None,
 ) -> str | None:
-    """移除 PDF 字体子集前缀并归一化字体族名称，供几何续行作软兼容判断。"""
+    """Remove the PDF font subset prefix and normalize the font family name for geometric continuation for soft compatibility judgment."""
 
     if signature is None:
         return None

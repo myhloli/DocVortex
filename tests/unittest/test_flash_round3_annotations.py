@@ -1,4 +1,4 @@
-"""第三轮真实原件验收：断言成员、段界和类型，不依赖修改后块编号。"""
+"""Third round of true original acceptance: Assert members, segment boundaries and types without relying on modified block numbers."""
 
 from functools import lru_cache
 import hashlib
@@ -20,7 +20,7 @@ MANIFEST = json.loads((ROOT / "tests/fixtures/flash_round3_annotations.json").re
 
 @lru_cache(maxsize=2)
 def _model(name):
-    """完整读取带指纹的原件，保留跨页字体和参考文献上下文。"""
+    """Read the fingerprinted original in full, preserving cross-page fonts and reference context."""
     document = next(d for d in MANIFEST["documents"] if d["name"] == name)
     data = (ROOT / document["path"]).read_bytes()
     assert hashlib.sha256(data).hexdigest() == document["sha256"]
@@ -29,7 +29,7 @@ def _model(name):
 
 
 def _starting(name, page, prefix):
-    """按可见文字前缀定位唯一块。"""
+    """Locate unique blocks by visible text prefix."""
     blocks = [b for b in _model(name)[page - 1] if visible(b["content"]).startswith(prefix)]
     assert len(blocks) == 1, (name, page, prefix, [(b["type"], visible(b["content"])) for b in blocks])
     return blocks[0]
@@ -67,14 +67,14 @@ def _starting(name, page, prefix):
     ],
 )
 def test_titles_and_explicit_paragraph_boundaries(name, page, prefix, kind):
-    """真标题与机构、正文分别归类，缩进新段保留独立起点。"""
+    """The real title is classified separately from the organization and main text, and new paragraphs are indented to retain independent starting points."""
     exact = [block for block in _model(name)[page - 1] if visible(block["content"]) == prefix]
     block = exact[0] if len(exact) == 1 else _starting(name, page, prefix)
     assert block["type"] == kind
 
 
 def test_indented_paragraph_first_word_has_one_owner_and_matching_bounds():
-    """段首宽空格拆开的单词完整回到本段，文字及行框不再残留在上一段。"""
+    """The words separated by wide spaces at the beginning of the paragraph return to this paragraph completely, and the text and line boxes no longer remain in the previous paragraph."""
     previous = _starting("dual_caption", 10, "Prednisolone,")
     current = _starting("dual_caption", 10, "Prescribing an intermediate-acting")
     assert visible(previous["content"]).endswith("day.")
@@ -94,7 +94,7 @@ def test_indented_paragraph_first_word_has_one_owner_and_matching_bounds():
 
 
 def test_small_multiline_heading_is_one_complete_title_band():
-    """已确认的双行小标题保持一个块，不能在语义行连接时再次拆分。"""
+    """Confirmed two-line subtitles remain a block and cannot be split again when semantic lines are joined."""
     block = _starting("dual_caption", 15, "Nutritional, Psychological,")
     assert block["type"] == "paragraph_title"
     assert visible(block["content"]).endswith("Behavioral Therapies")
@@ -114,14 +114,14 @@ def test_small_multiline_heading_is_one_complete_title_band():
     ],
 )
 def test_continuous_body_members_are_not_split(name, page, prefix, tail):
-    """同行碎片、数学起始续行和短尾仍属于原来的正文段落。"""
+    """Peer fragments, mathematical initial continuation lines, and short tails still belong to the original text paragraphs."""
     block = _starting(name, page, prefix)
     assert block["type"] == "text"
     assert tail in visible(block["content"])
 
 
 def test_mixed_columns_do_not_turn_body_into_reference_rows():
-    """同页双栏正文与三栏参考区各用自己的范围和行序。"""
+    """The two-column text and three-column reference area on the same page each have their own range and line order."""
     prefixes = ["trials,", "We need to define", "The outcomes of drug studies", "Effective communication"]
     blocks = [_starting("dual_caption", 17, prefix) for prefix in prefixes]
     assert all(block["type"] == "text" for block in blocks)
@@ -139,7 +139,7 @@ def test_mixed_columns_do_not_turn_body_into_reference_rows():
     ],
 )
 def test_each_numbered_reference_has_one_entry(name, first, last, pattern, count):
-    """新编号不能被前条吞入，条目中的字体改变不能生出假标题。"""
+    """The new number cannot be swallowed by the previous article, and the font change in the article cannot produce a false title."""
     numbers = []
     for page in _model(name)[first - 1 : last]:
         for block in page:
@@ -173,7 +173,7 @@ def test_each_numbered_reference_has_one_entry(name, first, last, pattern, count
     ],
 )
 def test_complete_display_equation_owns_number_and_fragments(page, region):
-    """从源页字形确定的数学区域只被一个完整公式认领，正文不能覆盖公式。"""
+    """The mathematical region determined from the source page glyph is only claimed by a complete formula, and the text cannot cover the formula."""
     blocks = _model("fix")[page - 1]
     matches = [
         b
@@ -191,7 +191,7 @@ def test_complete_display_equation_owns_number_and_fragments(page, region):
 
 
 def test_table_note_is_external_and_unique():
-    """外围横线以内的说明文字仍为表注，不进入 HTML 单元格或投影表体。"""
+    """The explanatory text within the outer horizontal line is still a table note and does not enter the HTML cell or the projected table body."""
     page = _model("dual_caption")[4]
     table = next(b for b in page if b["type"] == "table")
     note = _starting("dual_caption", 5, "*There are several reports")
@@ -210,7 +210,7 @@ def test_table_note_is_external_and_unique():
     ],
 )
 def test_full_caption_band_keeps_first_line_and_followers(name, page, prefix, tail):
-    """图上编号和图下说明各自完整，首行粗体和公式角标不会切断图注。"""
+    """The numbers on the figures and the descriptions below the figures are complete. The first line of bold text and formula subtitles will not cut off the figure notes."""
     block = _starting(name, page, prefix)
     assert block["type"] == "caption"
     assert tail in visible(block["content"])
@@ -227,14 +227,14 @@ def test_full_caption_band_keeps_first_line_and_followers(name, page, prefix, ta
     ],
 )
 def test_legend_names_and_symbols_keep_same_row(prefix, markers):
-    """药名及其同行圈字母作为一个图注释行输出。"""
+    """The drug name and its corresponding letters are output as a figure comment line."""
     block = _starting("dual_caption", 6, prefix)
     assert block["type"] == "footnote"
     assert visible(block["content"]).endswith(markers)
 
 
 def test_public_pages_keep_reference_boundaries_and_legend_ownership():
-    """公共转换消费临时证据后保留段界、跨栏续项及完整图注释归属。"""
+    """Public conversion consumes temporary evidence and retains segment boundaries, cross-column continuations, and complete figure annotation attribution."""
     pages = model_json_to_pages(
         ModelJson(
             pages=_model("dual_caption"),

@@ -1,4 +1,4 @@
-"""将规范化分析结果转换为独立的语义文档。"""
+"""Convert normalized analysis results into an independent semantic document."""
 
 from __future__ import annotations
 from copy import deepcopy
@@ -7,7 +7,7 @@ from .pages import model_json_to_pages
 
 
 def model_json_to_middle_json(model_json: ModelJson) -> MiddleJson:
-    """只执行确定性后处理，智能增强由调用方另行执行。"""
+    """Run only deterministic postprocessing; callers perform intelligent enhancements separately."""
     return MiddleJson(
         pages=model_json_to_pages(model_json),
         is_full_document=model_json.is_full_document,

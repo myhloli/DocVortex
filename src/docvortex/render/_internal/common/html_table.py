@@ -1,4 +1,4 @@
-"""多格式 renderer 共用的有界 HTML table 占位网格解析。"""
+"""Bounded HTML table placeholder grid parsing common to multiple formats renderer."""
 
 from __future__ import annotations
 
@@ -18,12 +18,12 @@ HtmlTableSource: TypeAlias = str | BeautifulSoup | Tag
 
 
 class HtmlTableError(ValueError):
-    """表示 HTML table 无法安全解析为严格矩形网格。"""
+    """Means HTML table cannot be parsed safely to a strictly rectangular grid."""
 
 
 @dataclass(frozen=True, slots=True)
 class HtmlTableCell:
-    """保存原始 HTML 单元格在逻辑占位网格中的位置。"""
+    """Saves the position of the original HTML cell in the logical placeholder grid."""
 
     tag: Tag
     row: int
@@ -34,18 +34,18 @@ class HtmlTableCell:
 
     @property
     def end_row(self) -> int:
-        """返回单元格占用的末行下标。"""
+        """Returns the last row index occupied by the cell."""
         return self.row + self.rowspan - 1
 
     @property
     def end_column(self) -> int:
-        """返回单元格占用的末列下标。"""
+        """Returns the last column index occupied by the cell."""
         return self.column + self.colspan - 1
 
 
 @dataclass(frozen=True, slots=True)
 class HtmlTableGrid:
-    """保存经过重叠、边界、规模与矩形校验的 HTML 表格网格。"""
+    """Saves a HTML table grid with overlap, bounds, scale and rectangle validation."""
 
     tag: Tag
     row_count: int
@@ -55,7 +55,7 @@ class HtmlTableGrid:
 
 
 def parse_html_tables(source: HtmlTableSource) -> tuple[HtmlTableGrid, ...]:
-    """解析 source 中相对当前上下文的一个或多个顶层 table。"""
+    """Resolve one or more top-level tables in a source relative to the current context."""
     root = BeautifulSoup(source, "html.parser") if isinstance(source, str) else source
     if not isinstance(root, (BeautifulSoup, Tag)):
         raise HtmlTableError("HTML table source must be a string or BeautifulSoup Tag")
@@ -70,7 +70,7 @@ def parse_html_tables(source: HtmlTableSource) -> tuple[HtmlTableGrid, ...]:
 
 
 def _parse_html_table(table: Tag) -> HtmlTableGrid:
-    """把单个 table 标签解析为严格矩形占位网格。"""
+    """Parse a single table tag into a strictly rectangular grid of placeholders."""
     if table.name != "table":
         raise HtmlTableError("Expected a <table> tag")
     rows = tuple(row for row in table.find_all("tr") if row.find_parent("table") is table)
@@ -142,7 +142,7 @@ def _parse_html_table(table: Tag) -> HtmlTableGrid:
 
 
 def _parse_span(cell: Tag, attribute: str) -> int:
-    """读取严格正整数 rowspan/colspan，缺失时返回一。"""
+    """Reads a strictly positive integer rowspan/colspan, returning one if missing."""
     raw_value = cell.get(attribute, "1")
     if isinstance(raw_value, list):
         raise HtmlTableError(f"Invalid {attribute}: {raw_value!r}")
@@ -156,7 +156,7 @@ def _parse_span(cell: Tag, attribute: str) -> int:
 
 
 def _row_belongs_to_thead(row: Tag, table: Tag) -> bool:
-    """判断 tr 是否位于当前 table 的 thead 内。"""
+    """Determine whether tr is located within thead of the current table."""
     parent = row.parent
     while isinstance(parent, Tag) and parent is not table:
         if parent.name == "thead":

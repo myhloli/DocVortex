@@ -1,4 +1,4 @@
-"""仅让新鲜的同源页面证据使用快照样式内核，公开可变输入仍走原入口。"""
+"""Only fresh source page evidence uses the snapshot style kernel, and public variable input still uses the original entrance."""
 
 import math
 from functools import lru_cache
@@ -10,7 +10,7 @@ from . import detection as reference
 
 @lru_cache(maxsize=4096)
 def _snapshot_text_properties(text):
-    """每个 Unicode 文本值只计算一次宿主解释器的匹配、可见和项目符号属性。"""
+    """The host interpreter's match, visible, and bullet properties are evaluated only once per Unicode text value."""
     fragment = reference._normalize_match_fragment(text)
     return (
         fragment,
@@ -21,13 +21,13 @@ def _snapshot_text_properties(text):
 
 
 def _snapshot_font_bold(name, flags, weight):
-    """复用原正则和字体判断，字体大小不同但名称/flags/字重相同的字符共享结果。"""
+    """Reuse the original regular rules and font judgment, and characters with different font sizes but the same name/flags/weight share the results."""
     name = reference._PDF_FONT_SUBSET_PREFIX_RE.sub("", name)
     return "bold" in reference._font_styles_from_metadata(name, flags, weight if weight > 0 else None)
 
 
 def _plain_box(box):
-    """私有同源数据只准入有限普通坐标，特殊对象保留参考转换与错误语义。"""
+    """Private homologous data only has access to limited common coordinates, and special objects retain reference conversion and error semantics."""
     return (
         type(box) in (tuple, list)
         and len(box) == 4
@@ -36,7 +36,7 @@ def _plain_box(box):
 
 
 def detect_owned_style_lines(owner, lines, drawings, identities):
-    """仅传行框、成员索引和绘图线，最终才构造公开样式行；能力不适用返回 None。"""
+    """Only the row box, member index and plot line are passed and the public style row is finally constructed; capability not applicable returns None."""
     native = get_native()
     if native is None or type(owner) is not native.NativeTextSnapshot or identities is None:
         return None

@@ -1,43 +1,43 @@
-"""内部自有候选流适配；文字判定保留 Python，数值展开与动态合并连续执行。"""
+"""It has its own internal candidate stream adaptation; text judgment is retained as Python, and numerical expansion and dynamic merging are executed continuously."""
 
 import math
 
 
 class _NativeCoreLineSet:
-    """以 Rust 核心成员和少量新增注释行提供只读查询及局部选择集合。"""
+    """Provides read-only queries and partial selection collections with the Rust core member and a few new comment lines."""
 
     def __init__(self, native, extra=None):
-        """不枚举核心成员，只保存当前注释扫描新增的少量行号。"""
+        """The core members are not enumerated, and only a small number of new line numbers added by the current comment scan are saved."""
         self.native = native
         self.extra = set() if extra is None else extra
 
     def __len__(self):
-        """不导出核心集合即可判断大小和真假值。"""
+        """The size and true and false values can be determined without exporting the core collection."""
         return len(self.native) + len(self.extra)
 
     def __iter__(self):
-        """仅不支持的参考适配需要显式枚举时物化成员。"""
+        """Only unsupported reference adaptations require explicit enumeration when materializing members."""
         yield from self.native.members()
         yield from self.extra
 
     def __contains__(self, value):
-        """注释通常只查询少量来源行，保持核心集合驻留 Rust。"""
+        """Annotation typically queries only a small number of source rows, keeping the core collection resident Rust."""
         return value in self.extra or self.native.contains_all([value])
 
     def copy(self):
-        """注释扫描拥有独立新增集合，不修改候选核心。"""
+        """Annotation scanning has an independent new set and does not modify candidate cores."""
         return _NativeCoreLineSet(self.native, self.extra.copy())
 
     def issuperset(self, values):
-        """一次查询整条注释行的来源成员，避免 Python 集合转换整个核心。"""
+        """Query the source member for an entire comment line at once, avoiding Python set conversion of the entire core."""
         return self.native.contains_all([value for value in values if value not in self.extra])
 
     def update(self, values):
-        """仅记录核心之外新选中的注释成员。"""
+        """Only newly selected annotation members outside the core are logged."""
         self.extra.update(self.native.difference(list(values)))
 
     def intersection(self, values):
-        """仅遍历较小的注释集合，供已有注释几何缓存复用。"""
+        """Only a smaller annotation collection is traversed for reuse by the existing annotation geometry cache."""
         values = list(values)
         result = set(self.native.intersection(values))
         if self.extra:
@@ -46,7 +46,7 @@ class _NativeCoreLineSet:
 
 
 def _plain_box(box):
-    """仅准入普通有限框，极端数值保留参考路径的原计算行为。"""
+    """Only ordinary finite boxes are allowed, and extreme values retain the original calculation behavior of the reference path."""
     return (
         type(box) in (tuple, list)
         and len(box) == 4
@@ -55,17 +55,17 @@ def _plain_box(box):
 
 
 def _plain_ids(values):
-    """确认来源 ID 可无损传入原生有符号整数。"""
+    """Confirm the source ID can pass native signed integers losslessly."""
     return all(type(v) is int and -(2**63) <= v < 2**63 for v in values)
 
 
 def _annotations(values):
-    """保留注释类型、成员与行框字典插入顺序，不重新裁决注释文字。"""
+    """The insertion order of comment types, members and line box dictionaries is preserved, and the comment text is not re-adjusted."""
     return [(a.kind, a.bbox, list(a.line_indices), list(a.line_bboxes.items())) for a in values]
 
 
 def merge_owned(candidates):
-    """仅消费检测器独占的普通候选；特殊输入在执行任何展开前交回参考实现。"""
+    """Only ordinary candidates exclusive to the detector are consumed; special inputs are handed back to the reference implementation before any unrolling is performed."""
     from ...._compute_backend import get_native
     from . import table_rules as rules
     from .models import _Fragment, _TableAnnotation, _TableCandidate, _VisualRow, _SharedLineIndexSet

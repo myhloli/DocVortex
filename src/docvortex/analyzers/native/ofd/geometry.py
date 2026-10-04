@@ -1,4 +1,4 @@
-"""OFD 毫米坐标、仿射矩阵与 bbox 工具。"""
+"""OFD Millimeter coordinates, affine matrices and bbox tools."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ Quad = tuple[Point, Point, Point, Point]
 
 @dataclass(frozen=True, slots=True)
 class Affine:
-    """保存 OFD 六参数仿射矩阵。"""
+    """Save OFD six-parameter affine matrix."""
 
     a: float = 1.0
     b: float = 0.0
@@ -25,12 +25,12 @@ class Affine:
     f: float = 0.0
 
     def apply(self, point: Point) -> Point:
-        """把一个局部点变换到目标坐标空间。"""
+        """Transform a local point into the target coordinate space."""
         x, y = point
         return (self.a * x + self.c * y + self.e, self.b * x + self.d * y + self.f)
 
     def compose(self, inner: Affine) -> Affine:
-        """返回先执行 inner、再执行当前矩阵的组合结果。"""
+        """Return the combined result of executing inner first and then executing the current matrix."""
         return Affine(
             a=self.a * inner.a + self.c * inner.b,
             b=self.b * inner.a + self.d * inner.b,
@@ -42,12 +42,12 @@ class Affine:
 
     @classmethod
     def translation(cls, x: float, y: float) -> Affine:
-        """构造只包含平移的矩阵。"""
+        """Construct a matrix containing only translations."""
         return cls(e=x, f=y)
 
     @classmethod
     def rotation(cls, angle: float) -> Affine:
-        """构造绕局部原点旋转指定角度的矩阵。"""
+        """Construct a matrix that rotates a specified angle around the local origin."""
         radians = math.radians(angle)
         cosine = math.cos(radians)
         sine = math.sin(radians)
@@ -55,7 +55,7 @@ class Affine:
 
 
 def parse_numbers(value: str | None, *, expected: int | None = None) -> tuple[float, ...] | None:
-    """把空白分隔的有限数值解析为元组。"""
+    """Parse white space separated finite values into tuples."""
     if not value:
         return None
     try:
@@ -70,7 +70,7 @@ def parse_numbers(value: str | None, *, expected: int | None = None) -> tuple[fl
 
 
 def parse_st_box(value: str | None) -> BBox | None:
-    """把 OFD 的 x/y/width/height 转换为 x0/y0/x1/y1。"""
+    """Convert x/y/width/height of OFD to x0/y0/x1/y1."""
     numbers = parse_numbers(value, expected=4)
     if numbers is None:
         return None
@@ -81,19 +81,19 @@ def parse_st_box(value: str | None) -> BBox | None:
 
 
 def parse_affine(value: str | None) -> Affine:
-    """解析可选 CTM，缺失或非法时返回单位矩阵。"""
+    """Parse optional CTM, return the identity matrix when missing or illegal."""
     numbers = parse_numbers(value, expected=6)
     return Affine(*numbers) if numbers is not None else Affine()
 
 
 def rect_quad(bbox: BBox) -> Quad:
-    """把轴对齐矩形转换为顺时针四点。"""
+    """Convert the axis-aligned rectangle to four clockwise points."""
     x0, y0, x1, y1 = bbox
     return ((x0, y0), (x1, y0), (x1, y1), (x0, y1))
 
 
 def quad_bbox(points: Iterable[Point]) -> BBox | None:
-    """计算一组有限点的轴对齐外接框。"""
+    """Compute an axis-aligned bounding box for a set of finite points."""
     materialized = list(points)
     if not materialized or not all(math.isfinite(value) for point in materialized for value in point):
         return None
@@ -104,17 +104,17 @@ def quad_bbox(points: Iterable[Point]) -> BBox | None:
 
 
 def transform_quad(quad: Quad, transform: Affine) -> Quad:
-    """把四点按给定仿射矩阵变换。"""
+    """Transform four points according to a given affine matrix."""
     return tuple(transform.apply(point) for point in quad)  # type: ignore[return-value]
 
 
 def transform_bbox(bbox: BBox, transform: Affine) -> BBox | None:
-    """变换矩形四角并返回目标空间 AABB。"""
+    """Transform the four corners of the rectangle and return to the target space AABB."""
     return quad_bbox(transform_quad(rect_quad(bbox), transform))
 
 
 def bbox_union(bboxes: Iterable[BBox]) -> BBox | None:
-    """合并全部有效 bbox。"""
+    """Merge all valid bbox."""
     materialized = list(bboxes)
     if not materialized:
         return None
@@ -127,7 +127,7 @@ def bbox_union(bboxes: Iterable[BBox]) -> BBox | None:
 
 
 def bbox_intersection(first: BBox, second: BBox) -> BBox | None:
-    """返回两个 bbox 的非退化交集。"""
+    """Return the non-degenerate intersection of two bboxs."""
     bbox = (
         max(first[0], second[0]),
         max(first[1], second[1]),
@@ -138,29 +138,29 @@ def bbox_intersection(first: BBox, second: BBox) -> BBox | None:
 
 
 def bbox_center(bbox: BBox) -> Point:
-    """返回 bbox 中心点。"""
+    """Return bbox center point."""
     return ((bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0)
 
 
 def bbox_area(bbox: BBox) -> float:
-    """返回非负 bbox 面积。"""
+    """Returns the non-negative bbox area."""
     return max(0.0, bbox[2] - bbox[0]) * max(0.0, bbox[3] - bbox[1])
 
 
 def bbox_overlap_ratio(first: BBox, second: BBox) -> float:
-    """返回交集相对较小 bbox 的面积比例。"""
+    """Return the area ratio of the relatively small intersection bbox."""
     intersection = bbox_intersection(first, second)
     smaller = min(bbox_area(first), bbox_area(second))
     return bbox_area(intersection) / smaller if intersection is not None and smaller > 0 else 0.0
 
 
 def transform_angle(transform: Affine) -> float:
-    """返回局部 X 轴经过矩阵后的页面角度。"""
+    """Return the page angle after the local X axis passes through the matrix."""
     return math.degrees(math.atan2(transform.b, transform.a)) % 360.0
 
 
 def canonical_angle(angle: float, *, tolerance: float = 5.0) -> int:
-    """把接近直角的角度收敛为 0/90/180/270。"""
+    """The angles close to right angles converge to 0/90/180/270."""
     normalized = angle % 360.0
     nearest = min((0, 90, 180, 270, 360), key=lambda item: abs(normalized - item))
     if abs(normalized - nearest) <= tolerance:
@@ -169,12 +169,12 @@ def canonical_angle(angle: float, *, tolerance: float = 5.0) -> int:
 
 
 def bbox_to_points(bbox: BBox) -> list[float]:
-    """把毫米 bbox 转换为供共享 XYCut 使用的 point 坐标。"""
+    """Convert millimeters bbox to point coordinates for use by shared XYCut."""
     return [value * MM_TO_POINTS for value in bbox]
 
 
 def normalize_bbox(bbox: BBox, physical_box: BBox) -> list[float] | None:
-    """把页面 bbox 裁剪并归一化到 PhysicalBox。"""
+    """Crop and normalize page bbox to PhysicalBox."""
     clipped = bbox_intersection(bbox, physical_box)
     if clipped is None:
         return None

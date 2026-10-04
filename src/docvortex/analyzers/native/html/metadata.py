@@ -1,4 +1,4 @@
-"""从静态 HTML head 元素读取源属性，不解释正文或访问资源。"""
+"""Reading the source attribute from the static HTML head element, without interpreting the text or accessing the resource."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ def read_html_properties(
     data: bytes,
     source_context: HtmlSourceContext | None = None,
 ) -> tuple[DocumentProperties, list[str]]:
-    """按标准 meta、Dublin Core、Open Graph 的顺序读取显式元数据。"""
+    """Read explicit metadata in the order of standard meta, Dublin Core, Open Graph."""
     document = parse_html_document(data, source_context=source_context, metadata_only=True)
     warnings: list[str] = []
     values: dict[str, list[str]] = {}

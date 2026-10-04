@@ -1,4 +1,4 @@
-"""按空间关系检测并物化原生 PDF 公式块。"""
+"""Detect and materialize native PDF formula blocks in spatial relationships."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ _VECTOR_FORMULA_NUMBER_MAX_PATHS = 6
 
 @dataclass(slots=True)
 class _VectorPathComponent:
-    """保存同栏邻接 Path 形成的矢量组件。"""
+    """Save the vector components formed by adjacent Path in the same column."""
 
     lane_index: int
     path_infos: list[PDFPathInfo]
@@ -69,7 +69,7 @@ class _VectorPathComponent:
 
 @dataclass(slots=True)
 class _VectorFormulaCandidate:
-    """保存已通过主体校验、等待吸收横线和编号的矢量公式。"""
+    """Save the vector formula that has passed the main body check and is waiting to absorb horizontal lines and numbers."""
 
     lane_index: int
     bbox: BBox
@@ -82,7 +82,7 @@ def _build_vector_formula_blocks(
     container_blocks: list[dict[str, Any]],
     claimed_line_indices: set[int],
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """从根层填充 Path 构建空内容公式，并唯一认领可提取的公式编号。"""
+    """Populate Path from the root level to build an empty content formula and uniquely claim the extractable formula number."""
 
     available_lines = [line for line in source.lines if line.angle == 0 and line.source_index not in claimed_line_indices]
     if len(available_lines) < 3 or not source.path_infos:
@@ -194,7 +194,7 @@ def _build_vector_formula_blocks(
 
 
 def _inline_vector_formula_prose_sources(component, lane, em, containers) -> set[int]:
-    """原生正文两侧留给复杂矢量字形的槽位可保留公式裁图；单字装饰和容器内标签排除。"""
+    """The slots reserved for complex vector glyphs on both sides of the native text can be reserved for formula clipping; single-word decorations and labels within containers are excluded."""
     box, paths = component.bbox, component.path_infos
     width, height = box[2] - box[0], box[3] - box[1]
     if (
@@ -258,7 +258,7 @@ def _inline_vector_formula_prose_sources(component, lane, em, containers) -> set
 
 
 def _join_open_vector_equation_rows(candidates, components, text_lines, em) -> None:
-    """短左式末尾居中扁平运算字形加紧接长右式确认跨行等式，正文和独立编号阻断合并。"""
+    """The short left-hand formula ends with a centered, flat arithmetic glyph and is followed by the long right-hand formula to confirm the cross-line equation, and the main text and independent numbering are blocked and merged."""
     for first in list(candidates):
         if first not in candidates or first.has_number:
             continue
@@ -299,7 +299,7 @@ def _join_open_vector_equation_rows(candidates, components, text_lines, em) -> N
 
 
 def _vector_shape_signature(paths: list[PDFPathInfo], bbox: BBox) -> tuple:
-    """保存与颜色及绝对位置无关的路径结构，避免同位置的不同图形被当成重复装饰。"""
+    """Save the path structure independent of color and absolute position to prevent different graphics at the same position from being regarded as repeated decorations."""
     width, height = max(0.1, bbox[2] - bbox[0]), max(0.1, bbox[3] - bbox[1])
     return tuple(
         sorted(
@@ -318,7 +318,7 @@ def _vector_shape_signature(paths: list[PDFPathInfo], bbox: BBox) -> tuple:
 
 
 def _vector_has_decoration_shape(paths: list[PDFPathInfo]) -> bool:
-    """混合图案字标或多行等高字标提供装饰形证据；仍须出版上下文或跨页重复且无数学证据。"""
+    """Mixed-pattern wordmarks or multiple lines of equal-height wordmarks provide decorative evidence; publication context or cross-page repetition is still required and there is no mathematical evidence."""
     heights = [p.bbox[3] - p.bbox[1] for p in paths if p.bbox[3] > p.bbox[1]]
     if len(heights) < 5:
         return False
@@ -344,7 +344,7 @@ def _vector_has_decoration_shape(paths: list[PDFPathInfo]) -> bool:
 
 
 def _vector_has_math_evidence(paths: list[PDFPathInfo], bbox: BBox, lines: list[_LineItem], em: float) -> bool:
-    """公式编号、可读数学内容和上下居中的分数结构优先于任何装饰判断。"""
+    """Formula numbering, readable mathematical content, and top-to-bottom centered fraction structure take precedence over any cosmetic judgments."""
     if any(
         (
             _standalone_formula_number_marker(line.text)
@@ -364,7 +364,7 @@ def _vector_has_math_evidence(paths: list[PDFPathInfo], bbox: BBox, lines: list[
 
 
 def classify_repeated_vector_decorations(pages) -> None:
-    """跨页同时核对结构签名和归一化几何，只重标缺少数学证据的装饰形候选。"""
+    """Check structural signatures and normalized geometries simultaneously across pages, and only remark decorative shape candidates that lack mathematical evidence."""
     groups = {}
     for index, page in enumerate(pages):
         for block in page.fixed_blocks:
@@ -383,7 +383,7 @@ def _build_vector_path_components(
     lanes: list[_TextLane],
     median_height: float,
 ) -> list[_VectorPathComponent]:
-    """按文本栏带筛选矢量字形，并用空间网格生成局部连通组件。"""
+    """Filter vector glyphs by text field bands and generate locally connected components with spatial grids."""
 
     members_by_lane: dict[int, list[PDFPathInfo]] = {}
     for path_info in path_infos:
@@ -420,7 +420,7 @@ def _assign_vector_path_lane(
     lanes: list[_TextLane],
     median_height: float,
 ) -> int | None:
-    """按中心点和水平覆盖率把 Path 唯一分配给一个正文栏带。"""
+    """Uniquely assign Path to a text column band by center point and horizontal coverage."""
 
     center_x = _bbox_center_x(bbox)
     path_width = max(0.1, bbox[2] - bbox[0])
@@ -441,7 +441,7 @@ def _is_vector_formula_path_member(
     lane: _TextLane,
     median_height: float,
 ) -> bool:
-    """保留小字形轮廓和细横线，过滤跨栏或过大的普通矢量对象。"""
+    """Keep small glyph outlines and thin horizontal lines, and filter out hurdles or overly large ordinary vector objects."""
 
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
@@ -456,7 +456,7 @@ def _connect_vector_path_members(
     lane_index: int,
     median_height: float,
 ) -> list[_VectorPathComponent]:
-    """用扩张 bbox 的网格邻接和并查集连接同栏 Path，避免全量两两比较。"""
+    """Use the expanded bbox grid adjacency and union-find sets to connect Path in the same column to avoid full pairwise comparisons."""
 
     if not members:
         return []
@@ -464,7 +464,7 @@ def _connect_vector_path_members(
     parents = list(range(len(ordered)))
 
     def find(index: int) -> int:
-        """查找并压缩一个 Path 的并查集根节点。"""
+        """Find and compress the union-find root node of a Path."""
 
         while parents[index] != index:
             parents[index] = parents[parents[index]]
@@ -472,7 +472,7 @@ def _connect_vector_path_members(
         return index
 
     def merge(first: int, second: int) -> None:
-        """合并两个相交扩张框所属的连通分量。"""
+        """Merges the connected components belonging to two intersecting expansion boxes."""
 
         first_root = find(first)
         second_root = find(second)
@@ -521,7 +521,7 @@ def _is_vector_formula_core(
     page_size: tuple[float, float],
     container_bboxes: list[BBox],
 ) -> bool:
-    """按复杂度、尺寸、正文碰撞和容器优先级校验公式主体组件。"""
+    """Validate formula body components by complexity, size, body collision, and container priority."""
 
     path_count = len(component.path_infos)
     complex_count = sum(item.segment_count >= _VECTOR_FORMULA_COMPLEX_SEGMENTS for item in component.path_infos)
@@ -546,7 +546,7 @@ def _is_vector_formula_core(
 
 
 def _is_formula_component_in_page_margin(bbox: BBox, page_height: float) -> bool:
-    """仅当公式组件完全落在页面顶部或底部边缘带时排除。"""
+    """Exclude only if the formula component falls completely within the top or bottom edge band of the page."""
 
     margin = _FORMULA_PAGE_MARGIN_RATIO * page_height
     return bbox[3] <= margin or bbox[1] >= page_height - margin
@@ -558,7 +558,7 @@ def _vector_formula_collides_with_text(
     line_bbox: BBox,
     median_height: float,
 ) -> bool:
-    """排除覆盖正文或紧贴正文同行的 Path 组件，独立公式编号除外。"""
+    """Exclude Path components that cover the main text or are immediately adjacent to the main text, except for stand-alone formula numbers."""
 
     if _standalone_formula_number_marker(line.text) is not None:
         return False
@@ -577,7 +577,7 @@ def _attach_vector_formula_rules(
     components: list[_VectorPathComponent],
     median_height: float,
 ) -> None:
-    """把靠近公式主体且横向覆盖充分的孤立细横线唯一并入主体。"""
+    """Uniquely incorporate into the body the isolated thin horizontal lines that are close to the body of the formula and have sufficient horizontal coverage."""
 
     used_sources = {source_index for candidate in candidates for source_index in candidate.path_source_indices}
     for component in components:
@@ -611,7 +611,7 @@ def _attach_vector_formula_path_numbers(
     lanes: list[_TextLane],
     median_height: float,
 ) -> None:
-    """把栏右缘的小型复杂 Path 组件作为公式编号并入唯一主体。"""
+    """Incorporate the small complex Path component at the right edge of the column into a unique body as a formula number."""
 
     used_sources = {source_index for candidate in candidates for source_index in candidate.path_source_indices}
     for component in components:
@@ -646,7 +646,7 @@ def _attach_vector_formula_path_numbers(
 
 
 def _is_local_vector_number(component: _VectorPathComponent, em: float) -> bool:
-    """独立小组件两端同尺度的狭长轮廓提供括号编号证据，允许编号紧随短公式而不在栏右缘。"""
+    """The elongated outlines of the same scale at each end of the individual widgets provide evidence of bracket numbering, allowing the numbering to follow the short formula rather than on the right edge of the column."""
     paths = sorted(component.path_infos, key=lambda path: path.bbox[0])
     if not 3 <= len(paths) <= 6 or not all(path.segment_count >= _VECTOR_FORMULA_COMPLEX_SEGMENTS for path in paths):
         return False
@@ -666,7 +666,7 @@ def _is_vector_formula_number_component(
     lane: _TextLane,
     median_height: float,
 ) -> bool:
-    """识别位于栏右缘、尺寸接近正文行高的全复杂路径编号组件。"""
+    """Identifies the fully complex path number component located at the right edge of the column and sized close to the text line height."""
 
     path_count = len(component.path_infos)
     bbox = component.bbox
@@ -689,7 +689,7 @@ def _vector_formula_number_matches(
     *,
     allow_left: bool = False,
 ) -> list[tuple[float, float, float, int]]:
-    """返回编号可关联的公式主体及稳定排序分值。"""
+    """Returns the formula body and stable sorting score that the number can be associated with."""
 
     matches: list[tuple[float, float, float, int]] = []
     for candidate_index, candidate in enumerate(candidates):
@@ -713,7 +713,7 @@ def _attach_vector_formula_text_numbers(
     median_height: float,
     claimed_line_indices: set[int],
 ) -> set[int]:
-    """关联可提取的独立公式编号并认领其文本身份，防止重复输出。"""
+    """Associate extractable independent formula numbers and claim their text identity to prevent duplicate output."""
 
     claimed: set[int] = set()
     for lane_index, lane in enumerate(lanes):
@@ -743,7 +743,7 @@ def _attach_vector_formula_text_numbers(
                 allow_left=at_left,
             )
             if at_left and not at_right:
-                # 左侧近编号只能有一个同栏、同高度的数学主体，防止普通条目误绑相邻公式。
+                # There can only be one mathematical subject of the same column and height near the number on the left to prevent ordinary entries from being mistakenly tied to adjacent formulas.
                 matches = [match for match in matches if candidates[match[3]].bbox[0] >= bbox[2]]
                 if len(matches) != 1:
                     continue
@@ -757,7 +757,7 @@ def _attach_vector_formula_text_numbers(
 
 
 def _standalone_formula_number_marker(text: str) -> str | None:
-    """仅接受整行由圆括号公式编号构成的文本，不接纳带正文前缀的后缀。"""
+    """Only whole lines of text consisting of formula numbers in parentheses are accepted, suffixes with text prefixes are not accepted."""
 
     parts = _split_trailing_formula_number(text)
     if parts is None:
@@ -773,7 +773,7 @@ def _build_formula_like_blocks(
     *,
     drawing_lines: list[_AxisLine] | None = None,
 ) -> tuple[list[dict[str, Any]], list[_LineItem]]:
-    """仅依据栏带、右侧短锚点和空间连通关系聚合公式状区域。"""
+    """Aggregate formula-like regions only based on the band, right short anchor point and spatial connectivity relationship."""
 
     blocks, claimed_source_indices = _build_split_visual_row_formula_blocks(
         lines,
@@ -995,7 +995,7 @@ def _build_formula_like_blocks(
     )
     blocks.extend(detached_blocks)
     claimed_source_indices.update(detached_sources)
-    # 完整二维带只替换缺失成员或重复切割；已有完整公式保留原编号和成员序列。
+    # The complete 2D band only replaces missing members or repeated cuts; there are complete formulas that retain the original numbering and member sequences.
     whole_blocks, _whole_sources = _recover_detached_display_components(
         lines, table_bboxes, page_size, drawing_lines=drawing_lines
     )
@@ -1074,7 +1074,7 @@ def _build_formula_like_blocks(
             for old in [block.get("_tight_output_bbox", block["bbox"]) for block in overlaps]
         ):
             continue
-        # 只补齐缺失成员，既有完整公式的内容、裁图和顺序保持原结果。
+        # Only missing members are filled in, and the content, cropping, and order of the complete formula remain the original result.
         ids = set(band["_formula_members"]).union(*(block.get("_formula_members", []) for block in overlaps))
         members = [(line, line.ink_bbox or line.bbox) for line in lines if line.source_index in ids]
         if not members:
@@ -1099,7 +1099,7 @@ def _build_formula_like_blocks(
 
 
 def _build_spatial_numbered_bands(lines, table_bboxes, page_size, rules):
-    """在成员被拆散认领前，用正文栏右缘的短编号与独立数学带恢复完整公式。"""
+    """Before members are separated and claimed, use the short number and independent math band at the right edge of the text column to restore the complete formula."""
     prose = [line for line in lines if line.angle == 0 and len(line.text) >= 25 and _has_sentence_words(line.text)]
     layout = build_layout_evidence(prose, page_size, barriers=table_bboxes)
     blocks, claimed = [], set()
@@ -1107,12 +1107,12 @@ def _build_spatial_numbered_bands(lines, table_bboxes, page_size, rules):
         em = statistics.median(_line_effective_height(line, bounds) for line, bounds in lane.lines)
 
         def is_body(line):
-            """短数学簇的拉丁变量不等同于正文词行，实际正文宽度及词组提供屏障。"""
+            """The Latin variant of the short math cluster is not equivalent to the text line, and the actual text width and phrase provide a barrier."""
             if not _display_math_has_prose(line.text):
                 return False
             words = re.findall(r"\b[A-Za-z]{3,}\b", line.text)
             if len(words) >= 2 and line.font_coverage >= 0.75 and not _formula_line_has_math_operator(line.text):
-                # 短说明句不足半栏宽仍是正文；不得借由邻近数学带吸收进公式裁图。
+                # Short explanatory sentences that are less than half a column wide are still main text; they must not be absorbed into formula clipping through adjacent mathematical bands.
                 return True
             return _has_sentence_words(line.text) and (
                 line.bbox[2] - line.bbox[0] >= 0.6 * (lane.right - lane.left)
@@ -1161,7 +1161,7 @@ def _build_spatial_numbered_bands(lines, table_bboxes, page_size, rules):
             ]
             if not nearby:
                 continue
-            # 先形成二维数学主体，再关联隔着水平空白或位于右下角的编号。
+            # First form the two-dimensional mathematical body, and then associate the numbers separated by horizontal blanks or located in the lower right corner.
             pending = set(range(len(nearby)))
             components = []
             while pending:
@@ -1254,7 +1254,7 @@ def _recover_detached_display_components(
     *,
     drawing_lines: list[_AxisLine] | None = None,
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """在编号和字体分类前聚合独立二维数学带，正文同行连通时保留为行内内容。"""
+    """Aggregate independent two-dimensional mathematical bands before numbering and font classification, and keep them as inline content when the text is connected in the same row."""
     blocks, claimed = [], set()
     for angle in {line.angle for line in lines}:
         geometry = [
@@ -1287,7 +1287,7 @@ def _recover_detached_display_components(
                 _, bbox = candidates[current]
                 for index in sorted(pending):
                     other = candidates[index][1]
-                    # 完整长公式各占一条基线；松行框重叠不能把相邻等式合成一个裁图。
+                    # Complete long formulas each occupy a baseline; overlapping loose line boxes cannot combine adjacent equations into one crop.
                     if (
                         bbox[2] - bbox[0] > 3 * em
                         and other[2] - other[0] > 3 * em
@@ -1345,7 +1345,7 @@ def _recover_detached_display_components(
                 for _, pb in prose
             ):
                 continue
-            # 健康原生行不保留修复专用 ink 框；编号与二维结构共同提供等价的保守证据。
+            # Healthy native lines do not retain the repair-specific ink box; numbering together with the 2D structure provide evidence of equivalent conservation.
             fraction_rule = any(
                 rule.orientation == "horizontal"
                 and rule.bbox[2] - rule.bbox[0] >= 0.7 * em
@@ -1374,7 +1374,7 @@ def _recover_detached_display_components(
                 continue
             if bbox[3] - bbox[1] > 8 * em or bbox[2] - bbox[0] < 3 * em:
                 continue
-            # 原生外框可能很松，使用 ink 判断正文是否与公式同处一行；栏间正文不构成宿主。
+            # The native outer frame may be very loose. Use ink to determine whether the text and the formula are on the same line; the text between columns does not constitute a host.
             corridor = prose_layout.corridor(bbox) if prose_layout is not None else None
             if any(
                 _bbox_axis_overlap_ratio(bbox, pb, axis="y") >= 0.15
@@ -1390,7 +1390,7 @@ def _recover_detached_display_components(
             local_height = page_size[0] if angle in {90, 270} else page_size[1]
             if _is_formula_component_in_page_margin(bbox, local_height):
                 continue
-            # 右缘编号可以与公式主体隔开很远；同栏同行且没有正文屏障时唯一绑定。
+            # The right edge number can be far away from the body of the formula; it is only bound when it is in the same column and there is no text barrier.
             marker_peers = [
                 (line, box)
                 for line, box in candidates
@@ -1426,7 +1426,7 @@ def _recover_detached_display_components(
 
 
 def _native_math_word_fragments(line: _LineItem) -> frozenset[str]:
-    """短连写变量只有全部斜体或包含独立小号角标时才消除自然语言屏障。"""
+    """Short ligature variables only remove the natural language barrier if they are fully italicized or contain a separate trumpet."""
     chars = [char for char in line.chars if str(char.get("char", "")).isprintable()]
     text = "".join(str(char.get("char", "")) for char in chars)
     words = set(line.native_math_words)
@@ -1442,14 +1442,14 @@ def _native_math_word_fragments(line: _LineItem) -> frozenset[str]:
 
 
 def _detached_math_line_has_prose(line: _LineItem) -> bool:
-    """保留普通词和正文屏障，仅移除有原生字形证据的短变量乘积。"""
+    """Normal words and text barriers are retained, and only short variable products with evidence of native glyphs are removed."""
     words = _native_math_word_fragments(line)
     text = re.sub(r"\b[a-z]{3,4}\b", lambda match: "x" if match.group() in words else match.group(), line.text)
     return _display_math_has_prose(text)
 
 
 def _has_sentence_words(text: str) -> bool:
-    """用独立自然语言词排除正文，数学函数名和变量内部字母不计作句子。"""
+    """Use independent natural language words to exclude the main text. Mathematical function names and internal letters of variables are not counted as sentences."""
     return has_prose(text)
 
 
@@ -1458,7 +1458,7 @@ def _build_mixed_body_display_formulas(
     table_bboxes: list[BBox],
     page_size: tuple[float, float],
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """在混合字体正文的独立留白带内恢复无编号公式，避免把碎片窄栏当作正文栏。"""
+    """Restore unnumbered formulas in separate white spaces for mixed-font text to avoid treating narrow columns of fragments as columns of text."""
 
     blocks: list[dict[str, Any]] = []
     claimed: set[int] = set()
@@ -1472,7 +1472,7 @@ def _build_mixed_body_display_formulas(
         body = [
             (line, bbox) for line, bbox in geometry if bbox[2] - bbox[0] >= 0.5 * width and _formula_prefix_has_prose(line.text)
         ]
-        # 该补充路径只处理既有 dominant-font 路径缺少稳定正文覆盖的混排页面。
+        # This supplementary path only handles shuffled pages where the existing dominant-font path lacks stable text coverage.
         if sum(line.font_coverage < 0.75 for line, _bbox in body) < 2:
             continue
         height = statistics.median(_line_effective_height(line, bbox) for line, bbox in body)
@@ -1527,7 +1527,7 @@ def _build_mixed_body_display_formulas(
 
 
 def _unmapped_formula_ink_bboxes(chars: list[Char]) -> list[BBox]:
-    """保留实际绘制、但映射为空白或控制码的高字形几何，不改变公开文本。"""
+    """Preserves tall glyph geometry that is actually drawn but mapped to whitespace or control code, without changing the public text."""
 
     output: list[BBox] = []
     for char in chars:
@@ -1550,7 +1550,7 @@ def _unmapped_formula_ink_bboxes(chars: list[Char]) -> list[BBox]:
 
 
 def _attach_unmapped_formula_ink(blocks: list[dict[str, Any]], bboxes: list[BBox]) -> None:
-    """将紧贴公式且纵向相容的未映射字形唯一认领到公式框。"""
+    """Unmapped unmapped glyphs that adhere to the formula and are vertically compatible are uniquely claimed to the formula box."""
 
     for bbox in bboxes:
         matches = [
@@ -1571,7 +1571,7 @@ def _attach_unmapped_formula_ink(blocks: list[dict[str, Any]], bboxes: list[BBox
 
 
 def _formula_line_has_math_operator(text: str) -> bool:
-    """检查文本行是否具有独立公式常见的数学运算符。"""
+    """Checks whether a text line has independent formulas for common mathematical operators."""
 
     return any(
         character in _FORMULA_OPERATOR_CHARS
@@ -1582,10 +1582,10 @@ def _formula_line_has_math_operator(text: str) -> bool:
 
 
 def _display_math_has_prose(text: str) -> bool:
-    """变量、函数调用及常见数学连接词不构成说明正文，其余完整词和汉字建立屏障。"""
+    """Variables, function calls and common mathematical connectives do not constitute the main text of the explanation, and the remaining complete words establish a barrier with Chinese characters."""
     if len(re.findall(r"[\u3400-\u9fff]", text)) >= 2:
         return True
-    # 带数字后缀的完整自然语言词仍是术语，不能因连字符被数学词法器整体消去。
+    # Complete natural language words with numeric suffixes are still terms and cannot be completely eliminated by the mathematical lexer due to hyphens.
     if any(len(re.findall(r"[a-z]", word)) >= 3 for word in re.findall(r"\b([A-Za-z]{4,})-\d+\b", text)):
         return True
     mathematical_words = {"lim", "sin", "cos", "tan", "log", "exp", "min", "max", "with", "and", "for"}
@@ -1594,7 +1594,7 @@ def _display_math_has_prose(text: str) -> bool:
 
 
 def _formula_prefix_has_prose(prefix: str) -> bool:
-    """用通用文字数量识别公式前的正文片段，不依赖特定引导词或标点。"""
+    """Identifies text fragments before formulas using universal text quantities, without relying on specific guide words or punctuation."""
 
     prose_prefix = re.sub(
         r"[({\[（［【｛][^)}\]）］】｝]*[)}\]）］】｝]",
@@ -1612,7 +1612,7 @@ def _formula_component_has_left_prose(
     lane: _TextLane,
     median_height: float,
 ) -> bool:
-    """识别贴栏左缘且在首个运算符前带同行正文的伪行间公式。"""
+    """Identifies pseudo-inline formulas at the left edge of the column with accompanying text before the first operator."""
 
     for line, bbox in members:
         normalized = unicodedata.normalize("NFKC", line.text).strip()
@@ -1628,7 +1628,7 @@ def _formula_component_has_left_prose(
 
 
 def _fragmented_left_prose(members: list[tuple[_LineItem, BBox]], lane: _TextLane, median_height: float) -> bool:
-    """运算符前的正文被拆成多个 run 时，沿同行邻接找到栏左缘的正文证据。"""
+    """When the text before the operator is split into multiple run, find the text evidence along the left edge of the column along the row adjacency."""
     for line, bbox in members:
         normalized = unicodedata.normalize("NFKC", line.text).strip()
         positions = [index for index, character in enumerate(normalized) if character in _FORMULA_OPERATOR_CHARS]
@@ -1648,7 +1648,7 @@ def _fragmented_left_prose(members: list[tuple[_LineItem, BBox]], lane: _TextLan
 def _merge_paragraph_formula_members(
     members: list[tuple[_LineItem, BBox]], page_size: tuple[float, float], median_height: float
 ) -> _LineItem:
-    """把已确认的行内分式按重叠视觉行恢复顺序，避免字形高度差把正文前缀排到分子之后。"""
+    """Restore the order of confirmed inline fractions in overlapping visual lines to avoid font height differences and arrange the text prefix after the numerator."""
     rows: list[list[tuple[_LineItem, BBox]]] = []
     for item in sorted(members, key=lambda item: (item[1][1], item[1][0])):
         match = next(
@@ -1672,7 +1672,7 @@ def _formula_component_has_isolated_numbered_fraction(
     median_height: float,
     horizontal_rules: list[BBox],
 ) -> bool:
-    """用右侧编号、内部分数线和上下留白确认独立多层公式。"""
+    """Confirm independent multilevel formulas with numbers on the right, internal fraction lines, and white space above and below."""
 
     if len(members) < 3 or not horizontal_rules:
         return False
@@ -1724,7 +1724,7 @@ def _is_wide_tagged_formula_member(
     member_bbox: BBox,
     lane_width: float,
 ) -> bool:
-    """判断独立编号左侧是否为接近满栏的单行公式主体。"""
+    """Determine whether the left side of the independent number is a single-line formula body that is close to full column."""
 
     member_width = member_bbox[2] - member_bbox[0]
     marker = _standalone_formula_number_marker(anchor_line.text)
@@ -1742,7 +1742,7 @@ def _is_single_line_numbered_formula(
     lane: _TextLane,
     median_height: float,
 ) -> bool:
-    """识别公式主体与右侧编号已落在同一原生文本行的情形。"""
+    """Recognize the situation where the body of the formula and the number on the right have fallen into the same native text line."""
 
     line, bbox = candidate
     if not line.style_scale_repaired:
@@ -1776,7 +1776,7 @@ def _expand_single_line_numbered_formula_members(
     dominant_body_font: tuple[str, int] | None,
     median_height: float,
 ) -> list[tuple[_LineItem, BBox]]:
-    """为已带编号的公式核心吸收同栏连通的等号前缀和窄分式碎片。"""
+    """Absorb equal sign prefixes and narrow fraction fragments connected in the same column for numbered formula cores."""
 
     core_line, core_bbox = core
     lane_width = max(0.1, lane.right - lane.left)
@@ -1874,7 +1874,7 @@ def _build_split_visual_row_formula_blocks(
     table_bboxes: list[BBox],
     page_size: tuple[float, float],
 ) -> tuple[list[dict[str, Any]], set[int]]:
-    """在栏带推断前恢复同一视觉行中带右侧编号的多字体公式。"""
+    """Restore multi-font formulas with right-hand numbers in the same visual line before band inference."""
 
     row_groups: dict[tuple[int, int], list[_LineItem]] = {}
     for line in lines:
@@ -1920,8 +1920,8 @@ def _build_split_visual_row_formula_blocks(
             continue
         body_bbox = _bbox_union_many([bbox for _member, bbox in body_members])
         body_width = max(0.1, body_bbox[2] - body_bbox[0])
-        # 同行成员可能只是分式尾部；窄尾部不能压低外部公式片段的宽度容差，
-        # 否则会提前认领分母、右括号和编号，使左侧公式主体落回普通文本。
+        # Peer members may only be fractional tails; narrow tails cannot suppress the width tolerance of the outer formula fragment,
+        # Otherwise, the denominator, right bracket and number will be claimed in advance, causing the body of the formula on the left to fall back to ordinary text.
         nearby_fragment_width_limit = max(
             0.65 * body_width,
             3.0 * median_height,
@@ -1979,7 +1979,7 @@ def _is_isolated_compact_formula_cluster(
     lane: _TextLane,
     median_height: float,
 ) -> bool:
-    """用上下正文邻行确认紧凑二维文本簇是独立行间公式。"""
+    """Use upper and lower text adjacent lines to confirm that compact two-dimensional text clusters are independent interline formulas."""
 
     line, bbox = candidate
     if not line.compact_formula_cluster:
@@ -1992,7 +1992,7 @@ def _is_isolated_compact_formula_cluster(
     center_delta_ratio = abs(_bbox_center_x(bbox) - 0.5 * (lane.left + lane.right)) / lane_width
     left_indent_ratio = (bbox[0] - lane.left) / lane_width
     right_blank_ratio = (lane.right - bbox[2]) / lane_width
-    # 部分期刊把独立公式按固定左缩进排版；同时要求右侧大留白，排除贴栏正文。
+    # Some journals format independent formulas with a fixed left indentation; they also require a large margin on the right side to exclude the main text of the column.
     deliberately_left_indented = 0.03 <= left_indent_ratio <= 0.25 and right_blank_ratio >= 0.35
     if center_delta_ratio > 0.2 and not deliberately_left_indented:
         return False
@@ -2022,7 +2022,7 @@ def _compact_cluster_has_nearby_number_anchor(
     lane: _TextLane,
     median_height: float,
 ) -> bool:
-    """检测紧凑公式右侧的独立编号，保留给既有空间锚点统一扩张。"""
+    """Detect the independent numbers on the right side of the compact formula and reserve them for unified expansion of existing spatial anchor points."""
 
     line, bbox = candidate
     return any(
@@ -2040,7 +2040,7 @@ def _is_isolated_unnumbered_formula_line(
     median_height: float,
     dominant_body_font: tuple[str, int] | None,
 ) -> bool:
-    """用低正文覆盖的数学排版和上下正文邻接识别无编号行间公式。"""
+    """Mathematical typesetting with low text coverage and upper and lower text adjacency to identify unnumbered interline formulas."""
 
     line, bbox = candidate
     if (
@@ -2100,7 +2100,7 @@ def _is_hanging_indent_tail_line(
     lane: _TextLane,
     median_height: float,
 ) -> bool:
-    """用相邻行缩进、字体和节奏识别参考条目的悬挂缩进尾行。"""
+    """Identify hanging indented trailing lines of reference entries using adjacent line indentation, font, and rhythm."""
 
     line, bbox = candidate
     if line.font_signature is None:
@@ -2139,7 +2139,7 @@ def _has_nearby_punctuated_formula_number_anchor(
     lane: _TextLane,
     median_height: float,
 ) -> bool:
-    """识别同一公式带右侧仅带标点前缀的编号，避免分式上下行被提前认领。"""
+    """Identify numbers with only punctuation prefixes on the right side of the same formula to avoid the upper and lower parts of the fraction from being claimed in advance."""
 
     line, bbox = candidate
     for other_line, other_bbox in lane.lines:
@@ -2171,7 +2171,7 @@ def _find_repeated_formula_number_anchors(
     median_height: float,
     body_interval: tuple[float, float] | None,
 ) -> list[_FormulaAnchor]:
-    """用栏右缘重复编号恢复正文区间之外的行间公式锚点。"""
+    """Use repeated numbers on the right edge of the column to restore interline formula anchors outside the text range."""
     lane_width = max(0.1, lane.right - lane.left)
     markers = [
         (line, bbox)
@@ -2226,7 +2226,7 @@ def _find_formula_spatial_anchors(
     median_height: float,
     dominant_body_font: tuple[str, int] | None = None,
 ) -> list[_FormulaAnchor]:
-    """查找栏带右缘短块或带编号后缀的非正文字体公式锚点。"""
+    """Find bar with right margin short block or non-text font formula anchor with number suffix."""
 
     lane_width = max(0.1, lane.right - lane.left)
     body_interval = _formula_lane_body_interval(lane, median_height)
@@ -2268,7 +2268,7 @@ def _find_formula_spatial_anchors(
             for other_line in same_row_fragments
             if other_line.source_index != line.source_index
         ):
-            # 一条粗行被多个大空格拆成密集词组时更像普通排版行，不能把末词当作公式编号锚点。
+            # When a thick line is broken into dense phrases by multiple large spaces, it looks more like an ordinary typesetting line. The last word cannot be used as a formula numbering anchor.
             continue
         if _split_visual_row_has_prose_continuation(
             lane,
@@ -2334,9 +2334,9 @@ def _find_formula_spatial_anchors(
                     for peer, _bounds in left_peers
                 )
             ):
-                # 页号与同字体普通词语构成边缘排版行，空间分离不提供数学证据。
+                # The page number and the common words in the same font form a marginal typesetting line, and the spatial separation provides no mathematical evidence.
                 continue
-            # 非编号短锚点必须与左侧主体真正分离；分母字符与正文横向重叠时不能扩张成公式。
+            # Non-numbered short anchors must be truly separated from the body on the left; denominator characters cannot expand into formulas when they overlap laterally with the text.
             if any(_bbox_axis_overlap_ratio(bbox, other_bbox, axis="x") >= 0.5 for _other_line, other_bbox in left_peers):
                 continue
             minimum_gap = max(0.5, 0.1 * line_height)
@@ -2360,7 +2360,7 @@ def _split_visual_row_has_prose_continuation(
     same_row_fragments: list[_LineItem],
     median_height: float,
 ) -> bool:
-    """识别覆盖大部分栏宽且紧接下一正文行的同行拆分文本。"""
+    """Identifies line-split text that covers most of the column width and follows the next body line."""
 
     if len(same_row_fragments) < 3 or anchor_line.visual_row_id is None:
         return False
@@ -2406,7 +2406,7 @@ def _infer_formula_body_font(
     lane: _TextLane,
     median_height: float,
 ) -> tuple[str, int] | None:
-    """从栏内常规宽正文行推断 dominant font，供公式扩张排除正文前缀。"""
+    """dominant font is extrapolated from the regular wide text lines in the column for formula expansion excluding the text prefix."""
 
     lane_width = max(0.1, lane.right - lane.left)
     font_counts: dict[tuple[str, int], int] = {}
@@ -2428,7 +2428,7 @@ def _formula_lane_body_interval(
     lane: _TextLane,
     median_height: float,
 ) -> tuple[float, float] | None:
-    """用连续出现的常规宽行确定栏带正文纵向范围，排除孤立页眉。"""
+    """Determine the vertical extent of the column body text with consecutive regular wide lines, excluding isolated headers."""
 
     lane_width = max(0.1, lane.right - lane.left)
     body_lines = sorted(
@@ -2455,7 +2455,7 @@ def _deduplicate_formula_anchors(
     anchors: list[_FormulaAnchor],
     median_height: float,
 ) -> list[_FormulaAnchor]:
-    """同一高度出现多个右缘短块时只保留最靠右的空间锚点。"""
+    """When multiple right-edge short blocks appear at the same height, only the rightmost spatial anchor point is retained."""
 
     if not anchors:
         return []
@@ -2480,7 +2480,7 @@ def _grow_formula_spatial_component(
     dominant_body_font: tuple[str, int] | None,
     median_height: float,
 ) -> list[tuple[_LineItem, BBox]]:
-    """从右缘锚点的左侧首批成员出发，按二维邻接扩展公式分量。"""
+    """Starting from the first members to the left of the right edge anchor point, expand the formula components by two-dimensional adjacency."""
 
     anchor_line, anchor_bbox = anchor.line, anchor.bbox
     anchor_geometry = (anchor_line, anchor_bbox)
@@ -2583,7 +2583,7 @@ def _is_formula_body_barrier(
     dominant_body_font: tuple[str, int] | None,
     median_height: float,
 ) -> bool:
-    """识别具有稳定正文排版的行，阻止公式分量吸收正文尾行。"""
+    """Identify lines with stable text layout, preventing formula components from absorbing the last line of text."""
 
     line, bbox = candidate
     if not line.style_scale_repaired:
@@ -2624,7 +2624,7 @@ def _is_formula_title_barrier(
     dominant_body_font: tuple[str, int] | None,
     median_height: float,
 ) -> bool:
-    """用左对齐、字号突变和字体变化隔离公式下方的章节标题。"""
+    """Isolate section headings below formulas with left alignment, font size bumps, and font changes."""
 
     if dominant_body_font is None:
         return False
@@ -2650,7 +2650,7 @@ def _is_formula_body_prefix(
     *,
     minimum_font_coverage: float = 0.75,
 ) -> bool:
-    """识别锚点上方左对齐的常规正文行，防止公式空间扩张越界认领。"""
+    """Identifies left-aligned regular text lines above anchor points to prevent formula space expansion from being claimed out of bounds."""
 
     line, bbox = candidate
     anchor_line, anchor_bbox = anchor
@@ -2694,7 +2694,7 @@ def _formula_detached_seed_vertical_match(
     candidate_bbox: BBox,
     candidate_height: float,
 ) -> bool:
-    """放宽正文密集区下方锚点的同高匹配，以接纳多行分段公式底部。"""
+    """Relax the same-height matching of anchor points below the text-dense area to accommodate the bottom of multi-line segmented formulas."""
 
     has_vertical_overlap = min(anchor_bbox[3], candidate_bbox[3]) > max(anchor_bbox[1], candidate_bbox[1])
     center_difference = abs(_bbox_center_y(anchor_bbox) - _bbox_center_y(candidate_bbox))
@@ -2707,7 +2707,7 @@ def _formula_seed_vertical_match(
     candidate_bbox: BBox,
     candidate_height: float,
 ) -> bool:
-    """判断左侧短行是否与右缘锚点处在同一公式高度带。"""
+    """Determine whether the left short row is in the same formula height zone as the right edge anchor point."""
 
     overlap_ratio = _bbox_axis_overlap_ratio(anchor_bbox, candidate_bbox, axis="y")
     center_difference = abs(_bbox_center_y(anchor_bbox) - _bbox_center_y(candidate_bbox))
@@ -2721,7 +2721,7 @@ def _formula_lines_are_connected(
     second_bbox: BBox,
     table_bboxes: list[BBox],
 ) -> bool:
-    """按垂直接近和水平覆盖判断两个公式成员是否空间连通。"""
+    """Determine whether two formula members are spatially connected based on vertical proximity and horizontal coverage."""
 
     if first_line.angle != second_line.angle:
         return False
@@ -2744,7 +2744,7 @@ def _is_detached_formula_sidecar(
     members: list[tuple[_LineItem, BBox]],
     median_height: float,
 ) -> bool:
-    """仅依据 bbox 判断右侧锚点是否为与公式主体分离的窄幅 sidecar。"""
+    """Only bbox is used to determine whether the right anchor point is a narrow sidecar that is separated from the main body of the formula."""
 
     anchor_line, anchor_bbox = anchor
     body_bboxes = [bbox for line, bbox in members if line.source_index != anchor_line.source_index]
@@ -2769,7 +2769,7 @@ def _is_detached_formula_sidecar(
 
 
 def _split_trailing_formula_number(text: str) -> tuple[str, str] | None:
-    """拆出右缘文本末尾的圆括号公式序号，并保留序号前的标点或正文。"""
+    """Remove the formula serial number in parentheses at the end of the right margin text, and retain the punctuation or text before the serial number."""
 
     match = _FORMULA_NUMBER_SUFFIX_RE.fullmatch(str(text or "").strip())
     if match is None:
@@ -2785,7 +2785,7 @@ def _formula_members_to_block(
     anchor_source_index: int,
     include_member_ids: bool = False,
 ) -> dict[str, Any] | None:
-    """把公式空间分量按视觉行聚类，将编号序列化为 tag 并后置其他 sidecar。"""
+    """Cluster the formula space components by visual row, serialize the number to tag and append the other sidecar."""
 
     anchor_line = next(
         (line for line, _bbox in members if line.source_index == anchor_source_index),
@@ -2807,7 +2807,7 @@ def _formula_members_to_block(
             rows.append([member])
 
     trailing_sidecar_content: str | None = None
-    # 右侧 sidecar 按视觉 y 常落在分式中部；仅在其后仍有公式行时转为逻辑末行。
+    # sidecar on the right side. According to vision, y always falls in the middle of the fraction; it only changes to the logical last line when there is a formula line after it.
     for row_index, row in enumerate(rows[:-1]):
         anchor_member = next(
             (member for member in row if member[0].source_index == anchor_source_index),

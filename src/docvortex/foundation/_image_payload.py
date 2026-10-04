@@ -59,21 +59,21 @@ _SAFE_SVG_ATTRIBUTES: dict[str, set[str]] = {
 
 
 class _RejectingSvgTreeBuilder(ElementTree.TreeBuilder):
-    """构造拒绝任何 DTD 的 SVG XML 树。"""
+    """Constructs a SVG XML tree that rejects any DTD."""
 
     def doctype(self, _name: str, _pubid: str | None, _system: str | None) -> None:
-        """在实体声明被处理前拒绝任意偏移和编码的 DOCTYPE。"""
+        """DOCTYPE rejects arbitrary offsets and encodings before the entity declaration is processed."""
         raise ValueError("Generated SVG must not contain a DTD or entity declaration")
 
 
 def normalize_image_extension(fmt: str) -> str:
-    """规范化图片扩展名，保证同一图片格式生成稳定文件名。"""
+    """Standardize image extensions to ensure stable file names are generated for the same image format."""
     normalized = fmt.lower().split("+", 1)[0]
     return "jpg" if normalized in {"jpeg", "jpg"} else normalized
 
 
 def validate_decoded_raster_size(width: int, height: int) -> None:
-    """在 Pillow 解码像素前校验 raster 单边尺寸与总像素预算。"""
+    """Verify raster single side size against total pixel budget before Pillow decodes pixels."""
     if (
         width <= 0
         or height <= 0
@@ -88,7 +88,7 @@ def validate_decoded_raster_size(width: int, height: int) -> None:
 
 
 def _parse_svg_root_strict(payload: bytes) -> ElementTree.Element:
-    """在固定字节预算内解析 SVG 根节点，并在实体展开前拒绝 DTD。"""
+    """Parse SVG root node within fixed byte budget and reject DTD before entity expansion."""
     if len(payload) > MAX_GENERATED_SVG_BYTES:
         raise ValueError("SVG image payload exceeds its byte limit")
     try:
@@ -102,7 +102,7 @@ def _parse_svg_root_strict(payload: bytes) -> ElementTree.Element:
 
 
 def parse_image_data_uri_strict(data_uri: str) -> tuple[bytes, str]:
-    """严格解析图片 data URI，并同时校验 MIME 与文件签名是否一致。"""
+    """Strictly parse the picture data URI, and also verify whether MIME is consistent with the file signature."""
     if len(data_uri) > MAX_IMAGE_DATA_URI_BYTES:
         raise ValueError("Image data URI exceeds its byte limit")
     match = re.fullmatch(r"data:image/([^;]+);base64,([A-Za-z0-9+/]*={0,2})", data_uri)
@@ -153,7 +153,7 @@ def parse_image_data_uri_strict(data_uri: str) -> tuple[bytes, str]:
 
 
 def _decode_png_data_uri(value: str) -> bytes:
-    """严格解码生成 SVG 内嵌的 PNG data URI。"""
+    """Strict decoding generates SVG embedded PNG data URI."""
     match = re.fullmatch(r"data:image/png;base64,([A-Za-z0-9+/]*={0,2})", value)
     if match is None:
         raise ValueError("Generated SVG image href must contain a PNG data URI")
@@ -167,7 +167,7 @@ def _decode_png_data_uri(value: str) -> bytes:
 
 
 def _validate_generated_svg_attribute(tag: str, name: str, value: str) -> None:
-    """校验生成 SVG 属性只使用静态数值、颜色、本地 clip 或 PNG。"""
+    """Verification generates SVG properties using only static values, colors, local clip or PNG."""
     if name not in _SAFE_SVG_ATTRIBUTES[tag] or "\x00" in value or name.lower().startswith("on"):
         raise ValueError(f"Generated SVG contains an unsafe attribute: {tag}.{name}")
     normalized = value.strip().casefold()
@@ -184,7 +184,7 @@ def _validate_generated_svg_attribute(tag: str, name: str, value: str) -> None:
 
 
 def extract_generated_svg_fallback(payload: bytes) -> tuple[bytes, int, int]:
-    """验证 metafile-render 生成 SVG，并返回 PNG fallback 与逻辑像素尺寸。"""
+    """Verify that metafile-render generates SVG and returns PNG and fallback with logical pixel dimensions."""
     if not isinstance(payload, bytes) or not payload:
         raise ValueError("Generated SVG payload is empty or exceeds its byte limit")
     root = _parse_svg_root_strict(payload)
@@ -232,7 +232,7 @@ def extract_generated_svg_fallback(payload: bytes) -> tuple[bytes, int, int]:
 
 
 def validate_image_sidecar_path(image_path: str) -> str:
-    """校验图片 sidecar 路径只能是安全的相对子路径，并返回规范化 POSIX 路径。"""
+    """Verify that the image sidecar path can only be a safe relative subpath and return the normalized POSIX path."""
     if (
         not image_path
         or image_path == "."
@@ -258,7 +258,7 @@ def validate_image_sidecar_path(image_path: str) -> str:
 
 
 def validate_remote_image_url(image_url: str) -> str:
-    """校验远程图片只能使用无凭据的 HTTP(S) 绝对地址。"""
+    """Verification of remote images can only use the absolute address of HTTP (S) without credentials."""
     normalized = image_url.strip()
     if (
         not normalized

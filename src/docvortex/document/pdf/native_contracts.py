@@ -1,4 +1,4 @@
-"""PDF 原生页面快照、数据类型与固定常量，保持原生提取算法与资源语义。"""
+"""PDF native page snapshots, data types and fixed constants, maintaining native extraction algorithms and resource semantics."""
 
 from __future__ import annotations
 
@@ -66,17 +66,17 @@ PDFMetadataKey: TypeAlias = Literal[
 
 
 class PDFPageImage:
-    """保存页面像素及其相对 PDF 点坐标的缩放比例。"""
+    """Saves the page pixels and their scaling relative to the PDF point coordinates."""
 
     def __init__(self, pil_image: Image.Image, scale: float) -> None:
-        """持有调用者提供的独立 Pillow 图片与缩放值。"""
+        """Holds an independent Pillow image and scaling value provided by the caller."""
         self.pil_image = pil_image
         self.scale = scale
 
 
 @dataclass(frozen=True, slots=True)
 class PDFPageTextGeometry:
-    """保存原始字符及 loose/tight/origin 三套视觉几何。"""
+    """Save original characters and loose/tight/origin three sets of visual geometry."""
 
     chars: list[Char]
     tight_bboxes: dict[int, BBox]
@@ -86,7 +86,7 @@ class PDFPageTextGeometry:
 
 @dataclass(frozen=True)
 class PDFDrawingLine:
-    """PDF 页面中可见的水平或竖直绘图线，坐标使用页面左上原点的 PDF point。"""
+    """PDF Horizontal or vertical drawing line visible on the page, coordinates use PDF point from the upper left origin of the page."""
 
     start: tuple[float, float]
     end: tuple[float, float]
@@ -97,7 +97,7 @@ class PDFDrawingLine:
 
 @dataclass(frozen=True)
 class PDFLinkAnnotation:
-    """PDF 外部 URI Link 注解，区域坐标使用页面左上原点的 PDF point。"""
+    """PDF External URI Link Note, the area coordinates use the PDF point of the upper left origin of the page."""
 
     target: str
     bboxes: tuple[BBox, ...]
@@ -106,7 +106,7 @@ class PDFLinkAnnotation:
 
 @dataclass(frozen=True)
 class PDFPathInfo:
-    """PDF Path 的可见几何和绘制特征，bbox 使用页面左上原点坐标。"""
+    """PDF Visible geometry and drawing features of Path, bbox uses the coordinates of the upper left origin of the page."""
 
     bbox: BBox
     segment_count: int
@@ -120,18 +120,18 @@ class PDFPathInfo:
 
 @dataclass(frozen=True)
 class PDFImageInfo:
-    """PDF 点阵图的页面几何与稳定内容指纹，指纹读取失败时为 None。"""
+    """PDF The page geometry and stable content fingerprint of the bitmap, None when the fingerprint reading fails."""
 
     bbox: BBox
     fingerprint: str | None
     smooth_background: bool = False
-    # 图片自身像素证明的白色/透明顶边，仅供原生布局排除相邻大标题使用。
+    # The pixel-proven white/transparent top edge of the image itself is only used by the native layout to exclude adjacent large titles.
     blank_top_bbox: BBox | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class PDFPageVectorGeometry:
-    """保存一次 Path 遍历物化的线与路径摘要，不持有 PDFium 句柄。"""
+    """Save a Path traversal of the materialized line and path summary, without holding a PDFium handle."""
 
     drawing_lines: tuple[PDFDrawingLine, ...] = ()
     path_infos: tuple[PDFPathInfo, ...] = ()
@@ -139,7 +139,7 @@ class PDFPageVectorGeometry:
 
 @dataclass(frozen=True, slots=True)
 class _PDFFormInfo:
-    """一个 Form 调用的自有证据；来源编号保持原字符与 Path 的遍历身份。"""
+    """Self-evident evidence of a Form call; the source number retains the traversal identity of the original character and Path."""
 
     instance_id: int
     parent_id: int | None
@@ -158,7 +158,7 @@ class _PDFFormInfo:
 
 @dataclass(frozen=True, slots=True, init=False)
 class _PDFPageSnapshot:
-    """保存单次页面提取的自有原生文本或兼容证据，不持有 PDFium 子对象。"""
+    """Saves own native text or compatibility evidence for a single page extraction, does not hold the PDFium sub-object."""
 
     page_size: tuple[float, float]
     rotation: Literal[0, 90, 180, 270]
@@ -186,7 +186,7 @@ class _PDFPageSnapshot:
         native_text: Any = None,
         form_infos: tuple[_PDFFormInfo, ...] = (),
     ) -> None:
-        """保留既有text_geometry构造关键字和位置顺序，内部字段仅用于惰性兼容缓存。"""
+        """The existing text_geometry construction keywords and positional order are retained, and internal fields are only used for lazy-compatible caching."""
         for name, value in (
             ("page_size", page_size),
             ("rotation", rotation),
@@ -204,7 +204,7 @@ class _PDFPageSnapshot:
 
     @property
     def text_geometry(self) -> PDFPageTextGeometry:
-        """旧私有消费者显式访问时物化一次；Flash原生管线不提前创建兼容字符。"""
+        """The old private consumer is materialized once when explicitly accessed; Flash native pipeline does not create compatible characters in advance."""
         if self._text_geometry is None and self.native_text is not None:
             object.__setattr__(self, "_text_geometry", self.native_text.materialize_geometry())
         return self._text_geometry
@@ -212,7 +212,7 @@ class _PDFPageSnapshot:
 
 @dataclass
 class _PathSubpath:
-    """保存一个 PDF Path 子路径的点、直线段和闭合状态。"""
+    """Saves the points, straight segments, and closure status of a PDF Path subpath."""
 
     points: list[tuple[float, float]]
     straight_segments: list[tuple[tuple[float, float], tuple[float, float]]]

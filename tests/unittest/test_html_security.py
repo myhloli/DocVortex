@@ -18,7 +18,7 @@ _SAFE_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8
 
 
 def _generated_svg_data_uri(extra_markup: str = "") -> str:
-    """构造带 PNG fallback 的最小 MinerU 安全 SVG data URI。"""
+    """Construct minimum MinerU safe SVG data URI with PNG fallback."""
     svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" viewBox="0 0 1 1" '
         'data-metafile-render="wmf-emf">'
@@ -38,7 +38,7 @@ def _generated_svg_data_uri(extra_markup: str = "") -> str:
     ],
 )
 def test_generated_svg_accepts_new_contract_and_rejects_obsolete_markers(current: bytes, obsolete: bytes) -> None:
-    """消费端只接受独立包的新 SVG 标识，不保留旧根属性、元数据或裁剪引用。"""
+    """The consumer only accepts the new SVG identifier for standalone packages and does not retain old root attributes, metadata or clipping references."""
     data_uri = _generated_svg_data_uri(
         '<defs><clipPath id="metafile-render-clip-1"><path d="M 0 0 L 1 0 L 1 1 Z"/></clipPath></defs>'
         '<g clip-path="url(#metafile-render-clip-1)"><path d="M 0 0 L 1 1"/></g>'
@@ -61,7 +61,7 @@ def test_generated_svg_accepts_new_contract_and_rejects_obsolete_markers(current
     ],
 )
 def test_supported_html_markup_detects_renderable_and_active_tags(content: str) -> None:
-    """验证可渲染标签和需整体删除的活动标签会进入安全层。"""
+    """Verify that renderable tags and active tags that need to be deleted entirely will enter the security layer."""
     assert is_supported_html_markup(content)
 
 
@@ -78,7 +78,7 @@ def test_supported_html_markup_detects_renderable_and_active_tags(content: str) 
     ],
 )
 def test_supported_html_markup_keeps_ordinary_angle_brackets_as_text(content: str) -> None:
-    """验证未知尖括号文本不会被误判为 HTML。"""
+    """Verify that unknown angle bracket text is not misinterpreted as HTML."""
     assert not is_supported_html_markup(content)
 
 
@@ -96,7 +96,7 @@ def test_supported_html_markup_keeps_ordinary_angle_brackets_as_text(content: st
     ],
 )
 def test_sanitize_link_url_allows_document_links(url: str, expected: str) -> None:
-    """验证文档内链接和明确允许的外部协议被保留。"""
+    """Verify that in-document links and explicitly allowed external protocols are preserved."""
     assert sanitize_link_url(url) == expected
 
 
@@ -120,12 +120,12 @@ def test_sanitize_link_url_allows_document_links(url: str, expected: str) -> Non
     ],
 )
 def test_sanitize_link_url_rejects_dangerous_or_invalid_urls(url: str) -> None:
-    """验证可执行、本地文件、协议相对及无效 URL 被拒绝。"""
+    """Verify executable, local file, protocol relative and invalid URL rejected."""
     assert sanitize_link_url(url) is None
 
 
 def test_sanitize_image_source_rewrites_only_safe_relative_sidecars() -> None:
-    """验证仅安全相对 sidecar 路径应用资源根地址。"""
+    """Verify that only secure relative sidecar paths apply to the resource root address."""
     base = "https://cdn.example/doc"
 
     assert sanitize_image_source("images/a b.png", asset_base_url=base) == ("https://cdn.example/doc/images/a%20b.png")
@@ -155,7 +155,7 @@ def test_sanitize_image_source_rewrites_only_safe_relative_sidecars() -> None:
     ],
 )
 def test_sanitize_image_source_rejects_unsafe_sources(source: str) -> None:
-    """验证路径逃逸、活动内容和非栅格 data URI 被拒绝。"""
+    """Validation path escapes, active content, and non-raster data URI rejected."""
     assert sanitize_image_source(source, asset_base_url="assets") is None
 
 
@@ -169,7 +169,7 @@ def test_sanitize_image_source_rejects_unsafe_sources(source: str) -> None:
     ],
 )
 def test_sanitize_image_source_allows_strict_raster_data_uris(source: str) -> None:
-    """验证语法正确的常见栅格图 base64 data URI 被保留。"""
+    """Common raster plots base64 data URI that verify correct syntax are retained."""
     assert sanitize_image_source(source, asset_base_url="https://cdn.example/doc") == source
 
 
@@ -186,12 +186,12 @@ def test_sanitize_image_source_allows_strict_raster_data_uris(source: str) -> No
     ],
 )
 def test_sanitize_image_source_rejects_malicious_asset_bases(asset_base_url: str) -> None:
-    """验证恶意资源根地址不会被拼接到安全 sidecar 路径。"""
+    """Verify that the malicious resource root address is not spliced to the secure sidecar path."""
     assert sanitize_image_source("images/a.png", asset_base_url=asset_base_url) is None
 
 
 def test_sanitize_html_fragment_keeps_structure_and_bounded_attributes() -> None:
-    """验证表格、列表、富文本与合法数值属性被保留。"""
+    """Verify that table, list, rich text, and legal numeric attributes are preserved."""
     markup = (
         "<div><blockquote><p><b>B</b><strong>S</strong><i>I</i><em>E</em><u>U</u>"
         "<s>D</s><sub>1</sub><sup>2</sup><code>C</code><br><span>T</span></p></blockquote>"
@@ -217,7 +217,7 @@ def test_sanitize_html_fragment_keeps_structure_and_bounded_attributes() -> None
 
 
 def test_sanitize_html_fragment_strips_source_presentation_and_clobbering_attributes() -> None:
-    """验证来源样式、事件、DOM clobbering 和 data 属性全部删除。"""
+    """Verify that the source style, event, DOM, clobbering and data attributes are all removed."""
     markup = (
         '<table id="location" name="cookie" class="evil" style="position:fixed" data-x="1">'
         '<tr><td onclick="alert(1)"><span id="forms" class="x" style="color:red">safe</span></td></tr>'
@@ -236,7 +236,7 @@ def test_sanitize_html_fragment_strips_source_presentation_and_clobbering_attrib
 
 
 def test_sanitize_html_fragment_removes_active_elements_with_contents() -> None:
-    """验证活动、表单和媒体标签连同内容删除。"""
+    """Validate activity, form and media tags along with content removal."""
     paired_tags = [
         "audio",
         "button",
@@ -263,14 +263,14 @@ def test_sanitize_html_fragment_removes_active_elements_with_contents() -> None:
 
 
 def test_sanitize_html_fragment_unwraps_unknown_safe_elements() -> None:
-    """验证未知非活动 wrapper 只去除标签，不丢失可见内容。"""
+    """Verification Unknown Inactive wrapper Only removes tags without losing visible content."""
     markup = '<custom-wrapper onclick="alert(1)">before<strong>safe</strong>after</custom-wrapper>'
 
     assert sanitize_html_fragment(markup) == "before<strong>safe</strong>after"
 
 
 def test_sanitize_html_fragment_repairs_list_colgroup_and_image_content_models() -> None:
-    """验证孤立列表项、非法直接子项、colgroup span 与缺失 alt 被规范化。"""
+    """Verify that orphaned list items, illegal direct children, colgroup span and missing alt are normalized."""
     markup = (
         "<li>orphan</li><ol>text<div>block</div><li>ok</li></ol>"
         "<span>before<li>phrasing orphan</li>after</span>"
@@ -289,23 +289,23 @@ def test_sanitize_html_fragment_repairs_list_colgroup_and_image_content_models()
 
 
 def test_unmarked_svg_data_uri_is_rejected() -> None:
-    """验证普通或伪装 SVG 仍无法绕过 MinerU 安全子集。"""
+    """Verifying that plain or spoofed SVG still cannot bypass the MinerU security subset."""
     assert sanitize_image_source("data:image/svg+xml;base64,PHN2Zz4=") is None
 
 
 def test_mineru_generated_svg_data_uri_is_allowed() -> None:
-    """验证带严格 PNG fallback 的 MinerU SVG 可用于 HTML 图片。"""
+    """Verification MinerU SVG with strict PNG fallback can be used with HTML pictures."""
     source = _generated_svg_data_uri()
     assert sanitize_image_source(source) == source
 
 
 def test_mineru_generated_svg_rejects_dtd_beyond_prefix_window(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证任意偏移和编码的 DTD 都不能绕过 HTML SVG 安全校验。"""
+    """Verify that DTD of any offset and encoding cannot bypass the HTML SVG security check."""
     original_fromstring = image_payload.ElementTree.fromstring
     parser_calls: list[object] = []
 
     def guarded_fromstring(payload: bytes, parser: object | None = None) -> object:
-        """断言 SVG 的首次 XML 解析已经使用拒绝 DTD 的 parser。"""
+        """Asserting SVG The first XML parse has used parser which rejects DTD."""
         assert parser is not None
         parser_calls.append(parser)
         return original_fromstring(payload, parser=parser)  # type: ignore[arg-type,return-value]
@@ -329,7 +329,7 @@ def test_mineru_generated_svg_rejects_dtd_beyond_prefix_window(monkeypatch: pyte
 
 
 def test_svg_data_uri_rejects_encoded_oversize_before_xml_parse(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证明显超限的 SVG 在 base64 解码和 XML 解析前被拒绝。"""
+    """A SVG that clearly exceeds the verification limit is rejected before base64 is decoded and XML is parsed."""
     xml_parser = Mock(side_effect=AssertionError("oversized SVG must not reach XML parsing"))
     monkeypatch.setattr(image_payload, "MAX_GENERATED_SVG_BYTES", 1)
     monkeypatch.setattr(image_payload.ElementTree, "fromstring", xml_parser)
@@ -347,12 +347,12 @@ def test_svg_data_uri_rejects_encoded_oversize_before_xml_parse(monkeypatch: pyt
     ],
 )
 def test_mineru_svg_marker_does_not_bypass_active_content_checks(extra_markup: str) -> None:
-    """验证 MinerU marker 无法放行脚本、外链或 foreignObject。"""
+    """Verification MinerU marker Unable to release script, external link or foreignObject."""
     assert sanitize_image_source(_generated_svg_data_uri(extra_markup)) is None
 
 
 def test_sanitize_html_fragment_preserves_safe_equation_as_plain_text() -> None:
-    """验证 eq 保留为后续公式载体，其中的标签仅作纯文本处理。"""
+    """Verify that eq is retained as a subsequent formula carrier, and the labels in it are only processed as plain text."""
     markup = "<p>before <eq>x&lt;y &lt;/script&gt;<b>z</b></eq> after</p>"
 
     rendered = sanitize_html_fragment(markup)
@@ -365,7 +365,7 @@ def test_sanitize_html_fragment_preserves_safe_equation_as_plain_text() -> None:
 
 
 def test_sanitize_html_fragment_degrades_dangerous_links_and_images_visibly() -> None:
-    """验证危险链接留下 label，危险图片留下已转义的 alt。"""
+    """Validating dangerous links leaves label, and dangerous images leaves escaped alt."""
     markup = (
         '<a href="javascript&colon;alert(1)"><strong>label</strong></a>'
         '<img src="data:image/svg+xml;base64,PHN2Zz4=" alt="&lt;unsafe&gt;">'
@@ -379,7 +379,7 @@ def test_sanitize_html_fragment_degrades_dangerous_links_and_images_visibly() ->
 
 
 def test_sanitize_html_fragment_handles_malformed_mutation_xss() -> None:
-    """验证畸形 SVG/MathML/脚本与属性组合不会绕过二次解析。"""
+    """Verification malformation SVG/MathML/script and attribute combination does not bypass secondary parsing."""
     markup = (
         '<svg><style><img src="x" onerror="alert(1)"></style></svg>'
         '<math><mtext><img src="x" onerror="alert(2)"></mtext></math>'
@@ -401,7 +401,7 @@ def test_sanitize_html_fragment_handles_malformed_mutation_xss() -> None:
 
 
 def test_sanitize_html_fragment_escapes_malicious_titles_and_alt_text() -> None:
-    """验证 title/alt 中的引号与标签只作属性或可见文本。"""
+    """Validate quotes and labels in title/alt as attributes or visible text only."""
     markup = (
         '<a href="https://example.com" title="&quot; onmouseover=&quot;alert(1)">safe</a>'
         '<img src="javascript:alert(2)" alt="&lt;img src=x onerror=alert(3)&gt;">'
@@ -418,7 +418,7 @@ def test_sanitize_html_fragment_escapes_malicious_titles_and_alt_text() -> None:
 
 
 def test_sanitize_html_fragment_rejects_invalid_argument_types() -> None:
-    """验证安全层不隐式接受非字符串输入。"""
+    """Verify that the security layer does not implicitly accept non-string input."""
     with pytest.raises(TypeError, match="markup"):
         sanitize_html_fragment(None)  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="asset_base_url"):

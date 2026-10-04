@@ -1,4 +1,4 @@
-"""按图旁连续的物理行恢复分离图注与带符号的图例，不依赖图中文字。"""
+"""Restore separate legends and legends with symbols by consecutive physical lines next to the figure, without relying on text in the figure."""
 
 from __future__ import annotations
 
@@ -12,12 +12,12 @@ from .visual_annotations import _is_strong_caption_text, _is_strong_footnote_tex
 
 
 def _annotation_em(block):
-    """按原始行高确定图注邻接尺度，避免固定页面坐标或像素阈值。"""
+    """Determine legend adjacency dimensions based on the original row height to avoid fixing page coordinates or pixel thresholds."""
     return statistics.median(block.get("_line_heights") or [block["bbox"][3] - block["bbox"][1]])
 
 
 def recover_image_annotation_bands(blocks, page_size, drawing_lines):
-    """只从紧邻图片的显式编号出发，恢复说明带及带重复符号的图例。"""
+    """Restore captions and legends with repeated symbols starting only from the explicit numbering immediately adjacent to the picture."""
     removed = set()
     for image in [block for block in blocks if block.get("type") == "image"]:
         bounds = image["bbox"]
@@ -61,7 +61,7 @@ def recover_image_annotation_bands(blocks, page_size, drawing_lines):
             continue
         left, right = first["bbox"][0], max(first["bbox"][2], bounds[2])
         if not leading:
-            # 碎片化首行的编号很窄，后续实际满行给出图注宽度。
+            # The first row of fragments is numbered very narrowly, and subsequent actual full rows give the legend width.
             followers = [b for b in candidates if b["bbox"][1] <= first["bbox"][3] + em]
             right = max([right] + [b["bbox"][2] for b in followers])
         group = []
@@ -113,7 +113,7 @@ def recover_image_annotation_bands(blocks, page_size, drawing_lines):
         symbols = [b for b in legend if len(str(b.get("content", "")).strip()) == 1 and str(b["content"]).strip().isalpha()]
         if len(symbols) < 3:
             continue
-        # 多栏图例按名称的实际左缘分组，同行的小字母只认领最近的左侧名称。
+        # Multi-column legends are grouped by the actual left edge of the name, with smaller letters in the row claiming only the nearest left edge of the name.
         physical_rows = []
         for block in sorted(legend, key=lambda b: (_bbox_center_y(b["bbox"]), b["bbox"][0])):
             row = next(
@@ -152,7 +152,7 @@ def recover_image_annotation_bands(blocks, page_size, drawing_lines):
             note["type"] = "footnote"
             note["_annotation_band_parent"] = image
             if len(stable_lefts) >= 2 and note["bbox"][2] - note["bbox"][0] < 0.65 * (right - left):
-                # 分类标题开启新分组；组内各栏自上而下，避免右栏子类标题插入左栏药名中。
+                # The classification title opens a new group; the columns in the group are from top to bottom to avoid inserting the subcategory title in the right column into the drug name in the left column.
                 section = max([bottom] + [top for top in heading_tops if top <= note["bbox"][1] + 0.25 * em])
                 lane = min(stable_lefts, key=lambda start: abs(start - note["bbox"][0]))
                 if any(block.get("type") == "paragraph_title" for block in row):

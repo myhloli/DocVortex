@@ -39,7 +39,7 @@ _PNG_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAA
 
 
 def _middle(*pages: PageInfo) -> MiddleJson:
-    """构造无需 PDF bbox 的严格 Office MiddleJson。"""
+    """Construction does not require the strictness of PDF bbox Office MiddleJson."""
     return MiddleJson(
         pages=list(pages),
         is_full_document=True,
@@ -49,12 +49,12 @@ def _middle(*pages: PageInfo) -> MiddleJson:
 
 
 def _page(page_idx: int, *blocks: PageBlock) -> PageInfo:
-    """按调用方顺序构造测试页面。"""
+    """Construct test pages in caller order."""
     return PageInfo(page_idx=page_idx, blocks=list(blocks))
 
 
 def _list(index: int, *items: str, sub_type: str | None = None) -> ListBlock:
-    """构造普通或参考文献列表。"""
+    """Construct a general or reference list."""
     child_class = RefTextBlock if sub_type == "ref_text" else TextBlock
     return ListBlock(
         type="list",
@@ -65,13 +65,13 @@ def _list(index: int, *items: str, sub_type: str | None = None) -> ListBlock:
 
 
 def _mermaid_fence(source: str, *, language: str = "mermaid") -> str:
-    """用标准三反引号构造 diagram fence，避免测试字符串散落围栏细节。"""
+    """Construct diagram fence with standard triple backticks to avoid test strings littering with fence details."""
     fence = chr(96) * 3
     return f"{fence}{language}\n{source}\n{fence}"
 
 
 def _flowchart(content: str, *, with_raster: bool = True) -> ImageBlock:
-    """构造带可选 raster 回退的 flowchart 图片块。"""
+    """Constructs a flowchart picture block with optional raster fallback."""
     body: dict[str, object] = {
         "type": "image_body",
         "index": 0,
@@ -93,7 +93,7 @@ def _flowchart(content: str, *, with_raster: bool = True) -> ImageBlock:
 
 
 def test_public_contract_fragment_standalone_title_and_input_immutability() -> None:
-    """验证严格公共参数、双输出形态、标题回退和输入无副作用。"""
+    """Verify strict public parameters, dual output morphology, title fallback, and input without side effects."""
     middle = _middle(
         _page(
             0,
@@ -137,7 +137,7 @@ def test_public_contract_fragment_standalone_title_and_input_immutability() -> N
 
 
 def test_default_and_full_modes_preserve_their_page_contracts() -> None:
-    """验证 DEFAULT 连续阅读与 FULL 空页、辅助块和页面分隔。"""
+    """Verify DEFAULT continuous reading with FULL empty pages, auxiliary blocks, and page delimiters."""
     middle = _middle(
         _page(
             0,
@@ -167,7 +167,7 @@ def test_default_and_full_modes_preserve_their_page_contracts() -> None:
 
 
 def test_default_and_full_html_link_to_visible_page_footnote_anchor() -> None:
-    """验证默认与完整 HTML 都输出页面脚注目标及弱化样式类。"""
+    """Verify that both default and full HTML output page footer targets and weakened style classes."""
     middle = _middle(
         _page(
             0,
@@ -202,7 +202,7 @@ def test_default_and_full_html_link_to_visible_page_footnote_anchor() -> None:
 
 
 def test_inline_html_escapes_plain_text_and_renders_styles_links_and_math() -> None:
-    """验证普通尖括号、富样式、安全链接及 MathJax carrier。"""
+    """Validates plain angle brackets, rich styles, safe links, and MathJax carrier."""
     content = [
         {"type": "text", "content": "p <0.05 <local_dir> "},
         {"type": "text", "content": " styled ", "styles": ["bold", "italic", "underline"]},
@@ -229,7 +229,7 @@ def test_inline_html_escapes_plain_text_and_renders_styles_links_and_math() -> N
 
 
 def test_plain_text_autolinks_mpe_style_urls_domains_and_email() -> None:
-    """验证显式 URL、www、裸域名、邮箱、括号和 CJK 句读按 MPE 风格转成链接。"""
+    """Verify that explicit URL, www, naked domain names, email addresses, brackets, and CJK sentence reads are converted into links in MPE style."""
     content = (
         "See https://example.com/a_(b), www.example.org/path?x=1, "
         "example.net/docs。Email user+tag@example.co.uk；"
@@ -304,7 +304,7 @@ def test_plain_text_autolinks_mpe_style_urls_domains_and_email() -> None:
     ],
 )
 def test_common_engineering_bare_domain_suffixes_linkify(tld: str) -> None:
-    """验证 B 工程常用集中的裸域名后缀全部保持可链接。"""
+    """Verify that all naked domain name suffixes commonly used in the B project remain linkable."""
     content = f"Project.Example.{tld}/docs?x=1#intro"
     soup = BeautifulSoup(
         render_html(_middle(_page(0, TextBlock(type="text", index=0, content=_inline(content)))), standalone=False),
@@ -333,7 +333,7 @@ def test_common_engineering_bare_domain_suffixes_linkify(tld: str) -> None:
     ],
 )
 def test_non_common_bare_domain_suffixes_remain_plain_text(content: str) -> None:
-    """验证文件名、股票代码、作者姓名和非白名单后缀不再误生成链接。"""
+    """Verifying filenames, tickers, author names, and non-whitelisted suffixes no longer generate links by mistake."""
     soup = BeautifulSoup(
         render_html(_middle(_page(0, TextBlock(type="text", index=0, content=_inline(content)))), standalone=False),
         "html.parser",
@@ -344,7 +344,7 @@ def test_non_common_bare_domain_suffixes_remain_plain_text(content: str) -> None
 
 
 def test_strong_link_syntax_bypasses_bare_domain_suffix_allowlist() -> None:
-    """验证显式 HTTP、www 和邮箱不受裸域名 B 白名单限制。"""
+    """Verify that explicit HTTP, www, and mailboxes are not whitelisted by the naked domain name B."""
     content = "https://example.ch www.example.ch user@example.ua https://machine.Aborted"
     soup = BeautifulSoup(
         render_html(_middle(_page(0, TextBlock(type="text", index=0, content=_inline(content)))), standalone=False),
@@ -360,7 +360,7 @@ def test_strong_link_syntax_bypasses_bare_domain_suffix_allowlist() -> None:
 
 
 def test_autolink_excludes_existing_links_code_math_algorithm_and_raw_html() -> None:
-    """验证 linkify 不嵌套显式链接，也不进入危险协议、代码、公式、算法和 raw HTML。"""
+    """Verify that linkify does not nest explicit links or enter dangerous protocols, codes, formulas, algorithms and raw HTML."""
     text = TextBlock(
         type="text",
         index=0,
@@ -411,7 +411,7 @@ def test_autolink_excludes_existing_links_code_math_algorithm_and_raw_html() -> 
 
 
 def test_formula_body_closing_delimiters_are_neutralized_before_mathjax_scanning() -> None:
-    """验证公式体内的结束定界符改写为等价 TeX，不会提前闭合 carrier。"""
+    """Verify that the end delimiter in the body of the formula is rewritten to be equivalent to TeX, and carrier will not be closed prematurely."""
     middle = _middle(
         _page(
             0,
@@ -430,7 +430,7 @@ def test_formula_body_closing_delimiters_are_neutralized_before_mathjax_scanning
 
 
 def test_lists_cover_native_explicit_reference_nested_and_orphan_shapes() -> None:
-    """验证列表分类、非连续编号、显式 marker、参考文献和嵌套归属。"""
+    """Verify list classification, non-consecutive numbering, explicit marker, references, and nested attributions."""
     ordered = _list(0, "1. first", "3. third")
     alpha = _list(1, "a. alpha", "b. beta")
     explicit = _list(2, "(1) one", "[x] done", "plain")
@@ -488,7 +488,7 @@ def test_lists_cover_native_explicit_reference_nested_and_orphan_shapes() -> Non
 
 
 def test_index_uses_real_forward_anchor_and_omits_duplicate_ids() -> None:
-    """验证目录前向链接、页码尾清理、嵌套目录及重复 anchor 首项生效。"""
+    """Verify that directory forward links, page number tail cleaning, nested directories, and duplicate anchor first items take effect."""
     index = IndexBlock(
         type="index",
         index=0,
@@ -515,7 +515,7 @@ def test_index_uses_real_forward_anchor_and_omits_duplicate_ids() -> None:
 
 
 def test_empty_title_does_not_create_a_broken_index_target_and_anchor_controls_are_normalized() -> None:
-    """验证空正文标题不成为链接目标，控制字符在 id/href 两侧一致归一化。"""
+    """Verify that empty text titles do not become link targets and that control characters are consistently normalized on both sides of id/href."""
     index = IndexBlock(
         type="index",
         index=0,
@@ -548,7 +548,7 @@ def test_empty_title_does_not_create_a_broken_index_target_and_anchor_controls_a
 
 
 def test_empty_index_leaf_owns_its_following_nested_index() -> None:
-    """验证空目录叶子的 nested ul 不会错误挂到更早的可见目录项。"""
+    """Verify that nested ul for empty directory leaves does not incorrectly hang on earlier visible directory entries."""
     index = IndexBlock(
         type="index",
         index=0,
@@ -567,7 +567,7 @@ def test_empty_index_leaf_owns_its_following_nested_index() -> None:
 
 
 def test_visual_child_order_image_details_and_asset_precedence() -> None:
-    """验证视觉说明顺序、图片路径优先级、URL 编码与识别内容 details。"""
+    """Verify visual description sequence, image path priority, URL encoding and identification content details."""
     image = ImageBlock.model_validate(
         {
             "type": "image",
@@ -602,7 +602,7 @@ def test_visual_child_order_image_details_and_asset_precedence() -> None:
 
 
 def test_mermaid_flowchart_keeps_raster_primary_and_lazy_details_render() -> None:
-    """验证原图为主视图，折叠区只显示图且隐藏源码供按需渲染。"""
+    """Verify that the original image is the main view, and only the image is displayed in the folded area and the source code is hidden for on-demand rendering."""
     source_text = '%% comment\ngraph LR\n  A["<script>alert(1)</script>"] --> B'
     middle = _middle(_page(0, _flowchart(_mermaid_fence(source_text))))
     fragment = render_html(middle, standalone=False)
@@ -637,7 +637,7 @@ def test_mermaid_flowchart_keeps_raster_primary_and_lazy_details_render() -> Non
 
 
 def test_mermaid_flowchart_without_raster_opens_diagram() -> None:
-    """验证无原图时源码作为渲染失败回退，成功渲染后由 CSS 隐藏。"""
+    """When verifying that there is no original image, the source code will fall back as a rendering failure, and will be hidden by CSS after successful rendering."""
     soup = BeautifulSoup(
         render_html(
             _middle(_page(0, _flowchart(_mermaid_fence("flowchart TD\n  A --> B"), with_raster=False))),
@@ -664,11 +664,11 @@ def test_mermaid_flowchart_without_raster_opens_diagram() -> None:
         _mermaid_fence("graph LR\n  A --> B", language="python"),
         _mermaid_fence(f"graph LR\n  A[{'x' * 50_001}]"),
     ],
-    # 使用简短 ID，避免 pytest 将超长源码写入 Windows 环境变量。
+    # Use short ID to avoid pytest from writing long source code into the Windows environment variable.
     ids=["unsupported-diagram", "init-directive", "frontmatter", "wrong-language", "oversized-source"],
 )
 def test_invalid_or_out_of_scope_mermaid_keeps_existing_image_path(content: str) -> None:
-    """验证非流程图、配置注入、错误 fence 和超限源码不触发 Mermaid 依赖。"""
+    """Verify that non-flowchart, configuration injection, error fence and over-limit source code do not trigger Mermaid dependencies."""
     rendered = render_html(_middle(_page(0, _flowchart(content))))
     soup = BeautifulSoup(rendered, "html.parser")
 
@@ -680,7 +680,7 @@ def test_invalid_or_out_of_scope_mermaid_keeps_existing_image_path(content: str)
 
 
 def test_table_keeps_safe_html_and_spatial_or_image_fallbacks() -> None:
-    """验证原生表格、公式、危险属性清理、空间文本和不可用表格图片回退。"""
+    """Verify native tables, formulas, dangerous attribute cleaning, space text and unavailable table image fallback."""
     html_table = TableBlock(
         type="table",
         index=0,
@@ -717,7 +717,7 @@ def test_table_keeps_safe_html_and_spatial_or_image_fallbacks() -> None:
 
 
 def test_table_preserves_standard_inline_style_tags() -> None:
-    """验证表格安全 HTML 保留 renderer 支持的标准行内样式标签。"""
+    """Validate table security HTML Preserves the standard inline style tags supported by renderer."""
     table = TableBlock(
         type="table",
         index=0,
@@ -747,7 +747,7 @@ def test_table_preserves_standard_inline_style_tags() -> None:
 
 
 def test_discarded_invalid_table_math_does_not_load_mathjax() -> None:
-    """验证无单元格表格回退图片后，已丢弃的 eq 不会误触发 MathJax。"""
+    """After verifying that there is no cell table fallback image, the discarded eq will not trigger MathJax accidentally."""
     table = TableBlock(
         type="table",
         index=0,
@@ -768,7 +768,7 @@ def test_discarded_invalid_table_math_does_not_load_mathjax() -> None:
 
 
 def test_chart_gfm_details_code_prism_and_algorithm_html() -> None:
-    """验证严格 chart GFM、图片 details、Prism Autoloader 和算法转义。"""
+    """Verification strict chart GFM, image details, Prism Autoloader and algorithmic escapes."""
     chart = ChartBlock(
         type="chart",
         index=0,
@@ -846,7 +846,7 @@ def test_chart_gfm_details_code_prism_and_algorithm_html() -> None:
 
 @pytest.mark.parametrize("guess_lang", ["python bad/../../x", "constructor", "prototype", "__proto__"])
 def test_invalid_code_language_remains_visible_without_loading_prism(guess_lang: str) -> None:
-    """验证非法语言名不会进入 class 或 CDN 组件路径。"""
+    """Verify that illegal language names do not enter the class or CDN component paths."""
     code = CodeBlock(
         type="code",
         index=0,
@@ -864,7 +864,7 @@ def test_invalid_code_language_remains_visible_without_loading_prism(guess_lang:
 
 
 def test_empty_code_and_literal_class_text_do_not_load_external_runtimes() -> None:
-    """验证空代码和普通文本中的 class 字样不会误触发 Prism 或 MathJax。"""
+    """Verify that empty codes and the words class in plain text do not accidentally trigger Prism or MathJax."""
     middle = _middle(
         _page(
             0,
@@ -886,7 +886,7 @@ def test_empty_code_and_literal_class_text_do_not_load_external_runtimes() -> No
 
 
 def test_crlf_and_cr_are_normalized_to_visible_line_breaks() -> None:
-    """验证 CRLF 与 CR 统一为两个可见 HTML 换行。"""
+    """Verify that CRLF and CR are unified into two visible HTML line breaks."""
     rendered = render_html(
         _middle(_page(0, TextBlock(type="text", index=0, content=_inline("one\r\ntwo\rthree")))),
         standalone=False,
@@ -898,7 +898,7 @@ def test_crlf_and_cr_are_normalized_to_visible_line_breaks() -> None:
 
 
 def test_invalid_html_characters_are_replaced_and_output_remains_utf8_encodable() -> None:
-    """验证普通文本、代码、anchor 和富 HTML 中的控制字符与 surrogate 可见降级。"""
+    """Verify control characters in plain text, code, anchor, and rich HTML with visible degradation of surrogate."""
     middle = _middle(
         _page(
             0,
@@ -935,7 +935,7 @@ def test_invalid_html_characters_are_replaced_and_output_remains_utf8_encodable(
 
 
 def test_setext_heading_shape_is_not_misclassified_as_a_gfm_chart_table() -> None:
-    """验证缺少 pipe 的 Setext 标题形态按普通 chart 文本输出。"""
+    """Verify that the Setext header form missing pipe is output as normal chart text."""
     chart = ChartBlock(
         type="chart",
         index=0,
@@ -952,7 +952,7 @@ def test_setext_heading_shape_is_not_misclassified_as_a_gfm_chart_table() -> Non
     [(1, "|"), (2, "|"), (3, r"\|"), (4, r"\|"), (5, r"\\|")],
 )
 def test_chart_gfm_pipe_matches_markdown_it_backslash_decoding(slash_count: int, expected: str) -> None:
-    """验证任意相邻反斜杠都保护列内 pipe，并与 markdown-it 解码结果一致。"""
+    """Verify that any adjacent backslashes protect pipe within the column and are consistent with the decoding result of markdown-it."""
     chart = ChartBlock(
         type="chart",
         index=0,
@@ -970,7 +970,7 @@ def test_chart_gfm_pipe_matches_markdown_it_backslash_decoding(slash_count: int,
 
 
 def test_mineru_styles_are_minified_scoped_and_inlined_byte_exact() -> None:
-    """验证独立样式产物体积、作用域及 standalone 的逐字内联契约。"""
+    """Validate independent style artifact volume, scope, and verbatim inline contract for standalone."""
     root = resources.files("docvortex").joinpath("resources", "html")
     source = root.joinpath("docvortex.css").read_text(encoding="utf-8")
     minified = root.joinpath("docvortex.min.css").read_text(encoding="utf-8")
@@ -986,7 +986,7 @@ def test_mineru_styles_are_minified_scoped_and_inlined_byte_exact() -> None:
 
 
 def test_empty_document_and_equation_image_do_not_load_external_scripts() -> None:
-    """验证空文档和纯公式图片不会无谓加载 MathJax 或 Prism。"""
+    """Verify that empty documents and pure formula images do not unnecessarily load MathJax or Prism."""
     empty = render_html(_middle())
     image_equation = render_html(_middle(_page(0, EquationBlock(type="equation", index=0, content="", image_base64=_PNG_URI))))
 

@@ -1,4 +1,4 @@
-"""在已经聚合的单个连续正文区域中识别列表，不跨文本块拼凑条目。"""
+"""Recognizes lists within a single contiguous text region that has been aggregated, without piecing together entries across blocks of text."""
 
 import re
 import statistics
@@ -9,7 +9,7 @@ from .text_assembly.common import _merge_text_line_content
 
 
 def _vector_bullet(line, paths, em):
-    """以实心近圆小路径、正文左缘和同排中心证明圆点，不接受分隔线或图表刻度。"""
+    """Prove the dots with a solid near-circle path, the left edge of the text, and the center of the same row. Dividers or chart scales are not accepted."""
     return next(
         (
             path.bbox
@@ -29,7 +29,7 @@ def _vector_bullet(line, paths, em):
 
 
 def split_local_list_blocks(blocks, paths):
-    """完整连续区域内的递增字母或重复圆点恢复条目；续行沿用同区域字符及行框。"""
+    """Increasing letters or repeated dots within a complete contiguous range restore the entry; continuing lines use the same range of characters and line boxes."""
     output = []
     for block in blocks:
         rows = sorted(block.get("_text_lines", []), key=lambda line: (line.bbox[1], line.bbox[0]))
@@ -40,7 +40,7 @@ def split_local_list_blocks(blocks, paths):
         if em <= 0 or any(not 0.85 * em <= _line_effective_height(line, line.bbox) <= 1.15 * em for line in rows):
             output.append(block)
             continue
-        # 同一区域内也必须有稳定行距，真实段界和内嵌小字不得被吸入列表。
+        # There must also be stable line spacing within the same area, and real paragraph boundaries and embedded small text must not be sucked into the list.
         if any(not -0.3 * em <= b.bbox[1] - a.bbox[3] <= 0.7 * em for a, b in zip(rows, rows[1:])):
             output.append(block)
             continue

@@ -1,3 +1,3 @@
-"""按职责拆分的 Flash PDF 内部实现。"""
+"""Flash PDF internal implementation split by responsibility."""
 
 __all__: list[str] = []

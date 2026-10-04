@@ -1,4 +1,4 @@
-"""安全加载、规范化并描述一个 standalone HTML 文档。"""
+"""Securely load, normalize and describe a standalone HTML document."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ _UNICODE_BOMS = (b"\x00\x00\xfe\xff", b"\xff\xfe\x00\x00", b"\xef\xbb\xbf", b"\x
 
 @dataclass(frozen=True, slots=True)
 class HtmlStylesheetSource:
-    """保存一个按 head 源顺序出现的内联或外链 stylesheet。"""
+    """Save an inline or external link stylesheet that appears in the order of head sources."""
 
     kind: Literal["inline", "link"]
     value: str
@@ -60,7 +60,7 @@ class HtmlStylesheetSource:
 
 @dataclass(frozen=True, slots=True)
 class HtmlDocument:
-    """保存已规范化 DOM、标题、样式引用与来源上下文。"""
+    """Save the normalized DOM, title, style reference and source context."""
 
     root: etree._Element
     body: etree._Element
@@ -78,7 +78,7 @@ def parse_html_document(
     *,
     metadata_only: bool = False,
 ) -> HtmlDocument:
-    """从受限字节输入构造不执行脚本且资源引用尚未加载的 HTML DOM。"""
+    """Constructing a HTML DOM from restricted byte input that does not execute the script and the resource reference has not yet been loaded."""
     if len(file_bytes) > MAX_HTML_BYTES:
         raise HtmlResourceLimitError(f"HTML resource limit exceeded: max_html_bytes={MAX_HTML_BYTES}")
     context = source_context or HtmlSourceContext()
@@ -167,7 +167,7 @@ def parse_html_document(
 
 
 def _normalize_transport_encoding(value: str | None) -> str | None:
-    """把 HTTP 声明编码规范化为 lxml 可用名称，未知标签继续走文档内探测。"""
+    """The HTTP statement encoding is standardized to the lxml available name, and unknown tags continue to be detected within the document."""
     if not value:
         return None
     try:
@@ -177,7 +177,7 @@ def _normalize_transport_encoding(value: str | None) -> str | None:
 
 
 def _has_html_encoding_declaration(file_bytes: bytes) -> bool:
-    """只承认首个 4 KiB 内由 HTML 语法解析出的真实编码声明。"""
+    """Only the real encoding statement parsed by the HTML syntax within the first 4 KiB is recognized."""
     prefix = file_bytes[:4096]
     if not _HTML_ENCODING_DECLARATION_CANDIDATE_RE.search(prefix):
         return False
@@ -207,7 +207,7 @@ def _has_html_encoding_declaration(file_bytes: bytes) -> bool:
 
 
 def _html_parser_input(file_bytes: bytes, *, transport_encoding: str | None = None) -> bytes | str:
-    """无显式编码且符合 UTF-8 时先解码，避免 lxml 按单字节旧编码解释正文。"""
+    """When there is no explicit encoding and it conforms to UTF-8, it is decoded first to avoid lxml interpreting the text according to the single-byte old encoding."""
     if transport_encoding is not None:
         return file_bytes
     if file_bytes.startswith(_UNICODE_BOMS) or _has_html_encoding_declaration(file_bytes):
@@ -219,7 +219,7 @@ def _html_parser_input(file_bytes: bytes, *, transport_encoding: str | None = No
 
 
 def _validate_dom_shape(root: etree._Element) -> None:
-    """迭代校验 DOM 节点数和最大深度，避免深层递归继续传播。"""
+    """Iteratively verify the number of DOM nodes and the maximum depth to avoid continued propagation of deep recursion."""
     node_count = 0
     stack: list[tuple[etree._Element, int]] = [(root, 1)]
     while stack:
@@ -235,7 +235,7 @@ def _validate_dom_shape(root: etree._Element) -> None:
 
 
 def _meta_content(root: etree._Element, *, property_name: str) -> str | None:
-    """返回首个匹配 property/name 的非空 meta content。"""
+    """Return the first non-empty meta content matching property/name."""
     target = property_name.casefold()
     for element in root.iter():
         if not isinstance(element.tag, str) or local_name(element) != "meta":
@@ -248,17 +248,17 @@ def _meta_content(root: etree._Element, *, property_name: str) -> str | None:
 
 
 def _collapsed_text(element: etree._Element) -> str:
-    """折叠元素纯文本中的 HTML 排版空白。"""
+    """HTML typographical white space in folded element plain text."""
     return re.sub(r"\s+", " ", "".join(element.itertext())).strip()
 
 
 def _has_discarded_active_ancestor(element: etree._Element) -> bool:
-    """判断元素是否位于稍后会整棵删除的活动内容祖先中。"""
+    """Determine whether the element is located in the active content ancestor that will be deleted entirely later."""
     return any(isinstance(ancestor.tag, str) and local_name(ancestor) in _ACTIVE_TAGS for ancestor in element.iterancestors())
 
 
 def _normalize_formula_sources(root: etree._Element) -> None:
-    """按共享优先级把成功来源收敛为携带裸 LaTeX 的静态 math 元素。"""
+    """Convergence of successful sources by shared priority to static math elements carrying bare LaTeX."""
     _preserve_asciimath_text(root)
     for element in list(root.iter()):
         if not isinstance(element.tag, str) or not _is_attached(root, element):
@@ -274,7 +274,7 @@ def _normalize_formula_sources(root: etree._Element) -> None:
 
 
 def _is_formula_carrier(element: etree._Element) -> bool:
-    """判断元素自身是否携带公式来源，而不是仅从任意后代继承。"""
+    """Determine whether the element itself carries the formula source, rather than just inheriting from any descendants."""
     if local_name(element) == "math" or is_tex_script(element):
         return True
     if any((element.get(attribute) or "").strip() for attribute in ("data-docvortex-latex", "data-tex", "data-expr")):
@@ -284,7 +284,7 @@ def _is_formula_carrier(element: etree._Element) -> bool:
 
 
 def _formula_wrapper_contains_only_carrier(element: etree._Element) -> bool:
-    """仅允许恰好一个 carrier 且其外没有可见文本或媒体的通用 wrapper 整体折叠。"""
+    """Only a generic wrapper global collapse of exactly one carrier with no visible text or media outside of it is allowed."""
     carrier: etree._Element | None = None
     for candidate in element.iterdescendants():
         if not isinstance(candidate.tag, str) or not _is_formula_carrier(candidate):
@@ -299,7 +299,7 @@ def _formula_wrapper_contains_only_carrier(element: etree._Element) -> bool:
         return False
 
     def inside_carrier(candidate: etree._Element | None) -> bool:
-        """判断节点正文是否位于唯一 carrier 子树内。"""
+        """Determine whether the node text is located in the unique carrier subtree."""
         return candidate is not None and (
             candidate is carrier or any(ancestor is carrier for ancestor in candidate.iterancestors())
         )
@@ -320,7 +320,7 @@ def _formula_wrapper_contains_only_carrier(element: etree._Element) -> bool:
 
 
 def _preserve_asciimath_text(root: etree._Element) -> None:
-    """把暂不支持的 AsciiMath script 转为可见静态文本，避免活动内容清理时丢失。"""
+    """Convert the temporarily unsupported AsciiMath script into visible static text to avoid loss during cleaning of active content."""
     for element in list(root.iter()):
         if not isinstance(element.tag, str) or local_name(element) != "script":
             continue
@@ -341,7 +341,7 @@ def _preserve_asciimath_text(root: etree._Element) -> None:
 
 
 def _replace_with_formula(element: etree._Element, formula: FormulaExtraction) -> None:
-    """用携带规范 LaTeX 的安全 math 占位替换一个网页公式节点。"""
+    """Replace a web page formula node with a secure math placeholder carrying specification LaTeX."""
     parent = element.getparent()
     if parent is None:
         return
@@ -360,12 +360,12 @@ def _replace_with_formula(element: etree._Element, formula: FormulaExtraction) -
 
 
 def _is_attached(root: etree._Element, element: etree._Element) -> bool:
-    """判断预扫描元素是否仍属于当前 DOM，跳过已被外层公式替换的旧后代。"""
+    """Determine whether the pre-scan element still belongs to the current DOM, skipping the old descendants that have been replaced by the outer formula."""
     return element is root or any(ancestor is root for ancestor in element.iterancestors())
 
 
 def _remove_active_content(root: etree._Element) -> None:
-    """删除活动内容并把 noscript 静态回退转换为普通容器。"""
+    """Remove active content and convert noscript static fallback to a normal container."""
     for element in list(root.iter()):
         if isinstance(element, etree._Comment):
             _drop_tree_preserve_tail(element)
@@ -381,7 +381,7 @@ def _remove_active_content(root: etree._Element) -> None:
 
 
 def _drop_tree_preserve_tail(element: etree._Element) -> None:
-    """删除节点整棵子树，同时把 tail 归还给相邻文本位置。"""
+    """Delete the entire subtree of the node and return tail to the adjacent text position."""
     parent = element.getparent()
     if parent is None:
         return

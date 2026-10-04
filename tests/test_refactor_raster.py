@@ -1,4 +1,4 @@
-"""守卫按需 PDF 裁图和页面资源生命周期的行为边界。"""
+"""Guard behavioral boundaries for on-demand clipping and page resource lifecycles PDF."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from docvortex.document.pdf import PDFDocument
 
 
 def make_pdf(pages: int) -> bytes:
-    """构造指定页数的真实 PDF，让抽页与调用者生命周期走实际输入路径。"""
+    """Construct the real PDF of the specified number of pages, so that the page extraction and the caller life cycle take the actual input path."""
     output = BytesIO()
     canvas = Canvas(output)
     for index in range(pages):
@@ -30,14 +30,14 @@ def make_pdf(pages: int) -> bytes:
 
 
 def use_local_crop_worker(monkeypatch, raster):
-    """在当前进程执行真实裁图 worker，仅替换底层页图，继续检查图片关闭语义。"""
+    """Execute real cropping worker in the current process, only replace the underlying page image, and continue to check the image closing semantics."""
     from docvortex.document.pdf import images
 
     def load(data, prepared_pages, **options):
-        """将原测试页图源接到 worker 内部，模拟进程传输前的全部裁图处理。"""
+        """Connect the original test page image source to worker to simulate all cropping processes before process transmission."""
 
         def core(pdf_bytes, dpi, start, end, image_type):
-            """传递公开调度参数，供原有断言检查实际页面和配置。"""
+            """Pass public dispatch parameters for the original assertion to check the actual page and configuration."""
             return raster(
                 pdf_bytes,
                 start_page_id=start,
@@ -60,7 +60,7 @@ def use_local_crop_worker(monkeypatch, raster):
 def test_sparse_visual_pages_keep_physical_identity(
     monkeypatch: pytest.MonkeyPatch, page_range: str, expected_count: int
 ) -> None:
-    """抽页后按所选 PDF 的物理索引裁图，保留对外页号映射且及时释放图片。"""
+    """After page extraction, the image is cropped according to the physical index of the selected PDF, retaining the external page number mapping and releasing the image in time."""
     from docvortex.analyzers.native.models import PdfModel
     from docvortex.document.pdf import visuals
 
@@ -83,7 +83,7 @@ def test_sparse_visual_pages_keep_physical_identity(
     calls, created = [], []
 
     def predict(_model: object, document: PDFDocument) -> list:
-        """保留真实抽页流程，仅以确定性视觉块替代语义分析。"""
+        """The real page extraction process is retained, and only deterministic visual blocks replace semantic analysis."""
         assert document.page_count == expected_count
         return deepcopy(raw_pages)
 
@@ -96,7 +96,7 @@ def test_sparse_visual_pages_keep_physical_identity(
         timeout: int | None = None,
         threads: int | None = None,
     ) -> list[dict[str, Any]]:
-        """用带物理页颜色的图片检查稀疏调度和裁图匹配。"""
+        """Check sparse scheduling and crop matching with images with physical page color."""
         calls.extend(range(start_page_id, end_page_id + 1))
         assert timeout is None and threads is None
         batch = [Image.new("RGB", (16, 16), (index * 30, 0, 0)) for index in range(start_page_id, end_page_id + 1)]
@@ -118,11 +118,11 @@ def test_sparse_visual_pages_keep_physical_identity(
 
 
 def test_text_only_pdf_does_not_start_raster_pool(monkeypatch: pytest.MonkeyPatch) -> None:
-    """无视觉块的真实文本 PDF 不应启动进程池。"""
+    """True text without visual block PDF The process pool should not be started."""
     from docvortex.document.pdf import images
 
     def forbidden(*args: object, **kwargs: object) -> object:
-        """任何页图请求均表示无图路径仍执行了无效渲染。"""
+        """Any page image request indicates that the imageless path still performed an invalid rendering."""
         raise AssertionError("Text-only PDF must not rasterize")
 
     monkeypatch.setattr(images, "load_images_from_pdf_bytes_range", forbidden)
@@ -131,7 +131,7 @@ def test_text_only_pdf_does_not_start_raster_pool(monkeypatch: pytest.MonkeyPatc
 
 
 def test_visual_windows_and_container_preparation() -> None:
-    """连续需裁图页保留 64 页窗口，image_block 在筛页前折叠并保留来源索引。"""
+    """Continuous cropping pages retain a 64-page window, and image_block folds and retains the source index before filtering pages."""
     from docvortex.document.pdf.visuals import _prepare_page_visual_blocks, _visual_page_ranges
 
     page = [{"type": "image_block", "bbox": [0, 0, 1, 1]}, {"type": "text", "bbox": [0.1, 0.1, 0.2, 0.2]}]
@@ -147,22 +147,22 @@ def test_visual_windows_and_container_preparation() -> None:
 
 
 def test_crop_failure_releases_all_images(monkeypatch: pytest.MonkeyPatch) -> None:
-    """整批裁图异常时也关闭已返回页图，并保留调用者持有的 PDFDocument。"""
+    """When the entire batch of cropping is abnormal, the returned page image will also be closed, and the PDFDocument held by the caller will be retained."""
     from docvortex.analyzers.native.models import PdfModel
     from docvortex.document.pdf import visuals
 
     image = Image.new("RGB", (8, 8))
 
     def predict(_model: object, _document: PDFDocument) -> list:
-        """给真实输入安排一个需要裁图的视觉块。"""
+        """Arrange a visual block that needs to be cropped for the real input."""
         return [[{"type": "image", "bbox": [0, 0, 1, 1], "content": ""}]]
 
     def raster(*args: object, **kwargs: object) -> list:
-        """返回可检查关闭状态的图片。"""
+        """Returns an image that can be checked for closed status."""
         return [{"img_pil": image}]
 
     def failure(*args: object, **kwargs: object) -> None:
-        """在释放保护区域内模拟裁图异常。"""
+        """Simulate cropping anomalies within the release protection area."""
         raise RuntimeError("crop failed")
 
     monkeypatch.setattr(PdfModel, "predict", predict)
@@ -178,7 +178,7 @@ def test_crop_failure_releases_all_images(monkeypatch: pytest.MonkeyPatch) -> No
 
 @pytest.mark.parametrize("window_size", [0, -1, True, 1.5, "2"])
 def test_public_visual_raster_rejects_invalid_window_before_mutation(window_size: Any) -> None:
-    """非法窗口必须在折叠容器或访问页图前失败。"""
+    """Illegal windows must fail before the container is collapsed or the page map is accessed."""
     from docvortex.document.pdf.visuals import attach_visual_block_images_from_pdf
 
     pages = [[{"type": "image_block", "bbox": [0, 0, 1, 1]}]]
@@ -191,7 +191,7 @@ def test_public_visual_raster_rejects_invalid_window_before_mutation(window_size
 
 
 def test_public_visual_raster_rejects_page_count_before_mutation() -> None:
-    """错误页数不能提前折叠块或关闭调用者文档。"""
+    """The wrong number of pages cannot collapse the block or close the caller document early."""
     from docvortex.document.pdf.visuals import attach_visual_block_images_from_pdf
 
     pages = [[{"type": "image_block", "bbox": [0, 0, 1, 1]}]]
@@ -208,7 +208,7 @@ def test_public_visual_raster_matches_eager_crops(
     timeout: int | None,
     threads: int | None,
 ) -> None:
-    """以旧全页裁图为参考，验证稀疏筛页、容器、旋转、边界和显式配置透传。"""
+    """Use the old full-page crop as a reference to verify sparse filter pages, containers, rotations, borders, and explicit configuration transparent transmission."""
     from docvortex.document.pdf import visuals
 
     pages = [
@@ -222,7 +222,7 @@ def test_public_visual_raster_matches_eager_crops(
     ]
 
     def page_image(index: int) -> Image.Image:
-        """创建带方向与物理页颜色的页图，防止截图错页或旋转被掩盖。"""
+        """Create a page map with orientation and physical page color to prevent screenshots from being mispaged or being rotated."""
         image = Image.new("RGB", (32, 16), (index * 30, 20, 100))
         image.paste((0, 255, 0), (0, 0, 10, 8))
         return image
@@ -236,7 +236,7 @@ def test_public_visual_raster_matches_eager_crops(
     created: list[Image.Image] = []
 
     def raster(data: bytes, **options: Any) -> list[dict[str, Any]]:
-        """记录调度配置并返回与全页参考相同的独立页图。"""
+        """Records the scheduling configuration and returns the same independent page map as the full page reference."""
         assert data.startswith(b"%PDF")
         assert options["timeout"] == timeout and options["threads"] == threads
         start, end = options["start_page_id"], options["end_page_id"]
@@ -261,13 +261,13 @@ def test_public_visual_raster_failure_releases_completed_batches(
     monkeypatch: pytest.MonkeyPatch,
     failure: str,
 ) -> None:
-    """后续批次失败时既不泄漏前批页图，也不接管外部文档生命周期。"""
+    """When a subsequent batch fails, it neither leaks the page image of the previous batch nor takes over the external document life cycle."""
     from docvortex.document.pdf import visuals
 
     created: list[Image.Image] = []
 
     def raster(data: bytes, **options: Any) -> list[dict[str, Any]]:
-        """第二批模拟加载失败或错误页数，检查已取得图片都能释放。"""
+        """The second batch of simulated loading fails or the wrong page number is checked, and all the acquired images can be released."""
         if options["start_page_id"] == 1 and failure == "render":
             raise RuntimeError("render failed")
         batch = [Image.new("RGB", (8, 8)) for _ in range(2 if options["start_page_id"] == 1 else 1)]
@@ -287,7 +287,7 @@ def test_public_visual_raster_failure_releases_completed_batches(
 
 @pytest.mark.parametrize("failure", (TimeoutError, BrokenProcessPool, ValueError))
 def test_encoded_crop_failure_preserves_pool_recovery(monkeypatch, failure):
-    """编码素材任务复用原超时和损坏池回收规则，普通计算异常保持原样传播。"""
+    """The encoding material task reuses the original timeout and damage pool recycling rules, and ordinary calculation exceptions remain propagated as they are."""
     monkeypatch.setenv("DOCVORTEX_PDF_RENDER_BACKEND", "legacy")
     from docvortex.document.pdf import images
 
@@ -311,7 +311,7 @@ def test_encoded_crop_failure_preserves_pool_recovery(monkeypatch, failure):
 
 
 def test_encoded_crop_results_keep_page_order_and_pool(monkeypatch):
-    """逆序提交并重复请求时仍按页回填，已编码数据不经过 PIL 清理或重新编码。"""
+    """Pages are still backfilled when submitted in reverse order and repeated requests, and the encoded data is not sanitized or re-encoded by PIL."""
     monkeypatch.setenv("DOCVORTEX_PDF_RENDER_BACKEND", "legacy")
     from docvortex.document.pdf import images
 
@@ -319,7 +319,7 @@ def test_encoded_crop_results_keep_page_order_and_pool(monkeypatch):
     submitted = []
 
     def submit(pool, worker, payload, dpi, start, end, prepared):
-        """返回独立完成的 Future，记录实际传入的 worker 和切片索引。"""
+        """Returns a standalone completed Future, recording the actual worker and slice index passed in."""
         assert pool is executor and worker is images._load_visual_crops_worker
         submitted.append((start, prepared))
         future = Future()

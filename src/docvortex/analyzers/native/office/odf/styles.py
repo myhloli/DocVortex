@@ -1,4 +1,4 @@
-"""解析 OpenDocument 样式继承、列表和逻辑分页属性。"""
+"""Resolving OpenDocument style inheritance, list and logical pagination properties."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .models import ListLevel, TextStyle, TextStyleDelta
 
 @dataclass(frozen=True, slots=True)
 class _StyleDefinition:
-    """保存一个命名样式的父级、文本增量和跨格式投影属性。"""
+    """Saves the parent, text delta, and cross-format projection properties of a named style."""
 
     name: str
     family: str
@@ -26,7 +26,7 @@ class _StyleDefinition:
 
 
 def _numeric_font_weight(value: str) -> int | None:
-    """在整数转换前验证 CSS 数字字重的词法长度和有效范围。"""
+    """Verify lexical length and valid range of CSS numeric weight before integer conversion."""
     normalized = value.strip()
     if not normalized or len(normalized) > 4 or not normalized.isascii() or not normalized.isdigit():
         return None
@@ -35,10 +35,10 @@ def _numeric_font_weight(value: str) -> int | None:
 
 
 class OdfStyles:
-    """合并 styles.xml 与 content.xml 中的 ODF 样式定义。"""
+    """Merges ODF style definitions from styles.xml and content.xml."""
 
     def __init__(self, *roots: etree._Element | None) -> None:
-        """按传入顺序收集文档样式，使 content.xml 自动样式覆盖基础定义。"""
+        """Collects document styles in the order they are passed in, allowing content.xml automatic styles to override the underlying definition."""
         self._styles: dict[tuple[str, str], _StyleDefinition] = {}
         self._defaults: dict[str, TextStyleDelta] = {}
         self._list_styles: dict[str, dict[int, ListLevel]] = {}
@@ -51,7 +51,7 @@ class OdfStyles:
                 self._collect(root)
 
     def _collect(self, root: etree._Element) -> None:
-        """从一棵 ODF XML 树收集默认、命名、列表和 master-page 样式。"""
+        """Collects default, named, list and master-page styles from a ODF XML tree."""
         for default in root.iter(qname("style", "default-style")):
             family = default.get(qname("style", "family"))
             if family:
@@ -82,7 +82,7 @@ class OdfStyles:
 
     @staticmethod
     def _text_delta(style: etree._Element) -> TextStyleDelta:
-        """把 style:text-properties 转换为可继承的三态样式增量。"""
+        """Convert style:text-properties to an inheritable tri-state style increment."""
         properties = style.find(qname("style", "text-properties"))
         if properties is None:
             return TextStyleDelta()
@@ -118,7 +118,7 @@ class OdfStyles:
 
     @staticmethod
     def _position_is_positive(position: str) -> bool:
-        """判断百分比形式的 text-position 是否表示上标。"""
+        """Determine whether text-position in percentage form represents superscript."""
         try:
             return float(position.split("%", 1)[0]) > 0
         except ValueError:
@@ -126,7 +126,7 @@ class OdfStyles:
 
     @staticmethod
     def _position_is_negative(position: str) -> bool:
-        """判断百分比形式的 text-position 是否表示下标。"""
+        """Determine whether text-position in percentage form represents a subscript."""
         try:
             return float(position.split("%", 1)[0]) < 0
         except ValueError:
@@ -134,7 +134,7 @@ class OdfStyles:
 
     @staticmethod
     def _table_display(style: etree._Element) -> bool | None:
-        """读取表格样式的 display 开关，用于过滤隐藏工作表。"""
+        """Read table style display switch for filtering hidden worksheets."""
         properties = style.find(qname("style", "table-properties"))
         if properties is None:
             return None
@@ -145,7 +145,7 @@ class OdfStyles:
 
     @staticmethod
     def _drawing_page_visibility(style: etree._Element) -> bool | None:
-        """读取 drawing-page 样式的 presentation visibility。"""
+        """Read presentation in drawing-page style visibility."""
         properties = style.find(qname("style", "drawing-page-properties"))
         if properties is None:
             return None
@@ -156,7 +156,7 @@ class OdfStyles:
 
     @staticmethod
     def _parse_list_style(element: etree._Element) -> dict[int, ListLevel]:
-        """解析列表样式的层级、类型和通用起始值。"""
+        """Resolves the level, type, and common starting value of a list style."""
         levels: dict[int, ListLevel] = {}
         for child in element:
             if not isinstance(child.tag, str):
@@ -180,7 +180,7 @@ class OdfStyles:
         return levels
 
     def _resolved_delta(self, family: str, name: str | None) -> TextStyleDelta:
-        """沿 parent-style-name 合并样式，并在循环处安全截断。"""
+        """Merge styles along parent-style-name with safe truncation at loops."""
         if not name:
             return self._defaults.get(family, TextStyleDelta())
         key = (family, name)
@@ -206,7 +206,7 @@ class OdfStyles:
         return result
 
     def text_style(self, style_name: str | None, *, family: str, inherited: TextStyle | None = None) -> TextStyle:
-        """解析指定样式，并让 span 的未声明属性继承当前段落样式。"""
+        """Resolves the specified style and causes the undeclared properties of span to inherit the current paragraph style."""
         delta = self._resolved_delta(family, style_name)
         if inherited is not None:
             base = TextStyleDelta(
@@ -221,7 +221,7 @@ class OdfStyles:
         return delta.resolve()
 
     def paragraph_master_page_name(self, style_name: str | None) -> str | None:
-        """沿段落父样式查找首个有效 master-page 名称。"""
+        """Finds the first valid master-page name along the paragraph parent style."""
         if not style_name:
             return None
         seen: set[str] = set()
@@ -240,7 +240,7 @@ class OdfStyles:
         return None
 
     def is_document_title(self, style_name: str | None) -> bool:
-        """沿段落父样式，根据名称和 display-name 判断是否继承文档标题语义。"""
+        """Along the paragraph parent style, determine whether to inherit the document title semantics based on the name and display-name."""
         if not style_name:
             return False
         seen: set[str] = set()
@@ -261,7 +261,7 @@ class OdfStyles:
         return False
 
     def list_level(self, style_name: str | None, depth: int) -> ListLevel | None:
-        """返回指定列表深度的定义；样式已定义但无任何层级时返回 None（无可见标记）。"""
+        """Returns the definition for the specified list depth; returns None (no visible markers) if the style is defined but has no levels."""
         if not style_name:
             return ListLevel()
         levels = self._list_styles.get(style_name)
@@ -272,7 +272,7 @@ class OdfStyles:
         return levels.get(depth, ListLevel())
 
     def table_is_visible(self, style_name: str | None) -> bool:
-        """沿表格父样式解析 display，子样式显式值优先。"""
+        """display is parsed along the table parent style, with child style explicit values taking precedence."""
         if not style_name:
             return True
         if style_name in self._resolved_table_display:
@@ -296,7 +296,7 @@ class OdfStyles:
         return resolved is not False
 
     def drawing_page_is_visible(self, page: etree._Element) -> bool:
-        """解析 ODP 页面直接属性或 drawing-page 样式中的隐藏状态。"""
+        """Resolve hidden state in ODP page direct property or drawing-page style."""
         direct_visibility = page.get(qname("presentation", "visibility"))
         if direct_visibility is not None:
             return direct_visibility.casefold() != "hidden"
@@ -324,7 +324,7 @@ class OdfStyles:
         return resolved is not False
 
     def master_page(self, name: str | None) -> etree._Element | None:
-        """返回指定 master-page；空名称时优先使用第一个定义。"""
+        """Returns the specified master-page; if the name is empty, the first definition will be used first."""
         if name and name in self._master_pages:
             return self._master_pages[name]
         return next(iter(self._master_pages.values()), None)

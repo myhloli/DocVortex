@@ -33,7 +33,7 @@ EPUB_TYPE = "{http://www.idpf.org/2007/ops}type"
     ],
 )
 def test_quoted_note_type_tokens(value: str) -> None:
-    """完整 token 去除成对引号后仍按单条注释语义识别。"""
+    """Complete token is still recognized semantically as a single comment after removing the paired quotation marks."""
     element = etree.Element("aside", attrib={EPUB_TYPE: value})
     assert _is_individual_note(element)
 
@@ -57,19 +57,19 @@ def test_quoted_note_type_tokens(value: str) -> None:
     ],
 )
 def test_invalid_or_collection_note_types_are_not_promoted(value: str) -> None:
-    """未配对、未知及集合标记不能误提升为单条脚注。"""
+    """Unpaired, unknown, and collective markers cannot be mistakenly promoted to single footnotes."""
     element = etree.Element("aside", attrib={EPUB_TYPE: value})
     assert not _is_individual_note(element)
 
 
 def test_multiple_quoted_tokens_remain_separate() -> None:
-    """多个分别加引号的 token 不因外层剥离而损坏。"""
+    """Multiple individually quoted tokens are not damaged by outer layer peeling."""
     element = etree.Element("aside", attrib={EPUB_TYPE: "“footnote” “other”"})
     assert _epub_types(element) == {"footnote", "other"}
 
 
 def _quoted_fixture() -> bytes:
-    """只在合成 EPUB 内修改 type 标记，保留多段、隐藏与空脚注结构。"""
+    """Only modify the type markup within the composite EPUB, retaining the multi-paragraph, hidden and empty footnote structures."""
     output = BytesIO()
     with ZipFile(BytesIO(build_epub_notes_fixture())) as source, ZipFile(output, "w") as target:
         for info in source.infolist():
@@ -86,7 +86,7 @@ def _quoted_fixture() -> bytes:
 
 
 def test_quoted_footnotes_preserve_semantics_and_roundtrip_links() -> None:
-    """异常引号与标准输入产生相同语义，三种输出和重读保留脚注及返回链接。"""
+    """Exception quotes produce the same semantics as standard input, and the three types of output and rereading preserve footnotes and return links."""
     expected, _ = analyze_native_test_document(build_epub_notes_fixture(), file_suffix="epub")
     actual, _ = analyze_native_test_document(_quoted_fixture(), file_suffix="epub")
     assert [page.model_dump() for page in actual.pages] == [page.model_dump() for page in expected.pages]
@@ -111,7 +111,7 @@ def test_quoted_footnotes_preserve_semantics_and_roundtrip_links() -> None:
 
 @pytest.mark.parametrize("attribute,value", [("hidden", "hidden"), ("style", "display:none"), ("aria-hidden", "true")])
 def test_quoted_hidden_notes_stay_hidden(attribute: str, value: str) -> None:
-    """成对引号容错不改变脚注可见性与目标物化约束。"""
+    """Paired quote tolerance does not change footnote visibility and target materialization constraints."""
     output = BytesIO()
     with ZipFile(BytesIO(_quoted_fixture())) as source, ZipFile(output, "w") as target:
         for info in source.infolist():

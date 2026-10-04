@@ -1,4 +1,4 @@
-"""OPF 源属性的唯一字段映射，供原生解析和独立元数据接口复用。"""
+"""OPF Unique field mapping of source attributes for native parsing and independent metadata interface reuse."""
 
 from __future__ import annotations
 import lxml.etree as etree
@@ -12,7 +12,7 @@ def properties_from_opf(
     *,
     warnings: list[str] | None = None,
 ) -> DocumentProperties:
-    """映射 OPF 中显式的出版物信息，不读取正文或推断缺失字段。"""
+    """Map explicit publication information in OPF without reading the text or inferring missing fields."""
     props = DocumentProperties(page_count=spine_count, page_count_kind="spine")
     dc = "{http://purl.org/dc/elements/1.1/}"
     scalar = {dc + "title": "title", dc + "description": "description", dc + "publisher": "publisher"}

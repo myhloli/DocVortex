@@ -1,4 +1,4 @@
-"""用独立横线带恢复正文中的整行分组标题，不放宽普通单元格安全门。"""
+"""Use independent horizontal lines to restore the entire row of group titles in the text without relaxing the ordinary cell safety gate."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from .sparse_multiline import (
 
 
 def _select_rows(text: NativeTableText, indices: set[int]) -> NativeTableText:
-    """建立仅供列证据检查的局部行视图，保留字符来源并同步视觉行索引。"""
+    """Build partial row views for column evidence inspection only, preserving character sources and synchronizing visual row indexes."""
     rows = [row for row in text.rows if row.row_index in indices]
     mapping = {row.row_index: index for index, row in enumerate(rows)}
     return replace(
@@ -38,7 +38,7 @@ def build_grouped_rule_band_candidate(
     text: NativeTableText,
     diagnostics: dict[str, Any],
 ) -> NativeTableCandidate | None:
-    """只在重复独立分组带与稳定数据列共同成立时生成正文 colspan。"""
+    """The text colspan is generated only when repeated independent grouping bands are combined with stable data columns."""
     diagnostics.update(evidence="grouped_rule_band", first_rejection_gate="group_bands")
     width, height = table_local_size(table_input.table_bbox, normalize_angle(table_input.angle))
     rules = _local_rules(table_input, width, height)
@@ -56,7 +56,7 @@ def build_grouped_rule_band_candidate(
             tolerance,
         )
     ]
-    # 模型框可能裁掉末条外线；跨列证据必须来自组内上下横线，不依赖框外补线。
+    # The model frame may cut off the last outer line; the cross-column evidence must come from the upper and lower horizontal lines in the group and does not rely on the supplementary lines outside the frame.
     if len(horizontal) < 4 or horizontal[0] > 3 * tolerance:
         return None
     group_bands: dict[int, tuple[float, float]] = {}
@@ -103,7 +103,7 @@ def build_grouped_rule_band_candidate(
         if occupied not in (full, full - {0}) or len(row.tokens) != len(occupied):
             diagnostics["first_rejection_gate"] = "data_occupancy"
             return None
-    # 表头可以有明确空白的首列；单层列标题不能横切任何叶子列边界。
+    # Table headers can have an explicitly blank first column; single-level column headers cannot cross any leaf column boundaries.
     header = text.rows[0]
     if _row_occupancy(header, glyphs, tracks) not in (full, full - {0}):
         diagnostics["first_rejection_gate"] = "header_occupancy"
@@ -122,7 +122,7 @@ def build_grouped_rule_band_candidate(
         elif previous.row_index in group_bands:
             boundary = group_bands[previous.row_index][1]
         else:
-            # 字体 loose 框可轻微交叠；独立视觉行按中心分界，最终仍要求零字符落格歧义。
+            # Font loose Boxes may overlap slightly; independent visual lines are centered, ultimately requiring zero character ambiguity.
             boundary = sum((previous.bbox[1], previous.bbox[3], current.bbox[1], current.bbox[3])) / 4.0
         if (current.row_index in group_bands or previous.row_index in group_bands) and not (
             previous.bbox[3] - tolerance <= boundary <= current.bbox[1] + tolerance
@@ -166,7 +166,7 @@ def build_grouped_rule_band_candidate(
     ):
         diagnostics["first_rejection_gate"] = "verified_integrity"
         return None
-    # 新跨列标题复用原生投影的紧字框间距；不改变普通格和既有恢复路径的文本行为。
+    # The new cross-column title reuses the tight font spacing of the native projection; the text behavior of the normal grid and the existing recovery path is not changed.
     raw_by_source = {}
     for index, char in enumerate(table_input.chars):
         try:
@@ -185,7 +185,7 @@ def build_grouped_rule_band_candidate(
                 if index in sources:
                     selected_chars.append(char)
                 elif first_source < index < last_source and str(char.get("char", "")).isspace():
-                    # PDF 空格框可退化为点；只认领左右可见源字符都属于本格的显式空白。
+                    # PDF The space box can be degenerated into a dot; only the left and right visible source characters that belong to the original box are claimed.
                     position = bisect_left(visible_sources, index)
                     if (
                         0 < position < len(visible_sources)

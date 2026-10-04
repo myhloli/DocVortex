@@ -1,11 +1,11 @@
-//! 字符到基础文本行的连续原生管线；不携带 Python 对象或 PDFium 指针。
+//! Continuous native pipeline of characters to underlying text lines; does not carry Python objects or PDFium pointers.
 use std::collections::HashMap;
 
-/// 保存当前 Python 解释器的非 ASCII 字符属性，纯计算阶段不回调 Python。
+/// Save the non-ASCII character attributes of the current Python interpreter, and do not call back Python in the pure calculation phase.
 #[derive(Default)]
 pub struct UnicodeProperties(pub HashMap<char, u8>);
 impl UnicodeProperties {
-    /// ASCII 使用固定语义，其他字符读取绑定层去重后的 Unicode 属性。
+    /// ASCII uses fixed semantics, and other characters read the Unicode attribute after deduplication in the binding layer.
     fn flags(&self, ch: char) -> u8 {
         if ch.is_ascii() {
             (u8::from(ch.is_ascii_alphanumeric()))
@@ -18,7 +18,7 @@ impl UnicodeProperties {
             self.0.get(&ch).copied().unwrap_or(0)
         }
     }
-    /// 保持 Python str.strip 的空白定义。
+    /// Keep the blank definition of Python str.strip.
     fn is_space(&self, ch: char) -> bool {
         self.flags(ch) & 8 != 0
     }
@@ -54,7 +54,7 @@ pub struct TextLine {
     pub spans: Vec<TextSpan>,
 }
 
-/// 按 Python 累加矩形的比较顺序合并，保留非有限输入的既有行为。
+/// Merge in the comparison order of Python accumulation rectangles, retaining the existing behavior of non-finite inputs.
 fn merge(a: &mut [f64; 4], b: [f64; 4]) {
     if b[0] < a[0] {
         a[0] = b[0];
@@ -70,7 +70,7 @@ fn merge(a: &mut [f64; 4], b: [f64; 4]) {
     }
 }
 
-/// 一次遍历生成字体片段，再连续执行组行与上下标标记。
+/// One traversal generates font fragments, and then continuously executes group lines and superscript and subscript markings.
 pub fn group_text_lines(
     chars: &[TextChar],
     height_threshold: f64,
@@ -143,7 +143,7 @@ pub fn group_text_lines(
     lines
 }
 
-/// 在线性时间取得两个极值，保持同值时的首索引规则。
+/// Obtain two extreme values in linear time and maintain the first index rule when the same value is maintained.
 fn extreme_two(values: impl Iterator<Item = f64>, maximum: bool) -> (f64, usize, f64) {
     let initial = if maximum {
         f64::NEG_INFINITY
@@ -164,7 +164,7 @@ fn extreme_two(values: impl Iterator<Item = f64>, maximum: bool) -> (f64, usize,
     (first, at, second)
 }
 
-/// 按基础片段几何标记上下标，Unicode 判定使用与参考后端一致的类别表。
+/// According to the basic segment geometry marking superscript and subscript, Unicode determines to use the category table consistent with the reference backend.
 fn assign_scripts(line: &mut TextLine, threshold: f64, distance: f64, unicode: &UnicodeProperties) {
     let n = line.spans.len();
     let line_height = line.bbox[3] - line.bbox[1];
@@ -244,7 +244,7 @@ pub struct VisualTextRun {
     pub typographic_scale: Option<f64>,
 }
 
-/// 按 Python 规则缓存正数字体尺寸中位数，缺失时留给调用方使用行高回退。
+/// The positive font size median is cached according to the Python rule, leaving it to the caller to use row height fallback when missing.
 fn typographic_scale(indices: &[usize], chars: &[TextChar]) -> Option<f64> {
     let sizes: Vec<_> = indices
         .iter()
@@ -254,14 +254,14 @@ fn typographic_scale(indices: &[usize], chars: &[TextChar]) -> Option<f64> {
     (!sizes.is_empty()).then(|| 0.1_f64.max(crate::median(sizes)))
 }
 
-/// 返回 Python 字符串语义下的可打印、全空白标志。
+/// Returns the printable, all-white flag for Python string semantics.
 fn glyph_flags(text: &str, unicode: &UnicodeProperties) -> u8 {
     let printable = text.chars().all(|ch| unicode.flags(ch) & 16 != 0);
     let space = !text.is_empty() && text.chars().all(|ch| unicode.is_space(ch));
     u8::from(printable && !space) | (u8::from(space) << 1)
 }
 
-/// 将弧度换成非负圆周角，匹配 Python 对非法方向的零度处理。
+/// Change the radian to a non-negative circumferential angle to match the zero-degree processing of illegal directions by Python.
 fn angle_degrees(value: f64) -> f64 {
     if value.is_finite() {
         value.to_degrees().rem_euclid(360.0)
@@ -270,12 +270,12 @@ fn angle_degrees(value: f64) -> f64 {
     }
 }
 
-/// 计算两个角度的最短圆周距离。
+/// Calculate the shortest circumferential distance between two angles.
 fn angle_distance(a: f64, b: f64) -> f64 {
     ((a - b + 180.0).rem_euclid(360.0) - 180.0).abs()
 }
 
-/// 用字符中心及中位字高识别仿斜体矩阵，不把真实斜排误判成正文。
+/// Use the character center and median character height to identify the pseudo-italic matrix, so as not to misjudge the real italic matrix as text.
 fn horizontal_baseline(
     spans: &[TextSpan],
     chars: &[TextChar],
@@ -322,7 +322,7 @@ fn horizontal_baseline(
     angle <= 2.0 && maximum - minimum <= 0.75 * median
 }
 
-/// 解析常规方向及公式专用小角度候选，保持原判定顺序。
+/// Analyze conventional directions and formula-specific small angle candidates, and maintain the original judgment order.
 fn visual_angle(
     spans: &[TextSpan],
     rotation: f64,
@@ -379,7 +379,7 @@ fn visual_angle(
     }
 }
 
-/// 将连续基础组行、旋转拆分、方向筛选及视觉间隙分段融合，避免中间 Python 片段对象。
+/// Continuous basic group rows, rotation splitting, direction filtering and visual gap segmentation are merged to avoid intermediate Python fragment objects.
 pub fn prepare_visual_lines(
     chars: &[TextChar],
     size: [f64; 2],
@@ -522,7 +522,7 @@ pub fn prepare_visual_lines(
     output
 }
 
-/// 按 Python 原规则顺序清洗 run 文本，不改变字符成员或视觉分段编号。
+/// Clean the run text in the original rule order of Python without changing the character members or visual segment numbers.
 fn normalize_run_text(text: &str, unicode: &UnicodeProperties) -> String {
     let mut translated = Vec::with_capacity(text.len());
     let mut source = text.chars().peekable();
@@ -550,7 +550,7 @@ fn normalize_run_text(text: &str, unicode: &UnicodeProperties) -> String {
     let mut previous_space = false;
     for (index, &original) in translated.iter().enumerate() {
         let mut ch = original;
-        // 软断词的前后断言必须在删除控制字符、换行和软连字符之前计算。
+        // The pre and post assertions of soft word segmentation must be calculated before removing control characters, newlines and soft hyphens.
         if matches!(ch, '\u{2}' | '\u{ad}')
             && index > 0
             && translated[index - 1].is_ascii_alphabetic()
@@ -585,7 +585,7 @@ fn normalize_run_text(text: &str, unicode: &UnicodeProperties) -> String {
         .to_owned()
 }
 
-/// 基于规范化文本和原字符记录判断句尾，保留引用长度按记录切片的既有语义。
+/// Determine the end of the sentence based on the normalized text and original character records, and retain the existing semantics of slicing the reference length according to the record.
 fn sentence_terminal(run: &VisualTextRun, chars: &[TextChar], unicode: &UnicodeProperties) -> bool {
     let text = run.text.trim_end_matches(|ch| unicode.is_space(ch));
     let mut ending = text.chars().rev();

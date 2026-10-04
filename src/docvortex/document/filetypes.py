@@ -103,7 +103,7 @@ MIME_TYPE_BY_EXTENSION: dict[str, str] = {
     "csv": "text/csv",
     "tsv": "text/tab-separated-values",
     "epub": "application/epub+zip",
-    # OFD 尚无 IANA 注册 subtype；使用生态中通行的项目级 MIME 映射。
+    # OFD There is no IANA registration yet subtype; use the project-level MIME mapping common in the ecosystem.
     "ofd": "application/ofd",
     "html": "text/html",
     "htm": "text/html",
@@ -138,7 +138,7 @@ _RTF_HEADER_RE: Final = re.compile(
 
 
 def has_mhtml_header(file_bytes: bytes) -> bool:
-    """识别有界 MIME 头中的 related 容器，避免仅靠后缀误判普通邮件或 HTML。"""
+    """Identify related containers in bounded MIME headers to avoid misidentifying regular mail or HTML based on the suffix alone."""
     prefix = file_bytes[:65536]
     if b"multipart/related" not in prefix.lower():
         return False
@@ -150,7 +150,7 @@ def has_mhtml_header(file_bytes: bytes) -> bool:
 
 
 def rtf_header_offset(file_bytes: bytes) -> int | None:
-    """返回 RTF 根组左花括号偏移；不接受带任意前缀的伪装文本。"""
+    """Returns RTF Root group opening brace offset; disguised text with arbitrary prefixes is not accepted."""
     match = _RTF_HEADER_RE.match(file_bytes)
     if match is None:
         return None
@@ -181,7 +181,7 @@ def is_tiered_parse_extension(path_or_ext: str | Path) -> bool:
 
 
 def is_page_range_parse_extension(path_or_ext: str | Path) -> bool:
-    """仅允许 PDF 输入使用局部页范围解析。"""
+    """Only PDF input is allowed to use local page range parsing."""
     return normalize_parse_extension(path_or_ext) in PAGE_RANGE_PARSE_EXTENSIONS
 
 

@@ -1,4 +1,4 @@
-"""基于 PDF 横竖线与矩形路径恢复原子网格和合并单元格。"""
+"""Restore atomic grids and merged cells based on PDF horizontal and vertical lines and rectangular paths."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ MAX_TRACK_HYPOTHESES = 8
 
 @dataclass(frozen=True, slots=True)
 class _MergedRule:
-    """保存吸附并连接后的局部单轴线段。"""
+    """Save the adsorbed and connected local uniaxial line segments."""
 
     orientation: str
     coordinate: float
@@ -41,17 +41,17 @@ class _MergedRule:
 
 @dataclass(frozen=True, slots=True)
 class _CanonicalTrack:
-    """保存折叠后的规范轨道及其全部原始坐标别名。"""
+    """Saves the collapsed canonical orbit with all its original coordinate aliases."""
 
     coordinate: float
     aliases: tuple[float, ...]
 
 
 class _IndexedRules(list[_MergedRule]):
-    """保存单次候选构造中的只读线段及轨道区间缓存，使用期间不修改线段。"""
+    """Save the read-only line segments and track interval cache in a single candidate construction, and do not modify the line segments during use."""
 
     def __init__(self, rules: list[_MergedRule]) -> None:
-        """按方向分组并保留原始线段顺序，缓存随当前表格调用释放。"""
+        """Group by direction and preserve the original segment order, cache is released with the current table call."""
         super().__init__(rules)
         self._oriented = {
             orientation: tuple(rule for rule in rules if rule.orientation == orientation)
@@ -61,7 +61,7 @@ class _IndexedRules(list[_MergedRule]):
         self._coverages: dict[tuple[str, tuple[float, ...], float, float, float], float] = {}
 
     def prime_coverages(self, queries: list[tuple[str, tuple[float, ...], float, float, float]]) -> None:
-        """一次预计算整张网格的覆盖查询，后续原判断代码直接读取缓存。"""
+        """Precompute the coverage query of the entire grid at once, and the subsequent original judgment code directly reads the cache."""
         from ....._compute_backend import get_native
 
         native = get_native()
@@ -83,7 +83,7 @@ class _IndexedRules(list[_MergedRule]):
                 self._coverages[(orientation, aliases, tolerance, start, end)] = value
 
     def coverage(self, orientation: str, aliases: tuple[float, ...], start: float, end: float, tolerance: float) -> float:
-        """复用轨道匹配和相同查询，区间覆盖仍执行原有裁剪与浮点累加。"""
+        """Track matching and identical queries are reused, and interval coverage still performs original clipping and floating point accumulation."""
         key = orientation, aliases, tolerance
         coverage_key = (*key, start, end)
         cached = self._coverages.get(coverage_key)
@@ -109,7 +109,7 @@ class _IndexedRules(list[_MergedRule]):
 
 @dataclass(frozen=True, slots=True)
 class _RulePreparation:
-    """保存相同裁剪范围的线段与原始轨道，供 raw/supported 假设复用。"""
+    """Save line segments with the same clipping range and original tracks for reuse by raw/supported hypothesis."""
 
     fragments: list[_MergedRule]
     rules: _IndexedRules
@@ -127,7 +127,7 @@ def _prepare_rule_evidence(
     include_rectangles: bool,
     evidence_halo: float,
 ) -> _RulePreparation:
-    """一次构造裁剪、合并和原始轨道证据，不缓存后续假设判定。"""
+    """Construct clipping, merging, and raw orbital evidence once, without caching subsequent hypothesis decisions."""
     fragments = _local_rule_fragments(
         table_input,
         snap_tolerance,
@@ -143,7 +143,7 @@ def _prepare_rule_evidence(
 
 @dataclass(frozen=True, slots=True)
 class _PhysicalRowEvidence:
-    """保存一个原子行由 drawing 独立验证的边界可靠度。"""
+    """Saves the bounded reliability of an atomic row independently verified by drawing."""
 
     row: int
     top_coverage: float
@@ -155,7 +155,7 @@ class _PhysicalRowEvidence:
 
     @property
     def reliability(self) -> float:
-        """返回该行所有强物理条件中的最小可靠度。"""
+        """Returns the minimum reliability among all strong physical conditions for this row."""
 
         if self.glyph_crossing:
             return 0.0
@@ -169,14 +169,14 @@ class _PhysicalRowEvidence:
 
     @property
     def verified(self) -> bool:
-        """判断该行能否脱离文本占用独立证明结构存在。"""
+        """Determine whether the line can independently prove the existence of the structure independently of text occupation."""
 
         return self.reliability >= SEPARATOR_COVERAGE_THRESHOLD
 
 
 @dataclass(frozen=True, slots=True)
 class _SingleRowEvidence:
-    """保存单物理行网格的全部外框和纵向隔断可靠度。"""
+    """Preserves the overall frame and vertical partition reliability of a single physical row grid."""
 
     top_coverage: float
     bottom_coverage: float
@@ -186,7 +186,7 @@ class _SingleRowEvidence:
 
     @property
     def reliability(self) -> float:
-        """返回单行网格所有不可替代物理证据中的最小值。"""
+        """Returns the minimum value among all irreplaceable physical evidence in a single row grid."""
 
         if self.glyph_crossing or not self.vertical_coverages:
             return 0.0
@@ -199,13 +199,13 @@ class _SingleRowEvidence:
 
     @property
     def verified(self) -> bool:
-        """判断单行网格是否可脱离文本对齐独立验证。"""
+        """Determine whether a single-line grid can be verified independently of text alignment."""
 
         return self.reliability >= SEPARATOR_COVERAGE_THRESHOLD
 
     @property
     def confidence(self) -> float:
-        """把通过八成物理硬门的覆盖率校准到 verified 分数区间。"""
+        """Calibrate the coverage rate through 80% physical hard door to the verified score interval."""
 
         if not self.verified:
             return 0.0
@@ -217,7 +217,7 @@ class _SingleRowEvidence:
 
 @dataclass(frozen=True, slots=True)
 class _SingleColumnEvidence:
-    """保存多行单列表单的横向边界和左右外框可靠度。"""
+    """Save the reliability of horizontal borders and left and right frames of multi-line single-column forms."""
 
     horizontal_coverages: tuple[float, ...]
     left_coverage: float
@@ -227,7 +227,7 @@ class _SingleColumnEvidence:
 
     @property
     def reliability(self) -> float:
-        """返回单列表单所有强物理条件中的最小可靠度。"""
+        """Returns the minimum reliability among all strong physical conditions in a single column form."""
 
         if self.glyph_crossing or not self.horizontal_coverages:
             return 0.0
@@ -240,13 +240,13 @@ class _SingleColumnEvidence:
 
     @property
     def verified(self) -> bool:
-        """判断单列表单是否具备不依赖文本对齐的完整线框证据。"""
+        """Determines whether a single-column form has complete wireframe evidence independent of text alignment."""
 
         return self.reliability >= SEPARATOR_COVERAGE_THRESHOLD
 
     @property
     def confidence(self) -> float:
-        """把通过八成物理硬门的可靠度校准到 verified 分数区间。"""
+        """Calibrate the reliability of passing through 80% physical hard doors to the verified score interval."""
 
         if not self.verified:
             return 0.0
@@ -257,15 +257,15 @@ class _SingleColumnEvidence:
 
 
 class _UnionFind:
-    """维护缺失内部隔断连接的原子网格并查集。"""
+    """Maintain atomic meshes with missing internal partition connections and find them."""
 
     def __init__(self, size: int) -> None:
-        """为固定数量原子格初始化各自独立的集合。"""
+        """Initialize separate sets for a fixed number of atomic lattice."""
 
         self._parents = list(range(size))
 
     def find(self, index: int) -> int:
-        """返回原子格根节点并执行路径压缩。"""
+        """Returns the atomic lattice root node and performs path compression."""
 
         parent = self._parents[index]
         if parent != index:
@@ -273,7 +273,7 @@ class _UnionFind:
         return self._parents[index]
 
     def union(self, first: int, second: int) -> None:
-        """合并两个原子格所属集合。"""
+        """Merge the sets belonging to two atomic lattices."""
 
         first_root = self.find(first)
         second_root = self.find(second)
@@ -287,7 +287,7 @@ def _drawing_bbox_to_table_local(
     angle: int,
     evidence_halo: float,
 ) -> tuple[float, float, float, float] | None:
-    """在不扩大字符区域的前提下，把邻近外框 drawing 转到表格局部坐标。"""
+    """Without expanding the character area, move the adjacent outer frame drawing to the local coordinates of the table."""
 
     clipped = bbox_intersection(rule_bbox, table_bbox)
     if clipped is None and evidence_halo > 0:
@@ -319,7 +319,7 @@ def _local_rule_fragments(
     include_rectangles: bool = True,
     evidence_halo: float = 0.0,
 ) -> list[_MergedRule]:
-    """按来源裁剪 drawing/矩形，并转换为局部轴线片段。"""
+    """Crop drawing/rectangle by source and convert to local grid segment."""
 
     table_bbox = normalize_bbox(table_input.table_bbox)
     if table_bbox is None:
@@ -392,7 +392,7 @@ def _merge_rule_fragments(
     snap_tolerance: float,
     join_gap: float,
 ) -> list[_MergedRule]:
-    """按方向和轴坐标吸附线段，再连接小间隙共线片段。"""
+    """Adsorb line segments according to direction and axis coordinates, and then connect collinear segments with small gaps."""
 
     from ....._compute_backend import get_native
 
@@ -447,7 +447,7 @@ def _repeated_long_rule_endpoints(
     axis_extent: float,
     snap_tolerance: float,
 ) -> list[float]:
-    """仅保留重复长线端点或接近表格外缘的外围轨道证据。"""
+    """Only evidence of peripheral tracks at the endpoints of repeated long lines or near the outer edge of the form is retained."""
 
     if not rules:
         return []
@@ -481,7 +481,7 @@ def _infer_grid_tracks(
     *,
     prune_unsupported_horizontal: bool = False,
 ) -> tuple[list[float], list[float], list[float]]:
-    """融合物理轴线与受重复门约束的端点，恢复开放外框轨道。"""
+    """Fusion of physical axes with endpoints constrained by repeating doors restores open frame rails."""
 
     horizontal = [rule for rule in rules if rule.orientation == "horizontal"]
     vertical = [rule for rule in rules if rule.orientation == "vertical"]
@@ -524,7 +524,7 @@ def _filter_horizontal_track_creators(
     width: float,
     snap_tolerance: float,
 ) -> tuple[list[_MergedRule], list[float]]:
-    """剔除完全缩进在单元格内、不能形成真实横向轨道的装饰短线。"""
+    """Eliminate decorative short lines that are completely indented within the cell and cannot form a true horizontal track."""
 
     if len(x_tracks) < 2:
         return rules, []
@@ -570,7 +570,7 @@ def _rule_indices_for_track(
     track: _CanonicalTrack,
     snap_tolerance: float,
 ) -> set[int]:
-    """返回能够归属指定轨道的全部物理线索引。"""
+    """Returns all physical line indices that can belong to the specified track."""
 
     return {
         index
@@ -590,7 +590,7 @@ def _collapse_outer_duplicate_tracks(
     snap_tolerance: float,
     collapse_leading_edge: bool,
 ) -> tuple[list[_CanonicalTrack], int, bool]:
-    """折叠外缘同一物理描边产生的重复轨，并保留独立双边界。"""
+    """Collapses the outer edge of a duplicate track resulting from the same physical stroke, while retaining independent double borders."""
 
     if rules is None or not orientation or len(tracks) < 2:
         return tracks, 0, False
@@ -685,7 +685,7 @@ def _canonicalize_axis_tracks(
     collapse_narrow_bands: bool = True,
     collapse_leading_edge: bool = True,
 ) -> tuple[list[_CanonicalTrack], bool, int]:
-    """吸附外缘并折叠无字形占用的窄带，同时保留全部原始别名。"""
+    """Snaps the outer edge and collapses the narrow strip that is not occupied by the glyph, while retaining all of the original aliases."""
 
     tracks = [
         _CanonicalTrack(
@@ -789,7 +789,7 @@ def _canonicalize_axis_tracks(
 def _canonical_track_coordinates(
     tracks: list[_CanonicalTrack],
 ) -> list[float]:
-    """提取规范轨道数值坐标，供网格 bbox 和稳定度计算使用。"""
+    """Extracts canonical orbit numerical coordinates for use in grid bbox and stability calculations."""
 
     return [track.coordinate for track in tracks]
 
@@ -800,7 +800,7 @@ def _canonical_tracks_are_unique(
     orientation: str,
     snap_tolerance: float,
 ) -> bool:
-    """校验每条物理线最多只能归属一个规范轨道别名集合。"""
+    """Verify that each physical line can only belong to at most one canonical track alias set."""
 
     for rule in rules:
         if rule.orientation != orientation:
@@ -821,7 +821,7 @@ def _separator_coverage_for_track(
     end: float,
     snap_tolerance: float,
 ) -> float:
-    """按规范轨道全部 alias 合并计算 separator 覆盖率。"""
+    """All alias in the standard track are combined to calculate the separator coverage."""
 
     if isinstance(rules, _IndexedRules):
         return rules.coverage(orientation, track.aliases, start, end, snap_tolerance)
@@ -839,7 +839,7 @@ def _rect_lattice_is_repeated(
     y_tracks: list[float],
     snap_tolerance: float,
 ) -> bool:
-    """要求矩形边缘在二维晶格中重复且覆盖至少八成理论边界。"""
+    """The rectangular edges are required to repeat in the two-dimensional lattice and cover at least 80% of the theoretical boundary."""
 
     rows = len(y_tracks) - 1
     cols = len(x_tracks) - 1
@@ -900,7 +900,7 @@ def _separator_coverage(
     end: float,
     snap_tolerance: float,
 ) -> float:
-    """计算指定潜在隔断被同轴物理线段覆盖的比例。"""
+    """Calculates the proportion of a specified potential partition covered by coaxial physical line segments."""
 
     if isinstance(rules, _IndexedRules):
         return rules.coverage(orientation, (coordinate,), start, end, snap_tolerance)
@@ -913,7 +913,7 @@ def _separator_coverage(
 
 
 def _grid_index(row: int, col: int, cols: int) -> int:
-    """把二维原子格坐标转换为并查集线性索引。"""
+    """Convert two-dimensional atomic lattice coordinates to union-find linear indices."""
 
     return row * cols + col
 
@@ -925,7 +925,7 @@ def _build_component_specs(
     x_tracks: list[float],
     y_tracks: list[float],
 ) -> tuple[GridCellSpec, ...] | None:
-    """把原子格连通分量转成矩形逻辑单元格，非矩形分量整体拒绝。"""
+    """Convert the connected components of the atomic grid into rectangular logical cells, and reject the non-rectangular components as a whole."""
 
     from ....._compute_backend import get_native
 
@@ -974,7 +974,7 @@ def _occupied_text_rows(
     text: NativeTableText,
     y_tracks: list[float],
 ) -> set[int]:
-    """返回至少包含一个视觉文本行中心的物理行索引。"""
+    """Returns the physical line index containing at least one visual text line center."""
 
     occupied_rows: set[int] = set()
     for row in text.rows:
@@ -995,7 +995,7 @@ def _line_grid_row_evidence(
     minimum_row_height: float,
     local_width: float,
 ) -> tuple[_PhysicalRowEvidence, ...]:
-    """计算 line-grid 每个原子行的独立物理封闭证据。"""
+    """Compute independent physical closure evidence for each atomic row of line-grid."""
 
     left = x_tracks[0].coordinate
     right = x_tracks[-1].coordinate
@@ -1069,7 +1069,7 @@ def _single_row_line_grid_evidence(
     snap_tolerance: float,
     minimum_row_height: float,
 ) -> _SingleRowEvidence:
-    """校验单物理行候选的上下外框及每一条纵向边界。"""
+    """Verify the upper and lower outer frames and each vertical boundary of the single physical row candidate."""
 
     top_track, bottom_track = y_tracks
     top = top_track.coordinate
@@ -1124,7 +1124,7 @@ def _single_column_line_grid_evidence(
     snap_tolerance: float,
     minimum_row_height: float,
 ) -> _SingleColumnEvidence:
-    """校验多行单列表单的全部横边和左右连续外框。"""
+    """Verify all horizontal edges and left and right continuous outlines of multi-line single-column forms."""
 
     left_track, right_track = x_tracks
     top = y_tracks[0].coordinate
@@ -1182,7 +1182,7 @@ def _text_grid_stability(
     y_tracks: list[float],
     physically_verified_rows: set[int] | None = None,
 ) -> tuple[float, float]:
-    """衡量视觉文本行和文本项对推断行列轨道的占用稳定性。"""
+    """Measuring the stability of occupation of visual text lines and text items on inferred row and column tracks."""
 
     occupied_rows = _occupied_text_rows(text, y_tracks)
     supported_rows = occupied_rows | (physically_verified_rows or set())
@@ -1213,7 +1213,7 @@ def _physical_row_dense_baseline_pairs(
     x_tracks: list[float],
     y_tracks: list[float],
 ) -> tuple[dict[str, object], ...]:
-    """识别同一物理行带内占用集合相同的多条稠密文本基线。"""
+    """Identify multiple dense text baselines with the same occupancy set within the same physical line band."""
 
     cols = len(x_tracks) - 1
     dense_column_count = max(2, math.ceil(0.60 * cols))
@@ -1244,7 +1244,7 @@ def _physical_row_dense_baseline_pairs(
 
     ambiguous_pairs: list[dict[str, object]] = []
     text_rows_by_index = {row.row_index: row for row in text.rows}
-    # 首行两个答题列的双行列名不是漏行：后面至少三行仅有左侧行名，两列答案全空且列名不含数值。
+    # The double row and column names of the two answer columns in the first row are not missing rows: at least the next three rows only have left row names, and the answers in the two columns are all empty and the column names do not contain numerical values.
     blank_answer_header = (
         cols == 3
         and len(rows_by_band) >= 4
@@ -1283,7 +1283,7 @@ def _looks_like_single_column_tracks(
     local_width: float,
     edge_band: float,
 ) -> bool:
-    """判断初始 X 轨是否全部属于单列表单的左右外缘。"""
+    """Determine whether the initial X rails all belong to the left and right outer edges of the single column form."""
 
     return (
         len(x_tracks) >= 2
@@ -1294,7 +1294,7 @@ def _looks_like_single_column_tracks(
 
 @dataclass(frozen=True, slots=True)
 class _VectorTracks:
-    """保存已通过别名、尺寸和物理行数校验的规范轨道。"""
+    """Saves a canonical track that has passed alias, size, and physical row count verification."""
 
     snap_tolerance: float
     local_width: float
@@ -1313,7 +1313,7 @@ class _VectorTracks:
 
 @dataclass(frozen=True, slots=True)
 class _VectorTopology:
-    """保存隔断连接后的逻辑单元格及独立物理证据。"""
+    """Save the logical cells and independent physical evidence after partition connection."""
 
     specs: tuple[GridCellSpec, ...]
     separator_decisions: list[float]
@@ -1326,7 +1326,7 @@ class _VectorTopology:
 
 
 def _reject_vector_candidate(diagnostics: dict[str, Any] | None, gate: str) -> None:
-    """记录当前假设的首个拒绝门，供各显式阶段保留统一诊断行为。"""
+    """Record the first rejection gate of the current hypothesis for each explicit stage to preserve uniform diagnostic behavior."""
 
     if diagnostics is not None:
         diagnostics["first_rejection_gate"] = gate
@@ -1343,7 +1343,7 @@ def _build_vector_tracks(
     diagnostics: dict[str, Any] | None,
     rule_cache: dict[tuple[bool, bool, float], _RulePreparation] | None = None,
 ) -> _VectorTracks | None:
-    """构造并规范化轨道，保持 halo、别名及物理行数的原有拒绝顺序。"""
+    """Construct and normalize the track, maintaining the original rejection order of halo, aliases, and physical row numbers."""
 
     snap_tolerance = clamp(
         0.08 * text.median_glyph_height,
@@ -1391,8 +1391,8 @@ def _build_vector_tracks(
     if not exact_fragments or len(exact_fragments) > MAX_PRIMITIVES_PER_TABLE:
         return _reject_vector_candidate(diagnostics, "raw_fragments")
     exact_x_tracks, exact_y_tracks, _removed = exact.inferred
-    # 多行表格保持原始 bbox 裁剪；halo 只服务可能退化为单物理行的
-    # 边界片段，避免吸入相邻行或页外端点改变既有拓扑。
+    # Multi-row tables retain original bbox clipping; halo only serves tables that may degrade to a single physical row
+    # Boundary fragments to avoid sucking in adjacent rows or off-page endpoints and changing the existing topology.
     single_column_halo_hint = (
         include_drawing
         and not include_rectangles
@@ -1624,7 +1624,7 @@ def _build_vector_topology(
     text: NativeTableText,
     diagnostics: dict[str, Any] | None,
 ) -> _VectorTopology | None:
-    """连接原子格并验证矩形拓扑，保留单行和单列的独立物理证据。"""
+    """Connect lattice atoms and verify rectangular topology, preserving independent physical evidence of single rows and columns."""
 
     snap_tolerance = tracks.snap_tolerance
     rules = tracks.rules
@@ -1830,7 +1830,7 @@ def _materialize_vector_candidate(
     evidence_label: str,
     diagnostics: dict[str, Any] | None,
 ) -> NativeTableCandidate | None:
-    """将文本落格并评分，按原顺序执行完整性与空行发布门。"""
+    """Box and score the text, performing integrity and blank line release gates in the original order."""
 
     snap_tolerance = tracks.snap_tolerance
     local_width = tracks.local_width
@@ -1996,7 +1996,7 @@ def _build_vector_candidate(
     diagnostics: dict[str, Any] | None = None,
     rule_cache: dict[tuple[bool, bool, float], _RulePreparation] | None = None,
 ) -> NativeTableCandidate | None:
-    """按轨道、拓扑、文本落格及评分的固定顺序构造矢量候选。"""
+    """Construct vector candidates in a fixed order of orbit, topology, text placement and scoring."""
 
     if diagnostics is not None:
         diagnostics["evidence"] = evidence_label
@@ -2018,7 +2018,7 @@ def _build_vector_candidate(
 
 
 def _without_empty_edge_decorations(table_input: NativeTableInput, text: NativeTableText) -> NativeTableInput:
-    """删除近外框的短装饰竖线；须有空白外带或该伪轨道横切正文字形。"""
+    """Delete the short decorative vertical lines near the outer frame; there must be a blank outer band or the pseudo track crosses the main text."""
 
     width, height = table_local_size(table_input.table_bbox, normalize_angle(table_input.angle))
     tolerance = max(0.5, 0.08 * text.median_glyph_height)
@@ -2041,7 +2041,7 @@ def _without_empty_edge_decorations(table_input: NativeTableInput, text: NativeT
             if coordinate < width / 2
             else [glyph for glyph in text.glyphs if (glyph.bbox[0] + glyph.bbox[2]) / 2 > coordinate]
         )
-        # 短线所在高度之外横切完整字形，说明它不能延伸为全表列界。
+        # The short line crosses the complete glyph beyond the height, indicating that it cannot be extended to the entire table column boundary.
         cuts_body = any(
             glyph.bbox[0] + tolerance < coordinate < glyph.bbox[2] - tolerance
             and all(glyph.bbox[3] < start - tolerance or glyph.bbox[1] > end + tolerance for start, end in intervals)
@@ -2061,7 +2061,7 @@ def build_vector_candidates(
     text: NativeTableText,
     diagnostics: list[dict[str, Any]] | None = None,
 ) -> list[NativeTableCandidate]:
-    """分别从 drawing 中心线和矩形晶格生成矢量网格候选。"""
+    """Generate vector mesh candidates from drawing centerlines and rectangular lattices respectively."""
 
     candidates: list[NativeTableCandidate] = []
     rule_cache: dict[tuple[bool, bool, float], _RulePreparation] = {}
@@ -2078,7 +2078,7 @@ def build_vector_candidates(
     )
     line_hypotheses = [raw_line_diagnostics] if raw_line_diagnostics is not None else []
     selected_line_diagnostics = raw_line_diagnostics
-    # 高分也可能由大量真实格稀释装饰线歧义；非零歧义仍须验证支持轨道。
+    # High scores may also be diluted by large numbers of real lattices for decorative line ambiguity; non-zero ambiguities must still be verified on supporting tracks.
     ambiguous = line_candidate is not None and "ambiguous_separator_ratio=0.0000" not in line_candidate.issues
     if (line_candidate is None or line_candidate.score < 0.95 or ambiguous) and len(line_hypotheses) < MAX_TRACK_HYPOTHESES:
         supported_line_diagnostics: dict[str, Any] | None = {} if diagnostics is not None else None
@@ -2130,7 +2130,7 @@ def diagnose_vector_candidate_builds(
     table_input: NativeTableInput,
     text: NativeTableText,
 ) -> tuple[dict[str, Any], ...]:
-    """返回 line/rect 假设真实首个拒绝门和物理证据。"""
+    """Return line/rect assuming true first rejection gate and physical evidence."""
 
     diagnostics: list[dict[str, Any]] = []
     build_vector_candidates(

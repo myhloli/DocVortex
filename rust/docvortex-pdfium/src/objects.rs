@@ -1,4 +1,4 @@
-//! 同库对象树与裁剪遍历；借用地址只允许在原页面作用域内消费。
+//! Same library object tree and clipping traversal; borrowed addresses are only allowed to be consumed within the scope of the original page.
 use crate::ReadError;
 use std::ffi::{c_float, c_int, c_uint, c_ulong, c_void};
 pub type Matrix = [f64; 6];
@@ -22,7 +22,7 @@ struct Api {
     segment: unsafe extern "system" fn(*mut c_void, c_int, c_int) -> *mut c_void,
     point: unsafe extern "system" fn(*mut c_void, *mut c_float, *mut c_float) -> c_int,
 }
-/// 保留 Python min 对相同值与有符号零的首项选择。
+/// Reserve Python min First selection for identical values and signed zeros.
 fn minimum(a: f64, b: f64) -> f64 {
     if b < a {
         b
@@ -30,7 +30,7 @@ fn minimum(a: f64, b: f64) -> f64 {
         a
     }
 }
-/// 保留 Python max 对相同值与有符号零的首项选择。
+/// Reserve Python max First selection for identical values and signed zeros.
 fn maximum(a: f64, b: f64) -> f64 {
     if b > a {
         b
@@ -38,7 +38,7 @@ fn maximum(a: f64, b: f64) -> f64 {
         a
     }
 }
-/// 使用与参考实现相同的运算顺序合成对象和父级矩阵。
+/// The object and parent matrices are synthesized using the same order of operations as the reference implementation.
 fn multiply(a: Matrix, b: Matrix) -> Matrix {
     [
         a[0] * b[0] + a[1] * b[2],
@@ -50,7 +50,7 @@ fn multiply(a: Matrix, b: Matrix) -> Matrix {
     ]
 }
 impl Api {
-    /// 裁剪路径在父坐标中变换；损坏的局部路径不抹掉继承裁剪。
+    /// The clipping path is transformed in parent coordinates; damaged local paths are not erased and inherit clipping.
     unsafe fn clip_bounds(
         &self,
         raw: *mut c_void,
@@ -99,7 +99,7 @@ impl Api {
         }
         result
     }
-    /// 按原深度优先顺序遍历叶子，在 Rust 内过滤类型以减少 Python 临时对象。
+    /// Traverse leaves in original depth-first order, filtering types within Rust to reduce Python temporary objects.
     #[allow(clippy::too_many_arguments)]
     unsafe fn walk(
         &self,
@@ -135,7 +135,7 @@ impl Api {
             }
             let combined = multiply(matrix.values.map(f64::from), parent);
             let object_kind = (self.kind)(raw);
-            // 类型先于裁剪判断：类型不匹配的叶子（如纯路径页上的 Path）不必读 clip。
+            // Type is judged before clipping: leaves that do not match the type (such as Path on the pure path page) do not need to read clip.
             if object_kind == 5 {
                 let clip = self.clip_bounds(raw, parent, inherited);
                 self.walk(
@@ -155,10 +155,10 @@ impl Api {
         }
     }
 }
-/// TEXT 对象地址、最终可见性和页面视觉坐标中的有效裁剪框。
+/// TEXT Object address, final visibility, and valid cropping box in page visual coordinates.
 pub type TextVisibility = (usize, bool, Option<Bounds>);
 
-/// 按 Python 页面坐标变换裁剪框，四个角点独立取保守外框。
+/// Press Python page coordinates to transform the cropping frame, and the four corner points independently take the conservative outer frame.
 fn visual_bounds(bounds: Bounds, frame: [f64; 4], rotation: i32) -> Bounds {
     let point = |x: f64, y: f64| match rotation {
         90 => (y - frame[1], x - frame[0]),
@@ -182,10 +182,10 @@ fn visual_bounds(bounds: Bounds, frame: [f64; 4], rotation: i32) -> Bounds {
     ]
 }
 
-/// 一次 TEXT 对象遍历同时计算绘制状态和有效裁剪；不跨调用保存 PDFium 地址。
+/// A TEXT object traversal simultaneously calculates the drawing state and effective cropping; the PDFium address is not saved across calls.
 ///
 /// # Safety
-/// 调用方必须验证 14 个函数的 ABI，并持有同一 PDFium 页面、运行库和全局锁。
+/// The caller must verify ABI for 14 functions and hold the same PDFium page, runtime, and global locks.
 pub unsafe fn read_text_visibility(
     addresses: Vec<usize>,
     handle: usize,
@@ -264,11 +264,11 @@ pub unsafe fn read_text_visibility(
         .collect())
 }
 
-/// 借用有效页面同步读取指定类型叶子，不跨调用缓存原生地址。
+/// Use valid pages to synchronously read leaves of specified types, and do not cache native addresses across calls.
 ///
 /// # Safety
 ///
-/// 调用方必须验证函数 ABI，并持有同一 PDFium 运行库、页面和全局锁。
+/// The caller must verify function ABI and hold the same PDFium runtime, page, and global locks.
 pub unsafe fn read_objects(
     addresses: Vec<usize>,
     handle: usize,

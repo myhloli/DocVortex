@@ -1,8 +1,8 @@
-"""守卫持久 PDF 进程池的空闲复用与冷启动节流。"""
+"""Guard persistence PDF Idle multiplexing and cold start throttling of the process pool."""
 
 
 def test_idle_worker_does_not_pay_spawn_throttle() -> None:
-    """持久池存在空闲 worker 时无需重复冷启动等待，探测不消耗空闲名额。"""
+    """When there is idle worker in the persistent pool, there is no need to repeat the cold start wait, and the detection does not consume idle quota."""
     import threading
     from types import SimpleNamespace
     from docvortex.document.pdf.images import _is_pdf_render_pool_still_spawning_workers

@@ -1,4 +1,4 @@
-"""验证 PDF 原始块布局的公共接口、页面几何和可移植渲染。"""
+"""Verify public interface, page geometry and portable rendering of PDF primitive block layout."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from docvortex.schema import MiddleJson, PageInfo, Producer
 
 
 def _middle(pages: list[dict], *, suffix: str = "pdf", sizes: list[tuple[int, float, float]] | None = None) -> MiddleJson:
-    """构造带显式源页几何的严格文档，保留非连续页号以测试映射。"""
+    """Constructs a strict document with explicit source page geometry, retaining non-consecutive page numbers to test mapping."""
     return MiddleJson(
         pages=[PageInfo.model_validate(page) for page in pages],
         is_full_document=False,
@@ -42,24 +42,24 @@ def _middle(pages: list[dict], *, suffix: str = "pdf", sizes: list[tuple[int, fl
 
 
 def _text(text: str, *, index: int = 0, bbox: tuple = (0.1, 0.1, 0.45, 0.3), **kwargs) -> dict:
-    """生成可覆盖不同块类型和续接标记的文本块。"""
+    """Generate text blocks that can cover different block types and continuation markers."""
     return {"type": "text", "index": index, "bbox": bbox, "content": [{"type": "text", "content": text}], **kwargs}
 
 
 def _reader(payload: bytes) -> PdfReader:
-    """从导出 bytes 检查真实 PDF 的页面和文字。"""
+    """Export from bytes Check the pages and text of the real PDF."""
     return PdfReader(BytesIO(payload))
 
 
 def _png_uri() -> str:
-    """创建宽高比与测试区域一致的图片以验证绝对定位。"""
+    """Create an image with the same aspect ratio as the test area to verify absolute positioning."""
     output = BytesIO()
     Image.new("RGB", (100, 100), "red").save(output, "PNG")
     return "data:image/png;base64," + base64.b64encode(output.getvalue()).decode()
 
 
 def _source_pdf() -> bytes:
-    """生成包含旋转、非 A4、空白页及横向页的真实源 PDF。"""
+    """Generates true source PDF including rotated, non-A4, blank pages, and landscape pages."""
     output = BytesIO()
     canvas = Canvas(output, pagesize=(400, 600))
     canvas.drawString(40, 500, "FIRST PAGE")
@@ -78,7 +78,7 @@ def _source_pdf() -> bytes:
 
 
 def test_original_preserves_pages_auxiliaries_continuations_and_input() -> None:
-    """辅助文字和续段留在原页，空白页及不同页面尺寸均不被折叠。"""
+    """Auxiliary text and continuation paragraphs remain on the original page, and blank pages and different page sizes are not folded."""
     middle = _middle(
         [
             {"page_idx": 1, "blocks": [_text("HEADER", type="header"), _text("inter-", index=1, bbox=(0.1, 0.4, 0.5, 0.5))]},
@@ -103,7 +103,7 @@ def test_original_preserves_pages_auxiliaries_continuations_and_input() -> None:
 
 
 def test_text_and_image_positions_match_source_boxes() -> None:
-    """用 PDF 原生对象检查文字列位置和图片四边，容差不超过 0.5 pt。"""
+    """Use the PDF native object to check the position of the text column and the four sides of the image, with a tolerance not exceeding 0.5 pt."""
     middle = _middle(
         [
             {
@@ -133,7 +133,7 @@ def test_text_and_image_positions_match_source_boxes() -> None:
     positions = {}
 
     def visit(text, cm, tm, font, size) -> None:
-        """记录 PDF 提取器报告的实际文字坐标变换。"""
+        """Logging the actual text coordinate transformation reported by the PDF extractor."""
         if text.strip():
             positions[text.strip()] = (tm[4] * cm[0] + tm[5] * cm[2] + cm[4], tm[4] * cm[1] + tm[5] * cm[3] + cm[5])
 
@@ -148,7 +148,7 @@ def test_text_and_image_positions_match_source_boxes() -> None:
 
 @pytest.mark.parametrize("damage", ["missing", "partial", "version", "duplicate", "negative", "boolean", "bbox"])
 def test_auto_falls_back_for_incomplete_geometry_and_original_rejects(damage: str) -> None:
-    """旧数据和非法几何在 AUTO 整体回退，显式 ORIGINAL 在导出前失败。"""
+    """Old data and illegal geometries fall back overall at AUTO, explicit ORIGINAL fails before export."""
     middle = _middle([{"page_idx": 3, "blocks": [_text("body")]}])
     extension = middle.extensions["docvortex_layout"]
     if damage == "missing":
@@ -174,7 +174,7 @@ def test_auto_falls_back_for_incomplete_geometry_and_original_rejects(damage: st
 
 @pytest.mark.parametrize("suffix", ["ofd", "docx", "html"])
 def test_non_pdf_sources_keep_reflow_and_reject_original(suffix: str) -> None:
-    """OFD 和流式来源维持重排，即使携带几何扩展也不启用首版还原。"""
+    """OFD and streaming sources maintain reflow even when carrying geometry extensions and do not enable first-version restore."""
     middle = _middle([{"page_idx": 0, "blocks": [_text("body")]}], suffix=suffix)
     artifact = render_artifact(middle, "pdf")
     assert artifact.content == render_pdf(middle, layout=PdfLayout.REFLOW)
@@ -184,7 +184,7 @@ def test_non_pdf_sources_keep_reflow_and_reject_original(suffix: str) -> None:
 
 
 def test_overflow_preserves_all_text_and_reports_small_type() -> None:
-    """极小框仍包含末尾文字，并输出低字号与缩放诊断。"""
+    """The minimal box still contains the final text and outputs low font size and scaling diagnostics."""
     middle = _middle([{"page_idx": 0, "blocks": [_text("word " * 100 + "ENDMARK", bbox=(0.1, 0.1, 0.2, 0.12))]}])
     artifact = render_artifact(middle, "pdf")
     text = _reader(artifact.content).pages[0].extract_text()
@@ -195,7 +195,7 @@ def test_overflow_preserves_all_text_and_reports_small_type() -> None:
 
 
 def test_structured_table_replaces_region_image_without_duplicate_caption() -> None:
-    """表格优先结构文字，不叠加整表图片，表题仍独立定位且只出现一次。"""
+    """The table structure text is given priority, and the entire table image is not superimposed. The table title is still positioned independently and appears only once."""
     bbox = (0.1, 0.1, 0.6, 0.5)
     middle = _middle(
         [
@@ -228,7 +228,7 @@ def test_structured_table_replaces_region_image_without_duplicate_caption() -> N
 
 
 def test_table_without_image_uses_structured_content() -> None:
-    """区域图缺失时正常输出结构文字，不把 HTML 渲染报告为降级。"""
+    """Normally output structure text when area map is missing, and do not report HTML rendering as degraded."""
     bbox = (0.1, 0.1, 0.9, 0.8)
     middle = _middle(
         [
@@ -259,7 +259,7 @@ def test_table_without_image_uses_structured_content() -> None:
 
 
 def test_missing_child_geometry_uses_parent_group() -> None:
-    """缺少图注坐标的组合整体排入父框，素材与文字均保留。"""
+    """The combinations that lack legend coordinates are placed into the parent box as a whole, and the materials and text are retained."""
     middle = _middle(
         [
             {
@@ -284,10 +284,10 @@ def test_missing_child_geometry_uses_parent_group() -> None:
 
 
 def test_formula_image_fallback_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
-    """公式矢量失败后使用已有区域图，错误可在高层产物定位。"""
+    """After the formula vector fails, the existing area map is used, and the error can be located in the high-level product."""
 
     def fail_formula(*args, **kwargs):
-        """模拟无法转换的公式以覆盖图片降级。"""
+        """Simulate unconvertible formulas to override picture degradation."""
         raise PdfFormulaError("test unsupported formula")
 
     monkeypatch.setattr(FormulaRenderer, "render", fail_formula)
@@ -313,7 +313,7 @@ def test_formula_image_fallback_is_reported(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_index_links_keep_source_page_numbers() -> None:
-    """固定布局目录保留原文页码，并正确链接到后面的正文目标。"""
+    """The fixed layout table of contents retains the original text page numbers and correctly links to the following text targets."""
     middle = _middle(
         [
             {
@@ -340,7 +340,7 @@ def test_index_links_keep_source_page_numbers() -> None:
 
 
 def test_pdf_parse_and_bundle_retain_selected_page_geometry(tmp_path) -> None:
-    """真实解析、后处理和 bundle 往返后仍可脱离源文件导出选中页面。"""
+    """After real parsing, post-processing and bundle round-trip, the selected page can still be exported without source files."""
     result = parse(_source_pdf(), file_suffix="pdf", page_range="1,3", keep_model_json=True)
     extension = result.middle_json.extensions["docvortex_layout"]
     assert extension == result.model_json.extensions["docvortex_layout"]
@@ -357,7 +357,7 @@ def test_pdf_parse_and_bundle_retain_selected_page_geometry(tmp_path) -> None:
 
 
 def test_rotation_and_blank_page_geometry_survive_parsing() -> None:
-    """旋转空白页的可见宽高只交换一次，原始分页保持完整。"""
+    """The visible width and height of the rotated blank page are swapped only once, and the original paging remains intact."""
     result = parse(_source_pdf(), file_suffix="pdf")
     reader = _reader(render_pdf(result.middle_json))
     assert len(reader.pages) == 3
@@ -366,13 +366,13 @@ def test_rotation_and_blank_page_geometry_survive_parsing() -> None:
 
 
 def test_geometry_failure_is_nonfatal_during_analysis() -> None:
-    """无法取得某页尺寸时保留其诊断，不伪造 A4 尺寸。"""
+    """Preserves diagnostics when a page size cannot be obtained and does not forge A4 sizes."""
 
     class BrokenDocument:
         page_count = 1
 
         def page_size(self, page_idx):
-            """模拟底层页尺寸读取失败。"""
+            """Simulated underlying page size read failure."""
             raise RuntimeError("broken geometry")
 
     geometry, diagnostics = extract_layout_geometry(BrokenDocument(), [7])
@@ -381,7 +381,7 @@ def test_geometry_failure_is_nonfatal_during_analysis() -> None:
 
 
 def test_layout_options_are_strict_and_unified_render_is_equivalent() -> None:
-    """统一入口与直接入口使用相同布局，并拒绝字符串冒充严格枚举。"""
+    """Unified portals use the same layout as direct portals and reject string impersonation of strict enumerations."""
     middle = _middle([{"page_idx": 0, "blocks": [_text("body")]}])
     assert render(middle, RenderFormat.PDF, options=PdfRenderOptions(layout=PdfLayout.ORIGINAL)) == render_pdf(middle)
     with pytest.raises(TypeError, match="PdfLayout"):
@@ -391,7 +391,7 @@ def test_layout_options_are_strict_and_unified_render_is_equivalent() -> None:
 
 
 def test_concurrent_diagnostics_do_not_leak() -> None:
-    """同时导出旧 PDF 和新 PDF 时，回退诊断只属于对应调用。"""
+    """When exporting both the old PDF and the new PDF, the fallback diagnostics only belong to the corresponding call."""
     middle = _middle([{"page_idx": 0, "blocks": [_text("body")]}])
     legacy = middle.model_copy(deep=True)
     legacy.extensions.clear()
@@ -402,7 +402,7 @@ def test_concurrent_diagnostics_do_not_leak() -> None:
 
 
 def test_cli_pdf_layout_reaches_export(tmp_path) -> None:
-    """通过真实 CLI 验证显式布局选项到页面输出的完整链路。"""
+    """Verify complete link of explicit layout options to page output via real CLI."""
     source = tmp_path / "source.pdf"
     source.write_bytes(_source_pdf())
     output = tmp_path / "out.pdf"
@@ -417,7 +417,7 @@ def test_cli_pdf_layout_reaches_export(tmp_path) -> None:
 
 @pytest.mark.parametrize("angle", [90, 180, 270])
 def test_rotated_region_images_restore_source_orientation(angle: int) -> None:
-    """通过双色素材的实际渲染像素验证裁图方向被正确撤销。"""
+    """Verify that the crop direction is correctly undone via the actual rendered pixels of the two-color material."""
     image = Image.new("RGB", (200, 100), "red")
     image.paste("blue", (100, 0, 200, 100))
     data = BytesIO()
@@ -456,7 +456,7 @@ def test_rotated_region_images_restore_source_orientation(angle: int) -> None:
 
 
 def test_crop_rotation_metadata_uses_source_page_and_block_indices() -> None:
-    """裁图角度按选页后的源页号和最终 raw 块索引关联，缺失素材不声明角度。"""
+    """The cropping angle is related to the source page number after page selection and the final raw block index. Missing material does not declare the angle."""
     extension = {"version": 1, "pages": [{"page_idx": 7, "width_pt": 400, "height_pt": 600}]}
     pages = [
         [
@@ -470,7 +470,7 @@ def test_crop_rotation_metadata_uses_source_page_and_block_indices() -> None:
 
 
 def test_rotated_cropped_page_keeps_image_position() -> None:
-    """带 CropBox 偏移的旋转页只变换一次，实际图片位置与源页一致。"""
+    """A rotated page with CropBox offset is transformed only once, and the actual picture position is consistent with the source page."""
     source_bytes = BytesIO()
     canvas = Canvas(source_bytes, pagesize=(400, 600))
     canvas.drawImage(ImageReader(Image.new("RGB", (100, 100), "red")), 100, 200, width=100, height=100)
@@ -490,7 +490,7 @@ def test_rotated_cropped_page_keeps_image_position() -> None:
 
 @pytest.mark.parametrize("layout", [PdfLayout.ORIGINAL, PdfLayout.REFLOW])
 def test_bullet_text_is_copyable_as_unicode(layout: PdfLayout) -> None:
-    """列表符号复制后仍是 Unicode bullet，避免标准字体生成 DEL 控制字符。"""
+    """The list symbol is still Unicode bullet after copying to avoid standard fonts from generating DEL control characters."""
     middle = _middle([{"page_idx": 0, "blocks": [_text("• 项目 Bullet item")]}])
     text = _reader(render_pdf(middle, layout=layout)).pages[0].extract_text()
     assert "• 项目 Bullet item" in text

@@ -1,4 +1,4 @@
-"""PPTX 形状层级及页面几何，复用当前转换器的单文档状态。"""
+"""PPTX Shape hierarchy and page geometry, reuse the single document state of the current converter."""
 
 from typing import Optional
 from loguru import logger
@@ -17,13 +17,13 @@ from .context import (
 
 
 class _PptxShapes:
-    """集中维护形状层级及页面几何，不改变文档生命周期和公开入口。"""
+    """Centrally maintain shape hierarchy and page geometry without changing the document life cycle and public access."""
 
     @staticmethod
     def _shape_type_cache_key(
         shape,
     ) -> Optional[tuple[Optional[str], Optional[int], Optional[str]]]:
-        """按原有形状层级及页面几何规则执行 _shape_type_cache_key，保持输入顺序与降级行为。"""
+        """Execute _shape_type_cache_key according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         part = getattr(shape, "part", None)
         partname = getattr(part, "partname", None)
         element = getattr(shape, "element", None)
@@ -39,7 +39,7 @@ class _PptxShapes:
         return (partname, shape_id, element_tag)
 
     def _safe_shape_type(self, shape) -> Optional[MSO_SHAPE_TYPE]:
-        """按原有形状层级及页面几何规则执行 _safe_shape_type，保持输入顺序与降级行为。"""
+        """Execute _safe_shape_type according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         shape_key = self._shape_type_cache_key(shape)
         if shape_key is not None and shape_key in self._shape_type_cache:
             return self._shape_type_cache[shape_key]
@@ -70,7 +70,7 @@ class _PptxShapes:
         shapes,
         slide_transform: Optional[_SlideTransform] = None,
     ) -> list[_FlattenedShape]:
-        """按原有形状层级及页面几何规则执行 _flatten_slide_shapes，保持输入顺序与降级行为。"""
+        """Execute _flatten_slide_shapes according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         if slide_transform is None:
             slide_transform = _SlideTransform()
 
@@ -102,7 +102,7 @@ class _PptxShapes:
         slide_width: int,
         slide_height: int,
     ) -> list:
-        """按原有形状层级及页面几何规则执行 _collect_shape_blocks，保持输入顺序与降级行为。"""
+        """Execute _collect_shape_blocks according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         shape = shape_entry.shape
         shape_blocks = []
         previous_page = self.cur_page
@@ -175,7 +175,7 @@ class _PptxShapes:
 
     @staticmethod
     def _shape_bbox(shape) -> Optional[tuple[float, float, float, float]]:
-        """按原有形状层级及页面几何规则执行 _shape_bbox，保持输入顺序与降级行为。"""
+        """Execute _shape_bbox according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         try:
             left = float(shape.left)
             top = float(shape.top)
@@ -191,7 +191,7 @@ class _PptxShapes:
 
     @staticmethod
     def _group_shape_transform(shape) -> _SlideTransform:
-        """按原有形状层级及页面几何规则执行 _group_shape_transform，保持输入顺序与降级行为。"""
+        """Execute _group_shape_transform according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         group_properties = getattr(shape._element, "grpSpPr", None)
         xfrm = getattr(group_properties, "xfrm", None) if group_properties is not None else None
         if xfrm is None:
@@ -228,7 +228,7 @@ class _PptxShapes:
 
     @staticmethod
     def _bbox_area(bbox: tuple[float, float, float, float]) -> float:
-        """按原有形状层级及页面几何规则执行 _bbox_area，保持输入顺序与降级行为。"""
+        """Execute _bbox_area according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         return max(0.0, bbox[2] - bbox[0]) * max(0.0, bbox[3] - bbox[1])
 
     @staticmethod
@@ -236,7 +236,7 @@ class _PptxShapes:
         bbox1: tuple[float, float, float, float],
         bbox2: tuple[float, float, float, float],
     ) -> Optional[tuple[float, float, float, float]]:
-        """按原有形状层级及页面几何规则执行 _bbox_intersection，保持输入顺序与降级行为。"""
+        """Execute _bbox_intersection according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         x0 = max(bbox1[0], bbox2[0])
         y0 = max(bbox1[1], bbox2[1])
         x1 = min(bbox1[2], bbox2[2])
@@ -249,7 +249,7 @@ class _PptxShapes:
 
     @classmethod
     def _rectangles_union_area(cls, bboxes: list[tuple[float, float, float, float]]) -> float:
-        """按原有形状层级及页面几何规则执行 _rectangles_union_area，保持输入顺序与降级行为。"""
+        """Execute _rectangles_union_area according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         if not bboxes:
             return 0.0
 
@@ -289,7 +289,7 @@ class _PptxShapes:
 
     @staticmethod
     def _shape_has_raw_text(shape) -> bool:
-        """通过shape底层XML判断是否有文本，避免数学公式触发python-pptx文本转换。"""
+        """Determine whether there is text through XML, the underlying layer of shape, to avoid mathematical formulas triggering text conversion in python-pptx."""
         if not getattr(shape, "has_text_frame", False):
             return False
 
@@ -311,7 +311,7 @@ class _PptxShapes:
 
     @staticmethod
     def _is_nonempty_text_shape(shape) -> bool:
-        """按原有形状层级及页面几何规则执行 _is_nonempty_text_shape，保持输入顺序与降级行为。"""
+        """Execute _is_nonempty_text_shape according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         return _PptxShapes._shape_has_raw_text(shape)
 
     def _is_small_picture(
@@ -320,7 +320,7 @@ class _PptxShapes:
         slide_width: int,
         slide_height: int,
     ) -> bool:
-        """按原有形状层级及页面几何规则执行 _is_small_picture，保持输入顺序与降级行为。"""
+        """Execute _is_small_picture according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         if picture_bbox is None:
             return False
 
@@ -347,7 +347,7 @@ class _PptxShapes:
         picture_entry: _FlattenedShape,
         later_shapes: list[_FlattenedShape],
     ) -> bool:
-        """按原有形状层级及页面几何规则执行 _is_background_picture，保持输入顺序与降级行为。"""
+        """Execute _is_background_picture according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         picture_bbox = picture_entry.bbox
         if picture_bbox is None:
             return False
@@ -382,7 +382,7 @@ class _PptxShapes:
         slide_width: int,
         slide_height: int,
     ) -> bool:
-        """按原有形状层级及页面几何规则执行 _should_skip_picture，保持输入顺序与降级行为。"""
+        """Execute _should_skip_picture according to the original shape hierarchy and page geometry rules, maintaining the input order and degradation behavior."""
         return self._is_small_picture(
             picture_entry.bbox,
             slide_width,

@@ -1,4 +1,4 @@
-"""以三线表物理表头边界恢复换行表头和同步重启的描述列。"""
+"""Restore the newline header and synchronous restart description column with the physical header boundary of the three-line table."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def build_rule_band_candidates(
     text: NativeTableText,
     diagnostics: list[dict[str, Any]] | None = None,
 ) -> list[NativeTableCandidate]:
-    """只在三条完整横线及无歧义列占用共同成立时恢复特殊三线表。"""
+    """The special three-line table is restored only when three complete horizontal lines and unambiguous column occupation are jointly established."""
 
     width, height = table_local_size(table_input.table_bbox, normalize_angle(table_input.angle))
     rules = _local_rules(table_input, width, height)
@@ -56,7 +56,7 @@ def build_rule_band_candidates(
     prefix_cols = min(common) if common else 0
     groups: list[tuple[int, int]] = []
     if prefix_cols:
-        # 至少两个描述列同步重启，右侧逐行完整，才能区分 rowspan 与普通空格。
+        # At least two description columns are restarted synchronously, and the right side is complete line by line to distinguish rowspan from ordinary spaces.
         suffix = set(range(prefix_cols, cols))
         starts = [index for index, occupied in enumerate(occupancy) if occupied == full]
         ends = starts[1:] + [len(body)]
@@ -74,13 +74,13 @@ def build_rule_band_candidates(
     elif any(occupied != full for occupied in occupancy):
         return []
     if not groups and len(header) == 1:
-        # 普通单行表头三线表仍走既有策略，避免无关候选和金标漂移。
+        # Ordinary single-line header and three-line tables still follow the existing strategy to avoid irrelevant candidates and gold standard drift.
         return []
     header_occupancy = [_row_occupancy(row, glyphs, tracks) for row in header]
     if set.union(*header_occupancy) != full:
         return []
     if len(header) > 1 and header_occupancy[-1] != full:
-        # 多级表头可能有仅出现在上层的 rowspan 标签，不能误折叠成普通换行表头。
+        # Multi-level headers may have rowspan labels that only appear on the upper level and cannot be mistakenly folded into ordinary line-wrapped headers.
         return []
     margin = max(0.25, 0.05 * text.median_glyph_width)
     if any(

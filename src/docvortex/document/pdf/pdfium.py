@@ -16,13 +16,13 @@ T = TypeVar("T")
 
 
 def _check_runtime_process() -> None:
-    """拒绝复用 fork 继承的字体接口；渲染 worker 应通过 spawn/forkserver 独立初始化。"""
+    """Reuse of the font interface inherited by fork is refused; rendering worker should be initialized independently through spawn/forkserver."""
     if _font_provider is not None and _font_provider.pid != os.getpid():
         raise PdfiumFontError("Inherited PDFium font runtime: use spawn/forkserver instead of forking after PDF use")
 
 
 def initialize_pdfium_runtime() -> PdfiumRuntimeInfo:
-    """幂等安装本进程的固定 CJK 字体提供器；必须先于首次 PDF 字体使用。"""
+    """Idempotent installation of this process's fixed CJK font provider; must precede first use of the PDF font."""
     global _font_provider
     _check_runtime_process()
     with _pdfium_lock:
@@ -31,7 +31,7 @@ def initialize_pdfium_runtime() -> PdfiumRuntimeInfo:
             import pypdfium2.raw as raw
 
             provider = _FontProvider(raw, str(pdfium.PDFIUM_INFO))
-            # 注册前保留强引用，保证即使安装阶段回调失败，C 指针也不会指向被回收的对象。
+            # Keep a strong reference before registration to ensure that even if the callback fails during the installation phase, the C pointer will not point to the recycled object.
             _font_provider = provider
             provider.install()
         _font_provider.raise_if_failed()
@@ -40,7 +40,7 @@ def initialize_pdfium_runtime() -> PdfiumRuntimeInfo:
 
 @dataclass
 class PdfiumRewriteResult:
-    """记录 PDFium 安全重写结果，供调用方按实际保留页修正原始页号。"""
+    """Records the PDFium safe rewrite result for the caller to correct the original page number according to the actual reserved page."""
 
     pdf_bytes: bytes
     retained_page_indices: list[int] | None = None
@@ -50,7 +50,7 @@ class PdfiumRewriteResult:
 
 @contextmanager
 def pdfium_guard() -> Iterator[None]:
-    """串行化访问并确保字体运行时就绪，在原生栈退出后传播字体故障。"""
+    """Serialize access and ensure font runtime readiness, propagating font failures after native stack exit."""
     _check_runtime_process()
     with _pdfium_lock:
         initialize_pdfium_runtime()
@@ -62,7 +62,7 @@ def pdfium_guard() -> Iterator[None]:
 
 
 def close_pdfium_document(pdf_doc: Any) -> None:
-    """清理时只持锁，不安装字体、不重建已销毁的 PDFium 运行时。"""
+    """Only locks are held during cleanup, fonts are not installed, and the destroyed PDFium runtime is not rebuilt."""
     if pdf_doc is None:
         return
     with _pdfium_lock:
@@ -70,7 +70,7 @@ def close_pdfium_document(pdf_doc: Any) -> None:
 
 
 def close_pdfium_child(pdfium_obj: Any) -> None:
-    """显式关闭 PDFium 子对象，避免依赖 weakref/finalizer 延迟释放 native 资源。"""
+    """Explicitly close the PDFium sub-object to avoid relying on weakref/finalizer to delay the release of native resources."""
     if pdfium_obj is None:
         return
     close = getattr(pdfium_obj, "close", None)
@@ -80,7 +80,7 @@ def close_pdfium_child(pdfium_obj: Any) -> None:
 
 
 def close_pdfium_objects_safely(*pdfium_objs: object, owner: str = "pdfium cleanup") -> None:
-    """清理多个 PDFium 对象时逐个尝试关闭，避免前一个关闭失败阻断后续对象释放。"""
+    """When cleaning up multiple PDFium objects, try to close them one by one to avoid the failure of the previous close from blocking the release of subsequent objects."""
     for pdfium_obj in pdfium_objs:
         if pdfium_obj is None:
             continue
@@ -95,7 +95,7 @@ def get_loadable_pdfium_page_indices(
     start_page_id: int = 0,
     end_page_id: int | None = None,
 ) -> tuple[list[int], list[int]]:
-    """逐页探测 PDFium 可加载页面，返回可保留页和损坏页的 0-based 索引。"""
+    """Detects PDFium loadable pages on a page-by-page basis, returning a 0-based index of preserveable and damaged pages."""
     import pypdfium2 as pdfium
 
     loadable_page_indices = []
@@ -141,7 +141,7 @@ def _normalize_rewrite_page_indices(
     end_page_id: int | None = None,
     page_indices: Sequence[int] | None = None,
 ) -> list[int]:
-    """按 rewrite_pdf_bytes_with_pdfium 的规则归一化实际导出的 0-based 页号。"""
+    """The actual exported 0-based page numbers are normalized according to the rules of rewrite_pdf_bytes_with_pdfium."""
     if total_page_count == 0:
         return []
 
@@ -163,7 +163,7 @@ def _get_rewrite_page_indices_from_pdf(
     end_page_id: int | None = None,
     page_indices: Sequence[int] | None = None,
 ) -> list[int]:
-    """读取源 PDF 页数并计算本次重写会保留的原始页号。"""
+    """Read the source PDF page number and calculate the original page number that will be retained by this rewrite."""
     import pypdfium2 as pdfium
 
     pdf_doc = None
@@ -226,7 +226,7 @@ def safe_rewrite_pdf_bytes_with_pdfium(
     end_page_id: int | None = None,
     page_indices: Sequence[int] | None = None,
 ) -> bytes:
-    """安全重写 PDF 字节；常规重写失败时跳过损坏页并保留可加载页面。"""
+    """Safe rewrite of PDF bytes; skips corrupt pages and preserves loadable pages when normal rewrite fails."""
     return safe_rewrite_pdf_bytes_with_pdfium_result(
         src_pdf_bytes,
         start_page_id=start_page_id,
@@ -241,7 +241,7 @@ def safe_rewrite_pdf_bytes_with_pdfium_result(
     end_page_id: int | None = None,
     page_indices: Sequence[int] | None = None,
 ) -> PdfiumRewriteResult:
-    """安全重写 PDF 字节，并返回重写后 PDF 对应的原始页号映射。"""
+    """Safely rewrite PDF bytes and return the original page number mapping corresponding to PDF after rewriting."""
     try:
         rebuilt_pdf_bytes = rewrite_pdf_bytes_with_pdfium(
             src_pdf_bytes,

@@ -1,4 +1,4 @@
-"""对齐原生行证据与输出块文本，保留来源和偏移。"""
+"""Align native line evidence with output block text, preserving source and offset."""
 
 from __future__ import annotations
 
@@ -35,15 +35,15 @@ from .types import (
 
 
 class _ContentProjectionCache:
-    """当前脚本物化调用内的只读投影缓存，按块身份及精确内容区分。"""
+    """A read-only projection cache within the current script materialization call, differentiated by block identity and exact content."""
 
     def __init__(self):
-        """容量同时受块数和投影字符数约束，不保留跨页面状态。"""
+        """Capacity is bounded by both the number of blocks and the number of projected characters, and cross-page state is not preserved."""
         self.values = OrderedDict()
         self.characters = 0
 
     def project(self, block, content):
-        """特殊块或字符串沿用参考读取，普通缓存淘汰后重新计算。"""
+        """Special blocks or strings are read using the reference, and are recalculated after the ordinary cache is eliminated."""
         if type(block) is not dict or type(content) is not str:
             return _project_content_chars(content)
         key = id(block)
@@ -69,7 +69,7 @@ def _resplit_evidence_segments(
     evidence_text: str,
     resplit: _NativeVisualResplit,
 ) -> list[tuple[_LineItem, int, int, str]] | None:
-    """按原字符身份把紧凑 evidence 文本映射到每个重切成员区间。"""
+    """Map the compact evidence text to each recut member interval according to the original character identity."""
 
     source_spans: list[tuple[int, int]] = []
     spans_by_object_id: dict[int, tuple[int, int]] = {}
@@ -138,7 +138,7 @@ def _partition_resplit_text_evidence(
     link_lines: list[PDFTextLinkLine],
     resplits: dict[int, _NativeVisualResplit],
 ) -> tuple[list[PDFTextStyleLine], list[PDFTextLinkLine]]:
-    """只替换被重切粗行的样式与链接 evidence，其它行保持原对象和顺序。"""
+    """Only the style and link evidence of the recut thick rows will be replaced, and the other rows will retain the original objects and order."""
 
     if not resplits:
         return style_lines, link_lines
@@ -219,7 +219,7 @@ def _realign_repaired_text_evidence(
     line_bboxes: dict[int, BBox],
     resplits: dict[int, _NativeVisualResplit],
 ) -> tuple[list[PDFTextStyleLine], list[PDFTextLinkLine]]:
-    """同步未重切修复行的 evidence 框，再按字符身份切分发生重切的样式与链接。"""
+    """Synchronize the evidence box of the repaired line that has not been recut, and then segment the styles and links where recut occurs by character identity."""
 
     aligned_styles = style_lines
     for index, line in enumerate(style_lines):
@@ -257,7 +257,7 @@ def _realign_repaired_text_evidence(
 
 
 def _block_bbox_to_page_bbox(value: Any, page_size: tuple[float, float]) -> BBox | None:
-    """把 model-list 的归一化 bbox 转回页面 point，同时兼容已是绝对坐标的内部输入。"""
+    """Return the normalized bbox of model-list to the page point, while being compatible with internal inputs that are already absolute coordinates."""
 
     bbox = _coerce_bbox(value)
     if bbox is None:
@@ -273,7 +273,7 @@ def _block_bbox_to_page_bbox(value: Any, page_size: tuple[float, float]) -> BBox
 
 
 def _line_block_score(line_bbox: BBox, block_bbox: BBox) -> tuple[float, float, float]:
-    """计算文本行归属 block 的中心包含、重叠率与紧致度评分。"""
+    """Calculate the center inclusion, overlap rate and compactness score of the text line attributed to block."""
 
     center_x = (line_bbox[0] + line_bbox[2]) / 2
     center_y = (line_bbox[1] + line_bbox[3]) / 2
@@ -288,7 +288,7 @@ def _assign_lines_to_blocks(
     lines: Sequence[PDFTextEvidenceLine],
     page_size: tuple[float, float],
 ) -> dict[int, list[PDFTextEvidenceLine]]:
-    """把每个视觉文本行唯一分配给最匹配的自然语言 block。"""
+    """Uniquely assign each visual text line to the best matching natural language block."""
 
     target_bboxes = {
         block_index: block_bbox
@@ -330,7 +330,7 @@ def _assign_script_lines_to_blocks(
     *,
     projection_cache: _ContentProjectionCache | None = None,
 ) -> dict[int, list[PDFTextScriptLine]]:
-    """保留整行主归属，并为无法投影的脚本区间补充 tight bbox 备用归属。"""
+    """Preserves the primary assignment for the entire row and adds tight bbox alternate assignments for script intervals that cannot be projected."""
 
     target_bboxes = {
         block_index: block_bbox
@@ -415,7 +415,7 @@ def _filter_line_styles_for_block(
     lines: Sequence[PDFTextStyleLine],
     block_type: Any,
 ) -> list[PDFTextStyleLine]:
-    """按目标 block 类型过滤样式区间，同时保留无样式物理行用于顺序对齐。"""
+    """Filter style intervals by target block type while retaining unstyled physical rows for sequential alignment."""
 
     output: list[PDFTextStyleLine] = []
     for line in lines:
@@ -450,7 +450,7 @@ def _filter_line_styles_for_block(
 
 
 def _project_content_chars(content: str) -> list[_ProjectedChar]:
-    """把原始文字投影为忽略空白和圆括号公式的可比较字符。"""
+    """Project original text into comparable characters ignoring whitespace and parenthetical formulas."""
 
     projected: list[_ProjectedChar] = []
     pending_formula_gap = False
@@ -482,7 +482,7 @@ def _project_content_chars(content: str) -> list[_ProjectedChar]:
 
 
 def _all_occurrences(content: str, target: str, start: int) -> list[int]:
-    """返回 target 在 content 指定位置后的全部精确匹配起点。"""
+    """Returns all exact matching starting points of target after the position specified by content."""
 
     output: list[int] = []
     cursor = start
@@ -498,7 +498,7 @@ def _resolve_fallback_occurrence(
     style_range: PDFTextStyleRange,
     start: int,
 ) -> int | None:
-    """在整行无法对齐时，用唯一样式片段及两侧精确上下文选择位置。"""
+    """Use unique style fragments and precise contextual selection positions on both sides when the entire row cannot be aligned."""
 
     target = line.text[style_range.start : style_range.end]
     occurrences = _all_occurrences(content, target, start)
@@ -537,7 +537,7 @@ def _match_line_across_formula_gaps(
     projected: Sequence[_ProjectedChar],
     start: int,
 ) -> _LineProjectionMatch | None:
-    """用精确字符序列跨过公式空洞，将一个物理行对齐到 block 文本。"""
+    """Align a physical line to block text with the exact sequence of characters across the formula hole."""
 
     if not line_text or start >= len(projected) or not any(token.formula_gap_before for token in projected[start:]):
         return None
@@ -588,7 +588,7 @@ def _ranges_from_line_projection(
     line: PDFTextStyleLine,
     match: _LineProjectionMatch,
 ) -> list[PDFTextStyleRange]:
-    """把物理行样式区间投影为公式字符被跳过后的 block 文本区间。"""
+    """Projects a physical line style range into a block text range with formula characters skipped."""
 
     output: list[PDFTextStyleRange] = []
     for style_range in line.style_ranges:
@@ -634,7 +634,7 @@ def _lines_form_dehyphenated_continuation(
     line: PDFTextEvidenceLine,
     next_line: PDFTextEvidenceLine | None,
 ) -> bool:
-    """判断相邻物理行是否符合正文回填使用的英文断词规则。"""
+    """Determine whether adjacent physical lines comply with the English word segmentation rules used in text backfill."""
 
     return bool(
         next_line is not None
@@ -652,7 +652,7 @@ def _match_line_without_terminal_hyphen(
     next_line: PDFTextEvidenceLine | None,
     start: int,
 ) -> _LineProjectionMatch | None:
-    """将 block 已删除的行末断词符映射为空洞，歧义时拒绝匹配。"""
+    """Map block deleted end-of-line breakers as holes, and reject matching when ambiguous."""
 
     if not _lines_form_dehyphenated_continuation(line, next_line):
         return None
@@ -681,7 +681,7 @@ def _match_style_ranges(
     projected: Sequence[_ProjectedChar],
     lines: Sequence[PDFTextStyleLine],
 ) -> list[PDFTextStyleRange]:
-    """按物理行顺序把字体与装饰线证据确定性对齐到 block 文本。"""
+    """Deterministically align font and decorative line evidence to block text in physical line order."""
 
     projected_text = "".join(token.value for token in projected)
     output: list[PDFTextStyleRange] = []
@@ -758,7 +758,7 @@ def _match_script_line_ranges(
     projected: Sequence[_ProjectedChar],
     line: PDFTextStyleLine,
 ) -> list[PDFTextStyleRange]:
-    """独立投影单条脚本行，避免其它视觉行推进 cursor 后吞掉短脚本。"""
+    """Project individual script lines independently to prevent other visual lines from swallowing short scripts after advancing cursor."""
 
     projected_text = "".join(token.value for token in projected)
     exact_occurrences = _all_occurrences(projected_text, line.text, 0)
@@ -800,7 +800,7 @@ def _match_script_line_ranges(
 
 
 def _merge_style_ranges(ranges: Sequence[PDFTextStyleRange]) -> list[PDFTextStyleRange]:
-    """把重叠样式取并集，并合并相邻且样式集合相同的区间。"""
+    """Take the union of overlapping styles and merge adjacent intervals with the same style set."""
 
     events: dict[int, dict[PDFTextStyle, int]] = {}
     for style_range in ranges:
@@ -847,7 +847,7 @@ def _resolve_link_fallback_occurrence(
     link_range: PDFTextLinkRange,
     start: int,
 ) -> int | None:
-    """整行无法对齐时，用唯一标签或两侧精确上下文定位链接片段。"""
+    """Position linked fragments with unique labels or precise context on both sides when the entire row won't align."""
 
     target_text = line.text[link_range.start : link_range.end]
     occurrences = _all_occurrences(content, target_text, start)
@@ -882,7 +882,7 @@ def _project_link_range_from_line_match(
     match: _LineProjectionMatch,
     source_index: int,
 ) -> list[_MatchedLinkRange]:
-    """按行字符投影映射链接区间，并在缺失字符处安全分段。"""
+    """Line-wise character projection mapping of linked intervals with safe segmentation at missing characters."""
 
     output: list[_MatchedLinkRange] = []
     current_start: int | None = None
@@ -930,7 +930,7 @@ def _link_lines_form_dehyphenated_continuation(
     line: PDFTextLinkLine,
     next_line: PDFTextLinkLine | None,
 ) -> bool:
-    """判断相邻同 href 链接行是否符合文本回填的英文断词规则。"""
+    """Determine whether adjacent linked lines with the same href comply with the English word segmentation rules of text backfill."""
 
     if not _lines_form_dehyphenated_continuation(line, next_line):
         return False
@@ -945,7 +945,7 @@ def _match_link_line_without_terminal_hyphen(
     next_line: PDFTextLinkLine | None,
     start: int,
 ) -> _LineProjectionMatch | None:
-    """在严格跨行条件下将已被 block 回填删除的行末断词符投影为空洞。"""
+    """Project end-of-line breakers that have been deleted by block backfill as holes under strict cross-line conditions."""
 
     if not _link_lines_form_dehyphenated_continuation(line, next_line):
         return None
@@ -960,7 +960,7 @@ def _match_link_line_without_terminal_hyphen(
 def _merge_matched_link_ranges(
     ranges: Sequence[_MatchedLinkRange],
 ) -> list[_MatchedLinkRange]:
-    """删除不同目标重叠区，并合并同一物理行内的同目标相邻区间。"""
+    """Delete overlapping areas of different targets and merge adjacent areas of the same target in the same physical row."""
 
     valid_ranges = [link_range for link_range in ranges if link_range.start < link_range.end and link_range.target]
     if not valid_ranges:
@@ -997,7 +997,7 @@ def _match_link_ranges(
     projected: Sequence[_ProjectedChar],
     lines: Sequence[PDFTextLinkLine],
 ) -> list[_MatchedLinkRange]:
-    """按物理行顺序把 Link 几何证据确定性对齐到 block 文本。"""
+    """Deterministic alignment of Link geometric evidence to block text in physical line order."""
 
     projected_text = "".join(token.value for token in projected)
     output: list[_MatchedLinkRange] = []
@@ -1088,7 +1088,7 @@ def _append_raw_link_interval(
     target: str,
     source_index: int,
 ) -> None:
-    """向结果追加一个合法原字符串链接区间。"""
+    """Appends a valid raw string link range to the result."""
 
     if start is not None and start < end and target:
         intervals.append(
@@ -1106,7 +1106,7 @@ def _raw_link_intervals(
     projected: Sequence[_ProjectedChar],
     ranges: Sequence[_MatchedLinkRange],
 ) -> list[_RawLinkInterval]:
-    """把链接区间转换为不跨公式或已有 hyperlink 的原字符串区间。"""
+    """Convert the linked range to the original string range that does not span formulas or has hyperlink."""
 
     intervals: list[_RawLinkInterval] = []
     for link_range in ranges:
@@ -1152,7 +1152,7 @@ def _raw_link_intervals(
 
 
 def _raw_link_gap_is_boundary_only(gap: str) -> bool:
-    """判断两个跨行链接片段之间是否只包含空白或非正文边界符号。"""
+    """Determines whether two cross-line link fragments contain only white space or non-text boundary symbols."""
 
     if not gap:
         return True
@@ -1165,7 +1165,7 @@ def _merge_raw_link_intervals(
     content: str,
     intervals: Sequence[_RawLinkInterval],
 ) -> list[_RawLinkInterval]:
-    """合并相邻物理行中同 href 的首尾链接片段，不跨越正文或公式。"""
+    """Merge the first and last linked fragments of the same href in adjacent physical lines, without spanning text or formulas."""
 
     merged: list[_RawLinkInterval] = []
     for interval in sorted(

@@ -1,4 +1,4 @@
-"""按显式模块映射抽取源代码，并保留源码排版与相对导入。"""
+"""Extract source code according to explicit module mapping, and preserve source code layout and relative imports."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ for name in ("images", "visuals", "geometry", "constants"):
 
 
 def renamed(module: str) -> str:
-    """按最长前缀将源模块归入唯一的目标职责模块。"""
+    """Group source modules into unique target responsibility modules by longest prefix."""
     for prefix in sorted(PREFIXES, key=len, reverse=True):
         if module == prefix or module.startswith(prefix + "."):
             return PREFIXES[prefix] + module[len(prefix):]
@@ -41,7 +41,7 @@ def renamed(module: str) -> str:
 
 
 def relative_module(module: str, package: str) -> str:
-    """计算包内静态相对导入，保留第三方绝对导入。"""
+    """Calculate static relative imports within the package, and retain third-party absolute imports."""
     if not module.startswith("docvortex"):
         return module
     destination = module.split(".")
@@ -55,7 +55,7 @@ def relative_module(module: str, package: str) -> str:
 
 
 def rewrite_imports(text: str, old_module: str, new_module: str, is_package: bool) -> str:
-    """只替换 import 节点，避免重新格式化已验证的算法代码。"""
+    """Replace only the import node to avoid reformatting the verified algorithm code."""
     old_package = old_module if is_package else old_module.rpartition(".")[0]
     new_package = new_module if is_package else new_module.rpartition(".")[0]
     lines = text.splitlines(keepends=True)
@@ -79,7 +79,7 @@ def rewrite_imports(text: str, old_module: str, new_module: str, is_package: boo
 
 
 def main() -> None:
-    """抽取完整能力闭包，同时记录供 MinerU 调用迁移使用的映射。"""
+    """Extract the full capability closure while recording the mapping used by the MinerU call migration."""
     files = set()
     for folder in ("mineru/model/flash", "mineru/backend/postprocess", "mineru/render"):
         files.update((SOURCE / folder).rglob("*.py"))
@@ -89,7 +89,7 @@ def main() -> None:
         files.add(SOURCE / path)
     for name in ("images", "visuals", "geometry", "constants"):
         files.add(SOURCE / f"mineru/backend/analysis/pdf/{name}.py")
-    # 历史结果转换归宿主所有，不能通过后处理的通用映射重新抽取。
+    # Historical result transformations are owned by the host and cannot be re-extracted via post-processing's universal mapping.
     excluded = {
         "llm_aided.py", "llm_client.py", "title_leveling.py", "llm_cell_merge.py",
         "pdftext_adapter.py", "legacy_schema_adapter.py",

@@ -4,7 +4,7 @@ from typing import Any
 
 
 def inline(content: str, *, styles: list[str] | None = None) -> list[dict[str, Any]]:
-    """把测试文字构造成最小 Middle JSON 2.0 TextSpan 列表。"""
+    """Construct test text into a minimal Middle JSON 2.0 TextSpan list."""
     span: dict[str, Any] = {"type": "text", "content": content}
     if styles:
         span["styles"] = styles
@@ -12,22 +12,22 @@ def inline(content: str, *, styles: list[str] | None = None) -> list[dict[str, A
 
 
 def equation(latex: str) -> dict[str, str]:
-    """构造测试用行内公式 Span。"""
+    """Construct the inline formula Span for testing."""
     return {"type": "equation_inline", "content": latex}
 
 
 def code(content: str) -> dict[str, str]:
-    """构造测试用行内代码 Span。"""
+    """Construct the inline code Span for testing."""
     return {"type": "code_inline", "content": content}
 
 
 def hyperlink(url: str, content: str) -> dict[str, Any]:
-    """构造测试用超链接 Span。"""
+    """Construct hyperlink Span for testing."""
     return {"type": "hyperlink", "url": url, "content": inline(content)}
 
 
 def inline_text(spans: Any) -> str:
-    """提取 raw 或 Pydantic InlineSpan 序列的可见文字，供断言复用。"""
+    """Extract the visible text of the raw or Pydantic InlineSpan sequence for assertion reuse."""
     if not isinstance(spans, list):
         return ""
     parts: list[str] = []
@@ -46,7 +46,7 @@ def inline_text(spans: Any) -> str:
 
 
 def inline_items(spans: Any) -> list[Any]:
-    """深度优先展开 InlineSpan，保留 HyperlinkSpan 本身及其子 Span。"""
+    """Depth-first expands InlineSpan, preserving HyperlinkSpan itself and its child Span."""
     if not isinstance(spans, list):
         return []
     output: list[Any] = []
@@ -60,7 +60,7 @@ def inline_items(spans: Any) -> list[Any]:
 
 
 def inline_urls(spans: Any) -> list[str]:
-    """提取 InlineSpan 序列中的全部超链接目标。"""
+    """Extract all hyperlink targets in the InlineSpan sequence."""
     urls: list[str] = []
     for span in inline_items(spans):
         span_type = span.get("type") if isinstance(span, dict) else getattr(span, "type", None)
@@ -71,7 +71,7 @@ def inline_urls(spans: Any) -> list[str]:
 
 
 def visible_content(content: Any) -> str:
-    """统一提取专用字符串内容或 InlineSpan 内容的可见文字。"""
+    """Unified extraction of visible text from dedicated string content or InlineSpan content."""
     return content if isinstance(content, str) else inline_text(content)
 
 

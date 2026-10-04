@@ -1,4 +1,4 @@
-"""验证中英混排按中文字符断行，避免表注因空格分词产生大段留白。"""
+"""Verify that mixed Chinese and English lines are broken according to Chinese characters to avoid large blank spaces in table notes due to space segmentation."""
 
 from copy import deepcopy
 from io import BytesIO
@@ -19,7 +19,7 @@ WIDTH = 232.0554
 
 
 def _paragraph(spans, *, style=None, block_type="table_footnote", preserve_newlines=False, anchor=None):
-    """通过生产入口解析富文本，保留真实字体度量与链接注册。"""
+    """Parse rich text through production portals, preserving true font metrics and link registrations."""
     return build_pdf_paragraph(
         spans,
         style or build_pdf_styles().footnote,
@@ -34,13 +34,13 @@ def _paragraph(spans, *, style=None, block_type="table_footnote", preserve_newli
 
 
 def _lines(paragraph, width=WIDTH):
-    """读取测量得到的实际行内容，而非只检查断行模式开关。"""
+    """Read the actual measured line contents instead of just checking the line break mode switch."""
     paragraph.wrap(width, 1000)
     return ["".join(fragment.text for fragment in line.words) for line in paragraph.blPara.lines]
 
 
 def test_real_chinese_footnote_uses_remaining_line_width():
-    """真实表注的 IQR 回到可容纳的首行，前两行不再因中文分词留下大段空白。"""
+    """The real table annotation IQR returns to the first line that can be accommodated, and the first two lines no longer leave a large blank space due to Chinese word segmentation."""
     paragraph = _paragraph([TextSpan(type="text", content=NOTE)])
     lines = _lines(paragraph)
     assert "IQR）原则确定" in lines[0]
@@ -50,7 +50,7 @@ def test_real_chinese_footnote_uses_remaining_line_width():
 
 
 def test_font_and_link_boundaries_do_not_move_chinese_phrases():
-    """粗体与超链接边界不会令中文整段搬行，链接标注只生成一次。"""
+    """Bold fonts and hyperlink boundaries will not cause the entire Chinese paragraph to move, and link annotations are only generated once."""
     prefix, suffix = NOTE.split("IQR", 1)
     paragraph = _paragraph(
         [
@@ -74,7 +74,7 @@ def test_font_and_link_boundaries_do_not_move_chinese_phrases():
 
 
 def test_table_text_preserves_explicit_breaks_and_wraps_chinese():
-    """表格保留显式换行，同时中文仍能在字符边界使用剩余行宽。"""
+    """Tables retain explicit line breaks, while Chinese can still use the remaining line width at character boundaries."""
     paragraph = _paragraph([TextSpan(type="text", content=NOTE + "\n下一行")], block_type="table_body", preserve_newlines=True)
     lines = _lines(paragraph)
     assert "IQR" in lines[0]
@@ -83,13 +83,13 @@ def test_table_text_preserves_explicit_breaks_and_wraps_chinese():
 
 @pytest.mark.parametrize("kind", ["code_body", "algorithm_body"])
 def test_literal_blocks_keep_existing_wrap_mode(kind):
-    """含中文的代码和算法字面块不启用新的自然语言断行规则。"""
+    """Code and algorithm literal blocks containing Chinese do not enable the new natural language line breaking rules."""
     paragraph = _paragraph([TextSpan(type="text", content=NOTE)], block_type=kind, preserve_newlines=True)
     assert paragraph.style.wordWrap is None
 
 
 def test_cjk_style_is_local_and_english_remains_unchanged():
-    """中英文段落共用输入样式时互不污染，纯英文保留原有空格分词。"""
+    """When Chinese and English paragraphs share input styles, they will not contaminate each other, and pure English retains the original space segmentation."""
     style = build_pdf_styles().footnote
     chinese = _paragraph([TextSpan(type="text", content=NOTE)], style=style)
     english = _paragraph([TextSpan(type="text", content="English words use the existing line breaking rules.")], style=style)
@@ -99,7 +99,7 @@ def test_cjk_style_is_local_and_english_remains_unchanged():
 
 @pytest.mark.parametrize("layout", [PdfLayout.ORIGINAL, PdfLayout.REFLOW])
 def test_public_pdf_paths_preserve_all_mixed_text(layout):
-    """两条公开 PDF 路径输出完整混排文字，原布局首个 IQR 实际位于首行且输入不变。"""
+    """The two public PDF paths output complete mixed text. The first IQR in the original layout is actually located on the first line and the input remains unchanged."""
     middle = _middle([{"page_idx": 0, "blocks": [_text(NOTE, bbox=(0.1, 0.1, 0.68, 0.25))]}])
     before = deepcopy(middle.to_dict())
     payload = render_pdf(middle, layout=layout)

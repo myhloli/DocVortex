@@ -1,4 +1,4 @@
-"""DOCX renderer 的 HTML 表格占位网格解析与原生表格物化。"""
+"""DOCX HTML table placeholder grid parsing and native table materialization of renderer."""
 
 from __future__ import annotations
 
@@ -24,12 +24,12 @@ HtmlTableSource: TypeAlias = str | BeautifulSoup | Tag
 
 
 class DocxTableError(ValueError):
-    """表示 HTML 表格结构或 DOCX 表格几何无法安全物化。"""
+    """Indicates that the HTML table structure or DOCX table geometry cannot be safely materialized."""
 
 
 @dataclass(frozen=True, slots=True)
 class HtmlTableCell:
-    """保存一个 HTML 原始单元格在逻辑占位网格中的位置。"""
+    """Saves the position of a HTML original cell in the logical placeholder grid."""
 
     tag: Tag
     row: int
@@ -40,18 +40,18 @@ class HtmlTableCell:
 
     @property
     def end_row(self) -> int:
-        """返回单元格占用的末行下标。"""
+        """Returns the last row index occupied by the cell."""
         return self.row + self.rowspan - 1
 
     @property
     def end_column(self) -> int:
-        """返回单元格占用的末列下标。"""
+        """Returns the last column index occupied by the cell."""
         return self.column + self.colspan - 1
 
 
 @dataclass(frozen=True, slots=True)
 class HtmlTableGrid:
-    """保存一个经过完整矩形校验的 HTML 表格占位网格。"""
+    """Saves a fully rectangularly verified HTML table placeholder grid."""
 
     tag: Tag
     row_count: int
@@ -62,19 +62,19 @@ class HtmlTableGrid:
 
 
 class NestedTableWriter(Protocol):
-    """定义单元格回调可调用的嵌套表格写入函数。"""
+    """Define nested table writing functions that can be called by cell callbacks."""
 
     def __call__(
         self,
         source: HtmlTableSource,
         width_twips: int | None = None,
     ) -> tuple[Table, ...]:
-        """把 source 中的直接嵌套表格写入当前 Word 单元格。"""
+        """Writes the directly nested table in source to the current Word cell."""
         ...
 
 
 class CellFillCallback(Protocol):
-    """定义由上层 renderer 填充原始单元格内容的回调。"""
+    """Define the callback for filling the original cell content by the upper renderer."""
 
     def __call__(
         self,
@@ -82,12 +82,12 @@ class CellFillCallback(Protocol):
         source: Tag,
         write_nested: NestedTableWriter,
     ) -> None:
-        """使用原始 td/th 标签填充 origin cell，并按需递归写入嵌套表格。"""
+        """Populate origin cell with the original td/th tags and recursively write to nested tables as needed."""
         ...
 
 
 def parse_html_table(table: Tag) -> HtmlTableGrid:
-    """把单个 table 标签解析为经过重叠、越界和矩形校验的占位网格。"""
+    """Parses a single table tag into a grid of placeholders with overlap, out-of-bounds, and rectangle checks."""
     if table.name != "table":
         raise DocxTableError("Expected a <table> tag")
 
@@ -166,7 +166,7 @@ def parse_html_table(table: Tag) -> HtmlTableGrid:
 
 
 def parse_html_tables(source: HtmlTableSource) -> tuple[HtmlTableGrid, ...]:
-    """解析 source 中相对当前上下文的一个或多个顶层 table。"""
+    """Resolve one or more top-level tables in a source relative to the current context."""
     root = BeautifulSoup(source, "html.parser") if isinstance(source, str) else source
     if not isinstance(root, (BeautifulSoup, Tag)):
         raise DocxTableError("HTML table source must be a string or BeautifulSoup Tag")
@@ -188,7 +188,7 @@ def materialize_docx_tables(
     width_twips: int = DEFAULT_TABLE_WIDTH_TWIPS,
     fill_cell: CellFillCallback,
 ) -> tuple[Table, ...]:
-    """把 source 中的全部顶层表格物化到 Document、Header/Footer 或 Cell。"""
+    """Materialize all top-level tables in source to Document, Header/Footer or Cell."""
     grids = parse_html_tables(source)
     return _materialize_grids(
         container,
@@ -206,7 +206,7 @@ def materialize_docx_table(
     width_twips: int = DEFAULT_TABLE_WIDTH_TWIPS,
     fill_cell: CellFillCallback,
 ) -> Table:
-    """把一个已解析表格网格物化到指定 python-docx 容器。"""
+    """Materializes a parsed table mesh into the specified python-docx container."""
     return _materialize_grid(
         container,
         grid,
@@ -224,7 +224,7 @@ def _materialize_grids(
     fill_cell: CellFillCallback,
     depth: int,
 ) -> tuple[Table, ...]:
-    """在同一递归层级内按源码顺序物化全部表格网格。"""
+    """Materialize all table grids in source code order within the same recursion level."""
     if depth > MAX_NESTED_TABLE_DEPTH:
         raise DocxTableError(f"Nested table depth exceeds {MAX_NESTED_TABLE_DEPTH}")
     _validate_width(width_twips)
@@ -248,7 +248,7 @@ def _materialize_grid(
     fill_cell: CellFillCallback,
     depth: int,
 ) -> Table:
-    """创建单个 Word 表格、应用合并几何并回调填充所有 origin cell。"""
+    """Create a single Word table, apply merged geometry and callback to populate all origin cell."""
     if depth > MAX_NESTED_TABLE_DEPTH:
         raise DocxTableError(f"Nested table depth exceeds {MAX_NESTED_TABLE_DEPTH}")
     column_widths = _split_width(width_twips, grid.column_count)
@@ -271,7 +271,7 @@ def _materialize_grid(
             _origin_width: int = origin_width,
             _depth: int = depth,
         ) -> tuple[Table, ...]:
-            """在当前 origin cell 内继续物化直接嵌套表格。"""
+            """Continue materializing directly nested tables within the current origin cell."""
             if _depth >= MAX_NESTED_TABLE_DEPTH:
                 raise DocxTableError(f"Nested table depth exceeds {MAX_NESTED_TABLE_DEPTH}")
             nested_grids = parse_html_tables(nested_source)
@@ -288,7 +288,7 @@ def _materialize_grid(
 
 
 def _parse_span(cell: Tag, attribute: str) -> int:
-    """读取严格正整数 rowspan/colspan，缺失属性时返回一。"""
+    """Reads a strictly positive integer rowspan/colspan, returning one if the attribute is missing."""
     raw_value = cell.get(attribute, "1")
     if isinstance(raw_value, list):
         raise DocxTableError(f"Invalid {attribute}: {raw_value!r}")
@@ -302,7 +302,7 @@ def _parse_span(cell: Tag, attribute: str) -> int:
 
 
 def _row_belongs_to_thead(row: Tag, table: Tag) -> bool:
-    """判断当前 tr 是否位于本 table 的 thead 内。"""
+    """Determine whether the current tr is within the thead of this table."""
     parent = row.parent
     while isinstance(parent, Tag) and parent is not table:
         if parent.name == "thead":
@@ -312,13 +312,13 @@ def _row_belongs_to_thead(row: Tag, table: Tag) -> bool:
 
 
 def _validate_width(width_twips: int) -> None:
-    """校验调用方传入的 DXA/twips 表格宽度。"""
+    """Verify the DXA/twips table width passed in by the caller."""
     if isinstance(width_twips, bool) or not isinstance(width_twips, int) or width_twips <= 0:
         raise DocxTableError("width_twips must be a positive integer")
 
 
 def _split_width(width_twips: int, column_count: int) -> tuple[int, ...]:
-    """把总宽度确定性地均分到列，并保证列宽之和严格等于总宽。"""
+    """Deterministically divide the total width into columns, and ensure that the sum of column widths is strictly equal to the total width."""
     _validate_width(width_twips)
     if column_count <= 0:
         raise DocxTableError("Table must contain at least one column")
@@ -329,7 +329,7 @@ def _split_width(width_twips: int, column_count: int) -> tuple[int, ...]:
 
 
 def _add_table(container: Any, row_count: int, column_count: int, width_twips: int) -> Table:
-    """按 python-docx 容器的不同 add_table 签名创建空表格。"""
+    """Create empty tables by different add_table signatures of python-docx containers."""
     if not hasattr(container, "add_table"):
         raise DocxTableError("DOCX container must provide add_table()")
     try:
@@ -349,7 +349,7 @@ def _configure_table_geometry(
     width_twips: int,
     column_widths: tuple[int, ...],
 ) -> None:
-    """设置固定布局、Table Grid 样式及确定性的 tblW、tblGrid、tcW。"""
+    """Set fixed layout, Table Grid style and deterministic tblW, tblGrid, tcW."""
     try:
         table.style = "Table Grid"
     except KeyError as exc:
@@ -379,7 +379,7 @@ def _configure_table_geometry(
 
 
 def _apply_cell_merges(table: Table, grid: HtmlTableGrid) -> None:
-    """按已验证 origin placement 为 Word 表格应用水平和垂直合并。"""
+    """Apply horizontal and vertical merging by Verified origin placement for Word table."""
     for placement in grid.cells:
         if placement.rowspan == 1 and placement.colspan == 1:
             continue
@@ -390,7 +390,7 @@ def _apply_cell_merges(table: Table, grid: HtmlTableGrid) -> None:
 
 
 def _normalize_cell_widths(table: Table, column_widths: tuple[int, ...]) -> None:
-    """合并后按 gridSpan 重新写入每个物理 tc 的确定性 DXA 宽度。"""
+    """Rewrite the deterministic DXA width of each physical tc by gridSpan after merging."""
     for row_index, row in enumerate(table._tbl.tr_lst):
         column_index = 0
         for cell in row.tc_lst:
@@ -407,7 +407,7 @@ def _normalize_cell_widths(table: Table, column_widths: tuple[int, ...]) -> None
 
 
 def _clear_fixed_row_heights(table: Table) -> None:
-    """删除所有固定 trHeight，使 Word 根据单元格内容自然扩展行高。"""
+    """Remove all fixed trHeight so that Word naturally expands the row height based on the cell content."""
     for row in table._tbl.tr_lst:
         row_properties = row.trPr
         if row_properties is None:
@@ -417,7 +417,7 @@ def _clear_fixed_row_heights(table: Table) -> None:
 
 
 def _mark_header_rows(table: Table, header_rows: tuple[int, ...]) -> None:
-    """把 thead 或全 th 行标记为可跨页重复的 Word 表头行。"""
+    """Mark thead or all th rows as Word header rows that can be repeated across pages."""
     for row_index in header_rows:
         row_properties = table.rows[row_index]._tr.get_or_add_trPr()
         header = row_properties.find(qn("w:tblHeader"))

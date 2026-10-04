@@ -1,4 +1,4 @@
-"""把静态 XHTML/HTML DOM 投影为 DocVortex raw blocks。"""
+"""Project static XHTML/HTML DOM to DocVortex raw blocks."""
 
 from __future__ import annotations
 
@@ -114,33 +114,33 @@ _InlineProjectionSegment: TypeAlias = list[_InlineSpanDict] | dict[str, object]
 
 
 class _SourceSpans(list[_InlineSpanDict]):
-    """仅在投影期间携带源元素归属，物化前移除，不进入公开协议。"""
+    """The source element ownership is only carried during the projection period, removed before materialization, and does not enter the public agreement."""
 
     def __init__(self, spans: list[_InlineSpanDict] | None = None) -> None:
-        """复制行内内容和已有来源，避免合并 Span 时丢失定位信息。"""
+        """Copy inline content and existing sources to avoid losing positioning information when merging Span."""
         super().__init__(spans or [])
         self.sources: set[etree._Element] = set(spans.sources) if isinstance(spans, _SourceSpans) else set()
 
     def clear(self) -> None:
-        """缓冲区提交后同步清除来源，避免后续片段继承前段引用。"""
+        """The source is cleared synchronously after the buffer is submitted to prevent subsequent fragments from inheriting references from the previous fragment."""
         super().clear()
         self.sources.clear()
 
 
 def _has_source_id(element: etree._Element) -> bool:
-    """只追踪具备显式身份的元素，避免正文量大时保存无用 DOM 来源。"""
+    """Only track elements with explicit identities to avoid saving useless DOM sources when the text is large."""
     return bool(element.get("id") or element.get("{http://www.w3.org/XML/1998/namespace}id"))
 
 
 def _extend_source_spans(output: list[_InlineSpanDict], spans: list[_InlineSpanDict]) -> None:
-    """在正常行内合并之外传播来源，不修改 Span 的语义字段。"""
+    """Propagating sources outside of normal inline merging does not modify the semantic fields of Span."""
     if isinstance(output, _SourceSpans) and isinstance(spans, _SourceSpans):
         output.sources.update(spans.sources)
     extend_inline_spans(output, spans)
 
 
 def _strip_source_spans(spans: list[_InlineSpanDict]) -> list[_InlineSpanDict]:
-    """修剪文本后保留有效片段的来源，空片段不产生目标。"""
+    """Sources of valid fragments are retained after trimming text, empty fragments do not produce targets."""
     content = strip_span_dicts(spans)
     if content and isinstance(spans, _SourceSpans) and spans.sources:
         result = _SourceSpans(content)
@@ -150,23 +150,23 @@ def _strip_source_spans(spans: list[_InlineSpanDict]) -> list[_InlineSpanDict]:
 
 
 def clean_text_node(value: str | None) -> str:
-    """折叠普通标记文档文本节点中的排版空白。"""
+    """Collapses typographic whitespace in plain markup document text nodes."""
     return _WHITESPACE_RE.sub(" ", value) if value else ""
 
 
 def visible_text(element: etree._Element) -> str:
-    """提取元素折叠空白后的可见纯文本。"""
+    """Extracts the visible plain text of an element after whitespace is collapsed."""
     return _WHITESPACE_RE.sub(" ", html.unescape("".join(element.itertext()))).strip()
 
 
 def _semantic_tokens(element: etree._Element) -> frozenset[str]:
-    """按 class/id 的完整空白 token 返回小写集合，不执行任意 substring 匹配。"""
+    """Complete blank token by class/id Returns the lowercase collection without performing any substring matching."""
     value = f"{element.get('class') or ''} {element.get('id') or ''}".casefold()
     return frozenset(value.split())
 
 
 def _raw_visual_type(value: object) -> BlockType | None:
-    """把 raw visual 主体或 algorithm 规范为统一父块类型。"""
+    """Normalize raw visual body or algorithm to a unified parent block type."""
     if value in {BlockType.IMAGE, BlockType.TABLE, BlockType.CHART}:
         return BlockType(value)
     if value in {BlockType.CODE, RAW_ALGORITHM}:
@@ -178,7 +178,7 @@ def _append_inline_segment(
     segments: list[_InlineProjectionSegment],
     segment: _InlineProjectionSegment,
 ) -> None:
-    """追加行内投影片段，并合并相邻 Span 组以保持稳定 block 粒度。"""
+    """Append inline projection fragments and merge adjacent Span groups to maintain stable block granularity."""
     if isinstance(segment, list) and segments and isinstance(segments[-1], list):
         _extend_source_spans(segments[-1], segment)
     elif not isinstance(segment, list) or segment:
@@ -186,7 +186,7 @@ def _append_inline_segment(
 
 
 def _append_list_block_content(parts: list[_InlineSpanDict], rendered: list[_InlineSpanDict]) -> None:
-    """用换行包围列表项内的块级正文，避免相邻段落静默粘连。"""
+    """Use line breaks to surround block-level text within list items to prevent adjacent paragraphs from silently sticking together."""
     if not rendered:
         return
     last_visible = inline_span_plain_text(parts)
@@ -197,13 +197,13 @@ def _append_list_block_content(parts: list[_InlineSpanDict], rendered: list[_Inl
 
 
 def entity_text(element: etree._Element) -> str:
-    """把 lxml 保留的安全命名实体恢复为可见文本。"""
+    """Restore lxml reserved security named entities to visible text."""
     name = getattr(element, "name", "")
     return html.unescape(f"&{name};") if name else ""
 
 
 def bounded_table_span(value: str) -> str | None:
-    """规范化有界表格跨度，避免异常整数放大渲染网格。"""
+    """Normalize bounded table spans to avoid unusual integer scaling of rendering grids."""
     if not value.isdigit():
         return None
     normalized = value.lstrip("0")
@@ -219,7 +219,7 @@ def visible_raw_text_with_style(
     style: TextStyle,
     visibility_hidden: bool,
 ) -> str:
-    """递归提取遵守整树隐藏和继承 visibility 的原始文本。"""
+    """Recursive extraction respects whole-tree hiding and inherits the original text of visibility."""
     parts: list[str] = [] if visibility_hidden else [element.text or ""]
     for child in element:
         if isinstance(child.tag, str):
@@ -242,7 +242,7 @@ def visible_raw_text_with_style(
 
 @dataclass(frozen=True, slots=True)
 class ResolvedMarkupImage:
-    """保存标记文档图片解析后的互斥载荷和说明文本。"""
+    """Save the mutually exclusive payload and description text after parsing the marked document image."""
 
     image_base64: str | None = None
     image_url: str | None = None
@@ -250,26 +250,26 @@ class ResolvedMarkupImage:
 
 
 class MarkupContext(Protocol):
-    """定义 projector 向具体容器请求链接、图片和 anchor 的边界。"""
+    """Define projector to request links, images, and boundaries for anchor from a specific container."""
 
     def resolve_link(self, href: str) -> str | None:
-        """解析一个安全链接目标。"""
+        """Resolve a safe link target."""
 
     def resolve_image(self, source: str, *, alt: str = "") -> ResolvedMarkupImage | None:
-        """解析图片为 data URI、远程 URL 或可见降级文本。"""
+        """Resolves image as data URI, remote URL, or visible degraded text."""
 
     def heading_anchor(self, heading: etree._Element) -> str | None:
-        """返回标题对应的规范 anchor。"""
+        """Returns the specification anchor corresponding to the title."""
 
     def heading_label(self, anchor: str) -> str | None:
-        """返回规范 anchor 对应的标题标签。"""
+        """Returns the title tag corresponding to specification anchor."""
 
     def note_anchor(self, note: etree._Element) -> str | None:
-        """返回脚注节点对应的规范 anchor。"""
+        """Returns the specification anchor corresponding to the footnote node."""
 
 
 class MarkupProjector:
-    """按 DOM 顺序把一个静态内容根节点投影为统一 raw blocks。"""
+    """Project a static content root node into unity raw blocks in order DOM."""
 
     def __init__(
         self,
@@ -281,7 +281,7 @@ class MarkupProjector:
         document_title_emitted: bool = False,
         track_text_sources: bool = False,
     ) -> None:
-        """绑定 DOM、格式适配器、有限 CSS 和标题策略。"""
+        """Binds DOM, format adapter, limited CSS and title policy."""
         self.track_text_sources = track_text_sources
         self.text_sources: list[tuple[etree._Element, dict[str, object]]] = []
         self.root = root
@@ -291,7 +291,7 @@ class MarkupProjector:
         self.document_title_emitted = document_title_emitted
 
     def convert(self) -> list[dict[str, object]]:
-        """转换内容根节点的子树并返回按 DOM 顺序排列的 raw blocks。"""
+        """Transforms the subtree of the content root node and returns raw blocks in order DOM."""
         resolved = self.stylesheet.resolve(self.root, TextStyle())
         if resolved.subtree_hidden:
             return []
@@ -308,7 +308,7 @@ class MarkupProjector:
                 if block.get("type") == BlockType.TEXT:
                     self.text_sources.extend((source, block) for source in content.sources)
                 block["content"] = list(content)
-        # 来源只用于登记顶层正文目标；嵌套列表与 Span 也必须恢复普通 JSON 容器。
+        # Sources are only used to register top-level text objects; nested lists with Span must also restore ordinary JSON containers.
         pending = list(blocks)
         while pending:
             item = pending.pop()
@@ -319,16 +319,16 @@ class MarkupProjector:
         return blocks
 
     def convert_svg(self) -> list[dict[str, object]]:
-        """把 standalone SVG 根节点尽力转换为文本和静态图片。"""
+        """Do your best to convert the standalone SVG root node into text and static images."""
         resolved = self.stylesheet.resolve(self.root, TextStyle())
         return [] if resolved.subtree_hidden else self._parse_svg(self.root, resolved.text, resolved.visibility_hidden)
 
     def project_block(self, element: etree._Element) -> list[dict[str, object]]:
-        """把一个已知块元素按默认继承样式投影，供版本化 HTML 解码复用。"""
+        """Project a known block element according to the default inheritance style for versioned HTML decoding and reuse."""
         return self._parse_block(element, TextStyle())
 
     def project_inline_content(self, element: etree._Element) -> list[_InlineSpanDict]:
-        """把一个已知行内容器恢复为结构化 Span。"""
+        """Restore a known in-line container to structured Span."""
         resolved = self.stylesheet.resolve(element, TextStyle())
         if resolved.subtree_hidden:
             return []
@@ -343,14 +343,14 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool = False,
     ) -> list[dict[str, object]]:
-        """把连续行内内容和块级子元素按源顺序拆成 raw blocks。"""
+        """Split consecutive inline content and block-level child elements into raw blocks in source order."""
         blocks: list[dict[str, object]] = []
         inline_parts: list[_InlineSpanDict] = _SourceSpans()
         if not visibility_hidden:
             _extend_source_spans(inline_parts, self._render_text(element.text, style))
 
         def flush_inline() -> None:
-            """把当前连续行内片段写为普通正文 block。"""
+            """Write the current continuous inline segment as normal text block."""
             content = _strip_source_spans(inline_parts)
             inline_parts.clear()
             if content:
@@ -384,7 +384,7 @@ class MarkupProjector:
         blocks: list[dict[str, object]],
         hidden: bool,
     ) -> None:
-        """把可见容器自身绑定到首个正文片段，不把内部 ID 错绑到前段。"""
+        """Bind the visible container itself to the first text segment, and do not bind the internal ID to the previous segment by mistake."""
         if not self.track_text_sources or hidden or not _has_source_id(element):
             return
         for block in blocks:
@@ -401,7 +401,7 @@ class MarkupProjector:
         inherited: TextStyle,
         inherited_visibility_hidden: bool = False,
     ) -> list[dict[str, object]]:
-        """完成块投影后记录容器位置，仅 EPUB 显式启用来源追踪。"""
+        """Record container position after block projection is complete, only EPUB explicitly enables source tracking."""
         blocks = self._parse_block_content(element, inherited, inherited_visibility_hidden)
         if not self.track_text_sources:
             return blocks
@@ -416,7 +416,7 @@ class MarkupProjector:
         inherited: TextStyle,
         inherited_visibility_hidden: bool = False,
     ) -> list[dict[str, object]]:
-        """把一个块级元素分派到对应 raw block 转换逻辑。"""
+        """Assign a block-level element to the corresponding raw block conversion logic."""
         resolved = self.stylesheet.resolve(element, inherited, inherited_visibility_hidden)
         if resolved.subtree_hidden:
             return []
@@ -462,7 +462,7 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool,
     ) -> list[dict[str, object]]:
-        """转换标题或段落，并旁路其中的视觉 blocks。"""
+        """Convert a title or paragraph and bypass the visual within it blocks."""
         blocks: list[dict[str, object]] = []
         text_emitted = False
         for segment in self._render_inline_children_ordered(element, style, visibility_hidden):
@@ -503,7 +503,7 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool = False,
     ) -> list[dict[str, object]]:
-        """逐块转换单条脚注，并只给首个文本脚注挂载 anchor。"""
+        """Convert individual footnotes block by block and mount anchor only to the first text footnote."""
         blocks = self._parse_container_contents(element, style, visibility_hidden)
         anchor = self.context.note_anchor(element)
         anchor_attached = False
@@ -523,7 +523,7 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool = False,
     ) -> tuple[list[_InlineSpanDict], list[dict[str, object]]]:
-        """渲染元素的连续行内 Span，并旁路其中的视觉 blocks。"""
+        """Renders the element's contiguous inline Span and bypasses the visual blocks within it."""
         segments = self._render_inline_children_ordered(element, style, visibility_hidden)
         content: list[_InlineSpanDict] = _SourceSpans()
         for segment in segments:
@@ -540,7 +540,7 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool = False,
     ) -> list[_InlineProjectionSegment]:
-        """按 DOM 顺序返回连续文本与旁路 block，保留 inline visual 前后边界。"""
+        """Returns continuous text in DOM order with bypass block, preserving inline visual front and rear boundaries."""
         segments: list[_InlineProjectionSegment] = []
         if not visibility_hidden:
             _append_inline_segment(segments, self._render_text(element.text, style))
@@ -562,7 +562,7 @@ class MarkupProjector:
         inherited: TextStyle,
         inherited_visibility_hidden: bool = False,
     ) -> tuple[list[_InlineSpanDict], list[dict[str, object]]]:
-        """把一个行内元素转换为结构化 Span 和可选视觉块。"""
+        """Convert an inline element to a structured Span and optional visual block."""
         segments = self._render_inline_element_ordered(element, inherited, inherited_visibility_hidden)
         content: list[_InlineSpanDict] = _SourceSpans()
         for segment in segments:
@@ -579,7 +579,7 @@ class MarkupProjector:
         inherited: TextStyle,
         inherited_visibility_hidden: bool = False,
     ) -> list[_InlineProjectionSegment]:
-        """记录行内 ID 实际所在的首个可见文本片段，保留视觉切分边界。"""
+        """Records the first visible text segment within the line where ID actually resides, preserving visual segmentation boundaries."""
         segments = self._render_inline_element_segments(element, inherited, inherited_visibility_hidden)
         if self.track_text_sources and _has_source_id(element):
             resolved = self.stylesheet.resolve(element, inherited, inherited_visibility_hidden)
@@ -598,7 +598,7 @@ class MarkupProjector:
         inherited: TextStyle,
         inherited_visibility_hidden: bool = False,
     ) -> list[_InlineProjectionSegment]:
-        """递归投影单个行内元素，并在嵌套 visual 位置保留顺序分段。"""
+        """Recursively projects a single inline element, preserving sequential segmentation at nested visual positions."""
         resolved = self.stylesheet.resolve(element, inherited, inherited_visibility_hidden)
         if resolved.subtree_hidden:
             return []
@@ -650,7 +650,7 @@ class MarkupProjector:
 
     @staticmethod
     def _render_text(value: str | None, style: TextStyle) -> list[_InlineSpanDict]:
-        """折叠文本节点并直接投影为带样式 TextSpan。"""
+        """Collapse the text node and project directly to styled TextSpan."""
         text = clean_text_node(value)
         if not text:
             return []
@@ -662,7 +662,7 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool = False,
     ) -> str:
-        """递归提取可见原始文本，并允许后代显式恢复 visibility。"""
+        """Recursively extract the visible original text and allow posterity to explicitly restore visibility."""
         return visible_raw_text_with_style(element, self.stylesheet, style, visibility_hidden)
 
     def _visible_plain_text(
@@ -671,7 +671,7 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool = False,
     ) -> str:
-        """返回折叠空白并还原实体后的可见纯文本。"""
+        """Returns the visible plain text after collapsing whitespace and restoring entities."""
         value = self._visible_raw_text(element, style, visibility_hidden)
         return _WHITESPACE_RE.sub(" ", html.unescape(value)).strip()
 
@@ -682,7 +682,7 @@ class MarkupProjector:
         caption: str | None = None,
         emit_alt_caption: bool = True,
     ) -> list[dict[str, object]]:
-        """把可解析图片转换为 image block，并用 caption/alt 补说明。"""
+        """Convert the parsable image to image block and add the description with caption/alt."""
         source = element.get("src") or element.get("href") or element.get(_XLINK_HREF) or ""
         requested_alt = (caption or element.get("alt") or element.get("title") or "").strip()
         resolved = self.context.resolve_image(source, alt=requested_alt)
@@ -706,7 +706,7 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool = False,
     ) -> list[dict[str, object]]:
-        """按标准标签或完整 token 解析 visual 主体、caption 与 footnote。"""
+        """Parse visual body, caption and footnote by standard label or complete token."""
         annotations = [
             (child, kind)
             for child in element
@@ -766,7 +766,7 @@ class MarkupProjector:
         annotation_elements: set[etree._Element],
         emit_alt_caption: bool,
     ) -> tuple[list[dict[str, object]], dict[etree._Element, list[dict[str, object]]]]:
-        """按 DOM 顺序缓冲 figure 文本，并在 visual extras 前后切分正文 block。"""
+        """Buffer the figure text in the order of DOM, and split the text block before and after visual extras."""
         blocks: list[dict[str, object]] = []
         visual_blocks_by_child: dict[etree._Element, list[dict[str, object]]] = {}
         inline_parts: list[_InlineSpanDict] = _SourceSpans()
@@ -774,7 +774,7 @@ class MarkupProjector:
             _extend_source_spans(inline_parts, self._render_text(element.text, style))
 
         def flush_inline() -> None:
-            """把 figure 当前连续文本写为普通正文 block。"""
+            """Write the current continuous text of figure as ordinary text block."""
             content = _strip_source_spans(inline_parts)
             inline_parts.clear()
             if content:
@@ -822,7 +822,7 @@ class MarkupProjector:
         annotations: set[etree._Element],
         visual_blocks_by_child: dict[etree._Element, list[dict[str, object]]],
     ) -> dict[etree._Element, dict[str, object] | None]:
-        """用双向线性扫描绑定全部 annotation，优先最近前序 visual。"""
+        """Bind all annotation with bidirectional linear scan, giving priority to the most recent visual."""
         children = [child for child in figure if isinstance(child.tag, str)]
         targets: dict[etree._Element, dict[str, object] | None] = {}
         previous_visual: dict[str, object] | None = None
@@ -841,7 +841,7 @@ class MarkupProjector:
         return targets
 
     def _has_contextual_visual_annotation(self, element: etree._Element) -> bool:
-        """仅在直属完整 token annotation 与 visual 后代并存时启用非标准容器解析。"""
+        """Non-standard container resolution is only enabled when direct full token annotation coexists with visual descendants."""
         children = [child for child in element if isinstance(child.tag, str)]
         if not any(self._visual_annotation_kind(child) is not None for child in children):
             return False
@@ -855,7 +855,7 @@ class MarkupProjector:
 
     @staticmethod
     def _visual_annotation_kind(element: etree._Element) -> str | None:
-        """用标准标签、role 或完整 class/id token 返回 caption/footnote 角色。"""
+        """Returns the caption/footnote role with the standard tag, role or the full class/id token."""
         if local_name(element) == "figcaption":
             return "caption"
         tokens = _semantic_tokens(element)
@@ -872,12 +872,12 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool = False,
     ) -> list[dict[str, object]]:
-        """从 SVG 尽力提取 title/desc/text 和静态 image。"""
+        """Best effort extraction of title/desc/text and static image from SVG."""
         blocks: list[dict[str, object]] = []
         texts: list[str] = []
 
         def visit(parent: etree._Element, inherited: TextStyle, inherited_visibility_hidden: bool) -> None:
-            """按 SVG 树顺序访问候选节点，并允许可见后代恢复输出。"""
+            """Access candidate nodes in SVG tree order and allow visible descendants to resume output."""
             for child in parent:
                 if not isinstance(child.tag, str):
                     continue
@@ -906,7 +906,7 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool = False,
     ) -> list[dict[str, object]]:
-        """重建白名单化 HTML 表格，并把 caption 投影为表格说明。"""
+        """Rebuild the whitelisted HTML table and project caption as a table description."""
         markup = self._serialize_table_node(table, style, visibility_hidden)
         if not markup:
             return []
@@ -931,7 +931,7 @@ class MarkupProjector:
         *,
         row_link_target: str | None = None,
     ) -> str:
-        """递归序列化安全表格结构、行内样式、链接、公式和图片。"""
+        """Recursively serialize safe table structures, inline styles, links, formulas, and images."""
         resolved = self.stylesheet.resolve(element, inherited, inherited_visibility_hidden)
         if resolved.subtree_hidden:
             return ""
@@ -1030,7 +1030,7 @@ class MarkupProjector:
         *,
         row_link_target: str | None = None,
     ) -> str:
-        """序列化表格节点的文本、子元素和 tail。"""
+        """Serialize table node's text, child elements, and tail."""
         parts = [] if visibility_hidden else [self._render_table_text(element.text, style)]
         for child in element:
             if isinstance(child.tag, str):
@@ -1042,7 +1042,7 @@ class MarkupProjector:
         return "".join(parts)
 
     def _toc_table_row_target(self, row: etree._Element) -> str | None:
-        """为严格匹配单一目标标题的目录表格行返回内部链接。"""
+        """Returns internal links for table of contents table rows that strictly match a single target title."""
         links = [
             element
             for element in row.iter()
@@ -1070,7 +1070,7 @@ class MarkupProjector:
 
     @staticmethod
     def _table_cell_can_inherit_toc_link(cell: etree._Element) -> bool:
-        """只允许纯文本与行内样式单元格继承目录行的唯一内部链接。"""
+        """Only plain text and inline style cells are allowed to inherit unique internal links for table of contents rows."""
         if not visible_text(cell):
             return False
         allowed_inline = {"b", "br", "code", "em", "i", "s", "span", "strong", "sub", "sup", "u"}
@@ -1078,7 +1078,7 @@ class MarkupProjector:
 
     @staticmethod
     def _render_table_text(value: str | None, style: TextStyle) -> str:
-        """把表格文字转义后包装为 renderer 支持的安全 HTML 样式标签。"""
+        """Escape table text and wrap it into safe HTML style tags supported by renderer."""
         rendered = html.escape(clean_text_node(value), quote=False)
         if not rendered:
             return ""
@@ -1100,7 +1100,7 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool = False,
     ) -> tuple[dict[str, object] | None, list[dict[str, object]]]:
-        """解析有序/无序列表，并投影为连续阿拉伯编号结构。"""
+        """Parse ordered/unordered lists and project into continuous Arabic numbering structures."""
         if self._list_contains_page_blocks(element):
             return self._parse_list_with_page_blocks(element, style, visibility_hidden)
         ordered = local_name(element) == "ol"
@@ -1172,7 +1172,7 @@ class MarkupProjector:
 
     @staticmethod
     def _list_contains_page_blocks(element: etree._Element) -> bool:
-        """判断列表是否含可能提升为页面兄弟的 visual、code 或公式子树。"""
+        """Determines whether the list contains visual, code, or formula subtrees that may be promoted to page siblings."""
         return any(
             isinstance(candidate.tag, str) and local_name(candidate) in _LIST_PAGE_BLOCK_TAGS
             for candidate in element.iterdescendants()
@@ -1184,7 +1184,7 @@ class MarkupProjector:
         style: TextStyle,
         visibility_hidden: bool,
     ) -> tuple[dict[str, object] | None, list[dict[str, object]]]:
-        """把含 visual 的列表切成有序 list/text/page block 片段，保持 DOM 阅读顺序。"""
+        """Cut the list containing visual into ordered list/text/page block fragments, keeping the DOM reading order."""
         ordered = local_name(element) == "ol"
         list_start = self._ordered_list_start(element) if ordered else 1
         items = [child for child in element if isinstance(child.tag, str) and local_name(child) == "li"]
@@ -1195,7 +1195,7 @@ class MarkupProjector:
         has_page_blocks = False
 
         def flush_pending() -> None:
-            """把当前连续列表项写为一个顶层 list block。"""
+            """Writes the current consecutive list item as a top-level list block."""
             nonlocal pending_children
             if not pending_children:
                 return
@@ -1258,7 +1258,7 @@ class MarkupProjector:
     def _normalize_list_item_segments(
         segments: list[_InlineProjectionSegment],
     ) -> list[_InlineProjectionSegment]:
-        """把列表内部普通 text block 还原为文本片段，保留 visual/list 页面边界。"""
+        """Restore ordinary text block inside the list to text fragments, retaining visual/list page boundaries."""
         normalized: list[_InlineProjectionSegment] = []
         for segment in segments:
             if isinstance(segment, dict) and segment.get("type") == BlockType.TEXT:
@@ -1270,7 +1270,7 @@ class MarkupProjector:
 
     @staticmethod
     def _list_item_children(segments: list[_InlineProjectionSegment]) -> list[dict[str, object]]:
-        """把无页面 visual 的列表片段收敛为一个文本叶子及其嵌套列表。"""
+        """Convergence list fragments of pageless visual into a text leaf and its nested lists."""
         content: list[_InlineSpanDict] = _SourceSpans()
         for segment in segments:
             if isinstance(segment, list):
@@ -1287,7 +1287,7 @@ class MarkupProjector:
         ordered: bool,
         start: int,
     ) -> dict[str, object]:
-        """构造一段可由既有无坐标后处理编号的 raw list block。"""
+        """Construct a raw list block that can be numbered by existing coordinate post-processing."""
         block: dict[str, object] = {
             "type": BlockType.LIST,
             "attribute": "ordered" if ordered else "unordered",
@@ -1299,7 +1299,7 @@ class MarkupProjector:
 
     @staticmethod
     def _ordered_list_start(element: etree._Element) -> int:
-        """读取有序列表唯一通用起始值，非法或负值统一回退为一。"""
+        """Read the unique common starting value of the ordered list. Illegal or negative values fall back to one."""
         try:
             start = int(element.get("start") or 1)
         except ValueError:
@@ -1308,12 +1308,12 @@ class MarkupProjector:
 
     @staticmethod
     def _formula_extraction(element: etree._Element) -> FormulaExtraction | None:
-        """调用共享公式优先级，返回裸 LaTeX 及来源信息。"""
+        """Call the shared formula priority and return the bare LaTeX and source information."""
         return extract_formula(element)
 
     @staticmethod
     def _code_language_hint(element: etree._Element) -> str | None:
-        """从 pre/code 的标准 class 或 data 属性提取安全语言提示。"""
+        """Extracts the safe language prompt from the standard class or data attribute of pre/code."""
         candidates = [element, *[child for child in element if isinstance(child.tag, str) and local_name(child) == "code"]]
         for candidate in candidates:
             for attribute in ("data-language", "data-lang"):
@@ -1344,7 +1344,7 @@ __all__ = [
     "visible_text",
 ]
 
-# 保持既有公开类型的 pickle 路径，所有旧、新入口指向同一个类。
+# Keep the existing public type pickle path, with all old and new entries pointing to the same class.
 preserve_type_module(ResolvedMarkupImage, "docvortex.analyzers.native._shared.markup.projector")
 preserve_type_module(MarkupContext, "docvortex.analyzers.native._shared.markup.projector")
 preserve_type_module(MarkupProjector, "docvortex.analyzers.native._shared.markup.projector")

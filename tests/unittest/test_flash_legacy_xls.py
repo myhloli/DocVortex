@@ -38,7 +38,7 @@ from docvortex.schema import BlockType
 
 
 def test_xls_model_preserves_visible_empty_pages_and_skips_hidden_sheet() -> None:
-    """验证可见空表保留页位而隐藏 sheet 不输出。"""
+    """Verify that visible empty tables reserve page bits and hide sheet without output."""
 
     file_bytes = build_xls(
         [
@@ -56,7 +56,7 @@ def test_xls_model_preserves_visible_empty_pages_and_skips_hidden_sheet() -> Non
 
 
 def test_xls_formula_cache_merge_and_hyperlink_flow_into_table() -> None:
-    """验证缓存公式、合并结构和安全链接进入同一 HTML 表格。"""
+    """Verify that cached formulas, merge structures, and secure links go into the same HTML table."""
 
     records = (
         label_cell(0, 0, "header")
@@ -84,7 +84,7 @@ def test_xls_formula_cache_merge_and_hyperlink_flow_into_table() -> None:
 
 
 def test_xls_rich_sst_uses_utf16_ranges_across_non_bmp_text() -> None:
-    """验证非 BMP 字符的 UTF-16 rich run 边界不会偏移。"""
+    """Verify that UTF-16 rich run boundaries for non-BMP characters are not offset."""
 
     globals_records = font_record(bold=True) + font_record(italic=True) + rich_sst([("A😀B", [(0, 1), (3, 2)])])
     pages = XlsModel().predict(
@@ -102,7 +102,7 @@ def test_xls_rich_sst_uses_utf16_ranges_across_non_bmp_text() -> None:
 
 
 def test_xls_sst_character_data_can_cross_continue_records() -> None:
-    """验证 SST 在字符中间切入 CONTINUE 后重读压缩标志并继续 rich runs。"""
+    """Verify SST Reread the compression flag after cutting mid-character CONTINUE and continue rich runs."""
 
     globals_records = font_record(bold=True) + font_record(italic=True) + continued_rich_sst("A😀BC", [(0, 1), (3, 2)])
     pages = XlsModel().predict(
@@ -142,13 +142,13 @@ def test_xls_number_formats_match_expected_visible_semantics(
     value: float,
     expected: str,
 ) -> None:
-    """验证关键数值格式符合预期的稳定显示语义。"""
+    """Verify that the key value format conforms to the expected stable display semantics."""
 
     assert format_number(value, format_code, date1904=False) == expected
 
 
 def test_xls_text_format_and_unsafe_hyperlink_fallback() -> None:
-    """验证文本 section 生效且危险链接降级为普通文本。"""
+    """Verify that the text section is in effect and the dangerous link is downgraded to normal text."""
 
     assert format_text("hi", '0;0;0;"* "@" *"') == "* hi *"
     records = label_cell(0, 0, "unsafe") + url_hyperlink(
@@ -172,7 +172,7 @@ def test_xls_text_format_and_unsafe_hyperlink_fallback() -> None:
 
 
 def test_xls_filepass_and_broken_boundsheet_behaviors() -> None:
-    """验证加密硬失败，而损坏 sheet offset 可按 worksheet BOF 恢复。"""
+    """Verification encryption hard failed and corrupted sheet offset recoverable by worksheet BOF."""
 
     with pytest.raises(LegacyOfficeEncryptedError, match="password-protected"):
         XlsModel().predict(BytesIO(build_xls([SheetFixture("Data")], encrypted=True)))
@@ -189,7 +189,7 @@ def test_xls_filepass_and_broken_boundsheet_behaviors() -> None:
 
 
 def test_xls_encrypted_ooxml_marker_and_missing_workbook_are_stable_errors() -> None:
-    """验证 OLE 加密包不会误判成 BIFF，缺失 Workbook/Book 返回稳定错误。"""
+    """Verify that the OLE encrypted package will not be misjudged as BIFF, and a stable error will be returned if Workbook/Book is missing."""
 
     encrypted = _build_cfb(
         [
@@ -205,7 +205,7 @@ def test_xls_encrypted_ooxml_marker_and_missing_workbook_are_stable_errors() -> 
 
 
 def test_xls_biff5_codepage_and_hidden_rows_columns_are_preserved() -> None:
-    """验证 BIFF5 codepage 降级及用户选择的隐藏行列保留策略。"""
+    """Verify BIFF5 codepage downgrade and user-selected hidden column retention policy."""
 
     assert XlsModel().predict(BytesIO(build_biff5_xls("légacy"))) == [[{"type": BlockType.TEXT, "content": inline("légacy")}]]
 
@@ -225,7 +225,7 @@ def test_xls_biff5_codepage_and_hidden_rows_columns_are_preserved() -> None:
 def test_xls_record_and_grid_limits_are_hard_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证记录访问与工作簿网格预算均不可静默绕过。"""
+    """Neither validation record access nor workbook grid budgeting can be silently bypassed."""
 
     budget = RecordBudget(count=MAX_RECORDS)
     with pytest.raises(LegacyOfficeResourceLimitError, match="max_records"):
@@ -237,11 +237,11 @@ def test_xls_record_and_grid_limits_are_hard_failures(
 
 
 def test_xls_rejects_oversized_merge_before_openpyxl_materialization(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证单个超限 BIFF merge 不会进入 openpyxl 单元格物化。"""
+    """Verify that a single out-of-limit BIFF merge does not materialize into a openpyxl cell."""
     monkeypatch.setattr(xls_converter_module, "MAX_GRID_SLOTS", 4)
 
     def unexpected_merge(*_args: object, **_kwargs: object) -> None:
-        """超限 merge 不得调用 openpyxl。"""
+        """merge out of limit openpyxl must not be called."""
         pytest.fail("oversized BIFF merge reached openpyxl materialization")
 
     monkeypatch.setattr(xls_converter_module.Worksheet, "merge_cells", unexpected_merge)
@@ -252,13 +252,13 @@ def test_xls_rejects_oversized_merge_before_openpyxl_materialization(monkeypatch
 
 
 def test_xls_charges_cumulative_merge_budget_before_each_materialization(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证多个合法 merge 的累计面积会在下一次物化前触发预算。"""
+    """Verifying the cumulative area of multiple legal merges triggers the budget before the next materialization."""
     monkeypatch.setattr(xls_converter_module, "MAX_GRID_SLOTS", 4)
     original_merge = xls_converter_module.Worksheet.merge_cells
     materialized: list[tuple[object, ...]] = []
 
     def tracking_merge(self: object, *args: object, **kwargs: object) -> None:
-        """记录预算内实际进入 openpyxl 的 merge。"""
+        """Record merge that actually goes into openpyxl within budget."""
         materialized.append(args or tuple(kwargs.values()))
         original_merge(self, *args, **kwargs)  # type: ignore[arg-type]
 

@@ -1,4 +1,4 @@
-"""HTML table 到 TeX Live longtable/tabular 源码的安全物化。"""
+"""HTML table to TeX Live longtable/tabular Secure materialization of source code."""
 
 from __future__ import annotations
 
@@ -26,23 +26,23 @@ _HtmlCellToken: TypeAlias = InlineSpan | Tag
 
 
 class LatexTableError(HtmlTableError):
-    """表示 HTML table 无法安全物化为 LaTeX 表格。"""
+    """Indicates that HTML table cannot be safely materialized into the LaTeX form."""
 
 
 class LatexTableRenderer:
-    """持有图片路径和 anchor 上下文的递归 LaTeX 表格 renderer。"""
+    """Recursive LaTeX table renderer holding image path and anchor context."""
 
     def __init__(self, *, asset_base_path: str, anchors: LatexAnchorRegistry) -> None:
-        """保存表格单元格渲染所需的文档级上下文。"""
+        """Saves the document-level context required for table cell rendering."""
         self.asset_base_path = asset_base_path
         self.anchors = anchors
 
     def render(self, source: HtmlTableSource) -> str:
-        """把一个或多个顶层 HTML table 转换为可分页 LaTeX 表格。"""
+        """Converts one or more top-level HTML table to pageable LaTeX tables."""
         return self._render_source(source, depth=1)
 
     def _render_source(self, source: HtmlTableSource, *, depth: int) -> str:
-        """递归解析当前层级的 table，并执行深度上限校验。"""
+        """Recursively parse the table of the current level and perform depth upper limit verification."""
         if depth > MAX_NESTED_TABLE_DEPTH:
             raise LatexTableError(f"Nested table depth exceeds {MAX_NESTED_TABLE_DEPTH}")
         try:
@@ -52,7 +52,7 @@ class LatexTableRenderer:
         return "\n\n".join(self._render_grid(grid, depth=depth) for grid in grids)
 
     def _render_grid(self, grid: HtmlTableGrid, *, depth: int) -> str:
-        """把严格占位网格转换为 longtable 或嵌套 tabular。"""
+        """Convert strict placeholder grid to longtable or nested tabular."""
         environment = "longtable" if depth == 1 else "tabular"
         column_spec = self._column_spec(grid.column_count)
         occupied = {
@@ -98,7 +98,7 @@ class LatexTableRenderer:
         column_count: int,
         depth: int,
     ) -> str:
-        """渲染一个 origin cell，并组合 rowspan/colspan 声明。"""
+        """Renders a origin cell, combined with the rowspan/colspan declaration."""
         parts = self._render_cell_parts(cell, depth=depth)
         content = r"\par ".join(part for part in parts if part) or "~"
         if is_header:
@@ -111,13 +111,13 @@ class LatexTableRenderer:
         return content
 
     def _render_cell_parts(self, cell: Tag, *, depth: int) -> list[str]:
-        """按 HTML 来源顺序交替渲染行内内容、图片与嵌套表格。"""
+        """Alternately render inline content, images, and nested tables in the order of the HTML source."""
 
         parts: list[str] = []
         inline_buffer: list[InlineSpan] = []
 
         def flush_inline_buffer() -> None:
-            """把当前连续行内 token 校验并渲染为一个 LaTeX 片段。"""
+            """Verify and render token in the current continuous line into a LaTeX fragment."""
 
             if not inline_buffer:
                 return
@@ -140,7 +140,7 @@ class LatexTableRenderer:
         return parts
 
     def _render_image_tag(self, image: Tag) -> str:
-        """读取一个单元格图片标签并渲染为 LaTeX 图片或可见回退。"""
+        """Reads a cell image label and renders it as a LaTeX image or visible fallback."""
 
         source = image.get("src", "")
         if isinstance(source, list):
@@ -151,7 +151,7 @@ class LatexTableRenderer:
         return self._render_image(str(source), str(alt))
 
     def _render_image(self, source: str, alt_text: str) -> str:
-        """渲染单元格图片；非本地 sidecar 退化为可见链接或占位。"""
+        """Rendering cell image; non-native sidecar degrades to visible link or placeholder."""
         path = resolve_html_image_path(source, self.asset_base_path)
         if path is not None:
             return rf"\includegraphics[width=.85\linewidth,height=.25\textheight,keepaspectratio]{{{tex_image_path(path)}}}"
@@ -163,7 +163,7 @@ class LatexTableRenderer:
 
     @staticmethod
     def _column_spec(column_count: int) -> str:
-        """按逻辑列数生成确定性的等宽段落列声明。"""
+        """Generate deterministic equal-width paragraph column declarations in logical column numbers."""
         if column_count <= 0:
             raise LatexTableError("Table must contain at least one column")
         width = _cell_width(1, column_count)
@@ -172,12 +172,12 @@ class LatexTableRenderer:
 
     @staticmethod
     def _continued_rowspan_placeholder(colspan: int) -> str:
-        """为前序行延续下来的 rowspan 写入等列宽空占位。"""
+        """Write equal column width space for rowspan that is continued from the previous row."""
         return rf"\multicolumn{{{colspan}}}{{|l|}}{{}}" if colspan > 1 else ""
 
 
 def _cell_width(colspan: int, column_count: int) -> str:
-    """按表格总列数计算当前单元格占用的 linewidth 比例。"""
+    """Calculate the proportion of linewidth occupied by the current cell based on the total number of columns in the table."""
     ratio = 0.94 * colspan / column_count
     return f"{ratio:.6f}\\linewidth"
 
@@ -188,7 +188,7 @@ def _row_rules(
     row_index: int,
     column_count: int,
 ) -> list[str]:
-    """只在当前行结束的单元格列下画线，避免横线切穿 rowspan。"""
+    """Only draw lines under the cell column at the end of the current row to avoid horizontal lines cutting through rowspan."""
     ending_columns = [column for column in range(column_count) if occupied[(row_index, column)].end_row == row_index]
     if len(ending_columns) == column_count:
         return [r"\hline"]
@@ -208,7 +208,7 @@ def _row_rules(
 
 
 def _parse_cell_inline_spans(spans: list[InlineSpan]) -> list[InlineSpan]:
-    """校验一个不跨图片或嵌套表格的连续单元格行内片段。"""
+    """Verify that a contiguous inline segment of cells does not span images or nested tables."""
 
     try:
         return parse_inline_spans(spans)
@@ -217,7 +217,7 @@ def _parse_cell_inline_spans(spans: list[InlineSpan]) -> list[InlineSpan]:
 
 
 def _html_cell_tokens(cell: Tag) -> list[_HtmlCellToken]:
-    """按来源顺序返回单元格中的行内、图片与嵌套表格 token。"""
+    """Returns in-row, picture, and nested tables in cells in order of source token."""
 
     return [
         token
@@ -236,7 +236,7 @@ def _html_node_tokens(
     styles: tuple[InlineStyle, ...],
     allow_links: bool,
 ) -> list[_HtmlCellToken]:
-    """递归解析 HTML 节点，同时把图片和嵌套表格保留为顺序屏障。"""
+    """Parse HTML nodes recursively while preserving images and nested tables as order barriers."""
 
     if isinstance(node, NavigableString):
         text = str(node)
@@ -304,7 +304,7 @@ def _wrap_hyperlink_tokens(
     tokens: list[_HtmlCellToken],
     target: str | None,
 ) -> list[_HtmlCellToken]:
-    """只包装链接内连续的 InlineSpan，让图片和嵌套表格保持原位。"""
+    """Only wrap contiguous InlineSpan within a link, leaving images and nested tables in place."""
 
     if target is None:
         return tokens
@@ -312,7 +312,7 @@ def _wrap_hyperlink_tokens(
     inline_buffer: list[InlineSpan] = []
 
     def flush_inline_buffer() -> None:
-        """把当前链接行内片段包装成一个 HyperlinkSpan。"""
+        """Wrap the current linked inline fragment into a HyperlinkSpan."""
 
         if not inline_buffer:
             return
@@ -339,7 +339,7 @@ def _wrap_hyperlink_tokens(
 
 
 def _tokens_end_with_newline(tokens: list[_HtmlCellToken]) -> bool:
-    """判断当前 token 序列是否已经以普通文本换行结束。"""
+    """Determine whether the current token sequence has ended with a normal text line break."""
 
     return bool(tokens and isinstance(tokens[-1], TextSpan) and tokens[-1].content.endswith("\n"))
 

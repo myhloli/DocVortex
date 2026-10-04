@@ -1,3 +1,3 @@
-"""HTML renderer 的内部实现。"""
+"""HTML Internal implementation of renderer."""
 
 __all__: list[str] = []

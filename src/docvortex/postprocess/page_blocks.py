@@ -1,4 +1,4 @@
-"""单页 raw block 的内容清理、列表整理和视觉分组流水线。"""
+"""Content cleaning, list organization, and visual grouping pipeline for single page raw block."""
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ _INLINE_CONTENT_BLOCK_TYPES = {
 
 
 def _normalize_raw_blocks(page_model_list: list[BlockDict]) -> list[BlockDict]:
-    """原地规范化 raw block 类型、内容、索引和代码子类型。"""
+    """In-place normalization of raw block type, content, index, and code subtypes."""
     blocks: list[BlockDict] = []
     for index, block in enumerate(page_model_list):
         code_block_sub_type = None
@@ -111,7 +111,7 @@ def _normalize_raw_blocks(page_model_list: list[BlockDict]) -> list[BlockDict]:
 
 
 def _apply_caption_fallbacks(blocks: list[BlockDict], *, use_bbox: bool) -> None:
-    """按 PDF 或 Office 结构应用视觉标题兜底规则。"""
+    """Apply the visual title wrapper rules according to the PDF or Office structure."""
     if use_bbox:
         fallback_inline_caption_fragments(blocks, VISUAL_MAIN_TYPES)
         fallback_leading_table_continuation_captions(blocks, VISUAL_MAIN_TYPES)
@@ -122,7 +122,7 @@ def _apply_caption_fallbacks(blocks: list[BlockDict], *, use_bbox: bool) -> None
 def _partition_textual_blocks(
     blocks: list[BlockDict],
 ) -> tuple[list[BlockDict], list[BlockDict], list[BlockDict], list[BlockDict]]:
-    """按 text、ref_text、list、index 四类分区 raw block。"""
+    """According to four types of partitions: text, ref_text, list, index raw block."""
     text_blocks: list[BlockDict] = []
     ref_text_blocks: list[BlockDict] = []
     list_blocks: list[BlockDict] = []
@@ -145,7 +145,7 @@ def _prepare_lists_and_indices(
     *,
     use_bbox: bool,
 ) -> tuple[list[BlockDict], list[BlockDict], list[BlockDict], list[BlockDict]]:
-    """根据文档类型整理列表、目录以及被列表吸收的文本块。"""
+    """Organize lists, tables of contents, and blocks of text absorbed by lists according to document type."""
     text_blocks, ref_text_blocks, list_blocks, index_blocks = _partition_textual_blocks(blocks)
     if use_bbox:
         list_blocks, text_blocks, ref_text_blocks = fix_pdf_list_blocks(
@@ -161,7 +161,7 @@ def _prepare_lists_and_indices(
 
 
 def _finalize_code_blocks(code_blocks: list[BlockDict]) -> None:
-    """确定代码语言，并把算法唯一主体切换为 algorithm_body。"""
+    """Determine the code language and switch the algorithm sole body to algorithm_body."""
     for code_block in code_blocks:
         if code_block["sub_type"] == RAW_ALGORITHM:
             for sub_block in code_block["content"]:
@@ -184,7 +184,7 @@ def process_page_blocks(
     *,
     use_bbox: bool | None = None,
 ) -> list[BlockDict]:
-    """按固定阶段将单页 raw model-list 转换为可对象化的顶层 blocks。"""
+    """Convert single page raw model-list to objectable top-level blocks in fixed stages."""
     resolved_use_bbox = any(block.get("bbox") for block in page_model_list) if use_bbox is None else use_bbox
     blocks = _normalize_raw_blocks(page_model_list)
     _apply_caption_fallbacks(blocks, use_bbox=resolved_use_bbox)

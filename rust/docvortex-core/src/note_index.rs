@@ -1,4 +1,4 @@
-//! 纵向前缀的持久化高度计数树，仅保存本次候选构建的数值。
+//! The persistent height count tree of the vertical prefix only saves the value of this candidate construction.
 
 #[derive(Clone, Copy, Default)]
 struct Node {
@@ -15,7 +15,7 @@ pub struct HeightIndex {
 }
 
 impl HeightIndex {
-    /// 高度平局保留输入顺序，中心排序也稳定，查询不复制高度样本。
+    /// The height draw retains the input order, the center sorting is also stable, and the query does not copy height samples.
     pub fn new(items: &[(i64, f64, f64)]) -> Self {
         let mut order: Vec<usize> = (0..items.len()).collect();
         order.sort_by(|&a, &b| items[a].2.partial_cmp(&items[b].2).unwrap());
@@ -39,7 +39,7 @@ impl HeightIndex {
         result
     }
 
-    /// 仅复制根到新增高度叶子的路径，共享所有未变化节点。
+    /// Only copy the path from the root to the newly added height leaf, sharing all unchanged nodes.
     fn insert(&mut self, previous: usize, low: usize, high: usize, rank: usize) -> usize {
         let mut node = self.nodes[previous];
         node.count += 1;
@@ -55,7 +55,7 @@ impl HeightIndex {
         self.nodes.len() - 1
     }
 
-    /// 在左前缀加完整集合减右前缀的有序多重集合中查找零起算位置。
+    /// Find the zero-based position in the ordered multiple set of the left prefix plus the complete set minus the right prefix.
     fn select(&self, mut left: usize, mut total: usize, mut right: usize, mut rank: usize) -> f64 {
         let (mut low, mut high) = (0, self.heights.len());
         while high - low > 1 {
@@ -81,7 +81,7 @@ impl HeightIndex {
         self.heights[low]
     }
 
-    /// 闭区间纵向排除后，精确读取最高四分位的一个或两个中位数值。
+    /// After longitudinal exclusion of closed intervals, one or two median values of the highest quartile are accurately read.
     pub fn height(&self, top: f64, bottom: f64, fallback: f64) -> Option<f64> {
         if !top.is_finite() || !bottom.is_finite() || top > bottom || !fallback.is_finite() {
             return None;
@@ -122,7 +122,7 @@ pub struct CoreRows {
 }
 
 impl CoreRows {
-    /// 将同一来源的所有中心纳入行范围，避免重复来源落在排除区间外时误省略。
+    /// All centers from the same source are included in the row range to avoid mistaken omission when repeated sources fall outside the exclusion interval.
     pub fn new(
         members: Vec<Vec<i64>>,
         extents: &std::collections::HashMap<i64, (f64, f64)>,
@@ -150,7 +150,7 @@ impl CoreRows {
         }
     }
 
-    /// 查询连续行中所有核心来源的中心范围，无需传输或展开成员列表。
+    /// Query the central range of all core sources in consecutive rows without transmitting or expanding the member list.
     pub fn contained(&self, start: usize, end: usize, top: f64, bottom: f64) -> bool {
         let (mut l, mut r) = (start + self.size, end + self.size);
         while l < r {

@@ -1,4 +1,4 @@
-"""PDF 填充单元格候选；保留原有认领顺序与判定规则。"""
+"""PDF fills cell candidates; retains the original claiming order and decision rules."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def _detect_filled_grid_table_candidates(
     page_size: tuple[float, float],
     excluded_bboxes: list[BBox] | None = None,
 ) -> list[_TableCandidate]:
-    """仅按根层填充矩形的嵌套行带识别精确表格外框。"""
+    """Nested rows of filled rectangles by root level only recognize exact table outlines."""
 
     page_width, page_height = page_size
     page_area = page_width * page_height
@@ -107,7 +107,7 @@ def _select_maximal_filled_grid_cells(
     rectangles: list[BBox],
     outer_bbox: BBox,
 ) -> list[BBox]:
-    """移除边缘细条、重复 Path 和同跨度半行底纹，保留最大单元格。"""
+    """Remove edge strips, repeating Path and same-span half-row shading, retaining the largest cell."""
 
     outer_width = outer_bbox[2] - outer_bbox[0]
     outer_height = outer_bbox[3] - outer_bbox[1]
@@ -159,7 +159,7 @@ def _bbox_is_contained_with_tolerance(
     x_tolerance: float,
     y_tolerance: float,
 ) -> bool:
-    """按横纵独立容差判断一个矩形是否完整位于另一个矩形内。"""
+    """Determine whether a rectangle is completely within another rectangle based on the horizontal and vertical independent tolerances."""
 
     return (
         inner_bbox[0] >= outer_bbox[0] - x_tolerance
@@ -173,7 +173,7 @@ def _group_filled_grid_cells_into_bands(
     cells: list[BBox],
     outer_bbox: BBox,
 ) -> list[list[BBox]]:
-    """按相近上下边界把最大填充单元格聚成水平行带。"""
+    """Group the largest filled cells into horizontal rows based on similar upper and lower boundaries."""
 
     y_tolerance = 0.02 * (outer_bbox[3] - outer_bbox[1])
     bands: list[list[BBox]] = []
@@ -193,7 +193,7 @@ def _filled_grid_band_covers_outer_width(
     band: list[BBox],
     outer_bbox: BBox,
 ) -> bool:
-    """校验单个填充行带的单元格数量、横向覆盖、间隙和端点。"""
+    """Verify the number of cells, horizontal coverage, gaps, and endpoints of a single padded row band."""
 
     if len(band) < 2:
         return False

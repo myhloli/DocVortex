@@ -1,4 +1,4 @@
-"""PDF 链接与签名注解提取，保持原生提取算法与资源语义。"""
+"""PDF link and signature annotation extraction, maintaining the native extraction algorithm and resource semantics."""
 
 from __future__ import annotations
 
@@ -19,12 +19,12 @@ logger = logging.getLogger("docvortex.document.pdf._document")
 
 
 def _validate_pdf_external_link_target(value: str) -> str | None:
-    """校验 PDF URI Action，只保留显式且可安全输出的外部链接。"""
+    """Check PDF URI Action, retaining only explicit and output-safe external links."""
     return sanitize_hyperlink_target(value, allowed_schemes=_PDF_EXTERNAL_LINK_SCHEMES)
 
 
 def _get_pdfium_uri_path(raw_doc: Any, raw_action: Any) -> str | None:
-    """按 PDFium 两阶段缓冲区协议读取 URI Action 的 UTF-8 目标。"""
+    """Read URI UTF-8 target of Action per PDFium two-stage buffer protocol."""
 
     try:
         required = int(
@@ -61,7 +61,7 @@ def _get_pdfium_uri_path(raw_doc: Any, raw_action: Any) -> str | None:
 
 
 def _pdf_link_annotation_is_visible(page: pdfium.PdfPage, raw_link: Any) -> bool:
-    """读取 Link 注解可见性；损坏或显式隐藏的注解均不参与文本富化。"""
+    """Read Link Annotation visibility; corrupted or explicitly hidden annotations do not participate in text enrichment."""
 
     raw_annot = None
     try:
@@ -86,7 +86,7 @@ def _visual_bbox_from_pdf_points(
     page_bbox: BBox,
     page_rotation: int,
 ) -> BBox | None:
-    """把 PDF 底左坐标点集转换并裁剪为视觉页面左上坐标 bbox。"""
+    """Convert and crop the bottom left coordinate point set of PDF to the upper left coordinate of the visual page, bbox."""
 
     if not points or not all(math.isfinite(coordinate) for point in points for coordinate in point):
         return None
@@ -108,7 +108,7 @@ def _pdf_link_region_bboxes(
     page_bbox: BBox,
     page_rotation: int,
 ) -> tuple[BBox, ...]:
-    """优先读取 Link QuadPoints，并在缺失时回退到注解矩形。"""
+    """Read Link QuadPoints first, falling back to the annotation rectangle if missing."""
 
     bboxes: list[BBox] = []
     try:
@@ -173,7 +173,7 @@ def _extract_page_link_annotations(
     page_bbox: BBox,
     page_rotation: int,
 ) -> list[PDFLinkAnnotation]:
-    """枚举页面外部 URI Link；单条损坏数据不会中断同页其他链接。"""
+    """Enumeration page external URI Link; a single piece of damaged data will not interrupt other links on the same page."""
 
     annotations: list[PDFLinkAnnotation] = []
     position = ctypes.c_int(0)
@@ -225,7 +225,7 @@ def _extract_page_link_annotations(
 
 
 def _get_annotation_string(raw_annot: Any, key: bytes) -> str | None:
-    """读取 PDFium 注释字典中的 UTF-16 字符串或名称，异常和空值统一返回 None。"""
+    """Read the UTF-16 string or name in the PDFium annotation dictionary, exceptions and null values will uniformly return None."""
 
     try:
         required = int(pdfium_c.FPDFAnnot_GetStringValue(raw_annot, key, None, 0))
@@ -259,7 +259,7 @@ def _signature_bbox_from_annotation(
     page_rotation: int,
     form_handle: Any | None,
 ) -> BBox | None:
-    """校验一个可见签名 Widget，并把注释矩形裁剪到视觉页面坐标。"""
+    """Verify a visible signature Widget and clip the annotation rectangle to visual page coordinates."""
 
     try:
         if int(pdfium_c.FPDFAnnot_GetSubtype(raw_annot)) != pdfium_c.FPDF_ANNOT_WIDGET:
@@ -284,7 +284,7 @@ def _signature_bbox_from_annotation(
     else:
         return None
 
-    # 正常外观长度只有 UTF-16 终止符时等价于无 /AP /N，不能形成可见签名。
+    # When the normal appearance length is only UTF-16 terminator, it is equivalent to no /AP /N, and no visible signature can be formed.
     try:
         appearance_length = int(
             pdfium_c.FPDFAnnot_GetAP(
@@ -336,7 +336,7 @@ def _extract_page_signature_bboxes(
     *,
     form_handle: Any | None = None,
 ) -> list[BBox]:
-    """遍历页面签名注释；逐个关闭句柄，并隔离损坏注释造成的异常。"""
+    """Traverse the page signature annotations; close handles one by one, and isolate exceptions caused by corrupted annotations."""
 
     try:
         annot_count = max(0, int(pdfium_c.FPDFPage_GetAnnotCount(page.raw)))
@@ -358,7 +358,7 @@ def _extract_page_signature_bboxes(
             if signature_bbox is not None:
                 signature_bboxes.append(signature_bbox)
         except Exception:
-            # 单个损坏注释不能影响同页其他有效签名框。
+            # A single corrupted comment cannot affect other valid signature boxes on the same page.
             continue
         finally:
             if raw_annot:

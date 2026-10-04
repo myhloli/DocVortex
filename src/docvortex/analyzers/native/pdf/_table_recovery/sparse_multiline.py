@@ -1,4 +1,4 @@
-"""在既有候选全部失败后恢复多行少线表格结构。"""
+"""Restore the multi-row, low-line table structure after all existing candidates fail."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ MIN_MULTILINE_RELIABILITY = 0.98
 
 @dataclass(frozen=True, slots=True)
 class _LocalRectangle:
-    """保存正向表格局部坐标中的矩形证据。"""
+    """Save rectangular evidence in forward table local coordinates."""
 
     bbox: tuple[float, float, float, float]
     fill_visible: bool
@@ -27,7 +27,7 @@ class _LocalRectangle:
 
 @dataclass(frozen=True, slots=True)
 class _ColumnHypothesis:
-    """保存少线多行候选的一组列轨与来源证据。"""
+    """Save a set of tracks and source evidence for candidates with few lines and multiple rows."""
 
     evidence: str
     x_tracks: tuple[float, ...]
@@ -37,7 +37,7 @@ class _ColumnHypothesis:
 
 @dataclass(frozen=True, slots=True)
 class _LogicalRow:
-    """保存由一条或多条视觉基线组成的逻辑正文行。"""
+    """Saves a logical body line consisting of one or more visual baselines."""
 
     visual_indices: tuple[int, ...]
     top: float
@@ -49,7 +49,7 @@ def _local_rectangles(
     width: float,
     height: float,
 ) -> tuple[_LocalRectangle, ...]:
-    """把相交矩形转换为局部坐标并裁剪到表格范围。"""
+    """Convert the intersecting rectangles to local coordinates and clip to the table extent."""
 
     table_bbox = normalize_bbox(table_input.table_bbox)
     if table_bbox is None:
@@ -88,7 +88,7 @@ def _row_occupancy(
     glyph_by_id: dict[int, NativeTableGlyph],
     x_tracks: tuple[float, ...],
 ) -> set[int]:
-    """按字符中心统计一条视觉行占用的叶子列。"""
+    """Count the leaf columns occupied by a visual line according to the character center."""
 
     occupied: set[int] = set()
     for glyph_id in row.glyph_ids:
@@ -102,7 +102,7 @@ def _row_occupancy(
 
 
 def _infer_target_columns(text: NativeTableText) -> int | None:
-    """从重复的最大 token 数推断叶子列数。"""
+    """The number of leaf columns is inferred from the maximum number of token duplicates."""
 
     counts = Counter(len(row.tokens) for row in text.rows if 2 <= len(row.tokens) <= 20)
     candidates = [count for count, occurrences in counts.items() if occurrences >= 2]
@@ -114,7 +114,7 @@ def _infer_text_tracks(
     width: float,
     target_cols: int,
 ) -> tuple[float, ...] | None:
-    """从完整锚点行的相邻 token 空隙恢复文本列轨。"""
+    """Restore text column track from adjacent token gap of complete anchor row."""
 
     anchor_rows = [row for row in text.rows if len(row.tokens) == target_cols]
     if len(anchor_rows) < 2:
@@ -147,7 +147,7 @@ def _refine_text_tracks(
     text: NativeTableText,
     tracks: tuple[float, ...],
 ) -> tuple[float, ...]:
-    """用全部简单 token 的外缘扩展文本列间空白走廊。"""
+    """Extend the empty corridor between text columns with the outer edge of all simple token."""
 
     refined = list(tracks)
     for boundary_index in range(1, len(tracks) - 1):
@@ -179,7 +179,7 @@ def _rectangle_tracks(
     tolerance: float,
     outer_tolerance: float,
 ) -> tuple[float, ...]:
-    """从重复矩形端点恢复列轨并去除一次性装饰边缘。"""
+    """Restore the rails from the repeating rectangular endpoints and remove the one-time decorative edges."""
 
     edges = [coordinate for rectangle in rectangles for coordinate in (rectangle.bbox[0], rectangle.bbox[2])]
     positions: list[float] = [0.0, width]
@@ -200,7 +200,7 @@ def _filled_band_count(
     median_height: float,
     tolerance: float,
 ) -> int:
-    """统计能覆盖多列的重复填充行带数量。"""
+    """Counts the number of duplicate filled rows that cover multiple columns."""
 
     bands: list[tuple[float, float]] = []
     for rectangle in rectangles:
@@ -224,7 +224,7 @@ def _build_column_hypothesis(
     rectangles: tuple[_LocalRectangle, ...],
     diagnostics: dict[str, Any] | None,
 ) -> _ColumnHypothesis | None:
-    """融合矩形端点与文本空白选择唯一列轨假设。"""
+    """Fusion of rectangle endpoints and text margins selects unique column hypothesis."""
 
     target_cols = _infer_target_columns(text)
     if target_cols is None:
@@ -293,7 +293,7 @@ def _internal_full_rules(
     width: float,
     height: float,
 ) -> tuple[_LocalRule, ...]:
-    """返回排除上下外框后的长横线。"""
+    """Returns the long horizontal line excluding the upper and lower frames."""
 
     return tuple(
         rule
@@ -312,7 +312,7 @@ def _infer_header_boundary(
     height: float,
     evidence: str,
 ) -> float | None:
-    """用首条正文锚点和最后一条表头长线确定表头底边。"""
+    """Use the first text anchor point and the last long line of the header to determine the bottom edge of the header."""
 
     if len(text.rows) < 3:
         return None
@@ -344,7 +344,7 @@ def _choose_key_column(
     occupancies: list[set[int]],
     cols: int,
 ) -> tuple[int, int]:
-    """选择能重复标记逻辑记录起点的最左稳定关键列。"""
+    """Select the leftmost stable key column that repeatedly marks the starting point of the logical record."""
 
     stats: list[tuple[int, int, int]] = []
     for col in range(cols):
@@ -383,7 +383,7 @@ def _rule_bands(
     width: float,
     height: float,
 ) -> list[tuple[float, float]]:
-    """用正文长横线切出有限物理行带。"""
+    """Use long horizontal lines of text to cut out finite physical strips."""
 
     boundaries = [header_bottom]
     boundaries.extend(
@@ -401,7 +401,7 @@ def _split_rows_by_anchors(
     *,
     group_short_key_runs: bool,
 ) -> list[tuple[int, ...]]:
-    """按关键列锚点把视觉基线拆成逻辑记录组。"""
+    """Split the visual baseline into logical record groups by key column anchors."""
 
     if not rows:
         return []
@@ -443,7 +443,7 @@ def _logical_body_rows(
     evidence: str,
     diagnostics: dict[str, Any] | None,
 ) -> tuple[list[_LogicalRow], int, list[set[int]]] | None:
-    """结合物理行带和关键列锚点构造正文逻辑行。"""
+    """Combine physical row bands and key column anchors to construct logical rows of text."""
 
     glyph_by_id = {glyph.glyph_id: glyph for glyph in text.glyphs}
     body_rows = [row for row in text.rows if (row.bbox[1] + row.bbox[3]) / 2.0 > header_bottom]
@@ -565,7 +565,7 @@ def _separator_coverage(
     right: float,
     tolerance: float,
 ) -> float:
-    """计算一条表头局部分隔在指定列带的覆盖率。"""
+    """Calculate the coverage of a table header's local partition in the specified column band."""
 
     intervals = [
         (rule.start, rule.end) for rule in rules if rule.orientation == "horizontal" and abs(rule.coordinate - y) <= tolerance
@@ -579,7 +579,7 @@ def _header_separator(
     header_bottom: float,
     width: float,
 ) -> float | None:
-    """选择表头内部唯一的完整或局部分隔线。"""
+    """Select the only complete or partial divider inside the header."""
 
     header_rows = [row for row in text.rows if (row.bbox[1] + row.bbox[3]) / 2.0 < header_bottom]
     if len(header_rows) < 2:
@@ -608,7 +608,7 @@ def _header_layer_tokens(
     top: float,
     bottom: float,
 ) -> list[tuple[float, float, float]]:
-    """收集一个表头层中 token 的水平区间和中心。"""
+    """Collects the horizontal intervals and centers of token in a header layer."""
 
     tokens: list[tuple[float, float, float]] = []
     for row in text.rows:
@@ -633,7 +633,7 @@ def _two_layer_header_specs(
     separator: float,
     rules: tuple[_LocalRule, ...],
 ) -> tuple[GridCellSpec, ...] | None:
-    """用表头局部分隔恢复两层表头合并格。"""
+    """Use header partial separation to restore the merged grid of two layers of headers."""
 
     cols = len(x_tracks) - 1
     tolerance = max(1.0, 0.25 * text.median_glyph_height)
@@ -733,7 +733,7 @@ def _logical_cell_has_glyph(
     col: int,
     x_tracks: tuple[float, ...],
 ) -> bool:
-    """判断一个逻辑正文格是否含有字符中心。"""
+    """Determine whether a logical text grid contains a character center."""
 
     visual_indices = set(logical_row.visual_indices)
     for glyph in text.glyphs:
@@ -753,7 +753,7 @@ def _body_specs(
     evidence: str,
     key_col: int,
 ) -> tuple[GridCellSpec, ...]:
-    """构造正文网格，并仅在填充记录表中推断首列 rowspan。"""
+    """Construct the text grid and infer only the first column rowspan in the populated record table."""
 
     cols = len(x_tracks) - 1
     specs: list[GridCellSpec] = []
@@ -820,7 +820,7 @@ def _stable_gutters(
     header_bottom: float,
     diagnostics: dict[str, Any] | None,
 ) -> bool:
-    """校验每条文本列边界都由稳定空白走廊或物理边缘支持。"""
+    """Verify that each text column boundary is supported by a stable whitespace corridor or physical edge."""
 
     edge_tolerance = max(0.15, 0.03 * text.median_glyph_width)
     supports: list[int] = []
@@ -880,7 +880,7 @@ def _has_overlapping_formula_rows(
     text: NativeTableText,
     header_bottom: float,
 ) -> bool:
-    """识别高公式字符框跨越相邻逻辑行的危险表格。"""
+    """Identify dangerous tables with tall formula character boxes spanning adjacent logical rows."""
 
     body_rows = [row for row in text.rows if (row.bbox[1] + row.bbox[3]) / 2.0 > header_bottom]
     if any(row.bbox[3] - row.bbox[1] > 3.0 * text.median_glyph_height for row in body_rows):
@@ -892,7 +892,7 @@ def _has_ambiguous_body_descriptor(
     logical_occupancies: list[set[int]],
     evidence: str,
 ) -> bool:
-    """识别无线正文中首列空缺后再次出现而无法唯一确定 rowspan 的情况。"""
+    """Identifies the situation where rowspan cannot be uniquely determined when a gap in the first column of the wireless text reoccurs."""
 
     if evidence == "filled_record":
         return False
@@ -913,7 +913,7 @@ def _build_candidate(
     text: NativeTableText,
     diagnostics: dict[str, Any] | None,
 ) -> NativeTableCandidate | None:
-    """构造一个末级多行少线候选并执行高置信硬门。"""
+    """Construct a final-level multi-row few-line candidate and perform high-confidence hard gates."""
 
     table_bbox = normalize_bbox(table_input.table_bbox)
     if table_bbox is None:
@@ -1095,7 +1095,7 @@ def build_sparse_multiline_candidates(
     text: NativeTableText,
     diagnostics: list[dict[str, Any]] | None = None,
 ) -> list[NativeTableCandidate]:
-    """生成仅在既有候选全部失败后运行的多行少线候选。"""
+    """Generate multi-line, few-line candidates that are run only after all existing candidates have failed."""
 
     record: dict[str, Any] | None = {"source": "sparse_multiline"} if diagnostics is not None else None
     candidate = _build_candidate(table_input, text, record)
@@ -1115,7 +1115,7 @@ def diagnose_sparse_multiline_candidate_builds(
     table_input: NativeTableInput,
     text: NativeTableText,
 ) -> tuple[dict[str, Any], ...]:
-    """重放多行少线候选构造并返回私有诊断。"""
+    """Replay multi-line few-line candidate construction and return private diagnostics."""
 
     diagnostics: list[dict[str, Any]] = []
     build_sparse_multiline_candidates(

@@ -1,4 +1,4 @@
-"""将受限的 OFD 路径场景直接绘制为 PNG，不调用 PDF 或 OCR。"""
+"""Draw the restricted OFD path scene directly as PNG without calling PDF or OCR."""
 
 from __future__ import annotations
 
@@ -21,12 +21,12 @@ from .path import OfdPathBudget, PathCommand, parse_path_commands
 
 
 class UnsupportedVector(ValueError):
-    """表示无法忠实绘制的路径或绘制参数，必须向调用方报告。"""
+    """Indicates a path or drawing parameter that cannot be faithfully drawn and must be reported to the caller."""
 
 
 @dataclass(frozen=True, slots=True)
 class ClipPath:
-    """保留一个裁剪区域内的数值路径和对象坐标系变换。"""
+    """Preserve the numerical path and object coordinate system transformation within a clipping area."""
 
     commands: tuple[PathCommand, ...]
     transform: Affine
@@ -35,7 +35,7 @@ class ClipPath:
 
 @dataclass(frozen=True, slots=True)
 class VectorPath:
-    """保留完整路径、绘制上下文以及各裁剪区的区域并集。"""
+    """Preserve the complete path, drawing context, and the area union of each cropping area."""
 
     commands: tuple[PathCommand, ...]
     transform: Affine
@@ -45,7 +45,7 @@ class VectorPath:
 
 
 def _number(value: str | None, default: float) -> float:
-    """读取有限绘制数值，非法值明确报告而不交给栅格器猜测。"""
+    """Read limited drawing values, and illegal values are reported explicitly without leaving it to the rasterizer to guess."""
     result = default if value is None else float(value)
     if not math.isfinite(result):
         raise UnsupportedVector("non-finite drawing parameter")
@@ -53,14 +53,14 @@ def _number(value: str | None, default: float) -> float:
 
 
 def _affine(value: str | None) -> Affine:
-    """校验可选变换矩阵，避免非法 CTM 被静默替换成单位矩阵。"""
+    """Verify the optional transformation matrix to avoid illegal CTM from being silently replaced by the identity matrix."""
     if value is not None and parse_numbers(value, expected=6) is None:
         raise UnsupportedVector("invalid affine matrix")
     return parse_affine(value)
 
 
 def _matrix(transform: Affine) -> str:
-    """只使用已验证的数值生成 SVG 仿射矩阵。"""
+    """Generate the SVG affine matrix using only verified values."""
     return (
         "matrix("
         + " ".join(
@@ -71,13 +71,13 @@ def _matrix(transform: Affine) -> str:
 
 
 def _data(commands: tuple[PathCommand, ...]) -> str:
-    """逐命令映射 OFD 到 SVG，避免紧缩命令与 SVG 同名字母含义冲突。"""
+    """Map OFD to SVG on a command-by-command basis to avoid conflicts in the meaning of the letters with the same names of the compression command and SVG."""
     names = {"S": "M", "M": "M", "L": "L", "CM": "L", "Q": "Q", "B": "C", "A": "A", "C": "Z"}
     return " ".join(names[operator] + " ".join(format(value, ".12g") for value in values) for operator, values in commands)
 
 
 def _rule(value: str | None) -> str:
-    """将 OFD 的非零与奇偶填充规则映射为 SVG 标准值。"""
+    """Map the non-zero and odd-even padding rules of OFD to the SVG standard value."""
     if value in (None, "NonZero"):
         return "nonzero"
     if value == "Even-Odd":
@@ -94,7 +94,7 @@ def build_vector_path(
     budget: OfdPathBudget,
     parent_clips: tuple[tuple[ClipPath, ...], ...] = (),
 ) -> VectorPath | None:
-    """解析一次完整路径及裁剪，供页面绘制与表格边框分类共同使用。"""
+    """Parse a complete path and clipping for common use in page drawing and table border classification."""
     if style.get("Visible", "true").casefold() in {"false", "0"} or _number(style.get("Alpha"), 255) == 0:
         return None
     boundary = parse_st_box(element.get("Boundary"))
@@ -116,7 +116,7 @@ def build_vector_path(
 def parse_clip_groups(
     element: etree._Element, base_transform: Affine, budget: OfdPathBudget
 ) -> tuple[tuple[ClipPath, ...], ...]:
-    """将对象或祖先组的裁剪区域转换到页面坐标，同组取并集、多组取交集。"""
+    """Convert the cropping area of the object or ancestor group to page coordinates, and take the union of the same group and the intersection of multiple groups."""
     clips = []
     clips_element = first_child(element, "Clips")
     for clip_element in clips_element if clips_element is not None else []:
@@ -149,7 +149,7 @@ def parse_clip_groups(
 
 
 def _color(style: dict[str, str], prefix: str) -> tuple[str, str]:
-    """读取 Gray、RGB 或 CMYK 直接颜色；未解析的色空间和渐变明确降级。"""
+    """Reading Gray, RGB, or CMYK direct color; unresolved color spaces and gradients are explicitly degraded."""
     if prefix + ".Unsupported" in style or prefix + ".ColorSpace" in style:
         raise UnsupportedVector("unsupported color resource or paint")
     values = [_number(value, 0) for value in style.get(prefix + ".Value", "0 0 0").split()]
@@ -169,7 +169,7 @@ def _color(style: dict[str, str], prefix: str) -> tuple[str, str]:
 
 
 def _paint(style: dict[str, str]) -> dict[str, str]:
-    """生成受控的填充和描边属性，保留线型与透明度。"""
+    """Generate controlled fill and stroke properties, preserving linetype and transparency."""
     alpha = _number(style.get("Alpha"), 255)
     if not 0 <= alpha <= 255:
         raise UnsupportedVector("alpha outside byte range")
@@ -206,7 +206,7 @@ def _paint(style: dict[str, str]) -> dict[str, str]:
 
 
 def render_vector_page(scene: OfdPageScene, package: OfdPackage) -> bytes | None:
-    """按页受限绘制路径，完全白色结果保留为空页，其余返回 PNG 字节。"""
+    """Draw paths restricted by page, completely white results remain as empty pages, the rest return PNG bytes."""
     import resvg_py
 
     box = scene.physical_box
@@ -241,7 +241,7 @@ def render_vector_page(scene: OfdPageScene, package: OfdPackage) -> bytes | None
         outer = ET.SubElement(svg, "g", {"clip-path": f"url(#{identifier})"})
         parent = outer
         for areas in path.clips:
-            # 祖先裁剪按对象身份复用，避免同一大轮廓随每个子路径重复展开。
+            # Ancestor clipping is reused according to object identity to avoid repeated expansion of the same large outline with each sub-path.
             clip_id = clip_ids.get(id(areas))
             if clip_id is None:
                 clip_id = f"clip{len(clip_ids)}"

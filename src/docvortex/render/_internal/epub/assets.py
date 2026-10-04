@@ -1,4 +1,4 @@
-"""EPUB renderer 的图片解析、规范化与包内去重。"""
+"""EPUB Image parsing, normalization and in-package deduplication of renderer."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ _MEDIA_TYPES = {
 
 @dataclass(frozen=True, slots=True)
 class EpubAsset:
-    """保存一个已规范化且可写入 EPUB 的图片资源。"""
+    """Saves a normalized image resource writable to EPUB."""
 
     file_name: str
     media_type: str
@@ -42,21 +42,21 @@ class EpubAsset:
 
 
 class EpubAssetRegistry:
-    """按内容哈希登记 EPUB 图片，并隔离所有外部素材读取。"""
+    """Register EPUB images by content hash and isolate all external material reads."""
 
     def __init__(self, asset_resolver: AssetResolver | None) -> None:
-        """保存显式 resolver，并初始化来源缓存与内容去重表。"""
+        """Save the explicit resolver and initialize the source cache and content deduplication table."""
         self._asset_resolver = asset_resolver
         self._source_cache: dict[str, str | None] = {}
         self._assets: dict[str, EpubAsset] = {}
 
     @property
     def assets(self) -> tuple[EpubAsset, ...]:
-        """按稳定文件名顺序返回所有已登记包内图片。"""
+        """Returns all registered images in the package in order of stable file names."""
         return tuple(self._assets[name] for name in sorted(self._assets))
 
     def resolve_block(self, block: ImagePayloadBlock) -> str | None:
-        """按 sidecar、data URI、远程 URL 优先级解析一个图片 block。"""
+        """Parse a picture according to sidecar, data URI, remote URL priority block."""
         if block.image_path:
             resolved = self._resolve_relative_path(block.image_path)
             if resolved is not None:
@@ -65,11 +65,11 @@ class EpubAssetRegistry:
             resolved = self._resolve_data_uri(block.image_base64)
             if resolved is not None:
                 return resolved
-        # EPUB 图片必须位于容器中；远程 image_url 只作为不可下载的最后候选跳过。
+        # The EPUB image must be in the container; the remote image_url is skipped only as a last-ditch non-downloadable candidate.
         return None
 
     def resolve_embedded_source(self, source: str) -> str | None:
-        """解析富 HTML img 的 data URI 或安全相对 sidecar，拒绝网络来源。"""
+        """Resolving the rich HTML, img, data, URI or safe relative sidecar, rejects the network source."""
         normalized = source.strip()
         if not normalized:
             return None
@@ -89,7 +89,7 @@ class EpubAssetRegistry:
         return self._resolve_relative_path(safe_path)
 
     def _resolve_relative_path(self, image_path: str) -> str | None:
-        """通过显式 resolver 读取相对图片，失败时返回可降级的空结果。"""
+        """Read a relative image via explicit resolver, returning a degradeable empty result on failure."""
         cache_key = f"path:{image_path}"
         if cache_key in self._source_cache:
             return self._source_cache[cache_key]
@@ -109,7 +109,7 @@ class EpubAssetRegistry:
         return href
 
     def _resolve_data_uri(self, data_uri: str) -> str | None:
-        """严格解码图片 data URI，失败时返回可降级的空结果。"""
+        """Strictly decode images data URI, returning a downgradeable empty result on failure."""
         if len(data_uri) > MAX_IMAGE_DATA_URI_BYTES:
             return None
         cache_key = f"data:{hashlib.sha256(data_uri.encode('utf-8', errors='replace')).hexdigest()}"
@@ -124,7 +124,7 @@ class EpubAssetRegistry:
         return href
 
     def _register_prepared(self, data: bytes, *, declared_extension: str | None) -> str:
-        """规范化图片格式，按 SHA-256 去重并返回正文相对 href。"""
+        """Normalize image format, deduplicate according to SHA-256 and return text relative to href."""
         normalized, extension = _prepare_epub_image(data, declared_extension=declared_extension)
         digest = hashlib.sha256(normalized).hexdigest()
         file_name = f"{digest}.{extension}"
@@ -138,7 +138,7 @@ class EpubAssetRegistry:
 
 
 def _prepare_epub_image(data: bytes, *, declared_extension: str | None) -> tuple[bytes, str]:
-    """校验图片字节，并把非 PNG/JPEG/GIF 栅格统一转为 PNG。"""
+    """Verify image bytes and convert non-PNG/JPEG/GIF rasters to PNG."""
     if not isinstance(data, bytes) or not data:
         raise ValueError("Image payload must contain bytes")
     if len(data) > MAX_IMAGE_PAYLOAD_BYTES:

@@ -1,4 +1,4 @@
-"""读取 Word 97–2003 WordDocument stream 中的变长 FIB。"""
+"""Read variable length FIB in Word 97–2003 WordDocument stream."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ FCLCB_HEADER_TEXTBOX_BREAK = 76
 
 @dataclass(frozen=True, slots=True)
 class FcLcb:
-    """FIB 中一对 stream 偏移和字节长度。"""
+    """Pair of stream offset and byte length in FIB."""
 
     fc: int = 0
     lcb: int = 0
@@ -51,7 +51,7 @@ class FcLcb:
 
 @dataclass(frozen=True, slots=True)
 class FibBase:
-    """FIB 固定头中与解析相关的字段。"""
+    """FIB Fields related to parsing in the fixed header."""
 
     n_fib: int
     lid: int
@@ -61,38 +61,38 @@ class FibBase:
 
     @property
     def complex(self) -> bool:
-        """返回文档是否使用 complex/fast-save piece table。"""
+        """Return whether the document uses complex/fast-save piece table."""
 
         return bool(self.flags & 0x0004)
 
     @property
     def encrypted(self) -> bool:
-        """返回文档是否设置加密标志。"""
+        """Returns whether the document has an encryption flag set."""
 
         return bool(self.flags & 0x0100)
 
     @property
     def uses_1table(self) -> bool:
-        """返回 FIB 指定的首选 Table stream。"""
+        """Returns the preferred Table stream specified by FIB."""
 
         return bool(self.flags & 0x0200)
 
     @property
     def far_east(self) -> bool:
-        """返回文档是否优先使用远东语言标识。"""
+        """Return whether the document preferentially uses Far Eastern language identifiers."""
 
         return bool(self.flags & 0x4000)
 
     @property
     def obfuscated(self) -> bool:
-        """返回文档是否设置 XOR 混淆标志。"""
+        """Returns whether the document has the XOR confusion flag set."""
 
         return bool(self.flags & 0x8000)
 
 
 @dataclass(frozen=True, slots=True)
 class FileInformationBlock:
-    """完成边界校验的 Word 97+ FIB。"""
+    """Word 97+ FIB that completes boundary verification."""
 
     base: FibBase
     rgw: tuple[int, ...]
@@ -103,77 +103,77 @@ class FileInformationBlock:
 
     @property
     def n_fib(self) -> int:
-        """返回版本扩展中的有效 nFib。"""
+        """Return valid nFib in version extension."""
 
         return self.csw_new[0] if self.csw_new else self.base.n_fib
 
     def pair(self, index: int) -> FcLcb:
-        """读取可选 fc/lcb 对，不存在时返回零值。"""
+        """Read the optional fc/lcb pair, returning a zero value if it does not exist."""
 
         return self.pairs[index] if 0 <= index < len(self.pairs) else FcLcb()
 
     def story_count(self, index: int) -> int:
-        """读取 FibRgLw97 中一个 story 的 UTF-16 CP 数。"""
+        """Read the UTF-16 CP number of one story in FibRgLw97."""
 
         return int(self.rglw[index]) if 0 <= index < len(self.rglw) else 0
 
     @property
     def ccp_text(self) -> int:
-        """返回主文档 story 的 CP 数。"""
+        """Return the CP number of the main document story."""
 
         return self.story_count(3)
 
     @property
     def ccp_footnote(self) -> int:
-        """返回脚注 story 的 CP 数。"""
+        """Return the CP number of footnote story."""
 
         return self.story_count(4)
 
     @property
     def ccp_header(self) -> int:
-        """返回页眉页脚 story 的 CP 数。"""
+        """Return the CP number of header and footer story."""
 
         return self.story_count(5)
 
     @property
     def ccp_macro(self) -> int:
-        """返回宏 story 的 CP 数。"""
+        """Returns the CP number of macro story."""
 
         return self.story_count(6)
 
     @property
     def ccp_annotation(self) -> int:
-        """返回批注 story 的 CP 数。"""
+        """Return the CP number of the annotation story."""
 
         return self.story_count(7)
 
     @property
     def ccp_endnote(self) -> int:
-        """返回尾注 story 的 CP 数。"""
+        """Return the CP number of the endnote story."""
 
         return self.story_count(8)
 
     @property
     def ccp_textbox(self) -> int:
-        """返回正文文本框 story 的 CP 数。"""
+        """Return the CP number of the text text box story."""
 
         return self.story_count(9)
 
     @property
     def ccp_header_textbox(self) -> int:
-        """返回页眉文本框 story 的 CP 数。"""
+        """Returns the CP number of the header text box story."""
 
         return self.story_count(10)
 
     @property
     def total_story_cp(self) -> int:
-        """返回全部已知 story 的累计 CP 数。"""
+        """Return the cumulative CP number of all known storys."""
 
         return sum(self.story_count(index) for index in range(3, 11))
 
     @property
     def story_bases(self) -> dict[str, int]:
-        """返回各 story 在全局 CP 空间中的起点。"""
+        """Return the starting point of each story in the global CP space."""
 
         counts = [self.story_count(index) for index in range(3, 11)]
         names = [
@@ -195,7 +195,7 @@ class FileInformationBlock:
 
 
 def _read_values(data: bytes, offset: int, count: int, width: int, label: str) -> tuple[tuple[int, ...], int]:
-    """按指定宽度读取一组无符号小端整数。"""
+    """Read a set of unsigned little-endian integers of specified width."""
 
     if count < 0 or width not in {2, 4}:
         raise LegacyOfficeMalformedError(f"invalid {label} count")
@@ -210,7 +210,7 @@ def _read_values(data: bytes, offset: int, count: int, width: int, label: str) -
 
 
 def parse_fib(word_document: bytes) -> FileInformationBlock:
-    """按 MS-DOC 变长布局解析 FIB，并拒绝 Word 95 及更早版本。"""
+    """Parse FIB by MS-DOC variable length layout, and reject Word 95 and earlier."""
 
     if len(word_document) < 34:
         raise LegacyOfficeMalformedError("WordDocument FIB is truncated")
@@ -247,8 +247,8 @@ def parse_fib(word_document: bytes) -> FileInformationBlock:
         cursor += 2
         csw_new, cursor = _read_values(word_document, cursor, count, 2, "FibRgCswNew")
     if len(rglw) <= 3:
-        # 确定性最小 fixture 可能省略变长计数，但仍保留 Word 97 固定槽位；
-        # 仅在标准布局不可用时按这些公开槽位做恢复读取。
+        # The deterministic minimum fixture may omit the variable length count, but still retains the Word 97 fixed slot;
+        # Only when the standard layout is unavailable, do recovery reads according to these public slots.
         if len(word_document) < 0x6C:
             raise LegacyOfficeMalformedError("FIB does not contain ccpText")
         rglw = tuple(int(struct.unpack_from("<I", word_document, 0x40 + index * 4)[0]) for index in range(11))

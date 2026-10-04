@@ -1,4 +1,4 @@
-"""验证只有同级标题统一字号，正文继续按各自框独立适配。"""
+"""Verify that only titles at the same level have the same font size, and the main text continues to be adapted independently according to their respective boxes."""
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -15,7 +15,7 @@ from test_pdf_original_layout import _middle, _text
 
 
 def _document(title_heights, body_heights=None):
-    """按受控高度构造同级标题和正文，检查各自的容量约束。"""
+    """Construct sibling headings and body text at controlled heights, checking their respective capacity constraints."""
     heights = body_heights or [80] * len(title_heights)
     return _middle(
         [
@@ -32,7 +32,7 @@ def _document(title_heights, body_heights=None):
 
 
 def _render(middle, layout=PdfLayout.ORIGINAL):
-    """从公开入口导出并读取内部标题统计，验证输入保持不变。"""
+    """Export and read internal header statistics from the public portal, verifying that the input remains unchanged."""
     before = deepcopy(middle.to_dict())
     with collect_font_plans() as plans:
         artifact = render_artifact(middle, "pdf", options=PdfRenderOptions(layout=layout))
@@ -41,12 +41,12 @@ def _render(middle, layout=PdfLayout.ORIGINAL):
 
 
 def _sizes(payload):
-    """读取实际 PDF 字号，计入 Canvas 变换而不只检查字体指令的名义字号。"""
+    """Read the actual PDF font size, factored into the Canvas transformation rather than just checking the nominal font size of the font directive."""
     result = {}
     for page in PdfReader(BytesIO(payload)).pages:
 
         def visit(text, cm, tm, font, size):
-            """保存各段文字最终绘制字号。"""
+            """Save the final drawn font size of each paragraph of text."""
             if text.strip():
                 result[text.strip()] = size * hypot(cm[0], cm[1])
 
@@ -55,7 +55,7 @@ def _sizes(payload):
 
 
 def test_only_titles_share_size_and_body_keeps_individual_fit():
-    """公共标题字号参考正文，正文较大的位置允许单独放大标题而不改变正文。"""
+    """The public title font size refers to the main text, and the larger position of the main text allows the title to be enlarged independently without changing the main text."""
     artifact, plans = _render(_document([80, 12.2], [80, 12.2]))
     assert set(plans) == {"paragraph_title:level=2"}
     assert plans["paragraph_title:level=2"].target_font_size == 11.1
@@ -68,7 +68,7 @@ def test_only_titles_share_size_and_body_keeps_individual_fit():
 
 @pytest.mark.parametrize("heights", [[80] * 9 + [4], [80] * 8 + [12.2], [80, 4]])
 def test_tiny_title_boxes_borrow_space_without_shrinking_the_group(heights):
-    """原框再矮也不压低标题目标；周围有空白时达到正文加 2 pt。"""
+    """No matter how short the original frame is, it will not lower the title target; when there is white space around it, add 2 pt to the text."""
     artifact, plans = _render(_document(heights))
     plan = plans["paragraph_title:level=2"]
     assert plan.target_font_size == 12.5 and plan.exception_count == 0
@@ -83,7 +83,7 @@ def test_tiny_title_boxes_borrow_space_without_shrinking_the_group(heights):
 
 @pytest.mark.parametrize("kind", ["text", "ref_text", "header", "footer", "page_number", "page_footnote"])
 def test_non_title_types_are_not_uniformly_scaled(kind):
-    """正文及辅助文字完全恢复逐块适配，不进入任何文档级字号组。"""
+    """The main text and auxiliary text are completely restored to block-by-block adaptation and do not enter any document-level font size group."""
     middle = _middle(
         [
             {
@@ -101,7 +101,7 @@ def test_non_title_types_are_not_uniformly_scaled(kind):
 
 
 def test_title_levels_and_index_references_are_separate():
-    """不同标题级别独立选字号，目录引用不压低正文标题或重复注册锚点。"""
+    """Select font sizes independently for different title levels, and table of contents references do not lower text titles or duplicate anchor points."""
     middle = _middle(
         [
             {
@@ -134,7 +134,7 @@ def test_title_levels_and_index_references_are_separate():
 
 
 def test_export_selection_blank_pages_and_parallel_font_plans():
-    """标题统计仅考虑导出页，空白页保留，并发调用不共享字号计划。"""
+    """Title statistics only consider exported pages, blank pages are reserved, and concurrent calls do not share font size plans."""
     full = _document([80, 12.2])
     selected = full.model_copy(update={"pages": [full.pages[0]]})
     blank = full.pages[1].model_copy(update={"blocks": []})

@@ -1,4 +1,4 @@
-"""构造确定性 WMF/EMF 测试载荷。"""
+"""Construct the deterministic WMF/EMF test load."""
 
 from __future__ import annotations
 
@@ -6,12 +6,12 @@ import struct
 
 
 def _pad4(data: bytes) -> bytes:
-    """把 EMF payload 填充到 4 字节边界。"""
+    """Pad EMF payload to 4-byte boundary."""
     return data + b"\x00" * (-len(data) % 4)
 
 
 def emf_record(record_type: int, payload: bytes = b"") -> bytes:
-    """构造带通用头部和 4 字节对齐的 EMF record。"""
+    """Construct EMF record with generic header and 4-byte alignment."""
     aligned = _pad4(payload)
     return struct.pack("<II", record_type, 8 + len(aligned)) + aligned
 
@@ -23,7 +23,7 @@ def _emf_header(
     bounds: tuple[int, int, int, int],
     frame: tuple[int, int, int, int],
 ) -> bytes:
-    """构造满足 EMR_HEADER 基础版本的 88 字节头部。"""
+    """Constructs an 88-byte header that satisfies the base version of EMR_HEADER."""
     header = bytearray(88)
     struct.pack_into("<II", header, 0, 1, 88)
     struct.pack_into("<4i", header, 8, *bounds)
@@ -44,7 +44,7 @@ def build_emf(
     bounds: tuple[int, int, int, int] = (0, 0, 100, 100),
     frame: tuple[int, int, int, int] = (0, 0, 2540, 2540),
 ) -> bytes:
-    """为给定 records 补齐 EMR_HEADER 与 EMR_EOF。"""
+    """Complete EMR_HEADER and EMR_EOF for a given records."""
     eof = emf_record(14, struct.pack("<III", 0, 0, 20))
     body = b"".join(records) + eof
     total_bytes = 88 + len(body)
@@ -52,57 +52,57 @@ def build_emf(
 
 
 def emf_create_pen(handle: int, colorref: int, *, width: int = 1, style: int = 0) -> bytes:
-    """构造 EMR_CREATEPEN。"""
+    """Construct EMR_CREATEPEN."""
     return emf_record(38, struct.pack("<IIiiI", handle, style, width, 0, colorref))
 
 
 def emf_create_brush(handle: int, colorref: int, *, style: int = 0) -> bytes:
-    """构造 EMR_CREATEBRUSHINDIRECT。"""
+    """Construct EMR_CREATEBRUSHINDIRECT."""
     return emf_record(39, struct.pack("<IIII", handle, style, colorref, 0))
 
 
 def emf_select_object(handle: int) -> bytes:
-    """构造 EMR_SELECTOBJECT。"""
+    """Construct EMR_SELECTOBJECT."""
     return emf_record(37, struct.pack("<I", handle))
 
 
 def emf_rectangle(left: int, top: int, right: int, bottom: int) -> bytes:
-    """构造 EMR_RECTANGLE。"""
+    """Construct EMR_RECTANGLE."""
     return emf_record(43, struct.pack("<4i", left, top, right, bottom))
 
 
 def emf_savedc() -> bytes:
-    """构造 EMR_SAVEDC。"""
+    """Construct EMR_SAVEDC."""
     return emf_record(33)
 
 
 def emf_restoredc(level: int = -1) -> bytes:
-    """构造 EMR_RESTOREDC。"""
+    """Construct EMR_RESTOREDC."""
     return emf_record(34, struct.pack("<i", level))
 
 
 def emf_set_world_transform(matrix: tuple[float, float, float, float, float, float]) -> bytes:
-    """构造 EMR_SETWORLDTRANSFORM。"""
+    """Construct EMR_SETWORLDTRANSFORM."""
     return emf_record(35, struct.pack("<6f", *matrix))
 
 
 def emf_move_to(x: int, y: int) -> bytes:
-    """构造 EMR_MOVETOEX。"""
+    """Construct EMR_MOVETOEX."""
     return emf_record(27, struct.pack("<2i", x, y))
 
 
 def emf_line_to(x: int, y: int) -> bytes:
-    """构造 EMR_LINETO。"""
+    """Construct EMR_LINETO."""
     return emf_record(54, struct.pack("<2i", x, y))
 
 
 def emf_intersect_clip_rect(left: int, top: int, right: int, bottom: int) -> bytes:
-    """构造 EMR_INTERSECTCLIPRECT。"""
+    """Construct EMR_INTERSECTCLIPRECT."""
     return emf_record(30, struct.pack("<4i", left, top, right, bottom))
 
 
 def emf_angle_arc(center_x: int, center_y: int, radius: int, start_angle: float, sweep_angle: float) -> bytes:
-    """构造 EMR_ANGLEARC。"""
+    """Construct EMR_ANGLEARC."""
     return emf_record(41, struct.pack("<iiIff", center_x, center_y, radius, start_angle, sweep_angle))
 
 
@@ -111,42 +111,42 @@ def emf_arc_to(
     start: tuple[int, int],
     end: tuple[int, int],
 ) -> bytes:
-    """构造 EMR_ARCTO，start/end 可位于椭圆边界之外。"""
+    """Constructing EMR_ARCTO, start/end can be located outside the ellipse boundary."""
     return emf_record(55, struct.pack("<8i", *rect, *start, *end))
 
 
 def emf_begin_path() -> bytes:
-    """构造 EMR_BEGINPATH。"""
+    """Construct EMR_BEGINPATH."""
     return emf_record(59)
 
 
 def emf_end_path() -> bytes:
-    """构造 EMR_ENDPATH。"""
+    """Construct EMR_ENDPATH."""
     return emf_record(60)
 
 
 def emf_close_figure() -> bytes:
-    """构造 EMR_CLOSEFIGURE。"""
+    """Construct EMR_CLOSEFIGURE."""
     return emf_record(61)
 
 
 def emf_fill_path() -> bytes:
-    """构造 EMR_FILLPATH。"""
+    """Construct EMR_FILLPATH."""
     return emf_record(62)
 
 
 def emf_stroke_and_fill_path() -> bytes:
-    """构造 EMR_STROKEANDFILLPATH。"""
+    """Construct EMR_STROKEANDFILLPATH."""
     return emf_record(63)
 
 
 def emf_stroke_path() -> bytes:
-    """构造 EMR_STROKEPATH。"""
+    """Construct EMR_STROKEPATH."""
     return emf_record(64)
 
 
 def _emf_compact_poly_record(record_type: int, points: list[tuple[int, int]]) -> bytes:
-    """构造使用 PointS 数组的紧凑 EMF poly record。"""
+    """Constructs a compact EMF poly record using the PointS array."""
     if points:
         xs = [point[0] for point in points]
         ys = [point[1] for point in points]
@@ -159,32 +159,32 @@ def _emf_compact_poly_record(record_type: int, points: list[tuple[int, int]]) ->
 
 
 def emf_polyline_to(points: list[tuple[int, int]]) -> bytes:
-    """构造 EMR_POLYLINETO16。"""
+    """Construct EMR_POLYLINETO16."""
     return _emf_compact_poly_record(89, points)
 
 
 def emf_polybezier(points: list[tuple[int, int]], *, to: bool) -> bytes:
-    """构造 EMR_POLYBEZIER16 或 EMR_POLYBEZIERTO16。"""
+    """Construct EMR_POLYBEZIER16 or EMR_POLYBEZIERTO16."""
     return _emf_compact_poly_record(88 if to else 85, points)
 
 
 def emf_set_polyfill_mode(mode: int) -> bytes:
-    """构造 EMR_SETPOLYFILLMODE。"""
+    """Construct EMR_SETPOLYFILLMODE."""
     return emf_record(19, struct.pack("<I", mode))
 
 
 def emf_set_miter_limit(value: float) -> bytes:
-    """构造 EMR_SETMITERLIMIT。"""
+    """Construct EMR_SETMITERLIMIT."""
     return emf_record(58, struct.pack("<f", value))
 
 
 def emf_set_text_align(value: int) -> bytes:
-    """构造 EMR_SETTEXTALIGN。"""
+    """Construct EMR_SETTEXTALIGN."""
     return emf_record(22, struct.pack("<I", value))
 
 
 def emf_font(handle: int, face_name: str = "DejaVu Sans", *, height: int = -14) -> bytes:
-    """构造只填充常用 LOGFONTW 字段的 EMR_EXTCREATEFONTINDIRECTW。"""
+    """Constructs a EMR_EXTCREATEFONTINDIRECTW that populates only the common LOGFONTW fields."""
     logfont = bytearray(92)
     struct.pack_into("<iiiii", logfont, 0, height, 0, 0, 0, 400)
     logfont[23] = 1
@@ -194,7 +194,7 @@ def emf_font(handle: int, face_name: str = "DejaVu Sans", *, height: int = -14) 
 
 
 def emf_text(text: str, x: int, y: int, *, dx: int | None = 12) -> bytes:
-    """构造可选显式 Dx 数组的 EMR_EXTTEXTOUTW。"""
+    """Constructs EMR_EXTTEXTOUTW of an optional explicit Dx array."""
     encoded = text.encode("utf-16le")
     record = bytearray(76)
     nominal_dx = dx if dx is not None else 12
@@ -217,7 +217,7 @@ def emf_text(text: str, x: int, y: int, *, dx: int | None = 12) -> bytes:
 
 
 def emf_stretch_dib() -> bytes:
-    """构造含红绿蓝白四像素的 EMR_STRETCHDIBITS。"""
+    """Construct EMR_STRETCHDIBITS with four pixels of red, green, blue and white."""
     header = bytearray(40)
     struct.pack_into("<IiiHHIIiiII", header, 0, 40, 2, -2, 1, 32, 0, 16, 0, 0, 0, 0)
     bits = bytes(
@@ -252,40 +252,40 @@ def emf_stretch_dib() -> bytes:
 
 
 def emfplus_comment(*, dual: bool) -> bytes:
-    """构造只含 EMF+ Header 的 EMR_COMMENT。"""
+    """Construct EMR_COMMENT containing only EMF + Header."""
     plus = struct.pack("<IHHII", 0x2B464D45, 0x4001, 1 if dual else 0, 12, 0)
     return emf_record(70, struct.pack("<I", len(plus)) + plus)
 
 
 def wmf_record(function: int, payload: bytes = b"") -> bytes:
-    """构造按 WORD 计长的 WMF record。"""
+    """Construct WMF record with length WORD."""
     if len(payload) % 2:
         payload += b"\x00"
     return struct.pack("<IH", (6 + len(payload)) // 2, function) + payload
 
 
 def wmf_move_to(x: int, y: int) -> bytes:
-    """构造 META_MOVETO。"""
+    """Construct META_MOVETO."""
     return wmf_record(0x0214, struct.pack("<hh", y, x))
 
 
 def wmf_set_text_align(value: int) -> bytes:
-    """构造 META_SETTEXTALIGN。"""
+    """Construct META_SETTEXTALIGN."""
     return wmf_record(0x012E, struct.pack("<H", value))
 
 
 def wmf_set_map_mode(value: int) -> bytes:
-    """构造 META_SETMAPMODE。"""
+    """Construct META_SETMAPMODE."""
     return wmf_record(0x0103, struct.pack("<h", value))
 
 
 def wmf_rectangle(left: int, top: int, right: int, bottom: int) -> bytes:
-    """构造 META_RECTANGLE。"""
+    """Construct META_RECTANGLE."""
     return wmf_record(0x041B, struct.pack("<hhhh", bottom, right, top, left))
 
 
 def wmf_textout(text: str, x: int, y: int) -> bytes:
-    """构造没有显式字符 spacing 的 META_TEXTOUT。"""
+    """Constructs META_TEXTOUT without the explicit character spacing."""
     encoded = text.encode("cp1252")
     payload = struct.pack("<H", len(encoded)) + encoded
     if len(encoded) & 1:
@@ -295,7 +295,7 @@ def wmf_textout(text: str, x: int, y: int) -> bytes:
 
 
 def build_placeable_wmf(records: list[bytes], *, bbox: tuple[int, int, int, int] = (0, 0, 1000, 1000)) -> bytes:
-    """构造带 Aldus placeable header 的标准 WMF。"""
+    """Constructed with Aldus placeable header standard WMF."""
     eof = wmf_record(0)
     body = b"".join(records) + eof
     standard = struct.pack("<HHHIHIH", 1, 9, 0x0300, (18 + len(body)) // 2, 16, max(3, len(body) // 2), 0)
@@ -308,7 +308,7 @@ def build_placeable_wmf(records: list[bytes], *, bbox: tuple[int, int, int, int]
 
 
 def basic_wmf() -> bytes:
-    """构造包含画笔、画刷、矩形与多边形的 placeable WMF。"""
+    """Constructs placeable WMF containing brushes, brushes, rectangles and polygons."""
     records = [
         wmf_record(0x02FA, struct.pack("<HhhI", 0, 8, 0, 0x000000FF)),
         wmf_record(0x02FC, struct.pack("<HIH", 0, 0x0000FF00, 0)),

@@ -1,4 +1,4 @@
-"""保留既有入口的 Flash PDF 门面，内部实现按职责显式组织。"""
+"""The Flash PDF facade of the existing entrance is retained, and the internal implementation is explicitly organized by responsibility."""
 
 from .text_assembly.annotations import (
     _merge_image_caption_text_blocks as _merge_image_caption_text_blocks,

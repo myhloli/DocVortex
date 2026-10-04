@@ -1,4 +1,4 @@
-"""把已验证的 DocVortex HTML v1 typed plan 物化为 raw model-list。"""
+"""Materialize the verified DocVortex HTML v1 typed plan into raw model-list."""
 
 from __future__ import annotations
 
@@ -31,10 +31,10 @@ from .contracts import (
 
 
 class ExactAnchorResolver:
-    """把 renderer DOM id 恢复为 typed plan 中保存的原始 anchor。"""
+    """Restore renderer DOM id to the original anchor saved in typed plan."""
 
     def __init__(self, plan: DocVortexHtmlWirePlan) -> None:
-        """预扫描标题和页面脚注的 id、文本及原始 anchor。"""
+        """Pre-scanned id for titles and page footers, text and original anchor."""
         self._targets: dict[str, str] = {}
         self._heading_anchors: dict[etree._Element, str] = {}
         self._heading_labels: dict[str, str] = {}
@@ -57,20 +57,20 @@ class ExactAnchorResolver:
                 self._note_anchors[spec.content_root] = anchor
 
     def resolve_fragment(self, fragment: str) -> str | None:
-        """把 renderer id 或原始 anchor 统一还原为内部 fragment。"""
+        """Restore renderer id or original anchor to internal fragment."""
         identity = fragment.removeprefix("#").strip()
         return f"#{anchor}" if (anchor := self._targets.get(identity)) else None
 
     def heading_anchor(self, heading: etree._Element) -> str | None:
-        """返回精确标题节点的原始 anchor。"""
+        """Returns the original anchor of the exact title node."""
         return self._heading_anchors.get(heading)
 
     def heading_label(self, anchor: str) -> str | None:
-        """返回原始 anchor 对应的标题文本。"""
+        """Returns the title text corresponding to the original anchor."""
         return self._heading_labels.get(anchor)
 
     def note_anchor(self, note: etree._Element) -> str | None:
-        """返回精确页面脚注节点的原始 anchor。"""
+        """Returns the original anchor of the exact page footer node."""
         return self._note_anchors.get(note)
 
 
@@ -78,7 +78,7 @@ def materialize_docvortex_html_wire(
     plan: DocVortexHtmlWirePlan,
     resources: WireResourceContext,
 ) -> list[dict[str, object]]:
-    """在整棵 canonical 树验证成功后一次性解析资源并生成 raw blocks。"""
+    """After the entire canonical tree is successfully verified, the resource is parsed at one time and raw blocks is generated."""
     resources.bind_anchors(ExactAnchorResolver(plan))
     stylesheet = MarkupStylesheet()
     projector = MarkupProjector(plan.root, resources, stylesheet, single_document_title=True)
@@ -94,13 +94,13 @@ def materialize_docvortex_html_wire(
             blocks.append(_materialize_list(spec.root, projector))
         elif isinstance(spec, IndexBlockWireSpec):
             blocks.append(_materialize_index(spec.root, projector))
-        else:  # pragma: no cover - PageWireSpec 已穷尽。
+        else:  # pragma: no cover - PageWireSpec Exhausted.
             raise AssertionError(f"unsupported wire spec: {type(spec).__name__}")
     return blocks
 
 
 def _materialize_text(spec: TextWireSpec, projector: MarkupProjector) -> dict[str, object]:
-    """恢复文本、标题、页面辅助块和页面脚注。"""
+    """Recover text, titles, page aids, and page footers."""
     block: dict[str, object] = {
         "type": spec.block_type,
         "content": _project_inline_content(projector, spec.content_root),
@@ -115,7 +115,7 @@ def _materialize_text(spec: TextWireSpec, projector: MarkupProjector) -> dict[st
 
 
 def _materialize_equation(spec: EquationWireSpec, resources: WireResourceContext) -> dict[str, object]:
-    """恢复行间公式裸 LaTeX 或 renderer-owned 公式图片。"""
+    """Restores the bare LaTeX or renderer-owned formula picture between lines."""
     formula = extract_formula(spec.content_root)
     block: dict[str, object] = {
         "type": BlockType.EQUATION,
@@ -131,7 +131,7 @@ def _materialize_visual(
     resources: WireResourceContext,
     projector: MarkupProjector,
 ) -> list[dict[str, object]]:
-    """按 renderer DOM 顺序恢复 visual body 与 annotations。"""
+    """Restore visual, body and annotations in order renderer DOM."""
     blocks: list[dict[str, object]] = []
     for child in spec.children:
         if isinstance(child, AnnotationWireSpec):
@@ -156,7 +156,7 @@ def _materialize_visual_body(
     resources: WireResourceContext,
     projector: MarkupProjector,
 ) -> dict[str, object]:
-    """从 typed body spec 恢复唯一载荷，不重新判断 DOM 形状。"""
+    """Restore unique load from typed body spec without re-judging DOM shape."""
     if isinstance(spec, RichVisualBodyWireSpec):
         block: dict[str, object] = {
             "type": spec.parent_type,
@@ -183,7 +183,7 @@ def _materialize_table(
     resources: WireResourceContext,
     projector: MarkupProjector,
 ) -> dict[str, object]:
-    """恢复已判别的结构表格、文本、图片或空载荷。"""
+    """Restore identified structural tables, texts, images or empty loads."""
     block: dict[str, object] = {"type": BlockType.TABLE, "content": ""}
     if spec.kind == "html" and spec.payload_element is not None:
         fragment = etree.Element("div")
@@ -197,7 +197,7 @@ def _materialize_table(
 
 
 def _materialize_code(spec: CodeBodyWireSpec, projector: MarkupProjector) -> dict[str, object]:
-    """恢复普通代码文本或 algorithm 行内语义。"""
+    """Restore normal code text or algorithm inline semantics."""
     if spec.kind == "code":
         return {
             "type": BlockType.CODE,
@@ -210,7 +210,7 @@ def _materialize_code(spec: CodeBodyWireSpec, projector: MarkupProjector) -> dic
 
 
 def _materialize_list(spec: ListWireSpec, projector: MarkupProjector) -> dict[str, object]:
-    """递归恢复列表叶子、marker 和嵌套 ListBlock。"""
+    """Recursively restore list leaves, marker and nested ListBlock."""
     children: list[dict[str, object]] = []
     for child in spec.children:
         if isinstance(child, ListWireSpec):
@@ -236,7 +236,7 @@ def _materialize_list(spec: ListWireSpec, projector: MarkupProjector) -> dict[st
 
 
 def _materialize_index(spec: IndexWireSpec, projector: MarkupProjector) -> dict[str, object]:
-    """递归恢复目录叶子和嵌套 IndexBlock。"""
+    """Recursive recovery of directory leaves and nests IndexBlock."""
     children: list[dict[str, object]] = []
     for child in spec.children:
         if isinstance(child, IndexWireSpec):
@@ -250,7 +250,7 @@ def _materialize_index(spec: IndexWireSpec, projector: MarkupProjector) -> dict[
 
 
 def _materialize_index_leaf(spec: IndexLeafWireSpec, projector: MarkupProjector) -> dict[str, object]:
-    """恢复目录叶子的内容和标题元数据。"""
+    """Restore the content and title metadata of directory leaves."""
     content = _project_inline_content(projector, spec.content_element) if spec.content_element is not None else []
     block: dict[str, object] = {"type": spec.block_type, "content": content}
     if spec.anchor:
@@ -263,7 +263,7 @@ def _materialize_index_leaf(spec: IndexLeafWireSpec, projector: MarkupProjector)
 
 
 def _restore_content(fragment: etree._Element | None, projector: MarkupProjector) -> str:
-    """按 inline 或安全富 HTML 语义恢复 visual body content。"""
+    """Semantic recovery by inline or safe rich HTML visual body content."""
     if fragment is None:
         return ""
     if not _contains_rich_markup(fragment):
@@ -287,7 +287,7 @@ def _restore_content(fragment: etree._Element | None, projector: MarkupProjector
 
 
 def _contains_rich_markup(fragment: etree._Element) -> bool:
-    """判断片段是否需要以结构化 HTML 而非内部 inline 字符串保存。"""
+    """Determines whether the fragment needs to be saved as a structured HTML rather than the internal inline string."""
     return any(
         isinstance(element.tag, str) and (local_name(element) in BLOCK_TAGS or local_name(element) in {"image", "img"})
         for element in fragment.iterdescendants()
@@ -295,7 +295,7 @@ def _contains_rich_markup(fragment: etree._Element) -> bool:
 
 
 def _serialize_fragment(fragment: etree._Element) -> str:
-    """把 synthetic fragment 的内容序列化为规范化安全 HTML。"""
+    """Serializes the contents of synthetic fragment to canonicalized secure HTML."""
     parts = [html.escape(fragment.text or "", quote=False)]
     parts.extend(
         etree.tostring(child, encoding="unicode", method="html", with_tail=True)
@@ -306,18 +306,18 @@ def _serialize_fragment(fragment: etree._Element) -> str:
 
 
 def _project_inline_content(projector: MarkupProjector, element: etree._Element) -> list[dict[str, object]]:
-    """直接恢复 projector 生成的结构化 Span。"""
+    """Directly restores structured Span generated by projector."""
     return projector.project_inline_content(element)
 
 
 def _flowchart_content(source_element: etree._Element) -> str:
-    """把 canonical Mermaid 源码恢复为标准 fence。"""
+    """Restore canonical Mermaid source code to standard fence."""
     value = "".join(source_element.itertext()).strip("\n")
     return f"```mermaid\n{value}\n```" if value else ""
 
 
 def _resolve_image_payload(element: etree._Element, resources: WireResourceContext) -> dict[str, object]:
-    """解析已由 canonical parser 选定的单个 renderer-owned 图片。"""
+    """Resolve a single renderer-owned picture that has been selected by canonical parser."""
     resolved = resources.resolve_image(element.get("src") or "", alt=element.get("alt") or "")
     if resolved is None:
         return {}

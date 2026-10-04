@@ -1,4 +1,4 @@
-//! 自有文档入口：坐标与统计在 Rust 连续执行，按后续规则需要决定是否物化字符。
+//! Own document entry: coordinates and statistics are continuously executed in Rust, and whether to materialize characters is determined according to subsequent rules.
 use super::geometry::{plain_coordinates, shared_coordinates};
 use super::geometry_runs::materialize_runs;
 use docvortex_core::{
@@ -37,7 +37,7 @@ pub(super) struct NativeStyleDocument {
 
 #[pymethods]
 impl NativeStyleDocument {
-    /// 新建单次消费的自有文档；仅布局分支保留最终物化所需的 Python 来源对象。
+    /// Create a new self-owned document for single consumption; only the layout branch retains the Python source object required for final materialization.
     #[new]
     #[pyo3(signature = (with_samples=false))]
     fn new(with_samples: bool) -> Self {
@@ -49,7 +49,7 @@ impl NativeStyleDocument {
         }
     }
 
-    /// 融合原始框选择、裁剪与旋转，仅把有效位置索引送给字体编码回调。
+    /// Integrate original frame selection, cropping and rotation, and only send the effective position index to the font encoding callback.
     #[pyo3(signature = (records, size, angle, page, source, height, metadata, line=None))]
     fn add_line(
         &mut self,
@@ -138,7 +138,7 @@ impl NativeStyleDocument {
         }
         let positions: Vec<_> = rows.iter().map(|r| r.1).collect();
         let data = metadata.call1((positions,))?;
-        // 字体回调在执行自定义转换前可明确拒绝；其他异常不拦截。
+        // The font callback can be explicitly rejected before executing the custom conversion; other exceptions are not intercepted.
         if data.is_none() {
             return Ok(false);
         }
@@ -205,7 +205,7 @@ impl NativeStyleDocument {
         Ok(true)
     }
 
-    /// 样式分支只导出最终摘要；重复结束或继续追加明确报错。
+    /// The style branch only exports the final summary; repeat the end or continue to add a clear error.
     fn finish(&mut self, py: Python<'_>, families: Vec<usize>) -> PyResult<Option<Result>> {
         let document = self
             .document
@@ -216,7 +216,7 @@ impl NativeStyleDocument {
         Ok(py.detach(move || document.finish(families)))
     }
 
-    /// 布局分支连续完成样式及来源恢复，再仅物化一次最终样本和 run。
+    /// The layout branch continuously completes the style and source recovery, and then only materializes the final sample and run once.
     #[pyo3(signature = (families, keys, sample_type, run_type, on_ready=None, with_metrics=false, compensated=false))]
     fn finish_layout<'py>(
         &mut self,
@@ -294,7 +294,7 @@ impl NativeStyleDocument {
         for (index, scale) in &prepared.style.scales {
             scales.set_item(prepared.line_keys[*index], *scale)?;
         }
-        // 接受原生输入后先释放无用侧表，再创建布局对象，限制瞬时存活量和 GC 扫描。
+        // After accepting the native input, first release the useless side table, then create the layout object, limit the instantaneous survival amount and GC scan.
         if let Some(on_ready) = on_ready {
             on_ready.call0()?;
         }

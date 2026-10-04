@@ -11,21 +11,21 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_vector_image_part_skip_log_is_debug(monkeypatch: MonkeyPatch) -> None:
-    """验证 WMF/EMF 占位图使用 debug 日志而不是 warning。"""
+    """Verify that the WMF/EMF placeholder map uses the debug log instead of warning."""
 
     class _Logger:
-        """记录图片工具日志级别的测试替身。"""
+        """Test stand-in for logging image tool log levels."""
 
         def __init__(self) -> None:
             self.debug_messages: list[str] = []
             self.warning_messages: list[str] = []
 
         def debug(self, message: str) -> None:
-            """记录 debug 日志。"""
+            """Log debug."""
             self.debug_messages.append(message)
 
         def warning(self, message: str) -> None:
-            """记录 warning 日志。"""
+            """Log warning."""
             self.warning_messages.append(message)
 
     fake_logger = _Logger()
@@ -46,14 +46,14 @@ def test_vector_image_part_skip_log_is_debug(monkeypatch: MonkeyPatch) -> None:
 
 
 def test_vector_image_emu_size_uses_200_dpi() -> None:
-    """验证统一入口使用 200 DPI，并显式传递 EMU 换算分辨率。"""
+    """Verify that the unified portal uses 200 DPI and explicitly passes the EMU scaled resolution."""
     assert office_image.VECTOR_IMAGE_RENDER_DPI == 200
     assert office_image._render_size_from_emu((914400, 457200), dpi=200) == (200, 100)
     assert office_image._render_size_from_emu((914400, 457200), dpi=144) == (144, 72)
 
 
 def test_docx_nested_ordered_lists_render_with_local_markers() -> None:
-    """验证真实 DOCX 的多级有序列表使用当前层编号，并由 Markdown 缩进表达层级。"""
+    """Verify that a multi-level ordered list of true DOCX uses the current level number and expresses levels indented by Markdown."""
     file_bytes = (_PROJECT_ROOT / "demo" / "ms_office_docs" / "docx_01.docx").read_bytes()
 
     middle_json = parse(file_bytes, file_suffix="docx").middle_json

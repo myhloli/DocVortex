@@ -1,4 +1,4 @@
-"""原生 ModelJson 视觉素材处理使用的共享常量。"""
+"""Native ModelJson Shared constant used by visual material processing."""
 
 from ...schema import BlockType
 

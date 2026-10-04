@@ -1,8 +1,8 @@
-"""绘图线连通分量的扫描线剪枝必须与朴素全配对结果一致（#20 回归）。
+"""Scanline pruning of the connected components of the plot line must be consistent with the naive full pairing results (#20 regression).
 
-`_connected_drawing_line_components()` 用左缘排序限制配对范围：第二条线起点
-超过第一条线右缘加容差时水平净空已超容差，欧氏距离必然更大，可以安全跳过。
-差分测试对比修复前的朴素实现，覆盖堆叠、共 x 跨度、零宽、端点相接等形态。
+`_connected_drawing_line_components()` Limit matching range with left edge sorting: starting point of second line
+When the horizontal clearance exceeds the tolerance plus the right edge of the first line, the Euclidean distance must be larger and can be safely skipped.
+Differential testing compared to the naive implementation before repair, covering stacked, total x span, zero-width, endpoint connected, etc.
 """
 
 from __future__ import annotations
@@ -23,11 +23,11 @@ def _reference_components(
     drawing_lines: list[_AxisLine],
     tolerance: float,
 ) -> list[list[_AxisLine]]:
-    """修复前的朴素实现：全部配对逐一计算欧氏距离。"""
+    """Naive implementation before repair: calculate Euclidean distance for all pairs one by one."""
     parents = list(range(len(drawing_lines)))
 
     def find(index: int) -> int:
-        """路径压缩并返回参考并查集根节点。"""
+        """The path is compressed and the reference is returned and the root node is found."""
         while parents[index] != index:
             parents[index] = parents[parents[index]]
             index = parents[index]
@@ -47,12 +47,12 @@ def _reference_components(
 
 
 def _canonical(components: list[list[_AxisLine]]) -> list[tuple[BBoxLike, ...]]:
-    """分量转成按 bbox 排序的规范形，消除并查集树形与根身份差异。"""
+    """The components are converted into the canonical form sorted by bbox, and the differences between the tree form and the root identity are eliminated and found."""
     return sorted(tuple(sorted(line.bbox for line in component)) for component in components)
 
 
 def _random_lines(rng: random.Random, count: int) -> list[_AxisLine]:
-    """网格加抖动的横竖短线，混入同 x 跨度堆叠与端点相接的形态。"""
+    """The grid adds dithering horizontal and vertical short lines, mixed with the same x span stacking and connecting endpoints."""
     lines: list[_AxisLine] = []
     for index in range(count):
         column, row = index % 30, index // 30
@@ -73,7 +73,7 @@ def _random_lines(rng: random.Random, count: int) -> list[_AxisLine]:
 @pytest.mark.parametrize("seed", [1, 2, 3, 4])
 @pytest.mark.parametrize("tolerance", [2.0, 5.5, 12.0])
 def test_sweep_components_match_naive_pair_loop(seed: int, tolerance: float) -> None:
-    """随机形态下扫描线分量的成员划分与朴素实现逐位一致。"""
+    """The member division of scan line components in random form is consistent bit by bit with naive implementation."""
     rng = random.Random(seed)
     lines = _random_lines(rng, 420)
 
@@ -83,7 +83,7 @@ def test_sweep_components_match_naive_pair_loop(seed: int, tolerance: float) -> 
 
 
 def test_sweep_bounds_evaluated_pairs_on_dispersed_grid() -> None:
-    """分散网格上实际计算距离的配对数被线性约束，而不是 n² 全扫。"""
+    """The number of pairs for the actual calculated distance on the dispersed grid is linearly constrained instead of n² full sweep."""
     lines: list[_AxisLine] = []
     for index in range(1800):
         column, row = index % 60, index // 60
@@ -97,7 +97,7 @@ def test_sweep_bounds_evaluated_pairs_on_dispersed_grid() -> None:
     original = graphics._bbox_distance
 
     def counting(first, second):
-        """统计空间索引筛选后仍需精确计算的候选配对。"""
+        """Candidate pairs that still need to be accurately calculated after statistical spatial index screening."""
         counter["calls"] += 1
         return original(first, second)
 
@@ -108,13 +108,13 @@ def test_sweep_bounds_evaluated_pairs_on_dispersed_grid() -> None:
         graphics._bbox_distance = original
 
     assert all(isinstance(component, list) for component in components)
-    # 60 列共享 x 起点的线天然无法被 x 窗口剪枝（26100 次），但必须远低于 n²/2=1620000。
+    # The 60-column line sharing the starting point of x naturally cannot be pruned by the x window (26100 times), but must be well below n²/2=1620000.
     assert counter["calls"] <= 20 * len(lines)
 
 
 @pytest.mark.parametrize("shape", ["long_horizontal", "overlap_x_separate_y", "dense_cross"])
 def test_sweep_components_match_naive_degenerate_shapes(shape: str) -> None:
-    """长横线、同 x 远隔线和密集交叉线均保持原连通成员及顺序。"""
+    """Long horizontal lines, distant lines with the same x and densely crossing lines all maintain their original connected members and order."""
     lines: list[_AxisLine] = []
     for index in range(180):
         if shape == "long_horizontal":
@@ -135,14 +135,14 @@ def test_sweep_components_match_naive_degenerate_shapes(shape: str) -> None:
 
 
 def test_component_summaries_reuse_only_identical_lines_and_tolerance(monkeypatch) -> None:
-    """同页相同输入只计算一次，换线对象或容差后必须重新计算。"""
+    """The same input on the same page is only calculated once and must be recalculated after changing line objects or tolerances."""
     lines = _random_lines(random.Random(4), 80)
     source = _PageSource(page_size=(1200.0, 800.0), lines=[], chars=[], drawing_lines=lines)
     original = graphics._connected_drawing_line_components
     counter = {"calls": 0}
 
     def counting(drawing_lines, tolerance):
-        """统计实际进入连通分量计算的次数。"""
+        """Count the actual number of times connected component calculations are entered."""
         counter["calls"] += 1
         return original(drawing_lines, tolerance)
 
@@ -157,10 +157,10 @@ def test_component_summaries_reuse_only_identical_lines_and_tolerance(monkeypatc
 
 
 def test_axis_index_preserves_boundary_hits_and_original_vertical_order() -> None:
-    """纵轴索引在容差边缘命中，并按输入顺序输出相交图形。"""
+    """The vertical axis index hits at the tolerance edge and the intersection figures are output in the order in which they were entered."""
 
     def path(bbox, segment_count=2):
-        """构造仅包含轴线检测所需字段的真实路径记录。"""
+        """Constructs a true path record containing only the fields required for axis detection."""
         return PDFPathInfo(bbox, segment_count, False, True, 0, 0)
 
     horizontal = path((100.0, 99.5, 200.0, 100.5))

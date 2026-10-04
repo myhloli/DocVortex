@@ -1,4 +1,4 @@
-"""识别通用学术文本角色和数学语法，不引用文档名称、变量名称或出版社名称。"""
+"""Recognize common academic text roles and mathematical syntax without citing document names, variable names, or publisher names."""
 
 import re
 import unicodedata
@@ -23,18 +23,18 @@ _FIELDS = {
 
 
 def text_role(text: str) -> str | None:
-    """仅对独立角色标题归一化，正文中出现同词不会升级为标题。"""
+    """Only independent character titles are normalized. Same words appearing in the text will not be upgraded to titles."""
     normalized = re.sub(r"[\s:：]+", "", unicodedata.normalize("NFKC", text)).casefold()
     return next((role for role, names in _ROLES.items() if normalized in names), None)
 
 
 def metadata_field(text: str) -> str | None:
-    """提取独立元数据字段类别，多次出现同一日期字段不算多个角色。"""
+    """Extract independent metadata field categories. Multiple occurrences of the same date field are not counted as multiple roles."""
     return next((role for role, pattern in _FIELDS.items() if re.search(pattern, text.strip(), re.IGNORECASE)), None)
 
 
 def publication_text(text: str) -> bool:
-    """出版标识及独立文章体裁提供页边上下文，不识别具体期刊或出版社名称。"""
+    """Publication identifiers and independent article genres provide margin context and do not identify specific journal or publisher names."""
     return bool(re.search(r"copyright|©|\bjournal\b|\bissn\b|\bdoi\b|出版|版权所有", text, re.IGNORECASE)) or (
         len(text.split()) <= 4
         and bool(
@@ -44,14 +44,14 @@ def publication_text(text: str) -> bool:
 
 
 def prose_residue(text: str) -> str:
-    """去除语法连接的数学表达式，留下自然语言；自定义标识符由结构而非名称识别。"""
+    """Syntactically connected mathematical expressions are removed, leaving natural language; custom identifiers are identified by structure rather than name."""
     normalized = unicodedata.normalize("NFKC", text)
     normalized = _EXPRESSION.sub(" ", normalized)
     return _CALL.sub(" ", normalized)
 
 
 def has_prose(text: str, *, minimum_words: int = 3) -> bool:
-    """数学表达式外的连续自然语言才构成正文证据；孤立标识符仍需空间分类。"""
+    """Only continuous natural language outside mathematical expressions constitutes textual evidence; isolated identifiers still require spatial classification."""
     residue = prose_residue(text)
     return (
         bool(re.search(r"\b(?:where|with|when|from|that|then|the|this|these|which|is|are)\b", residue, re.IGNORECASE))

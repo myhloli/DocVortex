@@ -1,10 +1,10 @@
-//! 行内上下标保序配对；仅计算数值关系，文字和对象物化留在 Python。
+//! In-line superscripts and subscripts are paired in order; only numerical relationships are calculated, text and object materialization remain in Python.
 use crate::geometry::Box4;
 
 pub type Record = (Box4, f64, f64, usize, bool, usize, usize);
 type Choice = (f64, usize, bool, bool);
 
-/// 复现主体与小字号框的低重叠外置判断。
+/// Low overlap external judgment of reproduction subject and small font size frame.
 fn detached(a: Box4, b: Box4, h: f64) -> bool {
     let width = 0.0_f64.max(a[2] - a[0]);
     let edge = (b[0] - a[2]).abs().min((a[0] - b[2]).abs());
@@ -18,7 +18,7 @@ fn detached(a: Box4, b: Box4, h: f64) -> bool {
         && outside >= 0.5_f64.max(0.2 * h)
 }
 
-/// 为已验证记录计算候选度量；布尔位置 true 表示前缀。
+/// Compute candidate metrics for verified records; Boolean position true represents the prefix.
 fn candidate(a: &Record, b: &Record) -> Option<(f64, bool, bool)> {
     if a.5 == b.5 || a.6 != b.6 || a.1 <= 0.0 || b.1 <= 0.0 {
         return None;
@@ -66,7 +66,7 @@ fn candidate(a: &Record, b: &Record) -> Option<(f64, bool, bool)> {
     ))
 }
 
-/// 每页建立边缘索引，严格按小行和主体原索引裁决相同度量，存储规模为线性。
+/// Each page establishes an edge index, strictly determines the same measurement based on small rows and the main original index, and the storage scale is linear.
 pub fn matches(records: Vec<Record>) -> Option<Vec<(usize, usize, bool, bool)>> {
     let n = records.len();
     if records.iter().any(|r| {

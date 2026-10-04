@@ -1,4 +1,4 @@
-"""以真实截页和反例验证 Flash 图框、公式、段落及三线表修复。"""
+"""Use real screenshots and counterexamples to verify Flash frame, formula, paragraph and three-line table repair."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ FIXTURES = Path(__file__).parent / "pdfs" / "flash_layout"
 
 
 def _text(value: object) -> str:
-    """读取字符串和行内样式中的可见文字，避免把样式差异当作内容缺失。"""
+    """Read visible text in strings and inline styles to avoid interpreting style differences as missing content."""
     if isinstance(value, str):
         return value
     if isinstance(value, list):
@@ -32,13 +32,13 @@ def _text(value: object) -> str:
 
 @lru_cache(maxsize=None)
 def _pages(name: str) -> list[list[dict]]:
-    """缓存真实截页的完整原生解析，测试不依赖外置磁盘。"""
+    """Cache the complete native analysis of the real screenshot, and the test does not rely on external disks."""
     with PDFDocument(str(FIXTURES / f"{name}.pdf")) as document:
         return pipeline._analyze_native_document(document)
 
 
 def test_real_unnumbered_math_components_keep_prose_outside() -> None:
-    """三处行间公式完整认领，下标不得再成为正文或小标题。"""
+    """The three interline formulas must be fully claimed, and the subscripts must not become the main text or subtitles."""
     page = _pages("math_display_formulas")[0]
     equations = [block for block in page if block["type"] == "equation"]
     assert len(equations) == 3
@@ -53,7 +53,7 @@ def test_real_unnumbered_math_components_keep_prose_outside() -> None:
 
 
 def test_math_note_merges_without_losing_paired_scripts() -> None:
-    """跨 run 的组合数上下标与注释同属一个文本块，正文 m、k 不被升降标。"""
+    """The superscript and subscript of the combination number across run and the comments belong to the same text block, and the text m and k will not be raised or lowered."""
     page = _pages("math_display_formulas")[0]
     notes = [block for block in page if 0.31 < block["bbox"][1] < 0.34]
     assert len(notes) == 1 and notes[0]["type"] == "text"
@@ -68,7 +68,7 @@ def test_math_note_merges_without_losing_paired_scripts() -> None:
 
 @pytest.mark.parametrize("barrier", ["explicit_split", "no_ink", "separate_columns", "multichar_script", "table"])
 def test_paired_script_merge_respects_missing_evidence_and_barriers(barrier: str) -> None:
-    """成对角标补证据不能绕过显式边界、缺失几何、邻列距离或表格认领。"""
+    """Pairwise corner complement evidence cannot bypass explicit boundaries, missing geometry, neighbor distances, or table claims."""
     from docvortex.analyzers.native.pdf import line_merging
     from docvortex.analyzers.native.pdf.models import _TextLane
 
@@ -103,7 +103,7 @@ def test_paired_script_merge_respects_missing_evidence_and_barriers(barrier: str
 
 
 def test_real_form_labels_and_blank_mapped_bracket_are_inside() -> None:
-    """Form 收紧不能丢掉边缘标签，映射为空格的大括号仍须计入公式裁图。"""
+    """Form Tightening cannot discard edge labels, and braces mapped to spaces must still be included in formula cropping."""
     pages = _pages("bloom_form_labels")
     images = [block for block in pages[0] if block["type"] == "image"]
     assert [_text(block["content"]).count("3 hashes") for block in images] == [1, 3]
@@ -123,7 +123,7 @@ def test_real_form_labels_and_blank_mapped_bracket_are_inside() -> None:
 
 
 def test_real_journal_title_rules_and_marginal_formulas() -> None:
-    """公开分块同时保持标题合并、分隔线断点、脚注归属及公式编号。"""
+    """Expose chunking while maintaining header merging, separator breaks, footnote attribution, and formula numbering."""
     pages = _pages("journal_layout_tables")
     titles = [block for block in pages[0] if block["type"] == "doc_title"]
     assert len(titles) == 1
@@ -140,7 +140,7 @@ def test_real_journal_title_rules_and_marginal_formulas() -> None:
 
 
 def test_real_three_rule_tables_have_complete_html_topology() -> None:
-    """表头换行不增加记录，两个同步描述列各形成五个五行合并格。"""
+    """The header line wrap does not add records, and the two synchronization description columns each form five five-line merge cells."""
     pages = _pages("journal_layout_tables")
     tables = [next(block for block in pages[index] if block["type"] == "table") for index in (4, 5)]
     first, second = [BeautifulSoup(table["content"], "html.parser") for table in tables]
@@ -156,7 +156,7 @@ def test_real_three_rule_tables_have_complete_html_topology() -> None:
 
 
 def test_public_postprocess_preserves_title_and_rule_separated_paragraphs() -> None:
-    """公开 ModelJson 到 MiddleJson 边界不得重新合并已修复的独立段落。"""
+    """Exposed ModelJson to MiddleJson boundaries must not re-merge fixed independent paragraphs."""
     from copy import deepcopy
     from docvortex.api import postprocess
     from docvortex.schema import DocumentMetadata, ModelJson, Producer
@@ -175,7 +175,7 @@ def test_public_postprocess_preserves_title_and_rule_separated_paragraphs() -> N
 
 
 def test_pdf_implicit_fill_closure_is_a_rule_but_triangle_is_not() -> None:
-    """通过真实 PDF 绘制操作验证隐式闭合，避免只模拟中间对象。"""
+    """Verify implicit closure with real PDF draw operations to avoid simulating only intermediate objects."""
     stream = BytesIO()
     canvas = Canvas(stream, pagesize=(200, 200))
     canvas._code.extend(["20 150 m 180 150 l 180 149.5 l 20 149.5 l f*", "20 100 m 180 100 l 20 99.5 l f*"])
@@ -189,7 +189,7 @@ def test_pdf_implicit_fill_closure_is_a_rule_but_triangle_is_not() -> None:
 
 
 def test_form_ink_fallback_preserves_external_caption_and_missing_evidence() -> None:
-    """仅实际字形位于容器内时补认领，不吸收图注或猜测缺失的字形框。"""
+    """Only the actual glyphs are claimed if they are inside the container, no legends or missing glyph boxes are added."""
     line = _text_line("edge label", (20, 92, 70, 104), 0, ink_bbox=(21, 93, 69, 99))
     bbox = (10, 10, 90, 100)
     assert graphics._form_member_bbox(line, bbox) == line.ink_bbox
@@ -201,12 +201,12 @@ def test_form_ink_fallback_preserves_external_caption_and_missing_evidence() -> 
     "pair,expected", [(("(2)", "(6)"), False), (("（12）", "（13）"), False), (("Journal 2024", "Journal 2025"), True)]
 )
 def test_formula_tags_do_not_supply_repeated_footer_evidence(pair: tuple[str, str], expected: bool) -> None:
-    """括号编号不能误充重复页脚，含正文的真实页脚仍可忽略变化数字。"""
+    """Bracket numbers cannot be mistaken for repeated footers, and real footers containing text can still ignore changing numbers."""
     assert auxiliary_text._marginal_text_matches(*pair) is expected
 
 
 def test_unmapped_ink_excludes_spaces_and_invisible_text() -> None:
-    """普通空白、合成换行、不可见字形不能扩张公式截图。"""
+    """Ordinary white space, synthetic line breaks, and invisible glyphs cannot expand formula screenshots."""
     char = {"char": " ", "tight_bbox": (10, 10, 15, 40), "font": {"size": 10}, "text_object_id": 1, "text_render_mode": 0}
     assert formulas._unmapped_formula_ink_bboxes([char]) == [(10, 10, 15, 40)]
     assert not formulas._unmapped_formula_ink_bboxes(
@@ -215,7 +215,7 @@ def test_unmapped_ink_excludes_spaces_and_invisible_text() -> None:
 
 
 def test_fraction_rule_above_visible_ink_is_not_strikethrough() -> None:
-    """填充分式横线穿过字体外框时，仍需检查是否穿过实际字形。"""
+    """When the fill fraction horizontal line passes through the font outline, it still needs to be checked whether it passes through the actual glyph."""
     from docvortex.analyzers.native.pdf.inline.detection import _build_line_candidate, _drawing_match_for_line
     from docvortex.analyzers.native.pdf.models import _AxisLine
 
@@ -242,7 +242,7 @@ def test_fraction_rule_above_visible_ink_is_not_strikethrough() -> None:
     ],
 )
 def test_reviewed_existing_formula_geometry(name: str, index: int, fingerprint: str) -> None:
-    """锁定人工叠框验收的两页完整几何，覆盖同类括号裁切修复。"""
+    """Lock the complete geometry of the two pages for manual stacking frame acceptance, covering the same type of bracket cropping and repair."""
     from _flash_pdf_test_utils import _page_bbox_fingerprint, formula_detection_evidence
 
     source = Path(__file__).parents[2] / "demo" / "pdfs" / name
@@ -253,7 +253,7 @@ def test_reviewed_existing_formula_geometry(name: str, index: int, fingerprint: 
 
 @pytest.mark.parametrize("asymmetric,with_gaps", [(False, True), (True, False)])
 def test_sparse_descriptor_ambiguity_keeps_recovery_fallback(asymmetric: bool, with_gaps: bool) -> None:
-    """描述列不同步或叶子列缺值时，不能把普通空单元格强行解释为合并格。"""
+    """When description columns are out of sync or leaf columns have missing values, ordinary empty cells cannot be forcibly interpreted as merged cells."""
     from test_native_pdf_table import _char_items
 
     entries = [(f"H{col}", (col * 50 + 5, 5, col * 50 + 20, 12)) for col in range(6)]

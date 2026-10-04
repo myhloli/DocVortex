@@ -1,4 +1,4 @@
-//! 表格计算与调用内索引状态的 Python 绑定。
+//! Table calculations are bound to Python within the call to the index state.
 
 use docvortex_core::geometry::Box4;
 use docvortex_core::tables;
@@ -7,7 +7,7 @@ use pyo3::types::PyList;
 
 use super::conversion::{box_tuple, read_boxes, BoxTuple};
 
-/// 行范围极值索引，不向 Python 返回重复浮点坐标。
+/// Row range extreme value index, do not return repeated floating point coordinates to Python.
 #[pyclass(frozen)]
 pub(super) struct TableRowGeometry {
     index: docvortex_core::row_geometry::RowGeometry,
@@ -15,7 +15,7 @@ pub(super) struct TableRowGeometry {
 
 #[pymethods]
 impl TableRowGeometry {
-    /// 构建时一次验证全部有限框，非法输入必须交回参考实现。
+    /// All limited frames are verified at one time during construction, and illegal input must be returned to the reference implementation.
     #[new]
     fn new(py: Python<'_>, boxes: Vec<[f64; 4]>) -> PyResult<Self> {
         py.detach(|| docvortex_core::row_geometry::RowGeometry::new(boxes))
@@ -23,12 +23,12 @@ impl TableRowGeometry {
             .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("nonfinite row geometry"))
     }
 
-    /// 返回四个坐标分别来自哪一行，Python 复用已有坐标对象。
+    /// Return which row the four coordinates come from, and Python reuses existing coordinate objects.
     fn union_indices(&self, py: Python<'_>, start: usize, end: usize) -> Option<[usize; 4]> {
         py.detach(|| self.index.union_indices(start, end))
     }
 
-    /// 保留原行顺序，只跳过下边界一定不超过表底的前缀。
+    /// The original row order is retained, and only the prefixes that must not exceed the bottom of the table are skipped at the lower boundary.
     fn first_after(&self, py: Python<'_>, bottom: f64) -> Option<usize> {
         if !bottom.is_finite() {
             return None;
@@ -37,7 +37,7 @@ impl TableRowGeometry {
     }
 }
 
-/// 调用内的稳定列累计状态，均值读取不折叠补偿量。
+/// The stable column accumulation status within the call is read, and the mean value is read without folding the compensation amount.
 #[pyclass]
 pub(super) struct StableColumnClusters {
     state: docvortex_core::columns::Columns,
@@ -45,7 +45,7 @@ pub(super) struct StableColumnClusters {
 
 #[pymethods]
 impl StableColumnClusters {
-    /// Python 边界依据解释器版本选择已验证的浮点求和模式。
+    /// Python Bounds selects the validated floating point summation mode according to the interpreter version.
     #[new]
     fn new(compensated: bool) -> Self {
         Self {
@@ -53,7 +53,7 @@ impl StableColumnClusters {
         }
     }
 
-    /// 只传入严格前缀之后的新增行，纯数值计算期间释放 GIL。
+    /// Only new rows after the strict prefix are passed in, and GIL is released during pure numerical calculations.
     fn extend(
         &mut self,
         py: Python<'_>,
@@ -63,7 +63,7 @@ impl StableColumnClusters {
         py.detach(|| self.state.extend(&rows, tolerance))
     }
 
-    /// 为差分测试返回均值、累计结果、成员数和覆盖行数，不暴露 Python 对象。
+    /// Return the mean, cumulative results, number of members, and number of covered rows for differential testing without exposing the Python object.
     fn snapshot(&self) -> Vec<Vec<(f64, f64, usize, usize)>> {
         self.state
             .groups
@@ -85,13 +85,13 @@ impl StableColumnClusters {
     }
 }
 
-/// 为整页候选复用排序后的正文高度，查询仅传入区间及核心来源。
+/// The text height after sorting is reused for the whole page candidate, and only the interval and core source are passed in to the query.
 #[pyclass(frozen)]
 pub(super) struct TableNoteMetrics {
     metrics: std::sync::Arc<docvortex_core::statistics::NoteMetrics>,
 }
 
-/// 已验证走廊行的来源成员及其中心范围，只在当前候选组复用。
+/// The source members of the verified corridor row and their center range are only reused in the current candidate group.
 #[pyclass(frozen)]
 pub(super) struct TableNoteCore {
     rows: docvortex_core::note_index::CoreRows,
@@ -100,7 +100,7 @@ pub(super) struct TableNoteCore {
 
 #[pymethods]
 impl TableNoteMetrics {
-    /// 一次性接收全部走廊行成员，后续候选仅传入行区间。
+    /// All corridor row members are received at one time, and subsequent candidates are only passed into row intervals.
     fn prepare_rows(&self, py: Python<'_>, members: Vec<Vec<i64>>) -> TableNoteCore {
         TableNoteCore {
             rows: py.detach(|| self.metrics.rows(members)),
@@ -108,7 +108,7 @@ impl TableNoteMetrics {
         }
     }
 
-    /// 跳过 Python 成员校验与打包，索引不适用时仍由 Rust 精确排除来源。
+    /// Skip Python member verification and packaging, and when the index is not applicable, the source is still accurately excluded by Rust.
     fn height_for_rows(
         &self,
         py: Python<'_>,
@@ -127,7 +127,7 @@ impl TableNoteMetrics {
                 .height_for_rows(&rows.rows, start, end, top, bottom, fallback)
         })
     }
-    /// 拒绝非有限数值，确保参考实现负责特殊排序语义。
+    /// Reject non-finite numeric values, ensuring that the reference implementation takes care of special ordering semantics.
     #[new]
     fn new(py: Python<'_>, items: Vec<(i64, f64, f64)>) -> PyResult<Self> {
         py.detach(move || docvortex_core::statistics::NoteMetrics::new(items))
@@ -137,7 +137,7 @@ impl TableNoteMetrics {
             .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("invalid note metrics"))
     }
 
-    /// 数值筛选时释放 GIL，有限输入溢出返回参考路径标志。
+    /// GIL is released during numerical filtering, and the limited input overflow returns to the reference path flag.
     fn height(
         &self,
         py: Python<'_>,
@@ -150,7 +150,7 @@ impl TableNoteMetrics {
     }
 }
 
-/// 表格组行只返回成员索引，由 Python 复用原字形对象。
+/// The table group row only returns the member index, and the original glyph object is reused by Python.
 #[pyfunction]
 pub(super) fn table_visual_rows(
     py: Python<'_>,
@@ -161,7 +161,7 @@ pub(super) fn table_visual_rows(
     py.detach(move || tables::visual_rows(boxes, ids, median_height))
 }
 
-/// 已物化的字符中心按整表轨道批量统计，不改变候选数量。
+/// The materialized character centers are counted in batches according to the entire table track, without changing the number of candidates.
 #[pyfunction]
 pub(super) fn table_row_occupancy(
     py: Python<'_>,
@@ -171,7 +171,7 @@ pub(super) fn table_row_occupancy(
     py.detach(move || tables::row_occupancy(rows, tracks))
 }
 
-/// 表格区域一次筛选整页字符，特殊输入继续沿 Python 的原验证入口处理。
+/// The table area filters the entire page of characters at a time, and special input continues to be processed along the original verification entry of Python.
 #[pyfunction]
 pub(super) fn table_boxes(
     py: Python<'_>,
@@ -192,7 +192,7 @@ pub(super) fn table_boxes(
     })))
 }
 
-/// 对整批轨道查询计算覆盖率，避免逐线段绑定调用。
+/// Query and calculate coverage for the entire batch of tracks to avoid binding calls on a segment-by-line basis.
 #[pyfunction]
 pub(super) fn coverage_batch(
     py: Python<'_>,
@@ -202,7 +202,7 @@ pub(super) fn coverage_batch(
     py.detach(move || tables::coverage_batch(rules, queries))
 }
 
-/// 按 Python 簇坐标批量合并相邻线段。
+/// Merge adjacent line segments in batches according to Python cluster coordinates.
 #[pyfunction]
 pub(super) fn merge_rules(
     py: Python<'_>,
@@ -214,7 +214,7 @@ pub(super) fn merge_rules(
     py.detach(move || tables::merge_rules(rules, coordinates, tolerance, join))
 }
 
-/// 批量完成所有字符的单元格分配，保留索引和歧义位。
+/// Complete cell allocation of all characters in batches, retaining index and ambiguity bits.
 #[pyfunction]
 pub(super) fn assign_cells(
     py: Python<'_>,
@@ -225,7 +225,7 @@ pub(super) fn assign_cells(
     py.detach(move || tables::assign_cells(glyphs, specs, index))
 }
 
-/// 验证原子格索引后一次执行网格连接。
+/// Grid join is performed once after verifying the atomic lattice index.
 #[pyfunction]
 pub(super) fn grid_parents(
     py: Python<'_>,
@@ -240,7 +240,7 @@ pub(super) fn grid_parents(
     Ok(py.detach(move || tables::grid_parents(count, pairs)))
 }
 
-/// 将合法并查集转为矩形单元格，同时返回路径压缩后的父节点。
+/// Convert the legal union set into a rectangular cell, and return the parent node after path compression at the same time.
 #[pyfunction]
 pub(super) fn component_specs(
     py: Python<'_>,
@@ -254,7 +254,7 @@ pub(super) fn component_specs(
             "invalid table parents",
         ));
     }
-    // 来源是私有 Python 并查集；在绑定边界阻止异常环导致原生死循环。
+    // The source is private Python and is searched; preventing abnormal loops at the binding boundary from causing a native infinite loop.
     for start in 0..parents.len() {
         let mut i = start;
         let mut steps = 0;

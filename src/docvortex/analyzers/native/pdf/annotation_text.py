@@ -1,4 +1,4 @@
-"""共享图注文字证据；独立图表题与正文引用句使用同一判定，不跨领域导入。"""
+"""Share textual evidence of figure annotations; use the same judgment for independent figure titles and text quotations, and do not import them across fields."""
 
 from __future__ import annotations
 
@@ -38,13 +38,13 @@ _SUBFIGURE_REFERENCE_TAIL_RE = re.compile(
 
 
 def _normalize_annotation_text(text: str) -> str:
-    """统一全角字符和兼容罗马数字，保留原文仅供规则判断。"""
+    """Uniform full-width characters and compatible with Roman numerals, retain the original text only for rule judgment."""
 
     return unicodedata.normalize("NFKC", text).strip()
 
 
 def _caption_tail_is_reference(tail: str) -> bool:
-    """排除编号后紧接叙述谓语、并列编号或正文连接词的引用句。"""
+    """Exclude quotations that are followed by descriptive predicates, parallel numbers, or text connectives immediately after the number."""
 
     stripped = tail.lstrip()
     if not stripped:
@@ -59,7 +59,7 @@ def _caption_tail_is_reference(tail: str) -> bool:
 
 
 def _is_strong_caption_text(text: str) -> bool:
-    """判断文本是否以带编号的中英文强图表标题标记开头。"""
+    """Determine whether the text begins with a numbered Chinese and English strong chart title tag."""
 
     normalized = _normalize_annotation_text(text)
     match = _ENGLISH_CAPTION_RE.match(normalized) or _CHINESE_CAPTION_RE.match(normalized)
@@ -67,7 +67,7 @@ def _is_strong_caption_text(text: str) -> bool:
 
 
 def _caption_identifier(text: str) -> str | None:
-    """返回中英文强图表题共用的规范化编号。"""
+    """Returns the normalized number shared by Chinese and English strong chart titles."""
 
     normalized = _normalize_annotation_text(text)
     match = _ENGLISH_CAPTION_RE.match(normalized) or _CHINESE_CAPTION_RE.match(normalized)

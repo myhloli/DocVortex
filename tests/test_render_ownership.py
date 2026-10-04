@@ -1,4 +1,4 @@
-"""验证独立引擎只提供七种目标，不反向加载宿主专用 renderer。"""
+"""The verification standalone engine only provides seven targets and does not reverse load the host-specific renderer."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from docvortex.schema import MiddleJson
 
 @pytest.mark.parametrize("target", ["content_list", "content_list_v2"])
 def test_host_formats_are_not_available(target: str, tmp_path: Path) -> None:
-    """枚举、模块、API 和 CLI 均不再接受宿主专用输出。"""
+    """Enums, modules, API and CLI no longer accept host-specific output."""
     assert len(RenderFormat) == 7
     assert util.find_spec(f"docvortex.render.{target}") is None
     with pytest.raises(ValueError):

@@ -1,4 +1,4 @@
-"""核验当前 ctypes ABI 后借用函数地址；不重载运行库，不缓存文档或原生地址。"""
+"""Verify the current ctypes ABI and then borrow the function address; do not reload the runtime library, do not cache documents or native addresses."""
 
 import ctypes as ct
 from itertools import chain
@@ -16,7 +16,7 @@ _RECORD_BATCH_SIZE = None
 
 
 def bridge_info():
-    """报告真实完成的桥接次数和最近的能力探测结果。"""
+    """Reports the actual number of bridges completed and the most recent capability probe results."""
     return {
         "pdfium_bridge_calls": _CALLS,
         "pdfium_empty_pages": _EMPTY_PAGES,
@@ -26,7 +26,7 @@ def bridge_info():
 
 
 def read_native_chars(textpage, extended, *, frame=None, rotation=0):
-    """在同一 textpage 和锁内完成原始读取，特殊输入及非标准函数留给参考实现。"""
+    """Raw reading is done within the same textpage and lock, special inputs and non-standard functions are left to the reference implementation."""
     global _CALLS, _EMPTY_PAGES, _UNAVAILABLE_REASON, _RECORD_BATCH_SIZE
     native = get_native()
     if native is None:
@@ -38,8 +38,8 @@ def read_native_chars(textpage, extended, *, frame=None, rotation=0):
     if type(textpage) is not pdfium.PdfTextPage or not textpage.raw or type(extended) is not bool:
         _UNAVAILABLE_REASON = "nonstandard or closed text page"
         return None
-    # 零字符页没有需要借用的字符函数地址；在原锁内确认后直接返回空快照，
-    # 单独计数，不能把未执行的 Rust FFI 调用记为桥接成功。
+    # The zero character page has no character function address that needs to be borrowed; an empty snapshot is returned directly after confirmation in the original lock.
+    # Counted separately, unexecuted calls to Rust and FFI cannot be counted as successful bridging.
     with pdfium_guard():
         if textpage.count_chars() == 0:
             _EMPTY_PAGES += 1
@@ -77,7 +77,7 @@ def read_native_chars(textpage, extended, *, frame=None, rotation=0):
             return None
         functions.append(function)
         addresses.append(ct.cast(function, ct.c_void_p).value)
-    # 本地列表在原生调用结束前保留函数强引用；textpage 参数保留页面及运行库的生命周期。
+    # The local list retains strong references to the function until the end of the native call; the textpage parameter retains the life cycle of the page and runtime library.
     with pdfium_guard():
         count = textpage.count_chars()
         if count < 0:

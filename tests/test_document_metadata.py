@@ -1,4 +1,4 @@
-"""验证源属性提取、轻量边界、异常保留和跨阶段协议。"""
+"""Verify source property extraction, lightweight boundaries, exception retention, and cross-stage protocols."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from docvortex.schema import FILE_SUFFIXES, DocumentMetadata, DocumentProperties
 
 
 def pdf_payload() -> bytes:
-    """构造含源属性的两页 PDF，避免依赖原始文件路径。"""
+    """Constructs a two-page PDF with source properties to avoid relying on the original file path."""
     writer = PdfWriter()
     writer.add_blank_page(width=100, height=100)
     writer.add_blank_page(width=100, height=100)
@@ -29,7 +29,7 @@ def pdf_payload() -> bytes:
 
 
 def ooxml_payload(suffix: str, *, bad_core: bool = False) -> bytes:
-    """构造只含属性和目录的 OOXML，证明不必加载正文对象。"""
+    """Construct OOXML containing only attributes and directories to prove that it is not necessary to load the text object."""
     stream = BytesIO()
     dc = 'xmlns:dc="http://purl.org/dc/elements/1.1/"'
     dcterms = 'xmlns:dcterms="http://purl.org/dc/terms/"'
@@ -58,11 +58,11 @@ def ooxml_payload(suffix: str, *, bad_core: bool = False) -> bytes:
 
 @pytest.mark.parametrize("suffix", sorted(FILE_SUFFIXES))
 def test_every_native_format_has_independent_metadata(suffix: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    """全部原生输入可轻量读取，不允许触发正文预测或 PDF 分类。"""
+    """All native inputs are lightweight and are not allowed to trigger text predictions or PDF classifications."""
     from docvortex.analyzers.native import models
 
     def forbidden(*args: object, **kwargs: object) -> None:
-        """任何正文分析或分类调用都说明突破了轻量接口边界。"""
+        """Any text analysis or classification calls indicate a violation of lightweight interface boundaries."""
         raise AssertionError("metadata must not analyze body or classify PDF")
 
     for name in (
@@ -92,7 +92,7 @@ def test_every_native_format_has_independent_metadata(suffix: str, monkeypatch: 
 
 @pytest.mark.parametrize("suffix", sorted(FILE_SUFFIXES))
 def test_metadata_matches_full_analysis(suffix: str) -> None:
-    """独立读取和原生分析使用相同源数据，后处理保留完整属性。"""
+    """Independent reads and native analysis use the same source data, and post-processing preserves complete attributes."""
     source = source_payload(suffix)
     expected = docvortex.extract_metadata(source, file_suffix=suffix).metadata.document
     analysis = docvortex.analyze(source, file_suffix=suffix)
@@ -103,7 +103,7 @@ def test_metadata_matches_full_analysis(suffix: str) -> None:
 
 @pytest.mark.parametrize("suffix,count,kind", [("docx", 7, "declared"), ("pptx", 2, "slide"), ("xlsx", 2, "sheet")])
 def test_ooxml_fields_and_counts(suffix: str, count: int, kind: str) -> None:
-    """多类型 Office 只读元数据并区分声明页数与目录项计数。"""
+    """Multitype Office Read-only metadata and differentiate between declaration page count and directory entry count."""
     props = docvortex.extract_metadata(ooxml_payload(suffix), file_suffix=suffix).metadata.document
     assert props is not None
     assert (props.title, props.authors, props.languages) == ("中文标题", ["Doe, Jane"], ["zh-CN"])
@@ -113,7 +113,7 @@ def test_ooxml_fields_and_counts(suffix: str, count: int, kind: str) -> None:
 
 
 def test_ooxml_path_metadata_reads_only_selected_parts(tmp_path: Path) -> None:
-    """验证大媒体成员不会阻断从 OOXML 路径读取核心属性。"""
+    """Verify that large media members do not block reading core properties from the OOXML path."""
 
     source = ooxml_payload("pptx")
     package_path = tmp_path / "large-media.pptx"
@@ -130,7 +130,7 @@ def test_ooxml_path_metadata_reads_only_selected_parts(tmp_path: Path) -> None:
 
 
 def test_ooxml_bytes_metadata_does_not_use_global_input_limit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 OOXML 元数据按选定成员读取，不受通用输入阈值影响。"""
+    """Verify that OOXML metadata is read by the selected member and is not affected by the universal input threshold."""
 
     import docvortex.metadata as metadata_module
 
@@ -142,7 +142,7 @@ def test_ooxml_bytes_metadata_does_not_use_global_input_limit(monkeypatch: pytes
 
 
 def test_bad_optional_xml_preserves_count_and_application() -> None:
-    """坏的核心属性 XML 只生成诊断，不丢失其他属性与结构计数。"""
+    """Bad core properties XML Only diagnostics are generated, other properties and structure counts are not lost."""
     result = docvortex.extract_metadata(ooxml_payload("pptx", bad_core=True), file_suffix="pptx")
     assert result.metadata.document.page_count == 2
     assert result.metadata.document.creator_application == "Source App"
@@ -150,7 +150,7 @@ def test_bad_optional_xml_preserves_count_and_application() -> None:
 
 
 def test_pdf_selection_ownership_and_bundle(tmp_path: Path) -> None:
-    """选页保留整本属性，调用方句柄保持可用，结果包脱离源文件往返。"""
+    """The page selection retains the entire book's properties, the caller handle remains available, and the result packet is round-tripped from the source file."""
     with PDFDocument(pdf_payload()) as document:
         original = docvortex.extract_metadata(document).metadata.document
         result = docvortex.parse(document, page_range="2", keep_model_json=True)
@@ -168,14 +168,14 @@ def test_pdf_selection_ownership_and_bundle(tmp_path: Path) -> None:
 
 
 def test_static_html_properties_and_no_body_inference() -> None:
-    """HTML 标准字段优先，模板和正文伪属性不参与提取。"""
+    """HTML Standard fields take precedence, and template and text pseudo-attributes do not participate in extraction."""
     data = b'<html lang="en"><head><title>Standard</title><meta property="og:title" content="Other"><meta name="author" content="A"><meta name="author" content="B"><meta name="author" content="A"><template><meta name="author" content="Bad"></template></head><body><h1>Not metadata</h1><meta name="author" content="Bad2"></body></html>'
     props = docvortex.extract_metadata(data, file_suffix="html").metadata.document
     assert (props.title, props.authors, props.languages) == ("Standard", ["A", "B"], ["en"])
 
 
 def test_rtf_explicit_time_count_and_application() -> None:
-    """RTF 只提取 info 与 generator，保留分钟精度。"""
+    """RTF only extracts info and generator, retaining minute precision."""
     data = rb"{\rtf1\ansi{\*\generator SourceApp;}{\info{\title Sample}{\author A}{\creatim\yr2024\mo3\dy4\hr5\min6}\nofpages12} Body}"
     props = docvortex.extract_metadata(data, file_suffix="rtf").metadata.document
     assert props.created_at == "2024-03-04T05:06"
@@ -197,12 +197,12 @@ def test_rtf_explicit_time_count_and_application() -> None:
     ],
 )
 def test_dates_never_invent_missing_parts(value: str, expected: str | None) -> None:
-    """非法日期保持未知，年和月精度不能补成任意日期。"""
+    """Illegal dates remain unknown, and the year and month precision cannot be filled into arbitrary dates."""
     assert property_date(value) == expected
 
 
 def test_old_metadata_remains_optional_and_new_fields_copy() -> None:
-    """旧 2.0 属性不补造 document，多值字段独立复制且稳定去重。"""
+    """The old 2.0 attributes are not rebuilt document, multi-value fields are replicated independently and deduplication is stable."""
     old = DocumentMetadata(file_suffix="pdf", producer=Producer(name="old", version="1"))
     assert "document" not in old.to_dict()
     old.document = DocumentProperties(authors=[" A ", "A", "B"], title="Test")
@@ -212,7 +212,7 @@ def test_old_metadata_remains_optional_and_new_fields_copy() -> None:
 
 
 def test_unreadable_source_has_stable_error(tmp_path: Path) -> None:
-    """缺失输入和损坏容器使用统一错误码而非空的伪成功结果。"""
+    """Missing input and corrupted containers use uniform error codes instead of empty pseudo-success results."""
     with pytest.raises(DocumentError, match="Cannot read") as exc:
         docvortex.extract_metadata(tmp_path / "missing.docx")
     assert exc.value.code == "open_failed"
@@ -222,7 +222,7 @@ def test_unreadable_source_has_stable_error(tmp_path: Path) -> None:
 
 
 def replace_zip_part(data: bytes, part: str, value: bytes) -> bytes:
-    """只替换夹具的指定属性 part，保留其他目录和正文。"""
+    """Replaces only the specified attribute part of the fixture, leaving the other directories and text intact."""
     output = BytesIO()
     with ZipFile(BytesIO(data)) as original, ZipFile(output, "w", ZIP_DEFLATED) as changed:
         for name in original.namelist():
@@ -231,7 +231,7 @@ def replace_zip_part(data: bytes, part: str, value: bytes) -> bytes:
 
 
 def test_epub_extended_properties_and_multiple_authors() -> None:
-    """OPF 多作者、语言、标识符与出版日期语义在唯一映射中保留。"""
+    """OPF Multiple authors, languages, identifiers and publication date semantics are preserved in unique mappings."""
     import lxml.etree as etree
 
     data = source_payload("epub")
@@ -263,7 +263,7 @@ def test_epub_extended_properties_and_multiple_authors() -> None:
 
 
 def test_invalid_date_retains_other_office_properties() -> None:
-    """非法日期记录诊断，但保留标题和其他可用属性。"""
+    """Illegal date records diagnostics, but keeps title and other available attributes."""
     data = ooxml_payload("docx")
     with ZipFile(BytesIO(data)) as package:
         core = package.read("docProps/core.xml").replace(b"2024-03-04T05:06:07+08:00", b"not-a-date")
@@ -274,7 +274,7 @@ def test_invalid_date_retains_other_office_properties() -> None:
 
 
 def test_ofd_document_dates_identifiers_and_keyword_list() -> None:
-    """OFD 多 DocBody 汇总页数，同时保留 DocInfo 的日期、标识符和关键词列表。"""
+    """OFD Multiple DocBody Summarizes the page count while retaining the date, identifier, and keyword list for DocInfo."""
     import lxml.etree as etree
 
     data = source_payload("ofd")
@@ -297,7 +297,7 @@ def test_ofd_document_dates_identifiers_and_keyword_list() -> None:
 
 
 def test_bad_odf_metadata_does_not_block_body() -> None:
-    """ODF 的可选 meta.xml 损坏不阻止正文转换，且保留诊断。"""
+    """Optional meta.xml corruption of ODF does not prevent text conversion and preserves diagnostics."""
     data = replace_zip_part(source_payload("odt"), "meta.xml", b"<broken>")
     analysis = docvortex.analyze(data, file_suffix="odt")
     assert analysis.model_json.pages
@@ -306,11 +306,11 @@ def test_bad_odf_metadata_does_not_block_body() -> None:
 
 
 def test_partial_ole_properties_survive_optional_stream_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    """模拟后续属性流损坏，不能丢掉 olefile 已读出的标题和作者。"""
+    """Simulate subsequent attribute stream corruption and cannot lose olefile read title and author."""
     import olefile
 
     def partially_read(document: olefile.OleFileIO) -> None:
-        """底层库读取部分属性后遇到坏的可选流。"""
+        """The underlying library encountered a bad optional stream after reading some properties."""
         document.metadata = olefile.OleMetadata()
         document.metadata.title = "Saved title"
         document.metadata.author = "Saved author"
@@ -325,7 +325,7 @@ def test_partial_ole_properties_survive_optional_stream_failure(monkeypatch: pyt
 
 @pytest.mark.parametrize("broken", [False, True])
 def test_pdf_xmp_fills_missing_properties_without_replacing_info(broken: bool) -> None:
-    """PDF Info 优先，XMP 补缺并保留月精度；坏 XMP 不丢有效 Info。"""
+    """PDF Info takes priority, XMP fills in the gaps and retains monthly accuracy; bad XMP does not lose the valid Info."""
     from pypdf.generic import DecodedStreamObject, NameObject
 
     writer = PdfWriter()

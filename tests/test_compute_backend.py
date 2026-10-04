@@ -1,4 +1,4 @@
-"""验证可选扩展缺失、协议不匹配和显式后端的边界。"""
+"""Verify bounds for missing optional extensions, protocol mismatches, and explicit backends."""
 
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -10,14 +10,14 @@ from docvortex import _compute_backend as backend
 
 @pytest.fixture(autouse=True)
 def reset_backend():
-    """隔离进程级选择缓存，不让测试环境变量影响其它回归。"""
+    """Isolate the process-level selection cache and prevent test environment variables from affecting other regressions."""
     backend.get_native.cache_clear()
     yield
     backend.get_native.cache_clear()
 
 
 def test_python_never_imports_extension(monkeypatch):
-    """强制 Python 时即使扩展可用也不能导入。"""
+    """When forcing Python the extension cannot be imported even if it is available."""
     monkeypatch.setenv("DOCVORTEX_COMPUTE_BACKEND", "python")
     load = Mock(side_effect=AssertionError("must not import"))
     monkeypatch.setattr(backend.importlib, "import_module", load)
@@ -27,7 +27,7 @@ def test_python_never_imports_extension(monkeypatch):
 
 @pytest.mark.parametrize("error", [ImportError("missing"), OSError("bad binary")])
 def test_missing_extension_modes(monkeypatch, error):
-    """auto 可以降级，rust 必须显式暴露安装问题并保留 cause。"""
+    """auto can be downgraded, rust must explicitly expose the installation problem and cause be retained."""
     monkeypatch.setattr(backend.importlib, "import_module", Mock(side_effect=error))
     monkeypatch.setenv("DOCVORTEX_COMPUTE_BACKEND", "auto")
     assert backend.get_native() is None
@@ -39,7 +39,7 @@ def test_missing_extension_modes(monkeypatch, error):
 
 
 def test_protocol_and_invalid_mode(monkeypatch):
-    """旧 editable 编译产物不能当作兼容扩展加载。"""
+    """Old editable compiled products cannot be loaded as compatible extensions."""
     monkeypatch.setattr(backend.importlib, "import_module", Mock(return_value=SimpleNamespace(PROTOCOL_VERSION=-1)))
     monkeypatch.setenv("DOCVORTEX_COMPUTE_BACKEND", "rust")
     with pytest.raises(RuntimeError, match="compatible"):
@@ -52,7 +52,7 @@ def test_protocol_and_invalid_mode(monkeypatch):
 
 @pytest.mark.parametrize("mode", ["auto", "rust"])
 def test_protocol_28_obeys_backend_selection(monkeypatch, mode):
-    """旧协议 28 在 auto 下回退，在显式 rust 下报告扩展不兼容。"""
+    """Old protocol 28 falls back under auto and reports extension incompatibility under explicit rust."""
     monkeypatch.setattr(backend.importlib, "import_module", Mock(return_value=SimpleNamespace(PROTOCOL_VERSION=28)))
     monkeypatch.setenv("DOCVORTEX_COMPUTE_BACKEND", mode)
     if mode == "auto":
@@ -64,7 +64,7 @@ def test_protocol_28_obeys_backend_selection(monkeypatch, mode):
 
 
 def test_unexpected_import_error_is_not_hidden(monkeypatch):
-    """扩展自身代码错误不能被自动回退掩盖。"""
+    """Errors in the extension's own code cannot be covered up by automatic fallback."""
     monkeypatch.setenv("DOCVORTEX_COMPUTE_BACKEND", "auto")
     monkeypatch.setattr(backend.importlib, "import_module", Mock(side_effect=ValueError("broken")))
     with pytest.raises(ValueError, match="broken"):
@@ -72,7 +72,7 @@ def test_unexpected_import_error_is_not_hidden(monkeypatch):
 
 
 def test_default_auto_prefers_rust_and_allows_missing_extension(monkeypatch):
-    """默认 auto 优先选择兼容 Rust，扩展缺失时允许 Python 回退。"""
+    """By default, auto is preferred to be compatible with Rust, and Python is allowed to fall back when the extension is missing."""
     monkeypatch.delenv("DOCVORTEX_COMPUTE_BACKEND", raising=False)
     native = SimpleNamespace(PROTOCOL_VERSION=backend._PROTOCOL_VERSION)
     load = Mock(return_value=native)

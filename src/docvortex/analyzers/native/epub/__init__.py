@@ -1,4 +1,4 @@
-"""Flash EPUB 原生解析实现。"""
+"""Flash EPUB native parsing implementation."""
 
 from .converter import EpubConverter
 from .errors import EpubEncryptedError, EpubError, EpubParseError, EpubResourceLimitError

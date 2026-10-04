@@ -1,4 +1,4 @@
-//! 不访问 Python 对象或 PDFium 的单线程批量计算内核。
+//! Single-threaded batch computing kernel without access to Python object or PDFium.
 
 pub const PROTOCOL_VERSION: u32 = 30;
 pub mod columns;
@@ -13,7 +13,7 @@ pub mod geometry;
 pub mod scripts;
 pub mod tables;
 
-/// 对有限数值稳定排序并计算与 statistics.median 相同的中位数。
+/// Stably sort finite values and calculate the same median as statistics.median.
 pub fn median(mut values: Vec<f64>) -> f64 {
     values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let n = values.len();
@@ -27,7 +27,7 @@ pub fn median(mut values: Vec<f64>) -> f64 {
     }
 }
 
-/// 使用 Python round 的偶数舍入选择已有样本，不做插值。
+/// Use the even rounding of Python round to select existing samples without interpolation.
 pub fn quantile(mut values: Vec<f64>, fraction: f64) -> f64 {
     if values.is_empty() {
         return 0.0;

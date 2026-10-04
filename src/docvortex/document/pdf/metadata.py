@@ -1,4 +1,4 @@
-"""读取原始 PDF 属性，复用调用方 PDFium 生命周期与共享锁。"""
+"""Read the original PDF attribute and reuse the caller's PDFium life cycle and shared lock."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 def read_pdf_properties(document: PDFDocument) -> tuple[DocumentProperties, list[str]]:
-    """优先保留 Info 字段，用 XMP 补缺；可选属性损坏不丢失物理页数。"""
+    """Priority is given to retaining the Info field and filling the vacancy with XMP; if the optional attribute is damaged, the number of physical pages will not be lost."""
     properties = DocumentProperties(page_count=document.page_count, page_count_kind="physical")
     warnings: list[str] = []
     try:
@@ -38,7 +38,7 @@ def read_pdf_properties(document: PDFDocument) -> tuple[DocumentProperties, list
             properties.languages = property_values(catalog.get("/Lang"))
         xmp = reader.xmp_metadata
         if xmp is not None:
-            # 日期直接读取原始 XMP 文本，避免库将无时区日期隐式解释为 UTC。
+            # Dates are read directly as raw XMP text, avoiding the library's implicit interpretation of timezone-less dates as UTC.
             mappings = {
                 "title": ("dc_title", False),
                 "authors": ("dc_creator", True),

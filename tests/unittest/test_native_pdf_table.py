@@ -1,5 +1,5 @@
 # Copyright (c) Opendatalab. All rights reserved.
-"""验证 Native PDF 表格结构恢复的网格、文本和候选仲裁。"""
+"""Verification Native PDF Grid, text and candidate quorum for table structure recovery."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from docvortex.document.pdf._document import PDFDocument
 def _char_items(
     entries: Iterable[tuple[str, tuple[float, float, float, float]]],
 ) -> tuple[dict[str, object], ...]:
-    """把文本框拆成带稳定 char_idx 的逐字符测试输入。"""
+    """Split textbox into character-by-character test input with stable char_idx."""
 
     rebuilt: list[dict[str, object]] = []
     for text, bbox in entries:
@@ -56,7 +56,7 @@ def _char_items(
 
 
 def _cell_glyph_rows(rows: list[str]) -> list[NativeTableGlyph]:
-    """把多条物理行构造成保留显式词间空格的 cell 字形。"""
+    """Construct multiple physical lines into the cell glyph that preserves explicit interword spacing."""
 
     glyphs: list[NativeTableGlyph] = []
     source_index = 0
@@ -91,7 +91,7 @@ def _grid_rules(
     internal_vertical: tuple[float, float] = (0.0, 60.0),
     internal_horizontal: tuple[float, float] = (0.0, 100.0),
 ) -> tuple[NativeTableRule, ...]:
-    """构造二行二列表格边框，并允许裁剪内部横竖隔断。"""
+    """Construct a two-row and two-column table border, and allow cutting of internal horizontal and vertical partitions."""
 
     return (
         NativeTableRule((0.0, 0.0, width, 1.0), 1.0, "horizontal"),
@@ -117,7 +117,7 @@ def _local_to_page_bbox(
     page_height: float,
     angle: int,
 ) -> tuple[float, float, float, float]:
-    """把正向局部测试框逆变换回页面坐标。"""
+    """Inversely transform the forward local test frame back to page coordinates."""
 
     x0, y0, x1, y1 = bbox
     if angle == 90:
@@ -136,7 +136,7 @@ def _aligned_text_input(
     rules: tuple[NativeTableRule, ...] = (),
     rectangles: tuple[NativeTableRectangle, ...] = (),
 ) -> NativeTableInput:
-    """构造标准旋转下的等距文本表格输入。"""
+    """Constructing isometric text form input under standard rotation."""
 
     page_width, page_height = 120.0, 90.0
     local_width, local_height = (page_height, page_width) if angle in {90, 270} else (page_width, page_height)
@@ -177,7 +177,7 @@ def _aligned_text_input(
 
 
 def _rotated_single_row_input(angle: int) -> NativeTableInput:
-    """构造四种标准旋转下的三列单物理行强线框。"""
+    """Construct a three-column single physical row strong wireframe under four standard rotations."""
 
     page_width, page_height = 120.0, 90.0
     local_width, local_height = (page_height, page_width) if angle in {90, 270} else (page_width, page_height)
@@ -233,7 +233,7 @@ def _rotated_single_row_input(angle: int) -> NativeTableInput:
 
 
 def _rotated_single_column_input(angle: int) -> NativeTableInput:
-    """构造四种标准旋转下的二行单列强线框表单。"""
+    """Construct a two-row, single-column strong wireframe form under four standard rotations."""
 
     page_width, page_height = 120.0, 90.0
     local_width, local_height = (page_height, page_width) if angle in {90, 270} else (page_width, page_height)
@@ -291,7 +291,7 @@ def _rotated_single_column_input(angle: int) -> NativeTableInput:
 
 
 def _rotated_sparse_hybrid_input(angle: int) -> NativeTableInput:
-    """构造四种标准旋转下仅有表头横线的三行三列表格。"""
+    """Construct a three-row, three-column table with only header horizontal lines under four standard rotations."""
 
     page_width, page_height = 120.0, 90.0
     local_width, local_height = (page_height, page_width) if angle in {90, 270} else (page_width, page_height)
@@ -357,7 +357,7 @@ def _candidate(
     score: float,
     issues: tuple[str, ...] = (),
 ) -> NativeTableCandidate:
-    """构造候选仲裁测试需要的最小内部对象。"""
+    """Constructs the minimal internal object required for a candidate arbitration test."""
 
     cells = tuple(
         NativeTableCell(
@@ -387,7 +387,7 @@ def _candidate(
 
 
 def _build_reportlab_table_pdf() -> bytes:
-    """生成带真实 PDF drawing 和文本层的二行二列表格 fixture。"""
+    """Generates a two-row, two-column table fixture with real PDF drawing and a text layer."""
 
     output = BytesIO()
     canvas = Canvas(output, pagesize=(200, 200))
@@ -406,7 +406,7 @@ def _build_reportlab_table_pdf() -> bytes:
 
 
 def test_vector_grid_recovers_cells_and_escapes_html() -> None:
-    """验证完整矢量网格生成稳定 HTML，并转义单元格文本。"""
+    """Verify that full vector mesh generates stable HTML and escapes cell text."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 60.0),
@@ -432,7 +432,7 @@ def test_vector_grid_recovers_cells_and_escapes_html() -> None:
 
 
 def test_vector_grid_splits_one_pdf_text_run_by_character_boundary() -> None:
-    """验证物理列边界可将同一 PDF 文本对象按字符安全落格。"""
+    """Verify physical column boundaries to safely frame the same PDF text object character by character."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 60.0),
@@ -455,7 +455,7 @@ def test_vector_grid_splits_one_pdf_text_run_by_character_boundary() -> None:
 
 
 def test_text_candidate_rejects_token_split_across_cell_boundary() -> None:
-    """验证纯文本轨道不将一个原子 token 分割到两个逻辑单元格。"""
+    """Verify that the plain text track does not split an atom token into two logical cells."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 60.0),
@@ -498,7 +498,7 @@ def test_text_candidate_rejects_token_split_across_cell_boundary() -> None:
 
 
 def test_vector_grid_accepts_open_outer_vertical_edges() -> None:
-    """验证横线端点可补齐缺失的左右外框而不伪造内部隔断。"""
+    """Verify that the horizontal line endpoints can complete the missing left and right outer frames without forging internal partitions."""
 
     rules = (
         NativeTableRule((0.0, 0.0, 100.0, 1.0), 1.0, "horizontal"),
@@ -529,7 +529,7 @@ def test_vector_grid_accepts_open_outer_vertical_edges() -> None:
 
 
 def test_single_long_rule_endpoint_does_not_create_global_column() -> None:
-    """验证单条长横线的内缩端点不能创建全局幽灵列。"""
+    """Verify that the indented endpoint of a single long horizontal line does not create a global ghost column."""
 
     rules = list(_grid_rules())
     rules[0] = NativeTableRule((10.0, 0.0, 100.0, 1.0), 1.0, "horizontal")
@@ -555,7 +555,7 @@ def test_single_long_rule_endpoint_does_not_create_global_column() -> None:
 
 
 def test_sparse_hybrid_splits_dense_keyed_baselines_after_line_undercount() -> None:
-    """验证只有表头横线时按独立关键列把稠密正文基线恢复成多行。"""
+    """When verifying that there is only a horizontal line in the header, restore the dense text baseline into multiple lines by independent key columns."""
 
     rules = (
         NativeTableRule((0.0, 0.0, 120.0, 1.0), 1.0, "horizontal"),
@@ -607,7 +607,7 @@ def test_sparse_hybrid_splits_dense_keyed_baselines_after_line_undercount() -> N
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_sparse_hybrid_supports_standard_table_rotations(angle: int) -> None:
-    """验证竖线加视觉正文行的少线候选支持四种标准旋转。"""
+    """Verify that few line candidates for vertical lines plus visual text lines support four standard rotations."""
 
     result = recover_native_pdf_table(_rotated_sparse_hybrid_input(angle))
 
@@ -618,7 +618,7 @@ def test_sparse_hybrid_supports_standard_table_rotations(angle: int) -> None:
 
 
 def test_sparse_hybrid_recovers_two_level_header_spans() -> None:
-    """验证局部表头横线恢复左侧 rowspan 和分组标题 colspan。"""
+    """Verify that the partial header horizontal line restores the left side rowspan and the group header colspan."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 100.0),
@@ -655,7 +655,7 @@ def test_sparse_hybrid_recovers_two_level_header_spans() -> None:
 
 
 def test_sparse_hybrid_rejects_ambiguous_partial_header_separator() -> None:
-    """验证表头横线只覆盖部分叶子列时不猜测 rowspan/colspan。"""
+    """rowspan/colspan is not guessed when verifying that the header horizontal line only covers part of the leaf columns."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 100.0),
@@ -690,7 +690,7 @@ def test_sparse_hybrid_rejects_ambiguous_partial_header_separator() -> None:
 
 
 def test_vector_grid_joins_small_collinear_gaps() -> None:
-    """验证内部竖线的小间隙会先连接，不会误判为 colspan。"""
+    """Verify that the small gaps in the internal vertical wires will be connected first and will not be misjudged as colspan."""
 
     rules = tuple(rule for rule in _grid_rules() if not (rule.orientation == "vertical" and 49.0 <= rule.bbox[0] <= 51.0)) + (
         NativeTableRule((49.5, 0.0, 50.5, 14.0), 1.0, "vertical"),
@@ -718,7 +718,7 @@ def test_vector_grid_joins_small_collinear_gaps() -> None:
 
 
 def test_line_grid_ignores_stroked_rectangle_duplicate_tracks() -> None:
-    """验证 drawing 与描边矩形重复边界不会混成幽灵行列。"""
+    """Verify that drawing and stroked rectangle repeating boundaries do not blend into ghost rows."""
 
     rectangles = tuple(
         NativeTableRectangle(bbox, 5, False, True)
@@ -753,7 +753,7 @@ def test_line_grid_ignores_stroked_rectangle_duplicate_tracks() -> None:
 
 
 def test_rect_grid_requires_repeated_two_dimensional_lattice() -> None:
-    """验证四个重复单元格矩形可独立形成 rect_grid。"""
+    """Verify that four repeating cell rectangles independently form rect_grid."""
 
     rectangles = tuple(
         NativeTableRectangle(bbox, 5, True, False)
@@ -787,7 +787,7 @@ def test_rect_grid_requires_repeated_two_dimensional_lattice() -> None:
 
 
 def test_vector_grid_collapses_narrow_empty_duplicate_track() -> None:
-    """验证窄空列会保留较强真实边界并删除重复竖轨。"""
+    """Verifying narrow empty columns preserves strong true boundaries and removes duplicate vertical rails."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 60.0),
@@ -815,7 +815,7 @@ def test_vector_grid_collapses_narrow_empty_duplicate_track() -> None:
 
 
 def test_vector_grid_uses_aliases_for_offset_complementary_separators() -> None:
-    """验证表头正文错位的同一竖线折叠后仍按 alias 保持分隔。"""
+    """Verify that the same vertical line with misaligned header text remains separated according to alias after folding."""
 
     rules = tuple(rule for rule in _grid_rules() if not (rule.orientation == "vertical" and 49.0 <= rule.bbox[0] <= 51.0)) + (
         NativeTableRule((48.5, 0.0, 49.5, 30.0), 1.0, "vertical"),
@@ -845,7 +845,7 @@ def test_vector_grid_uses_aliases_for_offset_complementary_separators() -> None:
 
 
 def test_vector_grid_rejects_non_unique_alias_chain() -> None:
-    """验证连续窄轨的 alias 总跨度超限时主动放弃。"""
+    """Verify that the total span of alias of continuous narrow gauge exceeds the limit and give up automatically."""
 
     rules = (
         NativeTableRule((0.0, 0.0, 100.0, 1.0), 1.0, "horizontal"),
@@ -879,7 +879,7 @@ def test_vector_grid_rejects_non_unique_alias_chain() -> None:
 
 
 def test_vector_grid_rejects_single_column_region_with_narrow_ghost_track() -> None:
-    """验证单列区域不能借一个窄空轨伪装成二列表格。"""
+    """Verify that a single-column area cannot be disguised as a two-column table by using a narrow empty rail."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 60.0),
@@ -906,7 +906,7 @@ def test_vector_grid_rejects_single_column_region_with_narrow_ghost_track() -> N
 
 
 def test_vector_grid_accepts_one_text_row_with_blank_physical_row() -> None:
-    """验证强物理二行网格即使只有一行原生文本也可保留空白数据行。"""
+    """Validated strong physical two-row grid preserves blank data rows even if there is only one row of native text."""
 
     rules = (
         NativeTableRule((0.0, 0.0, 120.0, 1.0), 1.0, "horizontal"),
@@ -939,7 +939,7 @@ def test_vector_grid_accepts_one_text_row_with_blank_physical_row() -> None:
 
 
 def test_line_grid_accepts_multilevel_header_and_blank_template_row() -> None:
-    """验证强线框多层表头可保留全宽空白模板行。"""
+    """Verify that strong wireframe multi-layer headers preserve full-width blank template rows."""
 
     rules = (
         NativeTableRule((0.0, 0.0, 120.0, 1.0), 1.0, "horizontal"),
@@ -978,7 +978,7 @@ def test_line_grid_accepts_multilevel_header_and_blank_template_row() -> None:
 
 
 def test_line_grid_accepts_blank_row_when_alias_recovery_is_elsewhere() -> None:
-    """验证其他物理行的 alias 恢复不会误伤独立封闭的空白行。"""
+    """Verify that alias recovery of other physical rows does not accidentally destroy independently enclosed blank rows."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 60.0),
@@ -1016,7 +1016,7 @@ def test_line_grid_accepts_blank_row_when_alias_recovery_is_elsewhere() -> None:
 
 
 def test_line_grid_rejects_blank_row_touched_by_alias_recovery() -> None:
-    """验证空白行自身依赖 alias separator 时仍主动回退。"""
+    """Verify that the blank line itself still actively rolls back when it depends on alias and separator."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 60.0),
@@ -1052,7 +1052,7 @@ def test_line_grid_rejects_blank_row_touched_by_alias_recovery() -> None:
 
 
 def test_line_grid_rejects_blank_row_without_bottom_boundary() -> None:
-    """验证缺少独立下边界的空白行不能借端点推断进入 HTML。"""
+    """Verify that blank rows missing independent lower bounds cannot be extrapolated into HTML by endpoint."""
 
     base = (
         NativeTableRule((0.0, 0.0, 120.0, 1.0), 1.0, "horizontal"),
@@ -1091,7 +1091,7 @@ def test_line_grid_rejects_blank_row_without_bottom_boundary() -> None:
 
 
 def test_line_grid_rejects_too_narrow_blank_row() -> None:
-    """验证高度不足的空白物理行仍主动回退。"""
+    """Blank physical rows with insufficient verification height are still actively rolled back."""
 
     rules = (
         NativeTableRule((0.0, 0.0, 120.0, 1.0), 1.0, "horizontal"),
@@ -1127,7 +1127,7 @@ def test_line_grid_rejects_too_narrow_blank_row() -> None:
 
 
 def test_line_grid_prunes_inset_decorative_underlines() -> None:
-    """验证单元格内缩短下划线不会创建全表横轨。"""
+    """Verify that shortening underlines within cells does not create table-wide rails."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 60.0),
@@ -1161,7 +1161,7 @@ def test_line_grid_prunes_inset_decorative_underlines() -> None:
 
 
 def test_line_grid_keeps_partial_separator_spanning_complete_columns() -> None:
-    """验证跨完整列带的局部横线保留，同时删除单元格内短下划线。"""
+    """Verify that partial horizontal lines across full column strips are preserved while removing short underlines within cells."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 60.0),
@@ -1201,7 +1201,7 @@ def test_line_grid_keeps_partial_separator_spanning_complete_columns() -> None:
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_single_column_line_grid_supports_standard_rotations(angle: int) -> None:
-    """验证强线框单列表单在四种标准方向下保留文本和转义。"""
+    """Verify that strong wireframe single-column forms preserve text and escapes in the four standard orientations."""
 
     result = recover_native_pdf_table(_rotated_single_column_input(angle))
 
@@ -1216,7 +1216,7 @@ def test_single_column_line_grid_supports_standard_rotations(angle: int) -> None
 def test_single_column_line_grid_requires_complete_physical_frame(
     missing: str,
 ) -> None:
-    """验证缺少侧边或行分隔的单列区域不能进入 HTML。"""
+    """Verify that single-column regions missing side or row separators do not enter HTML."""
 
     rules = [
         NativeTableRule((0.0, 0.0, 100.0, 1.0), 1.0, "horizontal"),
@@ -1246,7 +1246,7 @@ def test_single_column_line_grid_requires_complete_physical_frame(
 
 
 def test_line_grid_rejects_single_cell_frame() -> None:
-    """验证完整外框中的单个文本块不能作为一行一列表格采用。"""
+    """Validates that a single block of text within a complete outline cannot be used as a one-row, one-column table."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 40.0),
@@ -1265,7 +1265,7 @@ def test_line_grid_rejects_single_cell_frame() -> None:
 
 
 def test_line_grid_collapses_duplicate_outer_y_track_in_multirow_table() -> None:
-    """验证纵线端点与底部描边形成的重复外缘不会制造幽灵行。"""
+    """Verify that the repeated outer edges formed by the vertical line endpoints and the bottom stroke do not create ghost lines."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 60.0),
@@ -1299,7 +1299,7 @@ def test_line_grid_collapses_duplicate_outer_y_track_in_multirow_table() -> None
 
 
 def test_line_grid_preserves_independent_nearby_outer_boundaries() -> None:
-    """验证两条各自有强物理线的近邻外缘不会被重复轨规则折叠。"""
+    """Verify that two adjacent outer edges with strong physical lines each are not collapsed by the repeating orbit rule."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 60.0),
@@ -1333,7 +1333,7 @@ def test_line_grid_preserves_independent_nearby_outer_boundaries() -> None:
 
 
 def test_line_grid_does_not_fold_distinct_short_rule_into_outer_border() -> None:
-    """验证外缘附近存在独立短物理线时保留原有 rowspan 拓扑。"""
+    """Verify that the original rowspan topology is retained when there are independent short physical lines near the outer edge."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 400.0, 60.0),
@@ -1373,7 +1373,7 @@ def test_line_grid_does_not_fold_distinct_short_rule_into_outer_border() -> None
 
 
 def test_single_row_line_grid_recovers_clipped_outer_borders() -> None:
-    """验证 drawing halo 可恢复 bbox 外邻近边框且保留物理空列。"""
+    """Verification drawing halo restores bbox outer adjacent borders and preserves physical empty columns."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 2.0, 120.0, 58.0),
@@ -1408,7 +1408,7 @@ def test_single_row_line_grid_recovers_clipped_outer_borders() -> None:
 
 
 def test_single_row_line_grid_rejects_missing_outer_border() -> None:
-    """验证单物理行缺少任一横向外框时继续主动回退。"""
+    """Continue to proactively roll back when a single physical line of verification lacks any horizontal frame."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 60.0),
@@ -1437,7 +1437,7 @@ def test_single_row_line_grid_rejects_missing_outer_border() -> None:
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_single_row_line_grid_supports_standard_rotations(angle: int) -> None:
-    """验证强线框单物理行在四种标准旋转下保持同一拓扑。"""
+    """Verify that a single physical row of strong wireframe maintains the same topology under four standard rotations."""
 
     result = recover_native_pdf_table(_rotated_single_row_input(angle))
 
@@ -1447,7 +1447,7 @@ def test_single_row_line_grid_supports_standard_rotations(angle: int) -> None:
 
 
 def test_vector_cell_preserves_explicit_small_gap_space() -> None:
-    """验证 PDF 字符流显式空格在几何间距很小时仍不会丢失。"""
+    """Verify that PDF character stream explicit spaces are not lost when geometric spacing is small."""
 
     chars = (
         {"char": "A", "bbox": (10.0, 10.0, 14.0, 18.0), "char_idx": 0},
@@ -1472,7 +1472,7 @@ def test_vector_cell_preserves_explicit_small_gap_space() -> None:
 
 
 def test_reportlab_pdf_primitives_recover_expected_html() -> None:
-    """验证真实 ReportLab PDF 的字符与 drawing 可端到端恢复结构。"""
+    """Verify characters of authentic ReportLab PDF and drawing recoverable structures end-to-end."""
 
     with PDFDocument(_build_reportlab_table_pdf()) as document:
         page = document[0]
@@ -1504,7 +1504,7 @@ def test_vector_grid_recovers_rectangular_spans(
     horizontal_range: tuple[float, float],
     expected_attribute: str,
 ) -> None:
-    """验证内部隔断缺失只生成矩形横向或纵向合并格。"""
+    """Verify that missing internal partitions only generate rectangular horizontal or vertical merged grids."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 60.0),
@@ -1531,7 +1531,7 @@ def test_vector_grid_recovers_rectangular_spans(
 
 
 def test_vector_grid_rejects_non_rectangular_merge_component() -> None:
-    """验证横纵缺边形成 L 形连通域时拒绝矢量候选。"""
+    """Reject vector candidates when verifying that missing horizontal and vertical edges form a L-shaped connected domain."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 60.0),
@@ -1557,7 +1557,7 @@ def test_vector_grid_rejects_non_rectangular_merge_component() -> None:
 
 
 def test_vector_cell_joins_latin_visual_lines_with_space() -> None:
-    """验证同一逻辑单元格中的 Latin 多行补空格但不写入 HTML 换行。"""
+    """Verify that Latin multi-line padding in the same logical cell pads spaces but does not write HTML line breaks."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 60.0),
@@ -1602,7 +1602,7 @@ def test_cell_visual_line_join_is_language_aware(
     rows: list[str],
     expected: str,
 ) -> None:
-    """验证 Latin、CJK、URL、连字符、数字和紧凑标识符的边界策略。"""
+    """Validates boundary policies for Latin, CJK, URL, hyphens, numbers, and compact identifiers."""
 
     glyphs = _cell_glyph_rows(rows)
 
@@ -1610,7 +1610,7 @@ def test_cell_visual_line_join_is_language_aware(
 
 
 def test_cell_visual_line_separator_has_no_source_index() -> None:
-    """验证新增行间空格不伪造 PDF 字符来源索引。"""
+    """Verify that the added interline spaces do not forge the PDF character source index."""
 
     parts = build_cell_text_parts(_cell_glyph_rows(["Latin", "text"]), 8.0)
 
@@ -1620,7 +1620,7 @@ def test_cell_visual_line_separator_has_no_source_index() -> None:
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_text_grid_supports_standard_table_rotations(angle: int) -> None:
-    """验证三列无线表在四个标准方向下恢复相同结构。"""
+    """Verify that the three-column wireless table recovers the same structure in four standard orientations."""
 
     result = recover_native_pdf_table(
         _aligned_text_input(
@@ -1640,7 +1640,7 @@ def test_text_grid_supports_standard_table_rotations(angle: int) -> None:
 
 
 def test_text_grid_preserves_empty_cells() -> None:
-    """验证缺少文本的叶子列保留空 td，且不会被推断为合并格。"""
+    """Verify that leaf columns with missing text remain empty td and are not inferred as merge cells."""
 
     result = recover_native_pdf_table(
         _aligned_text_input(
@@ -1659,7 +1659,7 @@ def test_text_grid_preserves_empty_cells() -> None:
 
 
 def test_text_grid_groups_tight_subset_continuation_without_break() -> None:
-    """验证无线表紧邻且不引入新列的续行并入同一逻辑行且直接拼接。"""
+    """Verify that the consecutive rows in the wireless table that are adjacent and do not introduce new columns are merged into the same logical row and directly spliced."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 75.0),
@@ -1689,7 +1689,7 @@ def test_text_grid_groups_tight_subset_continuation_without_break() -> None:
 
 
 def test_text_grid_rejects_tight_equal_dense_baselines() -> None:
-    """验证紧邻且占用列相同的稠密基线不被冒充续行合并。"""
+    """Verify that dense baselines that are immediately adjacent and occupy the same columns are not merged by pretending to be continuation rows."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 75.0),
@@ -1719,7 +1719,7 @@ def test_text_grid_rejects_tight_equal_dense_baselines() -> None:
 
 
 def test_text_grid_accepts_right_aligned_numeric_columns() -> None:
-    """验证数字宽度变化但右缘稳定时仍能恢复同一列结构。"""
+    """Verify that the same column structure can be restored when the number width changes but the right edge is stable."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 110.0, 70.0),
@@ -1748,7 +1748,7 @@ def test_text_grid_accepts_right_aligned_numeric_columns() -> None:
 
 
 def test_text_grid_recovers_conservative_multicolumn_header() -> None:
-    """验证前导单项文本真实横跨叶子列时生成 colspan。"""
+    """colspan is generated when verifying that the leading single text actually spans the leaf column."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 70.0),
@@ -1774,7 +1774,7 @@ def test_text_grid_recovers_conservative_multicolumn_header() -> None:
 
 
 def test_text_grid_rejects_header_that_requires_rowspan() -> None:
-    """验证表头角落空缺且需要 rowspan 才能还原时不生成伪网格。"""
+    """No false mesh is generated when verifying header corners are empty and require rowspan to restore."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 90.0),
@@ -1802,7 +1802,7 @@ def test_text_grid_rejects_header_that_requires_rowspan() -> None:
 
 
 def test_key_value_candidate_handles_two_stable_columns() -> None:
-    """验证两列字段值表走独立 key-value 候选。"""
+    """Verify that two column field value tables go independently for key-value candidates."""
 
     result = recover_native_pdf_table(
         _aligned_text_input(
@@ -1820,7 +1820,7 @@ def test_key_value_candidate_handles_two_stable_columns() -> None:
 
 
 def test_text_grid_abstains_for_prose_without_repeated_columns() -> None:
-    """验证已知 bbox 内只有连续正文行时仍主动放弃结构化。"""
+    """Verify that structuring is still actively abandoned even though there are only continuous text lines in bbox."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 70.0),
@@ -1840,7 +1840,7 @@ def test_text_grid_abstains_for_prose_without_repeated_columns() -> None:
 
 @pytest.mark.parametrize("evidence", ["booktabs", "stripes"])
 def test_sparse_candidate_uses_rules_or_row_stripes(evidence: str) -> None:
-    """验证三线规则和重复行底纹均可提升同拓扑少线候选。"""
+    """Verification of both the three-line rule and repeated line shading can improve candidates with few lines of the same topology."""
 
     rules: tuple[NativeTableRule, ...] = ()
     rectangles: tuple[NativeTableRectangle, ...] = ()
@@ -1873,7 +1873,7 @@ def test_sparse_candidate_uses_rules_or_row_stripes(evidence: str) -> None:
 
 
 def test_candidate_conflict_with_close_scores_abstains() -> None:
-    """验证近分异构候选无法建立明确优势时主动放弃。"""
+    """Take the initiative to give up when verification of near-isomeric candidates cannot establish clear advantages."""
 
     assert (
         _select_candidate(
@@ -1887,7 +1887,7 @@ def test_candidate_conflict_with_close_scores_abstains() -> None:
 
 
 def test_verified_line_grid_wins_conflicting_text_topology() -> None:
-    """验证无歧义 drawing 网格以独立物理证据胜出异构文本候选。"""
+    """Verification of unambiguous drawing meshes outperforms heterogeneous textual candidates with independent physical evidence."""
 
     line = _candidate(
         source="vector_grid",
@@ -1905,7 +1905,7 @@ def test_verified_line_grid_wins_conflicting_text_topology() -> None:
 
 
 def test_verified_line_and_rect_topology_conflict_abstains() -> None:
-    """验证两类独立物理证据拓扑不一致时不由 line-grid 抢占。"""
+    """Verify that two types of independent physical evidence are not preempted by line-grid when their topologies are inconsistent."""
 
     line = _candidate(
         source="vector_grid",
@@ -1932,7 +1932,7 @@ def test_verified_line_and_rect_topology_conflict_abstains() -> None:
 
 
 def test_text_candidate_removes_significantly_undercounted_vector() -> None:
-    """验证稳定文本候选显著多出行列时剔除欠分割矢量候选。"""
+    """Verify that under-segmented vector candidates are eliminated when there are significantly more stable text candidates in rows and columns."""
 
     vector = _candidate(source="vector_grid", rows=2, cols=2, score=0.96)
     text = _candidate(source="text_grid", rows=3, cols=3, score=0.93)
@@ -1941,7 +1941,7 @@ def test_text_candidate_removes_significantly_undercounted_vector() -> None:
 
 
 def test_verified_line_grid_is_not_removed_by_text_undercount() -> None:
-    """验证无歧义强物理网格不会被多 baseline 文本候选误判欠分割。"""
+    """Verify that unambiguous strong physical meshes are not falsely under-segmented by multiple baseline text candidates."""
 
     vector = _candidate(
         source="vector_grid",
@@ -1959,7 +1959,7 @@ def test_verified_line_grid_is_not_removed_by_text_undercount() -> None:
 
 
 def test_primitive_limit_falls_back_before_candidate_generation() -> None:
-    """验证单表原语超过保护上限时直接主动放弃。"""
+    """When the single table primitive verification exceeds the protection limit, it will be given up directly."""
 
     base = _aligned_text_input(
         [
@@ -1984,7 +1984,7 @@ def test_primitive_limit_falls_back_before_candidate_generation() -> None:
 
 
 def test_diagnostics_records_tracks_components_and_adoption() -> None:
-    """验证调试入口记录轨道、分项可靠度和最终采用状态。"""
+    """Verify debug portal record tracks, item reliability, and final adoption status."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 100.0, 60.0),
@@ -2013,7 +2013,7 @@ def test_diagnostics_records_tracks_components_and_adoption() -> None:
 
 
 def test_sparse_multiline_recovers_keyed_long_records() -> None:
-    """验证连续关键行和右列续行会合并为稳定长文本记录。"""
+    """Verify that consecutive key rows and right column continuation rows merge into a stable long text record."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 145.0),
@@ -2057,7 +2057,7 @@ def test_sparse_multiline_recovers_keyed_long_records() -> None:
 
 
 def test_sparse_multiline_recovers_filled_record_continuations() -> None:
-    """验证填充行带和关键列可恢复含续行的三列记录表。"""
+    """Verifying the padded row band and key column restores a three-column record table with continuation rows."""
 
     rectangles = tuple(
         NativeTableRectangle((left, top, right, bottom), 5, True, False)
@@ -2102,7 +2102,7 @@ def test_sparse_multiline_recovers_filled_record_continuations() -> None:
 
 
 def test_sparse_multiline_merges_one_level_multiline_header() -> None:
-    """验证没有局部分隔线时多条表头基线只形成一层表头。"""
+    """Verify that multiple header baselines only form one header when there are no local separation lines."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 120.0),
@@ -2144,7 +2144,7 @@ def test_sparse_multiline_merges_one_level_multiline_header() -> None:
 
 
 def test_sparse_multiline_rejects_ambiguous_body_rowspan() -> None:
-    """验证无线正文首列空缺后再次出现时不猜测正文 rowspan。"""
+    """Verify that the text rowspan is not guessed when it appears again after the first column of the wireless text is empty."""
 
     table_input = NativeTableInput(
         table_bbox=(0.0, 0.0, 120.0, 100.0),

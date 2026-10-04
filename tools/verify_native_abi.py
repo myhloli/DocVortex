@@ -1,4 +1,4 @@
-"""不导入应用依赖，直接在当前 CPython 上检查实际 wheel 中的原生 ABI。"""
+"""Without importing application dependencies, check the native ABI in the actual wheel directly on the current CPython."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import zipfile
 
 
 def _expected_protocol_version() -> int:
-    """以文本方式读取 Python 侧协议常量（本脚本不导入应用依赖），协议版本升级时无需同步修改本脚本。"""
+    """Read Python side protocol constants in text mode (this script does not import application dependencies). There is no need to modify this script simultaneously when the protocol version is upgraded."""
     source = Path(__file__).resolve().parents[1] / "src" / "docvortex" / "_compute_backend.py"
     match = re.search(r"^_PROTOCOL_VERSION = (\d+)$", source.read_text(encoding="utf-8"), re.MULTILINE)
     assert match is not None, f"protocol constant not found in {source}"
@@ -20,7 +20,7 @@ def _expected_protocol_version() -> int:
 
 
 def verify_binary(binary: Path) -> None:
-    """在独立进程中执行内核，让 Windows 在退出后释放已加载 DLL。"""
+    """Execute the kernel in a separate process and let Windows release the loaded DLL upon exit."""
     spec = importlib.util.spec_from_file_location("_native", binary)
     assert spec is not None and spec.loader is not None
     native = importlib.util.module_from_spec(spec)
@@ -92,7 +92,7 @@ def verify_binary(binary: Path) -> None:
 
 
 def verify(directory: Path) -> None:
-    """解包唯一构建产物，子进程验证结束后再删除临时二进制。"""
+    """Unpack the only build product and delete the temporary binary after the sub-process verification is completed."""
     assert sys.version_info[:2] == (3, 14), sys.version
     wheels = list(directory.glob("*.whl"))
     assert len(wheels) == 1, wheels

@@ -33,7 +33,7 @@ from docvortex.schema import BlockType
     ids=["none", "solid", "pattern", "linear-gradient", "path-gradient"],
 )
 def test_cell_fill_preserves_content_and_supported_styles(fill: PatternFill | GradientFill, background: str | None) -> None:
-    """验证不同填充经过 StyleProxy 后均能提取内容，渐变不影响字体、对齐或纯色支持。"""
+    """Verify that different fills can extract content after passing through StyleProxy, and gradients do not affect fonts, alignment, or solid color support."""
     workbook = Workbook()
     sheet = workbook.active
     assert sheet is not None
@@ -53,7 +53,7 @@ def test_cell_fill_preserves_content_and_supported_styles(fill: PatternFill | Gr
         expected["background-color"] = background
     assert styles == expected
 
-    # 单格也会经过样式提取；通过公共入口锁定 issue 中的最小失败路径。
+    # Cells also go through style extraction; minimum failure path in issue locked via public entry.
     stream = BytesIO()
     workbook.save(stream)
     pages = XlsxModel().predict(BytesIO(stream.getvalue()))
@@ -61,7 +61,7 @@ def test_cell_fill_preserves_content_and_supported_styles(fill: PatternFill | Gr
 
 
 def test_xlsx_mixed_fills_preserve_all_sheets_and_merged_cells() -> None:
-    """验证两类渐变与纯色混用时仍输出全部工作表、单元格内容和合并跨度。"""
+    """Verify that when two types of gradients are mixed with solid colors, the entire worksheet, cell contents, and merge spans are still output."""
     workbook = Workbook()
     sheet = workbook.active
     assert sheet is not None
@@ -100,7 +100,7 @@ def _cell(
     source_row: int | None = None,
     source_col: int | None = None,
 ) -> ExcelCell:
-    """构造具有完整默认值的共享单元格测试对象。"""
+    """Constructs a shared cell test object with complete default values."""
     return ExcelCell(
         row=row,
         col=col,
@@ -116,7 +116,7 @@ def _cell(
 
 
 def test_shared_html_renderer_preserves_escape_merge_media_and_equation_order() -> None:
-    """验证纯 renderer 保留转义、合并格以及文本媒体公式顺序。"""
+    """Verify that pure renderer preserves escape, merge, and text media formula order."""
     table = ExcelTable(
         anchor=(0, 0),
         num_rows=2,
@@ -159,7 +159,7 @@ def test_singleton_with_structured_content_remains_table(
     equations: list[str],
     text_is_html: bool,
 ) -> None:
-    """验证带媒体、公式或 HTML 的单格不会错误降级为文本。"""
+    """Verify that cells with media, formulas, or HTML are not incorrectly downgraded to text."""
     projector = SpreadsheetProjector()
     plain = ExcelTable(anchor=(0, 0), num_rows=1, num_cols=1, data=[_cell(0, 0, "plain")])
     structured = ExcelTable(
@@ -174,7 +174,7 @@ def test_singleton_with_structured_content_remains_table(
 
 
 def test_projector_materializes_safe_links_rich_text_media_and_equations() -> None:
-    """验证单元格 IR 在渲染前已完整持有链接、富文本、媒体和公式。"""
+    """Verify that cell IR holds links, rich text, media, and formulas intact before rendering."""
     workbook = Workbook()
     sheet = workbook.active
     assert sheet is not None
@@ -197,7 +197,7 @@ def test_projector_materializes_safe_links_rich_text_media_and_equations() -> No
 
 
 def test_gap_discovery_sparse_cells_and_merged_spans_are_stable() -> None:
-    """验证 gap 候选、稀疏扫描和合并跨度沿用当前算法。"""
+    """Verify that gap candidate, sparse scan, and merge spans follow the current algorithm."""
     workbook = Workbook()
     sheet = workbook.active
     assert sheet is not None
@@ -227,7 +227,7 @@ def test_gap_discovery_sparse_cells_and_merged_spans_are_stable() -> None:
 
 
 def test_semantic_subset_filter_keeps_only_maximal_table() -> None:
-    """验证候选过滤只删除语义坐标严格属于另一候选的表格。"""
+    """Validation candidate filtering only removes tables whose semantic coordinates strictly belong to another candidate."""
     projector = SpreadsheetProjector()
     subset = ExcelTable(
         anchor=(0, 0),
@@ -249,7 +249,7 @@ def test_semantic_subset_filter_keeps_only_maximal_table() -> None:
 
 
 def test_hidden_sheet_titles_and_standalone_images_remain_separate() -> None:
-    """验证隐藏 sheet、非空页标题和未吸收图片继续遵守原边界。"""
+    """Verify that hidden sheet, non-empty page titles, and unabsorbed images continue to respect the original boundaries."""
     workbook = Workbook()
     first = workbook.active
     assert first is not None
@@ -281,33 +281,33 @@ def test_hidden_sheet_titles_and_standalone_images_remain_separate() -> None:
 
 
 class _OrderingProjector(SpreadsheetProjector):
-    """为稳定排序测试提供不依赖表格发现的确定性 artifacts。"""
+    """Providing deterministic artifacts for stable ordering tests that do not rely on table discovery."""
 
     def _find_tables_in_sheet(
         self,
         sheet: Worksheet,
     ) -> tuple[set[tuple[int, int]], list[AnchoredBlock]]:
-        """返回一个位置较后的表格 block。"""
+        """Returns a later table, block."""
         return set(), [((1, 0), 0, {"type": BlockType.TABLE, "content": "table"})]
 
     def _find_charts_in_sheet(self, sheet: Worksheet) -> list[AnchoredBlock]:
-        """返回与公式同 anchor 但优先级较后的 chart。"""
+        """Returns chart with the same formula as anchor but with a lower priority."""
         return [((0, 1), 10, {"type": BlockType.CHART, "content": "chart"})]
 
     def _find_additional_visual_artifacts(
         self,
         used_cells: set[tuple[int, int]],
     ) -> list[AnchoredBlock]:
-        """返回与 chart 同 anchor 但优先级更高的公式。"""
+        """Returns the formula with the same anchor as chart but with higher priority."""
         return [((0, 1), 5, {"type": BlockType.EQUATION, "content": "equation"})]
 
     def _find_images_in_sheet(self, used_cells: set[tuple[int, int]] | None = None) -> None:
-        """在几何排序完成后追加独立图片。"""
+        """Append independent images after the geometry sorting is completed."""
         self.cur_page.append({"type": BlockType.IMAGE, "image_base64": "image"})
 
 
 def test_sheet_projection_sorts_artifacts_before_standalone_images() -> None:
-    """验证排序键固定为 anchor、priority，独立图片最后输出。"""
+    """Verify that the sort keys are fixed to anchor, priority, and independent images are output last."""
     workbook = Workbook()
     sheet = workbook.active
     assert sheet is not None
@@ -325,7 +325,7 @@ def test_sheet_projection_sorts_artifacts_before_standalone_images() -> None:
 
 
 def test_xls_and_xlsx_depend_only_on_shared_projector_contract() -> None:
-    """验证最终继承关系和旧 XLSX 私有表格模型均已严格迁移。"""
+    """Verify that both final inheritance relationships and the old XLSX private table model have been strictly migrated."""
     assert issubclass(_XlsPageBuilder, SpreadsheetProjector)
     assert issubclass(XlsxConverter, SpreadsheetProjector)
     assert XlsxConverter not in _XlsPageBuilder.__mro__

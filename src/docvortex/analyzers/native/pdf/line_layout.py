@@ -1,4 +1,4 @@
-"""提供文本栏带、行距和行连接的共享布局判定。"""
+"""Provides shared layout decisions for text column bands, leading, and line connections."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ _TIGHT_OUTPUT_PADDING = 1.0
 
 
 def _title_fonts_compatible(first: _LineItem, second: _LineItem) -> bool:
-    """检查标题字体和字重是否兼容；低字体覆盖率时仍保留可靠字重证据。"""
+    """Check that title fonts and weights are compatible; evidence of reliable weights is retained at low font coverage."""
 
     font_conflicts = (
         first.font_signature is not None
@@ -43,7 +43,7 @@ def _font_signatures_share_family(
     first: tuple[str, int] | None,
     second: tuple[str, int] | None,
 ) -> bool:
-    """判断两个可靠字体签名是否仅因 PDF 子集前缀或描述标志不同。"""
+    """Determines whether two reliable font signatures differ only by the PDF subset prefix or description flag."""
 
     first_family = _normalized_font_family(first)
     second_family = _normalized_font_family(second)
@@ -51,7 +51,7 @@ def _font_signatures_share_family(
 
 
 def _font_signatures_share_emphasis_family(first: tuple[str, int], second: tuple[str, int]) -> bool:
-    """仅在已确认的正文强调续行中忽略通用字重/斜体后缀，不改变标题或其他字体兼容规则。"""
+    """Ignore the universal weight/italic suffix only in confirmed body text emphasis continuations, without changing headings or other font compatibility rules."""
     style_suffix = r"(?:semibold|demibold|regular|regu|roman|bold|light|medium|italic|ital|oblique)+$"
     first_family = re.sub(style_suffix, "", _normalized_font_family(first) or "")
     second_family = re.sub(style_suffix, "", _normalized_font_family(second) or "")
@@ -59,7 +59,7 @@ def _font_signatures_share_emphasis_family(first: tuple[str, int], second: tuple
 
 
 def _font_weights_conflict(first: _LineItem, second: _LineItem) -> bool:
-    """判断两行是否存在足以构成段落硬边界的显著字重差异。"""
+    """Determine whether the weight difference between the two lines is significant enough to form a hard boundary between the paragraphs."""
 
     return (
         first.dominant_font_weight is not None
@@ -78,7 +78,7 @@ def _should_connect_semantic_rows(
     table_bboxes: list[BBox],
     axis_lines: list[_LocalAxisLine],
 ) -> bool:
-    """只用几何、字体和障碍连接同类型语义行，避免标题内容影响聚合。"""
+    """Only use geometry, fonts and barriers to connect semantic lines of the same type to avoid title content affecting aggregation."""
 
     previous_line, previous_bbox = previous
     current_line, current_bbox = current
@@ -90,7 +90,7 @@ def _should_connect_semantic_rows(
         and current_line.title_band_id is not None
         and current_line.title_band_id != previous_line.title_band_id
     ):
-        # 已确认的独立编号标题带构成永久边界，连续两级标题不能因紧排而粘连。
+        # The confirmed independent numbered title strips form a permanent boundary, and two consecutive levels of titles cannot be stuck together due to tight arrangement.
         return False
     if _connection_crosses_table(previous_line.bbox, current_line.bbox, table_bboxes):
         return False
@@ -137,7 +137,7 @@ def _should_connect_semantic_rows(
 
 
 def _line_style_scale(line: _LineItem, local_bbox: BBox) -> float:
-    """返回 canonical 字体尺度，缺失时兼容旧有效行高与局部 bbox。"""
+    """Returns the canonical font size, compatible with the old effective line height and local bbox when missing."""
 
     return max(
         0.1,
@@ -148,7 +148,7 @@ def _line_style_scale(line: _LineItem, local_bbox: BBox) -> float:
 
 
 def _line_canonical_style_scale(line: _LineItem, local_bbox: BBox) -> float:
-    """忽略语义选择标记，直接返回 tight/origin 校准后的字体尺度。"""
+    """Ignore the semantic selection flag and directly return the calibrated font scale of tight/origin."""
 
     return max(
         0.1,
@@ -157,13 +157,13 @@ def _line_canonical_style_scale(line: _LineItem, local_bbox: BBox) -> float:
 
 
 def _line_effective_height(line: _LineItem, local_bbox: BBox) -> float:
-    """兼容既有布局调用，并统一转发到 canonical 字体尺度。"""
+    """Compatible with existing layout calls and uniformly forwarded to canonical font scale."""
 
     return _line_style_scale(line, local_bbox)
 
 
 def _line_layout_height(_line: _LineItem, local_bbox: BBox) -> float:
-    """返回 canonical 布局包络高度，供公式与视觉容器空间判断使用。"""
+    """Returns the layout envelope height of canonical, which is used for formula and visual container space judgment."""
 
     return max(0.1, local_bbox[3] - local_bbox[1])
 
@@ -172,7 +172,7 @@ def _line_tight_output_bbox(
     line: _LineItem,
     page_size: tuple[float, float],
 ) -> BBox | None:
-    """把可靠 tight 字形并集四边各扩 1pt，并裁剪到页面范围。"""
+    """Combine the reliable tight glyph, expand it by 1pt on each side, and crop it to the page range."""
 
     ink_bbox = _coerce_bbox(line.ink_bbox)
     if ink_bbox is None:
@@ -192,7 +192,7 @@ def _lines_tight_output_bbox(
     lines: Sequence[_LineItem],
     page_size: tuple[float, float],
 ) -> BBox | None:
-    """合并多行 tight+1pt 候选；缺失 tight 的成员继续使用原 layout bbox。"""
+    """Merge multiple lines of tight+1pt candidates; members missing tight continue to use the original layout bbox."""
 
     output_bboxes: list[BBox] = []
     changed = False
@@ -209,12 +209,12 @@ def _effective_text_row_gap(
     previous: tuple[_LineItem, BBox],
     current: tuple[_LineItem, BBox],
 ) -> float:
-    """按前一行顶边与有效行高计算净空，避免高数学字形拉长 bbox 底边。"""
+    """Calculate headroom based on the top edge of the previous line and the effective line height to avoid elongating the bottom edge of high math glyphs bbox."""
 
     previous_line, previous_bbox = previous
     _current_line, current_bbox = current
     if previous_line.restored_inline_cluster:
-        # 二维文本簇的 bbox 底边是真实分母边界；同时截断深度重叠，避免相邻分式互相成为段落屏障。
+        # The bbox bottom edge of the two-dimensional text cluster is the true denominator boundary; at the same time, the depth overlap is cut off to prevent adjacent fractions from becoming paragraph barriers to each other.
         return max(
             current_bbox[1] - previous_bbox[3],
             -0.25 * _line_effective_height(previous_line, previous_bbox),
@@ -226,7 +226,7 @@ def _effective_body_text_row_gap(
     previous: tuple[_LineItem, BBox],
     current: tuple[_LineItem, BBox],
 ) -> float:
-    """正文连接优先使用 origin 基线节奏，缺证据时回退既有 bbox 净空。"""
+    """The main text connection uses the origin baseline rhythm first, and falls back to the existing bbox clearance when evidence is lacking."""
 
     previous_line, previous_bbox = previous
     current_line, _current_bbox = current
@@ -258,7 +258,7 @@ def _infer_text_lanes(
     *,
     recalculate_intervals: bool = True,
 ) -> list[_TextLane]:
-    """从重复左右边缘推断稳定栏带，并按需用已分配成员重算边界。"""
+    """Stable bars are inferred from repeated left and right edges, and boundaries are recalculated with assigned members as needed."""
 
     anchor_tolerance = max(3.0, 0.75 * median_height)
     anchor_geometry = [
@@ -396,8 +396,8 @@ def _infer_text_lanes(
             ordered_lanes,
             anchor_tolerance,
         )
-        # 同时覆盖两个稳定正文栏的行仍属于跨栏内容；只进入单侧栏且未越过栏沟的
-        # 宽正文行则回到该栏，避免窄图注把正文错误挤入 span lane。
+        # Lines that cover two stable text columns at the same time are still cross-column content; lines that only enter a single side column and do not cross the column gap
+        # Wide text lines are returned to this column to prevent narrow legends from erroneously squeezing text into span lane.
         if second_coverage >= 0.2 and not fits_only_one_lane:
             span_lines.append(item)
             continue
@@ -429,7 +429,7 @@ def _best_lane_coverage(
     bbox: BBox,
     lanes: list[_TextLane],
 ) -> tuple[_TextLane, float, float]:
-    """一次遍历求最佳栏覆盖与次高覆盖，平局保留原有首个最佳栏。"""
+    """Find the best column coverage and the second highest coverage in one traversal, and retain the original first best column in a tie."""
 
     line_width = max(0.1, bbox[2] - bbox[0])
     best_lane = lanes[0]
@@ -452,7 +452,7 @@ def _fits_only_one_lane_ordered(
     ordered: list[_TextLane],
     tolerance: float,
 ) -> bool:
-    """在调用方预排序的栏序列上判断宽行是否只停留在一个栏内。"""
+    """Determines whether wide rows only stay in one column on the caller's presorted column sequence."""
 
     lane_index = ordered.index(best_lane)
     if lane_index > 0 and bbox[0] < ordered[lane_index - 1].right - tolerance:
@@ -468,7 +468,7 @@ def _fits_only_one_lane(
     lanes: list[_TextLane],
     tolerance: float,
 ) -> bool:
-    """保留旧内部入口；独立调用仍自行排序，输出与预排序版完全一致。"""
+    """The old internal entry is retained; independent calls still sort themselves, and the output is exactly the same as the presorted version."""
 
     return _fits_only_one_lane_ordered(
         bbox,
@@ -482,7 +482,7 @@ def _expand_nested_lane_intervals_from_members(
     lanes: list[_TextLane],
     tolerance: float,
 ) -> None:
-    """按已归属成员扩展局部栏边界，并在相邻栏相交前保留稳定栏沟。"""
+    """Expand local column boundaries by owned members and preserve stable column grooves until adjacent columns intersect."""
 
     for lane in lanes:
         alignment_tolerance = max(1.0, 0.5 * tolerance)
@@ -496,8 +496,8 @@ def _expand_nested_lane_intervals_from_members(
         ]
         if not aligned_members:
             continue
-        # 页眉、页码和标题不参与；同时只让至少一侧锚点稳定的正文扩张栏宽，
-        # 避免页面后续另一版式区段把当前局部栏整体拉宽。
+        # Headers, page numbers and titles are not involved; at the same time, only the main text with stable anchor points on at least one side is allowed to expand the column width.
+        # Prevent another layout section later on the page from widening the current partial column as a whole.
         lane.left = min(lane.left, min(bbox[0] for bbox in aligned_members))
         lane.right = max(lane.right, max(bbox[2] for bbox in aligned_members))
     ordered = sorted(lanes, key=lambda lane: lane.left)
@@ -517,7 +517,7 @@ def _infer_nested_column_band(
     *,
     enhanced: bool = False,
 ) -> tuple[list[_TextLane], float, float] | None:
-    """在全宽版心内查找仅占局部纵向区间的并列正文栏。"""
+    """Find side-by-side text columns that occupy only a partial vertical range within the full-width format."""
 
     outer_width = max(0.1, outer_interval[1] - outer_interval[0])
     candidates = [
@@ -631,7 +631,7 @@ def _reattach_span_lane_continuations(
     lanes: list[_TextLane],
     median_height: float,
 ) -> None:
-    """把紧随稳定跨栏多行之后的单栏宽短尾行迁回对应 span lane。"""
+    """Move the single-column-wide short trailing line immediately following the stable hurdle multiline back to the corresponding span lane."""
 
     regular_lanes = [lane for lane in lanes if not lane.is_span]
     span_lanes = [lane for lane in lanes if lane.is_span]
@@ -722,7 +722,7 @@ def _lane_accepts_short_tail(
     lane: _TextLane,
     median_height: float,
 ) -> bool:
-    """用同一组前序行证据判断当前栏或其他栏是否能够接纳正文短尾。"""
+    """Use the same set of preceding lines of evidence to determine whether the current column or other columns can accommodate the text short tail."""
 
     candidate_line, candidate_bbox = candidate
     preceding = [
@@ -730,13 +730,13 @@ def _lane_accepts_short_tail(
     ]
     if not preceding:
         return False
-    # 同位置前序行按栏内稳定排序取 source_index 较小者，避免后续插入触发排序后改变已用证据。
+    # For the previous rows at the same position, the smaller source_index is used in stable sorting in the column to prevent subsequent insertions from triggering sorting and changing the used evidence.
     previous = max(preceding, key=lambda item: (item[1][1], item[1][0], -item[0].source_index))
     return _short_tail_accepts_previous(candidate, lane, median_height, previous)
 
 
 def _short_tail_accepts_previous(candidate, lane, median_height, previous) -> bool:
-    """复用已确定的原规则前序行，保持字体、间距和视觉行门槛不变。"""
+    """Reuse the determined preamble lines of the original rules, keeping the font, spacing, and visual line thresholds unchanged."""
     candidate_line, candidate_bbox = candidate
     previous_line, previous_bbox = previous
     pair_height = max(
@@ -770,9 +770,9 @@ def _reattach_cross_lane_short_tails(
     lanes: list[_TextLane],
     median_height: float,
 ) -> None:
-    """按纵向事件复用各栏最近前序行；特殊输入交给原逐次扫描实现。"""
-    # 只有一个栏带时不存在“跨栏”归属，直接跳过输入校验和前序扫描；
-    # 这不改变成员、顺序或边界，也能让常见单栏页面避开整页重复遍历。
+    """The most recent previous row of each column is reused according to vertical events; special input is implemented by the original sequential scan."""
+    # When there is only one column, there is no "cross-column" attribution, and the input checksum pre-sequence scan is skipped directly;
+    # This does not change members, order, or boundaries, and also allows common single-column pages to avoid full-page repeats.
     if len(lanes) < 2:
         return
     pending = []
@@ -820,7 +820,7 @@ def _reattach_cross_lane_short_tails(
                 ordinal = append_ordinal
                 append_ordinal += 1
             settled.append((target, candidate, ordinal))
-        # 严格较低 y 才能成为下一组的前序行，同高候选不互相影响。
+        # Only the y that is strictly lower can become the preamble row of the next group. Candidates with the same high level do not affect each other.
         for target, row, ordinal in settled:
             key = (row[1][1], row[1][0], -row[0].source_index, -ordinal)
             if previous_keys[target] is None or key > previous_keys[target]:
@@ -832,14 +832,14 @@ def _reattach_cross_lane_short_tails_python(
     lanes: list[_TextLane],
     median_height: float,
 ) -> None:
-    """按前序依赖顺序，把具有唯一栏归属的正文短尾迁回对应栏。"""
+    """Move the short tail of the text with unique column ownership back to the corresponding column in the preorder dependency order."""
 
-    # 栏边界固定，且匹配只依赖 y0 严格更小的行；先确定上方行后，每行至多迁移一次。
-    # 保留原始对象及其来源栏，不能用 source_index 合并或跳过不同的文本行。
+    # Column boundaries are fixed, and matching only relies on y0 strictly smaller rows; each row is migrated at most once after the upper row is determined first.
+    # The original object and its source column are retained, and different lines of text cannot be merged or skipped with source_index.
     pending = [(lane, candidate) for lane in lanes for candidate in lane.lines if candidate[0].semantic_type is None]
     pending.sort(key=lambda item: (item[1][1][1], item[1][1][0], item[1][0].source_index))
     for source_lane, candidate in pending:
-        # 当前栏也必须参与唯一性判断；多个栏均能接纳时保留原位，避免双向迁移。
+        # The current column must also participate in the uniqueness judgment; if multiple columns can be accepted, it will remain in place to avoid two-way migration.
         matches = [lane for lane in lanes if _lane_accepts_short_tail(candidate, lane, median_height)]
         if len(matches) != 1 or matches[0] is source_lane:
             continue
@@ -856,7 +856,7 @@ def _reattach_repeated_indented_span_tails(
     regular_lanes: list[_TextLane],
     median_height: float,
 ) -> None:
-    """识别重复的跨栏首行与缩进短尾，并把短尾统一迁回跨栏栏带。"""
+    """Identify the repeated first line of the hurdle and the indented short tail, and move the short tail back to the hurdle band."""
 
     span_rows = sorted(
         span_lane.lines,
@@ -909,7 +909,7 @@ def _reattach_repeated_indented_span_tails(
 
 
 def _estimate_lane_gap(lane: _TextLane) -> tuple[float, float]:
-    """仅为本次行距估计提取一次行高，排序仍作用于原栏带成员列表。"""
+    """The row height is only extracted once for this line spacing estimation, and the sorting still applies to the original column member list."""
     from ...._compute_backend import get_native
 
     native = get_native()
@@ -929,7 +929,7 @@ def _estimate_lane_gap(lane: _TextLane) -> tuple[float, float]:
 
 
 def _estimate_lane_gap_python(lane: _TextLane) -> tuple[float, float]:
-    """从栏带内兼容相邻行的较小间隙簇估计常规净空和 MAD。"""
+    """Estimating conventional headroom and MAD from clusters of smaller gaps compatible with adjacent rows within the pen strip."""
 
     lane.lines.sort(key=lambda item: (item[1][1], item[1][0], item[0].source_index))
     heights = [_line_effective_height(line, bbox) for line, bbox in lane.lines]
@@ -955,7 +955,7 @@ def _estimate_lane_gap_python(lane: _TextLane) -> tuple[float, float]:
             and abs(previous_bbox[0] - current_bbox[0]) > 1.5 * median_height
         ):
             continue
-        # PDF 字符框常在相邻基线间产生极小重叠；按零净空计入常规行距统计。
+        # PDF Character boxes often produce minimal overlap between adjacent baselines; zero headroom is included in regular line spacing statistics.
         gaps.append(max(0.0, gap))
 
     if not gaps:
@@ -977,7 +977,7 @@ def _is_structural_typography_gap(
     *,
     reliable_style_change: bool = False,
 ) -> bool:
-    """判断异常段间净空是否同时具有行高或可靠字体层级变化。"""
+    """Determine whether the abnormal inter-segment headroom also has line height or reliable font level changes."""
 
     pair_height = max(previous_height, current_height)
     minimum_height = max(0.1, min(previous_height, current_height))
@@ -997,7 +997,7 @@ def _should_connect_text_rows(
     table_bboxes: list[BBox],
     axis_lines: list[_LocalAxisLine],
 ) -> bool:
-    """综合局部间距、首行缩进、字体和障碍判断两个相邻视觉行是否同段。"""
+    """Determine whether two adjacent visual lines are in the same paragraph based on local spacing, first line indentation, fonts and obstacles."""
 
     previous_line, previous_bbox = previous
     current_line, current_bbox = current
@@ -1033,7 +1033,7 @@ def _should_connect_text_rows(
         or (current_width <= 0.5 * lane_width and previous_line.font_signature[1] == current_line.font_signature[1])
     )
     previous_indent = previous_bbox[0] - lane.left
-    # 极端字体矩阵校正后，旧字框高度不再夸大缩进；真实同行左缘与常规基线间距仍约束续行。
+    # After the extreme font matrix correction, the height of the old font box no longer exaggerates the indentation; the distance between the left edge of the real line and the regular baseline still restricts line continuation.
     local_metric_pair = all(
         line.style_scale_repaired
         and line.source_bbox is not None
@@ -1046,7 +1046,7 @@ def _should_connect_text_rows(
         and reliable_font_match
         and -0.25 * pair_height <= vertical_gap <= regular_gap + max(0.75 * pair_height, 3.0 * gap_mad)
     )
-    # 逗号未终止的满行正文可接同字体家族的粗体枚举短尾；真实标题、留白和字号变化仍拒绝。
+    # Full-line text not terminated by commas can be connected to the bold enumeration short tail of the font family; real titles, white space, and font size changes are still rejected.
     emphasized_enumeration_tail = (
         previous_line.semantic_type is None
         and current_line.semantic_type is None
@@ -1059,7 +1059,7 @@ def _should_connect_text_rows(
         and max(previous_height, current_height) <= 1.2 * min(previous_height, current_height)
         and -0.1 * pair_height <= vertical_gap <= 0.4 * pair_height
     )
-    # 未收句的满栏正文后，连词或小写词开头的短斜体收句仍是正文续行；独立大写标签和公式不适用。
+    # After a full column of unfinished sentences, short italicized sentences starting with conjunctions or lowercase words are still text continuations; independent capital labels and formulas do not apply.
     italic_sentence_tail = (
         previous_line.semantic_type is None
         and current_line.semantic_type is None
@@ -1132,7 +1132,7 @@ def _should_connect_text_rows(
         and not fallback_font_continuation
         and not emphasized_enumeration_tail
     ):
-        # 显式样式位与显著字重同时变化仍是硬边界，不能被满栏几何放宽。
+        # Explicit style bits and significant font weight changes at the same time are still hard boundaries and cannot be relaxed by full column geometry.
         return False
     if (
         not is_hyphen_at_line_end(previous_line.text)
@@ -1146,7 +1146,7 @@ def _should_connect_text_rows(
         )
         and not fallback_font_continuation
     ):
-        # 图注到正文等排版层级转换即使同栏满行，也不能被常规续行规则重新吸收。
+        # Even if the same column is full in the typesetting level transition such as legend to main text, it cannot be reabsorbed by the regular line continuation rules.
         return False
     full_width_continuation = (
         both_fill_lane
@@ -1155,7 +1155,7 @@ def _should_connect_text_rows(
         and vertical_gap <= regular_gap + max(0.75 * min(previous_height, current_height), 3.0 * gap_mad)
     )
     if height_ratio > 1.35 and not safe_short_tail and not full_width_continuation:
-        # 满栏混合字体可跨字号续接，但显式正体/斜体等样式边界仍保持原分段语义。
+        # Full-column mixed fonts can be continued across font sizes, but explicit regular/italic style boundaries still maintain the original segmentation semantics.
         if not both_fill_lane or not aligned_left_edges or font_style_changed:
             return False
 
@@ -1176,8 +1176,8 @@ def _should_connect_text_rows(
         regular_gap + max(0.5 * pair_height, 3.0 * gap_mad),
         1.1 * pair_height,
     )
-    # 排版断词可以跳过缩进、字体和短行规则，但仍须限制在邻近物理行内，
-    # 避免页内远距离的 “cross-” 与后续标题被误拼为同一段。
+    # Typographic breakers can skip indentation, font, and shortline rules, but must still be limited to adjacent physical lines.
+    # Avoid the long distance "cross-" on the page from being mistakenly spelled into the same paragraph as the subsequent title.
     if is_hyphen_at_line_end(previous_line.text):
         return vertical_gap <= max(gap_limit, 1.8 * pair_height)
     if vertical_gap > gap_limit:
@@ -1192,7 +1192,7 @@ def _should_connect_text_rows(
     ):
         return False
 
-    # 局部版心可能比整栏推断边界更靠左，缩进需同时参考上一物理行。
+    # The local layout center may be further to the left than the inferred boundary of the entire column, and the indentation must also refer to the previous physical line.
     local_lane_left = min(lane.left, previous_bbox[0])
     local_lane_width = max(0.1, lane.right - local_lane_left)
     next_indent = current_bbox[0] - local_lane_left
@@ -1203,7 +1203,7 @@ def _should_connect_text_rows(
         and not safe_short_tail
         and not repeated_indent_continuation
     ):
-        # 已确认的同左缘短尾优先于栏左缘缩进，避免参考文献冒号后的末行被切断。
+        # Confirmed short tails with the same left margin are indented prior to the left margin of the column to prevent the last line after the reference colon from being cut off.
         return False
 
     abnormal_gap = vertical_gap > regular_gap + max(0.25 * pair_height, 3.0 * gap_mad)
@@ -1226,7 +1226,7 @@ def _horizontal_rule_separates_rows(
     lane: _TextLane,
     axis_lines: list[_LocalAxisLine],
 ) -> bool:
-    """检查两个相邻文本行之间是否存在覆盖当前栏带的长水平规则线。"""
+    """Checks whether there is a long horizontal rule line covering the current column band between two adjacent lines of text."""
 
     if current_bbox[1] <= previous_bbox[3]:
         return False
@@ -1248,7 +1248,7 @@ def _connection_crosses_table(
     second_bbox: BBox,
     table_bboxes: list[BBox],
 ) -> bool:
-    """检查两行中心连接区域是否穿过已确认表格。"""
+    """Check whether the center connecting area of two rows crosses the confirmed form."""
 
     first_center = (_bbox_center_x(first_bbox), _bbox_center_y(first_bbox))
     second_center = (_bbox_center_x(second_bbox), _bbox_center_y(second_bbox))

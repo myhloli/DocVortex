@@ -12,7 +12,7 @@ def _axis_line(
     orientation: str,
     bbox: tuple[float, float, float, float],
 ) -> models._LocalAxisLine:
-    """构造表格候选测试使用的局部横竖线。"""
+    """Constructs local horizontal and vertical lines used by table candidate tests."""
 
     return models._LocalAxisLine(
         bbox=bbox,
@@ -28,7 +28,7 @@ def _path_info(
     *,
     form_depth: int = 0,
 ) -> PDFPathInfo:
-    """构造填充网格测试使用的矩形 Path。"""
+    """Constructs the rectangle Path used in the filled grid test."""
 
     return PDFPathInfo(
         bbox=bbox,
@@ -41,7 +41,7 @@ def _path_info(
 
 
 def test_continuation_marker_is_externalized_above_precise_rule_grid() -> None:
-    """验证续表标记成为独立 caption，表体从连通竖轨支撑的网格顶线开始。"""
+    """Verify that the continuation table is marked as independent caption and that the table body starts from the top line of the grid connected to the vertical rail support."""
 
     continuation = models._LineItem(
         text="续表",
@@ -105,7 +105,7 @@ def _filled_grid_path_fixture(
     right_edge: float = 495.0,
     form_depth: int = 0,
 ) -> list[PDFPathInfo]:
-    """构造含重复 Path、半行底纹和边缘细条的五行双列填充网格。"""
+    """Constructs a five-row, two-column filled grid with repeating Path, half-row shading, and edge bars."""
 
     output = [
         _path_info((100.0, 100.0, 500.0, 400.0), 0, form_depth=form_depth),
@@ -150,7 +150,7 @@ def _filled_grid_path_fixture(
 
 
 def test_filled_grid_geometry_detects_exact_outer_bbox_without_text() -> None:
-    """验证纯 Path 网格在没有文本时仍保留精确外框并清除嵌套副本。"""
+    """Verify that plain Path grid retains accurate outlines without text and clear nested copies."""
 
     path_infos = _filled_grid_path_fixture()
     rectangles = [path_info.bbox for path_info in path_infos]
@@ -191,7 +191,7 @@ def test_filled_grid_geometry_detects_exact_outer_bbox_without_text() -> None:
 
 
 def test_filled_grid_geometry_rejects_incomplete_or_interfering_paths() -> None:
-    """验证行带不足、横向破损、非根层和强图形重叠均不能生成外框。"""
+    """Verify that insufficient line strips, horizontal damage, non-root layers, and strong graphic overlap cannot generate an outer frame."""
 
     page_size = (1000.0, 1000.0)
     assert (
@@ -233,7 +233,7 @@ def test_filled_grid_geometry_rejects_incomplete_or_interfering_paths() -> None:
 
 
 def test_filled_grid_candidate_prevents_rule_bbox_expansion() -> None:
-    """验证填充网格优先后，重叠横线候选不能扩大其 Path 外框。"""
+    """After verifying filled grid priority, overlapping horizontal line candidates cannot expand their Path bounding box."""
 
     lines: list[models._LineItem] = []
     source_index = 0
@@ -277,7 +277,7 @@ def test_filled_grid_candidate_prevents_rule_bbox_expansion() -> None:
 def test_filled_grid_materialization_uses_existing_spatial_projection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证空成员候选由 core bbox 收集文本，不需要建立单元格归属。"""
+    """Validating empty member candidates by core bbox collects text without establishing cell ownership."""
 
     lines = [
         models._LineItem(
@@ -335,7 +335,7 @@ def test_filled_grid_materialization_uses_existing_spatial_projection(
 
 
 def test_table_materialization_preserves_raw_page_line_breaks() -> None:
-    """验证短末列与下一行轻微重叠时使用原始换行，禁止跨行拼接。"""
+    """Use original line breaks when verifying that the short last column overlaps slightly with the next row, and disable cross-row splicing."""
 
     def build_chars(
         text: str,
@@ -343,7 +343,7 @@ def test_table_materialization_preserves_raw_page_line_breaks() -> None:
         top: float,
         start_index: int,
     ) -> list[dict[str, object]]:
-        """构造带稳定字符序号和紧凑字符框的空间投影测试字符。"""
+        """Construct spatially projected test characters with stable character numbers and compact character boxes."""
 
         return [
             {
@@ -418,7 +418,7 @@ def test_table_materialization_preserves_raw_page_line_breaks() -> None:
 def test_table_core_reclaims_semantic_line_without_touching_outer_marginals(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 core 内预标页脚可被表格认领，表框外页脚与页码保持未认领。"""
+    """Verify that the pre-marked footer within core can be claimed by the table, while the footer and page number outside the table frame remain unclaimed."""
 
     lines = [
         models._LineItem(
@@ -497,7 +497,7 @@ def test_long_rule_group_uses_40pt_or_ten_times_height_threshold(
     rejected_length: float,
     accepted_length: float,
 ) -> None:
-    """验证长横线沿用 40pt 或十倍行高门槛，竖线不参与分组。"""
+    """Verify that long horizontal lines follow the threshold of 40pt or ten times the line height, and vertical lines do not participate in grouping."""
 
     rejected_lines = [
         _axis_line("horizontal", (0.0, 10.0, rejected_length, 10.1)),
@@ -517,7 +517,7 @@ def test_long_rule_group_uses_40pt_or_ten_times_height_threshold(
 
 
 def test_connected_rule_grid_expands_core_and_reclaims_sparse_bottom_row() -> None:
-    """验证连续物理网格会补全候选底边，并重新认领稀疏末行文本。"""
+    """Verifying that the continuous physical grid completes candidate bases and reclaims sparse last lines of text."""
 
     bottom_bbox = (10.0, 66.0, 35.0, 72.0)
     bottom_line = models._LineItem(
@@ -571,7 +571,7 @@ def test_connected_rule_grid_expands_core_and_reclaims_sparse_bottom_row() -> No
 
 
 def test_disconnected_stacked_rule_grids_remain_separate() -> None:
-    """验证竖轨未跨越空白间距时，同跨度上下网格仍保持为两张表。"""
+    """When verifying that the vertical rails do not span the empty space, the upper and lower grids of the same span remain as two tables."""
 
     axis_lines = [
         *[_axis_line("horizontal", (0.0, top, 110.0, top + 0.1)) for top in (8.0, 58.0, 90.0, 140.0)],
@@ -597,7 +597,7 @@ def _closed_sparse_grid_fixture(
     list[models._LineItem],
     list[models._LocalAxisLine],
 ]:
-    """构造仅有少量文本、但外轨完整闭合的物理网格。"""
+    """Construct a physical mesh with only a small amount of text but completely closed outer rails."""
 
     fragment_bboxes = (
         (10.0, 10.0, 30.0, 15.0),
@@ -641,7 +641,7 @@ def _closed_sparse_grid_fixture(
 
 
 def test_closed_grid_accepts_sparse_single_column_form_with_empty_row() -> None:
-    """验证三条横边界和完整外轨可接纳有空数据行的单列表单。"""
+    """Verify that three horizontal borders and a complete outer rail can accommodate a single-column form with empty data rows."""
 
     rows, lines, axis_lines = _closed_sparse_grid_fixture()
     rows[0].fragments = rows[0].fragments[:1]
@@ -664,7 +664,7 @@ def test_closed_grid_accepts_sparse_single_column_form_with_empty_row() -> None:
 
 
 def test_closed_two_boundary_grid_requires_text_in_two_physical_columns() -> None:
-    """验证两条横边界只有在三条贯穿竖轨且文字占两列时才接纳。"""
+    """Verify that two horizontal borders are only accepted if three cross the vertical rails and the text occupies two columns."""
 
     rows, lines, axis_lines = _closed_sparse_grid_fixture(
         horizontal_count=2,
@@ -697,7 +697,7 @@ def test_closed_two_boundary_grid_requires_text_in_two_physical_columns() -> Non
 def test_closed_sparse_grid_rejects_incomplete_or_excluded_geometry(
     failure_mode: str,
 ) -> None:
-    """验证空框、短外轨、单格框、单列文字和强图形区域不会误报表格。"""
+    """Verify that empty boxes, short outer rails, single-frame boxes, single-column text, and strong graphic areas do not falsely report tables."""
 
     rows, lines, axis_lines = _closed_sparse_grid_fixture(
         horizontal_count=2,
@@ -735,7 +735,7 @@ def test_closed_sparse_grid_rejects_incomplete_or_excluded_geometry(
 
 
 def test_closed_grid_inside_form_bbox_is_not_a_table_candidate() -> None:
-    """验证 Form 容器内的闭合线框继续由图片分支处理而不生成表格。"""
+    """Verify that closed wireframes within Form containers continue to be processed by the image branch without generating a table."""
 
     rows, lines, axis_lines = _closed_sparse_grid_fixture()
     source = models._PageSource(
@@ -765,7 +765,7 @@ def _rule_table_fixture(
     list[models._LineItem],
     list[models._LocalAxisLine],
 ]:
-    """构造无 caption 的规则表格，并可切换为宽度变化的居中列。"""
+    """Constructs a regular table without caption and switchable to a centered column with varying widths."""
 
     rows: list[models._VisualRow] = []
     lines: list[models._LineItem] = []
@@ -821,7 +821,7 @@ def _compact_fully_ruled_table_fixture() -> tuple[
     list[models._LineItem],
     list[models._LocalAxisLine],
 ]:
-    """构造两行四列、三横五竖的紧凑全封闭网格。"""
+    """Construct a compact fully enclosed grid with two rows and four columns, three horizontal and five vertical."""
 
     rows: list[models._VisualRow] = []
     lines: list[models._LineItem] = []
@@ -874,7 +874,7 @@ def _compact_fully_ruled_table_fixture() -> tuple[
 
 
 def test_rule_table_candidate_accepts_captionless_regular_text_distribution() -> None:
-    """验证三横线和连续稳定列足以识别没有显式标题的表格。"""
+    """Verify that three horizontal lines and continuous stable columns are sufficient to identify tables without explicit headers."""
 
     rows, lines, axis_lines = _rule_table_fixture()
 
@@ -893,7 +893,7 @@ def test_rule_table_candidate_accepts_captionless_regular_text_distribution() ->
 
 @pytest.mark.parametrize("centered", (False, True))
 def test_deferred_rule_candidates_match_eager_merge(monkeypatch, centered):
-    """确认排序前没有物化候选，最终合并的框、成员、评分和注释完全相同。"""
+    """Confirm that there are no materialization candidates before sorting, and the final merged boxes, members, scores, and annotations are exactly the same."""
     import pickle
 
     rows, lines, rules = _rule_table_fixture(centered_columns=centered)
@@ -904,7 +904,7 @@ def test_deferred_rule_candidates_match_eager_merge(monkeypatch, centered):
     calls = []
 
     def materialize(*args, **kwargs):
-        """只记录真正候选物化时机，不修改构造参数。"""
+        """Only the real candidate materialization timing is recorded, and the construction parameters are not modified."""
         calls.append(1)
         return original(*args, **kwargs)
 
@@ -917,13 +917,13 @@ def test_deferred_rule_candidates_match_eager_merge(monkeypatch, centered):
 
 
 def test_deferred_rule_candidates_share_frozen_grid_components(monkeypatch):
-    """确认延迟候选冻结的网格分量可被闭合网格检测复用而不重复扫描。"""
+    """Confirm that delayed candidate frozen grid components can be multiplexed by closed grid detection without re-scanning."""
     rows, lines, axis_lines = _rule_table_fixture()
     original = table_rules._connected_rule_grid_components
     calls = []
 
     def counted(*args, **kwargs):
-        """只计数连通分量重建次数，不改变任何几何结果。"""
+        """It only counts the number of reconstructions of connected components and does not change any geometric results."""
         calls.append(1)
         return original(*args, **kwargs)
 
@@ -966,7 +966,7 @@ def test_deferred_rule_candidates_share_frozen_grid_components(monkeypatch):
 
 
 def test_rule_table_candidate_accepts_center_aligned_columns_with_varying_widths() -> None:
-    """验证左右边界变化但中心稳定的两列表格仍可形成候选。"""
+    """Verify that a two-column table with changing left and right boundaries but stable center can still form a candidate."""
 
     rows, lines, axis_lines = _rule_table_fixture(centered_columns=True)
 
@@ -985,7 +985,7 @@ def test_rule_table_candidate_accepts_center_aligned_columns_with_varying_widths
 
 
 def test_compact_fully_ruled_two_row_table_is_accepted() -> None:
-    """验证两行表格在三横五竖形成完整网格时可通过严格候选准入。"""
+    """Verify that the two-row table can pass strict candidate admission when three horizontal and five vertical lines form a complete grid."""
 
     rows, lines, axis_lines = _compact_fully_ruled_table_fixture()
 
@@ -1004,7 +1004,7 @@ def test_compact_fully_ruled_two_row_table_is_accepted() -> None:
 
 
 def test_caption_anchored_two_row_three_line_table_is_accepted() -> None:
-    """验证强表题可与三横线、两行稳定多列共同确认无竖线表格。"""
+    """Verification of strong table questions can be combined with three horizontal lines, two rows and multiple columns to confirm the table without vertical lines."""
 
     rows, lines, axis_lines = _compact_fully_ruled_table_fixture()
     axis_lines = [line for line in axis_lines if line.orientation == "horizontal"]
@@ -1050,7 +1050,7 @@ def test_caption_anchored_two_row_three_line_table_is_accepted() -> None:
 
 
 def test_compact_grid_deduplicates_repeated_vertical_paths() -> None:
-    """验证同位置重复竖线路径不会扩大紧凑表格的物理列数和评分。"""
+    """Verify that repeating a vertical line path at the same location does not expand the physical column count and score of a compact table."""
 
     rows, lines, axis_lines = _compact_fully_ruled_table_fixture()
     axis_lines.extend(_axis_line("vertical", (left + 0.3, 8.1, left + 0.4, 32.0)) for left in (0.0, 27.5, 55.0, 82.5, 109.9))
@@ -1081,7 +1081,7 @@ def test_compact_grid_deduplicates_repeated_vertical_paths() -> None:
 def test_compact_two_row_layout_requires_complete_grid(
     failure_mode: str,
 ) -> None:
-    """验证两行文本缺少完整竖向网格或唯一单元格映射时仍保持非表格。"""
+    """Verify that two lines of text remain non-table when missing a full vertical grid or unique cell mapping."""
 
     rows, lines, axis_lines = _compact_fully_ruled_table_fixture()
     if failure_mode == "horizontal_only":
@@ -1113,7 +1113,7 @@ def test_compact_two_row_layout_requires_complete_grid(
 
 
 def test_compact_admission_does_not_accept_two_row_column_prose() -> None:
-    """验证两行普通双栏文本不会因紧凑表格分支而降低准入门槛。"""
+    """Verify that two lines of normal two-column text does not lower the barrier to entry due to compact table branches."""
 
     rows, lines, axis_lines = _compact_fully_ruled_table_fixture()
     for row in rows:
@@ -1136,7 +1136,7 @@ def test_compact_admission_does_not_accept_two_row_column_prose() -> None:
 
 
 def test_two_horizontal_rule_grid_is_accepted_by_spatial_distribution() -> None:
-    """验证两条长横线结合密集稳定列即可形成表格候选。"""
+    """Verify that two long horizontal lines combined with dense stable columns form a table candidate."""
 
     rows, lines, axis_lines = _rule_table_fixture(rule_count=2)
     axis_lines.extend(
@@ -1161,7 +1161,7 @@ def test_two_horizontal_rule_grid_is_accepted_by_spatial_distribution() -> None:
 
 
 def test_duplicate_horizontal_paths_count_as_one_boundary() -> None:
-    """验证同一 y 位置的重复 PDF path 只计为一条边界。"""
+    """Verify that duplicate PDF path at the same y location counts as only one boundary."""
 
     axis_lines = [
         _axis_line("horizontal", (0.0, 10.0, 100.0, 10.1)),
@@ -1178,7 +1178,7 @@ def test_duplicate_horizontal_paths_count_as_one_boundary() -> None:
 
 
 def test_rule_spans_keep_historical_exhaustive_order() -> None:
-    """验证横线候选完整保留旧版 first/bottom 枚举顺序，不删除内部子区间。"""
+    """Verify that horizontal line candidates retain the legacy first/bottom enumeration order intact and do not delete internal subranges."""
 
     assert list(table_rules._iter_rule_spans(5)) == [
         (0, 1),
@@ -1195,7 +1195,7 @@ def test_rule_spans_keep_historical_exhaustive_order() -> None:
 
 
 def test_shared_line_index_set_matches_builtin_set_mutations() -> None:
-    """验证共享基底集合在候选增删与同基底合并时与普通 set 完全一致。"""
+    """Verify that the shared basis set is exactly the same as the ordinary set when adding, deleting, and merging candidates with the same basis."""
 
     base = frozenset({1, 2, 3})
     shared = models._SharedLineIndexSet(base, {4})
@@ -1221,7 +1221,7 @@ def test_shared_line_index_set_matches_builtin_set_mutations() -> None:
 
 
 def test_shared_line_index_set_exact_conversion_preserves_plain_target_union() -> None:
-    """验证普通候选转入共享基底后，合并结果不会错误补回候选已删除的基底成员。"""
+    """Verify that after ordinary candidates are transferred to the shared base, the merge result will not incorrectly replace the deleted base members of the candidates."""
 
     base = frozenset({1, 2, 3})
     shared = models._SharedLineIndexSet(base, {5})
@@ -1249,7 +1249,7 @@ def test_shared_line_index_set_exact_conversion_preserves_plain_target_union() -
 
 
 def test_rule_interval_partition_matches_historical_closed_interval_scan() -> None:
-    """验证一次分桶与旧版闭区间逐段扫描完全一致，边界行同时属于相邻两段。"""
+    """Verify that primary bucketing is completely consistent with the old version of closed interval segment-by-segment scanning, and the boundary rows belong to two adjacent segments at the same time."""
 
     rules = [_axis_line("horizontal", (0.0, y, 100.0, y + 0.1)) for y in (10.0, 20.0, 30.0)]
     rows = [
@@ -1286,7 +1286,7 @@ def test_rule_interval_partition_matches_historical_closed_interval_scan() -> No
 
 
 def test_rule_corridor_cache_matches_uncached_interval_projection() -> None:
-    """验证精确走廊缓存只复用横向裁剪，不改变纵向准入和输出视觉行。"""
+    """Verify that the exact corridor cache only reuses the horizontal cropping and does not change the vertical admission and output visual lines."""
 
     rows, _lines, _axis_lines = _rule_table_fixture()
     cache: dict[tuple[float, float], list[table_rules._RuleCorridorRow]] = {}
@@ -1316,7 +1316,7 @@ def test_rule_corridor_cache_matches_uncached_interval_projection() -> None:
 
 
 def test_stable_column_prefix_reuse_matches_full_recomputation() -> None:
-    """验证严格前缀续算在每个增长阶段都与从头聚类完全一致。"""
+    """Verify that strict prefix continuation is fully consistent with de novo clustering at each growth stage."""
 
     rows, _lines, _axis_lines = _rule_table_fixture()
     cache = table_rules._StableColumnCache()
@@ -1337,7 +1337,7 @@ def test_stable_column_prefix_reuse_matches_full_recomputation() -> None:
 
 
 def test_nearest_rule_pair_excludes_header_line_from_table_bbox() -> None:
-    """验证页首横线与表格上边界间没有多单元行时，不扩张表格 bbox。"""
+    """When verifying that there are no multi-cell rows between the header horizontal line and the upper boundary of the table, the table is not expanded bbox."""
 
     rows, lines, axis_lines = _rule_table_fixture(rule_count=2)
     axis_lines.insert(0, _axis_line("horizontal", (0.0, 0.0, 110.0, 0.1)))
@@ -1357,7 +1357,7 @@ def test_nearest_rule_pair_excludes_header_line_from_table_bbox() -> None:
 
 
 def test_chart_tick_rows_fail_dense_multi_cell_distribution() -> None:
-    """验证多个图表刻度行因纵向不连续而不能冒充规则表格。"""
+    """Verify that multiple chart scale rows cannot impersonate regular tables due to vertical discontinuity."""
 
     rows: list[models._VisualRow] = []
     lines: list[models._LineItem] = []
@@ -1419,7 +1419,7 @@ def test_chart_tick_rows_fail_dense_multi_cell_distribution() -> None:
 
 
 def test_long_sparse_rule_interval_cannot_bridge_two_low_column_tables() -> None:
-    """验证低列数表格之间仅有一行稀疏文本时不能跨长区间合并。"""
+    """Verify that low-column tables cannot be merged across long ranges when there is only one row of sparse text between them."""
 
     rows: list[models._VisualRow] = []
     source_index = 0
@@ -1460,7 +1460,7 @@ def test_long_sparse_rule_interval_cannot_bridge_two_low_column_tables() -> None
 
 
 def test_split_table_footnote_marker_is_joined_before_matching() -> None:
-    """验证旋转表拆开的 For 与星号脚注在视觉行拼接后可被识别。"""
+    """Verify that the rotated table of unpacked For with asterisk footnotes can be recognized after visual row splicing."""
 
     row = models._VisualRow(
         fragments=[
@@ -1476,7 +1476,7 @@ def test_split_table_footnote_marker_is_joined_before_matching() -> None:
 
 
 def test_table_candidate_merge_keeps_body_and_annotation_roles_disjoint() -> None:
-    """验证重复候选合并时表体身份优先，并据逐行框收紧 caption 边界。"""
+    """Verify table body identity takes precedence when merging duplicate candidates, and tighten caption boundaries according to line-by-line boxes."""
 
     caption_bbox = (10.0, 10.0, 50.0, 20.0)
     header_bbox = (10.0, 25.0, 90.0, 35.0)
@@ -1525,7 +1525,7 @@ def test_table_candidate_merge_keeps_body_and_annotation_roles_disjoint() -> Non
 def test_materialize_table_externalizes_multiline_annotations_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证拆分编号 caption、多行数字脚注和表体按来源行各物化并认领一次。"""
+    """Verification split number caption, multi-line numeric footnotes and table bodies are each materialized and claimed once per source line."""
 
     line_specs = (
         ("Table", (10.0, 10.0, 35.0, 20.0), 0),
@@ -1608,7 +1608,7 @@ def test_materialize_table_externalizes_multiline_annotations_once(
 
 
 def test_table_annotation_splits_short_tail_before_wide_font_family_reset() -> None:
-    """验证表下注短尾后的宽行字体族重启形成两个独立注释块。"""
+    """Verify that the wideline font family restarts after the short tail of the table to form two independent comment blocks."""
 
     lines = [
         models._LineItem(
@@ -1691,7 +1691,7 @@ def test_table_annotation_splits_short_tail_before_wide_font_family_reset() -> N
 def test_invalid_table_annotation_falls_back_to_full_table_projection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证无法形成内容的注释行留在表体投影，表框与认领均不收缩。"""
+    """Verify that the comment lines that cannot form content remain in the table body projection, and the table frame and claims do not shrink."""
 
     lines = [
         models._LineItem("body", (10.0, 30.0, 90.0, 60.0), 0, 0),
@@ -1746,7 +1746,7 @@ def _table_note_reference_fixture(
     set[int],
     tuple[float, float],
 ]:
-    """构造含中性表内引用、表注首行和正文高度样本的局部坐标夹具。"""
+    """Construct a local coordinate fixture with neutral in-table references, table note first row, and text height samples."""
 
     page_size = (200.0, 200.0)
     rule_bbox = (0.0, 20.0, 100.0, 50.0)
@@ -1836,7 +1836,7 @@ def _table_note_reference_fixture(
     (("7 neutral", "7"), ("(q) neutral", "q"), ("xy: neutral", "xy")),
 )
 def test_auxiliary_table_note_marker_is_unicode_generic(text: str, expected: str) -> None:
-    """验证辅助标记仅受通用 Unicode 形态约束，具体字符变化不影响提取。"""
+    """Verification auxiliary tags are only subject to the general Unicode morphology, and specific character changes do not affect extraction."""
 
     assert tables._extract_auxiliary_table_note_marker(text) == expected
 
@@ -1849,7 +1849,7 @@ def test_auxiliary_table_note_requires_neutral_core_reference(
     marker: str,
     reference_mode: str,
 ) -> None:
-    """验证中性标记经上标或紧凑单元格确认后可以启动表注链。"""
+    """Verification that neutral markers are confirmed by superscript or compact cells can initiate the table annotation chain."""
 
     rows, lines, rule_bbox, core_indices, page_size = _table_note_reference_fixture(
         marker,
@@ -1870,7 +1870,7 @@ def test_auxiliary_table_note_requires_neutral_core_reference(
 
 
 def test_prepared_table_note_context_matches_direct_calculation() -> None:
-    """验证走廊行和正文高度预计算与逐次计算得到完全相同的表注结果。"""
+    """Verify that the precalculation of corridor rows and text heights and the successive calculations yield exactly the same table annotation results."""
 
     rows, lines, rule_bbox, core_indices, page_size = _table_note_reference_fixture(
         "q",
@@ -1933,7 +1933,7 @@ def test_prepared_table_note_context_matches_direct_calculation() -> None:
 
 
 def test_auxiliary_table_note_rejects_marker_without_core_reference() -> None:
-    """验证紧邻表格的短标记正文在缺少表内引用时不能启动表注链。"""
+    """Validates that short markup text immediately adjacent to a table cannot start a table annotation chain when an in-table reference is missing."""
 
     rows, lines, rule_bbox, core_indices, page_size = _table_note_reference_fixture(
         "7",
@@ -1955,7 +1955,7 @@ def test_auxiliary_table_note_rejects_marker_without_core_reference() -> None:
 
 
 def test_superscript_reference_requires_smaller_raised_glyph() -> None:
-    """验证普通基线上的同字符不能被当成表内上标引用。"""
+    """Verify that the same character on the common baseline cannot be referenced as an intra-table superscript."""
 
     _rows, lines, _rule_bbox, _core_indices, page_size = _table_note_reference_fixture(
         "7",
@@ -1973,7 +1973,7 @@ def test_superscript_reference_requires_smaller_raised_glyph() -> None:
 def test_auxiliary_table_note_rejects_body_or_title_sized_first_row(
     note_height: float,
 ) -> None:
-    """验证具有表内引用的普通正文或标题字号行仍不能启动表注链。"""
+    """Verifying that a normal body or title line with an in-table reference still does not start the table note chain."""
 
     rows, lines, rule_bbox, core_indices, page_size = _table_note_reference_fixture(
         "q",
@@ -1996,7 +1996,7 @@ def test_auxiliary_table_note_rejects_body_or_title_sized_first_row(
 
 
 def test_auxiliary_table_note_rejects_loose_first_gap() -> None:
-    """验证辅助标记首行距超过四分之三局部行高时立即停止扩张。"""
+    """Verify that the expansion of the first line of the auxiliary mark exceeds three-quarters of the local line height."""
 
     rows, lines, rule_bbox, core_indices, page_size = _table_note_reference_fixture(
         "q",
@@ -2026,7 +2026,7 @@ def test_auxiliary_table_note_rejects_loose_first_gap() -> None:
 
 
 def test_auxiliary_table_note_requires_smaller_than_body_reference() -> None:
-    """验证辅助标记首行还必须显著小于同方向正文参考高度。"""
+    """The first line of verification auxiliary marks must also be significantly smaller than the reference height of the text in the same direction."""
 
     rows, lines, rule_bbox, core_indices, page_size = _table_note_reference_fixture(
         "q",
@@ -2050,7 +2050,7 @@ def test_auxiliary_table_note_requires_smaller_than_body_reference() -> None:
 
 
 def test_table_note_precheck_uses_clipped_corridor_projection() -> None:
-    """验证另一栏普通文本不会遮蔽表格走廊内真实的 Note 起始行。"""
+    """Verify that another column of normal text does not obscure the real Note start row in the table corridor."""
 
     outside_bbox = (140.0, 51.0, 190.0, 59.0)
     inside_bbox = (10.0, 51.0, 70.0, 59.0)
@@ -2076,7 +2076,7 @@ def test_table_note_precheck_uses_clipped_corridor_projection() -> None:
 
 
 def test_auxiliary_table_note_uses_clipped_corridor_projection() -> None:
-    """验证另一栏短标记不能借表格栏内片段制造虚假的整行投影证据。"""
+    """Verify that the short mark in another column cannot use fragments in the table column to create false evidence of the projection of the entire row."""
 
     rows, lines, rule_bbox, core_indices, page_size = _table_note_reference_fixture(
         "q",
@@ -2120,7 +2120,7 @@ def test_auxiliary_table_note_uses_clipped_corridor_projection() -> None:
 
 
 def test_rotated_auxiliary_table_note_uses_local_superscript_geometry() -> None:
-    """验证旋转表格先转入局部正向坐标后仍可确认上标引用。"""
+    """Verify that superscript references can still be confirmed after rotating the table first into local forward coordinates."""
 
     rows, lines, rule_bbox, core_indices, page_size = _table_note_reference_fixture(
         "7",
@@ -2142,7 +2142,7 @@ def test_rotated_auxiliary_table_note_uses_local_superscript_geometry() -> None:
 
 
 def test_table_note_chain_cannot_expand_beyond_ten_line_heights() -> None:
-    """验证表注续行链即使字体和行距稳定也不能无限向页面底部扩张。"""
+    """Verify that table and annotation continuation links cannot expand infinitely toward the bottom of the page even if the font and line spacing are stable."""
 
     lines: list[models._LineItem] = []
     rows: list[models._VisualRow] = []
@@ -2185,7 +2185,7 @@ def test_table_note_chain_cannot_expand_beyond_ten_line_heights() -> None:
 
 
 def test_table_note_chain_stops_at_font_and_size_transition() -> None:
-    """验证表注续行不能跨越字体字号突变的标题或后续正文。"""
+    """Verify that the continuation line of a table note cannot span the title or subsequent body text where the font size changes."""
 
     specs = [
         ("Note: neutral marker", (0.0, 52.0, 60.0, 60.0), ("Note", 0), 8.0),
@@ -2240,7 +2240,7 @@ def test_table_note_chain_stops_at_font_and_size_transition() -> None:
 
 
 def test_numeric_body_row_cannot_start_table_note_chain() -> None:
-    """验证数字开头正文即使紧邻表格下边界也不能独立启动表注扩张。"""
+    """Verify that text starting with a number cannot independently initiate table annotation expansion even if it is immediately adjacent to the lower boundary of the table."""
 
     bbox = (0.0, 52.0, 80.0, 62.0)
     line = models._LineItem(
@@ -2278,7 +2278,7 @@ def test_failed_table_projection_does_not_claim_text(
     monkeypatch: pytest.MonkeyPatch,
     projection_mode: str,
 ) -> None:
-    """验证投影为空或抛错时完整回滚候选，文本行仍可进入正文路径。"""
+    """Complete rollback candidate when verification projection is empty or throws an error, text lines can still enter the text path."""
 
     lines = [
         models._LineItem(

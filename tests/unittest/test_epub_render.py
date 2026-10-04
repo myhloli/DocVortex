@@ -66,7 +66,7 @@ _NS = {
 
 
 def _middle(*pages: PageInfo) -> MiddleJson:
-    """构造无需固定版式 bbox 的测试 MiddleJson。"""
+    """Construct test MiddleJson without fixed layout bbox."""
     return MiddleJson(
         pages=list(pages),
         is_full_document=True,
@@ -76,28 +76,28 @@ def _middle(*pages: PageInfo) -> MiddleJson:
 
 
 def _page(page_idx: int, *blocks: PageBlock) -> PageInfo:
-    """按调用方顺序构造一页测试内容。"""
+    """Construct a page of test content in caller order."""
     return PageInfo(page_idx=page_idx, blocks=list(blocks))
 
 
 def _archive(payload: bytes) -> ZipFile:
-    """从内存字节打开 EPUB ZIP，供测试读取成员。"""
+    """Open EPUB ZIP from memory bytes for test read member."""
     return ZipFile(BytesIO(payload))
 
 
 def _xml(archive: ZipFile, name: str) -> etree._Element:
-    """使用禁用网络和实体的 parser 读取 EPUB XML 成员。"""
+    """Read the EPUB XML member using parser with the network and entity disabled."""
     parser = etree.XMLParser(resolve_entities=False, load_dtd=False, no_network=True, recover=False)
     return etree.fromstring(archive.read(name), parser=parser)
 
 
 def _text(element: etree._Element) -> str:
-    """合并 XML 节点全部可见文本，便于断言。"""
+    """Merge all visible text of XML node for easier assertion."""
     return "".join(element.itertext())
 
 
 def test_epub_package_is_single_spine_epub33_with_stable_metadata_and_mathml() -> None:
-    """验证 OCF、必需元数据、单正文 spine、导航和确定性输出。"""
+    """Verify OCF, required metadata, single body spine, navigation and deterministic output."""
     middle = _middle(
         _page(
             0,
@@ -176,7 +176,7 @@ def test_epub_package_is_single_spine_epub33_with_stable_metadata_and_mathml() -
 
 
 def test_epub_table_preserves_standard_inline_style_tags() -> None:
-    """验证表格中的标准文字样式标签安全复制为 XHTML。"""
+    """The standard text style label in the verification form is safely copied to XHTML."""
     table = TableBlock(
         type="table",
         index=0,
@@ -208,7 +208,7 @@ def test_epub_table_preserves_standard_inline_style_tags() -> None:
 
 
 def test_epub_uses_default_planner_without_source_page_boundaries() -> None:
-    """验证固定默认 EPUB 连续阅读、隐藏辅助块且不保留源页边界。"""
+    """Verification fixed default EPUB reads continuously, hides auxiliary blocks and does not preserve source page boundaries."""
     middle = _middle(
         _page(
             0,
@@ -240,7 +240,7 @@ def test_epub_uses_default_planner_without_source_page_boundaries() -> None:
 
 
 def test_epub_navigation_prefers_valid_index_then_falls_back_to_heading_hierarchy() -> None:
-    """验证源目录优先、无效项过滤和标题层级回退。"""
+    """Verify source directory priority, invalid item filtering and title level fallback."""
     source_index = IndexBlock(
         type="index",
         index=0,
@@ -290,11 +290,11 @@ def test_epub_navigation_prefers_valid_index_then_falls_back_to_heading_hierarch
 
 
 def test_epub_assets_are_embedded_deduplicated_and_missing_sources_degrade_to_text() -> None:
-    """验证 resolver/base64 去重、富 HTML 图片重写及缺图文字降级。"""
+    """Verify resolver/base64 deduplication, rich HTML image rewriting and missing image text downgrade."""
     requested: list[str] = []
 
     def resolve_asset(path: str) -> bytes:
-        """记录 sidecar 请求，并仅为已知图片返回有效 PNG。"""
+        """Log sidecar requests and only return valid PNG for known pictures."""
         requested.append(path)
         if path != "images/shared.png":
             raise FileNotFoundError(path)
@@ -393,7 +393,7 @@ def test_epub_assets_are_embedded_deduplicated_and_missing_sources_degrade_to_te
     ],
 )
 def test_decoded_raster_size_uses_shared_dimension_and_pixel_limits(width: int, height: int, is_valid: bool) -> None:
-    """验证共享 raster 解码预算固定为单边 8192 与总像素 1600 万。"""
+    """Verification shared raster decoding budget fixed at 8192 per side and 16 million total pixels."""
     assert MAX_DECODED_RASTER_DIMENSION == 8_192
     assert MAX_DECODED_RASTER_PIXELS == 16_000_000
     if is_valid:
@@ -404,7 +404,7 @@ def test_decoded_raster_size_uses_shared_dimension_and_pixel_limits(width: int, 
 
 
 def test_image_data_uri_enforces_encoded_and_decoded_byte_budgets(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 raster data URI 会在 Base64 前后分别执行固定字节预算。"""
+    """Verification raster data URI performs a fixed byte budget before and after Base64."""
     decode = MagicMock(return_value=b"\x89PNG\r\n\x1a\nx")
     monkeypatch.setattr(image_payload_utils, "MAX_RASTER_IMAGE_BYTES", 8)
     monkeypatch.setattr(image_payload_utils.base64, "b64decode", decode)
@@ -419,7 +419,7 @@ def test_image_data_uri_enforces_encoded_and_decoded_byte_budgets(monkeypatch: p
 
 
 def test_epub_oversized_data_uri_is_omitted_before_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 EPUB 在缓存键哈希前拒绝超过编码预算的 data URI。"""
+    """Verification EPUB Reject data URI that exceeds encoding budget before caching key hash."""
     digest = MagicMock(side_effect=AssertionError("oversized data URI must not be hashed"))
     monkeypatch.setattr(epub_assets, "MAX_IMAGE_DATA_URI_BYTES", len(_PNG_URI) - 1)
     monkeypatch.setattr(epub_assets.hashlib, "sha256", digest)
@@ -433,7 +433,7 @@ def test_epub_oversized_data_uri_is_omitted_before_hashing(monkeypatch: pytest.M
 
 
 def test_epub_oversized_image_is_omitted_before_pixel_decode(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 EPUB 超限 raster 在 load 前省略且保留图片识别文字。"""
+    """Verify that EPUB exceeds the limit raster. Omit and retain the picture identification text before load."""
     image = MagicMock()
     image.__enter__.return_value = image
     image.format = "PNG"
@@ -467,7 +467,7 @@ def test_epub_oversized_image_is_omitted_before_pixel_decode(monkeypatch: pytest
 
 
 def test_epub_mathml_failure_uses_visible_latex_without_false_manifest_property() -> None:
-    """验证无效 LaTeX 回退为可见文本且不会误声明 mathml。"""
+    """Validation of invalid LaTeX falls back to visible text and does not mistakenly declare mathml."""
     middle = _middle(_page(0, EquationBlock(type="equation", index=0, content="{")))
     with _archive(render_epub(middle, modified_at=_FIXED_TIME)) as archive:
         package = _xml(archive, "EPUB/package.opf")
@@ -479,7 +479,7 @@ def test_epub_mathml_failure_uses_visible_latex_without_false_manifest_property(
 
 
 def test_epub_static_chart_code_and_algorithm_cover_remaining_visual_bodies() -> None:
-    """验证 chart、空代码和带行内公式算法均有无脚本静态表示。"""
+    """Verify that chart, empty code, and algorithms with inline formulas have unscripted static representations."""
     middle = _middle(
         _page(
             0,
@@ -527,7 +527,7 @@ def test_epub_static_chart_code_and_algorithm_cover_remaining_visual_bodies() ->
 
 
 def test_epub_resolver_converts_webp_to_manifested_png() -> None:
-    """验证 reader 兼容性较弱的 WebP sidecar 会在内存中转为 PNG。"""
+    """Verify reader The less compatible WebP sidecar is converted to PNG in memory."""
     source = BytesIO()
     Image.new("RGBA", (2, 2), (10, 20, 30, 128)).save(source, format="WEBP", lossless=True)
     middle = _middle(
@@ -563,7 +563,7 @@ def test_epub_resolver_converts_webp_to_manifested_png() -> None:
 
 
 def test_real_epub_middlejson_renders_and_roundtrips_through_existing_flash_parser() -> None:
-    """验证丰富 EPUB fixture 的所有核心结构可生成并由现有 parser 回读。"""
+    """Verify that all core structures of the rich EPUB fixture can be generated and read back by the existing parser."""
     source, _ = analyze_native_test_document(build_epub_fixture(), file_suffix="epub")
     payload = render_epub(source, modified_at=_FIXED_TIME)
 
@@ -590,7 +590,7 @@ def test_real_epub_middlejson_renders_and_roundtrips_through_existing_flash_pars
 
 
 def test_epub_fragment_links_gain_noteref_semantics_and_external_links_remain() -> None:
-    """验证脚注 fragment 被标为 noteref，安全外链保持可点击。"""
+    """Validation footnote fragment is marked as noteref and secure external links remain clickable."""
     middle = _middle(
         _page(
             0,

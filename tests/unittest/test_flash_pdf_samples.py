@@ -33,7 +33,7 @@ _SAFE_WATERMARK_TEXT = "MINERU TEST WATERMARK"
 
 
 def _pdf_cache_key(pdf_path: Path) -> tuple[str, int, int]:
-    """以规范路径、文件大小和纳秒 mtime 构造单次 pytest 进程内缓存键。"""
+    """Constructs a one-shot pytest in-process cache key with canonical path, file size, and nanoseconds mtime."""
 
     resolved = pdf_path.resolve()
     stat = resolved.stat()
@@ -46,21 +46,21 @@ def _cached_model_list(
     _size: int,
     _mtime_ns: int,
 ) -> list[list[dict[str, Any]]]:
-    """每份 PDF 只运行一次预测；检测金标保留清空前的公式证据，公开输出另行测试。"""
+    """Each copy of PDF only runs the prediction once; the test gold standard retains the formula evidence before clearing, and the public output is tested separately."""
 
     with PDFDocument(Path(pdf_path).read_bytes()) as pdf_doc, formula_detection_evidence():
         return PdfModel().predict(pdf_doc)
 
 
 def _cached_model_list_copy(pdf_path: Path) -> list[list[dict[str, Any]]]:
-    """返回缓存模型输出的深拷贝，隔离不同测试对可变 block 的修改。"""
+    """Returns a deep copy of the cached model output, isolating modifications to the variable block from different tests."""
 
     return deepcopy(_cached_model_list(*_pdf_cache_key(pdf_path)))
 
 
 @pytest.fixture(scope="module", autouse=True)
 def _clear_real_pdf_model_cache_after_module() -> Iterator[None]:
-    """模块结束后释放真实 PDF 模型缓存，避免影响后续 unittest 内存。"""
+    """After the module ends, release the real PDF model cache to avoid affecting subsequent unittest memory."""
 
     yield
     _cached_model_list.cache_clear()
@@ -71,7 +71,7 @@ def _model_json(
     *,
     page_index_map: list[int] | None = None,
 ) -> ModelJson:
-    """为 Flash 样例后处理构造最小严格 ModelJson。"""
+    """Construct minimally stringent ModelJson for Flash sample postprocessing."""
     return ModelJson(
         pages=pages,
         page_index_map=page_index_map or [],
@@ -79,7 +79,7 @@ def _model_json(
     )
 
 
-# demo4 第 9 至 11 页中实际跨物理行显示的 URL，用于确保纯正则拼接覆盖全部形态。
+# demo4 The actual URL shown across physical rows on pages 9 to 11 is used to ensure that pure canonical splicing covers all forms.
 _DEMO4_WRAPPED_URLS = (
     "https://doi.org/10.1007/s00259-025-07388-8",
     "https://doi.org/10.37921/690910twdfoo",
@@ -129,7 +129,7 @@ def _native_model_list(
     *,
     pdf_dir: Path = _DEMO_PDF_DIR,
 ) -> list[list[dict[str, Any]]]:
-    """运行仓库内数字 PDF 样例并返回 Flash 原生模型输出。"""
+    """Runs the digital PDF sample in the repository and returns the Flash native model output."""
 
     return _cached_model_list_copy(pdf_dir / pdf_name)
 
@@ -139,13 +139,13 @@ def _txt_model_list(
     *,
     pdf_dir: Path = _DEMO_PDF_DIR,
 ) -> list[list[dict[str, Any]]]:
-    """显式使用 Flash TXT 模式解析仓库内回归 PDF，禁止经过 auto 分类。"""
+    """Explicitly use the Flash TXT mode to parse the regression PDF in the warehouse, and it is prohibited to pass the auto classification."""
 
     return _cached_model_list_copy(pdf_dir / pdf_name)
 
 
 def _auto_model_list(pdf_name: str) -> list[list[dict[str, Any]]]:
-    """通过稳定公共入口以 auto 模式解析仓库内最小回归 PDF。"""
+    """Resolving minimal regression PDF within the warehouse in auto mode via stable public entry."""
 
     pdf_path = Path(__file__).parents[2] / "demo" / "pdfs" / pdf_name
     with PDFDocument(pdf_path.read_bytes()) as pdf_doc:
@@ -154,7 +154,7 @@ def _auto_model_list(pdf_name: str) -> list[list[dict[str, Any]]]:
 
 
 def _native_table_counts(pdf_name: str) -> list[int]:
-    """返回仓库内数字 PDF 样例的逐页表格块数量。"""
+    """Returns the number of page-by-page table blocks for the digital PDF sample in the warehouse."""
 
     return [sum(block["type"] == "table" for block in page) for page in _native_model_list(pdf_name)]
 
@@ -163,14 +163,14 @@ def test_real_pdf_model_cache_reuses_parse_and_isolates_mutation(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """验证相同文件只预测一次，且调用方修改深拷贝不会污染缓存。"""
+    """Verify that the same file is predicted only once and that caller modifications to the deep copy do not pollute the cache."""
 
     pdf_path = tmp_path / "cache-fixture.pdf"
     pdf_path.write_bytes(b"cache fixture")
     predict_calls: list[object] = []
 
     class FakePDFDocument:
-        """提供缓存测试所需的最小 PDFDocument 上下文。"""
+        """Provides the minimum PDFDocument context required for cache testing."""
 
         def __init__(self, _payload: bytes) -> None:
             pass
@@ -182,7 +182,7 @@ def test_real_pdf_model_cache_reuses_parse_and_isolates_mutation(
             return None
 
     class FakePdfModel:
-        """记录预测次数并返回可变模型块。"""
+        """Record the number of predictions and return the variable model nugget."""
 
         def predict(self, document: object) -> list[list[dict[str, Any]]]:
             predict_calls.append(document)
@@ -204,7 +204,7 @@ def test_real_pdf_model_cache_reuses_parse_and_isolates_mutation(
 
 
 def _native_page_source(pdf_name: str, page_idx: int) -> models._PageSource:
-    """读取指定样例页并构造候选检测与认领测试使用的页面源。"""
+    """Read the specified sample page and construct the page source used for candidate detection and claim testing."""
 
     pdf_path = Path(__file__).parents[2] / "demo" / "pdfs" / pdf_name
     with PDFDocument(str(pdf_path)) as pdf_doc:
@@ -230,12 +230,12 @@ def _grouped_visual_blocks(
     page_blocks: list[dict[str, Any]],
     block_type: str,
 ) -> list[dict[str, Any]]:
-    """通过新的单页后处理入口返回指定类型的视觉容器，且不修改原始样例结果。"""
+    """Return the specified type of visual container through the new single-page post-processing entry without modifying the original sample results."""
     return [block for block in process_page_blocks(deepcopy(page_blocks), use_bbox=True) if block.get("type") == block_type]
 
 
 def _visible_content(value: Any) -> str:
-    """返回 model block 的专用字符串或 InlineSpan 可见文本。"""
+    """Returns the private string of model block or the visible text of InlineSpan."""
 
     content = value.get("content") if isinstance(value, dict) else value
     if isinstance(content, str) and content.lstrip().lower().startswith("<table"):
@@ -245,14 +245,14 @@ def _visible_content(value: Any) -> str:
 
 
 def _html_table_rows(content: str) -> list[tuple[str, ...]]:
-    """读取原生结构恢复输出的 HTML 表格行与单元格纯文本。"""
+    """Read native structure to restore output HTML table rows and cells plain text."""
 
     soup = BeautifulSoup(content, "html.parser")
     return [tuple(cell.get_text() for cell in row.find_all(["td", "th"], recursive=False)) for row in soup.find_all("tr")]
 
 
 def _normalized_content_probe(text: str) -> str:
-    """还原 LaTeX tag 并去除排版差异，生成原生行内容覆盖检查使用的探针。"""
+    """Restore LaTeX tag and remove typographical differences, generating probes used by native row content coverage checks."""
 
     text = _visible_content(text)
     text = re.sub(r"\\tag\{([^{}]+)\}", r"\1", text)
@@ -260,7 +260,7 @@ def _normalized_content_probe(text: str) -> str:
 
 
 def _unsafe_flash_content_characters(text: str) -> list[str]:
-    """返回 Flash content 中不应跨接口保留的排版空白与控制字符。"""
+    """Return Flash Typesetting whitespace and control characters in content that should not be preserved across interfaces."""
 
     return [
         char
@@ -277,14 +277,14 @@ def _blocks_containing(
     blocks: list[dict[str, Any]],
     probe: str,
 ) -> list[dict[str, Any]]:
-    """返回归一化内容中包含指定探针的模型块。"""
+    """Returns the model nugget that contains the specified probe in its normalized content."""
 
     normalized_probe = _normalized_content_probe(probe)
     return [block for block in blocks if normalized_probe in _normalized_content_probe(_visible_content(block))]
 
 
 def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
-    """验证显式登记的 demo 与合成 PDF 逐文件保持预期页数和块库存。"""
+    """Verify that explicitly registered demo and synthetic PDF maintain expected page and block inventories on a file-by-file basis."""
 
     expected_inventory = {
         "IEBM_A_2667169_O-5.pdf": (1, Counter({"equation": 16, "header": 2, "text": 12})),
@@ -486,7 +486,7 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
                     "footnote": 3,
                     "page_number": 8,
                     "table": 6,
-                    # 第 5 页三条等节奏句号行按当前正文段界规则拆开；视觉 gold 已完成人工批准。
+                    # The three equal-paced period lines on page 5 are split according to the current paragraph boundary rules; visual gold has completed manual approval.
                     "text": 18,
                 }
             ),
@@ -500,8 +500,8 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
                     "index": 1,
                     "page_number": 4,
                     "paragraph_title": 1,
-                    # 无效字重不再把两条句末中文说明误判为标题，原页均为普通正文。
-                    # 第2页独立“目录”题名经原页和前后标框复核恢复为标题，目录成员及水印过滤不变。
+                    # Invalid word weight no longer misjudges the Chinese descriptions at the end of two sentences as titles, and the original pages are all ordinary text.
+                    # The title of the independent "Table of Contents" on page 2 is restored to the title after being reviewed by the original page and the front and rear labels, and the table of contents members and watermark filtering remain unchanged.
                     "text": 13,
                 }
             ),
@@ -525,7 +525,7 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
             if (unsafe_chars := _unsafe_flash_content_characters(str(block.get("content", ""))))
         )
 
-    # 固定 Droid 字库后，各平台使用同一份完整库存断言。
+    # After fixing the Droid font, all platforms use the same complete inventory assertion.
     for pdf_name, (expected_pages, expected_counts) in expected_inventory.items():
         actual_pages, actual_counts = actual_inventory[pdf_name]
         assert actual_pages == expected_pages, pdf_name
@@ -534,7 +534,7 @@ def test_explicit_pdf_fixtures_keep_expected_txt_block_inventory() -> None:
 
 
 def test_demo1_keeps_five_real_tables_without_formula_false_positive() -> None:
-    """验证 demo1 首页脚注尾段页脚、参考文献、公式与五个真实表格均正确。"""
+    """Verify that demo1 home page footnotes, footers, references, formulas and five real tables are correct."""
 
     model_list = _native_model_list("demo1.pdf")
 
@@ -618,7 +618,7 @@ def test_demo1_keeps_five_real_tables_without_formula_false_positive() -> None:
 
 
 def test_demo1_rotated_table_claims_all_206_lines_without_residual_text() -> None:
-    """验证 demo1 第五页旋转表完整认领 206 行且表框内没有残留文本。"""
+    """Verify that the fifth page of the demo1 rotation table claims all 206 rows and there is no residual text in the table frame."""
 
     source = _native_page_source("demo1.pdf", 4)
     candidates = tables._detect_table_candidates(source)
@@ -656,13 +656,13 @@ def test_demo1_rotated_table_claims_all_206_lines_without_residual_text() -> Non
 
 
 def test_demo2_rejects_figure_grid_and_keeps_two_real_tables() -> None:
-    """验证 demo2 曲线图被拒绝且第四、五页真实表格保留。"""
+    """Verify that the demo2 graph is rejected and the real tables on pages 4 and 5 are retained."""
 
     assert _native_table_counts("demo2.pdf") == [0, 0, 0, 1, 1, 0]
 
 
 def test_demo2_page1_forms_sixteen_blocks_and_keeps_figure_caption_separate() -> None:
-    """验证 demo2 首页正文、Abstract 粗体和 Figure 1 图文归属保持正确。"""
+    """Verify that demo2 home page text, Abstract bold and Figure 1 graphic attributions remain correct."""
 
     page = _native_model_list("demo2.pdf")[0]
     graphic_block = next(block for block in page if "Left camera" in _visible_content(block))
@@ -704,7 +704,7 @@ def test_demo2_page1_forms_sixteen_blocks_and_keeps_figure_caption_separate() ->
 
 
 def test_demo2_pages2_to6_restore_paragraphs_formulas_and_reading_order() -> None:
-    """验证 demo2 后续页达到目标块数，正文、公式、caption 与双栏顺序均稳定。"""
+    """Verify that demo2 subsequent pages reach the target number of blocks, and that text, formulas, caption, and double-column order are all stable."""
 
     model_list = _native_model_list("demo2.pdf")
 
@@ -778,7 +778,7 @@ def test_demo2_pages2_to6_restore_paragraphs_formulas_and_reading_order() -> Non
 
 
 def test_demo2_container_claims_are_pairwise_disjoint() -> None:
-    """验证表格、图形和公式阶段按 source_index 唯一认领，不重复消费文本身份。"""
+    """During the verification stage, tables, graphics and formulas are uniquely claimed by source_index, and text identities are not consumed repeatedly."""
 
     for page_idx in (1, 2, 3):
         source = _native_page_source("demo2.pdf", page_idx)
@@ -811,7 +811,7 @@ def test_demo2_container_claims_are_pairwise_disjoint() -> None:
 
 
 def test_demo2_page4_groups_three_figures_and_keeps_table1() -> None:
-    """验证 demo2 第四页正文尾行不被图形吸收，同图题的三个子图聚合，三个独立图和 Table 1 均保持完整。"""
+    """Verify that the last line of text on the fourth page of demo2 is not absorbed by the figure, the three subfigures with the same figure title are aggregated, and the three independent figures and Table 1 remain intact."""
 
     page = _native_model_list("demo2.pdf")[3]
     table_blocks = [block for block in page if block["type"] == "table"]
@@ -837,7 +837,7 @@ def test_demo2_page4_groups_three_figures_and_keeps_table1() -> None:
 
 
 def test_demo2_table_captions_and_numeric_footnotes_are_independent_blocks() -> None:
-    """验证 demo2 两张表的换行标题和数字脚注独立输出并绑定为三段子块。"""
+    """Verification demo2 The line-wrapped titles and numeric footnotes of the two tables are output independently and bound as three paragraph sub-blocks."""
 
     model_list = _native_model_list("demo2.pdf")
     page4_table = next(block for block in model_list[3] if block["type"] == "table")
@@ -901,7 +901,7 @@ def test_demo2_table_captions_and_numeric_footnotes_are_independent_blocks() -> 
 
 
 def test_demo3_keeps_tables_and_covers_every_native_source_line() -> None:
-    """验证 demo3 容器、后续页段落边界及每条原生 source line 均保持稳定。"""
+    """Verify that the demo3 container, subsequent page paragraph boundaries, and each native source line remain stable."""
 
     pdf_path = Path(__file__).parents[2] / "demo" / "pdfs" / "demo3.pdf"
     model_list = _native_model_list("demo3.pdf")
@@ -988,7 +988,7 @@ def test_demo3_keeps_tables_and_covers_every_native_source_line() -> None:
 
 
 def test_demo3_auxiliary_text_types_match_real_page_geometry() -> None:
-    """验证真实 PDF 的首页侧栏及第 1、5、6、9 页脚注命中，公式页不误报。"""
+    """Verify that the sidebar on the home page and the footnotes on pages 1, 5, 6, and 9 of the real PDF are hit, and there are no false positives on the formula page."""
 
     model_list = _native_model_list("demo3.pdf")
 
@@ -1021,7 +1021,7 @@ def test_demo3_auxiliary_text_types_match_real_page_geometry() -> None:
 
 
 def test_demo3_pages1_and2_fix_title_front_matter_and_embedding_list() -> None:
-    """验证首页标题稳定，第二页标题、嵌入列表和栏尾正文各自保持完整。"""
+    """Verify that the title of the first page is stable, and that the title, embedded list, and text at the end of the column on the second page remain intact."""
 
     page1, page2 = _native_model_list("demo3.pdf")[:2]
     title = next(block for block in page1 if _visible_content(block).startswith("TABLEFORMER:"))
@@ -1100,7 +1100,7 @@ def test_demo3_pages1_and2_fix_title_front_matter_and_embedding_list() -> None:
 
 
 def test_demo3_pages6_7_and10_fix_caption_inline_titles_and_reference_tail() -> None:
-    """验证跨栏 caption、行内粗体正文与参考文献尾行均保持正确归属。"""
+    """Verify that the crossbar caption, the inline bold text, and the last line of references maintain correct attribution."""
 
     model_list = _native_model_list("demo3.pdf")
     page6 = model_list[5]
@@ -1184,7 +1184,7 @@ def test_demo3_pages6_7_and10_fix_caption_inline_titles_and_reference_tail() -> 
 
 
 def test_demo3_page3_form_image_formulas_titles_and_inline_body_are_whole() -> None:
-    """验证第三页大 Form、caption、公式、标题及行内粗体都按整体输出。"""
+    """Verify that the large Form, caption, formulas, titles and inline bold on the third page are all output as a whole."""
 
     page = _native_model_list("demo3.pdf")[2]
     image_blocks = [block for block in page if block["type"] == "image"]
@@ -1228,7 +1228,7 @@ def test_demo3_page3_form_image_formulas_titles_and_inline_body_are_whole() -> N
 
 
 def test_demo3_pages4_and5_fix_lists_formula_titles_italics_and_footnotes() -> None:
-    """验证第四、五页列表、公式、独立标题、行内标题、斜体续行及脚注边界。"""
+    """Verify lists, formulas, stand-alone headings, inline headings, italicized line continuations, and footnote boundaries on pages four and five."""
 
     page4, page5 = _native_model_list("demo3.pdf")[3:5]
     left_bullets = [
@@ -1288,7 +1288,7 @@ def test_demo3_pages4_and5_fix_lists_formula_titles_italics_and_footnotes() -> N
 
 
 def test_demo4_nct00083083_targeted_flash_regressions() -> None:
-    """验证 demo4 的跨栏图注、页眉脚注、续行、公式否决和参考文献分组。"""
+    """Verify column legends, header footers, line continuations, formula rejections, and reference groupings for demo4."""
 
     model_list = _native_model_list("demo4.pdf")
     all_content = "\n".join(_visible_content(block) for page in model_list for block in page)
@@ -1451,7 +1451,7 @@ def test_demo4_nct00083083_targeted_flash_regressions() -> None:
 
 
 def test_synthetic_flash_table_annotation_regressions() -> None:
-    """验证合成 Flash 夹具覆盖表格、表注、跨页边界和空图片页脚。"""
+    """Verify that the synthetic Flash fixture covers tables, table notes, cross-page boundaries, and empty image footers."""
 
     model_list = _native_model_list(
         _FLASH_SYNTHETIC_PDF_NAME,
@@ -1528,7 +1528,7 @@ def test_synthetic_flash_table_annotation_regressions() -> None:
 
 
 def test_demo6_default3_targeted_title_regressions() -> None:
-    """验证 demo6 的五个正文负样本和九个真实章节标题。"""
+    """Validation of five text negative samples and nine real chapter titles of demo6."""
 
     model_list = _native_model_list("demo6.pdf")
     blocks = [block for page in model_list for block in page]
@@ -1566,7 +1566,7 @@ def test_demo6_default3_targeted_title_regressions() -> None:
     assert sum("盖章" in str(block["content"]) for block in model_list[6]) == 1
     assert not [block for page in model_list for block in page if block["type"] in {"caption", "footnote"}]
     page5 = model_list[4]
-    # 原页顿号编号形成独立项目，正文类型与小数编号政策续行仍保持。
+    # The comma numbering of the original page forms an independent item, and the text type and decimal numbering policy for continuation lines are still maintained.
     assert all(block["type"] == "text" for block in page5)
     policy = [block for block in page5 if "[2014]68 号" in _visible_content(block)]
     assert len(policy) == 1
@@ -1578,7 +1578,7 @@ def test_demo6_default3_targeted_title_regressions() -> None:
 
 
 def test_mixed_elements_pages_03_06_force_txt_regressions() -> None:
-    """验证原文 3–6 页的标题、公式、图内坐标和边缘文本修复。"""
+    """Verification of titles, formulas, in-figure coordinates, and edge text repairs on pages 3–6 of the original text."""
 
     model_list = _txt_model_list("mixed_elements_pages_03_06.pdf")
 
@@ -1668,7 +1668,7 @@ def test_mixed_elements_pages_03_06_force_txt_regressions() -> None:
 
 
 def test_caibao_table_reclaims_repeated_dates_but_keeps_real_marginals() -> None:
-    """验证完整财报第 9–16 页回收表格日期行，免责声明与页码仍独立保留。"""
+    """Verify that the date line on pages 9–16 of the complete financial report is recycled, and the disclaimer and page number remain independent."""
 
     model_list = _auto_model_list("caibao1.pdf")
 
@@ -1692,7 +1692,7 @@ def test_caibao_table_reclaims_repeated_dates_but_keeps_real_marginals() -> None
 
 
 def test_caibao_page2_parallel_chart_captions_stay_separate() -> None:
-    """验证第二页左右图表的同行图注按各自横线和图形范围独立输出。"""
+    """Verify that the accompanying legends for the charts on the left and right pages of the second page are output independently according to their respective horizontal lines and graphic ranges."""
 
     model_list = _txt_model_list("caibao1.pdf")
     page = model_list[1]
@@ -1790,7 +1790,7 @@ def test_caibao_page2_parallel_chart_captions_stay_separate() -> None:
 
 
 def test_iebm_left_indented_compact_formula_is_equation() -> None:
-    """验证右栏左缩进紧凑公式通过公共 auto 入口输出为 equation。"""
+    """Verify that the right column left indented compact formula is output as equation through the public auto entry."""
 
     page = _auto_model_list("IEBM_A_2667169_O-5.pdf")[0]
     target = [block for block in page if block["bbox"] == [0.531, 0.291, 0.658, 0.311]]
@@ -1802,7 +1802,7 @@ def test_iebm_left_indented_compact_formula_is_equation() -> None:
 
 
 def test_synthetic_cjk_captions_and_urls_are_independent_annotations() -> None:
-    """验证合成 CJK 图注稳定、跨行 URL 连续且多条独立 URL 不相连。"""
+    """Verify that the synthesized CJK legend is stable, that URL is continuous across rows, and that multiple independent URLs are not connected."""
 
     model_list = _txt_model_list(
         _CJK_SYNTHETIC_PDF_NAME,
@@ -1835,7 +1835,7 @@ def test_synthetic_cjk_captions_and_urls_are_independent_annotations() -> None:
 
 
 def test_synthetic_cjk_fixture_contains_only_safe_watermarks_and_links() -> None:
-    """验证合成 CJK PDF 仅含安全旋转水印和预期 URI 注解。"""
+    """Validation synthesis CJK PDF contains only the secure rotation watermark and the expected URI annotation."""
 
     pdf_path = _FIXTURE_PDF_DIR / _CJK_SYNTHETIC_PDF_NAME
     model_list = _txt_model_list(
@@ -1867,7 +1867,7 @@ def test_synthetic_cjk_fixture_contains_only_safe_watermarks_and_links() -> None
 
 
 def test_synthetic_pdf_fixtures_have_neutral_metadata_and_catalogs() -> None:
-    """验证两份合成 PDF 均无加密、附件、脚本、隐藏元数据或无关批注。"""
+    """Verify that both synthetic PDFs have no encryption, attachments, scripts, hidden metadata, or extraneous annotations."""
 
     expected_metadata = {
         "/Author": "MinerU Test Suite",
@@ -1894,7 +1894,7 @@ def test_synthetic_pdf_fixtures_have_neutral_metadata_and_catalogs() -> None:
 
 
 def test_frozen_soil_page3_formula3_remains_one_equation() -> None:
-    """验证中文论文第三页公式编号完整转为 tag 并归入单个公式块。"""
+    """Verify that the formula number on the third page of the Chinese paper is completely converted to tag and classified into a single formula block."""
 
     page = _txt_model_list("中文论文.pdf")[2]
     equations = [block for block in page if block["type"] == "equation"]
@@ -1915,7 +1915,7 @@ def test_frozen_soil_page3_formula3_remains_one_equation() -> None:
 
 
 def test_frozen_soil_reference_tails_remain_single_text_blocks() -> None:
-    """验证中文论文双语图注独立标记，正文图引用和参考文献保持 text。"""
+    """Verify that bilingual figure captions in Chinese papers are independently marked, and text figure citations and references remain text."""
 
     model_list = _auto_model_list("中文论文.pdf")
     middle_pages = model_json_to_pages(_model_json(model_list))
@@ -1998,7 +1998,7 @@ def test_frozen_soil_reference_tails_remain_single_text_blocks() -> None:
 
 
 def test_mixed_elements_pages_07_10_force_txt_regressions() -> None:
-    """验证原文 7–10 页作者列、代码边界、尾词标题和参考文献修复。"""
+    """Verify author columns, code boundaries, end word titles, and reference fixes on pages 7–10 of the original text."""
 
     model_list = _txt_model_list("mixed_elements_pages_07_10.pdf")
     assert len(model_list) == 4
@@ -2095,7 +2095,7 @@ def test_mixed_elements_pages_07_10_force_txt_regressions() -> None:
 
 
 def test_mixed_elements_pages_11_15_force_txt_regressions() -> None:
-    """验证原文 11–15 页双行标题、正文小节、页码、图注与网址页脚。"""
+    """Verify the original text, pages 11–15, with two-line titles, text sections, page numbers, figure captions, and URL footers."""
 
     model_list = _txt_model_list("mixed_elements_pages_11_15.pdf")
     all_blocks = [block for page in model_list for block in page]
@@ -2153,7 +2153,7 @@ def test_mixed_elements_pages_11_15_force_txt_regressions() -> None:
 
 
 def test_mixed_elements_pages_39_40_force_txt_regressions() -> None:
-    """验证原文 39–40 页三个公式和公式后同视觉行正文的唯一输出。"""
+    """Verify the three formulas on pages 39–40 of the original text and the only output of the same visual line of text after the formula."""
 
     model_list = _txt_model_list("mixed_elements_pages_39_40.pdf")
     page40 = model_list[1]
@@ -2183,7 +2183,7 @@ def test_mixed_elements_pages_39_40_force_txt_regressions() -> None:
 
 
 def test_caibao_risk_subsection_titles_remain_separate_from_their_native_body():
-    """风险主标题后两个独立短题名都应成标题，各自说明正文不能吞入标题。"""
+    """The two independent short titles after the main risk title should become the title, and each indicates that the main text cannot be swallowed into the title."""
     page=_txt_model_list('caibao1.pdf')[18]
     for text in ('宏观经济下行导致需求不足','芯片短缺问题持续影响整车生产'):
         found=[block for block in page if _visible_content(block)==text]

@@ -1,4 +1,4 @@
-"""PDF 原生子资源关闭，保持原生提取算法与资源语义。"""
+"""PDF The native sub-resource is closed and the native extraction algorithm and resource semantics are maintained."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ logger = logging.getLogger("docvortex.document.pdf._document")
 
 
 def _try_close(obj: object) -> None:
-    """尽力关闭原生子资源，清理失败不得覆盖原有解析异常。"""
+    """Try your best to close the original sub-resource, and cleanup failure must not overwrite the original parsing exception."""
     if callable(close := getattr(obj, "close", None)):
         try:
             close()

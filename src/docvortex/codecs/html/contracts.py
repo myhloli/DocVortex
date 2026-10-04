@@ -1,4 +1,4 @@
-"""DocVortex HTML v1 canonical wire 的内部类型契约。"""
+"""Internal type contract for DocVortex HTML v1 canonical wire."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ WireFallbackReason: TypeAlias = Literal["unsupported_version", "non_canonical_wi
 
 @dataclass(frozen=True, slots=True)
 class TextWireSpec:
-    """保存一个文本类顶层 block 的 canonical 节点与元数据。"""
+    """Save the canonical node and metadata of a text class top-level block."""
 
     wrapper: etree._Element
     content_root: etree._Element
@@ -36,7 +36,7 @@ class TextWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class EquationWireSpec:
-    """保存一个行间公式或公式图片 carrier。"""
+    """Save an inline formula or formula picture carrier."""
 
     wrapper: etree._Element
     content_root: etree._Element
@@ -46,7 +46,7 @@ class EquationWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class AnnotationWireSpec:
-    """保存 visual caption/footnote 的 canonical 行内容器。"""
+    """canonical in-row container holding visual caption/footnote."""
 
     element: etree._Element
     block_type: BlockType
@@ -54,7 +54,7 @@ class AnnotationWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class RichVisualBodyWireSpec:
-    """保存普通 image/chart body 的主图片与规范化富内容片段。"""
+    """Save the main image and the normalized rich content fragment of the normal image/chart body."""
 
     element: etree._Element
     parent_type: BlockType
@@ -65,7 +65,7 @@ class RichVisualBodyWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class FlowchartBodyWireSpec:
-    """保存 flowchart 源码与可选原图（旧外壳中为 raster 回退图）。"""
+    """Save flowchart source code and optional original image (raster fallback image in the old shell)."""
 
     element: etree._Element
     source_element: etree._Element
@@ -74,7 +74,7 @@ class FlowchartBodyWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class TableBodyWireSpec:
-    """保存 table body 的唯一 canonical 载荷。"""
+    """Save the unique canonical payload of table body."""
 
     element: etree._Element
     kind: Literal["empty", "html", "text", "image"]
@@ -83,7 +83,7 @@ class TableBodyWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class CodeBodyWireSpec:
-    """保存 code/algorithm body 的唯一 canonical 内容载体。"""
+    """The only canonical content carrier that holds code/algorithm body."""
 
     element: etree._Element
     kind: Literal["code", "algorithm"]
@@ -101,7 +101,7 @@ VisualChildWireSpec: TypeAlias = Union[VisualBodyWireSpec, AnnotationWireSpec]
 
 @dataclass(frozen=True, slots=True)
 class VisualWireSpec:
-    """保存 visual 顶层 block 与已按 DOM 顺序解析的子节点。"""
+    """Save visual top-level block with child nodes that have been resolved in DOM order."""
 
     wrapper: etree._Element
     content_root: etree._Element
@@ -115,7 +115,7 @@ class VisualWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class ListLeafWireSpec:
-    """保存一个列表叶子的内容 carrier、marker 与公开类型。"""
+    """Saves the contents of a list leaf carrier, marker with public types."""
 
     block_type: BlockType
     block_index: int | None
@@ -125,7 +125,7 @@ class ListLeafWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class ListWireSpec:
-    """保存一个 canonical 列表及其递归子项。"""
+    """Saves a list of canonicals and their recursive subkeys."""
 
     element: etree._Element
     block_index: int | None
@@ -138,7 +138,7 @@ class ListWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class ListBlockWireSpec:
-    """保存顶层 ListBlock wrapper 与列表树。"""
+    """Save the top level ListBlock wrapper with the list tree."""
 
     wrapper: etree._Element
     page_idx: int
@@ -148,7 +148,7 @@ class ListBlockWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class IndexLeafWireSpec:
-    """保存一个目录叶子的 canonical 内容 carrier 与元数据。"""
+    """Saves the canonical contents of a directory leaf carrier with metadata."""
 
     block_type: BlockType
     block_index: int | None
@@ -159,7 +159,7 @@ class IndexLeafWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class IndexWireSpec:
-    """保存一个 canonical 目录列表及其递归子项。"""
+    """Saves a list of canonical directories and their recursive subkeys."""
 
     element: etree._Element
     block_index: int | None
@@ -168,7 +168,7 @@ class IndexWireSpec:
 
 @dataclass(frozen=True, slots=True)
 class IndexBlockWireSpec:
-    """保存顶层 IndexBlock wrapper 与目录树。"""
+    """Save the top-level IndexBlock wrapper with the directory tree."""
 
     wrapper: etree._Element
     page_idx: int
@@ -187,7 +187,7 @@ PageWireSpec: TypeAlias = Union[
 
 @dataclass(frozen=True, slots=True)
 class DocVortexHtmlWirePlan:
-    """保存一次无资源副作用的完整 canonical wire 解析结果。"""
+    """Save the complete canonical wire parsing result once without resource side effects."""
 
     root: etree._Element
     render_mode: WireRenderMode
@@ -196,7 +196,7 @@ class DocVortexHtmlWirePlan:
 
 @dataclass(frozen=True, slots=True)
 class WireDecodeResult:
-    """区分未命中 wire、精确解码成功与需要通用回退。"""
+    """Distinguish between a wire miss, an exact decode success, and a universal fallback required."""
 
     blocks: list[dict[str, object]] | None
     fallback_reason: WireFallbackReason | None = None

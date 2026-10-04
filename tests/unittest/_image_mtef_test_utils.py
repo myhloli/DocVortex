@@ -1,4 +1,4 @@
-"""构造携带 MathType MTEF comment 的确定性 WMF/GIF 图片。"""
+"""Construct a deterministic WMF/GIF picture carrying MathType MTEF comment."""
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ _TINY_GIF = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAA
 
 
 def _wmf_record(function: int, payload: bytes = b"") -> bytes:
-    """构造按 WORD 对齐并声明正确 record size 的 WMF record。"""
+    """Construct WMF record aligned to WORD and declare the correct record size."""
 
     padded = payload + b"\x00" * (len(payload) % 2)
     return struct.pack("<IH", (6 + len(padded)) // 2, function) + padded
 
 
 def _wmf_comment_record(comment: bytes) -> bytes:
-    """把 comment 包装为 META_ESCAPE/MFCOMMENT record。"""
+    """Package comment as META_ESCAPE/MFCOMMENT record."""
 
     payload = struct.pack("<HH", 0x000F, len(comment)) + comment
     return _wmf_record(0x0626, payload)
@@ -27,7 +27,7 @@ def build_wmf(
     *,
     placeable: bool = False,
 ) -> bytes:
-    """构造仅含 comment records 与 EOF 的标准 WMF。"""
+    """Constructs standard WMF containing only comment records and EOF."""
 
     records = [_wmf_comment_record(comment) for comment in comments]
     records.append(_wmf_record(0))
@@ -62,7 +62,7 @@ def build_wmf(
 
 
 def pre6_wmf_comment(mtef: bytes) -> bytes:
-    """构造 MathType 6.0b 前的单 comment MTEF 头。"""
+    """Constructed MathType 6. Single comment MTEF header in front of b."""
 
     if len(mtef) > 0xFFFF:
         raise ValueError("pre-6 WMF fixture MTEF is too large")
@@ -70,7 +70,7 @@ def pre6_wmf_comment(mtef: bytes) -> bytes:
 
 
 def baseline_wmf_comment(delta: int = 0) -> bytes:
-    """构造必须被忽略的 MathType baseline comment。"""
+    """The construct MathType baseline comment must be ignored."""
 
     return b"MathType" + struct.pack("<HH", 0, delta & 0xFFFF)
 
@@ -81,7 +81,7 @@ def apps_mfcc_comment(
     total_length: int,
     signature: str = "Design Science, Inc./MTEF",
 ) -> bytes:
-    """构造一个 AppsMFCC v1 chunk。"""
+    """Construct a AppsMFCC v1 chunk."""
 
     return b"AppsMFCC" + struct.pack("<HII", 1, total_length, len(chunk)) + signature.encode("ascii") + b"\x00" + chunk
 
@@ -92,7 +92,7 @@ def apps_mfcc_comments(
     chunk_size: int,
     signature: str = "Design Science, Inc./MTEF",
 ) -> list[bytes]:
-    """把 MTEF 切成多个连续 AppsMFCC comments。"""
+    """Cut MTEF into multiple consecutive AppsMFCC comments."""
 
     if chunk_size <= 0:
         raise ValueError("AppsMFCC fixture chunk_size must be positive")
@@ -112,7 +112,7 @@ def _gif_application_extension(
     authentication: bytes,
     chunk_size: int,
 ) -> bytes:
-    """构造 MathType GIF Application Extension 与 sub-blocks。"""
+    """Construct MathType GIF Application Extension and sub-blocks."""
 
     if len(authentication) != 3 or not 0 < chunk_size <= 255:
         raise ValueError("GIF application fixture parameters are invalid")
@@ -124,7 +124,7 @@ def _gif_application_extension(
 
 
 def build_gif_with_extensions(extensions: list[bytes]) -> bytes:
-    """把 extensions 插入有效 1×1 GIF 的首个图像块之前。"""
+    """Insert extensions before the first image block of a valid 1×1 GIF."""
 
     image_separator = _TINY_GIF.find(b"\x2c")
     if image_separator < 0:
@@ -137,7 +137,7 @@ def gif_mtef_extension(
     *,
     chunk_size: int = 255,
 ) -> bytes:
-    """构造可组合到同一 GIF 中的 MathType/001 extension。"""
+    """Constructs MathType/001 extension that can be combined into the same GIF."""
 
     return _gif_application_extension(
         mtef,
@@ -151,7 +151,7 @@ def gif_baseline_extension(
     *,
     chunk_size: int = 255,
 ) -> bytes:
-    """构造可组合到同一 GIF 中、不会产生公式 candidate 的 baseline extension。"""
+    """Constructs baseline extension which can be combined into the same GIF without producing the formula candidate."""
 
     return _gif_application_extension(
         payload,
@@ -166,7 +166,7 @@ def build_gif_with_mtef(
     chunk_size: int = 255,
     include_baseline: bool = False,
 ) -> bytes:
-    """构造带 MathType/001 MTEF 及可选 002 baseline 的有效 GIF。"""
+    """Constructs valid GIF with MathType/001 MTEF and optional 002 baseline."""
 
     extensions = [gif_mtef_extension(mtef, chunk_size=chunk_size)]
     if include_baseline:
@@ -182,7 +182,7 @@ def build_gif_with_mtef(
 
 
 def build_baseline_only_gif() -> bytes:
-    """构造只有 MathType/002 baseline、没有公式的有效 GIF。"""
+    """Constructs a valid GIF with only MathType/002 baseline and no formula."""
 
     return build_gif_with_extensions(
         [

@@ -1,4 +1,4 @@
-"""在 OFD 所属区域内恢复视觉行、样式片段和保守段落。"""
+"""Restore visual lines, style fragments and conservative paragraphs in the area belonging to OFD."""
 
 from __future__ import annotations
 
@@ -17,20 +17,20 @@ _LIST_START = re.compile(r"^\s*(?:[•●▪◆]|[-*]\s|\d+[.)、]\s*|[一二三
 
 
 def upright_point(x: float, y: float, angle: int) -> tuple[float, float]:
-    """将页面点旋转到文字阅读方向，统一横排与直角旋转的几何计算。"""
+    """Rotate the page point to the text reading direction and unify the geometric calculations of horizontal and rectangular rotation."""
     radians = math.radians(angle)
     cosine, sine = round(math.cos(radians), 12), round(math.sin(radians), 12)
     return cosine * x + sine * y, -sine * x + cosine * y
 
 
 def upright_box(bbox: BBox, angle: int) -> BBox:
-    """在文字方向坐标内计算矩形外接框。"""
+    """Calculate the rectangular bounding box within the text direction coordinates."""
     points = [upright_point(x, y, angle) for x in (bbox[0], bbox[2]) for y in (bbox[1], bbox[3])]
     return min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)
 
 
 def line_baseline(line: TextLine) -> float:
-    """优先读取真实字形基线，缺少字形时才退回视觉框中心。"""
+    """The real glyph baseline is read first, and the center of the visual frame is returned only when the glyph is missing."""
     if line.glyphs:
         return statistics.median(upright_point(*glyph.origin, line.angle)[1] for glyph in line.glyphs)
     box = upright_box(line.bbox, line.angle)
@@ -38,22 +38,22 @@ def line_baseline(line: TextLine) -> float:
 
 
 def line_runs(line: TextLine) -> tuple[tuple[str, tuple[str, ...]], ...]:
-    """读取已组装行的样式片段，原始行按其自身样式返回单个片段。"""
+    """Reads the styled fragments of the assembled row, returning the original row as a single fragment styled by itself."""
     return line.runs or ((line.text, line.styles),)
 
 
 def line_spans(line: TextLine) -> list[dict[str, object]]:
-    """将视觉行的各样式片段投影为既有结构化 Span。"""
+    """Project each style fragment of the visual row to the existing structured Span."""
     return [span for text, styles in line_runs(line) for span in format_line_spans(text, styles)]
 
 
 def line_html(line: TextLine) -> str:
-    """按片段样式序列化单元格文字，不把首片段样式扩散到整行。"""
+    """Serialize cell text by fragment style without spreading the first fragment style to the entire row."""
     return "".join(format_line_html(text, styles) for text, styles in line_runs(line))
 
 
 def _fragment_separator(first: TextLine, second: TextLine) -> str:
-    """仅在英文单词片段之间存在可见词间距时补空格。"""
+    """Fill spaces only when there is visible word space between English word fragments."""
     if not first.text or not second.text:
         return ""
     if not (first.text[-1].isascii() and second.text[0].isascii() and first.text[-1].isalnum() and second.text[0].isalnum()):
@@ -66,7 +66,7 @@ def _fragment_separator(first: TextLine, second: TextLine) -> str:
 
 
 def merge_same_baseline_lines(lines: list[TextLine]) -> list[TextLine]:
-    """按真实基线聚行并沿阅读方向拼接，保留样式及层和模板隔离。"""
+    """Cluster according to the true baseline and splice along the reading direction, preserving style and layer and template isolation."""
     metrics = {id(line): (line_baseline(line), upright_box(line.bbox, line.angle)) for line in lines}
     ordered = sorted(lines, key=lambda line: (line.angle, line.layer_type, line.template_id or -1, metrics[id(line)][0]))
     rows: list[list[TextLine]] = []
@@ -108,12 +108,12 @@ def merge_same_baseline_lines(lines: list[TextLine]) -> list[TextLine]:
 
 
 def _block_text(block: dict[str, Any]) -> str:
-    """读取 OFD 私有视觉行文本，避免依赖公共 Span 的序列化细节。"""
+    """Read OFD private visual line text to avoid relying on serialization details of public Span."""
     return block.get("text_line", "")
 
 
 def _paragraph_separator(previous: str, current: str) -> str:
-    """中文换行直接续接，英文词和句末标点后的换行补空格，保留已有空白与连字符。"""
+    """Chinese line breaks are directly continued, English words and sentence end punctuation are filled with spaces after line breaks, and existing blanks and hyphens are retained."""
     last, first = previous[-1:], current[:1]
     if not last or not first or not (last.isascii() and first.isascii()):
         return ""
@@ -121,7 +121,7 @@ def _paragraph_separator(previous: str, current: str) -> str:
 
 
 def merge_paragraph_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """在阅读顺序内按局部栏宽、行距及缩进合段，视觉块和辅助块作为屏障。"""
+    """Within the reading order, paragraphs are combined according to local column width, line spacing and indentation, and visual blocks and auxiliary blocks serve as barriers."""
     output: list[dict[str, Any]] = []
     for index, block in enumerate(blocks):
         if block["type"] != BlockType.TEXT:
@@ -130,7 +130,7 @@ def merge_paragraph_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]
         angle = block["angle"]
         current_box = upright_box(block["bbox_mm"], angle)
         size = block["font_size_mm"]
-        # 只观察邻近且横向重叠的正文，防止另一栏或远处区域影响本栏尺度。
+        # Only observe adjacent and horizontally overlapping text to prevent another column or distant areas from affecting the size of this column.
         neighbors: list[dict[str, Any]] = []
         for direction in (-1, 1):
             for offset in range(1, 9):
@@ -187,6 +187,6 @@ def merge_paragraph_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]
             previous["baseline_mm"] = block["baseline_mm"]
             previous["text_line"] = current_text
         else:
-            # 复制将被追加的列表，确保组段不会修改调用方的原始视觉行。
+            # Copies the list to be appended, ensuring that the group segment does not modify the caller's original visual line.
             output.append({**block, "content": list(block["content"]), "line_bboxes_mm": list(block["line_bboxes_mm"])})
     return output

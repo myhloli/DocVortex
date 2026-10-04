@@ -1,4 +1,4 @@
-"""在独立进程中测量公开流水线，并冻结七种渲染结果和完整语义产物。"""
+"""Measuring the public pipeline in independent processes and freezing seven rendering results and full semantic artifacts."""
 
 from __future__ import annotations
 
@@ -31,24 +31,24 @@ _CASE_CACHE: dict[str, tuple[object, dict[str, object], str]] = {}
 
 
 def write_json(path: Path, value: object) -> None:
-    """写出完整可审查产物，报告使用 UTF-8 编码。"""
+    """Write a complete auditable product, report using UTF-8 encoding."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def digest(value: bytes) -> str:
-    """计算稳定字节摘要，保留文本、空白和几何的所有差异。"""
+    """Computes stable byte digests, preserving all differences in text, whitespace, and geometry."""
     return hashlib.sha256(value).hexdigest()
 
 
 def memory_bytes(pids: list[int]) -> dict[int, int]:
-    """读取各进程当前 RSS；RSS 总和包含共享页，不等同于唯一物理内存。"""
+    """Read the current RSS of each process; the sum of RSS includes shared pages and is not equivalent to unique physical memory."""
     if sys.platform == "win32":
         import ctypes
         from ctypes import wintypes
 
         class Counters(ctypes.Structure):
-            """描述 Windows PROCESS_MEMORY_COUNTERS 的固定 ABI。"""
+            """Description Windows Fixed ABI for PROCESS_MEMORY_COUNTERS."""
 
             _fields_ = [("cb", wintypes.DWORD), ("faults", wintypes.DWORD)] + [
                 (name, ctypes.c_size_t)
@@ -80,10 +80,10 @@ def memory_bytes(pids: list[int]) -> dict[int, int]:
 
 
 class MemorySampler:
-    """周期采样父进程及其裁图子进程，剖析运行不参与内存峰值。"""
+    """Periodically samples the parent process and its cropping child process, and analyzes the operation without participating in memory peaks."""
 
     def __init__(self) -> None:
-        """为当前单文档进程建立采样状态。"""
+        """Establish sampling status for the current single document process."""
         self.stop = threading.Event()
         self.peaks: dict[int, int] = {}
         self.total_peak = 0
@@ -91,7 +91,7 @@ class MemorySampler:
         self.thread = threading.Thread(target=self.collect, daemon=True)
 
     def collect(self) -> None:
-        """每 50ms 读取仍存活的裁图进程和父进程内存。"""
+        """Read the surviving cropping process and parent process memory every 50ms."""
         while not self.stop.is_set():
             pids = [os.getpid(), *(child.pid for child in multiprocessing.active_children() if child.pid)]
             values = memory_bytes(pids)
@@ -102,7 +102,7 @@ class MemorySampler:
             self.stop.wait(0.05)
 
     def finish(self) -> dict[str, object]:
-        """停止采样并分开报告父进程峰值、子进程峰值和同时 RSS 总峰值。"""
+        """Stops sampling and reports parent process peaks, child process peaks, and simultaneous RSS total peaks separately."""
         self.stop.set()
         self.thread.join()
         return {
@@ -115,7 +115,7 @@ class MemorySampler:
 
 
 def instrument(stack: ExitStack, timings: dict[str, float]) -> None:
-    """包裹现有阶段入口，记录包含子阶段的耗时且不改变调用结果。"""
+    """Wrap the existing stage entry, record the time consumption of the included sub-stages, and do not change the call results."""
     from docvortex import api
     from docvortex.analyzers.native.models import PdfModel
     from docvortex.document.pdf import images
@@ -123,12 +123,12 @@ def instrument(stack: ExitStack, timings: dict[str, float]) -> None:
     from docvortex.postprocess import document
 
     def wrap(owner: object, name: str, label: str) -> None:
-        """通过可恢复的包装记录阶段累计时间。"""
+        """Record phase accumulation time via a recoverable wrapper."""
         original = getattr(owner, name)
 
         @wraps(original)
         def timed(*args: object, **kwargs: object) -> object:
-            """异常路径也记录耗时，保持原异常传播。"""
+            """The exception path also records the time taken to maintain the original exception propagation."""
             started = time.perf_counter()
             try:
                 return original(*args, **kwargs)
@@ -149,7 +149,7 @@ def instrument(stack: ExitStack, timings: dict[str, float]) -> None:
 
 
 def source_case(name: str) -> tuple[object, dict[str, object], str]:
-    """读取真实语料或既有十五格式 fixture，并提供确定性长续接链。"""
+    """Read real corpus or the existing fifteen format fixture, and provide a deterministic long connection link."""
     from docvortex.schema import MiddleJson, PageInfo, TextBlock, TextSpan
 
     if name in _CASE_CACHE:
@@ -187,7 +187,7 @@ def source_case(name: str) -> tuple[object, dict[str, object], str]:
 
 
 def artifact_signature(target: str, payload: bytes) -> object:
-    """对 ZIP 解包比较，对 PDF 比较逐页文字和像素，排除容器时间元数据。"""
+    """Unpack comparison for ZIP and page-by-page text and pixel comparison for PDF, excluding container time metadata."""
     if target in {"docx", "epub"}:
         with ZipFile(BytesIO(payload)) as package:
             return {name: digest(package.read(name)) for name in sorted(package.namelist())}
@@ -215,7 +215,7 @@ def artifact_signature(target: str, payload: bytes) -> object:
 
 
 def pipeline_once(name: str, destination: Path | None = None) -> tuple[dict[str, float], dict[str, object]]:
-    """执行一次公开流水线；仅捕获运行写出结果，正式计时不做差分计算。"""
+    """Execute the public pipeline once; only capture the running results and write out the results, no difference calculation is performed for formal timing."""
     from docvortex import api
     from docvortex.result import DocumentResult
     from docvortex.schema import MiddleJson
@@ -278,7 +278,7 @@ def pipeline_once(name: str, destination: Path | None = None) -> tuple[dict[str,
 
 
 def worker(name: str, output: Path, runs: int, profile: bool, source_file: Path | None = None) -> None:
-    """先测冷运行，再计时预热后的运行；内存采样和剖析各自独立执行。"""
+    """Cold runs are measured first, then warmed-up runs are timed; memory sampling and profiling are performed independently."""
     from loguru import logger
 
     logger.disable("docvortex")
@@ -331,7 +331,7 @@ def worker(name: str, output: Path, runs: int, profile: bool, source_file: Path 
 
 
 def main() -> None:
-    """为每份语料启动独立解释器，并严格比较同源、同集合的输出。"""
+    """Start an independent interpreter for each corpus, and strictly compare the output from the same source and the same set."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--baseline", type=Path)

@@ -1,4 +1,4 @@
-"""OpenDocument 内部行内、样式与表格模型。"""
+"""OpenDocument internal inline, style and table models."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any, TypeAlias, Union
 
 @dataclass(frozen=True, slots=True)
 class TextStyle:
-    """保存可继承的 ODF 行内样式最终值。"""
+    """Saves the inheritable ODF inline style final value."""
 
     bold: bool = False
     italic: bool = False
@@ -18,7 +18,7 @@ class TextStyle:
     subscript: bool = False
 
     def names(self) -> tuple[str, ...]:
-        """按 DocVortex 内联协议的稳定顺序返回已启用样式名。"""
+        """Returns enabled style names in stable order for the DocVortex inline protocol."""
         result: list[str] = []
         if self.bold:
             result.append("bold")
@@ -37,7 +37,7 @@ class TextStyle:
 
 @dataclass(frozen=True, slots=True)
 class TextStyleDelta:
-    """保存 ODF 样式层级中可显式覆盖的三态字段。"""
+    """Save ODF Tri-state fields in the style hierarchy that can be explicitly overridden."""
 
     bold: bool | None = None
     italic: bool | None = None
@@ -47,7 +47,7 @@ class TextStyleDelta:
     subscript: bool | None = None
 
     def merge(self, child: TextStyleDelta) -> TextStyleDelta:
-        """用子样式的非空字段覆盖当前样式。"""
+        """Overrides the current style with the child style's non-empty fields."""
         return TextStyleDelta(
             bold=self.bold if child.bold is None else child.bold,
             italic=self.italic if child.italic is None else child.italic,
@@ -58,7 +58,7 @@ class TextStyleDelta:
         )
 
     def resolve(self) -> TextStyle:
-        """把未声明字段按关闭处理并返回最终样式。"""
+        """Process undeclared fields as closed and return the final style."""
         return TextStyle(
             bold=bool(self.bold),
             italic=bool(self.italic),
@@ -71,7 +71,7 @@ class TextStyleDelta:
 
 @dataclass(frozen=True, slots=True)
 class ListLevel:
-    """保存一个 ODF 列表层级的通用编号语义。"""
+    """Saves the universal numbering semantics of a ODF list hierarchy."""
 
     ordered: bool = False
     start: int = 1
@@ -79,7 +79,7 @@ class ListLevel:
 
 @dataclass(frozen=True, slots=True)
 class InlineText:
-    """保存带样式和可选超链接的行内文本。"""
+    """Saves inline text with styles and optional hyperlinks."""
 
     text: str
     style: TextStyle = TextStyle()
@@ -88,26 +88,26 @@ class InlineText:
 
 @dataclass(frozen=True, slots=True)
 class InlineMath:
-    """保存不含外围标记的行内 LaTeX。"""
+    """Save inline LaTeX without peripheral markers."""
 
     latex: str
 
 
 @dataclass(frozen=True, slots=True)
 class InlineBreak:
-    """表示段内显式换行。"""
+    """Indicates an explicit line break within the paragraph."""
 
 
 @dataclass(frozen=True, slots=True)
 class InlineNote:
-    """保存应随当前行内内容归属的 ODF note body。"""
+    """Save ODF note body which should belong with the current line content."""
 
     content: str
 
 
 @dataclass(frozen=True, slots=True)
 class InlineImage:
-    """保存表格单元格中允许内联呈现的图片 data URI。"""
+    """Saving images in table cells allows inline rendering data URI."""
 
     data_uri: str
     alt: str = ""
@@ -115,7 +115,7 @@ class InlineImage:
 
 @dataclass(frozen=True, slots=True)
 class InlineBlockGroup:
-    """在行内流中保存段外 block 及其与内联图片的配对关系。"""
+    """Save the out-of-segment block and its pairing with the inline picture in the inline stream."""
 
     blocks: tuple[dict[str, Any], ...]
     inline_image_rendered: bool = False
@@ -133,7 +133,7 @@ InlineAtom: TypeAlias = Union[
 
 @dataclass(slots=True)
 class GridCell:
-    """保存 ODF 表格原点单元格的 HTML 与跨度。"""
+    """Save ODF HTML table origin cell with span."""
 
     html: str = ""
     row_span: int = 1
@@ -142,13 +142,13 @@ class GridCell:
 
     @property
     def has_content(self) -> bool:
-        """返回单元格是否包含可见或结构化 HTML。"""
+        """Returns whether the cell contains visible or structured HTML."""
         return bool(self.html.strip())
 
 
 @dataclass(slots=True)
 class TableGrid:
-    """保存带合并占位的 ODF 二维表格。"""
+    """Save the ODF 2D table with merged placeholders."""
 
     rows: list[list[GridCell | None]] = field(default_factory=list)
     header_rows: int = 0
@@ -156,7 +156,7 @@ class TableGrid:
 
     @property
     def width(self) -> int:
-        """返回网格最大视觉列数。"""
+        """Returns the maximum number of visual columns in the grid."""
         return max((len(row) for row in self.rows), default=0)
 
 

@@ -17,7 +17,7 @@ from docvortex.analyzers.native._shared.markup import (
 
 @dataclass(frozen=True, slots=True)
 class _TestAnchorPolicy:
-    """为共享 anchor 单元测试提供可切换的脚注语义策略。"""
+    """Provides switchable footnote semantics strategy for shared anchor unit tests."""
 
     anchor_prefix: str = "test"
     register_document_start: bool = True
@@ -25,16 +25,16 @@ class _TestAnchorPolicy:
 
     @staticmethod
     def heading_identity(element: etree._Element, ordinal: int) -> str:
-        """按源 ID 与文档内序号生成测试标题 identity。"""
+        """Generate the test title identity according to the source ID and the serial number in the document."""
         return f"heading-{element_id(element) or 'anonymous'}-{ordinal}"
 
     def is_materializable_note(self, element: etree._Element, document: MarkupAnchorDocument) -> bool:
-        """只登记匹配当前策略且具有最终可见文本的测试脚注。"""
+        """Only test footnotes that match the current policy and have final visible text are registered."""
         return element.get("data-note") == self.note_marker and bool(visible_element_text(element, document))
 
     @staticmethod
     def note_identity(element: etree._Element, ordinal: int) -> str:
-        """按源 ID 与文档内序号生成测试脚注 identity。"""
+        """Generate the test footnote identity according to the source ID and the serial number in the document."""
         return f"note-{element_id(element) or 'anonymous'}-{ordinal}"
 
 
@@ -44,7 +44,7 @@ def _document(
     *,
     visibility_scope: AnchorVisibilityScope = "all_ancestors",
 ) -> MarkupAnchorDocument:
-    """用空样式表构造一份共享 anchor 测试文档。"""
+    """Construct a shared anchor test document with an empty stylesheet."""
     return MarkupAnchorDocument(
         key=key,
         root=root,
@@ -54,7 +54,7 @@ def _document(
 
 
 def test_markup_anchor_element_id_and_canonical_digest_are_stable() -> None:
-    """验证 id/xml:id 优先级、空白清理及二十位 SHA-256 anchor 契约。"""
+    """Verify id/xml:id priority, blank cleaning and twenty-digit SHA-256 anchor contract."""
     html_id = etree.fromstring(b'<p id=" html-id " xml:id="xml-id"/>')
     xml_id = etree.fromstring(b'<p xml:id="xml-only"/>')
     anonymous = etree.fromstring(b"<p/>")
@@ -67,7 +67,7 @@ def test_markup_anchor_element_id_and_canonical_digest_are_stable() -> None:
 
 
 def test_markup_anchor_registry_filters_hidden_targets_and_keeps_visible_descendants() -> None:
-    """验证隐藏标题/脚注不注册，而 visibility:visible 后代仍可提供可落地文本。"""
+    """Verify that hidden captions/footnotes are not registered while visibility:visible descendants still provide landing text."""
     root = etree.fromstring(
         b"""<html><body>
         <h1 id="visible">Visible title</h1>
@@ -96,7 +96,7 @@ def test_markup_anchor_registry_filters_hidden_targets_and_keeps_visible_descend
 
 
 def test_markup_anchor_registry_resolves_direct_ancestor_descendant_and_duplicate_fragments() -> None:
-    """验证 fragment 依次映射到直接、最近祖先和首个后代目标，且重复 ID 首个映射优先。"""
+    """Verify that fragment maps to the direct, nearest ancestor, and first descendant targets in that order, with duplicate ID first mapping first."""
     first_root = etree.fromstring(
         b"""<body>
         <h1 id="direct">Direct</h1>
@@ -124,7 +124,7 @@ def test_markup_anchor_registry_resolves_direct_ancestor_descendant_and_duplicat
 
 
 def test_markup_anchor_document_start_visibility_scope_and_policy_do_not_leak() -> None:
-    """验证可选文档起点、祖先范围和不同脚注 policy 彼此隔离。"""
+    """Verify that optional document origins, ancestor ranges, and different footnotes policy are isolated from each other."""
     root = etree.fromstring(
         b"""<html hidden="hidden"><body><h1 id="title">Visible in body scope</h1>
         <aside id="primary" data-note="primary">Primary note</aside>

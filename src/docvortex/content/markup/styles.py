@@ -1,4 +1,4 @@
-"""解析 XHTML/HTML 使用的有限语义 CSS 子集。"""
+"""Parsing XHTML/HTML uses a limited semantic subset of CSS."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ _VISIBILITY_FIELDS = ("display", "visibility", "opacity")
 
 @dataclass(frozen=True, slots=True)
 class TextStyle:
-    """保存可投影到 Middle JSON 行内协议的文字样式。"""
+    """Save text styles that can be projected to the Middle JSON inline protocol."""
 
     bold: bool = False
     italic: bool = False
@@ -28,7 +28,7 @@ class TextStyle:
     subscript: bool = False
 
     def merge(self, other: TextStyle) -> TextStyle:
-        """合并继承样式和当前元素显式开启的样式。"""
+        """Merges inherited styles with styles explicitly enabled on the current element."""
         return TextStyle(
             bold=self.bold or other.bold,
             italic=self.italic or other.italic,
@@ -39,7 +39,7 @@ class TextStyle:
         )
 
     def names(self) -> tuple[str, ...]:
-        """按稳定顺序返回现有行内协议识别的样式名称。"""
+        """Returns the style names recognized by existing inline protocols in stable order."""
         return tuple(
             name
             for enabled, name in (
@@ -56,7 +56,7 @@ class TextStyle:
 
 @dataclass(frozen=True, slots=True)
 class TextStyleDelta:
-    """保存 CSS 对各文字样式的显式开启、关闭或未声明状态。"""
+    """Save CSS The explicit on, off, or undeclared state of each text style."""
 
     bold: bool | None = None
     italic: bool | None = None
@@ -66,7 +66,7 @@ class TextStyleDelta:
     subscript: bool | None = None
 
     def apply(self, base: TextStyle) -> TextStyle:
-        """把当前声明覆盖到已解析的继承/标签样式。"""
+        """Overrides the current declaration to the resolved inheritance/tag style."""
         return TextStyle(
             bold=base.bold if self.bold is None else self.bold,
             italic=base.italic if self.italic is None else self.italic,
@@ -77,7 +77,7 @@ class TextStyleDelta:
         )
 
     def is_empty(self) -> bool:
-        """返回当前声明是否没有触及任何受支持样式。"""
+        """Returns whether the current declaration does not touch any supported styles."""
         return all(
             value is None
             for value in (
@@ -93,7 +93,7 @@ class TextStyleDelta:
 
 @dataclass(frozen=True, slots=True)
 class ElementStyle:
-    """保存元素最终文字样式、整树隐藏状态和继承可见性。"""
+    """Save the element's final text style, tree-wide hidden state, and inherited visibility."""
 
     text: TextStyle
     subtree_hidden: bool = False
@@ -101,20 +101,20 @@ class ElementStyle:
 
     @property
     def hidden(self) -> bool:
-        """返回当前元素是否因任一种受支持的隐藏语义而不可见。"""
+        """Returns whether the current element is invisible due to any of the supported hiding semantics."""
         return self.subtree_hidden or self.visibility_hidden
 
 
 @dataclass(slots=True)
 class _SelectorCascade:
-    """按 selector 聚合各属性最后一次声明及其源码顺序。"""
+    """Aggregate the last declaration of each attribute and its source code sequence by selector."""
 
     priority: int
     declarations: dict[str, tuple[bool, int, bool]] = field(default_factory=dict)
     visibility: dict[str, tuple[bool, int, bool]] = field(default_factory=dict)
 
     def update(self, parsed: _ParsedDeclarations, order: int) -> None:
-        """按 importance 和源码顺序更新同 selector 的逐属性级联结果。"""
+        """Update the attribute-by-attribute cascade results of the same selector in order of importance and source code."""
         for name, (important, value) in parsed.text.items():
             current = self.declarations.get(name)
             if current is None or (important, order) >= current[:2]:
@@ -127,14 +127,14 @@ class _SelectorCascade:
 
 @dataclass(frozen=True, slots=True)
 class _ParsedDeclarations:
-    """保存已投影 CSS 属性的 importance 与布尔值。"""
+    """Saves the importance and Boolean value of the projected CSS attribute."""
 
     text: dict[str, tuple[bool, bool]]
     visibility: dict[str, tuple[bool, bool]]
 
 
 def _numeric_font_weight(value: str) -> int | None:
-    """在整数转换前解析 CSS Fonts 允许的一到一千字重。"""
+    """Parse CSS before integer conversion Fonts Allowed word weight from one to one thousand."""
     if not value.isascii() or not value.isdigit() or len(value) > 4:
         return None
     weight = int(value)
@@ -142,7 +142,7 @@ def _numeric_font_weight(value: str) -> int | None:
 
 
 def _parse_declarations(value: str) -> _ParsedDeclarations:
-    """从声明串逐属性提取字体语义、隐藏状态和 important 优先级。"""
+    """Extract font semantics, hidden state, and important priority from declaration string properties."""
     text: dict[str, tuple[bool, bool]] = {}
     visibility: dict[str, tuple[bool, bool]] = {}
     for raw_declaration in value.split(";"):
@@ -201,17 +201,17 @@ def _parse_declarations(value: str) -> _ParsedDeclarations:
 
 
 class MarkupStylesheet:
-    """保存按文档顺序解析的简单 tag/class CSS 规则。"""
+    """Saves a simple tag/class CSS rule that parses in document order."""
 
     def __init__(self) -> None:
-        """初始化按 tag、class 与 tag.class 分桶的 selector 索引。"""
+        """Initialize the selector index bucketed by tag, class, and tag.class."""
         self._tag_cascades: dict[str, _SelectorCascade] = {}
         self._class_cascades: dict[str, _SelectorCascade] = {}
         self._tag_class_cascades: dict[tuple[str, str], _SelectorCascade] = {}
         self._source_order = 0
 
     def _selector_cascade(self, tag: str | None, class_name: str | None, priority: int) -> _SelectorCascade:
-        """返回指定简单 selector 的聚合级联槽。"""
+        """Returns the aggregate cascade slot for the specified simple selector."""
         if class_name is None:
             assert tag is not None
             return self._tag_cascades.setdefault(tag, _SelectorCascade(priority))
@@ -220,7 +220,7 @@ class MarkupStylesheet:
         return self._tag_class_cascades.setdefault((tag, class_name), _SelectorCascade(priority))
 
     def add(self, css: str) -> None:
-        """追加一个 stylesheet 中受支持的简单 selector 规则。"""
+        """Appends a simple selector rule supported in stylesheet."""
         normalized_css = _CSS_COMMENT_RE.sub("", css)
         for chunk in normalized_css.split("}"):
             if "{" not in chunk:
@@ -240,7 +240,7 @@ class MarkupStylesheet:
 
     @staticmethod
     def _parse_selector(selector: str) -> tuple[str | None, str | None, int] | None:
-        """只接受 tag、.class 和 tag.class，拒绝组合器及伪类。"""
+        """Only tag, .class and tag.class are accepted, combinators and pseudo-classes are rejected."""
         normalized = selector.strip()
         if not normalized or any(token in normalized for token in (" ", ">", "+", "~", ":", "[", "#")):
             return None
@@ -258,7 +258,7 @@ class MarkupStylesheet:
         inherited: TextStyle,
         inherited_visibility_hidden: bool = False,
     ) -> ElementStyle:
-        """计算元素的继承样式、标签默认样式、CSS 规则和 inline style。"""
+        """Calculates inherited styles for elements, label default styles, CSS rules, and inline style."""
         tag = local_name(element)
         classes = frozenset((element.get("class") or "").split())
         tag_style = TextStyle(
@@ -317,7 +317,7 @@ class MarkupStylesheet:
 
 __all__ = ["ElementStyle", "MarkupStylesheet", "TextStyle", "TextStyleDelta"]
 
-# 保持既有公开类型的 pickle 路径，所有旧、新入口指向同一个类。
+# Keep the existing public type pickle path, with all old and new entries pointing to the same class.
 preserve_type_module(TextStyle, "docvortex.analyzers.native._shared.markup.styles")
 preserve_type_module(TextStyleDelta, "docvortex.analyzers.native._shared.markup.styles")
 preserve_type_module(ElementStyle, "docvortex.analyzers.native._shared.markup.styles")

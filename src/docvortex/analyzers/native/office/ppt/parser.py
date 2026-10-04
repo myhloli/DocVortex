@@ -1,4 +1,4 @@
-"""PowerPoint 97–2003 二进制文档的分页语义解析器。"""
+"""PowerPoint 97–2003 A paginated semantic parser for binary documents."""
 
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ _OLE_SUBTYPE_EXCEL_CHART = 0x0000_000E
 
 @dataclass(frozen=True, slots=True)
 class _TextContent:
-    """一个 TextHeaderAtom 对应的完整段落集合。"""
+    """A complete set of paragraphs corresponding to TextHeaderAtom."""
 
     paragraphs: tuple[PptParagraph, ...]
     text_type: int
@@ -106,7 +106,7 @@ class _TextContent:
 
 @dataclass(frozen=True, slots=True)
 class _PersistLayout:
-    """最新 UserEdit 解析出的文档与 persist 映射。"""
+    """The latest UserEdit parsed document is mapped to persist."""
 
     document: PptRecord
     persist: dict[int, int]
@@ -115,7 +115,7 @@ class _PersistLayout:
 
 @dataclass(frozen=True, slots=True)
 class _EmbeddedOleObject:
-    """一个已按 exObjId 绑定并解压的 PPT OLE 对象。"""
+    """A PPT OLE object that has been bound and unpacked as exObjId."""
 
     subtype: int
     storage: bytes
@@ -123,7 +123,7 @@ class _EmbeddedOleObject:
 
 @dataclass(frozen=True, slots=True)
 class _GroupSpace:
-    """嵌套 OfficeArt group 到幻灯片坐标的线性映射。"""
+    """Nested OfficeArt Linear mapping of group to slide coordinates."""
 
     coord_left: int
     coord_top: int
@@ -137,7 +137,7 @@ class _GroupSpace:
 
 @dataclass(frozen=True, slots=True)
 class _ShapeInfo:
-    """带唯一遍历路径、坐标和 z-order 的 OfficeArt shape。"""
+    """OfficeArt shape with unique traversal path, coordinates and z-order."""
 
     key: tuple[int, ...]
     record: PptRecord
@@ -149,7 +149,7 @@ class _ShapeInfo:
 
 @dataclass(frozen=True, slots=True)
 class _TableGroup:
-    """一个由 fIsTable 标记的 group 及其所有叶子 shape。"""
+    """A group marked by fIsTable and all its leaves shape."""
 
     key: tuple[int, ...]
     group_shape: PptRecord
@@ -163,7 +163,7 @@ _ImagePayload = OfficeImagePayload
 
 @dataclass(frozen=True, slots=True)
 class _NumberingStyle:
-    """一个 pp9rt 槽位的自动编号覆盖。"""
+    """Automatic numbering override for a pp9rt slot."""
 
     enabled: bool | None
     start: int | None
@@ -171,14 +171,14 @@ class _NumberingStyle:
 
 @dataclass(frozen=True, slots=True)
 class _ShapeCollection:
-    """一次遍历得到的叶子 shape 与表格 group。"""
+    """The leaves shape and table group obtained by one traversal."""
 
     shapes: tuple[_ShapeInfo, ...]
     table_groups: tuple[_TableGroup, ...]
 
 
 def _direct_children(record: PptRecord, budget: RecordBudget) -> list[PptRecord]:
-    """返回容器的直接子记录，普通 atom 返回空列表。"""
+    """Returns the direct child records of the container, normal atom returns an empty list."""
 
     if record.version != CONTAINER_VERSION:
         return []
@@ -186,7 +186,7 @@ def _direct_children(record: PptRecord, budget: RecordBudget) -> list[PptRecord]
 
 
 def _find_latest_user_edit_offset(data: bytes, current_user: bytes) -> int | None:
-    """从 Current User stream 读取最新 UserEditAtom 偏移。"""
+    """Read the latest UserEditAtom offset from Current User stream."""
 
     offset = get_u32(current_user, 16)
     return int(offset) if offset else None
@@ -196,7 +196,7 @@ def _merge_persist_directory(
     mapping: dict[int, int],
     payload: bytes,
 ) -> None:
-    """合并一个 PersistDirectoryAtom；调用顺序保证较新记录优先。"""
+    """Merge a PersistDirectoryAtom; the calling order ensures that newer records take precedence."""
 
     cursor = 0
     while cursor < len(payload):
@@ -217,7 +217,7 @@ def _merge_persist_directory(
 
 
 def _latest_document_fallback(data: bytes, budget: RecordBudget) -> PptRecord | None:
-    """在 persist 链损坏时选择最后一个完整 DocumentContainer。"""
+    """Selects the last complete DocumentContainer when the persist chain is broken."""
 
     candidates = [
         record
@@ -232,7 +232,7 @@ def _locate_document(
     current_user: bytes,
     budget: RecordBudget,
 ) -> _PersistLayout:
-    """解析最新 UserEdit 链，失败时回退到顶层 DocumentContainer。"""
+    """Parse the latest UserEdit chain, falling back to the top-level DocumentContainer on failure."""
 
     edit_offset = _find_latest_user_edit_offset(data, current_user)
     persist: dict[int, int] = {}
@@ -277,7 +277,7 @@ def _locate_document(
     document = _latest_document_fallback(data, budget)
     if document is None:
         raise LegacyOfficeMalformedError("PowerPoint DocumentContainer is missing")
-    # 顶层 persist 记录仍可帮助恢复同一保存版本中的 slide。
+    # The top-level persist record can still help recover slide in the same saved version.
     recovered_persist: dict[int, int] = {}
     for record in iter_records(data, budget=budget):
         if record.record_type == RT_PERSIST_DIRECTORY_ATOM:
@@ -289,7 +289,7 @@ def _locate_document(
 
 
 def _slide_entries(document: PptRecord, budget: RecordBudget) -> list[tuple[int, int]]:
-    """按 SlideListWithText 的保存顺序返回 persist 引用与稳定 slide id。"""
+    """Returns persist reference and stable slide id in the order in which SlideListWithText was saved."""
 
     entries: list[tuple[int, int]] = []
     for container in iter_descendants(document, budget=budget):
@@ -307,7 +307,7 @@ def _slide_entries(document: PptRecord, budget: RecordBudget) -> list[tuple[int,
 
 
 def _master_entries(document: PptRecord, budget: RecordBudget) -> list[tuple[int, int]]:
-    """返回 master persist 引用与 master id。"""
+    """Returns master persist references master id."""
 
     entries: list[tuple[int, int]] = []
     for container in iter_descendants(document, budget=budget):
@@ -325,7 +325,7 @@ def _master_entries(document: PptRecord, budget: RecordBudget) -> list[tuple[int
 
 
 def _notes_entries(document: PptRecord, budget: RecordBudget) -> list[int]:
-    """返回 notes list 中的 persist 引用。"""
+    """Returns the persist reference in notes list."""
 
     references: list[int] = []
     for container in iter_descendants(document, budget=budget):
@@ -341,7 +341,7 @@ def _notes_entries(document: PptRecord, budget: RecordBudget) -> list[int]:
 
 
 def _slide_master_id(slide: PptRecord, budget: RecordBudget) -> int | None:
-    """读取 SlideAtom.masterIdRef。"""
+    """Read SlideAtom.masterIdRef."""
 
     for child in iter_descendants(slide, budget=budget):
         if child.record_type == RT_SLIDE_ATOM:
@@ -351,7 +351,7 @@ def _slide_master_id(slide: PptRecord, budget: RecordBudget) -> int | None:
 
 
 def _presentation_size(document: PptRecord, budget: RecordBudget) -> tuple[int, int]:
-    """从 DocumentAtom 读取页面 master units 尺寸。"""
+    """Read page master units dimensions from DocumentAtom."""
 
     for child in iter_descendants(document, budget=budget):
         if child.record_type != RT_DOCUMENT_ATOM or len(child.payload) < 8:
@@ -364,7 +364,7 @@ def _presentation_size(document: PptRecord, budget: RecordBudget) -> tuple[int, 
 
 
 def _decode_text_atom(record: PptRecord) -> str | None:
-    """解码 TextCharsAtom 或 TextBytesAtom。"""
+    """Decode TextCharsAtom or TextBytesAtom."""
 
     if record.record_type == RT_TEXT_CHARS_ATOM:
         return utf16_text(record.payload)
@@ -374,7 +374,7 @@ def _decode_text_atom(record: PptRecord) -> str | None:
 
 
 def _hyperlink_targets(document: PptRecord, budget: RecordBudget) -> dict[int, str]:
-    """建立 ExHyperlinkId 到安全外链目标的映射。"""
+    """Establish the mapping of ExHyperlinkId to the safe external link target."""
 
     result: dict[int, str] = {}
     for container in iter_descendants(document, budget=budget):
@@ -402,7 +402,7 @@ def _interactive_spans(
     hyperlinks: dict[int, str],
     budget: RecordBudget,
 ) -> list[tuple[int, int, str]]:
-    """解析一段文本之后的 InteractiveInfo 与 UTF-16 范围。"""
+    """Parse the InteractiveInfo and UTF-16 ranges after a text."""
 
     flattened: list[PptRecord] = []
     for record in related_records:
@@ -427,13 +427,13 @@ def _interactive_spans(
 
 
 def _utf16_width(text: str) -> int:
-    """返回字符串占用的 UTF-16 code unit 数。"""
+    """Returns the number of UTF-16 code unit occupied by the string."""
 
     return len(text.encode("utf-16-le", "surrogatepass")) // 2
 
 
 def _master_level(levels: list[MasterLevel], depth: int) -> MasterLevel:
-    """按深度取得母版默认值，超界时回退最后一个可用层级。"""
+    """Get the default value of the master according to the depth, and fall back to the last available level when it exceeds the limit."""
 
     if not levels:
         return MasterLevel()
@@ -441,7 +441,7 @@ def _master_level(levels: list[MasterLevel], depth: int) -> MasterLevel:
 
 
 def _paragraph_run_at(runs: list[ParagraphRun], offset: int) -> ParagraphRun:
-    """返回覆盖指定 UTF-16 偏移的段落 run。"""
+    """Returns the paragraph run covering the specified UTF-16 offset."""
 
     cursor = 0
     for run in runs:
@@ -452,7 +452,7 @@ def _paragraph_run_at(runs: list[ParagraphRun], offset: int) -> ParagraphRun:
 
 
 def _character_run_at(runs: list[CharacterRun], offset: int) -> CharacterRun:
-    """返回覆盖指定 UTF-16 偏移的字符 run。"""
+    """Returns the character run covering the specified UTF-16 offset."""
 
     cursor = 0
     for run in runs:
@@ -463,7 +463,7 @@ def _character_run_at(runs: list[CharacterRun], offset: int) -> CharacterRun:
 
 
 def _hyperlink_at(spans: list[tuple[int, int, str]], offset: int) -> str | None:
-    """返回覆盖当前 UTF-16 偏移的超链接目标。"""
+    """Returns the hyperlink target covering the current UTF-16 offset."""
 
     return next((target for start, end, target in spans if start <= offset < end), None)
 
@@ -474,7 +474,7 @@ def _resolve_run(
     master: MasterLevel,
     hyperlink: str | None,
 ) -> PptTextRun:
-    """把字符异常属性覆盖到母版默认值上。"""
+    """Override character exception properties to master defaults."""
 
     return PptTextRun(
         text=text,
@@ -492,7 +492,7 @@ def _flush_text_run(
     text: str,
     style: PptTextRun | None,
 ) -> None:
-    """追加非空文本，并合并相邻同样式 run。"""
+    """Append non-empty text and merge adjacent styles run."""
 
     if not text or style is None:
         return
@@ -509,7 +509,7 @@ def _build_paragraphs(
     master_levels: list[MasterLevel],
     hyperlinks: list[tuple[int, int, str]],
 ) -> tuple[PptParagraph, ...]:
-    """把 UTF-16 属性范围转换为带样式 run 的段落。"""
+    """Converts the UTF-16 attribute range to a paragraph with style run."""
 
     paragraphs: list[PptParagraph] = []
     current_runs: list[PptTextRun] = []
@@ -519,14 +519,14 @@ def _build_paragraphs(
     paragraph_start = 0
 
     def flush_run() -> None:
-        """把当前相同样式字符提交到段落。"""
+        """Submits characters of the same current style to the paragraph."""
 
         nonlocal run_text
         _flush_text_run(current_runs, "".join(run_text), active_style)
         run_text = []
 
     def flush_paragraph() -> None:
-        """完成当前段落并解析列表属性。"""
+        """Completes the current paragraph and resolves list properties."""
 
         flush_run()
         paragraph_style = _paragraph_run_at(styles.paragraphs, paragraph_start)
@@ -574,7 +574,7 @@ def _parse_text_contents(
     hyperlinks: dict[int, str],
     budget: RecordBudget,
 ) -> list[_TextContent]:
-    """从一组相邻记录中解析所有文本形状内容。"""
+    """Parse all text shape content from a set of adjacent records."""
 
     result: list[_TextContent] = []
     text_type = 4
@@ -615,7 +615,7 @@ def _external_text_records(
     document: PptRecord,
     budget: RecordBudget,
 ) -> dict[int, list[PptRecord]]:
-    """按 slide persist 引用收集 SlideListWithText 中的外置文本记录。"""
+    """Collect external text records in SlideListWithText by slide persist reference."""
 
     grouped: dict[int, list[PptRecord]] = {}
     for container in iter_descendants(document, budget=budget):
@@ -636,7 +636,7 @@ def _external_text_records(
 
 
 def _master_styles(record: PptRecord, budget: RecordBudget) -> dict[int, list[MasterLevel]]:
-    """解析一个 master container 的逐文本类型默认样式。"""
+    """Parse a master container per text type default style."""
 
     result: dict[int, list[MasterLevel]] = {}
     for child in iter_descendants(record, budget=budget):
@@ -654,7 +654,7 @@ def _collect_masters(
     data: bytes,
     budget: RecordBudget,
 ) -> tuple[dict[int, tuple[PptRecord, dict[int, list[MasterLevel]]]], tuple[PptRecord, dict[int, list[MasterLevel]]] | None]:
-    """按 master id 建立容器与样式映射，并返回确定性 fallback。"""
+    """Press master id to establish container and style mapping and return deterministic fallback."""
 
     masters: dict[int, tuple[PptRecord, dict[int, list[MasterLevel]]]] = {}
     for reference, master_id in _master_entries(layout.document, budget):
@@ -676,7 +676,7 @@ def _collect_masters(
 
 
 def _fopt_properties(record: PptRecord) -> dict[int, int]:
-    """读取 OfficeArt FOPT 的简单属性，重复属性以后者覆盖。"""
+    """Read the simple attributes of OfficeArt and FOPT. Repeated attributes are overwritten by the latter."""
 
     count = int(record.instance)
     properties: dict[int, int] = {}
@@ -690,7 +690,7 @@ def _fopt_properties(record: PptRecord) -> dict[int, int]:
 
 
 def _fopt_complex_properties(record: PptRecord) -> dict[int, bytes]:
-    """读取 OfficeArt FOPT 中紧随属性数组的复杂载荷。"""
+    """Read the complex payload following the attribute array in OfficeArt FOPT."""
 
     count = int(record.instance)
     cursor = count * 6
@@ -714,7 +714,7 @@ def _fopt_complex_properties(record: PptRecord) -> dict[int, bytes]:
 
 
 def _shape_properties(shape: PptRecord, budget: RecordBudget) -> dict[int, int]:
-    """合并 shape 的 primary 与 tertiary FOPT 属性。"""
+    """Merges the primary and tertiary FOPT properties of shape."""
 
     properties: dict[int, int] = {}
     for child in _direct_children(shape, budget):
@@ -724,7 +724,7 @@ def _shape_properties(shape: PptRecord, budget: RecordBudget) -> dict[int, int]:
 
 
 def _shape_external_object_id(shape: PptRecord, budget: RecordBudget) -> int | None:
-    """从 OfficeArtClientData 读取 ExObjRefAtom 的外部对象 id。"""
+    """Reads external object id of ExObjRefAtom from OfficeArtClientData."""
 
     for child in _direct_children(shape, budget):
         if child.record_type != RT_OFFICEART_CLIENT_DATA:
@@ -746,7 +746,7 @@ def _embedded_object_references(
     document: PptRecord,
     budget: RecordBudget,
 ) -> dict[int, tuple[int, int]]:
-    """收集支持的嵌入 OLE subtype、exObjId 与 persistIdRef。"""
+    """Collection of supported embeddings OLE subtype, exObjId and persistIdRef."""
 
     references: dict[int, tuple[int, int]] = {}
     for atom in iter_descendants(document, budget=budget):
@@ -775,7 +775,7 @@ def _embedded_object_references(
 
 
 def _decompress_ole_storage(record: PptRecord) -> bytes | None:
-    """按 ExOleObjStg instance 有界恢复独立 CFB 字节。"""
+    """Bounded recovery by ExOleObjStg instance independent CFB bytes."""
 
     if record.record_type != RT_EXTERNAL_OLE_OBJECT_STG:
         return None
@@ -830,7 +830,7 @@ def _embedded_object_map(
     data: bytes,
     budget: RecordBudget,
 ) -> dict[int, _EmbeddedOleObject]:
-    """统一解压受支持的 PPT persist OLE storages 并共享资源预算。"""
+    """Unified decompression of supported PPT persist OLE storages and shared resource budget."""
 
     objects: dict[int, _EmbeddedOleObject] = {}
     asset_total = 0
@@ -862,7 +862,7 @@ def _embedded_object_map(
 
 
 def _equation_map(objects: dict[int, _EmbeddedOleObject]) -> dict[int, str]:
-    """从共享 OLE 对象集合解析 Equation Native。"""
+    """Parse Equation Native from shared OLE object collection."""
 
     equations: dict[int, str] = {}
     for object_id, embedded in objects.items():
@@ -880,7 +880,7 @@ def _equation_map(objects: dict[int, _EmbeddedOleObject]) -> dict[int, str]:
 
 
 def _chart_map(objects: dict[int, _EmbeddedOleObject]) -> dict[int, str]:
-    """从共享 OLE 对象集合解析 Excel.Chart 与 MSGraph.Chart 数据表。"""
+    """Parse the Excel.Chart and MSGraph.Chart data tables from the shared OLE object collection."""
 
     charts: dict[int, str] = {}
     for object_id, embedded in objects.items():
@@ -898,7 +898,7 @@ def _chart_map(objects: dict[int, _EmbeddedOleObject]) -> dict[int, str]:
 
 
 def _shape_complex_properties(shape: PptRecord, budget: RecordBudget) -> dict[int, bytes]:
-    """合并 shape 的复杂 FOPT 属性。"""
+    """Merge the complex FOPT properties of shape."""
 
     properties: dict[int, bytes] = {}
     for child in _direct_children(shape, budget):
@@ -908,7 +908,7 @@ def _shape_complex_properties(shape: PptRecord, budget: RecordBudget) -> dict[in
 
 
 def _shape_type(shape: PptRecord, budget: RecordBudget) -> int | None:
-    """返回 OfficeArtFSP header 中的 MSOSPT 类型。"""
+    """Returns the MSOSPT type in OfficeArtFSP header."""
 
     for child in _direct_children(shape, budget):
         if child.record_type == RT_OFFICEART_FSP:
@@ -917,7 +917,7 @@ def _shape_type(shape: PptRecord, budget: RecordBudget) -> int | None:
 
 
 def _is_background_shape(shape: PptRecord, budget: RecordBudget) -> bool:
-    """判断 FSP 标志是否把 shape 标记为背景。"""
+    """Determines whether the FSP flag marks shape as background."""
 
     for child in _direct_children(shape, budget):
         if child.record_type != RT_OFFICEART_FSP or len(child.payload) < 8:
@@ -927,7 +927,7 @@ def _is_background_shape(shape: PptRecord, budget: RecordBudget) -> bool:
 
 
 def _is_placeholder(shape: PptRecord, budget: RecordBudget) -> bool:
-    """判断 shape 的 ClientData 是否包含 OEPlaceholderAtom。"""
+    """Determine whether ClientData of shape contains OEPlaceholderAtom."""
 
     for child in _direct_children(shape, budget):
         if child.record_type != RT_OFFICEART_CLIENT_DATA:
@@ -942,7 +942,7 @@ def _is_placeholder(shape: PptRecord, budget: RecordBudget) -> bool:
 
 
 def _client_rect(payload: bytes) -> tuple[float, float, float, float] | None:
-    """把 OfficeArtClientAnchor 转成 left/top/right/bottom。"""
+    """Convert OfficeArtClientAnchor to left/top/right/bottom."""
 
     if len(payload) < 8:
         return None
@@ -951,7 +951,7 @@ def _client_rect(payload: bytes) -> tuple[float, float, float, float] | None:
 
 
 def _child_rect(payload: bytes) -> tuple[float, float, float, float] | None:
-    """把 OfficeArtChildAnchor 转成 left/top/right/bottom。"""
+    """Convert OfficeArtChildAnchor to left/top/right/bottom."""
 
     if len(payload) < 16:
         return None
@@ -963,7 +963,7 @@ def _map_group_rect(
     rect: tuple[float, float, float, float],
     space: _GroupSpace,
 ) -> tuple[float, float, float, float]:
-    """把 group 子坐标线性映射到幻灯片坐标。"""
+    """Linearly map group subcoordinates to slide coordinates."""
 
     coord_width = max(1.0, float(space.coord_right - space.coord_left))
     coord_height = max(1.0, float(space.coord_bottom - space.coord_top))
@@ -983,7 +983,7 @@ def _shape_bbox(
     space: _GroupSpace | None,
     budget: RecordBudget,
 ) -> tuple[float, float, float, float] | None:
-    """解析 shape anchor，并应用父 group 坐标映射。"""
+    """Resolve shape anchor and apply parent group coordinate mapping."""
 
     children = _direct_children(shape, budget)
     for child in children:
@@ -1010,7 +1010,7 @@ def _group_space(
     parent: _GroupSpace | None,
     budget: RecordBudget,
 ) -> _GroupSpace | None:
-    """解析 group 自身坐标系与它在父坐标系中的外框。"""
+    """Parse group's own coordinate system and its outer frame in the parent coordinate system."""
 
     children = _direct_children(group_shape, budget)
     fspgr = next(
@@ -1047,13 +1047,13 @@ def _group_space(
 
 
 def _is_table_group(group_shape: PptRecord, budget: RecordBudget) -> bool:
-    """读取 tableProperties.fIsTable 标志。"""
+    """Read tableProperties.fIsTable flag."""
 
     return bool(_shape_properties(group_shape, budget).get(FOPT_TABLE_PROPERTIES, 0) & 0x1)
 
 
 def _collect_shapes(slide: PptRecord, budget: RecordBudget) -> _ShapeCollection:
-    """单次遍历收集叶子 shape，并保留 table group 的成员边界。"""
+    """A single pass collects the leaves shape and preserves the member boundaries of table and group."""
 
     shapes: list[_ShapeInfo] = []
     groups: dict[tuple[int, ...], tuple[PptRecord, list[_ShapeInfo], int, bool]] = {}
@@ -1065,7 +1065,7 @@ def _collect_shapes(slide: PptRecord, budget: RecordBudget) -> _ShapeCollection:
         path: tuple[int, ...],
         active_table: tuple[int, ...] | None,
     ) -> None:
-        """递归遍历 OfficeArt 容器并传播 group 空间与 table 身份。"""
+        """Recursively traverse the OfficeArt container and propagate group spaces with table identities."""
 
         nonlocal order
         if record.record_type == RT_OFFICEART_SPGR_CONTAINER and record.version == CONTAINER_VERSION:
@@ -1123,7 +1123,7 @@ def _shape_text_content(
     hyperlinks: dict[int, str],
     budget: RecordBudget,
 ) -> _TextContent | None:
-    """解析 shape 的 ClientTextbox，必要时回退到 OutlineTextRefAtom。"""
+    """Parse ClientTextbox for shape, falling back to OutlineTextRefAtom if necessary."""
 
     textbox = next(
         (child for child in _direct_children(shape.record, budget) if child.record_type == RT_OFFICEART_CLIENT_TEXTBOX),
@@ -1149,7 +1149,7 @@ def _shape_text_content(
 
 
 def _skip_style_text9_cf(payload: bytes, position: int) -> int | None:
-    """跳过 TextCFException9；未知扩展位时停止该 atom 的解析。"""
+    """Skip TextCFException9; stop parsing atom when the extension bit is unknown."""
 
     mask = get_u32(payload, position)
     if mask is None:
@@ -1157,12 +1157,12 @@ def _skip_style_text9_cf(payload: bytes, position: int) -> int | None:
     position += 4
     if mask == 0:
         return position
-    # 当前只需要自动编号，复杂 CF9 不影响已解析文本样式，安全终止后续槽位。
+    # Currently only automatic numbering is required, complex CF9 does not affect the parsed text style, and subsequent slots are safely terminated.
     return None
 
 
 def _skip_style_text9_si(payload: bytes, position: int) -> int | None:
-    """跳过 TextSIException 中固定长度的语言与拼写字段。"""
+    """Skip fixed-length language and spelling fields in TextSIException."""
 
     mask = get_u32(payload, position)
     if mask is None:
@@ -1177,7 +1177,7 @@ def _skip_style_text9_si(payload: bytes, position: int) -> int | None:
 
 
 def _parse_style_text9_numbering(payload: bytes) -> dict[int, _NumberingStyle]:
-    """解析 StyleTextProp9 数组中与自动编号有关的三个字段。"""
+    """Parse the three fields related to automatic numbering in the StyleTextProp9 array."""
 
     result: dict[int, _NumberingStyle] = {}
     position = 0
@@ -1219,7 +1219,7 @@ def _shape_numbering_styles(
     shape: PptRecord,
     budget: RecordBudget,
 ) -> dict[int, _NumberingStyle]:
-    """从 PP9ShapeBinaryTagExtension 取出 StyleTextProp9 自动编号。"""
+    """Take the StyleTextProp9 automatic number from PP9ShapeBinaryTagExtension."""
 
     for tag in iter_descendants(shape, budget=budget):
         if tag.record_type != 0x138A or tag.version != CONTAINER_VERSION:
@@ -1243,7 +1243,7 @@ def _apply_shape_numbering(
     shape: PptRecord,
     budget: RecordBudget,
 ) -> _TextContent:
-    """按 paragraph 起始字符的 pp9rt 槽位覆盖列表类型和起始编号。"""
+    """Overrides list type and starting number by pp9rt slot with paragraph starting character."""
 
     numbering = _shape_numbering_styles(shape, budget)
     if not numbering:
@@ -1265,7 +1265,7 @@ def _apply_shape_numbering(
 
 
 def _cluster_coordinates(values: list[float], tolerance: float = 8.0) -> list[float]:
-    """把生产器舍入误差导致的近邻坐标合并为稳定边界。"""
+    """Merge nearest neighbor coordinates caused by producer rounding errors into stable boundaries."""
 
     if not values:
         return []
@@ -1279,7 +1279,7 @@ def _cluster_coordinates(values: list[float], tolerance: float = 8.0) -> list[fl
 
 
 def _boundary_index(boundaries: list[float], value: float, tolerance: float = 16.0) -> int | None:
-    """返回与坐标最近的边界索引，偏差过大时拒绝映射。"""
+    """Returns the closest boundary index to the coordinates, and rejects mapping if the deviation is too large."""
 
     if not boundaries:
         return None
@@ -1294,7 +1294,7 @@ def _table_from_group(
     hyperlinks: dict[int, str],
     budget: RecordBudget,
 ) -> PptTableElement | None:
-    """从 fIsTable group 的矩形单元格恢复含合并信息的完整网格。"""
+    """Recover full grid with merge information from rectangular cells of fIsTable group."""
 
     cell_shapes: list[tuple[_ShapeInfo, _TextContent | None]] = []
     x_values: list[float] = []
@@ -1304,7 +1304,7 @@ def _table_from_group(
         left, top, right, bottom = shape.bbox
         width = right - left
         height = bottom - top
-        # 线条只贡献边界，不成为单元格。
+        # Lines only contribute boundaries and do not become cells.
         if shape_type in {20, 32, 33, 34, 35, 36, 37, 38, 39, 40} or width <= 2 or height <= 2:
             if width <= 2:
                 x_values.extend((left, right))
@@ -1379,7 +1379,7 @@ def _table_from_group(
 
 
 def _decode_blip(record: PptRecord) -> _ImagePayload | None:
-    """通过 legacy-office 共享层解码一个 OfficeArt BLIP。"""
+    """Decoding a OfficeArt BLIP through the legacy-office shared layer."""
 
     return decode_officeart_blip(
         OfficeArtRecord(
@@ -1393,7 +1393,7 @@ def _decode_blip(record: PptRecord) -> _ImagePayload | None:
 
 
 def _decode_bse_body(body: bytes, budget: RecordBudget) -> _ImagePayload | None:
-    """从 FBSE body 的可选内嵌 BLIP 中提取图片。"""
+    """Extract images from optional inline BLIP of FBSE body."""
 
     if len(body) < 36:
         return None
@@ -1408,7 +1408,7 @@ def _picture_map(
     pictures: bytes,
     budget: RecordBudget,
 ) -> dict[int, _ImagePayload]:
-    """按 BStore 中 1-based BSE 序号建立图片资源映射。"""
+    """Create picture resource mapping according to the serial number 1-based BSE in BStore."""
 
     result: dict[int, _ImagePayload] = {}
     asset_total = 0
@@ -1442,7 +1442,7 @@ def _image_from_shape(
     equation_decoder: OfficeImageEquationDecoder,
     budget: RecordBudget,
 ) -> PptImageElement | PptEquationElement | None:
-    """把 shape 的 pib 属性解析为图片或 comment 内公式。"""
+    """Parse the pib attribute of shape into a picture or a formula within comment."""
 
     reference = _shape_properties(shape.record, budget).get(FOPT_PIB)
     if reference is None:
@@ -1485,7 +1485,7 @@ def _is_small_picture(
     slide_width: int,
     slide_height: int,
 ) -> bool:
-    """复用现代 PPTX 的尺寸阈值过滤装饰性小图。"""
+    """Reuse the modern PPTX's size threshold filter for decorative small images."""
 
     width = bbox[2] - bbox[0]
     height = bbox[3] - bbox[1]
@@ -1509,7 +1509,7 @@ def _slide_elements(
     slide_height: int,
     budget: RecordBudget,
 ) -> list[PptTextElement | PptImageElement | PptEquationElement | PptChartElement | PptTableElement]:
-    """把一张 slide 的 shapes 转换为文本、表格、chart 和图片元素。"""
+    """Convert a shapes of slide into text, table, chart and picture elements."""
 
     collection = _collect_shapes(slide, budget)
     tables: list[PptTableElement] = []
@@ -1602,7 +1602,7 @@ def _slide_elements(
         ):
             elements.append(image_or_equation)
     if not any(isinstance(element, PptTextElement) for element in elements):
-        # Handmade、早期生产器或恢复路径可能把文本直接放在 SlideContainer 中。
+        # Handmade, earlier producers, or recovery paths may place text directly in SlideContainer.
         raw_contents = _parse_text_contents(
             list(iter_descendants(slide, budget=budget)),
             master_styles,
@@ -1630,7 +1630,7 @@ def _slide_elements(
 
 
 def _slide_hidden(slide: PptRecord, budget: RecordBudget) -> bool:
-    """读取 SlideShowSlideInfoAtom 的隐藏标志。"""
+    """Read the hidden flag of SlideShowSlideInfoAtom."""
 
     for child in iter_descendants(slide, budget=budget):
         if child.record_type != RT_SLIDE_SHOW_SLIDE_INFO_ATOM or len(child.payload) < 12:
@@ -1641,7 +1641,7 @@ def _slide_hidden(slide: PptRecord, budget: RecordBudget) -> bool:
 
 
 def _plain_paragraph_text(paragraph: PptParagraph) -> str:
-    """返回一个内部段落的纯文本。"""
+    """Returns the plain text of an inner paragraph."""
 
     return "".join(run.text for run in paragraph.runs)
 
@@ -1652,7 +1652,7 @@ def _note_paragraphs(
     hyperlinks: dict[int, str],
     budget: RecordBudget,
 ) -> list[PptParagraph]:
-    """提取 notes container 中的正文，排除占位符字段。"""
+    """Extract the text in notes container, excluding placeholder fields."""
 
     paragraphs: list[PptParagraph] = []
     collection = _collect_shapes(note_record, budget)
@@ -1667,7 +1667,7 @@ def _note_paragraphs(
     if paragraphs:
         return paragraphs
 
-    # 少数生产器不把 notes 文本包在 OfficeArtClientTextbox 中。
+    # A few producers do not wrap the notes text in OfficeArtClientTextbox.
     all_records = list(iter_descendants(note_record, budget=budget))
     for content in _parse_text_contents(all_records, master_styles, hyperlinks, budget):
         for paragraph in content.paragraphs:
@@ -1684,7 +1684,7 @@ def _notes_by_slide_id(
     hyperlinks: dict[int, str],
     budget: RecordBudget,
 ) -> tuple[dict[int, list[PptParagraph]], list[list[PptParagraph]]]:
-    """按 NotesAtom.slideIdRef 绑定备注，并保留无主备注的顺序。"""
+    """Bind notes by NotesAtom.slideIdRef and preserve the order of unowned notes."""
 
     bound: dict[int, list[PptParagraph]] = {}
     unbound: list[list[PptParagraph]] = []
@@ -1716,7 +1716,7 @@ def _notes_by_slide_id(
 
 
 def _root_slide_records(data: bytes, budget: RecordBudget) -> list[PptRecord]:
-    """恢复 persist 不可用时直接位于文档 stream 顶层的 slide records。"""
+    """Recover slide records located directly on top of document stream when persist is unavailable."""
 
     return [
         record
@@ -1731,7 +1731,7 @@ def _fallback_slide_from_text(
     hyperlinks: dict[int, str],
     budget: RecordBudget,
 ) -> PptSlide | None:
-    """没有可靠 slide 边界时，把可恢复文本放入单个逻辑页。"""
+    """Put recoverable text into a single logical page when there is no reliable slide boundary."""
 
     contents = _parse_text_contents(
         list(iter_records(data, budget=budget)),
@@ -1761,7 +1761,7 @@ def parse_ppt_document(
     current_user: bytes = b"",
     pictures: bytes = b"",
 ) -> PptPresentation:
-    """把三个核心 PPT streams 解析为分页内部语义模型。"""
+    """Parse the three cores PPT streams into paginated internal semantic models."""
 
     if current_user:
         record_type = get_u16(current_user, 2)
@@ -1771,7 +1771,7 @@ def parse_ppt_document(
             raise LegacyOfficeEncryptedError("password-protected PPT is unsupported")
 
     budget = RecordBudget()
-    # 先完整验证可递归记录深度，避免无 Document 的攻击形状被误报为普通坏文件。
+    # First, completely verify the recursive record depth to avoid attack shapes without Document being mistakenly reported as ordinary bad files.
     for root_record in iter_records(
         powerpoint_document,
         budget=budget,

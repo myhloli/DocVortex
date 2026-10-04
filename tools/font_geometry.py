@@ -1,4 +1,4 @@
-"""记录实际 PDF 字体字节和未规范化的字符几何，供独立进程及三平台差分使用。"""
+"""Records actual PDF font bytes and unnormalized character geometry for standalone process and three-platform differential use."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from docvortex.document.pdf.pdfium import pdfium_guard
 
 
 def capture_geometry(source: Path, *, system_fonts: bool = False) -> dict[str, Any]:
-    """在关闭句柄前物化全部字符；系统模式仅用于独立进程保存替换前参考值。"""
+    """Materializes all characters before closing the handle; system mode is only used by independent processes to save the pre-replacement reference value."""
     fonts: dict[str, Any] = {}
     pages = []
     with nullcontext() if system_fonts else pdfium_guard():
@@ -53,7 +53,7 @@ def capture_geometry(source: Path, *, system_fonts: bool = False) -> dict[str, A
                         tight = [ctypes.c_double() for _ in range(4)]
                         loose = raw.FS_RECTF()
                         origin = [ctypes.c_double(), ctypes.c_double()]
-                        # 坐标按 PDF 原始坐标保存，不经过页面旋转或 Flash 几何修复。
+                        # Coordinates are saved as original PDF coordinates without page rotation or Flash geometry repair.
                         chars.append(
                             {
                                 "index": index,
@@ -76,7 +76,7 @@ def capture_geometry(source: Path, *, system_fonts: bool = False) -> dict[str, A
 
 
 def main() -> None:
-    """在全新解释器中按指定策略记录原始值，不在已使用的 PDFium 上切换提供器。"""
+    """Logging original values in a new interpreter with the specified policy, without switching providers on PDFium that is already in use."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)

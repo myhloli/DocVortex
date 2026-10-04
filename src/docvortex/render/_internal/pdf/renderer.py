@@ -1,4 +1,4 @@
-"""严格 MiddleJson 到 ReportLab PDF bytes 的公共渲染实现。"""
+"""Strictly public rendering implementation of MiddleJson to ReportLab PDF bytes."""
 
 from __future__ import annotations
 
@@ -110,10 +110,10 @@ _PLACEHOLDER_HEIGHT = 18 * mm
 
 
 class _PdfCanvas(Canvas):
-    """提供确定性 metadata 与行内 ZiaMath 矢量绘制的 ReportLab Canvas。"""
+    """Provides deterministic metadata with inline ZiaMath vector drawing of ReportLab and Canvas."""
 
     def __init__(self, filename: Any, *args: Any, document_title: str, **kwargs: Any) -> None:
-        """创建启用压缩和 invariant 的 PDF canvas，并写入稳定 metadata。"""
+        """Create PDF with compression enabled and invariant canvas, and write stable metadata."""
         kwargs.setdefault("pageCompression", 1)
         kwargs["invariant"] = 1
         super().__init__(filename, *args, **kwargs)
@@ -136,7 +136,7 @@ class _PdfCanvas(Canvas):
         anchorAtXY: bool = False,
         showBoundary: bool = False,
     ) -> Any:
-        """识别 Paragraph 传入的公式代理，否则沿用标准 raster 图片行为。"""
+        """Recognizes Paragraph incoming formula proxies, otherwise follows standard raster picture behavior."""
         if isinstance(image, InlineFormulaImage):
             resolved_width = image.vector.width if width is None else float(width)
             resolved_height = image.vector.height if height is None else float(height)
@@ -156,7 +156,7 @@ class _PdfCanvas(Canvas):
 
 
 class _PdfRenderer:
-    """维护一次 MiddleJson 到 PDF 渲染所需的样式、公式与素材状态。"""
+    """Maintain the styles, formulas and material status required for rendering MiddleJson to PDF once."""
 
     def __init__(
         self,
@@ -165,7 +165,7 @@ class _PdfRenderer:
         asset_resolver: AssetResolver | None,
         document_title: str | None,
     ) -> None:
-        """保存严格输入，并预注册标题及页面脚注 anchor。"""
+        """Save strict typing and pre-register title and page footer anchor."""
         self.middle_json = middle_json
         self.asset_resolver = asset_resolver
         self.document_title = _resolve_document_title(middle_json, document_title)
@@ -180,7 +180,7 @@ class _PdfRenderer:
         )
 
     def render(self) -> bytes:
-        """构造逐页 story，并将确定性 ReportLab 文档序列化为 bytes。"""
+        """Constructs a page-by-page story and serializes the deterministic ReportLab document into a bytes."""
         story: list[Flowable] = []
         measure_canvas = Canvas(BytesIO())
         pagination_options = {
@@ -197,7 +197,7 @@ class _PdfRenderer:
                     continue
                 rendered = self._render_planned_block(planned)
                 if isinstance(planned.block, (ImageBlock, TableBlock, ChartBlock)):
-                    # 标题计入图表的首段预算，避免满页图片或长表把标题单独留在前页。
+                    # The title is included in the budget of the first paragraph of the chart. Avoid leaving the title alone on the front page with a full page of pictures or a long table.
                     while story and isinstance(story[-1], Paragraph) and story[-1].getKeepWithNext():
                         rendered.insert(0, story.pop())
                 if isinstance(planned.block, (TextBlock, RefTextBlock, ListBlock)):
@@ -212,7 +212,7 @@ class _PdfRenderer:
                 story.extend(rendered)
         if not story:
             story.append(Spacer(1, 1))
-        # 重排 story 已经完整物化，分页只需要实际 Flowable，无需继续保留 HTML 解析缓存。
+        # Rearrangement story has been completely materialized, and paging only requires the actual Flowable, and there is no need to continue to retain the HTML parsing cache.
         self._table_contents.clear()
 
         output = BytesIO()
@@ -256,7 +256,7 @@ class _PdfRenderer:
         return output.getvalue()
 
     def _render_planned_block(self, planned: PlannedBlock) -> list[Flowable]:
-        """按严格 PageBlock 具体类型分派 PDF Flowable visitor。"""
+        """Dispatched by the exact PageBlock specific type PDF Flowable visitor."""
         block = planned.block
         if isinstance(block, (TextBlock, RefTextBlock)):
             spans = join_inline_spans(planned.text_contents or [block.content])
@@ -309,7 +309,7 @@ class _PdfRenderer:
         preserve_newlines: bool = False,
         max_width: float | None = None,
     ) -> Paragraph:
-        """为当前 block 构造带定位、anchor 与矢量公式的 Paragraph。"""
+        """Constructs a Paragraph with positioning, anchor and vector formulas for the current block."""
         return build_pdf_paragraph(
             spans,
             style,
@@ -323,7 +323,7 @@ class _PdfRenderer:
         )
 
     def _render_equation(self, block: EquationBlock, page_idx: int) -> list[Flowable]:
-        """优先输出 ZiaMath display 矢量，失败后使用图片、LaTeX 或占位。"""
+        """Priority is given to outputting the ZiaMath display vector. After failure, use pictures, LaTeX or placeholders."""
         content = block.content.strip()
         if content:
             formula, tag = split_formula_tag(content)
@@ -332,7 +332,7 @@ class _PdfRenderer:
                 vector = self.inline_context.formulas.render(formula or content, inline=False, font_size=font_size)
                 tag_vector = None
                 if tag:
-                    # 普通编号采用正体；编号中的显式数学命令仍由原 LaTeX 处理。
+                    # Ordinary numbering uses traditional Chinese font; explicit mathematical commands in numbering are still processed by the original LaTeX.
                     tag_latex = rf"\mathrm{{({tag})}}" if re.fullmatch(r"[\w .,:+\-/]+", tag) else f"({tag})"
                     tag_vector = self.inline_context.formulas.render(tag_latex, inline=True, font_size=font_size)
                 flowable = DisplayFormulaFlowable(
@@ -360,7 +360,7 @@ class _PdfRenderer:
         return [self._placeholder("formula unavailable", block=block, page_idx=page_idx)]
 
     def _render_list(self, block: ListBlock, page_idx: int, *, depth: int) -> list[Flowable]:
-        """保留 producer marker，以缩进和悬挂缩进表达递归列表。"""
+        """Reserved producer marker expresses recursive lists with indentation and hanging indentation."""
         rendered: list[Flowable] = []
         add_reference_bullets = reference_list_needs_bullets(block)
         for child in block.content:
@@ -383,7 +383,7 @@ class _PdfRenderer:
         return rendered
 
     def _render_index(self, block: IndexBlock, page_idx: int, *, depth: int) -> list[Flowable]:
-        """递归输出目录叶子，并把已注册标题 anchor 写成内部链接。"""
+        """Recursively output directory leaves and write the registered title anchor as an internal link."""
         rendered: list[Flowable] = []
         for child in block.content:
             if isinstance(child, IndexBlock):
@@ -410,7 +410,7 @@ class _PdfRenderer:
         return rendered
 
     def _render_image_block(self, block: ImageBlock, page_idx: int) -> list[Flowable]:
-        """按原始子块顺序输出图片主体、宽松占位与说明。"""
+        """Output the main body of the image, loose placeholder, and description in original sub-block order."""
         rendered: list[Flowable] = []
         for child in block.content:
             if isinstance(child, ImageBodyBlock):
@@ -433,7 +433,7 @@ class _PdfRenderer:
         return rendered
 
     def _render_table_block(self, block: TableBlock, page_idx: int) -> list[Flowable]:
-        """优先输出原生 HTML table，再回退空间文本、图片或占位。"""
+        """Prioritize the output of native HTML table, and then fall back to space text, pictures or placeholders."""
         rendered: list[Flowable] = []
         for child in block.content:
             if isinstance(child, TableBodyBlock):
@@ -465,7 +465,7 @@ class _PdfRenderer:
         return rendered
 
     def _render_chart_block(self, block: ChartBlock, page_idx: int) -> list[Flowable]:
-        """输出 chart 图片或占位，并继续保留可物化的结构化内容。"""
+        """Outputs a chart image or placeholder and continues to retain materializable structured content."""
         rendered: list[Flowable] = []
         for child in block.content:
             if isinstance(child, ChartBodyBlock):
@@ -504,7 +504,7 @@ class _PdfRenderer:
         return rendered
 
     def _render_code_block(self, block: CodeBlock, page_idx: int) -> list[Flowable]:
-        """使用等宽浅色块输出代码或带矢量公式的算法正文。"""
+        """Use light blocks of equal width to output code or algorithm text with vector formulas."""
         rendered: list[Flowable] = []
         for child in block.content:
             if isinstance(child, CodeBodyBlock):
@@ -542,7 +542,7 @@ class _PdfRenderer:
         block: ImageAnnotationBlock | TableAnnotationBlock | ChartAnnotationBlock | CodeAnnotationBlock,
         page_idx: int,
     ) -> Paragraph:
-        """根据 caption/footnote discriminator 选择弱化说明样式。"""
+        """Select the weakening description style according to caption/footnote discriminator."""
         style = self.styles.caption if str(block.type).endswith("caption") else self.styles.footnote
         return self._paragraph(block.content, style, page_idx, block)
 
@@ -553,7 +553,7 @@ class _PdfRenderer:
         block: BlockBase,
         style: ParagraphStyle,
     ) -> Paragraph:
-        """把需要保留换行和空白的普通字符串写为 Paragraph。"""
+        """Write an ordinary string that needs to preserve newlines and whitespace as Paragraph."""
         return self._paragraph(
             [TextSpan(type="text", content=content or " ")],
             style,
@@ -563,7 +563,7 @@ class _PdfRenderer:
         )
 
     def _table_content(self, block: BlockBase, content: str) -> PdfTableContent:
-        """把每个 block 的 HTML 内容准备一次，避免跨块复用定位上下文。"""
+        """Prepare the HTML content of each block once to avoid reusing positioning context across blocks."""
         prepared = self._table_contents.get(id(block))
         if prepared is None or prepared.source != content:
             prepared = self._table_contents[id(block)] = PdfTableContent(content)
@@ -578,10 +578,10 @@ class _PdfRenderer:
         available_width: float | None = None,
         spatial: SpatialTableOptions | None = None,
     ) -> list[Table]:
-        """使用当前 block 上下文把 HTML table 物化为 ReportLab 表格。"""
+        """Materializes HTML table into a ReportLab table using the current block context."""
 
         def build_paragraph(spans: list[InlineSpan], style: object, max_width: float) -> Paragraph:
-            """为表格单元格构造支持公式和链接的 Paragraph。"""
+            """Constructs a Paragraph for table cells that supports formulas and links."""
             if not isinstance(style, ParagraphStyle):
                 raise TypeError("PDF table paragraph style must be a ParagraphStyle")
             return self._paragraph(
@@ -590,12 +590,12 @@ class _PdfRenderer:
                 page_idx,
                 block,
                 preserve_newlines=True,
-                # 原版式表格用公式自然宽度参与列宽约束，最后统一缩放区域，避免提前缩放两次。
+                # The original format table uses formula natural width to participate in column width constraints, and finally unifies the zoom area to avoid scaling twice in advance.
                 max_width=max_width if spatial is None else float("inf"),
             )
 
         def build_image(source: str, max_width: float, alt_text: str) -> Flowable:
-            """为表格单元格构造离线图片或宽松占位。"""
+            """Construct offline pictures or loose placeholders for table cells."""
             try:
                 prepared = prepare_html_image(source, self.asset_resolver)
             except PdfAssetError as exc:
@@ -608,7 +608,7 @@ class _PdfRenderer:
                     url=source if _is_remote_url(source) else None,
                 )
             if spatial is not None:
-                # 单元格图片独立使用逻辑坐标，不继承整张区域图的旋转或外部高度上限。
+                # Cell pictures use logical coordinates independently and do not inherit the rotation or outer height limit of the entire area map.
                 width = min(max_width, prepared.width_px * 0.75)
                 return ReportLabImage(
                     BytesIO(prepared.data), width=width, height=width * prepared.height_px / prepared.width_px
@@ -634,7 +634,7 @@ class _PdfRenderer:
         page_idx: int,
         alt_text: str,
     ) -> tuple[Flowable, bool]:
-        """加载 block 图片；任何离线失败都转换为可见占位而不抛出。"""
+        """Load the block image; any offline failures are converted to visible placeholders without throwing."""
         prepared = self._try_prepared_block_image(block, page_idx)
         if prepared is not None:
             return self._prepared_image_flowable(prepared, block), True
@@ -650,7 +650,7 @@ class _PdfRenderer:
         )
 
     def _try_prepared_block_image(self, block: ImagePayloadBlock, page_idx: int) -> PreparedImage | None:
-        """尝试离线准备图片，并把素材错误统一记录为 DEBUG 诊断。"""
+        """Try preparing images offline and record material errors as DEBUG diagnostics."""
         try:
             return prepare_block_image(block, self.asset_resolver)
         except PdfAssetError as exc:
@@ -664,7 +664,7 @@ class _PdfRenderer:
         *,
         max_width: float | None = None,
     ) -> ReportLabImage:
-        """按自然尺寸或 bbox 宽度限制图片，并保持宽高比和左对齐。"""
+        """Constrains the image to its natural size or bbox width, maintaining aspect ratio and left alignment."""
         available_width = self.available_width if max_width is None else max(1.0, max_width)
         natural_width = prepared.width_px / 96 * 72
         desired_width = natural_width
@@ -692,7 +692,7 @@ class _PdfRenderer:
         width: float | None = None,
         url: str | None = None,
     ) -> Table:
-        """创建带浅色边框、可选远程链接和定位文本的稳定占位框。"""
+        """Creates a stable placeholder box with a light border, optional remote link, and positioned text."""
         self._diagnostic("pdf_content_placeholder", label, page_idx, block)
         normalized = re.sub(r"\s+", " ", label).strip()[:_MAX_PLACEHOLDER_TEXT] or "content unavailable"
         markup = render_plain_text_markup(normalized)
@@ -722,11 +722,11 @@ class _PdfRenderer:
 
     @staticmethod
     def _location(page_idx: int, block: BlockBase) -> str:
-        """返回 PDF 诊断与占位使用的稳定 page/block 定位。"""
+        """Returns stable page/block positioning for PDF diagnostics and placeholder usage."""
         return f"page_idx={page_idx}, block_index={block.index}, block_type={block.type}"
 
     def _diagnostic(self, code: str, message: str, page_idx: int, block: BlockBase) -> None:
-        """用统一位置格式同时报告 DEBUG 日志与结构化 PDF 诊断。"""
+        """Simultaneously report DEBUG logs and structured PDF diagnostics in a unified location format."""
         report_pdf_diagnostic(code, f"{message} ({self._location(page_idx, block)})", page_idx)
 
 
@@ -737,7 +737,7 @@ def render_pdf(
     document_title: str | None = None,
     layout: PdfLayout = PdfLayout.AUTO,
 ) -> bytes:
-    """把严格 MiddleJson 无副作用地渲染为完整 PDF bytes。"""
+    """Render strict MiddleJson to full PDF bytes without side effects."""
     if not isinstance(middle_json, MiddleJson):
         raise TypeError("render_pdf expects a MiddleJson instance")
     if asset_resolver is not None and not callable(asset_resolver):
@@ -773,7 +773,7 @@ def render_pdf(
 
 
 def _resolve_document_title(middle_json: MiddleJson, explicit: str | None) -> str:
-    """按显式标题、首个文档标题和固定回退的顺序生成 metadata title。"""
+    """Generates metadata title in the order of explicit title, first document title, and fixed fallback."""
     if explicit is not None:
         normalized = re.sub(r"\s+", " ", _INVALID_METADATA_TEXT_RE.sub("\ufffd", explicit)).strip()
         return normalized or "DocVortex Document"
@@ -791,7 +791,7 @@ def _resolve_document_title(middle_json: MiddleJson, explicit: str | None) -> st
 
 
 def _iter_document_anchors(middle_json: MiddleJson) -> Iterable[str]:
-    """按文档顺序枚举正文、标题和页面脚注的非空 anchor。"""
+    """Non-null anchor that enumerates body, title, and page footer in document order."""
     for page in middle_json.pages:
         for block in page.blocks:
             if isinstance(block, (TextBlock, TitleBlockBase)) and block.anchor:
@@ -801,7 +801,7 @@ def _iter_document_anchors(middle_json: MiddleJson) -> Iterable[str]:
 
 
 def _plain_html_text(content: str) -> str:
-    """把视觉 body 的 HTML 或普通字符串压缩为可见文本。"""
+    """Condenses the visual body's HTML or plain string into visible text."""
     if not content:
         return ""
     soup = BeautifulSoup(content, "html.parser")
@@ -811,7 +811,7 @@ def _plain_html_text(content: str) -> str:
 
 
 def _flatten_non_link_spans(spans: list[InlineSpan]) -> list[NonLinkInlineSpan]:
-    """递归移除已有 hyperlink 包装，供目录目标建立单层内部链接。"""
+    """Recursively remove existing hyperlink wrappers for directory targets to establish single-level internal linking."""
     flattened: list[NonLinkInlineSpan] = []
     for span in spans:
         if isinstance(span, HyperlinkSpan):
@@ -822,12 +822,12 @@ def _flatten_non_link_spans(spans: list[InlineSpan]) -> list[NonLinkInlineSpan]:
 
 
 def _has_image_payload(block: ImagePayloadBlock) -> bool:
-    """判断统一图片载荷是否声明 sidecar、data URI 或远程 URL。"""
+    """Determine whether the unified image payload declares sidecar, data URI or remote URL."""
     return block.image_path is not None or block.image_base64 is not None or block.image_url is not None
 
 
 def _is_remote_url(source: str) -> bool:
-    """判断图片 source 是否是不会被 PDF renderer 下载的 HTTP(S) URL。"""
+    """Determine whether the picture source is HTTP (S) URL which will not be downloaded by PDF renderer."""
     normalized = source.strip().casefold()
     return normalized.startswith("http://") or normalized.startswith("https://")
 

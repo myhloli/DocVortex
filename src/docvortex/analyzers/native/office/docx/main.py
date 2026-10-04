@@ -4,14 +4,14 @@ from ... import DocxModel
 
 
 def convert_path(file_path: str) -> list[list[dict[str, Any]]]:
-    """从 DOCX 文件路径调用统一模型入口。"""
+    """Call the unified model entry from the DOCX file path."""
 
     with open(file_path, "rb") as fh:
         return convert_binary(fh)
 
 
 def convert_binary(file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-    """兼容旧二进制转换函数，并转发给 DocxModel。"""
+    """Compatible with old binary conversion functions and forwarded to DocxModel."""
 
     return DocxModel().predict(file_binary)
 

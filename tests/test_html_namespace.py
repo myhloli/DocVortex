@@ -1,4 +1,4 @@
-"""验证独立 HTML 标记、旧标记回退及用户载荷保真。"""
+"""Verify standalone HTML tags, legacy tag fallback, and user payload fidelity."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from docvortex.schema import MiddleJson, parse_inline_spans
 
 
 def _document() -> MiddleJson:
-    """创建含公式、脚注和算法的中性文档，不添加宿主扩展。"""
+    """Create neutral documentation with formulas, footnotes, and algorithms without adding host extensions."""
     return MiddleJson.model_validate(
         {
             "pages": [
@@ -67,7 +67,7 @@ def _document() -> MiddleJson:
 @pytest.mark.parametrize("mode", [RenderMode.DEFAULT, RenderMode.FULL])
 @pytest.mark.parametrize("standalone", [False, True])
 def test_new_namespace_roundtrip(mode: RenderMode, standalone: bool) -> None:
-    """新 HTML 独立完成精确解码，且样式与脚本不引用旧前缀。"""
+    """The new HTML independently completes accurate decoding, and styles and scripts do not reference the old prefix."""
     source = _document()
     before = source.to_dict(skip_defaults=False)
     markup = render_html(source, mode=mode, standalone=standalone)
@@ -86,7 +86,7 @@ def test_new_namespace_roundtrip(mode: RenderMode, standalone: bool) -> None:
 
 @pytest.mark.parametrize("case", ["ordinary", "old", "old_docgale", "missing_version", "unknown_version", "damaged", "empty"])
 def test_decode_keeps_absence_invalid_and_empty_distinct(case: str) -> None:
-    """旧标记不再精确识别，非法新版与合法空内容保持不同结果。"""
+    """Old tags are no longer accurately identified, and illegal new versions maintain different results from legitimate empty content."""
     markup = render_html(_document(), standalone=False)
     if case == "ordinary":
         markup = "<p>ordinary</p>"
@@ -122,14 +122,14 @@ def test_decode_keeps_absence_invalid_and_empty_distinct(case: str) -> None:
 
 
 def test_codec_does_not_export_old_aliases() -> None:
-    """旧 codec 名称一次性移除，不通过动态兼容分支恢复。"""
+    """The old codec name is removed in one go and will not be restored via dynamic compatibility branches."""
     assert codec.DOCVORTEX_HTML_VERSION == "1"
     assert not hasattr(codec, "MINERU_HTML_VERSION")
     assert not hasattr(codec, "decode_mineru_html_wire")
 
 
 def test_user_text_links_and_code_are_not_namespace_rewritten() -> None:
-    """用户文字、链接目标和代码中的旧品牌字符串保持原样。"""
+    """The old brand strings in user text, link targets, and code remain intact."""
     source = _document()
     text = source.pages[0].blocks[0]
     text.content = [
@@ -152,7 +152,7 @@ def test_user_text_links_and_code_are_not_namespace_rewritten() -> None:
 
 
 def test_epub_and_markdown_share_new_html_namespace() -> None:
-    """EPUB 路径与 XHTML、Markdown 内嵌标签使用同一命名空间。"""
+    """The EPUB path uses the same namespace as the XHTML and Markdown inline tags."""
     document = _document()
     payload = render_epub(document)
     with ZipFile(BytesIO(payload)) as archive:
@@ -169,6 +169,6 @@ def test_epub_and_markdown_share_new_html_namespace() -> None:
 
 
 def test_explicit_document_title_still_wins() -> None:
-    """显式标题仍优先于缺省品牌标题。"""
+    """Explicit titles still take precedence over the default brand title."""
     markup = render_html(_document(), document_title="Custom title")
     assert BeautifulSoup(markup, "html.parser").title.string == "Custom title"

@@ -1,4 +1,4 @@
-"""PDF 块级布局所需的可移植页面几何扩展，不保存原生句柄。"""
+"""PDF Portable page geometry extension required for block-level layout, does not save native handles."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ LAYOUT_EXTENSION = "docvortex_layout"
 
 
 def remap_layout_geometry(extension: dict, page_indices: list[int] | None) -> dict:
-    """复制局部页几何并映射为源页号，保留空白页与图片方向字段。"""
+    """Copy the local page geometry and map it to the source page number, retaining the blank page and image orientation fields."""
     copied = deepcopy(extension)
     if page_indices:
         for page in copied["pages"]:
@@ -30,7 +30,7 @@ def remap_layout_geometry(extension: dict, page_indices: list[int] | None) -> di
 
 
 def merge_layout_extensions(previous: dict, current: dict, current_page_indices: list[int] | None = None) -> dict:
-    """合并同源批次几何；重复页以后一批为准，其余产品扩展必须一致。"""
+    """Merge homologous batch geometries; duplicate pages shall be subject to the later batch, and other product extensions must be consistent."""
     left, right = deepcopy(previous), deepcopy(current)
     left_layout, right_layout = left.pop(LAYOUT_EXTENSION, None), right.pop(LAYOUT_EXTENSION, None)
     if json.dumps(left, sort_keys=True) != json.dumps(right, sort_keys=True):
@@ -55,7 +55,7 @@ def merge_layout_extensions(previous: dict, current: dict, current_page_indices:
 
 
 def extract_layout_geometry(document: PDFDocument, page_indices: list[int] | None) -> tuple[dict, tuple[Diagnostic, ...]]:
-    """记录已选页面的可见尺寸，并把局部页号映射回源文档页号。"""
+    """Records the visible dimensions of the selected page and maps local page numbers back to the source document page numbers."""
     indices = list(range(document.page_count)) if page_indices is None else page_indices
     pages: list[dict] = []
     diagnostics: list[Diagnostic] = []
@@ -72,7 +72,7 @@ def extract_layout_geometry(document: PDFDocument, page_indices: list[int] | Non
 
 
 def read_layout_geometry(middle: MiddleJson) -> dict[int, tuple[float, float]]:
-    """严格读取扩展并验证全部输出页的尺寸及顶层定位，不猜测历史页尺寸。"""
+    """Strictly read extensions and verify the size and top-level positioning of all output pages, without guessing historical page sizes."""
     extension = middle.extensions.get(LAYOUT_EXTENSION)
     if not isinstance(extension, dict):
         raise ValueError(f"Missing extensions.{LAYOUT_EXTENSION}; reparse the source PDF")
@@ -112,7 +112,7 @@ def read_layout_geometry(middle: MiddleJson) -> dict[int, tuple[float, float]]:
 
 
 def attach_layout_image_rotations(extension: dict, model_pages: list[list[dict]], page_indices: list[int] | None) -> None:
-    """记录现有裁图转正时使用的角度，使原布局能恢复图片方向而不复制素材。"""
+    """Record the angle used when converting an existing crop, so that the original layout can restore the image orientation without duplicating the material."""
     from .constants import MODEL_JSON_VISUAL_BLOCK_TYPES
 
     geometry_pages = {page["page_idx"]: page for page in extension["pages"]}

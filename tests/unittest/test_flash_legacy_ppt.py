@@ -19,7 +19,7 @@ from docvortex.schema import BlockType
 
 
 def test_ppt_model_preserves_slide_pages_and_sparse_notes() -> None:
-    """验证旧版 PPT 始终逐 slide 分页，并按 slide id 绑定稀疏备注。"""
+    """Verify that legacy PPT always pages by slide and binds sparse notes by slide id."""
 
     pages = PptModel().predict(BytesIO(build_sparse_notes_ppt()))
 
@@ -32,7 +32,7 @@ def test_ppt_model_preserves_slide_pages_and_sparse_notes() -> None:
 
 
 def test_ppt_converter_preserves_empty_slide_positions() -> None:
-    """验证空白或隐藏 slide 仍在 model-list 中保留对应空页。"""
+    """Verify that a blank or hidden slide still retains the corresponding empty page in model-list."""
 
     presentation = PptPresentation(slides=[PptSlide(slide_id=1), PptSlide(slide_id=2, hidden=True)])
 
@@ -40,7 +40,7 @@ def test_ppt_converter_preserves_empty_slide_positions() -> None:
 
 
 def test_ppt_model_applies_per_slide_master_styles() -> None:
-    """验证每页按自身 master id 继承 bullet、粗体和斜体，而不是固定首个母版。"""
+    """Verify that each page inherits bullet, bold and italic from its own master id instead of fixing the first master."""
 
     pages = PptModel().predict(BytesIO(build_multimaster_ppt()))
 
@@ -68,14 +68,14 @@ def test_ppt_model_applies_per_slide_master_styles() -> None:
 
 
 def test_ppt_record_depth_is_a_hard_resource_limit() -> None:
-    """验证恶意深层 PPT records 在递归前触发固定资源限制。"""
+    """Verify malicious deep PPT records Trigger fixed resource limit before recursion."""
 
     with pytest.raises(LegacyOfficeResourceLimitError, match="max_record_depth"):
         PptModel().predict(BytesIO(build_deep_nested_ppt()))
 
 
 def test_ppt_encryption_marker_is_rejected_before_record_parsing() -> None:
-    """验证 Current User 加密标志在读取文档记录前返回稳定错误。"""
+    """Verify that the Current User encryption flag returns a stable error before reading the document record."""
 
     current_user = bytearray(20)
     struct.pack_into("<H", current_user, 2, 0x0FF6)
@@ -86,7 +86,7 @@ def test_ppt_encryption_marker_is_rejected_before_record_parsing() -> None:
 
 
 def test_safe_ppt_hyperlink_schemes_are_explicit() -> None:
-    """验证外链白名单保留 Web/邮件链接并拒绝本地或脚本目标。"""
+    """Validate external link whitelist to retain Web/email links and deny local or script targets."""
 
     assert sanitize_hyperlink_target("https://example.com/a", allowed_schemes=ppt_parser._ALLOWED_LINK_SCHEMES) == (
         "https://example.com/a"
@@ -99,7 +99,7 @@ def test_safe_ppt_hyperlink_schemes_are_explicit() -> None:
 
 
 def test_ppt_hyperlink_range_splits_utf16_and_style_boundaries() -> None:
-    """验证非 BMP 字符的 UTF-16 链接范围可跨字符样式边界准确拆分。"""
+    """Verify that UTF-16 link ranges for non-BMP characters split accurately across character style boundaries."""
 
     interactive_atom = struct.pack("<II8x", 0, 7)
     container_payload = struct.pack("<HHI", 0, ppt_parser.RT_INTERACTIVE_INFO_ATOM, len(interactive_atom)) + interactive_atom

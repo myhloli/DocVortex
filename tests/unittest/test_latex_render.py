@@ -65,7 +65,7 @@ _TEX_LIVE_FILES = (
 
 
 def _middle(*pages: PageInfo) -> MiddleJson:
-    """构造无需源坐标布局的严格测试 MiddleJson。"""
+    """Construct MiddleJson, a rigorous test that does not require source coordinate layout."""
     return MiddleJson(
         pages=list(pages),
         is_full_document=True,
@@ -75,12 +75,12 @@ def _middle(*pages: PageInfo) -> MiddleJson:
 
 
 def _page(page_idx: int, *blocks: PageBlock) -> PageInfo:
-    """按调用方顺序构造一页测试内容。"""
+    """Construct a page of test content in caller order."""
     return PageInfo(page_idx=page_idx, blocks=list(blocks))
 
 
 def test_latex_document_uses_tex_live_preamble_default_planner_and_escaping() -> None:
-    """验证固定 TeX Live 模板、续段合并、辅助块过滤、标题和普通文本转义。"""
+    """Validation fixed TeX Live templates, continuation merging, auxiliary block filtering, header and plain text escaping."""
     middle = _middle(
         _page(
             0,
@@ -112,7 +112,7 @@ def test_latex_document_uses_tex_live_preamble_default_planner_and_escaping() ->
 
 
 def test_latex_renders_inline_styles_formulas_links_and_safe_anchors() -> None:
-    """验证全部 InlineSpan 样式、原始公式、内外部链接及哈希 anchor。"""
+    """Verify all InlineSpan styles, original formulas, internal and external links, and hashes anchor."""
     title = ParagraphTitleBlock(
         type="paragraph_title",
         index=0,
@@ -152,7 +152,7 @@ def test_latex_renders_inline_styles_formulas_links_and_safe_anchors() -> None:
 
 
 def test_latex_renders_native_lists_and_linked_index() -> None:
-    """验证有序、显式、嵌套列表和目录链接保持来源语义。"""
+    """Verify that ordered, explicit, nested lists, and directory links preserve source semantics."""
     target = ParagraphTitleBlock(type="paragraph_title", index=0, level=2, anchor="target", content=_inline("Target"))
     ordered = ListBlock(
         type="list",
@@ -191,7 +191,7 @@ def test_latex_renders_native_lists_and_linked_index() -> None:
 
 
 def test_latex_renders_visual_blocks_complex_tables_and_code_in_source_order() -> None:
-    """验证图片、复杂表格、图表、代码和视觉说明按子块来源顺序输出。"""
+    """Verify that images, complex tables, diagrams, code, and visual descriptions are output in sub-block source order."""
     image = ImageBlock(
         type="image",
         index=0,
@@ -267,7 +267,7 @@ def test_latex_renders_visual_blocks_complex_tables_and_code_in_source_order() -
 
 
 def test_latex_table_cell_preserves_interleaved_text_image_and_nested_table_order() -> None:
-    """验证单元格文字、图片与嵌套表格严格保持 HTML 来源顺序。"""
+    """Verify that cell text, images, and nested tables strictly maintain the order of the HTML source."""
 
     table = TableBlock(
         type="table",
@@ -298,7 +298,7 @@ def test_latex_table_cell_preserves_interleaved_text_image_and_nested_table_orde
 
 
 def test_latex_image_and_table_fallbacks_remain_visible_without_io() -> None:
-    """验证远程、data URI、不支持格式和畸形表格均退化为可见内容。"""
+    """Verification remote, data URI, unsupported formats, and malformed tables are reduced to visible content."""
     remote = ImageBlock(
         type="image",
         index=0,
@@ -359,7 +359,7 @@ def test_latex_image_and_table_fallbacks_remain_visible_without_io() -> None:
 
 
 def test_latex_normalizes_windows_asset_prefix_without_system_font_or_io_dependencies() -> None:
-    """验证 Windows 路径前缀使用 XeLaTeX 跨平台可读的正斜杠。"""
+    """Verify that the Windows path prefix uses XeLaTeX cross-platform readable forward slashes."""
     image = ImageBlock(
         type="image",
         index=0,
@@ -372,7 +372,7 @@ def test_latex_normalizes_windows_asset_prefix_without_system_font_or_io_depende
 
 
 def test_latex_public_entry_rejects_invalid_contract_values() -> None:
-    """验证专用入口拒绝旧字典、错误选项类型和控制字符路径。"""
+    """Validation-specific portals reject old dictionaries, incorrect option types, and control character paths."""
     middle = _middle(_page(0))
 
     with pytest.raises(TypeError, match="MiddleJson"):
@@ -386,7 +386,7 @@ def test_latex_public_entry_rejects_invalid_contract_values() -> None:
 
 
 def test_latex_compiles_with_default_tex_live_full(tmp_path: Path) -> None:
-    """在可用或强制要求的 TeX Live full 环境中真实编译代表文档。"""
+    """Compile representative documentation authentically within the TeX Live full environment available or mandated."""
     required = os.environ.get("MINERU_REQUIRE_TEXLIVE") == "1"
     latexmk = shutil.which("latexmk")
     xelatex = shutil.which("xelatex")

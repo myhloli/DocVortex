@@ -1,4 +1,4 @@
-"""验证原生 PDF 表格上下标的几何识别与安全 HTML 序列化。"""
+"""Verify geometric recognition of native PDF table superscripts and subscripts with secure HTML serialization."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def _char(
     index: int,
     bbox: tuple[float, float, float, float],
 ) -> Char:
-    """构造带稳定来源索引的合成 PDF 字符。"""
+    """Constructs a synthetic PDF character with a stable source index."""
 
     return {
         "char": text,
@@ -58,7 +58,7 @@ def _origin_from_upright(
     page_size: tuple[float, float],
     angle: int,
 ) -> tuple[float, float]:
-    """把正向 origin 逆变换到合成页面坐标。"""
+    """Inversely transform forward origin to composite page coordinates."""
 
     x, y = origin
     page_width, page_height = page_size
@@ -77,7 +77,7 @@ def _result(
     *,
     cells: tuple[NativeTableCell, ...] | None = None,
 ) -> NativeTableResult:
-    """构造单格高置信恢复结果，并保持默认 HTML 与纯文本一致。"""
+    """Construct single-cell high-confidence recovery results and keep the default HTML consistent with plain text."""
 
     resolved_cells = cells or (
         NativeTableCell(
@@ -122,7 +122,7 @@ def _result(
 
 
 def test_table_script_serialization_escapes_text_and_marks_superscript() -> None:
-    """验证原始尖括号保持转义，只有可信数字被包装为上标。"""
+    """Verify that raw angle brackets remain escaped and only trusted digits are wrapped as superscripts."""
 
     chars = (
         _char("<", 0, (5.0, 40.0, 9.0, 50.0)),
@@ -150,7 +150,7 @@ def test_table_script_serialization_escapes_text_and_marks_superscript() -> None
 def test_table_script_serialization_preserves_latin_row_separator(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证无来源行间空格与后续上下标 HTML 可以同时保留。"""
+    """Verify that unsourced interline spaces and subsequent superscripts and subscripts HTML can be preserved simultaneously."""
 
     texts = "ModelNameH2"
     bboxes = tuple(
@@ -192,7 +192,7 @@ def test_table_script_serialization_preserves_latin_row_separator(
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_table_script_geometry_uses_upright_coordinates(angle: int) -> None:
-    """验证四种标准方向下 cell loose/tight/origin 同步正向化。"""
+    """Verify cell loose/tight/origin synchronization forwarding in four standard directions."""
 
     page_size = (100.0, 120.0)
     local_bboxes = ((10.0, 40.0, 20.0, 50.0), (20.0, 34.0, 26.0, 40.0))
@@ -218,7 +218,7 @@ def test_table_script_geometry_uses_upright_coordinates(angle: int) -> None:
 
 
 def test_table_fraction_region_stays_plain() -> None:
-    """验证 cell 内短分数线会拒识其上下叠排字符。"""
+    """Verify that short fraction lines in cell will reject overlapping characters."""
 
     chars = (
         _char("x", 0, (10.0, 40.0, 20.0, 50.0)),
@@ -251,7 +251,7 @@ def test_table_fraction_region_stays_plain() -> None:
 
 
 def test_table_grid_boundary_is_not_a_fraction_rule() -> None:
-    """验证与任一逻辑 cell 边界重合的横线不会进入分式检测。"""
+    """Verify that horizontal lines coinciding with any logical cell boundary do not enter fraction detection."""
 
     glyphs = (NativeTableGlyph(0, 0, "A", (5.0, 5.0, 15.0, 15.0), 0),)
     cells = (
@@ -273,7 +273,7 @@ def test_table_grid_boundary_is_not_a_fraction_rule() -> None:
 
 
 def test_table_missing_extended_geometry_keeps_original_html() -> None:
-    """验证缺少 tight/origin 时不根据 loose bbox 猜测上下标。"""
+    """Verify that tight/origin is missing and bbox does not guess superscript and subscript based on loose."""
 
     chars = (_char("A", 0, (10.0, 40.0, 20.0, 50.0)),)
     glyphs = (NativeTableGlyph(0, 0, "A", (10.0, 40.0, 20.0, 50.0), 0),)
@@ -289,7 +289,7 @@ def _manifest_table_input(
     *,
     cross_page_manifest: bool,
 ) -> tuple[NativeTableInput, dict[int, tuple[float, float, float, float]], dict[int, tuple[float, float]]]:
-    """按 manifest bbox 构造表格输入，并返回同页扩展字符几何。"""
+    """Press manifest bbox to construct table input and return to the same page extended character geometry."""
 
     page_index = int(entry["page_index"])  # type: ignore[arg-type]
     page_size = document.page_size(page_index)
@@ -321,7 +321,7 @@ def _manifest_table_input(
 
 
 def _real_manifest_script_runs() -> tuple[set[tuple[object, ...]], set[str]]:
-    """运行两套仓库表格语料，并收集最终 cell 上下标及带样式 cell。"""
+    """Run two sets of warehouse table corpora and collect the final cell superscript and subscript and styled cell."""
 
     fields = ("file", "page_index", "table_index", "row", "col", "text", "style")
     actual: set[tuple[object, ...]] = set()
@@ -373,7 +373,7 @@ def _real_manifest_script_runs() -> tuple[set[tuple[object, ...]], set[str]]:
 
 
 def test_demo3_compound_model_suffixes_are_complete_table_subscripts() -> None:
-    """验证 demo3 表 5 的复合模型后缀整体进入同一个下标标签。"""
+    """Verify that the composite model suffixes of demo3 Table 5 all go into the same subscript label."""
     manifest = json.loads((_PROJECT_ROOT / "tests/fixtures/native_pdf_table_demo_manifest.json").read_text(encoding="utf-8"))
     entry = next(
         item
@@ -393,7 +393,7 @@ def test_demo3_compound_model_suffixes_are_complete_table_subscripts() -> None:
 
 
 def test_real_native_table_scripts_are_precision_gated() -> None:
-    """验证全部实际输出属于人工真值，必召回项存在且强制负例保持纯文本。"""
+    """Verify that all actual outputs are artificial truth values, mandatory recalls exist and force negative examples to remain plain text."""
 
     truth = json.loads(_SCRIPT_TRUTH_PATH.read_text(encoding="utf-8"))
     fields = tuple(truth["matching"])

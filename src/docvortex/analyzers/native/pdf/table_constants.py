@@ -1,4 +1,4 @@
-"""PDF 固定阈值与模式；保留原有认领顺序与判定规则。"""
+"""PDF fixed threshold and mode; retain the original claiming order and judgment rules."""
 
 from __future__ import annotations
 import re

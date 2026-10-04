@@ -1,4 +1,4 @@
-"""集中建立静态 HTML/XHTML 标题、脚注与 fragment anchor 索引。"""
+"""Centrally create static HTML/XHTML titles, footnotes and fragment anchor indexes."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ _XML_ID = "{http://www.w3.org/XML/1998/namespace}id"
 
 @dataclass(frozen=True, slots=True)
 class MarkupAnchorDocument:
-    """描述一个待建立 anchor 索引的 DOM、样式表与兼容可见性规则。"""
+    """Describes the DOM, stylesheet, and compatible visibility rules for a anchor index to be created."""
 
     key: str
     root: etree._Element
@@ -35,29 +35,29 @@ class MarkupAnchorDocument:
 
 
 class MarkupAnchorPolicy(Protocol):
-    """定义格式适配器生成标题、脚注 anchor 所需的稳定策略。"""
+    """Defines the stable strategy required by the format adapter to generate headers, footers anchor."""
 
     anchor_prefix: str
     register_document_start: bool
 
     def heading_identity(self, element: etree._Element, ordinal: int) -> str:
-        """返回当前标题参与稳定摘要的格式专属 identity。"""
+        """Returns the format of the current title participating in the stable summary identity."""
 
     def is_materializable_note(self, element: etree._Element, document: MarkupAnchorDocument) -> bool:
-        """判断当前元素是否是能够兑现文本 anchor 的格式专属脚注。"""
+        """Determines whether the current element is a format-specific footnote capable of honoring the text anchor."""
 
     def note_identity(self, element: etree._Element, ordinal: int) -> str:
-        """返回当前脚注参与稳定摘要的格式专属 identity。"""
+        """Returns the format of the current footnote participation stable summary identity."""
 
 
 def element_id(element: etree._Element) -> str | None:
-    """返回元素去除首尾空白后的 HTML id 或 xml:id。"""
+    """Returns HTML id or xml:id with the leading and trailing blanks removed."""
     value = (element.get("id") or element.get(_XML_ID) or "").strip()
     return value or None
 
 
 def visible_element_text(element: etree._Element, document: MarkupAnchorDocument) -> str:
-    """按文档兼容配置解析祖先样式链，并返回最终可输出的纯文本。"""
+    """Parses the ancestor style chain according to the document-compatible configuration and returns the final printable plain text."""
     inherited = TextStyle()
     visibility_hidden = False
     chain = [ancestor for ancestor in reversed(list(element.iterancestors())) if isinstance(ancestor.tag, str)]
@@ -79,16 +79,16 @@ def visible_element_text(element: etree._Element, document: MarkupAnchorDocument
 
 
 def canonical_anchor(prefix: str, document_key: str, identity: str) -> str:
-    """按格式前缀、文档 key 与 identity 生成稳定的二十位摘要 anchor。"""
+    """Generates a stable twenty-digit summary of anchor by format prefix, document key and identity."""
     digest = hashlib.sha256(f"{document_key}#{identity}".encode()).hexdigest()[:20]
     return f"{prefix}-{digest}"
 
 
 class MarkupAnchorRegistry:
-    """统一登记多文档标题、脚注及源 fragment 到实际输出 anchor 的映射。"""
+    """Unified registration of multiple document titles, footnotes, and mapping of source fragment to actual output anchor."""
 
     def __init__(self, documents: list[MarkupAnchorDocument], policy: MarkupAnchorPolicy) -> None:
-        """按调用方文档顺序建立稳定索引，并保留格式专属 identity 规则。"""
+        """Stable indexing in caller document order, preserving format-specific identity rules."""
         self._policy = policy
         self._heading_anchors: dict[etree._Element, str] = {}
         self._note_anchors: dict[etree._Element, str] = {}
@@ -98,7 +98,7 @@ class MarkupAnchorRegistry:
             self._register_document(document)
 
     def _register_document(self, document: MarkupAnchorDocument) -> None:
-        """登记单个 DOM 的标题、脚注及全部可解析 fragment 别名。"""
+        """Registers the title, footer, and all parsable fragment aliases for a single DOM."""
         headings: list[tuple[etree._Element, str]] = []
         for element in document.root.iter():
             if not isinstance(element.tag, str) or local_name(element) not in _HEADING_TAGS:
@@ -132,7 +132,7 @@ class MarkupAnchorRegistry:
                 self._targets[target_key] = anchor
 
     def _target_anchor(self, element: etree._Element) -> str | None:
-        """把任意 fragment 元素映射到自身、最近祖先或首个后代输出目标。"""
+        """Maps any fragment element to itself, nearest ancestor, or first descendant output target."""
         direct = self._heading_anchors.get(element) or self._note_anchors.get(element)
         if direct is not None:
             return direct
@@ -160,7 +160,7 @@ class MarkupAnchorRegistry:
         root: etree._Element,
         sources: list[tuple[etree._Element, dict[str, object]]],
     ) -> None:
-        """按源顺序把实际物化正文的多个 ID 别名绑定到一个块级 anchor。"""
+        """Bind multiple ID aliases of the actual materialized body to a block-level anchor in source order."""
         blocks_by_source = {source: block for source, block in reversed(sources)}
         for element in root.iter():
             if not isinstance(element.tag, str) or not (fragment := element_id(element)):
@@ -178,19 +178,19 @@ class MarkupAnchorRegistry:
             self._targets[target_key] = anchor
 
     def heading_anchor(self, heading: etree._Element) -> str | None:
-        """返回一个已登记标题的规范 anchor。"""
+        """Returns the specification of a registered title anchor."""
         return self._heading_anchors.get(heading)
 
     def heading_label(self, anchor: str) -> str | None:
-        """返回规范标题 anchor 对应的可见标题文本。"""
+        """Returns the visible title text corresponding to the canonical title anchor."""
         return self._heading_labels.get(anchor)
 
     def note_anchor(self, note: etree._Element) -> str | None:
-        """返回一个已登记脚注的规范 anchor。"""
+        """Returns the specification anchor for a registered footnote."""
         return self._note_anchors.get(note)
 
     def resolve_target(self, document_key: str, fragment: str | None) -> str | None:
-        """按文档 key 与可选源 fragment 返回不带井号的规范 anchor。"""
+        """By document key with optional source fragment Returns the specification anchor without the hash mark."""
         return self._targets.get((document_key, fragment))
 
 
@@ -205,7 +205,7 @@ __all__ = [
     "visible_element_text",
 ]
 
-# 保持既有公开类型的 pickle 路径，所有旧、新入口指向同一个类。
+# Keep the existing public type pickle path, with all old and new entries pointing to the same class.
 preserve_type_module(MarkupAnchorDocument, "docvortex.analyzers.native._shared.markup.anchors")
 preserve_type_module(MarkupAnchorPolicy, "docvortex.analyzers.native._shared.markup.anchors")
 preserve_type_module(MarkupAnchorRegistry, "docvortex.analyzers.native._shared.markup.anchors")

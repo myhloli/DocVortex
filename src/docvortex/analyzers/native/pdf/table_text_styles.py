@@ -1,4 +1,4 @@
-"""使用 PDF 原生字符几何为高置信表格 HTML 恢复上下标。"""
+"""Recover subscripts and superscripts for high-confidence tables HTML using PDF native character geometry."""
 
 from __future__ import annotations
 
@@ -41,12 +41,12 @@ _owned_cell_fallbacks = 0
 
 
 def table_script_stats() -> tuple[int, int, int]:
-    """报告表格上下标 owned 批次、命中行数和整批回退数。"""
+    """The report table has subscripts owned for the batch, the number of hit rows, and the number of rollbacks for the entire batch."""
     return _owned_cell_batches, _owned_cell_lines, _owned_cell_fallbacks
 
 
 def _table_char_map(chars: tuple[Char, ...]) -> dict[int, Char]:
-    """按合法 char_idx 建立页面字符查询表，重复索引保留首项。"""
+    """Create a page character query table according to the legal char_idx, and retain the first item in the repeated index."""
 
     output: dict[int, Char] = {}
     for fallback_index, char in enumerate(chars):
@@ -62,7 +62,7 @@ def _cell_glyphs(
     cell: NativeTableCell,
     glyph_by_source: dict[int, NativeTableGlyph] | None = None,
 ) -> list[NativeTableGlyph]:
-    """按 cell 的稳定字符来源收集并恢复视觉行内顺序。"""
+    """Collect and restore visual inline order by stable character source for cell."""
 
     if glyph_by_source is None:
         glyph_by_source = {glyph.source_index: glyph for glyph in result.text.glyphs}
@@ -78,7 +78,7 @@ def _cell_visual_lines(
     page_size: tuple[float, float],
     angle: int,
 ) -> list[_LineItem]:
-    """把一个 cell 的 glyph 按 visual row 转换成正文公式分段使用的行。"""
+    """Convert a cell glyph to visual row into lines used by text formula segments."""
 
     grouped: dict[int, list[NativeTableGlyph]] = defaultdict(list)
     for glyph in glyphs:
@@ -86,8 +86,8 @@ def _cell_visual_lines(
 
     lines: list[_LineItem] = []
     for visual_row, row_glyphs in sorted(grouped.items()):
-        # 输入 glyph 已按 visual_row、x、y 和 glyph_id 排序；分组遍历保持
-        # 该顺序，因此这里不再对同一 visual row 重复执行一次稳定排序。
+        # Input glyph is sorted by visual_row, x, y, and glyph_id; group traversal remains
+        # This order, so the stable sorting is no longer repeated for the same visual row.
         ordered = row_glyphs
         chars = [chars_by_source[glyph.source_index] for glyph in ordered if glyph.source_index in chars_by_source]
         bboxes = [bbox for char in chars if (bbox := _coerce_bbox(char.get("bbox"))) is not None]
@@ -102,8 +102,8 @@ def _cell_visual_lines(
             visual_row_id=visual_row,
         )
         lines.append(line)
-    # 排版特征只供多行二维合并使用；单行会原样进入字符脚本判定，
-    # 该路径只读取 chars/angle/公式区域，不读取行级字体或高度统计。
+    # The typesetting feature is only used for two-dimensional merging of multiple lines; a single line will enter the character script judgment as it is.
+    # This path only reads the chars/angle/formula area, not line-level fonts or height statistics.
     if len(lines) > 1:
         for line in lines:
             _fill_native_typography(line, page_size)
@@ -117,7 +117,7 @@ def _rule_overlaps_boundary(
     boundary_right: float,
     tolerance: float,
 ) -> bool:
-    """判断局部横线是否与一个逻辑 cell 的水平边界重合。"""
+    """Determine whether the local horizontal line coincides with the horizontal boundary of a logical cell."""
 
     rule_y = (rule_bbox[1] + rule_bbox[3]) / 2.0
     if abs(rule_y - boundary_y) > tolerance:
@@ -132,7 +132,7 @@ def _non_grid_fraction_rules(
     table_input: NativeTableInput,
     result: NativeTableResult,
 ) -> list[NativeTableRule]:
-    """移除与恢复后 cell 边界重合的横线，仅保留可能的分式线。"""
+    """Remove horizontal lines that coincide with the restored cell boundary, leaving only possible fraction lines."""
 
     tolerance = max(0.75, 0.12 * result.text.median_glyph_height)
     output: list[NativeTableRule] = []
@@ -159,7 +159,7 @@ def _non_grid_fraction_rules(
 
 
 def _drop_shifted_word_prefixes(chars: list[dict[str, Any]], roles: list[ScriptRole]) -> None:
-    """拒绝普通字母词仅首字母偏移的弱候选，完整同基线词由精炼层闭合。"""
+    """Weak candidates with only the first letter offset of common alphabetic words are rejected, and complete homo-baseline words are closed by the refinement layer."""
 
     start = 0
     while start < len(chars):
@@ -175,7 +175,7 @@ def _drop_shifted_word_prefixes(chars: list[dict[str, Any]], roles: list[ScriptR
 
 
 def _roles_by_source(chars: list[dict[str, Any]], roles: list[ScriptRole]) -> dict[int, ScriptRole]:
-    """按来源编号聚合角色；同源冲突沿用原实现降级为 body。"""
+    """Aggregate roles by source number; origin conflicts are downgraded to body using the original implementation."""
     output: dict[int, ScriptRole] = {}
     for char, role in zip(chars, roles, strict=True):
         char_idx = char.get("char_idx")
@@ -197,7 +197,7 @@ def _cell_script_roles(
     *,
     visual_lines: list[_LineItem] | None = None,
 ) -> dict[int, ScriptRole]:
-    """在 cell 内按正文同款二维公式分段和字符几何返回稳定角色。"""
+    """In cell, the stable character is returned according to the segmentation and character geometry of the same two-dimensional formula as the text."""
 
     lines = _cell_visual_lines(glyphs, chars_by_source, page_size, angle) if visual_lines is None else visual_lines
     if not lines:
@@ -223,7 +223,7 @@ def _cell_script_roles(
 
 
 def _owned_cell_line_indices(line: _LineItem, identities: dict[int, int]) -> list[int] | None:
-    """仅普通 0 度、同源且无特殊公式标记的行可进入页面级 owned 批次。"""
+    """Only rows with normal 0 degrees, same origin, and no special formula tags can go into the page-level owned batch."""
     if (
         type(line) is not _LineItem
         or type(line.chars) is not list
@@ -249,7 +249,7 @@ def _owned_cell_classify(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
 ) -> dict[tuple[int, int], dict[int, ScriptRole]]:
-    """把多个同源 cell 的视觉行合并成有界 owned 批次并保留原精炼规则。"""
+    """Merge visual lines from multiple homologous cell into bounded owned batches and preserve the original refinement rules."""
     global _owned_cell_batches, _owned_cell_lines, _owned_cell_fallbacks
     evidence, identities = owned_inputs
     output: dict[tuple[int, int], dict[int, ScriptRole]] = {}
@@ -285,8 +285,8 @@ def _owned_cell_classify(
             continue
         _owned_cell_batches += 1
         _owned_cell_lines += len(batch)
-        # 表格 cell 与正文行的大二维合并语义不同；原生先给出任何非正文角色时，
-        # 整 cell 回到既有参考判定，只有确定全正文的结果直接复用 owned 批次。
+        # Table cell has different semantics than the large two-dimensional merge of text rows; when any non-text role is given first,
+        # The entire cell returns to the existing reference judgment, and only the result of determining the full text is directly reused in the owned batch.
         fallback_keys = {
             key
             for (key, _line, _indices), raw_roles in zip(batch, classified, strict=True)
@@ -328,7 +328,7 @@ def _cell_script_roles_from_lines(
     tight_bboxes: dict[int, BBox],
     origins: dict[int, tuple[float, float]],
 ) -> dict[int, ScriptRole]:
-    """以已缓存的 cell 视觉行执行参考路径，避免 owned 不可用时重复组行。"""
+    """Execute reference paths with cached cell visual lines to avoid duplicate group lines if owned is unavailable."""
     return _cell_script_roles(
         [],
         {},
@@ -352,7 +352,7 @@ def _render_styled_cell(
     origins: dict[int, tuple[float, float]] | None = None,
     preserve_font_styles: bool = False,
 ) -> str:
-    """按原字符来源安全插入上下标及可选的粗斜体，文字不匹配时保持转义回退。"""
+    """Safely insert superscripts, subscripts and optional bold italics according to the original character source, and maintain escape fallback when the text does not match."""
 
     parts = build_cell_text_parts(glyphs, median_height)
     if "".join(text for text, _source_index in parts) != cell.content:
@@ -364,7 +364,7 @@ def _render_styled_cell(
     active_parts: list[str] = []
 
     def flush() -> None:
-        """提交同角色同字体样式片段，仅生成固定标签并转义原文。"""
+        """Submit fragments with the same character and font style, only generate fixed tags and escape the original text."""
 
         nonlocal active_parts
         if not active_parts:
@@ -421,7 +421,7 @@ def render_native_table_html_with_scripts(
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
     preserve_font_styles: bool = False,
 ) -> str:
-    """为高置信原生表格恢复上下标，证据不足时返回原始 HTML。"""
+    """Restore subscripts and superscripts for high-confidence native tables, returning original HTML when evidence is insufficient."""
 
     if not tight_bboxes or not origins:
         return result.html
@@ -430,7 +430,7 @@ def render_native_table_html_with_scripts(
     chars_by_source = _table_char_map(table_input.chars)
     fraction_rules = _non_grid_fraction_rules(table_input, result)
     prepared_fraction_rules = _prepare_fraction_rules(fraction_rules, table_input.page_size, table_input.angle)
-    # 一张表只建立一次来源索引；保持原字典推导式的后项覆盖语义。
+    # A source index is only created once for a table; the consequent coverage semantics of the original dictionary derivation are maintained.
     glyph_by_source = {glyph.source_index: glyph for glyph in result.text.glyphs}
     cell_glyphs = {(cell.row, cell.col): _cell_glyphs(result, cell, glyph_by_source) for cell in result.cells}
     cell_lines = {
@@ -459,7 +459,7 @@ def render_native_table_html_with_scripts(
         lines = cell_lines[key]
         indices = None
         if _owned_script_inputs is not None and table_input.angle == 0 and not fraction_members and lines:
-            # owned 批次必须消费与参考路径完全相同的二维合并后的行。
+            # owned The batch must consume exactly the same 2D merged rows as the reference path.
             segmented = _merge_overlapping_inline_text_clusters(lines, table_input.page_size, [])
             packed = [
                 (line, line_indices)

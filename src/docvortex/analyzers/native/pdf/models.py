@@ -1,4 +1,4 @@
-"""Flash 原生 PDF 提取使用的内部数据模型。"""
+"""Flash The internal data model used by native PDF extraction."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class _SharedLineIndexSet(MutableSet[int]):
-    """共享只读基底，仅为单个候选记录增删差集，避免复制大型行号集合。"""
+    """A shared read-only base is used to only add and delete a single candidate record to avoid copying large row number sets."""
 
     __slots__ = ("base", "added", "removed")
 
@@ -26,12 +26,12 @@ class _SharedLineIndexSet(MutableSet[int]):
         base: frozenset[int],
         values: Iterable[int] = (),
     ) -> None:
-        """以共享基底和候选已有成员初始化集合。"""
+        """Initialize the collection with a shared base and candidate existing members."""
 
         self.base = base
         self.removed: set[int] = set()
         if isinstance(values, _SharedLineIndexSet) and values.base is base:
-            # 与共享基底求并集时，基底成员天然全部可见，只需保留额外成员。
+            # When performing a union with a shared base, all base members are naturally visible and only the extra members need to be retained.
             self.added = set(values.added)
         elif isinstance(values, (set, frozenset)):
             self.added = values.difference(base)
@@ -44,7 +44,7 @@ class _SharedLineIndexSet(MutableSet[int]):
         base: frozenset[int],
         values: Iterable[int],
     ) -> _SharedLineIndexSet:
-        """以共享基底精确表示给定集合，而不是默认并入全部基底成员。"""
+        """Exactly represent the given set in terms of a shared base, rather than merging all base members by default."""
 
         visible = set(values)
         instance = cls.__new__(cls)
@@ -54,14 +54,14 @@ class _SharedLineIndexSet(MutableSet[int]):
         return instance
 
     def __contains__(self, value: object) -> bool:
-        """按基底、删除集和新增集判断成员是否可见。"""
+        """Determine whether members are visible based on the base, deleted set and new set."""
 
         if value in self.added:
             return True
         return value in self.base and value not in self.removed
 
     def __iter__(self) -> Iterator[int]:
-        """迭代当前可见成员，不展开持久化副本。"""
+        """Iterates over currently visible members without expanding persistent copies."""
 
         for value in self.base:
             if value not in self.removed:
@@ -69,12 +69,12 @@ class _SharedLineIndexSet(MutableSet[int]):
         yield from self.added
 
     def __len__(self) -> int:
-        """返回当前可见成员数量。"""
+        """Returns the current number of visible members."""
 
         return len(self.base) - len(self.removed) + len(self.added)
 
     def add(self, value: int) -> None:
-        """加入成员；基底已有成员只需撤销删除标记。"""
+        """Add members; existing members only need to unmark the deletion mark."""
 
         if value in self.base:
             self.removed.discard(value)
@@ -82,7 +82,7 @@ class _SharedLineIndexSet(MutableSet[int]):
         self.added.add(value)
 
     def discard(self, value: int) -> None:
-        """删除成员；基底成员以差集标记表示。"""
+        """Remove members; base members are represented by difference markers."""
 
         if value in self.added:
             self.added.discard(value)
@@ -91,7 +91,7 @@ class _SharedLineIndexSet(MutableSet[int]):
             self.removed.add(value)
 
     def update(self, values: Iterable[int]) -> None:
-        """并入成员；同共享基底的候选直接合并差集。"""
+        """Merge members; directly merge difference sets with candidates that share a base."""
 
         if isinstance(values, _SharedLineIndexSet) and values.base is self.base:
             self.removed.intersection_update(values.removed)
@@ -102,7 +102,7 @@ class _SharedLineIndexSet(MutableSet[int]):
             self.add(value)
 
     def difference_update(self, values: Iterable[int]) -> None:
-        """移除给定成员，并保持共享基底不变。"""
+        """Removes the given member, leaving the shared base unchanged."""
 
         if isinstance(values, (set, frozenset)):
             self.added.difference_update(values)
@@ -114,7 +114,7 @@ class _SharedLineIndexSet(MutableSet[int]):
 
 @dataclass(slots=True)
 class _LineItem:
-    """保存单个可视文本行及其 source/ink/canonical 几何。"""
+    """Saves a single visual text line and its source/ink/canonical geometry."""
 
     text: str
     bbox: BBox
@@ -163,20 +163,20 @@ class _LineItem:
     native_title_label_left: float | None = field(compare=False, default=None)
 
     def __post_init__(self) -> None:
-        """为旧调用与合成测试补齐可选来源几何字段。"""
+        """Complete optional source geometry fields for legacy calls and synthetic tests."""
 
         if self.source_bbox is None:
             self.source_bbox = self.bbox
-        # 数字 run 的角色在输入边界冻结，辅助空间分类只消费编号证据，不重新读取整行文字。
+        # The role of the number run is frozen at the input boundary, and the auxiliary spatial classification only consumes the numbered evidence without rereading the entire line of text.
         marker = self.text.strip()
         self.note_marker_value = marker if marker.isdigit() and 1 <= len(marker) <= 3 else None
-        # 编号标题证据在输入边界冻结，辅助空间分类不重新访问全文。
+        # Numbered title evidence is frozen at input boundaries, and auxiliary spatial classification does not revisit the full text.
         self.numbered_heading_start = re.match(r"^\d+(?:\.\d+)*\.?(?:\s|$)\S", marker) is not None
 
 
 @dataclass(slots=True)
 class _Fragment:
-    """保存表格规则使用的单元文本片段。"""
+    """Saves the cell text fragment used by table rules."""
 
     text: str
     bbox: BBox
@@ -187,7 +187,7 @@ class _Fragment:
 
 @dataclass(slots=True)
 class _VisualRow:
-    """保存同一局部水平带内的表格片段。"""
+    """Save table fragments within the same local horizontal band."""
 
     fragments: list[_Fragment]
     center_y: float
@@ -197,7 +197,7 @@ class _VisualRow:
 
 @dataclass(slots=True)
 class _AxisLine:
-    """保存 PDF 路径中的横竖线。"""
+    """Save the horizontal and vertical lines in the PDF path."""
 
     bbox: BBox
     width: float
@@ -206,7 +206,7 @@ class _AxisLine:
 
 @dataclass(slots=True)
 class _LocalAxisLine:
-    """保存转入当前文本方向后的横竖线。"""
+    """Save the horizontal and vertical lines after switching to the current text direction."""
 
     bbox: BBox
     original_bbox: BBox
@@ -216,7 +216,7 @@ class _LocalAxisLine:
 
 @dataclass(slots=True)
 class _TableAnnotation:
-    """保存表格候选中已识别注释的类型、紧致边界和原始行身份。"""
+    """Saves the type, compact boundaries, and original row identity of identified annotations in table candidates."""
 
     kind: Literal["caption", "footnote"]
     bbox: BBox
@@ -226,7 +226,7 @@ class _TableAnnotation:
 
 @dataclass(slots=True)
 class _TableCandidate:
-    """保存已通过相邻横线边界与文本分布校验的表格候选。"""
+    """Save table candidates that have passed adjacent horizontal line boundary and text distribution verification."""
 
     bbox: BBox
     local_bbox: BBox
@@ -236,27 +236,27 @@ class _TableCandidate:
     line_indices: MutableSet[int] = field(default_factory=set)
     annotations: list[_TableAnnotation] = field(default_factory=list)
     inferred_grid: list[_AxisLine] = field(default_factory=list)
-    # 新恢复的文字网格按原生字符保留强调样式，已有表格维持原物化契约。
+    # The newly restored text grid retains the emphasis style according to the native characters, and the existing tables maintain the original materialization contract.
     preserve_inline_font_styles: bool = False
-    # 高置信裁切空白表单已重建规范网格，不能再混入填色矩形的文字行带边界。
+    # High-confidence cropping of blank forms has rebuilt the canonical grid and can no longer blend text lines with borders into filled rectangles.
     inferred_grid_authoritative: bool = False
 
 
 @dataclass(slots=True)
 class _GraphicCandidate:
-    """保存由紧凑绘图线组件形成的图形文本容器候选。"""
+    """Saves a graphic text container candidate formed from compact drawing line components."""
 
     core_bbox: BBox
     lane_index: int
     label_margin_scale: float = 2.5
     line_indices: set[int] = field(default_factory=set)
-    # 刻度证明的栅格图已包含完整轴标签，只允许核心内成员，避免再吸入说明续行或图间小框。
+    # The scale-proven raster plot already contains complete axis labels, allowing only members within the core to avoid drawing in description continuation lines or small boxes between figures.
     strict_core_members: bool = False
 
 
 @dataclass(slots=True)
 class _DrawingComponentSummary:
-    """缓存单页绘图线分量及两处图形检测共用的几何统计。"""
+    """Cache single-page drawing line components and geometric statistics shared by two graphics detections."""
 
     lines: list[_AxisLine]
     bbox: BBox
@@ -266,7 +266,7 @@ class _DrawingComponentSummary:
 
 @dataclass(slots=True)
 class _CodeCandidate:
-    """保存由填充背景或成对横线与稳定文本节奏确认的代码区域。"""
+    """Save areas of code identified by filled backgrounds or pairs of horizontal lines with a steady rhythm of text."""
 
     bbox: BBox
     angle: int
@@ -275,7 +275,7 @@ class _CodeCandidate:
 
 @dataclass(slots=True)
 class _TextLane:
-    """保存同一文本方向下的局部栏带与已归属文本行。"""
+    """Save local columns and owned text lines in the same text direction."""
 
     left: float
     right: float
@@ -285,7 +285,7 @@ class _TextLane:
 
 @dataclass(slots=True)
 class _FormulaAnchor:
-    """保存公式右缘锚点及其相对正文密集区的上下位置。"""
+    """Save the right edge anchor point of the formula and its upper and lower position relative to the dense text area."""
 
     line: _LineItem
     bbox: BBox
@@ -296,7 +296,7 @@ class _FormulaAnchor:
 
 @dataclass(slots=True)
 class _PageSource:
-    """保存单页原生文本分析所需的文本、字符、绘图线和视觉容器。"""
+    """Save text, characters, drawing lines, and visual containers required for single-page native text analysis."""
 
     page_size: tuple[float, float]
     lines: list[_LineItem]
@@ -317,14 +317,14 @@ class _PageSource:
 
 @dataclass(slots=True)
 class _PreparedPage:
-    """保存容器认领完成后、等待跨页与文本类型判定的轻量页面。"""
+    """Save the lightweight page that is waiting for cross-page and text type determination after the container claim is completed."""
 
     page_size: tuple[float, float]
     remaining_lines: list[_LineItem]
     table_bboxes: list[BBox]
     drawing_lines: list[_AxisLine]
     fixed_blocks: list[dict[str, Any]]
-    # 只保留小圆点候选的轻量路径证据，供完成文本聚合后恢复局部列表。
+    # Only the lightweight path evidence of small dot candidates is retained for restoring the local list after completing text aggregation.
     bullet_paths: tuple[PDFPathInfo, ...] = ()
     canonical_formula_geometry: bool = False
     canonical_formula_source_lines: list[_LineItem] = field(default_factory=list)
@@ -334,7 +334,7 @@ class _PreparedPage:
     script_lines: list[PDFTextScriptLine] = field(default_factory=list)
     formula_candidate_lines: list[_LineItem] = field(default_factory=list)
     formula_ink_bboxes: list[BBox] = field(default_factory=list)
-    # 稀疏表格页保留无字符载荷的原生行样式，防止表体认领后只用大题名反向统计正文。
+    # The sparse table page retains the native row style without character load to prevent reverse statistics of the text using only the large title after the table body is claimed.
     table_body_profile_lines: list[_LineItem] = field(default_factory=list)
     local_axis_table_cache: dict[tuple[int, int, int], tuple[list[_LocalAxisLine], list[_LocalAxisLine]]] = field(
         default_factory=dict
@@ -343,7 +343,7 @@ class _PreparedPage:
 
 @dataclass(slots=True)
 class _MarginalCandidate:
-    """保存页眉页脚带中的单行候选及其正向归一化几何。"""
+    """Save a single row candidate in the header and footer band and its forward normalized geometry."""
 
     page_index: int
     line: _LineItem
@@ -354,7 +354,7 @@ class _MarginalCandidate:
 
 @dataclass(slots=True)
 class _LaneBodyProfile:
-    """保存标题判定使用的栏带正文排版基线，不包含文本内容特征。"""
+    """Save the column and text layout baseline used for title determination, excluding text content characteristics."""
 
     body_height: float
     body_font: tuple[str, int] | None
@@ -366,7 +366,7 @@ class _LaneBodyProfile:
 
 @dataclass(frozen=True, slots=True)
 class _DocumentBodyProfile:
-    """保存跨页正文行高、常规字重与反复出现的常规字体。"""
+    """Save cross-page text line heights, regular font weights, and recurring regular fonts."""
 
     body_height: float
     body_weight: float | None
@@ -376,7 +376,7 @@ class _DocumentBodyProfile:
 
 @dataclass(frozen=True, slots=True)
 class _TitleStylePrototype:
-    """保存跨页标题原型的字体、尺度、字重和栏内对齐特征。"""
+    """Saves the font, size, weight, and column alignment characteristics of a cross-page title prototype."""
 
     font_family: str
     font_flags: int
@@ -390,6 +390,6 @@ class _TitleStylePrototype:
 
 @dataclass(frozen=True, slots=True)
 class _DocumentTitleProfile:
-    """保存全文中由重复高置信标题形成的排版原型集合。"""
+    """Save a collection of typographic prototypes formed by repeating high-confidence headlines throughout the text."""
 
     prototypes: tuple[_TitleStylePrototype, ...]

@@ -1,4 +1,4 @@
-"""Middle JSON 2.0 行内 Span 到 Markdown 的安全序列化。"""
+"""Middle JSON 2.0 Inline secure serialization of Span to Markdown."""
 
 from __future__ import annotations
 
@@ -22,27 +22,27 @@ _SIMPLE_STYLE_WRAPPERS = {
 
 
 def render_inline_content(content: list[InlineSpan], delimiters: LatexDelimitersConfig) -> str:
-    """把一段 MiddleJson 行内内容渲染为 Markdown。"""
+    """Render a MiddleJson inline content to Markdown."""
     return render_inline_spans(content, delimiters)
 
 
 def render_joined_inline_contents(contents: list[list[InlineSpan]], delimiters: LatexDelimitersConfig) -> str:
-    """按物理段落边界规则合并多段 content 后渲染 Markdown。"""
+    """Render Markdown after merging multiple segments of content according to physical segment boundary rules."""
     return render_inline_spans(join_inline_spans(contents), delimiters)
 
 
 def render_inline_spans(spans: list[InlineSpan], delimiters: LatexDelimitersConfig) -> str:
-    """把行内 Span 序列化为 Markdown 与必要的安全 HTML。"""
+    """Serialize inline Span to Markdown with necessary security HTML."""
     return "".join(_render_inline_span(span, delimiters) for span in spans)
 
 
 def render_inline_spans_in_html_context(spans: list[InlineSpan], delimiters: LatexDelimitersConfig) -> str:
-    """把 Markdown raw HTML 容器内的 Span 全部序列化为安全 HTML 行内语法。"""
+    """Serialize all Span in the Markdown raw HTML container to the safe HTML inline syntax."""
     return "".join(_render_inline_span_in_html_context(span, delimiters) for span in spans)
 
 
 def _render_inline_span(span: InlineSpan, delimiters: LatexDelimitersConfig) -> str:
-    """渲染单个结构化行内 Span。"""
+    """Renders a single structured inline Span."""
     if isinstance(span, TextSpan):
         content = _escape_plain_markdown_text(span.content)
         return _apply_styles(content, span.content, span.styles)
@@ -57,7 +57,7 @@ def _render_inline_span(span: InlineSpan, delimiters: LatexDelimitersConfig) -> 
 
 
 def _render_inline_span_in_html_context(span: InlineSpan, delimiters: LatexDelimitersConfig) -> str:
-    """渲染一个嵌入 Markdown raw HTML block 的结构化行内 Span。"""
+    """Renders a structured inline Span embedded in Markdown raw HTML block."""
     if isinstance(span, TextSpan):
         return _apply_html_styles(html.escape(span.content, quote=False), span.styles)
     if isinstance(span, CodeInlineSpan):
@@ -71,7 +71,7 @@ def _render_inline_span_in_html_context(span: InlineSpan, delimiters: LatexDelim
 
 
 def _render_inline_code(content: str) -> str:
-    """选择长于内容中反引号游程的 fence，稳定输出 Markdown 行内代码。"""
+    """Select fence that is longer than the backtick run in the content to stably output the Markdown inline code."""
     normalized = content.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
     longest = max((len(match.group(0)) for match in re.finditer(r"`+", normalized)), default=0)
     fence = "`" * (longest + 1)
@@ -81,7 +81,7 @@ def _render_inline_code(content: str) -> str:
 
 
 def _escape_plain_markdown_text(content: str) -> str:
-    """转义 Markdown 符号，并把普通文字中的标签外观保持为惰性实体。"""
+    """Escape the Markdown symbol and keep the label appearance as a lazy entity in plain text."""
     parts: list[str] = []
     cursor = 0
     for match in _HTML_LIKE_TEXT_RE.finditer(content):
@@ -93,10 +93,10 @@ def _escape_plain_markdown_text(content: str) -> str:
 
 
 def _escape_entity_like_text(content: str) -> str:
-    """保护会被下游 Markdown 解析器当作 HTML 实体的字面量文本。"""
+    """Protects literal literals that will be treated as HTML entities by downstream Markdown parsers."""
 
     def replace(match: re.Match[str]) -> str:
-        """只保护确实会被 HTML 实体解码器改写的候选。"""
+        """Only protect candidates that will actually be overwritten by the HTML entity decoder."""
         candidate = match.group(0)
         return f"&amp;{candidate[1:]}" if html.unescape(candidate) != candidate else candidate
 
@@ -104,7 +104,7 @@ def _escape_entity_like_text(content: str) -> str:
 
 
 def _apply_styles(content: str, plain_text: str, styles: Sequence[str]) -> str:
-    """按样式复杂度选择 Markdown wrapper 或安全 HTML 标签。"""
+    """Select Markdown wrapper or security HTML labels by style complexity."""
     if not content or not styles:
         return content
     marker = _get_visible_space_marker(styles)
@@ -119,7 +119,7 @@ def _apply_styles(content: str, plain_text: str, styles: Sequence[str]) -> str:
 
 
 def _get_visible_space_marker(styles: Sequence[str]) -> str | None:
-    """按 dev 规则选择可见空格 marker，下划线优先于删除线。"""
+    """Select visible spaces by dev rule marker, underline takes precedence over strikethrough."""
     if "underline" in styles:
         return "_"
     if "strikethrough" in styles:
@@ -133,7 +133,7 @@ def _render_visible_space_marker_text(
     styles: Sequence[str],
     marker: str,
 ) -> str | None:
-    """把纯 ASCII 空格或非空文本首尾空格转换为可见 marker。"""
+    """Convert plain ASCII spaces or non-empty text leading and trailing spaces to visible marker."""
     if not plain_text:
         return None
     style_key = frozenset(styles)
@@ -165,7 +165,7 @@ def _apply_style_wrappers(
     *,
     force_html: bool = False,
 ) -> str:
-    """给已处理空格的内容添加 Markdown 或 HTML 样式 wrapper。"""
+    """Adds Markdown or HTML style wrapper to content that has processed spaces."""
     if not content or not styles:
         return content
 
@@ -183,23 +183,23 @@ def _apply_style_wrappers(
 
 
 def render_styled_markdown_text(content: str, styles: Sequence[str]) -> str:
-    """按正文相同规则把已转义文字渲染为 Markdown 或安全 HTML 样式。"""
+    """Render escaped text into Markdown or safe HTML style according to the same rules as the text."""
     return _apply_style_wrappers(content, styles)
 
 
 def markdown_styles_require_html(styles: Sequence[str]) -> bool:
-    """判断样式组合是否必须整体使用 HTML 标签表达。"""
+    """Determine whether the style combination must be expressed using the HTML tag as a whole."""
     return bool(styles) and frozenset(styles) not in _SIMPLE_STYLE_WRAPPERS
 
 
 def _render_visible_whitespace(content: str, styles: Sequence[str]) -> str:
-    """使用原 HTML 规则保留非 ASCII marker 场景的可见空白。"""
+    """Preserve visible whitespace for non-ASCII marker scenes using the original HTML rules."""
     visible = "".join("<br>" if char == "\n" else "&nbsp;" for char in content.expandtabs(4))
     return _apply_html_styles(visible, styles)
 
 
 def _apply_html_styles(content: str, styles: Sequence[str]) -> str:
-    """按稳定顺序给复杂样式添加 HTML wrapper。"""
+    """Add HTML wrapper to complex styles in stable order."""
     if "superscript" in styles:
         content = f"<sup>{content}</sup>"
     elif "subscript" in styles:
@@ -218,7 +218,7 @@ def _apply_html_styles(content: str, styles: Sequence[str]) -> str:
 
 
 def _requires_html_link(spans: list[InlineSpan]) -> bool:
-    """判断链接标签是否含不适合嵌入 Markdown link 的复杂样式。"""
+    """Determine whether the link tag contains complex styles that are not suitable for embedding Markdown link."""
     for span in spans:
         if isinstance(span, TextSpan):
             if span.styles and frozenset(span.styles) not in _SIMPLE_STYLE_WRAPPERS:
@@ -227,7 +227,7 @@ def _requires_html_link(spans: list[InlineSpan]) -> bool:
 
 
 def _render_link(label: str, url: str, use_html: bool) -> str:
-    """按标签复杂度输出 Markdown 或 HTML 超链接。"""
+    """Outputs Markdown or HTML hyperlinks by tag complexity."""
     if not label:
         return ""
     if not url or url == ".":
@@ -239,13 +239,13 @@ def _render_link(label: str, url: str, use_html: bool) -> str:
 
 
 def render_internal_link(label: str, anchor: str) -> str:
-    """把已渲染目录标签包装为当前文档内锚点链接。"""
+    """Wraps the rendered table of contents tag as an anchor link within the current document."""
     safe_anchor = anchor.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
     return f"[{_escape_markdown_link_label(label)}](#{safe_anchor})"
 
 
 def _escape_markdown_link_label(label: str) -> str:
-    """转义 Markdown link 标签中的方括号并保留既有反斜杠。"""
+    """Escape the square brackets in the Markdown link tag and preserve existing backslashes."""
     return re.sub(r"(?<!\\)([\[\]])", r"\\\1", label)
 
 

@@ -1,4 +1,4 @@
-"""从启动解释器到首次实际共享解析返回的冷运行基准；模型 tape 装载单列但不从总耗时扣除。"""
+"""Cold running benchmark from starting the interpreter to the first actual shared parse return; model tape loads a single column but does not deduct it from the total elapsed time."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import time
 
 
 def child(args):
-    """新进程只分析一次，记录返回时刻后才进行输出摘要和来源验证。"""
+    """The new process is analyzed only once, and the return time is recorded before output summary and source verification."""
     entered = time.monotonic_ns()
     os.environ.update(
         DOCVORTEX_COMPUTE_BACKEND="rust",
@@ -84,7 +84,7 @@ def child(args):
 
 
 def main():
-    """父进程先验证源码再启动五个独立解释器，关闭与结果序列化均不混入首次就绪时刻。"""
+    """The parent process first verifies the source code and then starts five independent interpreters. Neither shutdown nor result serialization is mixed into the first ready time."""
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("path", "docvortex-source", "mineru-source", "tape", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
@@ -101,7 +101,7 @@ def main():
     from mineru_flash_benchmark import repository_identity
 
     def identities():
-        """在计时区外核对两仓源码，避免源码哈希开销伪装成解析冷启动。"""
+        """Check the source code of the two warehouses outside the timing zone to avoid source code hash overhead disguised as parsing cold start."""
         return {
             "docvortex": repository_identity(args.docvortex_source, "src/docvortex", native=True),
             "mineru": repository_identity(args.mineru_source, "mineru"),

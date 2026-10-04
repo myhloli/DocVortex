@@ -1,4 +1,4 @@
-"""保留原有导入入口；共享实现由下层模块唯一维护。"""
+"""The original import entry is retained; the shared implementation is uniquely maintained by the lower module."""
 
 from ....foundation.image_encoding import image_to_b64str, image_to_bytes
 

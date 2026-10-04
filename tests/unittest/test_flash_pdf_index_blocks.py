@@ -11,7 +11,7 @@ def _directory_lines(
     *,
     row_count: int = 10,
 ) -> list[index_blocks._LineItem]:
-    """构造带居中标题、宽目录条目和右侧页码片段的视觉行。"""
+    """Construct a visual row with a centered title, a wide table of contents entry, and a page number fragment on the right."""
 
     lines = [
         _text_line(
@@ -57,20 +57,20 @@ def _directory_lines(
     ],
 )
 def test_index_page_number_suffix_supports_expected_forms(content: str) -> None:
-    """验证目录行尾支持半角、全角、罗马页码及有限尾随标点。"""
+    """Verify that the directory line ending supports half-width, full-width, Roman page numbers and limited trailing punctuation."""
 
     assert index_blocks._index_row_ends_in_page_number(content)
 
 
 @pytest.mark.parametrize("content", ["entry", "version A12x", "word LIVE"])
 def test_index_page_number_suffix_rejects_non_page_number_tail(content: str) -> None:
-    """验证普通词尾和字母数字混合标识不会被当作目录页码。"""
+    """Verify that common suffixes and alphanumeric identifiers are not treated as table of contents page numbers."""
 
     assert not index_blocks._index_row_ends_in_page_number(content)
 
 
 def test_index_block_merges_split_rows_and_preserves_heading() -> None:
-    """验证目录正文合成一个换行块，居中目录标题保持段落标题。"""
+    """Verify that the table of contents text is combined into a line-wrapped block, and that the centered table of contents heading retains the paragraph headings."""
 
     lines = _directory_lines(set(range(6)), row_count=6)
 
@@ -90,7 +90,7 @@ def test_index_block_merges_split_rows_and_preserves_heading() -> None:
 
 
 def test_index_prepass_requires_geometric_heading_but_fallback_keeps_legacy_detection() -> None:
-    """验证公式前目录预判拒绝无标题编号行，公式后的兼容识别仍可处理无标题目录。"""
+    """The table of contents pre-judgment before verifying the formula rejects untitled numbered rows, and the compatibility recognition after the formula can still process the untitled table of contents."""
 
     lines = _directory_lines(set(range(6)), row_count=6)[1:]
 
@@ -123,7 +123,7 @@ def test_index_block_requires_seventy_percent_numeric_rows(
     numeric_rows: set[int],
     expected_block_count: int,
 ) -> None:
-    """验证目录候选在 70% 页码行尾阈值处命中，低于阈值则拒绝。"""
+    """Directory candidates are verified to hit at the 70% end-of-page line threshold and rejected below the threshold."""
 
     lines = _directory_lines(numeric_rows)
 
@@ -137,7 +137,7 @@ def test_index_block_requires_seventy_percent_numeric_rows(
 
 
 def test_numeric_lines_without_directory_width_or_sidecars_are_rejected() -> None:
-    """验证仅有大量数字行尾而缺少宽行及页码侧栏时不会误判目录。"""
+    """Verify that there is no misclassification of the table of contents when there are only large number line endings and lack of wide lines and page number sidebars."""
 
     lines = [
         _text_line(

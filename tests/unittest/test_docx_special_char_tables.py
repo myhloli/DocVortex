@@ -15,26 +15,26 @@ SOFT_HYPHEN = "­"
 
 
 def _save_docx_bytes(doc: Document) -> bytes:
-    """将内存中的 DOCX 文档序列化为字节。"""
+    """Serializes an in-memory DOCX document into bytes."""
     buffer = BytesIO()
     doc.save(buffer)
     return buffer.getvalue()
 
 
 def _convert_docx_bytes(file_bytes: bytes) -> list[dict]:
-    """调用当前 Flash DOCX Converter 并拉平分页块。"""
+    """Calls the current Flash DOCX Converter and flattens the paging block."""
     converter = DocxConverter()
     converter.convert(BytesIO(file_bytes))
     return [block for page in converter.pages for block in page]
 
 
 def _table_blocks(blocks: list[dict]) -> list[dict]:
-    """从拉平块列表中筛选表格块。"""
+    """Filter table blocks from the list of flattened blocks."""
     return [block for block in blocks if block["type"] == "table"]
 
 
 def _build_docx_with_no_break_hyphen_table() -> bytes:
-    """构造同时含不间断连字符和编号列表的整表丢失用例。"""
+    """Construct an entire table loss use case with both non-breaking hyphens and numbered lists."""
     doc = Document()
     doc.add_heading("1 项目概述", level=1)
 
@@ -55,7 +55,7 @@ def _build_docx_with_no_break_hyphen_table() -> bytes:
 
 
 def _build_docx_with_sym_table(*, char: str) -> bytes:
-    """构造同时含 Symbol 字符和编号列表的表格。"""
+    """Construct a table containing both the Symbol character and the numbered list."""
     doc = Document()
     doc.add_heading("符号表格", level=1)
     table = doc.add_table(rows=1, cols=2)
@@ -74,7 +74,7 @@ def _build_docx_with_sym_table(*, char: str) -> bytes:
 
 
 def _build_plain_docx_table() -> bytes:
-    """构造不含特殊字符的普通表格对照组。"""
+    """Constructs a normal table control group without special characters."""
     doc = Document()
     table = doc.add_table(rows=1, cols=2)
     table.cell(0, 0).paragraphs[0].add_run("APTT")
@@ -83,7 +83,7 @@ def _build_plain_docx_table() -> bytes:
 
 
 def _build_nested_merged_docx_table() -> bytes:
-    """构造含嵌套行、纵向合并和编号样式的完整上下文表格。"""
+    """Construct a complete contextual table with nested rows, vertical merging, and numbering styles."""
     doc = Document()
     table = doc.add_table(rows=2, cols=2)
     merged = table.cell(0, 0).merge(table.cell(1, 0))
@@ -98,7 +98,7 @@ def _build_nested_merged_docx_table() -> bytes:
 
 
 def _build_docx_with_residual_vmerge_text(*, explicit_continue: bool) -> bytes:
-    """构造 continuation 单元格含残留文本且相邻单元格含编号列表的表格。"""
+    """Construct a table with continuation cells containing residual text and adjacent cells containing numbered lists."""
     doc = Document()
     table = doc.add_table(rows=2, cols=2)
     merged = table.cell(0, 0).merge(table.cell(1, 0))
@@ -119,7 +119,7 @@ def _build_docx_with_residual_vmerge_text(*, explicit_continue: bool) -> bytes:
 
 
 def test_no_break_hyphen_table_not_lost() -> None:
-    """验证不间断连字符与编号列表并存时整表不会丢失。"""
+    """Verify that the entire table is not lost when a non-breaking hyphen coexists with a numbered list."""
     tables = _table_blocks(_convert_docx_bytes(_build_docx_with_no_break_hyphen_table()))
 
     assert len(tables) == 2
@@ -130,7 +130,7 @@ def test_no_break_hyphen_table_not_lost() -> None:
 
 
 def test_mapped_sym_table_takes_mammoth_path() -> None:
-    """验证普通 Symbol 映射字符与 Mammoth 表格签名保持一致。"""
+    """Verify that the common Symbol map characters are consistent with the Mammoth table signature."""
     tables = _table_blocks(_convert_docx_bytes(_build_docx_with_sym_table(char="0022")))
 
     assert len(tables) == 1
@@ -139,7 +139,7 @@ def test_mapped_sym_table_takes_mammoth_path() -> None:
 
 
 def test_f0_sym_table_takes_low_byte_fallback() -> None:
-    """验证 F0 前缀 Symbol 字符按 Mammoth 规则使用低字节回退映射。"""
+    """Verify that F0 prefix Symbol characters are mapped using low byte fallback according to Mammoth rules."""
     tables = _table_blocks(_convert_docx_bytes(_build_docx_with_sym_table(char="F0B7")))
 
     assert len(tables) == 1
@@ -148,7 +148,7 @@ def test_f0_sym_table_takes_low_byte_fallback() -> None:
 
 
 def test_plain_table_still_emitted() -> None:
-    """验证特殊字符签名修复不影响普通表格。"""
+    """Verify special character signature fix does not affect normal forms."""
     tables = _table_blocks(_convert_docx_bytes(_build_plain_docx_table()))
 
     assert len(tables) == 1
@@ -156,7 +156,7 @@ def test_plain_table_still_emitted() -> None:
 
 
 def test_nested_merged_table_uses_recursive_row_signature_and_full_context() -> None:
-    """验证 XML/HTML 递归行数对齐后不会进入缺少编号上下文的孤立回退。"""
+    """Verify that XML/HTML recursive line number alignment does not enter an orphan fallback with missing numbering context."""
     file_bytes = _build_nested_merged_docx_table()
     converter = DocxConverter()
     preparsed = converter._preparse_tables_with_mammoth(file_bytes)
@@ -173,7 +173,7 @@ def test_nested_merged_table_uses_recursive_row_signature_and_full_context() -> 
 
 @pytest.mark.parametrize("explicit_continue", (True, False))
 def test_vmerge_continuation_text_is_ignored_by_table_signature(explicit_continue: bool) -> None:
-    """验证两种 OOXML continuation 写法都与 Mammoth 表格文本签名一致。"""
+    """Verify that both OOXML and continuation writing methods are consistent with the Mammoth form text signature."""
     file_bytes = _build_docx_with_residual_vmerge_text(explicit_continue=explicit_continue)
     converter = DocxConverter()
     preparsed = converter._preparse_tables_with_mammoth(file_bytes)
@@ -189,7 +189,7 @@ def test_vmerge_continuation_text_is_ignored_by_table_signature(explicit_continu
 
 
 def test_xml_table_signature_renders_special_chars() -> None:
-    """验证 XML 签名保留不间断连字符和软连字符。"""
+    """Verify that the XML signature preserves non-breaking hyphens and soft hyphens."""
     doc = Document()
     table = doc.add_table(rows=1, cols=2)
     paragraph = table.cell(0, 0).paragraphs[0]
@@ -208,7 +208,7 @@ def test_xml_table_signature_renders_special_chars() -> None:
 
 
 def test_xml_table_signature_renders_sym_like_mammoth() -> None:
-    """验证已映射 Symbol 输出字符，真正未映射 Symbol 输出空字符串。"""
+    """Verified Symbol output character is mapped, true unmapped Symbol output empty string."""
     doc = Document()
     table = doc.add_table(rows=1, cols=2)
     paragraph = table.cell(0, 0).paragraphs[0]
@@ -234,7 +234,7 @@ def test_xml_table_signature_renders_sym_like_mammoth() -> None:
 
 
 def test_xml_table_signature_excludes_omml_equation_text() -> None:
-    """验证 Mammoth 不渲染的 OMML 公式文本不参与表格签名。"""
+    """Verify that Mammoth does not render the OMML formula text that does not participate in the table signature."""
     doc = Document()
     table = doc.add_table(rows=1, cols=2)
     paragraph = table.cell(0, 0).paragraphs[0]

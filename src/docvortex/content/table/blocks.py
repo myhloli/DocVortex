@@ -1,4 +1,4 @@
-"""DocVortex table block 的主体、辅助文本和 bbox 访问规则。"""
+"""Body, auxiliary text for DocVortex table block and access rules for bbox."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from .rules import is_table_continuation_text
 
 
 def _bbox_for_calculation(bbox: Any) -> CalculationBBox | None:
-    """复制归一化 bbox 并放大为千分位整数，原始字段保持不变。"""
+    """The normalized bbox is copied and upscaled to thousandths integers, the original fields remain unchanged."""
     if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
         return None
     if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in bbox):
@@ -32,7 +32,7 @@ def _bbox_for_calculation(bbox: Any) -> CalculationBBox | None:
 
 
 def _table_children(table_block: BlockDict) -> list[BlockDict]:
-    """读取 table 根块下的合法 dict 子块。"""
+    """Read the legal dict sub-block under the table root block."""
     content = table_block.get("content")
     if not isinstance(content, list):
         return []
@@ -40,7 +40,7 @@ def _table_children(table_block: BlockDict) -> list[BlockDict]:
 
 
 def _find_table_body_block(table_block: BlockDict) -> BlockDict | None:
-    """查找 dict table block 中的主体子块。"""
+    """Find the body sub-block in dict table block."""
     for block in _table_children(table_block):
         if block.get("type") == BlockType.TABLE_BODY:
             return block
@@ -48,7 +48,7 @@ def _find_table_body_block(table_block: BlockDict) -> BlockDict | None:
 
 
 def _build_post_body_child_index(table_block: BlockDict, offset: int) -> int | None:
-    """为复制到前表的 footnote 生成表体后的安全 index。"""
+    """Generate security index after table body for footnote copied to previous table."""
     body_block = _find_table_body_block(table_block)
     if body_block is None:
         return None
@@ -61,7 +61,7 @@ def _build_post_body_child_index(table_block: BlockDict, offset: int) -> int | N
 
 
 def _block_text(block: BlockDict) -> str:
-    """递归读取 dict block 的文本内容，供续表标记判断使用。"""
+    """Recursively read the text content of dict block for use in table continuation mark judgment."""
     content = block.get("content")
     if isinstance(content, str):
         return content
@@ -71,15 +71,15 @@ def _block_text(block: BlockDict) -> str:
 
 
 def _is_continuation_caption(caption_block: BlockDict) -> bool:
-    """判断 dict caption 文本是否带有续表标记。"""
+    """Determine whether the dict caption text has a table continuation mark."""
     return is_table_continuation_text(_block_text(caption_block))
 
 
 def _is_post_table_non_continuation_caption(table_block: BlockDict, caption_block: BlockDict) -> bool:
-    """判断 caption 是否是误挂到表格下方的新段落标题。
+    """Determine whether caption is mistakenly linked to a new paragraph title below the table.
 
-    这类 caption 位于 table body 下方，且不含续表标记；它不应作为
-    当前表的新标题阻断跨页关系判断。
+    This type caption is located below table body and does not contain the continuation mark; it should not be used as
+    The new title of the current table blocks cross-page relationship judgment.
     """
     if _is_continuation_caption(caption_block):
         return False
@@ -97,7 +97,7 @@ def _is_post_table_non_continuation_caption(table_block: BlockDict, caption_bloc
 
 
 def _build_table_state(table_block: BlockDict, max_header_rows: int = MAX_HEADER_ROWS) -> TableMergeState | None:
-    """从 dict table block 构建结构缓存，非法主体安全返回空。"""
+    """Building structure cache from dict table block, illegal principal safety returns null."""
     body_block = _find_table_body_block(table_block)
     if body_block is None:
         return None
@@ -137,7 +137,7 @@ def _get_or_create_table_state(
     state_cache: dict[int, TableMergeState],
     max_header_rows: int = MAX_HEADER_ROWS,
 ) -> TableMergeState | None:
-    """按 table dict 对象身份复用 HTML 结构扫描结果。"""
+    """Reuse HTML structure scan results by table dict object identity."""
     cache_key = id(table_block)
     state = state_cache.get(cache_key)
     if state is not None:

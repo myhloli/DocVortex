@@ -1,4 +1,4 @@
-"""从字体、绘图线及链接注解提取原生行内证据。"""
+"""Extract native inline evidence from fonts, drawing lines, and link annotations."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ from .types import (
 
 
 def _pdf_font_metadata(char: dict[str, Any]) -> tuple[str, int, float | None]:
-    """读取单个字符的规范字体名、FontDescriptor flags 和有效字重。"""
+    """Reads a single character's canonical font name, FontDescriptor flags, and valid font weight."""
 
     font = char.get("font")
     if not isinstance(font, dict):
@@ -73,7 +73,7 @@ def _pdf_font_metadata(char: dict[str, Any]) -> tuple[str, int, float | None]:
 
 
 def _char_font_styles(char: dict[str, Any]) -> frozenset[PDFTextStyle]:
-    """只依据直接字体证据返回 PDF 字符粗体样式。"""
+    """Returns the PDF character bold style based only on direct font evidence."""
 
     font_name, font_flags, font_weight = _pdf_font_metadata(char)
     return _font_styles_from_metadata(font_name, font_flags, font_weight)
@@ -81,7 +81,7 @@ def _char_font_styles(char: dict[str, Any]) -> frozenset[PDFTextStyle]:
 
 @lru_cache(maxsize=4096)
 def _font_styles_from_metadata(font_name: str, font_flags: int, font_weight: float | None) -> frozenset[PDFTextStyle]:
-    """仅按不可变字体值复用粗体判断，字段变化仍重新计算。"""
+    """Only the immutable font value is used to reuse bold judgment, and field changes are still recalculated."""
 
     styles: set[PDFTextStyle] = set()
     if (
@@ -99,7 +99,7 @@ def _has_list_marker_separator(
     next_source_index: int,
     median_height: float,
 ) -> bool:
-    """判断行首项目符号与后续正文之间是否存在空白或明显视觉间隔。"""
+    """Determine whether there is any white space or significant visual separation between the first bullet and the following text."""
 
     if any(str(chars[index].get("char") or "").isspace() for index in range(marker_source_index + 1, next_source_index)):
         return True
@@ -113,7 +113,7 @@ def _filter_pdf_bold_runs(
     font_styles: Sequence[frozenset[PDFTextStyle]],
     median_height: float,
 ) -> list[frozenset[PDFTextStyle]]:
-    """过滤过短粗体 run 和与正文分离的行首项目符号粗体。"""
+    """Filtered short bold run and line leading bullet bold separated from text."""
 
     output = list(font_styles)
     comparable_chars = [
@@ -157,7 +157,7 @@ def _filter_pdf_bold_runs(
 
 
 def _prepare_plain_style_line(line, font_cache):
-    """普通行一次准备字符顺序和字体分类，特殊字段不提前执行转换。"""
+    """Character order and font classification are prepared once for ordinary lines, and conversion is not performed in advance for special fields."""
     if type(line) is not _LineItem or type(line.chars) is not list or type(line.angle) is not int or line.angle % 360:
         return None
     if (
@@ -206,7 +206,7 @@ def _prepare_plain_style_line(line, font_cache):
 
 
 def _build_line_candidate(line: Any, prepared_style=None) -> _LineCandidate | None:
-    """从视觉水平 line 构造字符几何候选，旋转文字和退化行返回空。"""
+    """Constructing character geometry candidates from visual level line, rotated text and degenerate lines returns null."""
 
     if int(getattr(line, "angle", 0) or 0) % 360 != 0:
         return None
@@ -265,7 +265,7 @@ def _drawing_match_for_line(
     drawing: Any,
     style: PDFTextDecoration,
 ) -> _DrawingMatch | None:
-    """按目标纵向锚点和公共几何规则校验单条文本装饰线。"""
+    """Verify a single text decoration line by target vertical anchor point and common geometric rules."""
 
     if getattr(drawing, "orientation", None) != "horizontal":
         return None
@@ -294,7 +294,7 @@ def _drawing_match_for_line(
     if not hit_chars:
         return None
     if style == "strikethrough":
-        # 分式横线可能穿过字体外框却完全位于字形上方，不应据此生成删除线。
+        # A break line may pass through the font outline but be completely above the glyph, and should not be used to generate a strikethrough.
         ink_boxes = [_coerce_bbox(line.chars[char.source_index].get("tight_bbox")) for char in hit_chars]
         if all(bbox is not None for bbox in ink_boxes) and not any(
             bbox[1] <= drawing_center_y <= bbox[3] for bbox in ink_boxes if bbox is not None
@@ -329,7 +329,7 @@ def _drawing_match_for_line(
 
 
 def _merge_source_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
-    """合并重叠或相邻的来源字符区间。"""
+    """Merge overlapping or adjacent source character ranges."""
 
     merged: list[tuple[int, int]] = []
     for start, end in sorted(ranges):
@@ -343,7 +343,7 @@ def _merge_source_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]
 
 
 def _line_style_payload(line: _LineCandidate) -> PDFTextStyleLine | None:
-    """把来源字符的字体与装饰线证据转换为紧凑文本样式区间。"""
+    """Convert source character font and decorative line evidence into compact text style ranges."""
 
     if not any(line.font_styles) and not any(line.decoration_ranges.values()):
         text = "".join(fragment for char in line.chars if (fragment := _normalize_match_fragment(char.get("char"))))
@@ -393,7 +393,7 @@ def _build_line_geometry_grids(
     dict[int, list[tuple[int, PDFTextDecoration]]],
     dict[int, list[int]],
 ]:
-    """按装饰线锚点和行顶坐标建立网格，限制每条 drawing 的局部比较范围。"""
+    """Create a grid based on decorative line anchor points and row top coordinates to limit the local comparison range of each drawing."""
 
     grid_size = max(
         1.0,
@@ -430,7 +430,7 @@ def _is_fraction_bar_candidate(
     line_index: int,
     drawing_bbox: BBox,
 ) -> bool:
-    """用紧邻且被横线覆盖的下方文本 run 排除公式分数线。"""
+    """Use the text run immediately below and covered by a horizontal line to exclude formula fraction lines."""
 
     line = candidates[line_index]
     drawing_center_y = (drawing_bbox[1] + drawing_bbox[3]) / 2
@@ -461,7 +461,7 @@ def detect_pdf_text_style_lines(
     lines: Sequence[Any],
     drawing_lines: Sequence[Any],
 ) -> list[PDFTextStyleLine]:
-    """从视觉文本 run 与页面 drawing 中生成全部水平行样式证据。"""
+    """Generate full horizontal line style evidence from visual text run and page drawing."""
 
     if not lines:
         return []
@@ -474,9 +474,9 @@ def detect_pdf_text_style_lines(
     font_cache = {}
     prepared_styles = [_prepare_plain_style_line(line, font_cache) for line in lines] if no_horizontal_drawings else None
     if prepared_styles is not None and any(value is None for value in prepared_styles):
-        # 一个特殊行的字体回调可能修改后续普通行，整次检测必须恢复原准备次序。
+        # A font callback for a special line may modify subsequent ordinary lines, and the entire test must be restored to the original preparation order.
         prepared_styles = None
-    # 页面全部普通字体无样式时才跳过几何；混合页面仍保留无样式物理行作为对齐证据。
+    # Geometry is skipped only when all normal fonts on the page are unstyled; mixed pages still retain unstyled physical lines as evidence of alignment.
     if prepared_styles is not None and all(value is not None and not any(value[1]) for value in prepared_styles):
         return []
     candidates = []
@@ -540,7 +540,7 @@ def detect_pdf_text_style_lines(
 
 
 def _link_region_hits_char(region: BBox, char_bbox: BBox) -> bool:
-    """按字符中心或字符面积覆盖率判断 Link 区域是否命中字符。"""
+    """Determine whether the Link area hits the character based on the character center or character area coverage."""
 
     center_x = (char_bbox[0] + char_bbox[2]) / 2
     center_y = (char_bbox[1] + char_bbox[3]) / 2
@@ -557,7 +557,7 @@ def _link_targets_for_char(
     char_bbox: BBox,
     annotations: Sequence[PDFLinkAnnotation],
 ) -> set[str]:
-    """返回命中字符的全部不同链接目标，供冲突检测使用。"""
+    """Returns all different link targets for hit characters for use in conflict detection."""
 
     return {
         annotation.target
@@ -569,7 +569,7 @@ def _link_targets_for_char(
 def _compact_link_ranges(
     compact_targets: Sequence[str | None],
 ) -> tuple[PDFTextLinkRange, ...]:
-    """把逐字符链接目标压缩为同目标连续区间。"""
+    """Compress character-by-character link targets into continuous intervals of the same target."""
 
     ranges: list[PDFTextLinkRange] = []
     active_start = 0
@@ -595,7 +595,7 @@ def _build_link_line_payload(
     annotations: Sequence[PDFLinkAnnotation],
     fallback_source_index: int,
 ) -> PDFTextLinkLine | None:
-    """把一个视觉文本 run 与 Link 区域相交结果转换为紧凑链接证据。"""
+    """Convert a visual text run and Link region intersection result into compact link evidence."""
 
     try:
         angle = int(getattr(line, "angle", 0) or 0) % 360
@@ -622,7 +622,7 @@ def _build_link_line_payload(
             continue
         char_bbox = _coerce_bbox(char.get("bbox"))
         targets = _link_targets_for_char(char_bbox, nearby_annotations) if char_bbox is not None else set()
-        # 同一字符落入不同目标时不猜测 PDF 点击层级，保留为普通文本。
+        # No guessing when the same character falls into different targets PDF Click level, keep as normal text.
         target = next(iter(targets)) if len(targets) == 1 else None
         compact_parts.append(fragment)
         compact_targets.extend([target] * len(fragment))
@@ -647,7 +647,7 @@ def detect_pdf_text_link_lines(
     lines: Sequence[Any],
     annotations: Sequence[PDFLinkAnnotation],
 ) -> list[PDFTextLinkLine]:
-    """从视觉文本 run 与 PDF Link 注解生成字符级超链接证据。"""
+    """Generating character-level hyperlink evidence from visual text run and PDF Link annotations."""
 
     if not annotations:
         return []

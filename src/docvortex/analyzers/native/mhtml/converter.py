@@ -1,4 +1,4 @@
-"""把 MHTML 主文档及归档资源投影为现有 HTML 语义块。"""
+"""Project the MHTML master document and archive resources into existing HTML semantic blocks."""
 
 from __future__ import annotations
 
@@ -16,23 +16,23 @@ from .resources import MhtmlResourceContext
 
 
 def read_archive_properties(archive: MhtmlArchive) -> tuple[DocumentProperties, list[str]]:
-    """复用 HTML 声明元数据，仅用 MIME Subject 补充缺失标题。"""
+    """Reuse HTML declaration metadata and only use MIME Subject to supplement missing titles."""
     properties, warnings = read_html_properties(archive.html, archive.source_context)
     properties.title = properties.title or archive.subject
     return properties, warnings
 
 
 class MhtmlConverter(HtmlConverter):
-    """通过一次解包生成正文、元数据和可选资源诊断。"""
+    """Generate text, metadata and optional resource diagnostics through one unpacking."""
 
     def __init__(self) -> None:
-        """初始化与单次转换绑定的元数据及诊断。"""
+        """Initialize metadata and diagnostics bound to a single conversion."""
         super().__init__()
         self.properties = DocumentProperties()
         self.diagnostics: tuple[Diagnostic, ...] = ()
 
     def convert(self, file_binary: BinaryIO, *, source_context: HtmlSourceContext | None = None) -> None:
-        """加载主 HTML 后调用共享投影，不合并 iframe 或其他 HTML 附件。"""
+        """Shared projection is called after loading the main HTML, without merging iframe or other HTML attachments."""
         archive = MhtmlArchive(file_binary.read(MAX_ARCHIVE_BYTES + 1), source_context)
         self.properties, warnings = read_archive_properties(archive)
         document = parse_html_document(archive.html, archive.source_context)
@@ -49,7 +49,7 @@ class MhtmlConverter(HtmlConverter):
 
 
 def _restore_picture_sources(document: HtmlDocument, archive: MhtmlArchive) -> None:
-    """当回退图片未归档时采用已保存的 picture/srcset 候选，不发起外部请求。"""
+    """When the rollback picture is not archived, the saved picture/srcset candidate is used and no external request is initiated."""
     for image in document.body.iter("img"):
         if (image.get("src") or "").strip().casefold().startswith("data:"):
             continue
@@ -58,7 +58,7 @@ def _restore_picture_sources(document: HtmlDocument, archive: MhtmlArchive) -> N
         picture = next((parent for parent in image.iterancestors() if parent.tag == "picture"), None)
         sources = list(picture.iter("source")) if picture is not None else []
         for source in [*sources, image]:
-            # 浏览器归档中的网络候选按逗号分隔；data URI 无需做归档匹配。
+            # The network candidates in the browser archive are separated by commas; data URI No need to do archive matching.
             candidates = (source.get("srcset") or "").split(",")
             selected = next(
                 (

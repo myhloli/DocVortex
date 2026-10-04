@@ -1,4 +1,4 @@
-"""把已对齐的链接、样式及上下标区间物化为 InlineSpan。"""
+"""Materialize the aligned links, styles, and superscript and subscript intervals as InlineSpan."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ def apply_pdf_text_links(
     lines: Sequence[PDFTextLinkLine],
     page_size: tuple[float, float],
 ) -> None:
-    """把页面 Link 几何证据写入自然语言 block，歧义时保持原文。"""
+    """Write the geometric evidence of page Link into natural language block, keeping the original text in case of ambiguity."""
 
     assignments = _assign_lines_to_blocks(blocks, lines, page_size)
     for block_index, block_lines in assignments.items():
@@ -74,7 +74,7 @@ def _append_raw_style_interval(
     end: int,
     styles: tuple[PDFTextStyle, ...],
 ) -> None:
-    """向结果追加一个合法原字符串样式区间。"""
+    """Appends a valid raw string style range to the result."""
 
     if start is not None and start < end and styles:
         intervals.append(_RawStyleInterval(start, end, styles))
@@ -84,7 +84,7 @@ def _merge_raw_style_intervals(
     content: str,
     intervals: Sequence[_RawStyleInterval],
 ) -> list[_RawStyleInterval]:
-    """合并原字符串中相邻且样式一致、仅由普通空白隔开的区间。"""
+    """Merge adjacent and consistent ranges in the original string, separated only by ordinary whitespace."""
 
     merged: list[_RawStyleInterval] = []
     for interval in sorted(intervals, key=lambda item: (item.start, item.end, item.styles)):
@@ -110,7 +110,7 @@ def _raw_style_intervals(
     projected: Sequence[_ProjectedChar],
     ranges: Sequence[PDFTextStyleRange],
 ) -> list[_RawStyleInterval]:
-    """把样式区间转换为不跨公式或已有行内标签的原字符串区间。"""
+    """Convert style ranges to original string ranges that do not span formulas or have inline labels."""
 
     intervals: list[_RawStyleInterval] = []
     for style_range in ranges:
@@ -118,7 +118,7 @@ def _raw_style_intervals(
         current_end = 0
         current_styles: tuple[PDFTextStyle, ...] = ()
         for token in projected[style_range.start : style_range.end]:
-            # Link 注解已提供语义，链接范围内的几何下划线不重复输出为文本样式。
+            # Link annotation has provided semantics, and the geometric underline within the link range is not repeatedly output as a text style.
             missing_styles = _canonical_styles(
                 style
                 for style in style_range.styles
@@ -166,7 +166,7 @@ def apply_pdf_text_styles(
     lines: Sequence[PDFTextStyleLine],
     page_size: tuple[float, float],
 ) -> None:
-    """把页面字体和装饰线证据写入自然语言 block，歧义时保持原文。"""
+    """Write page font and decorative line evidence into natural language block, keeping the original text in case of ambiguity."""
 
     assignments = _assign_lines_to_blocks(blocks, lines, page_size)
     for block_index, block_lines in assignments.items():
@@ -198,7 +198,7 @@ def _script_range_hits_late_formula_region(
     script_range: PDFTextScriptRange,
     regions: list[BBox],
 ) -> bool:
-    """判断非公式候选是否落入后续文本块恢复出的行内数学区域。"""
+    """Determine whether the non-formula candidate falls into the inline math area recovered from the subsequent text block."""
     if script_range.formula_region:
         return False
     center_x = (script_range.bbox[0] + script_range.bbox[2]) / 2
@@ -215,7 +215,7 @@ def _record_materialized_script_ranges(
     script_ranges: Sequence[PDFTextScriptRange],
     output: list[dict[str, Any]],
 ) -> None:
-    """记录真正通过文本投影的私有上下标区间，供审阅产物精确回溯。"""
+    """Record the private superscript and subscript intervals that are actually projected through the text for accurate review of the product."""
     for script_range in script_ranges:
         evidence_line = PDFTextStyleLine(
             bbox=line.bbox,
@@ -267,8 +267,8 @@ def apply_pdf_text_scripts(
     *,
     materialized_diagnostics: list[dict[str, Any]] | None = None,
 ) -> None:
-    """把 Flash 上下标 sidecar 投影到最终自然语言 block，并清理公式私有区域。"""
-    # 空证据仍执行原分配流程，避免为扫描页建立不会被再次消费的缓存。
+    """Project Flash superscript and subscript sidecar to the final natural language block, and clean up the formula private area."""
+    # Empty evidence still executes the original allocation process to avoid creating a cache for scanned pages that will not be consumed again.
     projection_cache = _ContentProjectionCache() if lines else None
     assignments = _assign_script_lines_to_blocks(blocks, lines, page_size, projection_cache=projection_cache)
     for block_index, block_lines in assignments.items():
@@ -346,7 +346,7 @@ def apply_pdf_text_scripts(
 
 
 def _parse_native_script_markup(content: str) -> _NativeScriptMarkup | None:
-    """严格解析 detector-owned 平坦 sup/sub 标签；畸形或嵌套结构返回 None。"""
+    """Strictly parses detector-owned for flat sup/sub tags; malformed or nested structures return None."""
     marker_ranges: list[tuple[int, int]] = []
     style_intervals: list[tuple[int, int, str]] = []
     active: tuple[str, int] | None = None
@@ -372,7 +372,7 @@ def _parse_native_script_markup(content: str) -> _NativeScriptMarkup | None:
 
 
 def materialize_pdf_inline_spans(blocks: list[dict[str, Any]]) -> None:
-    """把 PDF 原文、样式区间、链接区间和行内公式一次性物化为 Span。"""
+    """Materialize the PDF original text, style interval, link interval and inline formula into Span at one time."""
     formula_pattern = re.compile(r"\\\((?P<latex>.*?)\\\)", re.DOTALL)
     for block in blocks:
         owns_native_script_markup = block.pop(PDF_NATIVE_SCRIPT_MARKUP_KEY, False) is True
@@ -471,7 +471,7 @@ def apply_pdf_inline_evidence(
     *,
     materialized_diagnostics: list[dict[str, Any]] | None = None,
 ) -> None:
-    """在调用方已有页面准备之后统一执行行内语义物化顺序。"""
+    """The inline semantic materialization sequence is uniformly executed after the caller has prepared the page."""
     apply_pdf_text_links(blocks, link_lines, page_size)
     apply_pdf_text_styles(blocks, style_lines, page_size)
     apply_pdf_text_scripts(blocks, script_lines, page_size, materialized_diagnostics=materialized_diagnostics)

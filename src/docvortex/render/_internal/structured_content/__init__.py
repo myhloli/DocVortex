@@ -1,3 +1,3 @@
-"""Structured Content 私有渲染实现。"""
+"""Structured Content Private rendering implementation."""
 
 __all__: list[str] = []

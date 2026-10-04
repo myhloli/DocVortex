@@ -1,4 +1,4 @@
-"""自有快照样式阶段与 Python 参考逐字段差分，覆盖排序、装饰线及能力边界。"""
+"""Own snapshot style stage with Python reference field-by-field differentiation covering sorting, trim lines and capability boundaries."""
 from io import BytesIO
 import random
 
@@ -13,7 +13,7 @@ from docvortex.analyzers.native.pdf.inline import detection, owned_styles
 
 @pytest.fixture(scope="module")
 def owned_page():
-    """从真实 PDF 获得独立快照，全部测试均在文档关闭后消费字符与字体证据。"""
+    """Taking independent snapshots from a real PDF, all tests consumed character and font evidence after the document was closed."""
     if get_native() is None:
         pytest.skip("Python reference backend")
     output = BytesIO()
@@ -31,7 +31,7 @@ def owned_page():
 
 @pytest.mark.parametrize("seed", range(100))
 def test_owned_style_geometry_matches_reference(owned_page, seed):
-    """随机组合乱序/重复成员、并列来源、旋转行和临界绘图线，完整比对区间及稳定顺序。"""
+    """Randomly combine shuffled/duplicated members, parallel sources, rotated rows and critical plot lines, complete alignment intervals and stable order."""
     owner, chars, identities = owned_page
     rng = random.Random(seed)
     lines = []
@@ -55,14 +55,14 @@ def test_owned_style_geometry_matches_reference(owned_page, seed):
 
 
 def test_owned_style_missing_identity_uses_reference(owned_page):
-    """调用方复制或替换字符时不能继续使用原快照的几何与字体。"""
+    """The caller cannot continue to use the geometry and font of the original snapshot when copying or replacing characters."""
     owner, chars, identities = owned_page
     line = _LineItem("A", (0.0, 0.0, 100.0, 30.0), 0, 0, chars=[dict(chars[0])])
     assert owned_styles.detect_owned_style_lines(owner, [line], [], identities) is None
 
 
 def test_owned_style_invalid_index_propagates(owned_page):
-    """身份映射损坏必须明确报错，不吞掉原生越界错误。"""
+    """If the identity mapping is damaged, an error must be reported clearly, and the native out-of-bounds error will not be swallowed."""
     owner, chars, _ = owned_page
     line = _LineItem("A", (0.0, 0.0, 100.0, 30.0), 0, 0, chars=[chars[0]])
     with pytest.raises(ValueError, match="member index"):
@@ -70,7 +70,7 @@ def test_owned_style_invalid_index_propagates(owned_page):
 
 
 def test_owned_style_extreme_grid_uses_reference(owned_page):
-    """超出有界网格的有限坐标明确返回能力不适用，不截断候选覆盖。"""
+    """The ability to explicitly return finite coordinates beyond a bounded grid does not apply, and candidate coverage is not truncated."""
     owner, chars, identities = owned_page
     line = _LineItem("A", (0.0, 1e90, 100.0, 2e90), 0, 0, chars=chars[:3])
     rule = _AxisLine((0.0, 0.0, 100.0, 0.1), 0.1, "horizontal")
@@ -79,7 +79,7 @@ def test_owned_style_extreme_grid_uses_reference(owned_page):
 
 @pytest.mark.parametrize("text", ["ﬃ", "\x02", "\u200b", "\u00ad", "\u00a0", "😀", "•", "汉字", "\u0378", "A\tB"])
 def test_snapshot_style_unicode_properties_match_host(text):
-    """连字、控制符、补充平面和项目符号仍由宿主 Python 的 Unicode 规则定义。"""
+    """Hyphenation, control characters, supplementary planes, and bullets are still defined by the Unicode rules of host Python."""
     fragment, visible, space, marker = owned_styles._snapshot_text_properties(text)
     assert fragment == detection._normalize_match_fragment(text)
     assert visible == (text.isprintable() and not text.isspace())
@@ -88,7 +88,7 @@ def test_snapshot_style_unicode_properties_match_host(text):
 
 
 def test_public_style_input_mutation_does_not_change_snapshot(owned_page):
-    """公开可变字符仍按当前字体值检测，修改不会反向写入 Rust 快照。"""
+    """Publicly variable characters are still detected according to the current font value, and modifications are not written back to the Rust snapshot."""
     owner, _, _ = owned_page
     chars = [char for char in owner.materialize_geometry().chars if detection._normalize_match_fragment(char["char"])][:2]
     boxes = [char["bbox"].bbox for char in chars]

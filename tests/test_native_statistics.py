@@ -1,4 +1,4 @@
-"""验证批量统计的阈值、稳定排序和来源成员，不以近似误差放行。"""
+"""Verify thresholds, stable ordering, and source members of batch statistics, and do not release with approximate errors."""
 
 import math
 import random
@@ -11,7 +11,7 @@ from docvortex._compute_backend import get_native
 
 @pytest.fixture
 def native():
-    """强制 Rust 时加载错误直接失败，纯 Python 回归跳过原生专用断言。"""
+    """Direct failure with load error when forcing Rust, pure Python regression skips native dedicated assertions."""
     value = get_native()
     if value is None:
         pytest.skip("native backend is not selected")
@@ -19,7 +19,7 @@ def native():
 
 
 def reference_clusters(values, tolerance, relative, last_only):
-    """逐步重算原中位数，作为独立且保留历史判断顺序的参考。"""
+    """Gradually recalculate the original median as a reference that is independent and retains the order of historical judgments."""
     groups = []
     for index in sorted(range(len(values)), key=values.__getitem__):
         targets = groups[-1:] if last_only else groups
@@ -41,7 +41,7 @@ def reference_clusters(values, tolerance, relative, last_only):
 @pytest.mark.parametrize("seed", range(12))
 @pytest.mark.parametrize("relative,last_only", [(0.0, False), (0.0, True), (0.1, False)])
 def test_ordered_clusters_exact_parity(native, seed, relative, last_only):
-    """奇偶中位数、重复键、多簇命中和阈值相等均须保持完整索引一致。"""
+    """Parity medians, duplicate keys, multi-cluster hits, and threshold equality are all required to keep the full index consistent."""
     rng = random.Random(seed)
     batches = [[], [0.0, -0.0], [0.0, 0.5, 0.75, 1.0, 1.25], [1e308, 1e308, 1e308]]
     batches += [[rng.choice([0.0, 0.5, 1.0, 2.0, rng.uniform(-4, 30)]) for _ in range(120)]]
@@ -53,13 +53,13 @@ def test_ordered_clusters_exact_parity(native, seed, relative, last_only):
 
 @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
 def test_nonfinite_clusters_reference_path(native, value):
-    """原生拒绝不适合稳定数值排序的输入，由 Python 参考路径决定行为。"""
+    """Inputs not suitable for stable numerical ordering are natively rejected, behavior determined by the Python reference path."""
     assert native.ordered_clusters([value], 0.5, 0.0, False) is None
 
 
 @pytest.mark.parametrize("seed", range(16))
 def test_typography_full_state_parity(native, seed):
-    """整行比较所有字段，覆盖字体平局、旋转、无效框、缺字重及共享字体字典。"""
+    """A full line comparison of all fields, covering font draw, rotation, invalid boxes, missing weights, and shared font dictionaries."""
     from copy import deepcopy
     from dataclasses import asdict
     from docvortex.analyzers.native.pdf import native_text as text
@@ -88,7 +88,7 @@ def test_typography_full_state_parity(native, seed):
     before = deepcopy(chars)
     text._fill_native_typography_python(expected, (200.0, 300.0))
     text._fill_native_typography(line, (200.0, 300.0))
-    # Bbox 容器没有值相等运算，字符部分单独按协议比较。
+    # Bbox There is no value equality operation in the container, and the character part is compared according to the protocol alone.
     left, right = asdict(line), asdict(expected)
     left.pop("chars")
     right.pop("chars")
@@ -98,7 +98,7 @@ def test_typography_full_state_parity(native, seed):
 
 @pytest.mark.parametrize("seed", range(16))
 def test_lane_gap_snapshot_parity(native, seed):
-    """数值输出和原列表排序副作用均须匹配，并保留成员引用。"""
+    """Both the numeric output and the original list sorting side effects must match and retain member references."""
     from copy import deepcopy
     from docvortex.analyzers.native.pdf import line_layout as layout
     from docvortex.analyzers.native.pdf.models import _LineItem, _TextLane
@@ -129,7 +129,7 @@ def test_lane_gap_snapshot_parity(native, seed):
 
 @pytest.mark.parametrize("seed", range(24))
 def test_table_visual_rows_member_parity(native, seed):
-    """逐项核对反向遍历的平局、阈值边界和原对象身份，输入不排序改写。"""
+    """Check the tie, threshold boundaries and original object identity of the reverse traversal item by item, and the input is not sorted and rewritten."""
     from docvortex.analyzers.native.pdf._table_recovery import text
 
     rng = random.Random(seed)
@@ -146,7 +146,7 @@ def test_table_visual_rows_member_parity(native, seed):
 
 
 def test_occupancy_boundary_and_cache_contract(native):
-    """公共边界优先左列；恢复调用缓存不暴露可变集合，且不修改文本字形。"""
+    """Public boundaries prioritize the left column; the restore call cache does not expose mutable collections and does not modify text glyphs."""
     from types import SimpleNamespace
     from docvortex.analyzers.native.pdf._table_recovery.sparse_hybrid import _RowOccupancy
 
@@ -165,7 +165,7 @@ def test_occupancy_boundary_and_cache_contract(native):
 
 
 def test_finite_weights_overflow_preserves_python_comparison(native):
-    """有限字重的中位数可溢出；Inf-Inf 的 NaN 必须保留原否定比较语义。"""
+    """Finite weight medians can overflow; NaN of Inf-Inf must preserve the original negative comparison semantics."""
     from copy import deepcopy
     from docvortex.analyzers.native.pdf import native_text as text
     from docvortex.analyzers.native.pdf.models import _LineItem
@@ -188,7 +188,7 @@ def test_finite_weights_overflow_preserves_python_comparison(native):
 
 
 def test_lane_intermediate_overflow_uses_reference(native):
-    """中间运算溢出时不在 Rust 中排序 NaN，回到原 Python 行距结果。"""
+    """When the intermediate operation overflows, NaN is not sorted in Rust, and the original line spacing result of Python is returned."""
     from docvortex.analyzers.native.pdf import line_layout as layout
     from docvortex.analyzers.native.pdf.models import _LineItem, _TextLane
 

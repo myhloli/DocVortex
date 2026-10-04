@@ -1,4 +1,4 @@
-"""使用 MIME 内嵌图片和样式的 HTML 资源适配器。"""
+"""HTML resource adapter using MIME embedded pictures and styles."""
 
 from __future__ import annotations
 
@@ -12,17 +12,17 @@ from ..html.resources import HtmlResourceContext, _image_data_uri
 
 
 class MhtmlResourceContext(HtmlResourceContext):
-    """仅从归档读取资源，复用 HTML 的链接、图片校验和字节预算。"""
+    """Read resources from archive only, reusing link, image checksum and byte budget of HTML."""
 
     def __init__(self, archive: MhtmlArchive, *, base_href: str | None = None) -> None:
-        """绑定归档并初始化以 MIME 部件为键的去重缓存。"""
+        """Bind the archive and initialize the deduplication cache keyed by the MIME part."""
         super().__init__(archive.source_context, base_href=base_href)
         self.archive = archive
         self._archive_images: dict[ArchivePart, str | None] = {}
         self._archive_stylesheets: dict[ArchivePart, str | None] = {}
 
     def _payload(self, part: ArchivePart, reference: str) -> bytes | None:
-        """可选部件损坏时记录诊断；资源限额错误仍向调用方传播。"""
+        """Logging diagnostics when optional components are damaged; resource quota errors are still propagated to the caller."""
         try:
             return self.archive.decode(part)
         except MhtmlParseError:
@@ -30,7 +30,7 @@ class MhtmlResourceContext(HtmlResourceContext):
             return None
 
     def resolve_image(self, source: str, *, alt: str = "") -> ResolvedMarkupImage | None:
-        """优先恢复归档图片，缺失时沿用安全外链或替代文本降级。"""
+        """Priority is given to restoring archived pictures, and when missing, safe external links or alternative text are used for downgrading."""
         if not source.strip() or source.strip().casefold().startswith("data:"):
             return super().resolve_image(source, alt=alt)
         part = self.archive.find(source, base_href=self.base_href)
@@ -57,7 +57,7 @@ class MhtmlResourceContext(HtmlResourceContext):
         return super().resolve_image(source, alt=alt)
 
     def load_stylesheet(self, href: str) -> str | None:
-        """按 HTML 源顺序读取归档 CSS，仅解释现有静态样式子集。"""
+        """Read archive CSS in HTML source order, interpreting only a subset of existing static styles."""
         part = self.archive.find(href, base_href=self.base_href)
         if part is None:
             self.archive.report("mhtml_resource_missing", href)

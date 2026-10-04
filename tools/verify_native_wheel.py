@@ -1,4 +1,4 @@
-"""在独立安装环境验证真实扩展、公共解析及逐字段 Python/Rust 一致性。"""
+"""Verify true extensions, common parsing, and field-by-field Python/Rust consistency in a stand-alone installation."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ import tempfile
 
 
 def capture(pdf: Path, output: Path, expected: str) -> None:
-    """要求加载安装包而非 checkout，并捕获模型、后处理、素材和诊断。"""
+    """Requires loading the installer package instead of checkout and capturing models, post-processing, footage and diagnostics."""
     os.environ["ORT_DISABLE_TELEMETRY"] = "1"
     import onnxruntime
 
-    # 安装验证不依赖遥测，关闭后台上传以免 SDK 的退出异常掩盖解析结果。
+    # Installation verification does not rely on telemetry, and background uploading is turned off to prevent the exit exception of SDK from covering up the parsing results.
     onnxruntime.disable_telemetry_events()
     from dataclasses import asdict
     from importlib.metadata import version
@@ -50,7 +50,7 @@ def capture(pdf: Path, output: Path, expected: str) -> None:
 
 
 def main() -> None:
-    """分别启动参考和原生进程，避免后端缓存及已导入模块相互污染。"""
+    """Start the reference and native processes separately to avoid mutual contamination of the backend cache and imported modules."""
     if len(sys.argv) == 5 and sys.argv[1] == "--capture":
         capture(Path(sys.argv[2]), Path(sys.argv[3]), sys.argv[4])
         return

@@ -1,4 +1,4 @@
-"""共享自然语言连接、字符清洗和公式编号文本规则。"""
+"""Share natural language joins, character cleaning, and formula numbering text rules."""
 
 from ..foundation._text import (
     build_tagged_formula_content,

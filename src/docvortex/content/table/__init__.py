@@ -1,4 +1,4 @@
-"""跨页表格结构检测和内容合并的稳定入口。"""
+"""Stable entry point for cross-page table structure detection and content merging."""
 
 from .content import merge_table_content
 from .document import merge_table

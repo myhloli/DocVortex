@@ -1,4 +1,4 @@
-"""通过公共 Flash API 重放视觉复核原件，并保存全部页及变化页证据；不读取GT。"""
+"""Replays the visual review of the original through public Flash API and saves all pages and changed page evidence; GT does not read."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def canonical(value):
-    """忽略资产保存路径，保留所有内容、成员、顺序、样式和几何参与比较。"""
+    """Ignores asset save paths, retaining all content, members, order, styles, and geometry for comparison."""
     if isinstance(value, dict):
         return {key: canonical(item) for key, item in value.items() if key not in {"image_path", "image_url", "img_path"}}
     if isinstance(value, list):
@@ -32,7 +32,7 @@ def canonical(value):
 
 
 def validate_public_artifacts(middle, folder):
-    """检查公开叶子成员唯一性、图片解码、公式裁图非空及包校验，不以结果生成视觉期望。"""
+    """Check the uniqueness of public leaf members, image decoding, non-empty formula clipping and package verification, and do not generate visual expectations based on the results."""
     errors = []
     images, equations = 0, 0
     for page_number, page in enumerate(middle["pages"], 1):
@@ -85,7 +85,7 @@ def validate_public_artifacts(middle, folder):
 
 
 def replay(manifest, output, selected=None, compare_to=None):
-    """校验源指纹后解析完整文档，变化仅进入待视觉裁决队列。"""
+    """After verifying the source fingerprint, the complete document is parsed, and changes are only queued for visual adjudication."""
     logger.remove()
     data = json.loads(manifest.read_text())
     code = hashlib.sha256()
@@ -173,7 +173,7 @@ def replay(manifest, output, selected=None, compare_to=None):
 
 
 def main():
-    """接受显式合并清单和全新目录，避免覆盖已冻结证据。"""
+    """Accept explicit merge manifests and completely new catalogs to avoid overwriting frozen evidence."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)

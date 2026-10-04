@@ -1,4 +1,4 @@
-"""MiddleJson 多格式 renderer 共用的公共类型与调用选项。"""
+"""MiddleJson Public types and calling options common to multiple formats renderer."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from ..options import LatexDelimitersConfig
 
 
 class RenderFormat(str, Enum):
-    """统一渲染入口支持的目标格式。"""
+    """Target formats supported by the unified rendering portal."""
 
     MARKDOWN = "markdown"
     HTML = "html"
@@ -25,14 +25,14 @@ class RenderFormat(str, Enum):
 
 
 class RenderMode(str, Enum):
-    """Markdown 与 HTML renderer 共用的默认合并视图与完整分页视图。"""
+    """Default merged view and full paged view shared by Markdown and HTML renderer."""
 
     DEFAULT = "default"
     FULL = "full"
 
 
 class PdfLayout(str, Enum):
-    """PDF 输出的自动选择、原始块布局及语义重排策略。"""
+    """Automatic selection, original block layout and semantic rearrangement strategy for PDF output."""
 
     AUTO = "auto"
     ORIGINAL = "original"
@@ -44,20 +44,20 @@ ImageRenderer: TypeAlias = Callable[[BlockBase], str]
 
 
 def _validate_mode(mode: object) -> None:
-    """校验 Markdown 与 HTML renderer 的公共模式参数。"""
+    """Verify common mode parameters of Markdown and HTML renderer."""
     if not isinstance(mode, RenderMode):
         raise TypeError("mode must be a RenderMode value")
 
 
 def _validate_asset_base_url(asset_base_url: object) -> None:
-    """校验用于拼接相对图片路径的资源根地址。"""
+    """Verify the resource root address used to splice relative image paths."""
     if not isinstance(asset_base_url, str):
         raise TypeError("asset_base_url must be a string")
 
 
 @dataclass(frozen=True, slots=True)
 class MarkdownRenderOptions:
-    """Markdown renderer 的统一入口选项。"""
+    """Markdown Unified entry option for renderer."""
 
     latex_delimiters: LatexDelimitersConfig | None = None
 
@@ -66,7 +66,7 @@ class MarkdownRenderOptions:
     image_renderer: ImageRenderer | None = None
 
     def __post_init__(self) -> None:
-        """在构造时拒绝不符合严格公共契约的选项值。"""
+        """Reject option values that do not conform to a strict public contract at construction time."""
         _validate_mode(self.mode)
         _validate_asset_base_url(self.asset_base_url)
         if self.image_renderer is not None and not callable(self.image_renderer):
@@ -75,7 +75,7 @@ class MarkdownRenderOptions:
 
 @dataclass(frozen=True, slots=True)
 class HtmlRenderOptions:
-    """HTML renderer 的统一入口选项。"""
+    """HTML Unified entry option for renderer."""
 
     mode: RenderMode = RenderMode.DEFAULT
     asset_base_url: str = ""
@@ -83,7 +83,7 @@ class HtmlRenderOptions:
     document_title: str | None = None
 
     def __post_init__(self) -> None:
-        """在构造时校验 HTML 文档形态与标题选项。"""
+        """Verify HTML document shape and title options at construction time."""
         _validate_mode(self.mode)
         _validate_asset_base_url(self.asset_base_url)
         if not isinstance(self.standalone, bool):
@@ -94,13 +94,13 @@ class HtmlRenderOptions:
 
 @dataclass(frozen=True, slots=True)
 class LatexRenderOptions:
-    """LaTeX renderer 的统一入口选项。"""
+    """LaTeX Unified entry option for renderer."""
 
     asset_base_path: str = ""
     document_title: str | None = None
 
     def __post_init__(self) -> None:
-        """在构造时校验 LaTeX 素材路径前缀与文档标题。"""
+        """Verify LaTeX material path prefix and document title during construction."""
         if not isinstance(self.asset_base_path, str):
             raise TypeError("asset_base_path must be a string")
         if self.document_title is not None and not isinstance(self.document_title, str):
@@ -109,12 +109,12 @@ class LatexRenderOptions:
 
 @dataclass(frozen=True, slots=True)
 class DocxRenderOptions:
-    """DOCX renderer 的统一入口选项。"""
+    """DOCX Unified entry option for renderer."""
 
     asset_resolver: AssetResolver | None = None
 
     def __post_init__(self) -> None:
-        """在构造时校验可选素材解析器。"""
+        """Validate optional material parsers at construction time."""
         if self.asset_resolver is not None and not callable(self.asset_resolver):
             raise TypeError("asset_resolver must be callable or None")
 
@@ -124,7 +124,7 @@ _EPUB_LANGUAGE_RE = re.compile(r"(?:[A-Za-z]{2,8}|und)(?:-[A-Za-z0-9]{1,8})*\Z",
 
 @dataclass(frozen=True, slots=True)
 class EpubRenderOptions:
-    """EPUB 3.3 renderer 的统一入口选项。"""
+    """EPUB 3.3 Unified entry options for renderer."""
 
     title: str | None = None
     authors: tuple[str, ...] = ()
@@ -134,7 +134,7 @@ class EpubRenderOptions:
     asset_resolver: AssetResolver | None = None
 
     def __post_init__(self) -> None:
-        """在构造时校验 EPUB 元数据、时间与素材解析器。"""
+        """Verify EPUB metadata, time and material parser at construction time."""
         if self.title is not None and (not isinstance(self.title, str) or not self.title.strip()):
             raise TypeError("title must be a non-empty string or None")
         if not isinstance(self.authors, tuple) or any(
@@ -158,14 +158,14 @@ class EpubRenderOptions:
 
 @dataclass(frozen=True, slots=True)
 class PdfRenderOptions:
-    """PDF renderer 的统一入口选项。"""
+    """PDF Unified entry option for renderer."""
 
     asset_resolver: AssetResolver | None = None
     document_title: str | None = None
     layout: PdfLayout = PdfLayout.AUTO
 
     def __post_init__(self) -> None:
-        """在构造时校验素材解析器与文档标题。"""
+        """Verify asset parser and document title at construction time."""
         if not isinstance(self.layout, PdfLayout):
             raise TypeError("layout must be a PdfLayout value")
         if self.asset_resolver is not None and not callable(self.asset_resolver):
@@ -176,14 +176,14 @@ class PdfRenderOptions:
 
 @dataclass(frozen=True, slots=True)
 class StructuredContentRenderOptions:
-    """树形 Markdown Structured Content renderer 的统一入口选项。"""
+    """Tree Unified entry options for Markdown Structured Content renderer."""
 
     latex_delimiters: LatexDelimitersConfig | None = None
 
     asset_base_url: str = ""
 
     def __post_init__(self) -> None:
-        """在构造时校验图片资源根地址。"""
+        """Verify the image resource root address during construction."""
         _validate_asset_base_url(self.asset_base_url)
 
 

@@ -17,7 +17,7 @@ _SPREADSHEETML_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 
 
 def _zip_bytes(members: dict[str, bytes]) -> bytes:
-    """把合成成员写成确定性的 OOXML 测试包。"""
+    """Write the synthetic members into the deterministic OOXML test package."""
     output = BytesIO()
     with ZipFile(output, "w", ZIP_DEFLATED) as archive:
         for name, data in members.items():
@@ -26,7 +26,7 @@ def _zip_bytes(members: dict[str, bytes]) -> bytes:
 
 
 def test_docx_normalizer_removes_missing_internal_relationship() -> None:
-    """验证 DOCX 仍删除指向缺失成员的内部 relationship。"""
+    """Verify that DOCX still removes the internal relationship that points to the missing member."""
     relationships = f"""
         <Relationships xmlns="{_PACKAGE_RELATIONSHIPS_NS}">
           <Relationship Id="rId1" Type="urn:test" Target="word/missing.xml"/>
@@ -47,7 +47,7 @@ def test_docx_normalizer_removes_missing_internal_relationship() -> None:
 
 
 def test_pptx_normalizer_translates_strict_ooxml_uri() -> None:
-    """验证 PPTX 仍把 Strict PresentationML URI 转为 Transitional URI。"""
+    """Verify PPTX still converts Strict PresentationML URI to Transitional URI."""
     strict_uri = b"http://purl.oclc.org/ooxml/presentationml/main"
     transitional_uri = b"http://schemas.openxmlformats.org/presentationml/2006/main"
     source = _zip_bytes({"ppt/presentation.xml": b'<p:presentation xmlns:p="' + strict_uri + b'"/>'})
@@ -61,7 +61,7 @@ def test_pptx_normalizer_translates_strict_ooxml_uri() -> None:
 
 
 def test_xlsx_normalizer_fills_empty_style_fill() -> None:
-    """验证 XLSX 仍为空 fill 补充 patternFill。"""
+    """Verify XLSX is still empty fill Supplement patternFill."""
     styles = f"""
         <styleSheet xmlns="{_SPREADSHEETML_NS}">
           <fills count="1"><fill/></fills>

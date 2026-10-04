@@ -10,7 +10,7 @@ from docvortex.schema import BlockType
 
 
 def _build_table_block(index: int, html: str, cell_merge: list[int] | None = None) -> dict[str, Any]:
-    """构造纯内容合并测试使用的两层 dict 表格块。"""
+    """Constructs a two-tier dict table block used for content-only merge testing."""
     body: dict[str, Any] = {
         "index": index,
         "type": BlockType.TABLE_BODY,
@@ -29,14 +29,14 @@ def _build_table_block(index: int, html: str, cell_merge: list[int] | None = Non
 
 
 def _row_texts(table: dict[str, Any]) -> list[list[str]]:
-    """提取合并后 table body 的逐行单元格文本。"""
+    """Extract the line-by-line cell text of the merged table body."""
     body = table["content"][0]
     soup = BeautifulSoup(body["content"], "html.parser")
     return [[cell.get_text() for cell in row.find_all(["td", "th"])] for row in soup.find_all("tr")]
 
 
 def test_merge_table_content_applies_partial_cell_merge_from_table() -> None:
-    """验证部分视觉列续接后保留当前首行并清空已迁移单元格。"""
+    """Verify that after some visual columns are continued, the current first row is retained and the migrated cells are cleared."""
     previous_table = _build_table_block(
         0,
         "<table><tr><td>A</td><td>X</td></tr></table>",
@@ -58,7 +58,7 @@ def test_merge_table_content_applies_partial_cell_merge_from_table() -> None:
 
 
 def test_merge_table_content_applies_full_cell_merge_and_removes_consumed_row() -> None:
-    """验证全部视觉列续接后删除已消费行，并继续追加后续数据行。"""
+    """After verifying that all visual columns are continued, delete the consumed rows and continue to append subsequent data rows."""
     previous_table = _build_table_block(
         0,
         "<table><tr><td>A</td><td>X</td></tr></table>",
@@ -76,7 +76,7 @@ def test_merge_table_content_applies_full_cell_merge_and_removes_consumed_row() 
 
 
 def test_merge_table_content_supports_fully_consumed_only_current_row() -> None:
-    """验证当前表仅有一行且被 cell_merge 全部消费时仍返回合并结果。"""
+    """Verify that the current table has only one row and the merged result is still returned when it is fully consumed by cell_merge."""
     previous_table = _build_table_block(
         0,
         "<table><tr><td>A</td><td>X</td></tr></table>",

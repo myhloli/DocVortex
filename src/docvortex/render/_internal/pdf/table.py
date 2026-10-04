@@ -1,4 +1,4 @@
-"""HTML table 到可分页 ReportLab 原生表格的安全物化。"""
+"""HTML table Secure materialization of native tables to pageable ReportLab."""
 
 from __future__ import annotations
 
@@ -33,24 +33,24 @@ _SPATIAL_VERTICAL_PADDING = 1
 
 
 def _spatial_leading(font_size: float) -> float:
-    """让实际段落和保守行高下界使用相同的行距规则及浮点运算顺序。"""
+    """Let actual paragraphs and conservative line-height lower bounds use the same leading rules and floating-point order."""
     return font_size * 11 / 8.5
 
 
 class PdfTableError(HtmlTableError):
-    """表示 HTML 表格结构或 PDF 表格几何无法安全物化。"""
+    """Indicates that the HTML table structure or PDF table geometry cannot be safely materialized."""
 
 
 @dataclass(frozen=True, slots=True)
 class SpatialTableOptions:
-    """只供原始版式使用的紧凑表格参数，不改变公共渲染选项。"""
+    """Compact table parameters used only by the original layout and do not change public rendering options."""
 
     font_size: float = 8.5
 
 
 @dataclass(frozen=True, slots=True)
 class _ColumnPlan:
-    """同时保存最终列宽和内容固有宽度，供父级嵌套表正确测量。"""
+    """Also saves the final column width and content intrinsic width for correct measurement by the parent nested table."""
 
     widths: list[float]
     minimum: float
@@ -58,19 +58,19 @@ class _ColumnPlan:
 
 
 class _SpatialTable(Table):
-    """固定区域表格保留固有宽度，避免嵌套时误把分配宽度当作最小宽度。"""
+    """The fixed area table retains its inherent width to avoid mistaking the allocated width as the minimum width when nesting."""
 
     def __init__(self, data: list[list[object]], plan: _ColumnPlan, repeat_rows: int) -> None:
-        """用确定列宽构造原生表格并记录可供外层复用的尺寸约束。"""
+        """Construct native tables with determined column widths and record size constraints for reuse by outer layers."""
         self.column_plan = plan
         super().__init__(data, colWidths=plan.widths, repeatRows=repeat_rows, splitByRow=1, splitInRow=1, hAlign="LEFT")
 
 
 class _PdfLongTable(LongTable):
-    """优先按整行分页，仅在新页也放不下时拆分超高行。"""
+    """Prioritize pagination by entire rows, and only split super-tall rows when the new page cannot fit."""
 
     def split(self, availWidth: float, availHeight: float) -> list[Flowable]:
-        """先禁用行内拆分尝试分页，页首失败后再启用原有兜底能力。"""
+        """First disable in-line splitting and try paging, and then enable the original bottom-up capability after the top of the page fails."""
         split_in_row = self.splitInRow
         self.splitInRow = 0
         try:
@@ -86,23 +86,23 @@ class _PdfLongTable(LongTable):
 
 
 class ParagraphBuilder(Protocol):
-    """定义表格单元格创建富文本 Paragraph 的回调。"""
+    """Define the callback for creating rich text in table cells Paragraph."""
 
     def __call__(self, spans: list[InlineSpan], style: object, max_width: float) -> Paragraph:
-        """把单元格行内 span 构造成指定宽度的 Paragraph。"""
+        """Construct span in the cell row into Paragraph with the specified width."""
         ...
 
 
 class HtmlImageBuilder(Protocol):
-    """定义表格单元格创建离线图片或占位 Flowable 的回调。"""
+    """Define the callback for table cells to create offline pictures or placeholder Flowable."""
 
     def __call__(self, source: str, max_width: float, alt_text: str) -> Flowable:
-        """把 HTML img source 转换为图片或宽松占位。"""
+        """Convert HTML img source to a picture or loose placeholder."""
         ...
 
 
 def parse_html_tables(source: HtmlTableSource) -> tuple[HtmlTableGrid, ...]:
-    """复用共用网格解析，并保持 PDF 私有异常类型不变。"""
+    """Reuse the common grid parsing and keep the PDF private exception type unchanged."""
     try:
         return _parse_common_html_tables(source)
     except HtmlTableError as exc:
@@ -120,7 +120,7 @@ def build_pdf_tables(
     spatial: SpatialTableOptions | None = None,
     prepared: PdfTableContent | None = None,
 ) -> tuple[Table, ...]:
-    """把 HTML 表格递归转换为支持合并单元格与重复表头的 PDF 表格。"""
+    """Recursively convert the HTML table into a PDF table that supports merged cells and repeated headers."""
     if depth > MAX_NESTED_TABLE_DEPTH:
         raise PdfTableError(f"Nested table depth exceeds {MAX_NESTED_TABLE_DEPTH}")
     if available_width <= 0:
@@ -167,7 +167,7 @@ def _build_pdf_table(
     spatial: SpatialTableOptions | None = None,
     prepared: PdfTableContent,
 ) -> Table:
-    """物化一个网格，写入单元格内容、合并区域与固定打印样式。"""
+    """Materialize a grid, write cell contents, merge regions and fix print styles."""
     column_plan = (
         _content_column_widths(grid, available_width, styles, build_paragraph, build_image, depth, spatial, prepared)
         if spatial is not None
@@ -233,7 +233,7 @@ def _cell_flowables(
     prepared: PdfTableContent,
     measure: bool = False,
 ) -> list[Flowable]:
-    """把单元格文本、图片与直接嵌套表按安全顺序转换为 Flowable。"""
+    """Convert cell text, images, and directly nested tables to Flowable in safe order."""
     flowables: list[Flowable] = []
     content = prepared.cell(cell)
     if content.spans:
@@ -286,13 +286,13 @@ def _content_column_widths(
     spatial: SpatialTableOptions,
     prepared: PdfTableContent,
 ) -> _ColumnPlan:
-    """按真实单元格的最小与自然宽度分配列宽，并把合并格作为跨列约束。"""
+    """Allocate column widths according to the minimum and natural width of real cells, and use merged cells as cross-column constraints."""
     minimum = [spatial.font_size + 4 for _ in range(grid.column_count)]
     preferred = minimum.copy()
     for cell in sorted(grid.cells, key=lambda item: item.colspan):
         style = styles.table_header if cell.is_header else styles.table_cell
         key = (id(cell.tag), prepared.style_key(style))
-        # 普通文本的固有宽度独立于分配宽度；资源、公式和嵌套表仍按本次约束真实测量。
+        # The inherent width of normal text is independent of the allocated width; resources, formulas, and nested tables are still measured according to this constraint.
         cached = prepared.widths.get(key) if prepared.cell(cell.tag).plain else None
         if cached is None:
             cached = _cell_widths(cell, width, style, styles, build_paragraph, build_image, depth, spatial, prepared)
@@ -307,7 +307,7 @@ def _content_column_widths(
     preferred = [max(low, high) for low, high in zip(minimum, preferred)]
     low_sum, high_sum = sum(minimum), sum(preferred)
     if width <= low_sum:
-        # 极窄区域保留真实最小宽度，由外层重建后缩放，不能让内边距挤出单元格。
+        # The extremely narrow area retains the true minimum width, which is reconstructed from the outer layer and then scaled, and the padding cannot be squeezed out of the cell.
         return _ColumnPlan(minimum, low_sum, high_sum)
     if width >= high_sum:
         return _ColumnPlan([value + (width - high_sum) / grid.column_count for value in preferred], low_sum, high_sum)
@@ -316,7 +316,7 @@ def _content_column_widths(
 
 
 def _cell_widths(cell, width, style, styles, build_paragraph, build_image, depth, spatial, prepared) -> tuple[float, float]:
-    """测量单元格的真实最小宽度和自然宽度，不保存参与 wrap 的可变对象。"""
+    """Measures the true minimum and natural width of a cell, without saving variable objects participating in wrap."""
     flows = _cell_flowables(
         cell.tag,
         max_width=max(1.0, width - 4),
@@ -351,7 +351,7 @@ def _cell_widths(cell, width, style, styles, build_paragraph, build_image, depth
 
 
 def _simple_cjk_widths(paragraph: Paragraph, prepared: PdfTableContent) -> tuple[float, float] | None:
-    """对不会发生断行的简单 CJK 内容直接测宽，保留 ReportLab 的逐字符累加和余量还原。"""
+    """Directly measure the width of simple CJK content that does not cause line breaks, and retain the character-by-character accumulation and margin restoration of ReportLab."""
     style = paragraph.style
     if (
         style.wordWrap != "CJK"
@@ -376,12 +376,12 @@ def _simple_cjk_widths(paragraph: Paragraph, prepared: PdfTableContent) -> tuple
                 return None
             if not character.isspace():
                 minimum = max(minimum, width)
-    # getActualLineWidths0 使用 width - extraSpace，不能直接返回 total 而改变浮点舍入。
+    # getActualLineWidths0 uses width - extraSpace and cannot directly return total to change the floating point rounding.
     return minimum, _NATURAL_MEASURE_WIDTH - (_NATURAL_MEASURE_WIDTH - total)
 
 
 def _paragraph_minimum_width(paragraph: Paragraph) -> float:
-    """CJK 段落按真实可断开的字符计最小列宽，同时保留行内公式的完整宽度。"""
+    """CJK Paragraphs have minimum column widths based on true breakable characters while retaining the full width of inline formulas."""
     if paragraph.style.wordWrap != "CJK":
         return paragraph.minWidth()
     widths = [0.0]
@@ -395,7 +395,7 @@ def _paragraph_minimum_width(paragraph: Paragraph) -> float:
 
 
 def _html_cell_spans(cell: Tag) -> list[InlineSpan]:
-    """把单元格中非图片、非嵌套表内容转换为严格 InlineSpan。"""
+    """Convert non-image, non-nested table content in cells to strict InlineSpan."""
     spans: list[InlineSpan] = []
     for child in cell.children:
         spans.extend(_html_node_spans(child, styles=(), allow_links=True))
@@ -408,7 +408,7 @@ def _html_cell_spans(cell: Tag) -> list[InlineSpan]:
 
 
 def _html_node_spans(node: object, *, styles: tuple[InlineStyle, ...], allow_links: bool) -> list[InlineSpan]:
-    """递归解析安全 HTML 富文本标签，忽略活动内容与独立视觉节点。"""
+    """Recursively parse safe HTML rich text tags, ignoring active content and independent visual nodes."""
     if isinstance(node, NavigableString):
         text = str(node)
         return [TextSpan(type="text", content=text, styles=list(styles))] if text else []
@@ -463,12 +463,12 @@ def _html_node_spans(node: object, *, styles: tuple[InlineStyle, ...], allow_lin
 
 
 def _spans_end_with_newline(spans: list[InlineSpan]) -> bool:
-    """判断当前 span 序列是否已经以普通文本换行结束。"""
+    """Determine whether the current span sequence has ended with a normal text line break."""
     return bool(spans and isinstance(spans[-1], TextSpan) and spans[-1].content.endswith("\n"))
 
 
 def _column_widths(total_width: float, column_count: int) -> list[float]:
-    """把可用宽度确定性地均分到全部逻辑列。"""
+    """Deterministically divide the available width evenly among all logical columns."""
     if column_count <= 0:
         raise PdfTableError("Table must contain at least one column")
     base = total_width / column_count

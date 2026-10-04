@@ -1,4 +1,4 @@
-"""DOCX 列表与编号处理；共享当前 Converter 的单文档状态。"""
+"""DOCX list and number processing; shares the single document status of the current Converter."""
 
 from typing import Optional
 from docx.oxml.xmlchemy import BaseOxmlElement
@@ -10,22 +10,22 @@ from .context import _DocxConstants
 
 
 class _DocxNumbering:
-    """集中维护列表与编号，不自行创建文档或持有跨文档缓存。"""
+    """Maintain lists and numbers centrally, without creating documents yourself or holding cross-document caches."""
 
     def _get_numId_and_ilvl(self, paragraph: Paragraph) -> tuple[Optional[int], Optional[int]]:
         """
-        获取段落的列表编号ID和层级。
+        Get the list number ID and level of the paragraph.
 
         Args:
-            paragraph: 段落对象
+            paragraph: paragraph object
 
         Returns:
-            tuple[Optional[int], Optional[int]]: (numId, ilvl) 元组
+            tuple[Optional[int], Optional[int]]: (numId, ilvl) tuple
         """
         numPr = self._get_effective_numPr(paragraph)
 
         if numPr is not None:
-            # 获取 numId 元素并提取值
+            # Get the numId element and extract the value
             namespaces = getattr(numPr, "nsmap", None) or _DocxConstants._BLIP_NAMESPACES
             numId_elem = numPr.find("w:numId", namespaces=namespaces)
             ilvl_elem = numPr.find("w:ilvl", namespaces=namespaces)
@@ -35,17 +35,17 @@ class _DocxNumbering:
             numId_int = self._str_to_int(numId, None)
             ilvl_int = self._str_to_int(ilvl, None)
             if numId_int == 0:
-                # numId=0 是 Word 中显式取消编号的信号，不能继续从样式继承编号层级。
+                # numId=0 is a signal in Word to explicitly cancel numbering and the numbering hierarchy can no longer be inherited from the style.
                 return numId_int, ilvl_int
             if numId_int is not None and ilvl_int is None:
                 ilvl_int = self._infer_numbering_ilvl_from_style(numId_int, paragraph)
 
             return numId_int, ilvl_int
 
-        return None, None  # 如果段落不是列表的一部分
+        return None, None  # if paragraph is not part of list
 
     def _get_numbering_num_element(self, numId: int) -> Optional[BaseOxmlElement]:
-        """根据 numId 获取 word/numbering.xml 中的 num 定义。"""
+        """Get the num definition in word/numbering.xml based on numId."""
         numbering_root = self._get_numbering_root()
         if numbering_root is None:
             return None
@@ -57,7 +57,7 @@ class _DocxNumbering:
         )
 
     def _get_abstract_numbering_element(self, numId: int) -> Optional[BaseOxmlElement]:
-        """根据 numId 获取对应的 abstractNum 定义，用于复用编号层级解析逻辑。"""
+        """Obtain the corresponding abstractNum definition based on numId, which is used to reuse the numbering level parsing logic."""
         numbering_root = self._get_numbering_root()
         namespaces = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
         if numbering_root is None:
@@ -79,7 +79,7 @@ class _DocxNumbering:
         return numbering_root.find(abstract_num_xpath, namespaces=namespaces)
 
     def _infer_numbering_ilvl_from_style(self, numId: int, paragraph: Paragraph) -> Optional[int]:
-        """当 numPr 只有 numId 时，根据 numbering.xml 中的 pStyle 反查编号层级。"""
+        """When numPr only has numId, the numbering hierarchy is checked based on pStyle in numbering.xml."""
         abstract_num_element = self._get_abstract_numbering_element(numId)
         if abstract_num_element is None:
             return None
@@ -137,7 +137,7 @@ class _DocxNumbering:
         return lvl_element
 
     def _get_numbering_level_start(self, numId: int, ilvl: int) -> int:
-        """解析编号层级的起始值，优先使用 num/lvlOverride，其次使用 abstractNum/lvl/start。"""
+        """To resolve the starting value of the numbering level, num/lvlOverride is used first, followed by abstractNum/lvl/start."""
         cache_key = (numId, ilvl)
         if cache_key in self._numbering_start_cache:
             return self._numbering_start_cache[cache_key]
@@ -170,7 +170,7 @@ class _DocxNumbering:
         return start
 
     def _advance_list_counter(self, numId: int, ilvl: int) -> int:
-        """推进 Word 编号计数，并返回当前列表项应显示的真实序号。"""
+        """Advance the Word number count and return the actual sequence number that the current list item should display."""
         counter_key = (numId, ilvl)
         if counter_key not in self.list_counters:
             current_number = self._get_numbering_level_start(numId, ilvl)
@@ -178,7 +178,7 @@ class _DocxNumbering:
             current_number = self.list_counters[counter_key] + 1
         self.list_counters[counter_key] = current_number
 
-        # 父级编号前进后，子级编号应在下次出现时重新从定义的起始值开始。
+        # After the parent numbering is advanced, the child numbering should restart from the defined starting value the next time it occurs.
         for key in list(self.list_counters.keys()):
             counter_num_id, counter_ilevel = key
             if counter_num_id == numId and counter_ilevel > ilvl:
@@ -188,14 +188,14 @@ class _DocxNumbering:
 
     def _is_numbered_list(self, numId: int, ilvl: int) -> bool:
         """
-        根据 numFmt 值检查列表是否为编号列表。
+        Check whether the list is a numbered list based on the numFmt value.
 
         Args:
-            numId: 列表编号ID
-            ilvl: 列表层级
+            numId: List number ID
+            ilvl: List level
 
         Returns:
-            bool: 如果是编号列表返回 True，否则返回 False
+            bool: If it is a numbered list, return True, otherwise return False
         """
         try:
             lvl_element = self._get_numbering_level_definition(numId, ilvl)
@@ -203,15 +203,15 @@ class _DocxNumbering:
                 return False
             namespaces = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 
-            # 获取 numFmt 元素
+            # Get the numFmt element
             num_fmt_element = lvl_element.find(".//w:numFmt", namespaces=namespaces)
             if num_fmt_element is None:
                 return False
 
             num_fmt = num_fmt_element.get("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val")
 
-            # 编号格式包括: decimal, lowerRoman, upperRoman, lowerLetter, upperLetter
-            # 项目符号格式包括: bullet
+            # Numbering formats include: decimal, lowerRoman, upperRoman, lowerLetter, upperLetter
+            # Bullet formats include: bullet
             numbered_formats = {
                 "decimal",
                 "lowerRoman",
@@ -238,49 +238,49 @@ class _DocxNumbering:
         equations: list = None,
     ) -> list:
         """
-        添加列表项。
+        Add list item.
 
-        生成的列表结构：
+        Generated list structure:
         {
             "type": "list",
             "attribute": "ordered" / "unordered",
             "ilevel": 0,
             "content": [
-                {"type": "text", "content": "列表项文本"},
+                {"type": "text", "content": "List item text"},
                 {"type": "list", "attribute": "...", "ilevel": 1, "content": [...]},
-                {"type": "text", "content": "另一个列表项"}
+                {"type": "text", "content": "Another list item"}
             ]
         }
 
         Args:
-            numid: 列表ID
-            ilevel: 缩进等级
-            elements: 元素列表
-            is_numbered: 是否编号
-            text: 处理后的文本（包含公式标记）
-            equations: 公式列表
+            numid: ListID
+            ilevel: Indentation level
+            elements: element list
+            is_numbered: Is it numbered?
+            text: Processed text (contains formula marks)
+            equations: Formula list
 
         Returns:
-            list[RefItem]: 元素引用列表
+            list[RefItem]: element reference list
         """
         if equations is None:
             equations = []
         if not elements:
             return None
 
-        # 构建 content_text，处理行内公式和超链接
+        # Build content_text to handle inline formulas and hyperlinks
         content_text = self._build_text_with_equations_and_hyperlinks(elements, text, equations)
         content_text = self._normalize_text_block_content(content_text)
         if not content_text:
             return None
 
-        # 确定列表属性
+        # Determine list properties
         list_attribute = "ordered" if is_numbered else "unordered"
         list_start = self._advance_list_counter(numid, ilevel) if is_numbered else None
 
-        # 情况 1: 不存在上一个列表ID，或遇到了不同 numId 的新列表，创建新的顶层列表
+        # Case 1: The previous list ID does not exist, or a new list with a different numId is encountered, create a new top-level list
         if self.pre_num_id == -1 or self.pre_num_id != numid:
-            # 切换到不同的列表时，先重置旧列表状态
+            # When switching to a different list, reset the old list state first
             if self.pre_num_id != -1:
                 self._close_active_list()
 
@@ -293,7 +293,7 @@ class _DocxNumbering:
             if list_start is not None:
                 list_block["start"] = list_start
             self.cur_page.append(list_block)
-            # 入栈, 记录当前的列表块
+            # Push onto the stack, record the current list block
             self.list_block_stack.append(list_block)
 
             list_item = {
@@ -305,13 +305,13 @@ class _DocxNumbering:
             self.pre_num_id = numid
             self.pre_ilevel = ilevel
 
-        # 情况 2: 增加缩进，打开子列表
+        # Case 2: Increase indentation, open sublist
         elif (
-            self.pre_num_id == numid  # 同一个列表
-            and self.pre_ilevel != -1  # 上一个缩进级别已知
-            and self.pre_ilevel < ilevel  # 当前层级比之前更缩进
+            self.pre_num_id == numid  # same list
+            and self.pre_ilevel != -1  # The previous indentation level is known
+            and self.pre_ilevel < ilevel  # The current level is more indented than before
         ):
-            # 创建新的子列表块
+            # Create new sublist block
             child_list_block = {
                 "type": BlockType.LIST,
                 "attribute": list_attribute,
@@ -336,30 +336,30 @@ class _DocxNumbering:
                 self.pre_ilevel = ilevel
                 return None
 
-            # 获取栈顶的列表块，将子列表直接添加到其content中
+            # Get the list block on top of the stack and add the sublist directly to its content
             parent_list_block = self.list_block_stack[-1]
             parent_list_block["content"].append(child_list_block)
 
-            # 入栈, 记录当前的列表块
+            # Push onto the stack, record the current list block
             self.list_block_stack.append(child_list_block)
 
-            # 添加当前列表项到子列表
+            # Add current list item to sublist
             list_item = {
                 "type": BlockType.TEXT,
                 "content": content_text,
             }
             child_list_block["content"].append(list_item)
 
-            # 更新目前缩进
+            # Update current indent
             self.pre_ilevel = ilevel
 
-        # 情况3: 减少缩进，关闭子列表
+        # Case 3: Reduce indentation, close sublist
         elif (
-            self.pre_num_id == numid  # 同一个列表
-            and self.pre_ilevel != -1  # 上一个缩进级别已知
-            and ilevel < self.pre_ilevel  # 当前层级比之前更少缩进
+            self.pre_num_id == numid  # same list
+            and self.pre_ilevel != -1  # The previous indentation level is known
+            and ilevel < self.pre_ilevel  # The current level is less indented than before
         ):
-            # 出栈，直到找到匹配的 ilevel
+            # Pop the stack until a matching ilevel is found
             while self.list_block_stack:
                 top_list_block = self.list_block_stack[-1]
                 if top_list_block["ilevel"] == ilevel:
@@ -387,7 +387,7 @@ class _DocxNumbering:
             list_block["content"].append(list_item)
             self.pre_ilevel = ilevel
 
-        # 情况 4: 同级列表项（相同缩进）
+        # Case 4: Sibling list items (same indentation)
         elif self.pre_num_id == numid and self.pre_ilevel == ilevel:
             if not self.list_block_stack:
                 logger.warning(
@@ -404,7 +404,7 @@ class _DocxNumbering:
                 self.cur_page.append(list_block)
                 self.list_block_stack.append(list_block)
             else:
-                # 获取栈顶的列表块
+                # Get the list block at the top of the stack
                 list_block = self.list_block_stack[-1]
 
             list_item = {
@@ -423,22 +423,22 @@ class _DocxNumbering:
 
     def _detect_heading_list_numids(self) -> set:
         """
-        预扫描文档，检测用作章节标题的列表numId。
+        Prescan the document, detecting the list numId used as chapter headings.
 
-        判断依据（需同时满足两个条件）：
-        1. 该numId的列表项之间穿插了非列表的正文内容（段落/表格等）；
-        2. 该numId的列表项出现在**多个不同的缩进层级**（ilevel > 1种），
-           即为真正的多级列表结构，而非普通的单级内容条目列表。
+        Judgment basis (two conditions need to be met at the same time):
+        1. The list items of numId are interspersed with non-list text content (paragraphs/tables, etc.);
+        2. The list item of numId appears in **multiple different indentation levels** (ilevel > 1 type),
+           That is a true multi-level list structure, rather than an ordinary single-level content item list.
 
-        这样可以避免将"多段内容条目之间穿插了小标签"的单级列表误判为标题列表。
+        This can avoid misjudgment of a single-level list with "small tags interspersed between multiple content items" as a title list.
 
         Returns:
-            set: 应当转换为标题块的列表numId集合
+            set: A list of numId collections that should be converted to title blocks
         """
         heading_numids = set()
-        # 收集文档元素序列：("list", numid, ilevel) 或 ("content",)
+        # Collect document element sequence: ("list", numid, ilevel) or ("content",)
         items = []
-        # 记录每个numId出现过的所有ilevel，用于判断是否为真正的多级列表
+        # Record all ilevel that appear in each numId to determine whether it is a real multi-level list
         numid_ilvels: dict[int, set] = {}
 
         for element in self.docx_obj.element.body:
@@ -466,23 +466,23 @@ class _DocxNumbering:
             elif tag_name == "tbl":
                 items.append(("content", None, None))
 
-        # 对每个numId，检测其列表项之间是否有正文内容穿插
-        # seen_numids[numid] = True 表示该numId的最后一个列表项之后出现了正文内容
+        # For each numId, check whether there is text content interspersed between the list items.
+        # seen_numids[numid] = True means that the text content appears after the last list item of numId
         seen_numids: dict[int, bool] = {}
 
         for item_type, numid, ilevel in items:
             if item_type == "list":
                 if numid in seen_numids and seen_numids[numid]:
-                    # 上次列表项之后出现了正文内容，满足条件1
+                    # The text content appears after the last list item, satisfying condition 1
                     heading_numids.add(numid)
-                seen_numids[numid] = False  # 重置：记录该numId出现了新列表项
+                seen_numids[numid] = False  # Reset: Log the numId and a new list item appears
             elif item_type == "content":
-                # 将所有已见numId标记为"之后出现了正文内容"
+                # Mark all seen numId as "Text content appears after"
                 for nid in seen_numids:
                     seen_numids[nid] = True
 
-        # 条件2：只保留真正的多级列表（出现过多于1种ilevel的numId）
-        # 单级列表（如只有ilevel=0的内容条目列表）即使有正文段落穿插也不应转换为标题
+        # Condition 2: Only keep true multi-level lists (numId with more than 1 ilevel appearing)
+        # Single-level lists (such as content entry lists with only ilevel=0) should not be converted into titles even if they are interspersed with text paragraphs.
         heading_numids = {nid for nid in heading_numids if len(numid_ilvels.get(nid, set())) > 1}
 
         if heading_numids:

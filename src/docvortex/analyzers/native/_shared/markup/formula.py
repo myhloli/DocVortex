@@ -1,4 +1,4 @@
-"""保留原有导入入口；共享实现由下层模块唯一维护。"""
+"""The original import entry is retained; the shared implementation is uniquely maintained by the lower module."""
 
 from docvortex.content.markup.formula import (
     FormulaDisplay as FormulaDisplay,

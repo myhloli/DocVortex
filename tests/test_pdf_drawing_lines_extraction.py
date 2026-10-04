@@ -1,8 +1,8 @@
-"""绘图线提取的按需构建与聚类合并等价性（#18 回归）。
+"""On-demand construction and cluster merging equivalence of plot line extraction (#18 regression).
 
-`get_page_drawing_lines()` 不得构建随即丢弃的 `PDFPathInfo`；
-`_merge_orientation_lines()` 以聚类首元素坐标代替整簇重扫，
-两者输出都必须与全量构建、朴素重扫的实现逐位一致。
+`get_page_drawing_lines()` must not build `PDFPathInfo` which is then discarded;
+`_merge_orientation_lines()` uses the coordinates of the first element of the cluster to replace the entire cluster and rescan.
+Both outputs must be bit-by-bit consistent with the fully built, naive rescan implementation.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ native_objects_module = import_module("docvortex.document.pdf.native_objects")
 
 
 def _pdf(objects: list[bytes]) -> bytes:
-    """按对象号顺序写出带 xref 表的最小合法 PDF（对象 1 是 catalog）。"""
+    """Write the smallest legal PDF with the xref table in object number order (object 1 is catalog)."""
     out, offsets = bytearray(b"%PDF-1.7\n"), []
     for number, body in enumerate(objects, start=1):
         offsets.append(len(out))
@@ -33,7 +33,7 @@ def _pdf(objects: list[bytes]) -> bytes:
 
 
 def _vector_page_pdf(paths: int) -> bytes:
-    """A4 页面上横竖交替的短描边线段，模拟 CAD 导出的路径密度。"""
+    """A4 Short stroke lines alternating horizontally and vertically on the page, simulating the path density exported by CAD."""
     directions = ((40, 0), (0, 40))
     segments = [b"0.4 w"]
     for index in range(paths):
@@ -53,7 +53,7 @@ def _vector_page_pdf(paths: int) -> bytes:
 
 
 def _reference_merge_orientation_lines(lines, page_size):
-    """修复前的朴素实现：每条线对当前聚类整体重算最小轴坐标。"""
+    """Naive implementation before repair: each line recalculates the minimum axis coordinate of the current cluster as a whole."""
     tolerance = native_objects.DRAWING_LINE_MERGE_TOLERANCE
     if not lines:
         return []
@@ -93,7 +93,7 @@ def _reference_merge_orientation_lines(lines, page_size):
 
 
 def _random_axis_lines(rng: random.Random, count: int, page_size) -> list[PDFDrawingLine]:
-    """生成贴近与跨越合并容差的同轴/跨轴线段，覆盖聚类边界形态。"""
+    """Generate on-axis/cross-axis line segments close to and across merge tolerances to cover cluster boundary shapes."""
     lines = []
     for _ in range(count):
         horizontal = rng.random() < 0.5
@@ -116,7 +116,7 @@ def _random_axis_lines(rng: random.Random, count: int, page_size) -> list[PDFDra
 
 @pytest.mark.parametrize("seed", [1, 2, 3])
 def test_cluster_start_merge_matches_full_rescan(seed: int) -> None:
-    """记聚类起点的合并结果与整簇重扫的朴素实现逐位一致。"""
+    """The merging result of the cluster starting point is consistent bit by bit with the naive implementation of the whole cluster rescan."""
     rng = random.Random(seed)
     page_size = (595.0, 842.0)
     lines = _random_axis_lines(rng, 260, page_size)
@@ -125,12 +125,12 @@ def test_cluster_start_merge_matches_full_rescan(seed: int) -> None:
 
 
 def test_drawing_lines_skip_path_info_construction(monkeypatch) -> None:
-    """get_page_drawing_lines 不再构建随即丢弃的 PDFPathInfo，结果与全量提取一致。"""
+    """get_page_drawing_lines no longer builds and discards PDFPathInfo, the results are consistent with full extraction."""
     counter = {"calls": 0}
     original = native_objects._path_info_from_object
 
     def counting(*args, **kwargs):
-        """统计绘图线专用入口意外构建路径信息的次数。"""
+        """Count the number of times the special entry for drawing lines accidentally builds path information."""
         counter["calls"] += 1
         return original(*args, **kwargs)
 
@@ -157,20 +157,20 @@ def test_drawing_lines_skip_path_info_construction(monkeypatch) -> None:
 
 
 def test_path_dual_consumption_reads_draw_state_once(monkeypatch) -> None:
-    """同一 Path 同时产出线与摘要时，绘制状态只允许读取一次。"""
+    """When the same Path produces lines and summaries at the same time, the drawing status is only allowed to be read once."""
     from docvortex.document.pdf import _object_bridge
 
     original = native_objects._get_path_visibility
     calls = 0
 
     def counted(*args, **kwargs):
-        """包装参考实现，用于确认联合消费没有重复读取属性。"""
+        """Wrapper reference implementation used to confirm that joint consumption does not read attributes repeatedly."""
         nonlocal calls
         calls += 1
         return original(*args, **kwargs)
 
     monkeypatch.setattr(native_objects, "_get_path_visibility", counted)
-    # 联合属性读取是 Python 参考路径的约束；原生批量路径另由桥接命中测试覆盖。
+    # Union attribute reads are constrained by the Python reference path; the native batch path is additionally covered by the bridge hit test.
     monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
     with PDFDocument(_vector_page_pdf(5)) as document:
         vector = document[0].get_vector_geometry()
@@ -181,7 +181,7 @@ def test_path_dual_consumption_reads_draw_state_once(monkeypatch) -> None:
 
 
 def test_native_path_evidence_matches_python_reference(monkeypatch) -> None:
-    """批量原生 Path 证据与逐对象 Python 参考输出逐字段且按顺序一致。"""
+    """Batch native Path evidence is field-by-field and sequentially consistent with the per-object Python reference output."""
     from docvortex.document.pdf import _object_bridge
     from docvortex._compute_backend import backend_info, get_native
     from docvortex.document.pdf.native_coordinates import _normalize_pdf_page_bbox
@@ -203,7 +203,7 @@ def test_native_path_evidence_matches_python_reference(monkeypatch) -> None:
 
 
 def _open_filled_path_pdf(path_commands: bytes) -> bytes:
-    """构造仅包含一个开放填充 Path 的最小 PDF，用于原生/参考差分。"""
+    """Constructs a minimal PDF containing only an open-filled Path for native/reference differential."""
     content = b"0 0 0 rg\n" + path_commands
     return _pdf(
         [
@@ -218,16 +218,16 @@ def _open_filled_path_pdf(path_commands: bytes) -> bytes:
 @pytest.mark.parametrize(
     ("path_commands", "expected_line_count"),
     [
-        # 缺失左上角且重复右下角时，参考实现不接受该开放路径为细矩形。
+        # The reference implementation does not accept the open path as a thin rectangle when the upper left corner is missing and the lower right corner is repeated.
         (b"20 20 m 30 20 l 30 21 l 30 20 l f", 0),
-        # 对象矩阵会把两条局部斜边转换为轴对齐边，应按转换后的线段判定。
+        # The object matrix will convert the two local hypotenuses into axis-aligned edges, which should be judged as converted line segments.
         (b"q 1 0 -2 1 40 0 cm 20 20 m 30 20 l 32 21 l 22 21 l f Q", 1),
-        # Python round(x, 3) 与 Rust 先乘千再取整在这个角点上不同。
+        # Python round(x, 3) differs from Rust by multiplying by thousands and then rounding at this corner point.
         (b"20.0625 20 m 70.0625 20 l 70.0625 21 l 20.062498 21 l f", 1),
     ],
 )
 def test_native_open_filled_path_edges_match_reference(monkeypatch, path_commands, expected_line_count) -> None:
-    """覆盖开放细矩形的角点完整性与矩阵后轴对齐两个后端分歧行为。"""
+    """Covering the corner integrity of the open thin rectangle with the matrix rear axis aligning the two back end divergence behaviors."""
     from docvortex.document.pdf import _object_bridge
     from docvortex._compute_backend import backend_info, get_native
     from docvortex.document.pdf.native_coordinates import _normalize_pdf_page_bbox
@@ -257,7 +257,7 @@ def test_native_open_filled_path_edges_match_reference(monkeypatch, path_command
 
 
 def test_native_path_failed_fill_color_keeps_unknown_rgba(monkeypatch) -> None:
-    """颜色查询失败仍按不透明判可见，但 Path 摘要不能伪造黑色填充。"""
+    """Color query failure is still visible as opacity, but Path summary cannot fake black fill."""
     import pypdfium2.raw as raw
 
     from docvortex._compute_backend import get_native
@@ -286,7 +286,7 @@ def test_native_path_failed_fill_color_keeps_unknown_rgba(monkeypatch) -> None:
 
 
 def test_drawing_lines_match_vector_and_snapshot_entries() -> None:
-    """独立线接口、矢量几何和页面快照的绘图线逐字段且按顺序一致。"""
+    """Drawing lines for the independent line interface, vector geometry, and page snapshots are field-by-field and sequentially consistent."""
     data = _vector_page_pdf(600)
     with PDFDocument(data) as document:
         direct = document.get_page_drawing_lines(0)
@@ -300,7 +300,7 @@ def test_drawing_lines_match_vector_and_snapshot_entries() -> None:
 
 
 def test_native_drawing_line_bridge_reports_execution_or_fallback() -> None:
-    """后端报告必须区分新绘图线入口的实际执行与 Python 参考回退。"""
+    """Backend reporting must distinguish between the actual execution of new plot line entry and the Python reference fallback."""
     from docvortex._compute_backend import backend_info, get_native
 
     native = get_native()
@@ -316,7 +316,7 @@ def test_native_drawing_line_bridge_reports_execution_or_fallback() -> None:
 
 
 def test_filled_path_and_transformed_form_use_reference_lines() -> None:
-    """填充矩形及变换 Form 保留参考路径的几何和顺序。"""
+    """Filled Rectangle and Transform Form Preserves the geometry and order of the reference path."""
 
     content = b"0 0 0 rg 10 10 40 2 re f q 2 0 0 2 0 0 cm /F1 Do Q"
     form_content = b"0.5 w 30 30 m 90 30 l S"
@@ -340,7 +340,7 @@ def test_filled_path_and_transformed_form_use_reference_lines() -> None:
 
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
 def test_rust_lines_match_reference_for_page_rotation_and_offset(rotation: int, monkeypatch) -> None:
-    """四种页面旋转和非零页面原点下，新入口与 Python 参考路径逐字段一致。"""
+    """Under four page rotations and a non-zero page origin, the new entry is field-by-field consistent with the Python reference path."""
 
     content = b"0.4 w 20 30 m 100 30 l S 150 60 m 150 200 l S"
     data = _pdf(
@@ -357,7 +357,7 @@ def test_rust_lines_match_reference_for_page_rotation_and_offset(rotation: int, 
     from docvortex.document.pdf import _object_bridge
 
     def no_bridge(*_args):
-        """强制第二次查询经过 Python 参考路径。"""
+        """Forces the second query to go through the Python reference path."""
         return None
 
     monkeypatch.setattr(_object_bridge, "read_drawing_lines", no_bridge)

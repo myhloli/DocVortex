@@ -1,4 +1,4 @@
-"""Standalone HTML 到单页 DocVortex raw model-list 的原生 converter。"""
+"""Standalone HTML native converter to single page DocVortex raw model-list."""
 
 from __future__ import annotations
 
@@ -23,10 +23,10 @@ from .selector import select_auto_content
 
 
 class HtmlConverter:
-    """把静态 HTML 转换为一个无 bbox 的逻辑页。"""
+    """Convert static HTML to a logical page without bbox."""
 
     def __init__(self) -> None:
-        """初始化空页面结果。"""
+        """Initialize empty page results."""
         self.pages: list[list[dict[str, Any]]] = []
 
     def convert(
@@ -35,7 +35,7 @@ class HtmlConverter:
         *,
         source_context: HtmlSourceContext | None = None,
     ) -> None:
-        """读取调用方 HTML 流，自动选择正文并生成单页 raw blocks。"""
+        """Read the caller's HTML stream, automatically select the text and generate a single page raw blocks."""
         file_bytes = file_binary.read(MAX_HTML_BYTES + 1)
         if len(file_bytes) > MAX_HTML_BYTES:
             raise HtmlResourceLimitError(f"HTML resource limit exceeded: max_html_bytes={MAX_HTML_BYTES}")
@@ -44,7 +44,7 @@ class HtmlConverter:
         self._convert_document(document, resources)
 
     def _convert_document(self, document: HtmlDocument, resources: HtmlResourceContext) -> None:
-        """复用已解析 DOM 和资源适配器，供 HTML 与网页归档共享正文投影。"""
+        """Reuse parsed DOM and resource adapter for HTML to share text projection with web archives."""
         wire_result = decode_docvortex_html_wire(document.body, resources)
         if wire_result.blocks is not None:
             blocks = wire_result.blocks
@@ -89,7 +89,7 @@ class HtmlConverter:
 
 
 def _load_stylesheet(document: HtmlDocument, resources: HtmlResourceContext) -> MarkupStylesheet:
-    """按 head 文档顺序加载本地 stylesheet 与内联 style 的受支持子集。"""
+    """Load a supported subset of native stylesheet and inline style in head document order."""
     stylesheet = MarkupStylesheet()
     for source in document.stylesheets:
         if source.kind == "inline":
@@ -101,7 +101,7 @@ def _load_stylesheet(document: HtmlDocument, resources: HtmlResourceContext) -> 
 
 
 def _document_title(document: HtmlDocument) -> str | None:
-    """按 OpenGraph/title 优先级返回去重且保守去站点后缀的标题。"""
+    """Press OpenGraph/title priority to return the title of deduplication and conservative desite suffix."""
     title = (document.open_graph_title or document.title or "").strip()
     if not title:
         return None

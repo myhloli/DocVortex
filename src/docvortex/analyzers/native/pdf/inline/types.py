@@ -1,4 +1,4 @@
-"""定义原生 PDF 行内样式证据、区间及内部投影类型。"""
+"""Defines native PDF inline style evidence, interval and internal projection types."""
 
 from __future__ import annotations
 
@@ -165,7 +165,7 @@ _PDF_SCRIPT_MATH_BASE_CHARS = frozenset({"∆", "Δ", "σ", "Σ", "φ", "Φ", "�
 
 @dataclass(frozen=True, slots=True)
 class PDFTextStyleRange:
-    """保存可比较文本中的一个半开样式区间。"""
+    """Saves a half-open style range in comparable text."""
 
     start: int
     end: int
@@ -174,7 +174,7 @@ class PDFTextStyleRange:
 
 @dataclass(frozen=True, slots=True)
 class PDFTextStyleLine:
-    """保存一个视觉文本 run 的几何、可比较文本和样式区间。"""
+    """Saves the geometry, comparable text, and style intervals of a visual text run."""
 
     bbox: BBox
     text: str
@@ -184,7 +184,7 @@ class PDFTextStyleLine:
 
 @dataclass(frozen=True, slots=True)
 class PDFTextScriptRange:
-    """保存 Flash 上下标的文本区间、页面 tight bbox 与稳定性证据。"""
+    """Save Flash superscript and subscript text ranges, pages tight bbox and stability evidence."""
 
     start: int
     end: int
@@ -196,7 +196,7 @@ class PDFTextScriptRange:
 
 @dataclass(frozen=True, slots=True)
 class PDFTextScriptLine:
-    """保存一个 Flash 视觉行的紧凑文本及上下标候选。"""
+    """Saves compact text and superscript and subscript candidates for a Flash visual line."""
 
     bbox: BBox
     text: str
@@ -207,7 +207,7 @@ class PDFTextScriptLine:
 
 @dataclass(frozen=True, slots=True)
 class PDFTextLinkRange:
-    """保存可比较文本中的一个半开超链接区间。"""
+    """Saves a half-open hyperlink range in comparable text."""
 
     start: int
     end: int
@@ -216,7 +216,7 @@ class PDFTextLinkRange:
 
 @dataclass(frozen=True, slots=True)
 class PDFTextLinkLine:
-    """保存视觉文本 run 的几何、可比较文本和超链接区间。"""
+    """Save geometry, comparable text, and hyperlink intervals for visual text run."""
 
     bbox: BBox
     text: str
@@ -234,7 +234,7 @@ PDFTextEvidenceLine = TypeVar(
 
 @dataclass(frozen=True, slots=True)
 class _VisibleChar:
-    """保存参与文本装饰线几何判断的可见字符。"""
+    """Save the visible characters that participate in the geometric judgment of text decoration lines."""
 
     source_index: int
     bbox: BBox
@@ -242,7 +242,7 @@ class _VisibleChar:
 
 @dataclass(slots=True)
 class _LineCandidate:
-    """保存字体与文本装饰线匹配阶段使用的视觉文本行指标。"""
+    """Saves the visual text line metrics used in the font and text decoration line matching phase."""
 
     bbox: BBox
     chars: list[dict[str, Any]]
@@ -257,7 +257,7 @@ class _LineCandidate:
 
 @dataclass(frozen=True, slots=True)
 class _DrawingMatch:
-    """保存单条 drawing 对单个文本行的匹配结果和排序指标。"""
+    """Save the matching results and sorting indicators of a single drawing for a single text line."""
 
     style: PDFTextDecoration
     start_index: int
@@ -268,7 +268,7 @@ class _DrawingMatch:
 
 @dataclass(frozen=True, slots=True)
 class _ProjectedChar:
-    """保存 model content 可比较字符到原字符串位置的映射。"""
+    """Save model content Mapping of comparable characters to original string positions."""
 
     value: str
     raw_start: int
@@ -280,7 +280,7 @@ class _ProjectedChar:
 
 @dataclass(frozen=True, slots=True)
 class _RawStyleInterval:
-    """保存 model content 原字符串中的半开样式区间。"""
+    """Save model content The half-open style interval in the original string."""
 
     start: int
     end: int
@@ -289,7 +289,7 @@ class _RawStyleInterval:
 
 @dataclass(frozen=True, slots=True)
 class _NativeScriptMarkup:
-    """保存 detector-owned 上下标标签边界及对应原文样式区间。"""
+    """Save detector-owned superscript and subscript label boundaries and corresponding original text style intervals."""
 
     marker_ranges: tuple[tuple[int, int], ...]
     style_intervals: tuple[tuple[int, int, str], ...]
@@ -297,7 +297,7 @@ class _NativeScriptMarkup:
 
 @dataclass(frozen=True, slots=True)
 class _MatchedLinkRange:
-    """保存已经对齐到 block 可比较文本的链接区间与物理行身份。"""
+    """Saves linked ranges with physical line identities that have been aligned to block comparable text."""
 
     start: int
     end: int
@@ -307,7 +307,7 @@ class _MatchedLinkRange:
 
 @dataclass(frozen=True, slots=True)
 class _RawLinkInterval:
-    """保存 model content 原字符串中的半开链接区间。"""
+    """Save model content The half-open link interval in the original string."""
 
     start: int
     end: int
@@ -317,7 +317,7 @@ class _RawLinkInterval:
 
 @dataclass(frozen=True, slots=True)
 class _LineProjectionMatch:
-    """保存物理行跨公式空洞对齐到 block 可比较文本的结果。"""
+    """Save results of physical line alignment across formula holes to block comparable text."""
 
     start: int
     end: int

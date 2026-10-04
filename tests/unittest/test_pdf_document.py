@@ -27,13 +27,13 @@ from docvortex.document.pdf.text._contracts import Bbox
 
 
 def test_pdf_document_does_not_expose_span_bbox_visualization() -> None:
-    """验证公开 PDFDocument 不再暴露无法支持的 span bbox 绘制接口。"""
+    """Verify that exposing PDFDocument no longer exposes the unsupported span bbox drawing interface."""
 
     assert not hasattr(pdf_document.PDFDocument, "draw_span_bbox")
 
 
 def test_pdf_page_exposes_path_infos_without_raw_pdfium_access() -> None:
-    """验证 PDFPage 只读代理当前页 Path 摘要并保留页索引。"""
+    """Verify PDFPage read-only agent current page Path summary and preserve page index."""
 
     document = MagicMock()
     expected = [MagicMock()]
@@ -44,7 +44,7 @@ def test_pdf_page_exposes_path_infos_without_raw_pdfium_access() -> None:
 
 
 def test_pdf_page_exposes_chars_with_geometry_without_raw_pdfium_access() -> None:
-    """验证 PDFPage 代理扩展字符几何并保留页索引。"""
+    """Verify PDFPage agent expands character geometry and preserves page index."""
     document = MagicMock()
     expected = pdf_document.PDFPageTextGeometry(chars=[], tight_bboxes={}, origins={})
     document.get_page_chars_with_geometry.return_value = expected
@@ -54,7 +54,7 @@ def test_pdf_page_exposes_chars_with_geometry_without_raw_pdfium_access() -> Non
 
 
 def _build_drawing_pdf() -> bytes:
-    """构造包含描边、填充细矩形、相邻线段、Form 矩阵和斜线的测试 PDF。"""
+    """Constructs a test PDF containing a stroke, a thin filled rectangle, adjacent line segments, a Form matrix, and a diagonal line."""
     output = BytesIO()
     canvas = Canvas(output, pagesize=(100, 200))
     canvas.setLineWidth(1)
@@ -73,15 +73,15 @@ def _build_drawing_pdf() -> bytes:
     canvas.doForm("NestedLine")
     canvas.restoreState()
 
-    # alpha 为 0 的描边不可见，公共接口应过滤。
+    # Strokes with alpha 0 are not visible and public interfaces should be filtered.
     canvas.saveState()
     canvas.setStrokeAlpha(0)
     canvas.line(10, 120, 90, 120)
     canvas.restoreState()
 
-    # 斜线不属于表格横竖线，公共接口应过滤。
+    # Slashes do not belong to horizontal and vertical lines in the table, and the public interface should be filtered.
     canvas.line(10, 10, 90, 50)
-    # 闭合贝塞尔用于验证 Path 信息保留控制点形成的几何范围。
+    # Closed Bezier is used to verify that the Path information preserves the geometric extent formed by the control points.
     curve = canvas.beginPath()
     curve.moveTo(10, 80)
     curve.curveTo(20, 95, 30, 95, 40, 80)
@@ -93,7 +93,7 @@ def _build_drawing_pdf() -> bytes:
 
 
 def _build_rotated_cropped_drawing_pdf() -> bytes:
-    """构造带 CropBox 与 90 度页面旋转的测试 PDF。"""
+    """Construct a test PDF with CropBox and 90 degree page rotation."""
     source = BytesIO()
     canvas = Canvas(source, pagesize=(100, 200))
     canvas.setLineWidth(2)
@@ -113,7 +113,7 @@ def _build_rotated_cropped_drawing_pdf() -> bytes:
 
 
 def _build_colored_path_pdf() -> bytes:
-    """构造可见浅色填充与透明填充 Path，验证 RGBA 元数据。"""
+    """Construct visible light fill and transparent fill Path, verify RGBA metadata."""
 
     output = BytesIO()
     canvas = Canvas(output, pagesize=(100, 100))
@@ -128,7 +128,7 @@ def _build_colored_path_pdf() -> bytes:
 
 
 def _build_rotated_cropped_image_pdf() -> bytes:
-    """构造普通、嵌套 Form、部分页外和完全页外点阵图，并应用 CropBox 与旋转。"""
+    """Construct normal, nested Form, partial off-page and fully off-page bitmaps and apply CropBox with rotation."""
     image = Image.new("RGB", (3, 4), "red")
     image_buffer = BytesIO()
     image.save(image_buffer, format="PNG")
@@ -163,7 +163,7 @@ def _build_rotated_cropped_image_pdf() -> bytes:
 
 
 def _build_rotated_cropped_signature_pdf() -> bytes:
-    """构造带可见签名和各类无效注释的 CropBox 旋转测试 PDF。"""
+    """Construct CropBox rotation test PDF with visible signature and various invalid annotations."""
 
     writer = PdfWriter()
     page = writer.add_blank_page(width=100, height=200)
@@ -172,7 +172,7 @@ def _build_rotated_cropped_signature_pdf() -> bytes:
     page.cropbox.upper_right = (95, 190)
 
     def add_appearance(width: float, height: float) -> object:
-        """为测试签名创建最小正常 Form 外观流。"""
+        """Create a minimal normal Form appearance stream for the test signature."""
 
         appearance = DecodedStreamObject()
         appearance.set_data(b"q 1 0 0 rg 0 0 1 1 re f Q")
@@ -205,7 +205,7 @@ def _build_rotated_cropped_signature_pdf() -> bytes:
         with_appearance: bool = True,
         inherited_field_type: bool = False,
     ) -> None:
-        """追加一个可配置的测试 Widget，覆盖可见性和结构过滤分支。"""
+        """Append a configurable test Widget covering the visibility and structure filter branches."""
 
         annotation = DictionaryObject(
             {
@@ -262,7 +262,7 @@ def _build_rotated_cropped_signature_pdf() -> bytes:
 
 
 def _build_rotated_cropped_link_pdf() -> bytes:
-    """构造带 QuadPoints、Rect 回退和无效动作的旋转 Link 注解测试 PDF。"""
+    """Construct a rotational Link annotation test PDF with QuadPoints, Rect fallback and invalid actions."""
 
     writer = PdfWriter()
     page = writer.add_blank_page(width=100, height=200)
@@ -278,7 +278,7 @@ def _build_rotated_cropped_link_pdf() -> bytes:
         quad_points: tuple[float, ...] | None = None,
         flags: int = 0,
     ) -> None:
-        """追加一个可配置 URI Link，用于覆盖目标校验和区域读取分支。"""
+        """Append a configurable URI Link to override the target checksum area read branch."""
 
         annotation = DictionaryObject(
             {
@@ -380,7 +380,7 @@ class _TrackingLock:
 def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: pytest.MonkeyPatch) -> None:
     lock = _TrackingLock()
     monkeypatch.setattr(pdf_document, "_pdfium_lock", lock)
-    # 操作入口和清理入口必须使用同一个共享锁，允许初始化及清理时重入。
+    # The operation entrance and cleanup entrance must use the same shared lock to allow reentrancy during initialization and cleanup.
     from docvortex.document.pdf import pdfium as pdfium_runtime
 
     monkeypatch.setattr(pdfium_runtime, "_pdfium_lock", lock)
@@ -440,7 +440,7 @@ def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: p
     def fake_get_chars(
         textpage: _FakeTextPage, page_bbox: list[float], page_rotation: int, *, include_geometry: bool = False
     ) -> list[dict[str, Any]]:
-        """记录文本抽取时的锁深度，避免依赖旧模块级 get_page_chars 钩子。"""
+        """Record lock depth when extracting text to avoid relying on the old module-level get_page_chars hook."""
         events.append(f"get_chars:{lock.depth}:{page_bbox}:{page_rotation}")
         return [
             {
@@ -459,7 +459,7 @@ def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: p
         page_bbox: tuple[float, float, float, float],
         page_rotation: int,
     ) -> list[pdf_document.PDFDrawingLine]:
-        """记录绘图对象遍历时仍由 PDFDocument 持有 PDFium 锁。"""
+        """The PDFium lock is still held by PDFDocument while recording the drawing object traversal."""
         events.append(f"drawing_lines:{lock.depth}:{page_bbox}:{page_rotation}")
         return []
 
@@ -468,7 +468,7 @@ def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: p
         page_bbox: tuple[float, float, float, float],
         page_rotation: int,
     ) -> list[tuple[float, float, float, float]]:
-        """记录点阵图遍历时仍由 PDFDocument 持有 PDFium 锁。"""
+        """The PDFium lock is still held by PDFDocument while recording the bitmap traversal."""
         events.append(f"image_bboxes:{lock.depth}:{page_bbox}:{page_rotation}")
         return []
 
@@ -477,7 +477,7 @@ def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: p
         page_bbox: tuple[float, float, float, float],
         page_rotation: int,
     ) -> list[pdf_document.PDFImageInfo]:
-        """记录图片指纹元数据遍历时仍由 PDFDocument 持有 PDFium 锁。"""
+        """The PDFium lock is still held by PDFDocument when recording image fingerprint metadata traversal."""
 
         events.append(f"image_infos:{lock.depth}:{page_bbox}:{page_rotation}")
         return []
@@ -487,7 +487,7 @@ def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: p
         page_bbox: tuple[float, float, float, float],
         page_rotation: int,
     ) -> list[pdf_document.PDFPathInfo]:
-        """记录完整 Path 几何遍历时仍由 PDFDocument 持有 PDFium 锁。"""
+        """The PDFium lock is still held by PDFDocument while the fully logged Path geometry is traversed."""
         events.append(f"path_infos:{lock.depth}:{page_bbox}:{page_rotation}")
         return []
 
@@ -496,7 +496,7 @@ def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: p
         page_bbox: tuple[float, float, float, float],
         page_rotation: int,
     ) -> list[tuple[float, float, float, float]]:
-        """记录 Form 遍历时仍由 PDFDocument 持有 PDFium 锁。"""
+        """The PDFium lock is still held by PDFDocument while logging Form is traversed."""
         events.append(f"form_bboxes:{lock.depth}:{page_bbox}:{page_rotation}")
         return []
 
@@ -507,7 +507,7 @@ def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: p
         *,
         form_handle: object | None = None,
     ) -> list[tuple[float, float, float, float]]:
-        """记录签名注释遍历时仍由 PDFDocument 持有 PDFium 锁。"""
+        """The PDFium lock is still held by PDFDocument while the record signature annotation is traversed."""
 
         assert form_handle is None
         events.append(f"signature_bboxes:{lock.depth}:{page_bbox}:{page_rotation}")
@@ -519,7 +519,7 @@ def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: p
         page_bbox: tuple[float, float, float, float],
         page_rotation: int,
     ) -> list[pdf_document.PDFLinkAnnotation]:
-        """记录 Link 注解遍历时页面和文档句柄仍处于 PDFium 锁内。"""
+        """Logging Link The page and document handles were still within the PDFium lock while the annotation was traversed."""
 
         assert raw_doc is doc._pdf_doc.raw
         events.append(f"link_annotations:{lock.depth}:{page_bbox}:{page_rotation}")
@@ -589,7 +589,7 @@ def test_char_visual_bbox_from_pdfium_applies_page_rotation(
     rotation: int,
     expected: tuple[float, float, float, float],
 ) -> None:
-    """验证 tight char box 按非零 CropBox 和四种页面旋转转换。"""
+    """Verify tight char box converts by non-zero CropBox and four page rotations."""
     assert (
         pdf_document._char_visual_bbox_from_pdfium(
             20.0,
@@ -606,7 +606,7 @@ def test_char_visual_bbox_from_pdfium_applies_page_rotation(
 def test_extract_page_char_extended_geometry_isolates_single_char_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 tight/origin 单字符失败或非法值不会影响同页其余字符。"""
+    """Failure to verify tight/origin single character or illegal value does not affect the remaining characters on the same page."""
 
     class _FakeTextPage:
         raw = object()
@@ -630,7 +630,7 @@ def test_extract_page_char_extended_geometry_isolates_single_char_failures(
         bottom: Any,
         top: Any,
     ) -> bool:
-        """只为第一个字符返回合法 tight bbox。"""
+        """Returns legal tight bbox only for the first character."""
         if index != 0:
             return False
         left.value, right.value, bottom.value, top.value = 10.0, 15.0, 180.0, 190.0
@@ -641,7 +641,7 @@ def test_extract_page_char_extended_geometry_isolates_single_char_failures(
         index: int,
         rect: Any,
     ) -> bool:
-        """只为第一个字符返回合法 loose bbox。"""
+        """Returns legal loose bbox only for the first character."""
         if index != 0:
             return False
         rect.left, rect.right, rect.bottom, rect.top = 9.0, 16.0, 179.0, 191.0
@@ -653,7 +653,7 @@ def test_extract_page_char_extended_geometry_isolates_single_char_failures(
         origin_x: Any,
         origin_y: Any,
     ) -> bool:
-        """第二个字符返回非有限 origin，验证其被单独丢弃。"""
+        """The second character returns a non-limited origin, verify that it is discarded alone."""
         origin_x.value = 10.0 + index
         origin_y.value = 180.0 if index == 0 else float("nan")
         return True
@@ -675,7 +675,7 @@ def test_extract_page_char_extended_geometry_isolates_single_char_failures(
 
 
 def test_get_page_chars_with_geometry_preserves_legacy_char_output() -> None:
-    """验证扩展读取不会改变既有字符文本、索引或 loose bbox。"""
+    """Verify that extended reads do not alter existing character text, indexes, or loose bbox."""
     output = BytesIO()
     canvas = Canvas(output, pagesize=(120, 80))
     canvas.drawString(10, 50, "Geometry A2")
@@ -686,7 +686,7 @@ def test_get_page_chars_with_geometry_preserves_legacy_char_output() -> None:
         geometry = document.get_page_chars_with_geometry(0)
 
     def snapshot(chars: list[dict[str, Any]]) -> list[tuple[str, int, tuple[float, ...]]]:
-        """生成忽略第三方 bbox 容器类型的稳定字符快照。"""
+        """Generate stable character snapshots that ignore third-party bbox container types."""
         return [
             (
                 str(char.get("char", "")),
@@ -706,7 +706,7 @@ def test_get_page_chars_with_geometry_preserves_legacy_char_output() -> None:
 def test_restore_pdfium_surrogate_pairs_recovers_supplementary_unicode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证合法 surrogate pair 可恢复，真实替换符与孤立 surrogate 不被误判。"""
+    """Verify that the legal surrogate pair is recoverable, and the real replacement characters and isolated surrogate will not be misjudged."""
 
     raw_codes = [ord("A"), 0xD835, 0xDF03, 0xFFFD, 0xD835, ord("B")]
 
@@ -739,7 +739,7 @@ def test_restore_pdfium_surrogate_pairs_recovers_supplementary_unicode(
 
 
 def test_get_page_drawing_lines_extracts_forms_filled_rectangles_and_merges_segments() -> None:
-    """验证绘图线接口支持 Form、细长填充矩形、共线合并并过滤斜线。"""
+    """Verify that the drawing line interface supports Form, slim filled rectangles, collinear merging, and filtered diagonal lines."""
     with pdf_document.PDFDocument(_build_drawing_pdf()) as doc:
         lines = doc.get_page_drawing_lines(0)
 
@@ -765,7 +765,7 @@ def test_get_page_drawing_lines_extracts_forms_filled_rectangles_and_merges_segm
 
 
 def test_get_page_path_infos_preserves_bezier_visibility_depth_and_source_order() -> None:
-    """验证完整 Path 接口保留贝塞尔 bbox、绘制模式、Form 深度和稳定源序号。"""
+    """Verify that the complete Path interface retains the Bessel bbox, draw mode, Form depth and stable source number."""
 
     with pdf_document.PDFDocument(_build_drawing_pdf()) as doc:
         path_infos = doc.get_page_path_infos(0)
@@ -778,7 +778,7 @@ def test_get_page_path_infos_preserves_bezier_visibility_depth_and_source_order(
     assert path_infos[3].fill_visible and not path_infos[3].stroke_visible
     assert path_infos[3].fill_rgba == (0, 0, 0, 255)
     nested_path = next(item for item in path_infos if item.form_depth == 1)
-    # Form 的 BBox 裁掉下半描边和两端扩张；渲染验证仅保留 x=30..70、y<100 的可见墨迹。
+    # BBox of Form cuts off the lower half of the stroke and expands both ends; rendering verification only retains visible ink for x=30..70 and y<100.
     assert nested_path.bbox == pytest.approx((30.0, 99.0, 70.0, 100.0))
     bezier_path = path_infos[-1]
     assert bezier_path.segment_count == 5
@@ -786,7 +786,7 @@ def test_get_page_path_infos_preserves_bezier_visibility_depth_and_source_order(
 
 
 def test_get_page_path_infos_exposes_fill_rgba_and_transparency() -> None:
-    """验证可见 Path 保留填充 RGBA，透明填充不伪装成可见背景。"""
+    """Validate visible Path Preserve padding RGBA, transparent padding does not masquerade as visible background."""
 
     with pdf_document.PDFDocument(_build_colored_path_pdf()) as doc:
         path_infos = doc.get_page_path_infos(0)
@@ -798,10 +798,10 @@ def test_get_page_path_infos_exposes_fill_rgba_and_transparency() -> None:
 
 
 def test_raw_object_rgba_failure_returns_none() -> None:
-    """验证旧 PDFium 或损坏对象读取颜色失败时返回 None。"""
+    """None is returned when verifying that old PDFium or corrupted objects fail to read color."""
 
     def broken_getter(*_args: Any) -> bool:
-        """模拟底层颜色接口异常。"""
+        """Simulate underlying color interface exceptions."""
 
         raise RuntimeError("broken color")
 
@@ -809,7 +809,7 @@ def test_raw_object_rgba_failure_returns_none() -> None:
 
 
 def test_get_page_drawing_lines_applies_crop_box_and_page_rotation() -> None:
-    """验证页面 CropBox 与 90 度旋转被转换为左上原点坐标。"""
+    """Verification page CropBox with 90 degree rotation is converted to upper left origin coordinates."""
     with pdf_document.PDFDocument(_build_rotated_cropped_drawing_pdf()) as doc:
         page_size = doc.page_size(0)
         page_rotation = doc.page_rotation(0)
@@ -829,7 +829,7 @@ def test_get_page_drawing_lines_applies_crop_box_and_page_rotation() -> None:
 
 
 def test_get_page_path_infos_applies_crop_box_page_rotation_and_stroke_width() -> None:
-    """验证 Path bbox 在 CropBox 与页面旋转后仍保留可见描边宽度。"""
+    """Verify that Path bbox retains visible stroke width after CropBox and page rotation."""
 
     with pdf_document.PDFDocument(_build_rotated_cropped_drawing_pdf()) as doc:
         path_infos = doc.get_page_path_infos(0)
@@ -841,7 +841,7 @@ def test_get_page_path_infos_applies_crop_box_page_rotation_and_stroke_width() -
 
 
 def test_get_page_image_bboxes_applies_forms_crop_box_rotation_and_clipping() -> None:
-    """验证点阵图接口递归 Form，并按 CropBox、页面旋转裁剪为左上坐标。"""
+    """Verify the bitmap interface recursively Form, and press CropBox, page rotation and crop to the upper left coordinate."""
     with pdf_document.PDFDocument(_build_rotated_cropped_image_pdf()) as doc:
         page_size = doc.page_size(0)
         image_bboxes = doc.get_page_image_bboxes(0)
@@ -857,7 +857,7 @@ def test_get_page_image_bboxes_applies_forms_crop_box_rotation_and_clipping() ->
 
 
 def test_get_page_image_infos_preserves_bboxes_and_fingerprints_reused_images() -> None:
-    """验证图片信息保持既有几何，并为普通与 Form 复用图生成相同内容指纹。"""
+    """Verify that the image information maintains the existing geometry and generates the same content fingerprint for the normal and Form multiplex images."""
 
     with pdf_document.PDFDocument(_build_rotated_cropped_image_pdf()) as doc:
         image_infos = doc.get_page_image_infos(0)
@@ -876,25 +876,25 @@ def test_get_page_image_infos_preserves_bboxes_and_fingerprints_reused_images() 
 def test_image_fingerprint_fails_open_when_raw_stream_exceeds_limit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证超大图片流不分配缓冲区且返回空指纹，后续按普通图片放行。"""
+    """Verify that the oversized image stream does not allocate a buffer and returns an empty fingerprint. Subsequently, it will be released as a normal image."""
 
     raw_data_calls: list[tuple[object | None, int]] = []
 
     def fake_metadata(raw_obj: object, raw_page: object, metadata_pointer: Any) -> int:
-        """填入有效像素宽高，使测试只命中原始流大小上限。"""
+        """Fill in the valid pixel width and height so that the test only hits the upper limit of the original stream size."""
 
         metadata_pointer._obj.width = 100
         metadata_pointer._obj.height = 200
         return 1
 
     def fake_raw_data(raw_obj: object, buffer: object | None, buffer_length: int) -> int:
-        """声明超过上限的流，并记录是否发生第二次缓冲区读取。"""
+        """Declare a stream that exceeds the cap and log if a second buffer read occurs."""
 
         raw_data_calls.append((buffer, buffer_length))
         return pdf_document.PDF_IMAGE_FINGERPRINT_MAX_RAW_BYTES + 1
 
     class _FakePage:
-        """提供 PDFium 元数据接口所需的最小 raw 页面句柄。"""
+        """Provides the minimum raw page handle required by the PDFium metadata interface."""
 
         raw = object()
 
@@ -906,7 +906,7 @@ def test_image_fingerprint_fails_open_when_raw_stream_exceeds_limit(
 
 
 def test_get_page_form_bboxes_reads_root_forms_and_nested_content_bounds() -> None:
-    """验证顶层 Form bbox 覆盖其嵌套绘图内容，且不重复输出内部对象。"""
+    """Verify that the top-level Form bbox overwrites its nested drawing contents and does not duplicate the output of internal objects."""
     with pdf_document.PDFDocument(_build_drawing_pdf()) as doc:
         form_bboxes = doc.get_page_form_bboxes(0)
 
@@ -914,7 +914,7 @@ def test_get_page_form_bboxes_reads_root_forms_and_nested_content_bounds() -> No
 
 
 def test_get_page_form_bboxes_applies_crop_box_rotation_and_clipping() -> None:
-    """验证 Form bbox 按 CropBox 与页面旋转转换，并裁剪为左上原点坐标。"""
+    """Verify Form bbox Press CropBox to convert with page rotation and crop to upper left origin coordinates."""
     with pdf_document.PDFDocument(_build_rotated_cropped_image_pdf()) as doc:
         page_size = doc.page_size(0)
         form_bboxes = doc.get_page_form_bboxes(0)
@@ -924,7 +924,7 @@ def test_get_page_form_bboxes_applies_crop_box_rotation_and_clipping() -> None:
 
 
 def test_get_page_signature_bboxes_filters_visibility_and_applies_page_geometry() -> None:
-    """验证仅输出可见正常签名，并正确应用 CropBox、旋转和页面裁剪。"""
+    """Verify that only normal signatures are visible in the output, and that CropBox, rotation, and page cropping are applied correctly."""
 
     with pdf_document.PDFDocument(_build_rotated_cropped_signature_pdf()) as doc:
         page_size = doc.page_size(0)
@@ -940,7 +940,7 @@ def test_get_page_signature_bboxes_filters_visibility_and_applies_page_geometry(
 
 
 def test_pdf_document_extracts_safe_external_link_annotations() -> None:
-    """验证外部 URI 白名单、QuadPoints 优先级和旋转 CropBox 坐标转换。"""
+    """Verify external URI whitelist, QuadPoints priority and rotation CropBox coordinate transformation."""
 
     with pdf_document.PDFDocument(_build_rotated_cropped_link_pdf()) as document:
         page_size = document.page_size(0)
@@ -975,7 +975,7 @@ def test_pdf_external_link_target_validation(
     target: str,
     expected: str | None,
 ) -> None:
-    """验证 PDF producer 只接受显式安全协议及完整目标。"""
+    """Verification PDF producer only accepts explicit security protocols and complete targets."""
 
     assert pdf_document._validate_pdf_external_link_target(target) == expected
 
@@ -993,7 +993,7 @@ def test_pdf_link_region_geometry_supports_standard_page_rotations(
     rotation: int,
     expected: tuple[float, float, float, float],
 ) -> None:
-    """验证 Link 点集在四个标准页面方向下转换到统一视觉坐标。"""
+    """Verify that the Link point set is converted to unified visual coordinates in the four standard page orientations."""
 
     bbox = pdf_document._visual_bbox_from_pdf_points(
         [(20.0, 25.0), (40.0, 25.0), (20.0, 35.0), (40.0, 35.0)],
@@ -1007,19 +1007,19 @@ def test_pdf_link_region_geometry_supports_standard_page_rotations(
 def test_extract_page_signature_bboxes_closes_handles_and_skips_bad_annotation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证损坏签名被隔离，且成功或失败路径都关闭注释句柄。"""
+    """Verify that the corrupted signature is isolated and the annotation handle is closed on either success or failure path."""
 
     bad_annot = object()
     good_annot = object()
     closed: list[object] = []
 
     class _FakePage:
-        """提供注释原始接口所需的最小页面句柄。"""
+        """Provides the minimum page handle required to annotate the original interface."""
 
         raw = object()
 
     def fake_get_annot(_raw_page: object, index: int) -> object:
-        """按索引返回一个损坏注释和一个有效注释。"""
+        """Returns one corrupted comment and one valid comment by index."""
 
         return (bad_annot, good_annot)[index]
 
@@ -1029,7 +1029,7 @@ def test_extract_page_signature_bboxes_closes_handles_and_skips_bad_annotation(
         _page_rotation: int,
         _form_handle: object | None,
     ) -> tuple[float, float, float, float]:
-        """让首个注释抛错，验证第二个注释仍能被提取。"""
+        """Let the first annotation throw an error and verify that the second annotation can still be extracted."""
 
         if raw_annot is bad_annot:
             raise RuntimeError("broken annotation")
@@ -1049,7 +1049,7 @@ def test_extract_page_signature_bboxes_closes_handles_and_skips_bad_annotation(
 
 
 def test_extract_page_form_bboxes_skips_one_bad_object(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证单个损坏 Form 不会阻断同页其他有效 Form 的提取。"""
+    """Verify that a single corrupted Form does not block the extraction of other valid Forms on the same page."""
     bad_object = object()
     good_object = object()
 
@@ -1058,7 +1058,7 @@ def test_extract_page_form_bboxes_skips_one_bad_object(monkeypatch: pytest.Monke
         page_bbox: tuple[float, float, float, float],
         page_rotation: int,
     ) -> tuple[float, float, float, float]:
-        """首个对象抛错，第二个对象返回可验证 bbox。"""
+        """The first object throws an error, and the second object returns verifiable bbox."""
         assert page_bbox == (0.0, 0.0, 100.0, 200.0)
         assert page_rotation == 0
         if raw_object is bad_object:
@@ -1066,7 +1066,7 @@ def test_extract_page_form_bboxes_skips_one_bad_object(monkeypatch: pytest.Monke
         return (10.0, 20.0, 30.0, 40.0)
 
     def fake_root_forms(_page: object) -> Any:
-        """依次返回损坏对象与有效对象，验证逐对象异常隔离。"""
+        """Return damaged objects and valid objects in sequence to verify object-by-object exception isolation."""
         return iter((bad_object, good_object))
 
     monkeypatch.setattr(
@@ -1084,12 +1084,12 @@ def test_extract_page_form_bboxes_skips_one_bad_object(monkeypatch: pytest.Monke
 
 
 def test_get_page_drawing_lines_skips_one_bad_path(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证单个 Path 解析异常不会丢失同页其他有效绘图线。"""
+    """Verify that a single Path parsing exception does not lose other valid plot lines on the same page."""
     original_extract = pdf_document._extract_path_drawing_lines
     call_count = 0
 
     def flaky_extract(*args: Any, **kwargs: Any) -> list[pdf_document.PDFDrawingLine]:
-        """仅让首个 Path 失败，后续对象仍调用真实实现。"""
+        """Only the first Path fails, subsequent objects still call the real implementation."""
         nonlocal call_count
         call_count += 1
         if call_count == 1:
@@ -1107,13 +1107,13 @@ def test_get_page_drawing_lines_skips_one_bad_path(monkeypatch: pytest.MonkeyPat
 
 
 def test_get_page_path_infos_skips_one_bad_path(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证单个 Path 信息解析失败不会丢失同页其他有效对象。"""
+    """Verify that failure to parse a single Path message will not lose other valid objects on the same page."""
 
     original_extract = pdf_document._path_info_from_object
     call_count = 0
 
     def flaky_extract(*args: Any, **kwargs: Any) -> pdf_document.PDFPathInfo | None:
-        """仅让首个 Path 失败，后续对象仍调用真实实现。"""
+        """Only the first Path fails, subsequent objects still call the real implementation."""
 
         nonlocal call_count
         call_count += 1
@@ -1142,7 +1142,7 @@ def test_get_page_path_infos_skips_one_bad_path(monkeypatch: pytest.MonkeyPatch)
     ],
 )
 def test_native_page_snapshot_matches_independent_accessors(builder: Callable[[], bytes]) -> None:
-    """批量提取与独立接口在旋转、裁剪、Form、签名和链接语料上完全一致。"""
+    """Batch extraction is identical to the standalone interface for rotation, cropping, Form, signatures and linked corpora."""
 
     with pdf_document.PDFDocument(builder()) as document:
         snapshot = document._extract_native_page(0)
@@ -1164,14 +1164,14 @@ def test_native_page_snapshot_matches_independent_accessors(builder: Callable[[]
 
 
 def test_native_page_snapshot_opens_once_and_closes_after_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    """批量读取只打开一次页面，字符提取抛错时同样关闭原生页面。"""
+    """Batch reading only opens the page once, and the native page is also closed when an error occurs in character extraction."""
 
     opened: list[pdf_document.pdfium.PdfPage] = []
     original = pdf_document.PDFDocument._open_page
 
     @contextmanager
     def record_page(document: pdf_document.PDFDocument, page_idx: int) -> Iterator[pdf_document.pdfium.PdfPage]:
-        """记录真实页面对象，使用原生命周期管理检查成功和失败后的关闭状态。"""
+        """Record the real page object and use the original life cycle management to check the closing status after success and failure."""
 
         with original(document, page_idx) as page:
             opened.append(page)
@@ -1186,7 +1186,7 @@ def test_native_page_snapshot_opens_once_and_closes_after_failure(monkeypatch: p
         def fail_text(
             page: pdf_document.pdfium.PdfPage, *, include_extended_geometry: bool, visible_only: bool = False
         ) -> pdf_document.PDFPageTextGeometry:
-            """模拟字符提取失败，验证页面生命周期仍由外层上下文管理。"""
+            """Simulated character extraction failed, verifying that the page life cycle is still managed by the outer context."""
 
             raise RuntimeError("broken text")
 
@@ -1198,20 +1198,20 @@ def test_native_page_snapshot_opens_once_and_closes_after_failure(monkeypatch: p
 
 
 def test_native_page_snapshot_decodes_each_path_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    """同一 Path 解码由绘图线和路径信息共享，避免独立接口的重复工作。"""
+    """The same Path decoding is shared by drawing line and path information, avoiding duplication of work by independent interfaces."""
     from docvortex.document.pdf import _object_bridge
 
     counts: list[object] = []
     original = pdf_document._read_raw_path_subpaths
 
     def record_decode(raw_object: Any) -> list[pdf_document._PathSubpath]:
-        """统计真实 Path 解码次数，不替换解码结果。"""
+        """Count the real Path decoding times and do not replace the decoding results."""
 
         counts.append(raw_object)
         return original(raw_object)
 
     monkeypatch.setattr(native_objects, "_read_raw_path_subpaths", record_decode)
-    # 本例验证 Python 联合解码；原生批量路径和简单绘图线各有独立桥接测试。
+    # This example verifies Python joint decoding; native batch paths and simple plot lines each have independent bridge tests.
     monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
     monkeypatch.setattr(_object_bridge, "read_drawing_lines", lambda *args, **kwargs: None)
     with pdf_document.PDFDocument(_build_drawing_pdf()) as document:

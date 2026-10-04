@@ -1,4 +1,4 @@
-"""严格 MiddleJson 多格式渲染的统一公共入口。"""
+"""Strict MiddleJson A unified common entrance for multi-format rendering."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def render(
     *,
     options: MarkdownRenderOptions | None = None,
 ) -> str:
-    """声明 Markdown 目标对应的字符串返回类型。"""
+    """Declare the string return type corresponding to the Markdown target."""
     ...
 
 
@@ -45,7 +45,7 @@ def render(
     *,
     options: HtmlRenderOptions | None = None,
 ) -> str:
-    """声明 HTML 目标对应的字符串返回类型。"""
+    """Declare the string return type corresponding to the HTML target."""
     ...
 
 
@@ -56,7 +56,7 @@ def render(
     *,
     options: LatexRenderOptions | None = None,
 ) -> str:
-    """声明 LaTeX 目标对应的字符串返回类型。"""
+    """Declare the string return type corresponding to the LaTeX target."""
     ...
 
 
@@ -67,7 +67,7 @@ def render(
     *,
     options: DocxRenderOptions | None = None,
 ) -> bytes:
-    """声明 DOCX 目标对应的字节返回类型。"""
+    """Declare the byte return type corresponding to the DOCX target."""
     ...
 
 
@@ -78,7 +78,7 @@ def render(
     *,
     options: EpubRenderOptions | None = None,
 ) -> bytes:
-    """声明 EPUB 目标对应的字节返回类型。"""
+    """Declare the byte return type corresponding to the EPUB target."""
     ...
 
 
@@ -89,7 +89,7 @@ def render(
     *,
     options: PdfRenderOptions | None = None,
 ) -> bytes:
-    """声明 PDF 目标对应的字节返回类型。"""
+    """Declare the byte return type corresponding to the PDF target."""
     ...
 
 
@@ -100,7 +100,7 @@ def render(
     *,
     options: StructuredContentRenderOptions | None = None,
 ) -> dict[str, Any]:
-    """声明 Structured Content 目标对应的字典返回类型。"""
+    """Declare the dictionary return type corresponding to the Structured Content target."""
     ...
 
 
@@ -110,7 +110,7 @@ def render(
     *,
     options: RenderOptions | None = None,
 ) -> RenderOutput:
-    """按严格目标格式和对应选项把 MiddleJson 渲染为原生结果。"""
+    """Render MiddleJson to native results in strict target format and corresponding options."""
     if not isinstance(middle_json, MiddleJson):
         raise TypeError("render expects a MiddleJson instance")
     if not isinstance(output_format, RenderFormat):

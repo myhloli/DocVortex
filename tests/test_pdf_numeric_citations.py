@@ -1,4 +1,4 @@
-"""锁定宽行距论文中空白分隔及多位数字引用的完整上标。"""
+"""Locks full superscripting of whitespace-delimited and multi-digit citations in wide-spaced papers."""
 
 from copy import deepcopy
 import hashlib
@@ -34,7 +34,7 @@ EXPECTED = [value for _, _, values in CASES for value in values]
 
 @pytest.fixture(scope="module")
 def source_evidence():
-    """从冻结的三页原件提取证据，检查样本身份且复用只读结果。"""
+    """Extract evidence from frozen three-page originals, check sample identity and reuse read-only results."""
     assert hashlib.sha256(SOURCE.read_bytes()).hexdigest() == SOURCE_SHA256
     with PDFDocument(str(SOURCE)) as document:
         assert len(document) == 3
@@ -43,7 +43,7 @@ def source_evidence():
 
 @pytest.mark.parametrize("page,anchor,expected", CASES)
 def test_real_citation_evidence_is_complete(source_evidence, page, anchor, expected):
-    """逐个原文锚点验证所有引用及逗号，不以局部字符或总数代替正确性。"""
+    """Verify all quotes and commas on a source-by-text anchor basis, without substituting local characters or totals for correctness."""
     matches = [line for line in source_evidence[page].scripts if anchor in line.text]
     assert len(matches) == 1
     line = matches[0]
@@ -53,7 +53,7 @@ def test_real_citation_evidence_is_complete(source_evidence, page, anchor, expec
 
 
 def test_real_citations_survive_public_export():
-    """公开 Model/Middle/HTML/Markdown 都保留十二组完整引用且不提升其他正文。"""
+    """Public Model/Middle/HTML/Markdown all retain twelve complete sets of citations and do not promote other text."""
     result = parse(SOURCE, keep_model_json=True)
     for markup in (render_html(result.middle_json), render_markdown(result.middle_json)):
         for value in EXPECTED:
@@ -64,7 +64,7 @@ def test_real_citations_survive_public_export():
         scripts = []
 
         def visit(value):
-            """递归收集公共协议内的上下标，覆盖嵌套段落且不依赖块编号。"""
+            """Recursively collect superscripts and subscripts within common protocols, covering nested paragraphs and independent of block numbering."""
             if isinstance(value, dict):
                 if set(value.get("styles", [])) & {"superscript", "subscript"}:
                     scripts.append((value["content"], value["styles"]))
@@ -79,7 +79,7 @@ def test_real_citations_survive_public_export():
 
 
 def _citation_fixture(reference="word.", citation="13,14", separator=" ", shift=-4.0):
-    """建立有明确正文参照的双 bbox 字符，引用中的标点保持同一基线。"""
+    """Establish double bbox characters with clear text references, keeping punctuation within the reference to the same baseline."""
     text = reference + separator + citation + " next"
     start, end = len(reference + separator), len(reference + separator + citation)
     chars, tight, origins = [], {}, {}
@@ -100,12 +100,12 @@ def _citation_fixture(reference="word.", citation="13,14", separator=" ", shift=
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 @pytest.mark.parametrize("scale,translation", [(0.75, 0), (1.0, 75), (1.6, 0)])
 def test_numeric_citations_generalize(citation, separator, angle, scale, translation):
-    """有无空白、引用长度、字号、平移和旋转均不改变正文及引用角色。"""
+    """The presence or absence of white space, quotation length, font size, translation and rotation do not change the text and quotation roles."""
     chars, tight, origins, start, end = _citation_fixture(citation=citation, separator=separator)
     size = (800.0, 1000.0)
 
     def transform(box):
-        """同步变换两类 bbox，保持样式判断不依赖绝对位置。"""
+        """Synchronously transform two types of bbox, keeping style judgment independent of absolute position."""
         return _rotate_bbox_from_upright(tuple(v * scale + translation for v in box), size, angle)
 
     for char in chars:
@@ -125,7 +125,7 @@ def test_numeric_citations_generalize(citation, separator, angle, scale, transla
 
 @pytest.mark.parametrize("mode", ["same-baseline", "weak", "newline", "column", "row", "missing", "no-anchor"])
 def test_numeric_citation_requires_local_geometry(mode):
-    """普通数字、弱偏移、跨行跨栏、缺失证据和孤立数字不可借用正文锚点。"""
+    """Ordinary numbers, weak offsets, straddling lines and columns, missing evidence, and isolated numbers cannot be used as text anchors."""
     chars, tight, origins, start, end = _citation_fixture(
         reference="1." if mode == "no-anchor" else "word.",
         citation="2021",
@@ -146,7 +146,7 @@ def test_numeric_citation_requires_local_geometry(mode):
 
 
 def test_inline_math_retains_its_body_base():
-    """数字幂的基数留在正文，不将整个数学 token 强制保护为引用。"""
+    """The bases of numerical powers are left in the text and the entire mathematics token is not forced to be protected as a reference."""
     chars, tight, origins, start, end = _citation_fixture(reference="10", citation="12", separator="")
     _, roles, _, _ = _script_line_char_roles(
         SimpleNamespace(chars=chars, angle=0, inline_math_regions=[]), (800, 1000), tight, origins, set()
@@ -156,7 +156,7 @@ def test_inline_math_retains_its_body_base():
 
 @pytest.mark.parametrize("scaled_loose", [True, False])
 def test_lowercase_body_requires_complementary_loose_evidence(scaled_loose):
-    """正文 x-height 接近数字时，须同时具备强位移及较小 loose 框才能补判。"""
+    """Text x-height When approaching numbers, strong displacement and a small loose frame are required to make up the judgment."""
     chars, tight, origins, start, end = _citation_fixture(reference="losses,", citation="18,19")
     for index in range(start):
         box = tight[index]
@@ -171,7 +171,7 @@ def test_lowercase_body_requires_complementary_loose_evidence(scaled_loose):
 
 @pytest.mark.parametrize("reference", ["SK", "σT", "word. "])
 def test_numeric_protection_does_not_bypass_fraction_filter(reference):
-    """分式指数仍由原数学过滤处理，不因保护数字而只留下分子上标。"""
+    """The fractional exponent is still processed by the original mathematical filtering, and only the numerator superscript is left to protect the number."""
     chars, tight, origins, start, end = _citation_fixture(reference=reference, citation="1/2", separator="")
     _, roles, _, _ = _script_line_char_roles(
         SimpleNamespace(chars=chars, angle=0, inline_math_regions=[]), (800, 1000), tight, origins, set()
@@ -180,7 +180,7 @@ def test_numeric_protection_does_not_bypass_fraction_filter(reference):
 
 
 def test_reviewed_klee_footnote_survives_public_export():
-    """锁定原页已确认的 KLEE 数字脚注改善，保持后续句号为正文。"""
+    """Lock the original page and confirm the KLEE digital footnote improvement, keeping the subsequent period as the main text."""
     source = Path(__file__).parents[1] / "demo/pdfs/mixed_elements_pages_07_10.pdf"
     assert hashlib.sha256(source.read_bytes()).hexdigest() == "89076ee9cce2168ab894ee7e280872f8a3c09053b9dcdeda9c1da76d111adc1e"
     result = parse(source)

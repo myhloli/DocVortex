@@ -1,4 +1,4 @@
-"""MHTML 容器、资源隔离、正文和公共导出的行为回归。"""
+"""MHTML Regression in behavior of containers, resource isolation, body, and public exports."""
 
 from __future__ import annotations
 
@@ -25,14 +25,14 @@ from _mhtml_test_utils import build_mhtml_fixture, image_bytes, mime_part, relat
 
 
 def markdown(data: bytes, **kwargs) -> tuple[str, docvortex.DocumentResult]:
-    """经公开接口返回 Markdown 与原始结果，方便同时验证资源和元数据。"""
+    """Markdown and original results are returned through the public interface to facilitate simultaneous verification of resources and metadata."""
     result = docvortex.parse(data, **kwargs)
     return docvortex.render_artifact(result.middle_json, "markdown", assets=result.assets).content.decode(), result
 
 
 @pytest.mark.parametrize("extension", ["mhtml", "mht", "MHTML"])
 def test_detection_public_api_cli_and_schema(extension: str, tmp_path: Path) -> None:
-    """文件名、字节、显式格式和 CLI 统一规范为 mhtml，JSON 符合公开协议。"""
+    """File names, bytes, explicit formats, and CLI are uniformly specified as mhtml, and JSON conforms to the public protocol."""
     data = build_mhtml_fixture()
     source = tmp_path / f"sample.{extension}"
     source.write_bytes(data)
@@ -56,14 +56,14 @@ def test_detection_public_api_cli_and_schema(extension: str, tmp_path: Path) -> 
 @pytest.mark.parametrize("encoding", ["base64", "quoted-printable", "8bit", "binary"])
 @pytest.mark.parametrize("charset", ["utf-8", "gb18030"])
 def test_transfer_encoding_and_charset(encoding: str, charset: str) -> None:
-    """MIME 声明字符集正确传给 HTML，传输编码不污染中文。"""
+    """MIME declares that the character set is correctly transmitted to HTML, and the transmission encoding does not pollute Chinese."""
     data = related(mime_part("<p>中文 café</p>".encode(charset), charset=charset, encoding=encoding)).as_bytes()
     text, _ = markdown(data)
     assert "中文 café" in text
 
 
 def test_start_alternative_and_ignore_other_html() -> None:
-    """start 可选择后置 alternative，并只解析最后一个受支持 HTML。"""
+    """start optionally follows alternative and only parses the last supported HTML."""
     alternative = EmailMessage(policy=policy.SMTP)
     alternative.set_type("multipart/alternative")
     alternative["Content-ID"] = "<root>"
@@ -76,7 +76,7 @@ def test_start_alternative_and_ignore_other_html() -> None:
 
 
 def test_invalid_root_boundary_and_decode() -> None:
-    """错误 start、缺少 HTML、破损边界和主文档编码均产生明确错误。"""
+    """Error start, missing HTML, broken borders, and master document encoding all produce explicit errors."""
     invalid = [
         related(mime_part(b"<p>unused</p>"), start="missing").as_bytes(),
         related(mime_part(b"plain", "text/plain")).as_bytes(),
@@ -92,9 +92,9 @@ def test_invalid_root_boundary_and_decode() -> None:
 
 @pytest.mark.parametrize("limit", ["MAX_ARCHIVE_BYTES", "MAX_DECODED_BYTES", "MAX_PARTS", "MAX_DEPTH"])
 def test_archive_limits(limit: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    """原始字节、累计解码、部件数和嵌套深度都有独立预算。"""
-    # 转换器在导入时保存读取预算；先加载，避免 xdist 的冷进程把临时值
-    # 固化到另一个模块，导致 monkeypatch 恢复后仍把后续归档截成两字节。
+    """There are separate budgets for raw bytes, cumulative decodes, number of parts, and nesting depth."""
+    # Converter saves read budget on import; load first to avoid cold process of xdist dumping temporary values
+    # Solidified to another module, causing monkeypatch to still cut subsequent archives into two bytes after recovery.
     importlib.import_module("docvortex.analyzers.native.mhtml.converter")
     monkeypatch.setattr(archive_module, limit, 1)
     with pytest.raises(MhtmlResourceLimitError):
@@ -102,7 +102,7 @@ def test_archive_limits(limit: str, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_locations_cid_css_base_and_picture() -> None:
-    """归档 CSS 控制可见性，CID 与完整 URL 复用图片，picture 恢复实际保存的候选。"""
+    """Archive CSS controls visibility, CID reuses the image with the full URL, and picture restores the actual saved candidate."""
     image = image_bytes()
     body = b"""<html><head><base href="https://site.test/assets/"><link rel="stylesheet" href="cid:style"></head><body><p class="hidden">HIDDEN</p><p>VISIBLE</p><img src="one.png?v=1"><img src="cid:shared"><picture><source srcset="saved.png 1x"><img src="missing.png" alt="COVER"></picture></body></html>"""
     data = related(
@@ -121,7 +121,7 @@ def test_locations_cid_css_base_and_picture() -> None:
 
 
 def test_uri_query_percent_encoding_and_fragments() -> None:
-    """查询参数和编码差异不能误配，哈希路由子页也不能被误判为重复资源。"""
+    """Query parameters and encoding differences cannot be mismatched, and hash routing subpages cannot be misjudged as duplicate resources."""
     message = related(
         mime_part(b"<p>body</p>", location="https://a.test/sub/index.html"),
         mime_part(image_bytes(), "image/png", location="a%2eb.png?v=1"),
@@ -140,7 +140,7 @@ def test_uri_query_percent_encoding_and_fragments() -> None:
 
 
 def test_duplicate_resource_identifier_is_rejected() -> None:
-    """同一容器中重复的资源地址或 ID 不允许随机覆盖。"""
+    """Duplicate resource addresses in the same container or ID do not allow random overwriting."""
     for key in ("cid", "location"):
         parts = [mime_part(image_bytes(), "image/png", **{key: "same"}) for _ in range(2)]
         with pytest.raises(MhtmlParseError, match="Duplicate"):
@@ -148,7 +148,7 @@ def test_duplicate_resource_identifier_is_rejected() -> None:
 
 
 def test_nested_scope_does_not_leak_child_resources() -> None:
-    """外层正文不能引用内层 iframe 的图片，内层允许读取外层共享资源。"""
+    """The outer text cannot reference the picture of iframe in the inner layer, and the inner layer is allowed to read the outer shared resource."""
     child = related(mime_part(b"<p>frame</p>"), mime_part(image_bytes(), "image/png", cid="private"))
     child["Content-ID"] = "<child>"
     archive = MhtmlArchive(related(mime_part(b"<p>root</p>"), child).as_bytes())
@@ -159,7 +159,7 @@ def test_nested_scope_does_not_leak_child_resources() -> None:
 
 
 def test_optional_bad_resources_and_no_external_io(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """缺失或损坏部件可诊断降级，即使传入本地根也不能读取归档外资源。"""
+    """Missing or corrupted parts can diagnose degradation, even when local roots are passed in and resources outside the archive cannot be read."""
     invalid = mime_part(b"bad image", "image/png", cid="bad")
     broken = mime_part(b"broken", "text/css", cid="css")
     broken.set_payload("bad@@base64")
@@ -172,7 +172,7 @@ def test_optional_bad_resources_and_no_external_io(tmp_path: Path, monkeypatch: 
     ).as_bytes()
 
     def forbidden(*args, **kwargs):
-        """任何网络连接或路径资源读取都应使该离线测试失败。"""
+        """Any network connection or path resource reading should fail this offline test."""
         raise AssertionError("external IO")
 
     monkeypatch.setattr(socket, "create_connection", forbidden)
@@ -185,7 +185,7 @@ def test_optional_bad_resources_and_no_external_io(tmp_path: Path, monkeypatch: 
 
 
 def test_metadata_subject_and_bundle(tmp_path: Path) -> None:
-    """标题缺失使用 Subject，保存时间不冒充发布时间，结果包完整恢复素材。"""
+    """Use Subject if the title is missing, the save time does not pretend to be the release time, and the result package completely restores the material."""
     message = related(mime_part(b'<p>body</p><img src="cid:figure">'), mime_part(image_bytes(), "image/png", cid="figure"))
     message["Subject"] = "归档标题"
     message["Date"] = "Wed, 23 Sep 2026 03:00:00 +0000"
@@ -203,7 +203,7 @@ def test_metadata_subject_and_bundle(tmp_path: Path) -> None:
 
 
 def test_comments_pruned_only_for_independent_article() -> None:
-    """独立正文旁的评论和头像被过滤，论坛帖子及正文相关单词仍保留。"""
+    """The comments and avatars next to the independent text are filtered, but the forum posts and related words in the text are still retained."""
     prose = "An article about comments and commentary. " * 10
     body = f'<main><img src="cid:cover" alt="COVER"><article><h1>Title</h1><p>{prose}</p></article><div class="Comments-container"><p>REMOVE COMMENT</p><img src="cid:avatar" alt="AVATAR"></div></main>'
     text, result = markdown(related(mime_part(body.encode()), mime_part(image_bytes(), "image/png", cid="cover")).as_bytes())
@@ -216,7 +216,7 @@ def test_comments_pruned_only_for_independent_article() -> None:
 
 
 def test_nested_container_source_and_relative_locations() -> None:
-    """主文档与资源的相对地址继承嵌套 MIME 容器基址。"""
+    """The relative address of the main document and resource inherits the nested MIME container base address."""
     child = related(
         mime_part(b'<p>nested</p><img src="figure.png">', location="index.html"),
         mime_part(image_bytes(), "image/png", location="figure.png"),
@@ -230,7 +230,7 @@ def test_nested_container_source_and_relative_locations() -> None:
 
 
 def test_relative_root_without_site_does_not_invent_remote_links() -> None:
-    """无原站来源时保持相对链接，内部索引基址不得泄露到输出。"""
+    """Relative links are maintained when there is no original source, and the internal index base address must not be leaked to the output."""
     message = related(
         mime_part(b'<a href="next.html">NEXT</a><img src="figure.png">', location="sub/index.html"),
         mime_part(image_bytes(), "image/png", location="figure.png"),
@@ -241,7 +241,7 @@ def test_relative_root_without_site_does_not_invent_remote_links() -> None:
 
 
 def test_source_context_and_snapshot_fallback() -> None:
-    """容器来源优先于快照地址，快照优先于调用方来源。"""
+    """The container origin takes precedence over the snapshot address, and the snapshot takes precedence over the caller origin."""
     message = related(mime_part(b'<a href="next">NEXT</a>'))
     context = HtmlSourceContext(source_uri="https://caller.test/a/")
     assert MhtmlArchive(message.as_bytes(), context).source_context.source_uri == context.source_uri
@@ -252,7 +252,7 @@ def test_source_context_and_snapshot_fallback() -> None:
 
 
 def test_decode_cache_and_optional_resource_budget(monkeypatch: pytest.MonkeyPatch) -> None:
-    """重复引用不重复消耗解码预算，不同资源累计超限则停止解析。"""
+    """Repeated references will not consume the decoding budget repeatedly, and parsing will stop if the accumulation of different resources exceeds the limit."""
     archive = MhtmlArchive(
         related(mime_part(b"<p>body</p>"), mime_part(b"1234", cid="one"), mime_part(b"5678", cid="two")).as_bytes()
     )
@@ -264,7 +264,7 @@ def test_decode_cache_and_optional_resource_budget(monkeypatch: pytest.MonkeyPat
 
 
 def test_archived_images_and_stylesheets_obey_html_limits(monkeypatch: pytest.MonkeyPatch) -> None:
-    """归档图片与样式不能绕过已有 HTML 单资源限额。"""
+    """Archived images and styles cannot bypass the existing HTML single resource quota."""
     from docvortex.analyzers.native.mhtml import resources
     from docvortex.analyzers.native.html import resources as html_resources
     from docvortex.analyzers.native.html.errors import HtmlResourceLimitError
@@ -284,7 +284,7 @@ def test_archived_images_and_stylesheets_obey_html_limits(monkeypatch: pytest.Mo
 
 
 def test_mhtml_reuses_table_formula_and_footnote_projection() -> None:
-    """表格中的归档图片、数学公式和脚注沿用 HTML 投影而不丢失。"""
+    """Archived images, mathematical formulas, and footnotes in tables are inherited from the HTML projection without being lost."""
     body = b"""<html><body><h1>Document</h1><p>Formula <math data-tex="x^2"></math> and <a href="#note">note</a>.</p><table><tr><td>Cell</td><td><img src="cid:figure" alt="table figure"></td></tr></table><aside id="note" role="doc-footnote">Footnote content</aside></body></html>"""
     text, result = markdown(related(mime_part(body), mime_part(image_bytes(), "image/png", cid="figure")).as_bytes())
     assert "x^2" in text and "Cell" in text and "Footnote content" in text
@@ -293,7 +293,7 @@ def test_mhtml_reuses_table_formula_and_footnote_projection() -> None:
 
 @pytest.mark.parametrize("class_name", ["Comments-container", "CommentContent", "post_comments"])
 def test_html_comment_filter_preserves_cover_and_forum(class_name: str) -> None:
-    """共享筛选规则也作用于普通 HTML，同时保护多个独立论坛文章。"""
+    """Shared filtering rules also work on common HTML, protecting multiple independent forum posts at the same time."""
     prose = "Article discussion about commentary. " * 10
     body = f'<main><article><p>{prose}</p></article><div class="{class_name}"><p>NOISE</p><img src="https://site.test/avatar.png"></div></main>'
     text, _ = markdown(body.encode(), file_suffix="html")

@@ -1,4 +1,4 @@
-"""对冻结基线逐页生成结构差异和原页对照，不修改测试金标或自动批准变化。"""
+"""Generate structural differences and original page comparisons for the frozen baseline page by page, without modifying the test gold standard or automatically approving changes."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def source_fingerprint() -> str:
-    """记录当前生产源码，确保重放产物与实际交付代码一致。"""
+    """Record the current production source code to ensure that the replayed product is consistent with the actual delivered code."""
     digest = hashlib.sha256()
     for path in sorted((ROOT / "src").rglob("*.py")):
         digest.update(str(path.relative_to(ROOT)).encode())
@@ -26,12 +26,12 @@ def source_fingerprint() -> str:
 
 
 def text_inventory(blocks: list[dict]) -> Counter:
-    """统计可见字母数字，排除换行断词和空格差异；原始内容仍单独保存供逐字审阅。"""
+    """Alphanumeric statistics are visible, excluding differences in line breaks, word breaks, and spaces; the original content is still saved separately for verbatim review."""
     return Counter(c for block in blocks for c in unicodedata.normalize("NFKC", visible(block["content"])) if c.isalnum())
 
 
 def apply_review_decisions(changes: list[dict], path: Path | None) -> None:
-    """仅复用明确提供且前后差异指纹完全匹配的视觉裁决，新差异继续待审。"""
+    """Only visual rulings that are explicitly provided and for which the front and rear difference fingerprints exactly match are reused, and new differences remain pending."""
     if path is None:
         return
     decisions = json.loads(path.read_text(encoding="utf-8"))
@@ -50,7 +50,7 @@ def apply_review_decisions(changes: list[dict], path: Path | None) -> None:
 
 
 def compare_manual(root: Path, decisions_path: Path | None = None) -> list[dict]:
-    """逐页对比人工样本原模型，并为所有变化页保存原页和前后标框。"""
+    """Compare the original model of artificial samples page by page, and save the original page and front and back frames for all changed pages."""
     manifest = json.loads((ROOT / "tests/fixtures/flash_manual_annotations.json").read_text(encoding="utf-8"))
     review = root / "visual-review"
     review.mkdir(parents=True, exist_ok=True)
@@ -105,7 +105,7 @@ def compare_manual(root: Path, decisions_path: Path | None = None) -> list[dict]
 
 
 def main() -> None:
-    """汇总基线、变化和源码指纹；视觉裁决另写报告，不能由脚本默认通过。"""
+    """Summarize baselines, changes and source code fingerprints; visual adjudication is a separate report and cannot be passed by default by the script."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "output/pdf/flash-rule-generalization")
     parser.add_argument("--decisions", type=Path)

@@ -1,4 +1,4 @@
-"""改变原生字形尺度、位置和无关文字，验证本轮图注成员与公共父关系。"""
+"""Change the native glyph scale, position and irrelevant text, and verify the relationship between the current round of legend members and the public parent."""
 
 import pytest
 
@@ -11,7 +11,7 @@ from docvortex.analyzers.native.pdf import visual_annotations as annotations
 @pytest.mark.parametrize('scale,left', [(.7, 15), (1, 50), (1.6, 100)])
 @pytest.mark.parametrize('kind', ['caption', 'far_image', 'not_bare', 'no_frame', 'font', 'few', 'numeric', 'inside', 'semantic'])
 def test_framed_side_caption_requires_photo_bare_number_descriptive_rows_and_a_complete_frame(scale, left, kind):
-    """图旁卡片需要编号、同式说明和完整细框，缺少任一证据不能把真正图表标签改成图注。"""
+    """The card next to the figure needs to be numbered, have the same description and a complete frame. Without any evidence, the real figure label cannot be changed into a figure caption."""
     h = 10 * scale
     caption = _metric_fixture_line('Figure 4. A graph' if kind == 'not_bare' else 'Figure 4',
                                   (left+120*scale,100*scale,left+160*scale,110*scale),0,
@@ -40,7 +40,7 @@ def test_framed_side_caption_requires_photo_bare_number_descriptive_rows_and_a_c
 @pytest.mark.parametrize('scale,left', [(.7, 15), (1, 50), (1.6, 100)])
 @pytest.mark.parametrize('kind', ['grid','three_rows','two_columns','axis','shifted','prose'])
 def test_numeric_grid_evidence_requires_repeated_two_dimensional_cells(scale,left,kind):
-    """重复数字网格与图轴、普通正文、少量数字和逐排漂移的数据必须区分。"""
+    """Grids of repeating numbers must be distinguished from graph axes, plain text, small numbers, and data that drifts from row to row."""
     lines=[]
     for row in range(3 if kind=='three_rows' else 5):
         for column in range(2 if kind=='two_columns' else 3):
@@ -54,7 +54,7 @@ def test_numeric_grid_evidence_requires_repeated_two_dimensional_cells(scale,lef
 @pytest.mark.parametrize('scale,left', [(.7,15),(1,50),(1.6,100)])
 @pytest.mark.parametrize('kind', ['caption','regular','no_body','close_body','far_image','multiline','misaligned','short_image'])
 def test_unlabelled_caption_needs_italic_single_row_large_photo_and_body_separation(scale,left,kind):
-    """未编号说明的几何及斜体证据必须齐全，普通正文和紧接续行不能改成图注。"""
+    """The geometric and italic evidence of unnumbered descriptions must be complete, and ordinary text and immediately following lines cannot be changed into figure notes."""
     h=10*scale
     capbox=(left+(30*scale if kind=='misaligned' else 0),111*scale,left+210*scale,121*scale)
     caption={'type':'text','bbox':capbox,'content':'A conceptual illustration of the topic shown in the photograph',
@@ -72,7 +72,7 @@ def test_unlabelled_caption_needs_italic_single_row_large_photo_and_body_separat
 @pytest.mark.parametrize('scale,left', [(.7,15),(1,50),(1.6,100)])
 @pytest.mark.parametrize('kind',['evidence','none','missing','ambiguous','barrier'])
 def test_internal_native_parent_evidence_is_consumed_only_for_one_valid_visual_neighbor(scale,left,kind):
-    """内部父框只匹配合法邻图；缺失和正文屏障回落距离，后面的重复图由邻接屏障排除。"""
+    """Internal parent boxes only match legal adjacent images; missing and text barriers fall back a distance, and subsequent duplicate images are excluded by adjacency barriers."""
     from docvortex.postprocess.visual import find_best_visual_parent
     first={'type':'image','bbox':(left,20*scale,left+200*scale,100*scale),'index':0}
     caption={'type':'caption','bbox':(left+30*scale,120*scale,left+160*scale,130*scale),'index':1}
@@ -93,7 +93,7 @@ def test_internal_native_parent_evidence_is_consumed_only_for_one_valid_visual_n
 @pytest.mark.parametrize('scale,left', [(.7,15),(1,50),(1.6,100)])
 @pytest.mark.parametrize('kind',['graph','ordinary','no_grid_evidence','no_other_image','body_barrier'])
 def test_graph_caption_keeps_native_grid_exclusion_through_legacy_decoration_band(scale,left,kind):
-    """图题词义加重复网格证据才胜过旧装饰图注带；普通图题、单图和正文屏障维持近距绑定。"""
+    """Figure caption word meaning plus repeated grid evidence outperforms the old decorative figure caption strip; ordinary figure titles, single figures and text barriers maintain close binding."""
     upper={'type':'image','bbox':(left,20*scale,left+220*scale,100*scale),'content':'Numeric cell grid',
            '_native_numeric_grid':kind!='no_grid_evidence'}
     lower={'type':'image','bbox':(left,160*scale,left+220*scale,240*scale),'content':''}

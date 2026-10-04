@@ -1,4 +1,4 @@
-"""验证已规范化几何的阶段内复用，保留两类原始输入校验契约。"""
+"""Verify in-stage reuse of normalized geometries, preserving both types of original input verification contracts."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from docvortex.analyzers.native.pdf.geometry import _clip_bbox, _clip_validated_
 
 
 def test_validated_clipping_matches_original_for_finite_boxes() -> None:
-    """边界、反向输入与退化页尺寸产生完全相同的坐标值和 JSON 数值类型。"""
+    """Boundary, reverse input and degenerate page sizes produce exactly the same coordinate values and JSON numeric type."""
     random_source = random.Random(604)
     raw_boxes = [None, (0, 0, 0, 1), (5, 9, -3, -7), (float("nan"), 0, 1, 1)]
     raw_boxes.extend(tuple(random_source.uniform(-100, 100) for _ in range(4)) for _ in range(1000))
@@ -20,7 +20,7 @@ def test_validated_clipping_matches_original_for_finite_boxes() -> None:
 
 
 def test_raw_geometry_contracts_remain_distinct() -> None:
-    """版面校验可整理反向框，行内证据必须继续拒绝反向框，不能混用快路径。"""
+    """Layout verification can sort out reverse frames, inline evidence must continue to reject reverse frames, and fast paths cannot be mixed."""
     from docvortex.analyzers.native.pdf.inline.common import _coerce_bbox as inline_bbox
 
     reversed_box = (10, 20, 0, 0)

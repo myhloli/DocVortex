@@ -15,7 +15,7 @@ def text_object(
     delta_x: str | None = None,
     ctm: str | None = None,
 ) -> str:
-    """构造测试用 TextObject XML。"""
+    """Construct TextObject XML for testing."""
     delta = f' DeltaX="{delta_x}"' if delta_x else ""
     transform = f' CTM="{ctm}"' if ctm else ""
     return (
@@ -26,7 +26,7 @@ def text_object(
 
 
 def path_object(object_id: int, *, boundary: str, data: str) -> str:
-    """构造测试用 PathObject XML。"""
+    """Construct PathObject XML for testing."""
     return (
         f'<ofd:PathObject ID="{object_id}" Boundary="{boundary}" LineWidth="0.2">'
         f"<ofd:AbbreviatedData>{data}</ofd:AbbreviatedData>"
@@ -42,7 +42,7 @@ def page_xml(
     template_id: int | None = None,
     page_res: str | None = None,
 ) -> str:
-    """构造测试用 OFD 页面 XML。"""
+    """Construct the OFD page XML for testing."""
     template = f'<ofd:Template TemplateID="{template_id}" ZOrder="Background"/>' if template_id is not None else ""
     page_resource = f"<ofd:PageRes>{page_res}</ofd:PageRes>" if page_res else ""
     return (
@@ -61,7 +61,7 @@ def build_ofd_package(
     templates: dict[int, tuple[str, str]] | None = None,
     extra_parts: dict[str, bytes | str] | None = None,
 ) -> bytes:
-    """构造包含指定页树、模板和附加成员的最小 OFD 包。"""
+    """Constructs a minimal OFD package containing the specified page tree, templates, and additional members."""
     templates = templates or {}
     page_refs = "".join(f'<ofd:Page ID="{index + 10}" BaseLoc="{path}"/>' for index, (path, _content) in enumerate(pages))
     template_refs = "".join(
@@ -100,7 +100,7 @@ def build_ofd_package(
 
 
 def build_multi_document_ofd() -> bytes:
-    """构造包含两个 DocBody 的测试 OFD 包。"""
+    """Construct a test OFD package containing two DocBodys."""
     namespace = "http://www.ofdspec.org/2016"
     ofd_xml = (
         f'<ofd:OFD xmlns:ofd="{namespace}" Version="1.0" DocType="OFD">'

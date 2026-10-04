@@ -1,4 +1,4 @@
-//! 同库原始读取直接进入自有 canonical 快照，只在兼容边界构造 Python 字符。
+//! The original reading from the same library directly enters its own canonical snapshot, and only constructs Python characters at the compatible boundary.
 use docvortex_core::geometry_risk::{Entry, RunKey};
 use docvortex_core::{
     extraction,
@@ -28,7 +28,7 @@ static SPAN_CONTENT_CALLS: AtomicU64 = AtomicU64::new(0);
 static SPAN_ASSIGNMENT_CALLS: AtomicU64 = AtomicU64::new(0);
 static SPAN_ASSIGNMENT_UNSUPPORTED: AtomicU64 = AtomicU64::new(0);
 
-/// 公开实际原生字符归属调用次数及显式不支持选择，避免把接口存在视为已执行。
+/// Disclose the actual number of native character attribution calls and explicitly do not support selection to avoid considering the existence of the interface as executed.
 #[pyfunction]
 pub fn text_snapshot_stats() -> (u64, u64, u64) {
     (
@@ -38,7 +38,7 @@ pub fn text_snapshot_stats() -> (u64, u64, u64) {
     )
 }
 
-/// 保留读取错误类型，不把计算错误改写为参考路径选择。
+/// The read error type is retained and calculation errors are not rewritten as reference path selection.
 fn read_error(error: ReadError) -> PyErr {
     match error {
         ReadError::InvalidInput(message) => PyValueError::new_err(message),
@@ -46,14 +46,14 @@ fn read_error(error: ReadError) -> PyErr {
         ReadError::Allocation(message) => PyMemoryError::new_err(message),
     }
 }
-/// 保留缺失代理来源的 KeyError，其他已准入算法失败明确传播。
+/// KeyError for missing proxy sources is retained and other admitted algorithm failures are explicitly propagated.
 fn snapshot_error(error: SnapshotError) -> PyErr {
     match error {
         SnapshotError::MissingSource(index) => PyKeyError::new_err(index),
         SnapshotError::Invalid(message) => PyValueError::new_err(message),
     }
 }
-/// 正负零属于相同字体值，但首个字体记录仍保存原始位型。
+/// Positive and negative zeros belong to the same font value, but the first font record still retains the original bit pattern.
 fn number_key(value: f64) -> u64 {
     if value == 0.0 {
         0
@@ -61,7 +61,7 @@ fn number_key(value: f64) -> u64 {
         value.to_bits()
     }
 }
-/// 按不同字符串读取宿主 Unicode 语义，不为每个字符构造 Python 字典。
+/// Read the host Unicode semantics according to different strings, and do not construct a Python dictionary for each character.
 fn prepare_properties(
     py: Python<'_>,
     values: impl IntoIterator<Item = String>,
@@ -85,7 +85,7 @@ fn prepare_properties(
     Ok(())
 }
 
-/// 只为实际映射组准备 canonical 值，保留普通页面不读取部首资源的惰性行为。
+/// Only prepare the canonical value for the actual mapping group, retaining the lazy behavior of ordinary pages not reading radical resources.
 fn prepare_mapping_properties(
     py: Python<'_>,
     chars: &[Character],
@@ -109,7 +109,7 @@ fn prepare_mapping_properties(
     Ok(())
 }
 
-/// 按不同书写角保留 CPython round 的两种量化和 math.sin/cos 的平台结果。
+/// The two quantifications of CPython, round and the platform results of math.sin/cos are retained according to different writing angles.
 fn prepare_angles(py: Python<'_>, glyphs: &[snapshot::Glyph]) -> PyResult<HashMap<u64, Angle>> {
     let math = py.import("math")?;
     let round = py.import("builtins")?.getattr("round")?;
@@ -133,7 +133,7 @@ fn prepare_angles(py: Python<'_>, glyphs: &[snapshot::Glyph]) -> PyResult<HashMa
     }
     Ok(output)
 }
-/// 普通 PDF 数值准入在任何 canonical 算法前完成；异常量级必须明确选择参考实现。
+/// Normal PDF numerical admission is done before any canonical algorithm; the exception magnitude must be explicitly selected for the reference implementation.
 fn supported(records: &[Record], frame: [f64; 4]) -> bool {
     let ordinary = |value: f64| value.is_finite() && value.abs() <= 1e12;
     frame.into_iter().all(ordinary)
@@ -180,7 +180,7 @@ static GEOMETRY_EVIDENCE_PREPARES: AtomicU64 = AtomicU64::new(0);
 static GEOMETRY_EVIDENCE_LINES: AtomicU64 = AtomicU64::new(0);
 static GEOMETRY_EVIDENCE_FALLBACKS: AtomicU64 = AtomicU64::new(0);
 
-/// Python float 字典语义把正负零视为同键；普通有限值按位型保持区分。
+/// Python float dictionary semantics treats positive and negative zero as the same key; ordinary finite values are distinguished by bit type.
 fn geometry_number_key(value: f64) -> u64 {
     if value == 0.0 {
         0
@@ -189,7 +189,7 @@ fn geometry_number_key(value: f64) -> u64 {
     }
 }
 
-/// 报告页面级 geometry evidence 准备、风险行命中和明确回退次数。
+/// Report page-level geometry evidence readiness, risk row hits, and clear rollback times.
 #[pyfunction]
 pub fn geometry_evidence_stats() -> (u64, u64, u64) {
     (
@@ -199,7 +199,7 @@ pub fn geometry_evidence_stats() -> (u64, u64, u64) {
     )
 }
 
-/// 同步借用 PDFium 读取原始字符；函数和句柄由已核验 ABI 的宿主 guard 保活。
+/// Synchronously borrow PDFium to read original characters; functions and handles are kept alive by guard, the host of ABI that has been verified.
 #[pyfunction]
 pub fn read_pdfium_text_snapshot(
     py: Python<'_>,
@@ -403,7 +403,7 @@ pub fn read_pdfium_text_snapshot(
 }
 
 impl NativeTextSnapshot {
-    /// 一次准备页面级风险输入；解释器 Unicode/round 语义只在不同文本和字体上调用。
+    /// Prepare page-level risk input once; interpreter Unicode/round semantics are only invoked on different texts and fonts.
     fn prepare_geometry_evidence_impl(
         &self,
         py: Python<'_>,
@@ -441,7 +441,7 @@ impl NativeTextSnapshot {
                 let rounded_size: f64 =
                     round.call1((font.size * 4.0,))?.extract::<i64>()? as f64 / 4.0;
                 let weight: i64 = round.call1((f64::from(font.weight) / 100.0,))?.extract()?;
-                // 分组使用取整字号，风险阈值仍须消费 PDFium 的原始字号。
+                // The grouping uses rounded font sizes, and the risk threshold still needs to consume the original font size of PDFium.
                 let value = (family, font.size, rounded_size, font.flags, weight as i32);
                 font_metadata.insert(ch.font, value.clone());
                 value
@@ -470,13 +470,13 @@ impl NativeTextSnapshot {
         Ok(Some(NativeGeometryEvidence { records }))
     }
 
-    /// 一次物化中的字体字典共享，字符和 Bbox 独立；不会在 Rust 快照缓存 Python 可变对象。
+    /// The font dictionary in a materialization is shared, and the characters are independent of Bbox; the Python variable object will not be cached in the Rust snapshot.
     fn geometry<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyList>)> {
         let bbox_type = py
             .import("docvortex.document.pdf.text._contracts")?
             .getattr("Bbox")?;
         let chars = PyList::empty(py);
-        // 一次缓存字段名，避免每个字符重复走解释器 intern 查找。
+        // Cache the field name once to avoid repeated searches by the interpreter intern for each character.
         let key_bbox = pyo3::intern!(py, "bbox");
         let key_char = pyo3::intern!(py, "char");
         let key_rotation = pyo3::intern!(py, "rotation");
@@ -499,7 +499,7 @@ impl NativeTextSnapshot {
         let loose = PyDict::new(py);
         let origins = PyDict::new(py);
 
-        // 字体表由 Rust 索引直接寻址，避免每个字符再做一次哈希查找。
+        // The font table is directly addressed by the Rust index, avoiding another hash lookup for each character.
         let mut fonts: Vec<Option<Bound<'py, PyDict>>> = vec![None; self.data.fonts.len()];
         let mut names: HashMap<usize, Bound<'py, pyo3::types::PyString>> = HashMap::new();
         for (font_id, slot) in fonts.iter_mut().enumerate() {
@@ -519,7 +519,7 @@ impl NativeTextSnapshot {
             let value = PyDict::new(py);
             let bbox = bbox_type.call1((PyList::new(py, ch.bbox)?,))?;
             let text = pyo3::types::PyString::new(py, &ch.text);
-            // 先转换一次不可变坐标容器；字符字段和 loose/tight/origin 侧表必须共享同一对象。
+            // First convert the immutable coordinate container; the character field and the loose/tight/origin side table must share the same object.
             let origin = ch
                 .origin
                 .map(|p| (p[0], p[1]))
@@ -583,7 +583,7 @@ impl NativeTextSnapshot {
 
 #[pymethods]
 impl NativeTextSnapshot {
-    /// 一次准备全文风险使用的页面级 geometry evidence。
+    /// Prepare page-level geometry evidence for full-text risk use at once.
     fn prepare_geometry_evidence(
         &self,
         py: Python<'_>,
@@ -591,18 +591,18 @@ impl NativeTextSnapshot {
         self.prepare_geometry_evidence_impl(py)
     }
 
-    /// 兼容属性每次创建独立输出，快照在页面关闭后仍能使用。
+    /// Compatible attributes create independent output each time, and the snapshot can still be used after the page is closed.
     fn materialize_geometry<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         self.geometry(py).map(|(geometry, _)| geometry)
     }
-    /// 不可变 Rust 数据可安全共享给 deepcopy，绝不缓存兼容 Python 字典。
+    /// Immutable Rust data can be safely shared to deepcopy and is never cache-compatible with Python dictionaries.
     fn __deepcopy__(&self, _memo: &Bound<'_, PyAny>) -> Self {
         Self {
             data: self.data.clone(),
             raw_count: self.raw_count,
         }
     }
-    /// 自有数据直接生成基础组行结果，供表格方向等早期消费者使用。
+    /// Own data directly generates basic group row results for use by early consumers such as table directions.
     #[pyo3(signature=(height_threshold=0.7, distance=0.1))]
     fn prepare_grouped_evidence<'py>(
         &self,
@@ -632,7 +632,7 @@ impl NativeTextSnapshot {
         let lines = super::text_pipeline::materialize_grouped_lines(py, &chars, lines)?;
         Ok((geometry, lines))
     }
-    /// 方向判断只物化粗行的框、旋转和文本，不创建任何 Python Char、字体或 Bbox 对象。
+    /// Orientation judgment only materializes the thick line's box, rotation, and text, and does not create any Python, Char, font, or Bbox objects.
     #[pyo3(signature=(height_threshold=0.7, distance=0.1))]
     fn get_line_summaries<'py>(
         &self,
@@ -677,11 +677,11 @@ impl NativeTextSnapshot {
         }
         Ok(output)
     }
-    /// 返回 PDFium 原始字符数，绝不以去重/可见性过滤后的长度替代安全上限。
+    /// Return the original number of characters of PDFium and never replace the safe upper limit with the length after deduplication/visibility filtering.
     fn raw_char_count(&self) -> usize {
         self.raw_count
     }
-    /// 标准方向可直接使用完整自有字符；局部倾斜页保留现有整行水印判定路径。
+    /// The standard direction can directly use complete own characters; the partial tilt page retains the existing entire line of watermark determination paths.
     fn supports_span_matching(&self) -> bool {
         self.data.chars.iter().all(|ch| {
             let degrees = ch.rotation * (180.0 / std::f64::consts::PI);
@@ -690,7 +690,7 @@ impl NativeTextSnapshot {
                 .any(|angle| (degrees - angle).abs() < 0.1)
         })
     }
-    /// 仅从自有快照读取字符；Python 只提供小型 span 框与现有标点配置，不重新打包字符字典。
+    /// Only reads characters from own snapshots; Python only provides small span boxes with existing punctuation configurations, without repackaging the character dictionary.
     #[pyo3(signature=(span_bboxes, median_height, stop_flags, start_flags, height_ratio, break_flags=None))]
     fn assign_spans(
         &self,
@@ -773,7 +773,7 @@ impl NativeTextSnapshot {
         SPAN_ASSIGNMENT_CALLS.fetch_add(1, Ordering::Relaxed);
         Ok(Some(result))
     }
-    /// 正文已有共享上下标侧车时，字符归属及内容构造连续完成，仅输出每个 span 的文本和 PUA 计数。
+    /// When the text has shared superscripts and subscripts, the character attribution and content structure are continuously completed, and only the text of each span and the PUA count are output.
     #[pyo3(signature = (span_bboxes, median_height, stop_flags, start_flags, height_ratio, break_flags, modifiers, overlap_threshold, private_range, tight_spacing=None))]
     fn prepare_span_texts<'py>(
         &self,
@@ -799,7 +799,7 @@ impl NativeTextSnapshot {
             return Ok(None);
         }
         let count = span_bboxes.len();
-        // 旧宿主没有代码区域掩码，省略新增参数时保持历史文本组装行为。
+        // The old host does not have a code area mask, and the historical text assembly behavior is maintained when new parameters are omitted.
         let tight_spacing = tight_spacing.unwrap_or_else(|| vec![false; count]);
         if tight_spacing.len() != count {
             return Err(pyo3::exceptions::PyValueError::new_err(
@@ -913,7 +913,7 @@ impl NativeTextSnapshot {
         SPAN_CONTENT_CALLS.fetch_add(1, Ordering::Relaxed);
         Ok(Some(output))
     }
-    /// 在自有字符上计算可靠词界，仅返回源编号，避免 Flash 逐字符重复跨语言判定。
+    /// Calculate reliable word boundaries on own characters, and only return the source number to avoid repeated cross-language determination of Flash character by character.
     fn tight_space_indices(&self, py: Python<'_>) -> PyResult<Vec<usize>> {
         let category = py.import("unicodedata")?.getattr("category")?;
         let mut ordinary = HashSet::new();
@@ -951,14 +951,14 @@ impl NativeTextSnapshot {
         }))
     }
 
-    /// 为新鲜同源页面证据准备独立上下标记录，后续批次只传整数成员索引。
+    /// Prepare independent superscript and subscript records for fresh homologous page evidence, and only integer member indexes are transmitted in subsequent batches.
     fn prepare_script_evidence(
         &self,
         flags: &Bound<'_, PyAny>,
     ) -> PyResult<Option<super::script_snapshot::NativeScriptEvidence>> {
         super::script_snapshot::prepare(&self.data, flags)
     }
-    /// 报告实际所有权和策略，区分 Flash 可见文本与公开页面原始文本视图。
+    /// Report actual ownership and policy, distinguishing Flash visible text from public page raw text views.
     fn info(&self) -> (usize, usize, bool, bool) {
         (
             self.data.chars.len(),
@@ -967,7 +967,7 @@ impl NativeTextSnapshot {
             self.data.visible_only,
         )
     }
-    /// 直接以快照字符及行成员 ID 生成粗体和装饰线证据，不逐字符往返 Python。
+    /// Generate bold and decorative line evidence directly from snapshot characters and line members ID, without round-trip character-by-character Python.
     fn detect_style_lines(
         &self,
         py: Python<'_>,
@@ -989,7 +989,7 @@ impl NativeTextSnapshot {
             min_bold,
         )
     }
-    /// 自有 canonical 记录直接组行；完成纯计算后才联合物化字符与引用它们的视觉行。
+    /// The original canonical record directly assembles the lines; only after the pure calculation is completed, the materialized characters and the visual lines that refer to them are combined.
     fn prepare_visual_evidence<'py>(
         &self,
         py: Python<'py>,
@@ -997,7 +997,7 @@ impl NativeTextSnapshot {
         rotation: i32,
         supported_angles: Vec<f64>,
     ) -> PyResult<(Bound<'py, PyAny>, Bound<'py, PyList>)> {
-        // 剖析开关只统计私有管线的五个连续阶段，不影响正式解析结果。
+        // The analysis switch only counts the five consecutive stages of the private pipeline and does not affect the formal analysis results.
         let profile = std::env::var_os("DOCVORTEX_PROFILE_VISUAL_EVIDENCE").is_some();
         let total_started = std::time::Instant::now();
         if size.iter().chain(&supported_angles).any(|v| !v.is_finite()) {
@@ -1087,7 +1087,7 @@ impl NativeTextSnapshot {
 
 #[pymethods]
 impl NativeGeometryEvidence {
-    /// 把同源行成员一次转换并累积到全文风险器；None 表示本行选择参考路径。
+    /// Convert the homologous row members once and accumulate them into the full-text risk detector; None represents the selection reference path of this row.
     #[pyo3(signature = (risk, runs, page, source, height, skip_y, indices, size, angle))]
     fn add_line(
         &self,
@@ -1145,7 +1145,7 @@ impl NativeGeometryEvidence {
     }
 }
 
-/// 累计剖析中的视觉证据阶段耗时，单位为纳秒。
+/// The visual evidence phase in the cumulative analysis takes time, in nanoseconds.
 fn record_visual_stage_stats(values: [std::time::Duration; 6]) {
     let mut slot = VISUAL_STAGE_NS
         .lock()
@@ -1159,7 +1159,7 @@ fn record_visual_stage_stats(values: [std::time::Duration; 6]) {
     *slot = next;
 }
 
-/// 暴露累计视觉证据剖析，最后一项为页面调用数。
+/// Exposure cumulative visual evidence analysis, the last item is the number of page calls.
 #[pyfunction]
 pub fn visual_evidence_stage_stats() -> [u64; 7] {
     let slot = VISUAL_STAGE_NS
@@ -1168,5 +1168,5 @@ pub fn visual_evidence_stage_stats() -> [u64; 7] {
     *slot
 }
 
-/// 保存累计视觉证据剖析的阶段耗时和调用数。
+/// Save the accumulated stage time consumption and call number of visual evidence analysis.
 static VISUAL_STAGE_NS: std::sync::Mutex<[u64; 7]> = std::sync::Mutex::new([0; 7]);

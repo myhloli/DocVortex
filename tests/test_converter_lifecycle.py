@@ -1,4 +1,4 @@
-"""验证职责拆分后转换器状态、类型入口及失败重试的隔离性。"""
+"""Verify the isolation of converter status, type entry, and failed retries after splitting responsibilities."""
 
 from __future__ import annotations
 
@@ -13,10 +13,10 @@ from docvortex.analyzers.native.office.errors import LegacyOfficeResourceLimitEr
 
 
 class _NonSeekableStream(BytesIO):
-    """模拟仅支持顺序读取的输入，覆盖不可复位流分支。"""
+    """The simulation only supports sequentially read inputs, covering non-resettable stream branches."""
 
     def seek(self, *args, **kwargs):
-        """拒绝复位，让转换器使用一次性读取路径。"""
+        """Reject reset, allowing the converter to use a one-time read path."""
         raise UnsupportedOperation("not seekable")
 
 
@@ -25,7 +25,7 @@ class _NonSeekableStream(BytesIO):
 def test_pptx_resource_errors_do_not_normalize(
     monkeypatch: pytest.MonkeyPatch, seekable: bool, error_type: type[Exception]
 ) -> None:
-    """验证两种输入流的资源异常原样传播，且不会复制整包或触发规范化。"""
+    """Verify that resource exceptions for both input streams are propagated intact and do not copy the entire packet or trigger normalization."""
     from docvortex.analyzers.native.office.pptx import pptx_converter as module
 
     converter = module.PptxConverter()
@@ -51,7 +51,7 @@ def test_pptx_resource_errors_do_not_normalize(
 def test_pptx_strict_package_still_retries_after_normalization(
     monkeypatch: pytest.MonkeyPatch, seekable: bool
 ) -> None:
-    """验证真正的 Strict OOXML 包兼容问题仍能规范化重试并完整输出。"""
+    """Verify that genuine Strict OOXML package compatibility issues still result in normalized retries and complete output."""
     from pptx import Presentation
     from docvortex.analyzers.native.office.pptx import pptx_converter as module
 
@@ -86,14 +86,14 @@ def test_pptx_strict_package_still_retries_after_normalization(
 
 @pytest.mark.parametrize("suffix", ["docx", "pptx"])
 def test_converter_reuse_after_failure_matches_fresh_instance(suffix: str) -> None:
-    """不同文档及失败重试使用独立状态，不修改之前交付的页面列表。"""
+    """Different documents and failed retries use independent states and do not modify the previously delivered page list."""
     if suffix == "docx":
         from docx import Document
 
         from docvortex.analyzers.native.office.docx.docx_converter import DocxConverter as Converter
 
         def payload(text: str) -> bytes:
-            """生成包含单段正文的独立 DOCX。"""
+            """Generates a stand-alone DOCX containing a single paragraph of text."""
             document = Document()
             document.add_paragraph(text)
             stream = BytesIO()
@@ -105,7 +105,7 @@ def test_converter_reuse_after_failure_matches_fresh_instance(suffix: str) -> No
         from docvortex.analyzers.native.office.pptx.pptx_converter import PptxConverter as Converter
 
         def payload(text: str) -> bytes:
-            """生成包含一个标题页的独立 PPTX。"""
+            """Generates a standalone PPTX containing a title page."""
             document = Presentation()
             slide = document.slides.add_slide(document.slide_layouts[0])
             slide.shapes.title.text = text
@@ -129,7 +129,7 @@ def test_converter_reuse_after_failure_matches_fresh_instance(suffix: str) -> No
 
 
 def test_pdf_contract_identity_survives_module_split() -> None:
-    """原 PDF 模块的类型仍是唯一对象，已存在的 pickle 数据可以继续读取。"""
+    """The type of the original PDF module is still the only object, and the existing pickle data can continue to be read."""
     import pickle
 
     from docvortex.document.pdf import _document as document

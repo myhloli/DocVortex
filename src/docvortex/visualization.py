@@ -1,4 +1,4 @@
-"""在原始 PDF 上标注严格 Middle JSON 的布局，共享实现不负责文件读写。"""
+"""The layout of Middle and JSON is marked strictly on the original PDF, the shared implementation is not responsible for file reading and writing."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from .schema import PAGE_AUXILIARY_BLOCK_TYPES, BBox, BlockBase, BlockType, Page
 
 _VISUAL_PARENT_TYPES = {BlockType.IMAGE, BlockType.TABLE, BlockType.CHART, BlockType.CODE}
 
-# 当前布局使用实色边框和同色类型标签；页面脚注独立着色，页面辅助块统一为灰色。
+# The current layout uses solid-color borders and type labels of the same color; page footers are independently colored, and page auxiliary blocks are uniformly gray.
 _BLOCK_COLORS: dict[str, tuple[float, float, float]] = {
     "text": (0.60, 0.05, 0.30),
     "ref_text": (0.45, 0.20, 0.65),
@@ -52,13 +52,13 @@ def render_layout_pdf(
     *,
     page_indices: Sequence[int] | None = None,
 ) -> bytes:
-    """把当前 PageInfo 布局画到 PDF，返回新字节且不修改解析结果。
+    """Draw the current PageInfo layout to PDF, return new bytes without modifying the parsing result.
 
-    bbox 使用页面显示方向下、以 CropBox 左上角为原点的归一化坐标。
-    page_indices 的第 i 项是输入 PDF 第 i 页对应的原始 page_idx；
-    完整原文可省略映射，抽页或重排后的 PDF 必须显式提供映射。
-    没有对应解析结果的页面原样保留，映射长度错误时抛出 ValueError。
-    每个边框标注自身类型和原始 index，缺失 index 显示 -；标签文字可被 PDF 提取。
+    bbox uses the normalized coordinates in the page display direction with the upper left corner of CropBox as the origin.
+    Item i of page_indices is the original page_idx corresponding to page i of input PDF;
+    The complete original text can omit mapping, but the extracted or rearranged PDF must provide mapping explicitly.
+    Pages without corresponding parsing results are retained as they are, and ValueError is thrown when the mapping length is incorrect.
+    Each border is labeled with its own type and the original index, missing index displays -; the label text can be extracted by PDF.
     """
     if any(not isinstance(page, PageInfo) for page in pages):
         raise TypeError("pages must contain PageInfo instances")
@@ -75,7 +75,7 @@ def render_layout_pdf(
 
     writer = PdfWriter()
     for source_page, original_index in zip(reader.pages, indices):
-        # 直接复制原页可保留 MediaBox、CropBox、Rotate 和原有批注。
+        # Directly copy the original page to retain MediaBox, CropBox, Rotate and original annotations.
         page_copy = writer.add_page(source_page)
         middle_page = pages_by_index.get(original_index)
         if middle_page is not None:
@@ -89,7 +89,7 @@ def render_layout_pdf(
 
 
 def _build_page_overlay(page: PageObject, middle_page: PageInfo) -> PageObject | None:
-    """先绘制边框，再按显示方向放置标签，保留原页方向和页面框。"""
+    """Draw the border first, then place the label according to the display direction, retaining the original page direction and page frame."""
     if page.cropbox.width <= 0 or page.cropbox.height <= 0:
         return None
     boxes = list(_iter_overlay_boxes(middle_page.blocks))
@@ -107,14 +107,14 @@ def _build_page_overlay(page: PageObject, middle_page: PageInfo) -> PageObject |
     painter.save()
     packet.seek(0)
     overlay = PdfReader(packet).pages[0]
-    # merge_page 按 overlay 的 CropBox 裁剪，必须同步原页偏移，支持负坐标。
+    # merge_page is cropped according to overlay and CropBox. The original page offset must be synchronized and negative coordinates are supported.
     overlay.mediabox = RectangleObject(page.mediabox)
     overlay.cropbox = RectangleObject(page.cropbox)
     return overlay
 
 
 def _iter_overlay_boxes(blocks: Iterable[BlockBase]) -> Iterable[tuple[str, BBox, int | None]]:
-    """遍历当前 block 树并保留自身 index；视觉父块只画子块，列表保留层级框。"""
+    """Traverse the current block tree and retain its own index; the visual parent block only draws sub-blocks, and the list retains the hierarchical box."""
     for block in blocks:
         if block.bbox is not None and block.type not in _VISUAL_PARENT_TYPES:
             yield str(block.type), block.bbox, block.index
@@ -129,7 +129,7 @@ def _iter_overlay_boxes(blocks: Iterable[BlockBase]) -> Iterable[tuple[str, BBox
 
 
 def _draw_overlay_labels(painter: canvas.Canvas, page: PageObject, boxes: Sequence[tuple[str, BBox, int | None]]) -> None:
-    """在显示方向的左下原点坐标系中绘制正向标签，并用白底保护文字可读性。"""
+    """Draw the forward label in the coordinate system of the lower left origin of the display direction, and use a white background to protect text readability."""
     left, bottom = float(page.cropbox.left), float(page.cropbox.bottom)
     width, height = float(page.cropbox.width), float(page.cropbox.height)
     rotation = page.rotation % 360
@@ -156,7 +156,7 @@ def _draw_overlay_labels(painter: canvas.Canvas, page: PageObject, boxes: Sequen
         painter.setFillColorRGB(*_BLOCK_COLORS.get(block_type, (0.90, 0.10, 0.10)))
         text = painter.beginText(x0 + _LABEL_PADDING, y0 + _LABEL_PADDING - descent)
         text.setFont(_LABEL_FONT, _LABEL_FONT_SIZE)
-        # 极窄页面仅压缩标签的水平宽度，不让右侧文字越过 CropBox。
+        # Extremely narrow pages only compress the horizontal width of the label and do not allow the text on the right to cross CropBox.
         text.setHorizScale(100 * min(1, max(0, label_width - 2 * _LABEL_PADDING) / text_width))
         text.textOut(label)
         painter.drawText(text)
@@ -171,14 +171,14 @@ def _place_label(
     page_width: float,
     page_height: float,
 ) -> BBox:
-    """固定贴着所属框上方，仅在页面边缘就近收拢，不因其他标签碰撞而跨行移动。"""
+    """It is fixed to the top of the box it belongs to, and is only gathered close to the edge of the page, and does not move across lines due to collisions with other labels."""
     left = max(0, min(left, page_width - width))
     bottom = max(0, min(top + _LABEL_GAP, page_height - height))
     return left, bottom, left + width, min(bottom + height, page_height)
 
 
 def _normalized_bbox_to_pdf(bbox: BBox, page: PageObject) -> BBox:
-    """反转显示方向的直角旋转，并把 CropBox 内的归一化框还原为 PDF 坐标。"""
+    """Reverse the rectangular rotation of the display direction and restore the normalization box within CropBox to PDF coordinates."""
     left, bottom = float(page.cropbox.left), float(page.cropbox.bottom)
     width, height = float(page.cropbox.width), float(page.cropbox.height)
     x0, y0, x1, y1 = bbox

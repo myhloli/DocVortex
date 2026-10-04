@@ -1,4 +1,4 @@
-"""把 OFD 文档、模板、图层与资源组合成逐页场景。"""
+"""Combine OFD documents, templates, layers and resources into page-by-page scenes."""
 
 from __future__ import annotations
 
@@ -21,10 +21,10 @@ from .text import FontMetricResolver, OfdTextBudget, build_text_lines
 
 
 class OfdSceneBuilder:
-    """按文档页树构造 OFD 页面场景。"""
+    """Construct OFD page scene according to document page tree."""
 
     def __init__(self, package: OfdPackage) -> None:
-        """绑定当前包和跨页共享预算。"""
+        """Bind current package and cross-page shared budget."""
         self.package = package
         self.text_budget = OfdTextBudget()
         self.path_budget = OfdPathBudget()
@@ -33,7 +33,7 @@ class OfdSceneBuilder:
         self._page_count = 0
 
     def build(self) -> list[OfdPageScene]:
-        """按 DocBody 和 Pages 声明顺序构造全部页面。"""
+        """Construct all pages in the order of declaration of DocBody and Pages."""
         scenes: list[OfdPageScene] = []
         try:
             for document_ref in self.package.document_refs():
@@ -44,7 +44,7 @@ class OfdSceneBuilder:
             self.font_metrics.close()
 
     def _required_ofd_xml(self, part_name: str) -> etree._Element:
-        """读取必需核心 XML 并限制为已知 OFD 命名空间。"""
+        """Reading required core XML and restricted to known OFD namespace."""
         root = self.package.xml_part(part_name, required=True)
         assert root is not None
         namespace = namespace_name(root.tag)
@@ -53,14 +53,14 @@ class OfdSceneBuilder:
         return root
 
     def _resolve_part(self, base_part: str, element: etree._Element | None, *, required: bool = False) -> str | None:
-        """解析一个 ST_Loc 元素并按需要求结果存在。"""
+        """Parse a ST_Loc element and require the result to exist as needed."""
         part = self.package.resolve_reference(base_part, element_text(element)) if element is not None else None
         if required and (part is None or not self.package.has_part(part)):
             raise OfdParseError(f"Malformed OFD package: invalid required location from {base_part!r}")
         return part
 
     def _document_resources(self, document_part: str, document_root: etree._Element) -> ResourceRegistry:
-        """解析文档级 PublicRes 与 DocumentRes。"""
+        """Parse document-level PublicRes and DocumentRes."""
         common_data = first_descendant(document_root, "CommonData")
         public_element = first_child(common_data, "PublicRes")
         document_resource_element = first_child(common_data, "DocumentRes")
@@ -76,7 +76,7 @@ class OfdSceneBuilder:
         )
 
     def _page_area(self, root: etree._Element, fallback: BBox | None, name: str) -> BBox | None:
-        """读取页面区域，缺失或非法时返回文档级回退。"""
+        """Read the page area and return to the document level when it is missing or illegal."""
         area = first_descendant(root, "Area")
         if area is None:
             area = first_descendant(root, "PageArea")
@@ -84,7 +84,7 @@ class OfdSceneBuilder:
         return value or fallback
 
     def _template_refs(self, document_part: str, document_root: etree._Element) -> dict[int, TemplateRef]:
-        """读取 CommonData 中的模板页面映射。"""
+        """Read the template page mapping in CommonData."""
         common_data = first_descendant(document_root, "CommonData")
         result: dict[int, TemplateRef] = {}
         if common_data is None:
@@ -99,7 +99,7 @@ class OfdSceneBuilder:
         return result
 
     def _page_refs(self, document_part: str, document_root: etree._Element) -> list[PageRef]:
-        """按 Document.xml 的 Pages 子节点顺序读取页面引用。"""
+        """Read page references in order of Pages subnodes of Document.xml."""
         pages = first_descendant(document_root, "Pages")
         if pages is None:
             raise OfdParseError(f"Malformed OFD package: {document_part!r} has no Pages")
@@ -122,7 +122,7 @@ class OfdSceneBuilder:
         document_root: etree._Element,
         page_index_offset: int,
     ) -> list[OfdPageScene]:
-        """构造单个 Document.xml 声明的全部页面。"""
+        """Construct all pages declared by a single Document.xml."""
         common_data = first_descendant(document_root, "CommonData")
         default_physical = self._page_area(common_data, None, "PhysicalBox") if common_data is not None else None
         default_content = self._page_area(common_data, None, "ContentBox") if common_data is not None else None
@@ -177,7 +177,7 @@ class OfdSceneBuilder:
         scene: OfdPageScene,
         base_context: PageBuildContext,
     ) -> None:
-        """把一个页面引用的模板内容合并到当前场景。"""
+        """Merge the template content referenced by a page into the current scene."""
         template_id = parse_int(template_use.get("TemplateID"))
         template_ref = templates.get(template_id) if template_id is not None else None
         if template_ref is None:
@@ -198,7 +198,7 @@ class OfdSceneBuilder:
         self._walk(content, context, template_resources, scene, depth=0, composite_stack=frozenset())
 
     def _child_context(self, element: etree._Element, context: PageBuildContext) -> PageBuildContext | None:
-        """为 PageBlock 或 CompositeObject 计算子级变换和裁剪。"""
+        """Compute child transforms and clipping for PageBlock or CompositeObject."""
         boundary = parse_st_box(element.get("Boundary"))
         if boundary is None:
             return replace(context, transform=context.transform.compose(parse_affine(element.get("CTM"))))
@@ -219,7 +219,7 @@ class OfdSceneBuilder:
         context: PageBuildContext,
         resources: ResourceRegistry,
     ) -> dict[str, str]:
-        """按父上下文、DrawParam 和对象直接属性解析最终样式。"""
+        """Final styles are resolved by parent context, DrawParam and object direct properties."""
         style = dict(context.draw_style)
         try:
             style = merge_drawing_attributes(style, resolve_draw_param(resources, parse_int(element.get("DrawParam"))))
@@ -231,7 +231,7 @@ class OfdSceneBuilder:
         return style
 
     def _vector_clip_context(self, element: etree._Element, context: PageBuildContext, scene: OfdPageScene) -> PageBuildContext:
-        """传递祖先裁剪，无法解释时只禁用整页回退并保留明确诊断。"""
+        """Passing ancestor clipping, only disabling full page fallback when unexplained and retaining explicit diagnostics."""
         try:
             clips = parse_clip_groups(element, context.transform, self.path_budget)
         except OfdResourceLimitError:
@@ -252,7 +252,7 @@ class OfdSceneBuilder:
         depth: int,
         composite_stack: frozenset[int],
     ) -> None:
-        """按绘制顺序递归展开页面、模板和复合图元对象。"""
+        """Recursively expand pages, templates and composite primitive objects in drawing order."""
         if depth > MAX_OBJECT_RECURSION:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_object_recursion={MAX_OBJECT_RECURSION}")
         for child in element:

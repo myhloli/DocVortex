@@ -1,4 +1,4 @@
-"""合并本轮人工与视觉标注并重放明确的 PDF 白名单，禁止读取 benchmark GT。"""
+"""Merges manual and visual annotation for this round and replays explicit PDF whitelist, prohibiting reading benchmark GT."""
 
 from __future__ import annotations
 
@@ -99,7 +99,7 @@ NEW = {
 
 
 def visible(value):
-    """递归展开公开内容，只用于锚定已完成的视觉判定。"""
+    """Expand the public content recursively, only to anchor the completed visual judgment."""
     if isinstance(value, str):
         return value
     if isinstance(value, list):
@@ -108,7 +108,7 @@ def visible(value):
 
 
 def indices(label):
-    """展开人工块号区间，保留遗漏区域的空编号。"""
+    """Expand the artificial block number range, leaving empty numbers in missing areas."""
     out = set()
     for part in label.split(",") if label != "-" else []:
         ends = list(map(int, part.split("-")))
@@ -117,7 +117,7 @@ def indices(label):
 
 
 def flatten(blocks):
-    """保存所有父子块的真实编号、位置和完整可见文字。"""
+    """Saves the true number, position and full visible text of all parent and child blocks."""
     out = []
     for block in blocks:
         out.append({key: block.get(key) for key in ("index", "type", "bbox")} | {"text": visible(block.get("content", ""))})
@@ -128,7 +128,7 @@ def flatten(blocks):
 
 
 def issue(doc, page, position, label, expected, blocks, origin, status="确认问题", confidence="H"):
-    """将人工判断与来源版本、区域和文字锚点绑定，不由输出生成期望。"""
+    """Bind human judgment to source versions, locales, and text anchors, and don't generate expectations from the output."""
     chosen = [block for block in blocks if block["index"] in indices(label)]
     return {
         "id": f"{doc}-p{page:03d}-{position:03d}",
@@ -148,7 +148,7 @@ def issue(doc, page, position, label, expected, blocks, origin, status="确认�
 
 
 def decide_old(item):
-    """执行用户明确的单页豁免及OCR边界，保留类型、成员和段界问题。"""
+    """Enforce user-specific single-page exemptions and OCR boundaries, preserving type, member, and segment boundary issues."""
     expectation = item["expectation"]
     types = {b["type"] for b in item["current_blocks"]}
     marginal = re.search(r"header|footer|page_number|页眉|页脚|页码", expectation)
@@ -161,7 +161,7 @@ def decide_old(item):
 
 
 def refine_cases(data):
-    """拆分类型建议与真实边界缺陷，并补入原页直接观察的漏框区域。"""
+    """The splitting type is suggested with the real boundary defects, and the missing frame area directly observed on the original page is filled in."""
     boundaries = {
         56: "六个圆点条目保持独立边界；原块1、2属于同一条目，原块3应拆成两项。",
         66: "从正文切出第一条 full-service restaurants，五项分别保持完整边界。",
@@ -231,7 +231,7 @@ def refine_cases(data):
 
 
 def render_gallery(output, data):
-    """生成可编辑的逐页证据画廊，并允许导出用户修正后的JSON。"""
+    """Generates editable page-by-page evidence galleries and allows export of user-corrected JSON."""
     payload = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
     shell = """<!doctype html><meta charset="utf-8"><title>Flash合并复核</title>
 <style>body{font:16px system-ui;margin:20px;background:#eef1f5}header{position:sticky;top:0;background:white;padding:12px;z-index:2}select,input,button{font:inherit;margin:4px}article{background:white;padding:12px;margin:16px 0}section{display:flex;gap:10px}figure{margin:0;flex:1;min-width:0}img{width:100%}textarea{width:99%;min-height:70px;font:15px system-ui}.issue{border-top:1px solid #ddd;padding:10px}small{color:#555}h2{font-size:18px}</style>
@@ -246,7 +246,7 @@ document.querySelector('#search').oninput=draw;document.querySelector('#filter')
 
 
 def merge(args):
-    """复制已有视觉证据并合并明确白名单，不扫描基准目录或读取GT。"""
+    """Copies existing visual evidence and incorporates an explicit whitelist, without scanning the base directory or reading GT."""
     old = json.loads((args.initial / "annotations.initial.json").read_text())
     old_run = json.loads((args.initial / "run.json").read_text())
     manual_run = json.loads((args.diagnostic / "run.json").read_text())
@@ -350,7 +350,7 @@ def merge(args):
 
 
 def main():
-    """通过显式输入目录运行合并，所有读取都指向本轮已知产物。"""
+    """Merges were run by explicitly entering the directory, with all reads pointing to known products of the round."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--initial", type=Path, required=True)
     parser.add_argument("--diagnostic", type=Path, required=True)

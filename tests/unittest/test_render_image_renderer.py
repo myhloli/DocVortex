@@ -23,12 +23,12 @@ from docvortex.schema import (
 
 
 def _delimiters() -> LatexDelimitersConfig:
-    """提供显式默认定界符，不读取宿主全局配置。"""
+    """Provides an explicit default delimiter and does not read host global configuration."""
     return LatexDelimitersConfig()
 
 
 def _image_block() -> ImageBlock:
-    """构造带图片载体与说明文字的最小块。"""
+    """Construct minimal blocks with image carriers and captions."""
     body = ImageBodyBlock(
         type=BlockType.IMAGE_BODY,
         index=0,
@@ -51,7 +51,7 @@ def _image_block() -> ImageBlock:
 
 
 def test_pipeline_markdown_uses_custom_block_image_renderer_and_keeps_caption() -> None:
-    """PDF 图片采用自定义渲染器并保留说明文字。"""
+    """PDF image uses custom renderer and retains captions."""
     block = _image_block()
     renderer_mock = Mock(return_value="![Image block](doc:aaaaaaa/tier:standard/page:1/block:1)")
     image_renderer: ImageRenderer = renderer_mock
@@ -70,7 +70,7 @@ def test_pipeline_markdown_uses_custom_block_image_renderer_and_keeps_caption() 
 
 
 def test_office_markdown_uses_custom_block_image_renderer_and_keeps_caption() -> None:
-    """Office 图片采用自定义渲染器并保留说明文字。"""
+    """Office image uses custom renderer and retains captions."""
     block = _image_block()
 
     rendered = render_single_block(
@@ -89,7 +89,7 @@ def test_office_markdown_uses_custom_block_image_renderer_and_keeps_caption() ->
 def test_pipeline_markdown_uses_custom_renderer_for_image_only_visual_blocks(
     block_type: BlockType,
 ) -> None:
-    """仅有图片的视觉块也调用自定义渲染器。"""
+    """Image-only visual blocks also call custom renderers."""
     if block_type == BlockType.TABLE:
         block: BlockBase = TableBlock(
             type=BlockType.TABLE,
@@ -132,7 +132,7 @@ def test_pipeline_markdown_uses_custom_renderer_for_image_only_visual_blocks(
 
 
 def test_pipeline_markdown_uses_custom_renderer_for_image_only_formula() -> None:
-    """仅有图片的公式使用自定义渲染器。"""
+    """Image-only formulas use a custom renderer."""
     block = EquationBlock(
         type=BlockType.EQUATION,
         index=0,
@@ -152,7 +152,7 @@ def test_pipeline_markdown_uses_custom_renderer_for_image_only_formula() -> None
 
 
 def test_custom_renderer_removes_internal_images_from_structured_table_html() -> None:
-    """表格自定义图片输出移除重复的内部图片。"""
+    """Table custom image output removes duplicate internal images."""
     internal_path = "internal/cell-image.png"
     html = f'<table><tr><td>Text<img src="{internal_path}"></td></tr></table>'
     block = TableBlock(
@@ -185,7 +185,7 @@ def test_custom_renderer_removes_internal_images_from_structured_table_html() ->
 
 
 def test_custom_renderer_handles_table_html_containing_only_images() -> None:
-    """只含图片的表格 HTML 保持自定义输出契约。"""
+    """Image-only table HTML maintains a custom output contract."""
     internal_path = "internal/cell-image.png"
     block = TableBlock(
         type=BlockType.TABLE,

@@ -1,4 +1,4 @@
-"""Middle JSON 2.0 行内 Span 的规范化、可见文本与段落边界操作。"""
+"""Middle JSON 2.0 Inline Span Normalization, visible text, and paragraph boundary operations."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from ..schema import CodeInlineSpan, EquationInlineSpan, HyperlinkSpan, InlineSp
 
 
 def normalize_inline_spans(spans: Iterable[InlineSpan | dict[str, object]]) -> list[InlineSpan]:
-    """严格解析、递归规范化并合并相邻等样式文字 Span。"""
+    """Strictly parse, recursively normalize, and merge adjacent equal style text Span."""
     parsed = parse_inline_spans(list(spans))
     normalized: list[InlineSpan] = []
     for span in parsed:
@@ -46,7 +46,7 @@ def normalize_inline_spans(spans: Iterable[InlineSpan | dict[str, object]]) -> l
 
 
 def inline_plain_text(spans: Iterable[InlineSpan]) -> str:
-    """提取 Span 列表的完整可见文字，供排序、合并和标题判断使用。"""
+    """Extract the complete visible text of the Span list for use in sorting, merging, and title judgment."""
     parts: list[str] = []
     for span in spans:
         if isinstance(span, (TextSpan, CodeInlineSpan, EquationInlineSpan)):
@@ -57,13 +57,13 @@ def inline_plain_text(spans: Iterable[InlineSpan]) -> str:
 
 
 def join_inline_spans(contents: Iterable[Iterable[InlineSpan]]) -> list[InlineSpan]:
-    """按物理段落边界规则合并多组 Span，并保持结构化语义。"""
+    """Merge multiple groups of Span by physical paragraph boundary rules and maintain structured semantics."""
     merged: list[InlineSpan] = []
     for content in contents:
         current = map_text_span_content(list(content), remove_invalid_surrogates)
         if not current:
             continue
-        # 边界裁剪最多清空最后一个根节点；保留其前驱以重新合并新相邻的 Span。
+        # Boundary clipping clears up to the last root node; retaining its predecessors to re-merge newly adjacent Span.
         boundary_start = max(0, len(merged) - 2)
         if merged:
             _join_inline_span_sequences(merged, current)
@@ -73,7 +73,7 @@ def join_inline_spans(contents: Iterable[Iterable[InlineSpan]]) -> list[InlineSp
 
 
 def strip_inline_spans(spans: Iterable[InlineSpan]) -> list[InlineSpan]:
-    """删除行内内容首尾空白，同时保留内部 Span 边界和样式。"""
+    """Removes leading and trailing whitespace from inline content while retaining internal Span borders and styles."""
     normalized = normalize_inline_spans(deepcopy(list(spans)))
     first = _first_text_span(normalized)
     last = _last_text_span(normalized)
@@ -85,14 +85,14 @@ def strip_inline_spans(spans: Iterable[InlineSpan]) -> list[InlineSpan]:
 
 
 def replace_inline_text(spans: Iterable[InlineSpan], content: str) -> list[InlineSpan]:
-    """把纯文本回填为单一 TextSpan，供确实丢弃原样式的规则使用。"""
+    """Backfill plain text to a single TextSpan for use by rules that actually discard the original style."""
     if not content:
         return []
     return [TextSpan(type="text", content=content)]
 
 
 def slice_inline_spans(spans: Iterable[InlineSpan], start: int = 0, end: int | None = None) -> list[InlineSpan]:
-    """按可见字符偏移裁剪 Span，并保留覆盖范围内的样式和链接。"""
+    """Crops Span by visible character offset, preserving styles and links within coverage."""
     normalized = normalize_inline_spans(deepcopy(list(spans)))
     visible_length = len(inline_plain_text(normalized))
     resolved_start = min(max(start, 0), visible_length)
@@ -117,7 +117,7 @@ def slice_inline_spans(spans: Iterable[InlineSpan], start: int = 0, end: int | N
 
 
 def map_text_span_content(spans: Iterable[InlineSpan], transform: Callable[[str], str]) -> list[InlineSpan]:
-    """递归转换 TextSpan 正文，同时保留其它 Span 语义。"""
+    """Recursively convert TextSpan text while preserving other Span semantics."""
     output: list[InlineSpan] = []
     for span in normalize_inline_spans(deepcopy(list(spans))):
         if isinstance(span, TextSpan):
@@ -135,7 +135,7 @@ def map_text_span_content(spans: Iterable[InlineSpan], transform: Callable[[str]
 
 
 def _join_inline_span_sequences(previous: list[InlineSpan], current: list[InlineSpan]) -> None:
-    """按两组 Span 的可见边界拼接，只修改可写文本叶子，保留公式和代码。"""
+    """Splice according to the visible boundaries of the two groups of Span, only modify the writable text leaves, and retain the formulas and codes."""
     previous_visible = inline_plain_text(previous).rstrip()
     current_visible = inline_plain_text(current).lstrip()
     if not previous_visible or not current_visible:
@@ -150,7 +150,7 @@ def _join_inline_span_sequences(previous: list[InlineSpan], current: list[Inline
 
     processed, separator = resolve_text_line_boundary(previous_visible, next_content=current_visible)
     if last_text is not None:
-        # 共享规则最多删除一个行末断词符；不能把整个可见投影写回单一叶子。
+        # Sharing rules may remove at most one end-of-line breaker; the entire visible projection cannot be written back to a single leaf.
         if processed == previous_visible[:-1] and last_text.content.endswith(previous_visible[-1]):
             object.__setattr__(last_text, "content", last_text.content[:-1])
     if separator:
@@ -158,7 +158,7 @@ def _join_inline_span_sequences(previous: list[InlineSpan], current: list[Inline
 
 
 def _first_text_span(spans: list[InlineSpan]) -> TextSpan | None:
-    """返回首个可见叶子为文字时对应的 TextSpan。"""
+    """Returns the corresponding TextSpan when the first visible leaf is text."""
     for span in spans:
         if not inline_plain_text([span]):
             continue
@@ -171,7 +171,7 @@ def _first_text_span(spans: list[InlineSpan]) -> TextSpan | None:
 
 
 def _last_text_span(spans: list[InlineSpan]) -> TextSpan | None:
-    """返回末个可见叶子为文字时对应的 TextSpan。"""
+    """Returns the corresponding TextSpan when the last visible leaf is text."""
     for span in reversed(spans):
         if not inline_plain_text([span]):
             continue
@@ -184,7 +184,7 @@ def _last_text_span(spans: list[InlineSpan]) -> TextSpan | None:
 
 
 def _drop_empty_text_spans(spans: list[InlineSpan]) -> list[InlineSpan]:
-    """删除裁剪后为空的 TextSpan，并递归清理空链接。"""
+    """Delete TextSpan which is empty after clipping and clean up empty links recursively."""
     result: list[InlineSpan] = []
     for span in spans:
         if isinstance(span, TextSpan) and not span.content:
@@ -200,7 +200,7 @@ def _drop_empty_text_spans(spans: list[InlineSpan]) -> list[InlineSpan]:
 
 
 def _slice_inline_span(span: InlineSpan, start: int, end: int) -> InlineSpan | None:
-    """裁剪单个 Span 的局部可见区间。"""
+    """Clip the local visible range of a single Span."""
     if start >= end:
         return None
     if isinstance(span, TextSpan):

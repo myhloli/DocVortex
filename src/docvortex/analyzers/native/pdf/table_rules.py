@@ -1,4 +1,4 @@
-"""PDF 规则线与文本行候选；保留原有认领顺序与判定规则。"""
+"""PDF rule line and text line candidates; retain the original claiming order and judgment rules."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ from .table_rows import _clip_visual_row_to_corridor
 
 @dataclass(slots=True)
 class _RuleCorridorRow:
-    """保存精确横向走廊裁剪后的行，以及原算法用于纵向准入的几何。"""
+    """Save the exact transverse corridor cropped rows, as well as the geometry used by the original algorithm for longitudinal admission."""
 
     source_bbox: BBox
     gate_center_y: float
@@ -56,7 +56,7 @@ class _RuleCorridorRow:
 
 @dataclass(slots=True)
 class _RuleIntervalPrefix:
-    """仅保留当前横线起点下的一份精确行序列和相邻区间分配。"""
+    """Only an exact copy of the row sequence and adjacent interval allocation below the current starting point of the horizontal line is retained."""
 
     rows: tuple[_VisualRow, ...]
     rules: tuple[_LocalAxisLine, ...]
@@ -65,7 +65,7 @@ class _RuleIntervalPrefix:
 
 @dataclass(slots=True)
 class _RuleBandIndex:
-    """保存同走廊的原行身份及其在完整横线组中的首个相邻区间。"""
+    """Save the original row identity of the same corridor and its first adjacent interval in the complete horizontal line group."""
 
     rows: tuple[_VisualRow, ...]
     positions: dict[int, int]
@@ -76,7 +76,7 @@ class _RuleBandIndex:
     shared_core_rows: Any = None
 
     def interval(self, rows: list[_VisualRow]) -> tuple[int, int] | None:
-        """只准入与原走廊完全相同、连续且保序的行引用。"""
+        """Only row references that are identical to the original corridor, continuous and in order are allowed."""
 
         if not rows:
             return 0, 0
@@ -89,10 +89,10 @@ class _RuleBandIndex:
 
 
 class _RuleIntervalGroups(list):
-    """保留普通分组列表行为，并携带同一次原生扫描产生的区间文本证据。"""
+    """Preserve the normal grouped list behavior and carry the interval text evidence produced by the same native scan."""
 
     def __init__(self, groups, rows, rules, height, accepted):
-        """证据仅供原输入列表和同一行高查询复用，不缓存外部可变对象的跨调用状态。"""
+        """The evidence is only reused by the original input list and the same row of high queries, and the cross-call state of external mutable objects is not cached."""
         super().__init__(groups)
         self.source_rows = rows
         self.source_rules = rules
@@ -102,7 +102,7 @@ class _RuleIntervalGroups(list):
 
 @dataclass(slots=True)
 class _StableColumnPrefixState:
-    """保存稳定列聚类的完整前缀状态，供严格前缀输入继续计算。"""
+    """Saves the complete prefix state of stable column clustering for continued calculation with strict prefix input."""
 
     row_ids: tuple[int, ...]
     clusters_by_alignment: Any
@@ -110,7 +110,7 @@ class _StableColumnPrefixState:
 
 @dataclass(slots=True)
 class _StableColumnCache:
-    """保存稳定列精确结果与当前起点下可安全续算的前缀状态。"""
+    """Save the precise results of the stable column and the prefix status that can be safely continued at the current starting point."""
 
     results: dict[tuple[float, tuple[int, ...]], tuple[int, float]] = field(default_factory=dict)
     prefixes: dict[tuple[float, int], _StableColumnPrefixState] = field(default_factory=dict)
@@ -119,7 +119,7 @@ class _StableColumnCache:
 
 @dataclass(slots=True)
 class _RuleCandidateContext:
-    """同一候选组共享只读输入和网格索引，避免每个区间复制页面成员。"""
+    """The same candidate group shares read-only input and grid indexes, avoiding duplication of page members for each interval."""
 
     rows: list
     lines: list
@@ -142,7 +142,7 @@ class _RuleCandidateContext:
 
 @dataclass(slots=True)
 class _RuleCandidateDraft:
-    """保存轻量候选描述，评分排序之后再创建注释及成员集合。"""
+    """Save lightweight candidate descriptions and create annotations and member collections after scoring and sorting."""
 
     context: _RuleCandidateContext
     boundaries: list
@@ -155,7 +155,7 @@ class _RuleCandidateDraft:
     prepared_candidate: Any = None
 
     def materialize(self) -> _TableCandidate:
-        """按参考规则物化当前候选，并复用本组网格成员后立即交给合并器。"""
+        """The current candidate is materialized according to the reference rules, and the grid members of this group are reused and immediately handed over to the combiner."""
         context = self.context
         if context.annotation_geometry is None:
             context.annotation_geometry = _prepare_annotation_geometry(context.rows) or False
@@ -204,7 +204,7 @@ def _build_fragments(
     lines: list[_LineItem],
     page_size: tuple[float, float],
 ) -> list[_Fragment]:
-    """将精修后的原生 run 转换成表格单元候选。"""
+    """Convert refined native run into table cell candidates."""
 
     fragments: list[_Fragment] = []
     for line in lines:
@@ -215,8 +215,8 @@ def _build_fragments(
                 bbox=line.bbox,
                 local_bbox=local_bbox,
                 line_index=line.source_index,
-                # 复用原生粗行身份，避免同一字符行内不同 cell
-                # 因轻微基线差异被误拆成多行。
+                # Reuse native thick line identities to avoid different characters within the same line cell
+                # Incorrectly split into multiple lines due to slight baseline differences.
                 visual_row_id=line.visual_row_id,
             )
         )
@@ -227,7 +227,7 @@ def _cluster_fragment_rows(
     fragments: list[_Fragment],
     median_height: float,
 ) -> list[_VisualRow]:
-    """优先复用原生视觉行身份，其余片段按中心线容差聚成表格行。"""
+    """Prioritize the reuse of native visual row identities, and cluster the remaining fragments into table rows based on centerline tolerance."""
 
     tolerance = max(2.0, median_height * 0.5)
     native_groups: dict[int, list[_Fragment]] = {}
@@ -238,8 +238,8 @@ def _cluster_fragment_rows(
         else:
             native_groups.setdefault(fragment.visual_row_id, []).append(fragment)
 
-    # 先锁定同一原生粗行拆出的 run，再允许不同粗行按基线几何合并；
-    # 旋转表格常把同一数据行的各 cell 分成多个 pdftext 粗行，不能只依赖 row id。
+    # First lock the run detached from the same native thick row, and then allow different thick rows to be merged according to the baseline geometry;
+    # Rotating tables often divides each cell of the same data row into multiple pdftext thick rows, and cannot rely only on row id.
     seed_groups = [*native_groups.values(), *[[fragment] for fragment in geometric_fragments]]
     prepared_seed_groups = [
         (
@@ -264,7 +264,7 @@ def _cluster_fragment_rows(
         else:
             target_group = grouped[target_index]
             target_group.extend(seed_group)
-            # 仅在组成员变化时使用原有 fmean 重新计算，后续比较直接复用精确结果。
+            # Only when the group members change, the original fmean is used for recalculation, and subsequent comparisons directly reuse the accurate results.
             group_centers[target_index] = statistics.fmean(_bbox_center_y(item.local_bbox) for item in target_group)
 
     rows: list[_VisualRow] = []
@@ -297,7 +297,7 @@ def _build_rule_table_candidates(
     caption_candidates: list[tuple[_LineItem, BBox]] | None = None,
     defer_materialization: bool = False,
 ) -> list[_TableCandidate] | list[_RuleCandidateDraft]:
-    """枚举同跨度横线边界区间，再以连续多列文本分布确认表格。"""
+    """Enumerate horizontal line boundary intervals with the same span, and then confirm the table with continuous multi-column text distribution."""
 
     candidates: list[_TableCandidate] = []
     path_infos = path_infos or []
@@ -329,7 +329,7 @@ def _build_rule_table_candidates(
         active_first_index = -1
         interval_prefix: _RuleIntervalPrefix | None = None
         band_indexes: OrderedDict[tuple[float, float], _RuleBandIndex | None] = OrderedDict()
-        # 保留历史算法的候选集合与枚举顺序；性能优化只复用候选内部的纯计算结果。
+        # The candidate set and enumeration order of the historical algorithm are retained; performance optimization only reuses the pure calculation results within the candidates.
         for first_index, bottom_index in _iter_rule_spans(len(rule_group)):
             if first_index != active_first_index:
                 stable_column_cache.prefixes.clear()
@@ -438,15 +438,15 @@ def _build_rule_table_candidates(
                     allow_prefix_reuse=True,
                 )
                 if compact_grid_columns > 0:
-                    # 两行样本容易把左右/中心锚点误算成不同稳定列，使用物理网格列数。
+                    # Two rows of samples easily miscalculate the left and right/center anchor points into different stable columns, using the physical grid column number.
                     stable_columns = compact_grid_columns
                 caption_supported_compact_rows = (
                     caption_anchored_compact_grid and len(dense_rows) >= 2 and stable_columns >= 3 and column_coverage >= 0.5
                 )
                 if len(dense_rows) < 3 and compact_grid_columns == 0 and not caption_supported_compact_rows:
                     continue
-                # 真表格的多单元行会在整个数据带内反复出现；少数图题、图例和
-                # 坐标刻度偶然形成的多列行不能支撑一大片正文区域。
+                # True tables have multi-cell rows that recur throughout the data band; a few figure titles, legends, and
+                # The accidental multi-column rows of the coordinate scale cannot support a large text area.
                 if len(dense_rows) / len(row_segment) < 0.2:
                     continue
                 if stable_columns < 2 or column_coverage < 0.5:
@@ -522,7 +522,7 @@ def _build_rule_table_candidates(
                     if context.marker_line_context is None:
                         context.marker_line_context = _prepare_marker_line_context(lines)
                     marker_safe, marker_source_lines = context.marker_line_context
-                    # 构建阶段内部行序列冻结为 tuple，允许两个只读索引安全共享切片校验。
+                    # The internal row sequence is frozen as tuple during the build phase, allowing two read-only indexes to safely share slice parity.
                     corridor_rows = (
                         band_index.rows if band_index is not None else tuple(item.row for item in corridor_cache[corridor_key])
                     )
@@ -569,8 +569,8 @@ def _build_rule_table_candidates(
             candidate.score = score
             candidates.append(candidate)
     if defer_materialization:
-        # 延迟物化时先冻结网格连通分量，供闭合网格检测和后续 owned
-        # 合并共用一次结果；没有候选的页面保持零额外扫描。
+        # During delayed materialization, grid connected components are first frozen for closed grid detection and subsequent owned
+        # The results are merged once; pages with no candidates remain scanned with zero extra effort.
         if drafts:
             context.grid_components = _connected_rule_grid_components(axis_lines, median_height)
         return drafts
@@ -597,7 +597,7 @@ def _expand_candidates_to_connected_rule_grids(
     prepared_grid_bboxes: list[BBox] | None = None,
     grid_member_cache: dict[BBox, frozenset[int]] | None = None,
 ) -> list[_TableCandidate]:
-    """把已确认候选沿连续横边界和贯穿竖轨扩展到完整物理网格。"""
+    """Expand identified candidates to the complete physical grid along continuous horizontal boundaries and through vertical rails."""
 
     grid_bboxes = (
         prepared_grid_bboxes
@@ -692,12 +692,12 @@ def _build_closed_rule_grid_candidates(
     *,
     grid_components: list[list[_LocalAxisLine]] | None = None,
 ) -> list[_TableCandidate]:
-    """用闭合物理网格接纳含空行或仅有表头文本的稀疏表格。"""
+    """Use a closed physical grid to accommodate sparse tables with empty rows or header text only."""
 
     candidates: list[_TableCandidate] = []
     row_interval_index = _build_row_interval_index(rows)
     components = grid_components if grid_components is not None else _connected_rule_grid_components(axis_lines, median_height)
-    # 复用方传入的分量仍由上面的调用/检测边界生成；这里只迭代，不重复扫描竖轨。
+    # The components passed in by the multiplexer are still generated by the above call/detection boundary; here it is only iterated and the vertical track is not scanned repeatedly.
     for component in components:
         grid_bbox = _bbox_union_many([rule.bbox for rule in component])
         if any(_bbox_overlap_in_smaller(grid_bbox, excluded_bbox) >= 0.5 for excluded_bbox in excluded_bboxes):
@@ -763,7 +763,7 @@ def _closed_grid_vertical_track_positions(
     axis_lines: list[_LocalAxisLine],
     median_height: float,
 ) -> list[float]:
-    """收集覆盖首末横边界中心跨度至少九成的竖轨并合并重复路径。"""
+    """Collect vertical rails covering at least 90% of the center span of the first and last horizontal boundaries and merge duplicate paths."""
 
     top = _bbox_center_y(horizontal_rules[0].bbox)
     bottom = _bbox_center_y(horizontal_rules[-1].bbox)
@@ -797,7 +797,7 @@ def _count_occupied_closed_grid_columns(
     rows: list[_VisualRow],
     vertical_positions: list[float],
 ) -> int:
-    """按文本片段中心统计闭合网格中实际有文字的物理列数。"""
+    """Count the number of physical columns actually containing text in the closed grid based on the center of the text fragment."""
 
     occupied_columns: set[int] = set()
     for row in rows:
@@ -819,10 +819,10 @@ def _connected_rule_grid_bboxes(
     *,
     components: list[list[_LocalAxisLine]] | None = None,
 ) -> list[BBox]:
-    """把端点一致且由外轨或至少两条列轨贯穿的相邻横线组成网格框。"""
+    """A grid frame is formed by adjacent horizontal lines whose endpoints are consistent and penetrated by an outer rail or at least two rails."""
 
-    # components 是同一页面内已冻结的私有复用输入；未提供时保持原签名
-    # 和原计算，直接调用本函数的测试/旧调用路径不受影响。
+    # components is a frozen private multiplex input within the same page; retains the original signature when not provided
+    # Compared with the original calculation, the test/old calling path that directly calls this function will not be affected.
     if components is None:
         components = _connected_rule_grid_components(axis_lines, median_height)
     return [_bbox_union_many([rule.bbox for rule in component]) for component in components]
@@ -832,7 +832,7 @@ def _connected_rule_grid_components(
     axis_lines: list[_LocalAxisLine],
     median_height: float,
 ) -> list[list[_LocalAxisLine]]:
-    """保留连续网格的横边界成员，供精确外轨和横边界数量校验。"""
+    """The transverse boundary members of the continuous grid are retained for accurate outer track and transverse boundary quantity verification."""
 
     output: list[list[_LocalAxisLine]] = []
     for rule_group in _group_long_horizontal_rules(axis_lines, median_height):
@@ -854,7 +854,7 @@ def _connected_rule_grid_components(
 def _connected_horizontal_rule_bboxes(
     source: _PageSource,
 ) -> set[BBox]:
-    """返回参与常规横排闭合网格的原始水平线框，供上游避免删除真实表格边界。"""
+    """Returns the original horizontal wireframe participating in the regular horizontal closed grid, for upstream to avoid deleting the true table boundaries."""
 
     angle_lines = [line for line in source.lines if line.angle == 0]
     fragments = _build_fragments(angle_lines, source.page_size)
@@ -882,7 +882,7 @@ def _rule_bands_share_grid_tracks(
     axis_lines: list[_LocalAxisLine],
     median_height: float,
 ) -> bool:
-    """校验相邻横边界的跨度，并确认其间存在连续外框或稳定列分隔线。"""
+    """Verify the span of adjacent horizontal boundaries and confirm that there is a continuous outline or stable column divider in between."""
 
     top_width = max(0.1, top_rule.bbox[2] - top_rule.bbox[0])
     bottom_width = max(0.1, bottom_rule.bbox[2] - bottom_rule.bbox[0])
@@ -925,7 +925,7 @@ def _rule_bands_share_grid_tracks(
 
 
 def _iter_rule_spans(rule_count: int):
-    """按历史顺序枚举全部横线边界组合，不删除任何内部子候选。"""
+    """Enumerate all horizontal line boundary combinations in historical order without deleting any internal sub-candidates."""
 
     for first_index in range(max(0, rule_count - 1)):
         for bottom_index in range(first_index + 1, rule_count):
@@ -936,7 +936,7 @@ def _group_long_horizontal_rules(
     axis_lines: list[_LocalAxisLine],
     median_height: float,
 ) -> list[list[_LocalAxisLine]]:
-    """按近似左右端点聚合长横线，并去除同位置重复路径。"""
+    """Aggregate long horizontal lines based on approximate left and right endpoints, and remove duplicate paths at the same location."""
 
     minimum_length = max(40.0, 10.0 * median_height)
     horizontal_lines = [
@@ -976,7 +976,7 @@ def _build_rule_corridor_rows(
     rule_bbox: BBox,
     excluded_bboxes: list[BBox],
 ) -> list[_RuleCorridorRow]:
-    """按精确左右边界预裁剪视觉行，保留原算法纵向准入所需的中间几何。"""
+    """Visual rows are pre-cropped according to the exact left and right boundaries, retaining the intermediate geometry required for vertical admission by the original algorithm."""
 
     output: list[_RuleCorridorRow] = []
     for row in rows:
@@ -1021,7 +1021,7 @@ def _rows_inside_rule_interval(
     row_interval_index: tuple[list[tuple[int, _VisualRow]], list[float]] | None = None,
     corridor_cache: dict[tuple[float, float], list[_RuleCorridorRow]] | None = None,
 ) -> list[_VisualRow]:
-    """截取边界走廊内文本行，并移除已由强图形核心覆盖的片段。"""
+    """Intercept lines of text within bounding corridors and remove segments already covered by strong graphics cores."""
 
     if corridor_cache is not None:
         corridor_key = (rule_bbox[0], rule_bbox[2])
@@ -1083,7 +1083,7 @@ def _rows_inside_rule_interval(
 def _build_row_interval_index(
     rows: list[_VisualRow],
 ) -> tuple[list[tuple[int, _VisualRow]], list[float]]:
-    """建立按行上边界排序的安全超集索引，保留原始行顺序供后续处理。"""
+    """Create a safe superset index sorted by the upper boundary of the rows, preserving the original row order for subsequent processing."""
     records = sorted(
         enumerate(rows),
         key=lambda item: (item[1].bbox[1], item[1].bbox[3], item[0]),
@@ -1095,7 +1095,7 @@ def _partition_rows_by_rule_intervals(
     rows: list[_VisualRow],
     rule_group: list[_LocalAxisLine],
 ) -> list[list[_VisualRow]]:
-    """一次把候选行分配到相邻横线闭区间，保持共享边界行同时属于两侧区间。"""
+    """Allocate candidate rows to adjacent horizontal line closed intervals at a time, keeping shared boundary rows belonging to both sides of the interval."""
 
     if len(rule_group) < 2:
         return []
@@ -1117,7 +1117,7 @@ def _partition_rows_by_rule_intervals(
 
 
 def _prepare_rule_band_index(rows: list[_VisualRow], rules: list[_LocalAxisLine]) -> _RuleBandIndex | None:
-    """为一条精确走廊计算完整横线组的首区间，异常和重复横线回退。"""
+    """Calculates the first interval of a complete horizontal line group for an exact corridor, with fallback for abnormal and repeated horizontal lines."""
 
     if len({id(row) for row in rows}) != len(rows) or any(
         type(row.center_y) is not float or not math.isfinite(row.center_y) for row in rows
@@ -1151,7 +1151,7 @@ def _prepare_rule_band_index(rows: list[_VisualRow], rules: list[_LocalAxisLine]
 
 
 def _prepare_native_rule_candidates(rows, centers, rules):
-    """仅为普通有限数据准备共享原生走廊，特殊对象在计算开始前留给参考路径。"""
+    """Only shared native corridors are prepared for common limited data, special objects are left as reference paths before calculations begin."""
     from ...._compute_backend import get_native
 
     native = get_native()
@@ -1183,7 +1183,7 @@ def _prepare_native_rule_candidates(rows, centers, rules):
 
 
 def _prepared_rule_candidate_query(index, rows, prepared_core=None):
-    """共享走廊身份只验证一次，后续复用已由 core.interval 验证的保序切片。"""
+    """The identity of the shared corridor is only verified once, and the order-preserving slices that have been verified by core.interval are subsequently reused."""
     if index is None or index.native is None:
         return None
     if prepared_core is not None:
@@ -1191,7 +1191,7 @@ def _prepared_rule_candidate_query(index, rows, prepared_core=None):
         if type(core) is _PreparedTableCoreRows and type(core.rows) is tuple:
             shared = index.shared_core_rows
             if shared is None or shared[0] is not core or shared[1] is not core.rows:
-                # 仅缓存内部不可变 tuple；字段替换会因身份变化重新验证，外部可变列表不准入。
+                # Only internal immutable tuple is cached; field replacement will be re-validated due to identity changes, and external mutable lists are not allowed.
                 same_rows = core.rows is index.rows or (
                     len(core.rows) == len(index.rows)
                     and all(actual is expected for actual, expected in zip(core.rows, index.rows, strict=True))
@@ -1204,7 +1204,7 @@ def _prepared_rule_candidate_query(index, rows, prepared_core=None):
 
 
 def _prepared_rule_candidate_core(prepared, rules, *, owned=False):
-    """原生一次归并核心成员与坐标来源，Python 保留原坐标身份及集合契约。"""
+    """By merging core members and coordinate sources at once, Python retains the original coordinate identity and collection contract."""
     if prepared is None or not rules:
         return None
     boxes = [rule.bbox for rule in rules]
@@ -1235,7 +1235,7 @@ def _partition_rows_by_prepared_bands(
     index: _RuleBandIndex | None,
     median_height: float | None = None,
 ) -> list[list[_VisualRow]] | None:
-    """仅对连续且保序的走廊行复用首区间，仍让边界行双归属。"""
+    """Only the first interval is reused for consecutive and order-preserving corridor rows, and boundary rows are still given dual ownership."""
 
     if index is None or first_index < 0 or first_index + len(rules) > index.rule_count:
         return None
@@ -1268,7 +1268,7 @@ def _partition_rows_by_rule_intervals_cached(
     rule_group: list[_LocalAxisLine],
     previous: _RuleIntervalPrefix | None,
 ) -> tuple[list[list[_VisualRow]], _RuleIntervalPrefix]:
-    """严格同一行序列与递增横线前缀时只补末区间，其余执行原分配。"""
+    """When strictly the same line sequence and increasing horizontal line prefix are used, only the last interval is supplemented, and the original allocation is performed for the rest."""
 
     reusable = (
         previous is not None
@@ -1301,7 +1301,7 @@ def _every_rule_interval_has_multi_cell_row(
     median_height: float,
     interval_row_groups: list[list[_VisualRow]] | None = None,
 ) -> bool:
-    """要求候选跨过的每个相邻横线区间都存在至少一行多单元文本。"""
+    """It is required that there is at least one line of multi-unit text for each adjacent horizontal line interval that the candidate spans."""
 
     if len(rule_group) < 2:
         return False
@@ -1321,8 +1321,8 @@ def _every_rule_interval_has_multi_cell_row(
         bottom = _bbox_center_y(bottom_rule.bbox)
         if any(len(row.fragments) >= 2 for row in interval_rows):
             continue
-        # 紧邻顶边界的合并表头可能由 pdftext 输出为一个短 fragment；
-        # 只放宽高度很小的首区间，避免把远处章节标题接到表格上。
+        # Merge headers immediately adjacent to the top boundary may be output by pdftext as a short fragment;
+        # Only widen the first interval with a small height to avoid connecting distant chapter titles to the table.
         if interval_index == 0 and interval_rows and bottom - top <= 2.5 * median_height:
             continue
         return False
@@ -1336,14 +1336,14 @@ def _rule_intervals_are_column_compatible(
     stable_column_cache: _StableColumnCache | None = None,
     interval_row_groups: list[list[_VisualRow]] | None = None,
 ) -> bool:
-    """拒绝跨过长篇栏式正文、导致稳定列数明显塌缩的多表合并区间。"""
+    """Multi-table merge ranges that span long columnar texts and result in significant collapse of the number of stable columns are rejected."""
 
     interval_heights = [
         _bbox_center_y(bottom_rule.bbox) - _bbox_center_y(top_rule.bbox)
         for top_rule, bottom_rule in zip(rule_group, rule_group[1:])
     ]
-    # 原逻辑对不高于六倍行高的所有区间都会无条件跳过后续兼容性检查；
-    # 因此全部为短区间时可直接返回，避免先计算永远不会参与裁决的列统计。
+    # The original logic will unconditionally skip subsequent compatibility checks for all intervals no higher than six times the row height;
+    # Therefore, when all are short ranges, you can return directly to avoid first calculating column statistics that will never participate in the decision.
     if interval_heights and all(height <= 6.0 * median_height for height in interval_heights):
         return True
 
@@ -1374,8 +1374,8 @@ def _rule_intervals_are_column_compatible(
         default=0,
     )
     for interval_index, (columns, interval_height, row_count, coverage) in enumerate(profiles):
-        # 紧凑首区间可能只是跨列表头；一旦区间明显高于普通表头，
-        # 也必须具有连续多单元格行，不能无条件跨过正文连接两张表。
+        # The compact first interval may only span the column header; once the interval is significantly higher than the ordinary table header,
+        # It must also have continuous multi-cell rows and cannot unconditionally connect two tables across the body.
         if interval_index == 0 and interval_height <= 2.5 * median_height:
             continue
         if interval_height <= 6.0 * median_height:
@@ -1389,7 +1389,7 @@ def _rule_intervals_are_column_compatible(
 
 
 def _is_multiline_description_cell_band(rows: list[_VisualRow], height: float) -> bool:
-    """确认短左单元格与多行右单元格，不能用物理续行次数否定逻辑表格行。"""
+    """Confirm short left cells and multi-row right cells, and do not use physical row continuation times to negate logical table rows."""
     if len(rows) < 3 or len(rows[0].fragments) != 2:
         return False
     first, second = sorted(rows[0].fragments, key=lambda fragment: fragment.local_bbox[0])
@@ -1411,7 +1411,7 @@ def _continuous_table_row_segments(
     rows: list[_VisualRow],
     median_height: float,
 ) -> list[list[_VisualRow]]:
-    """按物理行距切分边界区间，保留单元格换行参与连续性判断。"""
+    """Divide the boundary interval according to the physical line spacing, and retain cell line breaks to participate in continuity judgment."""
 
     segments: list[list[_VisualRow]] = []
     for row in sorted(rows, key=lambda item: item.center_y):
@@ -1427,7 +1427,7 @@ def _table_segment_reaches_boundaries(
     rule_bbox: BBox,
     median_height: float,
 ) -> bool:
-    """要求数据行链分别贴近最近的上下边界，排除页眉线和远处章节标题。"""
+    """Data row chains are required to be close to the nearest upper and lower boundaries respectively, excluding header lines and distant chapter titles."""
 
     if not rows:
         return False
@@ -1438,10 +1438,10 @@ def _table_segment_reaches_boundaries(
 
 
 class _RuleRowBounds:
-    """保存走廊行框索引，只接受身份与顺序完全连续的查询。"""
+    """Save the corridor row box index and only accept queries where the identity and sequence are completely consecutive."""
 
     def __init__(self, rows):
-        """一次构建有限行框极值树，特殊值和小页面不建立索引。"""
+        """A limited row box extremum tree is constructed at one time, and special values and small pages are not indexed."""
         from ...._compute_backend import get_native
 
         self.rows = rows
@@ -1462,7 +1462,7 @@ class _RuleRowBounds:
             self.native = native.TableRowGeometry([row.bbox for row in rows])
 
     def bbox(self, rows):
-        """保持重复和非连续行的原遍历；极值来源仍引用原坐标对象。"""
+        """The original traversal of repeated and non-consecutive rows is maintained; the source of extreme values still refers to the original coordinate object."""
         if self.native is None or not rows:
             return None
         start = self.positions.get(id(rows[0]))
@@ -1482,7 +1482,7 @@ def _table_rows_align_with_rule_span(
     median_height: float,
     prepared_bounds: _RuleRowBounds | None = None,
 ) -> bool:
-    """校验数据行总体跨度与横线走廊重叠，拒绝仅在边缘偶遇的多列文本。"""
+    """Verify that the overall span of data lines overlaps with horizontal corridors, rejecting multiple columns of text that are only encountered incidentally at the edges."""
 
     if not rows:
         return False
@@ -1504,7 +1504,7 @@ def _count_aligned_vertical_rules(
     median_height: float,
     vertical_axis_lines: list[_LocalAxisLine] | None = None,
 ) -> int:
-    """统计贯穿候选主要高度且位于横线跨度内的竖向分隔线。"""
+    """Count the vertical dividing lines that run through the candidate's main height and are within the span of the horizontal line."""
 
     required_height = max(4.0 * median_height, 0.5 * (rule_bbox[3] - rule_bbox[1]))
     candidates = vertical_axis_lines if vertical_axis_lines is not None else axis_lines
@@ -1525,7 +1525,7 @@ def _compact_fully_ruled_grid_column_count(
     rule_bbox: BBox,
     median_height: float,
 ) -> int:
-    """以完整横竖边界确认两行紧凑网格，并返回物理列数，失败时返回零。"""
+    """Confirms a two-row compact grid with full horizontal and vertical boundaries and returns the physical column number, or zero on failure."""
 
     rule_height = max(0.1, rule_bbox[3] - rule_bbox[1])
     if len(row_segment) != 2 or len(dense_rows) != 2 or len(interval_rules) < 3 or rule_height > 6.0 * median_height:
@@ -1586,7 +1586,7 @@ def _full_height_vertical_rule_positions(
     rule_bbox: BBox,
     median_height: float,
 ) -> list[float]:
-    """收集覆盖紧凑候选主要高度的竖线中心，并合并同位置重复路径。"""
+    """Collect vertical line centers covering the main heights of compact candidates and merge duplicate paths at the same location."""
 
     rule_height = max(0.1, rule_bbox[3] - rule_bbox[1])
     raw_positions: list[float] = []
@@ -1623,7 +1623,7 @@ def _looks_like_page_column_prose(
     aligned_vertical_count: int,
     rule_bbox: BBox,
 ) -> bool:
-    """用双栏占宽率识别夹在远横线间的普通并排正文。"""
+    """Use double column width to identify ordinary side-by-side text sandwiched between far horizontal lines."""
 
     if stable_columns != 2 or fill_band_count >= 2 or aligned_vertical_count > 0 or len(dense_rows) / len(rows) < 0.55:
         return False
@@ -1640,7 +1640,7 @@ def _prepare_fill_band_infos(
     page_size: tuple[float, float],
     angle: int,
 ) -> list[tuple[PDFPathInfo, BBox]]:
-    """预先转换可见填充 Path 的坐标，避免每个横线区间重复旋转。"""
+    """Pre-convert the coordinates of the visible filled Path to avoid repeated rotation of each horizontal line interval."""
     return [
         (path_info, _rotate_bbox_to_upright(path_info.bbox, page_size, angle))
         for path_info in path_infos
@@ -1656,7 +1656,7 @@ def _count_repeated_fill_bands(
     median_height: float,
     prepared_path_infos: list[tuple[PDFPathInfo, BBox]] | None = None,
 ) -> int:
-    """统计区间内左右端点和高度重复的填充行带，并对重叠 Path 去重。"""
+    """Count left and right endpoints and highly repeated padded row bands within the interval, and deduplicate overlapping Path."""
 
     minimum_width = max(8.0 * median_height, 0.3 * (rule_bbox[2] - rule_bbox[0]))
     candidates: list[BBox] = []
@@ -1702,7 +1702,7 @@ def _longest_dense_multi_cell_rows(
     rows: list[_VisualRow],
     median_height: float,
 ) -> list[_VisualRow]:
-    """返回行距不超过四倍行高的最长连续多单元格文本段。"""
+    """Returns the longest continuous multi-cell text segment with line spacing no greater than four times the line height."""
 
     segments: list[list[_VisualRow]] = []
     for row in (item for item in rows if len(item.fragments) >= 2):
@@ -1732,7 +1732,7 @@ def _expand_rule_table_candidate(
     *,
     owned: bool = False,
 ) -> _TableCandidate:
-    """合并横线核心与上下注释，并保留注释的独立行身份。"""
+    """Merges the horizontal core with upper and lower comments and preserves the independent line identity of the comments."""
 
     rule_bbox = _bbox_union_many([line.bbox for line in rule_group])
     native_core = (
@@ -1796,7 +1796,7 @@ def _expand_rule_table_candidate(
     if indexed_bbox and all(
         type(value) is float and math.isfinite(value) for row in (*caption_rows, *footnote_rows) for value in row.bbox
     ):
-        # 有限极值并集幂等，外层核心始终先参与比较，保留相等坐标的原对象。
+        # The finite extreme value union is idempotent, and the outer core always participates in the comparison first, retaining the original object with equal coordinates.
         local_bbox = core_local_bbox
         for row in (*caption_rows, *footnote_rows):
             local_bbox = _bbox_union(local_bbox, row.bbox)
@@ -1817,14 +1817,14 @@ def _expand_rule_table_candidate(
         angle=angle,
         score=0.0,
         core_bbox=_rotate_bbox_from_upright(core_local_bbox, page_size, angle),
-        # 表体成员与注释成员保持互斥；物化失败时会显式把无效注释放回表体投影。
+        # Table body members and annotation members remain mutually exclusive; when materialization fails, invalid annotations are explicitly put back into the table body projection.
         line_indices=core_line_indices - annotation_line_indices,
         annotations=annotations,
     )
 
 
 def _new_stable_column_clusters() -> dict[str, list[dict[str, Any]]]:
-    """创建与原稳定列算法一致的三组空聚类状态。"""
+    """Create three sets of empty cluster states consistent with the original stable column algorithm."""
 
     return {alignment: [] for alignment in ("left", "center", "right")}
 
@@ -1836,7 +1836,7 @@ def _extend_stable_column_clusters(
     start_row_index: int,
     tolerance: float,
 ) -> None:
-    """按原顺序把新增行续入已有聚类状态，不改变均值和首命中规则。"""
+    """Add new rows to the existing clustering state in the original order without changing the mean value and first hit rule."""
 
     for alignment in ("left", "center", "right"):
         clusters = clusters_by_alignment[alignment]
@@ -1859,7 +1859,7 @@ def _extend_stable_column_clusters(
                 else:
                     cluster["values"].append(anchor)
                     cluster["rows"].add(row_index)
-                    # 保留原实现的 sum/len 计算方式，避免改变临界浮点聚类归属。
+                    # The original implemented sum/len calculation method is retained to avoid changing the critical floating point clustering affiliation.
                     cluster["mean"] = sum(cluster["values"]) / len(cluster["values"])
 
 
@@ -1867,7 +1867,7 @@ def _stable_column_result(
     clusters_by_alignment: dict[str, list[dict[str, Any]]],
     row_count: int,
 ) -> tuple[int, float]:
-    """从完整聚类状态计算原有稳定列数量与最低覆盖率。"""
+    """Calculate the original stable column number and minimum coverage from the complete clustering state."""
 
     if row_count <= 0:
         return 0, 0.0
@@ -1884,7 +1884,7 @@ def _stable_column_result(
             len(stable_coverages),
             min(stable_coverages) if stable_coverages else 0.0,
         )
-        # 仅在结果严格更优时更新，平局时保留既有的左对齐优先级。
+        # Only updates if the result is strictly superior, retaining the existing left-aligned priority in case of a tie.
         if result > best_result:
             best_result = result
     return best_result
@@ -1897,7 +1897,7 @@ def _count_stable_columns(
     *,
     allow_prefix_reuse: bool = False,
 ) -> tuple[int, float]:
-    """复用走廊锚点与严格前缀的原生累计状态，特殊数值保留 Python 求和行为。"""
+    """Reuse native accumulation state of corridor anchors with strict prefixes, special values retain Python summing behavior."""
     from ...._compute_backend import get_native
 
     native = get_native()
@@ -1930,7 +1930,7 @@ def _count_stable_columns(
                     break
                 values.append((left, right))
             if cache is not None:
-                # 强引用限定于本次构建，避免行对象销毁后地址被另一个对象复用。
+                # Strong references are limited to this build to prevent the address from being reused by another object after the row object is destroyed.
                 cache.prepared_rows[id(row)] = (row, values)
         else:
             values = existing[1]
@@ -1957,7 +1957,7 @@ def _count_stable_columns_python(
     *,
     allow_prefix_reuse: bool = False,
 ) -> tuple[int, float]:
-    """分别聚类片段左边界、中心和右边界，并对严格前缀输入续算已有状态。"""
+    """Cluster the fragment left, center, and right boundaries separately, and continue the existing state for strictly prefixed input."""
 
     row_ids = tuple(id(row) for row in rows)
     cache_key = (median_height, row_ids)
@@ -2009,7 +2009,7 @@ def _count_stable_columns_python(
 
 
 def _merge_table_candidates(candidates: list[_TableCandidate]) -> list[_TableCandidate]:
-    """合并同方向且明显重叠的横线候选，避免同一表格重复输出。"""
+    """Merge horizontal line candidates with the same direction and obvious overlap to avoid repeated output of the same table."""
 
     merged: list[_TableCandidate] = []
     for candidate in sorted(candidates, key=lambda item: item.score, reverse=True):
@@ -2036,8 +2036,8 @@ def _merge_table_candidates(candidates: list[_TableCandidate]) -> list[_TableCan
             target.line_indices,
             _SharedLineIndexSet,
         ):
-            # 首个高分候选可能来自闭合网格路径并持有普通 set；转换为候选的
-            # 精确共享基底表示后，后续同网格候选即可合并差集而不重扫全部成员。
+            # The first high-scoring candidate may come from a closed grid path and hold a normal set; converted to candidate
+            # After accurately sharing the basis representation, subsequent candidates on the same grid can merge the difference sets without rescanning all members.
             target.line_indices = _SharedLineIndexSet.from_exact_values(
                 candidate.line_indices.base,
                 target.line_indices,
@@ -2049,7 +2049,7 @@ def _merge_table_candidates(candidates: list[_TableCandidate]) -> list[_TableCan
 
 
 def _median_fragment_height(fragments: list[_Fragment]) -> float:
-    """返回正向文本片段高度的中位数。"""
+    """Returns the median height of forward text fragments."""
 
     heights = [
         fragment.local_bbox[3] - fragment.local_bbox[1]
@@ -2060,7 +2060,7 @@ def _median_fragment_height(fragments: list[_Fragment]) -> float:
 
 
 def _merge_owned_table_candidates(candidates):
-    """检测器独占候选先走自有原生流，特殊输入保持原有可变对象参考语义。"""
+    """The detector's exclusive candidate goes through its own native stream first, and the special input maintains the original variable object reference semantics."""
     from ._native_table_merge import merge_owned
 
     result = merge_owned(candidates)

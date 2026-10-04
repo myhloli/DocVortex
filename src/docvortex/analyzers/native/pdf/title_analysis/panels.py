@@ -1,4 +1,4 @@
-"""用重复面板、正文尺度转折和图像邻接确认局部标题。"""
+"""Confirm local titles with repeating panels, text size transitions, and image adjacencies."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from ..models import _LineItem
 
 
 def _panel_title_rows(seed: _LineItem, lines: list[_LineItem]) -> list[_LineItem]:
-    """收集同左缘同样式的紧邻短续行，不把后续小字号简介并入标题。"""
+    """Collect adjacent short continuation lines of the same style as the left margin, and do not incorporate the subsequent small font introduction into the title."""
     result = [seed]
     for line in sorted(lines, key=lambda line: (line.bbox[1], line.bbox[0])):
         previous = result[-1]
@@ -32,7 +32,7 @@ def _panel_title_rows(seed: _LineItem, lines: list[_LineItem]) -> list[_LineItem
 
 
 def classify_panel_titles(lines: list[_LineItem], images: list[tuple], page_width: float) -> None:
-    """重复并列面板须有独立正文或下方图像；重复粗体侧栏还须有图像邻接。"""
+    """Repeating juxtaposed panels must have independent text or an underlying image; repeating bold sidebars must also have an adjacent image."""
     seeds = [
         line
         for line in lines
@@ -53,7 +53,7 @@ def classify_panel_titles(lines: list[_LineItem], images: list[tuple], page_widt
         runs.append((seed, rows, _bbox_union_many([line.bbox for line in rows])))
     for seed, rows, bounds in runs:
         em = seed.effective_height
-        # 紧贴较大标题的小字号简介不是另一个标题，即使它也在并列图像上方。
+        # The small blurb that follows the larger headline is not another headline, even if it is also above the juxtaposed image.
         if any(
             other is not seed
             and other.angle == 0

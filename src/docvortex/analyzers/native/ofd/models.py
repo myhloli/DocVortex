@@ -1,4 +1,4 @@
-"""OFD 解析器内部使用的确定性数据模型。"""
+"""OFD Deterministic data model used internally by the parser."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class FontResource:
-    """保存字体资源及可选内嵌字体成员路径。"""
+    """Save font resources and optional embedded font member paths."""
 
     resource_id: int
     font_name: str
@@ -28,7 +28,7 @@ class FontResource:
 
 @dataclass(frozen=True, slots=True)
 class MediaResource:
-    """保存多媒体资源的成员路径与声明格式。"""
+    """Save member paths and declaration formats of multimedia resources."""
 
     resource_id: int
     media_type: str
@@ -38,7 +38,7 @@ class MediaResource:
 
 @dataclass(frozen=True, slots=True)
 class CompositeResource:
-    """保存可递归展开的复合图元资源。"""
+    """Save recursively expandable composite primitive resources."""
 
     resource_id: int
     width: float
@@ -48,7 +48,7 @@ class CompositeResource:
 
 @dataclass(slots=True)
 class ResourceRegistry:
-    """保存当前文档或页面作用域内的资源索引。"""
+    """Save the resource index within the current document or page scope."""
 
     fonts: dict[int, FontResource] = field(default_factory=dict)
     media: dict[int, MediaResource] = field(default_factory=dict)
@@ -58,7 +58,7 @@ class ResourceRegistry:
 
 @dataclass(frozen=True, slots=True)
 class GlyphItem:
-    """保存一个语义字符在页面空间中的几何。"""
+    """Save the geometry of a semantic character in page space."""
 
     text: str
     bbox: BBox
@@ -69,7 +69,7 @@ class GlyphItem:
 
 @dataclass(slots=True)
 class TextLine:
-    """保存一个 TextCode 恢复出的可排序文字行。"""
+    """Save a sortable text line recovered by TextCode."""
 
     text: str
     bbox: BBox
@@ -86,7 +86,7 @@ class TextLine:
 
 @dataclass(frozen=True, slots=True)
 class AxisLine:
-    """保存页面空间中的一条可见水平或垂直线。"""
+    """Save a visible horizontal or vertical line in page space."""
 
     bbox: BBox
     orientation: str
@@ -97,7 +97,7 @@ class AxisLine:
 
 @dataclass(frozen=True, slots=True)
 class ImageItem:
-    """保存页面图片载荷、几何和绘制来源。"""
+    """Save page image load, geometry and drawing source."""
 
     bbox: BBox
     image_base64: str | None
@@ -110,7 +110,7 @@ class ImageItem:
 
 @dataclass(slots=True)
 class OfdPageScene:
-    """保存一页 OFD 的原生场景和可投影对象。"""
+    """Save a page of OFD's native scenes and projectable objects."""
 
     page_idx: int
     physical_box: BBox
@@ -127,7 +127,7 @@ class OfdPageScene:
 
 @dataclass(frozen=True, slots=True)
 class OfdDocumentRef:
-    """保存 OFD.xml 中一个 DocBody 的入口和元数据。"""
+    """Save the entry and metadata of a DocBody in OFD.xml."""
 
     document_part: str
     signatures_part: str | None
@@ -137,7 +137,7 @@ class OfdDocumentRef:
 
 @dataclass(frozen=True, slots=True)
 class PageRef:
-    """保存 Document.xml 页树中的一个页面引用。"""
+    """Save a page reference in the Document.xml page tree."""
 
     page_id: int | None
     page_part: str
@@ -145,7 +145,7 @@ class PageRef:
 
 @dataclass(frozen=True, slots=True)
 class TemplateRef:
-    """保存模板 ID 到模板页面成员的映射。"""
+    """Save the mapping of template ID to template page members."""
 
     template_id: int
     page_part: str
@@ -153,7 +153,7 @@ class TemplateRef:
 
 @dataclass(frozen=True, slots=True)
 class PageBuildContext:
-    """保存递归图元构建所需的父级状态。"""
+    """Save the parent state required for recursive primitive construction."""
 
     transform: Affine
     clip_bbox: BBox

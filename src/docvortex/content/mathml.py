@@ -1,4 +1,4 @@
-"""把常用 Presentation MathML 结构转换为 LaTeX。"""
+"""Convert the commonly used Presentation MathML structure to LaTeX."""
 
 from __future__ import annotations
 
@@ -72,25 +72,25 @@ _LATEX_MATH_TOKEN_ESCAPES = {
     "}": r"\}",
     "~": r"\~{}",
 }
-# Word 线性格式把公式编号分隔符写作 ``#(n)``；经 mo 转义后行尾呈现为 ``\#(n)``。
+# Word linear format uses ``#(n)`` as the equation-number separator; mo escaping yields ``\#(n)`` at line end.
 _EQUATION_TAG_RE = re.compile(r"\\#\s*\(([^()]*)\)\s*$")
 
 
 def _escape_text(value: str) -> str:
-    """转义进入 LaTeX 文本命令的保留字符。"""
+    """Escape reserved characters into the LaTeX text command."""
     return _LATEX_ESCAPE_RE.sub(r"\\\1", value)
 
 
 def _escape_math_token(value: str) -> str:
-    """转义 MathML 标识符中的 TeX 控制字符，避免字面文本改变公式结构。"""
+    """Escape the TeX control characters in the MathML identifier to avoid literal text altering the formula structure."""
     return "".join(_LATEX_MATH_TOKEN_ESCAPES.get(char, char) for char in value)
 
 
 def _tag_equation_number(latex: str) -> str | None:
-    """把 Word 公式编号分隔符残留的行尾 ``\\#(n)`` 转换为 LaTeX ``\\tag``。
+    """Convert the trailing Word equation-number separator ``\\#(n)`` into LaTeX ``\\tag``.
 
-    参考 OMML 转换器 ``do_eqarr`` 的既有语义：单行公式数组末尾的编号
-    ``#(n)`` 输出为 ``公式\\tag{n}``，同时避免 ``\\tag`` 进入 matrix 环境。
+    Follow the existing semantics of the OMML converter's ``do_eqarr``: a number at the end of a single-line equation array
+    ``#(n)`` becomes ``formula\\tag{n}``, while keeping ``\\tag`` outside the matrix environment.
     """
     match = _EQUATION_TAG_RE.search(latex)
     if match is None:
@@ -103,17 +103,17 @@ def _tag_equation_number(latex: str) -> str | None:
 
 
 def _children(element: etree._Element) -> list[etree._Element]:
-    """返回当前元素的全部普通 XML 子元素。"""
+    """Returns all normal XML child elements of the current element."""
     return [child for child in element if isinstance(child.tag, str)]
 
 
 def _join_children(element: etree._Element) -> str:
-    """按文档顺序拼接所有子 MathML 节点。"""
+    """Splice all child MathML nodes in document order."""
     return "".join(_convert(child) for child in _children(element))
 
 
 def _convert(element: etree._Element) -> str:
-    """递归转换一个常用 MathML 节点，未知容器保留其可解析子项。"""
+    """Recursively transform a common MathML node, and the unknown container retains its resolvable children."""
     name = local_name(element)
     children = _children(element)
     text = (element.text or "").strip()
@@ -171,7 +171,7 @@ def _convert(element: etree._Element) -> str:
 
 
 def mathml_to_latex(math_element: etree._Element) -> str | None:
-    """转换 MathML 根节点，并优先采用生产者保留的 TeX annotation。"""
+    """Convert the MathML root node in favor of the producer-reserved TeX annotation."""
     for annotation in math_element.iter():
         if not isinstance(annotation.tag, str):
             continue

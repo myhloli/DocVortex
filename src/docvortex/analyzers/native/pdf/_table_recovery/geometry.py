@@ -1,4 +1,4 @@
-"""Native PDF 表格结构恢复使用的局部坐标与聚类原语。"""
+"""Native PDF Table structure recovery uses local coordinates and clustering primitives."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from ..table_geometry import normalize_bbox, rotate_local_bbox
 
 
 def normalize_angle(value: object) -> int:
-    """把输入角度限制为表格流程支持的四个标准方向。"""
+    """Limit the input angle to the four standard directions supported by the form process."""
 
     try:
         angle = int(float(value or 0)) % 360
@@ -19,7 +19,7 @@ def normalize_angle(value: object) -> int:
 
 
 def bbox_area(bbox: BBox) -> float:
-    """返回 bbox 的非负面积。"""
+    """Returns the nonnegative area of bbox."""
 
     return max(0.0, float(bbox[2]) - float(bbox[0])) * max(
         0.0,
@@ -28,7 +28,7 @@ def bbox_area(bbox: BBox) -> float:
 
 
 def bbox_union(bboxes: Iterable[BBox]) -> BBox:
-    """返回一组有效 bbox 的最小外接框。"""
+    """Returns a set of minimum bounding boxes for a valid bbox."""
 
     items = list(bboxes)
     if not items:
@@ -42,7 +42,7 @@ def bbox_union(bboxes: Iterable[BBox]) -> BBox:
 
 
 def bbox_intersection(first: BBox, second: BBox) -> BBox | None:
-    """返回两个 bbox 的有效交集，无交集时返回空。"""
+    """Returns the valid intersection of two bbox, or returns empty if there is no intersection."""
 
     intersection = (
         max(first[0], second[0]),
@@ -54,7 +54,7 @@ def bbox_intersection(first: BBox, second: BBox) -> BBox | None:
 
 
 def bbox_overlap_ratio(inner: BBox, outer: BBox) -> float:
-    """返回 inner 面积被 outer 覆盖的比例。"""
+    """Returns the proportion of the area of inner covered by outer."""
 
     area = bbox_area(inner)
     intersection = bbox_intersection(inner, outer)
@@ -64,7 +64,7 @@ def bbox_overlap_ratio(inner: BBox, outer: BBox) -> float:
 
 
 def bbox_center(bbox: BBox) -> tuple[float, float]:
-    """返回 bbox 的中心坐标。"""
+    """Returns the center coordinates of bbox."""
 
     return (bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0
 
@@ -74,7 +74,7 @@ def page_bbox_to_table_local(
     table_bbox: BBox,
     angle: int,
 ) -> BBox | None:
-    """裁剪页面 bbox 并转换到正向表格局部坐标。"""
+    """Crop page bbox and convert to forward table local coordinates."""
 
     clipped = bbox_intersection(bbox, table_bbox)
     if clipped is None:
@@ -91,7 +91,7 @@ def page_bbox_to_table_local(
 
 
 def table_local_size(table_bbox: BBox, angle: int) -> tuple[float, float]:
-    """返回旋转到正向后的表格局部宽高。"""
+    """Returns the local width and height of the table after rotation."""
 
     width = table_bbox[2] - table_bbox[0]
     height = table_bbox[3] - table_bbox[1]
@@ -99,13 +99,13 @@ def table_local_size(table_bbox: BBox, angle: int) -> tuple[float, float]:
 
 
 def clamp(value: float, minimum: float, maximum: float) -> float:
-    """把浮点值限制在闭区间内。"""
+    """Limit floating point values to a closed interval."""
 
     return max(minimum, min(maximum, value))
 
 
 def cluster_positions(values: Iterable[float], tolerance: float) -> list[float]:
-    """按相邻距离聚类一维坐标，并返回各簇均值。"""
+    """Clusters one-dimensional coordinates by neighbor distance and returns the mean of each cluster."""
 
     ordered = sorted(float(value) for value in values)
     if not ordered:
@@ -125,7 +125,7 @@ def covered_interval_ratio(
     start: float,
     end: float,
 ) -> float:
-    """返回若干区间在目标区间上的并集覆盖比例。"""
+    """Returns the union coverage ratio of several intervals on the target interval."""
 
     if end <= start:
         return 0.0

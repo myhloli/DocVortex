@@ -1,4 +1,4 @@
-"""局部修复 CJK 对象断行，并在普通段落上复用测量，保持 ReportLab 的拆分与绘制契约。"""
+"""Partially fix CJK object line breaks and reuse measurements on normal paragraphs, maintaining ReportLab's splitting and drawing contracts."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .formula import InlineFormulaImage
 
 
 def _natural_cjk_unit(fragment: ParaFrag, text: str) -> rl_paragraph.cjkU:
-    """分页后的公式从未缩放的回调恢复几何，试排不修改原始片段或共享公式。"""
+    """Paginated formulas restore geometry from unscaled callbacks without modifying the original fragment or shared formulas."""
     definition = getattr(fragment, "cbDefn", None)
     original = getattr(definition, "_pdf_cjk_original", None)
     if original is not None:
@@ -25,7 +25,7 @@ def _natural_cjk_unit(fragment: ParaFrag, text: str) -> rl_paragraph.cjkU:
 
 
 def _fit_cjk_formula(unit: rl_paragraph.cjkU, width: float) -> rl_paragraph.cjkU:
-    """仅在空行仍容不下时缩小自有公式，保留原始回调供后续宽窄试排和分页复用。"""
+    """Only reduce the own formula when the empty row cannot be accommodated, and retain the original callback for subsequent wide and narrow trial arrangement and paging reuse."""
     definition = getattr(unit.frag, "cbDefn", None)
     if not isinstance(getattr(definition, "image", None), InlineFormulaImage) or not 0 < width < unit.width:
         return unit
@@ -39,7 +39,7 @@ def _fit_cjk_formula(unit: rl_paragraph.cjkU, width: float) -> rl_paragraph.cjkU
 
 
 def _safe_cjk_split(frags: list[ParaFrag], widths: list[float], calc_bounds: bool) -> rl_paragraph.ParaLines:
-    """沿用上游 CJK 断行规则，但把空文本回调当作完整对象，安全移行并保留零宽标记。"""
+    """Inherit the line breaking rules of upstream CJK, but treat empty text callbacks as complete objects, safely shifting lines and retaining zero-width markers."""
     # Adapted from ReportLab 4.4.4/5.0.1 cjkFragSplit (BSD); see licenses/REPORTLAB.txt.
     units = []
     for fragment in frags:
@@ -77,7 +77,7 @@ def _safe_cjk_split(frags: list[ParaFrag], widths: list[float], calc_bounds: boo
                                 unit = units[following]
                                 index = next_index
                                 break
-                # 空串属于任意字符串的子串，必须显式排除，不能当作悬挂的禁则标点。
+                # Empty strings are substrings of any string and must be explicitly excluded and cannot be used as hanging taboo punctuation.
                 if (not unit or unit not in rl_paragraph.ALL_CANNOT_START) and index > start + 1:
                     index -= 1
                     extra += advance
@@ -85,22 +85,22 @@ def _safe_cjk_split(frags: list[ParaFrag], widths: list[float], calc_bounds: boo
             width = widths[min(len(lines), len(widths) - 1)]
             start = index
             used = 0.0
-    # 零宽 anchor 仍有绘制副作用，不能按累计宽度决定是否丢弃尾部片段。
+    # Zero-width anchor still has drawing side effects, and the cumulative width cannot be used to decide whether to discard the tail fragment.
     if start < len(units):
         lines.append(rl_paragraph.makeCJKParaLine(units[start:], width, used, width - used, False, calc_bounds))
     return rl_paragraph.ParaLines(kind=1, lines=lines)
 
 
 def _split_cjk_lines(lines: rl_paragraph.ParaLines, start: int, stop: int) -> list[ParaFrag]:
-    """直接复制已分行的 CJK 片段，避免上游给公式补空格或修改原段落的绘制状态。"""
+    """Directly copy the line-branched CJK fragment to avoid upstream filling in spaces for formulas or modifying the drawing state of the original paragraph."""
     return [fragment.clone() for line in lines.lines[start:stop] for fragment in line.words]
 
 
 class CJKParagraph(Paragraph):
-    """为自有 CJK 特殊片段提供局部安全断行，其余内容继续遵守原生 Paragraph 契约。"""
+    """Provides local safe line breaking for native CJK special segments, while the rest of the content continues to adhere to the native Paragraph contract."""
 
     def breakLinesCJK(self, maxWidths: float | list[float] | tuple[float, ...]) -> rl_paragraph.ParaLines:
-        """只接管含空文本的片段；保留首行缩进、项目符号及分页首片的既有布局。"""
+        """Only the fragments containing empty text are taken over; the existing layout of first line indentation, bullet points, and pagination headers is retained."""
         self._pdf_safe_cjk = False
         if not any(getattr(fragment, "text", None) == "" for fragment in self.frags):
             return super().breakLinesCJK(maxWidths)
@@ -114,13 +114,13 @@ class CJKParagraph(Paragraph):
         return _safe_cjk_split(self.frags, widths, auto_leading not in ("", "off"))
 
     def _get_split_blParaFunc(self) -> Callable[[rl_paragraph.ParaLines, int, int], list[ParaFrag]]:
-        """只对安全组行的富片段使用无补空格拆分，普通文本仍走原生拆分入口。"""
+        """Only the rich fragments of security group lines are split without padding spaces, and ordinary text still uses the native splitting entry."""
         if getattr(self, "_pdf_safe_cjk", False):
             return _split_cjk_lines
         return super()._get_split_blParaFunc()
 
     def draw(self) -> None:
-        """仅对最终绘制的超小公式报告诊断，避免试排产生过时告警。"""
+        """Diagnostics are only reported for the ultra-small formulas that are finally drawn to avoid outdated alarms from trial troubleshooting."""
         if getattr(self, "_pdf_safe_cjk", False):
             for line in self.blPara.lines:
                 for fragment in line.words:
@@ -140,23 +140,23 @@ _MISSING = object()
 
 
 def _same_plain_style(first, second) -> bool:
-    """普通片段按身份或样式字典比较，避免逐字符触发动态属性查找和缺失属性异常。"""
+    """Ordinary fragments are compared by identity or style dictionary to avoid triggering dynamic attribute lookups and missing attribute exceptions on a character-by-character basis."""
     if first is second:
         return True
     left, right = first.__dict__, second.__dict__
-    # 保留原生比较中「属性不存在」与「属性值为 None」的区别。
+    # Keep the difference between "attribute does not exist" and "attribute value is None" in native comparison.
     return [left.get(name, _MISSING) for name in _STYLE_FIELDS] == [right.get(name, _MISSING) for name in _STYLE_FIELDS]
 
 
 def _plain_cjk_breaker():
-    """仅为自有段落绑定局部比较函数，不复制断行算法，也不修改 ReportLab 模块全局。"""
+    """Only bind local comparison functions to own paragraphs, do not copy the line breaking algorithm, and do not modify the global ReportLab module."""
     replacement = _same_plain_style
     for function, dependency in (
         (getattr(rl_paragraph, "makeCJKParaLine", None), "sameFrag"),
         (getattr(rl_paragraph, "cjkFragSplit", None), "makeCJKParaLine"),
         (Paragraph.breakLinesCJK, "cjkFragSplit"),
     ):
-        # ReportLab 内部实现变化或已被外部包装时，保守回到其原有入口。
+        # ReportLab keeps returning to its original entry when its internal implementation changes or has been packaged externally.
         if not isinstance(function, FunctionType) or dependency not in function.__code__.co_names:
             return None
         namespace = function.__globals__.copy()
@@ -170,10 +170,10 @@ _PLAIN_CJK_BREAK = _plain_cjk_breaker()
 
 
 class PlainCJKParagraph(CJKParagraph):
-    """仅普通 CJK 组行使用局部比较，复杂内容和拆分后的段落交给安全断行层。"""
+    """Only ordinary CJK group lines use local comparison, and complex content and split paragraphs are handed over to the safe line break layer."""
 
     def breakLinesCJK(self, maxWidths):
-        """每次检查当前片段，内容变更后不沿用旧资格或样式比较缓存。"""
+        """The current fragment is checked every time, and the old qualification or style comparison cache is not used after the content changes."""
         self._pdf_safe_cjk = False
         if (
             _PLAIN_CJK_BREAK is not None
@@ -196,14 +196,14 @@ class PlainCJKParagraph(CJKParagraph):
 
 
 class MeasuredParagraph(CJKParagraph):
-    """缓存仍保存在本对象中的完整排版状态，不跨段落分享 blPara 或 fragments。"""
+    """The cache remains in the full layout state of this object and does not share blPara or fragments across paragraphs."""
 
     def _measurement_key(self, width: float) -> tuple | None:
-        """检查内容、样式及已保存几何；复杂回调和处理后的词列表保守重新测量。"""
+        """Check content, style, and saved geometry; complex callbacks and conservative remeasurement of processed word lists."""
         if any(not hasattr(fragment, "__dict__") or hasattr(fragment, "cbDefn") for fragment in self.frags):
             return None
         style = vars(self.style).copy()
-        # ReportLab 已把继承值复制到当前样式，parent 本身不参与 wrap，不能按对象身份比较其深副本。
+        # ReportLab has copied the inherited value to the current style, parent itself does not participate in wrap, and its deep copy cannot be compared by object identity.
         style.pop("parent", None)
         return (
             width,
@@ -217,7 +217,7 @@ class MeasuredParagraph(CJKParagraph):
         )
 
     def wrap(self, availWidth: float, availHeight: float) -> tuple[float, float]:
-        """同宽且状态未变时复用现有换行；Paragraph 本身不使用可用高度决定换行。"""
+        """Reuse existing line breaks when the width is the same and the status does not change; Paragraph itself does not use the available height to determine line breaks."""
         key = self._measurement_key(availWidth)
         cached = getattr(self, "_measurement_cache", None)
         if key is not None and cached is not None and key == cached[0]:
@@ -226,12 +226,12 @@ class MeasuredParagraph(CJKParagraph):
         result = super().wrap(availWidth, availHeight)
         key = self._measurement_key(availWidth)
         if key is not None:
-            # 只在真实换行后保存独立快照；命中时用字典比较，避免逐次序列化样式和长文本。
+            # Save independent snapshots only after true line breaks; use dictionary comparison on hits to avoid sequential serialization of styles and long text.
             self._measurement_cache = (deepcopy(key), result)
         return result
 
     def split(self, availWidth: float, availHeight: float) -> list:
-        """拆分可能修改行布局，返回的新段落独立缓存，原对象随后重新测量。"""
+        """Splitting may modify the line layout, the new paragraphs returned are cached independently, and the original objects are subsequently remeasured."""
         self._measurement_cache = None
         try:
             return super().split(availWidth, availHeight)
@@ -239,7 +239,7 @@ class MeasuredParagraph(CJKParagraph):
             self._measurement_cache = None
 
     def draw(self) -> None:
-        """绘制可能更新行内状态，绘制后不再把旧结果当作未改变的试排状态。"""
+        """Drawing may update the inline state, and the old results will no longer be treated as unchanged trial layout state after drawing."""
         try:
             super().draw()
         finally:
@@ -247,4 +247,4 @@ class MeasuredParagraph(CJKParagraph):
 
 
 class MeasuredCJKParagraph(MeasuredParagraph, PlainCJKParagraph):
-    """组合普通 CJK 比较与原有测量复用，拆分段落继续拥有独立排版状态。"""
+    """The combined ordinary CJK comparison is multiplexed with the original measurement, and the split paragraphs continue to have independent typesetting status."""

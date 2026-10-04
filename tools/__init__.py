@@ -1,3 +1,3 @@
-"""DocVortex 开发与回归验证工具。"""
+"""DocVortex development and regression verification tool."""
 
 __all__ = []

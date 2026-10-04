@@ -31,13 +31,13 @@ from docvortex.schema import BlockType
 
 
 def _equation_contents(pages: list[list[dict]]) -> list[str]:
-    """按分页顺序返回所有独立 equation block 内容。"""
+    """Returns all individual equation block contents in paginated order."""
 
     return [block["content"] for page in pages for block in page if block.get("type") == BlockType.EQUATION]
 
 
 def test_ooxml_equation_decoder_enforces_scope_icon_and_total_budget() -> None:
-    """验证共享入口只接受公式 ProgID、非图标及预算内的 CFB。"""
+    """The verification shared portal only accepts formula ProgID, non-iconic and budgeted CFB."""
 
     _name, mtef, expected = formula_corpus()[0]
     blob = build_equation_object(mtef)
@@ -74,13 +74,13 @@ def test_mathtype_equation_prog_id_matching(
     prog_id: object | None,
     expected: bool,
 ) -> None:
-    """验证 OLE1 Equation 和 OLE2 Equation.* 的大小写无关匹配。"""
+    """Verify case-independent matching of OLE1 Equation and OLE2 Equation.*."""
 
     assert is_mathtype_equation_prog_id(prog_id) is expected
 
 
 def test_docx_pptx_xlsx_decode_the_full_mtef_corpus_exactly() -> None:
-    """验证三种 OOXML Model 对11类MTEF公式给出完全一致的LaTeX。"""
+    """Verification of three types of OOXML Model gives an identical LaTeX to the 11-category MTEF formula."""
 
     corpus = formula_corpus()
     formulas = [mtef for _name, mtef, _expected in corpus]
@@ -97,7 +97,7 @@ def test_docx_pptx_xlsx_decode_the_full_mtef_corpus_exactly() -> None:
 
 
 def test_docx_mtef_flows_inline_table_header_footer_and_omml_precedence() -> None:
-    """验证 DOCX 行内、表格、页眉页脚和 OMML 优先级语义。"""
+    """Verify DOCX inline, table, header footer, and OMML priority semantics."""
 
     corpus = formula_corpus()
     first = corpus[0]
@@ -127,7 +127,7 @@ def test_docx_mtef_flows_inline_table_header_footer_and_omml_precedence() -> Non
 
 @pytest.mark.parametrize(("separator", "break_type"), [("\t", None), ("\n", WD_BREAK.LINE)])
 def test_docx_equation_tokens_preserve_run_whitespace_offsets(separator: str, break_type: WD_BREAK | None) -> None:
-    """验证公式旁的 tab 和软换行参与样式 Span 的精确偏移。"""
+    """Verify that tab next to the formula and soft wrap participate in the exact offset of the style Span."""
     document = Document()
     paragraph = document.add_paragraph()
     first = paragraph.add_run("A")
@@ -163,7 +163,7 @@ def test_docx_equation_tokens_preserve_run_whitespace_offsets(separator: str, br
 
 
 def test_omml_precedes_mtef_and_preview_for_the_same_ooxml_object() -> None:
-    """验证三种 OOXML 兼容对象只输出 OMML 分支且不重复预览。"""
+    """Verify that the three OOXML compatible objects only output the OMML branch and do not duplicate previews."""
 
     _name, mtef, _expected = formula_corpus()[0]
     cases = [
@@ -215,7 +215,7 @@ def test_valid_ooxml_mtef_suppresses_preview_and_invalid_keeps_it(
     valid_file: Callable[[bytes], bytes],
     invalid_file: Callable[[], bytes],
 ) -> None:
-    """验证有效原生公式胜出，坏 MTEF 在三种格式均保留缓存图。"""
+    """Validate valid native formula wins, bad MTEF retains cached plots in all three formats."""
 
     _name, mtef, expected = formula_corpus()[1]
     valid_pages = model.predict(BytesIO(valid_file(mtef)))
@@ -230,7 +230,7 @@ def test_valid_ooxml_mtef_suppresses_preview_and_invalid_keeps_it(
 def test_ooxml_icon_mode_preserves_preview_instead_of_expanding_formula(
     file_suffix: str,
 ) -> None:
-    """验证 DrawAspect/showAsIcon/dvAspect 图标模式不展开公式。"""
+    """Verify that DrawAspect/showAsIcon/dvAspect icon mode does not expand formulas."""
 
     _name, mtef, _expected = formula_corpus()[0]
     builders = {
@@ -251,7 +251,7 @@ def test_ooxml_icon_mode_preserves_preview_instead_of_expanding_formula(
 
 
 def test_pptx_notes_equation_is_appended_as_page_footnote() -> None:
-    """验证 notesSlide 中的 Equation.3 公式精确归属当前幻灯片。"""
+    """Verify that the Equation.3 formula in notesSlide accurately belongs to the current slide."""
 
     _name, mtef, expected = formula_corpus()[0]
 
@@ -269,7 +269,7 @@ def test_pptx_notes_equation_is_appended_as_page_footnote() -> None:
 
 @pytest.mark.parametrize("anchor_mode", ["objectPr", "drawing", "vml", "none"])
 def test_xlsx_equation_anchor_variants_and_tail_fallback(anchor_mode: str) -> None:
-    """验证 XLSX objectPr、DrawingML、VML 与无 anchor 的稳定输出。"""
+    """Verify stable output of XLSX objectPr, DrawingML, VML with and without anchor."""
 
     _name, mtef, expected = formula_corpus()[0]
 
@@ -279,7 +279,7 @@ def test_xlsx_equation_anchor_variants_and_tail_fallback(anchor_mode: str) -> No
 
 
 def test_xlsx_mtef_inside_table_and_hidden_sheet_behavior() -> None:
-    """验证表内公式不重复输出，隐藏公式工作表沿用现有跳过策略。"""
+    """Verify that the formulas in the table are not output repeatedly, and the hidden formula sheet follows the existing skip strategy."""
 
     _name, mtef, expected = formula_corpus()[0]
     table_pages = XlsxModel().predict(BytesIO(build_equation_xlsx([mtef], cell_value="value")))
@@ -292,7 +292,7 @@ def test_xlsx_mtef_inside_table_and_hidden_sheet_behavior() -> None:
 
 
 def test_xlsx_linked_equation_never_loads_external_target() -> None:
-    """验证外链 Equation.3 只保留包内预览，不访问外部对象。"""
+    """Verify external links Equation.3 Only retains in-package previews and does not access external objects."""
 
     _name, mtef, _expected = formula_corpus()[0]
 
@@ -303,7 +303,7 @@ def test_xlsx_linked_equation_never_loads_external_target() -> None:
 
 
 def test_ooxml_mtef_model_input_streams_remain_open() -> None:
-    """验证三种 Model 均不关闭调用方持有的输入流。"""
+    """Verify that none of the three Models close the input stream held by the caller."""
 
     _name, mtef, _expected = formula_corpus()[0]
     cases = [
@@ -318,7 +318,7 @@ def test_ooxml_mtef_model_input_streams_remain_open() -> None:
 
 
 def test_ooxml_converter_reuse_does_not_leak_equations_between_documents() -> None:
-    """验证三个 converter 重用时公式缓存和分页状态都会重置。"""
+    """Verify that the formula cache and paging state are reset when three converters are reused."""
 
     first = formula_corpus()[0]
     second = formula_corpus()[1]
@@ -339,7 +339,7 @@ def test_invalid_ooxml_mtef_preview_exports_to_sidecar(
     file_suffix: str,
     tmp_path: Path,
 ) -> None:
-    """验证三种格式的图片回退导出后没有 base64 残留。"""
+    """Verify that no base64 remains after exporting images in the three formats."""
 
     builders = {
         "docx": build_equation_docx,

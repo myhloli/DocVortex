@@ -1,4 +1,4 @@
-"""在固定预算内读取 OFD ZIP/XML 包。"""
+"""Read OFD ZIP/XML packets within a fixed budget."""
 
 from __future__ import annotations
 
@@ -28,38 +28,38 @@ from .models import OfdDocumentRef
 
 
 def local_name(tag: object) -> str:
-    """返回 XML 标签不含命名空间的本地名。"""
+    """Return the local name of the XML tag without namespace."""
     return tag.rsplit("}", 1)[-1] if isinstance(tag, str) else ""
 
 
 def namespace_name(tag: object) -> str:
-    """返回 Clark notation 标签中的命名空间。"""
+    """Return the namespace in the Clark notation tag."""
     if not isinstance(tag, str) or not tag.startswith("{"):
         return ""
     return tag[1:].split("}", 1)[0]
 
 
 def first_child(element: etree._Element | None, name: str) -> etree._Element | None:
-    """返回指定本地名的首个直接子元素。"""
+    """Returns the first direct child element of the specified local name."""
     if element is None:
         return None
     return next((child for child in element if local_name(child.tag) == name), None)
 
 
 def first_descendant(element: etree._Element | None, name: str) -> etree._Element | None:
-    """返回指定本地名的首个后代元素。"""
+    """Returns the first descendant element of the specified local name."""
     if element is None:
         return None
     return next((child for child in element.iter() if local_name(child.tag) == name), None)
 
 
 def element_text(element: etree._Element | None) -> str:
-    """返回元素折叠首尾空白后的完整文本。"""
+    """Return the complete text of the element after folding the leading and trailing blanks."""
     return "" if element is None else "".join(element.itertext()).strip()
 
 
 def parse_int(value: object) -> int | None:
-    """把非负整数字段安全解析为 Python int。"""
+    """Safely parse non-negative integer fields as Python int."""
     try:
         parsed = int(str(value))
     except (TypeError, ValueError):
@@ -68,7 +68,7 @@ def parse_int(value: object) -> int | None:
 
 
 def _xml_parser() -> etree.XMLParser:
-    """为每个 OFD XML part 创建禁用实体、DTD 和网络的解析器。"""
+    """Create parsers for disabled entities, DTD and networks for each OFD XML part."""
     return etree.XMLParser(
         resolve_entities=False,
         load_dtd=False,
@@ -80,10 +80,10 @@ def _xml_parser() -> etree.XMLParser:
 
 
 class OfdPackage:
-    """负责 OFD 包身份、成员访问和受限 XML 解析。"""
+    """Responsible for OFD package identity, member access, and restricted XML resolution."""
 
     def __init__(self, file_bytes: bytes) -> None:
-        """打开内存包并在读取正文前校验中央目录。"""
+        """Open the memory package and verify the central directory before reading the text."""
         if len(file_bytes) > MAX_TOTAL_BYTES:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_total_bytes={MAX_TOTAL_BYTES}")
         try:
@@ -102,14 +102,14 @@ class OfdPackage:
         self._root: etree._Element | None = None
 
     def charge_generated_asset(self, size: int) -> None:
-        """将生成的 PNG 与包内读取素材累计到同一文档资产预算。"""
+        """Accumulate the generated PNG and the read materials in the package into the same document asset budget."""
         if self._asset_bytes + size > MAX_ASSET_TOTAL_BYTES:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}")
         self._asset_bytes += size
 
     @staticmethod
     def _is_safe_member_name(name: str) -> bool:
-        """判断 ZIP 成员是否为包内安全 POSIX 路径。"""
+        """Determine whether the ZIP member is a safe POSIX path in the package."""
         if not name or "\x00" in name or "\\" in name or name.startswith("/"):
             return False
         parts = PurePosixPath(name).parts
@@ -117,7 +117,7 @@ class OfdPackage:
 
     @classmethod
     def _validate_members(cls, infos: list[ZipInfo]) -> dict[str, ZipInfo]:
-        """校验成员数量、路径、加密、压缩方式和声明体积。"""
+        """Verify the number of members, path, encryption, compression method and declared volume."""
         if len(infos) > MAX_ENTRY_COUNT:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_entry_count={MAX_ENTRY_COUNT}")
         members: dict[str, ZipInfo] = {}
@@ -145,11 +145,11 @@ class OfdPackage:
         return members
 
     def has_part(self, part_name: str) -> bool:
-        """返回包内是否存在指定规范成员。"""
+        """Return whether the specified specification member exists in the package."""
         return part_name in self._infos
 
     def read_part(self, part_name: str, *, required: bool = False, asset: bool = False) -> bytes | None:
-        """在成员和累计预算内读取一个包内 part。"""
+        """Reading part within a package within membership and cumulative budget."""
         info = self._infos.get(part_name)
         if info is None:
             if required:
@@ -182,7 +182,7 @@ class OfdPackage:
         return data
 
     def _charge_asset(self, part_name: str, byte_count: int) -> None:
-        """按唯一成员累计保留的资源字节。"""
+        """Cumulatively reserved resource bytes by unique member."""
         if part_name in self._asset_parts:
             return
         self._asset_parts.add(part_name)
@@ -191,7 +191,7 @@ class OfdPackage:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}")
 
     def xml_part(self, part_name: str, *, required: bool = False) -> etree._Element | None:
-        """禁用 DTD/实体后解析 XML，并校验节点数量与深度。"""
+        """After disabling DTD/entity, parse XML and verify the number and depth of nodes."""
         data = self.read_part(part_name, required=required)
         if data is None:
             return None
@@ -208,7 +208,7 @@ class OfdPackage:
 
     @staticmethod
     def _validate_xml_shape(root: etree._Element, part_name: str) -> None:
-        """迭代校验 XML 节点数和最大深度。"""
+        """Iteratively check XML node number and maximum depth."""
         node_count = 0
         stack: list[tuple[etree._Element, int]] = [(root, 1)]
         while stack:
@@ -221,7 +221,7 @@ class OfdPackage:
             stack.extend((child, depth + 1) for child in element if isinstance(child.tag, str))
 
     def root(self) -> etree._Element:
-        """读取并验证 OFD.xml 根节点、命名空间、版本和文档类型。"""
+        """Read and verify the OFD.xml root node, namespace, version, and document type."""
         if self._root is not None:
             return self._root
         root = self.xml_part("OFD.xml", required=True)
@@ -243,7 +243,7 @@ class OfdPackage:
         return root
 
     def resolve_reference(self, base_part: str, location: str | None) -> str | None:
-        """解析大小写敏感的 ST_Loc，并拒绝包外与网络位置。"""
+        """Parse case-sensitive ST_Loc and reject out-of-packet and network locations."""
         raw = unquote((location or "").strip()).replace("\\", "/")
         if not raw:
             return None
@@ -263,7 +263,7 @@ class OfdPackage:
         return resolved.removeprefix("./")
 
     def document_refs(self) -> list[OfdDocumentRef]:
-        """按 DocBody 声明顺序返回全部文档入口。"""
+        """Return to all document entries in the order of DocBody declaration."""
         refs: list[OfdDocumentRef] = []
         for body in self.root():
             if local_name(body.tag) != "DocBody":
@@ -312,20 +312,20 @@ class OfdPackage:
         return refs
 
     def close(self) -> None:
-        """关闭底层 ZipFile。"""
+        """Close underlying ZipFile."""
         self._zip.close()
 
     def __enter__(self) -> OfdPackage:
-        """返回当前包以支持 with 生命周期。"""
+        """Return the current package to support the with life cycle."""
         return self
 
     def __exit__(self, _exc_type: object, _exc: object, _traceback: object) -> None:
-        """退出 with 块时关闭包。"""
+        """Close package when exiting with block."""
         self.close()
 
 
 def detect_ofd(file_bytes: bytes) -> bool:
-    """按受限 OFD 包身份识别内存字节。"""
+    """Bytes of memory identified by restricted OFD packet identity."""
     try:
         with OfdPackage(file_bytes) as package:
             package.root()
@@ -335,7 +335,7 @@ def detect_ofd(file_bytes: bytes) -> bool:
 
 
 def detect_ofd_path(file_path: str | Path) -> bool:
-    """直接从 ZIP 路径读取有限 OFD.xml 并验证包身份。"""
+    """Read limited OFD.xml directly from ZIP path and verify package identity."""
     try:
         path = Path(file_path)
         if path.stat().st_size > MAX_TOTAL_BYTES:

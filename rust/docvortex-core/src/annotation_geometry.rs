@@ -1,4 +1,4 @@
-//! 表注片段按原顺序筛选并聚合，只返回原坐标来源，不创建新的浮点对象。
+//! Filter and aggregate table-annotation fragments in source order, returning original coordinate sources without allocating floats.
 use crate::geometry::Box4;
 use std::collections::{HashMap, HashSet};
 
@@ -10,7 +10,7 @@ pub struct AnnotationGeometry {
 }
 
 impl AnnotationGeometry {
-    /// 保存走廊内只读片段，限制有限数值幅度以保证中间运算安全。
+    /// Store read-only corridor fragments and bound finite coordinate magnitudes to keep intermediate arithmetic safe.
     pub fn new(fragments: Vec<Fragment>) -> Option<Self> {
         if fragments.iter().any(|f| {
             f.1.iter()
@@ -22,7 +22,7 @@ impl AnnotationGeometry {
         Some(Self { fragments })
     }
 
-    /// 严格比较保留先出现的坐标来源，包括相等值与正负零。
+    /// Use strict comparisons to preserve the first coordinate source, including equal values and signed zero.
     fn combine(&self, a: [usize; 4], b: [usize; 4]) -> [usize; 4] {
         let mut result = a;
         for k in 0..4 {
@@ -35,7 +35,7 @@ impl AnnotationGeometry {
         result
     }
 
-    /// 按当前候选的原片段序处理排除与重复来源，错误索引明确拒绝。
+    /// Process exclusions and duplicate sources in the candidate's original fragment order; explicitly reject invalid indices.
     pub fn aggregate(
         &self,
         selected: Vec<usize>,

@@ -32,7 +32,7 @@ from docvortex.schema import (
 
 
 def _middle(*pages: PageInfo, file_suffix: str = "docx") -> MiddleJson:
-    """构造最小严格 MiddleJson 测试对象。"""
+    """Construct the minimally stringent MiddleJson test object."""
     return MiddleJson(
         pages=list(pages),
         is_full_document=True,
@@ -42,12 +42,12 @@ def _middle(*pages: PageInfo, file_suffix: str = "docx") -> MiddleJson:
 
 
 def _page(page_idx: int, *blocks: PageBlock) -> PageInfo:
-    """构造保持调用方 block 顺序的严格页面。"""
+    """Constructs a strict page that maintains the order of the caller's block."""
     return PageInfo(page_idx=page_idx, blocks=list(blocks))
 
 
 def _assert_output_field_contract(value: object) -> None:
-    """递归确认输出只在标题保留 level，且不暴露内部或重复图片字段。"""
+    """The recursive validation output retains level only in the header and does not expose internal or duplicate image fields."""
     if isinstance(value, list):
         for item in value:
             _assert_output_field_contract(item)
@@ -62,7 +62,7 @@ def _assert_output_field_contract(value: object) -> None:
 
 
 def test_structured_content_preserves_document_tree_without_merging_or_mutation() -> None:
-    """验证文档树、辅助块和续段字段原样保留，且输入对象不被修改。"""
+    """Verify that the document tree, auxiliary block, and continuation fields are left intact and that the input objects are not modified."""
     middle = _middle(
         _page(
             0,
@@ -131,7 +131,7 @@ def test_structured_content_preserves_document_tree_without_merging_or_mutation(
 
 
 def test_structured_content_flattens_recursive_list_index_and_code_metadata() -> None:
-    """验证递归容器和代码 body 上浮为 Markdown，渲染元数据不进入输出。"""
+    """Verify recursive container and code body floats to Markdown, rendering metadata does not enter output."""
     nested = ListBlock(
         type="list",
         content=[TextBlock(type="text", content=_inline("- inner"))],
@@ -193,7 +193,7 @@ def test_structured_content_flattens_recursive_list_index_and_code_metadata() ->
 
 
 def test_structured_content_renders_algorithm_as_markdown_like_content() -> None:
-    """验证算法 content 使用简单 Markdown 样式并为复杂样式降级到 HTML。"""
+    """Verification algorithm content uses the simple Markdown style and degrades to HTML for complex styles."""
     algorithm = CodeBlock(
         type="code",
         index=0,
@@ -236,7 +236,7 @@ def test_structured_content_renders_algorithm_as_markdown_like_content() -> None
 
 
 def test_structured_content_sorts_visual_annotations_and_selects_image_source() -> None:
-    """验证视觉说明稳定排序、空项保留及图片 path 优先规则。"""
+    """Verify visual instructions for stable sorting, retention of empty items, and picture path precedence rules."""
     image = ImageBlock.model_validate(
         {
             "type": "image",
@@ -293,7 +293,7 @@ def test_structured_content_sorts_visual_annotations_and_selects_image_source() 
 
 
 def test_structured_content_keeps_table_image_source_and_cross_page_metadata() -> None:
-    """验证表格 body 上浮后仍保留图片来源、续表字段且不执行跨页合并。"""
+    """After the verification table body is floated, the image source and table continuation fields are still retained and cross-page merging is not performed."""
     first = TableBlock(
         type="table",
         index=0,
@@ -367,7 +367,7 @@ def test_structured_content_keeps_table_image_source_and_cross_page_metadata() -
 def test_structured_content_keeps_chart_content_separate_from_base64_source(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 chart 只在 image_source 保存 base64，结构内容继续复用行内公式配置。"""
+    """Verify that chart only saves base64 in image_source, and the structure content continues to reuse the inline formula configuration."""
     configured = LatexDelimitersConfig(
         **{"display": {"left": "\\[", "right": "\\]"}, "inline": {"left": "\\(", "right": "\\)"}}
     )
@@ -407,7 +407,7 @@ def test_structured_content_keeps_chart_content_separate_from_base64_source(
 def test_structured_content_renders_equation_as_raw_latex_with_single_image_source(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证 equation 不加行间定界符，并把选中的图片载荷唯一提升为 image_source。"""
+    """Verify that equation does not add interline delimiters, and only promote the selected image payload to image_source."""
     configured = LatexDelimitersConfig(
         **{"display": {"left": "\\[", "right": "\\]"}, "inline": {"left": "\\(", "right": "\\)"}}
     )
@@ -466,7 +466,7 @@ def test_structured_content_renders_equation_as_raw_latex_with_single_image_sour
 
 
 def test_structured_content_rejects_legacy_dict_input() -> None:
-    """验证公共入口只接受严格 MiddleJson。"""
+    """Validation public entrance only accepts strict MiddleJson."""
     middle = _middle(_page(0))
 
     with pytest.raises(TypeError, match="MiddleJson"):

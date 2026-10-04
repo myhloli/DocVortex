@@ -1,4 +1,4 @@
-"""验证 Flash 可见字符视图与原始文本 API 的兼容边界。"""
+"""Verify the compatibility boundaries of the Flash visible character view with the original text API."""
 
 from io import BytesIO
 
@@ -10,7 +10,7 @@ from docvortex.document.pdf import PDFDocument
 
 
 def _visibility_pdf(rotation: int = 0, form_rotation: int = 0) -> bytes:
-    """构造隐藏、透明、白字及嵌套 Form 完全和部分裁剪的文字。"""
+    """Construct hidden, transparent, white text and nested Form fully and partially cropped text."""
     stream = BytesIO()
     painter = Canvas(stream, pagesize=(300, 220))
     painter.setFont("Helvetica", 10)
@@ -62,7 +62,7 @@ def _visibility_pdf(rotation: int = 0, form_rotation: int = 0) -> bytes:
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
 @pytest.mark.parametrize("form_rotation", [0, 90])
 def test_flash_visibility_filters_only_unpainted_or_fully_clipped_characters(rotation: int, form_rotation: int) -> None:
-    """四种页面方向下只排除无绘制和完全裁剪文字，原始 API 仍保留唯一隐藏文本层。"""
+    """Only undrawn and fully cropped text are excluded in the four page orientations, and the original API still retains the only hidden text layer."""
     with PDFDocument(_visibility_pdf(rotation, form_rotation)) as pdf:
         raw = pdf.get_page_chars_with_geometry(0)
         visible = pdf._extract_native_page(0).text_geometry
@@ -87,7 +87,7 @@ def test_flash_visibility_filters_only_unpainted_or_fully_clipped_characters(rot
 
 
 def test_fully_hidden_layer_does_not_create_flash_text_blocks() -> None:
-    """只有隐藏 OCR 文字的空白页不产生 Flash 正文，原始提取契约不变。"""
+    """Only the blank page hiding the OCR text does not produce the Flash text, and the original extraction contract remains unchanged."""
     from docvortex.analyzers.native import PdfModel
 
     stream = BytesIO()

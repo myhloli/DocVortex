@@ -1,4 +1,4 @@
-"""各格式共用的逻辑块复制、延续合并与页面规划。"""
+"""Logical block copying, continuation merging and page planning are common to all formats."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from ....schema import (
 
 @dataclass(slots=True)
 class PlannedBlock:
-    """保存一个待渲染块及其来源页和文本延续片段。"""
+    """Save a block to be rendered and its source page and text continuation fragment."""
 
     page_idx: int
     block: PageBlock
@@ -36,7 +36,7 @@ def build_render_plan(
     middle_json: MiddleJson,
     mode: RenderMode = RenderMode.DEFAULT,
 ) -> list[list[PlannedBlock]]:
-    """深拷贝 MiddleJson，并按模式生成不污染输入的逐页逻辑块计划。"""
+    """Deep copy MiddleJson and generate a page-by-page logical block plan by pattern that does not pollute the input."""
     owned = claim_owned_document(middle_json)
     copied = middle_json if owned else middle_json.model_copy(deep=True)
     pages = [
@@ -59,7 +59,7 @@ def build_render_plan(
 
 
 def _merge_continued_text_blocks(blocks: list[PlannedBlock], mode: RenderMode) -> None:
-    """把无独立正文锚点的 continues_prev 文本吸收到最近的前序文本逻辑块。"""
+    """Absorb continues_prev text without independent text anchor into the nearest logical block of preceding text."""
     previous_text: PlannedBlock | None = None
     previous_reference: PlannedBlock | None = None
     for current in blocks:
@@ -87,7 +87,7 @@ def _merge_continued_text_blocks(blocks: list[PlannedBlock], mode: RenderMode) -
 
 
 def _merge_continued_list_blocks(blocks: list[PlannedBlock], mode: RenderMode, *, copy_on_merge: bool = False) -> None:
-    """把续接列表吸收到子类型一致的前序列表，参考文献可跨过合并透明块。"""
+    """Assimilate the continuation list into the subtype-consistent predecessor list, and references can span merge transparent blocks."""
     previous_list: PlannedBlock | None = None
     previous_reference_list: PlannedBlock | None = None
     copied: set[int] = set()
@@ -105,7 +105,7 @@ def _merge_continued_list_blocks(blocks: list[PlannedBlock], mode: RenderMode, *
             and previous.block.sub_type == current.block.sub_type
             and not (mode is RenderMode.FULL and previous.page_idx != current.page_idx)
         ):
-            # EPUB 等渲染器仍读取原文档；只有实际修改的列表需要另建副本。
+            # Renderers such as EPUB still read the original document; only the actual modified list requires a new copy.
             if copy_on_merge and id(previous) not in copied:
                 previous.block = previous.block.model_copy(deep=True)
                 copied.add(id(previous))
@@ -116,7 +116,7 @@ def _merge_continued_list_blocks(blocks: list[PlannedBlock], mode: RenderMode, *
 
 
 def _merge_continued_table_blocks(blocks: list[PlannedBlock]) -> None:
-    """在默认模式中把跨页续表合并到最近的前序表格。"""
+    """In default mode, merge cross-page continuation tables to the nearest preceding table."""
     previous: PlannedBlock | None = None
     for current in blocks:
         if current.removed or not isinstance(current.block, TableBlock):

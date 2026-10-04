@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""生成并校验 DocVortex HTML 渲染器使用的压缩 CSS。"""
+"""Generate and verify DocVortex HTML Compressed CSS used by the renderer."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ _COMPACT_PUNCTUATION = frozenset("{}:;,>")
 
 
 def minify_css(source: str) -> str:
-    """在不改写 CSS 值的前提下删除注释和可安全省略的空白。"""
+    """Remove comments and whitespace that can be safely omitted without overwriting the CSS value."""
     output: list[str] = []
     pending_space = False
     quote: str | None = None
@@ -74,7 +74,7 @@ def minify_css(source: str) -> str:
             continue
 
         if char in _COMPACT_PUNCTUATION:
-            # 伪类前的空白可能是后代组合符，不能按声明冒号处理。
+            # The white space before the pseudo-class may be a descendant combinator and cannot be treated as a declaration colon.
             if char == ":" and pending_space and output and output[-1] not in "{,;>":
                 output.append(" ")
             elif output and output[-1] == " ":
@@ -106,12 +106,12 @@ def minify_css(source: str) -> str:
 
 
 def _needs_separator(output: list[str], next_char: str) -> bool:
-    """判断待处理空白是否用于分隔两个不能直接相邻的 CSS token。"""
+    """Determines whether the pending whitespace is used to separate two CSS token that cannot be directly adjacent."""
     return bool(output) and output[-1] not in _COMPACT_PUNCTUATION and next_char not in _COMPACT_PUNCTUATION
 
 
 def _write_atomically(path: Path, content: str) -> None:
-    """在目标目录创建临时文件并原子替换最终 CSS 产物。"""
+    """Creates a temporary file in the target directory and atomically replaces the final CSS product."""
     temporary_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile(
@@ -132,7 +132,7 @@ def _write_atomically(path: Path, content: str) -> None:
 
 
 def build_html_css(*, check: bool) -> bool:
-    """生成压缩 CSS，或只检查现有产物是否与源码一致。"""
+    """Generate a compressed CSS, or just check if an existing product is consistent with the source."""
     minified = minify_css(_SOURCE_PATH.read_text(encoding="utf-8"))
     existing = _OUTPUT_PATH.read_text(encoding="utf-8") if _OUTPUT_PATH.exists() else None
     if existing == minified:
@@ -144,14 +144,14 @@ def build_html_css(*, check: bool) -> bool:
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
-    """解析构建脚本的只校验选项。"""
+    """Parse the build script for check-only options."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="仅校验 docvortex.min.css 是否需要重新生成")
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """执行 CSS 构建并用退出码报告同步状态。"""
+    """Execute the CSS build and report synchronization status with exit code."""
     args = _parse_args(argv)
     if build_html_css(check=args.check):
         action = "校验通过" if args.check else "生成完成"

@@ -12,7 +12,7 @@ def _model_json(
     pages: list[list[dict[str, object]]] | None = None,
     page_index_map: list[int] | None = None,
 ) -> ModelJson:
-    """构造包含全部必填元数据的严格 ModelJson 测试对象。"""
+    """Constructs a strict ModelJson test object containing all required metadata."""
     return ModelJson(
         pages=pages if pages is not None else [[{"type": "text", "content": inline("正文")}]],
         page_index_map=page_index_map if page_index_map is not None else [],
@@ -22,7 +22,7 @@ def _model_json(
 
 
 def test_non_empty_page_index_map_represents_partial_input() -> None:
-    """验证非空页号映射表示显式抽页并与 raw pages 一一对应。"""
+    """Verify that the non-null page number mapping represents an explicit page extraction and corresponds to raw pages one-to-one."""
     model_json = _model_json(pages=[[], []], page_index_map=[3, 5])
 
     assert model_json.page_index_map == [3, 5]
@@ -31,7 +31,7 @@ def test_non_empty_page_index_map_represents_partial_input() -> None:
 
 
 def test_empty_model_json_resolves_to_no_page_indices() -> None:
-    """验证空文档仍属于整本解析且不会产生虚构页号。"""
+    """Verify that the empty document still belongs to the entire parsing and does not generate fictitious page numbers."""
     model_json = _model_json(pages=[])
 
     assert model_json.is_full_document is True
@@ -48,7 +48,7 @@ def test_empty_model_json_resolves_to_no_page_indices() -> None:
     ],
 )
 def test_model_json_rejects_invalid_page_index_map(page_index_map: list[int], message: str) -> None:
-    """验证显式抽页映射不允许截断、重复、逆序或负数。"""
+    """Verify that explicit paging mapping does not allow truncation, duplication, reversal, or negative numbers."""
     with pytest.raises(ValidationError, match=message):
         _model_json(pages=[[], []], page_index_map=page_index_map)
 
@@ -58,7 +58,7 @@ def test_model_json_rejects_invalid_page_index_map(page_index_map: list[int], me
     ["[]", [{}], [[[]]]],
 )
 def test_model_json_rejects_invalid_page_structure(pages: object) -> None:
-    """验证 pages 必须保持页列表、块列表和块字典三层结构。"""
+    """Verification pages must maintain a three-layer structure of page list, block list and block dictionary."""
     with pytest.raises(ValidationError):
         ModelJson(
             pages=pages,

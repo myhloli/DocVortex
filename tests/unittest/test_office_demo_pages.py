@@ -1,4 +1,4 @@
-"""验证真实 Office 样例的完整分页及公式语义。"""
+"""Verify the complete pagination and formula semantics of the real Office sample."""
 
 from pathlib import Path
 
@@ -12,7 +12,7 @@ _OPEN_OFFICE_SAMPLE_DIR = Path(__file__).parents[2] / "demo/open_office_docs"
 
 
 def analyze_sample(data: bytes, *, file_suffix: FileSuffix) -> tuple[MiddleJson, ModelJson]:
-    """对真实样例执行引擎分析与确定性后处理。"""
+    """Perform engine analysis and deterministic post-processing on real examples."""
     model = analyze(data, file_suffix=file_suffix).model_json
     return model_json_to_middle_json(model), model
 
@@ -22,7 +22,7 @@ def analyze_sample(data: bytes, *, file_suffix: FileSuffix) -> tuple[MiddleJson,
     [("docx", 3), ("pptx", 6), ("xlsx", 3), ("ods", 3)],
 )
 def test_native_office_real_samples(file_suffix: str, expected_page_count: int) -> None:
-    """验证统一入口可直接分析三类真实 Office 样例并返回完整分页结果。"""
+    """The unified entrance to verification can directly analyze three types of real Office samples and return complete paged results."""
     basename = "xlsx" if file_suffix == "ods" else file_suffix
     sample_dir = _OPEN_OFFICE_SAMPLE_DIR if file_suffix == "ods" else _MS_OFFICE_SAMPLE_DIR
     sample_path = sample_dir / f"{basename}_01.{file_suffix}"

@@ -1,4 +1,4 @@
-"""组装跨行标题、图片注释、页眉及首页信息块。"""
+"""Assemble cross-line titles, image annotations, page headers and home page information blocks."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from .continuity import _reassemble_member_lines
 
 
 def _split_labeled_visual_note_blocks(blocks, image_bboxes):
-    """图下说明与来源使用不同标签和物理首行时保留各自边界，页内正文不参与分割。"""
+    """When the description and source below the image use different labels and physical first lines, their respective boundaries are retained, and the text within the page does not participate in the segmentation."""
     output = []
     for block in blocks:
         lines = sorted(block.get("_text_lines", []), key=lambda line: (line.bbox[1], line.bbox[0]))
@@ -63,7 +63,7 @@ def _merge_image_caption_text_blocks(
     image_bboxes: list[BBox],
     numeric_grid_bboxes: list[BBox] | None = None,
 ) -> list[dict[str, Any]]:
-    """逐行恢复图注续文，后续轮次仅延伸尚未结束的图注，不能越过完整句尾吞入正文。"""
+    """Restore the figure captions and continue the text line by line. Subsequent rounds only extend the unfinished figure captions and cannot swallow the text past the end of the complete sentence."""
     continuation_only = False
     while True:
         merged = _merge_image_caption_text_pass(
@@ -82,7 +82,7 @@ def _merge_image_caption_text_pass(
     continuation_only: bool,
     numeric_grid_bboxes: list[BBox] | None = None,
 ) -> list[dict[str, Any]]:
-    """在图像邻接已成立后，用通用图注标记确认锚点并吸收同字体续行。"""
+    """After the image adjacency has been established, confirm the anchor point with a universal legend mark and absorb the continuation line in the same font."""
 
     if not image_bboxes:
         return blocks
@@ -174,7 +174,7 @@ def _caption_image_group_bboxes(
     image_bboxes: list[BBox],
     median_height: float,
 ) -> list[BBox]:
-    """合并同一视觉行的并排图片 bbox，使跨多图的统一图注也能建立邻接。"""
+    """Merge side-by-side images of the same visual line bbox so that unified captions across multiple images can also establish adjacency."""
 
     remaining = list(image_bboxes)
     grouped_bboxes = list(image_bboxes)
@@ -219,7 +219,7 @@ def _caption_seed_matches_image(
     median_height: float,
     max_gap_in_heights: float = 2.5,
 ) -> bool:
-    """用上下位置、水平投影和居中关系确认图像下方的图注空间候选。"""
+    """Confirm caption space candidates below the image using top-bottom position, horizontal projection, and centering relationships."""
 
     bbox = block["bbox"]
     image_width = max(0.1, image_bbox[2] - image_bbox[0])
@@ -238,7 +238,7 @@ def _caption_body_has_structural_gap(
     seed: dict[str, Any],
     candidate: dict[str, Any],
 ) -> bool:
-    """用图注末行、候选首行和图注内部行距阻止跨排版层级回并。"""
+    """Prevent merging across layout levels using legend last line, candidate first line, and legend internal leading."""
 
     seed_bboxes = seed.get("_local_line_bboxes")
     seed_heights = seed.get("_line_heights")
@@ -295,10 +295,10 @@ def _caption_tail_matches_seed(
     candidate: dict[str, Any],
     median_height: float,
 ) -> bool:
-    """只用同栏角色、字体、邻接和投影把无标记的图注续行接回锚点。"""
+    """Connect unmarked legend continuation lines back to the anchor point using only the same column character, font, adjacency, and drop shadow."""
 
     if candidate.get("_protected_hard_break_before") and str(seed.get("content", "")).rstrip().endswith((")", "）")):
-        # 已闭合括号署名之后的独立正文段界不能被图注补接抹掉；出版信息的普通句尾仍可续接。
+        # The independent text paragraph boundaries after the signature in closed brackets cannot be erased by figure supplements; ordinary sentence endings of published information can still be continued.
         return False
     seed_bbox = seed["bbox"]
     candidate_bbox = candidate["bbox"]
@@ -306,7 +306,7 @@ def _caption_tail_matches_seed(
     candidate_heights = candidate.get("_line_heights", [])
     em = statistics.median(seed_heights) if seed_heights else median_height
     if candidate.get("type") == "paragraph_title":
-        # 局部栏带可能把细小的图题尾行提升为标题；只回收同字体同尺度且无粗体结构证据的短尾。
+        # Local columns may elevate a small tail line of a figure title to a title; only short tail lines with the same font and size and no evidence of bold structure will be recycled.
         seed_fonts = seed.get("_font_signatures")
         tail_fonts = candidate.get("_font_signatures")
         if (
@@ -328,7 +328,7 @@ def _caption_tail_matches_seed(
         and abs(_bbox_center_x(candidate_bbox) - _bbox_center_x(seed_bbox)) <= 2 * em
         and -0.25 * em <= candidate_bbox[1] - seed_bbox[3] <= 0.5 * em
     )
-    # 环绕图片的正文可能在末行恢复通栏；其大外框不能充当右栏图注的续行。
+    # The text that surrounds the picture may revert to a banner at the end of the line; its large outline cannot serve as a continuation line for the legend in the right column.
     if candidate_bbox[0] < seed_bbox[0] - median_height and abs(
         _bbox_center_x(candidate_bbox) - _bbox_center_x(seed_bbox)
     ) > 0.25 * max(candidate_bbox[2] - candidate_bbox[0], seed_bbox[2] - seed_bbox[0]):
@@ -369,7 +369,7 @@ def _caption_tail_matches_seed(
 def _merge_multiline_title_blocks(
     blocks: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """跨错误栏带合并紧贴且字体兼容的多行文档标题和段落标题。"""
+    """Merge snug, font-compatible multi-line document titles and paragraph headings across error bars."""
 
     replacements: dict[int, dict[str, Any]] = {}
     consumed: set[int] = set()
@@ -420,7 +420,7 @@ def _merge_multiline_title_blocks(
             )
             vertical_gap = current_bbox[1] - previous_bbox[3]
             if vertical_gap < -0.2 * max(previous_height, current_height):
-                # 字体外框重叠时改用已验证的可见行框，避免紧排行标题被拆散。
+                # Use verified visible line boxes instead when font outlines overlap to prevent tight row titles from being broken up.
                 previous_ink = previous.get("_local_output_line_bboxes")
                 current_ink = current.get("_local_output_line_bboxes")
                 if (
@@ -440,7 +440,7 @@ def _merge_multiline_title_blocks(
                 and previous_fonts.isdisjoint(current_fonts)
             )
             previous_lines = previous.get("_text_lines", [])
-            # 已由几何确认同一结构标题带时，编号与文字可以使用不同字体。
+            # When the title band of the same structure has been confirmed by geometry, different fonts can be used for numbers and text.
             shared_structural_band = (
                 bool(previous_lines and current_lines)
                 and previous_lines[-1].structural_title
@@ -475,7 +475,7 @@ def _merge_multiline_title_blocks(
 def _merge_fragmented_header_blocks(
     blocks: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """聚合同一视觉行中等距分散的页眉页脚片段。"""
+    """Aggregate equally spaced header and footer fragments on the same visual line."""
 
     grouped: dict[tuple[int, int], list[int]] = {}
     for index, block in enumerate(blocks):
@@ -535,7 +535,7 @@ def _merge_front_matter_column_blocks(
     *,
     page_index: int,
 ) -> list[dict[str, Any]]:
-    """把首页标题下方规则排列的多列作者信息按列聚合。"""
+    """Aggregate multiple columns of author information arranged regularly below the title of the homepage in columns."""
 
     if page_index != 0:
         return blocks
@@ -645,7 +645,7 @@ def _merge_repeated_compact_title_continuations(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
 ) -> list[dict[str, Any]]:
-    """把重复出现的两行弱标题与紧邻异字体续行恢复为普通文本块。"""
+    """Restore the repeated two lines of weak titles and the adjacent continuation lines in different fonts to ordinary text blocks."""
 
     candidate_pairs: list[tuple[int, int, float]] = []
     for title_index, title in enumerate(blocks):

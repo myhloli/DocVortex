@@ -1,4 +1,4 @@
-"""验证无模型依赖的物理行边界规则及结构化 Span 保真。"""
+"""Verify model-free physical row boundary rules and structured Span fidelity."""
 
 from copy import deepcopy
 
@@ -41,12 +41,12 @@ from docvortex.schema import CodeInlineSpan, EquationInlineSpan, HyperlinkSpan, 
     ],
 )
 def test_boundary_rules(lines: list[str], expected: str) -> None:
-    """仅当前边界参与空格决策，保留内部内容以及已有 URL 和断词规则。"""
+    """Only the current boundary participates in whitespace decisions, retaining internal content as well as existing URL and word segmentation rules."""
     assert merge_text_line_contents(lines) == expected
 
 
 def test_inline_boundaries_preserve_payloads_and_source() -> None:
-    """公式、代码、链接目标及样式原样保留，断词只删除末尾文字叶子的字符。"""
+    """Formulas, codes, link targets, and styles are retained as they are, and only the characters at the end of the text leaf are deleted during word segmentation."""
     contents = [
         [TextSpan(type="text", content="中文 inter-", styles=["bold"])],
         [HyperlinkSpan(type="hyperlink", url="https://example.org/a-b", content=[TextSpan(type="text", content="national")])],

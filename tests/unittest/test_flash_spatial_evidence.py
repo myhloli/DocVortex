@@ -1,4 +1,4 @@
-"""空间规则的正反例及平移、缩放验证，文字使用与真实原件无关的占位内容。"""
+"""Positive and negative examples of spatial rules and verification of translation and zooming. The text uses placeholder content that has nothing to do with the real original."""
 
 from dataclasses import replace
 
@@ -16,7 +16,7 @@ from docvortex.analyzers.native.pdf.text_assembly.merging import _merge_spatial_
 
 
 def _line(text, bbox, index, scale=1.0, offset=0.0):
-    """构造具有独立字号、字形范围及来源身份的中性测试行。"""
+    """Construct neutral test lines with independent font size, font range, and source identity."""
     bounds = tuple(value * scale + offset for value in bbox)
     return _LineItem(
         text,
@@ -34,7 +34,7 @@ def _line(text, bbox, index, scale=1.0, offset=0.0):
 @pytest.mark.parametrize("scale,offset", [(0.7, 13), (1.0, 0), (1.8, 29)])
 @pytest.mark.parametrize("excluded", [None, "regular", "reference", "caption", "container", "runin"])
 def test_small_emphasized_heading_requires_independent_body_transition(scale, offset, excluded):
-    """缩放和平移不改变独立粗体小标题判断，图例、参考与同行强调不能提升。"""
+    """Zooming and panning do not change the judgment of independent bold subtitles, and legends, references, and peer emphasis cannot be improved."""
     lines = [
         _line("An ordinary preceding paragraph.", (40, 100, 280, 110), 0, scale, offset),
         _line("A neutral heading", (52, 128, 180, 135), 1, scale, offset),
@@ -68,7 +68,7 @@ def test_small_emphasized_heading_requires_independent_body_transition(scale, of
 @pytest.mark.parametrize("right", [240, 320])
 @pytest.mark.parametrize("case", ["column_start", "wide", "cross_edge", "lower_side_column"])
 def test_small_heading_uses_body_top_and_actual_column_edge(scale, offset, right, case):
-    """独立改变栏宽及页面变换后，栏首和近满栏标题可提升，越栏和侧栏中部不能提升。"""
+    """After independently changing the column width and changing the page, the header of the column and the nearly full column title can be increased, but the overcolumn and the middle part of the side column cannot be increased."""
     heading = _line(
         "Another neutral heading", (52, 128, right + 12 if case == "cross_edge" else right - 2, 135), 1, scale, offset
     )
@@ -96,7 +96,7 @@ def test_small_heading_uses_body_top_and_actual_column_edge(scale, offset, right
 
 @pytest.mark.parametrize("scale,offset", [(0.7, 13), (1.0, 0), (1.8, 29)])
 def test_justified_indented_row_members_are_recovered_before_paragraph_merging(scale, offset):
-    """宽空格分开的段首三个成员先恢复整行，后继正文的缩进支持使用整行左缘。"""
+    """The first three members of a paragraph separated by wide spaces are restored to the entire line first, and subsequent text indentation supports using the entire left margin of the line."""
     rows = [
         _line("A previous sentence ends here.", (40, 90, 210, 100), 0, scale, offset),
         _line("Leading", (52, 103, 100, 113), 1, scale, offset),
@@ -113,7 +113,7 @@ def test_justified_indented_row_members_are_recovered_before_paragraph_merging(s
 
 
 def test_spatial_component_merge_keeps_member_and_geometry_sets_together():
-    """短首行与正文续行合并时，源成员集合必须与内容和行框同时完整传递。"""
+    """When merging short first lines with text continuation lines, the source member collection must be passed in its entirety along with the content and line boxes."""
     lines = [_line("An opener", (40, 100, 65, 110), 1), _line("followed by a full ordinary body row", (40, 112, 270, 122), 2)]
     blocks = [
         {
@@ -138,7 +138,7 @@ def test_spatial_component_merge_keeps_member_and_geometry_sets_together():
 
 
 def test_body_corridor_ignores_first_line_indent_and_handles_inline_fragments():
-    """居中参照来自后继正文的重复左右缘，同行碎片不能变成狭窄栏。"""
+    """Centered references to repeated left and right margins from subsequent text, peer fragments cannot become narrow columns."""
     rows = [
         _line("An indented first line.", (62, 100, 280, 110), 0),
         _line("Left part", (40, 113, 115, 123), 1),
@@ -150,7 +150,7 @@ def test_body_corridor_ignores_first_line_indent_and_handles_inline_fragments():
 
 
 def test_wide_gutter_numeric_cells_do_not_use_prose_row_recovery():
-    """重复数值列不能采用段首正文的宽空格恢复，保留其独立单元格成员。"""
+    """Repeated numeric columns cannot be recovered by using wide spaces in the paragraph header text, retaining their independent cell members."""
     rows = [
         _line("Neutral label", (40, 100, 130, 110), 0),
         _line("32.68%", (151, 100, 205, 110), 1),
@@ -163,7 +163,7 @@ def test_wide_gutter_numeric_cells_do_not_use_prose_row_recovery():
 
 @pytest.mark.parametrize("scale,offset", [(1.0, 0.0), (0.7, 13.0), (1.8, 29.0)])
 def test_numbered_reference_band_does_not_claim_upper_body(scale, offset):
-    """下方三栏编号区的规则在缩放和平移后仍不能侵入上方两栏正文。"""
+    """The rules in the numbered area in the lower three columns still cannot invade the main text in the upper two columns after zooming and panning."""
     body = [
         _line("Ordinary body paragraph with neutral words.", (x, y, x + 240, y + 10), i, scale, offset)
         for i, (x, y) in enumerate((x, y) for x in (40, 320) for y in (70, 85, 100, 115))
@@ -189,7 +189,7 @@ def test_numbered_reference_band_does_not_claim_upper_body(scale, offset):
 
 
 def test_publication_years_are_not_new_numbered_entries():
-    """作者年代式条目的年份不能被误作新条目编号。"""
+    """The year of an author's chronological entry cannot be mistaken for a new entry number."""
     lines = [_line("References", (40, 100, 150, 110), 0)]
     for i in range(3):
         lines.extend(
@@ -206,7 +206,7 @@ def test_publication_years_are_not_new_numbered_entries():
 
 
 def test_author_year_references_do_not_enable_appendix_numbered_lists():
-    """上一页作者年代式参考上下文不能把下一页普通数字列表升级为编号文献。"""
+    """The author chronological reference context on the previous page cannot promote the ordinary number list on the next page to a numbered document."""
     references = _PreparedPage(
         (600, 800),
         [_line("References", (40, 100, 150, 110), 0)]
@@ -229,7 +229,7 @@ def test_author_year_references_do_not_enable_appendix_numbered_lists():
 @pytest.mark.parametrize("marker", ["(B7)", "‹B7›", "⟦B7⟧"])
 @pytest.mark.parametrize("scale", [0.8, 1.0, 1.6])
 def test_number_role_uses_column_and_isolated_math_band(marker, scale):
-    """不同包围符的右侧短编号可归入公式，紧邻的短正文不能吸入。"""
+    """The short numbers on the right side of different brackets can be included in the formula, and the short text immediately adjacent to them cannot be inhaled."""
     lines = [
         _line("A neutral body sentence with enough words.", (40, y, 280, y + 10), i, scale)
         for i, y in enumerate((50, 65, 80, 200, 215, 230))
@@ -247,7 +247,7 @@ def test_number_role_uses_column_and_isolated_math_band(marker, scale):
 
 @pytest.mark.parametrize("percentage", ["100%", "１００％"])
 def test_percentage_at_line_end_is_not_an_equation_number(percentage):
-    """行内百分比不构成包围式编号，不会导致正文成员被公式恢复删除。"""
+    """Inline percentages do not constitute bracketed numbers and will not cause body members to be deleted by formula recovery."""
     lines = [
         _line("An ordinary sentence with some body words.", (40, y, 280, y + 10), i)
         for i, y in enumerate((40, 55, 70, 200, 215, 230))
@@ -257,7 +257,7 @@ def test_percentage_at_line_end_is_not_an_equation_number(percentage):
 
 
 def test_outer_table_rule_does_not_make_notes_into_cells():
-    """表体结束后的全宽说明从外框中分离，而双列真实单元行保持在表内。"""
+    """The full-width description after the table body ends is separated from the outer box, while the double-column real cell row remains within the table."""
     notes = [
         _line("* A neutral note spanning the table width.", (40, 152, 275, 162), 1),
         _line("Continuation of the same explanatory note.", (40, 166, 275, 176), 2),
@@ -275,7 +275,7 @@ def test_outer_table_rule_does_not_make_notes_into_cells():
 
 
 def test_reference_boundaries_survive_public_page_finalization():
-    """新编号禁止续接，跨页同条续文即使以数字开头也保留连续关系。"""
+    """Continuations with new numbers are prohibited, and continuations of the same article across two pages will be maintained even if they begin with a number."""
     pages = [
         {
             "page_idx": 0,

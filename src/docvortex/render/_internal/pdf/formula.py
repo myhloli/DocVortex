@@ -1,4 +1,4 @@
-"""ZiaMath LaTeX 到受控 ReportLab 矢量路径的转换。"""
+"""ZiaMath LaTeX to controlled ReportLab vector path conversion."""
 
 from __future__ import annotations
 
@@ -28,12 +28,12 @@ _SVG_PATH_COMMAND_RE = re.compile(r"[A-DF-Za-df-z]")
 
 
 class PdfFormulaError(ValueError):
-    """表示 LaTeX 或 ZiaMath SVG 无法安全转换为 PDF 矢量对象。"""
+    """Indicates that LaTeX or ZiaMath SVG cannot be safely converted to a PDF vector object."""
 
 
 @dataclass(frozen=True, slots=True)
 class FormulaVector:
-    """保存一个公式的 ReportLab Drawing 与基线几何。"""
+    """Save a formula for ReportLab Drawing with baseline geometry."""
 
     drawing: Drawing
     width: float
@@ -44,7 +44,7 @@ class FormulaVector:
     multiline: bool = False
 
     def scaled(self, factor: float) -> FormulaVector:
-        """返回仅调整展示几何、不复制 Drawing 的等比公式对象。"""
+        """Returns a proportional formula object that only adjusts the display geometry and does not copy Drawing."""
         return FormulaVector(
             drawing=self.drawing,
             width=self.width * factor,
@@ -58,16 +58,16 @@ class FormulaVector:
 
 @dataclass(frozen=True, slots=True)
 class InlineFormulaImage:
-    """作为 ReportLab Paragraph 行内图片占位的矢量公式代理。"""
+    """Acts as a vector formula proxy for the ReportLab Paragraph inline picture placeholder."""
 
     vector: FormulaVector
 
 
 class FormulaRenderer:
-    """维护单份 PDF 文档内有界且无跨文档状态的公式缓存。"""
+    """Maintaining a formula cache that is bounded within a single PDF document and has no cross-document state."""
 
     def __init__(self) -> None:
-        """初始化最多缓存 512 个唯一公式的文档级缓存。"""
+        """Initializes a document-level cache that caches up to 512 unique formulas."""
         self._cache: dict[tuple[str, bool, float, str], FormulaVector] = {}
 
     def render(
@@ -78,7 +78,7 @@ class FormulaRenderer:
         font_size: float,
         color: str = "#1f2937",
     ) -> FormulaVector:
-        """把一个裸 LaTeX 公式转换为行内或行间矢量对象。"""
+        """Converts a bare LaTeX formula to an inline or interline vector object."""
         if not isinstance(latex, str) or not latex.strip():
             raise PdfFormulaError("formula must contain non-blank LaTeX")
         if not isinstance(font_size, (int, float)) or isinstance(font_size, bool) or font_size <= 0:
@@ -97,7 +97,7 @@ class FormulaRenderer:
 
 
 class DisplayFormulaFlowable(Flowable):
-    """在可用行宽内居中绘制公式，并把可选编号贴到右边界。"""
+    """Draw the formula centered within the available line width, with optional numbering taped to the right margin."""
 
     def __init__(
         self,
@@ -108,7 +108,7 @@ class DisplayFormulaFlowable(Flowable):
         location: str = "",
         page_index: int | None = None,
     ) -> None:
-        """保存公式、可选编号以及延迟到 wrap 阶段计算的缩放参数。"""
+        """Saves formulas, optional numbers, and scaling parameters that are deferred to the wrap stage calculation."""
         super().__init__()
         self.formula = formula
         self.tag = tag
@@ -125,27 +125,27 @@ class DisplayFormulaFlowable(Flowable):
 
     @property
     def effective_font_size(self) -> float:
-        """返回公式本体在最终绘制时的基准字号。"""
+        """Returns the base font size of the formula body when it is finally drawn."""
         return self.font_size * self._formula_scale
 
     @property
     def effective_tag_font_size(self) -> float | None:
-        """返回独立缩放后的序号字号，无序号时返回空值。"""
+        """Returns the serial number font size after independent scaling, and returns a null value if there is no serial number."""
         return self.font_size * self._tag_scale if self.tag is not None else None
 
     def wrap(self, avail_width: float, _avail_height: float) -> tuple[float, float]:
-        """重排版只按行宽试排，页尾剩余高度交给分页器处理。"""
+        """The rearranged version is only trial layout based on line width, and the remaining height at the footer is left to the pager."""
         self.fit_to_box(avail_width, font_size=self.font_size)
         return self.width, self.height
 
     def fit_to_box(self, width: float, *, font_size: float, max_height: float | None = None) -> None:
-        """每次从原始矢量重新试排；高度不足优先缩小本体，始终保留整栏坐标。"""
+        """Retry the arrangement from the original vector every time; if the height is insufficient, the body will be reduced first, and the entire column of coordinates will always be retained."""
         self.width = self._available_width = max(0.001, width)
         target_scale = font_size / self.font_size
         gap = font_size if self.tag is not None else 0.0
         tag_scale = min(target_scale, self.width / self.tag.width) if self.tag is not None else target_scale
         tag_width = self.tag.width * tag_scale if self.tag is not None else 0.0
-        # 编号很长或栏宽小于一个字时，独占末行比把编号压成微小文字更可读。
+        # When the number is very long or the column width is less than one word, it is more readable to occupy the last line than to compress the number into tiny text.
         stacked = self.tag is not None and (tag_width > self.width * 0.4 or self.width - tag_width - gap < font_size)
         main_limit = self.width if stacked else max(0.001, self.width - tag_width - gap)
         formula_scale = min(target_scale, main_limit / self.formula.width)
@@ -153,7 +153,7 @@ class DisplayFormulaFlowable(Flowable):
         if max_height is None or self.height <= max_height:
             return
         height_limit = max(0.001, max_height)
-        # 先判断序号本身是否能保留目标字号；极窄矮框才同比缩小序号及行间隔。
+        # First determine whether the serial number itself can retain the target font size; only when the extremely narrow and short frame reduces the serial number and line spacing year-on-year.
         self._position(0.0, tag_scale, gap, stacked)
         if self.height >= height_limit:
             ratio = height_limit / max(self.height, 0.001) * 0.5
@@ -170,7 +170,7 @@ class DisplayFormulaFlowable(Flowable):
         self._position(low, tag_scale, gap, stacked)
 
     def _position(self, formula_scale: float, tag_scale: float, gap: float, stacked: bool) -> None:
-        """统一计算本体和序号的最终矩形，单行使用数学轴，多行使用垂直中心。"""
+        """The final rectangle of the ontology and serial number is calculated uniformly, using the mathematical axis for a single row and the vertical center for multiple rows."""
         self._formula_scale, self._tag_scale = formula_scale, tag_scale
         fw, fh = self.formula.width * formula_scale, self.formula.height * formula_scale
         fx, fy = max(0.0, (self.width - fw) / 2), 0.0
@@ -195,7 +195,7 @@ class DisplayFormulaFlowable(Flowable):
         self.formula_rect = (fx, fy, fx + fw, fy + fh)
 
     def draw(self) -> None:
-        """使用最后一次试排结果绘制；过小公式在两种版式中均报告可读性诊断。"""
+        """Drawn using the results of the last pass; undersize formulas report readability diagnostics in both layouts."""
         if min(self.effective_font_size, self.effective_tag_font_size or self.effective_font_size) < 6 - 0.001:
             report_pdf_diagnostic(
                 "pdf_layout_small_text",
@@ -209,19 +209,19 @@ class DisplayFormulaFlowable(Flowable):
 
 
 class _ReportLabPathPen(BasePen):
-    """把 FontTools SVG path 回调写入 ReportLab Path。"""
+    """Write FontTools SVG path callback to ReportLab Path."""
 
     def __init__(self) -> None:
-        """创建不依赖 glyphSet 的空 ReportLab 路径。"""
+        """Create an empty ReportLab path that does not depend on glyphSet."""
         super().__init__(None)
         self.path = Path()
 
     def _moveTo(self, point: tuple[float, float]) -> None:
-        """把 SVG move 命令写入目标路径。"""
+        """Write the SVG move command to the target path."""
         self.path.moveTo(*point)
 
     def _lineTo(self, point: tuple[float, float]) -> None:
-        """把 SVG line 命令写入目标路径。"""
+        """Write the SVG line command to the target path."""
         self.path.lineTo(*point)
 
     def _curveToOne(
@@ -230,19 +230,19 @@ class _ReportLabPathPen(BasePen):
         point2: tuple[float, float],
         point3: tuple[float, float],
     ) -> None:
-        """把三次曲线写入目标路径，二次曲线由 BasePen 自动转换。"""
+        """Write the cubic curve into the target path, and the quadratic curve is automatically converted by BasePen."""
         self.path.curveTo(*point1, *point2, *point3)
 
     def _closePath(self) -> None:
-        """闭合当前 ReportLab 子路径。"""
+        """Close the current ReportLab subpath."""
         self.path.closePath()
 
     def _endPath(self) -> None:
-        """结束不闭合的 SVG 子路径。"""
+        """End unclosed SVG subpath."""
 
 
 def split_formula_tag(content: str) -> tuple[str, str | None]:
-    """剥离公式末尾括号平衡的 ``\\tag{...}``，并返回正文与编号。"""
+    """Strips the balanced ``\\tag{...}`` of the parentheses at the end of the formula and returns the text and numbering."""
     stripped_end = len(content.rstrip())
     if stripped_end == 0 or content[stripped_end - 1] != "}":
         return content, None
@@ -266,7 +266,7 @@ def draw_inline_formula(
     width: float,
     height: float,
 ) -> tuple[float, float]:
-    """由自定义 Canvas 在 Paragraph 计算的位置绘制一个行内矢量公式。"""
+    """Draws an inline vector formula by custom Canvas at the position calculated by Paragraph."""
     vector = image.vector
     scale = min(width / max(vector.width, 1.0), height / max(vector.height, 1.0))
     _draw_vector(canvas, vector, x, y, scale)
@@ -274,7 +274,7 @@ def draw_inline_formula(
 
 
 def _render_ziamath_formula(latex: str, *, inline: bool, font_size: float, color: str) -> FormulaVector:
-    """在全局锁内临时关闭 SVG2 symbols，并转换单个 ZiaMath 结果。"""
+    """Temporarily close SVG2 symbols within a global lock and convert a single ZiaMath result."""
     try:
         with _ZIAMATH_LOCK:
             previous_svg2 = ziamath.config.svg2
@@ -283,7 +283,7 @@ def _render_ziamath_formula(latex: str, *, inline: bool, font_size: float, color
                 if inline:
                     formula = ziamath.Latex(latex, inline=True, size=font_size, color=color, margin=0)
                 else:
-                    # 使用 ZiaMath 自身的转换保留 aligned、运算符等现有 LaTeX 预处理。
+                    # Conversions using ZiaMath itself preserve existing LaTeX preprocessing of aligned, operators, etc.
                     mathml = ElementTree.fromstring(tex2mml(latex, inline=False))
                     _normalize_display_mathml(mathml)
                     mathml.set("mathcolor", color)
@@ -304,20 +304,20 @@ def _render_ziamath_formula(latex: str, *, inline: bool, font_size: float, color
 
 
 def _normalize_display_mathml(element: ElementTree.Element, displaystyle: bool = True) -> None:
-    """在临时树中补充分数子项的紧凑样式，保留显式样式及 limits 的节点结构。"""
+    """Supplement compact styles for fractional children in temporary trees, preserving explicit styles and the node structure of limits."""
     displaystyle = element.get("displaystyle", str(displaystyle).lower()) == "true"
     name = _local_name(element.tag)
     if name == "mo" and element.text == "∑" and not displaystyle:
         element.attrib.setdefault("stretchy", "false")
     for child in element:
         if name == "mfrac":
-            # 显式 displaystyle 属性及后代 mstyle 可覆盖默认继承，不改原 LaTeX。
+            # The explicit displaystyle attribute and its descendant mstyle override the default inheritance without changing the original LaTeX.
             child.attrib.setdefault("displaystyle", "false")
         _normalize_display_mathml(child, displaystyle)
 
 
 def _svg_root_to_vector(root: ElementTree.Element) -> FormulaVector:
-    """把 ZiaMath 的固定 SVG 子集转换为坐标已翻转的 ReportLab Drawing。"""
+    """Converts a fixed SVG subset of ZiaMath to ReportLab Drawing with coordinates flipped."""
     namespace = root.get("xmlns") if root.tag == "svg" else root.tag.removeprefix("{").split("}", 1)[0]
     if _local_name(root.tag) != "svg" or namespace != _SVG_NAMESPACE:
         raise PdfFormulaError("ZiaMath output must contain an SVG root")
@@ -352,7 +352,7 @@ def _append_svg_element(
     node_counter: list[int],
     path_budget: list[int],
 ) -> None:
-    """递归转换 ZiaMath 允许的 group、path 与 rect 节点。"""
+    """Recursive conversion of ZiaMath allows group, path and rect nodes."""
     node_counter[0] += 1
     if node_counter[0] > _MAX_SVG_NODES:
         raise PdfFormulaError("ZiaMath SVG exceeds its node limit")
@@ -401,7 +401,7 @@ def _append_svg_element(
 
 
 def _apply_paint(shape: Any, attributes: dict[str, str], inherited: dict[str, str]) -> None:
-    """把受控 SVG fill、stroke 与 stroke-width 映射到 ReportLab shape。"""
+    """Map controlled SVG fill, stroke and stroke-width to ReportLab shape."""
     fill = attributes.get("fill", inherited.get("fill", "black"))
     stroke = attributes.get("stroke", inherited.get("stroke", "none"))
     shape.fillColor = _parse_color(fill)
@@ -411,7 +411,7 @@ def _apply_paint(shape: Any, attributes: dict[str, str], inherited: dict[str, st
 
 
 def _parse_color(value: str) -> Color | None:
-    """解析 ZiaMath 生成的静态颜色，none 映射为透明。"""
+    """Parse the static color generated by ZiaMath, none maps to transparent."""
     if value.strip().casefold() == "none":
         return None
     try:
@@ -421,7 +421,7 @@ def _parse_color(value: str) -> Color | None:
 
 
 def _parse_number(value: str, *, field: str) -> float:
-    """严格读取不含 CSS 单位的有限 SVG 数值。"""
+    """Strictly reads limited SVG values without CSS units."""
     try:
         number = float(value)
     except (TypeError, ValueError) as exc:
@@ -432,7 +432,7 @@ def _parse_number(value: str, *, field: str) -> float:
 
 
 def _parse_number_list(value: str | None, *, count: int, field: str) -> tuple[float, ...]:
-    """读取固定长度的空白或逗号分隔 SVG 数值列表。"""
+    """Reads a fixed-length whitespace or comma-separated list of SVG values."""
     if value is None:
         raise PdfFormulaError(f"ZiaMath SVG is missing {field}")
     values = tuple(_parse_number(item, field=field) for item in value.replace(",", " ").split())
@@ -442,24 +442,24 @@ def _parse_number_list(value: str | None, *, count: int, field: str) -> tuple[fl
 
 
 def _reject_unknown_attributes(element: ElementTree.Element, allowed: set[str]) -> None:
-    """拒绝 ZiaMath 固定子集之外的 SVG 属性。"""
+    """Reject SVG attributes outside the fixed subset of ZiaMath."""
     unexpected = set(element.attrib) - allowed
     if unexpected:
         raise PdfFormulaError(f"Unsupported ZiaMath SVG attributes: {', '.join(sorted(unexpected))}")
 
 
 def _local_name(tag: str) -> str:
-    """返回可带 XML namespace 的元素本地名称。"""
+    """Returns the local name of the element, which may take XML or namespace."""
     return tag.rsplit("}", 1)[-1]
 
 
 def _formula_preview(latex: str) -> str:
-    """为诊断生成有界 LaTeX 摘要，避免超长公式污染日志。"""
+    """Generate bounded LaTeX summaries for diagnostics to avoid contaminating logs with overlong formulas."""
     return latex if len(latex) <= 200 else f"{latex[:197]}..."
 
 
 def _draw_vector(canvas: Any, vector: FormulaVector, x: float, y: float, scale: float) -> None:
-    """在 canvas 上按给定位置和比例绘制公式 Drawing。"""
+    """Draws the formula Drawing on canvas at the given position and scale."""
     canvas.saveState()
     try:
         canvas.translate(x, y)
@@ -470,7 +470,7 @@ def _draw_vector(canvas: Any, vector: FormulaVector, x: float, y: float, scale: 
 
 
 def _find_tag_opening_brace(content: str, tag_start: int, content_end: int) -> int | None:
-    """查找 tag 命令允许空白后的左花括号。"""
+    """Find tag command allows white space after opening curly brace."""
     cursor = tag_start + len(r"\tag")
     while cursor < content_end and content[cursor].isspace():
         cursor += 1
@@ -478,7 +478,7 @@ def _find_tag_opening_brace(content: str, tag_start: int, content_end: int) -> i
 
 
 def _find_balanced_closing_brace(content: str, opening_brace: int, content_end: int) -> int | None:
-    """查找与 tag 左花括号配对的右花括号，并忽略转义花括号。"""
+    """Finds a closing brace paired with a tag opening brace, and ignores escaped braces."""
     depth = 0
     for cursor in range(opening_brace, content_end):
         character = content[cursor]
@@ -493,7 +493,7 @@ def _find_balanced_closing_brace(content: str, opening_brace: int, content_end: 
 
 
 def _is_escaped_character(content: str, position: int) -> bool:
-    """判断指定字符前是否存在奇数个连续反斜杠。"""
+    """Determines whether there is an odd number of consecutive backslashes before the specified character."""
     preceding_backslashes = 0
     cursor = position - 1
     while cursor >= 0 and content[cursor] == "\\":

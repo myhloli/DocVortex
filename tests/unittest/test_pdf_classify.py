@@ -24,7 +24,7 @@ SYNTHETIC_FLASH_PDF = REPO_ROOT / "tests" / "unittest" / "pdfs" / "flash_table_a
 
 
 def _write_single_sample_page(content_data: bytes) -> bytes:
-    """复制真实样本第二页，并用指定内容流替换页面内容。"""
+    """Copy the second page of the real sample and replace the page content with the specified content stream."""
     reader = PdfReader(MIXED_ELEMENTS_PDF)
     writer = PdfWriter()
     page = writer.add_page(reader.pages[1])
@@ -38,7 +38,7 @@ def _write_single_sample_page(content_data: bytes) -> bytes:
 
 
 def _get_exact_cid_usage(pdf_bytes: bytes) -> dict[int, dict[str, Any]]:
-    """返回全部页面按字体资源对象精确统计的坏 CID 用量。"""
+    """Returns the accurate statistics of bad CID usage by font resource object for all pages."""
     reader = PdfReader(BytesIO(pdf_bytes))
     signals = pdf_classify._get_font_resource_signals_pypdf(
         pdf_bytes,
@@ -52,7 +52,7 @@ def _make_form_xobject(
     content_data: bytes,
     resources: DictionaryObject,
 ) -> tuple[Any, DecodedStreamObject]:
-    """构造带局部资源的最小 Form XObject 并加入 writer。"""
+    """Construct the minimum Form XObject with local resources and add writer."""
     form = DecodedStreamObject()
     form.set_data(content_data)
     form.update(
@@ -75,7 +75,7 @@ def _make_form_xobject(
 
 
 def _build_nested_form_pdf() -> bytes:
-    """构造两次调用嵌套 Form 的 PDF，用于验证递归计数按调用次数累加。"""
+    """Constructs a PDF that calls a nested Form twice to verify that the recursion count accumulates by the number of calls."""
     reader = PdfReader(MIXED_ELEMENTS_PDF)
     writer = PdfWriter()
     page = writer.add_page(reader.pages[1])
@@ -106,7 +106,7 @@ def _build_nested_form_pdf() -> bytes:
 
 
 def _build_cyclic_form_pdf() -> bytes:
-    """构造自引用 Form，用于验证循环内容流会进入保守失败路径。"""
+    """Constructs a self-referential Form that verifies that looping content flows into a conservative failure path."""
     reader = PdfReader(MIXED_ELEMENTS_PDF)
     writer = PdfWriter()
     page = writer.add_page(reader.pages[1])
@@ -138,7 +138,7 @@ def _build_cyclic_form_pdf() -> bytes:
 
 
 def test_mixed_elements_uses_exact_cid_counts_and_classifies_as_txt() -> None:
-    """验证真实样本的小规模坏 CID 字形不再被同名正文放大成 OCR。"""
+    """Small-scale bad CID glyphs that verify real samples are no longer amplified into OCR by the body text of the same name."""
     pdf_bytes = MIXED_ELEMENTS_PDF.read_bytes()
     usage = _get_exact_cid_usage(pdf_bytes)
 
@@ -158,7 +158,7 @@ def test_mixed_elements_uses_exact_cid_counts_and_classifies_as_txt() -> None:
 
 
 def test_dominant_bad_cid_font_still_classifies_as_ocr_with_same_name_resource() -> None:
-    """验证同名正常字体存在时，大量实际使用的坏 CID 字体仍触发 OCR。"""
+    """A large number of actually used bad CID fonts still trigger OCR when verifying the presence of a normal font of the same name."""
     pdf_bytes = _write_single_sample_page(b"BT /C2_0 12 Tf 72 720 Td <" + b"0138" * 64 + b"> Tj ET")
     usage = _get_exact_cid_usage(pdf_bytes)
 
@@ -171,7 +171,7 @@ def test_dominant_bad_cid_font_still_classifies_as_ocr_with_same_name_resource()
 
 
 def test_exact_cid_count_tracks_text_operators_and_graphics_state() -> None:
-    """验证四类文本操作符及 q/Q 字体恢复均按具体资源统计。"""
+    """Verify that the four types of text operators and q/Q font recovery are counted according to specific resources."""
     pdf_bytes = _write_single_sample_page(
         b"q "
         b"BT /C2_0 12 Tf 72 720 Td <0138> Tj "
@@ -187,7 +187,7 @@ def test_exact_cid_count_tracks_text_operators_and_graphics_state() -> None:
 
 
 def test_exact_cid_count_recurses_nested_forms_per_invocation() -> None:
-    """验证嵌套 Form 的局部字体资源按实际两次调用累计。"""
+    """Verify that the local font resource for nested Form is accumulated as per actual two calls."""
     assert _get_exact_cid_usage(_build_nested_form_pdf())[0] == {
         "font_names": ["TimesNewRoman"],
         "cid_font_char_count": 4,
@@ -195,7 +195,7 @@ def test_exact_cid_count_recurses_nested_forms_per_invocation() -> None:
 
 
 def test_unused_bad_cid_resource_is_not_counted() -> None:
-    """验证页面资源中存在但内容流未选择的坏 CID 字体用量为零。"""
+    """Verify that the bad CID font usage is zero that exists in the page resource but is not selected by the content stream."""
     pdf_bytes = _write_single_sample_page(b"BT /TT2 12 Tf 72 720 Td (normal TimesNewRoman text) Tj ET")
 
     assert _get_exact_cid_usage(pdf_bytes)[0] == {
@@ -215,19 +215,19 @@ def test_malformed_cid_content_raises_for_conservative_classification(
     content_data: bytes,
     error_pattern: str,
 ) -> None:
-    """验证无法精确归因的坏 CID 内容不会静默退回字体名估算。"""
+    """Verify that bad CID content that cannot be accurately attributed does not silently fall back on font name estimates."""
     with pytest.raises(ValueError, match=error_pattern):
         _get_exact_cid_usage(_write_single_sample_page(content_data))
 
 
 def test_cyclic_form_raises_for_conservative_classification() -> None:
-    """验证自引用 Form 在精确计数阶段被识别为循环。"""
+    """Verify that self-referencing Form was identified as a loop during the exact count phase."""
     with pytest.raises(ValueError, match="Cyclic PDF Form XObject"):
         _get_exact_cid_usage(_build_cyclic_form_pdf())
 
 
 def test_missing_raw_text_bytes_are_rejected() -> None:
-    """验证坏 CID 字符串缺少原始字节时不会使用已解码文本猜测。"""
+    """Validation bad CID Decoded text guessing is not used when string is missing raw bytes."""
     with pytest.raises(ValueError, match="original bytes"):
         pdf_classify._get_pdf_string_raw_bytes("decoded text")
 
@@ -235,11 +235,11 @@ def test_missing_raw_text_bytes_are_rejected() -> None:
 def test_classifier_returns_ocr_when_exact_content_analysis_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """验证内容流精确分析异常沿用分类器的保守 OCR 兜底。"""
+    """Validate content flow accurate analysis anomaly inheritance classifier's conservative OCR cover."""
     pdf_bytes = MIXED_ELEMENTS_PDF.read_bytes()
 
     def fail_font_analysis(_pdf_bytes: bytes, _page_indices: list[int]) -> dict[str, Any]:
-        """模拟内容流无法解析。"""
+        """The mock content stream cannot be parsed."""
         raise ValueError("broken content stream")
 
     monkeypatch.setattr(
@@ -270,14 +270,14 @@ def test_demo_pdf_classification_regressions(
     pdf_name: str,
     expected_mode: str,
 ) -> None:
-    """验证仓库标准 PDF 分类仅修正目标样本且其余结果保持稳定。"""
+    """Validation warehouse standard PDF classification only corrects the target sample and the remaining results remain stable."""
     pdf_path = REPO_ROOT / "demo" / "pdfs" / pdf_name
     with PDFDocument(str(pdf_path)) as pdf_doc:
         assert pdf_doc.classify() == expected_mode
 
 
 def test_synthetic_flash_fixture_classification_regression() -> None:
-    """验证脱敏合成表格夹具继续稳定分类为 TXT。"""
+    """Verify that the desensitized synthetic form fixture continues to be stably classified as TXT."""
 
     with PDFDocument(str(SYNTHETIC_FLASH_PDF)) as pdf_doc:
         assert pdf_doc.classify() == "txt"

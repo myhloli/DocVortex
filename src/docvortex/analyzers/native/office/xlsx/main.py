@@ -4,14 +4,14 @@ from ... import XlsxModel
 
 
 def convert_path(file_path: str) -> list[list[dict[str, Any]]]:
-    """从 XLSX 文件路径调用统一模型入口。"""
+    """Call the unified model entry from the XLSX file path."""
 
     with open(file_path, "rb") as fh:
         return convert_binary(fh)
 
 
 def convert_binary(file_binary: BinaryIO) -> list[list[dict[str, Any]]]:
-    """兼容旧二进制转换函数，并转发给 XlsxModel。"""
+    """Compatible with old binary conversion functions and forwarded to XlsxModel."""
 
     return XlsxModel().predict(file_binary)
 

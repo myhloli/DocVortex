@@ -1,4 +1,4 @@
-"""核对 Rust 对象树遍历的矩阵、裁剪、顺序和异常边界。"""
+"""Check matrix, clipping, ordering and exception bounds for Rust object tree traversal."""
 
 from contextlib import closing
 import ctypes
@@ -19,7 +19,7 @@ from docvortex.document.pdf.pdfium import pdfium_guard
 
 @pytest.fixture
 def native():
-    """强制 Rust 任务不能静默跳过，纯 Python 任务保持参考测试模式。"""
+    """Forced Rust tasks cannot be silently skipped, pure Python tasks remain in reference test mode."""
     extension = get_native()
     if extension is None:
         pytest.skip("native backend is not selected")
@@ -27,7 +27,7 @@ def native():
 
 
 def nested_pdf():
-    """构建带嵌套 Form、旋转、斜切、曲线裁剪与不可见区域的真实 PDF。"""
+    """Build a real PDF with nested Forms, rotations, bevels, curve clipping and invisible areas."""
     stream = BytesIO()
     canvas = Canvas(stream)
     canvas.beginForm("inner")
@@ -54,7 +54,7 @@ def nested_pdf():
 
 @pytest.mark.parametrize("kind", [raw.FPDF_PAGEOBJ_TEXT, raw.FPDF_PAGEOBJ_PATH, raw.FPDF_PAGEOBJ_IMAGE])
 def test_object_bridge_matches_reference(native, kind):
-    """同一页面逐字段比较借用对象地址、矩阵、裁剪和遍历顺序。"""
+    """The same page compares the borrowed object address, matrix, clipping and traversal order field by field."""
     with pdfium_guard(), pdfium.PdfDocument(nested_pdf()) as document:
         with closing(document[0]) as page:
             expected = [
@@ -67,7 +67,7 @@ def test_object_bridge_matches_reference(native, kind):
 
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
 def test_text_visibility_bridge_matches_reference(native, monkeypatch, rotation):
-    """Rust 同批读取 TEXT 状态/裁剪，并与 Python 属性读取逐字段一致。"""
+    """Rust reads TEXT status/cropping in the same batch, and is consistent with Python attribute reading field by field."""
     with pdfium_guard(), pdfium.PdfDocument(nested_pdf()) as document:
         with closing(document[0]) as page:
             page.set_rotation(rotation)
@@ -86,7 +86,7 @@ def test_text_visibility_bridge_matches_reference(native, monkeypatch, rotation)
 
 
 def test_text_visibility_bridge_fallback_and_compute_failure(native, monkeypatch):
-    """ABI 不兼容回退 Python；已进入 Rust 的异常必须原样传播。"""
+    """ABI is not compatible with fallback Python; exceptions that have entered Rust must be propagated unchanged."""
     assert hasattr(native, "read_pdfium_text_visibility")
     with pdfium_guard(), pdfium.PdfDocument(nested_pdf()) as document:
         with closing(document[0]) as page:
@@ -102,7 +102,7 @@ def test_text_visibility_bridge_fallback_and_compute_failure(native, monkeypatch
 
 
 def test_text_visibility_python_backend_reports_reference_choice(monkeypatch):
-    """纯 Python 后端只记录能力选择，不把扩展不存在伪装成执行成功。"""
+    """The pure Python backend only records capability selections and does not disguise the absence of extensions as successful execution."""
 
     before = bridge.bridge_info()["pdfium_text_visibility_bridge_calls"]
     monkeypatch.setattr(bridge, "get_native", lambda: None)
@@ -113,7 +113,7 @@ def test_text_visibility_python_backend_reports_reference_choice(monkeypatch):
 
 
 def test_text_visibility_bridge_rejects_invalid_addresses(native):
-    """无效地址或几何在 unsafe 前拒绝，防止借用悬挂页面对象。"""
+    """Invalid addresses or geometries are rejected before unsafe to prevent borrowing of dangling page objects."""
     for addresses, handle, rotation, frame in [
         ([], 1, 0, (0.0, 0.0, 10.0, 10.0)),
         ([0] * 14, 1, 0, (0.0, 0.0, 10.0, 10.0)),
@@ -126,7 +126,7 @@ def test_text_visibility_bridge_rejects_invalid_addresses(native):
 
 
 def test_object_bridge_abi_fallback_and_compute_failure(native, monkeypatch):
-    """仅能力不兼容允许参考回退，已进入 Rust 的异常必须传播。"""
+    """Only capability incompatibilities allow reference fallback, exceptions that have entered Rust must be propagated."""
     with pdfium_guard(), pdfium.PdfDocument(nested_pdf()) as document:
         with closing(document[0]) as page:
             with monkeypatch.context() as context:
@@ -139,14 +139,14 @@ def test_object_bridge_abi_fallback_and_compute_failure(native, monkeypatch):
 
 
 def test_object_bridge_rejects_invalid_addresses(native):
-    """无效地址在进入 unsafe 调用前拒绝，不触发原生崩溃。"""
+    """Invalid addresses are rejected before entering the unsafe call without triggering a native crash."""
     for addresses, handle, depth in [([], 1, 15), ([0] * 11, 1, 15), ([1] * 11, 0, 15), ([1] * 11, 1, 65)]:
         with pytest.raises(ValueError, match="invalid PDFium"):
             native.read_pdfium_objects(addresses, handle, 1, depth)
 
 
 def test_drawing_bridge_fallback_and_compute_failure(native, monkeypatch):
-    """复杂 Form 与 ABI 不兼容回退；进入 Rust 后的计算错误原样传播。"""
+    """Complex Form and ABI are incompatible fallbacks; calculation errors after entering Rust are propagated unchanged."""
     assert hasattr(native, "read_pdfium_drawing_lines")
     with pdfium_guard(), pdfium.PdfDocument(nested_pdf()) as document:
         with closing(document[0]) as page:
@@ -164,7 +164,7 @@ def test_drawing_bridge_fallback_and_compute_failure(native, monkeypatch):
 
 
 def test_native_subpaths_match_reference_and_share_endpoints(native):
-    """原生解码保留子路径、曲线控制点、闭合边和同一点对象的引用。"""
+    """Native decoding preserves references to subpaths, curve control points, closed edges, and same-point objects."""
     stream = BytesIO()
     canvas = Canvas(stream)
     path = canvas.beginPath()

@@ -1,4 +1,4 @@
-"""不依赖 PDF 运行时或图像编解码的坐标原语。"""
+"""Coordinate primitives that do not rely on the PDF runtime or image codec."""
 
 from __future__ import annotations
 
@@ -12,18 +12,18 @@ from ..schema import BBox
 
 
 def bbox_to_quad(bbox: list[float] | tuple[float, ...]) -> np.ndarray:
-    """将轴对齐矩形转换为按边界顺序排列的四点坐标。"""
+    """Converts an axis-aligned rectangle to four-point coordinates in bounds order."""
     x0, y0, x1, y1 = [float(v) for v in bbox]
     return np.asarray([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], dtype=np.float32)
 
 
 def bbox_center(bbox: BBox) -> tuple[float, float]:
-    """计算 bbox 中心点，用于判断图片或公式应归属哪个表格。"""
+    """Calculate bbox center point, used to determine which table the picture or formula should belong to."""
     return (float(bbox[0]) + float(bbox[2])) / 2.0, (float(bbox[1]) + float(bbox[3])) / 2.0
 
 
 def normalize_quarter_turn_angle(angle: Any) -> int:
-    """规范视觉块角度为 0/90/180/270，无法识别的角度按 0 处理。"""
+    """The standard visual block angle is 0/90/180/270, and unrecognizable angles are treated as 0."""
     try:
         normalized_angle = int(float(angle or 0)) % 360
     except (TypeError, ValueError):
@@ -41,13 +41,13 @@ def rotate_bbox(
     image_height: float,
     angle: int,
 ) -> BBox:
-    """把原表格裁图中的 bbox 同步转换到旋转后裁图坐标系。"""
+    """Synchronously convert bbox in the original table cropping to the rotated cropping coordinate system."""
     x0, y0, x1, y1 = [float(value) for value in bbox]
     if angle == 270:
-        # 顺时针旋转 90 度后，新 x 轴来自原 y 轴的反方向。
+        # Rotated 90 degrees clockwise, the new x axis comes from the opposite direction of the original y axis.
         return (image_height - y1, x0, image_height - y0, x1)
     if angle == 90:
-        # 逆时针旋转 90 度后，新 y 轴来自原 x 轴的反方向。
+        # After rotating 90 degrees counterclockwise, the new y axis comes from the opposite direction of the original x axis.
         return (y0, image_width - x1, y1, image_width - x0)
     if angle == 180:
         return (image_width - x1, image_height - y1, image_width - x0, image_height - y0)
@@ -63,7 +63,7 @@ def convert_bbox(
     render_scale: float = 1.0,
     clip: bool = False,
 ) -> BBox | None:
-    """显式转换坐标空间；page_size 使用 PDF point，render_scale 表示每 point 像素数。"""
+    """Explicitly transform the coordinate space; page_size uses PDF to point, and render_scale represents the number of pixels per point."""
     spaces = {"unit", "pixel", "point"}
     if source_space not in spaces or target_space not in spaces:
         raise ValueError("Unknown coordinate space")
@@ -96,7 +96,7 @@ def convert_bbox(
 
 
 def normalize_bbox(raw_bbox: Any) -> BBox | None:
-    """校验模型 block 的四点框，返回可用于面积包含判断的浮点坐标。"""
+    """Verify the four-point box of model block and return floating point coordinates that can be used to determine area inclusion."""
     try:
         if raw_bbox is None or len(raw_bbox) != 4:
             return None

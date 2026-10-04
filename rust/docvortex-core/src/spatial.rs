@@ -1,8 +1,8 @@
-//! 有界同行区间查询；每次只返回一小批行，不保存平方规模的配对集合。
+//! Bounded peer interval query; only a small batch of rows are returned each time, and square-scale paired sets are not saved.
 
 use crate::geometry::Box4;
 
-/// 复现有限框的水平交叠比例，零宽和反向框保持原来的零支持量。
+/// Reproduce the horizontal overlap ratio of the finite box, and the zero-width and reverse boxes maintain the original zero support.
 fn x_overlap(a: Box4, b: Box4) -> f64 {
     let length = a[2].min(b[2]) - a[0].max(b[0]);
     let smaller = (a[2] - a[0]).min(b[2] - b[0]);
@@ -13,7 +13,7 @@ fn x_overlap(a: Box4, b: Box4) -> f64 {
     }
 }
 
-/// 批量计算标题净空，按源顺序处理相同对象和视觉行，溢出交给 Python。
+/// Header headroom is calculated in batches, identical objects and visual rows are processed in source order, and overflows are handed over to Python.
 pub fn title_gaps(
     records: Vec<(usize, Option<usize>, Box4, f64, bool)>,
 ) -> Option<Vec<(Option<f64>, Option<f64>)>> {
@@ -58,7 +58,7 @@ pub fn title_gaps(
     Some(output)
 }
 
-/// 为一页几何分析选择最近上下邻行；距离相等保留第一个来源，返回索引而非复制对象。
+/// Select the nearest upper and lower neighbor rows for a page of geometric analysis; keep the first source if the distance is equal, and return the index instead of copying the object.
 pub fn line_neighbors(
     records: Vec<(usize, Box4, f64, f64)>,
 ) -> Option<Vec<(Option<usize>, Option<usize>)>> {
@@ -115,7 +115,7 @@ pub struct IntervalIndex {
 }
 
 impl IntervalIndex {
-    /// 建立按左端点排序的最大右端点树，输入必须是已经验证的有限区间。
+    /// To establish the maximum right endpoint tree sorted by the left endpoint, the input must be a verified limited interval.
     pub fn new(bounds: Vec<(f64, f64)>, group_ids: Vec<usize>) -> Option<Self> {
         if bounds.len() != group_ids.len()
             || bounds
@@ -162,7 +162,7 @@ impl IntervalIndex {
         })
     }
 
-    /// 返回当前行右侧的相交行，按原始索引排序以保持并查集合并顺序。
+    /// Return the intersecting rows to the right of the current row, sorted by the original index to maintain the merge order of the merge lookup.
     pub fn query(&self, index: usize) -> Vec<usize> {
         let (low, high) = self.bounds[index];
         let group = &self.groups[self.group_ids[index]];
@@ -188,7 +188,7 @@ impl IntervalIndex {
         result
     }
 
-    /// 批量查询有限行数；单个极密行可以超过预算，但不会缓存整个页面的行对。
+    /// Batch queries have a limited number of rows; a single extremely dense row can exceed the budget, but an entire page of row pairs will not be cached.
     pub fn rows(&self, start: usize, count: usize, budget: usize) -> Vec<Vec<usize>> {
         let mut result = Vec::new();
         let mut total = 0;
@@ -204,7 +204,7 @@ impl IntervalIndex {
     }
 }
 
-/// 同行安全超集过滤，保留普通框和原始连续字符框两条独立路径。
+/// Peer safe superset filtering, retaining two independent paths of ordinary boxes and original continuous character boxes.
 pub struct BaselineGeometry {
     index: IntervalIndex,
     boxes: Vec<Box4>,
@@ -212,7 +212,7 @@ pub struct BaselineGeometry {
     sources: Vec<Option<Box4>>,
 }
 
-/// 有限正向框的参考同行几何，计算顺序与 Python 一致。
+/// The reference peer geometry of the finite forward frame, the calculation sequence is consistent with Python.
 fn same_baseline(a: Box4, ah: f64, b: Box4, bh: f64) -> bool {
     let h = ah.max(bh);
     if ah.min(bh) <= 0.0 || h / ah.min(bh) > 1.35 {
@@ -228,13 +228,13 @@ fn same_baseline(a: Box4, ah: f64, b: Box4, bh: f64) -> bool {
     gap >= -0.25 * h && gap <= 3.0_f64.max(0.75 * h)
 }
 
-/// 验证打包记录，限制幅度避免中间运算溢出改变必要条件。
+/// Verify the packaging record and limit the range to avoid intermediate operation overflow and change necessary conditions.
 fn safe_box(b: &Box4) -> bool {
     b.iter().all(|v| v.is_finite() && v.abs() <= 1e100) && b[2] > b[0] && b[3] > b[1]
 }
 
 impl BaselineGeometry {
-    /// 每次闭包阶段构建独立只读索引，不复用已经合并的旧几何。
+    /// Each closure phase builds an independent read-only index and does not reuse the old geometry that has been merged.
     pub fn new(
         bounds: Vec<(f64, f64)>,
         groups: Vec<usize>,
@@ -260,7 +260,7 @@ impl BaselineGeometry {
         })
     }
 
-    /// 只剔除所有参考分支均不可能接受的行对，语义与表格判断仍由 Python 执行。
+    /// Only row pairs that are impossible to accept in all reference branches are eliminated, and semantic and table judgments are still performed by Python.
     fn accepts(&self, i: usize, j: usize) -> bool {
         let (a, b, ah, bh) = (
             self.boxes[i],
@@ -287,7 +287,7 @@ impl BaselineGeometry {
         gap >= -0.15 * h && gap <= 0.75
     }
 
-    /// 保序返回有界行批次，单行超预算时仍返回全部成员。
+    /// The bounded row batch is returned in order, and all members are still returned when a single row exceeds the budget.
     pub fn rows(&self, start: usize, count: usize, budget: usize) -> Vec<Vec<usize>> {
         let mut output = Vec::new();
         let mut total = 0;

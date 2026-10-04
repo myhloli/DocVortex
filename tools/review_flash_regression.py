@@ -1,4 +1,4 @@
-"""在明确版本下捕获历史语料，逐页比较语义、几何和标框，不自动批准基线。"""
+"""Capture historical corpus under explicit version, compare semantics, geometry and framing on a page-by-page basis without automatic baseline approval."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ _PAGE_IDENTITY_FIELDS = ("fingerprint", "bbox_fingerprint")
 
 
 def _capture_environment(root: Path) -> dict:
-    """记录提交、解释器、PDFium 与字体运行时身份，供跨平台几何差异归因。"""
+    """Document commit, interpreter, PDFium and font runtime identities for cross-platform geometric difference attribution."""
     import pypdfium2
     from importlib.metadata import version
 
@@ -36,7 +36,7 @@ def _capture_environment(root: Path) -> dict:
 
 
 def build_comparison(output: Path, baseline: Path) -> None:
-    """为每个变化页生成同尺度前后标框，页面内容和模型 JSON 均可直接复核。"""
+    """Generate front and rear labels of the same scale for each change page, and the page content and model JSON can be directly reviewed."""
     from docvortex.document.pdf import PDFDocument
 
     documents = json.loads((output / "summary.json").read_text(encoding="utf-8"))
@@ -67,7 +67,7 @@ def build_comparison(output: Path, baseline: Path) -> None:
 
 
 def main() -> None:
-    """隔离导入指定 checkout，保存完整历史输出和变化页清单。"""
+    """Isolate import specified checkout, save complete historical output and change page list."""
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[1])

@@ -1,4 +1,4 @@
-"""在现有 setuptools 构建中选择原生扩展或可独立安装的纯 Python 包。"""
+"""Choose between native extensions or stand-alone installable pure Python packages within an existing setuptools build."""
 
 import os
 import shutil

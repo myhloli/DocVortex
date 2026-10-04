@@ -19,7 +19,7 @@ def _text_block(
     lane_is_span: bool = False,
     font_signature: tuple[str, int] | None = ("TestFont", 400),
 ) -> dict[str, object]:
-    """构造带稳定行框、字体和栏带元数据的独立文本测试块。"""
+    """Construct independent text test blocks with stable line boxes, fonts, and column metadata."""
 
     return {
         "type": block_type,
@@ -41,7 +41,7 @@ def _visual_block(
     *,
     block_type: str = "image",
 ) -> dict[str, object]:
-    """构造不包含内部文本的视觉主体测试块。"""
+    """Constructs a visual body test block that contains no inner text."""
 
     return {
         "type": block_type,
@@ -54,7 +54,7 @@ def _visual_block(
 def _classify_with_text_block_merge(
     blocks: list[dict[str, object]],
 ) -> list[list[dict[str, object]]]:
-    """通过 pipeline 使用的文本合并回调运行视觉注释分类。"""
+    """Run visual annotation classification through the text merge callback used by pipeline."""
 
     return visual_annotations._classify_and_bind_visual_annotations(
         blocks,
@@ -83,7 +83,7 @@ def _classify_with_text_block_merge(
     ],
 )
 def test_strong_caption_markers_accept_numbered_titles(content: str) -> None:
-    """验证中英文强标题标记兼容常用编号写法。"""
+    """Verify that Chinese and English strong title tags are compatible with common numbering methods."""
 
     assert visual_annotations._is_strong_caption_text(content)
 
@@ -102,13 +102,13 @@ def test_strong_caption_markers_accept_numbered_titles(content: str) -> None:
     ],
 )
 def test_strong_caption_markers_reject_body_references(content: str) -> None:
-    """验证正文引用、并列编号和无编号标签不会进入标题候选。"""
+    """Verify that in-text citations, concurrent numbering, and unnumbered tags do not enter title candidates."""
 
     assert not visual_annotations._is_strong_caption_text(content)
 
 
 def test_stacked_bilingual_captions_share_visual_parent() -> None:
-    """验证编号相同、上下紧邻的中英文图题共同绑定一个图片。"""
+    """Verify that the Chinese and English picture titles with the same number and immediately above and below are bound to one picture."""
 
     image = _visual_block((20.0, 20.0, 180.0, 120.0))
     chinese = _text_block(
@@ -146,7 +146,7 @@ def test_stacked_bilingual_captions_share_visual_parent() -> None:
     ],
 )
 def test_strong_footnote_markers_require_colon_and_body(content: str) -> None:
-    """验证来源与注释强规则要求冒号和实际正文。"""
+    """Strong rules for verifying sources and comments require colons and actual text."""
 
     assert visual_annotations._is_strong_footnote_text(content)
 
@@ -156,7 +156,7 @@ def test_strong_footnote_markers_require_colon_and_body(content: str) -> None:
     ["Note that the value changes.", "Source material is public.", "注释内容", "来源："],
 )
 def test_strong_footnote_markers_reject_narrative_text(content: str) -> None:
-    """验证无冒号的叙述句和空标记不会进入脚注候选。"""
+    """Verify that narrative sentences without colons and empty tags do not enter footnote candidates."""
 
     assert not visual_annotations._is_strong_footnote_text(content)
 
@@ -174,7 +174,7 @@ def test_caption_binds_on_all_four_sides(
     caption_bbox: tuple[float, float, float, float],
     expected_order: tuple[str, str],
 ) -> None:
-    """验证上下左右紧邻标题均能绑定，并按相对方向展开。"""
+    """Verify that the top, bottom, left, and right adjacent titles can be bound and expanded in relative directions."""
 
     caption = _text_block("Figure 1: Overview", caption_bbox)
     image = _visual_block((40.0, 40.0, 80.0, 80.0))
@@ -188,7 +188,7 @@ def test_caption_binds_on_all_four_sides(
 
 
 def test_rotated_caption_uses_parent_local_coordinates() -> None:
-    """验证九十度页面块会先转入共同局部坐标再判断上方标题。"""
+    """Verify that the ninety-degree page block will first enter the common local coordinates and then determine the upper title."""
 
     caption = _text_block("Figure 1: Rotated", (165.0, 40.0, 175.0, 80.0))
     image = _visual_block((120.0, 40.0, 160.0, 80.0))
@@ -204,7 +204,7 @@ def test_rotated_caption_uses_parent_local_coordinates() -> None:
 
 
 def test_caption_rejects_more_than_one_line_height_penetration() -> None:
-    """验证边缘轻微浮入主体可接受，深入超过自身一行高则保持 text。"""
+    """Verify that the edge floats slightly into the body and remains text if it goes deeper than one line height above itself."""
 
     image = _visual_block((40.0, 40.0, 80.0, 80.0))
     accepted = _text_block("Figure 1: Accepted", (40.0, 72.0, 80.0, 82.0))
@@ -226,7 +226,7 @@ def test_caption_rejects_more_than_one_line_height_penetration() -> None:
 
 
 def test_footnote_accepts_six_line_gap_but_rejects_farther_text() -> None:
-    """验证视觉块下方脚注的六行高距离上限为闭区间。"""
+    """Verify that the six-line high distance cap of the footnote below the visual block is a closed interval."""
 
     image = _visual_block((20.0, 20.0, 100.0, 50.0))
     accepted = _text_block("Note: accepted", (20.0, 110.0, 100.0, 120.0))
@@ -250,7 +250,7 @@ def test_footnote_accepts_six_line_gap_but_rejects_farther_text() -> None:
 
 
 def test_existing_visual_footnote_binds_without_content_marker() -> None:
-    """验证已有横线小字 footnote 无需再次命中内容规则即可加入区域。"""
+    """Verify that there are already small horizontal lines footnote. You can join the zone without hitting the content rules again."""
 
     image = _visual_block((20.0, 20.0, 100.0, 60.0))
     footnote = _text_block(
@@ -268,7 +268,7 @@ def test_existing_visual_footnote_binds_without_content_marker() -> None:
 
 
 def test_preclassified_table_annotations_keep_local_order_and_do_not_expand() -> None:
-    """验证预分类 caption/table/footnote 稳定成组，完整表注不吸收后续正文。"""
+    """Verify that the pre-categorization caption/table/footnote is stable and grouped, and the complete table notes do not absorb the subsequent text."""
 
     caption = _text_block(
         "unmarked table title",
@@ -298,7 +298,7 @@ def test_preclassified_table_annotations_keep_local_order_and_do_not_expand() ->
 
 
 def test_table_footnote_merges_multiple_hanging_indent_continuations() -> None:
-    """验证表注强标记会吸收多个同栏悬挂缩进续块并保留内部元数据。"""
+    """Validation table note strong markup will absorb multiple hanging indented continuation blocks in the same column and preserve internal metadata."""
 
     table = _visual_block((20.0, 20.0, 180.0, 60.0), block_type="table")
     anchor = _text_block(
@@ -348,7 +348,7 @@ def test_table_footnote_uses_pair_median_gap_limit(
     gap: float,
     should_merge: bool,
 ) -> None:
-    """验证 page 31 型净空按配对中位行高的一点五倍闭区间判定。"""
+    """Verification page Type 31 headroom is determined by a closed interval of one and a half times the paired median line height."""
 
     table = _visual_block((20.0, 20.0, 180.0, 60.0), block_type="table")
     anchor = _text_block(
@@ -417,7 +417,7 @@ def test_table_footnote_uses_pair_median_gap_limit(
 def test_table_footnote_rejects_incompatible_continuation(
     candidate: dict[str, object],
 ) -> None:
-    """验证间距、缩进、字体、行高或栏带突变均终止表注聚合。"""
+    """Verify that mutations in spacing, indentation, font, line height, or column banding terminate table annotation aggregation."""
 
     table = _visual_block((20.0, 20.0, 180.0, 60.0), block_type="table")
     anchor = _text_block(
@@ -439,7 +439,7 @@ def test_table_footnote_rejects_incompatible_continuation(
 def test_table_footnote_does_not_skip_semantic_or_visual_barrier(
     barrier_type: str,
 ) -> None:
-    """验证语义块或视觉块横隔栏带时，不会越过它吸收后续文本。"""
+    """When validating a semantic block or visual block strip, subsequent text will not be absorbed beyond it."""
 
     table = _visual_block((20.0, 20.0, 180.0, 60.0), block_type="table")
     anchor = _text_block(
@@ -472,7 +472,7 @@ def test_table_footnote_does_not_skip_semantic_or_visual_barrier(
 
 
 def test_table_footnote_stops_before_second_strong_annotation() -> None:
-    """验证第二个强标记注释保持独立，不会成为前一个表注的续块。"""
+    """Verify that the second strongly marked comment remains independent and does not become a continuation of the previous table comment."""
 
     table = _visual_block((20.0, 20.0, 180.0, 60.0), block_type="table")
     first = _text_block(
@@ -494,7 +494,7 @@ def test_table_footnote_stops_before_second_strong_annotation() -> None:
 
 
 def test_table_footnote_continuation_uses_rotated_local_coordinates() -> None:
-    """验证九十度表注在共同局部坐标中按相同缩进规则完成合并。"""
+    """Verify that ninety-degree table annotations are merged in common local coordinates using the same indentation rules."""
 
     angle = 90
     table_local = (20.0, 20.0, 180.0, 60.0)
@@ -539,7 +539,7 @@ def test_table_footnote_continuation_uses_rotated_local_coordinates() -> None:
 def test_non_table_or_existing_footnote_does_not_expand_continuations(
     visual_type: str,
 ) -> None:
-    """验证图片、代码脚注和既有 footnote 不进入表格强标记聚合范围。"""
+    """Verify that images, code footers, and existing footnote do not enter table strong tag aggregation scope."""
 
     image = _visual_block(
         (20.0, 20.0, 180.0, 60.0),
@@ -584,7 +584,7 @@ def test_non_table_or_existing_footnote_does_not_expand_continuations(
 
 
 def test_caption_does_not_expand_hanging_indent_text() -> None:
-    """验证表格 caption 即使后接悬挂缩进正文也不会触发表注聚合。"""
+    """Validation table caption does not trigger table annotation aggregation even if followed by dangling indent body text."""
 
     table = _visual_block((20.0, 20.0, 180.0, 60.0), block_type="table")
     caption = _text_block(
@@ -611,7 +611,7 @@ def test_caption_does_not_expand_hanging_indent_text() -> None:
 def test_cross_lane_caption_companion_uses_geometry_for_all_visual_parents(
     visual_type: str,
 ) -> None:
-    """验证三类跨栏视觉父块均可仅凭空间补标另一栏标题。"""
+    """Verify that all three types of cross-column visual parent blocks can add another column title using only space."""
 
     parent = _visual_block(
         (20.0, 20.0, 180.0, 80.0),
@@ -648,7 +648,7 @@ def test_cross_lane_caption_companion_uses_geometry_for_all_visual_parents(
 
 
 def test_cross_lane_caption_companion_above_parent_keeps_left_to_right_order() -> None:
-    """验证父块上方的双栏标题同样按左栏、右栏、主体展开。"""
+    """Verify that the two-column header above the parent block is also expanded by left column, right column, and body."""
 
     table = _visual_block(
         (20.0, 80.0, 180.0, 130.0),
@@ -673,7 +673,7 @@ def test_cross_lane_caption_companion_above_parent_keeps_left_to_right_order() -
 
 
 def test_cross_lane_caption_companion_uses_rotated_local_coordinates() -> None:
-    """验证旋转页面在共同局部坐标中完成跨栏匹配和行内排序。"""
+    """Verify that the rotated page completes cross-column matching and in-row sorting in common local coordinates."""
 
     angle = 90
     parent_local = (20.0, 20.0, 180.0, 80.0)
@@ -723,7 +723,7 @@ def test_cross_lane_caption_companion_uses_rotated_local_coordinates() -> None:
     ],
 )
 def test_cross_lane_caption_companion_rejects_unsafe_geometry(case: str) -> None:
-    """验证缺少任一关键空间或排版证据时不补标跨栏标题。"""
+    """Verify that cross-column headings are not added when any key spacing or typographic evidence is missing."""
 
     parent = _visual_block((20.0, 20.0, 180.0, 80.0))
     anchor = _text_block(
@@ -761,7 +761,7 @@ def test_cross_lane_caption_companion_rejects_unsafe_geometry(case: str) -> None
 
 
 def test_cross_lane_caption_companion_rejects_multiple_spatial_peers() -> None:
-    """验证一个锚点同时命中多个栏带时保持全部同伴为正文。"""
+    """Verify that when an anchor hits multiple columns at the same time, all companions are kept as text."""
 
     parent = _visual_block((10.0, 20.0, 190.0, 80.0))
     anchor = _text_block(
@@ -789,7 +789,7 @@ def test_cross_lane_caption_companion_rejects_multiple_spatial_peers() -> None:
 
 
 def test_cross_lane_caption_companion_rejects_multiple_caption_anchors() -> None:
-    """验证一个同伴被多个标题锚点认领时维持正文分类。"""
+    """Verify that text classification is maintained when a companion is claimed by multiple title anchors."""
 
     parent = _visual_block((20.0, 20.0, 180.0, 80.0))
     upper_anchor = _text_block(
@@ -817,7 +817,7 @@ def test_cross_lane_caption_companion_rejects_multiple_caption_anchors() -> None
 
 
 def test_multi_panel_images_only_group_when_union_improves_coverage() -> None:
-    """验证跨面板标题绑定图片并集，而单图标题不会无故吞并相邻图片。"""
+    """Verify that cross-panel titles bind image unions, and that single-image titles do not swallow adjacent images without reason."""
 
     caption = _text_block("Figure 1: Two panels", (10.0, 10.0, 90.0, 20.0))
     left = _visual_block((10.0, 25.0, 45.0, 60.0))
@@ -844,7 +844,7 @@ def test_multi_panel_images_only_group_when_union_improves_coverage() -> None:
 
 
 def test_nearest_parent_wins_and_intervening_body_blocks_cross_binding() -> None:
-    """验证竞争父块优先选择归一化边距更小者，正文阻挡远距绑定。"""
+    """Verify that competing parent blocks preferentially select the smaller normalized margin, and the text blocks long-distance binding."""
 
     upper = _visual_block((20.0, 10.0, 100.0, 40.0))
     caption = _text_block("Figure 1: Upper", (20.0, 45.0, 100.0, 55.0))
@@ -870,7 +870,7 @@ def test_nearest_parent_wins_and_intervening_body_blocks_cross_binding() -> None
 
 
 def test_visual_regions_prevent_cross_column_row_remerge() -> None:
-    """验证同一拆分视觉行的左右标题在区域化后不会先于两个主体一起输出。"""
+    """Verify that the left and right headers of the same split visual line are not output together before the two bodies after regionalization."""
 
     left_caption = _text_block(
         "Chart 1: Left",
@@ -900,7 +900,7 @@ def test_visual_regions_prevent_cross_column_row_remerge() -> None:
 
 
 def test_non_text_marginals_never_enter_visual_reclassification() -> None:
-    """验证 footer 与 page_footnote 即使内容像强规则也不会改为视觉脚注。"""
+    """Verify that footer and page_footnote are not changed to visual footnotes even if the content looks like a strong rule."""
 
     image = _visual_block((20.0, 20.0, 100.0, 60.0))
     footer = _text_block(

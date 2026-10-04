@@ -1,11 +1,11 @@
-//! 重复绘制、隐藏文字候选与映射分组的批量绑定。
+//! Repeated drawing, batch binding of hidden text candidates and mapping groups.
 
 use docvortex_core::dedup;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple, PyType};
 use std::collections::{HashMap, HashSet};
 
-/// 普通整数使用有界读取，超大或自定义整数由 Python 参考实现处理。
+/// Ordinary integers use bounded reads, oversized or custom integers are handled by the Python reference implementation.
 fn plain_integer(value: &Bound<'_, PyAny>) -> Option<i64> {
     value
         .is_exact_instance_of::<PyInt>()
@@ -13,7 +13,7 @@ fn plain_integer(value: &Bound<'_, PyAny>) -> Option<i64> {
         .flatten()
 }
 
-/// 直接借用现有字符列表，一次准备映射保护区间与 Glyph 行框，不重新打包旧分组内核。
+/// Directly borrow the existing character list, prepare the mapping protection interval and the Glyph line box once, and do not repackage the old grouping kernel.
 #[pyfunction]
 pub(super) fn mapping_glyph_rows<'py>(
     py: Python<'py>,
@@ -171,7 +171,7 @@ pub(super) fn mapping_glyph_rows<'py>(
             false
         };
         if same {
-            // 异字符保护组也返回完整区间；Unicode 转换在全部准备完成后由 Python 执行。
+            // The heterogeneous character protection group also returns the complete interval; Unicode conversion is executed by Python after all preparations are completed.
             output.last_mut().expect("mapping group exists").1 = position + 1;
         } else {
             let box_tuple = if box4[2] > box4[0] && box4[3] > box4[1] {
@@ -191,7 +191,7 @@ pub(super) fn mapping_glyph_rows<'py>(
     Ok(Some(output))
 }
 
-/// 批量生成重复绘制候选，不在内层循环回调 Python。
+/// Generate repeated drawing candidates in batches without calling back Python in the inner loop.
 #[pyfunction]
 pub(super) fn paint_pairs(
     py: Python<'_>,
@@ -200,7 +200,7 @@ pub(super) fn paint_pairs(
     py.detach(move || dedup::paint_pairs(records))
 }
 
-/// 检查来源索引后批量计算最早来源连通关系。
+/// After checking the source index, calculate the earliest source connectivity relationship in batches.
 #[pyfunction]
 pub(super) fn dedup_components(
     py: Python<'_>,
@@ -215,7 +215,7 @@ pub(super) fn dedup_components(
     Ok(py.detach(move || dedup::components(count, &pairs)))
 }
 
-/// 返回隐藏 OCR 的几何候选，文本比较与来源物化仍由 Python 拥有。
+/// Return the geometry candidate for hidden OCR, text comparison and source materialization are still owned by Python.
 #[pyfunction]
 pub(super) fn hidden_candidates(
     py: Python<'_>,
@@ -224,7 +224,7 @@ pub(super) fn hidden_candidates(
     py.detach(move || dedup::hidden_candidates(records))
 }
 
-/// 在原始候选顺序下确认平移证据，并验证全部来源索引。
+/// Confirm the translation evidence under the original candidate order and verify all source indexes.
 #[pyfunction]
 pub(super) fn confirmed_offsets(
     py: Python<'_>,
@@ -246,7 +246,7 @@ pub(super) fn confirmed_offsets(
     Ok(py.detach(move || dedup::confirmed_offsets(records, pairs, exact)))
 }
 
-/// 只传递一次每字符数值，返回分组范围以复用原有字符对象。
+/// Only pass each character value once, and return the grouping range to reuse the original character object.
 #[pyfunction]
 pub(super) fn mapping_runs(
     py: Python<'_>,

@@ -1,4 +1,4 @@
-"""HTML Flash 解析使用的来源上下文契约。"""
+"""HTML Flash Resolves the source context contract used."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from pathlib import Path
 
 @dataclass(frozen=True, slots=True)
 class HtmlSourceContext:
-    """保存相对链接解析及 HTML 解码所需的来源上下文。
+    """Save the source context required for relative link resolution and HTML decoding.
 
-    远程图片永不下载，仅在结果中保留受限 HTTP(S) 外链，解析过程保持零网络请求。
+    Remote images are never downloaded, only restricted HTTP (S) external links are retained in the results, and the parsing process maintains zero network requests.
     """
 
     source_uri: str | None = None

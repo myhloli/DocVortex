@@ -1,9 +1,9 @@
-//! 有序聚类、字体与栏间距的批量统计绑定。
+//! Ordered clustering, batch statistical binding of fonts and column spacing.
 
 use docvortex_core::geometry::Box4;
 use pyo3::prelude::*;
 
-/// 批量聚类仅返回索引，避免为簇成员复制坐标与公开对象。
+/// Batch clustering only returns indexes to avoid duplicating coordinates and public objects for cluster members.
 #[pyfunction]
 pub(super) fn ordered_clusters(
     py: Python<'_>,
@@ -17,7 +17,7 @@ pub(super) fn ordered_clusters(
     })
 }
 
-/// 聚合已验证的局部框，返回字号、主字体索引和行首特征，不返回重复字符记录。
+/// Aggregate the verified local boxes, return the font size, main font index and line start characteristics, and do not return repeated character records.
 #[pyfunction]
 pub(super) fn typography_metrics(
     py: Python<'_>,
@@ -32,7 +32,7 @@ pub(super) fn typography_metrics(
     })
 }
 
-/// 栏带调用内一次消费稳定快照，保留 Python 成员排序的副作用。
+/// The stable snapshot is consumed once within the band call, and the side effects of Python member sorting are retained.
 #[pyfunction]
 pub(super) fn lane_gap(
     py: Python<'_>,

@@ -1,8 +1,8 @@
-//! 用独立几何结果约束内核边界，Python 随机与真实 PDF 差分另行执行。
+//! The independent geometric results are used to constrain the kernel boundary, and the difference between Python random and real PDF is performed separately.
 
 use docvortex_core::{dedup, scripts, tables};
 
-/// 无内部竖隔断的第一行应构成横跨两列的矩形单元格。
+/// The first row without internal vertical partitions shall form a rectangular cell spanning two columns.
 #[test]
 fn merged_cell_is_rectangular() {
     let parents = tables::grid_parents(4, vec![(0, 1)]);
@@ -10,14 +10,14 @@ fn merged_cell_is_rectangular() {
     assert_eq!(specs, Some(vec![(0, 0, 1, 2), (1, 0, 1, 1), (1, 1, 1, 1)]));
 }
 
-/// L 形连通分量不能变成吞并空格的矩形表格。
+/// L-shaped connected components cannot be turned into a rectangular table that swallows spaces.
 #[test]
 fn l_shaped_component_is_rejected() {
     let parents = tables::grid_parents(4, vec![(0, 1), (0, 2)]);
     assert_eq!(tables::component_specs(parents, 2, 2).1, None);
 }
 
-/// 反向线段与相接线段共同覆盖轨道，零长目标保持零覆盖。
+/// The reverse line segment and the connecting line segment jointly cover the track, and the zero-length target maintains zero coverage.
 #[test]
 fn reversed_and_touching_intervals() {
     let values = tables::coverage_batch(
@@ -30,7 +30,7 @@ fn reversed_and_touching_intervals() {
     assert_eq!(values, Some(vec![1.0, 0.0]));
 }
 
-/// 叠层达到保护上限后，后续字形不得再产生删除候选。
+/// After the stack reaches the upper limit of protection, subsequent glyphs must no longer generate deletion candidates.
 #[test]
 fn paint_bucket_limit_preserves_later_glyphs() {
     let records = (0..80)
@@ -42,7 +42,7 @@ fn paint_bucket_limit_preserves_later_glyphs() {
     assert!(offsets.is_empty());
 }
 
-/// 两个稳定正文字母后的小号上移数字应成为上标。
+/// The upward-moving numbers of the trumpet after the two stable text letters should become superscripts.
 #[test]
 fn raised_digit_follows_body_baseline() {
     let records = vec![
@@ -71,7 +71,7 @@ fn raised_digit_follows_body_baseline() {
     assert_eq!(scripts::classify(records), Some(vec![0, 0, 1]));
 }
 
-/// 普通框不相邻时，原始行框仍可保留连续字符路径。
+/// When ordinary boxes are not adjacent, the original line boxes can still retain continuous character paths.
 #[test]
 fn baseline_keeps_original_source_branch() {
     let index = docvortex_core::spatial::BaselineGeometry::new(
@@ -85,7 +85,7 @@ fn baseline_keeps_original_source_branch() {
     assert_eq!(index.rows(0, 64, 8192), vec![vec![1], vec![]]);
 }
 
-/// 同分竞争必须选首个小行与首个主体，不随排序实现改变。
+/// In the competition for equal points, the first small row and the first subject must be selected and will not change with the sorting implementation.
 #[test]
 fn inline_ties_are_stable() {
     let a = ([10.0, 0.0, 12.0, 4.0], 4.0, 4.0, 1, false, 0, 0);
@@ -96,7 +96,7 @@ fn inline_ties_are_stable() {
     );
 }
 
-/// 聚合平局选择首坐标来源，重复来源不改变输出成员顺序。
+/// Aggregation draw selects the first coordinate source, and repeated sources do not change the output member order.
 #[test]
 fn annotation_union_preserves_first_coordinate() {
     let index = docvortex_core::annotation_geometry::AnnotationGeometry::new(vec![

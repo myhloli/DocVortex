@@ -1,8 +1,8 @@
-"""classify 抽样页加载次数与图像覆盖统计的等价性（#19 回归）。
+"""classify Equivalence of sampled page load times and image coverage statistics (regression #19).
 
-宽高比阶段用 FPDF_GetPageSizeByIndexF 免加载；文本采样与图像覆盖共用一次
-页面加载；覆盖统计走深度 3 的类型过滤原生 walk，与旧 pypdfium2
-get_objects(max_depth=3) 的可见图像集合一致。
+The aspect ratio stage uses FPDF_GetPageSizeByIndexF without loading; text sampling and image overlay are shared once
+Page loads; override statistics go depth 3 type filter native walk, vs. old pypdfium2
+The set of visible images for get_objects (max_depth=3) is consistent.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ classify = import_module("docvortex.document.pdf.classify")
 
 
 def _pdf(objects: list[bytes]) -> bytes:
-    """按对象号顺序写出带 xref 表的最小合法 PDF（对象 1 是 catalog）。"""
+    """Write the smallest legal PDF with the xref table in object number order (object 1 is catalog)."""
     out, offsets = bytearray(b"%PDF-1.7\n"), []
     for number, body in enumerate(objects, start=1):
         offsets.append(len(out))
@@ -31,7 +31,7 @@ def _pdf(objects: list[bytes]) -> bytes:
 
 
 def _text_pages_pdf(pages: int, page_size: tuple[int, int] = (612, 792)) -> bytes:
-    """多页纯文本 PDF，每页正文足以通过 CHARS_THRESHOLD。"""
+    """Multiple pages of plain text PDF, each page of text is sufficient to pass CHARS_THRESHOLD."""
     line = b"BT /F1 12 Tf 72 720 Td (" + b"Plain text on a sampled classification page. " * 3 + b") Tj ET"
     kids = b" ".join(b"%d 0 R" % (4 + 2 * k) for k in range(pages))
     objects: list[bytes] = [
@@ -49,15 +49,15 @@ def _text_pages_pdf(pages: int, page_size: tuple[int, int] = (612, 792)) -> byte
 
 
 def _nested_forms_images_pdf() -> bytes:
-    """图像分布在页、一层、二层、三层嵌套 Form 的 PDF。
+    """The images are distributed in pages, one layer, two layers, and three layers of nested Form PDF.
 
-    深度 3 的 walk 只统计页与两层 Form 内的图像（Im0/Im1/Im2），
-    三层 Form 内的 Im3 被排除，与旧 get_objects(max_depth=3) 一致。
+    walk of depth 3 only counts images within the page and two layers of Form (Im0/Im1/Im2).
+    Im3 within layer three Form is excluded, consistent with old get_objects (max_depth=3).
     """
     image = b"\x80"
 
     def image_xobject() -> bytes:
-        """生成一个最小的灰度图像 XObject。"""
+        """Generates a minimal grayscale image XObject."""
         return (
             b"<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 1 >>\nstream\n"
             + image
@@ -65,7 +65,7 @@ def _nested_forms_images_pdf() -> bytes:
         )
 
     def form_xobject(resources_refs: bytes, content: bytes) -> bytes:
-        """生成含指定资源与绘制指令的 Form XObject。"""
+        """Generate Form XObject containing specified resources and drawing instructions."""
         return (
             b"<< /Type /XObject /Subtype /Form /BBox [0 0 612 792] /Resources << /XObject << %s >> >> /Length %d >>\nstream\n%s\nendstream"
             % (
@@ -85,19 +85,19 @@ def _nested_forms_images_pdf() -> bytes:
             b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
             b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /XObject << /Im0 5 0 R /F0 6 0 R >> >> /Contents 4 0 R >>",
             b"<< /Length %d >>\nstream\n%s\nendstream" % (len(page_content), page_content),
-            image_xobject(),  # 5: Im0 页面级
-            form_xobject(b"/Im1 7 0 R /F1 8 0 R", f0_content),  # 6: F0 一层
-            image_xobject(),  # 7: Im1 深度 1
-            form_xobject(b"/Im2 9 0 R /F2 10 0 R", f1_content),  # 8: F1 二层
-            image_xobject(),  # 9: Im2 深度 2
-            form_xobject(b"/Im3 11 0 R", f2_content),  # 10: F2 三层
-            image_xobject(),  # 11: Im3 深度 3，必须被排除
+            image_xobject(),  # 5: Im0 page level
+            form_xobject(b"/Im1 7 0 R /F1 8 0 R", f0_content),  # 6: F0 first layer
+            image_xobject(),  # 7: Im1 Depth 1
+            form_xobject(b"/Im2 9 0 R /F2 10 0 R", f1_content),  # 8: F1 second floor
+            image_xobject(),  # 9: Im2 Depth 2
+            form_xobject(b"/Im3 11 0 R", f2_content),  # 10: F2 three layers
+            image_xobject(),  # 11: Im3 depth 3, must be excluded
         ]
     )
 
 
 def _clipped_overlapping_images_pdf() -> bytes:
-    """生成裁剪、重叠和缩放 Form 共存的纯图像页，检查旧面积统计语义。"""
+    """Generate image-only pages for cropped, overlapped and scaled Form coexistence, checking old area statistics semantics."""
     image = b"<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 1 >>\nstream\n\x80\nendstream"
     content = (
         b"q 0 0 10 10 re W n 300 0 0 300 30 30 cm /Im Do Q\n"
@@ -119,7 +119,7 @@ def _clipped_overlapping_images_pdf() -> bytes:
 
 
 def _reference_page_image_coverage_ratio(page: pdfium.PdfPage) -> float:
-    """沿用旧包装 walk 与原始 bounds，逐页返回未取阈值的覆盖率。"""
+    """Use the old package walk and the original bounds to return unthresholded coverage page by page."""
     page_bbox = page.get_bbox()
     page_area = abs((page_bbox[2] - page_bbox[0]) * (page_bbox[3] - page_bbox[1]))
     image_area = 0.0
@@ -130,7 +130,7 @@ def _reference_page_image_coverage_ratio(page: pdfium.PdfPage) -> float:
 
 
 def _reference_coverage(pdf_doc: pdfium.PdfDocument, page_indices: list[int]) -> float:
-    """旧实现：pypdfium2 对象包装 + get_objects(max_depth=3) 过滤。"""
+    """Old implementation: pypdfium2 object wrapping + get_objects(max_depth=3) filtering."""
     high_pages = 0
     for page_index in page_indices:
         page = pdf_doc[page_index]
@@ -144,12 +144,12 @@ def _reference_coverage(pdf_doc: pdfium.PdfDocument, page_indices: list[int]) ->
 
 
 def _count_page_loads(monkeypatch):
-    """统计 FPDF_LoadPage 路由的页面加载次数。"""
+    """Count the number of page loads for the FPDF_LoadPage route."""
     counter = {"loads": 0}
     original = pdfium.PdfDocument.get_page
 
     def counting(self, index):
-        """记录分类阶段实际触发的页面加载次数。"""
+        """Record the number of page loads actually triggered during the classification phase."""
         counter["loads"] += 1
         return original(self, index)
 
@@ -158,7 +158,7 @@ def _count_page_loads(monkeypatch):
 
 
 def test_classify_loads_each_sampled_page_once(monkeypatch):
-    """classify 全程每个抽样页只加载一次，而不是宽高比/文本/覆盖三阶段各一次。"""
+    """classify only loads each sampling page once in the whole process, instead of once for each of the three stages of aspect ratio/text/overlay."""
     pages = 5
     counter = _count_page_loads(monkeypatch)
 
@@ -169,7 +169,7 @@ def test_classify_loads_each_sampled_page_once(monkeypatch):
 
 
 def test_aspect_ratio_stage_loads_no_page(monkeypatch):
-    """宽高比阶段直接按索引取尺寸，不触发任何页面加载。"""
+    """The aspect ratio stage directly retrieves the size by index without triggering any page loading."""
     counter = _count_page_loads(monkeypatch)
     data = _text_pages_pdf(3, page_size=(612, 792))
 
@@ -186,7 +186,7 @@ def test_aspect_ratio_stage_loads_no_page(monkeypatch):
 
 
 def test_native_image_coverage_matches_wrapper_walk():
-    """嵌套 Form 各深度的图像覆盖统计与旧 pypdfium2 包装 walk 一致，深度 3 之外不计入。"""
+    """Image coverage statistics at each depth for nested Form are consistent with the old pypdfium2 wrapper walk, depths beyond depth 3 are not counted."""
     data = _nested_forms_images_pdf()
     with pdfium.PdfDocument(data) as pdf_doc:
         reference = _reference_coverage(pdf_doc, [0])
@@ -198,13 +198,13 @@ def test_native_image_coverage_matches_wrapper_walk():
             page.close()
 
     assert reference == actual
-    # Im0/Im1/Im2 各 200x200pt，合计约 0.25 页面占比；若深度 3 的 Im3
-    # （600x700，近整页）被错误计入，覆盖率会被钳到 1.0。
+    # Im0/Im1/Im2 each 200x200pt, the total page share is about 0.25; if Im3 of depth 3
+    # (600x700, nearly a full page) is incorrectly counted and the coverage is clamped to 1.0.
     assert 0.15 < per_page < 0.5
 
 
 def test_clipped_overlapping_form_images_keep_raw_area_semantics():
-    """图像裁剪、重叠和 Form 变换不改变旧实现的原始面积求和规则。"""
+    """Image cropping, overlapping, and Form transformations do not change the original area summation rules of the old implementation."""
     data = _clipped_overlapping_images_pdf()
     with pdfium.PdfDocument(data) as pdf_doc:
         page = pdf_doc[0]

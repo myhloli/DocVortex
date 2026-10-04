@@ -1,4 +1,4 @@
-"""共享文档链接目标的确定性校验规则。"""
+"""Deterministic validation rules for shared document link targets."""
 
 from ..foundation._hyperlink import OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
 

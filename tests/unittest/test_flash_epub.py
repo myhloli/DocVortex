@@ -30,7 +30,7 @@ from docvortex.schema import BlockType, PageFootnoteBlock
 
 
 def test_epub_notes_use_page_footnote_and_document_wide_anchors() -> None:
-    """验证 Footnote/Endnote、ARIA role、重复 ID 与跨章节 noteref 的统一语义。"""
+    """Verify unified semantics for Footnote/Endnote, ARIA role, duplicate ID and cross-chapter noteref."""
     middle, model = analyze_native_test_document(build_epub_notes_fixture(), file_suffix="epub")
     blocks = [block for page in middle.pages for block in page.blocks]
     footnotes = [block for block in blocks if block.type == BlockType.PAGE_FOOTNOTE]
@@ -102,7 +102,7 @@ def test_epub_notes_use_page_footnote_and_document_wide_anchors() -> None:
 
 
 def test_epub_internal_links_and_lists_use_cross_renderer_projection() -> None:
-    """验证 spine 链接保留，列表规范为连续阿拉伯序号且不注入目录页。"""
+    """Verify that the spine link is preserved, the list specification is consecutive Arabic numbers and the directory page is not injected."""
     middle, _ = analyze_native_test_document(build_epub_fixture(), file_suffix="epub")
     first_page = middle.pages[0]
     second_page = middle.pages[1]
@@ -129,7 +129,7 @@ def test_epub_internal_links_and_lists_use_cross_renderer_projection() -> None:
 
 
 def test_epub_hidden_list_items_do_not_consume_normalized_numbers() -> None:
-    """验证隐藏条目先被过滤，统一列表后处理再为可见内容连续编号。"""
+    """Verify that hidden entries are filtered first, unified list post-processing and then visible content is numbered consecutively."""
     package = EpubPackage(build_epub_fixture())
     chapter_path = "EPUB/text/ch1.xhtml"
     try:
@@ -162,7 +162,7 @@ def test_epub_hidden_list_items_do_not_consume_normalized_numbers() -> None:
     ],
 )
 def test_epub_anchor_registry_excludes_hidden_headings(attribute: str, value: str) -> None:
-    """验证 registry 不为 converter 会丢弃的隐藏标题生成悬空 anchor。"""
+    """Verify that registry does not generate dangling anchor for hidden headers that converter would discard."""
     package = EpubPackage(build_epub_fixture())
     chapter_path = "EPUB/text/ch1.xhtml"
     try:
@@ -197,7 +197,7 @@ def test_epub_anchor_registry_excludes_hidden_headings(attribute: str, value: st
     ],
 )
 def test_epub_anchor_registry_excludes_hidden_notes(attribute: str, value: str) -> None:
-    """验证隐藏 note 不生成 converter 无法兑现的 fragment target。"""
+    """Validation Hidden note does not generate converter Uncashed fragment target."""
     package = EpubPackage(build_epub_notes_fixture())
     try:
         chapters: list[tuple[str, etree._Element]] = []
@@ -236,7 +236,7 @@ def test_epub_anchor_registry_excludes_hidden_notes(attribute: str, value: str) 
 
 
 def test_epub_table_contents_resolve_title_marker_and_expand_only_exact_single_target_rows() -> None:
-    """验证标题内部 marker 可跳转，且目录表格只扩展严格匹配的单目标行。"""
+    """Verify that header internal marker is jumpable and that the table of contents only expands the strictly matched single target row."""
     middle, model = analyze_native_test_document(build_epub_table_toc_fixture(), file_suffix="epub")
     assert len(middle.pages) == 2
     assert all(block.type != BlockType.INDEX for page in middle.pages for block in page.blocks)
@@ -261,7 +261,7 @@ def test_epub_table_contents_resolve_title_marker_and_expand_only_exact_single_t
 
 
 def test_epub_table_spans_are_bounded_before_downstream_grid_parsing() -> None:
-    """验证超大 EPUB colspan 在进入 DOCX 占位网格前被移除。"""
+    """Verify that the oversized EPUB colspan is removed before entering the DOCX placeholder grid."""
     package = EpubPackage(build_epub_fixture())
     chapter_path = "EPUB/text/ch2.xhtml"
     try:
@@ -282,7 +282,7 @@ def test_epub_table_spans_are_bounded_before_downstream_grid_parsing() -> None:
 
 
 def _build_epub_with_svg_image_fixture() -> bytes:
-    """构造带 SVG 包内图片引用的最小 EPUB 3。"""
+    """Constructs a minimal EPUB 3 with a picture reference in the SVG package."""
     container = """<?xml version="1.0" encoding="UTF-8"?>
 <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0">
   <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
@@ -315,7 +315,7 @@ def _build_epub_with_svg_image_fixture() -> bytes:
 
 
 def test_epub_svg_package_image_rasterizes_to_png() -> None:
-    """验证包内 SVG 图片光栅化为 PNG，而不是整图丢弃只留 alt。"""
+    """Verify that the SVG image in the package is rasterized into PNG instead of discarding the entire image and leaving only alt."""
     package = EpubPackage(_build_epub_with_svg_image_fixture())
     chapter_path = "OEBPS/chapter.xhtml"
     try:
@@ -339,7 +339,7 @@ def test_epub_svg_package_image_rasterizes_to_png() -> None:
     ],
 )
 def test_epub_figure_skips_hidden_direct_images(attribute: str, value: str) -> None:
-    """验证 figure 的直接图片同样遵守元素属性、内联样式和 CSS 隐藏规则。"""
+    """Verify that direct images of figure also obey the element attributes, inline styles, and CSS hiding rules."""
     package = EpubPackage(build_epub_fixture())
     chapter_path = "EPUB/text/ch1.xhtml"
     try:
@@ -358,7 +358,7 @@ def test_epub_figure_skips_hidden_direct_images(attribute: str, value: str) -> N
 
 
 def test_epub_figure_preserves_direct_text_and_child_tails() -> None:
-    """验证共享 projector 不丢弃 XHTML figure 的直属文本及图片、caption tail。"""
+    """Verify sharing projector does not discard direct text and pictures of XHTML figure, caption tail."""
     package = EpubPackage(build_epub_fixture())
     chapter_path = "EPUB/text/ch1.xhtml"
     try:
@@ -390,7 +390,7 @@ def test_epub_figure_preserves_direct_text_and_child_tails() -> None:
 
 
 def test_epub2_and_mimetype_less_compatibility_packages_parse() -> None:
-    """验证 EPUB 2 common subset 和缺 mimetype 的 container 兼容分支。"""
+    """Verify EPUB 2 common subset and container compatible branches missing mimetype."""
     epub2 = build_epub2_fixture()
     compatibility = build_epub_fixture(omit_mimetype=True)
     assert detect_epub(epub2)
@@ -402,7 +402,7 @@ def test_epub2_and_mimetype_less_compatibility_packages_parse() -> None:
 
 
 def test_epub_mimetype_with_surrounding_whitespace_parses() -> None:
-    """验证 mimetype 带首尾空白的真实世界 EPUB 可解析，错误 mimetype 仍被拒绝。"""
+    """Verify that mimetype real-world EPUB with leading and trailing whitespace is parsable, error mimetype is still rejected."""
     sloppy = build_epub_fixture(mimetype_value="application/epub+zip\r\n")
     assert detect_epub(sloppy)
     assert len(analyze_native_test_document(sloppy, file_suffix="epub")[0].pages) == 3
@@ -412,19 +412,19 @@ def test_epub_mimetype_with_surrounding_whitespace_parses() -> None:
 
 
 def test_epub_spine_foreign_resource_uses_xhtml_fallback_chain() -> None:
-    """验证 foreign spine item 缺失时仍沿 manifest fallback 到 XHTML。"""
+    """Verify foreign spine item is missing along with manifest fallback to XHTML."""
     middle, _ = analyze_native_test_document(build_epub_fixture(use_foreign_fallback=True), file_suffix="epub")
     assert inline_text(middle.pages[1].blocks[0].content) == "Section Two"  # type: ignore[union-attr]
 
 
 def test_epub_spine_missing_supported_resource_uses_xhtml_fallback_chain() -> None:
-    """验证缺失的 XHTML 主资源不会阻断可用 fallback 链。"""
+    """Verify that the missing XHTML master resource does not block the available fallback chain."""
     middle, _ = analyze_native_test_document(build_epub_fixture(use_missing_supported_fallback=True), file_suffix="epub")
     assert inline_text(middle.pages[1].blocks[0].content) == "Section Two"  # type: ignore[union-attr]
 
 
 def test_epub_nav_and_ncx_outside_spine_do_not_create_synthetic_page() -> None:
-    """验证 spine 外的损坏 nav 与有效 NCX 都不会生成合成目录页。"""
+    """Verify that neither a corrupted nav nor a valid NCX other than spine will generate a composite directory page."""
     middle, _ = analyze_native_test_document(build_epub_fixture(corrupt_nav=True), file_suffix="epub")
     markdown = render_markdown(middle)
     assert len(middle.pages) == 3
@@ -434,7 +434,7 @@ def test_epub_nav_and_ncx_outside_spine_do_not_create_synthetic_page() -> None:
 
 
 def test_epub_without_authored_toc_keeps_only_spine_pages_and_titles() -> None:
-    """验证缺失 nav/NCX 时不从正文标题生成额外目录页。"""
+    """Verify that extra table of contents pages are not generated from text headers when nav/NCX is missing."""
     middle, _ = analyze_native_test_document(build_epub_fixture(include_nav=False, include_ncx=False), file_suffix="epub")
     assert len(middle.pages) == 3
     assert middle.pages[0].blocks[0].type == BlockType.DOC_TITLE
@@ -443,7 +443,7 @@ def test_epub_without_authored_toc_keeps_only_spine_pages_and_titles() -> None:
 
 
 def test_epub_without_toc_or_headings_does_not_add_empty_page() -> None:
-    """验证没有任何有效目录条目时不生成空 IndexBlock 专页。"""
+    """Verify that an empty IndexBlock page is not generated when there are no valid directory entries."""
     middle, _ = analyze_native_test_document(
         build_epub_fixture(include_nav=False, include_ncx=False, strip_headings=True), file_suffix="epub"
     )
@@ -452,7 +452,7 @@ def test_epub_without_toc_or_headings_does_not_add_empty_page() -> None:
 
 
 def test_epub_navigation_in_spine_preserves_page_order_and_extra_body_content() -> None:
-    """验证 spine 中的 nav 作为普通 XHTML 页保留目录和额外正文。"""
+    """Verify that nav in spine retains the table of contents and extra text as a normal XHTML page."""
     middle, _ = analyze_native_test_document(
         build_epub_fixture(nav_in_spine=True, nav_extra_body_text="Publisher front matter"), file_suffix="epub"
     )
@@ -463,7 +463,7 @@ def test_epub_navigation_in_spine_preserves_page_order_and_extra_body_content() 
 
 
 def test_epub_content_detection_precedes_extension_and_rejects_fake_packages(tmp_path: Path) -> None:
-    """验证 EPUB 强内容身份覆盖伪装扩展名，而普通 ZIP/文本不能依赖扩展名通过。"""
+    """Verification EPUB strong content identity overrides masquerade extensions, whereas plain ZIP/text cannot rely on extensions to pass."""
     payload = build_epub_fixture()
     disguised = tmp_path / "book.csv"
     disguised.write_bytes(payload)
@@ -478,7 +478,7 @@ def test_epub_content_detection_precedes_extension_and_rejects_fake_packages(tmp
 
 
 def test_epub_corrupt_chapter_keeps_empty_spine_placeholder() -> None:
-    """验证局部 XHTML 损坏不移动后续 spine 页号。"""
+    """Verify that local XHTML damage does not move subsequent spine page numbers."""
     middle, model = analyze_native_test_document(build_epub_fixture(corrupt_second_chapter=True), file_suffix="epub")
     assert len(model.pages) == 3
     assert model.pages[1] == []
@@ -488,7 +488,7 @@ def test_epub_corrupt_chapter_keeps_empty_spine_placeholder() -> None:
 
 
 def test_epub_malformed_xhtml_warns_and_recovers_without_relaxing_xml_part() -> None:
-    """验证正文 XHTML 严格失败后告警恢复，而通用 XML 入口仍保持严格。"""
+    """The alarm is restored after verification text XHTML strict fails, while the generic XML entry remains strict."""
     payload = build_epub_fixture(unclosed_br_second_chapter=True)
     package = EpubPackage(payload)
     try:
@@ -515,7 +515,7 @@ def test_epub_malformed_xhtml_warns_and_recovers_without_relaxing_xml_part() -> 
 
 
 def test_epub_svg_extraction_skips_hidden_descendants_and_hidden_root() -> None:
-    """验证 standalone SVG 不提取隐藏文本、隐藏图片或隐藏祖先子树。"""
+    """Verification standalone SVG does not extract hidden text, hidden pictures, or hidden ancestor subtrees."""
     package = EpubPackage(build_epub_fixture())
     path = "EPUB/fixed/page.svg"
     try:
@@ -544,7 +544,7 @@ def test_epub_svg_extraction_skips_hidden_descendants_and_hidden_root() -> None:
 
 
 def test_epub_malformed_resource_and_link_references_degrade_locally() -> None:
-    """验证非法 URI 只丢弃样式、图片或链接目标，不阻断章节正文。"""
+    """Illegal verification URI only discards styles, pictures or link targets, and does not block the chapter text."""
     package = EpubPackage(build_epub_fixture())
     chapter_path = "EPUB/text/ch1.xhtml"
     try:
@@ -569,7 +569,7 @@ def test_epub_malformed_resource_and_link_references_degrade_locally() -> None:
 
 
 def test_epub_rejects_encrypted_unsafe_and_dtd_inputs() -> None:
-    """验证选中正文加密、上跳成员和 DTD 在语义解析前稳定失败。"""
+    """Verification of selected body encryption, jump-up members, and DTD stable failure before semantic parsing."""
     encrypted = build_epub_fixture(encrypted_paths=("EPUB/text/ch1.xhtml",))
     with pytest.raises(EpubEncryptedError, match="Encrypted EPUB resource"):
         EpubModel().predict(BytesIO(encrypted))
@@ -601,7 +601,7 @@ def test_epub_rejects_encrypted_unsafe_and_dtd_inputs() -> None:
 
 
 def test_epub_resource_limits_fail_before_semantic_conversion(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 ZIP 条目与 XML 深度预算在正文遍历前生效。"""
+    """Verify that ZIP entry and XML depth budget are in effect before text traversal."""
     payload = build_epub_fixture()
     monkeypatch.setattr(epub_package_module, "MAX_ENTRY_BYTES", 32)
     with pytest.raises(EpubResourceLimitError, match="max_entry_bytes"):
@@ -614,7 +614,7 @@ def test_epub_resource_limits_fail_before_semantic_conversion(monkeypatch: pytes
 
 
 def test_epub_stylesheet_indexes_repeated_selectors_and_preserves_cascade_order() -> None:
-    """验证重复 selector 按属性聚合，交错同优先级规则仍遵守源码顺序。"""
+    """Verify that duplicate selector is aggregated by attributes, and the interleaving rules with the same priority still comply with the source code order."""
     stylesheet = MarkupStylesheet()
     stylesheet.add(
         ".x { font-weight: bold; display: none; }"
@@ -632,7 +632,7 @@ def test_epub_stylesheet_indexes_repeated_selectors_and_preserves_cascade_order(
 
 
 def test_epub_stylesheet_honors_important_before_specificity_and_source_order() -> None:
-    """验证 important 声明优先于后续普通规则和普通 inline，并允许 inline important 覆盖。"""
+    """Validates that important claims take precedence over subsequent normal rules and normal inline, and allows inline and important overrides."""
     stylesheet = MarkupStylesheet()
     stylesheet.add(
         ".secret { display: none !important; font-weight: bold !important; }.secret { display: block; font-weight: normal; }"
@@ -668,7 +668,7 @@ def test_epub_stylesheet_honors_important_before_specificity_and_source_order() 
     ],
 )
 def test_epub_stylesheet_tracks_display_and_visibility_independently(css: str, expected_hidden: bool) -> None:
-    """验证 display 与 visibility 各自级联，任一计算结果隐藏时都不输出元素。"""
+    """Verify that display and visibility are respectively cascaded, and no element will be output when any calculation result is hidden."""
     stylesheet = MarkupStylesheet()
     stylesheet.add(css)
 
@@ -678,7 +678,7 @@ def test_epub_stylesheet_tracks_display_and_visibility_independently(css: str, e
 
 
 def test_epub_combined_visibility_rule_does_not_export_hidden_content() -> None:
-    """验证真实 EPUB 中 visibility:visible 不会覆盖同规则的 display:none。"""
+    """Verify that the visibility:visible in the real EPUB will not overwrite the display:none of the same rule."""
     source = BytesIO(build_epub_fixture())
     rewritten = BytesIO()
     with ZipFile(source) as archive, ZipFile(rewritten, "w", ZIP_DEFLATED) as output:
@@ -694,7 +694,7 @@ def test_epub_combined_visibility_rule_does_not_export_hidden_content() -> None:
 
 
 def test_epub_stylesheet_allows_visible_descendant_to_override_inherited_visibility() -> None:
-    """验证 visibility 可继承且显式 visible 后代能够恢复自身输出。"""
+    """Verify that visibility is inheritable and that explicit visible descendants can restore their own output."""
     stylesheet = MarkupStylesheet()
     stylesheet.add(".parent { visibility: hidden; } .child { visibility: visible; }")
     parent = etree.fromstring(b'<div class="parent"><span class="child"/></div>')
@@ -710,7 +710,7 @@ def test_epub_stylesheet_allows_visible_descendant_to_override_inherited_visibil
 
 
 def test_epub_visibility_visible_descendants_survive_hidden_containers() -> None:
-    """验证真实 EPUB 的块、行内、列表、表格、SVG 和标题锚点均可从 visibility:hidden 恢复。"""
+    """Verify that true EPUB's block, inline, list, table, SVG and title anchors can all be recovered from visibility:hidden."""
     source = BytesIO(build_epub_fixture())
     rewritten = BytesIO()
     replacement = b"""<div class="visibility-parent">
@@ -772,7 +772,7 @@ def test_epub_visibility_visible_descendants_survive_hidden_containers() -> None
 
 
 def test_epub_visibility_hidden_body_still_visits_visible_children() -> None:
-    """验证 body 自身 visibility:hidden 时不会在显式可见子节点之前剪枝。"""
+    """Verify that body itself visibility:hidden does not prune until child nodes are explicitly visible."""
     source = BytesIO(build_epub_fixture())
     rewritten = BytesIO()
     with ZipFile(source) as archive, ZipFile(rewritten, "w", ZIP_DEFLATED) as output:
@@ -796,7 +796,7 @@ def test_epub_visibility_hidden_body_still_visits_visible_children() -> None:
 
 
 def test_epub_stylesheet_rejects_overlong_numeric_font_weight_before_int() -> None:
-    """验证超长或越界数字字重作为无效声明忽略且不会覆盖继承样式。"""
+    """Validation that overlong or out-of-bounds numeric weights are ignored as invalid declarations and will not override inherited styles."""
     stylesheet = MarkupStylesheet()
     stylesheet.add(f".x {{ font-weight: {'9' * 100_000}; }} .y {{ font-weight: 1001; }}")
 

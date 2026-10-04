@@ -1,4 +1,4 @@
-"""验证 CJK 非文本片段的移行、基线、宽度恢复与真实 PDF 输出。"""
+"""Verify transition, baseline, width recovery of CJK non-text fragments with true PDF output."""
 
 from copy import deepcopy
 from io import BytesIO
@@ -21,10 +21,10 @@ from test_pdf_original_layout import _middle, _text
 
 
 class _SizedFormulas(FormulaRenderer):
-    """以明确宽高的矢量替代字体度量，让边界与基线测试不依赖 ZiaMath 字形。"""
+    """Replace font metrics with explicit width and height vectors so that border and baseline testing does not rely on the ZiaMath glyph."""
 
     def render(self, latex: str, *, inline: bool, font_size: float, color: str = "#1f2937") -> FormulaVector:
-        """构造包含实际墨迹的公式代理，绘制测试能检测静默丢失。"""
+        """Formula proxies are constructed that contain actual ink, and draw tests can detect silent loss."""
         width = float(latex)
         drawing = Drawing(width, 20)
         drawing.add(Rect(0, 0, width, 20, fillColor=colors.red, strokeColor=None))
@@ -32,7 +32,7 @@ class _SizedFormulas(FormulaRenderer):
 
 
 def _paragraph(parts: list[str | float], *, cached: bool = False, anchor: str | None = None, indent: float = 0):
-    """通过生产段落构造入口生成中文、公式、锚点和显式换行。"""
+    """Generate Chinese text, formulas, anchor points and explicit line breaks by producing paragraph construction entries."""
     spans = [
         TextSpan(type="text", content=part)
         if isinstance(part, str)
@@ -54,7 +54,7 @@ def _paragraph(parts: list[str | float], *, cached: bool = False, anchor: str | 
 
 
 def _images(paragraph):
-    """提取最终组行中保留下来的公式回调，而不是原始输入片段。"""
+    """Extract the formula callbacks that remain in the final group of rows, rather than the original input fragment."""
     return [
         f.cbDefn
         for line in paragraph.blPara.lines
@@ -64,12 +64,12 @@ def _images(paragraph):
 
 
 def _text_content(paragraph) -> str:
-    """检查组行结果中的文字顺序及是否被分页插入了空格。"""
+    """Check the text order in the group row results and whether spaces have been inserted into pages."""
     return "".join(f.text for line in paragraph.blPara.lines for f in line.words)
 
 
 def _assert_bounds(paragraph) -> None:
-    """独立重算每行的真实对象宽度，不只信任 Paragraph 返回的框宽。"""
+    """Recalculate the true object width of each row independently, instead of just trusting the box width returned by Paragraph."""
     for line in paragraph.blPara.lines:
         actual = sum(
             getattr(fragment.cbDefn, "width", 0)
@@ -83,7 +83,7 @@ def _assert_bounds(paragraph) -> None:
 
 @pytest.mark.parametrize("cached", [False, True])
 def test_formula_moves_intact_to_next_line(cached):
-    """公式放不进剩余空间时整体移行，不能被当作悬挂标点或缩到剩余空隙。"""
+    """When the formula does not fit into the remaining space, it will move as a whole and cannot be used as a hanging punctuation point or shrunk into the remaining space."""
     paragraph = _paragraph(["中文前", 80.0, "后文"], cached=cached)
     paragraph.wrap(100, 1000)
     assert not any(hasattr(f, "cbDefn") for f in paragraph.blPara.lines[0].words)
@@ -93,7 +93,7 @@ def test_formula_moves_intact_to_next_line(cached):
 
 
 def test_latin_backtracking_crosses_formula_without_ord_error():
-    """Latin 溢出向前回溯会经过空文本公式，覆盖第二处 ord 调用。"""
+    """Latin overflow and traceback will pass through the empty text formula, covering the second ord call."""
     paragraph = _paragraph(["中AAAAAAAA", 20.0, "aaaaaaa"])
     paragraph.wrap(100, 1000)
     assert len(_images(paragraph)) == 1
@@ -103,7 +103,7 @@ def test_latin_backtracking_crosses_formula_without_ord_error():
 
 @pytest.mark.parametrize("cached", [False, True])
 def test_oversize_formula_fits_empty_line_and_restores_on_rewrap(cached):
-    """只缩放临时回调，宽窄交替后宽高与基线从基准恢复，原始最小列宽不变。"""
+    """Only temporary callbacks are made for scaling. After the width and width alternate, the width, height and baseline are restored from the baseline, and the original minimum column width remains unchanged."""
     paragraph = _paragraph([300.0, "中文"], cached=cached)
     original = next(f.cbDefn for f in paragraph.frags if hasattr(f, "cbDefn"))
     natural_minimum = paragraph.minWidth()
@@ -119,7 +119,7 @@ def test_oversize_formula_fits_empty_line_and_restores_on_rewrap(cached):
 
 
 def test_first_line_indent_adjacent_formulas_and_explicit_breaks():
-    """首行缩进、连续公式和显式换行共同作用时，所有对象只出现一次。"""
+    """When first-line indentation, consecutive formulas, and explicit line breaks work together, all objects appear only once."""
     paragraph = _paragraph([120.0, 60.0, "中文\n结束"], anchor="target", indent=30)
     paragraph.wrap(100, 1000)
     assert [image.width for image in _images(paragraph)] == [70, 60]
@@ -129,7 +129,7 @@ def test_first_line_indent_adjacent_formulas_and_explicit_breaks():
 
 
 def test_zero_width_anchor_survives_after_forced_break():
-    """宽度为零的末尾 anchor 仍需要绘制，不能被累计宽度判断丢弃。"""
+    """The end anchor with a width of zero still needs to be drawn and cannot be discarded by the cumulative width judgment."""
     from docvortex.render._internal.pdf.paragraph import CJKParagraph
 
     style = build_pdf_styles().body.clone("anchor-test", wordWrap="CJK")
@@ -143,7 +143,7 @@ def test_zero_width_anchor_survives_after_forced_break():
 
 
 def test_page_split_preserves_objects_text_and_natural_geometry():
-    """分页不修改父段落，不补空格，续段重新变宽后恢复原始公式尺寸。"""
+    """Pagination does not modify the parent paragraph, does not fill in spaces, and restores the original formula size after the continuation paragraph is widened again."""
     paragraph = _paragraph(["中文", 180.0, "后文\n"] * 12, cached=True)
     paragraph.wrap(100, 1000)
     original_text = _text_content(paragraph)
@@ -160,7 +160,7 @@ def test_page_split_preserves_objects_text_and_natural_geometry():
 
 
 def test_small_formula_diagnostic_only_describes_final_drawing():
-    """试排不报告低字号，最终绘制时诊断带有实际页块定位。"""
+    """Trial rendering does not report low font sizes, and final drawing diagnoses are performed with actual page block positioning."""
     paragraph = _paragraph([300.0, "中文"])
     with collect_pdf_diagnostics() as diagnostics:
         paragraph.wrap(30, 1000)
@@ -176,7 +176,7 @@ def test_small_formula_diagnostic_only_describes_final_drawing():
 
 @pytest.mark.parametrize("layout", [PdfLayout.AUTO, PdfLayout.ORIGINAL, PdfLayout.REFLOW])
 def test_public_render_preserves_vectors_links_and_input(layout):
-    """真实长公式经过公开渲染入口，输出矢量与链接并保持 MiddleJson 不变。"""
+    """The real long formula goes through the public rendering portal, outputting vectors with links and leaving MiddleJson unchanged."""
     block = _text("中文前文", bbox=(0.1, 0.1, 0.4, 0.8))
     block["content"] += [
         {"type": "equation_inline", "content": "+".join(["x_i"] * 80)},
@@ -194,14 +194,14 @@ def test_public_render_preserves_vectors_links_and_input(layout):
 
 
 def test_safe_path_does_not_change_reportlab_globals():
-    """安全路径不修改第三方的断行、字符对象或 Paragraph 入口。"""
+    """Safe paths do not modify third-party line breaks, character objects, or Paragraph entries."""
     original = (rl_paragraph.cjkFragSplit, rl_paragraph.cjkU, Paragraph.breakLinesCJK)
     _paragraph(["中文", 300.0]).wrap(100, 1000)
     assert original == (rl_paragraph.cjkFragSplit, rl_paragraph.cjkU, Paragraph.breakLinesCJK)
 
 
 def test_table_cell_keeps_natural_width_and_draws_fitted_formula():
-    """表格列宽测量保留公式自然宽度，实际窄列绘制仍可缩放且不污染后续宽列。"""
+    """Table column width measurements retain the formula's natural width, and actual narrow column drawing can still be scaled without contaminating subsequent wide columns."""
     from reportlab.platypus import Table
 
     paragraph = _paragraph(["中文", 180.0, "后文"], cached=True)
@@ -218,7 +218,7 @@ def test_table_cell_keeps_natural_width_and_draws_fitted_formula():
 
 
 def test_mutating_special_paragraph_back_to_plain_clears_safe_state():
-    """可变段落恢复为单一纯文本后，绘制不能继续把普通行结构当作富片段处理。"""
+    """After a variable paragraph reverts to a single plain text, Drawing can no longer treat normal line structures as rich fragments."""
     paragraph = _paragraph(["中文", 180.0])
     paragraph.wrap(100, 1000)
     paragraph.frags = [paragraph.frags[0]]

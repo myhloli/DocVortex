@@ -9,7 +9,7 @@ DEFAULT_MAX_RENDER_EDGE = 3500
 
 
 def _render_page_bitmap(page: PdfPage, dpi: int, max_width_or_height: int):
-    """在调用方 PDFium 锁内使用完全相同的缩放规则，返回须由调用方关闭的位图。"""
+    """Using the exact same scaling rules within the caller's PDFium lock returns a bitmap that must be closed by the caller."""
     scale = dpi / 72
     long_side_length = max(*page.get_size())
     if (long_side_length * scale) > max_width_or_height:
@@ -18,7 +18,7 @@ def _render_page_bitmap(page: PdfPage, dpi: int, max_width_or_height: int):
 
 
 def page_to_pixel_file(page: PdfPage, path, dpi: int = DEFAULT_PDF_IMAGE_DPI):
-    """直接写出原始位图缓冲及解码元数据，避免 worker 构造 PIL 和完整字节副本。"""
+    """Directly writes out the original bitmap buffer and decoded metadata, avoiding worker construction of PIL and full byte copies."""
     from pypdfium2.internal import BitmapTypeToStrReverse
 
     with pdfium_guard():
@@ -41,7 +41,7 @@ def page_to_pixel_file(page: PdfPage, path, dpi: int = DEFAULT_PDF_IMAGE_DPI):
 
 
 def estimate_page_image_bytes(page_size: tuple[float, float], dpi: int = DEFAULT_PDF_IMAGE_DPI) -> int:
-    """按现有渲染缩放估算四通道页图字节，用于限制批量驻留内存。"""
+    """Estimated four-channel page map bytes based on existing render scaling, used to limit batch-resident memory."""
     import math
 
     width, height = page_size
@@ -54,7 +54,7 @@ def page_to_image(
     dpi: int = DEFAULT_PDF_IMAGE_DPI,
     max_width_or_height: int = DEFAULT_MAX_RENDER_EDGE,
 ) -> tuple[Image.Image, float]:
-    """按既有 DPI 与长边上限渲染页面，并独立持有返回图片的像素。"""
+    """Renders the page as per DPI with long edge caps and holds the pixels of the returned image independently."""
     with pdfium_guard():
         bitmap: PdfBitmap | None = None
         try:
@@ -73,7 +73,7 @@ __all__ = ["page_to_image"]
 
 
 def page_to_owned_bitmap(page: PdfPage, dpi: int = DEFAULT_PDF_IMAGE_DPI):
-    """一次复制 PDFium 位图到不可变字节，关闭句柄后供 Rust 安全裁剪和旋转。"""
+    """Copies the PDFium bitmap to immutable bytes once, closing the handle for safe cropping and rotation by Rust."""
     with pdfium_guard():
         bitmap = None
         try:

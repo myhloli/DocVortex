@@ -1,4 +1,4 @@
-"""隔离比较 PDF 输入栅格化的进程树 RSS 与连续文档资源释放，不执行像素摘要。"""
+"""Isolation comparison PDF Input rasterized process tree RSS with continuous document resource release, no pixel summarization performed."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ BENCHMARKS = Path(__file__).resolve().parents[1] / "tests" / "benchmarks"
 
 
 def benchmark_helpers():
-    """只加载 DocVortex 的既有采样与身份工具，不导入 MinerU 或模型运行时。"""
+    """Only loads the existing sampling and identity tools for DocVortex and does not import MinerU or the model runtime."""
     location = str(BENCHMARKS)
     if location not in sys.path:
         sys.path.insert(0, location)
@@ -29,17 +29,17 @@ def benchmark_helpers():
 
 
 def write_json(path, value):
-    """仅在采样停止后序列化小型审计记录，不生成像素字节或完整输出 JSON。"""
+    """Only serialize small audit records after sampling is stopped, no pixel bytes or full output is generated JSON."""
     Path(path).write_text(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
 def utc_now():
-    """记录执行边界，便于避免和正式时间基准发生竞争。"""
+    """Record execution boundaries to avoid competing with formal time bases."""
     return datetime.now(timezone.utc).isoformat()
 
 
 def process_tree():
-    """读取当前时刻完整进程树 RSS，包含渲染与资源跟踪进程，不相加独立峰值。"""
+    """Read the complete process tree RSS at the current moment, including rendering and resource tracking processes, without adding independent peak values."""
     import psutil
 
     parent = psutil.Process()
@@ -60,7 +60,7 @@ def process_tree():
 
 
 def worker_identities(pids):
-    """在 worker 可观察时冻结 PID 与 OS 创建时间，拒绝误认 PID 重用后的其他进程。"""
+    """Freeze the creation time of PID and OS while worker is observable, and refuse to mistakenly recognize other processes after PID is reused."""
     import psutil
 
     identities = []
@@ -73,7 +73,7 @@ def worker_identities(pids):
 
 
 def verify_os_worker_exit(identities):
-    """关闭池后查询实际 OS 身份，僵尸或仍存活的同身份进程都记为残留。"""
+    """After closing the pool, query the actual OS identity. Zombies or still-surviving processes with the same identity will be recorded as residual."""
     import psutil
 
     exited = []
@@ -106,7 +106,7 @@ def verify_os_worker_exit(identities):
 
 
 def pool_state(render_backend):
-    """读取本进程拥有的池状态；只记录元数据，不触碰 PDFium 句柄或其他任务。"""
+    """Read the pool status owned by this process; only record metadata and do not touch the PDFium handle or other tasks."""
     from docvortex.document.pdf import images
 
     if render_backend == "session":
@@ -135,7 +135,7 @@ def pool_state(render_backend):
 
 
 def render_once(payload, config):
-    """新建一份文档并渲染全部窗口，每窗口立即关闭页图，结束时释放文档租约。"""
+    """Create a new document and render all windows. Each window will close the page image immediately, and the document lease will be released at the end."""
     from docvortex.document.pdf import PDFDocument
     from docvortex.document.pdf.images import load_images_from_pdf_bytes_range
 
@@ -166,7 +166,7 @@ def render_once(payload, config):
                     raise AssertionError("Rendered image count differs from requested window")
                 for offset, item in enumerate(images):
                     image = item["img_pil"]
-                    # 只读取现有图像元数据；禁止 tobytes、数组化或编码制造额外大分配。
+                    # Only existing image metadata is read; disallows tobytes, arraying, or encoding to make extra large allocations.
                     sizes.append(
                         {
                             "page": first + offset,
@@ -207,7 +207,7 @@ def render_once(payload, config):
 
 
 def verify_resources(result, state):
-    """关闭确认和文件检查失败时明确拒收，避免把低 RSS 误报为正确释放。"""
+    """Explicitly reject when closing acknowledgment and file check failure to avoid falsely reporting low RSS as a correct release."""
     if result["image_count"] != result["page_count"]:
         raise AssertionError("Not every document page was rendered")
     ownership = result["ownership"]
@@ -228,7 +228,7 @@ def verify_resources(result, state):
 
 
 def shutdown(render_backend):
-    """退出独立 worker 前关闭其唯一渲染池，不操作其他进程树的资源。"""
+    """Close its only rendering pool before exiting standalone worker, and do not operate the resources of other process trees."""
     from docvortex.document.pdf.images import shutdown_pdf_render_executor
 
     try:
@@ -241,7 +241,7 @@ def shutdown(render_backend):
 
 
 def memory_worker(config, output):
-    """唯一预热后逐次采样独立文档入口，JSON、源码摘要和 GC 均置于采样区间之外。"""
+    """The only independent document entry for sequential sampling after preheating, JSON, source code summary and GC are all placed outside the sampling interval."""
     read_input, sampler_class, source_identity = benchmark_helpers()
     import docvortex
     from docvortex._compute_backend import backend_info
@@ -353,14 +353,14 @@ def memory_worker(config, output):
     registry_empty = report["pool_after_shutdown"]["worker_count"] == 0
     report["summary"]["resource_release_checks_passed"] = all_exited and registry_empty
     report["finished_at_utc"] = utc_now()
-    # 失败也先持久化残留身份，不能仅抛异常而丢失泄漏证据。
+    # In case of failure, the residual identity must be persisted first. You cannot just throw an exception and lose the leakage evidence.
     write_json(output, report)
     if not all_exited or not registry_empty:
         raise AssertionError("Observed OS render workers remain alive or could not be verified after shutdown")
 
 
 def spawn_worker(config_path, output, config):
-    """基线和候选串行启动独立进程，明确源码、计算与渲染后端及并发预算。"""
+    """Baseline and candidate serial launch independent processes, specifying source code, calculation and rendering backends, and concurrency budgets."""
     environment = dict(os.environ)
     environment.update(
         {
@@ -379,7 +379,7 @@ def spawn_worker(config_path, output, config):
 
 
 def main():
-    """冻结输入并分别验证基线与候选的连续处理，保留每次 RSS 而非仅报告平均值。"""
+    """Freeze the input and verify successive processing of the baseline and candidate separately, retaining RSS each time rather than just reporting the average."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--path", type=Path)
     parser.add_argument("--baseline-source", type=Path)

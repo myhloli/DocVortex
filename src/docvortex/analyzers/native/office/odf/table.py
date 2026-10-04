@@ -1,4 +1,4 @@
-"""构造受限 ODF 表格网格并序列化为安全 HTML。"""
+"""Construct restricted ODF table grid and serialize to secure HTML."""
 
 from __future__ import annotations
 
@@ -28,23 +28,23 @@ _CELL_ADDRESS_RE = re.compile(r"\$?(?P<col>[A-Za-z]+)\$?(?P<row>[1-9][0-9]*)")
 
 @dataclass(slots=True)
 class OdfTableExpansionBudget:
-    """累计单个 ODF 文档全部表格的网格与重复文本膨胀。"""
+    """Cumulative grid and repeated text bloat for all tables in a single ODF document."""
 
     used_grid_slots: int = 0
     used_duplicated_text_bytes: int = 0
 
     def start_table(self) -> _TableGridReservation:
-        """为一次表格解析创建只累计新增矩形面积的局部预留。"""
+        """Create a local reservation that only accumulates the area of the newly added rectangle for a table parsing."""
         return _TableGridReservation(self)
 
     def charge_grid_slots(self, additional_slots: int) -> None:
-        """在表格网格扩容前累计文档级槽位。"""
+        """Accumulate document-level slots before expanding the table grid."""
         if additional_slots < 0 or self.used_grid_slots > MAX_GRID_SLOTS - additional_slots:
             raise OdfResourceLimitError(f"ODF resource limit exceeded: max_grid_slots={MAX_GRID_SLOTS}")
         self.used_grid_slots += additional_slots
 
     def charge_duplicated_text(self, byte_count: int) -> None:
-        """在复制单元格文本前累计文档级膨胀字节。"""
+        """Accumulate document-level bloat bytes before copying cell text."""
         if byte_count < 0 or self.used_duplicated_text_bytes > MAX_EXPANSION_TEXT_BYTES - byte_count:
             raise OdfResourceLimitError(f"ODF resource limit exceeded: max_expansion_text_bytes={MAX_EXPANSION_TEXT_BYTES}")
         self.used_duplicated_text_bytes += byte_count
@@ -52,13 +52,13 @@ class OdfTableExpansionBudget:
 
 @dataclass(slots=True)
 class _TableGridReservation:
-    """记录当前表格已经计入文档预算的最大矩形面积。"""
+    """Record the maximum rectangular area of the current table that has been included in the document budget."""
 
     budget: OdfTableExpansionBudget
     reserved_slots: int = 0
 
     def reserve(self, row_count: int, width: int) -> None:
-        """仅把当前表格增长部分计入文档级预算。"""
+        """Only current table growth is included in the document-level budget."""
         projected_slots = row_count * max(width, 1)
         if projected_slots <= self.reserved_slots:
             return
@@ -67,7 +67,7 @@ class _TableGridReservation:
 
 
 def _positive_int(value: str | None, default: int = 1) -> int:
-    """在转换前约束 ODF 计数属性，并把损坏值回退为至少一。"""
+    """Constrain the ODF count attribute before conversion and roll back the corrupted value to at least one."""
     if value is None:
         return default
     normalized = value.strip()
@@ -85,7 +85,7 @@ def _positive_int(value: str | None, default: int = 1) -> int:
 
 
 def _iter_rows(container: etree._Element, *, header: bool = False) -> Iterator[tuple[etree._Element, bool]]:
-    """按 ODF 容器顺序递归产出普通行和表头行。"""
+    """Recursively output ordinary rows and header rows in the order of ODF containers."""
     for child in container:
         if not isinstance(child.tag, str):
             continue
@@ -98,7 +98,7 @@ def _iter_rows(container: etree._Element, *, header: bool = False) -> Iterator[t
 
 
 def _typed_value_text(cell: etree._Element) -> str:
-    """在单元格无显示段落时把 ODF typed cached value 转为文本。"""
+    """When there is no paragraph displayed in the cell, convert ODF typed cached value into text."""
     value_type = cell.get(qname("office", "value-type"), "")
     if value_type == "percentage":
         try:
@@ -127,14 +127,14 @@ def _typed_value_text(cell: etree._Element) -> str:
 
 
 def _has_visible_html(value: str) -> bool:
-    """判断单元格 HTML 是否包含非空文本或图片/公式结构。"""
+    """Determine whether cell HTML contains non-empty text or picture/formula structure."""
     if any(token in value.casefold() for token in ("<img", "<eq", "<table", "<ul", "<ol")):
         return True
     return bool(html.unescape(_HTML_TEXT_RE.sub("", value)).strip())
 
 
 def _validate_grid_extent(row_count: int, width: int) -> None:
-    """在分配或遍历前校验预计矩形不会超过共享网格预算。"""
+    """Verify that the expected rectangle will not exceed the shared grid budget before allocating or traversing."""
     projected_width = max(width, 1)
     if row_count > MAX_GRID_SLOTS // projected_width:
         raise OdfResourceLimitError(f"ODF resource limit exceeded: max_grid_slots={MAX_GRID_SLOTS}")
@@ -146,7 +146,7 @@ def _ensure_row(
     width: int = 0,
     reservation: _TableGridReservation | None = None,
 ) -> list[GridCell | None]:
-    """确保网格存在指定行和最小列宽。"""
+    """Make sure the grid exists for the specified rows and minimum column widths."""
     _validate_grid_extent(max(len(grid.rows), row_index + 1), max(grid.width, width))
     if reservation is not None:
         reservation.reserve(max(len(grid.rows), row_index + 1), max(grid.width, width))
@@ -159,7 +159,7 @@ def _ensure_row(
 
 
 def _charge_grid(grid: TableGrid) -> None:
-    """按当前矩形边界检查最大网格槽位。"""
+    """Check the maximum grid slot by the current rectangular bounds."""
     _validate_grid_extent(len(grid.rows), grid.width)
 
 
@@ -169,7 +169,7 @@ def parse_table_grid(
     *,
     expansion_budget: OdfTableExpansionBudget | None = None,
 ) -> TableGrid:
-    """展开受限重复行列与合并单元格，构造规范二维网格。"""
+    """Expand restricted repeated rows and columns and merge cells to construct a standardized two-dimensional grid."""
     grid = TableGrid()
     reservation = expansion_budget.start_table() if expansion_budget is not None else None
     duplicated_text_bytes = 0
@@ -177,7 +177,7 @@ def parse_table_grid(
     pending_empty_rows = 0
 
     def ensure_row(target_row: int, width: int = 0) -> list[GridCell | None]:
-        """在兼容独立表格调用的同时应用可选文档级预留。"""
+        """Apply optional document-level reservations while being compatible with standalone table calls."""
         if reservation is None:
             return _ensure_row(grid, target_row, width)
         return _ensure_row(grid, target_row, width, reservation)
@@ -291,7 +291,7 @@ def parse_table_grid(
 
 
 def trim_table_grid(grid: TableGrid) -> TableGrid:
-    """移除尾部全空行列，同时保留已用范围内部的空白坐标。"""
+    """Removes trailing empty rows and columns while retaining empty coordinates within the used range."""
     last_row = -1
     last_col = -1
     for row_index, row in enumerate(grid.rows):
@@ -312,7 +312,7 @@ def trim_table_grid(grid: TableGrid) -> TableGrid:
 
 
 def crop_table_grid(grid: TableGrid, bounds: tuple[int, int, int, int]) -> TableGrid:
-    """按闭区间行列边界裁剪网格并重映射合并占位。"""
+    """The grid is clipped according to the closed interval row and column boundaries and the merged occupancies are remapped."""
     row_start, row_end, col_start, col_end = bounds
     if row_start < 0 or col_start < 0 or row_end < row_start or col_end < col_start:
         return TableGrid()
@@ -333,17 +333,17 @@ def crop_table_grid(grid: TableGrid, bounds: tuple[int, int, int, int]) -> Table
 
 
 def _grid_cell_at(grid: TableGrid, row: int, col: int) -> GridCell | None:
-    """安全返回网格坐标上的原点单元格，越界或未物化位置返回 None。"""
+    """Safely returns the origin cell on grid coordinates, returns None for out-of-bounds or unmaterialized locations."""
     cells = grid.rows[row] if 0 <= row < len(grid.rows) else []
     return cells[col] if 0 <= col < len(cells) else None
 
 
 def split_table_regions(grid: TableGrid) -> list[TableGrid]:
-    """洪水填充发现离散数据区域，并按 gap 候选评分选择稳定分割。
+    """Flood filling finds discrete data regions and selects stable segmentations by gap candidate score.
 
-    与 XLS/XLSX 投影器共用区域发现算法：连通性掩码把可见内容、合并跨度和
-    covered 占位都视为内容格，BFS 四向连通并在容忍距离内跨越空白；对候选
-    tolerance 按惩罚指标选优后，逐区域裁剪出包围盒网格。
+    Shared region discovery algorithm with XLS/XLSX projector: connectivity mask combines visible content, merge span and
+    covered placeholders are regarded as content cells, BFS is four-way connected and spans gaps within the tolerance distance; for candidates
+    tolerance After selecting the best according to the penalty index, the bounding box grid is cropped area by area.
     """
     max_row = len(grid.rows) - 1
     max_col = grid.width - 1
@@ -351,13 +351,13 @@ def split_table_regions(grid: TableGrid) -> list[TableGrid]:
         return []
 
     def has_content(row: int, col: int) -> bool:
-        """判断坐标是否有可见内容或属于合并占位（对齐 Excel 投影语义）。"""
+        """Determine whether the coordinate has visible content or belongs to a merged placeholder (aligned with Excel projection semantics)."""
         if (row, col) in grid.covered:
             return True
         cell = _grid_cell_at(grid, row, col)
         return cell is not None and (cell.has_content or cell.row_span > 1 or cell.col_span > 1)
 
-    # 仅从有可见内容的坐标出发，对齐 Excel 投影只以有值格为起点的行为。
+    # Alignment Excel Behavior of projection starting only from coordinates with visible content only.
     starts = [
         (row, col)
         for row, cells in enumerate(grid.rows)
@@ -368,12 +368,12 @@ def split_table_regions(grid: TableGrid) -> list[TableGrid]:
         return []
 
     def has_semantic_content(row: int, col: int) -> bool:
-        """判断坐标是否包含可见或结构化 HTML 语义。"""
+        """Determine whether the coordinate contains visible or structured HTML semantics."""
         cell = _grid_cell_at(grid, row, col)
         return cell is not None and cell.has_content
 
     def span_at(row: int, col: int) -> tuple[int, int]:
-        """返回原点单元格的合并跨度，非原点或空位返回 1x1。"""
+        """Returns the merged span of the origin cell, and returns 1x1 for non-origin or empty cells."""
         cell = _grid_cell_at(grid, row, col)
         return (cell.row_span, cell.col_span) if cell is not None else (1, 1)
 
@@ -393,7 +393,7 @@ def split_table_regions(grid: TableGrid) -> list[TableGrid]:
 
 
 def _render_html_row(grid: TableGrid, row_index: int, *, header: bool) -> str:
-    """把网格中的一行序列化为 tr，并跳过合并占位。"""
+    """Serialize a row in the grid to tr and skip merging placeholders."""
     row = grid.rows[row_index]
     tag = "th" if header else "td"
     parts = ["<tr>"]
@@ -415,7 +415,7 @@ def _render_html_row(grid: TableGrid, row_index: int, *, header: bool) -> str:
 
 
 def table_grid_to_html(grid: TableGrid) -> str:
-    """把规范网格稳定序列化为带 thead/tbody 和跨度的 HTML 表格。"""
+    """Stable serialization of canonical grids into HTML tables with thead/tbody and spans."""
     if not grid.rows:
         return ""
     header_rows = min(grid.header_rows, len(grid.rows))
@@ -433,7 +433,7 @@ def table_grid_to_html(grid: TableGrid) -> str:
 
 
 def _column_index(label: str) -> int | None:
-    """在共享网格预算内把 A1 地址中的列字母转换为零基列号。"""
+    """Convert column letters in the A1 address to zero-based column numbers within the shared grid budget."""
     max_label_length = 0
     remaining = MAX_GRID_SLOTS
     while remaining > 0:
@@ -448,7 +448,7 @@ def _column_index(label: str) -> int | None:
 
 
 def _row_index(label: str) -> int | None:
-    """在整数转换前把 A1 地址中的行号约束到共享网格预算。"""
+    """Constrain the row number in the A1 address to the shared grid budget before integer conversion."""
     normalized = label.lstrip("0")
     if not normalized or len(normalized) > len(str(MAX_GRID_SLOTS)):
         return None
@@ -457,7 +457,7 @@ def _row_index(label: str) -> int | None:
 
 
 def parse_cell_range_bounds(address: str) -> tuple[int, int, int, int] | None:
-    """从 ODF cell-range-address 中提取零基闭区间边界。"""
+    """Extract zero-based closed interval boundaries from ODF cell-range-address."""
     matches = list(_CELL_ADDRESS_RE.finditer(address or ""))
     if not matches:
         return None
@@ -473,7 +473,7 @@ def parse_cell_range_bounds(address: str) -> tuple[int, int, int, int] | None:
 
 
 def union_bounds(bounds: list[tuple[int, int, int, int]]) -> tuple[int, int, int, int] | None:
-    """返回多个表格范围的最小包围矩形。"""
+    """Returns the smallest bounding rectangle of multiple table ranges."""
     if not bounds:
         return None
     return (

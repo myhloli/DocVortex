@@ -1,4 +1,4 @@
-"""解析 DOC 标准书签名称及其主文档 CP 范围。"""
+"""Parse the DOC standard bookmark name and its main document CP range."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from .records import DocBudget, parse_plc
 
 
 def _parse_string_table(data: bytes, budget: DocBudget) -> list[str]:
-    """解析扩展或单字节 STTB 字符串表。"""
+    """Parse extended or single-byte STTB string table."""
 
     if len(data) < 2:
         return []
@@ -56,7 +56,7 @@ def parse_bookmarks(
     ends_size: int,
     budget: DocBudget,
 ) -> dict[int, list[str]]:
-    """返回主文档中书签起始 CP 到名称列表的映射。"""
+    """Returns the mapping of the bookmark start CP to the name list in the main document."""
 
     names_payload = bounded_slice(table_stream, names_offset, names_size)
     starts_payload = bounded_slice(table_stream, starts_offset, starts_size)

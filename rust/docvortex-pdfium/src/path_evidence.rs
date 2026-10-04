@@ -1,4 +1,4 @@
-//! 批量生成 Path 的绘图线与摘要证据，保持 Python 参考实现的对象级隔离语义。
+//! Batch generate drawing lines and summary evidence of Path, maintaining the object-level isolation semantics of the Python reference implementation.
 
 use crate::{objects, paths, ReadError};
 use std::ffi::{c_float, c_int, c_uint, c_void};
@@ -27,7 +27,7 @@ type ColorFn = unsafe extern "system" fn(
 type DrawModeFn = unsafe extern "system" fn(*mut c_void, *mut c_int, *mut c_int) -> c_int;
 type StrokeWidthFn = unsafe extern "system" fn(*mut c_void, *mut c_float) -> c_int;
 
-/// 一次页面读取中复用的 Path 状态 ABI。
+/// Path status ABI multiplexed in a page read.
 struct StateApi {
     subpaths: paths::Api,
     draw_mode: DrawModeFn,
@@ -36,7 +36,7 @@ struct StateApi {
     fill_color: ColorFn,
 }
 
-/// 保存原始子路径及其一次转换后的页面视觉点与直线。
+/// Save the original sub-path and the page visual points and straight lines after one conversion.
 struct PreparedSubpath {
     raw: paths::Subpath,
     points: Vec<(f64, f64)>,
@@ -44,7 +44,7 @@ struct PreparedSubpath {
     closed: bool,
 }
 
-/// 保存一次读取后的绘制状态；颜色失败沿用参考实现的 255 alpha。
+/// Save the drawing state after reading once; if the color fails, the 255 alpha of the reference implementation is used.
 struct PathState {
     fill_visible: bool,
     stroke_visible: bool,
@@ -52,7 +52,7 @@ struct PathState {
     raw_stroke_width: f64,
 }
 
-/// 保留 Python min 对相同值与 NaN 的首项选择。
+/// Reserve Python min for the first selection of the same value as NaN.
 fn minimum(a: f64, b: f64) -> f64 {
     if b < a {
         b
@@ -61,7 +61,7 @@ fn minimum(a: f64, b: f64) -> f64 {
     }
 }
 
-/// 保留 Python max 对相同值与 NaN 的首项选择。
+/// Reserve Python max for the first selection of the same value as NaN.
 fn maximum(a: f64, b: f64) -> f64 {
     if b > a {
         b
@@ -70,7 +70,7 @@ fn maximum(a: f64, b: f64) -> f64 {
     }
 }
 
-/// 按页面旋转角转换 PDF 底左坐标为页面左上坐标。
+/// Convert the bottom left coordinate of PDF to the upper left coordinate of the page according to the page rotation angle.
 fn visual_point(point: (f64, f64), frame: [f64; 4], rotation: i32) -> (f64, f64) {
     let (x, y) = point;
     match rotation {
@@ -81,7 +81,7 @@ fn visual_point(point: (f64, f64), frame: [f64; 4], rotation: i32) -> (f64, f64)
     }
 }
 
-/// 对象坐标先乘对象/Form 矩阵，再转换为页面视觉坐标。
+/// The object coordinates are first multiplied by the object/Form matrix and then converted into page visual coordinates.
 fn transformed_point(
     point: (f64, f64),
     matrix: [f64; 6],
@@ -93,7 +93,7 @@ fn transformed_point(
     visual_point((x, y), frame, rotation)
 }
 
-/// 取页面视觉页尺寸；旋转 90/270 时交换宽高。
+/// Get the visual page size of the page; swap the width and height when rotating 90/270.
 fn page_size(frame: [f64; 4], rotation: i32) -> (f64, f64) {
     let size = (frame[2] - frame[0], frame[3] - frame[1]);
     if rotation == 90 || rotation == 270 {
@@ -103,7 +103,7 @@ fn page_size(frame: [f64; 4], rotation: i32) -> (f64, f64) {
     }
 }
 
-/// 读取一次 Path 绘制状态，颜色失败按不透明处理。
+/// Read the Path drawing status once, and the color failure will be treated as opaque.
 unsafe fn path_state(raw: *mut c_void, api: &StateApi) -> PathState {
     let (mut fill_mode, mut stroke) = (0, 0);
     if (api.draw_mode)(raw, &mut fill_mode, &mut stroke) == 0 {
@@ -120,7 +120,7 @@ unsafe fn path_state(raw: *mut c_void, api: &StateApi) -> PathState {
     let stroke_rgba = (stroke != 0)
         .then(|| color(raw, api.stroke_color))
         .flatten();
-    // 查询失败只为可见性提供不透明 alpha；摘要仍保留颜色未知的 None。
+    // Query failure provides only opaque alpha for visibility; summary remains None with unknown color.
     let fill_visible = fill_mode != 0 && fill.is_none_or(|rgba| rgba.3 > 0);
     let stroke_visible = stroke != 0 && stroke_rgba.is_none_or(|rgba| rgba.3 > 0);
     let mut width: c_float = 0.0;
@@ -142,7 +142,7 @@ unsafe fn path_state(raw: *mut c_void, api: &StateApi) -> PathState {
     }
 }
 
-/// 调用 PDFium 颜色函数；失败时保留未知颜色，由可见性判断单独回退 alpha。
+/// Call the PDFium color function; upon failure, the unknown color is retained, and the visibility judgment alone falls back to alpha.
 unsafe fn color(raw: *mut c_void, getter: ColorFn) -> Option<Rgba> {
     let (mut red, mut green, mut blue, mut alpha) = (0, 0, 0, 255);
     if getter(raw, &mut red, &mut green, &mut blue, &mut alpha) == 0 {
@@ -151,7 +151,7 @@ unsafe fn color(raw: *mut c_void, getter: ColorFn) -> Option<Rgba> {
     Some((red, green, blue, alpha))
 }
 
-/// 一次转换整个子路径，避免绘图线和路径摘要重复矩阵乘法。
+/// Convert entire subpaths at once, avoiding repeated matrix multiplications for plot lines and path summaries.
 fn prepare_subpath(
     raw: paths::Subpath,
     matrix: [f64; 6],
@@ -182,7 +182,7 @@ fn prepare_subpath(
     }
 }
 
-/// 按局部线段法向量换算矩阵后的实际描边宽度。
+/// The actual stroke width after converting the matrix according to the local line segment normal vector.
 fn segment_stroke_width_with<H>(
     raw_width: f64,
     start: (f64, f64),
@@ -213,7 +213,7 @@ where
     }
 }
 
-/// 将近水平或近竖直线段吸附为页面内绘图线。
+/// The nearly horizontal or nearly vertical line segments are adsorbed as drawing lines within the page.
 fn axis_line(start: (f64, f64), end: (f64, f64), width: f64, page: (f64, f64)) -> Option<Line> {
     let (x0, y0) = start;
     let (x1, y1) = end;
@@ -278,7 +278,7 @@ fn axis_line(start: (f64, f64), end: (f64, f64), width: f64, page: (f64, f64)) -
     None
 }
 
-/// 把闭合或参考实现认可的开放细长填充子路径折叠为中心线。
+/// Collapse closed or reference implementation-approved open elongated filled subpaths into a centerline.
 fn thin_filled_line<R: Fn(f64) -> f64>(
     subpath: &PreparedSubpath,
     page: (f64, f64),
@@ -323,7 +323,7 @@ fn thin_filled_line<R: Fn(f64) -> f64>(
     }
 }
 
-/// 仅接纳参考实现允许的开放四点三边轴对齐矩形。
+/// Only open four-point three-sided axis-aligned rectangles allowed by the reference implementation are accepted.
 fn open_thin_rectangle<R: Fn(f64) -> f64>(
     subpath: &PreparedSubpath,
     x0: f64,
@@ -344,20 +344,20 @@ fn open_thin_rectangle<R: Fn(f64) -> f64>(
         .into_iter()
         .map(|(x, y)| (round3(x), round3(y)))
         .collect::<Vec<_>>();
-    // 与参考实现的集合相等语义保持一致：四个角点必须全部出现，缺失角点的退化开放路径不能折叠。
+    // Consistent with the set equality semantics of the reference implementation: all four corner points must appear, and degenerate open paths with missing corner points cannot be collapsed.
     if expected.iter().any(|point| !rounded.contains(point))
         || rounded.iter().any(|point| !expected.contains(point))
     {
         return false;
     }
-    // 轴对齐判断必须发生在对象/Form 矩阵与页面坐标转换之后，与 Python 参考实现一致。
+    // Axis alignment judgment must occur after the object/Form matrix and page coordinates are converted, consistent with the Python reference implementation.
     subpath
         .lines
         .iter()
         .all(|&(a, b)| !((a.0 - b.0).abs() > 0.001 && (a.1 - b.1).abs() > 0.001))
 }
 
-/// 生成单个 Path 的绘图线候选，不应用对象裁剪。
+/// Generate plot line candidates for a single Path without applying object clipping.
 fn object_lines_with<H, R>(
     prepared: &[PreparedSubpath],
     state: &PathState,
@@ -402,7 +402,7 @@ where
     output
 }
 
-/// 生成单个 Path 的摘要候选；无效几何返回 None。
+/// Generate digest candidates for a single Path; invalid geometry returns None.
 #[allow(clippy::too_many_arguments)]
 unsafe fn object_info_with<H, R>(
     raw: *mut c_void,
@@ -480,7 +480,7 @@ where
     }
 }
 
-/// 记录真实四角直边填充矩形，曲线控制点和复杂文字轮廓不能仅凭外框成为柱体。
+/// To record real four-corner straight-edge filled rectangles, curve control points and complex text outlines cannot become cylinders based solely on the outer frame.
 fn filled_rectangle_bbox<R: Fn(f64) -> f64>(
     path: &PreparedSubpath,
     round3: &R,
@@ -527,7 +527,7 @@ fn filled_rectangle_bbox<R: Fn(f64) -> f64>(
     Some((x0, y0, x1, y1))
 }
 
-/// 将父坐标裁剪转换为视觉外框并与对象边界求交。
+/// The parent coordinates are cropped and converted into a visual outer frame and intersected with the object boundary.
 fn clipped_bbox(
     bbox: (f64, f64, f64, f64),
     clip: Option<[f64; 4]>,
@@ -536,7 +536,7 @@ fn clipped_bbox(
 ) -> Option<(f64, f64, f64, f64)> {
     let clip = match clip {
         Some(value) => value,
-        // 无裁剪时直接保留原 bbox，不能用 Option None 误判为空交集。
+        // When there is no cropping, the original bbox is directly retained, and Option cannot be used. None is mistakenly judged as an empty intersection.
         None => return Some(bbox),
     };
     if clip[2] <= clip[0] || clip[3] <= clip[1] {
@@ -571,7 +571,7 @@ fn clipped_bbox(
     (result.2 > result.0 && result.3 > result.1).then_some(result)
 }
 
-/// 裁剪一条已吸附的轴线，并按方向重建端点。
+/// Cut an adsorbed axis and reconstruct the endpoints according to the direction.
 fn clipped_line(
     line: Line,
     clip: Option<[f64; 4]>,
@@ -592,10 +592,10 @@ fn clipped_line(
     Some((start, end, clipped, line.3, line.4))
 }
 
-/// 单次遍历全部 Path，并允许绑定层传入宿主解释器的 hypot 语义。
+/// Traverse all Paths in a single pass, and allow the binding layer to pass in the hypot semantics of the host interpreter.
 ///
 /// # Safety
-/// 调用方须验证全部 20 个函数 ABI，并持有同一 PDFium 页面、运行库和全局锁。
+/// The caller must verify that all 20 functions ABI hold the same PDFium page, runtime and global locks.
 #[allow(clippy::too_many_arguments)]
 pub unsafe fn read_path_evidence_with_hypot<H: Fn(f64, f64) -> f64, R: Fn(f64) -> f64>(
     addresses: Vec<usize>,

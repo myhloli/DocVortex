@@ -1,12 +1,12 @@
-"""HTML Flash 解析的稳定异常类型。"""
+"""HTML Flash parsed stable exception type."""
 
 
 class HtmlParseError(ValueError):
-    """表示 HTML 字节无法形成可用静态 DOM。"""
+    """Indicates that the HTML bytes cannot form a usable static DOM."""
 
 
 class HtmlResourceLimitError(HtmlParseError):
-    """表示 HTML 输入、DOM 或资源超过固定安全预算。"""
+    """Indicates that the HTML input, DOM, or resource exceeds the fixed security budget."""
 
 
 __all__ = ["HtmlParseError", "HtmlResourceLimitError"]

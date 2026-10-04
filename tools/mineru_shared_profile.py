@@ -1,4 +1,4 @@
-"""独立剖析冻结模型共享入口，只观察热运行，不修改 PDF 提取器的函数身份。"""
+"""Independent profiling of the frozen model shared entry only observes hot runs and does not modify the function identity of the PDF extractor."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from mineru_shared_benchmark import main as benchmark_main
 
 
 def main():
-    """原生路径存在函数身份保护，只替换诊断计时器并用 cProfile 观察真实调用。"""
+    """There is function identity protection on the native path, just replace the diagnostic timer and observe the real call with cProfile."""
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--docvortex-source", type=Path, required=True)
     parser.add_argument("--mineru-source", type=Path, required=True)
@@ -36,7 +36,7 @@ def main():
         ORT_DISABLE_TELEMETRY="1",
     )
     sys.path[:0] = [str(args.docvortex_source.resolve() / "src"), str(args.mineru_source.resolve())]
-    # 先按指定版本导入，防止入口自身的 import 成本污染热运行统计。
+    # First import according to the specified version to prevent the entrance's own import cost from contaminating hot operation statistics.
     from mineru.backend.analysis.pdf import pipeline
 
     assert Path(pipeline.__file__).resolve().is_relative_to(args.mineru_source.resolve())
@@ -52,7 +52,7 @@ def main():
 
     @contextmanager
     def stage_timer(stage):
-        """按嵌套关系扣除子阶段，防止把包含关系重复计入可优化占比。"""
+        """Sub-stages are deducted based on nested relationships to prevent inclusion relationships from being repeatedly counted in the optimizeable proportion."""
         if not enabled:
             yield
             return
@@ -73,7 +73,7 @@ def main():
                 local.stack[-1][2] += elapsed
 
     def begin(tape):
-        """首轮只预热；之后才开启采样，不替换任何生产提取或分析方法。"""
+        """The first round is only preheating; sampling is started after that, and does not replace any production extraction or analysis methods."""
         nonlocal resets, enabled
         reset(tape)
         enabled = resets > 0
@@ -82,7 +82,7 @@ def main():
             profile.enable()
 
     def finish(tape):
-        """实际入口结束立即停止，输出序列化和摘要不进入剖析。"""
+        """The actual entry is stopped immediately, and the output serialization and summary do not enter the analysis."""
         nonlocal enabled
         profile.disable()
         enabled = False

@@ -1,4 +1,4 @@
-"""基于静态 DOM 指标执行保守的 HTML 正文自动选择。"""
+"""Perform conservative HTML text automatic selection based on the static DOM indicator."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ _MIN_SCORE_MARGIN = 1.25
 
 @dataclass(frozen=True, slots=True)
 class CandidateMetrics:
-    """保存一个 DOM 子树的可见正文与噪声统计。"""
+    """Save the visible text and noise statistics of a DOM subtree."""
 
     text_chars: int = 0
     link_chars: int = 0
@@ -53,7 +53,7 @@ class CandidateMetrics:
     boilerplate_count: int = 0
 
     def __add__(self, other: CandidateMetrics) -> CandidateMetrics:
-        """合并两个子树指标。"""
+        """Merge two subtree indicators."""
         return CandidateMetrics(
             text_chars=self.text_chars + other.text_chars,
             link_chars=self.link_chars + other.link_chars,
@@ -66,7 +66,7 @@ class CandidateMetrics:
 
 @dataclass(frozen=True, slots=True)
 class ContentSelection:
-    """保存最终内容根、正文命中状态和可诊断的保留率。"""
+    """Save final content root, text hit status, and diagnosable retention rate."""
 
     root: etree._Element
     mode_used: str
@@ -77,7 +77,7 @@ class ContentSelection:
 
 @dataclass(frozen=True, slots=True)
 class _ScoredCandidate:
-    """绑定候选元素、指标、分数和显式语义标记。"""
+    """Binding candidate elements, indicators, scores and explicit semantic markup."""
 
     element: etree._Element
     metrics: CandidateMetrics
@@ -87,7 +87,7 @@ class _ScoredCandidate:
 
 @dataclass(frozen=True, slots=True)
 class _SoftPruneMetrics:
-    """保存 soft prune 所需的规范文本段、链接文本和语义对象统计。"""
+    """Save the specification text segments, link text and semantic object statistics required by soft prune."""
 
     text_chars: int = 0
     text_segments: int = 0
@@ -97,7 +97,7 @@ class _SoftPruneMetrics:
 
 
 def select_auto_content(body: etree._Element, stylesheet: MarkupStylesheet) -> ContentSelection:
-    """高置信选择正文候选，任一保守门槛失败时回退完整 body。"""
+    """Select text candidates with high confidence, and fall back to complete body when any conservative threshold fails."""
     metrics_by_element: dict[etree._Element, CandidateMetrics] = {}
     body_metrics = _collect_metrics(body, stylesheet, metrics_by_element, TextStyle(), False, False)
     repeated_penalties = _repeated_short_sibling_penalties(body)
@@ -155,7 +155,7 @@ def select_auto_content(body: etree._Element, stylesheet: MarkupStylesheet) -> C
 
 
 def _copy_candidate_with_ancestors(candidate: etree._Element, body: etree._Element) -> etree._Element:
-    """复制正文候选及其到 body 的空祖先链，保留继承样式但不带入周边正文。"""
+    """Copy the text candidate and its empty ancestor chain to body, retaining the inherited style but not bringing in the surrounding text."""
     selected = deepcopy(candidate)
     selected.tail = None
     _soft_prune(selected)
@@ -172,7 +172,7 @@ def _copy_candidate_with_ancestors(candidate: etree._Element, body: etree._Eleme
 
 
 def _empty_ancestor_wrapper(ancestor: etree._Element) -> etree._Element:
-    """复制祖先标签和属性；非法 HTML QName 使用安全 div，避免复制整棵兄弟子树。"""
+    """Copy ancestor tags and attributes; illegal HTML QName Use safe div to avoid copying the entire sibling subtree."""
     try:
         wrapper = etree.Element(ancestor.tag, nsmap=ancestor.nsmap)
     except ValueError:
@@ -193,7 +193,7 @@ def _collect_metrics(
     inherited_visibility_hidden: bool,
     inside_link: bool,
 ) -> CandidateMetrics:
-    """单次深度优先遍历计算所有元素的可见指标，避免候选间重复扫描。"""
+    """A single depth-first traversal calculates the visible indicators of all elements to avoid repeated scanning between candidates."""
     resolved = stylesheet.resolve(element, inherited, inherited_visibility_hidden)
     if resolved.subtree_hidden:
         output[element] = CandidateMetrics()
@@ -231,7 +231,7 @@ def _collect_metrics(
 
 
 def _candidate_score(element: etree._Element, metrics: CandidateMetrics, repeated_penalty: int) -> float:
-    """按正文、结构对象、链接与模板噪声计算确定性候选分数。"""
+    """Calculate deterministic candidate scores according to text, structural objects, links and template noise."""
     tokens = _tokens(element)
     token_bonus = 200 if tokens & _POSITIVE_TOKENS else 0
     token_penalty = 240 if tokens & _NEGATIVE_TOKENS else 0
@@ -250,7 +250,7 @@ def _candidate_score(element: etree._Element, metrics: CandidateMetrics, repeate
 
 
 def _is_explicit_candidate(element: etree._Element) -> bool:
-    """识别标准语义 main/article/role/itemprop 正文候选。"""
+    """Identify standard semantic main/article/role/itemprop text candidates."""
     name = local_name(element)
     roles = frozenset((element.get("role") or "").casefold().split())
     itemprop = frozenset((element.get("itemprop") or "").casefold().split())
@@ -258,13 +258,13 @@ def _is_explicit_candidate(element: etree._Element) -> bool:
 
 
 def _tokens(element: etree._Element) -> frozenset[str]:
-    """把 class/id 拆成完整小写 token，避免任意 substring 误判。"""
+    """Split class/id into complete lowercase token to avoid any misjudgment of substring."""
     value = f"{element.get('id') or ''} {element.get('class') or ''}".casefold()
     return frozenset(token for token in _TOKEN_RE.split(value) if token)
 
 
 def _repeated_short_sibling_penalties(root: etree._Element) -> dict[etree._Element, int]:
-    """单次后序遍历预计算各子树的重复短同级惩罚，供嵌套候选共享。"""
+    """A single post-order traversal precomputes the repeated short sibling penalty of each subtree for sharing by nested candidates."""
     elements = [element for element in root.iter() if isinstance(element.tag, str)]
     short_text_lengths: dict[etree._Element, int] = {}
     penalties: dict[etree._Element, int] = {}
@@ -293,7 +293,7 @@ def _repeated_candidate_items(
     candidates: list[_ScoredCandidate],
     metrics_by_element: dict[etree._Element, CandidateMetrics],
 ) -> frozenset[etree._Element]:
-    """一次预计算论坛、文档页或聚合页中的重复同级候选，避免逐候选重扫兄弟节点。"""
+    """Precompute duplicate sibling candidates in forums, document pages or aggregate pages at one time to avoid re-scanning sibling nodes one by one."""
     semantic_tokens = frozenset({"article", "content", "entry", "post", "section"})
     parents = {parent for candidate in candidates if (parent := candidate.element.getparent()) is not None}
     repeated: set[etree._Element] = set()
@@ -320,7 +320,7 @@ def _repeated_candidate_items(
 
 
 def _is_containment_equivalent(first: _ScoredCandidate, second: _ScoredCandidate) -> bool:
-    """忽略高度重叠的祖先/后代候选，避免嵌套 main/article 互相压低置信度。"""
+    """Ignore highly overlapping ancestor/descendant candidates to avoid nested main/article mutually suppressing confidence."""
     contains = first.element in second.element.iterancestors() or second.element in first.element.iterancestors()
     if not contains:
         return False
@@ -330,7 +330,7 @@ def _is_containment_equivalent(first: _ScoredCandidate, second: _ScoredCandidate
 
 
 def _soft_prune(root: etree._Element) -> None:
-    """在候选副本中删除确定的导航/表单和高噪声 token 子树。"""
+    """Remove identified navigation/form and high-noise token subtrees in candidate replicas."""
     _prune_article_comments(root)
     metrics_by_element = _collect_soft_prune_metrics(root)
     for element in list(root.iterdescendants()):
@@ -351,14 +351,14 @@ def _soft_prune(root: etree._Element) -> None:
 
 
 def _is_comment_region(element: etree._Element) -> bool:
-    """按完整词与驼峰边界识别评论容器，不匹配正文文本或任意子串。"""
+    """Identify comment containers by complete word and camel case boundaries, and do not match body text or any substring."""
     value = f"{element.get('id') or ''} {element.get('class') or ''}"
     value = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", value).casefold()
     return bool(frozenset(_TOKEN_RE.split(value)) & {"comment", "comments"})
 
 
 def _prune_article_comments(root: etree._Element) -> None:
-    """仅在单篇独立文章明确存在时移除附属评论，保留论坛及讨论型正文。"""
+    """Only remove subsidiary comments when a single independent article clearly exists, and retain the forum and discussion text."""
     articles = [
         element
         for element in root.iter()
@@ -367,7 +367,7 @@ def _prune_article_comments(root: etree._Element) -> None:
         and not any(_is_comment_region(parent) for parent in (element, *element.iterancestors()))
         and len(_normalized_text(" ".join(element.itertext()))) >= _MIN_TEXT_CHARS
     ]
-    # 嵌套 articleBody 与 article 属于同一正文；多个独立 article 按论坛处理。
+    # Nested articleBody and article belong to the same text; multiple independent article are processed according to the forum.
     outer_articles = [element for element in articles if not any(parent in articles for parent in element.iterancestors())]
     if len(outer_articles) != 1:
         return
@@ -381,7 +381,7 @@ def _prune_article_comments(root: etree._Element) -> None:
 
 
 def _collect_soft_prune_metrics(root: etree._Element) -> dict[etree._Element, _SoftPruneMetrics]:
-    """单次后序遍历预计算每个元素的完整子树文本、链接和语义对象统计。"""
+    """A single post-order traversal precomputes the complete subtree text, link and semantic object statistics for each element."""
     elements = [element for element in root.iter() if isinstance(element.tag, str)]
     output: dict[etree._Element, _SoftPruneMetrics] = {}
     for element in reversed(elements):
@@ -419,7 +419,7 @@ def _collect_soft_prune_metrics(root: etree._Element) -> dict[etree._Element, _S
 
 
 def _drop_tree_preserve_tail(element: etree._Element) -> None:
-    """删除噪声子树，同时把 tail 归还到相邻文本位置。"""
+    """Delete the noise subtree and return tail to the adjacent text position."""
     parent = element.getparent()
     if parent is None:
         return
@@ -434,12 +434,12 @@ def _drop_tree_preserve_tail(element: etree._Element) -> None:
 
 
 def _normalized_text(value: str | None) -> str:
-    """折叠文本空白，供字符计数和候选比较使用。"""
+    """Collapse text whitespace for use in character counting and candidate comparison."""
     return re.sub(r"\s+", " ", value or "").strip()
 
 
 def _document_order(element: etree._Element) -> tuple[int, ...]:
-    """返回元素从根到自身的逐层索引，作为稳定排序键。"""
+    """Return the layer-by-layer index of the element from the root to itself as a stable sort key."""
     path: list[int] = []
     current: etree._Element | None = element
     while current is not None and current.getparent() is not None:

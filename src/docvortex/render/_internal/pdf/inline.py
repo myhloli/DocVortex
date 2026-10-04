@@ -1,4 +1,4 @@
-"""Middle JSON InlineSpan 到 ReportLab Paragraph fragment 的转换。"""
+"""Conversion of Middle JSON InlineSpan to ReportLab Paragraph fragment."""
 
 from __future__ import annotations
 
@@ -26,10 +26,10 @@ _INVALID_TEXT_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\u
 
 
 class PdfAnchorRegistry:
-    """把 MiddleJson anchor 映射为稳定唯一的 PDF destination 名称。"""
+    """Map MiddleJson anchor to the stable and unique name PDF destination."""
 
     def __init__(self, anchors: Iterable[str]) -> None:
-        """预注册全部可见标题与页面脚注 anchor。"""
+        """Pre-register all visible titles and page footers anchor."""
         self._names: dict[str, str] = {}
         self._attached: set[str] = set()
         self._used_names: set[str] = set()
@@ -39,12 +39,12 @@ class PdfAnchorRegistry:
                 self._names[normalized] = self._allocate_name(normalized)
 
     def resolve(self, anchor: str | None) -> str | None:
-        """解析已注册 anchor，空值或未知值返回 None。"""
+        """Parsing registered anchor, null or unknown value returns None."""
         normalized = (anchor or "").strip()
         return self._names.get(normalized) if normalized else None
 
     def attach_markup(self, anchor: str | None) -> str:
-        """返回首个目标的 Paragraph anchor 标签，重复目标仅记录诊断。"""
+        """Returns the Paragraph anchor tag for the first target, duplicate targets only log diagnostics."""
         normalized = (anchor or "").strip()
         name = self.resolve(normalized)
         if name is None:
@@ -56,7 +56,7 @@ class PdfAnchorRegistry:
         return f'<a name="{html.escape(name, quote=True)}"/>'
 
     def _allocate_name(self, anchor: str) -> str:
-        """为原始 anchor 分配合法 ASCII destination，并稳定处理碰撞。"""
+        """Assigns legal ASCII to destination to original anchor, and handles collisions stably."""
         base = _BOOKMARK_SAFE_RE.sub("_", anchor).strip("_")
         if not base or not base[0].isalpha():
             base = f"b_{base}"
@@ -78,7 +78,7 @@ class PdfAnchorRegistry:
 
 @dataclass(slots=True)
 class PdfInlineContext:
-    """保存一份 PDF 文档共享的公式、anchor 与定位状态。"""
+    """Save a copy of the PDF document to share the formulas, anchor and positioning status."""
 
     formulas: FormulaRenderer
     anchors: PdfAnchorRegistry
@@ -87,11 +87,11 @@ class PdfInlineContext:
     cache_paragraphs: bool = False
 
     def location(self, page_idx: int, block_index: int | None, block_type: str) -> str:
-        """返回稳定的 page/block 诊断定位文本。"""
+        """Returns stable page/block diagnostic locator text."""
         return f"page_idx={page_idx}, block_index={block_index}, block_type={block_type}"
 
     def register_formula(self, image: InlineFormulaImage) -> str:
-        """注册一个 Paragraph 可引用的行内公式代理并返回内部 token。"""
+        """Registers a Paragraph referable inline formula agent and returns internal token."""
         token = f"{_FORMULA_SOURCE_PREFIX}{self.next_formula_id}"
         self.next_formula_id += 1
         self.formula_images[token] = image
@@ -99,15 +99,15 @@ class PdfInlineContext:
 
 
 class _PdfParaParser(ParaParser):
-    """让 ReportLab Paragraph 接受不经 ImageReader 的行内公式 token。"""
+    """Let ReportLab Paragraph accept inline formulas token without ImageReader."""
 
     def __init__(self, formula_images: dict[str, InlineFormulaImage]) -> None:
-        """保存当前文档的公式代理映射。"""
+        """Saves the formula proxy mapping for the current document."""
         super().__init__()
         self._formula_images = formula_images
 
     def end_img(self) -> None:
-        """把 docvortex-formula token 解析为带基线几何的矢量图片 fragment。"""
+        """Resolve docvortex-formula token into a vector image fragment with baseline geometry."""
         frag = self._stack[-1]
         if not getattr(frag, "_selfClosingTag", ""):
             raise ValueError("Parser failure in <img/>")
@@ -140,7 +140,7 @@ def build_pdf_paragraph(
     anchor: str | None = None,
     preserve_newlines: bool = False,
 ) -> Paragraph:
-    """把完整 InlineSpan 列表构造成支持矢量公式与链接的 Paragraph。"""
+    """Construct the complete InlineSpan list into a Paragraph that supports vector formulas and links."""
     markup = context.anchors.attach_markup(anchor)
     markup += render_pdf_inline_markup(
         spans,
@@ -154,8 +154,8 @@ def build_pdf_paragraph(
     )
     parser = _PdfParaParser(context.formula_images)
     parsed_style, fragments, bullet_fragments = parser.parse(markup or "&#8203;", style)
-    # 中文及混排正文按字符边界断行，避免空格间的一长串中文被当作英文单词整体移行。
-    # 只复制当前段落样式；代码的字面换行及共享样式不受影响，富文本与链接仍复用已解析片段。
+    # Chinese and mixed text are broken according to character boundaries to prevent a long string of Chinese characters between spaces from being treated as English words and moved as a whole.
+    # Only the current paragraph style is copied; literal line wrapping and shared styles of the code are not affected, and rich text and links still reuse parsed fragments.
     if block_type not in ("code_body", "algorithm_body") and any(
         getattr(fragment, "text", "") and fragment.fontName in (HAN_FONT, JAPANESE_FONT, KOREAN_FONT) for fragment in fragments
     ):
@@ -165,13 +165,13 @@ def build_pdf_paragraph(
             if isinstance(getattr(getattr(fragment, "cbDefn", None), "image", None), InlineFormulaImage):
                 fragment._pdf_location = context.location(page_idx, block_index, block_type)
                 fragment._pdf_page_idx = page_idx
-                # 公式的上下界参与实际行高，避免高分数与前后行重叠；不修改共享样式。
+                # The upper and lower bounds of the formula are included in the actual row height to prevent high scores from overlapping the previous and next rows; the shared style is not modified.
                 if getattr(parsed_style, "autoLeading", "") in ("", "off"):
                     parsed_style = parsed_style.clone(parsed_style.name + " Formula", autoLeading="max")
     bullet_text = None
     if bullet_fragments:
         bullet_text = "".join(getattr(fragment, "text", "") for fragment in bullet_fragments)
-    # 短 Latin 单元格原生换行很便宜，状态快照反而更慢；只缓存 CJK 或较长的普通段落。
+    # Short Latin cell native wrapping is cheap, state snapshots are slower; only CJK or longer normal paragraphs are cached.
     cache_measurement = (
         context.cache_paragraphs
         and not getattr(style, "keepWithNext", False)
@@ -202,7 +202,7 @@ def render_pdf_inline_markup(
     max_width: float,
     preserve_newlines: bool = False,
 ) -> str:
-    """把行内 Span 转成仅包含 renderer 生成标签的安全 Paragraph markup。"""
+    """Convert inline Span to safe Paragraph markup containing only renderer generated tags."""
     return "".join(
         _render_span(
             span,
@@ -219,7 +219,7 @@ def render_pdf_inline_markup(
 
 
 def render_plain_text_markup(text: str, *, preserve_newlines: bool = False) -> str:
-    """转义普通文本，并按字符脚本显式选择 Latin 或中日韩字体。"""
+    """Escape normal text and explicitly select Latin or CJK fonts by character script."""
     normalized = _INVALID_TEXT_RE.sub("\ufffd", text)
     if not normalized:
         return ""
@@ -228,7 +228,7 @@ def render_plain_text_markup(text: str, *, preserve_newlines: bool = False) -> s
     current_text: list[str] = []
 
     def flush() -> None:
-        """把当前同字体字符片段编码为 Paragraph markup。"""
+        """Encode the current character fragment of the same font as Paragraph markup."""
         if not current_text:
             return
         escaped = html.escape("".join(current_text), quote=False)
@@ -263,7 +263,7 @@ def _render_span(
     max_width: float,
     preserve_newlines: bool,
 ) -> str:
-    """按 InlineSpan discriminator 输出单个安全 Paragraph 片段。"""
+    """Press InlineSpan discriminator to output a single safe Paragraph clip."""
     if isinstance(span, TextSpan):
         markup = render_plain_text_markup(span.content, preserve_newlines=preserve_newlines)
         return _apply_text_styles(markup, tuple(span.styles))
@@ -315,7 +315,7 @@ def _render_span(
 
 
 def _apply_text_styles(markup: str, styles: tuple[str, ...]) -> str:
-    """按固定顺序把 MiddleJson 文本样式映射到 Paragraph 标签。"""
+    """Maps MiddleJson text styles to Paragraph labels in a fixed order."""
     if not markup:
         return ""
     tags: list[str] = []
@@ -337,7 +337,7 @@ def _apply_text_styles(markup: str, styles: tuple[str, ...]) -> str:
 
 
 def _resolve_link_target(url: str, anchors: PdfAnchorRegistry) -> str | None:
-    """把 fragment 映射为 PDF destination，其他安全 URL 原样保留。"""
+    """Map fragment to PDF destination, leaving other safe URL as is."""
     if url.startswith("#"):
         destination = anchors.resolve(url[1:])
         return f"#{destination}" if destination is not None else None
@@ -345,8 +345,8 @@ def _resolve_link_target(url: str, anchors: PdfAnchorRegistry) -> str | None:
 
 
 def _font_for_character(character: str) -> str | None:
-    """为中日韩字符选择 CID 字体，并为非 WinAnsi 字符选择 Unicode 回退。"""
-    # 标准字体把 bullet 映射到 0x7f，部分提取器会复制成控制字符；嵌入字体保留 ToUnicode。
+    """Select the CID font for Chinese, Japanese, and Korean characters and the Unicode fallback for non-WinAnsi characters."""
+    # Standard fonts map bullet to 0x7f, which some extractors copy as control characters; embedded fonts retain ToUnicode.
     if character == "•":
         return UNICODE_FALLBACK_FONT
     codepoint = ord(character)

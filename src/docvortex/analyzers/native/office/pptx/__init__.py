@@ -1,3 +1,3 @@
-"""Flash PPTX 转换实现。"""
+"""Flash PPTX conversion implementation."""
 
 __all__: list[str] = []

@@ -1,4 +1,4 @@
-"""验证同字体局部正文复核及真实论文的上下标输出。"""
+"""Verify partial text review in the same font and output superscript and subscripts of real papers."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ _FIXTURE = _ROOT / "tests/fixtures/pdf_mixed_font_script_line.json"
 
 
 def _fixture() -> tuple[list[dict[str, Any]], dict[int, tuple[float, ...]], dict[int, tuple[float, ...]]]:
-    """读取最小原始字符片段，为每个测试提供独立副本。"""
+    """Read the smallest raw character fragment, providing an independent copy for each test."""
     data = json.loads(_FIXTURE.read_text(encoding="utf-8"))
     chars, tight, origins = [], {}, {}
     for row in data["chars"]:
@@ -39,7 +39,7 @@ def _fixture() -> tuple[list[dict[str, Any]], dict[int, tuple[float, ...]], dict
 @pytest.mark.parametrize("halfwidth", [False, True])
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_target_roles_are_width_and_rotation_independent(halfwidth: bool, angle: int) -> None:
-    """半角/全角及四种旋转下，单位为正文，完整括号引用为上标，原始输入不变。"""
+    """In half-width/full-width and four rotations, the unit is the text, the complete bracket reference is superscript, and the original input remains unchanged."""
     chars, tight, origins = _fixture()
     size = (595.0, 842.0)
     for char in chars:
@@ -62,7 +62,7 @@ def test_target_roles_are_width_and_rotation_independent(halfwidth: bool, angle:
 
 @pytest.mark.parametrize("boundary", ["(", "+", " ", "中"])
 def test_reference_cannot_cross_text_boundaries(boundary: str) -> None:
-    """候选串内只剩一个正文参考时，不借用括号、运算符、空白或 CJK 外的样本。"""
+    """When there is only one text reference left in the candidate string, no parentheses, operators, whitespace, or samples outside CJK are borrowed."""
     chars, tight, origins = _fixture()
     next(c for c in chars if c["char_idx"] == 1354)["char"] = boundary
     roles = classify_char_script_roles(chars, tight_bboxes=tight, origins=origins)
@@ -71,7 +71,7 @@ def test_reference_cannot_cross_text_boundaries(boundary: str) -> None:
 
 @pytest.mark.parametrize("mode", ["missing", "one-reference", "subset-boundary"])
 def test_insufficient_font_evidence_keeps_original_classification(mode: str) -> None:
-    """缺少字体、仅一个参考或不同子集字体时，保留原有几何判定而不强制抹除。"""
+    """In the case of missing fonts, only one reference, or a different subset of fonts, the original geometry determination is retained without forcing erasure."""
     chars, tight, origins = _fixture()
     for char in chars:
         if mode == "missing":
@@ -83,7 +83,7 @@ def test_insufficient_font_evidence_keeps_original_classification(mode: str) -> 
 
 
 def test_body_reference_is_not_forced_to_superscript() -> None:
-    """同基线的普通数字引用保持正文，不因方括号模式而强制升为上标。"""
+    """Ordinary numeric references to the same baseline remain in the text and are not forced to be superscripted by square bracket mode."""
     chars, tight, origins = _fixture()
     body = next(c for c in chars if c["char_idx"] == 1353)
     for char in chars:
@@ -100,7 +100,7 @@ def test_body_reference_is_not_forced_to_superscript() -> None:
 
 
 def test_real_paper_exports_correct_unit_and_complete_citation(tmp_path: Path) -> None:
-    """公开 Model/Middle/HTML/Markdown 保留完整正文单位和整体引用上标。"""
+    """Public Model/Middle/HTML/Markdown Preserves full text units and overall citation superscripts."""
     source = _ROOT / "demo/pdfs/中文论文4.pdf"
     assert hashlib.sha256(source.read_bytes()).hexdigest() == json.loads(_FIXTURE.read_text(encoding="utf-8"))["source_sha256"]
     result = parse(source, keep_model_json=True)
@@ -135,7 +135,7 @@ def test_real_paper_exports_correct_unit_and_complete_citation(tmp_path: Path) -
 @pytest.mark.parametrize("halfwidth", [False, True])
 @pytest.mark.parametrize("word", ["TangJiaping", "Sample"])
 def test_numeric_superscript_does_not_rebase_body_word(word: str, halfwidth: bool) -> None:
-    """正文词语后已有数字上标时，下伸字形不应成为新的 token 切分点。"""
+    """When there is already a numerical superscript after the text word, the descending glyph should not become the new token segmentation point."""
     text = word + "1"
     chars, tight, origins = [], {}, {}
     for index, char in enumerate(text):

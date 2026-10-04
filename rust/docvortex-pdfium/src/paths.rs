@@ -1,4 +1,4 @@
-//! PDFium Path 段读取与子路径组装；仅保存点及共享端点索引。
+//! PDFium Path Segment reading and subpath assembly; only save points and shared endpoint indexes.
 
 use crate::ReadError;
 use std::ffi::{c_float, c_int, c_void};
@@ -9,7 +9,7 @@ type GetFn = unsafe extern "system" fn(*mut c_void, c_int) -> *mut c_void;
 type PointFn = unsafe extern "system" fn(*mut c_void, *mut c_float, *mut c_float) -> c_int;
 type SegmentFlagFn = unsafe extern "system" fn(*mut c_void) -> c_int;
 
-/// Path 段读取 ABI；同一页所有对象复用函数指针，不做逐对象重建。
+/// Path segment reading ABI; all objects on the same page reuse function pointers and do not perform object-by-object reconstruction.
 pub struct Api {
     pub(crate) count: CountFn,
     pub(crate) get: GetFn,
@@ -25,10 +25,10 @@ pub struct Subpath {
     pub closed: bool,
 }
 
-/// 借用同库函数一次读完路径，曲线控制点保留，但不误作直线段。
+/// Borrowing the same library function to read the path at once, the curve control points are retained, but no straight line segments are mistakenly made.
 ///
 /// # Safety
-/// 调用方须验证 ABI，保持对象所属页面存活，并持有 PDFium 全局访问锁。
+/// The caller must verify ABI, keep the page to which the object belongs alive, and hold the PDFium global access lock.
 pub unsafe fn read_subpaths(
     addresses: Vec<usize>,
     handle: usize,
@@ -48,10 +48,10 @@ pub unsafe fn read_subpaths(
     read_subpaths_with(&api, handle)
 }
 
-/// 使用已核验 ABI 解码一个 Path；段读取失败时保留参考实现的跳过语义。
+/// Decode a Path using verified ABI; retain the skip semantics of the reference implementation when segment read fails.
 ///
 /// # Safety
-/// 调用方须保持对象所属页面存活，并持有 PDFium 全局访问锁。
+/// The caller must keep the page to which the object belongs alive and hold the PDFium global access lock.
 pub unsafe fn read_subpaths_with(api: &Api, handle: usize) -> Result<Vec<Subpath>, ReadError> {
     let mut output = Vec::new();
     let mut current = Subpath::default();
@@ -86,7 +86,7 @@ pub unsafe fn read_subpaths_with(api: &Api, handle: usize) -> Result<Vec<Subpath
             current_index = next;
         }
         if segment_closes {
-            // 索引相同即同一 Python 点对象；NaN 也不能凭值比较额外产生闭合边。
+            // The same index means the same Python point object; NaN cannot generate additional closed edges based on value comparison.
             if current_index != 0 && current.points[current_index] != current.points[0] {
                 current.lines.push((current_index, 0));
             }

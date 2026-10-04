@@ -1,4 +1,4 @@
-"""提供行内证据共享的字符和几何规范化原语。"""
+"""Character and geometric normalization primitives that provide inline evidence sharing."""
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ from .types import (
 def _style_line_reading_order_key(
     line: PDFTextStyleLine,
 ) -> tuple[int, float, float]:
-    """优先使用原生 source_index 排序，重复索引时再以 bbox 保持稳定。"""
+    """Prioritize using the native source_index sorting, and then use bbox to maintain stability when repeating the index."""
 
     return line.source_index, line.bbox[1], line.bbox[0]
 
 
 def _coerce_bbox(value: Any) -> BBox | None:
-    """把 list、tuple 或 pdftext bbox 对象收敛为合法有限 bbox。"""
+    """Convergence of list, tuple or pdftext bbox objects to legal finite bbox."""
 
     raw_bbox = getattr(value, "bbox", value)
     try:
@@ -45,7 +45,7 @@ def _coerce_bbox(value: Any) -> BBox | None:
 
 
 def _ordered_line_chars(line: Any) -> list[dict[str, Any]]:
-    """按 char_idx 修复异常乱序字符，同时保留缺少索引时的来源顺序。"""
+    """Fix unexpected out-of-order characters by char_idx while preserving source order when index is missing."""
 
     chars = [char for char in getattr(line, "chars", []) if isinstance(char, dict)]
     indexed_chars = [char.get("char_idx") for char in chars]
@@ -59,7 +59,7 @@ def _ordered_line_chars(line: Any) -> list[dict[str, Any]]:
 
 
 def _normalize_match_fragment(value: Any) -> str:
-    """把单个字符片段规范为忽略排版空白的确定性匹配文本。"""
+    """Normalizes a single character fragment into a deterministic match of text that ignores typographical whitespace."""
     text = str(value or "")
     if get_native() is not None and len(text) <= 8:
         return _cached_match_fragment(text)
@@ -68,12 +68,12 @@ def _normalize_match_fragment(value: Any) -> str:
 
 @lru_cache(maxsize=4096)
 def _cached_match_fragment(text: str) -> str:
-    """缓存原生批处理边界的短 Unicode 特征，不缓存整行、页面或对象地址。"""
+    """Short Unicode signature that caches native batch boundaries, without caching entire rows, pages, or object addresses."""
     return _normalize_match_text(text)
 
 
 def _normalize_match_text(text: str) -> str:
-    """使用既有 Python Unicode 规则计算匹配文本，供参考和缓存路径共同复用。"""
+    """Compute matching text using existing Python Unicode rules for reuse with reference and cache paths."""
 
     output: list[str] = []
     for char in text:
@@ -91,7 +91,7 @@ def _normalize_match_text(text: str) -> str:
 
 
 def _canonical_styles(styles: Iterable[str]) -> tuple[PDFTextStyle, ...]:
-    """按公开富文本协议顺序过滤、去重并规范样式集合。"""
+    """Filter, deduplicate, and normalize style collections by public rich text protocol order."""
 
     style_set = set(styles)
     return cast(
@@ -101,7 +101,7 @@ def _canonical_styles(styles: Iterable[str]) -> tuple[PDFTextStyle, ...]:
 
 
 def _bbox_intersection_area(first: BBox, second: BBox) -> float:
-    """返回两个合法 bbox 的相交面积。"""
+    """Returns the intersection area of two legal bboxs."""
 
     width = max(0.0, min(first[2], second[2]) - max(first[0], second[0]))
     height = max(0.0, min(first[3], second[3]) - max(first[1], second[1]))
@@ -109,7 +109,7 @@ def _bbox_intersection_area(first: BBox, second: BBox) -> float:
 
 
 def _bbox_overlap_ratio(first: BBox, second: BBox) -> float:
-    """返回 first 面积中落入 second 的比例。"""
+    """Returns the proportion of the area of first that falls within second."""
 
     intersection_width = max(0.0, min(first[2], second[2]) - max(first[0], second[0]))
     intersection_height = max(0.0, min(first[3], second[3]) - max(first[1], second[1]))

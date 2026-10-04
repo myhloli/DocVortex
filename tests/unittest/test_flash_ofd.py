@@ -49,7 +49,7 @@ _LOCAL_SAMPLE_DIR = _PROJECT_ROOT / "tmp" / "ofd_samples" / "ofdrw_issues_202608
 
 
 def _minimal_payload(*, namespace: str = "http://www.ofdspec.org/2016", version: str = "1.0") -> bytes:
-    """构造包含单行文字的最小 OFD。"""
+    """Constructs a minimal OFD containing a single line of text."""
     content = text_object(3, "你好，OFD！", boundary="10 10 50 12", delta_x="g 6 5")
     return build_ofd_package(
         [("Pages/Page_0/Content.xml", page_xml(content, namespace=namespace))],
@@ -59,7 +59,7 @@ def _minimal_payload(*, namespace: str = "http://www.ofdspec.org/2016", version:
 
 
 def _replace_package_part(payload: bytes, part_name: str, replacement: bytes | None) -> bytes:
-    """替换或删除测试 OFD ZIP 中的单个成员。"""
+    """Replace or delete a single member in test OFD ZIP."""
     source_buffer = BytesIO(payload)
     output_buffer = BytesIO()
     with ZipFile(source_buffer) as source, ZipFile(output_buffer, "w", ZIP_DEFLATED) as output:
@@ -73,7 +73,7 @@ def _replace_package_part(payload: bytes, part_name: str, replacement: bytes | N
 
 
 def test_ofd_legacy_namespace_and_declared_page_order() -> None:
-    """验证旧命名空间、非目录排序页树和空页保持声明顺序。"""
+    """Verify that old namespaces, non-directory sorted page trees, and empty pages maintain declaration order."""
     namespace = "http://www.ofdspec.org"
     pages = [
         (
@@ -95,7 +95,7 @@ def test_ofd_legacy_namespace_and_declared_page_order() -> None:
 
 
 def test_ofd_multiple_doc_bodies_flatten_in_declared_order() -> None:
-    """验证多个 DocBody 按声明顺序展开为连续物理页。"""
+    """Verify that multiple DocBodys expand into contiguous physical pages in declaration order."""
     middle, model = analyze_native_test_document(build_multi_document_ofd(), file_suffix="ofd")
 
     assert [page.page_idx for page in middle.pages] == [0, 1]
@@ -103,7 +103,7 @@ def test_ofd_multiple_doc_bodies_flatten_in_declared_order() -> None:
 
 
 def test_ofd_declared_page_count_is_bounded_for_parser_and_metadata() -> None:
-    """验证重复引用同一页面 part 也受全文页数预算限制。"""
+    """Verification of repeated references to the same page part is also subject to the full-text page budget."""
     payload = build_ofd_package([("Pages/Page_0/Content.xml", page_xml(""))])
     source_buffer = BytesIO(payload)
     output_buffer = BytesIO()
@@ -131,7 +131,7 @@ def test_ofd_declared_page_count_is_bounded_for_parser_and_metadata() -> None:
 
 
 def test_ofd_page_count_budget_is_shared_across_doc_bodies(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证多个 DocBody 共用解析和元数据页数预算。"""
+    """Verify parsing and metadata page budgets shared by multiple DocBodys."""
     monkeypatch.setattr(ofd_scene, "MAX_PAGE_COUNT", 1)
     monkeypatch.setattr(ofd_metadata, "MAX_PAGE_COUNT", 1)
     payload = build_multi_document_ofd()
@@ -143,7 +143,7 @@ def test_ofd_page_count_budget_is_shared_across_doc_bodies(monkeypatch: pytest.M
 
 
 def test_ofd_declared_document_count_is_bounded_before_page_parsing() -> None:
-    """验证大量空 DocBody 在物化文档引用前受独立预算限制。"""
+    """Verify large number of empty DocBody subject to independent budget before materializing document references."""
     payload = build_ofd_package([("Pages/Page_0/Content.xml", page_xml(""))])
     source_buffer = BytesIO(payload)
     output_buffer = BytesIO()
@@ -175,7 +175,7 @@ def test_ofd_declared_document_count_is_bounded_before_page_parsing() -> None:
 
 
 def test_ofd_textcode_geometry_does_not_use_oversized_boundary() -> None:
-    """验证 Foxit 风格超大 Boundary 不会成为最终文字 bbox。"""
+    """Verify that Foxit style oversized Boundary will not be the final text bbox."""
     content = text_object(
         81,
         "661016910189",
@@ -197,7 +197,7 @@ def test_ofd_textcode_geometry_does_not_use_oversized_boundary() -> None:
 
 
 def test_ofd_cardinal_text_directions_keep_geometry_and_angle() -> None:
-    """验证 ReadDirection/CharDirection 参与字形 quad 与排序方向。"""
+    """Verify that ReadDirection/CharDirection participates in the glyph quad and the sort direction."""
     content = (
         '<ofd:TextObject ID="8" Boundary="20 20 20 50" Font="1" Size="5" '
         'ReadDirection="90" CharDirection="90">'
@@ -215,7 +215,7 @@ def test_ofd_cardinal_text_directions_keep_geometry_and_angle() -> None:
 
 @pytest.mark.parametrize(("second_x", "expected"), [(16.0, "Hello"), (17.0, "Hel lo")])
 def test_ofd_same_baseline_ascii_fragments_use_measured_gap(second_x: float, expected: str) -> None:
-    """验证相邻英文 run 仅在存在可见词间距时补空格。"""
+    """Verify adjacent English run Only pad spaces when there is a visible word gap."""
     content = "".join(
         [
             text_object(1, "Hel", boundary="10 10 10 10", size=4, y=5, delta_x="2 2"),
@@ -232,7 +232,7 @@ def test_ofd_same_baseline_ascii_fragments_use_measured_gap(second_x: float, exp
 
 
 def test_ofd_textcode_preserves_boundary_whitespace_and_glyph_positions() -> None:
-    """验证 TextCode 首尾空格参与 Delta 展开和 CGTransform 全局位置映射。"""
+    """Verify that TextCode leading and trailing spaces participate in Delta expansion and CGTransform global position mapping."""
     text_element = etree.fromstring(
         b'<TextObject ID="9" Boundary="10 10 50 10" Font="1" Size="5">'
         b'<TextCode X="1" Y="5" DeltaX="5 7"> A </TextCode>'
@@ -264,7 +264,7 @@ def test_ofd_textcode_preserves_boundary_whitespace_and_glyph_positions() -> Non
 
 
 def test_ofd_cgtransform_expands_only_actual_text_positions() -> None:
-    """验证超大 CodeCount 只映射 TextCode 实际存在的字符位置。"""
+    """Verify that the oversized CodeCount only maps character positions where TextCode actually exists."""
     glyphs = "42 " + "999 " * 100_000
     text_element = etree.fromstring(
         (
@@ -331,7 +331,7 @@ def test_ofd_cgtransform_expands_only_actual_text_positions() -> None:
 
 
 def test_ofd_delta_tokens_are_streamed_and_bounded() -> None:
-    """验证 Delta 只扫描所需 token，并在全文累计超限时受控失败。"""
+    """Verification Delta Scans only the required token, with controlled failure if the full text accumulation exceeds the limit."""
     budget = OfdTextBudget()
 
     assert parse_delta("1 " + "2 " * 100_000, 1, budget) == [1.0]
@@ -344,7 +344,7 @@ def test_ofd_delta_tokens_are_streamed_and_bounded() -> None:
 
 
 def test_ofd_textcode_is_decoded_and_charged_in_bounded_chunks(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证十六进制转义可跨分片恢复，超限时不会先解码完整 TextCode。"""
+    """Verify that hex escaping is recoverable across shards and does not decode the full TextCode first when exceeding the limit."""
     monkeypatch.setattr(ofd_text, "_TEXT_CODE_DECODE_CHUNK_SIZE", 3)
     escaped = etree.fromstring(b"<TextCode>before\\00<Part>41</Part>after</TextCode>")
     budget = OfdTextBudget()
@@ -358,7 +358,7 @@ def test_ofd_textcode_is_decoded_and_charged_in_bounded_chunks(monkeypatch: pyte
     decoded_chunk_lengths: list[int] = []
 
     def record_decode(value: str) -> str:
-        """记录单次解码规模并委托真实转义实现。"""
+        """Record the size of a single decoding and entrust the actual escape implementation."""
         decoded_chunk_lengths.append(len(value))
         return original_decode(value)
 
@@ -371,7 +371,7 @@ def test_ofd_textcode_is_decoded_and_charged_in_bounded_chunks(monkeypatch: pyte
 
 
 def test_ofd_textcode_discards_glyphs_outside_object_boundary() -> None:
-    """验证 TextObject Boundary 会裁掉完整位于边界外的字符和空行。"""
+    """Verification TextObject Boundary clips characters and blank lines that are completely outside the boundary."""
     package_buffer = BytesIO()
     with ZipFile(package_buffer, "w", ZIP_DEFLATED) as archive:
         archive.writestr("OFD.xml", "<OFD/>")
@@ -406,7 +406,7 @@ def test_ofd_textcode_discards_glyphs_outside_object_boundary() -> None:
 
 
 def test_ofd_draw_param_inheritance_is_ordered_and_bounded() -> None:
-    """验证 DrawParam 保持父到子覆盖顺序，并在继承链超限时受控失败。"""
+    """Verification DrawParam maintains parent-to-child override order and provides controlled failure when the inheritance chain exceeds limits."""
     ordered = ResourceRegistry(
         draw_params={
             1: {"ID": "1", "Relative": "2", "LineWidth": "2"},
@@ -442,7 +442,7 @@ def test_ofd_draw_param_inheritance_is_ordered_and_bounded() -> None:
     ],
 )
 def test_ofd_image_near_cardinal_rotation_accepts_both_directions(raw_angle: float, expected_angle: int) -> None:
-    """验证图片旋转从直角两侧逼近时都保留载荷和阅读顺序 block。"""
+    """Verify that loading and reading order are preserved when image rotation is approached from both sides of a right angle block."""
     image_buffer = BytesIO()
     Image.new("RGB", (2, 2), "white").save(image_buffer, format="PNG")
     package_buffer = BytesIO()
@@ -492,7 +492,7 @@ def test_ofd_image_near_cardinal_rotation_accepts_both_directions(raw_angle: flo
 
 
 def test_ofd_oversized_image_is_rejected_before_pixel_decode(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证 OFD 超限 raster 在 Pillow load 前降级为无载荷 diagnostic。"""
+    """Verification OFD out of limit raster downgraded to no load diagnostic before Pillow load."""
     image = MagicMock()
     image.__enter__.return_value = image
     image.size = (8_193, 1)
@@ -525,7 +525,7 @@ def test_ofd_oversized_image_is_rejected_before_pixel_decode(monkeypatch: pytest
 
 
 def test_ofd_referenced_media_resource_and_part_are_required() -> None:
-    """验证正文 ImageObject 引用不存在的资源 ID 或成员时整份失败。"""
+    """Validation body ImageObject failed when referencing resource ID or member that does not exist."""
     image_element = etree.fromstring(b'<ImageObject ID="7" Boundary="0 0 10 10" ResourceID="1"/>')
     package_buffer = BytesIO()
     with ZipFile(package_buffer, "w", ZIP_DEFLATED) as archive:
@@ -559,14 +559,14 @@ def test_ofd_referenced_media_resource_and_part_are_required() -> None:
 
 
 def test_ofd_path_rejects_unexpected_numeric_tokens_without_hanging() -> None:
-    """验证无活动命令或 C 后的数字 token 直接使当前非法路径降级。"""
+    """Verify that no active command or number after C token directly degrades the current illegal path."""
     assert _segments("1 2", Affine(), OfdPathBudget()) == []
     assert _segments("M 0 0 C 1 2 L 3 4", Affine(), OfdPathBudget()) == []
     assert _segments("M 0 0 L 10 0", Affine(), OfdPathBudget()) == [((0.0, 0.0), (10.0, 0.0))]
 
 
 def test_ofd_path_tokens_are_streamed_and_bounded() -> None:
-    """验证无活动命令时立即停止，并在路径 token 累计超限时失败。"""
+    """Verification stops immediately when there are no active commands and fails when path token accumulation exceeds limit."""
     stray_budget = OfdPathBudget()
 
     assert _segments("1 " * 100_000, Affine(), stray_budget) == []
@@ -579,7 +579,7 @@ def test_ofd_path_tokens_are_streamed_and_bounded() -> None:
 
 
 def test_ofd_path_segments_are_clipped_to_object_boundary() -> None:
-    """验证完全越界路径被丢弃，穿越路径裁到对象与父级裁剪交集。"""
+    """Verify that complete out-of-bounds paths are discarded, and crossing paths are clipped to the intersection of the object and parent clipping."""
     outside = etree.fromstring(
         b'<PathObject ID="1" Boundary="10 10 10 1" LineWidth="0.2">'
         b"<AbbreviatedData>M 20 0.5 L 30 0.5</AbbreviatedData></PathObject>"
@@ -620,7 +620,7 @@ def test_ofd_path_segments_are_clipped_to_object_boundary() -> None:
 
 
 def test_ofd_template_grid_recovers_table() -> None:
-    """验证模板路径和页面文字共同恢复高置信全线表。"""
+    """Validate template paths and page text together to restore high-confidence full-line tables."""
     paths = "".join(
         [
             path_object(10, boundary="10 20 80 0.2", data="M 0 0.1 L 80 0.1"),
@@ -652,7 +652,7 @@ def test_ofd_template_grid_recovers_table() -> None:
 
 
 def test_ofd_table_styles_use_standard_html_across_renderers() -> None:
-    """验证 OFD 表格直接输出标准标签，并由 Markdown、HTML、DOCX 保留样式。"""
+    """Verify that the OFD table directly outputs standard labels, and the styles are retained by Markdown, HTML, and DOCX."""
     paths = "".join(
         [
             path_object(10, boundary="10 20 80 0.2", data="M 0 0.1 L 80 0.1"),
@@ -694,10 +694,10 @@ def test_ofd_table_styles_use_standard_html_across_renderers() -> None:
 
 
 def test_ofd_table_intersection_budget_is_shared_across_pages(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证表格线段比较预算由同一 projector 跨页累计。"""
+    """Verify that the table segment comparison budget is accumulated by the same projector across pages."""
 
     def scene(page_idx: int) -> OfdPageScene:
-        """构造需要六次两两比较的单格表页面。"""
+        """Construct a single table page that requires six pairwise comparisons."""
         axis_lines = [
             AxisLine((0.0, 0.0, 10.0, 0.2), "horizontal", 0.2, 0, None),
             AxisLine((0.0, 10.0, 10.0, 10.2), "horizontal", 0.2, 1, None),
@@ -717,7 +717,7 @@ def test_ofd_table_intersection_budget_is_shared_across_pages(monkeypatch: pytes
 
 
 def test_ofd_page_resource_overrides_document_resource() -> None:
-    """验证异常重复资源 ID 按 PageRes 高于 PublicRes 的规则解析。"""
+    """Verification exception duplicate resource ID is resolved by the rules of PageRes which is higher than PublicRes."""
     page_resource = (
         '<ofd:Res xmlns:ofd="http://www.ofdspec.org/2016"><ofd:Fonts>'
         '<ofd:Font ID="1" FontName="Page Bold" Bold="true"/></ofd:Fonts></ofd:Res>'
@@ -745,7 +745,7 @@ def test_ofd_page_resource_overrides_document_resource() -> None:
     ],
 )
 def test_ofd_declared_resource_part_is_required(replacement: bytes | None, error: str) -> None:
-    """验证已声明资源成员缺失、损坏或 namespace 错误时整份失败。"""
+    """Validation failed entirely when a declared resource member is missing, corrupted, or with a namespace error."""
     payload = _replace_package_part(_minimal_payload(), "Doc_0/PublicRes.xml", replacement)
 
     with pytest.raises(OfdParseError, match=error):
@@ -753,7 +753,7 @@ def test_ofd_declared_resource_part_is_required(replacement: bytes | None, error
 
 
 def test_ofd_absent_resource_declaration_is_optional_but_empty_declaration_is_invalid() -> None:
-    """验证未声明资源合法，而显式空资源引用按损坏包处理。"""
+    """Verify that the undeclared resource is legal, and explicit null resource references are treated as broken packages."""
     payload = _minimal_payload()
     with ZipFile(BytesIO(payload)) as package:
         document_root = etree.fromstring(package.read("Doc_0/Document.xml"))
@@ -781,7 +781,7 @@ def test_ofd_absent_resource_declaration_is_optional_but_empty_declaration_is_in
 
 
 def test_parse_resource_part_none_returns_empty_registry() -> None:
-    """验证调用方明确传入未声明资源时不会读取可选成员。"""
+    """Verify that optional members are not read when the caller explicitly passes in an undeclared resource."""
     package_buffer = BytesIO()
     with ZipFile(package_buffer, "w", ZIP_DEFLATED) as archive:
         archive.writestr("OFD.xml", "<OFD/>")
@@ -793,7 +793,7 @@ def test_parse_resource_part_none_returns_empty_registry() -> None:
 
 
 def test_ofd_does_not_open_malformed_unreferenced_custom_tag() -> None:
-    """验证损坏但未参与正文的扩展 XML 不会中断解析。"""
+    """Verifying extension XML that is corrupted but does not participate in the body does not break parsing."""
     payload = build_ofd_package(
         [("Pages/Page_0/Content.xml", page_xml(text_object(1, "visible", boundary="10 10 30 10")))],
         extra_parts={"Doc_0/Tags/CustomTag.xml": "<broken"},
@@ -804,7 +804,7 @@ def test_ofd_does_not_open_malformed_unreferenced_custom_tag() -> None:
 
 
 def test_ofd_rejects_foreign_namespace_and_non_v1_version() -> None:
-    """验证未知命名空间和非 1.x 版本不会被宽松接受。"""
+    """Verify that unknown namespaces and non-1.x versions will not be accepted loosely."""
     assert not detect_ofd(_minimal_payload(namespace="https://example.com/ofd"))
     assert not detect_ofd(_minimal_payload(version="2.0"))
     with pytest.raises(OfdParseError):
@@ -812,7 +812,7 @@ def test_ofd_rejects_foreign_namespace_and_non_v1_version() -> None:
 
 
 def test_ofd_package_rejects_unsafe_member_and_dtd() -> None:
-    """验证 ZIP 上跳成员与任意 DTD 在正文解析前被拒绝。"""
+    """Verify ZIP up-hop member with any DTD rejected before body parsing."""
     unsafe = BytesIO()
     with ZipFile(unsafe, "w", ZIP_DEFLATED) as package:
         package.writestr("OFD.xml", '<ofd:OFD xmlns:ofd="http://www.ofdspec.org/2016" Version="1.0"/>')
@@ -849,7 +849,7 @@ _LOCAL_SAMPLE_CASES = [
 
 @pytest.mark.parametrize(("filename", "page_count"), _LOCAL_SAMPLE_CASES)
 def test_ofd_local_real_samples_preserve_pages_and_normalized_bboxes(filename: str, page_count: int) -> None:
-    """在用户本地真实语料存在时验证页数、稳定解析和 bbox 契约。"""
+    """Verify page count, stable parsing, and bbox contract when user local real corpus exists."""
     source = _LOCAL_SAMPLE_DIR / filename
     if not source.exists():
         pytest.skip("local OFD sample corpus is unavailable")

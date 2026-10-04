@@ -1,4 +1,4 @@
-"""用公共 parse 接口重放指定原件清单，保存可检查的 HTML、MiddleJson 和图片资产包。"""
+"""Use the public parse interface to replay a specified master list, saving inspectable HTML, MiddleJson and picture asset packages."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
-    """保留完整文档上下文并校验源指纹；只输出证据，不自动批准测试基线。"""
+    """Preserves full document context and verifies source fingerprints; only outputs evidence, does not automatically approve test baselines."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "output/pdf/flash-round2/exports")
     parser.add_argument("--manifest", type=Path, default=ROOT / "tests/fixtures/flash_round2_annotations.json")

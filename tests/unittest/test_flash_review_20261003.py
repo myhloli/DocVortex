@@ -1,4 +1,4 @@
-"""由原页视觉证据冻结本轮 Flash 缺陷，禁止用候选输出生成期望。"""
+"""Freezing the Flash defect of this round from the original page visual evidence, prohibiting the generation of expectations with candidate outputs."""
 
 from functools import lru_cache
 from io import BytesIO
@@ -16,7 +16,7 @@ FIXTURES = Path(__file__).parent / "pdfs" / "flash_review_20261003"
 
 @pytest.mark.parametrize("name,anchor", [("review_121", "Congratulations"), ("review_122", "3. Mix reagents")])
 def test_transformed_font_metrics_do_not_promote_plain_instructions_to_document_title(name, anchor):
-    """原页普通字号的祝贺句和编号操作仍为正文，异常字体包围框不能制造文档标题。"""
+    """The congratulations and numbering operations in normal font sizes on the original page are still the main text, and the special font bounding box cannot create document titles."""
     blocks = _pages(name)[0]
     matches = [b for b in blocks if anchor in _visible_text(b["content"])]
     assert len(matches) == 1 and matches[0]["type"] == "text"
@@ -24,7 +24,7 @@ def test_transformed_font_metrics_do_not_promote_plain_instructions_to_document_
 
 
 def test_drying_instruction_keeps_its_second_line_in_one_paragraph():
-    """步骤19的两行属于同一操作，不能因失真的原生字体行高而拆开。"""
+    """The two lines in step 19 belong to the same operation and cannot be separated due to distorted native font line height."""
     blocks = _pages("review_121")[0]
     matches = [b for b in blocks if "19. Allow the tubes" in _visible_text(b["content"])]
     assert len(matches) == 1 and matches[0]["type"] == "text"
@@ -32,7 +32,7 @@ def test_drying_instruction_keeps_its_second_line_in_one_paragraph():
 
 
 def test_incubation_instruction_and_separate_instructor_note_have_distinct_boundaries():
-    """原页步骤4与下方留白后的NOTE各自成段，不能合成一段。"""
+    """Step 4 of the original page and the blank NOTE below are separate segments and cannot be combined into one segment."""
     blocks = _pages("review_122")[0]
     instruction = next(b for b in blocks if "4. Incubate all" in _visible_text(b["content"]))
     note = next(b for b in blocks if "freeze your completed restriction digests" in _visible_text(b["content"]))
@@ -46,7 +46,7 @@ def test_incubation_instruction_and_separate_instructor_note_have_distinct_bound
     ("review_122", ("III. Electrophorese Digests", "Load the Gel")),
 ])
 def test_native_bold_instruction_section_headings_survive_local_metric_calibration(name, anchors):
-    """原页粗体章节标题各自独立，几何校准不能吞入相邻正文或表格表头。"""
+    """The bold section headings on the original page are independent of each other, and the geometric calibration cannot be swallowed up into the adjacent text or table headers."""
     blocks = _pages(name)[0]
     for anchor in anchors:
         matches = [b for b in blocks if anchor in _visible_text(b["content"])]
@@ -55,7 +55,7 @@ def test_native_bold_instruction_section_headings_survive_local_metric_calibrati
 
 
 def test_metric_calibration_preserves_complete_micropipette_instruction_and_number():
-    """几何校准不能把含微升符号的步骤20拆开，也不能裁掉左侧编号。"""
+    """Geometric calibration cannot separate step 20 containing the microliter symbol, nor can it cut off the left number."""
     blocks = _pages("review_121")[0]
     b = next(b for b in blocks if "20. Use a micropipette" in _visible_text(b["content"]))
     assert _visible_text(b["content"]).endswith("follows.")
@@ -63,7 +63,7 @@ def test_metric_calibration_preserves_complete_micropipette_instruction_and_numb
 
 
 def test_metric_calibration_keeps_four_complete_bullet_entries_and_separate_supply_label():
-    """原页四个圆点均与自己的正文合并，器材标签不混入前一条。"""
+    """The four dots on the original page are merged with their own text, and the equipment labels are not mixed into the previous one."""
     blocks = _pages("review_122")[0]
     bullets = [b for b in blocks if _visible_text(b["content"]).startswith("•") and b["bbox"][1] < .6]
     assert len(bullets) == 4
@@ -74,7 +74,7 @@ def test_metric_calibration_keeps_four_complete_bullet_entries_and_separate_supp
 
 
 def test_metric_calibration_separates_loading_step_note_and_bullet_introduction():
-    """第二步、独立NOTE及While loading引导各自完整，后续两条圆点保持独立。"""
+    """In the second step, the independent NOTE and While loading guides are complete, and the subsequent two dots remain independent."""
     blocks = _pages("review_122")[0]
     anchors = ("2. Use a micropipette to load", "NOTE: Be careful not to punch", "While loading,")
     matches = [next(b for b in blocks if anchor in _visible_text(b["content"])) for anchor in anchors]
@@ -86,7 +86,7 @@ def test_metric_calibration_separates_loading_step_note_and_bullet_introduction(
 
 
 def test_native_two_column_reagent_table_keeps_physical_cells_and_internal_text_order():
-    """原页完整外框和列线限定两行双列表；多行文字按各列顺序保留，不能回退错序投影。"""
+    """The complete outer frame and column lines of the original page limit two rows of double lists; multi-line text is retained in the order of each column, and misordered projection cannot be rolled back."""
     from bs4 import BeautifulSoup
     blocks = _pages("review_121")[0]
     table = next(b for b in blocks if b["type"] == "table")
@@ -103,7 +103,7 @@ def test_native_two_column_reagent_table_keeps_physical_cells_and_internal_text_
 
 
 def test_store_on_ice_is_a_unique_footnote_under_the_native_reagent_table():
-    """公开MiddleJson将中部表下注释唯一归属到该两列表格，不能成为页脚或表内文字。"""
+    """Public MiddleJson will only attribute the comments under the middle table to the two columns of the table and cannot become the footer or text in the table."""
     from docvortex import parse
     blocks = parse(FIXTURES / "review_121.pdf", keep_model_json=True).to_dict()["pages"][0]["blocks"]
     tables = [b for b in blocks if b["type"] == "table"]
@@ -116,7 +116,7 @@ def test_store_on_ice_is_a_unique_footnote_under_the_native_reagent_table():
 @pytest.mark.parametrize("scale,left,width", [(.7, 10, 240), (1, 43, 400), (1.8, 110, 620)])
 @pytest.mark.parametrize("kind", ["calibrated", "no_map", "unrelated_map"])
 def test_table_recovery_consumes_calibrated_character_geometry_without_mutating_source(scale, left, width, kind):
-    """移动缩放原生网格与失真字框，明确的字符校准才恢复四个单元格，源记录始终保留。"""
+    """Moving scaled native grids with distorted text boxes, explicit character calibration is restored to only four cells, and the source record is always preserved."""
     from bs4 import BeautifulSoup
     from docvortex.analyzers.native.pdf.models import _PageSource, _TableCandidate, _AxisLine
     from docvortex.analyzers.native.pdf.table_materialization import _materialize_table_blocks
@@ -151,7 +151,7 @@ def test_table_recovery_consumes_calibrated_character_geometry_without_mutating_
 
 
 def _metric_fixture_line(text, bbox, index, **fields):
-    """构造允许显式指定内部几何与语义标记的尺度反例，不修改通用测试替身。"""
+    """Constructs scale counterexamples that allow explicit specification of internal geometry and semantic labeling, without modifying the generic test double."""
     from docvortex.analyzers.native.pdf.models import _LineItem
     return _LineItem(text, bbox, 0, index, **fields)
 
@@ -160,7 +160,7 @@ def _metric_fixture_line(text, bbox, index, **fields):
 @pytest.mark.parametrize('kind', ['zero_group', 'group', 'none', 'different', 'title'])
 @pytest.mark.parametrize('merger', ['baseline', 'overlap', 'dense'])
 def test_same_row_mergers_preserve_only_unanimous_native_structural_membership(scale, kind, merger):
-    """三种同行合并均保留零值段组和标题带；未知或不一致归属不能被强行传播。"""
+    """All three types of peer merges preserve zero-valued segment groups and title bands; unknown or inconsistent attributions cannot be forcefully propagated."""
     from docvortex.analyzers.native.pdf.line_merging import (
         _merge_same_baseline_group, _merge_overlapping_inline_cluster, _merge_dense_split_visual_row,
     )
@@ -190,7 +190,7 @@ def test_same_row_mergers_preserve_only_unanimous_native_structural_membership(s
 @pytest.mark.parametrize("scale,left,width", [(.7, 10, 240), (1, 43, 400), (1.8, 110, 620)])
 @pytest.mark.parametrize("kind", ["positive", "ordinary", "no_donor", "five_rows", "large_font", "two_baselines", "other_family", "unreliable_donor"])
 def test_extreme_local_font_metric_repair_requires_repetition_and_healthy_family_geometry(scale, left, width, kind):
-    """缩放移动字体矩阵异常；健康同族、六行重复与单基线同时成立才校正。"""
+    """The scaling and moving font matrix is abnormal; it must be corrected when healthy homogeneous, six-line duplication and single baseline are established at the same time."""
     from docvortex.analyzers.native.pdf.char_geometry import DocumentGeometryPlan, _CharSample, _repair_extreme_local_font_metrics
     from docvortex.analyzers.native.pdf.models import _LineItem
     by_line = {}
@@ -222,7 +222,7 @@ def test_extreme_local_font_metric_repair_requires_repetition_and_healthy_family
 @pytest.mark.parametrize("scale,left,width", [(.7, 10, 240), (1, 43, 400), (1.8, 110, 620)])
 @pytest.mark.parametrize("kind", ["positive", "unbold", "no_blank", "side_header", "numbered_step", "formula", "no_followers", "uncalibrated"])
 def test_bold_section_after_local_metric_repair_requires_whitespace_and_body_followers(scale, left, width, kind):
-    """移动缩放章节标题，普通正文、表头、编号操作和数学行不得凭粗体晋升。"""
+    """Mobile and zoom chapter titles, general text, table headers, numbering operations and mathematical lines cannot be promoted by boldface."""
     from docvortex.analyzers.native.pdf.title_analysis.structural import _classify_headings_after_extreme_local_metric_repair
     rows = []
     for index in range(6):
@@ -250,7 +250,7 @@ def test_bold_section_after_local_metric_repair_requires_whitespace_and_body_fol
 @pytest.mark.parametrize("scale,left,width", [(.7, 10, 240), (1, 43, 400), (1.8, 110, 620)])
 @pytest.mark.parametrize("kind", ["positive", "no_blank", "unfinished", "not_centered", "caption", "formula", "grouped", "large_type"])
 def test_centered_complete_sentence_is_separate_only_after_terminal_blank_transition(scale, left, width, kind):
-    """独立居中收句依赖前文收句和留白，普通续行、图注及数学成员保持原段。"""
+    """The independent and centered sentence closing relies on the preceding sentence closing and blank space, and ordinary line continuations, illustrations and mathematical elements remain in the original paragraph."""
     from docvortex.analyzers.native.pdf.text_assembly.rows import _leading_typography_reset_break_sources
     h = 10 * scale
     a = _metric_fixture_line("Unfinished tail," if kind == "unfinished" else "Completed tail.",
@@ -267,7 +267,7 @@ def test_centered_complete_sentence_is_separate_only_after_terminal_blank_transi
 @pytest.mark.parametrize("scale,left,width", [(.7, 10, 240), (1, 43, 400), (1.8, 110, 620)])
 @pytest.mark.parametrize("kind", ["positive", "blank", "different_left", "unrepaired", "healthy_source", "different_font", "table_barrier"])
 def test_calibrated_indented_instruction_continues_only_with_matching_rows(scale, left, width, kind):
-    """校准后的常规缩进续行仍受字体、左缘、净空及表格屏障约束。"""
+    """Calibrated regular indented line continuations are still subject to font, left margin, headroom, and table barriers."""
     from docvortex.analyzers.native.pdf.line_layout import _should_connect_text_rows
     h = 10 * scale
     x = left + 1.6 * h
@@ -288,13 +288,13 @@ def test_calibrated_indented_instruction_continues_only_with_matching_rows(scale
 
 @lru_cache(maxsize=None)
 def _pages(name):
-    """解析完整原件，保留跨页分类上下文且不读取 benchmark GT。"""
+    """Parse the complete original, preserving cross-page classification context and not reading benchmark GT."""
     with PDFDocument(str(FIXTURES / f"{name}.pdf")) as document:
         return pipeline._analyze_native_document(document)
 
 
 def test_short_rule_real_footnote_keeps_body_outside():
-    """短线下的编号18和两行小字是完整脚注，不能粘到正文。"""
+    """The number 18 and two lines of small words under the short line are complete footnotes and cannot be glued to the main text."""
     blocks = _pages("short_separator")[0]
     matches = [b for b in blocks if "SimultaneityNoisyCriteriaMultistart" in _visible_text(b["content"])]
     assert len(matches) == 1 and matches[0]["type"] == "page_footnote"
@@ -319,7 +319,7 @@ def test_short_rule_real_footnote_keeps_body_outside():
     ],
 )
 def test_reviewed_book_notes_have_complete_unique_numbered_entries(number, markers):
-    """依据人工原页复核完整编号条目，特别保留短小的同上注释而非只保留编号。"""
+    """Review fully numbered entries against the manual original page, specifically retaining short ditto notes rather than just numbering."""
     notes = [_visible_text(b["content"]) for b in _pages(f"review_{number}")[0] if b["type"] == "page_footnote"]
     for marker in markers:
         matches = [text for text in notes if text.startswith(str(marker) + " ")]
@@ -334,14 +334,14 @@ def test_reviewed_book_notes_have_complete_unique_numbered_entries(number, marke
 
 @pytest.mark.parametrize("name,anchor", [("review_2", "Choosing between Observer Models"), ("review_38", "6.2")])
 def test_reviewed_book_and_report_headings_are_separate_from_body(name, anchor):
-    """原页编号章节标题独立成框，章节号与标题完整且不包含相邻正文段。"""
+    """The original page numbered chapter title is framed independently, and the chapter number and title are complete and do not include adjacent text paragraphs."""
     matches = [block for block in _pages(name)[0] if anchor in _visible_text(block["content"])]
     assert len(matches) == 1 and matches[0]["type"] == "paragraph_title"
     assert matches[0]["bbox"][3] - matches[0]["bbox"][1] < 0.06
 
 
 def test_book_caption_excludes_larger_body_paragraph_after_publication_line():
-    """原页图注以出版信息结束，随后字号增大的正文不能被图注认领。"""
+    """The original page legend ends with the publication information, and the subsequent text in increased font size cannot be claimed by the legend."""
     blocks = _pages("review_11")[0]
     caption = next(b for b in blocks if "Figure 4.11" in _visible_text(b["content"]))
     assert caption["type"] == "caption" and caption["bbox"][3] < 0.52
@@ -351,7 +351,7 @@ def test_book_caption_excludes_larger_body_paragraph_after_publication_line():
 
 
 def test_parallel_book_images_keep_distinct_regions_and_centered_caption_tails():
-    """两个独立编号图注对应两张原生图片，每段居中斜体续行都属于自己的图注。"""
+    """Two independently numbered legends correspond to the two original pictures, and each centered italic continuation line belongs to its own legend."""
     blocks = _pages("review_12")[0]
     images = [b for b in blocks if b["type"] == "image"]
     assert len(images) == 2 and images[0]["bbox"][2] < images[1]["bbox"][0]
@@ -366,11 +366,11 @@ def test_parallel_book_images_keep_distinct_regions_and_centered_caption_tails()
 
 @pytest.mark.parametrize("scale,left", [(0.7, 10), (1, 43), (1.8, 110)])
 def test_short_numbered_note_keeps_its_small_body_at_each_scale(scale, left):
-    """移动编号并改变字号，短注释仍随自己的编号；无编号窄片段不能制造新条目。"""
+    """Move the numbers and change the font size, and short comments will still have their own numbers; unnumbered narrow segments cannot create new entries."""
     from docvortex.analyzers.native.pdf.text_assembly.footnotes import _split_page_footnote_entries
 
     def row(text, x, y, width, index, row_id):
-        """构造有稳定基线与悬挂缩进的脚注片段。"""
+        """Construct a footnote fragment with a stable baseline and hanging indent."""
         return _text_line(
             text,
             (left + x * scale, y * scale, left + (x + width) * scale, (y + 10) * scale),
@@ -398,7 +398,7 @@ def test_short_numbered_note_keeps_its_small_body_at_each_scale(scale, left):
 @pytest.mark.parametrize("scale,left,width", [(0.7, 15, 260), (1, 45, 350), (1.6, 90, 500)])
 @pytest.mark.parametrize("independent", [False, True])
 def test_parallel_native_images_follow_caption_regions_without_duplicate_ownership(scale, left, width, independent):
-    """改变页面宽度、字号及位置；独立图题分开两图，统一图题仍保留整体图形。"""
+    """Change the page width, font size and position; separate the independent figure title into two figures, and the unified figure title still retains the overall figure."""
     from docvortex.analyzers.native.pdf import graphics, models
 
     images = [
@@ -433,7 +433,7 @@ def test_parallel_native_images_follow_caption_regions_without_duplicate_ownersh
 @pytest.mark.parametrize("scale,left", [(0.7, 10), (1, 43), (1.8, 110)])
 @pytest.mark.parametrize("body", [False, True])
 def test_centered_caption_tail_and_body_font_reset_have_different_boundaries(scale, left, body):
-    """同尺度居中斜体续行属于图注，留白后字号增大的正文必须独立。"""
+    """The continuation lines in centered italics with the same scale belong to the legend, and the text with an increased font size after being left blank must be independent."""
     from docvortex.analyzers.native.pdf.text_assembly.annotations import _caption_tail_matches_seed
     from docvortex.analyzers.native.pdf.text_assembly.rows import _caption_to_body_break_sources
 
@@ -461,7 +461,7 @@ def test_centered_caption_tail_and_body_font_reset_have_different_boundaries(sca
 
 
 def test_caption_state_ends_at_outdented_body_with_unreliable_first_line_height():
-    """居中图注后正文回到栏左缘，即使首行有效字高偏小也不能误切第二行续文。"""
+    """After centering the legend, the text returns to the left edge of the column. Even if the effective font height of the first line is too small, the second line of continuation text cannot be mistakenly cut."""
     from docvortex.analyzers.native.pdf.text_assembly.rows import _caption_to_body_break_sources
 
     lines = [
@@ -476,13 +476,13 @@ def test_caption_state_ends_at_outdented_body_with_unreliable_first_line_height(
 
 @pytest.mark.parametrize("page,markers", [(5, ("7We leave", "8E.g.")), (7, ("10", "11")), (13, ("13", "14"))])
 def test_native_superscript_footnotes_remain_separate(page, markers):
-    """行内小号上标编号提供真实分项证据，不依赖拆 run 或块号。"""
+    """The superscript number of the small number in the line provides real itemized evidence and does not rely on the split run or block number."""
     notes = [_visible_text(b["content"]) for b in _pages("two_column_retrieval")[page] if b["type"] == "page_footnote"]
     assert all(sum(text.startswith(marker) for text in notes) == 1 for marker in markers), notes
 
 
 def test_bibliographic_notes_keep_all_continuations_and_unique_numbers():
-    """不同字体和独立编号 run 的两栏脚注也应逐项完整，不把书目信息拆出去。"""
+    """The two columns of footnotes in different fonts and independent numbers run should also be complete one by one without breaking out the bibliographic information."""
     notes = [_visible_text(b["content"]) for b in _pages("numbered_bibliographic_notes")[0] if b["type"] == "page_footnote"]
     assert len(notes) == 9
     assert all(sum(text.startswith(str(number) + " ") for text in notes) == 1 for number in range(25, 34))
@@ -490,13 +490,13 @@ def test_bibliographic_notes_keep_all_continuations_and_unique_numbers():
 
 
 def test_two_column_footnotes_follow_column_order():
-    """原页左栏25至29读完后再读右栏30至33，不能按跨栏视觉行交错。"""
+    """After reading 25 to 29 in the left column of the original page, read 30 to 33 in the right column. You cannot interleave according to the cross-column visual line."""
     notes = [_visible_text(b["content"]) for b in _pages("numbered_bibliographic_notes")[0] if b["type"] == "page_footnote"]
     assert [int(text.split()[0]) for text in notes] == list(range(25, 34))
 
 
 def test_full_width_same_size_footnote_has_number_indent_and_body_clearance():
-    """原页双栏正文下的通栏注5虽同字号，分隔线、独立编号和悬挂续行仍确认脚注。"""
+    """Although the column note 5 under the double-column text of the original page has the same font size, the dividing line, independent numbering and hanging continuation line still confirm the footnote."""
     matches = [block for block in _pages("review_38")[0] if "The question on re-hiring" in _visible_text(block["content"])]
     assert len(matches) == 1 and matches[0]["type"] == "page_footnote"
     assert _visible_text(matches[0]["content"]).startswith("5.")
@@ -504,14 +504,14 @@ def test_full_width_same_size_footnote_has_number_indent_and_body_clearance():
 
 
 def test_single_line_note_uses_native_ink_scale_when_line_metrics_are_wrong():
-    """原页注6字形明显缩小，异常行框高度与正文相同也不能丢失编号脚注。"""
+    """The font of Note 6 on the original page has been significantly reduced, and the height of the abnormal line box is the same as that of the main text, and the numbered footnotes cannot be lost."""
     blocks = _pages("native_bars_39")[0]
     matches = [block for block in blocks if "Compared to 38% in July" in _visible_text(block["content"])]
     assert len(matches) == 1 and matches[0]["type"] == "page_footnote"
 
 
 def test_parallel_chart_groups_own_all_native_labels():
-    """一幅图中多个行业分组仍为一个图体，坐标、刻度和图例不能残留成独立正文。"""
+    """Multiple industry groups in one picture are still one figure body, and coordinates, scales and legends cannot remain as independent text."""
     blocks = _pages("review_38")[0]
     images = [block for block in blocks if block["type"] == "image"]
     assert len(images) == 2
@@ -524,7 +524,7 @@ def test_parallel_chart_groups_own_all_native_labels():
 
 
 def test_wrapped_numbered_heading_keeps_its_unindented_last_line():
-    """9.5标题换行后的Business Models仍属于完整标题，不能成为独立text。"""
+    """9.5 Business Models after title wrapping is still a complete title and cannot become an independent text."""
     matches = [
         block for block in _pages("native_bars_39")[0] if "Adapting to the New Normal" in _visible_text(block["content"])
     ]
@@ -533,7 +533,7 @@ def test_wrapped_numbered_heading_keeps_its_unindented_last_line():
 
 
 def test_plain_marginal_number_and_word_do_not_form_equation():
-    """单页页眉可以是text，但页号和普通字词不能仅凭空间分裂成为公式。"""
+    """A single page header can be text, but page numbers and common words cannot be split into formulas by space alone."""
     blocks = _pages("short_separator")[0]
     assert not any(b["type"] == "equation" and b["bbox"][1] < 0.1 for b in blocks)
     assert any("314" in _visible_text(b["content"]) for b in blocks)
@@ -550,7 +550,7 @@ def test_plain_marginal_number_and_word_do_not_form_equation():
     ],
 )
 def test_single_page_marginal_text_is_separate_from_body(name, edge):
-    """单页允许页边块为text，但页码或小号页眉必须独立，不能合入正文。"""
+    """A single page allows the page margin block to be text, but the page number or small header must be independent and cannot be integrated into the main text."""
     matches = [b for b in _pages(name)[0] if edge in _visible_text(b["content"])]
     assert len(matches) == 1
     assert _visible_text(matches[0]["content"]).strip() == edge
@@ -560,7 +560,7 @@ def test_single_page_marginal_text_is_separate_from_body(name, edge):
 @pytest.mark.parametrize("scale,left", [(0.7, 12), (1, 45), (1.8, 95)])
 @pytest.mark.parametrize("kind", ["number", "small_label", "body_opener", "middle", "tight"])
 def test_marginal_body_boundary_uses_margin_gap_and_repeated_body_scale(scale, left, kind):
-    """改变字号和位置，只切开顶边编号或小号文字；正文短首行、紧排与页中编号保持连续。"""
+    """Change the font size and position, and only cut off the top number or small text; keep the first line of the text short, kerned, and the numbering on the page to keep continuity."""
     from docvortex.analyzers.native.pdf.text_assembly.rows import _top_marginal_text_break_sources
 
     top = 160 if kind == "middle" else 20
@@ -589,13 +589,13 @@ def test_marginal_body_boundary_uses_margin_gap_and_repeated_body_scale(scale, l
 
 
 def test_explanatory_sentence_stays_outside_display_equation():
-    """公式上方解释句的来源文字必须可导出，公式裁图不能吞入它。"""
+    """The source text of the explanatory sentence above the formula must be exportable, and the formula clipping cannot swallow it."""
     blocks = _pages("two_column_retrieval")[4]
     assert any("expressed in Equation 1." in _visible_text(b["content"]) and b["type"] == "text" for b in blocks)
 
 
 def test_modeling_body_is_complete_and_following_display_formula_contains_its_number():
-    """原页建模说明直到denoted as为同一正文段，下一行公式5包含全式及右编号，不产生伪标题。"""
+    """The original page modeling instructions up to denoted and as are the same text paragraph. The next line of formula 5 contains the full form and right number, and no pseudo title is generated."""
     blocks=_pages('display_math_29')[0]
     body=[block for block in blocks if _visible_text(block.get('content','')).startswith('To construct a miniature multiverse')]
     assert len(body)==1 and body[0]['type']=='text'
@@ -606,7 +606,7 @@ def test_modeling_body_is_complete_and_following_display_formula_contains_its_nu
 
 
 def test_two_numbered_url_footnotes_remain_complete_unique_entries():
-    """原页两条编号URL属于脚注，编号、完整地址及单双精度区别均保留，不能合成正文。"""
+    """The two numbers URL on the original page are footnotes. The numbers, complete addresses, and differences between odd and double precision are all retained and cannot be combined into the main text."""
     notes=[_visible_text(block['content']) for block in _pages('review_142')[0] if block['type']=='page_footnote']
     assert len(notes)==2
     assert notes==['1http://en.wikipedia.org/wiki/Single-precision_floating-point_format',
@@ -614,7 +614,7 @@ def test_two_numbered_url_footnotes_remain_complete_unique_entries():
 
 
 def test_two_difference_and_limit_display_formulas_keep_fraction_extents_outside_prose():
-    """原页两条独立差分/极限公式各自聚合分式全高，周围解释句完整保留为正文。"""
+    """The two independent difference/limit formulas on the original page have the full height of their respective aggregate fractions, and the surrounding explanatory sentences are completely retained as the main text."""
     blocks=_pages('review_143')[0]
     equations=[block for block in blocks if block['type']=='equation']
     assert len(equations)==2
@@ -625,7 +625,7 @@ def test_two_difference_and_limit_display_formulas_keep_fraction_extents_outside
 
 
 def test_repeated_soil_layer_labels_start_separate_complete_body_paragraphs():
-    """原页七个土层标签有独立空行，末尾括号不能阻止段界；各标签及其完整说明只归入自己的正文段。"""
+    """The seven soil layer labels on the original page have independent blank lines, and the brackets at the end cannot prevent paragraph boundaries; each label and its complete description are only included in its own text paragraph."""
     blocks=_pages('review_164')[0]
     labels=['3Btg2','3Btg3','3Btg4','3Btg5/E','3Btg6/E','3Btg7/E','3Btg8/E']
     paragraphs=[block for block in blocks if any(_visible_text(block.get('content','')).startswith(label) for label in labels)]
@@ -639,7 +639,7 @@ def test_repeated_soil_layer_labels_start_separate_complete_body_paragraphs():
 @pytest.mark.parametrize('scale,left,width',[(.7,12,350),(1,70,460),(1.8,210,700)])
 @pytest.mark.parametrize('kind',['paragraphs','single_font_start','no_blank','far_gap','outdent','caption','formula','grouped','large_type','wide_start'])
 def test_repeated_typographic_paragraph_starts_require_blank_same_lane_body_evidence(scale,left,width,kind):
-    """无句点段尾也可由重复窄字体标签和空行确认段界；连续行、异栏、图注、公式、分组和大字号均保护。"""
+    """The end of a paragraph without a period can also be confirmed by repeating narrow font labels and blank lines; continuous lines, different columns, legends, formulas, groupings and large font sizes are all protected."""
     from docvortex.analyzers.native.pdf.text_assembly.rows import _leading_typography_reset_break_sources
 
     lines=[]
@@ -680,7 +680,7 @@ def test_repeated_typographic_paragraph_starts_require_blank_same_lane_body_evid
     ],
 )
 def test_textbook_displays_own_complete_math_without_prose_or_overlapping_crops(number, regions):
-    """原页独立积分、分式及不等式必须唯一聚合，未编号公式也不能误作标题或正文。"""
+    """The independent integrals, fractions and inequalities on the original page must be uniquely aggregated, and unnumbered formulas cannot be mistaken for titles or text."""
     blocks = _pages(f"review_{number}")[0]
     equations = [block for block in blocks if block["type"] == "equation"]
     for bounds in regions:
@@ -706,11 +706,11 @@ def test_textbook_displays_own_complete_math_without_prose_or_overlapping_crops(
 @pytest.mark.parametrize("scale,left", [(0.7, 0), (1, 33), (1.8, 90)])
 @pytest.mark.parametrize("kind", ["fraction", "adjacent", "prose", "table"])
 def test_detached_math_requires_complete_geometry_and_respects_prose_tables(scale, left, kind):
-    """改变字号、位置和栏宽，检验分式完整性、相邻等式分离及正文和表格屏障。"""
+    """Change font size, position, and column width, check fraction integrity, separation of adjacent equations, and text and table barriers."""
     from docvortex.analyzers.native.pdf import formulas
 
     def row(text, x, y, width, index, coverage=0.5):
-        """按统一尺度构造独立源行，不使用特定教材原句。"""
+        """Construct independent source lines according to a unified scale and do not use the original sentences of specific textbooks."""
         return _text_line(
             text,
             (left + x * scale, y * scale, left + (x + width) * scale, (y + 10) * scale),
@@ -738,7 +738,7 @@ def test_detached_math_requires_complete_geometry_and_respects_prose_tables(scal
 
 @pytest.mark.parametrize("flags,small,expected", [(64, False, True), (0, True, True), (0, False, False)])
 def test_short_variable_products_require_native_style_evidence(flags, small, expected):
-    """连写短词只有斜体或角标证据才作为数学乘积，普通字体单词继续建立正文屏障。"""
+    """Short run-on words only have italic or subscript evidence as mathematical multiplication, and words in regular font continue to establish textual barriers."""
     from docvortex.analyzers.native.pdf import formulas
 
     line = _text_line("1 + uvw", (20, 40, 80, 50), 0)
@@ -769,7 +769,7 @@ def test_short_variable_products_require_native_style_evidence(flags, small, exp
     ],
 )
 def test_complete_native_display_math_members_and_separate_body(name, regions):
-    """按原页冻结的区域覆盖完整分式及编号，方程不得与解释正文或题名共享归属。"""
+    """The frozen area of the original page covers the complete fractions and numbers, and the equations must not share attribution with the explanatory text or title."""
     equations = [block for block in _pages(name)[0] if block["type"] == "equation"]
     for bounds in regions:
         matches = [
@@ -784,14 +784,14 @@ def test_complete_native_display_math_members_and_separate_body(name, regions):
 
 @pytest.mark.parametrize("page,count", [(6, 2), (7, 1), (14, 2), (16, 2)])
 def test_grouped_tables_include_headers_without_overlapping_fragments(page, count):
-    """同列分组表由表题限定完整范围，两个面板可分别成表但不得碎裂重叠。"""
+    """The complete range of grouped tables in the same column is limited by the table title. Two panels can be separated into tables but must not be fragmented and overlapped."""
     blocks = _pages("two_column_retrieval")[page]
     tables = [b for b in blocks if b["type"] == "table"]
     assert len(tables) == count
     target_tables = tables[1:] if page == 6 else tables
     assert all("Robust" in _visible_text(b["content"]) for b in target_tables)
     if page == 6:
-        # 左栏是不同列名的 Recall 参数表，原页中没有 Robust 列。
+        # The left column is the Recall parameter table with different column names. There is no Robust column in the original page.
         assert "k = 2" in _visible_text(tables[0]["content"])
     assert not any(
         b["type"] == "header" and _visible_text(b["content"]).strip() in {"Robust", "Covid", "News", "Touché", "Avg."}
@@ -800,7 +800,7 @@ def test_grouped_tables_include_headers_without_overlapping_fragments(page, coun
 
 
 def test_sparse_key_value_table_contains_every_group_once():
-    """同列分组表的十三条横线和独立表题限定范围，硬件、模型、训练及超参数必须同属一表。"""
+    """The thirteen horizontal lines and independent table questions in the same column group table limit the range. The hardware, model, training and hyperparameters must belong to the same table."""
     blocks = _pages("two_column_retrieval")[17]
     tables = [block for block in blocks if block["type"] == "table"]
     matched = [block for block in tables if "Elasticsearch" in _visible_text(block["content"])]
@@ -816,16 +816,16 @@ def test_sparse_key_value_table_contains_every_group_once():
     [("display_math_32", ("1The",)), ("display_math_33", ("3That", "4The")), ("display_math_34", ("5An", "6The"))],
 )
 def test_raster_separator_still_provides_native_footnote_geometry(name, markers):
-    """原件用极薄图片画分隔线，原生脚注文字仍按编号独立归属，保持非OCR解析。"""
+    """The original document uses ultra-thin pictures to draw dividing lines, and the original footnote text is still independently attributed according to the number, maintaining non-OCR analysis."""
     notes = [_visible_text(block["content"]) for block in _pages(name)[0] if block["type"] == "page_footnote"]
     assert all(sum(text.startswith(marker) for text in notes) == 1 for marker in markers), notes
 
 
 @pytest.mark.parametrize("name", ["gradient_slide", "chart_slide", "table_slide"])
 def test_background_images_do_not_consume_native_slide_text(name):
-    """完整原生标题保留为文字，纯背景不得成为整页内容图认领所有字符。"""
+    """The complete native title remains as text, and the pure background must not become a full-page content image to claim all characters."""
     blocks = _pages(name)[0]
-    # 渐变背景样本是本轮复核的目录页：完整原生目录也属于文字内容，不能限定只能是普通text。
+    # The gradient background sample is the catalog page for this round of review: the complete native catalog is also text content and cannot be limited to ordinary text.
     assert any(b["type"] in {"text", "paragraph_title", "doc_title", "index"} and len(_visible_text(b["content"])) > 30 for b in blocks)
     assert not any(
         b["type"] == "image" and b["bbox"][2] - b["bbox"][0] > 0.95 and b["bbox"][3] - b["bbox"][1] > 0.95 for b in blocks
@@ -834,7 +834,7 @@ def test_background_images_do_not_consume_native_slide_text(name):
 
 @pytest.mark.parametrize("name,count", [("native_bars_39", 1), ("native_bars_183", 3)])
 def test_native_bar_charts_keep_all_series_as_independent_images(name, count):
-    """原页的堆叠柱图和三个性能图各自完整保留，重复几何不能形成重叠图块或数据表。"""
+    """The stacked column chart and the three performance charts of the original page are each fully retained, and repeated geometries cannot form overlapping tiles or data tables."""
     images = [block for block in _pages(name)[0] if block["type"] == "image"]
     assert len(images) == count, images
     if name.endswith("183"):
@@ -845,7 +845,7 @@ def test_native_bar_charts_keep_all_series_as_independent_images(name, count):
 
 
 def test_bar_chart_labels_are_owned_once_and_caption_is_outside():
-    """完整柱图中的原生标签只随图片导出，图1标题作为图注保留在图外。"""
+    """The native labels in the complete column plot are only exported with the image, and the title of Figure 1 remains outside the figure as a legend."""
     blocks = _pages("native_bars_39")[0]
     image = next(block for block in blocks if block["type"] == "image")
     for block in blocks:
@@ -861,7 +861,7 @@ def test_bar_chart_labels_are_owned_once_and_caption_is_outside():
 
 @pytest.mark.parametrize("number", [81, 82, 84])
 def test_shaded_table_body_excludes_its_caption_and_note(number):
-    """红色表头限定首表范围，上方表题和下方注释不能被新表候选重复认领。"""
+    """The red table header limits the scope of the first table, and the table title above and the comments below cannot be claimed repeatedly by new table candidates."""
     blocks = _pages(f"review_{number}")[0]
     body = min((block for block in blocks if block["type"] == "table"), key=lambda block: block["bbox"][1])
     assert body["bbox"][1] > 0.16
@@ -879,7 +879,7 @@ def test_shaded_table_body_excludes_its_caption_and_note(number):
     ],
 )
 def test_open_vertical_table_tracks_restore_all_headers_and_terminal_rows(number, rows, words):
-    """原页竖向列线限定完整表体，恢复合并表头及末行，不把表题或页眉认领为单元格。"""
+    """The vertical column lines of the original page define the complete table body, restore the merging of table headers and bottom rows, and do not claim table titles or page headers as cells."""
     from bs4 import BeautifulSoup
 
     blocks = _pages(f"review_{number}")[0]
@@ -899,7 +899,7 @@ def test_open_vertical_table_tracks_restore_all_headers_and_terminal_rows(number
 
 
 def test_short_ruled_tables_use_caption_and_complete_rows_including_single_column():
-    """三条横线与独立表题支持单列十行任务表及六列两行数据表，不把表注当正文。"""
+    """Three horizontal lines and independent table headings support single-column and ten-row task tables and six-column and two-row data tables. Table notes are not used as text."""
     from bs4 import BeautifulSoup
 
     blocks = _pages("review_197")[0]
@@ -913,7 +913,7 @@ def test_short_ruled_tables_use_caption_and_complete_rows_including_single_colum
 
 
 def test_body_link_underline_does_not_start_page_footnote():
-    """正文中同字号链接的下划线不是脚注分隔线，后半正文保持完整。"""
+    """The underlines in links of the same font size in the text are not footnote separators, and the second half of the text remains intact."""
     blocks = _pages("review_178")[0]
     matches = [b for b in blocks if "events, they will still gain recognition" in _visible_text(b["content"])]
     assert len(matches) == 1 and matches[0]["type"] == "text"
@@ -921,14 +921,14 @@ def test_body_link_underline_does_not_start_page_footnote():
 
 
 def test_body_paragraph_below_chart_is_not_page_footnote():
-    """图底横线不是页脚注分隔线，图后的完整正文必须保留正文类型及末行。"""
+    """The horizontal line at the bottom of the figure is not the dividing line for footnotes. The complete text after the figure must retain the text type and the last line."""
     matches = [b for b in _pages("review_100")[0] if "On a final note" in _visible_text(b["content"])]
     assert len(matches) == 1 and matches[0]["type"] == "text"
     assert _visible_text(matches[0]["content"]).endswith("stripped of any language")
 
 
 def test_repeated_appendix_table_captions_separate_each_independent_grid():
-    """原页三张相邻表各有编号和表题，表35和36不能合并，表注不得进入表体。"""
+    """The three adjacent tables on the original page each have numbers and titles. Tables 35 and 36 cannot be merged, and table notes cannot be entered into the table body."""
     blocks = _pages("review_83")[0]
     tables = [b for b in blocks if b["type"] == "table"]
     assert len(tables) == 3
@@ -941,7 +941,7 @@ def test_repeated_appendix_table_captions_separate_each_independent_grid():
 
 
 def test_cell_text_reclusters_wrapped_lines_without_other_column_centered_bridge():
-    """其他列的垂直居中文字不能让单元格中两条物理行按横坐标交错拼接。"""
+    """Vertically centered text in other columns cannot allow two physical rows in the cell to be staggered and spliced according to the abscissa."""
     from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableGlyph
     from docvortex.analyzers.native.pdf._table_recovery.text import build_cell_text
 
@@ -963,7 +963,7 @@ def test_cell_text_reclusters_wrapped_lines_without_other_column_centered_bridge
 
 
 def test_cell_reclustering_keeps_overlapping_slanted_watermark_in_original_visual_row():
-    """倾斜水印字框互相覆盖，不具有两条完整物理行的净空，不能重排原视觉行。"""
+    """The slanted watermark text boxes overlap each other, do not have the headroom of two complete physical lines, and cannot rearrange the original visual lines."""
     from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableGlyph
     from docvortex.analyzers.native.pdf._table_recovery.text import build_cell_text
 
@@ -984,7 +984,7 @@ def test_cell_reclustering_keeps_overlapping_slanted_watermark_in_original_visua
 
 
 def test_two_digit_link_notes_are_separate_complete_entries():
-    """原页两位编号与链接同行，编号宽度稍大也应按两个独立条目保留。"""
+    """The two-digit number on the original page should be kept in line with the link. If the number width is slightly larger, it should be retained as two independent entries."""
     notes = [_visible_text(b["content"]) for b in _pages("review_46")[0] if b["type"] == "page_footnote"]
     assert len(notes) == 2
     assert [text.split()[0] for text in notes] == ["21", "22"]
@@ -993,7 +993,7 @@ def test_two_digit_link_notes_are_separate_complete_entries():
 
 @pytest.mark.parametrize("scale,left", [(0.7, 10), (1, 45), (1.8, 95)])
 def test_two_digit_note_marker_width_scales_with_digit_count(scale, left):
-    """移动并缩放两位编号，不把略宽编号连成一条注释，右侧链接仍完整。"""
+    """Move and scale the two-digit number, and do not connect the slightly wider number into a comment. The link on the right is still intact."""
     from docvortex.analyzers.native.pdf.text_assembly.footnotes import _split_page_footnote_entries
 
     lines = []
@@ -1044,7 +1044,7 @@ def test_two_digit_note_marker_width_scales_with_digit_count(scale, left):
     ],
 )
 def test_lower_numbered_notes_have_all_members_and_exclude_running_footer(number, markers):
-    """原页有线和无线脚注都按编号分项，不能把末尾页脚混入条目或留下游离编号。"""
+    """The wired and wireless footnotes on the original page are divided by number. You cannot mix the footer at the end into the article or leave free numbers."""
     import re
 
     blocks = _pages(f"review_{number}")[0]
@@ -1064,7 +1064,7 @@ def test_lower_numbered_notes_have_all_members_and_exclude_running_footer(number
 
 
 def test_poster_contact_instruction_below_decoration_is_body_text():
-    """海报底部联络说明与上方同字号内容连贯，无编号和缩字号证据时不能制造页脚注。"""
+    """The contact information at the bottom of the poster is consistent with the content in the same font size above. Footnotes cannot be made without evidence of numbering and abbreviation."""
     match = next(b for b in _pages("review_103")[0] if "EMAIL REBECCA" in _visible_text(b["content"]))
     assert match["type"] in {"text", "footer"}
 
@@ -1072,7 +1072,7 @@ def test_poster_contact_instruction_below_decoration_is_body_text():
 @pytest.mark.parametrize("scale,left,width", [(0.7, 20, 230), (1, 45, 330), (1.8, 110, 480)])
 @pytest.mark.parametrize("kind", ["note", "same_size", "no_marker", "bold_heading", "no_clearance"])
 def test_unruled_bottom_note_requires_number_shrink_and_body_clearance(scale, left, width, kind):
-    """无线编号小字有正文净空才是脚注；普通编号正文、无编号文字及缩小标题均保持原类型。"""
+    """Footnotes can be found in wirelessly numbered small text with text margin; ordinary numbered text, unnumbered text, and reduced titles all maintain their original type."""
     ys = (400, 416, 575) if kind == "no_clearance" else (400, 416, 432)
     lines = [
         _text_line("An unrelated ordinary body line", (left, y * scale, left + width, (y + 12) * scale), i)
@@ -1098,7 +1098,7 @@ def test_unruled_bottom_note_requires_number_shrink_and_body_clearance(scale, le
 @pytest.mark.parametrize("scale,left", [(0.7, 40), (1, 65), (1.8, 110)])
 @pytest.mark.parametrize("kind", ["matching", "unmatched", "ordinary_digit"])
 def test_unruled_spanning_same_scale_note_requires_raised_native_reference(scale, left, kind):
-    """同字号跨栏注释必须对应正文的原生上标，普通数字与其他编号不能代替对应证据。"""
+    """Cross-column notes of the same font size must correspond to the native superscripts of the text. Ordinary numbers and other numbers cannot replace corresponding evidence."""
     lines = [
         _text_line("Ordinary body with an inline reference", (left, y * scale, left + 300 * scale, (y + 12) * scale), i)
         for i, y in enumerate((400, 416, 432))
@@ -1126,7 +1126,7 @@ def test_unruled_spanning_same_scale_note_requires_raised_native_reference(scale
 @pytest.mark.parametrize("scale,left", [(0.7, 40), (1, 70), (1.8, 110)])
 @pytest.mark.parametrize("numbered", [True, False])
 def test_short_rule_outside_body_indent_uses_small_numbered_note_left_edge(scale, left, numbered):
-    """正文缩进不能排除位于栏外的编号；短线、同行编号与小字正文共同提供左缘证据。"""
+    """Text indentation cannot exclude numbers located outside columns; short lines, parallel numbers, and small text text together provide evidence of the left margin."""
     lines = [
         _text_line("Ordinary continued body paragraph", (left + 28 * scale, y * scale, left + 420 * scale, (y + 14) * scale), i)
         for i, y in enumerate((530, 548, 566))
@@ -1148,7 +1148,7 @@ def test_short_rule_outside_body_indent_uses_small_numbered_note_left_edge(scale
 
 
 def test_bibliography_page_range_continuation_with_loose_boxes_is_not_unruled_note():
-    """参考文献的页码续行虽以数字句点开始，物理行净空不足时不能制造脚注。"""
+    """Although page continuation lines in references begin with a numerical period, footnotes cannot be created when there is insufficient physical line clearance."""
     lines = [_text_line("Ordinary bibliographic description", (40, y, 340, y + 10), i) for i, y in enumerate((500, 520, 540))]
     lines.extend(
         [
@@ -1162,7 +1162,7 @@ def test_bibliography_page_range_continuation_with_loose_boxes_is_not_unruled_no
 @pytest.mark.parametrize("scale,left,width", [(0.7, 12, 230), (1, 45, 300), (1.8, 95, 480)])
 @pytest.mark.parametrize("kind", ["table", "prose", "no_rule", "closed"])
 def test_open_table_tracks_require_multiple_columns_and_repeated_rows(scale, left, width, kind):
-    """改变栏宽和字号，长列线恢复整表；穿越列线的正文或缺少横线的排列不制造表格。"""
+    """Change the column width and font size, and long column lines will restore the entire table; text that crosses the column lines or an arrangement that lacks horizontal lines will not create a table."""
     from docvortex.analyzers.native.pdf import models, table_detection
 
     top, bottom = 60 * scale, 160 * scale
@@ -1198,7 +1198,7 @@ def test_open_table_tracks_require_multiple_columns_and_repeated_rows(scale, lef
 
 
 def test_split_table_caption_seed_keeps_same_baseline_title_text_outside_header():
-    """表题编号与题名为独立原生run时仍组成完整图注，不把下一行表头加入表题。"""
+    """When the title number and title are independent native run, they still form a complete legend, and the next row of headers is not added to the table title."""
     from docvortex.analyzers.native.pdf import models, table_detection
 
     lines = [
@@ -1212,14 +1212,14 @@ def test_split_table_caption_seed_keeps_same_baseline_title_text_outside_header(
 
 
 def test_table_header_recovery_stops_at_previous_caption():
-    """表7上方的表6图注是独立排版屏障，不能作为多列表头向上扩张。"""
+    """The legend of Table 6 above Table 7 is an independent typesetting barrier and cannot be expanded upward as a multi-column header."""
     tables = [block for block in _pages("review_190")[0] if block["type"] == "table"]
     assert len(tables) == 2
     assert tables[1]["bbox"][1] > 0.19
 
 
 def test_appendix_multiline_heading_remains_one_title():
-    """附录D的两行粗体标题是一条完整题名，编号分类不能制造新的行间段界。"""
+    """The two-line bold title of appendix D is a complete title, and the number classification cannot create new inter-line boundaries."""
     blocks = _pages("two_column_retrieval")[15]
     titles = [
         block
@@ -1231,7 +1231,7 @@ def test_appendix_multiline_heading_remains_one_title():
 
 @pytest.mark.parametrize('page,anchors',[(9,['8 Limitations']),(15,['C Zero-Shot Baselines']),(17,['F Results Validation Set','G Ablations Validation Set'])])
 def test_reviewed_retrieval_section_headings_are_complete_separate_titles(page,anchors):
-    """原页编号章节与附录字母题名完整独立，表体及紧随正文不进入标题。"""
+    """The original page numbered chapters and appendix letter titles are completely independent, and the table body and the following text do not enter the title."""
     blocks=_pages('two_column_retrieval')[page-1]
     for anchor in anchors:
         matches=[b for b in blocks if _visible_text(b.get('content',''))==anchor]
@@ -1240,7 +1240,7 @@ def test_reviewed_retrieval_section_headings_are_complete_separate_titles(page,a
 
 
 def test_three_column_small_labels_keep_equal_heading_status():
-    """原页同排的三栏小标题具有相同视觉层级，不能只把右栏识别为标题。"""
+    """The three columns of subtitles in the same row on the original page have the same visual hierarchy, and the right column cannot be recognized as the title alone."""
     blocks=_pages('review_181')[0]
     for anchor in ['Our Purpose','Our Mission','What We Do']:
         matches=[b for b in blocks if _visible_text(b.get('content',''))==anchor]
@@ -1248,7 +1248,7 @@ def test_three_column_small_labels_keep_equal_heading_status():
 
 
 def test_metric_value_arrow_and_citation_keep_separate_companion_heading():
-    """原页指标和三栏同式的小标题分别保持独立，下面较小字号的解释才是正文。"""
+    """The original page indicators and the three-column subtitles of the same style remain independent, and the explanation in a smaller font size below is the main text."""
     blocks=_pages('review_184')[0]
     matches=[b for b in blocks if '1.8X' in _visible_text(b.get('content',''))]
     assert len(matches)==1 and matches[0]['type']=='paragraph_title'
@@ -1258,7 +1258,7 @@ def test_metric_value_arrow_and_citation_keep_separate_companion_heading():
 
 
 def test_same_style_short_heading_before_lettered_item_remains_complete():
-    """原页Trash与Replace同字体、字号、字重及左缘，均为独立小节题名，不含下方字母编号项目。"""
+    """The original page Trash and Replace have the same font, font size, font weight and left margin. They are independent section titles and do not include the letter number items below."""
     blocks=_pages('review_69')[0]
     for anchor in ['Replace','Trash']:
         matches=[b for b in blocks if _visible_text(b.get('content',''))==anchor]
@@ -1266,7 +1266,7 @@ def test_same_style_short_heading_before_lettered_item_remains_complete():
 
 
 def test_regular_material_and_numbered_procedure_items_are_not_headings():
-    """原页材料及六项操作的首项与其余项目同为常规正文，圆点或数字序号不构成小节标题。"""
+    """The original page material and the first item of the six operations are the same as the rest of the regular text. Dots or numerical serial numbers do not constitute section titles."""
     blocks=_pages('review_169')[0]
     for anchor in ['Reagent grade CaCO', 'Reagent grade CaO', 'Reagent grade CaSO',
                    'Coarse dolomitic limestone', 'Fine dolomitic limestone', 'Control (no amendments)',
@@ -1277,7 +1277,7 @@ def test_regular_material_and_numbered_procedure_items_are_not_headings():
 
 
 def test_retrieval_italic_method_tail_completes_previous_paragraph_before_emphasized_start():
-    """原页同一方法名的斜体短尾接回前段，加粗Parameter Efficiency为另起段的行内强调。"""
+    """The italic short tail of the same method name on the original page is connected to the previous paragraph, and the bold Parameter and Efficiency are the inline emphasis of the new paragraph."""
     blocks = _pages('two_column_retrieval')[5]
     previous = [block for block in blocks if _visible_text(block.get('content', '')).startswith('Intuitively,')]
     assert len(previous) == 1 and _visible_text(previous[0]['content']).endswith('CE MAML + Query FT.')
@@ -1287,7 +1287,7 @@ def test_retrieval_italic_method_tail_completes_previous_paragraph_before_emphas
 
 
 def test_retrieval_caption_does_not_disable_indented_body_paragraph_boundary():
-    """图注后恢复正文段界识别：前栏续段只有一句，下一缩进段独立且保留完整论述。"""
+    """After the figure annotation, the paragraph boundary recognition of the main text is restored: the continuation paragraph in the front column has only one sentence, and the next indented paragraph is independent and retains the complete discussion."""
     blocks = _pages('two_column_retrieval')[8]
     stub = [block for block in blocks if _visible_text(block.get('content', '')).startswith('over BM25 without')]
     assert len(stub) == 1 and _visible_text(stub[0]['content']) == 'over BM25 without query expansion.12'
@@ -1296,7 +1296,7 @@ def test_retrieval_caption_does_not_disable_indented_body_paragraph_boundary():
 
 
 def test_added_cation_blank_answer_column_is_preserved_as_complete_table():
-    """原页表13.2含表头、五种离子和右栏空白记录位置；应恢复六行两列表格及独立表题。"""
+    """Table 13.2 on the original page contains the table header, five ions and the blank record position in the right column; the six-row, two-column table and independent table title should be restored."""
     from bs4 import BeautifulSoup
 
     blocks = _pages('review_165')[0]
@@ -1310,7 +1310,7 @@ def test_added_cation_blank_answer_column_is_preserved_as_complete_table():
 
 
 def test_unruled_experiment_table_has_complete_four_column_header_and_three_rows():
-    """原页顶部实验配方为四列三行数据的无框线表，完整表头和体积单位不能留为游离标题或正文。"""
+    """The experimental formula at the top of the original page is a frameless line table with four columns and three rows of data. The complete header and volume unit cannot be left as free titles or text."""
     from bs4 import BeautifulSoup
 
     blocks = _pages('review_117')[0]
@@ -1324,7 +1324,7 @@ def test_unruled_experiment_table_has_complete_four_column_header_and_three_rows
 
 
 def test_page_clipped_comparison_form_keeps_three_columns_wrapped_headers_and_blank_answers():
-    """原页右侧被物理页界裁切，比较表仍有三列六行；两列双行表头不能切丢括号，五项空白答案必须保留。"""
+    """The right side of the original page is cut off by the physical page boundary, and the comparison table still has three columns and six rows; the brackets cannot be cut off in the header of the two-column, two-row table, and the five blank answers must be retained."""
     from bs4 import BeautifulSoup
 
     blocks=_pages('review_119')[0]
@@ -1343,7 +1343,7 @@ def test_page_clipped_comparison_form_keeps_three_columns_wrapped_headers_and_bl
 @pytest.mark.parametrize('scale,left,width',[(.7,12,210),(1,70,330),(1.8,190,600)])
 @pytest.mark.parametrize('kind',['form','no_page_edge','missing_track','filled_answer','few_rules','shifted_header','missing_row_label','terminal_header','claimed'])
 def test_clipped_blank_form_requires_page_edge_physical_grid_and_all_empty_answer_rows(scale,left,width,kind):
-    """变化字号、位置和表宽；仅恢复页界裁切且三列框线完整的空白表单，不吞入有答案、正文或无框区域。"""
+    """Change the font size, position and table width; only restore the blank form with the page boundary cropped and the three columns of frames intact, and do not swallow the answer, text or unframed areas."""
     from docvortex.analyzers.native.pdf.models import _PageSource,_AxisLine
     from docvortex.analyzers.native.pdf.table_detection import _detect_page_clipped_blank_form_tables
 
@@ -1378,7 +1378,7 @@ def test_clipped_blank_form_requires_page_edge_physical_grid_and_all_empty_answe
 @pytest.mark.parametrize('scale,left',[(.7,12),(1,70),(1.8,190)])
 @pytest.mark.parametrize('kind',['blank_form','numeric_header','filled_answers','few_rows','ordinary_two_column'])
 def test_multiline_blank_answer_header_is_not_physical_row_undercount(scale,left,kind):
-    """双行纯文字列名可作为一行表头；数值记录、有答案、行证据不足及普通多列数据仍触发漏行保护。"""
+    """A two-line plain text column name can be used as a row header; numerical records, answers, insufficient row evidence, and ordinary multi-column data will still trigger missing row protection."""
     from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableToken,NativeTableTextRow,NativeTableText
     from docvortex.analyzers.native.pdf._table_recovery.vector import _physical_row_dense_baseline_pairs
 
@@ -1400,7 +1400,7 @@ def test_multiline_blank_answer_header_is_not_physical_row_undercount(scale,left
 
 
 def test_captioned_fish_table_keeps_two_columns_and_spanning_header():
-    """原页鱼种表的整行底色表头跨两列，四个俗名和斜体学名分列完整，Table 6.1为独立表题。"""
+    """The entire row of the background color table header of the fish species table on the original page spans two columns. The four common names and the scientific names in italics are completely separated. Table 6.1 is an independent table title."""
     from bs4 import BeautifulSoup
 
     blocks = _pages('review_132')[0]
@@ -1420,7 +1420,7 @@ def test_captioned_fish_table_keeps_two_columns_and_spanning_header():
 
 @pytest.mark.parametrize('page,number,metric',[(15,6,'nDCG@20'),(18,10,'Recall@1000')])
 def test_parallel_table_panel_notes_bind_own_body_and_shared_caption_is_unique(page,number,metric):
-    """原页双面板各有a/b说明，总表题归入同组表格且只出现一次，不能游离为正文或错绑另一栏说明。"""
+    """The double-sided pages of the original page each have a description of a/b. The general table questions are included in the same group of tables and appear only once. They cannot be separated into the main text or mistakenly tied to another column of description."""
     from docvortex import parse
 
     blocks=parse(FIXTURES/'two_column_retrieval.pdf',keep_model_json=True).to_dict()['pages'][page-1]['blocks']
@@ -1443,7 +1443,7 @@ def test_parallel_table_panel_notes_bind_own_body_and_shared_caption_is_unique(p
 @pytest.mark.parametrize('scale,left,width',[(.7,12,150),(1,70,190),(1.8,210,290)])
 @pytest.mark.parametrize('kind',['panels','no_overall','no_right_note','different_row','wide_gap','large_note','far_note','body_between','independent_captions'])
 def test_shared_table_caption_needs_aligned_panels_native_notes_and_clear_corridor(scale,left,width,kind):
-    """改变栏宽、字号和位置；总表题与a/b说明确认共同区域，独立表题、缺项、错位和正文阻隔拒绝。"""
+    """Change the column width, font size and position; confirm the common area between the general table title and the a/b description, and reject the independent table title, missing items, misalignment and text obstruction."""
     from docvortex.analyzers.native.pdf.visual_annotations import (
         _build_visual_parents,_collect_annotation_candidates,_add_caption_supported_table_panel_parents,
         _classify_and_bind_visual_annotations,
@@ -1485,7 +1485,7 @@ def test_shared_table_caption_needs_aligned_panels_native_notes_and_clear_corrid
 @pytest.mark.parametrize('scale,left,width',[(.7,15,210),(1,70,290),(1.8,190,430)])
 @pytest.mark.parametrize('kind',['table','regular_header','two_rows','shifted_column','prose','missing_label','claimed','formula'])
 def test_unruled_numeric_grid_requires_repeated_columns_and_complete_emphasized_header(scale,left,width,kind):
-    """改变位置、字号、列宽和文字；只有三行数值与完整粗体列名同时成立才恢复表格。"""
+    """Change the position, font size, column width and text; restore the table only if the three rows of values and the full bold column names are true."""
     from docvortex.analyzers.native.pdf.models import _PageSource
     from docvortex.analyzers.native.pdf.table_detection import _detect_unruled_numeric_column_tables
 
@@ -1515,7 +1515,7 @@ def test_unruled_numeric_grid_requires_repeated_columns_and_complete_emphasized_
 @pytest.mark.parametrize('scale,left,width',[(.7,15,140),(1,70,180),(1.8,190,260)])
 @pytest.mark.parametrize('kind',['table','no_fill','light_fill','no_caption','few_rows','missing_right','misaligned','claimed'])
 def test_pair_text_table_requires_native_header_band_caption_and_each_column_start(scale,left,width,kind):
-    """移动表格并改变字号和宽度；填色表头、表题、四行双列字符缺一不可，原生合并行仍可恢复。"""
+    """Move the table and change the font size and width; coloring table headers, table titles, four rows and two columns of characters are indispensable, and the original merged rows can still be restored."""
     from docvortex.analyzers.native.pdf.models import _PageSource,_AxisLine
     from docvortex.analyzers.native.pdf.table_detection import _detect_captioned_pair_text_tables
     from docvortex.document.pdf.native_contracts import PDFPathInfo
@@ -1552,7 +1552,7 @@ def test_pair_text_table_requires_native_header_band_caption_and_each_column_sta
 @pytest.mark.parametrize('scale,left',[(.7,12),(1,70),(1.8,160)])
 @pytest.mark.parametrize('kind',['italic','bold','both','plain','sup','disabled','mismatch'])
 def test_native_table_font_styles_escape_source_text_and_preserve_scripts(scale,left,kind):
-    """字体标志和粗细来自原生字符，转义原文；上下标可与强调共存，未启用或文字不匹配时不生成强调。"""
+    """Font marks and weights come from native characters, escaping the original text; superscripts and subscripts can coexist with emphasis, and no emphasis is generated when it is not enabled or the text does not match."""
     from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableCell,NativeTableGlyph
     from docvortex.analyzers.native.pdf.table_text_styles import _render_styled_cell
 
@@ -1569,7 +1569,7 @@ def test_native_table_font_styles_escape_source_text_and_preserve_scripts(scale,
 
 
 def test_ai_pack_open_table_keeps_headers_and_final_highlight_row_inside():
-    """原页三种AI产品加左侧行名共四列，表头及末行Highlight均归入同一完整表体。"""
+    """The three AI products on the original page plus the row names on the left have a total of four columns. The table header and the last row Highlight are all included in the same complete table body."""
     from bs4 import BeautifulSoup
 
     blocks = _pages('review_182')[0]
@@ -1584,7 +1584,7 @@ def test_ai_pack_open_table_keeps_headers_and_final_highlight_row_inside():
 
 
 def test_table_dominated_slide_keeps_native_large_document_title():
-    """整表成员认领后正文不能只用两行大题名统计，大标题及上方小标签仍保持原有独立层级。"""
+    """After the entire list of members is claimed, the main text cannot only use two lines of large title statistics. The large title and the small label above still maintain the original independent level."""
     blocks = _pages('review_182')[0]
     title = [block for block in blocks if _visible_text(block.get('content', '')).startswith('Upstage offers 3 AI packs')]
     assert len(title) == 1 and title[0]['type'] == 'doc_title'
@@ -1596,7 +1596,7 @@ def test_table_dominated_slide_keeps_native_large_document_title():
 @pytest.mark.parametrize('canonical', [False, True])
 @pytest.mark.parametrize('table_evidence', [False, True])
 def test_table_native_body_typography_does_not_turn_large_title_into_body(scale, left, canonical, table_evidence):
-    """表体认领前后的原生常规行仍支持正文尺度，保留大題名相对字号；缺少证据时沿用现有回退。"""
+    """The original regular lines before and after the table body is claimed still support the text size, and the relative font size of the large title is retained; when evidence is lacking, the existing fallback will be used."""
     from docvortex.analyzers.native.pdf.models import _PreparedPage
     from docvortex.analyzers.native.pdf.title_analysis.body_profile import _infer_document_body_profile
 
@@ -1613,7 +1613,7 @@ def test_table_native_body_typography_does_not_turn_large_title_into_body(scale,
 
 @pytest.mark.parametrize('scale,left', [(1, 30), (.75, 180), (1.6, 65)])
 def test_dense_document_body_overrides_sparse_table_page_typography(scale, left):
-    """其他页已有充分正文时不以表格的小字污染全文画像，保证正文和表体样式的统计职责分离。"""
+    """When there is sufficient text on other pages, do not pollute the full text image with table fonts, and ensure the separation of statistical responsibilities between text and table formats."""
     from docvortex.analyzers.native.pdf.models import _PreparedPage
     from docvortex.analyzers.native.pdf.title_analysis.body_profile import _infer_document_body_profile
 
@@ -1631,7 +1631,7 @@ def test_dense_document_body_overrides_sparse_table_page_typography(scale, left)
 @pytest.mark.parametrize('scale,left,width', [(1, 30, 240), (.75, 180, 190), (1.6, 65, 370)])
 @pytest.mark.parametrize('kind', ['blank_table', 'no_caption', 'regular_header', 'normal_spaces', 'two_large_gaps', 'long_key', 'filled_answer', 'short_list', 'image'])
 def test_captioned_blank_table_requires_two_headers_and_repeated_short_left_keys(scale, left, width, kind):
-    """空白列需由独立表题、横线及双列表头共同证明，列表、正文、普通空格和内容图不能成为表格。"""
+    """Blank columns must be jointly proven by independent table titles, horizontal lines and double column headers. Lists, text, ordinary spaces and content figures cannot become tables."""
     from docvortex.analyzers.native.pdf import models, table_detection
 
     caption = _text_line('Table 7. General observations', (left, 25*scale, left+.9*width, 38*scale), 0)
@@ -1669,7 +1669,7 @@ def test_captioned_blank_table_requires_two_headers_and_repeated_short_left_keys
 @pytest.mark.parametrize('scale,left,width', [(1, 30, 240), (.75, 180, 190), (1.6, 65, 370)])
 @pytest.mark.parametrize('kind', ['headers', 'single', 'misaligned', 'crosses_column', 'caption', 'far', 'same_column'])
 def test_open_table_outside_headers_require_distinct_columns_and_same_visual_row(scale, left, width, kind):
-    """列线上方表头需独占不同列且同排，单条标题、跨列文字和不同层级不向表顶扩张。"""
+    """Table headers above the column lines must occupy different columns and be in the same row. Single titles, cross-column text, and different levels must not expand toward the top of the table."""
     from docvortex.analyzers.native.pdf.table_detection import _open_table_header_members
 
     bounds = (left, 100*scale, left+width, 260*scale)
@@ -1694,7 +1694,7 @@ def test_open_table_outside_headers_require_distinct_columns_and_same_visual_row
 @pytest.mark.parametrize('scale,left,width', [(1, 30, 240), (.75, 180, 190), (1.6, 65, 370)])
 @pytest.mark.parametrize('kind', ['three_rules', 'two_rules', 'divergent_ends'])
 def test_open_table_unequal_column_ends_require_three_complete_row_rules(scale, left, width, kind):
-    """略有错开的列线末端仅在三条同宽分隔线证据下采用最长完整边界，弱证据及明显越界不放宽。"""
+    """For the slightly staggered end of the line, only the longest complete boundary will be adopted based on the evidence of three dividing lines of the same width. Weak evidence and obvious cross-borders will not be relaxed."""
     from docvortex.analyzers.native.pdf import models, table_detection
 
     rules = [models._AxisLine((left+fraction*width-.1, 80*scale, left+fraction*width+.1, bottom*scale), .2, 'vertical')
@@ -1715,7 +1715,7 @@ def test_open_table_unequal_column_ends_require_three_complete_row_rules(scale, 
 @pytest.mark.parametrize('scale,left,width', [(1, 30, 220), (.75, 180, 180), (1.6, 65, 340)])
 @pytest.mark.parametrize('kind', ['tail', 'lowercase', 'capital_label', 'completed_previous', 'far_gap', 'font_conflict', 'bold', 'formula', 'table'])
 def test_short_italic_sentence_tail_requires_unfinished_wide_body_and_same_family(scale, left, width, kind):
-    """斜体收句短尾在缩放和移位后接回正文，独立标签、已收句前段、公式及障碍不被强行续接。"""
+    """The short tail of the italicized closing sentence will be connected to the main text after scaling and shifting. Independent labels, the beginning of the closing sentence, formulas and obstacles will not be forcibly continued."""
     from docvortex.analyzers.native.pdf.line_layout import _should_connect_text_rows
 
     previous = _text_line('An unfinished full sentence extends into the next',
@@ -1749,7 +1749,7 @@ def test_short_italic_sentence_tail_requires_unfinished_wide_body_and_same_famil
 @pytest.mark.parametrize('scale,left,width', [(1, 30, 220), (.75, 180, 180), (1.6, 65, 340)])
 @pytest.mark.parametrize('kind', ['body', 'caption_continues', 'no_blank', 'same_size', 'wrong_next_font', 'next_caption'])
 def test_completed_small_caption_releases_body_paragraph_indent_protection(scale, left, width, kind):
-    """完整小字图注后的留白与较大字号正文解除图注保护，图注续句或缺少排版转换时保持保护。"""
+    """The white space after the complete small font figure legend and the larger font size text are released from the figure legend protection, and the figure legend continuation sentence or lack of typesetting conversion remains protected."""
     from docvortex.analyzers.native.pdf.text_assembly.rows import _prose_paragraph_break_sources
 
     lines = []
@@ -1777,7 +1777,7 @@ def test_completed_small_caption_releases_body_paragraph_indent_protection(scale
 @pytest.mark.parametrize('scale,left,width', [(1, 30, 220), (.75, 180, 180), (1.6, 65, 340)])
 @pytest.mark.parametrize('kind', ['emphasis', 'no_terminal', 'no_weight', 'body_same_weight', 'no_following', 'far_gap', 'formula'])
 def test_short_tail_then_leading_bold_run_starts_new_body_paragraph(scale, left, width, kind):
-    """短收句后独立加粗行首及常规续行构成新正文段，弱字重、未收句、公式和远距均不适用。"""
+    """After the short closing sentence, independent bolded line beginnings and regular continuation lines form a new text paragraph. Weak word weight, unfinished sentences, formulas, and distance are not applicable."""
     from docvortex.analyzers.native.pdf.text_assembly.rows import _leading_typography_reset_break_sources
 
     previous = _text_line('A short final clause.' if kind != 'no_terminal' else 'An unfinished clause',
@@ -1801,7 +1801,7 @@ def test_short_tail_then_leading_bold_run_starts_new_body_paragraph(scale, left,
 @pytest.mark.parametrize('scale,left', [(1, 30), (.75, 180), (1.6, 65)])
 @pytest.mark.parametrize('kind', ['metric', 'far_arrow', 'missing_peer', 'formula', 'ambiguous', 'subtitle', 'misaligned', 'font_conflict'])
 def test_metric_heading_fragments_require_unique_arrow_and_parallel_heading(scale, left, kind):
-    """移动和缩放指标后仍聚合完整标题；远距、公式、歧义、字体冲突及下一行说明保持原成员。"""
+    """The full title remains aggregated after moving and zooming the indicator; distances, formulas, ambiguities, font conflicts, and next line descriptions retain their original members."""
     from docvortex.analyzers.native.pdf.line_merging import _merge_metric_heading_fragments
 
     font = ('GeneralMetric', 0)
@@ -1842,7 +1842,7 @@ def test_metric_heading_fragments_require_unique_arrow_and_parallel_heading(scal
 @pytest.mark.parametrize('scale,left', [(1, 30), (.75, 180), (1.6, 65)])
 @pytest.mark.parametrize('kind', ['labels', 'no_seed', 'two_columns', 'font_conflict', 'misaligned', 'inside_image', 'ambiguous_intro', 'narrow_intro'])
 def test_parallel_small_column_labels_require_repeated_geometry_and_known_level(scale, left, kind):
-    """三栏小题名按同排与独立简介复核层级，普通标签、图内文字和不一致排版不被晋升。"""
+    """The three-column subtitles are reviewed and ranked according to the same row and independent introduction. General labels, text in pictures and inconsistent layout will not be promoted."""
     from docvortex.analyzers.native.pdf.title_analysis.page_titles import _restore_parallel_small_column_labels
 
     geometry = []
@@ -1873,7 +1873,7 @@ def test_parallel_small_column_labels_require_repeated_geometry_and_known_level(
 @pytest.mark.parametrize('scale,left', [(1, 30), (.75, 180), (1.6, 65)])
 @pytest.mark.parametrize('kind', ['bullet', 'number', 'bold', 'single', 'nonconsecutive', 'misaligned', 'explicit', 'caption'])
 def test_regular_repeated_items_supply_body_evidence_without_demoting_real_heading(scale, left, kind):
-    """同排常规项目为首项提供正文反证，但字号、字重、编号或明确题名反证必须保留标题。"""
+    """Regular items in the same row should provide textual counter-evidence for the first item, but the font size, font weight, number, or clear title of the counter-evidence must retain the title."""
     from docvortex.analyzers.native.pdf.models import _DocumentBodyProfile
     from docvortex.analyzers.native.pdf.title_analysis.structural import _demote_regular_repeated_item_titles
 
@@ -1899,7 +1899,7 @@ def test_regular_repeated_items_supply_body_evidence_without_demoting_real_headi
 @pytest.mark.parametrize('scale,left', [(1, 30), (.75, 180), (1.6, 65)])
 @pytest.mark.parametrize('prefix', ['d.', 'Continued'])
 def test_runin_lettered_item_does_not_demote_preceding_independent_heading(scale, left, prefix):
-    """字母项目的行内强调只降级自身，真正的标题续行碎片仍将相同样式前缀降为正文。"""
+    """Inline emphasis of letter items only degrades itself, true title continuation line fragments still degrade the same style prefix as the main text."""
     from docvortex.analyzers.native.pdf.line_merging import _demote_runin_title_fragments
 
     font = ('GeneralBold', 0)
@@ -1916,7 +1916,7 @@ def test_runin_lettered_item_does_not_demote_preceding_independent_heading(scale
 @pytest.mark.parametrize("scale,left,width", [(1, 30, 220), (1.6, 70, 310), (0.8, 100, 180)])
 @pytest.mark.parametrize("kind", ["page_footnote", "header"])
 def test_marginal_column_order_preserves_note_entries_and_header_rows(scale, left, width, kind):
-    """改变字号、位置和栏宽后脚注仍沿栏读完，普通复合页眉仍按视觉行排序。"""
+    """After changing the font size, position and column width, footnotes will still be read along the columns, and ordinary compound headers will still be sorted by visual lines."""
     blocks = []
     for column in range(2):
         for row in range(2):
@@ -1938,7 +1938,7 @@ def test_marginal_column_order_preserves_note_entries_and_header_rows(scale, lef
 @pytest.mark.parametrize("scale,left", [(1, 45), (1.6, 120), (0.8, 70)])
 @pytest.mark.parametrize("hanging", [True, False])
 def test_numbered_heading_continuation_uses_indent_not_numeric_prefix(scale, left, hanging):
-    """同字族、字号和续行缩进确认长标题；另一个左对齐编号标题保持独立段界。"""
+    """Same font family, font size, and line continuation indentation confirms long titles; another left-aligned numbered title maintains separate paragraph boundaries."""
     from docvortex.analyzers.native.pdf.title_analysis.structural import _classify_bold_numbered_heading_rows
 
     first = _text_line(
@@ -1966,7 +1966,7 @@ def test_numbered_heading_continuation_uses_indent_not_numeric_prefix(scale, lef
 @pytest.mark.parametrize("scale,left", [(1, 45), (1.6, 110), (0.8, 70)])
 @pytest.mark.parametrize("kind", ["note", "same_ink", "missing_marker", "no_gap"])
 def test_single_line_note_ink_evidence_requires_number_gap_and_real_shrink(scale, left, kind):
-    """错误行框下仍依据原生字形缩小识别脚注，普通同字号编号段及紧贴编号不命中。"""
+    """Under the error line box, the footnotes are still recognized based on the original font size. Ordinary numbering segments with the same font size and close numbers are not hit."""
     from reportlab.pdfgen.canvas import Canvas
 
     payload = BytesIO()
@@ -1992,7 +1992,7 @@ def test_single_line_note_ink_evidence_requires_number_gap_and_real_shrink(scale
 
 
 def test_document_title_does_not_include_smaller_author_row():
-    """题名两行完整保留，作者行字号收缩且有多作者标记，属于独立文本。"""
+    """The two lines of the title are kept intact, and the font size of the author line is shrunk and marked by multiple authors, making it an independent text."""
     blocks = _pages("two_column_retrieval")[0]
     titles = [_visible_text(b["content"]) for b in blocks if b["type"] == "doc_title"]
     assert len(titles) == 1 and "Few-Shot Document Re-Ranking" in titles[0]
@@ -2001,7 +2001,7 @@ def test_document_title_does_not_include_smaller_author_row():
 
 
 def test_multiple_bold_author_rows_are_not_document_title():
-    """原页两行题名之后四行带贡献标记的作者名单，不能作为题名续行。"""
+    """The four-line list of authors with contribution marks after the two-line title on the original page cannot be used as a continuation of the title."""
     blocks = _pages("review_185")[0]
     title = next(block for block in blocks if block["type"] == "doc_title")
     assert "Depth Up-Scaling" in _visible_text(title["content"])
@@ -2018,7 +2018,7 @@ def test_multiple_bold_author_rows_are_not_document_title():
     ],
 )
 def test_single_page_author_year_bibliography_keeps_whole_entries(number, probes):
-    """原页悬挂缩进和逐条空白冻结完整文献条目，不依赖前页 References 标题。"""
+    """Original page hanging indentation and line-by-line blank freeze complete bibliographic entry independent of previous page References title."""
     blocks = _pages(f"review_{number}")[0]
     for probe in probes:
         matches = [block for block in blocks if _visible_text(block["content"]).startswith(probe)]
@@ -2045,7 +2045,7 @@ def test_single_page_author_year_bibliography_keeps_whole_entries(number, probes
     [(109, (0.092, 0.124, 0.231, 0.142)), (111, (0.092, 0.699, 0.222, 0.722)), (170, (0.141, 0.607, 0.423, 0.623))],
 )
 def test_compact_vector_math_and_local_number_are_not_omitted(number, region):
-    """空字符的原生矢量公式只要求完整裁图，短公式与局部括号编号共同确认。"""
+    """The native vector formula for empty characters only requires complete cropping, and the short formula is confirmed together with the local bracket number."""
     equations = [block for block in _pages(f"review_{number}")[0] if block["type"] == "equation"]
     assert any(
         all(block["bbox"][i] <= value + 0.006 if i < 2 else block["bbox"][i] >= value - 0.006 for i, value in enumerate(region))
@@ -2054,7 +2054,7 @@ def test_compact_vector_math_and_local_number_are_not_omitted(number, region):
 
 
 def test_shaded_header_tables_retain_sparse_numeric_rows_and_blank_cells():
-    """原页三个折旧表均有共享列，后半只有单列数据也必须留在完整表体。"""
+    """The three depreciation tables on the original page all have shared columns, and only a single column of data in the second half must remain in the complete table body."""
     tables = [block for block in _pages("review_127")[0] if block["type"] == "table"]
     assert len(tables) == 3
     assert "4.46%" in _visible_text(tables[0]["content"])
@@ -2062,7 +2062,7 @@ def test_shaded_header_tables_retain_sparse_numeric_rows_and_blank_cells():
 
 
 def test_native_slide_table_takes_priority_over_duplicate_raster_background():
-    """同一表格的原生单元格优先于截图背景，列头、跨行组及末行保留一次。"""
+    """The native cells of the same table take precedence over the screenshot background, and the column headers, cross-row groups, and last row are retained once."""
     blocks = _pages("table_slide")[0]
     tables = [block for block in blocks if block["type"] == "table"]
     assert len(tables) == 1
@@ -2076,7 +2076,7 @@ def test_native_slide_table_takes_priority_over_duplicate_raster_background():
 @pytest.mark.parametrize("scale,left", [(1, 45), (1.5, 85), (0.8, 110)])
 @pytest.mark.parametrize("kind", ["chart", "equal_bands", "no_values"])
 def test_bar_geometry_generalizes_without_turning_equal_bands_into_charts(scale, left, kind):
-    """移动图体和改变字号仍按共同基线确认柱图，等长色带与无数值矩形提供反例。"""
+    """Moving the figure body and changing the font size still confirms the column chart according to the common baseline. Equal-length color bands and non-valued rectangles provide counterexamples."""
     from reportlab.pdfgen.canvas import Canvas
     from docvortex.analyzers.native.pdf.graphics import _detect_native_bar_graphics
 
@@ -2103,7 +2103,7 @@ def test_bar_geometry_generalizes_without_turning_equal_bands_into_charts(scale,
 @pytest.mark.parametrize("scale,left", [(1, 45), (1.6, 110), (0.8, 80)])
 @pytest.mark.parametrize("numeric", [True, False])
 def test_shared_shaded_columns_require_data_rows_not_parallel_prose(scale, left, numeric):
-    """不同列宽、字号和横移下恢复数字表格，带底色的并排正文不应形成表格。"""
+    """Digital tables are restored under different column widths, font sizes, and traverses. Side-by-side text with background color should not form a table."""
     from reportlab.pdfgen.canvas import Canvas
     from docvortex.analyzers.native.pdf.table_detection import _detect_shaded_header_tables
 
@@ -2140,14 +2140,14 @@ def test_shared_shaded_columns_require_data_rows_not_parallel_prose(scale, left,
     ],
 )
 def test_bold_section_headings_have_complete_members_and_boundaries(page, starts):
-    """数字或附录字母与粗体同行构成真实标题，不能与下一标题或正文粘连。"""
+    """Numbers or appendix letters along with their counterparts in bold form the actual title and cannot be adhered to the next title or main text."""
     titles = [_visible_text(b["content"]) for b in _pages("two_column_retrieval")[page] if b["type"] == "paragraph_title"]
     assert all(sum(text.startswith(start) for text in titles) == 1 for start in starts), titles
     assert all(sum(start in text for start in starts) <= 1 for text in titles)
 
 
 def test_index_retains_bold_when_font_weight_metadata_is_missing():
-    """同字符字形笔画提供缺失字重的补证据，目录条目不能丢失粗体 span。"""
+    """Same character glyph strokes provide supplementary evidence of missing weights, catalog entries cannot be missing bold span."""
     indices = [b for b in _pages("opaque_index_fonts")[0] if b["type"] == "index"]
     assert indices
     assert any(
@@ -2159,7 +2159,7 @@ def test_index_retains_bold_when_font_weight_metadata_is_missing():
 
 @pytest.mark.parametrize("number", [44, 108, 113])
 def test_contents_title_and_all_index_rows_are_preserved(number):
-    """明确目录标题与五个以上条目提供局部证据，表格线和窄页边不改变目录语义。"""
+    """Explicit table of contents titles with more than five entries provide local evidence, and table lines and narrow margins do not change the semantics of the table of contents."""
     blocks = _pages(f"review_{number}")[0]
     assert any(
         "contents" in _visible_text(block["content"]).lower() and block["type"] in {"doc_title", "paragraph_title"}
@@ -2177,12 +2177,12 @@ def test_contents_title_and_all_index_rows_are_preserved(number):
             for block in blocks
         )
     if number == 113:
-        # 原页末条目录到0.952，独立页码1在0.972；边界来自原页字形而非候选框。
+        # The last table of contents on the original page is at 0.952, and the independent page number 1 is at 0.972; the border comes from the original page glyph rather than the candidate box.
         assert all(block["bbox"][3] < 0.96 for block in blocks if block["type"] == "index")
 
 
 def test_styled_native_index_bundle_roundtrips_without_invalid_nested_defaults(tmp_path):
-    """公开 parse 到结果包再回读应保留目录粗体，嵌套条目不得序列化顶层专用续段字段。"""
+    """Public parse Reading back into the result packet should preserve table of contents bold, and nested entries must not serialize top-level private continuation fields."""
     from docvortex import parse, load_bundle
 
     result = parse(FIXTURES / "opaque_index_fonts.pdf", keep_model_json=True)
@@ -2194,7 +2194,7 @@ def test_styled_native_index_bundle_roundtrips_without_invalid_nested_defaults(t
 @pytest.mark.parametrize("size,left", [(10, 45), (17, 110)])
 @pytest.mark.parametrize("font,is_bold", [("Helvetica-Bold", True), ("Helvetica", False), ("Courier", False)])
 def test_missing_weight_uses_same_character_ink_with_plain_font_negatives(size, left, font, is_bold):
-    """隐藏字体名字和字重后，真实加粗字形仍有证据，常规字体及不同字族不能误加粗。"""
+    """After hiding the font name and weight, there is still evidence of the true bold font. Regular fonts and different font families cannot be bolded by mistake."""
     from reportlab.pdfgen.canvas import Canvas
     from docvortex.analyzers.native.pdf.inline.glyph_weight import glyph_weight_style_lines
     from docvortex.analyzers.native.pdf.native_text import _build_native_line_items_from_chars
@@ -2223,7 +2223,7 @@ def test_missing_weight_uses_same_character_ink_with_plain_font_negatives(size, 
 
 @pytest.mark.parametrize("native_text,complex_image", [(False, False), (True, True)])
 def test_full_page_raster_without_background_evidence_is_retained(native_text, complex_image):
-    """纯图片页和带原生文字的复杂内容图必须保留，不能由全页尺寸直接判背景。"""
+    """Pure image pages and complex content images with native text must be retained, and the background cannot be directly determined by the full page size."""
     from PIL import Image
     from reportlab.lib.utils import ImageReader
     from reportlab.pdfgen.canvas import Canvas
@@ -2249,7 +2249,7 @@ def test_full_page_raster_without_background_evidence_is_retained(native_text, c
 @pytest.mark.parametrize("scale,left,width", [(1, 40, 240), (1.7, 90, 410), (0.8, 75, 160)])
 @pytest.mark.parametrize("kind", ["footnote", "same_size", "no_number", "fraction"])
 def test_short_rule_requires_number_shrink_and_clearance(scale, left, width, kind):
-    """独立改变字号、栏宽和位置，排除同字号分隔线、无编号文字及分式。"""
+    """Independently change font size, column width and position, excluding separators of the same font size, unnumbered text and fractions."""
     body = [
         _text_line("Ordinary paragraph", (left, y * scale, left + width, (y + 12) * scale), i)
         for i, y in enumerate((520, 535, 550))
@@ -2274,7 +2274,7 @@ def test_short_rule_requires_number_shrink_and_clearance(scale, left, width, kin
 
 
 def test_pie_chart_side_caption_keeps_its_complete_explanation():
-    """原页右侧图注是单一完整说明，不能因页面正文尺度污染而变成段落标题。"""
+    """The legend on the right side of the original page is a single complete description and cannot be turned into a paragraph title due to contamination by the size of the page text."""
     blocks = _pages("review_124")[0]
     caption = next(block for block in blocks if "Figure 2.9" in _visible_text(block["content"]))
     assert caption["type"] == "caption"
@@ -2298,7 +2298,7 @@ def test_pie_chart_side_caption_keeps_its_complete_explanation():
     ],
 )
 def test_chart_notes_are_bound_as_complete_visual_annotations(number, anchors):
-    """原页图后来源、缩写和数值口径属于图注释，每个文字锚点完整且仅出现一次。"""
+    """The source, abbreviation and numerical caliber after the figure on the original page belong to figure annotations, and each text anchor is complete and appears only once."""
     blocks = _pages(f"review_{number}")[0]
     for anchor in anchors:
         matches = [b for b in blocks if anchor in _visible_text(b.get("content", ""))]
@@ -2313,7 +2313,7 @@ def test_chart_notes_are_bound_as_complete_visual_annotations(number, anchors):
 
 
 def test_macrofouler_caption_parenthetical_tail_stays_in_one_caption():
-    """原页同字号斜体的括注续行是图题的一部分，需与首行合成完整图注。"""
+    """The parenthetical continuation line in italics with the same font size on the original page is part of the figure title and needs to be combined with the first line to form a complete figure caption."""
     blocks = _pages("review_63")[0]
     captions = [b for b in blocks if b["type"] == "caption"]
     assert len(captions) == 1
@@ -2323,7 +2323,7 @@ def test_macrofouler_caption_parenthetical_tail_stays_in_one_caption():
 
 @pytest.mark.parametrize("number,markers", [(70, ("Diagram 2", "Diagram 3")), (71, ("Diagram 4",)), (72, ("Diagram 5",))])
 def test_diagram_number_and_multiline_title_bind_the_correct_chart(number, markers):
-    """原页Diagram编号与旁边说明共同构成图注，不能作为章节标题或页面脚注。"""
+    """The original page Diagram number and the accompanying description together constitute the legend and cannot be used as chapter titles or page footnotes."""
     blocks = _pages(f"review_{number}")[0]
     for marker in markers:
         matches = [b for b in blocks if marker in _visible_text(b.get("content", ""))]
@@ -2334,11 +2334,11 @@ def test_diagram_number_and_multiline_title_bind_the_correct_chart(number, marke
 @pytest.mark.parametrize("scale,left", [(0.7, 20), (1, 40), (1.8, 110)])
 @pytest.mark.parametrize("kind", ["source", "no_caption", "barrier", "far_outdent"])
 def test_outdented_source_requires_nearby_caption_and_unobstructed_gap(scale, left, kind):
-    """移动图体与图题并改变字号；短来源允许有限外悬，但无图题、正文阻隔及远距不能绑定。"""
+    """Move the figure body and figure title and change the font size; short sources are allowed to have limited overhang, but no figure title, text blocking and long distance cannot be bound."""
     from docvortex.analyzers.native.pdf.visual_annotations import _classify_and_bind_visual_annotations
 
     def block(content, box, typ="text"):
-        """构造保留行高的注释块，用通用区域验证规则。"""
+        """Construct comment blocks that preserve line height, using common region validation rules."""
         return {
             "type": typ,
             "content": content,
@@ -2364,7 +2364,7 @@ def test_outdented_source_requires_nearby_caption_and_unobstructed_gap(scale, le
 
 
 def test_labeled_chart_note_and_source_keep_distinct_semantic_boundaries():
-    """原页Note与Source有独立标签及物理行，不能只因同字号把两种注释拼成一条。"""
+    """The original page Note and Source have independent labels and physical lines. The two comments cannot be combined into one just because they have the same font size."""
     notes = [_visible_text(b["content"]) for b in _pages("review_56")[0] if b["type"] == "footnote"]
     assert sum(text.startswith("Note:") for text in notes) == 1
     assert sum(text.startswith("Source:") for text in notes) == 1
@@ -2376,7 +2376,7 @@ def test_labeled_chart_note_and_source_keep_distinct_semantic_boundaries():
     [(78, "Figure 1.10", "caption"), (100, "Yoeli et al.", "footnote"), (170, "Table 16.5", "caption")],
 )
 def test_neighboring_visual_annotations_keep_their_native_role(number, anchor, kind):
-    """原页明确图表题及图后作者来源保持完整注释，不能因粗体或悬挂位置退化为正文标题。"""
+    """The title of the figure and the author's source behind the figure should be clearly stated on the original page and should not be reduced to text titles due to bold or hanging positions."""
     matches = [
         b
         for b in _pages(f"review_{number}")[0]
@@ -2387,7 +2387,7 @@ def test_neighboring_visual_annotations_keep_their_native_role(number, anchor, k
 
 @pytest.mark.parametrize("number,count", [(74, 1), (75, 1), (76, 3), (77, 1)])
 def test_compound_path_bar_charts_own_native_axes_and_values(number, count):
-    """原页多根柱被合成同一PDF路径，图体必须完整认领坐标和柱值，来源与正文留在图外。"""
+    """Multiple columns on the original page are combined into the same PDF path. The coordinates and column values must be fully claimed in the figure body, and the source and text are left outside the figure."""
     blocks = _pages(f"review_{number}")[0]
     images = [b for b in blocks if b["type"] == "image"]
     assert len(images) == count
@@ -2402,7 +2402,7 @@ def test_compound_path_bar_charts_own_native_axes_and_values(number, count):
 @pytest.mark.parametrize("scale,left", [(0.7, 20), (1, 45), (1.8, 110)])
 @pytest.mark.parametrize("kind", ["mixed_bars", "equal_bands", "no_values", "curves"])
 def test_compound_path_components_require_rectangles_and_external_numeric_evidence(scale, left, kind):
-    """改变位置字号与宽度；一个路径中的正负柱可识别，等长底色、无数值和曲线提供反例。"""
+    """Change the position font size and width; positive and negative columns in a path can be identified, and equal-length background colors, no values, and curves provide counterexamples."""
     from reportlab.pdfgen.canvas import Canvas
     from docvortex.analyzers.native.pdf.graphics import _detect_native_bar_graphics
 
@@ -2435,7 +2435,7 @@ def test_compound_path_components_require_rectangles_and_external_numeric_eviden
 
 @pytest.mark.parametrize("scale,left", [(0.7, 20), (1, 45), (1.8, 110)])
 def test_compound_shaded_cell_grid_cannot_supply_a_partial_bar_baseline(scale, left):
-    """同一填充路径的多行多列色块属于表格，不能只抽取某列共同边并用邻列数字当柱值。"""
+    """Multi-row and multi-column color blocks with the same filling path belong to a table. You cannot just extract the common edge of a certain column and use the numbers in adjacent columns as column values."""
     from reportlab.pdfgen.canvas import Canvas
     from docvortex.analyzers.native.pdf.graphics import _detect_native_bar_graphics
 
@@ -2458,7 +2458,7 @@ def test_compound_shaded_cell_grid_cannot_supply_a_partial_bar_baseline(scale, l
 
 
 def test_stacked_series_keep_all_native_numeric_labels_inside_the_chart():
-    """原页正确的堆叠柱图必须保持完整成员，色段接缝不能抢占共同零轴并丢出文字标签。"""
+    """A correct stacked column chart from the original page must maintain intact members, and color segment seams cannot seize the common zero axis and throw out text labels."""
     blocks = _pages("review_36")[0]
     images = [b for b in blocks if b["type"] == "image"]
     assert len(images) == 1
@@ -2469,14 +2469,14 @@ def test_stacked_series_keep_all_native_numeric_labels_inside_the_chart():
 
 
 def test_compound_header_cells_do_not_turn_known_tables_into_bar_charts():
-    """两层表头可共用下沿但没有横向共同零轴；不能将可变列宽当作柱长。"""
+    """The two-layer headers can share the lower edge but do not have a common horizontal zero axis; the variable column width cannot be regarded as the column length."""
     assert len([b for b in _pages("review_81")[0] if b["type"] == "table"]) == 2
     assert not any(b["type"] == "image" and b["bbox"][1] > 0.35 for b in _pages("review_78")[0])
 
 
 @pytest.mark.parametrize("prefix", ["TableFormer", "Tabular", "Figurehead", "Algorithmic", "SchemeXYZ"])
 def test_visual_marker_prefix_inside_a_word_is_not_a_caption_seed(prefix):
-    """图表标记只能在词界或紧邻数字处结束，普通复合词不能被罗马数字分支截断成图题。"""
+    """Diagram labels can only end at word boundaries or immediately adjacent to numbers, and ordinary compound words cannot be truncated into diagram titles by Roman numeral branches."""
     from docvortex.analyzers.native.pdf.visual_annotations import _is_strong_caption_text
 
     assert not _is_strong_caption_text(prefix + " supplies ordinary body text.")
@@ -2487,7 +2487,7 @@ def test_visual_marker_prefix_inside_a_word_is_not_a_caption_seed(prefix):
 @pytest.mark.parametrize("scale,left", [(0.7, 20), (1, 45), (1.8, 110)])
 @pytest.mark.parametrize("independent", [False, True])
 def test_caption_start_respects_full_body_continuation_and_short_source_boundary(scale, left, independent):
-    """图号出现在正常满行续段首部时不拆段；独立小字来源后的图题则保留边界。"""
+    """When the figure number appears at the beginning of a normal full-line continuation paragraph, the paragraph will not be split; the figure title after the source of independent small characters will retain the boundary."""
     from docvortex.analyzers.native.pdf.text_assembly.rows import _caption_to_body_break_sources
 
     prior = _text_line(
@@ -2506,7 +2506,7 @@ def test_caption_start_respects_full_body_continuation_and_short_source_boundary
 
 
 def test_compound_bar_crop_excludes_complete_two_line_caption():
-    """原页两行图题均在柱图上方；裁图不得重复包含第二行括号说明。"""
+    """The two lines of figure titles on the original page are both above the column figures; the cropped figure must not repeatedly include the second line of parentheses."""
     blocks = _pages('review_77')[0]
     image = next(b for b in blocks if b['type'] == 'image')
     caption = next(b for b in blocks if b['type'] == 'caption')
@@ -2517,7 +2517,7 @@ def test_compound_bar_crop_excludes_complete_two_line_caption():
 @pytest.mark.parametrize('scale,left', [(0.7, 25), (1, 70), (1.8, 160)])
 @pytest.mark.parametrize('tail_is_caption', [True, False])
 def test_top_graphic_caption_protection_excludes_numeric_axes(scale, left, tail_is_caption):
-    """位置字号变化不影响缩进图题续行保护；相同位置的数值轴标签必须留在图体。"""
+    """Positional font size changes do not affect indented figure title continuation line protection; value axis labels at the same position must remain in the figure body."""
     from docvortex.analyzers.native.pdf.graphics import _graphic_caption_line_indices_to_preserve
     from docvortex.analyzers.native.pdf.models import _GraphicCandidate
     seed = _text_line('Figure 3. Relative changes', (left, 30*scale, left+220*scale, 40*scale), 0)
@@ -2529,7 +2529,7 @@ def test_top_graphic_caption_protection_excludes_numeric_axes(scale, left, tail_
 
 
 def test_small_styled_caption_tail_is_not_an_independent_heading():
-    """原页Figure13.6的同尺度斜体尾行属于完整图题，不是章节标题。"""
+    """The same-scale italicized last line on the original page Figure13.6 belongs to the complete figure title, not the chapter title."""
     blocks = _pages('review_140')[0]
     captions = [b for b in blocks if b['type']=='caption']
     caption = next(b for b in captions if '13.6' in _visible_text(b['content']))
@@ -2539,7 +2539,7 @@ def test_small_styled_caption_tail_is_not_an_independent_heading():
 
 
 def test_tiny_logo_caption_retains_last_word_and_precedes_following_heading():
-    """原页两行图题以Logo结束，随后IMPLEMENTATION有独立粗体字号及留白。"""
+    """The two-line figure title on the original page ends with Logo, followed by IMPLEMENTATION with independent bold font size and blank space."""
     blocks = _pages('review_151')[0]
     caption = next(b for b in blocks if b['type']=='caption')
     assert _visible_text(caption['content']).rstrip().endswith('Logo')
@@ -2550,7 +2550,7 @@ def test_tiny_logo_caption_retains_last_word_and_precedes_following_heading():
 
 
 def test_centered_credit_caption_ends_before_justified_body_reset():
-    """原页图题及署名居中，以USGS括号结束；下一段首行缩进并恢复两端对齐。"""
+    """The title and signature of the original page are centered and ended with USGS brackets; the first line of the next paragraph is indented and aligned at both ends."""
     blocks = _pages('review_173')[0]
     caption = next(b for b in blocks if b['type']=='caption')
     text = _visible_text(caption['content'])
@@ -2560,7 +2560,7 @@ def test_centered_credit_caption_ends_before_justified_body_reset():
 
 
 def test_small_logo_caption_keeps_complete_publication_reference():
-    """原页Figure7.4的图题包含完整书名与作者年份，不能分裂成脚注或正文。"""
+    """The figure title on the original page Figure7.4 contains the complete title and author year and cannot be split into footnotes or text."""
     blocks = _pages('review_177')[0]
     caption = next(b for b in blocks if b['type']=='caption' and 'Figure 7.4' in _visible_text(b['content']))
     assert '2020)' in _visible_text(caption['content'])
@@ -2570,7 +2570,7 @@ def test_small_logo_caption_keeps_complete_publication_reference():
 @pytest.mark.parametrize('scale,left', [(0.7, 25), (1, 70), (1.8, 160)])
 @pytest.mark.parametrize('strong_heading', [False, True])
 def test_caption_tail_recovery_requires_small_compatible_regular_typography(scale, left, strong_heading):
-    """同字体小尾行可回收；放大或字体变更的真实标题不能仅凭靠近图题被吞入。"""
+    """Small trailing lines in the same font can be recycled; actual titles that are enlarged or changed in font cannot be swallowed up simply by being close to the figure title."""
     from docvortex.analyzers.native.pdf.text_assembly.annotations import _caption_tail_matches_seed
     seed = {'bbox':(left,100*scale,left+200*scale,110*scale),'content':'Figure 5. A simple overview',
             '_line_heights':[10*scale],'_font_signatures':{('Sample',0)}}
@@ -2583,7 +2583,7 @@ def test_caption_tail_recovery_requires_small_compatible_regular_typography(scal
 @pytest.mark.parametrize('scale,left', [(0.7, 25), (1, 70), (1.8, 160)])
 @pytest.mark.parametrize('justified_reset', [True,False])
 def test_centered_closed_caption_requires_indent_and_repeated_full_body_rows(scale,left,justified_reset):
-    """改变栏宽及位置；署名闭合后稳定首行缩进和连续满栏正文才形成段界。"""
+    """Change the column width and position; after the signature is closed, the indentation of the first line is stabilized and the column body is continuously filled to form a paragraph boundary."""
     from docvortex.analyzers.native.pdf.text_assembly.rows import _caption_to_body_break_sources
     width=300*scale
     lines=[_text_line('Figure 8. A general caption',(left+20*scale,20*scale,left+width-20*scale,30*scale),0),
@@ -2599,7 +2599,7 @@ def test_centered_closed_caption_requires_indent_and_repeated_full_body_rows(sca
 @pytest.mark.parametrize('scale,left', [(0.7, 25), (1, 70), (1.8, 160)])
 @pytest.mark.parametrize('two_columns', [False,True])
 def test_centered_standalone_visual_region_preserves_column_reading_flow(scale,left,two_columns):
-    """单栏图注整体先于下方小标题；真实双栏保留左栏正文后再读右栏图的顺序。"""
+    """In a single column, the overall figure precedes the subtitle below; in a true double column, keep the text in the left column and then read the order of the figures in the right column."""
     width=(140 if two_columns else 300)*scale
     first_lines=[_text_line('An unrelated full paragraph line',(left, (20+i*13)*scale, left+width, (30+i*13)*scale),i) for i in range(3)]
     last_lines=[_text_line('Another ordinary paragraph line',(left,(150+i*13)*scale,left+width,(160+i*13)*scale),i+10) for i in range(3)]
@@ -2620,7 +2620,7 @@ def test_centered_standalone_visual_region_preserves_column_reading_flow(scale,l
 
 @pytest.mark.parametrize('scale,left', [(0.7, 25), (1, 70), (1.8, 160)])
 def test_parallel_visual_regions_keep_left_to_right_order_with_minor_caption_height_offset(scale,left):
-    """同排两图的图题高度略有差别，独立图体仍按左到右阅读，不能各自扩成同一整栏。"""
+    """The height of the title of two figures in the same row is slightly different. The independent figures are still read from left to right and cannot be expanded into the same full column."""
     lines1=[_text_line('An ordinary line of full body text',(left,(20+i*13)*scale,left+300*scale,(30+i*13)*scale),i) for i in range(3)]
     lines2=[_text_line('Another line of full body text',(left,(180+i*13)*scale,left+300*scale,(190+i*13)*scale),i+10) for i in range(3)]
     body1={'type':'text','bbox':(left,20*scale,left+300*scale,56*scale),'content':'Earlier prose','_text_lines':lines1}
@@ -2637,21 +2637,21 @@ def test_parallel_visual_regions_keep_left_to_right_order_with_minor_caption_hei
 
 @pytest.mark.parametrize('number,anchor',[(36,'2. General Profile'),(37,'3. Impact on Business')])
 def test_oversized_chapter_heading_above_rule_is_not_a_running_header(number,anchor):
-    """原页超过正文字号两倍的编号章节标题带横线装饰，不能据横线误标页眉。"""
+    """Chapter titles that are numbered more than twice the text size on the original page are decorated with horizontal lines, and page headers cannot be mistakenly marked based on the horizontal lines."""
     blocks=_pages(f'review_{number}')[0]
     heading=next(b for b in blocks if anchor in _visible_text(b['content']))
     assert heading['type']=='paragraph_title'
 
 
 def test_centered_large_display_heading_above_image_remains_section_title():
-    """原页居中标题采用独立较大字号与上下留白；靠近图片不应使真实标题降为正文。"""
+    """The title in the center of the original page should use a separate larger font size and white space at the top and bottom; the proximity to the image should not reduce the real title to the main text."""
     heading=next(b for b in _pages('review_175')[0] if 'Orion Region at Different Wavelengths.' in _visible_text(b['content']))
     assert heading['type']=='paragraph_title'
 
 
 @pytest.mark.parametrize('number',[155,171])
 def test_large_native_contents_heading_is_separate_from_index_entries(number):
-    """原页目录上方的大字号Contents是标题，目录链接条目保持独立index。"""
+    """The large font Contents above the table of contents on the original page is the title, and the table of contents link entries remain independent index."""
     blocks=_pages(f'review_{number}')[0]
     heading=next(b for b in blocks if _visible_text(b['content']).strip()=='Contents')
     assert heading['type']=='paragraph_title'
@@ -2660,7 +2660,7 @@ def test_large_native_contents_heading_is_separate_from_index_entries(number):
 
 
 def test_complete_stacked_chart_and_caption_are_image_members():
-    """原页堆叠柱图及图例属于同一image，图题属于其caption，不能还原成表格或碎文本。"""
+    """The stacked column chart and legend on the original page belong to the same image, and the figure title belongs to its caption, and cannot be restored to tables or broken text."""
     blocks=_pages('review_37')[0]
     assert sum(b['type']=='image' for b in blocks)==1
     assert sum(b['type']=='caption' for b in blocks)==1
@@ -2670,7 +2670,7 @@ def test_complete_stacked_chart_and_caption_are_image_members():
 @pytest.mark.parametrize('scale,left',[(0.7,25),(1,70),(1.8,160)])
 @pytest.mark.parametrize('kind',['chapter','header','caption'])
 def test_top_rule_respects_relative_size_and_existing_caption_role(scale,left,kind):
-    """页首横线按相对字号区分章节和普通页眉；已有图注身份的行不应被改为页眉。"""
+    """The horizontal line at the top of the page distinguishes chapters and ordinary page headers based on relative font sizes; lines that already have legend status should not be changed to page headers."""
     from docvortex.analyzers.native.pdf import models
     h=(30 if kind=='chapter' else 10)*scale
     top=_text_line('4. A different chapter' if kind=='chapter' else 'An unrelated label',(left,35*scale,left+350*scale,35*scale+h),0)
@@ -2686,7 +2686,7 @@ def test_top_rule_respects_relative_size_and_existing_caption_role(scale,left,ki
 @pytest.mark.parametrize('scale,left',[(0.7,25),(1,70),(1.8,160)])
 @pytest.mark.parametrize('display_heading',[True,False])
 def test_image_adjacency_keeps_large_independent_heading_but_suppresses_plain_caption(scale,left,display_heading):
-    """不同位置栏宽下，独立大字体图前标题可识别；普通同字号图注不凭居中位置升格。"""
+    """Under different position column widths, independent large font captions can be identified; ordinary captions with the same font size are not upgraded based on the central position."""
     from docvortex.analyzers.native.pdf.title_analysis.page_titles import _classify_page_titles
     body=[_text_line('This ordinary body line contains several different words',(left,(90+i*14)*scale,left+300*scale,(100+i*14)*scale),i) for i in range(5)]
     heading=_text_line('Different heading above a visual',(left+40*scale,180*scale,left+260*scale,(196 if display_heading else 190)*scale),20)
@@ -2701,7 +2701,7 @@ def test_image_adjacency_keeps_large_independent_heading_but_suppresses_plain_ca
 
 @pytest.mark.parametrize('scale,left',[(0.7,25),(1,70),(1.8,160)])
 def test_overlapping_header_row_envelope_does_not_make_small_date_a_title(scale,left):
-    """小号日期的来源包络虽跨两行，校准字形尺度仍小于正文，不能误为编号章节标题。"""
+    """Although the source envelope of the small date spans two lines, the calibrated font size is still smaller than the main text and cannot be mistaken for a numbered chapter title."""
     from docvortex.analyzers.native.pdf import models
     top=_text_line('2031 6 Months',(left,35*scale,left+200*scale,65*scale),0)
     top.em_height=7*scale
@@ -2713,13 +2713,13 @@ def test_overlapping_header_row_envelope_does_not_make_small_date_a_title(scale,
 
 
 def test_large_unnumbered_document_heading_above_rule_is_not_header():
-    """原页上方大字号VersionHistory为主标题；下方同名章节和表题不作为本条验收范围。"""
+    """The large font VersionHistory at the top of the original page is the main title; the chapters and tables with the same name below are not included in the acceptance scope of this article."""
     heading=next(b for b in _pages('review_180')[0] if _visible_text(b['content']).strip()=='Version History' and b['bbox'][1]<.15)
     assert heading['type'] in {'doc_title','paragraph_title'}
 
 
 def test_caption_graphic_excludes_unrelated_underline_body_and_display_heading():
-    """原页短下划线属于上方正文，两行人物标题独立，图体从两幅照片顶边开始。"""
+    """The short underline on the original page belongs to the upper text, the two lines of character titles are independent, and the body of the figure starts from the top edge of the two photos."""
     blocks = _pages('review_174')[0]
     image = next(b for b in blocks if b['type'] == 'image')
     assert image['bbox'][1] > .52
@@ -2731,7 +2731,7 @@ def test_caption_graphic_excludes_unrelated_underline_body_and_display_heading()
 
 
 def test_caption_graphic_does_not_consume_short_second_heading_line():
-    """原页同字体居中标题的SST续行属于标题，图体应从三幅照片顶边开始。"""
+    """The continuation line of the SST title in the center of the original page with the same font belongs to the title, and the figure body should start from the top edge of the three photos."""
     blocks = _pages('review_176')[0]
     image = next(b for b in blocks if b['type'] == 'image')
     assert image['bbox'][1] > .69
@@ -2740,7 +2740,7 @@ def test_caption_graphic_does_not_consume_short_second_heading_line():
 
 
 def test_outdented_numbered_caption_binds_to_complete_stacked_chart():
-    """原页图题沿正文栏左边缘外悬于居中图体，仍属于完整堆叠柱图。"""
+    """The figure title on the original page hangs out from the center figure body along the left edge of the text column, and it is still a complete stacked column chart."""
     blocks = _pages('review_36')[0]
     caption = next(b for b in blocks if 'Figure 2.1:' in _visible_text(b['content']))
     assert caption['type'] == 'caption'
@@ -2749,7 +2749,7 @@ def test_outdented_numbered_caption_binds_to_complete_stacked_chart():
 @pytest.mark.parametrize('scale,left',[(.7,25),(1,70),(1.8,160)])
 @pytest.mark.parametrize('display',[True,False])
 def test_raster_graphic_floor_protects_display_heading_but_not_nearby_axis_values(scale,left,display):
-    """改变字号栏宽位置，大字号居中标题及短续行形成屏障，同字号刻度仍可归入图体。"""
+    """Change the font size, column width, position, large font size, centered title and short continuation lines to form a barrier, and scales with the same font size can still be included in the figure body."""
     from docvortex.analyzers.native.pdf.graphics import _caption_graphic_display_heading_floor
     from docvortex.analyzers.native.pdf.models import _PageSource
     h=(14 if display else 10)*scale
@@ -2766,7 +2766,7 @@ def test_raster_graphic_floor_protects_display_heading_but_not_nearby_axis_value
 @pytest.mark.parametrize('scale,left',[(.7,25),(1,70),(1.8,160)])
 @pytest.mark.parametrize('blocked',[False,True])
 def test_outdented_caption_requires_unobstructed_unique_parent(scale,left,blocked):
-    """外悬编号图题可绑定近邻图，插入正文屏障后不得越过正文认领同一图体。"""
+    """Overhanging numbered figure titles can be bound to adjacent figures. After inserting a text barrier, the same figure body cannot be claimed beyond the text."""
     from docvortex.analyzers.native.pdf.visual_annotations import _VisualParent, _choose_annotation_relation
     cap={'type':'text','bbox':(left,50*scale,left+220*scale,60*scale),'content':'Figure 8. An unrelated chart','_line_heights':[10*scale]}
     image={'type':'image','bbox':(left+100*scale,80*scale,left+360*scale,200*scale),'content':''}
@@ -2778,7 +2778,7 @@ def test_outdented_caption_requires_unobstructed_unique_parent(scale,left,blocke
 
 
 def test_parallel_caption_does_not_split_constant_width_unfinished_body():
-    """原页右栏CVCC段落横向宽度不变，左侧图注结束导致的栏带变化不是自然段断点。"""
+    """The horizontal width of the paragraph CVCC in the right column of the original page remains unchanged, and the change in column band caused by the end of the legend on the left is not a natural paragraph breakpoint."""
     blocks = _pages('review_177')[0]
     paragraph = next(b for b in blocks if b['type'] == 'text' and 'CVCC’s logo is more complex' in _visible_text(b['content']))
     assert 'print materials' in _visible_text(paragraph['content'])
@@ -2788,7 +2788,7 @@ def test_parallel_caption_does_not_split_constant_width_unfinished_body():
 @pytest.mark.parametrize('scale,left',[(.7,25),(1,70),(1.8,160)])
 @pytest.mark.parametrize('barrier',['none','indent','terminal','hard','fonts'])
 def test_changed_declared_lane_requires_actual_full_row_continuity(scale,left,barrier):
-    """栏带改变但行左右边缘恒定时可接续；真实缩进、句末、硬段界和字体变化继续分段。"""
+    """It can be continued when the column band changes but the left and right line edges are constant; real indentation, sentence endings, hard paragraph boundaries and font changes continue to segment."""
     from docvortex.analyzers.native.pdf.text_assembly.merging import _merge_unterminated_text_components
     rows1=[(left,(20+i*13)*scale,left+200*scale,(30+i*13)*scale) for i in range(2)]
     rows2=[(left+(8*scale if barrier=='indent' and i==0 else 0),(46+i*13)*scale,left+200*scale,(56+i*13)*scale) for i in range(2)]
@@ -2802,7 +2802,7 @@ def test_changed_declared_lane_requires_actual_full_row_continuity(scale,left,ba
 
 
 def test_numerical_chapter_margin_text_and_page_number_are_separate_from_formula():
-    """原页横线上方为普通章节页眉及35，单页可作独立文字但绝不能整体成为公式。"""
+    """Above the horizontal line on the original page are the ordinary chapter headers and 35. A single page can be used as independent text, but it must not become a formula as a whole."""
     blocks=_pages('review_144')[0]
     margin=[b for b in blocks if b['bbox'][3]<.11]
     assert len(margin)==2
@@ -2812,14 +2812,14 @@ def test_numerical_chapter_margin_text_and_page_number_are_separate_from_formula
 
 @pytest.mark.parametrize('number',[33,34])
 def test_prologue_margin_and_roman_page_number_do_not_become_equation(number):
-    """原页Prologue及罗马页码为横线上的普通文字，独立公式只能来自下方数学行。"""
+    """The original page Prologue and the Roman page number are ordinary text on the horizontal line, and independent formulas can only come from the math line below."""
     margin=[b for b in _pages(f'display_math_{number}')[0] if b['bbox'][3]<.08]
     assert len(margin)==2 and not any(b['type']=='equation' for b in margin)
     assert any(_visible_text(b['content']).strip()=='Prologue' for b in margin)
 
 
 def test_independent_performance_charts_include_complete_zero_axis_and_labels():
-    """原页右图横轴从0.694至0.925，图体裁图必须含两端及完整模型标签，三图保持独立。"""
+    """The horizontal axis of the image on the right of the original page ranges from 0.694 to 0.925. The image format must include both ends and complete model labels. The three images must remain independent."""
     blocks=_pages('native_bars_183')[0]
     images=[b for b in blocks if b['type']=='image']
     assert len(images)==3
@@ -2831,7 +2831,7 @@ def test_independent_performance_charts_include_complete_zero_axis_and_labels():
 @pytest.mark.parametrize('scale,left',[(.7,25),(1,70),(1.8,160)])
 @pytest.mark.parametrize('kind',['zero','floating','oversized','opposite'])
 def test_verified_bar_zero_axis_requires_matching_baseline_orientation_and_span(scale,left,kind):
-    """改变字号位置，零轴两端须覆盖柱组并同向同基线；浮动长装饰线与跨栏线不扩图框。"""
+    """When changing the font size position, both ends of the zero axis must cover the column group and be in the same direction and baseline; floating long decorative lines and hurdle lines do not expand the picture frame."""
     from docvortex.analyzers.native.pdf.graphics import _bar_zero_axis_bboxes
     from docvortex.analyzers.native.pdf.models import _AxisLine,_PageSource
     bounds=(left+100*scale,80*scale,left+300*scale,200*scale)
@@ -2843,7 +2843,7 @@ def test_verified_bar_zero_axis_requires_matching_baseline_orientation_and_span(
 
 
 def test_short_version_history_grid_keeps_multiline_dates_and_four_columns():
-    """原页四列三行历史表有内列线和两条行线，日期跨行及末列链接必须留在对应单元格。"""
+    """The four-column, three-row history table on the original page has inner column lines and two row lines. Date cross-row and last-column links must remain in the corresponding cells."""
     from bs4 import BeautifulSoup
     blocks=_pages('review_180')[0]
     tables=[b for b in blocks if b['type']=='table']
@@ -2858,7 +2858,7 @@ def test_short_version_history_grid_keeps_multiline_dates_and_four_columns():
 
 
 def test_unnumbered_centered_bold_table_caption_is_not_a_cell_or_heading():
-    """原页贴近表顶的居中粗体VersionHistory为独立表题，更上方的大标题仍为章节标题。"""
+    """The bold VersionHistory in the center near the top of the table on the original page is an independent table title, and the big title above is still the chapter title."""
     blocks=_pages('review_180')[0]
     caption=next(b for b in blocks if _visible_text(b['content']).strip()=='Version History' and .46<b['bbox'][1]<.49)
     assert caption['type']=='caption'
@@ -2871,7 +2871,7 @@ def test_unnumbered_centered_bold_table_caption_is_not_a_cell_or_heading():
     ('C,','2',''),('https://example.org/','123',''),('17','32',''),
 ])
 def test_multiline_cell_punctuation_separates_prose_and_numeric_tail(previous,following,expected):
-    """文字日期和短语逗号后的数字有空格，数字分组、短变量、URL及紧凑数字不增加词界。"""
+    """The numbers after commas in text dates and phrases have spaces. Number grouping, short variables, URL and compact numbers do not increase word boundaries."""
     from docvortex.analyzers.native.pdf._table_recovery.text import _cell_row_separator
     assert _cell_row_separator(previous,previous,following)==expected
 
@@ -2879,7 +2879,7 @@ def test_multiline_cell_punctuation_separates_prose_and_numeric_tail(previous,fo
 @pytest.mark.parametrize('scale,left',[(.7,25),(1,70),(1.8,160)])
 @pytest.mark.parametrize('kind',['grid','few_tracks','one_rule','crossing_prose'])
 def test_short_open_table_needs_repeated_columns_physical_rules_and_cell_boundaries(scale,left,kind):
-    """短表凭内列线、完整表头和两条行线成立；弱线、少列线及跨列长正文不制造表格。"""
+    """Short tables are established based on inner column lines, complete headers, and two row lines; weak lines, few column lines, and long text across columns do not create tables."""
     from docvortex.analyzers.native.pdf.models import _AxisLine,_PageSource
     from docvortex.analyzers.native.pdf.table_detection import _detect_open_vertical_tables
     tracks=[100,180] if kind=='few_tracks' else [100,180,340]
@@ -2898,7 +2898,7 @@ def test_short_open_table_needs_repeated_columns_physical_rules_and_cell_boundar
 @pytest.mark.parametrize('scale,left',[(.7,25),(1,70),(1.8,160)])
 @pytest.mark.parametrize('kind',['caption','regular','off_center','far','number'])
 def test_unnumbered_table_caption_needs_bold_centered_short_nearby_text(scale,left,kind):
-    """无编号表题需贴近已确认表顶且短、居中、强调；普通正文、偏列标题、远距和数字不绑定。"""
+    """Unnumbered table titles must be close to the top of the confirmed table and must be short, centered, and emphasized; ordinary text, partial column titles, distance, and numbers are not bound."""
     from docvortex.analyzers.native.pdf.models import _PageSource
     from docvortex.analyzers.native.pdf.table_detection import _bounded_table_caption_annotations
     x=(20 if kind=='off_center' else 190)*scale+left;y=(55 if kind=='far' else 85)*scale
@@ -2910,7 +2910,7 @@ def test_unnumbered_table_caption_needs_bold_centered_short_nearby_text(scale,le
 
 
 def test_display_roman_chapter_marker_and_wrapped_label_form_one_heading():
-    """原页大号罗马编号III与紧随的两行章节名组成完整标题，不应拆成text和doc_title。"""
+    """The large Roman number III on the original page and the following two lines of chapter names form a complete title and should not be split into text and doc_title."""
     blocks = _pages('review_80')[0]
     headings = [b for b in blocks if 'Regulatory cholesterol' in _visible_text(b['content'])]
     assert len(headings) == 1 and headings[0]['type'] == 'paragraph_title'
@@ -2919,7 +2919,7 @@ def test_display_roman_chapter_marker_and_wrapped_label_form_one_heading():
 
 
 def test_numbered_poster_steps_with_spaced_or_compact_dash_keep_equal_heading_status():
-    """原页01至06的粗体步骤标题视觉同级，02和03紧接短横线的编号同样属于完整标题。"""
+    """The bold step titles from 01 to 06 on the original page are visually equivalent, and the numbers 02 and 03 followed by dashes also belong to the complete title."""
     import re
     blocks = _pages('review_103')[0]
     steps = [b for b in blocks if re.match(r'^0[1-6]\s*-', _visible_text(b['content']))]
@@ -2928,7 +2928,7 @@ def test_numbered_poster_steps_with_spaced_or_compact_dash_keep_equal_heading_st
 
 
 def test_drop_cap_word_keeps_body_style_and_real_citation_superscript():
-    """原页下沉大写T与his组成正文首词，不能将后半词标为上标；真正的引用28仍保留上标。"""
+    """On the original page, T and his in lowered capital letters form the first word of the text, and the second half of the word cannot be marked as superscript; the real quotation 28 still retains the superscript."""
     blocks = _pages('review_80')[0]
     matches = [b for b in blocks if 'This report defines' in _visible_text(b['content'])]
     assert len(matches) == 1 and matches[0]['type'] == 'text'
@@ -2938,7 +2938,7 @@ def test_drop_cap_word_keeps_body_style_and_real_citation_superscript():
 
 
 def test_vector_formula_numbers_eight_to_twelve_remain_in_complete_crop():
-    """原页右侧括号8至12均属于对应公式，裁图必须覆盖视觉冻结的每个编号位置。"""
+    """Brackets 8 to 12 on the right side of the original page all belong to the corresponding formulas, and the cropped image must cover each numbered position of the visual freeze."""
     equations = [b for b in _pages('review_109')[0] if b['type'] == 'equation']
     assert len(equations) == 6
     for top, bottom, right in [(.209,.232,.244),(.277,.304,.261),(.348,.375,.355),(.420,.445,.274),(.617,.636,.303)]:
@@ -2948,9 +2948,9 @@ def test_vector_formula_numbers_eight_to_twelve_remain_in_complete_crop():
 
 @pytest.mark.parametrize('number,markers',[(129,['15.19','15.20','15.21','15.22']),(130,['15.42'])])
 def test_left_margin_number_is_owned_by_its_unique_vector_equation(number,markers):
-    """原页左侧括号编号进入唯一公式裁图，不再独立输出正文或标题；公式主体保持完整。"""
+    """The bracket number on the left side of the original page enters the unique formula cutout, and the text or title is no longer independently output; the main body of the formula remains intact."""
     blocks=_pages(f'review_{number}')[0]
-    # 编号只属于左侧独立陈列式；新恢复的行内裁图另有严格数量及区域验收，不能要求它们带编号。
+    # Numbers only belong to the independent display on the left side; newly restored in-line cuttings are subject to strict quantity and area acceptance, and they cannot be required to be numbered.
     equations=[b for b in blocks if b['type']=='equation' and b['bbox'][0] <= .09]
     assert len(equations)==len(markers)
     assert all(b['bbox'][0] <= .09 for b in equations)
@@ -2958,7 +2958,7 @@ def test_left_margin_number_is_owned_by_its_unique_vector_equation(number,marker
 
 
 def test_table_numeric_rows_end_before_two_independent_explanatory_paragraphs():
-    """原页最后数据行2016结束表体，Another way和We may两段正文不能被外层横线吞进表格。"""
+    """The last data line 2016 of the original page ends the table body. The two text sections Another way and We may cannot be swallowed into the table by the outer horizontal line."""
     blocks=_pages('review_130')[0]
     tables=[b for b in blocks if b['type']=='table']
     assert len(tables)==1 and tables[0]['bbox'][3] < .33
@@ -2973,7 +2973,7 @@ def test_table_numeric_rows_end_before_two_independent_explanatory_paragraphs():
 
 @pytest.mark.parametrize('number,first,second',[(86,'This report, prepared','We identified 10 countries'),(87,'members should specify','Some jurisdictions do not list')])
 def test_blank_paragraph_gap_survives_trailing_superscript_citation(number,first,second):
-    """原页正文句末引用上标不应掩盖段尾；明显空行前后的两个自然段保持独立且完整。"""
+    """Superscripts at the end of sentences in the text of the original page should not obscure the end of paragraphs; the two natural paragraphs before and after an obvious blank line should remain independent and complete."""
     blocks=_pages(f'review_{number}')[0]
     a=[b for b in blocks if _visible_text(b.get('content','')).startswith(first)]
     b=[b for b in blocks if _visible_text(b.get('content','')).startswith(second)]
@@ -2983,7 +2983,7 @@ def test_blank_paragraph_gap_survives_trailing_superscript_citation(number,first
 
 
 def test_bold_country_names_continue_the_unfinished_body_enumeration():
-    """原页We found的三行同段，最后的粗体国家名为逗号枚举续行，不能拆成独立段落。"""
+    """The three lines of the original page We found are in the same paragraph. The last bold country name is a comma enumeration continuation line and cannot be split into independent paragraphs."""
     blocks=_pages('review_86')[0]
     matches=[b for b in blocks if _visible_text(b.get('content','')).startswith('We found that')]
     assert len(matches)==1 and matches[0]['type']=='text'
@@ -2992,7 +2992,7 @@ def test_bold_country_names_continue_the_unfinished_body_enumeration():
 
 
 def test_regular_multiline_body_after_italic_section_is_not_promoted_to_heading():
-    """原页This game三行常规正文不能因上方以斜体为主而成为标题，真正的大写章节题仍独立。"""
+    """Original page This game The three lines of regular text cannot become titles because the upper part is in italics, and the real capitalized chapter titles are still independent."""
     blocks=_pages('review_97')[0]
     body=[b for b in blocks if _visible_text(b.get('content','')).startswith('This game shares')]
     assert len(body)==1 and body[0]['type']=='text'
@@ -3013,7 +3013,7 @@ def test_regular_multiline_body_after_italic_section_is_not_promoted_to_heading(
     (181,4,['Plug-and-play','Ensuring performance','Providing a platform','AI consulting service']),
 ])
 def test_repeated_bullets_keep_complete_separate_items_without_absorbing_intro(number,count,anchors):
-    """原页圆点项目按标记与缩进完整分项，短项也独立；游离圆点、简介或下一项目不能混入。"""
+    """The dot items on the original page are completely divided according to marks and indents, and short items are also independent; free dots, introductions or next items cannot be mixed in."""
     blocks=_pages(f'review_{number}')[0]
     items=[b for b in blocks if _visible_text(b.get('content','')).lstrip().startswith('•')]
     assert len(items)==count
@@ -3030,7 +3030,7 @@ def test_repeated_bullets_keep_complete_separate_items_without_absorbing_intro(n
 
 
 def test_historical_chinese_engineering_lists_keep_each_native_bullet_item():
-    """已维护原件的三处中文列表按圆点分项，正文、章节、代码和图注仍由历史逐页指纹单独冻结。"""
+    """The three Chinese lists of the maintained originals are itemized by dots, and the text, chapters, codes, and legends are still individually frozen by historical page-by-page fingerprints."""
     from test_flash_pdf_char_geometry import _read_pdf_fixture
     source=Path(__file__).parent/'pdfs/flash_layout/mixed_text_layout_sample.pdf.xor'
     with PDFDocument(_read_pdf_fixture(source)) as pdf:
@@ -3043,7 +3043,7 @@ def test_historical_chinese_engineering_lists_keep_each_native_bullet_item():
 @pytest.mark.parametrize('scale,left,width',[(.7,12,260),(1,90,400),(1.6,220,680)])
 @pytest.mark.parametrize('split',[False,True])
 def test_short_bullet_items_and_wrapped_tail_survive_scale_width_and_marker_font(scale,left,width,split):
-    """改变栏宽、位置、字号和符号字体，三个项目及首项续行完整，简介和后文保持独立。"""
+    """Change the column width, position, font size and symbol font. The three items and the continuation of the first item are complete, and the introduction and subsequent text remain independent."""
     from docvortex.analyzers.native.pdf.text_assembly.assembly import _build_text_blocks
     lines=[]
     for text,y,x,fill,font in [('A separate introductory explanatory paragraph.',70,0,.9,'GenericBody'),('Ordinary first item contains some extended descriptive evidence',100,12,.9,'GenericBody'),('its complete wrapped ending.',113,12,.4,'GenericBody'),('Another short item',126,12,.45,'GenericBody'),('The third ordinary item ends here.',139,12,.8,'GenericBody'),('A separate unrelated following paragraph.',170,0,.9,'GenericBody')]:
@@ -3063,7 +3063,7 @@ def test_short_bullet_items_and_wrapped_tail_survive_scale_width_and_marker_font
 @pytest.mark.parametrize('scale,left',[(.7,12),(1,90),(1.6,220)])
 @pytest.mark.parametrize('kind',['paired','single','different_scale','unaligned','same_row','far','ambiguous','no_words','formula','caption'])
 def test_detached_bullet_boundaries_need_repeated_aligned_unambiguous_native_text(scale,left,kind):
-    """孤立符号、数学点、相邻双宿主、错栏及样式跨度不能凭圆点制造条目边界。"""
+    """Isolated symbols, mathematical dots, adjacent double hosts, staggered columns, and style spans cannot create entry boundaries with dots."""
     from docvortex.analyzers.native.pdf.text_assembly.rows import _repeated_bullet_break_sources
     rows=[]
     for n in range(1 if kind=='single' else 2):
@@ -3083,7 +3083,7 @@ def test_detached_bullet_boundaries_need_repeated_aligned_unambiguous_native_tex
 @pytest.mark.parametrize('scale,left,width',[(.7,12,260),(1,90,400),(1.6,220,680)])
 @pytest.mark.parametrize('kind',['body','bold','large','short','different_family','large_gap','explicit','unfinished','no_sentence'])
 def test_full_width_sentence_body_run_requires_complete_regular_prose(scale,left,width,kind):
-    """同栏三行常规句构成正文反证；粗体、大号、短行、跳字体、空行与已确认标题均不触发保护。"""
+    """Three lines of regular sentences in the same column constitute the body of counter-evidence; bold, large, short lines, skipped fonts, blank lines and confirmed titles will not trigger protection."""
     from docvortex.analyzers.native.pdf.models import _LaneBodyProfile
     from docvortex.analyzers.native.pdf.title_analysis.lane_titles import _is_full_width_sentence_body_run
     words=[
@@ -3108,7 +3108,7 @@ def test_full_width_sentence_body_run_requires_complete_regular_prose(scale,left
 @pytest.mark.parametrize('scale,left,width',[(.7,12,260),(1,90,400),(1.6,220,680)])
 @pytest.mark.parametrize('kind',['reset','unfinished','no_outdent','still_italic','caption','large_gap','only_one_italic'])
 def test_complete_indented_italic_quote_does_not_absorb_regular_following_body(scale,left,width,kind):
-    """完成的连续缩进斜体与常规正文重置拆段；句内强调、同缩进、图注或孤立斜体不产生此边界。"""
+    """Completed continuous indented italics and regular text reset break paragraphs; in-sentence emphasis, co-indentation, legends, or isolated italics do not create this boundary."""
     from docvortex.analyzers.native.pdf.text_assembly.rows import _italic_quote_to_body_break_sources
     from docvortex.analyzers.native.pdf.inline.types import PDF_FONT_ITALIC_FLAG
     rows=[]
@@ -3128,7 +3128,7 @@ def test_complete_indented_italic_quote_does_not_absorb_regular_following_body(s
 @pytest.mark.parametrize('scale,left,width',[(.7,12,350),(1,90,440),(1.6,220,600)])
 @pytest.mark.parametrize('kind',['blank','compact','unfinished','caption','formula','different_style'])
 def test_blank_gap_paragraph_boundary_uses_native_terminal_evidence(scale,left,width,kind):
-    """改变引用编号、字号及栏宽；原生句末证据加空行拆段，普通续行、图注、公式与字体变化不制造同类正文段界。"""
+    """Change the citation number, font size and column width; add a blank line at the end of the original sentence to break up the paragraphs; ordinary line continuations, legends, formulas and font changes do not create similar text paragraph boundaries."""
     from docvortex.analyzers.native.pdf.text_assembly.rows import _prose_paragraph_break_sources
     y=113 if kind=='compact' else 125
     previous=_text_line('Some earlier completed explanatory sentence.73' if kind!='unfinished' else 'An unfinished ordinary sentence continues',(left,100*scale,left+.95*width,110*scale),0,font_signature=('GenericText',0),font_coverage=1)
@@ -3144,7 +3144,7 @@ def test_blank_gap_paragraph_boundary_uses_native_terminal_evidence(scale,left,w
 @pytest.mark.parametrize('scale,left,width',[(.7,12,350),(1,90,440),(1.6,220,600)])
 @pytest.mark.parametrize('kind',['enumeration','heading','unfinished_tail','large_gap','large_type','different_family','table'])
 def test_emphasized_short_tail_is_body_only_after_unfinished_close_comma_enumeration(scale,left,width,kind):
-    """正文中的粗体短尾跨通用字重后缀续接；标题、未终止短行、大净空、字号变化、异字体及表格屏障拒绝。"""
+    """Bold short tails in the main text are continued across common font weight suffixes; titles, unterminated short lines, large margins, font size changes, different fonts and table barriers are rejected."""
     from docvortex.analyzers.native.pdf.line_layout import _should_connect_text_rows
     gap=15 if kind=='large_gap' else 3
     height=17 if kind=='large_type' else 10
@@ -3158,7 +3158,7 @@ def test_emphasized_short_tail_is_body_only_after_unfinished_close_comma_enumera
 
 
 def test_scatter_figure_caption_binds_image_after_table_body_is_trimmed():
-    """公共MiddleJson中Figure15.3两行图题绑定下方散点图，不能作为上方表格的表题。"""
+    """The two-line figure title of Figure15.3 in the public MiddleJson is bound to the lower scatter plot and cannot be used as the title of the upper table."""
     from docvortex import parse
     result=parse(FIXTURES/'review_130.pdf',keep_model_json=True)
     blocks=result.to_dict()['pages'][0]['blocks']
@@ -3173,7 +3173,7 @@ def test_scatter_figure_caption_binds_image_after_table_body_is_trimmed():
 @pytest.mark.parametrize('scale,left,width',[(.7,13,350),(1,70,440),(1.6,210,600)])
 @pytest.mark.parametrize('kind',['body','note','same_font','one_paragraph','short_tail','ruled_cell','continued_data','few_rows'])
 def test_unruled_table_tail_needs_numeric_columns_and_independent_larger_body_paragraphs(scale,left,width,kind):
-    """改变字号、位置、栏宽和无关文字；表后正文释放，表注、同字号单元格、连续段、边框内文本及续行数据保留。"""
+    """Change the font size, position, column width and irrelevant text; release the main text after the table, and retain the table notes, cells of the same font size, continuous paragraphs, text in the border and continued row data."""
     from docvortex.analyzers.native.pdf.models import _PageSource,_TableCandidate,_AxisLine
     from docvortex.analyzers.native.pdf.table_detection import _trim_unruled_table_prose_tail
     lines=[]
@@ -3206,7 +3206,7 @@ def test_unruled_table_tail_needs_numeric_columns_and_independent_larger_body_pa
 @pytest.mark.parametrize('scale,left',[(.7,11),(1,70),(1.8,210)])
 @pytest.mark.parametrize('kind',['left','right','word','far','ambiguous','off_lane','footnote','different_row','claimed'])
 def test_vector_text_number_binding_needs_numeric_marker_lane_and_unique_nearby_core(scale,left,kind):
-    """改变字号、栏宽和编号位置；左右编号保留唯一归属，普通括号词、远距、多主体、脚注与其他行拒绝。"""
+    """Change font size, column width, and numbering position; left and right numbers retain unique ownership, and ordinary brackets, distances, multiple bodies, footnotes, and other lines are rejected."""
     from docvortex.analyzers.native.pdf.formulas import _VectorFormulaCandidate, _attach_vector_formula_text_numbers
     y=180 if kind=='different_row' else 100
     x=240 if kind=='right' else (50 if kind=='off_lane' else 0)
@@ -3228,7 +3228,7 @@ def test_vector_text_number_binding_needs_numeric_marker_lane_and_unique_nearby_
 @pytest.mark.parametrize('scale,left',[(.65,12),(1,90),(1.75,230)])
 @pytest.mark.parametrize('kind',['drop_cap','formula','small_cap','above_cap','misaligned','uppercase','number'])
 def test_drop_cap_script_repair_requires_word_baseline_and_large_descending_cap(scale,left,kind):
-    """改变字词、字号和位置；下沉首字母恢复正文，公式、真正高位脚本、错基线和非小写词尾拒绝。"""
+    """Change words, size, and position; drop initials to restore text, formulas, true high script, wrong baselines, and non-lowercase ending rejections."""
     from docvortex.analyzers.native.pdf.inline.scripts import _classify_script_runs, _drop_cap_body_indices
     text = 'Able' if kind != 'uppercase' else 'ABCD'
     if kind == 'number': text = 'A123'
@@ -3254,7 +3254,7 @@ def test_drop_cap_script_repair_requires_word_baseline_and_large_descending_cap(
 @pytest.mark.parametrize('scale,left',[(.7,25),(1,70),(1.8,160)])
 @pytest.mark.parametrize('kind',['chapter','page_number','small_label','offset','container'])
 def test_display_roman_heading_requires_scale_alignment_emphasis_and_free_region(scale,left,kind):
-    """改变字号位置和字体，罗马章号仅与邻近大号标题合并；页码、普通字、错位或图内标签均拒绝。"""
+    """Change the font size position and font, and the Roman chapter number will only be merged with the adjacent large title; page numbers, ordinary characters, misaligned or in-figure labels will be rejected."""
     from docvortex.analyzers.native.pdf.title_analysis.structural import _classify_display_roman_heading_rows
     marker_height=(10 if kind=='page_number' else 30)*scale
     marker=_text_line('VII.',(left,100*scale,left+40*scale,100*scale+marker_height),0)
@@ -3280,7 +3280,7 @@ def test_display_roman_heading_requires_scale_alignment_emphasis_and_free_region
     ('02-26',False),('02-variable expression',False),('02- Other complete sentence.',False),
 ])
 def test_compact_step_dash_requires_label_and_preserves_range_prose_negatives(scale,left,text,expected):
-    """紧接编号的短横线可引出粗体标题，数值范围、小写变量及完整句末正文仍不成为标题。"""
+    """The dash immediately following the number can lead to a bold title. Numeric ranges, lowercase variables, and complete text at the end of the sentence still do not become titles."""
     from docvortex.analyzers.native.pdf.title_analysis.structural import _classify_bold_numbered_heading_rows
     line=_text_line(text,(left,100*scale,left+180*scale,110*scale),0)
     line.dominant_font_weight=700
@@ -3290,7 +3290,7 @@ def test_compact_step_dash_requires_label_and_preserves_range_prose_negatives(sc
 
 
 def test_closed_grid_table_does_not_claim_prose_above_its_physical_header():
-    """原页闭合网格从Genes表头开始，上方两个自然段、圆点及引导句必须独立保留。"""
+    """The closed grid of the original page starts from the Genes header, and the two natural paragraphs, dots and introductory sentences above must be kept independently."""
     blocks = _pages('review_120')[0]
     tables = [b for b in blocks if b['type'] == 'table']
     assert len(tables) == 1
@@ -3310,7 +3310,7 @@ def test_closed_grid_table_does_not_claim_prose_above_its_physical_header():
 @pytest.mark.parametrize('scale,left,width',[(.7,13,250),(1,80,400),(1.8,210,660)])
 @pytest.mark.parametrize('kind',['prose','two_rows','short_labels','bold_header','caption','open_grid','no_top','other_column','unrelated_members','near_header'])
 def test_closed_grid_protects_boundary_only_against_member_prose_spanning_remote_rule(scale,left,width,kind):
-    """移动缩放闭合网格和页顶横线；多行表头、开放表、异栏或非成员正文不能触发弱区间排除。"""
+    """Move and scale closed grids and page top horizontal lines; multi-line headers, open tables, different columns or non-member text cannot trigger weak interval exclusion."""
     from types import SimpleNamespace
     from docvortex.analyzers.native.pdf.models import _PageSource, _TableCandidate, _AxisLine, _Fragment, _VisualRow
     from docvortex.analyzers.native.pdf.table_rules import _RuleCandidateDraft
@@ -3346,7 +3346,7 @@ def test_closed_grid_protects_boundary_only_against_member_prose_spanning_remote
 
 @pytest.mark.parametrize('name,figures',[('review_40',[1]),('review_41',[3]),('review_42',[5]),('review_43',[7,8])])
 def test_survey_charts_have_complete_unique_bodies_labels_and_captions(name,figures):
-    """实际横柱、纵柱、单环与同心环图均完整认领标签，所有连续图题唯一绑定自己的图体。"""
+    """In fact, horizontal columns, vertical columns, single rings and concentric ring figures all have complete label claims, and all continuous figure titles are uniquely bound to their own figure bodies."""
     from docvortex import parse
     blocks=parse(FIXTURES/f'{name}.pdf',keep_model_json=True).to_dict()['pages'][0]['blocks']
     images=[b for b in blocks if b['type']=='image']
@@ -3357,13 +3357,13 @@ def test_survey_charts_have_complete_unique_bodies_labels_and_captions(name,figu
         assert '%' not in _visible_text(captions[0]['content'])
         assert not any(b['type'] in {'equation','paragraph_title'} and b['bbox'][0]>=image['bbox'][0] and b['bbox'][2]<=image['bbox'][2] and b['bbox'][1]>=image['bbox'][1] and b['bbox'][3]<=image['bbox'][3] for b in blocks)
     if name=='review_42':assert _visible_text(images[0]['content'][0]['content']).endswith('travelling to conflict zones')
-    # 原页实际写作COVID-1，保留源文字而不是擅自补上数字9。
+    # The original page actually reads COVID-1, retaining the source text instead of adding the number 9 without authorization.
     if name=='review_43':assert any('during COVID-1' in _visible_text(c['content']) for c in images[1]['content'] if c['type']=='image_caption')
 
 
 @pytest.mark.parametrize('name,first,last',[('review_41','There were instances','of condemning the act'),('review_42','However,','minds are controlled, even though')])
 def test_emphasized_survey_quotations_stay_complete_text_not_headings_or_equations(name,first,last):
-    """粗体居中引用与首行分散排版的斜体引用都是完整正文，不是标题或展示公式。"""
+    """Bold, centered quotes and first-line, dispersed italic quotes are complete text, not titles or presentation formulas."""
     blocks=_pages(name)[0]
     matches=[b for b in blocks if first in _visible_text(b['content'])]
     assert len(matches)==1 and matches[0]['type']=='text'
@@ -3371,7 +3371,7 @@ def test_emphasized_survey_quotations_stay_complete_text_not_headings_or_equatio
 
 
 def test_quote_introduction_is_body_before_the_indented_interview_passage():
-    """普通字体的两行引语引导句不是小节标题，后面斜体引用仍独立。"""
+    """The two-line quotation introductory sentence in ordinary font is not the section title, and the subsequent italicized quotation is still independent."""
     blocks=_pages('review_43')[0]
     b=next(b for b in blocks if 'Another interviewee from Indonesia' in _visible_text(b['content']))
     assert b['type']=='text' and _visible_text(b['content']).endswith('observed that:')
@@ -3381,7 +3381,7 @@ def test_quote_introduction_is_body_before_the_indented_interview_passage():
 @pytest.mark.parametrize('scale,left',[(.7,15),(1,80),(1.8,200)])
 @pytest.mark.parametrize('kind',['ring','single','off_center','oval','tiny','no_caption','one_percent','no_stroke','nested_form','far_caption'])
 def test_concentric_graphic_requires_caption_two_native_outlines_and_percentage_labels(scale,left,kind):
-    """同心轮廓与百分比、编号图题共同确认图体；孤立圆、椭圆、装饰点、Form和无图题区域拒绝。"""
+    """Concentric outlines, percentages, and numbered figure titles jointly confirm the figure body; isolated circles, ellipses, decorative points, Form, and areas without figure titles are rejected."""
     from docvortex.document.pdf._document import PDFPathInfo
     from docvortex.analyzers.native.pdf.models import _PageSource
     from docvortex.analyzers.native.pdf.graphics import _detect_captioned_concentric_path_graphics
@@ -3404,7 +3404,7 @@ def test_concentric_graphic_requires_caption_two_native_outlines_and_percentage_
 @pytest.mark.parametrize('scale,left',[(.7,15),(1,80),(1.8,200)])
 @pytest.mark.parametrize('kind',['italic','bold_closed','regular','short','no_quote','large','math','different_family','large_gap'])
 def test_emphasized_quote_prose_requires_connected_native_sentence_rows_and_quote_evidence(scale,left,kind):
-    """改变位置字号及措辞；多行引用保护正文，普通标题、短引号、数学式、字体变化和大净空拒绝。"""
+    """Change position font size and wording; multi-line quotation protection text, ordinary titles, short quotation marks, mathematical formulas, font changes and large headroom rejection."""
     from docvortex.analyzers.native.pdf.title_analysis.structural import _mark_emphasized_quote_prose
     from docvortex.analyzers.native.pdf.inline.types import PDF_FONT_ITALIC_FLAG
     lines=[]
@@ -3428,7 +3428,7 @@ def test_emphasized_quote_prose_requires_connected_native_sentence_rows_and_quot
 @pytest.mark.parametrize('scale,left',[(.7,15),(1,80),(1.8,200)])
 @pytest.mark.parametrize('kind',['wrapped','subset','numeric','different_weight','other_family','different_column','gap','inside','reference'])
 def test_wrapped_figure_caption_uses_last_row_and_preserves_native_subset_font_continuation(scale,left,kind):
-    """图题末行决定图体距离；同字体子集续行可合并，数值标签、异字体、异栏及图内文字不能伪装成图题。"""
+    """The last line of the figure title determines the distance between the figure and body; subsequent lines with the same font subset can be merged, and numerical labels, different fonts, different columns, and text within the figure cannot be disguised as figure titles."""
     from docvortex.analyzers.native.pdf.graphics import _graphic_caption_line_indices_to_preserve
     from docvortex.analyzers.native.pdf.models import _GraphicCandidate
     lines=[]
@@ -3447,7 +3447,7 @@ def test_wrapped_figure_caption_uses_last_row_and_preserves_native_subset_font_c
 
 
 def test_multiline_figure_reference_prose_cannot_be_promoted_to_caption():
-    """原件Figure3 presents是正文引用句，不能因多行接近图体而被归为图注。"""
+    """The original Figure3 presents is a text quotation and cannot be classified as a figure note because multiple lines are close to the body of the figure."""
     blocks=_pages('two_column_retrieval')[15]
     matches=[b for b in blocks if 'Figure 3 presents the number' in _visible_text(b['content'])]
     assert len(matches)==1 and matches[0]['type']=='text'
@@ -3455,7 +3455,7 @@ def test_multiline_figure_reference_prose_cannot_be_promoted_to_caption():
 
 
 def test_long_indented_italic_quotation_in_plastics_report_remains_complete_body():
-    """原页长斜体引用由开引号至闭引号完整保留，不能作为段落标题。"""
+    """The original page-length italicized quotation remains intact from opening to closing quotation marks and cannot be used as a paragraph title."""
     blocks=_pages('review_68')[0]
     matches=[b for b in blocks if 'Despite these efforts' in _visible_text(b['content'])]
     assert len(matches)==1 and matches[0]['type']=='text'
@@ -3463,7 +3463,7 @@ def test_long_indented_italic_quotation_in_plastics_report_remains_complete_body
 
 
 def test_centered_emphasized_summary_heading_above_grid_is_not_body():
-    """原页表格上方居中的独立粗体标题不能混为正文。"""
+    """The independent bold title centered above the table on the original page cannot be mixed with the main text."""
     blocks = _pages('review_88')[0]
     matches = [b for b in blocks if _visible_text(b['content']) == 'Comparative Summary Table']
     assert len(matches) == 1 and matches[0]['type'] in {'paragraph_title','caption'}
@@ -3480,7 +3480,7 @@ def test_centered_emphasized_summary_heading_above_grid_is_not_body():
     (("Generic", 0), None, False),
 ])
 def test_heading_bold_metadata_survives_old_pdfium_weight_values(left, width, kind, font, weight, expected):
-    """独立改变栏宽和字体身份，旧字重必须有明确粗体证据才能支持编号或网格上方标题。"""
+    """Column width and font identity are changed independently, there must be clear bold evidence of the old weight to support numbering or above grid headings."""
     from docvortex.analyzers.native.pdf.title_analysis.structural import (
         _classify_bold_numbered_heading_rows,
         _classify_native_display_resets,
@@ -3507,7 +3507,7 @@ def test_heading_bold_metadata_survives_old_pdfium_weight_values(left, width, ki
 
 
 def test_repeated_light_display_style_titles_survive_equal_native_font_boxes():
-    """两个轻字重标题虽与正文字框同高，重复字体和上下区域仍证明独立标题。"""
+    """Although the two light weight titles are the same height as the main text box, the repeated fonts and upper and lower areas still prove that they are independent titles."""
     blocks = _pages('review_118')[0]
     for text in ['Cellular Replication','Growth and the Creation of Life']:
         matches = [b for b in blocks if _visible_text(b['content']) == text]
@@ -3515,7 +3515,7 @@ def test_repeated_light_display_style_titles_survive_equal_native_font_boxes():
 
 
 def test_brochure_multiline_heading_and_colon_subheadings_are_independent_titles():
-    """折页大标题两行完整合并，各同级冒号小标题独立成块。"""
+    """The two lines of the main title of the folding page are completely merged, and the subtitles with colons of the same level are formed into independent blocks."""
     blocks = _pages('review_163')[0]
     main = [b for b in blocks if ''.join(_visible_text(b['content']).split()) == 'HOWCANYOUHELP?']
     assert len(main) == 1 and main[0]['type'] == 'paragraph_title'
@@ -3525,14 +3525,14 @@ def test_brochure_multiline_heading_and_colon_subheadings_are_independent_titles
 
 
 def test_brochure_resource_heading_is_a_complete_section_title():
-    """折页中间栏两行资源标题属于章节标题，不能成为独立文档题名。"""
+    """The two rows of resource titles in the middle column of the folding page belong to chapter titles and cannot become independent document titles."""
     blocks = _pages('review_163')[0]
     matches = [b for b in blocks if _visible_text(b['content']) == 'FURTHER RESOURCES']
     assert len(matches) == 1 and matches[0]['type'] == 'paragraph_title'
 
 
 def test_chinese_multiline_investment_section_is_one_title_not_equation():
-    """原页两行投资章节题名完整聚合，同行大空白不能制造公式。"""
+    """The title of the investment chapter is completely integrated in the two lines on the original page, and the large blank space cannot create a formula."""
     blocks = _pages('securities_report')[3]
     matches = [b for b in blocks if '投资建议：主品牌短期承压' in _visible_text(b['content'])]
     assert len(matches) == 1 and matches[0]['type'] == 'paragraph_title'
@@ -3544,11 +3544,11 @@ def test_chinese_multiline_investment_section_is_one_title_not_equation():
 @pytest.mark.parametrize('scale,left,width',[(.7,15,220),(1,55,360),(1.6,130,590)])
 @pytest.mark.parametrize('kind',['light','light_single','light_body_font','light_small','light_sentence','table','table_regular','table_off_center','table_inside','multi','multi_single','multi_other_font','multi_far','multi_formula','chinese','chinese_first','colon','colon_same_weight','colon_single','colon_far'])
 def test_native_display_resets_need_repeated_style_or_complete_container_geometry(scale,left,width,kind):
-    """移动缩放标题和正文，字体重复、跨行对齐及容器净空必须成立；正文与表内文字不晋升。"""
+    """When moving and scaling titles and text, font duplication, cross-line alignment and container clearance must be established; text in the text and tables will not be promoted."""
     from docvortex.analyzers.native.pdf.title_analysis.structural import _classify_native_display_resets
     h=10*scale
     rows=[]
-    # 固定自然语言正文样本用于字号参照；坐标与栏宽均随参数变化。
+    # Fixed natural language text sample is used for font size reference; coordinates and column widths vary with parameters.
     for index in range(8):
         y=(300+index*14)*scale
         rows.append(_metric_fixture_line('Ordinary complete prose with several unrelated words.',(left,y,left+width,y+h),index,
@@ -3604,7 +3604,7 @@ def test_native_display_resets_need_repeated_style_or_complete_container_geometr
 
 
 def test_regular_financial_risk_prose_cannot_become_repeated_multiline_titles():
-    """财报风险正文与短标题同字体时，重复换行不能把完整说明句提升为标题。"""
+    """When the text of the financial report risk text and the short title are in the same font, repeated line breaks cannot promote the complete explanatory sentence to the title."""
     with PDFDocument(str(Path(__file__).parents[2]/'demo/pdfs/caibao1.pdf')) as document:
         blocks = pipeline._analyze_native_document(document)[18]
     for anchor in ['若国内宏观经济增速放缓','目前，全球芯片产业短缺问题仍未得到解决']:
@@ -3613,7 +3613,7 @@ def test_regular_financial_risk_prose_cannot_become_repeated_multiline_titles():
 
 
 def test_captioned_photo_cannot_absorb_a_parallel_prose_column():
-    """右侧照片不能认领左侧连续正文，后两行仍归入同一完整段落。"""
+    """The photo on the right cannot claim the continuous text on the left, and the last two lines are still included in the same complete paragraph."""
     blocks=_pages('review_62')[0]
     photos=[b for b in blocks if b['type']=='image']
     assert len(photos)==1 and photos[0]['bbox'][0]>.45
@@ -3623,7 +3623,7 @@ def test_captioned_photo_cannot_absorb_a_parallel_prose_column():
 
 
 def test_captioned_raster_table_cannot_absorb_the_previous_paragraph_last_word():
-    """表格图片只保留原生图片边界，cross-section完整续行仍归上方正文。"""
+    """The table image only retains the original image border, and the complete continuation of cross-section still returns to the text above."""
     blocks=_pages('review_110')[0]
     image=next(b for b in blocks if b['type']=='image')
     assert image['bbox'][1]>.44
@@ -3632,14 +3632,14 @@ def test_captioned_raster_table_cannot_absorb_the_previous_paragraph_last_word()
 
 
 def test_photo_frame_and_contained_photo_are_one_raster_object():
-    """一张大照片的阴影边框和内图只输出一个图块，三个独立侧栏插图保持。"""
+    """The shadow border and inner image of a large photo are output in only one tile, and the three independent sidebar insets remain."""
     images=[b for b in _pages('review_118')[0] if b['type']=='image']
     large=[b for b in images if b['bbox'][0]<.2 and b['bbox'][2]<.8]
     assert len(large)==1 and len(images)==4
 
 
 def test_native_blank_photo_margin_cannot_include_resource_title_ink():
-    """图片自身白色顶边可以裁去，标题文字和海牛主体都完整保留。"""
+    """The white top edge of the image itself can be cut off, leaving the title text and the manatee body intact."""
     blocks=_pages('review_163')[0]
     image=next(b for b in blocks if b['type']=='image' and .3<b['bbox'][0]<.4 and b['bbox'][1]<.2)
     title=next(b for b in blocks if _visible_text(b['content'])=='FURTHER RESOURCES')
@@ -3648,7 +3648,7 @@ def test_native_blank_photo_margin_cannot_include_resource_title_ink():
 
 
 def test_restored_light_titles_preserve_two_separate_complete_native_body_paragraphs():
-    """原页prokaryotes收句后，Cell division首行独立成段且两段文字完整。"""
+    """After the original page prokaryotes ends, the first line of Cell division becomes an independent paragraph and the two paragraphs of text are complete."""
     blocks=_pages('review_118')[0]
     first=next(b for b in blocks if 'One of the characteristics' in _visible_text(b['content']))
     second=next(b for b in blocks if 'Cell division in eukaryotes' in _visible_text(b['content']))
@@ -3658,18 +3658,18 @@ def test_restored_light_titles_preserve_two_separate_complete_native_body_paragr
 
 
 def test_photo_side_recycling_paragraph_preserves_short_final_native_rows():
-    """左侧回收说明绕过右图图注后继续至收句，不能因栏宽变化断开。"""
+    """The recycling instructions on the left bypass the legend on the right and continue to the closing sentence. They cannot be disconnected due to changes in column width."""
     blocks=_pages('review_69')[0]
     matches=[b for b in blocks if 'McDonalds has installed' in _visible_text(b['content'])]
     assert len(matches)==1 and matches[0]['type']=='text'
-    # 原页和原生字层均写为recycling. initiatives.，只修复段落归属，不改写原文标点。
+    # Both the original page and the original character layer are written as recycling. initiatives., only the paragraph attribution is restored, and the original punctuation is not rewritten.
     assert 'recycling. initiatives.' in _visible_text(matches[0]['content'])
 
 
 @pytest.mark.parametrize('scale,left',[(.7,15),(1,65),(1.6,110)])
 @pytest.mark.parametrize('kind',['prose','inside','numeric','two_rows','sparse','far','font_change','offset'])
 def test_raster_side_prose_protection_requires_native_continuous_language_rows(scale,left,kind):
-    """图片旁同栏连续正文才被保护；图内标签、数轴、稀疏行和字体/缩进屏障不建立段组。"""
+    """Only continuous text in the same column next to a picture is protected; labels, axes, sparse lines and font/indent barriers within figures do not create paragraph groups."""
     from docvortex.analyzers.native.pdf.models import _PageSource
     from docvortex.analyzers.native.pdf.graphics import _raster_outside_prose_sources
     h=10*scale
@@ -3693,7 +3693,7 @@ def test_raster_side_prose_protection_requires_native_continuous_language_rows(s
 @pytest.mark.parametrize('scale,left',[(.7,15),(1,65),(1.6,110)])
 @pytest.mark.parametrize('kind',['frame','small_inset','caption_border','partial','same_area','wide_padding'])
 def test_contained_photo_deduplication_keeps_separate_content_and_native_border_labels(scale,left,kind):
-    """移动缩放近重合照片边框，只合并高覆盖且边缘无文字的嵌套帧。"""
+    """Move scale to nearly coincide with photo borders and only merge nested frames with high coverage and no text on the edges."""
     from docvortex.analyzers.native.pdf.models import _PageSource
     from docvortex.analyzers.native.pdf.graphics import _deduplicate_contained_photo_frames
     outer=(left,100*scale,left+200*scale,230*scale)
@@ -3710,7 +3710,7 @@ def test_contained_photo_deduplication_keeps_separate_content_and_native_border_
 @pytest.mark.parametrize('size',[(120,100),(360,300),(720,600)])
 @pytest.mark.parametrize('kind',['white','transparent','dark','top_ink','no_margin','huge_margin','all_white'])
 def test_blank_top_pixels_require_full_width_clear_margin_and_keep_all_visible_ink(size,kind):
-    """像素证据只证明全宽白色/透明小顶边，黑底、顶边墨迹及大空白不裁切。"""
+    """Pixel evidence only proves full width white/transparent small top edge, black background, top edge ink and large white space are not cropped."""
     from PIL import Image,ImageDraw
     from docvortex.document.pdf.native_objects import _blank_image_top_fraction
     background=(255,255,255,0) if kind=='transparent' else (0,0,0,255) if kind=='dark' else (255,255,255,255)
@@ -3727,7 +3727,7 @@ def test_blank_top_pixels_require_full_width_clear_margin_and_keep_all_visible_i
 @pytest.mark.parametrize('scale,left,width',[(.7,15,220),(1,55,360),(1.6,130,590)])
 @pytest.mark.parametrize('kind',['proven','no_pixels','ordinary_text','small_heading','inside_ink','no_overlap'])
 def test_blank_raster_margin_is_consumed_only_under_independent_emphasized_display_text(scale,left,width,kind):
-    """改变图片和标题位置/字号，像素白边、大字号和独立相交三种证据缺一不可。"""
+    """To change the position/font size of pictures and titles, three types of evidence are indispensable: pixel white borders, large font size, and independent intersection."""
     from docvortex.analyzers.native.pdf.models import _PageSource
     from docvortex.document.pdf.native_contracts import PDFImageInfo
     h=10*scale
@@ -3739,7 +3739,7 @@ def test_blank_raster_margin_is_consumed_only_under_independent_emphasized_displ
     y=95*scale if kind=='inside_ink' else 90*scale
     rows.append(_metric_fixture_line('DISPLAY TITLE',(x,y,x+.8*width,y+hh),1,effective_height=hh,dominant_font_weight=400 if kind=='ordinary_text' else 700))
     source=_PageSource((left+width+50,500*scale),rows,[],[],image_bboxes=[box])
-    # 增加普通字号参照行，避免仅有一个标题和一行正文时以平均字号反向推断标题。
+    # Add an ordinary font size reference line to avoid inferring the title from the average font size when there is only one title and one line of text.
     rows.extend([_metric_fixture_line('Other ordinary body sentence.',(left,(420+i*14)*scale,left+width,(430+i*14)*scale),i+2,effective_height=h) for i in range(3)])
     info=PDFImageInfo(box,None,blank_top_bbox=None if kind=='no_pixels' else trimmed)
     result=pipeline._exclude_proven_blank_top_under_display_title(source,[info])
@@ -3747,7 +3747,7 @@ def test_blank_raster_margin_is_consumed_only_under_independent_emphasized_displ
 
 
 def test_public_photo_side_prose_keeps_every_justified_native_run_in_source_order():
-    """公共解析必须保持左右散排的第二行在完整段内，弱收句断言不能掩盖中间缺行。"""
+    """Public parsing must keep the second line of the left and right scattered lines within the complete paragraph, and weak closing assertions cannot cover up the missing line in the middle."""
     from docvortex import parse
     blocks=parse(FIXTURES/'review_62.pdf',keep_model_json=True).to_dict()['pages'][0]['blocks']
     paragraphs=[b for b in blocks if b['type']=='text' and 'Shipping remains' in _visible_text(b['content'])]
@@ -3759,7 +3759,7 @@ def test_public_photo_side_prose_keeps_every_justified_native_run_in_source_orde
 
 
 def test_ruled_contents_keeps_every_entry_page_and_native_bold_style_in_one_index():
-    """目录横线不是数据表，九条目录和页码完整唯一聚合并保留原生粗体。"""
+    """The table of contents horizontal line is not a data table. The nine tables of contents and page numbers are completely and uniquely aggregated and retain the original bold font."""
     blocks=_pages('review_44')[0]
     indices=[b for b in blocks if b['type']=='index']
     assert len(indices)==1 and not any(b['type']=='table' for b in blocks)
@@ -3771,7 +3771,7 @@ def test_ruled_contents_keeps_every_entry_page_and_native_bold_style_in_one_inde
 
 
 def test_directory_continuation_includes_its_first_unpaged_chapter_like_later_chapters():
-    """首个Part V与后续同式章节共同归入目录，不能把页首章节截为游离正文。"""
+    """The first Part V and subsequent chapters of the same type are included in the table of contents. The top chapter cannot be cut into free text."""
     blocks = _pages('review_172')[0]
     indices = [block for block in blocks if block['type'] == 'index']
     assert len(indices) == 1
@@ -3783,7 +3783,7 @@ def test_directory_continuation_includes_its_first_unpaged_chapter_like_later_ch
 
 
 def test_native_unpaged_contents_is_one_index_below_its_explicit_heading():
-    """有明确Contents题名和连续编号的五条无页码目录形成index，背景不再认领原生正文。"""
+    """Five unpaged table of contents with a clear title of Contents and consecutive numbers form index, and the background no longer claims the original text."""
     blocks = _pages('review_198')[0]
     headings = [block for block in blocks if _visible_text(block['content']) == 'Contents']
     assert len(headings) == 1 and headings[0]['type'] == 'paragraph_title'
@@ -3797,7 +3797,7 @@ def test_native_unpaged_contents_is_one_index_below_its_explicit_heading():
 
 
 def _directory_fixture_row(text, x, y, width, h, index, font='Body'):
-    """用可缩放的原生行构造目录行，页码判定保持真实入口行为。"""
+    """Construct directory rows with scalable native rows, and page number determination maintains true entry behavior."""
     from docvortex.analyzers.native.pdf.index_blocks import _IndexRow, _index_row_ends_in_page_number
     line = _metric_fixture_line(text, (x, y, x + width, y + h), index, effective_height=h,
                                 font_signature=(font, 0), font_coverage=1)
@@ -3805,13 +3805,13 @@ def _directory_fixture_row(text, x, y, width, h, index, font='Body'):
 
 
 def _public_first_page_blocks(name):
-    """通过公开解析与MiddleJson转换检查注释的实际父对象，避免只验证扁平标签。"""
+    """Check the annotation's actual parent object by exposing it to parsing with MiddleJson conversion to avoid validating only flat tags."""
     from docvortex import parse
     return parse(FIXTURES / f'{name}.pdf', keep_model_json=True).to_dict()['pages'][0]['blocks']
 
 
 def test_cross_column_first_bullet_is_separate_from_its_introduction_and_precedes_remaining_items():
-    """首条项目与正文拆开，四条条目按左栏末条到右栏续项的真实阅读顺序连续保留。"""
+    """The first item is separated from the main text, and the four items are kept consecutively in the actual reading order from the last item in the left column to the continued item in the right column."""
     blocks = _public_first_page_blocks('review_39')
     introduction = next(block for block in blocks if 'In all survey phases' in _visible_text(block['content']))
     assert _visible_text(introduction['content']).endswith('made changes were:')
@@ -3822,7 +3822,7 @@ def test_cross_column_first_bullet_is_separate_from_its_introduction_and_precede
 
 
 def test_italic_game_derivation_is_one_paragraph_and_keeps_both_outlined_inline_formulas():
-    """同式斜体推导完整成段，两个无Unicode的矢量公式必须各有非空裁图，后续普通问题分开。"""
+    """The derivation of the same formula in italics is completely divided into paragraphs. The two vector formulas without Unicode must each have a non-empty cutout, and subsequent ordinary questions will be separated."""
     blocks = _public_first_page_blocks('review_97')
     text = next(block for block in blocks if 'Here, Player 2 applies' in _visible_text(block['content']))
     assert text['type'] == 'text' and 'concede and be done with it.' in _visible_text(text['content'])
@@ -3832,7 +3832,7 @@ def test_italic_game_derivation_is_one_paragraph_and_keeps_both_outlined_inline_
 
 
 def test_native_paragraph_flow_around_four_outlined_math_fragments_keeps_one_complete_body():
-    """上段的期望值、方差与行内完整等式保持四幅裁图；不能把同一物理行前后文本拆段。"""
+    """The expected value, variance and complete equation within the line in the upper paragraph remain in four cuts; the text before and after the same physical line cannot be split into segments."""
     blocks = _public_first_page_blocks('review_129')
     text = next(block for block in blocks if 'the distributions were identically distributed' in _visible_text(block['content']))
     assert text['type'] == 'text' and _visible_text(text['content']).endswith('each partner would face would be:')
@@ -3842,7 +3842,7 @@ def test_native_paragraph_flow_around_four_outlined_math_fragments_keeps_one_com
 
 
 def test_short_vector_lhs_and_long_aligned_rhs_form_one_complete_equation():
-    """短左式行末居中扁平运算字形与紧接长右式构成完整等式，不能拆成两幅公式。"""
+    """The short left-hand formula with a centered flat arithmetic glyph at the end of the line and the immediately following long right-hand formula form a complete equation and cannot be split into two formulas."""
     blocks = _public_first_page_blocks('review_169')
     equations = [block for block in blocks if block['type'] == 'equation']
     assert len(equations) == 1 and equations[0]['bbox'][1] < .11 and equations[0]['bbox'][3] > .15
@@ -3850,7 +3850,7 @@ def test_short_vector_lhs_and_long_aligned_rhs_form_one_complete_equation():
 
 
 def test_captioned_mixed_port_table_preserves_two_header_levels_and_ten_complete_rows():
-    """PORT与SHIPCALLS两层表头及十行三列完整成表，独立表题属于该表且正文不混入。"""
+    """PORT and SHIPCALLS have two layers of headers and ten rows and three columns to form a complete table. The independent table title belongs to the table and the text is not mixed in."""
     from bs4 import BeautifulSoup
     blocks = _public_first_page_blocks('review_64')
     tables = [block for block in blocks if block['type'] == 'table']
@@ -3864,7 +3864,7 @@ def test_captioned_mixed_port_table_preserves_two_header_levels_and_ten_complete
 
 
 def test_captioned_remittance_table_preserves_seven_columns_group_header_and_source_note():
-    """七列表保留增长率分组表头、八个国家和数据，表题及来源归属唯一。"""
+    """The seven tables retain the growth rate group headers, eight countries and data, and the table titles and sources are unique."""
     from bs4 import BeautifulSoup
     blocks = _public_first_page_blocks('review_78')
     tables = [block for block in blocks if block['type'] == 'table']
@@ -3878,7 +3878,7 @@ def test_captioned_remittance_table_preserves_seven_columns_group_header_and_sou
 
 
 def test_saccharometer_table_keeps_four_complete_numeric_unit_rows_and_its_caption():
-    """四列四行实验数据含星号单位并不构成公式，表头和两行表题完整归属。"""
+    """The four columns and four rows of experimental data containing asterisked units do not constitute a formula, and the header and two rows of table titles are fully attributed."""
     from bs4 import BeautifulSoup
     blocks = _public_first_page_blocks('review_116')
     tables = [block for block in blocks if block['type']=='table']
@@ -3890,7 +3890,7 @@ def test_saccharometer_table_keeps_four_complete_numeric_unit_rows_and_its_capti
 
 
 def test_single_data_row_continuation_uses_repeated_headers_and_keeps_instruction_outside_cells():
-    """重复四列表头支持单行续表；加粗两行倍量说明作为前表脚注，不能吞入续表表头。"""
+    """Repeating the four-column header supports single-line continuation of the table; bold two-line double descriptions are used as footnotes in the previous table and cannot be swallowed into the continuation table header."""
     from bs4 import BeautifulSoup
     tables = [block for block in _public_first_page_blocks('review_116') if block['type']=='table']
     assert len(tables)==2
@@ -3902,7 +3902,7 @@ def test_single_data_row_continuation_uses_repeated_headers_and_keeps_instructio
 
 
 def test_wrapped_bold_heading_takes_its_final_word_back_from_regular_prose():
-    """第二行加粗plastics.属于标题，后续India说明至technical advice保持完整正文。"""
+    """The second line bolded plastics belongs to the title, and subsequent descriptions from India to technical and advice keep the complete text."""
     blocks = _public_first_page_blocks('review_68')
     heading = next(block for block in blocks if 'Regulated Storage, Manufacture and Use of' in _visible_text(block['content']))
     assert heading['type'] == 'paragraph_title'
@@ -3914,7 +3914,7 @@ def test_wrapped_bold_heading_takes_its_final_word_back_from_regular_prose():
 
 
 def test_short_open_heading_and_image_displaced_final_word_preserve_intro_before_charts():
-    """普通字号独立题名与引导段分离；被图像挤到下方的末词format.归回正文并在两图前阅读。"""
+    """The independent title in ordinary font size is separated from the introductory paragraph; the last word format is squeezed below by the image. Return to the text and read in front of the two pictures."""
     blocks = _public_first_page_blocks('review_107')
     heading = next(block for block in blocks if _visible_text(block['content']) == 'Print vs. Digital')
     assert heading['type'] == 'paragraph_title'
@@ -3926,7 +3926,7 @@ def test_short_open_heading_and_image_displaced_final_word_preserve_intro_before
 
 
 def test_paragraph_final_italic_hyperlink_is_a_continuation_of_regular_native_prose():
-    """同栏紧邻的斜体书名链接是未收句正文的段尾，不能因字体变体断开。"""
+    """The italicized book title link next to the same column is the end of the unfinished sentence text and cannot be broken due to font variations."""
     blocks = _public_first_page_blocks('review_153')
     text_blocks = [block for block in blocks if block['type'] == 'text' and 'in Open Educational Resources' in _visible_text(block['content'])]
     assert len(text_blocks) == 1
@@ -3936,7 +3936,7 @@ def test_paragraph_final_italic_hyperlink_is_a_continuation_of_regular_native_pr
 
 
 def test_framed_side_description_is_a_complete_caption_of_the_single_photo():
-    """右侧Figure 6装饰卡片完整作为左图图注，不能输出成独立图片或遗漏说明。"""
+    """The Figure 6 decorative card on the right is completely used as the legend of the left picture and cannot be exported as an independent picture or the description is missing."""
     blocks = _public_first_page_blocks('review_73')
     images = [block for block in blocks if block['type'] == 'image']
     assert len(images) == 1
@@ -3948,7 +3948,7 @@ def test_framed_side_description_is_a_complete_caption_of_the_single_photo():
 
 
 def test_unlabelled_italic_caption_binds_to_the_photo_above_it():
-    """紧贴照片的小字号斜体说明属于图注；与下方隔开的大段正文保持独立。"""
+    """The caption in small italics immediately following the photo belongs to the figure; it remains separate from the large block of text that separates it below."""
     blocks = _public_first_page_blocks('review_106')
     image = next(block for block in blocks if block['type'] == 'image')
     captions = [child for child in image['content'] if child.get('type') == 'image_caption']
@@ -3958,7 +3958,7 @@ def test_unlabelled_italic_caption_binds_to_the_photo_above_it():
 
 
 def test_graph_caption_between_a_numeric_grid_and_a_plot_binds_to_the_plot():
-    """表图之间的Graph图题与模板链接关联下方折线图，上方原生电子表格不认领该图注。"""
+    """The Graph figure caption between the tables and figures is associated with the line chart below and the template link. The native spreadsheet above does not claim the caption."""
     blocks = _public_first_page_blocks('review_128')
     images = sorted([block for block in blocks if block['type'] == 'image'], key=lambda block: block['bbox'][1])
     assert len(images) == 1
@@ -3970,7 +3970,7 @@ def test_graph_caption_between_a_numeric_grid_and_a_plot_binds_to_the_plot():
 
 
 def test_adapted_table_source_and_dagger_explanation_bind_to_the_upper_table():
-    """Table adapted来源及同段匕首说明是上表注释，不能流入两个问题或下表。"""
+    """Table adapted The source and the description of the dagger in the same paragraph are the notes in the table above and cannot flow into the two questions or the table below."""
     blocks = _public_first_page_blocks('review_170')
     tables = sorted([block for block in blocks if block['type'] == 'table'], key=lambda block: block['bbox'][1])
     assert len(tables) == 2
@@ -3986,7 +3986,7 @@ def test_adapted_table_source_and_dagger_explanation_bind_to_the_upper_table():
 @pytest.mark.parametrize('scale,left', [(.7, 15), (1, 50), (1.6, 100)])
 @pytest.mark.parametrize('kind', ['wrap', 'far', 'font', 'indent', 'chapter', 'paged', 'no_sidecar', 'wide'])
 def test_wrapped_directory_labels_keep_their_page_after_only_a_matching_close_continuation(scale, left, kind):
-    """目录续行必须同式、近距和同缩进；远行、章节、另一条页码行与宽正文不归并。"""
+    """Table of contents continuation lines must be of the same format, close and indented; long lines, chapters, and another page number line must not be merged with the main text."""
     from docvortex.analyzers.native.pdf.index_blocks import _IndexRow, _join_index_label_continuations
     from docvortex.analyzers.native.pdf.geometry import _bbox_union_many
     h = 10 * scale
@@ -4011,7 +4011,7 @@ def test_wrapped_directory_labels_keep_their_page_after_only_a_matching_close_co
 @pytest.mark.parametrize('scale,left', [(.7, 15), (1, 50), (1.6, 100)])
 @pytest.mark.parametrize('kind', ['chapter', 'one_peer', 'font', 'indent', 'far', 'ordinary', 'paged'])
 def test_leading_directory_chapter_requires_repeated_matching_internal_section_rows(scale, left, kind):
-    """首个无页码章节只在内部至少两次同式章节与稳定目录已确认时归入，普通题名不能吞入。"""
+    """The first chapter without page number will only be included when the same type of chapter and stable table of contents have been confirmed at least twice internally. Ordinary titles cannot be included."""
     from docvortex.analyzers.native.pdf.index_blocks import _include_repeated_leading_index_section
     h = 10 * scale
     leading = _directory_fixture_row('Unrelated ordinary heading' if kind == 'ordinary' else 'Chapter I. Beginning 1' if kind == 'paged' else 'Chapter I. Beginning',
@@ -4028,7 +4028,7 @@ def test_leading_directory_chapter_requires_repeated_matching_internal_section_r
 @pytest.mark.parametrize('scale,left', [(.7, 15), (1, 50), (1.6, 100)])
 @pytest.mark.parametrize('kind', ['contents', 'tiny_number', 'no_heading', 'few', 'font', 'sequence', 'indent', 'far', 'sentence'])
 def test_unpaged_index_requires_explicit_contents_and_short_consecutive_typographic_entries(scale, left, kind):
-    """无页码目录需要明确题名和五条连续短项；步骤、正文收句、字号字体及缩进断层都拒绝。"""
+    """Table of contents without page numbers requires a clear title and five consecutive short items; steps, text closing, font size, and indentation breaks are all rejected."""
     from docvortex.analyzers.native.pdf.index_blocks import _unpaged_numbered_index_bands
     h = 10 * scale
     heading = _directory_fixture_row('Instructions' if kind == 'no_heading' else 'Contents', left, 15 * scale, 110 * scale, 20 * scale, 0)
@@ -4050,7 +4050,7 @@ def test_unpaged_index_requires_explicit_contents_and_short_consecutive_typograp
 
 
 def test_securities_report_analysis_keeps_five_native_paragraphs_and_short_advisory_boundaries():
-    """原页五段核心分析保持独立，风险提示与投资建议不能被同字体正文吞并。"""
+    """The five paragraphs of core analysis on the original page remain independent, and risk warnings and investment recommendations cannot be swallowed up by the main text in the same font."""
     blocks=_pages('securities_report')[0]
     anchors=('第三季度收入下滑 11%，销售费用率提升，盈利承压。', '存货大幅增长', '第三季度主品牌线下承压', '风险提示：', '投资建议：')
     matches=[next(block for block in blocks if anchor in _visible_text(block['content'])) for anchor in anchors]
@@ -4061,7 +4061,7 @@ def test_securities_report_analysis_keeps_five_native_paragraphs_and_short_advis
 
 
 def test_securities_related_reports_keep_independent_heading_and_five_complete_entries():
-    """相关研究报告题名单独成标题；每份两行报告与日期保持一项，不能全部粘成正文。"""
+    """The title of the relevant research report should be a separate title; each two-line report and date should remain in one column and cannot be glued together into the main text."""
     blocks=_pages('securities_report')[0]
     heading=[block for block in blocks if _visible_text(block['content'])=='相关研究报告']
     assert len(heading)==1 and heading[0]['type']=='paragraph_title'
@@ -4072,7 +4072,7 @@ def test_securities_related_reports_keep_independent_heading_and_five_complete_e
 
 
 def test_adjustment_section_keeps_native_heading_intro_and_four_numbered_paragraphs():
-    """原页短题名、六行引言与四个顿号编号段分别完整，栅格表格仍保留为图片。"""
+    """The original page's short title, six-line introduction, and four period-numbered paragraphs are complete, and the grid table is still retained as a picture."""
     blocks=_pages('securities_report')[2]
     heading=[block for block in blocks if _visible_text(block['content'])=='盈利预测调整说明']
     assert len(heading)==1 and heading[0]['type']=='paragraph_title'
@@ -4085,7 +4085,7 @@ def test_adjustment_section_keeps_native_heading_intro_and_four_numbered_paragra
 
 
 def test_securities_six_numbered_panels_follow_visual_rows_and_keep_caption_body_adjacency():
-    """原页六幅成对图表按逐行编号阅读，每个完整图注紧邻自己唯一图体。"""
+    """The six paired figures on the original page are read line by line, with each complete figure caption next to its own unique figure body."""
     blocks=_pages('securities_report')[1]
     captions=[block for block in blocks if block['type']=='caption']
     numbers=[int(__import__('re').match(r'^图(\d+)',_visible_text(block['content'])).group(1)) for block in captions]
@@ -4097,7 +4097,7 @@ def test_securities_six_numbered_panels_follow_visual_rows_and_keep_caption_body
 
 
 def test_securities_basic_data_uses_complete_six_row_pair_table_and_keeps_its_heading():
-    """基础数据为六行两列表，评级文字和各单位数字完整，不能整体作为公式。"""
+    """The basic data consists of six rows and two tables. The rating text and each unit number are complete and cannot be used as a formula as a whole."""
     from bs4 import BeautifulSoup
     page=_pages('securities_report')[0]
     matches=[block for block in page if block['type']=='table' and '52周最高价' in __import__('re').sub(r'\s+','',_visible_text(block['content']))]
@@ -4112,7 +4112,7 @@ def test_securities_basic_data_uses_complete_six_row_pair_table_and_keeps_its_he
 
 
 def test_four_securities_financial_tables_include_each_year_header_and_do_not_merge_stacked_tables():
-    """财务页四表按独立年份表头分开，六列含五个年份及所有数据，上下表不能纵向粘连。"""
+    """The four tables on the financial page are separated by independent year headers. The six columns contain five years and all data. The upper and lower tables cannot be connected vertically."""
     from bs4 import BeautifulSoup
     page=_pages('securities_report')[4]
     tables=[block for block in page if block['type']=='table']

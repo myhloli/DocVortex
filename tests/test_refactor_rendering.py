@@ -1,4 +1,4 @@
-"""守卫线性续接规划、行内合并及一次调用内的对象所有权。"""
+"""Guards linear continuation planning, inline merging, and object ownership within a single call."""
 
 from __future__ import annotations
 
@@ -14,12 +14,12 @@ from docvortex.schema import MiddleJson, PageInfo, TextBlock, TextSpan, ListBloc
 
 
 def text_block(index: int, text: str, **kwargs: object) -> TextBlock:
-    """构造带稳定索引的正文块。"""
+    """Construct text blocks with stable indexes."""
     return TextBlock(type="text", index=index, content=[TextSpan(type="text", content=text)], **kwargs)
 
 
 def test_reference_barriers_anchors_and_page_modes() -> None:
-    """普通正文可跨透明块续接，参考文献不能跨正文屏障，锚点独立保留。"""
+    """Ordinary text can be continued across transparent blocks, references cannot cross text barriers, and anchor points are retained independently."""
     middle = MiddleJson(
         pages=[
             PageInfo(page_idx=0, blocks=[text_block(0, "A"), text_block(1, "B", continues_prev=True, anchor="b")]),
@@ -49,7 +49,7 @@ def test_reference_barriers_anchors_and_page_modes() -> None:
 
 
 def test_merged_lists_do_not_change_epub_identity_or_input() -> None:
-    """内部复用时列表合并不得改变 EPUB 根据原文档计算的标识符。"""
+    """List merging during internal reuse must not change the EPUB identifier calculated from the original document."""
     from datetime import datetime, timezone
     from docvortex.render import render, RenderFormat
 
@@ -74,7 +74,7 @@ def test_merged_lists_do_not_change_epub_identity_or_input() -> None:
 
 
 def test_owned_context_is_consumed_and_recovers_after_exception() -> None:
-    """相同文档的重入规划和异常后的新调用均恢复防御性复制。"""
+    """Defensive replication is restored for both reentrancy planning and new calls after exceptions to the same document."""
     from docvortex.render._internal.common.context import owned_render_document
 
     middle = MiddleJson(
@@ -92,7 +92,7 @@ def test_owned_context_is_consumed_and_recovers_after_exception() -> None:
 
 
 def test_inline_join_preserves_links_and_empty_leaves() -> None:
-    """逐边界使用字符规则，空白、同目标链接和公式的语义边界可复核。"""
+    """Character rules are used on a boundary-by-boundary basis, and semantic boundaries for whitespace, same-target links, and formulas can be reviewed."""
     from docvortex.content import inline
     from docvortex.schema import HyperlinkSpan, EquationInlineSpan
 
@@ -109,7 +109,7 @@ def test_inline_join_preserves_links_and_empty_leaves() -> None:
 
 
 def test_callback_failure_and_repeated_exports_leave_source_untouched() -> None:
-    """图片回调对内部块的修改及失败不会泄漏到调用者拥有的源文档。"""
+    """Modifications and failures of internal blocks by image callbacks are not leaked to the source document owned by the caller."""
     from docvortex.schema import ImageBlock, ImageBodyBlock
 
     body = ImageBodyBlock(type="image_body", content="", index=0, image_path="images/a.png")
@@ -121,7 +121,7 @@ def test_callback_failure_and_repeated_exports_leave_source_untouched() -> None:
     before = middle.model_dump()
 
     def callback(block: object) -> str:
-        """修改收到的副本后失败，模拟有副作用的宿主扩展。"""
+        """Fails after modifying the received copy, simulating a side-effecting host extension."""
         block.content.clear()
         raise RuntimeError("image failure")
 

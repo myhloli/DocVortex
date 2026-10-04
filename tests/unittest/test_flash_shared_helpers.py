@@ -32,7 +32,7 @@ def test_shared_image_encoding_preserves_format_and_data_uri(
     image_format: str,
     expected_format: str,
 ) -> None:
-    """验证共享图片编码同时保留字节格式与 data URI 载荷。"""
+    """Verify shared image encoding while preserving byte formatting with data URI payload."""
     image = Image.new(mode, (2, 3), (12, 34, 56, 78) if mode == "RGBA" else (12, 34, 56))
 
     image_bytes = image_to_bytes(image, image_format=image_format)
@@ -47,7 +47,7 @@ def test_shared_image_encoding_preserves_format_and_data_uri(
 
 
 def test_mathml_semantics_ignores_non_tex_alternate_annotations() -> None:
-    """验证 semantics 只转换主展示分支，不重复拼接非 TeX annotation。"""
+    """Verify that semantics only converts the main display branch and does not repeatedly splice non-TeX annotation."""
     math = etree.fromstring(
         b'<math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mfrac><mi>x</mi><mn>2</mn></mfrac>'
         b'<annotation-xml encoding="MathML-Content"><apply><divide/><ci>x</ci><cn>2</cn></apply></annotation-xml>'
@@ -68,7 +68,7 @@ def test_mathml_semantics_ignores_non_tex_alternate_annotations() -> None:
     ],
 )
 def test_mathml_literal_identifier_tokens_do_not_become_latex_syntax(token: str, value: str, expected: str) -> None:
-    """验证标识符和数字字面量转义 TeX 控制字符，同时保留显式希腊字母映射。"""
+    """Verify that identifiers and numeric literals escape TeX control characters while preserving explicit Greek letter mappings."""
     math = etree.fromstring(f'<math xmlns="http://www.w3.org/1998/Math/MathML"><{token}>{value}</{token}></math>'.encode())
 
     assert mathml_to_latex(math) == expected
@@ -84,7 +84,7 @@ def test_mathml_literal_identifier_tokens_do_not_become_latex_syntax(token: str,
     ],
 )
 def test_mathml_literal_operator_tokens_do_not_become_latex_syntax(value: str, expected: str) -> None:
-    """验证操作符字面量同样转义 TeX 控制字符，避免裸 #/& 破坏公式渲染。"""
+    """Validation operator literals also escape the TeX control character to avoid naked #/& breaking formula rendering."""
     math = etree.fromstring(
         f'<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>a</mi><mo>{value}</mo><mi>b</mi></math>'.encode()
     )
@@ -93,7 +93,7 @@ def test_mathml_literal_operator_tokens_do_not_become_latex_syntax(value: str, e
 
 
 def test_mathml_word_equation_number_separator_becomes_tag() -> None:
-    """验证 Word 公式编号分隔符 #(n) 转换为 \\tag 并去掉多余的 matrix 包裹。"""
+    """Verify that the Word formula number separator #(n) is converted to \\tag and remove the redundant matrix wrapper."""
     math = etree.fromstring(
         b'<math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><mtable><mtr><mtd>'
         b"<mi>E</mi><mo>=</mo><msup><mi>mc</mi><mn>2</mn></msup>"
@@ -105,7 +105,7 @@ def test_mathml_word_equation_number_separator_becomes_tag() -> None:
 
 
 def test_mathml_mtable_without_trailing_equation_number_keeps_matrix() -> None:
-    """验证无编号单行与多行 mtable 维持 matrix 输出，编号转换只命中行尾模式。"""
+    """Verify unnumbered single line vs. multi-line mtable Maintain matrix output, number conversion only hits end-of-line pattern."""
     single = etree.fromstring(
         b'<math xmlns="http://www.w3.org/1998/Math/MathML"><mtable><mtr><mtd><mi>a</mi></mtd></mtr></mtable></math>'
     )
@@ -123,7 +123,7 @@ def test_mathml_mtable_without_trailing_equation_number_keeps_matrix() -> None:
 
 @pytest.mark.parametrize("extra_node", ["<!--producer note-->", "<?producer note?>"])
 def test_mathml_annotation_scan_skips_non_element_nodes(extra_node: str) -> None:
-    """验证 TeX annotation 扫描跳过 XML comment 与处理指令。"""
+    """Verification TeX annotation scan skips XML comment with processing instructions."""
     math = etree.fromstring(
         (
             '<math xmlns="http://www.w3.org/1998/Math/MathML">'
@@ -152,7 +152,7 @@ def test_mathml_annotation_scan_skips_non_element_nodes(extra_node: str) -> None
     ],
 )
 def test_shared_hyperlink_policy_rejects_active_and_local_targets(target: str, expected: str | None) -> None:
-    """验证共享策略统一处理外链、fragment、相对路径和危险目标。"""
+    """The verification sharing policy uniformly handles external links, fragment, relative paths and dangerous targets."""
     assert (
         sanitize_hyperlink_target(
             target,
@@ -165,7 +165,7 @@ def test_shared_hyperlink_policy_rejects_active_and_local_targets(target: str, e
 
 
 def test_shared_hyperlink_spans_preserve_url_and_tag_literals() -> None:
-    """验证结构化链接保留 URL 与标签外观原文，危险目标降级为 TextSpan。"""
+    """Verify that structured links retain the original text of URL and label appearance, and dangerous targets are downgraded to TextSpan."""
     unsafe = build_rich_text_from_segments(
         [OfficeRichTextSegment("<hyperlink>click</hyperlink>", hyperlink="javascript:alert(1)")]
     )
@@ -184,7 +184,7 @@ def test_shared_hyperlink_spans_preserve_url_and_tag_literals() -> None:
 
 
 def test_legacy_binary_readers_preserve_bounds_and_values() -> None:
-    """验证旧版 Office 共用读取器只在完整边界内返回小端数值。"""
+    """Verify that the legacy Office shared reader only returns little-endian values within full bounds."""
     data = struct.pack("<HhId", 0xABCD, -123, 0x1234_5678, 1.25)
 
     assert get_u16(data, 0) == 0xABCD
@@ -201,7 +201,7 @@ def test_legacy_binary_readers_preserve_bounds_and_values() -> None:
 
 
 def test_format_record_modules_no_longer_export_duplicate_binary_readers() -> None:
-    """验证严格迁移后格式 records 模块不再暴露重复的读取函数。"""
+    """Verify strict post-migration format records module no longer exposes duplicate read functions."""
     for module in (doc_records, ppt_records, xls_records):
         for name in ("get_u16", "get_i16", "get_u32", "get_f64", "bounded_slice"):
             assert not hasattr(module, name)
@@ -218,12 +218,12 @@ def test_format_record_modules_no_longer_export_duplicate_binary_readers() -> No
     ],
 )
 def test_opc_relationship_source_base_dir(rels_filename: str, expected: str | None) -> None:
-    """验证 OPC relationship 路径只接受根关系或规范 part 关系。"""
+    """Verify that the OPC relationship path only accepts root relationships or canonical part relationships."""
     assert relationship_source_base_dir(rels_filename) == expected
 
 
 def test_write_zip_package_preserves_member_data_and_metadata() -> None:
-    """验证共享写包器保留成员内容与 ZipInfo 元数据。"""
+    """Verify that the shared packet writer retains member content and ZipInfo metadata."""
     info = ZipInfo("word/document.xml", date_time=(2024, 1, 2, 3, 4, 6))
     info.compress_type = ZIP_DEFLATED
     info.external_attr = 0o640 << 16

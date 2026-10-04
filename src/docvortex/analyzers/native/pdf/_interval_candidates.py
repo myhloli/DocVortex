@@ -1,4 +1,4 @@
-"""在调用内保存线性规模的区间树，并按原行索引有界地产生同行候选。"""
+"""A linearly scaled interval tree is saved within the call and peer candidates are generated bounded by the original row index."""
 
 from bisect import bisect_right
 
@@ -6,10 +6,10 @@ from ...._compute_backend import get_native
 
 
 class IntervalCandidates:
-    """代替密集页面的全配对回退，保持下标查询与稳定右侧成员顺序。"""
+    """Instead of full-pair fallback for dense pages, keep subscripted queries with stable right-hand member order."""
 
     def __init__(self, bounds, groups, *, geometry=None):
-        """冻结本轮数值区间；原生索引不持有行对象或 PDF 句柄。"""
+        """Freezes the value range for this round; the native index does not hold row objects or PDF handles."""
         self.bounds = bounds
         self.group_ids = [0] * len(bounds)
         for group_id, indices in enumerate(groups.values()):
@@ -39,11 +39,11 @@ class IntervalCandidates:
             self.groups.append((order, [bounds[i][0] for i in order], maxima, width))
 
     def __len__(self):
-        """返回源行数，供序列消费及存储规模检查。"""
+        """Returns the number of source rows for sequence consumption and storage scale checking."""
         return len(self.bounds)
 
     def __getitem__(self, index):
-        """按源行顺序查询；只缓存至多一批行对，异常下标明确失败。"""
+        """Query in source row order; only cache at most one batch of row pairs, exception subscript explicitly fails."""
         if not 0 <= index < len(self.bounds):
             raise IndexError(index)
         if self.native is not None:

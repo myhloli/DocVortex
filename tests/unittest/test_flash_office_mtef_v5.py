@@ -27,19 +27,19 @@ from docvortex.schema import BlockType
 
 
 def _equation_contents(pages: list[list[dict]]) -> list[str]:
-    """按分页和 block 顺序收集独立公式内容。"""
+    """Collects independent formula content in paginated and block order."""
 
     return [block["content"] for page in pages for block in page if block.get("type") == BlockType.EQUATION]
 
 
 def _has_preview_image(pages: list[list[dict]]) -> bool:
-    """判断 model-list 是否至少保留一个图片回退。"""
+    """Determine whether model-list retains at least one picture for fallback."""
 
     return any(block.get("type") == BlockType.IMAGE for page in pages for block in page)
 
 
 def test_six_office_models_decode_the_full_mtef_v5_corpus() -> None:
-    """验证 DOC/DOCX/PPT/PPTX/XLS/XLSX 对完整 v5 语料输出一致。"""
+    """Verify that the output of DOC/DOCX/PPT/PPTX/XLS/XLSX is consistent with the complete v5 corpus."""
 
     corpus = v5_formula_corpus()
     formulas = [mtef for _name, mtef, _expected in corpus]
@@ -96,7 +96,7 @@ def test_ooxml_prog_id_and_mtef_version_are_orthogonal(
     model: DocxModel | PptxModel | XlsxModel,
     builder: Callable[..., bytes],
 ) -> None:
-    """验证 Equation.3 可承载 v5，DSMT4/Equation 也可承载 v3。"""
+    """Verify that Equation.3 can carry v5 and DSMT4/Equation can also carry v3."""
 
     _v5_name, v5, v5_expected = v5_formula_corpus()[1]
     _v3_name, v3, v3_expected = formula_corpus()[1]
@@ -119,7 +119,7 @@ def test_non_equation_ooxml_prog_id_is_not_probed(
     model: DocxModel | PptxModel | XlsxModel,
     builder: Callable[..., bytes],
 ) -> None:
-    """验证非公式或空后缀 ProgID 不探测有效 v5 OLE 内容。"""
+    """Validating non-formula or empty suffix ProgID does not detect valid v5 OLE content."""
 
     _name, mtef, _expected = v5_formula_corpus()[0]
     for prog_id in ("Package", "Equation."):
@@ -140,7 +140,7 @@ def test_mtef_v5_icon_mode_keeps_icon_preview(
     model: DocxModel | PptxModel | XlsxModel,
     builder: Callable[..., bytes],
 ) -> None:
-    """验证图标模式不展开有效 v5，只保留原图标预览。"""
+    """Verify that the icon mode does not expand the valid v5, and only retains the original icon preview."""
 
     _name, mtef, _expected = v5_formula_corpus()[0]
     pages = model.predict(
@@ -158,7 +158,7 @@ def test_mtef_v5_icon_mode_keeps_icon_preview(
 
 
 def test_xlsx_linked_mtef_v5_object_never_loads_external_target() -> None:
-    """验证 XLSX 外链 MathType 对象只保留包内预览，不访问目标。"""
+    """Verify that the XLSX external link MathType object only retains the in-package preview and does not access the target."""
 
     _name, mtef, _expected = v5_formula_corpus()[0]
     pages = XlsxModel().predict(
@@ -228,7 +228,7 @@ def test_mtef_v4_keeps_preview_in_all_six_formats(
     model: DocModel | DocxModel | PptModel | PptxModel | XlsModel | XlsxModel,
     file_bytes: bytes,
 ) -> None:
-    """验证六格式遇到 v4 均不猜测解析并保留缓存预览。"""
+    """Verify that none of the six formats encountered by v4 are parsed and cached previews are retained."""
 
     pages = model.predict(BytesIO(file_bytes))
 
@@ -237,7 +237,7 @@ def test_mtef_v4_keeps_preview_in_all_six_formats(
 
 
 def test_mtef_v5_enters_docx_xls_xlsx_table_cells() -> None:
-    """验证三种文档/表格格式的 v5 公式进入 cell HTML 且不重复输出。"""
+    """Verify that v5 formulas for the three document/table formats enter cell HTML and are not output repeatedly."""
 
     _name, mtef, expected = v5_formula_corpus()[0]
     docx = DocxModel().predict(
@@ -275,7 +275,7 @@ def test_mtef_v5_enters_docx_xls_xlsx_table_cells() -> None:
 
 
 def test_docx_equationxml_and_ooxml_omml_precede_mtef_v5() -> None:
-    """验证 DOCX equationxml 以及 PPTX/XLSX OMML 都优先于有效 v5。"""
+    """Verify that DOCX equationxml as well as PPTX/XLSX OMML take precedence over a valid v5."""
 
     _name, mtef, _expected = v5_formula_corpus()[0]
     docx = DocxModel().predict(
@@ -314,7 +314,7 @@ def test_docx_equationxml_and_ooxml_omml_precede_mtef_v5() -> None:
 
 
 def test_docx_header_footer_and_pptx_notes_accept_mtef_v5() -> None:
-    """验证 v5 在 DOCX 页眉页脚和 PPTX notes 中保持归属。"""
+    """Verify that v5 maintains ownership in DOCX header footer and PPTX notes."""
 
     corpus = v5_formula_corpus()
     first = corpus[0]
@@ -355,7 +355,7 @@ def test_docx_header_footer_and_pptx_notes_accept_mtef_v5() -> None:
 
 
 def test_mtef_v5_model_streams_remain_open_in_all_six_formats() -> None:
-    """验证六种 Model 的 v5 路径均不关闭调用方输入流。"""
+    """Verify that none of the six Model paths to v5 close the caller input stream."""
 
     _name, mtef, _expected = v5_formula_corpus()[0]
     prog_id = "Equation.DSMT4"
@@ -375,7 +375,7 @@ def test_mtef_v5_model_streams_remain_open_in_all_six_formats() -> None:
 
 
 def test_modern_office_converter_reuse_resets_v5_state() -> None:
-    """验证现代 Office converter 复用时 v5 缓存和分页状态不会串文档。"""
+    """Verify that modern Office converter cache and paging state does not string documents when multiplexing v5."""
 
     first = v5_formula_corpus()[0]
     second = v5_formula_corpus()[1]

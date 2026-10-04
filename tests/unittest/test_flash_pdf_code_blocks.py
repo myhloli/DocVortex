@@ -21,7 +21,7 @@ def _mono_line(
     font_name: str = "TestMono",
     glyph_widths: list[float] | None = None,
 ) -> models._LineItem:
-    """构造带原生字符框的等宽或比例字体测试行。"""
+    """Constructs a monospaced or proportional font test line with native character boxes."""
 
     widths = glyph_widths or [5.0] * len(text)
     line = _text_line(
@@ -59,7 +59,7 @@ def _code_source(
     *lines: models._LineItem,
     fill_rgba: tuple[int, int, int, int] = (242, 242, 255, 255),
 ) -> models._PageSource:
-    """构造带大幅浅色填充背景的代码页测试源。"""
+    """Constructs a code page test source with a large light fill background."""
 
     return models._PageSource(
         page_size=(200.0, 100.0),
@@ -81,7 +81,7 @@ def _code_source(
 
 
 def test_colored_monospace_region_materializes_code_and_claims_text() -> None:
-    """验证浅色等宽区域输出 code，并且内部文本不再重复进入正文。"""
+    """Verify that the light constant-width region outputs code and that the inner text is no longer repeated into the body."""
 
     first = _mono_line("alpha", (15.0, 15.0, 40.0, 23.0), 0)
     second = _mono_line("beta", (20.0, 35.0, 40.0, 43.0), 1)
@@ -100,7 +100,7 @@ def test_colored_monospace_region_materializes_code_and_claims_text() -> None:
 def test_code_candidate_rejects_missing_background_or_monospace_evidence(
     rejection: str,
 ) -> None:
-    """验证白框、比例字体和已确认表格均不会被升级为代码块。"""
+    """Validation white boxes, proportional fonts, and confirmed tables will not be promoted to code blocks."""
 
     if rejection == "proportional":
         first = _mono_line(
@@ -127,7 +127,7 @@ def test_code_candidate_rejects_missing_background_or_monospace_evidence(
 
 
 def test_code_projection_preserves_columns_and_blank_rows() -> None:
-    """验证通用 PDF 空间投影保留等宽缩进、双列关系和明显空行。"""
+    """Verify that the generic PDF space projection preserves equal-width indentation, two-column relationships, and obvious empty lines."""
 
     left = _mono_line("left", (5.0, 5.0, 25.0, 13.0), 0)
     right = _mono_line("right", (55.0, 5.0, 80.0, 13.0), 1)
@@ -149,7 +149,7 @@ def _rule_delimited_code_source(
     page_height: float = 300.0,
     touch_right_edge: bool = False,
 ) -> models._PageSource:
-    """构造带上下边界、行号槽和可选内部网格线的代码清单页面。"""
+    """Constructs a code listing page with a lower and lower boundary, line number slots, and optional internal gridlines."""
 
     lines: list[models._LineItem] = []
     for row_index, top in enumerate((30.0, 42.0, 54.0, 66.0, 78.0, 90.0)):
@@ -196,7 +196,7 @@ def _rule_delimited_code_source(
 
 
 def _full_width_indent_only_source() -> models._PageSource:
-    """构造没有行号槽、仅靠多层缩进且横向占满的宽幅文本候选。"""
+    """Construct wide text candidates that have no line number slots, rely only on multiple levels of indentation, and fill up horizontally."""
 
     lines = [
         _text_line(
@@ -220,7 +220,7 @@ def _full_width_indent_only_source() -> models._PageSource:
 
 
 def test_rule_delimited_listing_materializes_code_before_table_claim() -> None:
-    """验证无内部网格的上下横线清单形成单一 code 并唯一认领全部来源行。"""
+    """Verify that a list of top and bottom lines without internal grids forms a single code and uniquely claims all source lines."""
 
     source = _rule_delimited_code_source()
     blocks, claimed = code_blocks._build_rule_delimited_code_blocks(
@@ -234,7 +234,7 @@ def test_rule_delimited_listing_materializes_code_before_table_claim() -> None:
 
 
 def test_tall_full_width_rule_delimited_listing_materializes_code() -> None:
-    """验证高占比且文本触边的强行号槽清单仍能形成单一 code。"""
+    """Verify that a forced number slot list with a high proportion and touching the text can still form a single code."""
 
     source = _rule_delimited_code_source(
         page_height=200.0,
@@ -252,7 +252,7 @@ def test_tall_full_width_rule_delimited_listing_materializes_code() -> None:
 
 
 def test_tall_full_width_indent_only_listing_is_rejected() -> None:
-    """验证没有行号槽的宽幅缩进正文仍受占宽保护，不会误判为 code。"""
+    """Verify that wide indented text without line number slots is still protected by width and will not be misjudged as code."""
 
     blocks, claimed = code_blocks._build_rule_delimited_code_blocks(
         _full_width_indent_only_source(),
@@ -264,7 +264,7 @@ def test_tall_full_width_indent_only_listing_is_rejected() -> None:
 
 
 def test_rule_delimited_listing_rejects_real_table_internal_grid() -> None:
-    """验证带内部横向网格的区域不会被规则代码路径侵蚀。"""
+    """Verify that areas with internal horizontal grids are not eroded by regular code paths."""
 
     blocks, claimed = code_blocks._build_rule_delimited_code_blocks(
         _rule_delimited_code_source(include_internal_grid=True),
@@ -276,7 +276,7 @@ def test_rule_delimited_listing_rejects_real_table_internal_grid() -> None:
 
 
 def test_rule_delimited_listing_rejects_vertical_track_spanning_candidate() -> None:
-    """验证跨越上下边界的长竖轨按候选高度计量并否决伪代码区域。"""
+    """Verify that long vertical rails spanning upper and lower boundaries measure at candidate heights and reject pseudocode regions."""
 
     source = _rule_delimited_code_source()
     source.drawing_lines.append(
@@ -304,7 +304,7 @@ def test_rule_delimited_listing_rejects_vertical_track_spanning_candidate() -> N
 
 
 def test_kvcache_algorithm_pdf_materializes_caption_and_code() -> None:
-    """验证真实长算法页面输出相邻 caption/code，且来源文本不再重复。"""
+    """Verify that the real long algorithm page outputs adjacent caption/code and that the source text is no longer repeated."""
 
     pdf_path = Path(__file__).parents[2] / "demo" / "pdfs" / "2407.00079v4_origi-10.pdf"
     with PDFDocument(str(pdf_path)) as pdf_doc:

@@ -1,4 +1,4 @@
-"""工作表投影阶段使用的中立内部数据模型。"""
+"""Neutral internal data model used during the worksheet projection phase."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ FormulaMap: TypeAlias = dict[CellPosition, list[str]]
 
 @dataclass
 class DataRegion:
-    """表示工作表中非空单元格的 1-based 边界矩形区域。"""
+    """Represents the 1-based bounding rectangular area of non-empty cells in the worksheet."""
 
     min_row: Annotated[PositiveInt, Field(description="Smallest row index (1-based index).")]
     max_row: Annotated[PositiveInt, Field(description="Largest row index (1-based index).")]
@@ -24,16 +24,16 @@ class DataRegion:
     max_col: Annotated[PositiveInt, Field(description="Largest column index (1-based index).")]
 
     def width(self) -> PositiveInt:
-        """返回数据区域的列数。"""
+        """Returns the number of columns in the data range."""
         return self.max_col - self.min_col + 1
 
     def height(self) -> PositiveInt:
-        """返回数据区域的行数。"""
+        """Returns the number of rows in the data range."""
         return self.max_row - self.min_row + 1
 
 
 class ExcelCell(BaseModel):
-    """表示已经完成文本、媒体与公式物化的工作表单元格。"""
+    """Represents worksheet cells that have completed text, media, and formula materialization."""
 
     row: int
     col: int
@@ -49,7 +49,7 @@ class ExcelCell(BaseModel):
 
 
 class ExcelTable(BaseModel):
-    """表示具有显示坐标和源工作表锚点的矩形表格。"""
+    """Represents a rectangular table with display coordinates and source worksheet anchor points."""
 
     anchor: tuple[NonNegativeInt, NonNegativeInt]
     num_rows: int
@@ -59,7 +59,7 @@ class ExcelTable(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class SheetImage:
-    """表示绑定到工作表 cell anchor 的图片或图片公式。"""
+    """Represents a picture or picture formula bound to worksheet cell anchor."""
 
     anchor: OptionalCellPosition
     image_base64: str | None = None

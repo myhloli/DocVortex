@@ -1,4 +1,4 @@
-"""构造不依赖 Excel/LibreOffice 的最小 BIFF8 测试文件。"""
+"""Construct a minimal BIFF8 test file that does not depend on Excel/LibreOffice."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from _legacy_ppt_test_utils import _build_cfb
 
 @dataclass(frozen=True, slots=True)
 class SheetFixture:
-    """一个测试 worksheet 的名称、记录和可见状态。"""
+    """The name, record, and visible status of a test worksheet."""
 
     name: str
     records: bytes = b""
@@ -21,7 +21,7 @@ class SheetFixture:
 
 
 def biff_record(record_type: int, payload: bytes = b"") -> bytes:
-    """构造一条 BIFF record。"""
+    """Construct a BIFF record."""
 
     return struct.pack("<HH", record_type, len(payload)) + payload
 
@@ -33,7 +33,7 @@ def _officeart_record(
     version: int = 0,
     instance: int = 0,
 ) -> bytes:
-    """构造一条 OfficeArt record。"""
+    """Construct a OfficeArt record."""
 
     return (
         struct.pack(
@@ -47,7 +47,7 @@ def _officeart_record(
 
 
 def _equation_shape(row: int, col: int, object_id: int, *, preview: bool) -> bytes:
-    """构造带 cell anchor、可选 pib 与 ExObj 对应顺序的 Excel shape。"""
+    """Construct Excel shape with cell anchor, optional pib and ExObj in corresponding order."""
 
     fsp = _officeart_record(
         0xF00A,
@@ -88,7 +88,7 @@ def _equation_shape(row: int, col: int, object_id: int, *, preview: bool) -> byt
 
 
 def _equation_obj(location: int, object_id: int) -> bytes:
-    """构造以 FtPictFmla 指向 MBD storage 的 picture OBJ。"""
+    """Construct picture OBJ with FtPictFmla pointing to MBD storage."""
 
     cmo = struct.pack("<HHH", 0x0008, object_id, 0) + b"\x00" * 12
     pict_flags = struct.pack("<H", 0)
@@ -108,7 +108,7 @@ def _equation_obj(location: int, object_id: int) -> bytes:
 
 
 def _preview_bstore(preview_payload: bytes | None = None) -> bytes:
-    """构造一个可由 XLS/PPT 共用解码器读取的 PNG/WMF BStore。"""
+    """Constructs a PNG/WMF BStore that can be read by the XLS/PPT shared decoder."""
 
     if preview_payload is None:
         blip = _officeart_record(0xF01E, b"\x00" * 17 + _TINY_PNG)
@@ -132,7 +132,7 @@ def _build_xls_with_embeddings(
     *,
     prog_id: str,
 ) -> bytes:
-    """把 Workbook 与多个 MBD Equation Native storage 写入同一 CFB。"""
+    """Write Workbook with multiple MBD Equation Native storage to the same CFB."""
 
     none = 0xFFFF_FFFF
     entries: list[dict[str, object]] = [
@@ -188,7 +188,7 @@ def _build_xls_with_embeddings(
 
 
 def biff_bof(substream_type: int, *, version: int = 0x0600) -> bytes:
-    """构造 BIFF8 BOF 记录。"""
+    """Construct BIFF8 BOF record."""
 
     return biff_record(
         0x0809,
@@ -197,7 +197,7 @@ def biff_bof(substream_type: int, *, version: int = 0x0600) -> bytes:
 
 
 def label_cell(row: int, col: int, text: str, *, xf_index: int = 0) -> bytes:
-    """构造 BIFF8 LABEL 单元格。"""
+    """Construct BIFF8 LABEL cell."""
 
     encoded = text.encode("utf-16le")
     string = struct.pack("<HB", len(encoded) // 2, 1) + encoded
@@ -205,20 +205,20 @@ def label_cell(row: int, col: int, text: str, *, xf_index: int = 0) -> bytes:
 
 
 def number_cell(row: int, col: int, value: float, *, xf_index: int = 0) -> bytes:
-    """构造 NUMBER 单元格。"""
+    """Construct the NUMBER cell."""
 
     return biff_record(0x0203, struct.pack("<HHHd", row, col, xf_index, value))
 
 
 def formula_number_cell(row: int, col: int, value: float, *, xf_index: int = 0) -> bytes:
-    """构造仅依赖缓存数值的 FORMULA 单元格。"""
+    """Constructs a FORMULA cell that relies only on cached values."""
 
     body = struct.pack("<HHH", row, col, xf_index) + struct.pack("<d", value) + b"\x00" * 6
     return biff_record(0x0006, body)
 
 
 def formula_string_cell(row: int, col: int, value: str, *, xf_index: int = 0) -> bytes:
-    """构造缓存结果由紧随 STRING 记录提供的 FORMULA。"""
+    """Construct cache results from FORMULA provided immediately following the STRING record."""
 
     cached = bytes([0, 0, 0, 0, 0, 0, 0xFF, 0xFF])
     formula = biff_record(
@@ -231,7 +231,7 @@ def formula_string_cell(row: int, col: int, value: str, *, xf_index: int = 0) ->
 
 
 def merged_cells(*ranges: tuple[int, int, int, int]) -> bytes:
-    """构造 MERGEDCELLS 记录。"""
+    """Construct MERGEDCELLS record."""
 
     payload = struct.pack("<H", len(ranges))
     for row_first, col_first, row_last, col_last in ranges:
@@ -245,7 +245,7 @@ def url_hyperlink(
     label: str,
     target: str,
 ) -> bytes:
-    """构造带 display name 和 URL Moniker 的 HLink。"""
+    """Construct HLink with display name and URL Moniker."""
 
     ref = struct.pack("<4H", row, row, col, col)
     hyperlink_clsid = uuid.UUID("79eac9d0-baf9-11ce-8c82-00aa004ba90b").bytes_le
@@ -266,7 +266,7 @@ def url_hyperlink(
 
 
 def font_record(*, bold: bool = False, italic: bool = False) -> bytes:
-    """构造只携带粗体/斜体属性的 FONT 记录。"""
+    """Constructs a FONT record carrying only the bold/italic attributes."""
 
     flags = 0x0002 if italic else 0
     weight = 700 if bold else 400
@@ -276,7 +276,7 @@ def font_record(*, bold: bool = False, italic: bool = False) -> bytes:
 
 
 def rich_sst(strings: list[tuple[str, list[tuple[int, int]]]]) -> bytes:
-    """构造含字体切换点的 SST。"""
+    """Construct SST with font switching points."""
 
     payload = struct.pack("<II", len(strings), len(strings))
     for text, starts in strings:
@@ -292,7 +292,7 @@ def rich_sst(strings: list[tuple[str, list[tuple[int, int]]]]) -> bytes:
 
 
 def continued_rich_sst(text: str, starts: list[tuple[int, int]]) -> bytes:
-    """在字符数据中间用 CONTINUE 切分一个富文本 SST entry。"""
+    """Use CONTINUE to split a rich text SST entry in the middle of character data."""
 
     encoded = text.encode("utf-16le")
     unit_count = len(encoded) // 2
@@ -306,7 +306,7 @@ def continued_rich_sst(text: str, starts: list[tuple[int, int]]) -> bytes:
 
 
 def labelsst_cell(row: int, col: int, string_index: int, *, xf_index: int = 0) -> bytes:
-    """构造引用 SST 的 LABELSST 单元格。"""
+    """Constructs the LABELSST cell that references SST."""
 
     return biff_record(0x00FD, struct.pack("<HHHI", row, col, xf_index, string_index))
 
@@ -320,7 +320,7 @@ def build_xls(
     equations: dict[int, bytes] | None = None,
     equation_prog_id: str = "Equation.3",
 ) -> bytes:
-    """构造含 Workbook Globals 与多个 worksheet substreams 的 OLE 文件。"""
+    """Construct a OLE file containing Workbook Globals and multiple worksheet substreams."""
 
     prefix = biff_bof(0x0005)
     prefix += biff_record(0x0042, struct.pack("<H", 1200))
@@ -331,7 +331,7 @@ def build_xls(
     prefix += globals_records
 
     def boundsheet(offset: int, sheet: SheetFixture) -> bytes:
-        """构造 BoundSheet8 目录项。"""
+        """Constructs the BoundSheet8 directory entry."""
 
         name = sheet.name.encode("utf-16le")
         body = struct.pack("<IBB", offset, 0 if sheet.visible else 1, 0)
@@ -367,7 +367,7 @@ def build_equation_xls(
     prog_id: str = "Equation.3",
     preview_payload: bytes | None = None,
 ) -> bytes:
-    """构造带公式 picture OBJ、MBD storages 和可选预览的 XLS。"""
+    """Construct XLS with formulas picture OBJ, MBD storages and optional preview."""
 
     drawing_records = b""
     for index, (location, _mtef) in enumerate(formulas, start=1):
@@ -386,7 +386,7 @@ def build_equation_xls(
 
 
 def build_biff5_xls(text: str) -> bytes:
-    """构造使用 Book stream 和 cp1252 LABEL 的 BIFF5 文件。"""
+    """Construct BIFF5 files using Book stream and cp1252 LABEL."""
 
     encoded = text.encode("cp1252")
     label = biff_record(

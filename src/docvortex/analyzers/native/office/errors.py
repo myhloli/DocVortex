@@ -1,33 +1,33 @@
-"""Flash Office 二进制、嵌入对象与 RTF 解析共享的稳定错误类型。"""
+"""Flash Office Stable error type shared by binary, embedded objects and RTF parsing."""
 
 from __future__ import annotations
 
 
 class LegacyOfficeError(ValueError):
-    """旧版 Office 解析错误基类，并携带稳定错误码。"""
+    """The old version of Office parses the error base class and carries stable error codes."""
 
     code = "legacy_office_error"
 
 
 class LegacyOfficeMalformedError(LegacyOfficeError):
-    """输入容器或核心二进制记录无法形成有效文档。"""
+    """The input container or core binary records cannot form a valid document."""
 
     code = "malformed"
 
 
 class LegacyOfficeMissingPartError(LegacyOfficeError):
-    """缺少完成解析所必需的 OLE stream。"""
+    """OLE stream required to complete parsing is missing."""
 
     code = "missing_part"
 
 
 class LegacyOfficeEncryptedError(LegacyOfficeError):
-    """输入使用了当前纯 Python 解析链不支持的加密。"""
+    """The input uses encryption that is not supported by the current pure Python parsing chain."""
 
     code = "encrypted"
 
 
 class LegacyOfficeResourceLimitError(LegacyOfficeError):
-    """输入超过固定安全限制。"""
+    """Input exceeds fixed safety limits."""
 
     code = "resource_limit"

@@ -1,4 +1,4 @@
-"""所有入口共享的页码范围语法、求值和格式化；默认选页策略由调用方决定。"""
+"""Page range syntax, evaluation, and formatting shared by all portals; default paging policy determined by the caller."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ _SEGMENT_PATTERN = re.compile(r"(r?[1-9][0-9]*)(?:\s*-\s*(r?[1-9][0-9]*))?")
 
 
 def get_end_page_id(end_page_id: int | None, pdf_page_num: int) -> int:
-    """归一化旧 CLI 的 0-based 结束页，越界时钳制到最后一页。"""
+    """Normalize the 0-based end page of the old CLI, and clamp to the last page when out of bounds."""
     normalized_end_page_id = end_page_id if end_page_id is not None and end_page_id >= 0 else pdf_page_num - 1
     if normalized_end_page_id > pdf_page_num - 1:
         logger.debug("end_page_id is out of range, use images length")
@@ -28,17 +28,17 @@ def get_end_page_id(end_page_id: int | None, pdf_page_num: int) -> int:
 
 
 def _invalid_range(raw: str | None, reason: str) -> InvalidRequestError:
-    """统一生成可跨 Python、CLI 和 HTTP 传递的页码错误。"""
+    """Unified generation of page number errors that are propagated across Python, CLI, and HTTP."""
     return InvalidRequestError("page_range_invalid", f"Invalid page range {raw!r}: {reason}", "page_range")
 
 
 def _parse_endpoint(token: str) -> int:
-    """以负整数在内部标记倒数端点，外部输入只接受 rN。"""
+    """Marks the reciprocal endpoint internally with a negative integer, external input only accepts rN."""
     return -int(token[1:]) if token.startswith("r") else int(token)
 
 
 def _parse_segments(raw: str | None) -> list[tuple[int, int]] | None:
-    """解析完整表达式；None 表示全部，倒数端点留待获得总页数后求值。"""
+    """Parse the full expression; None means all, with the reciprocal endpoint left to be evaluated after the total number of pages has been obtained."""
     value = (raw or "").strip()
     if not value or value == "all":
         return None
@@ -59,7 +59,7 @@ def _parse_segments(raw: str | None) -> list[tuple[int, int]] | None:
 
 
 def _merge_intervals(intervals: Iterable[tuple[int, int]]) -> list[tuple[int, int]]:
-    """合并已求值区间，无需逐页展开即可排序、去重和连接相邻区间。"""
+    """Merge evaluated ranges, sort, deduplicate, and join adjacent ranges without page-by-page expansion."""
     merged: list[tuple[int, int]] = []
     for start, end in sorted(intervals):
         if merged and start <= merged[-1][1] + 1:
@@ -70,12 +70,12 @@ def _merge_intervals(intervals: Iterable[tuple[int, int]]) -> list[tuple[int, in
 
 
 def _format_endpoint(value: int) -> str:
-    """把内部端点转换为正整数或 rN 文本。"""
+    """Convert internal endpoint to positive integer or rN text."""
     return str(value) if value > 0 else f"r{-value}"
 
 
 def _format_intervals(intervals: Iterable[tuple[int, int]]) -> str:
-    """生成无空白的范围文本，单页只输出一个端点。"""
+    """Generate range text without white space, and only output one endpoint on a single page."""
     return ",".join(
         _format_endpoint(start) if start == end else f"{_format_endpoint(start)}-{_format_endpoint(end)}"
         for start, end in intervals
@@ -83,7 +83,7 @@ def _format_intervals(intervals: Iterable[tuple[int, int]]) -> str:
 
 
 def normalize_page_range_input(raw: str | None) -> str:
-    """校验未绑定文档的输入，清理空白并保留 all/rN；空值统一为未指定。"""
+    """Verify the input of unbound documents, clean up the blanks and retain all/rN; empty values are unified as unspecified."""
     segments = _parse_segments(raw)
     if segments is None:
         return "all" if (raw or "").strip() else ""
@@ -93,7 +93,7 @@ def normalize_page_range_input(raw: str | None) -> str:
 
 
 def _resolved_intervals(raw: str | None, page_count: int) -> list[tuple[int, int]]:
-    """按文档总页数求值并裁剪，先验证所有区间再合并有效交集。"""
+    """Evaluate and crop based on the total number of pages in the document. First verify all intervals and then merge valid intersections."""
     segments = _parse_segments(raw)
     if page_count <= 0:
         raise _invalid_range(raw, "document has no available pages")
@@ -114,20 +114,20 @@ def _resolved_intervals(raw: str | None, page_count: int) -> list[tuple[int, int
 
 
 def parse_page_range(raw: str, page_count: int) -> list[int]:
-    """把 1-based 表达式转换为去重升序的 0-based 页索引，空值选择全部。"""
+    """Converts the 1-based expression to a 0-based page index in deduplicated ascending order, with a null value selecting all."""
     return [page_idx for start, end in _resolved_intervals(raw, page_count) for page_idx in range(start - 1, end)]
 
 
 def expand_page_range(raw: str | None, page_count: int) -> str:
-    """将含 all/rN 的表达式展开为实际文档的正整数规范范围。"""
+    """Expands expressions containing all/rN to the positive integer specification range of the actual document."""
     return _format_intervals(_resolved_intervals(raw, page_count))
 
 
 def _absolute_intervals(raw: str) -> list[tuple[int, int]]:
-    """读取已求值范围，兼容历史半角 ~；空文本为空集合，禁止 all/rN。"""
+    """Read the evaluated range, compatible with historical half-width ~; empty text is an empty set, prohibited all/rN."""
     if not raw.strip():
         return []
-    # 只在结果读取边界兼容旧分隔符，新请求及全角波浪号仍由严格语法拒绝。
+    # Old delimiters are only compatible with result read boundaries; new requests and full-width tildes are still rejected by strict syntax.
     segments = _parse_segments(raw.replace("~", "-"))
     if segments is None or any(start < 0 or end < 0 for start, end in segments):
         raise _invalid_range(raw, "page count is required to resolve all/rN")
@@ -135,22 +135,22 @@ def _absolute_intervals(raw: str) -> list[tuple[int, int]]:
 
 
 def normalize_result_page_range(raw: str) -> str:
-    """将已求值的新旧结果范围规范化为连字符格式，不修改持久化记录或文件名。"""
+    """Normalizes the old and new result ranges of the evaluation into hyphenated format, without modifying the persisted record or file name."""
     return _format_intervals(_absolute_intervals(raw))
 
 
 def parse_page_range_set(raw: str) -> set[int]:
-    """把已求值的范围转换为 1-based 页码集合，供缓存覆盖与内容过滤使用。"""
+    """Convert the evaluated range into a set of 1-based page numbers for use by cache overrides and content filtering."""
     return {page_no for start, end in _absolute_intervals(raw) for page_no in range(start, end + 1)}
 
 
 def count_pages_in_range(raw: str) -> int:
-    """统计已求值范围的唯一页数，不为统计分配逐页集合。"""
+    """Counts the number of unique pages of the evaluated range, no page-by-page collection is allocated for the statistics."""
     return sum(end - start + 1 for start, end in _absolute_intervals(raw))
 
 
 def format_page_range(page_numbers: Iterable[int]) -> str:
-    """将 1-based 页码集合格式化为去重升序的连续范围；空集合输出空字符串。"""
+    """Format the 1-based page number collection into a continuous range in ascending order without duplication; an empty collection outputs an empty string."""
     return _format_intervals(_merge_intervals((page_no, page_no) for page_no in page_numbers))
 
 

@@ -1,4 +1,4 @@
-"""解析 StyleTextPropAtom 与 TextMasterStyleAtom。"""
+"""Parse StyleTextPropAtom and TextMasterStyleAtom."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from ..legacy.binary import get_i16, get_u16, get_u32
 
 @dataclass(frozen=True, slots=True)
 class ParagraphRun:
-    """一段 UTF-16 文本范围对应的段落属性。"""
+    """Paragraph attributes corresponding to a UTF-16 text range."""
 
     count: int
     depth: int
@@ -20,7 +20,7 @@ class ParagraphRun:
 
 @dataclass(frozen=True, slots=True)
 class CharacterRun:
-    """一段 UTF-16 文本范围对应的字符属性。"""
+    """Character attributes corresponding to a UTF-16 text range."""
 
     count: int
     bold: bool | None = None
@@ -33,7 +33,7 @@ class CharacterRun:
 
 @dataclass(frozen=True, slots=True)
 class MasterLevel:
-    """一个母版缩进层级的可继承默认值。"""
+    """An inheritable default value for the master's indentation level."""
 
     bullet: bool | None = None
     bold: bool | None = None
@@ -44,7 +44,7 @@ class MasterLevel:
 
 @dataclass(slots=True)
 class StyleRuns:
-    """同一文本形状的段落与字符属性序列。"""
+    """A sequence of paragraph and character attributes for the same text shape."""
 
     paragraphs: list[ParagraphRun] = field(default_factory=list)
     characters: list[CharacterRun] = field(default_factory=list)
@@ -52,7 +52,7 @@ class StyleRuns:
 
 @dataclass(frozen=True, slots=True)
 class _CharacterStyle:
-    """TextCFException 解出的三态字符属性。"""
+    """TextCFException solved tri-state character attributes."""
 
     bold: bool | None = None
     italic: bool | None = None
@@ -66,7 +66,7 @@ def _parse_paragraph_exception(
     body: bytes,
     position: int,
 ) -> tuple[bool | None, int] | None:
-    """解析 TextPFException 并返回显式 bullet 状态与下一偏移。"""
+    """Parses TextPFException and returns explicit bullet status and next offset."""
 
     mask = get_u32(body, position)
     if mask is None:
@@ -116,7 +116,7 @@ def _parse_character_exception(
     body: bytes,
     position: int,
 ) -> tuple[_CharacterStyle, int] | None:
-    """解析 TextCFException，并保留每个可继承属性的三态值。"""
+    """Parse TextCFException and retain the tri-state value of each inheritable property."""
 
     mask = get_u32(body, position)
     if mask is None:
@@ -134,10 +134,10 @@ def _parse_character_exception(
             italic = bool(flags & 0x0002)
         if mask & 0x0004:
             underline = bool(flags & 0x0004)
-        # 一些生产器把删除线写入扩展 style 位；未声明时继续继承。
+        # Some producers write strikethrough to the extended style bit; inheritance continues when undeclared.
         if mask & 0x0100:
             strike = bool(flags & 0x0100)
-        # fontStyle 的 4 位 pp9rt 选择 StyleTextProp9 数组条目。
+        # The 4-bit pp9rt of fontStyle selects the StyleTextProp9 array entry.
         pp9rt = (flags >> 10) & 0xF
         position += 2
     for property_mask in (0x0001_0000, 0x0020_0000, 0x0040_0000, 0x0080_0000):
@@ -169,7 +169,7 @@ def _parse_character_exception(
 
 
 def parse_style_text(body: bytes, text_utf16_length: int) -> StyleRuns:
-    """按 UTF-16 单元长度解析一个 StyleTextPropAtom。"""
+    """Parses a StyleTextPropAtom by UTF-16 unit length."""
 
     runs = StyleRuns()
     position = 0
@@ -217,7 +217,7 @@ def parse_style_text(body: bytes, text_utf16_length: int) -> StyleRuns:
 
 
 def parse_master_style(body: bytes, instance: int) -> list[MasterLevel]:
-    """解析 TextMasterStyleAtom 的逐层默认字符与列表属性。"""
+    """Parse the layer-by-layer default character and list attributes of TextMasterStyleAtom."""
 
     level_count = get_u16(body, 0)
     if level_count is None:

@@ -1,4 +1,4 @@
-//! 固定字体回调的原生实现；仅调用宿主传入的同库 PDFium 地址。
+//! Native implementation of fixed font callback; only calls the PDFium address of the same library passed in by the host.
 use parking_lot::ReentrantMutex;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -38,7 +38,7 @@ enum Handle {
     System(usize),
 }
 
-/// 回调表必须位于首字段；注册后的 Arc 强引用由 Release 回调归还。
+/// The callback table must be located in the first field; the registered Arc strong reference is returned by the Release callback.
 #[repr(C)]
 pub struct FontProvider {
     interface: FontInfo,
@@ -63,14 +63,14 @@ pub struct FontProvider {
     full_font_copies: Cell<usize>,
 }
 
-// 安全约束：所有可变状态访问均持有可重入锁，借用在外部回调前结束；默认接口操作另受宿主 PDFium 全局锁保护。
+// Security constraints: All variable state accesses hold reentrant locks, and borrowing ends before external callbacks; default interface operations are additionally protected by the host PDFium global lock.
 unsafe impl Send for FontProvider {}
 unsafe impl Sync for FontProvider {}
 
 impl FontProvider {
-    /// 验证资源边界并借用已初始化运行库的三个入口，绝不自行加载或初始化 PDFium。
+    /// Verify resource boundaries and borrow the three entries of the initialized runtime library, never load or initialize PDFium by yourself.
     /// # Safety
-    /// 地址须具有匹配 ABI、保持存活，全部方法和回调须由宿主运行时锁串行化。
+    /// The address must have a matching ABI, remain alive, and all methods and callbacks must be serialized by the host runtime lock.
     pub unsafe fn new(
         addresses: [usize; 3],
         data: Vec<u8>,
@@ -135,7 +135,7 @@ impl FontProvider {
             full_font_copies: Cell::new(0),
         }))
     }
-    /// 安装时增加原生所有权，使 Python 包装器提前回收也不会产生悬空回调。
+    /// Add native ownership during installation so that the Python wrapper can be recycled in advance without generating a dangling callback.
     pub fn install(self: &Arc<Self>) -> Result<(), String> {
         let _guard = self.lock.lock();
         if self.released.get() {
@@ -149,7 +149,7 @@ impl FontProvider {
         }
         self.check()
     }
-    /// 在离开 C 边界后读取永久错误，不清除已经记录的故障。
+    /// Reading a permanent error after leaving the C boundary does not clear already logged faults.
     pub fn check(&self) -> Result<(), String> {
         let _guard = self.lock.lock();
         if let Some(error) = self.failure.borrow().as_ref() {
@@ -160,11 +160,11 @@ impl FontProvider {
         }
         Ok(())
     }
-    /// 暴露只供 ABI 差分测试调用的接口地址，调用方必须保持提供器存活。
+    /// Expose the interface address called only for ABI differential testing, the caller must keep the provider alive.
     pub fn interface_address(&self) -> usize {
         &self.interface as *const FontInfo as usize
     }
-    /// 返回不依赖 Python 回调的运行时诊断。
+    /// Returns runtime diagnostics that do not rely on the Python callback.
     pub fn stats(&self) -> (bool, usize, usize) {
         let _guard = self.lock.lock();
         (
@@ -173,7 +173,7 @@ impl FontProvider {
             self.full_font_copies.get(),
         )
     }
-    /// 分配与系统地址无关的 opaque 句柄，溢出作为永久回调故障处理。
+    /// Allocate opaque handle independent of system address, overflow is handled as a permanent callback fault.
     fn allocate(&self, handle: Handle) -> *mut c_void {
         let id = self
             .next
@@ -184,7 +184,7 @@ impl FontProvider {
         self.handles.borrow_mut().insert(id, handle);
         id as *mut c_void
     }
-    /// 取得自有句柄，非法句柄由最外层 panic 隔离转为 ABI 失败值。
+    /// Obtain the own handle, and the illegal handle is converted from the outermost panic isolation to the ABI failure value.
     fn lookup(&self, handle: *mut c_void) -> Handle {
         *self
             .handles
@@ -192,7 +192,7 @@ impl FontProvider {
             .get(&(handle as usize))
             .expect("unknown font handle")
     }
-    /// 使用固定字符集及显式族名识别规则，系统字体请求不做任意子串匹配。
+    /// Using a fixed character set and explicit family name recognition rules, system font requests do not perform any substring matching.
     pub fn classify(&self, face: &[u8], charset: i32) -> Option<i32> {
         let _guard = self.lock.lock();
         if [128, 129, 134, 136].contains(&charset) {
@@ -201,7 +201,7 @@ impl FontProvider {
         if charset != 0 && charset != 1 {
             return None;
         }
-        // 非 ASCII 名称保留宿主五编码及 Unicode casefold 的精确语义，仅此低频边界回调 Python。
+        // Non-ASCII names retain the precise semantics of the host five encoding and Unicode casefold, with only this low-frequency boundary calling back Python.
         if !face.is_ascii() {
             let value = unsafe { (self.classify_legacy)(face.as_ptr(), face.len(), charset) };
             return (value >= 0).then_some(value);
@@ -243,7 +243,7 @@ impl FontProvider {
         }
         None
     }
-    /// 清理全部系统句柄及默认接口；允许未注册对象析构和重复清理。
+    /// Clean up all system handles and default interfaces; allow unregistered object destruction and repeated cleaning.
     fn cleanup(&self) {
         let _guard = self.lock.lock();
         if self.released.replace(true) {
@@ -267,13 +267,13 @@ impl FontProvider {
     }
 }
 impl Drop for FontProvider {
-    /// 未安装的对象仍负责释放取得的默认接口；已释放对象不重复调用 PDFium。
+    /// Uninstalled objects are still responsible for releasing the obtained default interface; released objects do not call PDFium repeatedly.
     fn drop(&mut self) {
         self.cleanup();
     }
 }
 
-/// 对所有 C 回调统一隔离 Rust panic，并保留首次失败供宿主检查。
+/// Isolate Rust panic uniformly for all C callbacks, and retain the first failure for host inspection.
 unsafe fn guarded<T>(
     info: *mut FontInfo,
     fallback: T,
@@ -294,7 +294,7 @@ unsafe fn guarded<T>(
         }
     }
 }
-/// 读取 PDFium 借出的零结尾字体名，仅在当前回调内使用。
+/// Read the zero-terminated font name lent by PDFium, only used within the current callback.
 unsafe fn face_bytes<'a>(face: *const c_char) -> &'a [u8] {
     if face.is_null() {
         b""
@@ -302,7 +302,7 @@ unsafe fn face_bytes<'a>(face: *const c_char) -> &'a [u8] {
         unsafe { CStr::from_ptr(face).to_bytes() }
     }
 }
-/// 释放默认提供器后归还安装时增加的强引用，最后一步才可能销毁对象。
+/// After releasing the default provider, the strong reference added during installation is returned, and the object can be destroyed in the last step.
 unsafe extern "system" fn release(info: *mut FontInfo) {
     let p = unsafe { &*(info as *const FontProvider) };
     let was_installed = {
@@ -312,14 +312,14 @@ unsafe extern "system" fn release(info: *mut FontInfo) {
         }
         p.installed.replace(false)
     };
-    // 先销毁锁 guard，再归还安装所有权，避免 guard 引用已释放对象。
+    // Destroy the lock guard first, and then return the installation ownership to avoid guard referencing the released object.
     if was_installed {
         unsafe {
             drop(Arc::from_raw(info as *const FontProvider));
         }
     }
 }
-/// 枚举期间禁止替换原字体元数据，并允许默认提供器重入其它回调。
+/// It is forbidden to replace the original font metadata during enumeration, and the default provider is allowed to re-enter other callbacks.
 unsafe extern "system" fn enumerate(info: *mut FontInfo, mapper: *mut c_void) {
     unsafe {
         guarded(info, (), "_enum_fonts", |p| {
@@ -335,7 +335,7 @@ unsafe extern "system" fn enumerate(info: *mut FontInfo, mapper: *mut c_void) {
         });
     }
 }
-/// 按请求记录字符集；系统代理保留原权重、斜体、pitch 与 exact 指针。
+/// Record character set on request; system agent retains original weights, italics, pitch and exact pointers.
 unsafe extern "system" fn map_font(
     info: *mut FontInfo,
     weight: i32,
@@ -368,7 +368,7 @@ unsafe extern "system" fn map_font(
         })
     }
 }
-/// 名称查询复用最近请求的字符集，保留稳定字库缓存身份。
+/// The name query reuses the most recently requested character set, retaining a stable font cache identity.
 unsafe extern "system" fn get_font(info: *mut FontInfo, face: *const c_char) -> *mut c_void {
     unsafe {
         guarded(info, std::ptr::null_mut(), "_get_font", |p| {
@@ -396,7 +396,7 @@ unsafe extern "system" fn get_font(info: *mut FontInfo, face: *const c_char) -> 
         })
     }
 }
-/// 返回所需字节数，小缓冲区完全不写入；固定字库直接复制原切片。
+/// The required number of bytes is returned, and the small buffer is not written at all; the fixed font library directly copies the original slice.
 unsafe extern "system" fn get_data(
     info: *mut FontInfo,
     handle: *mut c_void,
@@ -433,7 +433,7 @@ unsafe extern "system" fn get_data(
         })
     }
 }
-/// 固定字库使用带哈希名称，系统句柄则返回原始提供器名称。
+/// The fixed font uses a hashed name, and the system handle returns the original provider name.
 unsafe extern "system" fn get_name(
     info: *mut FontInfo,
     handle: *mut c_void,
@@ -459,7 +459,7 @@ unsafe extern "system" fn get_name(
         })
     }
 }
-/// 保持每个固定句柄的请求字符集及系统接口缺省值。
+/// Keep the request character set and system interface default value of each fixed handle.
 unsafe extern "system" fn get_charset(info: *mut FontInfo, handle: *mut c_void) -> i32 {
     unsafe {
         guarded(info, 1, "_get_font_charset", |p| match p.lookup(handle) {
@@ -473,7 +473,7 @@ unsafe extern "system" fn get_charset(info: *mut FontInfo, handle: *mut c_void) 
         })
     }
 }
-/// 先移除自有 ID，再释放系统句柄，避免重入或重复释放同一资源。
+/// Remove the own ID first, and then release the system handle to avoid re-entry or repeated release of the same resource.
 unsafe extern "system" fn delete_font(info: *mut FontInfo, handle: *mut c_void) {
     unsafe {
         guarded(info, (), "_delete_font", |p| {

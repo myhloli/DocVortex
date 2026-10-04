@@ -1,4 +1,4 @@
-"""从 TextObject/TextCode 恢复语义文字与页面几何。"""
+"""Recovering semantic text and page geometry from TextObject/TextCode."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ _TEXT_CODE_DECODE_CHUNK_SIZE = 64 * 1024
 
 @dataclass(slots=True)
 class OfdTextBudget:
-    """累计限制 TextCode 文字与展开字形数量。"""
+    """Cumulative limit TextCode text and number of expanded glyphs."""
 
     text_bytes: int = 0
     glyph_count: int = 0
@@ -51,7 +51,7 @@ class OfdTextBudget:
     delta_token_count: int = 0
 
     def charge(self, text: str) -> None:
-        """为一次 TextCode 展开计费。"""
+        """Charge for one TextCode expansion."""
         glyph_count = self.glyph_count + len(text)
         if glyph_count > MAX_EXPANDED_GLYPHS:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_expanded_glyphs={MAX_EXPANDED_GLYPHS}")
@@ -62,19 +62,19 @@ class OfdTextBudget:
         self.text_bytes = text_bytes
 
     def charge_glyph_mapping(self, count: int) -> None:
-        """累计 CGTransform 的有效字符映射数量并限制全文展开量。"""
+        """Accumulate the number of valid character mappings of CGTransform and limit the amount of full-text expansion."""
         self.glyph_mapping_count += count
         if self.glyph_mapping_count > MAX_EXPANDED_GLYPHS:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_expanded_glyphs={MAX_EXPANDED_GLYPHS}")
 
     def charge_glyph_token(self) -> None:
-        """累计实际扫描的 Glyphs token 数量并限制全文解析量。"""
+        """Accumulate the actual scanned Glyphs token quantity and limit the full text parsing amount."""
         self.glyph_token_count += 1
         if self.glyph_token_count > MAX_GLYPH_TOKENS:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_glyph_tokens={MAX_GLYPH_TOKENS}")
 
     def charge_delta_token(self) -> None:
-        """累计实际扫描的 Delta token 数量并限制全文解析量。"""
+        """Accumulate the actual scanned Delta token quantity and limit the full text parsing amount."""
         self.delta_token_count += 1
         if self.delta_token_count > MAX_DELTA_TOKENS:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_delta_tokens={MAX_DELTA_TOKENS}")
@@ -82,7 +82,7 @@ class OfdTextBudget:
 
 @dataclass(slots=True)
 class _LoadedFont:
-    """缓存 FontTools 中与字形几何相关的只读表。"""
+    """Cache read-only tables related to glyph geometry in FontTools."""
 
     font: object
     glyph_order: list[str]
@@ -94,15 +94,15 @@ class _LoadedFont:
 
 
 class FontMetricResolver:
-    """按 OFD 字体资源惰性读取内嵌 OpenType 指标。"""
+    """Read the embedded OpenType indicator lazily according to the OFD font resource."""
 
     def __init__(self, package: OfdPackage) -> None:
-        """绑定当前包并创建字体解析缓存。"""
+        """Bind the current package and create a font parsing cache."""
         self.package = package
         self._cache: dict[str, _LoadedFont | None] = {}
 
     def _load(self, resource: FontResource | None) -> _LoadedFont | None:
-        """读取一个受限字体成员，失败时缓存空结果。"""
+        """Read a restricted font member and cache empty results on failure."""
         if resource is None or resource.font_part is None:
             return None
         if resource.font_part in self._cache:
@@ -146,7 +146,7 @@ class FontMetricResolver:
         return loaded
 
     def resolve_character(self, resource: FontResource | None, glyph_id: int | None, fallback: str) -> str:
-        """在 TextCode 使用占位符时尝试由 glyph cmap 恢复字符。"""
+        """Attempt to recover characters from glyph cmap when using placeholders in TextCode."""
         if fallback != "¤" or glyph_id is None:
             return fallback
         loaded = self._load(resource)
@@ -164,7 +164,7 @@ class FontMetricResolver:
         hscale: float,
         advance_hint: float | None,
     ) -> BBox:
-        """返回以 glyph origin 为基准的确定性局部字形框。"""
+        """Return a deterministic local glyph frame based on glyph origin."""
         loaded = self._load(resource)
         glyph_name: str | None = None
         if loaded is not None:
@@ -195,7 +195,7 @@ class FontMetricResolver:
         return (0.0, -0.85 * size, fallback_advance, 0.2 * size)
 
     def close(self) -> None:
-        """关闭已经打开的 FontTools 字体对象。"""
+        """Close the opened FontTools font object."""
         for loaded in self._cache.values():
             if loaded is None:
                 continue
@@ -205,12 +205,12 @@ class FontMetricResolver:
 
 
 def decode_text_code(value: str) -> str:
-    """解码 OFD TextCode 中的反斜杠四位十六进制字符。"""
+    """Decode the backslash four-digit hexadecimal character in OFD TextCode."""
     return _HEX_ESCAPE_RE.sub(lambda match: chr(int(match.group(1), 16)), value)
 
 
 def _incomplete_hex_escape_length(value: str) -> int:
-    """返回末尾可能跨分片的反斜杠十六进制前缀长度。"""
+    """Returns the length of the backslash hexadecimal prefix at the end that may span shards."""
     for length in range(min(4, len(value)), 0, -1):
         suffix = value[-length:]
         if suffix[0] == "\\" and all(character in _HEX_DIGITS for character in suffix[1:]):
@@ -219,7 +219,7 @@ def _incomplete_hex_escape_length(value: str) -> int:
 
 
 def _decode_text_code_element(text_code: etree._Element, budget: OfdTextBudget) -> str:
-    """分片解码一个 TextCode，并在写入完整字符串前累计文字预算。"""
+    """Decode a TextCode in slices and accumulate text budget before writing the complete string."""
     output = StringIO()
     carry = ""
     for part in text_code.itertext():
@@ -245,7 +245,7 @@ def _decode_text_code_element(text_code: etree._Element, budget: OfdTextBudget) 
 
 
 def parse_delta(value: str | None, count: int, budget: OfdTextBudget) -> list[float]:
-    """流式展开普通与 g-count-value 压缩 Delta，并补齐不足项。"""
+    """Streaming expands ordinary and g-count-value compressed Delta, and fills in deficiencies."""
     if count <= 0:
         return []
     output: list[float] = []
@@ -253,7 +253,7 @@ def parse_delta(value: str | None, count: int, budget: OfdTextBudget) -> list[fl
     pending: deque[str] = deque()
 
     def next_token() -> str | None:
-        """返回下一个 Delta token，并只对首次扫描计费。"""
+        """Return to the next Delta token and only charge for the first scan."""
         if pending:
             return pending.popleft()
         try:
@@ -296,7 +296,7 @@ def parse_delta(value: str | None, count: int, budget: OfdTextBudget) -> list[fl
 
 
 def _bounded_glyph_ids(glyphs_element: etree._Element, limit: int, budget: OfdTextBudget) -> list[int]:
-    """按需迭代 Glyphs token，只保留有效映射所需的有限 ID。"""
+    """Iterate Glyphs token on demand, retaining only the limited ID required for valid mapping."""
     glyph_ids: list[int] = []
     for match in _GLYPH_TOKEN_RE.finditer(element_text(glyphs_element)):
         budget.charge_glyph_token()
@@ -310,7 +310,7 @@ def _bounded_glyph_ids(glyphs_element: etree._Element, limit: int, budget: OfdTe
 
 
 def _glyph_map(text_object: etree._Element, position_count: int, budget: OfdTextBudget) -> dict[int, int]:
-    """把实际 TextCode 字符位置映射到 glyph ID，并限制累计展开量。"""
+    """Map the actual TextCode character position to glyph ID, and limit the cumulative expansion amount."""
     result: dict[int, int] = {}
     for element in text_object:
         if local_name(element.tag) != "CGTransform":
@@ -338,7 +338,7 @@ def _styles(
     font: FontResource | None,
     resolved_style: dict[str, str],
 ) -> tuple[str, ...]:
-    """从字体资源和 TextObject 属性恢复可投影行内样式。"""
+    """Restore projectable inline styles from font resources and TextObject attributes."""
     styles: list[str] = []
     weight = parse_int(resolved_style.get("Weight") or text_object.get("Weight"))
     if (font is not None and font.bold) or (weight is not None and weight >= 600):
@@ -352,12 +352,12 @@ def _styles(
 
 
 def format_line_spans(text: str, styles: tuple[str, ...]) -> list[dict[str, object]]:
-    """把 OFD 原生文字和样式直接投影为结构化 Span。"""
+    """Project OFD native text and styles directly into structured Span."""
     return text_spans(text, styles)
 
 
 def format_line_html(text: str, styles: tuple[str, ...]) -> str:
-    """把 OFD 表格单元格文字序列化为安全 HTML。"""
+    """Serialize OFD table cell text to secure HTML."""
     rendered = html.escape(text, quote=False)
     if "superscript" in styles:
         rendered = f"<sup>{rendered}</sup>"
@@ -388,7 +388,7 @@ def build_text_lines(
     template_id: int | None,
     resolved_style: dict[str, str] | None = None,
 ) -> list[TextLine]:
-    """把一个 TextObject 展开为按 TextCode 划分的页面文字行。"""
+    """Expand a TextObject into page text lines divided by TextCode."""
     style = resolved_style or {}
     if (style.get("Visible") or text_object.get("Visible") or "true").casefold() in {"false", "0"}:
         return []

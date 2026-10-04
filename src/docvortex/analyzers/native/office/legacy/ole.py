@@ -1,4 +1,4 @@
-"""基于 olefile 的有界 OLE2/CFB 只读包装。"""
+"""A bounded OLE2/CFB read-only wrapper based on olefile."""
 
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ from ..limits import MAX_ENTRY_BYTES, MAX_TOTAL_BYTES
 
 
 class BoundedOleReader:
-    """限制输入、单流及累计读取量，并提供大小写无关的 stream 访问。"""
+    """Limits input, single-stream, and cumulative reads, and provides case-independent access to stream."""
 
     def __init__(self, file_bytes: bytes) -> None:
-        """校验输入大小并打开内存中的 OLE2 容器。"""
+        """Verify the input size and open the OLE2 container in memory."""
 
         if not isinstance(file_bytes, bytes):
             raise TypeError("legacy Office input must be bytes")
@@ -29,7 +29,7 @@ class BoundedOleReader:
         self._stream_names = self._build_stream_name_map()
 
     def _build_stream_name_map(self) -> dict[str, tuple[str, ...]]:
-        """建立大小写无关的完整 stream 名称索引。"""
+        """Create a case-independent index of the complete stream name."""
 
         names: dict[str, tuple[str, ...]] = {}
         try:
@@ -42,12 +42,12 @@ class BoundedOleReader:
         return names
 
     def has_stream(self, name: str) -> bool:
-        """返回容器是否含有指定 stream。"""
+        """Returns whether the container contains the specified stream."""
 
         return name.casefold() in self._stream_names
 
     def stream_names(self, *, prefix: str | None = None) -> tuple[str, ...]:
-        """返回完整 stream 名称；可按大小写无关前缀筛选。"""
+        """Returns the full stream name; filterable by case-independent prefix."""
 
         normalized_prefix = prefix.casefold() if prefix is not None else None
         names = (
@@ -58,7 +58,7 @@ class BoundedOleReader:
         return tuple(sorted(names, key=str.casefold))
 
     def read_stream(self, name: str, *, required: bool = True) -> bytes:
-        """有界读取指定 stream；可选 stream 不存在时返回空字节。"""
+        """Bounded read specifies stream; optional returns a null byte if stream does not exist."""
 
         parts = self._stream_names.get(name.casefold())
         if parts is None:
@@ -84,13 +84,13 @@ class BoundedOleReader:
         return payload
 
     def metadata(self) -> Any | None:
-        """尽力读取 SummaryInformation，失败时不影响正文解析。"""
+        """Try our best to read SummaryInformation. Failure will not affect text parsing."""
 
         metadata, _ = self.metadata_with_diagnostics()
         return metadata
 
     def metadata_with_diagnostics(self) -> tuple[Any | None, list[str]]:
-        """可选属性流损坏时保留 olefile 已读取的字段，并返回具体诊断。"""
+        """Optional attribute stream corruption olefile Retains read fields and returns specific diagnostics."""
 
         try:
             return self._ole.get_metadata(), []
@@ -98,7 +98,7 @@ class BoundedOleReader:
             return getattr(self._ole, "metadata", None), [f"OLE property streams: {exc}"]
 
     def close(self) -> None:
-        """关闭底层 olefile 句柄。"""
+        """Close the underlying olefile handle."""
 
         ole = getattr(self, "_ole", None)
         if ole is not None:
@@ -106,11 +106,11 @@ class BoundedOleReader:
             self._ole = None
 
     def __enter__(self) -> BoundedOleReader:
-        """返回当前有界读取器。"""
+        """Returns the current bounded reader."""
 
         return self
 
     def __exit__(self, *_args: object) -> None:
-        """离开上下文时关闭底层句柄。"""
+        """Close the underlying handle when leaving the context."""
 
         self.close()

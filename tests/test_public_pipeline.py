@@ -1,4 +1,4 @@
-"""验证中性协议和独立的渲染后半程。"""
+"""Verification of neutral protocols and independent rendering second half."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from docvortex.schema import BlockType, EquationBlock, MiddleJson, PageInfo, Tex
 
 
 def document() -> MiddleJson:
-    """建立不携带宿主信息的最小语义文档。"""
+    """Create a minimal semantic document that does not carry host information."""
     return MiddleJson(
         pages=[
             PageInfo(
@@ -29,7 +29,7 @@ def document() -> MiddleJson:
 
 
 def test_neutral_roundtrip() -> None:
-    """协议默认值完整输出，读取后无需构造 MinerU 元数据。"""
+    """The protocol default values are output completely, and there is no need to construct MinerU metadata after reading."""
     middle = document()
     payload = middle.to_dict()
     assert payload["schema"] == "docvortex.middle"
@@ -40,7 +40,7 @@ def test_neutral_roundtrip() -> None:
 
 @pytest.mark.parametrize("target", list(RenderFormat))
 def test_all_renderers_are_independent_and_do_not_mutate(target: RenderFormat) -> None:
-    """七种输出共享同一文档，而且渲染不会修改源对象。"""
+    """Seven outputs share the same document, and rendering does not modify the source object."""
     middle = document()
     before = middle.to_dict(skip_defaults=False)
     assert render(middle, target)
@@ -48,7 +48,7 @@ def test_all_renderers_are_independent_and_do_not_mutate(target: RenderFormat) -
 
 
 def test_render_options_are_per_call() -> None:
-    """两个调用可以使用不同分隔符，不读写全局配置。"""
+    """The two calls can use different delimiters and do not read or write global configuration."""
     middle = document()
     custom = LatexDelimitersConfig(display=LatexDelimiterConfig(left="\\[", right="\\]"))
     assert "\\[" in render_markdown(middle, latex_delimiters=custom)
@@ -56,13 +56,13 @@ def test_render_options_are_per_call() -> None:
 
 
 def test_schema_has_no_filesystem_export_method() -> None:
-    """基础数据类型不再承担目录写入。"""
+    """The underlying data type is no longer responsible for directory writing."""
     assert not hasattr(document(), "export")
 
 
 @pytest.mark.parametrize("target_name", ["markdown", "structured_content"])
 def test_inline_delimiters_reach_each_text_renderer(target_name: str) -> None:
-    """两种共享文本目标实际采用调用方的公式分隔符，防止门面丢失选项。"""
+    """Both shared text targets actually use the caller's formula delimiter to prevent the facade from losing options."""
     from docvortex.schema import EquationInlineSpan, ChartBlock, ChartBodyBlock
     from docvortex.render.contracts import (
         MarkdownRenderOptions,
@@ -86,7 +86,7 @@ def test_inline_delimiters_reach_each_text_renderer(target_name: str) -> None:
     value = render(middle, RenderFormat(target_name), options=option_types[target_name](latex_delimiters=delimiters))
 
     def strings(item: object) -> list[str]:
-        """读取目标中所有文本叶子，避免依赖格式各自的封装层级。"""
+        """Read all text leaves in the target to avoid relying on the format's respective encapsulation level."""
         if isinstance(item, str):
             return [item]
         if isinstance(item, dict):
@@ -99,7 +99,7 @@ def test_inline_delimiters_reach_each_text_renderer(target_name: str) -> None:
 
 
 def test_nested_json_extensions_roundtrip() -> None:
-    """Pydantic 升级后仍保留严格 JSON 扩展中的嵌套类型与数值。"""
+    """Pydantic Strictly nested types and values in the JSON extension are retained after the upgrade."""
     middle = document()
     middle.extensions = {"consumer": {"items": [None, True, 3, 1.25, "文档", {"enabled": False}]}}
     restored = load_middle(middle.to_dict(skip_defaults=False))
@@ -110,7 +110,7 @@ def test_nested_json_extensions_roundtrip() -> None:
 
 @pytest.mark.parametrize("invalid", [object(), {"nested": object()}, {"values": {1, 2}}, {1: "non-string key"}])
 def test_extensions_reject_non_json_values(invalid: object) -> None:
-    """扩展信息不得接收任意 Python 对象或非 JSON 容器。"""
+    """Extended information must not receive any Python objects or non-JSON containers."""
     from pydantic import ValidationError
 
     middle = document()

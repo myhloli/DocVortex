@@ -30,40 +30,40 @@ _OFFICE_SAMPLE_DIR = _PROJECT_ROOT / "demo" / "ms_office_docs"
 
 
 def _predict_sample(model: Any, suffix: str) -> list[list[dict[str, Any]]]:
-    """调用指定 Office model 解析仓库中的真实样例。"""
+    """Call the specified Office model to parse the real sample in the warehouse."""
     with (_OFFICE_SAMPLE_DIR / f"{suffix}_01.{suffix}").open("rb") as stream:
         return model.predict(stream)
 
 
 def _flatten_pages(pages: list[list[dict[str, Any]]]) -> list[dict[str, Any]]:
-    """按页面顺序展开 model_output blocks。"""
+    """Expand model_output blocks in page order."""
     return [block for page in pages for block in page]
 
 
 def _find_block_by_content(blocks: list[dict[str, Any]], content: str) -> dict[str, Any]:
-    """按完整 content 查找唯一 block。"""
+    """Find unique block by complete content."""
     matches = [block for block in blocks if inline_text(block.get("content")) == content]
     assert len(matches) == 1
     return matches[0]
 
 
 def _find_block_containing(blocks: list[dict[str, Any]], content: str) -> dict[str, Any]:
-    """按 content 子串查找唯一 block。"""
+    """Find unique block by content substring."""
     matches = [block for block in blocks if content in inline_text(block.get("content"))]
     assert len(matches) == 1
     return matches[0]
 
 
 def _set_subtitle(slide: Any, text: str) -> None:
-    """设置标题页的 Subtitle 占位符文本。"""
+    """Sets the Subtitle placeholder text for the title page."""
     subtitle = next(shape for shape in slide.placeholders if shape.placeholder_format.type == PP_PLACEHOLDER.SUBTITLE)
     subtitle.text = text
 
 
 def test_office_models_store_standalone_images_in_image_base64() -> None:
-    """验证三类 Office model 的独立图片载荷统一通过 image_base64 输出。
+    """Verify that the independent picture loads of the three types of Office, model are uniformly output through image_base64.
 
-    content 只允许承载 descr 替代文本（纯文本），不得携带图片载荷。
+    content is only allowed to carry descr alternative text (plain text) and is not allowed to carry image payloads.
     """
     for suffix, model in (
         ("docx", DocxModel()),
@@ -84,11 +84,11 @@ def test_office_models_store_standalone_images_in_image_base64() -> None:
 
 
 def test_pptx_svg_picture_rasterizes_to_png(monkeypatch: Any) -> None:
-    """验证 PPTX SVG 图片光栅化为 PNG 并使用统一 image_base64 字段。"""
+    """Verify that PPTX SVG pictures are rasterized to PNG and use the unified image_base64 field."""
     converter = PptxConverter()
 
     def fake_get_shape_image_data(_shape: Any, *, include_svg: bool = True) -> tuple[bytes, str]:
-        """返回固定 SVG 图片载荷，隔离 PPTX shape 解析逻辑。"""
+        """Return fixed SVG image payload, isolate PPTX shape parsing logic."""
         return (
             b'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20">'
             b'<rect width="40" height="20" fill="red"/></svg>',
@@ -107,7 +107,7 @@ def test_pptx_svg_picture_rasterizes_to_png(monkeypatch: Any) -> None:
 
 
 def test_pptx_unrasterizable_svg_falls_back_to_companion_raster_blip(monkeypatch: Any) -> None:
-    """验证 SVG 光栅化失败时回退到 PowerPoint 原生伴随存储的栅量 blip。"""
+    """Verification SVG Fallback to PowerPoint native accompanying stored raster volume blip when rasterization fails."""
     converter = PptxConverter()
     pixel_png = base64.b64decode(
         "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEElEQVR4nGP8zwACTGCSAQANHQEDgslx/wAAAABJRU5ErkJggg=="
@@ -115,7 +115,7 @@ def test_pptx_unrasterizable_svg_falls_back_to_companion_raster_blip(monkeypatch
     include_svg_calls: list[bool] = []
 
     def fake_get_shape_image_data(_shape: Any, *, include_svg: bool = True) -> tuple[bytes, str]:
-        """记录调用顺序并按 include_svg 返回 SVG 或其栅量 fallback。"""
+        """Record the calling sequence and press include_svg to return SVG or its gate value fallback."""
         include_svg_calls.append(include_svg)
         if include_svg:
             return b"<svg/>", "image/svg+xml"
@@ -135,7 +135,7 @@ def test_pptx_unrasterizable_svg_falls_back_to_companion_raster_blip(monkeypatch
 
 
 def test_docx_model_splits_document_and_paragraph_titles() -> None:
-    """验证 DOCX model 按样式来源拆分文档标题和段落标题。"""
+    """Validation DOCX model Split document titles and paragraph titles by style source."""
     pages = _predict_sample(DocxModel(), "docx")
     blocks = _flatten_pages(pages)
 
@@ -159,7 +159,7 @@ def test_docx_model_splits_document_and_paragraph_titles() -> None:
 
 
 def test_docx_heading_levels_are_shifted_below_document_title() -> None:
-    """验证 DOCX Title/Heading 1/Heading 2 输出全局一级、二级、三级层级。"""
+    """Verify DOCX Title/Heading 1/Heading 2 Output global primary, secondary, and tertiary levels."""
     document = Document()
     document.add_paragraph("Document", style="Title")
     document.add_heading("Heading one", level=1)
@@ -176,7 +176,7 @@ def test_docx_heading_levels_are_shifted_below_document_title() -> None:
 
 
 def test_pptx_model_splits_title_placeholders_and_subtitle() -> None:
-    """验证 PPTX 真实样例的首页主标题、Subtitle 和普通页标题映射。"""
+    """Verify the mapping of homepage main title, Subtitle and normal page title for PPTX real example."""
     pages = _predict_sample(PptxModel(), "pptx")
     blocks = _flatten_pages(pages)
 
@@ -207,7 +207,7 @@ def test_pptx_model_splits_title_placeholders_and_subtitle() -> None:
 
 
 def test_pptx_title_candidates_are_finalized_without_losing_levels() -> None:
-    """验证 PPTX 标题候选收口时清理内部标记并保留段落标题层级。"""
+    """Clean up internal markup and preserve paragraph heading hierarchy when validating PPTX heading candidate closing."""
     blocks = [
         {
             "type": BlockType.TEXT,
@@ -273,7 +273,7 @@ def test_pptx_title_candidates_are_finalized_without_losing_levels() -> None:
 
 
 def test_pptx_existing_title_candidates_do_not_participate_in_text_promotion() -> None:
-    """验证占位符标题候选不会干扰普通文本的字号标题提升。"""
+    """Verify that the placeholder title candidate does not interfere with the normal text title boost."""
     blocks = [
         {
             "type": BlockType.TEXT,
@@ -305,7 +305,7 @@ def test_pptx_existing_title_candidates_do_not_participate_in_text_promotion() -
 
 
 def test_pptx_notes_only_slide_does_not_consume_document_title() -> None:
-    """验证空白且仅含备注的前置页不会抢占首个可见文档标题。"""
+    """Verify that a blank, notes-only prepend page does not preempt the first visible document title."""
     presentation = Presentation()
     notes_only_slide = presentation.slides.add_slide(presentation.slide_layouts[6])
     notes_only_slide.notes_slide.notes_text_frame.text = "Presenter note"
@@ -335,7 +335,7 @@ def test_pptx_notes_only_slide_does_not_consume_document_title() -> None:
 
 
 def test_xlsx_model_emits_sheet_names_as_level_two_paragraph_titles() -> None:
-    """验证 XLSX 多 Sheet 名称全部输出为二级段落标题。"""
+    """Verify that XLSX multiple Sheet names are all output as secondary paragraph headings."""
     pages = _predict_sample(XlsxModel(), "xlsx")
     blocks = _flatten_pages(pages)
     sheet_titles = [_find_block_by_content(blocks, sheet_name) for sheet_name in ("Sheet1", "Sheet2", "Sheet3")]

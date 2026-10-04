@@ -1,4 +1,4 @@
-"""以来源索引连接批量统计与 Python 对象，保留非有限输入的参考行为。"""
+"""Join batch statistics with the Python object using a source index, preserving reference behavior for non-finite inputs."""
 
 import statistics
 
@@ -6,7 +6,7 @@ from ...._compute_backend import get_native
 
 
 def ordered_clusters(values, tolerance, *, relative=0.0, last_only=False):
-    """返回稳定簇索引；特殊数值继续使用 Python 的排序与中位数语义。"""
+    """Returns a stable cluster index; special values continue to use the sorting and median semantics of Python."""
     native = get_native()
     if native is not None and all(type(value) is float for value in values):
         result = native.ordered_clusters(values, tolerance, relative, last_only)

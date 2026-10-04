@@ -1,4 +1,4 @@
-"""独立元数据调度层，显式调用各格式的只读属性提取器。"""
+"""Independent metadata scheduling layer, explicitly calling the read-only attribute extractor of each format."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def extract_metadata(
     file_suffix: FileSuffix | None = None,
     source_context: HtmlSourceContext | None = None,
 ) -> MetadataResult:
-    """仅读取文档属性；未知格式和打不开的输入使用稳定错误码。"""
+    """Only document properties are read; stable error codes are used for unknown formats and input that cannot be opened."""
     document = None
     path = Path(source) if isinstance(source, (str, Path)) else None
     data: bytes | None = None
@@ -86,7 +86,7 @@ def _read_properties(
     document: PDFDocument | None,
     source_context: HtmlSourceContext | None,
 ) -> tuple[DocumentProperties, list[str]]:
-    """按格式惰性加载读取器，不加载其他格式正文解析或推理模型。"""
+    """Lazy loading of readers by format and no other format body parsing or inference models."""
     if suffix == "pdf":
         from .document.pdf._document import PDFDocument
         from .document.pdf.metadata import read_pdf_properties

@@ -10,7 +10,7 @@ VISIBLE_SPACE_STYLES = {"underline", "emphasis", "strikethrough"}
 
 @dataclass(frozen=True)
 class OfficeRichTextSegment:
-    """表示 Office 行内富文本片段，用于统一样式和超链接输出。"""
+    """Represents Office inline rich text fragment for uniform styling and hyperlink output."""
 
     text: str
     style: str | list[str] | tuple[str, ...] | None = None
@@ -18,7 +18,7 @@ class OfficeRichTextSegment:
 
 
 def _style_list(style: str | list[str] | tuple[str, ...] | None) -> list[str]:
-    """把样式字符串或列表规范为样式列表。"""
+    """Normalize a style string or list into a style list."""
     if not style:
         return []
     if isinstance(style, str):
@@ -27,13 +27,13 @@ def _style_list(style: str | list[str] | tuple[str, ...] | None) -> list[str]:
 
 
 def _style_str(style: str | list[str] | tuple[str, ...] | None) -> Optional[str]:
-    """把样式字符串或列表规范为逗号分隔字符串。"""
+    """Normalizes a style string or list to a comma-separated string."""
     styles = _style_list(style)
     return ",".join(styles) if styles else None
 
 
 def _script_to_style_name(format_obj: Any) -> Optional[str]:
-    """把 DOCX 上下标脚本位置转换为 Office 内部富文本样式名。"""
+    """Convert DOCX superscript and subscript script positions to Office internal rich text style names."""
     script = getattr(format_obj, "script", None)
     script_value = getattr(script, "value", script)
     if script_value == "super":
@@ -44,7 +44,7 @@ def _script_to_style_name(format_obj: Any) -> Optional[str]:
 
 
 def formatting_to_style_str(format_obj: Any) -> Optional[str]:
-    """从 Formatting-like 对象提取 Office 内部富文本样式字符串。"""
+    """Extracts the Office internal rich text style string from the Formatting-like object."""
     if format_obj is None:
         return None
     styles = []
@@ -65,7 +65,7 @@ def formatting_to_style_str(format_obj: Any) -> Optional[str]:
 
 
 def has_visible_style(format_obj: Any) -> bool:
-    """判断格式是否包含让空白文本也可见的样式。"""
+    """Determines whether the format contains styles that make blank text visible."""
     if format_obj is None:
         return False
     return bool(
@@ -76,7 +76,7 @@ def has_visible_style(format_obj: Any) -> bool:
 
 
 def has_non_visible_text_style(format_obj: Any) -> bool:
-    """判断格式是否只包含空白文本不可见的字形样式。"""
+    """Determines whether the format only contains invisible glyph styles for blank text."""
     if format_obj is None:
         return False
     return bool(getattr(format_obj, "bold", False) or getattr(format_obj, "italic", False))
@@ -88,7 +88,7 @@ def normalize_format_for_text(
     *,
     preserve_blank_non_visible_style: bool = False,
 ) -> Any:
-    """按文本内容规范 run 格式，避免空白 run 误把不可见样式带到输出。"""
+    """Standardize run format according to text content to avoid blank run from accidentally bringing invisible styles to the output."""
     if format_obj is None:
         return None
     if text.strip():
@@ -118,7 +118,7 @@ def should_keep_group_text(
     *,
     preserve_plain_blank: bool = False,
 ) -> bool:
-    """判断当前累积文本是否应输出，保留可见样式或被显式保留的空白。"""
+    """Determines whether the current accumulated text should be output, preserving visible styles or explicitly preserving whitespace."""
     if not text:
         return False
     if text.strip():
@@ -134,7 +134,7 @@ def append_rich_text_element(
     format_obj: Any,
     hyperlink: Any,
 ) -> None:
-    """追加段落元素；相邻同 URL 且同格式的片段合并为一个元素。"""
+    """Append paragraph elements; adjacent fragments with the same URL and the same format are merged into one element."""
     if (
         hyperlink is not None
         and paragraph_elements
@@ -157,7 +157,7 @@ def format_text_spans(
     hyperlink: Any = None,
     style: str | list[str] | tuple[str, ...] | None = None,
 ) -> list[dict[str, Any]]:
-    """把 Office 文字、样式和安全超链接直接构造为 Span。"""
+    """Construct Office text, styles, and safe hyperlinks directly into Span."""
     if not text:
         return []
     normalized_text = text.replace("\r\n", "\n").replace("\r", "\n")
@@ -177,7 +177,7 @@ def format_text_spans(
 
 
 def is_valid_hyperlink_target(hyperlink: Any) -> bool:
-    """判断超链接目标是否可作为真实链接输出。"""
+    """Determine whether the hyperlink target can be output as a real link."""
     return (
         sanitize_hyperlink_target(
             hyperlink,
@@ -190,7 +190,7 @@ def is_valid_hyperlink_target(hyperlink: Any) -> bool:
 
 
 def _format_hyperlink_segments(group: list[OfficeRichTextSegment]) -> list[dict[str, Any]]:
-    """将连续同 URL 的多个片段构造成单个 HyperlinkSpan。"""
+    """Constructs multiple consecutive segments of the same URL into a single HyperlinkSpan."""
     if not group:
         return []
     safe_target = sanitize_hyperlink_target(
@@ -212,7 +212,7 @@ def _format_hyperlink_segments(group: list[OfficeRichTextSegment]) -> list[dict[
 def format_hyperlink_group(
     group: list[tuple[str, Any, Any]],
 ) -> list[dict[str, Any]]:
-    """将 DOCX paragraph element 分组构造成单个 HyperlinkSpan。"""
+    """Construct groups of DOCX paragraph element into a single HyperlinkSpan."""
     return _format_hyperlink_segments(
         [
             OfficeRichTextSegment(
@@ -226,14 +226,14 @@ def format_hyperlink_group(
 
 
 def _style_has_visible_space(style: str | list[str] | tuple[str, ...] | None) -> bool:
-    """判断样式列表是否会让空白文本在渲染结果中可见。"""
+    """Determines whether the style list will make blank text visible in the rendered result."""
     return any(style_name in VISIBLE_SPACE_STYLES for style_name in _style_list(style))
 
 
 def _trim_plain_edge_spaces(
     segments: list[OfficeRichTextSegment],
 ) -> list[OfficeRichTextSegment]:
-    """只裁剪段落首尾普通空白，不裁剪带可见样式的空白。"""
+    """Only the normal white space at the beginning and end of the paragraph will be cut, and the white space with visible styles will not be cut."""
     trimmed_segments = [segment for segment in segments if segment.text is not None]
     if not trimmed_segments:
         return []
@@ -274,7 +274,7 @@ def _trim_plain_edge_spaces(
 def _merge_non_link_segments(
     segments: list[OfficeRichTextSegment],
 ) -> list[OfficeRichTextSegment]:
-    """合并相邻同样式的非超链接片段，避免输出碎片化样式标记。"""
+    """Merge adjacent non-hyperlink fragments of the same style to avoid outputting fragmented style markup."""
     merged: list[OfficeRichTextSegment] = []
     for segment in segments:
         if (
@@ -299,7 +299,7 @@ def build_rich_text_from_segments(
     *,
     trim_plain_edges: bool = False,
 ) -> list[dict[str, Any]]:
-    """从 Office 富文本片段直接构建规范化行内 Span。"""
+    """Build normalized inline Span directly from Office rich text fragments."""
     normalized_segments = [
         OfficeRichTextSegment(
             segment.text,
@@ -352,7 +352,7 @@ def build_rich_text_from_segments(
 def build_spans_from_elements(
     paragraph_elements: list[tuple[str, Any, Any]],
 ) -> list[dict[str, Any]]:
-    """把 DOCX paragraph element 直接构造成结构化 Span。"""
+    """Construct DOCX paragraph element directly into structured Span."""
     return build_rich_text_from_segments(
         [
             OfficeRichTextSegment(
@@ -371,7 +371,7 @@ def build_rich_text_html_from_segments(
     *,
     trim_plain_edges: bool = False,
 ) -> str:
-    """把 Office 富文本片段序列化为表格单元格使用的安全 HTML。"""
+    """Serialize Office rich text fragment to secure HTML for table cell use."""
     normalized = _trim_plain_edge_spaces(segments) if trim_plain_edges else list(segments)
     parts: list[str] = []
     for segment in normalized:

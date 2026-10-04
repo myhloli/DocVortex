@@ -1,4 +1,4 @@
-"""共享稀疏表格的坐标聚类和局部物理规则转换，保留两路候选策略。"""
+"""Coordinate clustering and local physical rule transformation of shared sparse tables, preserving two-way candidate strategies."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from .geometry import normalize_angle, normalize_bbox, page_bbox_to_table_local
 
 @dataclass(frozen=True, slots=True)
 class _LocalRule:
-    """保存转换到正向表格坐标后的细线区间。"""
+    """Save the thin line interval converted to forward table coordinates."""
 
     orientation: str
     coordinate: float
@@ -24,7 +24,7 @@ def cluster_members(
     values: list[float],
     tolerance: float,
 ) -> list[tuple[float, tuple[float, ...]]]:
-    """按一维距离聚类坐标并保留每簇原始成员。"""
+    """Cluster coordinates by one-dimensional distance and retain the original members of each cluster."""
 
     if not values:
         return []
@@ -43,7 +43,7 @@ def _local_rules(
     width: float,
     height: float,
 ) -> tuple[_LocalRule, ...]:
-    """把页面 drawing 线转换为按局部长轴重新判向的规则区间。"""
+    """Convert the drawing line on the page into a regular interval that is reoriented according to the local long axis."""
 
     table_bbox = normalize_bbox(table_input.table_bbox)
     if table_bbox is None:

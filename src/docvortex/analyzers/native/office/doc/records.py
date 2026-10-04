@@ -1,4 +1,4 @@
-"""DOC 二进制结构使用的有界整数、PLC 和记录预算工具。"""
+"""DOC Bounded integers, PLC and record budget tools used by binary structures."""
 
 from __future__ import annotations
 
@@ -11,12 +11,12 @@ from ..limits import MAX_RECORDS
 
 @dataclass(slots=True)
 class DocBudget:
-    """限制 DOC 解析累计访问的记录和文本单元数。"""
+    """Limit the number of records and text units that DOC parses the cumulative access."""
 
     visited: int = 0
 
     def charge(self, amount: int = 1) -> None:
-        """计入本次访问量，超过统一上限时稳定失败。"""
+        """Counted into the current visit volume, stable failure occurs when the unified upper limit is exceeded."""
 
         if amount < 0 or self.visited + amount > MAX_RECORDS:
             raise LegacyOfficeResourceLimitError(f"DOC records exceed max_records={MAX_RECORDS}")
@@ -24,7 +24,7 @@ class DocBudget:
 
 
 def parse_plc(data: bytes, *, item_size: int, budget: DocBudget) -> tuple[list[int], list[bytes]]:
-    """解析由 CP 数组和定长数据项组成的通用 PLC。"""
+    """Parse a general PLC consisting of a CP array and fixed-length data items."""
 
     if item_size < 0 or len(data) < 4:
         return [], []

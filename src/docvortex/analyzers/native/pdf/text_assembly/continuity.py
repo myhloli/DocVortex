@@ -1,4 +1,4 @@
-"""共享参考条目和重叠段落的成员证据，避免最后按外框盲目拼接文本。"""
+"""Share membership evidence for reference entries and overlapping paragraphs to avoid blindly splicing text together out of bounds at the end."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ _REFERENCE_NUMBER = re.compile(r"^\s*(?:\[(\d{1,4})\]|(\d{1,3})[.])\s*(?=\D)")
 
 
 def group_native_inline_formula_prose(lines: list[_LineItem], regions: list[tuple]) -> None:
-    """至少两处原生行内矢量公式证明同式正文连续带，公式槽位纳入行宽且字体重置阻断段组。"""
+    """At least two native inline vector formulas prove that the same style of text is continuous, the formula slots are included in the line width and the font is reset to block groupings."""
     if len(regions) < 2:
         return
     rows = []
@@ -84,7 +84,7 @@ def group_native_inline_formula_prose(lines: list[_LineItem], regions: list[tupl
 
 
 def _standalone_author_year_regions(page: _PreparedPage) -> list[tuple]:
-    """单页缺少参考文献标题时，以重复作者行、年代和悬挂缩进共同确认局部参考栏。"""
+    """When a single page lacks a reference title, repeat the author line, chronological date, and hanging indent to confirm the local reference column."""
     lines = [
         line
         for line in page.remaining_lines
@@ -122,7 +122,7 @@ def _standalone_author_year_regions(page: _PreparedPage) -> list[tuple]:
 
 
 def _numbered_reference_regions(page: _PreparedPage, active: bool) -> list[tuple]:
-    """由连续编号的重复左缘恢复局部参考栏，栏顶不沿整页正文栏传播。"""
+    """Restores local reference columns from consecutively numbered repeated left margins, with column tops not propagating along full-page text columns."""
     candidates = []
     for line in page.remaining_lines:
         match = _REFERENCE_NUMBER.match(line.text)
@@ -164,7 +164,7 @@ def _numbered_reference_regions(page: _PreparedPage, active: bool) -> list[tuple
             if headings
             else 0.0
         )
-        # 后栏首项前可能有上一条的续行，但必须与参考文字同字号、同左缘。
+        # There may be a continuation of the previous item before the first item in the back column, but it must be in the same font size and left margin as the reference text.
         if active or i:
             peers = [
                 peer
@@ -205,7 +205,7 @@ def _numbered_reference_regions(page: _PreparedPage, active: bool) -> list[tuple
 
 
 def mark_document_reference_regions(pages: list[_PreparedPage]) -> None:
-    """沿实际栏序处理参考文献开始及章节结束事件，同页附录不丢弃此前的有效条目。"""
+    """Process reference start and chapter end events along the actual column order, and appendices on the same page do not discard previously valid entries."""
     active = False
     numbered_active = False
     for page in pages:
@@ -216,7 +216,7 @@ def mark_document_reference_regions(pages: list[_PreparedPage]) -> None:
             for line in lines
             if re.fullmatch(r"(?:references|bibliography|参考文献)\s*[:：]?", line.text.strip(), re.IGNORECASE)
         }
-        # 作者年代式参考区不能为后续附录的普通数字列表提供编号文献证据。
+        # The author's chronological reference area does not provide numbered bibliographic evidence for the ordinary numerical lists in subsequent appendices.
         numbered = _numbered_reference_regions(page, numbered_active or bool(headings))
         if numbered:
             page.numbered_references = True
@@ -260,7 +260,7 @@ def mark_document_reference_regions(pages: list[_PreparedPage]) -> None:
 
 
 def group_reference_lines(lines: list[_LineItem], page: _PreparedPage) -> None:
-    """按稳定首行左缘与悬挂续行分组，允许连续单行条目和断词链接。"""
+    """Grouped by stable first line left margin and hanging continuation lines, allowing for continuous single-line entries and word break links."""
     group = 0
     for region in page.reference_regions:
         members = [
@@ -294,7 +294,7 @@ def group_reference_lines(lines: list[_LineItem], page: _PreparedPage) -> None:
         )
         if biography_tops:
             members = [line for line in members if line.bbox[1] < min(biography_tops)]
-        # 没有重复首行和续行缩进就不推断条目，以免普通附注变成逐行段落。
+        # Entries are not inferred without repeated first and continuation line indentations, to prevent ordinary notes from turning into line-by-line paragraphs.
         if sum(abs(line.bbox[0] - left) <= 0.5 * em for line in members) < 1:
             continue
         numbered = page.numbered_references and sum(bool(_REFERENCE_NUMBER.match(line.text)) for line in members) >= 2
@@ -326,7 +326,7 @@ def group_reference_lines(lines: list[_LineItem], page: _PreparedPage) -> None:
 
 
 def _reassemble_member_lines(members: list[_LineItem], previous_content: str = "") -> str:
-    """按实际行和水平顺序重建合并内容，嵌在段落中间的短 run 不会被追加到段尾。"""
+    """Merged content is reconstructed in actual line and horizontal order, and short run embedded in the middle of a paragraph is not appended to the end of the paragraph."""
     unique = {line.source_index: line for line in members}
     ordered = sorted(unique.values(), key=lambda line: (_bbox_center_y(line.ink_bbox or line.bbox), line.bbox[0]))
     rows: list[list[_LineItem]] = []
@@ -353,14 +353,14 @@ def _reassemble_member_lines(members: list[_LineItem], previous_content: str = "
                 content = _merge_text_line_content([content, line.text])
         contents.append(content)
     rebuilt = _merge_text_line_content(contents)
-    # 仅当成员次序需要修复时重建文字，已完成的空格与断词恢复不能被原始 run 覆盖。
+    # The text is reconstructed only if the member order needs to be repaired. Completed spacing and word break restoration cannot be overwritten by the original run.
     if previous_content and re.sub(r"\s+", "", previous_content) == re.sub(r"\s+", "", rebuilt):
         return previous_content
     return rebuilt
 
 
 def order_body_above_reference_band(blocks: list[dict], page: _PreparedPage) -> list[dict]:
-    """混合栏页的上方正文按自身栏序排列，上标顶边不能把右栏首段提前。"""
+    """The upper text of the mixed column page is arranged in its own column order, and the superscript top cannot advance the first paragraph of the right column."""
     if not page.numbered_references or not page.reference_regions:
         return blocks
     top = min(region[1] for region in page.reference_regions)
@@ -396,10 +396,10 @@ def order_body_above_reference_band(blocks: list[dict], page: _PreparedPage) -> 
 
 
 def group_front_matter_lines(lines: list[_LineItem], page_size: tuple) -> None:
-    """以首页摘要之前连续的机构编号组织作者附属信息，邮箱不另立小标题。"""
+    """Organize the author's affiliated information with the consecutive institution number before the abstract on the homepage, and do not create separate subtitles in the mailbox."""
     abstracts = [line for line in lines if text_role(line.text) == "abstract"]
     if not abstracts:
-        # 无显式摘要标题时，独立的出版日期带仍是作者机构区的可靠下界。
+        # In the absence of an explicit abstract title, the independent publication date band is still a reliable lower bound for the author's institutional area.
         abstracts = [line for line in lines if re.match(r"^\s*[（(]?(?:received|accepted|published)\b", line.text, re.I)]
     if not abstracts:
         return
@@ -409,7 +409,7 @@ def group_front_matter_lines(lines: list[_LineItem], page_size: tuple) -> None:
     markers = [(line, int(match.group(1))) for line, match in markers if match is not None]
     if not markers:
         return
-    # 单个机构也可成立，但须有机构或联系方式证据，避免把首页普通编号列表当作者单位。
+    # A single institution can also be established, but it must have evidence of institution or contact information to avoid taking the ordinary numbered list on the home page as the author's institution.
     if not any(
         re.search(
             r"university|institute|department|laboratory|centre|center|大学|学院|研究所|实验室|医院", line.text, re.IGNORECASE
@@ -445,7 +445,7 @@ def group_front_matter_lines(lines: list[_LineItem], page_size: tuple) -> None:
 
 
 def merge_overlapping_member_blocks(blocks: list[dict], page_size: tuple) -> list[dict]:
-    """以同栏实际行的重叠关系回收段内小块，不能仅因外接矩形相交就跨栏合并。"""
+    """The small blocks in the segment are recycled based on the overlapping relationship of the actual rows in the same column. They cannot be merged across columns just because the bounding rectangles intersect."""
     output = list(blocks)
     layouts = {
         angle: build_layout_evidence(
@@ -537,8 +537,8 @@ def merge_overlapping_member_blocks(blocks: list[dict], page_size: tuple) -> lis
                             continue
                         ab, bb = a.ink_bbox or a.bbox, b.ink_bbox or b.bbox
                         em = max(_line_effective_height(a, ab), _line_effective_height(b, bb))
-                        # 两条完整文字行横向分离时是相邻栏，外接矩形重叠不能让它们互相认领。
-                        # 小型上下标、公式碎片仍可依靠邻接归入宿主正文。
+                        # Two complete lines of text are adjacent columns when separated horizontally, and their bounding rectangles overlap so that they cannot claim each other.
+                        # Small superscripts, subscripts, and formula fragments can still be classified into the host text by relying on adjacency.
                         across_columns = layouts[a.angle].separated(
                             _rotate_bbox_to_upright(ab, page_size, a.angle),
                             _rotate_bbox_to_upright(bb, page_size, b.angle),

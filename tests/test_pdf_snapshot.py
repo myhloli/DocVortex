@@ -1,4 +1,4 @@
-"""显式页面快照的生命周期、来源校验和共享证据回归。"""
+"""Explicit page snapshot lifecycle, provenance verification, and shared evidence regression."""
 
 from dataclasses import FrozenInstanceError
 from io import BytesIO
@@ -15,7 +15,7 @@ from docvortex.document.pdf import PDFDocument
 
 
 def pdf_bytes():
-    """生成包含文字、链接与路径的两页 PDF，避免依赖外部样本。"""
+    """Generates a two-page PDF containing text, links and paths to avoid relying on external samples."""
     stream = BytesIO()
     canvas = Canvas(stream, pagesize=(400, 500))
     for index in range(2):
@@ -28,7 +28,7 @@ def pdf_bytes():
 
 
 def test_snapshot_survives_close_and_isolates_mutations():
-    """快照脱离原生资源，调用方修改导出字符不会影响后续读取。"""
+    """The snapshot is separated from the native resource, and the caller's modification of the exported characters will not affect subsequent reading."""
     with PDFDocument(pdf_bytes()) as document:
         page = document[0]
         expected = pickle.dumps(page.get_chars_with_geometry())
@@ -47,7 +47,7 @@ def test_snapshot_survives_close_and_isolates_mutations():
 
 
 def test_snapshot_consumers_do_not_reopen_pdf():
-    """字符、路径、链接、尺寸和旋转都来自快照，关闭后继续生成相同证据。"""
+    """Characters, paths, links, dimensions and rotations are all taken from the snapshot and continue to generate the same evidence after closing."""
     document = PDFDocument(pdf_bytes())
     page = document[0]
     expected = prepare_text_evidence(page)
@@ -62,7 +62,7 @@ def test_snapshot_consumers_do_not_reopen_pdf():
 
 
 def test_snapshot_rejects_wrong_page_and_mixed_geometry():
-    """拒绝跨页、跨文档和显式几何混用，而不是静默接受错误证据。"""
+    """Reject cross-page, cross-document, and explicit geometry mixes instead of silently accepting evidence of error."""
     with PDFDocument(pdf_bytes()) as first, PDFDocument(pdf_bytes()) as second:
         snapshot = first[0].get_snapshot()
         for prepare in (prepare_text_evidence, prepare_table_page):
@@ -74,7 +74,7 @@ def test_snapshot_rejects_wrong_page_and_mixed_geometry():
 
 
 def test_snapshot_cache_does_not_retain_consumed_pages():
-    """释放消费者后弱缓存立即允许页面证据回收，不形成文档级强引用。"""
+    """The weak cache allows page evidence recovery immediately after the consumer is released, without forming a document-level strong reference."""
     with PDFDocument(pdf_bytes()) as document:
         snapshot = document[0].get_snapshot()
         reference = weakref.ref(snapshot)
@@ -85,7 +85,7 @@ def test_snapshot_cache_does_not_retain_consumed_pages():
 
 
 def test_snapshot_extracts_once_and_failure_is_not_cached():
-    """首次失败不留下半快照，成功提取后同页调用只打开一次页面。"""
+    """The first failure does not leave a semi-snapshot, and the same page call only opens the page once after successful extraction."""
     with PDFDocument(pdf_bytes()) as document:
         with patch.object(document, "_open_page", side_effect=RuntimeError("failure")):
             with pytest.raises(RuntimeError, match="failure"):
@@ -98,7 +98,7 @@ def test_snapshot_extracts_once_and_failure_is_not_cached():
 
 
 def test_page_metadata_reuses_successful_reads():
-    """不可变文档的尺寸和旋转只需一次页面读取，失败不会写入缓存。"""
+    """Immutable documents are sized and rotated with only one page read, and failures are not written to the cache."""
     with PDFDocument(pdf_bytes()) as document:
         with patch.object(document, "_open_page", wraps=document._open_page) as opened:
             assert document.page_size(0) == (400, 500)
@@ -112,7 +112,7 @@ def test_page_metadata_reuses_successful_reads():
 
 
 def test_raw_character_count_reuses_successful_read():
-    """重复读取原始计数不重建 textpage，零值也属于可缓存的成功结果。"""
+    """Repeated read raw count does not reconstruct textpage, zero value is also a cacheable success result."""
     from contextlib import nullcontext
     from unittest.mock import Mock
 
@@ -130,7 +130,7 @@ def test_raw_character_count_reuses_successful_read():
 
 
 def test_visible_snapshot_keeps_raw_count_for_limits():
-    """可见性过滤后的快照长度不能替代原始计数，读取计数也不重新打开页面。"""
+    """The visibility filtered snapshot length does not replace the raw count, nor does the read count reopen the page."""
     from docvortex._compute_backend import get_native
 
     if get_native() is None:

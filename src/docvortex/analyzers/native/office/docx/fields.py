@@ -1,4 +1,4 @@
-"""DOCX 字段与目录处理；共享当前 Converter 的单文档状态。"""
+"""DOCX field and catalog handling; sharing the current single-document status of Converter."""
 
 import re
 from pathlib import Path
@@ -15,10 +15,10 @@ from .context import _DocxConstants, _DocxComplexFieldFrame, _ParagraphElement, 
 
 
 class _DocxFields:
-    """集中维护字段与目录，不自行创建文档或持有跨文档缓存。"""
+    """Maintain fields and directories centrally, without creating documents yourself or holding cross-document caches."""
 
     def _collect_toc_anchor_set(self) -> set[str]:
-        """从真实超链接和复杂域中收集整份文档的 TOC bookmark 目标。"""
+        """TOC bookmark goal of collecting entire documents from real hyperlinks and complex domains."""
         anchor_attr = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}anchor"
         anchors: set[str] = set()
         for hl in self.docx_obj.element.body.findall(".//w:hyperlink", namespaces=_DocxConstants._BLIP_NAMESPACES):
@@ -41,7 +41,7 @@ class _DocxFields:
         cls,
         paragraph_element: BaseOxmlElement,
     ) -> list[str]:
-        """按文档顺序返回段落内可公开的 bookmark 名称，并排除 Word 导航标记。"""
+        """Returns the publicly available bookmark names within a paragraph in document order, excluding Word navigation tags."""
 
         bookmark_name_attr = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}name"
         names: list[str] = []
@@ -58,7 +58,7 @@ class _DocxFields:
         self,
         referenced_anchors: set[str],
     ) -> dict[str, str]:
-        """把同一段落的多个 TOC bookmark 收敛到一个 Middle JSON canonical anchor。"""
+        """Converg multiple TOC bookmark of the same paragraph into one Middle JSON canonical anchor."""
 
         aliases: dict[str, str] = {}
         for paragraph in self.docx_obj.element.body.findall(
@@ -75,13 +75,13 @@ class _DocxFields:
         return aliases
 
     def _canonical_toc_anchor(self, anchor: str) -> str:
-        """返回 bookmark alias 对应的唯一公开 anchor，未知名称保持原值。"""
+        """Returns the only public anchor corresponding to bookmark alias, and the unknown name remains as it is."""
 
         return self.toc_anchor_aliases.get(anchor, anchor)
 
     @staticmethod
     def _complex_field_hyperlink_target(instruction: str) -> tuple[str | None, bool]:
-        """从复杂字段指令中提取外部 URL 或内部 bookmark fragment。"""
+        """Extract external URL or internal bookmark fragment from complex field instructions."""
         external_match = re.search(r'\bHYPERLINK\s+"([^"]+)"', instruction, re.IGNORECASE)
         bookmark_match = re.search(r'\\l\s+"([^"]+)"', instruction, re.IGNORECASE)
         address = external_match.group(1).strip() if external_match else ""
@@ -97,7 +97,7 @@ class _DocxFields:
         cls,
         paragraph_element: BaseOxmlElement,
     ) -> list[str]:
-        """按字段边界与嵌套顺序合并段落中被拆分的复杂字段指令。"""
+        """Merge complex field directives split in paragraphs by field boundaries and nesting order."""
 
         word_namespace = cls._BLIP_NAMESPACES["w"]
         field_char_tag = f"{{{word_namespace}}}fldChar"
@@ -107,7 +107,7 @@ class _DocxFields:
         instructions: list[str] = []
 
         def append_instruction(frame: _DocxComplexFieldFrame) -> None:
-            """把一个字段已累计的非空指令追加到输出。"""
+            """Appends a field of accumulated non-null instructions to the output."""
 
             instruction = "".join(frame.instruction_parts).strip()
             if instruction:
@@ -134,7 +134,7 @@ class _DocxFields:
             if field_stack and field_stack[-1].phase == "instr":
                 field_stack[-1].instruction_parts.append(text)
             elif text.strip():
-                # 兼容缺少 fldChar 包裹、但过去可被逐节点解析的非规范指令。
+                # Compatible with non-canonical instructions that lack the fldChar package but used to be parsed node by node.
                 instructions.append(text.strip())
 
         for frame in field_stack:
@@ -144,7 +144,7 @@ class _DocxFields:
 
     @staticmethod
     def _python_docx_hyperlink_target(hyperlink: Hyperlink) -> _ParagraphHyperlink:
-        """把 python-docx Hyperlink 的地址或 fragment 转换为行内目标。"""
+        """Converts the address of python-docx Hyperlink or fragment to an inline target."""
         address = hyperlink.address
         fragment = hyperlink.fragment
         if address and fragment:
@@ -163,7 +163,7 @@ class _DocxFields:
         *,
         suppress_internal_links: bool,
     ) -> list[_ParagraphElement]:
-        """闭合复杂字段，并把字段结果绑定到解析出的超链接目标。"""
+        """Closes a complex field and binds the field result to the parsed hyperlink target."""
         target, is_internal = self._complex_field_hyperlink_target("".join(frame.instruction_parts))
         if target is None or (is_internal and suppress_internal_links):
             return frame.result_elements
@@ -174,7 +174,7 @@ class _DocxFields:
         paragraph: Paragraph,
         inner_contents: list[Union[Run, Hyperlink]],
     ) -> list[_ParagraphElement]:
-        """按文档顺序展开普通 run、真实超链接与可嵌套复杂字段。"""
+        """Expand ordinary run, real hyperlinks and nestable complex fields in document order."""
         elements: list[_ParagraphElement] = []
         field_stack: list[_DocxComplexFieldFrame] = []
         suppress_internal_links = self._get_toc_item_level(paragraph) is not None
@@ -265,24 +265,24 @@ class _DocxFields:
 
     def _get_paragraph_elements(self, paragraph: Paragraph) -> list[_ParagraphElement]:
         """
-        提取段落元素及其格式和超链接信息。
+        Extract paragraph elements and their formatting and hyperlink information.
 
         Args:
-            paragraph: 段落对象
+            paragraph: paragraph object
 
         Returns:
             list[_ParagraphElement]:
-            段落元素列表，每个元素包含文本、格式和超链接信息
+            A list of paragraph elements, each containing text, formatting, and hyperlink information
         """
 
         inner_contents = list(self._iter_paragraph_inner_content(paragraph))
         paragraph_text = self._get_paragraph_text_from_contents(inner_contents)
 
-        # 目前保留空段落以保持向后兼容性:
+        # Empty paragraphs are currently reserved for backward compatibility:
         if paragraph_text.strip() == "":
-            # 检查是否存在带可见样式（下划线或删除线）的空白文本 run。
-            # 有可见样式的空白文本（如带下划线的空格）在视觉上是可见的，应予保留，
-            # 因此跳过提前返回，交由后续完整 run 处理流程处理。
+            # Check for the presence of blank text with visible styling (underline or strikethrough) run.
+            # White text with visible styling (such as underlined spaces) is visually visible and should be preserved.
+            # Therefore, the early return is skipped and handed over to the subsequent complete run processing flow.
             has_visible_style_run = any(
                 isinstance(c, Run) and c.text and self._has_visible_style(self._get_format_from_run(c)) for c in inner_contents
             )
@@ -293,17 +293,17 @@ class _DocxFields:
         group_text = ""
         previous_format: Optional[Formatting] = None
 
-        # 遍历已经展开的普通 run、超链接与复杂字段结果，并按格式分组。
+        # Iterates through the expanded normal run, hyperlink and complex field results, grouped by format.
         flattened_elements = self._flatten_paragraph_elements(paragraph, inner_contents)
         for text, format_obj, hyperlink in flattened_elements:
-            # 当新 run 有可见内容（非空或带可见样式的空白）且格式变化时触发分组
+            # Grouping is triggered when the new run has visible content (not empty or blank with visible style) and the format changes
             has_visible_content = len(text.strip()) > 0 or self._has_visible_style(format_obj)
             is_blank_text = bool(text) and not text.strip()
             format_changed = format_obj != previous_format
             has_visible_boundary = self._has_visible_style(previous_format) or self._has_visible_style(format_obj)
             should_split_blank_boundary = is_blank_text and bool(group_text) and format_changed and has_visible_boundary
             if (has_visible_content and format_changed) or should_split_blank_boundary or (hyperlink is not None):
-                # 前一组有实质内容（非空或带可见样式的空白）时才保存
+                # Save only when the previous group has substantial content (not empty or whitespace with visible styles)
                 preserve_plain_blank = (
                     bool(group_text)
                     and not group_text.strip()
@@ -318,7 +318,7 @@ class _DocxFields:
                     paragraph_elements.append((group_text, previous_format, None))
                 group_text = ""
 
-                # 如果有超链接，则立即添加
+                # If there is a hyperlink, add it now
                 if hyperlink is not None:
                     self._append_paragraph_element(paragraph_elements, text, format_obj, hyperlink)
                     text = ""
@@ -327,9 +327,9 @@ class _DocxFields:
 
             group_text += text
 
-        # 格式化最后一个组
-        # 注意：使用 previous_format（当前累积组的格式），而非 format（最后一次循环迭代的格式）。
-        # 最后一次迭代可能是无样式的空 run，若使用 format 会导致样式丢失。
+        # Format last group
+        # NOTE: Use previous_format (the format of the current accumulation group), not format (the format of the last loop iteration).
+        # The last iteration may be an empty run with no style, using format will cause the style to be lost.
         last_has_visible = self._should_keep_group_text(
             group_text,
             previous_format,
@@ -375,19 +375,19 @@ class _DocxFields:
 
     def _is_toc_sdt(self, element: BaseOxmlElement) -> bool:
         """
-        检测SDT元素是否为目录(Table of Contents)。
+        Check whether the SDT element is a directory (Table of Contents).
 
-        检测策略：
-        1. 检查 w:sdtPr 中的 docPartGallery 或 tag 元素
-        2. 回退到检查内容中的段落样式是否为 "TOC N" 格式
+        Detection strategy:
+        1. Check the docPartGallery or tag element in w:sdtPr
+        2. Fall back to check whether the paragraph style in the content is in the "TOC N" format
 
         Args:
-            element: SDT XML元素
+            element: SDT XML element
 
         Returns:
-            bool: 如果是目录SDT返回 True，否则返回 False
+            bool: If it is a directory SDT returns True, otherwise returns False
         """
-        # 方法1: 检查 w:sdtPr 中的 docPartGallery
+        # Method 1: Check docPartGallery in w:sdtPr
         sdt_pr = element.find("w:sdtPr", namespaces=_DocxConstants._BLIP_NAMESPACES)
         if sdt_pr is not None:
             doc_part_gallery = sdt_pr.find(".//w:docPartGallery", namespaces=_DocxConstants._BLIP_NAMESPACES)
@@ -396,18 +396,18 @@ class _DocxFields:
                 if "Table of Contents" in val or "toc" in val.lower():
                     return True
 
-            # 检查 tag 元素的值
+            # Check the value of the tag element
             tag_elem = sdt_pr.find("w:tag", namespaces=_DocxConstants._BLIP_NAMESPACES)
             if tag_elem is not None:
                 val = tag_elem.get(self.XML_KEY, "").lower().replace(" ", "")
                 if "toc" in val or "contents" in val or "tableofcontents" in val:
                     return True
 
-        # 方法2: 检查内容段落的样式是否为 "TOC N" 格式
+        # Method 2: Check whether the style of the content paragraph is in the "TOC N" format
         sdt_content = element.find("w:sdtContent", namespaces=_DocxConstants._BLIP_NAMESPACES)
         if sdt_content is not None:
             paragraphs = sdt_content.findall("w:p", namespaces=_DocxConstants._BLIP_NAMESPACES)
-            for p in paragraphs[:5]:  # 只检查前5个段落即可判断
+            for p in paragraphs[:5]:  # Just check the first 5 paragraphs to tell
                 try:
                     p_obj = Paragraph(p, self.docx_obj)
                     paragraph_style = self._get_paragraph_style(p_obj)
@@ -422,17 +422,17 @@ class _DocxFields:
 
     def _get_toc_item_level(self, paragraph: Paragraph) -> Optional[int]:
         """
-        从段落样式中获取目录项的层级（0-based）。
+        Get the level of table of contents items from the paragraph style (0-based).
 
         "TOC 1" -> 0
         "TOC 2" -> 1
-        "目录 1" -> 0
+        "Directory 1" -> 0
 
         Args:
-            paragraph: 段落对象
+            paragraph: paragraph object
 
         Returns:
-            Optional[int]: 层级（0-based），如果不是目录样式则返回 None
+            Optional[int]: Level (0-based), if it is not a directory style, return None
         """
         paragraph_style = self._get_paragraph_style(paragraph)
         if paragraph_style is None:
@@ -442,15 +442,15 @@ class _DocxFields:
             match = re.match(r"^(?:TOC|目录)\s*(\d+)$", style_name, re.IGNORECASE)
             if match:
                 level = int(match.group(1))
-                return level - 1  # 转换为 0-based
+                return level - 1  # Convert to 0-based
         return None
 
     def _is_flat_list_toc(self, items: list[tuple[int, str, list, list, Optional[str]]]) -> bool:
         """
-        检测目录是否为扁平列表（插图清单、列表清单等），
-        这类目录的所有条目应在同一层级，不应嵌套。
+        Check if the directory is a flat list (illustration list, list of lists, etc.),
+        All entries in such directories should be at the same level and should not be nested.
 
-        策略：检查是否超过 50% 的条目以"图"或"表"开头。
+        Strategy: Check if more than 50% of entries start with "Figure" or "Table".
         """
         match_count = 0
         total_count = 0
@@ -467,13 +467,13 @@ class _DocxFields:
 
     def _correct_toc_level_by_text(self, toc_level: int, text: str) -> int:
         """
-        通过文本中的编号深度修正目录项的层级。
+        Correct the hierarchy of table of contents entries by numbering depth in the text.
 
-        仅对 toc_level > 0 的条目进行修正，避免影响顶层章节标题。
-        例如：
-        - "1.1 LYSO..." (toc 3 → ilevel=2) → text depth 2 → 返回 1
-        - "1.1.1 LYSO..." (toc 3 → ilevel=2) → text depth 3 → 返回 2
-        - "本章小结" (toc 1 → ilevel=0) → 返回 0（不修正）
+        Only entries with toc_level > 0 are corrected to avoid affecting top-level chapter titles.
+        For example:
+        - "1.1 LYSO..." (toc 3 → ilevel=2) → text depth 2 → return 1
+        - "1.1.1 LYSO..." (toc 3 → ilevel=2) → text depth 3 → return 2
+        - "Summary of this chapter" (toc 1 → ilevel=0) → return 0 (no correction)
         """
         if toc_level == 0:
             return 0
@@ -481,7 +481,7 @@ class _DocxFields:
         match = re.match(r"^(\d+(?:\.\d+)+)(?![\d.])", stripped)
         if match:
             parts = match.group(1).split(".")
-            # 只用明确的多级章节号把异常偏深的 TOC 样式修浅，避免普通列表编号被提升层级。
+            # Only clear multi-level chapter numbers are used to lighten the unusually dark TOC style to prevent ordinary list numbers from being upgraded.
             text_level = len(parts) - 1
             if text_level < toc_level:
                 return text_level
@@ -497,23 +497,23 @@ class _DocxFields:
         anchor: Optional[str] = None,
     ) -> None:
         """
-        添加目录项到索引块。
+        Add directory entries to index blocks.
 
-        生成的索引结构：
+        Generated index structure:
         {
             "type": "index",
             "ilevel": 0,
             "content": [
-                {"type": "text", "content": "目录项文本"},
+                {"type": "text", "content": "Directory entry text"},
                 {"type": "index", "ilevel": 1, "content": [...]},
             ]
         }
 
         Args:
-            ilevel: 缩进等级（0-based）
-            elements: 元素列表
-            text: 处理后的文本（包含公式标记）
-            equations: 公式列表
+            ilevel: Indentation level (0-based)
+            elements: element list
+            text: Processed text (contains formula marks)
+            equations: Formula list
         """
         if equations is None:
             equations = []
@@ -525,7 +525,7 @@ class _DocxFields:
         if not content_text:
             return
 
-        # 情况 1: 首个目录项，创建新的顶层索引块
+        # Case 1: First directory entry, creating new top-level index block
         if self.pre_index_ilevel == -1:
             index_block = {
                 "type": BlockType.INDEX,
@@ -544,10 +544,10 @@ class _DocxFields:
             index_block["content"].append(index_item)
             self.pre_index_ilevel = ilevel
 
-        # 情况 2: 增加缩进，打开子索引块
+        # Case 2: Increase indentation, open subindex block
         elif self.pre_index_ilevel < ilevel:
             if not self.index_block_stack:
-                # 防御异常 TOC 状态：栈为空时按新的目录块恢复，避免单个坏层级阻断解析。
+                # Defense exception TOC status: When the stack is empty, restore according to the new directory block to avoid a single bad level blocking parsing.
                 logger.debug(
                     "Recovering DOCX index stack before adding TOC item at level {}",
                     ilevel,
@@ -580,7 +580,7 @@ class _DocxFields:
             child_index_block["content"].append(index_item)
             self.pre_index_ilevel = ilevel
 
-        # 情况 3: 减少缩进，关闭子索引块
+        # Case 3: Reduce indentation, close subindex block
         elif ilevel < self.pre_index_ilevel:
             while self.index_block_stack:
                 top_block = self.index_block_stack[-1]
@@ -598,7 +598,7 @@ class _DocxFields:
                 index_block["content"].append(index_item)
             self.pre_index_ilevel = ilevel
 
-        # 情况 4: 同级目录项
+        # Case 4: Sibling directory entries
         else:
             if self.index_block_stack:
                 index_block = self.index_block_stack[-1]
@@ -625,7 +625,7 @@ class _DocxFields:
         return names[0]
 
     def _extract_toc_target_anchor(self, paragraph_element: BaseOxmlElement) -> Optional[str]:
-        """从真实超链接或复杂域中提取 TOC 段落的内部 bookmark。"""
+        """Extract the internal bookmark of a TOC paragraph from a real hyperlink or complex domain."""
         anchor_attr = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}anchor"
         anchors = []
         for hl in paragraph_element.findall(".//w:hyperlink", namespaces=_DocxConstants._BLIP_NAMESPACES):
@@ -660,7 +660,7 @@ class _DocxFields:
         text: str,
         equations: list,
     ) -> bool:
-        """将未包裹在 SDT 中的普通目录段落转换为 INDEX 项。"""
+        """Convert ordinary table of contents paragraphs not wrapped in SDT to INDEX items."""
         toc_level = self._get_toc_item_level(paragraph)
         if toc_level is None:
             return False
@@ -668,7 +668,7 @@ class _DocxFields:
             return True
 
         target_anchor = self._extract_toc_target_anchor(paragraph_element)
-        # 只有已经进入目录序列后才允许无锚点条目，避免误收复用 TOC 样式的封面文本。
+        # Only allow unanchored entries after entering the table of contents sequence to avoid accidentally reusing TOC style cover text.
         if not target_anchor and self.pre_index_ilevel == -1:
             return False
         if target_anchor and target_anchor.startswith("_Toc"):
@@ -689,18 +689,18 @@ class _DocxFields:
 
     def _handle_sdt_as_index(self, sdt_content: BaseOxmlElement) -> None:
         """
-        处理目录SDT内容，将其转换为层级化的INDEX块。
+        Process the contents of directory SDT and convert it into hierarchical INDEX blocks.
 
-        两阶段处理：
-        1. 收集所有段落及其层级；
-        2. 检测目录类型（常规目录 vs 扁平列表），对层级进行修正后写入索引块。
+        Two-stage processing:
+        1. Collect all paragraphs and their levels;
+        2. Detect the directory type (regular directory vs flat list), correct the hierarchy and write the index block.
 
         Args:
-            sdt_content: w:sdtContent XML元素
+            sdt_content: w:sdtContent XML element
         """
         paragraphs = sdt_content.findall(".//w:p", namespaces=_DocxConstants._BLIP_NAMESPACES)
 
-        # --- 第一阶段：收集所有条目 ---
+        # --- Phase 1: Collect all entries ---
         toc_items: list[tuple[int, str, list, list, Optional[str]]] = []
         for p in paragraphs:
             try:
@@ -729,18 +729,18 @@ class _DocxFields:
                 logger.debug(f"Error collecting TOC paragraph: {e}")
                 continue
 
-        # --- 第二阶段：修正层级并写入索引块 ---
+        # --- Phase 2: Correct the hierarchy and write the index block ---
         is_flat = self._is_flat_list_toc(toc_items)
 
-        # 重置索引状态，开始新的目录块
+        # Reset the index state and start a new directory block
         self._reset_index_state()
 
         for toc_level, text, elements, equations, target_anchor in toc_items:
             if is_flat:
-                # 插图/列表清单：强制全部扁平（层级 0）
+                # Illustrations/lists: force all flattened (level 0)
                 corrected_level = 0
             else:
-                # 常规目录：依据文本编号深度修正层级，解决 docx 跳级问题
+                # General directory: Correct levels based on text number depth to solve docx level skipping problem
                 corrected_level = self._correct_toc_level_by_text(toc_level, text)
 
             self._add_index_item(
@@ -751,18 +751,18 @@ class _DocxFields:
                 anchor=target_anchor,
             )
 
-        # 处理完成后重置索引状态
+        # Reset index status after processing is complete
         self._reset_index_state()
 
     def _get_heading_and_level(self, style_label: str) -> tuple[str, Optional[int]]:
         """
-        从样式标签获取标题和层级。
+        Get title and hierarchy from style tag.
 
         Args:
-            style_label: 样式标签
+            style_label: Style tag
 
         Returns:
-            tuple[str, Optional[int]]: (标签字符串, 层级) 元组
+            tuple[str, Optional[int]]: (tag string, level) tuple
         """
         parts = self._split_text_and_number(style_label)
 
@@ -782,13 +782,13 @@ class _DocxFields:
 
     def _split_text_and_number(self, input_string: str) -> list[str]:
         """
-        分割字符串中的文本和数字部分。
+        Split the text and numeric parts of a string.
 
         Args:
-            input_string: 输入字符串
+            input_string: input string
 
         Returns:
-            list[str]: 分割后的部分列表
+            list[str]: Split partial list
         """
         match = re.match(r"(\D+)(\d+)$|^(\d+)(\D+)", input_string)
         if match:
@@ -799,14 +799,14 @@ class _DocxFields:
 
     def _str_to_int(self, s: Optional[str], default: Optional[int] = 0) -> Optional[int]:
         """
-        将字符串转换为整数。
+        Convert string to integer.
 
         Args:
-            s: 要转换的字符串
-            default: 默认值，转换失败时返回
+            s: String to convert
+            default: Default value, returned when conversion fails
 
         Returns:
-            Optional[int]: 转换后的整数，转换失败时返回默认值
+            Optional[int]: converted integer, returning to the default value when the conversion fails
         """
         if s is None:
             return None

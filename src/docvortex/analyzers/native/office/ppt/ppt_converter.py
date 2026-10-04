@@ -1,4 +1,4 @@
-"""把旧版 PPT 内部语义模型转换为 DocVortex 分页 model-list。"""
+"""Convert legacy PPT internal semantic model to DocVortex paging model-list."""
 
 from __future__ import annotations
 
@@ -29,15 +29,15 @@ PPT_XYCUT_DENSITY_THRESHOLD = 0.9
 
 
 class PptConverter:
-    """将 PowerPoint 97–2003 二进制流转换为分页 raw blocks。"""
+    """Convert PowerPoint 97–2003 binary stream to paged raw blocks."""
 
     def __init__(self) -> None:
-        """初始化无状态转换器输出。"""
+        """Initialize the stateless converter output."""
 
         self.pages: list[list[dict[str, Any]]] = []
 
     def convert(self, file_binary: BinaryIO) -> None:
-        """读取输入流、解析三个核心 OLE streams 并生成 model-list。"""
+        """Reads the input stream, parses the three cores OLE streams and generates model-list."""
 
         file_bytes = read_stream_bytes_from_start(file_binary)
         with BoundedOleReader(file_bytes) as ole:
@@ -50,7 +50,7 @@ class PptConverter:
 
     @staticmethod
     def _run_styles(run: PptTextRun) -> list[str]:
-        """把内部字符属性转换为 DocVortex 富文本样式名。"""
+        """Convert internal character attributes to DocVortex rich text style names."""
 
         styles: list[str] = []
         if run.bold:
@@ -69,7 +69,7 @@ class PptConverter:
 
     @classmethod
     def _paragraph_content(cls, paragraph: PptParagraph) -> list[dict[str, Any]]:
-        """把段落 run 直接构建为结构化 Span。"""
+        """Construct paragraph run directly into structured Span."""
 
         segments = [
             OfficeRichTextSegment(
@@ -89,7 +89,7 @@ class PptConverter:
         stack: list[dict[str, Any]],
         paragraph: PptParagraph,
     ) -> None:
-        """把一个列表段落放入对应层级，并按需创建中间列表。"""
+        """Place a list paragraph into the corresponding level and create intermediate lists as needed."""
 
         depth = max(0, int(paragraph.depth))
         while len(stack) > depth + 1:
@@ -126,7 +126,7 @@ class PptConverter:
         *,
         title_candidate: bool,
     ) -> list[dict[str, Any]]:
-        """把文本形状转换为标题、正文和嵌套列表 raw blocks。"""
+        """Convert text shapes to titles, body text, and nested lists raw blocks."""
 
         blocks: list[dict[str, Any]] = []
         list_stack: list[dict[str, Any]] = []
@@ -156,7 +156,7 @@ class PptConverter:
 
     @classmethod
     def _table_cell_content(cls, cell: PptTableCell) -> str:
-        """把表格单元格内的多个段落连接为 HTML 内容。"""
+        """Connect multiple paragraphs within table cells into HTML content."""
         paragraphs: list[str] = []
         for paragraph in cell.paragraphs:
             segments = [
@@ -174,7 +174,7 @@ class PptConverter:
 
     @classmethod
     def _table_html(cls, table: PptTableElement) -> str:
-        """按原点单元格生成带 rowspan/colspan 的稳定 HTML 表格。"""
+        """Generate stable HTML table with rowspan/colspan by origin cell."""
 
         origins = {(cell.row, cell.col): cell for cell in table.cells}
         covered: set[tuple[int, int]] = set()
@@ -210,7 +210,7 @@ class PptConverter:
         slide_height: int,
         is_first_text_element: bool,
     ) -> list[dict[str, Any]]:
-        """把一个语义元素转换为 raw blocks。"""
+        """Convert a semantic element to raw blocks."""
 
         if isinstance(element, PptImageElement):
             return [{"type": BlockType.IMAGE, "image_base64": element.image_base64}]
@@ -244,7 +244,7 @@ class PptConverter:
 
     @classmethod
     def _slide_to_page(cls, slide: PptSlide, presentation: PptPresentation) -> list[dict[str, Any]]:
-        """按 XYCut++ 排序一张幻灯片，并把备注稳定追加到末尾。"""
+        """Sort a slide by XYCut++ and append notes steadily to the end."""
 
         entries: list[dict[str, Any]] = []
         text_seen = False
@@ -273,7 +273,7 @@ class PptConverter:
 
     @classmethod
     def _presentation_to_pages(cls, presentation: PptPresentation) -> list[list[dict[str, Any]]]:
-        """转换整份演示文稿，并把首个有效标题提升为文档标题。"""
+        """Converts the entire presentation and promotes the first valid title to the document title."""
 
         pages = [cls._slide_to_page(slide, presentation) for slide in presentation.slides]
         document_title_promoted = False

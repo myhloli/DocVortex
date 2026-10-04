@@ -1,4 +1,4 @@
-"""解析 Word CHPX/PAPX FKP 页面并提供按 FC 查询的格式 run。"""
+"""Parse the Word CHPX/PAPX FKP page and provide the query format run by FC."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from .sprm import PapDelta, apply_paragraph_sprms
 
 @dataclass(frozen=True, slots=True)
 class CharacterRun:
-    """一个物理 FC 范围内的原始 CHPX。"""
+    """A raw CHPX within the physical FC range."""
 
     fc_start: int
     fc_end: int
@@ -23,7 +23,7 @@ class CharacterRun:
 
 @dataclass(frozen=True, slots=True)
 class ParagraphRun:
-    """一个物理 FC 范围内的段落样式和 PAPX。"""
+    """A paragraph style within the range of physical FC and PAPX."""
 
     fc_start: int
     fc_end: int
@@ -32,10 +32,10 @@ class ParagraphRun:
 
 
 class FormattingRuns:
-    """按起始 FC 排序的 CHPX/PAPX 查询索引。"""
+    """CHPX/PAPX query index sorted by starting FC."""
 
     def __init__(self, characters: list[CharacterRun], paragraphs: list[ParagraphRun]) -> None:
-        """排序 run 并缓存二分查询键。"""
+        """Sort run and cache binary query keys."""
 
         self.characters = sorted(characters, key=lambda run: run.fc_start)
         self.paragraphs = sorted(paragraphs, key=lambda run: run.fc_start)
@@ -43,7 +43,7 @@ class FormattingRuns:
         self._paragraph_starts = [run.fc_start for run in self.paragraphs]
 
     def character_at(self, fc: int) -> CharacterRun | None:
-        """返回覆盖指定 FC 的最后一个 CHPX run。"""
+        """Returns the last CHPX run covering the specified FC."""
 
         index = bisect_right(self._character_starts, fc) - 1
         if index < 0:
@@ -52,7 +52,7 @@ class FormattingRuns:
         return run if fc < run.fc_end else None
 
     def paragraph_at(self, fc: int) -> ParagraphRun | None:
-        """返回覆盖指定 FC 的最后一个 PAPX run。"""
+        """Returns the last PAPX run covering the specified FC."""
 
         index = bisect_right(self._paragraph_starts, fc) - 1
         if index < 0:
@@ -62,7 +62,7 @@ class FormattingRuns:
 
 
 def _parse_bte_pages(table_stream: bytes, offset: int, size: int) -> list[int]:
-    """从 PlcBteChpx/PlcBtePapx 读取 FKP page number。"""
+    """Read FKP page number from PlcBteChpx/PlcBtePapx."""
 
     plc = bounded_slice(table_stream, offset, size)
     if plc is None or len(plc) < 8 or (len(plc) - 4) % 8:
@@ -78,7 +78,7 @@ def _parse_bte_pages(table_stream: bytes, offset: int, size: int) -> list[int]:
 
 
 def _parse_chpx_page(page: bytes, budget: DocBudget) -> list[CharacterRun]:
-    """解析一个 512 字节 ChpxFkp。"""
+    """Parse a 512-byte ChpxFkp."""
 
     count = page[511]
     if count == 0 or (count + 1) * 4 + count > 511:
@@ -103,7 +103,7 @@ def _parse_chpx_page(page: bytes, budget: DocBudget) -> list[CharacterRun]:
 
 
 def _parse_papx_page(page: bytes, data_stream: bytes, budget: DocBudget) -> list[ParagraphRun]:
-    """解析一个 512 字节 PapxFkp。"""
+    """Parse a 512-byte PapxFkp."""
 
     count = page[511]
     header_end = (count + 1) * 4 + count * 13
@@ -152,7 +152,7 @@ def parse_formatting_runs(
     papx_size: int,
     budget: DocBudget,
 ) -> FormattingRuns:
-    """解析 FIB 指向的全部 CHPX/PAPX FKP；坏可选页仅告警跳过。"""
+    """Parse all CHPX/PAPX and FKP pointed to by FIB; bad optional pages only alert and skip."""
 
     characters: list[CharacterRun] = []
     paragraphs: list[ParagraphRun] = []

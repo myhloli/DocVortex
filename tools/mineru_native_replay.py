@@ -1,4 +1,4 @@
-"""用真实 PDF 和冻结布局验证 MinerU 的 medium/high 原生复用；不运行模型推理。"""
+"""Verify medium/high native reuse of MinerU with real PDF and frozen layout; model inference is not run."""
 
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ from unittest.mock import patch
 
 
 def capture(args: argparse.Namespace) -> dict:
-    """回放实际宿主的表格优先与文本回填阶段，并冻结回退模型输入及调用计数。"""
+    """Replay the table priority and text backfill phases of the actual host, and freeze the fallback model input and call count."""
     os.environ["ORT_DISABLE_TELEMETRY"] = "1"
     import onnxruntime
 
-    # 回放不运行模型推理，禁用无关后台遥测以稳定独立进程的正常退出。
+    # Replay does not run model inference, and extraneous background telemetry is disabled to stabilize graceful exit of independent processes.
     onnxruntime.disable_telemetry_events()
     sys.path.insert(0, str(args.mineru_source.resolve()))
     from loguru import logger
@@ -41,7 +41,7 @@ def capture(args: argparse.Namespace) -> dict:
         payload = path.read_bytes()
         source_hash = hashlib.sha256(payload).hexdigest()
         if path.suffix == ".xor":
-            # 与冻结语料的来源摘要保持一致，只在交给 PDFium 前解码载荷。
+            # Consistent with the source digest of the frozen corpus, only decode the payload before handing it to PDFium.
             key = b"MinerU flash layout fixture"
             payload = bytes(value ^ key[index % len(key)] for index, value in enumerate(payload))
         entry = next(item for item in frozen["documents"] if item["source_sha256"] == source_hash)
@@ -51,12 +51,12 @@ def capture(args: argparse.Namespace) -> dict:
             geometry_calls = [0] * len(baseline)
 
             def geometry_once(document, page_index):
-                """统计真实提取调用，检查表格和文本阶段是否复用同一份字符几何。"""
+                """Statistics of real extraction calls are performed to check whether the table and text stages reuse the same character geometry."""
                 geometry_calls[page_index] += 1
                 return original_geometry(document, page_index)
 
             def fixed_ocr(_model, images, **_kwargs):
-                """冻结低置信 OCR 响应，并记录实际图像输入以验证宿主回退不变。"""
+                """Freeze the low-confidence OCR response and log the actual image input to verify that the host fallback is unchanged."""
                 calls.append(
                     [
                         {
@@ -159,7 +159,7 @@ def capture(args: argparse.Namespace) -> dict:
 
 
 def main() -> None:
-    """显式指定宿主 checkout 和后端，不向 DocVortex 的运行依赖加入 MinerU。"""
+    """Explicitly specify the host checkout and backend, and do not add MinerU to the running dependency of DocVortex."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mineru-source", type=Path, required=True)
     parser.add_argument("--flash-baseline", type=Path, required=True)

@@ -1,4 +1,4 @@
-"""以原生字体数据和字符几何验证替代边界，不依赖 PNG 编码的一致性。"""
+"""Validate alternative boundaries with native font data and character geometry, without relying on PNG encoding consistency."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 
 
 def _system_geometry(source: Path, destination: Path) -> dict[str, Any]:
-    """从独立解释器读取默认 PDFium，保证从未安装过 DocVortex 的字体接口。"""
+    """Reads the default PDFium from a standalone interpreter, ensuring that the font interface for DocVortex has never been installed."""
     completed = subprocess.run(
         [sys.executable, str(_ROOT / "tools/font_geometry.py"), str(source), str(destination), "--system-fonts"],
         capture_output=True,
@@ -35,7 +35,7 @@ def _system_geometry(source: Path, destination: Path) -> dict[str, Any]:
 
 
 def _assert_replacement_boundary(old: dict[str, Any], new: dict[str, Any]) -> tuple[int, int]:
-    """源字符不变；缺字环境可改变 PDFium 自动补空格数量，但索引仍来自原始 textpage。"""
+    """The source characters remain unchanged; the missing character environment can change the number of spaces automatically filled by PDFium, but the index is still from the original textpage."""
     assert old["source_sha256"] == new["source_sha256"]
     assert len(old["pages"]) == len(new["pages"])
     replaced_names = {font["name_hex"] for font in new["fonts"].values() if font["data_sha256"] == _FONT_SHA256}
@@ -63,8 +63,8 @@ def _assert_replacement_boundary(old: dict[str, Any], new: dict[str, Any]) -> tu
                     stable.append((char, font))
             protected.append(stable)
             cjk.append(replaced_codes)
-        # 无可用系统 CJK 字库时，旧 PDFium 会省略缺失字形；新结果不得丢失旧有字符。
-        # 三平台的新策略字符数量、Unicode 和索引仍由平台差分严格逐项检查。
+        # When no system CJK font is available, the old PDFium omits missing glyphs; new results must not lose old characters.
+        # The new policy character number, Unicode and index of the three platforms are still strictly checked item by item by the platform differential.
         assert Counter(cjk[0]) <= Counter(cjk[1])
         if len(cjk[0]) == len(cjk[1]):
             assert cjk[0] == cjk[1]
@@ -79,7 +79,7 @@ def _assert_replacement_boundary(old: dict[str, Any], new: dict[str, Any]) -> tu
 
 @pytest.mark.parametrize("name", ["中文论文3.pdf", "中文论文4.pdf"])
 def test_real_papers_preserve_unicode_and_embedded_fonts(name: str, tmp_path: Path) -> None:
-    """逐页确认两篇论文的字体接管真实生效，同时保护原始文本及嵌入字体。"""
+    """Confirm page by page that the font takeover of the two papers is truly effective, while protecting the original text and embedded fonts."""
     source = _ROOT / "demo/pdfs" / name
     old = _system_geometry(source, tmp_path / "system.json")
     new = capture_geometry(source)
@@ -88,7 +88,7 @@ def test_real_papers_preserve_unicode_and_embedded_fonts(name: str, tmp_path: Pa
 
 
 def _mixed_font_pdf(destination: Path) -> None:
-    """生成嵌入 CJK、未嵌入 CJK、英文/符号及旋转横排文本，使用已有运行时依赖。"""
+    """Generate embedded CJK, unembedded CJK, English/symbol and rotated horizontal text, using existing runtime dependencies."""
     from importlib import resources
     from pypdf import PdfReader, PdfWriter
 
@@ -121,7 +121,7 @@ def _mixed_font_pdf(destination: Path) -> None:
 
 
 def test_rotated_mixed_font_pdf_preserves_replacement_boundary(tmp_path: Path) -> None:
-    """旋转页面及横排文本仍只替换未嵌入 CJK，不修改字体嵌入或非 CJK 抽取。"""
+    """Rotating pages and horizontal text still only replaces non-embedded CJK, and does not modify font embedding or non-CJK extraction."""
     source = tmp_path / "mixed.pdf"
     _mixed_font_pdf(source)
     old = _system_geometry(source, tmp_path / "system.json")

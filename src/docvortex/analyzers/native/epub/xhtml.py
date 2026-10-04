@@ -1,4 +1,4 @@
-"""把 EPUB XHTML/SVG 内容文档转换为 DocVortex raw blocks。"""
+"""Convert EPUB XHTML/SVG content document to DocVortex raw blocks."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ _NOTE_NON_TEXT_SUBTREES = frozenset(
 
 
 def _unwrap_epub_type_quotes(value: str) -> str:
-    """移除单层成对外围引号，避免把多个各自带引号的 token 当作一个整体。"""
+    """Remove single layer of paired peripheral quotes to avoid treating multiple individually quoted tokens as one."""
     normalized = value.strip()
     quote_pairs = {'"': '"', "'": "'", "“": "”", "‘": "’"}
     if len(normalized) < 2 or quote_pairs.get(normalized[0]) != normalized[-1]:
@@ -77,7 +77,7 @@ def _unwrap_epub_type_quotes(value: str) -> str:
 
 
 def _epub_types(element: etree._Element) -> frozenset[str]:
-    """读取 EPUB 命名空间或未命名 type 属性中的结构语义 token。"""
+    """Read the structural semantics token in the EPUB namespace or unnamed type attribute."""
     values: list[str] = []
     for name, value in element.attrib.items():
         local_name = etree.QName(name).localname if name.startswith("{") else name.split(":", 1)[-1]
@@ -87,19 +87,19 @@ def _epub_types(element: etree._Element) -> frozenset[str]:
 
 
 def _roles(element: etree._Element) -> frozenset[str]:
-    """读取 ARIA role 属性中的小写语义 token。"""
+    """Read lowercase semantics token in the ARIA role attribute."""
     return frozenset((element.get("role") or "").casefold().split())
 
 
 def _is_individual_note(element: etree._Element) -> bool:
-    """判断块级元素是否表示单条 EPUB Footnote/Endnote。"""
+    """Determine whether the block-level element represents a single EPUB Footnote/Endnote."""
     if _local_name(element) not in _NOTE_BLOCK_TAGS:
         return False
     return bool(_epub_types(element) & _INDIVIDUAL_NOTE_TYPES or _roles(element) & _INDIVIDUAL_NOTE_ROLES)
 
 
 def _note_semantic(element: etree._Element) -> str:
-    """按固定优先级返回 note 的 EPUB type 或 ARIA role。"""
+    """Return EPUB type or ARIA role of note in fixed priority order."""
     epub_types = _epub_types(element)
     for note_type in _INDIVIDUAL_NOTE_TYPE_ORDER:
         if note_type in epub_types:
@@ -112,7 +112,7 @@ def _note_semantic(element: etree._Element) -> str:
 
 
 def _note_has_text_block(element: etree._Element) -> bool:
-    """判断 note 是否能产生非空 text，从而避免注册没有正文目标的 anchor。"""
+    """Determine whether note can generate non-empty text, thereby avoiding the registration of anchor without text objects."""
     if _clean_text_node(element.text).strip():
         return True
     for child in element:
@@ -131,7 +131,7 @@ def _note_has_text_block(element: etree._Element) -> bool:
 
 
 def _load_chapter_stylesheet(package: EpubPackage, chapter_path: str, root: etree._Element) -> MarkupStylesheet:
-    """按章节 head 顺序加载包内 CSS 与内联 style。"""
+    """Load CSS and inline style in the package in order of chapter head."""
     stylesheet = MarkupStylesheet()
     for element in root.iter():
         if not isinstance(element.tag, str):
@@ -150,33 +150,33 @@ def _load_chapter_stylesheet(package: EpubPackage, chapter_path: str, root: etre
 
 
 class _EpubAnchorPolicy:
-    """保持 EPUB 标题、脚注 identity 与可落地性判定的既有契约。"""
+    """Maintain the existing contract between EPUB title, footnote identity and feasibility judgment."""
 
     anchor_prefix = "epub"
     register_document_start = True
 
     @staticmethod
     def heading_identity(element: etree._Element, ordinal: int) -> str:
-        """按源 ID 或匿名标题序号生成 EPUB 标题 identity。"""
+        """Generate EPUB title identity according to source ID or anonymous title serial number."""
         return f"{element_id(element) or 'heading'}-{ordinal}"
 
     @staticmethod
     def is_materializable_note(element: etree._Element, document: MarkupAnchorDocument) -> bool:
-        """沿用 EPUB note 语义、文本块能力和最终可见性判断。"""
+        """Follow EPUB note semantics, text block capabilities and final visibility judgment."""
         return _is_individual_note(element) and _note_has_text_block(element) and bool(visible_element_text(element, document))
 
     @staticmethod
     def note_identity(element: etree._Element, ordinal: int) -> str:
-        """按 note 类型、源 ID 与章节内序号生成 EPUB 脚注 identity。"""
+        """Generate EPUB footnote identity according to note type, source ID and serial number in chapter."""
         source_id = element_id(element)
         return f"note-{_note_semantic(element)}-{source_id or 'anonymous'}-{ordinal}"
 
 
 class EpubAnchorRegistry:
-    """建立章节路径、正文、标题与 note fragment 到实际 canonical anchor 的别名表。"""
+    """Create an alias table of chapter path, text, title and note fragment to actual canonical anchor."""
 
     def __init__(self, chapters: list[tuple[str, etree._Element]], package: EpubPackage) -> None:
-        """预扫描全部选中 XHTML 章节，建立标题、note 与章节起点映射。"""
+        """Pre-scan all selected XHTML chapters, and establish mapping between title, note and chapter starting point."""
         self._package = package
         self._pending_links: dict[str, tuple[str, str | None]] = {}
         documents = [
@@ -197,11 +197,11 @@ class EpubAnchorRegistry:
         root: etree._Element,
         sources: list[tuple[etree._Element, dict[str, object]]],
     ) -> None:
-        """在章节投影完成后登记真实正文目标，不修改已有标题和脚注身份。"""
+        """After the chapter projection is completed, the real text object is registered, and the existing title and footnote identities are not modified."""
         self._registry.register_text_targets(chapter_path, root, sources)
 
     def defer_link(self, href: str, *, base_part: str) -> str | None:
-        """暂存尚未物化的包内目标，跨章节投影完成后统一兑现或降级。"""
+        """The targets in the package that have not yet been materialized are temporarily stored, and will be uniformly redeemed or downgraded after the cross-chapter projection is completed."""
         normalized = sanitize_hyperlink_target(href, allowed_schemes=(), allow_relative=True, allow_fragment=True)
         target = self._package.resolve_reference(normalized, base_part=base_part) if normalized is not None else None
         if target is None:
@@ -211,7 +211,7 @@ class EpubAnchorRegistry:
         return placeholder
 
     def finalize_links(self, pages: list[list[dict[str, object]]]) -> None:
-        """消除所有解析期链接占位，保留无效链接的文字与样式。"""
+        """Eliminate all parsing period link placeholders and retain the text and style of invalid links."""
         targets = {
             placeholder: (f"#{anchor}" if (anchor := self._registry.resolve_target(path, fragment)) else None)
             for placeholder, (path, fragment) in self._pending_links.items()
@@ -221,19 +221,19 @@ class EpubAnchorRegistry:
         self._pending_links.clear()
 
     def heading_anchor(self, heading: etree._Element) -> str | None:
-        """返回一个已预扫描 EPUB 标题的规范 anchor。"""
+        """Returns a canonical anchor that has the prescanned EPUB header."""
         return self._registry.heading_anchor(heading)
 
     def heading_label(self, anchor: str) -> str | None:
-        """返回规范 EPUB 标题 anchor 对应的可见标签。"""
+        """Return the visible label corresponding to the specification EPUB title anchor."""
         return self._registry.heading_label(anchor)
 
     def note_anchor(self, note: etree._Element) -> str | None:
-        """返回一个已预扫描 EPUB Footnote/Endnote anchor。"""
+        """Returns a pre-scanned EPUB Footnote/Endnote anchor."""
         return self._registry.note_anchor(note)
 
     def resolve_anchor(self, href: str, *, base_part: str) -> str | None:
-        """解析指向已登记正文、标题或 note 的包内链接，返回不带井号的 anchor。"""
+        """Parse in-package links pointing to registered text, titles, or note, returning anchor without the pound sign."""
         normalized = sanitize_hyperlink_target(
             href,
             allowed_schemes=(),
@@ -248,7 +248,7 @@ class EpubAnchorRegistry:
         return self._registry.resolve_target(target.path, target.fragment)
 
     def resolve_link(self, href: str, *, base_part: str) -> str | None:
-        """解析安全外部链接或指向已登记输出块的 EPUB 内部链接。"""
+        """Resolving safe external links or EPUB internal links to registered output blocks."""
         external = sanitize_hyperlink_target(href)
         if external is not None:
             return external
@@ -257,26 +257,26 @@ class EpubAnchorRegistry:
 
 
 def build_anchor_registry(chapters: list[tuple[str, etree._Element]], package: EpubPackage) -> EpubAnchorRegistry:
-    """从已解析章节元组建立跨章节锚点注册表。"""
+    """Create a cross-chapter anchor registry from parsed chapter tuples."""
     return EpubAnchorRegistry(chapters, package)
 
 
 @dataclass(frozen=True, slots=True)
 class _EpubMarkupContext:
-    """把 EPUB 包资源与文档级 anchor 适配到共享 markup projector。"""
+    """Adapt EPUB package resources and document-level anchor to shared markup projector."""
 
     package: EpubPackage
     chapter_path: str
     anchors: EpubAnchorRegistry
 
     def resolve_link(self, href: str) -> str | None:
-        """解析安全外部链接或实际存在的 EPUB 包内 anchor。"""
+        """Resolve secure external links or anchor within the actual existing EPUB package."""
         return self.anchors.resolve_link(href, base_part=self.chapter_path) or self.anchors.defer_link(
             href, base_part=self.chapter_path
         )
 
     def resolve_image(self, source: str, *, alt: str = "") -> ResolvedMarkupImage | None:
-        """读取并严格校验一个 EPUB 包内图片引用，SVG 光栅化为 PNG。"""
+        """Read and strictly verify the picture reference in a EPUB package, and SVG is rasterized into PNG."""
         target = self.package.resolve_reference(source, base_part=self.chapter_path)
         if target is None:
             return ResolvedMarkupImage(alt=alt) if alt else None
@@ -304,20 +304,20 @@ class _EpubMarkupContext:
         return ResolvedMarkupImage(image_base64=data_uri, alt=alt)
 
     def heading_anchor(self, heading: etree._Element) -> str | None:
-        """返回一个已预扫描 EPUB 标题的规范 anchor。"""
+        """Returns a canonical anchor that has the prescanned EPUB header."""
         return self.anchors.heading_anchor(heading)
 
     def heading_label(self, anchor: str) -> str | None:
-        """返回规范 EPUB 标题 anchor 对应的可见标签。"""
+        """Return the visible label corresponding to the specification EPUB title anchor."""
         return self.anchors.heading_label(anchor)
 
     def note_anchor(self, note: etree._Element) -> str | None:
-        """返回一个已预扫描 EPUB Footnote/Endnote anchor。"""
+        """Returns a pre-scanned EPUB Footnote/Endnote anchor."""
         return self.anchors.note_anchor(note)
 
 
 class EpubChapterConverter:
-    """把一个 XHTML spine item 通过共享 projector 投影为 raw blocks。"""
+    """Project a XHTML spine item to raw blocks by sharing projector."""
 
     def __init__(
         self,
@@ -326,7 +326,7 @@ class EpubChapterConverter:
         root: etree._Element,
         anchors: EpubAnchorRegistry,
     ) -> None:
-        """绑定单个章节的包、路径、DOM 与文档级 anchor 注册表。"""
+        """Bind a single chapter's package, path, DOM and document-level anchor registry."""
         self.package = package
         self.chapter_path = chapter_path
         self.root = root
@@ -334,7 +334,7 @@ class EpubChapterConverter:
         self.stylesheet = _load_chapter_stylesheet(package, chapter_path, root)
 
     def convert(self) -> list[dict[str, object]]:
-        """解析 XHTML body，并保持既有 EPUB 标题与脚注语义。"""
+        """Parse XHTML body, and maintain the existing EPUB title and footnote semantics."""
         body = next(
             (element for element in self.root.iter() if isinstance(element.tag, str) and _local_name(element) == "body"),
             None,
@@ -355,7 +355,7 @@ class EpubChapterConverter:
 
 
 def _finalize_pending_content(items: list[dict[str, object]], targets: dict[str, str | None]) -> None:
-    """递归处理 raw block 和行内 Span，表格 HTML 同步替换或解包失效链接。"""
+    """Recursively process raw block and inline Span, table HTML synchronously replace or unpack failed links."""
     output: list[dict[str, object]] = []
     flattened = False
     for item in items:
@@ -383,7 +383,7 @@ def _finalize_pending_content(items: list[dict[str, object]], targets: dict[str,
                 continue
         output.append(item)
     if flattened:
-        # 只有失效链接被解包的 Span 列表需要重新合并，避免重复校验整本正文。
+        # Only the Span list with unpacked invalid links needs to be re-merged to avoid repeated verification of the entire text.
         output = normalize_span_dicts(output)
     items[:] = output
 
@@ -393,7 +393,7 @@ def convert_svg_spine(
     chapter_path: str,
     root: etree._Element,
 ) -> list[dict[str, object]]:
-    """把 standalone SVG spine item 尽力转换为文本和包内栅格图片。"""
+    """Convert standalone SVG spine item to text and raster images in the package."""
     empty_registry = EpubAnchorRegistry([], package)
     context = _EpubMarkupContext(package, chapter_path, empty_registry)
     stylesheet = _load_chapter_stylesheet(package, chapter_path, root)

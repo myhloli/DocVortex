@@ -1,6 +1,6 @@
 # Portions derived from pdftext 0.7.1, Copyright Vik Paruchuri, Apache-2.0.
 # Changed in DocVortex: grouping uses owned dictionaries without upstream container adapters.
-"""基础文本行与上下标分组；保留已验证的几何判断。"""
+"""Basic text lines are grouped with superscripts and subscripts; verified geometric judgments preserved."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from ._contracts import Line, Lines, Spans
 
 
 def is_math_symbol(char: str) -> bool:
-    """判断单字符数学符号。"""
+    """Determine single-character mathematical symbols."""
     if len(char) != 1:
         return False
 
@@ -21,7 +21,7 @@ def is_math_symbol(char: str) -> bool:
 
 def _top2(values: list[float]) -> tuple[float, int, float]:
     # Returns (max1, max1_idx, max2) so that max-excluding-index can be answered in O(1)
-    """在线性时间内找到两个最大值。"""
+    """Find two maxima in linear time."""
     max1 = max2 = float("-inf")
     max1_idx = -1
     for idx, v in enumerate(values):
@@ -35,7 +35,7 @@ def _top2(values: list[float]) -> tuple[float, int, float]:
 
 
 def _bottom2(values: list[float]) -> tuple[float, int, float]:
-    """在线性时间内找到两个最小值。"""
+    """Find two minima in linear time."""
     min1 = min2 = float("inf")
     min1_idx = -1
     for idx, v in enumerate(values):
@@ -49,7 +49,7 @@ def _bottom2(values: list[float]) -> tuple[float, int, float]:
 
 
 def assign_scripts(lines: Lines, height_threshold: float = 0.8, line_distance_threshold: float = 0.1) -> None:
-    """根据邻接片段几何设置基础上下标提示。"""
+    """Subscript hints based on adjacent segment geometry settings."""
     for line in lines:
         spans = line["spans"]
         if len(spans) < 2:
@@ -120,12 +120,12 @@ def assign_scripts(lines: Lines, height_threshold: float = 0.8, line_distance_th
 
 
 def get_lines(spans: Spans) -> Lines:
-    """按换行、角度和位置将片段聚合为行。"""
+    """Aggregate clips into rows by wrap, angle, and position."""
     lines: Lines = []
     line: Line = None
 
     def line_break() -> None:
-        """以当前片段开始一个新的文本行。"""
+        """Starts a new line of text starting with the current fragment."""
         lines.append({"spans": [span], "bbox": span["bbox"].copy(), "rotation": span["rotation"]})
 
     for span in spans:

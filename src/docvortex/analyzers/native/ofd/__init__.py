@@ -1,4 +1,4 @@
-"""OFD 固定版式 Flash 解析入口。"""
+"""OFD fixed layout Flash analysis entry."""
 
 from .errors import OfdEncryptedError, OfdParseError, OfdResourceLimitError
 from .metadata import extract_ofd_metadata

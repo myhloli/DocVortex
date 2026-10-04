@@ -1,4 +1,4 @@
-//! 复用同一批 run 与样本，连续计算跨页样式异常和全文逐行字号校准。
+//! The same batch of run and samples are reused to continuously calculate cross-page style anomalies and full-text line-by-line font size calibration.
 use crate::{
     geometry_risk::quantile,
     geometry_runs::{Run, Sample},
@@ -17,7 +17,7 @@ pub struct Style {
     pub scales: Vec<(usize, f64)>,
 }
 
-/// 只复用已有数值，不物化 Python 字符；保持首锚点高度、重复来源行和并列字体规则。
+/// Only reuse existing values and do not materialize Python characters; maintain the first anchor point height, repeated source rows and parallel font rules.
 pub fn prepare(
     samples: &[Sample],
     lines: &[Vec<usize>],
@@ -70,7 +70,7 @@ pub fn prepare(
         }
     }
     let mut scales = Vec::new();
-    // 全文异常触发后校准所有行，不能只处理属于异常 run 的行。
+    // Calibrate all lines after the full-text exception is triggered, and cannot only process the lines belonging to the exception run.
     if !inflated.is_empty() {
         for (line_index, line) in lines.iter().enumerate() {
             let mut counts = HashMap::<usize, usize>::new();
@@ -119,7 +119,7 @@ pub fn prepare(
     Some(Style { inflated, scales })
 }
 
-/// 持有整本样式文档的数值样本，跨阶段不创建 Python 字符对象。
+/// Hold numerical samples of the entire style document and do not create Python character objects across stages.
 #[derive(Default)]
 pub struct Document {
     samples: Vec<Sample>,
@@ -143,7 +143,7 @@ pub type Report = (
 );
 pub type Result = (Vec<usize>, Vec<((i64, i64), f64)>, Vec<Report>);
 
-/// 完成锚点、run 和样式计算后的自有数据，布局分支仅在后续修复边界物化。
+/// After completing the own data of anchor point, run and style calculation, the layout branch only repairs the boundary materialization later.
 pub type Legacy = (Option<crate::geometry::Box4>, crate::geometry::Size, i32);
 
 pub struct Prepared {
@@ -157,7 +157,7 @@ pub struct Prepared {
 }
 
 impl Document {
-    /// 接收已完成坐标转换和字体编码的一行，保持重复来源行的成员追加次序。
+    /// Receive a row that has completed coordinate conversion and font encoding, and maintain the member appending order of the repeated source row.
     pub fn append(&mut self, page: i64, source: i64, height: f64, records: Vec<Sample>) {
         if records.is_empty() {
             return;
@@ -179,7 +179,7 @@ impl Document {
         }
     }
 
-    /// 只在 Rust 内生成完整前置数据，样本坐标不经过 Python 往返。
+    /// Complete pre-data is only generated within Rust, and the sample coordinates do not go through Python.
     pub fn prepare(mut self, families: &[usize], legacy: Option<Vec<Legacy>>) -> Option<Prepared> {
         for line in &self.lines {
             let heights = line
@@ -229,7 +229,7 @@ impl Document {
         })
     }
 
-    /// 样式分支只返回最终诊断，消费完成即释放全部字符数据。
+    /// The style branch only returns the final diagnosis, and all character data is released when consumption is completed.
     pub fn finish(self, families: Vec<usize>) -> Option<Result> {
         let Prepared {
             runs,
@@ -250,7 +250,7 @@ impl Document {
     }
 }
 
-/// 从已完成统计的自有 run 导出诊断数值，不构造 Python run 对象。
+/// Derive diagnostic values from the own run that has completed statistics, and do not construct Python run objects.
 pub fn reports(runs: &[Run], style: &Style) -> Vec<Report> {
     let inflated: HashSet<_> = style.inflated.iter().copied().collect();
     let mut reports = Vec::with_capacity(runs.len());

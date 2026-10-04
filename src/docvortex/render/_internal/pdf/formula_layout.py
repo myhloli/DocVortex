@@ -1,4 +1,4 @@
-"""在已冻结的正文和标题之间独立安排原始版式的行间公式。"""
+"""Arrange original layout's inline formulas independently between frozen body text and headings."""
 
 from __future__ import annotations
 
@@ -16,14 +16,14 @@ _EPS = 0.001
 
 
 def display_formula(item: PreparedBlock) -> DisplayFormulaFlowable | None:
-    """只选择独立的矢量行间公式，图片和文字兜底继续使用原有块适配。"""
+    """Only select independent vector interline formulas, and continue to use the original block adaptation for pictures and text."""
     if len(item.flowables) == 1 and isinstance(item.flowables[0], DisplayFormulaFlowable):
         return item.flowables[0]
     return None
 
 
 def _body_candidates(blocks: list[PreparedBlock]) -> list[PreparedBlock]:
-    """使用足够长的真实正文估计字号，排除 and 等短连接段及占位内容。"""
+    """Use a long enough real text to estimate the font size, and exclude short link segments and placeholder content such as and."""
     return [
         item
         for item in blocks
@@ -34,7 +34,7 @@ def _body_candidates(blocks: list[PreparedBlock]) -> list[PreparedBlock]:
 
 
 def _same_column(item: PreparedBlock, body: PreparedBlock) -> bool:
-    """通过原始横向覆盖范围归属正文栏，避免把对侧栏字号和宽度混在一起。"""
+    """By assigning the original horizontal coverage to the main text column, avoid mixing the font sizes and widths of the opposite side columns."""
     x0, _, x1, _ = item.original_rect
     bx0, _, bx1, _ = body.original_rect
     overlap = min(x1, bx1) - max(x0, bx0)
@@ -42,7 +42,7 @@ def _same_column(item: PreparedBlock, body: PreparedBlock) -> bool:
 
 
 def _safe_area(item: PreparedBlock, blocks: list[PreparedBlock], left: float, right: float) -> Rect | None:
-    """以其他块的最终绘制范围为障碍；未安排的公式预留原框，按阅读顺序分配空白。"""
+    """The final drawing range of other blocks is used as a barrier; unarranged formulas are reserved for the original box, and white space is allocated in reading order."""
     _, y0, _, y1 = item.original_rect
     top, bottom = _GAP, item.page_height - _GAP
     for other in blocks:
@@ -61,7 +61,7 @@ def _safe_area(item: PreparedBlock, blocks: list[PreparedBlock], left: float, ri
 
 
 def place_formulas(blocks: list[PreparedBlock], page_width: float, default_font_size: float) -> None:
-    """在同栏安全区内安排所有公式；字号和横向定位不再随整块画布缩放。"""
+    """Arrange all formulas in the same column safe area; font size and horizontal positioning no longer scale with the entire canvas."""
     bodies = _body_candidates(blocks)
     page_font_size = median(body.body_font_size for body in bodies) if bodies else default_font_size
     for item in blocks:
@@ -75,7 +75,7 @@ def place_formulas(blocks: list[PreparedBlock], page_width: float, default_font_
         right = min(page_width, median(body.original_rect[2] for body in column)) if column else x1
         area = _safe_area(item, blocks, left, right) or _safe_area(item, blocks, x0, x1)
         if area is None:
-            # 输入已经相交或没有安全间距时不扩展原框，同时给调用方明确诊断。
+            # The original box will not be expanded when the inputs already intersect or there is no safe distance, and a clear diagnosis will be provided to the caller.
             area = item.original_rect
             report_pdf_diagnostic(
                 "pdf_formula_clearance_unavailable",
@@ -87,7 +87,7 @@ def place_formulas(blocks: list[PreparedBlock], page_width: float, default_font_
         draw_top = min(max((y0 + y1 - flowable.height) / 2, top), bottom - flowable.height)
         item.reference_font_size = item.target_font_size = font_size
         item.draw_rect = (left, draw_top, right, draw_top + flowable.height)
-        # Flowable 内部完成本体缩放，外部画布比例恒为 1，序号不会被向左收缩。
+        # Flowable completes the body scaling internally, the external canvas ratio is always 1, and the serial number will not be shrunk to the left.
         item.fit = BlockFit(1.0, flowable.width, flowable.height, [(flowable, flowable.width, flowable.height, 0.0)])
         report_pdf_diagnostic(
             "pdf_formula_layout",

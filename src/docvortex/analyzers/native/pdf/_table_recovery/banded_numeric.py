@@ -1,4 +1,4 @@
-"""以重复数值行、共同字形间隙和物理表头证据恢复少线表。"""
+"""Recover less-lined tables with duplicate value rows, common glyph gaps, and physical header evidence."""
 
 from __future__ import annotations
 
@@ -17,12 +17,12 @@ from .sparse_common import _local_rules
 
 
 def _numeric_value(value: str) -> bool:
-    """接受数值、常见单位后缀或独立状态符号，不把普通短词当数据。"""
+    """Accepts numerical values, common unit suffixes or independent status symbols, and does not treat ordinary short words as data."""
     return bool(re.fullmatch(r"(?:[<>≤≥+-]?\d[\d.,\s–—/+-]*(?:%|[kKmMbB])?|[O✓✔✗✘×])", value.strip()))
 
 
 def _shared_gutter(text: NativeTableText, indices: set[int], lower: float, upper: float) -> float | None:
-    """在所有指定行的字形并集中寻找共同空白，拒绝横切单个字形。"""
+    """Searches for common whitespace in the union of glyphs on all specified lines, rejecting crosscutting of individual glyphs."""
     intervals = sorted(
         (max(lower, g.bbox[0]), min(upper, g.bbox[2]))
         for g in text.glyphs
@@ -43,7 +43,7 @@ def _shared_gutter(text: NativeTableText, indices: set[int], lower: float, upper
 
 
 def _filled_header_tracks(table_input: NativeTableInput, text: NativeTableText, cols: int, width: float) -> list[float] | None:
-    """仅采用同高、相邻且覆盖全部表头文本的底色矩形作为列界。"""
+    """Only use background-colored rectangles of the same height, adjacent, and covering all header text as column boundaries."""
     boxes = []
     for rectangle in table_input.rectangles:
         if not rectangle.fill_visible or rectangle.segment_count != 5:
@@ -72,7 +72,7 @@ def _filled_header_tracks(table_input: NativeTableInput, text: NativeTableText, 
 def build_banded_numeric_candidate(
     table_input: NativeTableInput, text: NativeTableText, diagnostics: dict[str, Any]
 ) -> NativeTableCandidate | None:
-    """只在三条以上重复数据行、完整落格和物理边界同时成立时生成候选。"""
+    """Candidates are only generated when there are more than three repeated data lines, complete grids and physical boundaries are established at the same time."""
     diagnostics.update(evidence="banded_numeric", first_rejection_gate="repeated_data_rows")
     dense = [row for row in text.rows if len(row.tokens) >= 2 and all(_numeric_value(token.text) for token in row.tokens[1:])]
     if len(dense) < 3:
@@ -102,7 +102,7 @@ def build_banded_numeric_candidate(
     if any(b - a < 2 * text.median_glyph_width for a, b in zip(centers, centers[1:])):
         return None
     body_indices = set(range(first_data, len(text.rows)))
-    # 叶子表头参与共同间隙验证；更高层表头另由局部横线证明跨列。
+    # The leaf header participates in common gap verification; the higher-level header also uses local horizontal lines to prove that it spans columns.
     leaf = first_data - 1
     if len(text.rows[leaf].tokens) < cols - 1 and first_data == 2:
         leaf = 0
@@ -142,7 +142,7 @@ def build_banded_numeric_candidate(
     ]
     spans: dict[tuple[int, int], tuple[int, int]] = {}
     occupied = set()
-    # 三层表头仅在组底横线吻合连续叶子列、且首列上下均无标题时合并。
+    # The three-layer headers are only merged when the bottom horizontal line of the group matches the continuous leaf column and there are no titles above and below the first column.
     if grouped_header:
         groups = []
         for token in text.rows[1].tokens:
@@ -183,7 +183,7 @@ def build_banded_numeric_candidate(
                     row, col, rowspan, colspan, (tracks[col], boundaries[row], tracks[col + colspan], boundaries[row + rowspan])
                 )
             )
-    # 高层标题若横切列界而无横线合并证据，拒绝猜测；同列跨行文字保持原文。
+    # If a high-level title cuts across column boundaries and there is no evidence of horizontal line merging, guessing is rejected; text across lines in the same column remains the original text.
     for spec in specs:
         for glyph in text.glyphs:
             if (
@@ -216,7 +216,7 @@ def build_banded_numeric_candidate(
     ):
         diagnostics["first_rejection_gate"] = "verified_integrity"
         return None
-    # 表头 loose 字框可能重叠；公共空间投影按原始基线恢复各格物理行。
+    # Header loose The word frames may overlap; public space projection restores the physical rows of each grid according to the original baseline.
     raw = {int(char.get("char_idx", index)): char for index, char in enumerate(table_input.chars)}
     visible = sorted(index for index, char in raw.items() if str(char.get("char", "")).strip())
     cells = []

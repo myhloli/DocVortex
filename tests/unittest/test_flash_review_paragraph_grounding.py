@@ -1,4 +1,4 @@
-"""原生标题续行、跨栏项目和图旁段尾的尺度与否定证据。"""
+"""Standards and negative evidence for original title line continuations, cross-bar items, and figure paragraph endings."""
 
 import pytest
 
@@ -13,7 +13,7 @@ from docvortex.analyzers.native.pdf.line_merging import _merge_same_baseline_gro
 
 
 def _native_chars(text, left, top, height, prefix_count=0, prefix_weight=700, regular_weight=400):
-    """构造不同字重的原生字符，字形坐标随字号同步改变。"""
+    """Construct native characters with different font weights, and the glyph coordinates change synchronously with the font size."""
     chars = []
     for index, letter in enumerate(text):
         bold = index < prefix_count
@@ -26,7 +26,7 @@ def _native_chars(text, left, top, height, prefix_count=0, prefix_weight=700, re
 @pytest.mark.parametrize('scale,left', [(.7,20),(1,50),(1.6,90)])
 @pytest.mark.parametrize('kind', ['title','numbered','closed','ordinary','far','offset','font','regular_prefix','bold_body','long_prefix','caption'])
 def test_short_native_bold_prefix_returns_only_to_an_open_matching_heading_after_character_release(scale,left,kind):
-    """字符释放后仍能回收同式短粗体标题末词；正文、异式标题和区域偏移必须保留。"""
+    """After the characters are released, the last word of the same-style short and bold title can still be recycled; the body text, different-style titles and regional offsets must be retained."""
     h=10*scale
     prefix='A much longer ending.' if kind=='long_prefix' else 'ending.'
     text=prefix+' Another ordinary sentence continues over the next physical row'
@@ -72,7 +72,7 @@ def test_short_native_bold_prefix_returns_only_to_an_open_matching_heading_after
 @pytest.mark.parametrize('scale,left', [(.7,20),(1,50),(1.6,90)])
 @pytest.mark.parametrize('kind', ['continuation','no_image','small_image','overlap_tail','terminal','font','far','long_tail','misaligned','marked'])
 def test_image_displaced_short_sentence_tail_requires_complete_native_continuity(scale,left,kind):
-    """连续正文和图像右缩共同证明短段尾，完整收句、异式文字和重叠图内标签不能回接。"""
+    """Continuous text and right-shortened images jointly prove that short paragraph endings, complete sentences, heterogeneous text, and labels in overlapping images cannot be tied back."""
     h=10*scale
     heading=_metric_fixture_line('Example open heading',(left,60*scale,left+150*scale,70*scale),0,
                                  effective_height=h,font_signature=('Body',0))
@@ -101,7 +101,7 @@ def test_image_displaced_short_sentence_tail_requires_complete_native_continuity
 @pytest.mark.parametrize('scale,left', [(.7,20),(1,50),(1.6,90)])
 @pytest.mark.parametrize('kind', ['cross_column','no_colon','single_peer','font','offset_peers','far_intro','indent','marked'])
 def test_cross_column_first_bullet_needs_colon_introduction_and_repeated_right_column_peers(scale,left,kind):
-    """另一栏重复圆点只在同式冒号引导证据齐全时分开首条，孤立或不齐的项目保持原判。"""
+    """The repeated dots in the other column will only be separated from the first line when the evidence of the same colon guide is complete, and the original judgment will remain for isolated or uneven items."""
     h=10*scale
     intro=_metric_fixture_line('Different ordinary choices were'+('.' if kind=='no_colon' else ':'),
                                (left,80*scale,left+190*scale,90*scale),0,effective_height=h)
@@ -123,5 +123,5 @@ def test_cross_column_first_bullet_needs_colon_introduction_and_repeated_right_c
                                                   ('Example-Roman','Example-Display',False),
                                                   ('Roman','Italic',False)])
 def test_emphasis_family_matches_generic_roman_style_without_accepting_unrelated_faces(first,second,expected):
-    """强调续行可忽略通用Roman样式后缀，字体族和未知样式仍然构成边界。"""
+    """The common Roman style suffix can be ignored when emphasizing line continuation, and the font family and unknown style still form the boundary."""
     assert _font_signatures_share_emphasis_family((first,0),(second,64))==expected

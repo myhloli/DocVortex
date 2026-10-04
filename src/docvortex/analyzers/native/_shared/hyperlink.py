@@ -1,4 +1,4 @@
-"""兼容导出位于 utils 层的共享超链接安全策略。"""
+"""Compatible with exporting shared hyperlink security policies located at the utils layer."""
 
 from __future__ import annotations
 

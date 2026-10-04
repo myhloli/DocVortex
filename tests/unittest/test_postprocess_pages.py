@@ -48,7 +48,7 @@ _RAW_INLINE_TYPES = {
 
 
 def _spanize_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """把本文件关注后处理逻辑的简写文字夹具转换为 Schema 2.0 Span。"""
+    """Convert this document's abbreviated text fixture focusing on post-processing logic to Schema 2.0 Span."""
     for block in blocks:
         block_type = str(block.get("type"))
         content = block.get("content")
@@ -64,7 +64,7 @@ def _model_json(
     *,
     page_index_map: list[int] | None = None,
 ) -> ModelJson:
-    """为 PageInfo 后处理测试构造最小严格 ModelJson。"""
+    """Construct the minimally stringent ModelJson for the PageInfo post-processing test."""
     return ModelJson(
         pages=[_spanize_blocks(deepcopy(page)) for page in pages],
         page_index_map=page_index_map or [],
@@ -74,13 +74,13 @@ def _model_json(
 
 
 def test_model_json_to_pages_replaces_raw_model_list_entrypoint() -> None:
-    """验证严格 ModelJson 是唯一文档级 PageInfo 转换入口。"""
+    """Verification Strict ModelJson is the only document-level PageInfo conversion entry."""
     assert callable(pages_module.model_json_to_pages)
     assert not hasattr(pages_module, "model_list_to_pages")
 
 
 def test_model_json_to_pages_keeps_equation_type_without_mutating_input() -> None:
-    """验证 equation 经单页后处理和严格对象化后保持类型、内容与图片载荷。"""
+    """Verify that equation maintains type, content and image payload after single page post-processing and strict objectization."""
     model_list = [
         [
             {
@@ -103,7 +103,7 @@ def test_model_json_to_pages_keeps_equation_type_without_mutating_input() -> Non
 
 
 def test_model_json_to_pages_returns_typed_pdf_tree_without_mutating_input() -> None:
-    """验证 PDF raw dict 只在副本上分组，并返回具体 PageInfo/Block 对象。"""
+    """Verify PDF raw dict groups only on replicas and returns concrete PageInfo/Block objects."""
     model_list = [
         [
             {"type": "image_caption", "bbox": [0.1, 0.05, 0.9, 0.1], "content": "Figure 1"},
@@ -134,7 +134,7 @@ def test_model_json_to_pages_returns_typed_pdf_tree_without_mutating_input() -> 
 
 
 def test_model_json_to_pages_preserves_recursive_office_list_and_index() -> None:
-    """验证 Office list/index 任意深度递归对象化，并清理未匹配目录 anchor。"""
+    """Verify Office list/index arbitrarily deep recursive objectification and clean unmatched directories anchor."""
     model_list = [
         [
             {
@@ -181,7 +181,7 @@ def test_model_json_to_pages_preserves_recursive_office_list_and_index() -> None
 
 
 def test_fix_office_list_blocks_uses_local_ordered_markers_at_each_depth() -> None:
-    """验证多级 Office 有序列表按当前层独立编号，并保留富文本与各层起始值。"""
+    """Verify that the multi-level Office ordered list is independently numbered according to the current level, and retains rich text and the starting value of each level."""
     rich_content = [*_inline("root", styles=["bold"]), equation("x"), hyperlink("https://example.com", "link")]
     list_block = {
         "type": "list",
@@ -274,7 +274,7 @@ def test_fix_office_list_blocks_uses_local_ordered_markers_at_each_depth() -> No
 
 
 def test_model_json_to_pages_maps_index_anchor_to_document_title_type_and_level() -> None:
-    """验证 Office 目录叶子按跨页目标 anchor 继承真实标题类型与层级。"""
+    """Verify that the Office table of contents leaf inherits the true title type and hierarchy by cross-page target anchor."""
     model_list = [
         [
             {
@@ -321,7 +321,7 @@ def test_model_json_to_pages_maps_index_anchor_to_document_title_type_and_level(
 
 
 def test_model_json_to_pages_uses_first_title_for_duplicate_anchor() -> None:
-    """验证重复 anchor 按文档顺序使用首个标题目标。"""
+    """Verify Duplicate anchor uses the first header target in document order."""
     model_list = [
         [
             {"type": "paragraph_title", "content": "First", "level": 2, "anchor": "same"},
@@ -341,7 +341,7 @@ def test_model_json_to_pages_uses_first_title_for_duplicate_anchor() -> None:
 
 
 def test_office_paragraph_numbering_is_document_wide_and_copy_only() -> None:
-    """验证 Office 标题跨页编号、显式编号同步和 raw 元数据保留。"""
+    """Verify Office title cross-page numbering, explicit numbering synchronization, and raw metadata preservation."""
     model_list = [
         [
             {"type": "paragraph_title", "content": "<b>A</b>", "level": 1, "is_numbered_style": True},
@@ -371,7 +371,7 @@ def test_office_paragraph_numbering_is_document_wide_and_copy_only() -> None:
 
 
 def test_office_paragraph_numbering_clears_deeper_levels() -> None:
-    """验证标题返回浅层时会清理旧深层计数，后续重新从一开始编号。"""
+    """When the verification header returns to the shallow level, the old deep count will be cleared, and subsequent numbers will start again from the beginning."""
     model_list = [
         [
             {"type": "paragraph_title", "content": "A", "level": 2, "is_numbered_style": True},
@@ -398,7 +398,7 @@ def test_office_paragraph_numbering_clears_deeper_levels() -> None:
 
 
 def test_visual_body_drops_empty_parent_subtype() -> None:
-    """验证 raw visual 的空 subtype 只用于父块判断，不会泄漏到严格 body 模型。"""
+    """Verify that the empty subtype of raw visual is only used for parent block determination and does not leak into the strict body model."""
     page = model_json_to_pages(_model_json([[{"type": "image", "content": None, "sub_type": None}]]))[0]
 
     assert isinstance(page.blocks[0], ImageBlock)
@@ -408,7 +408,7 @@ def test_visual_body_drops_empty_parent_subtype() -> None:
 
 
 def test_chart_none_content_is_normalized_to_empty_string() -> None:
-    """验证 raw chart 的 null content 在严格对象化前规范为空字符串。"""
+    """Verify that raw chart's null content specification is an empty string before strict objectification."""
     page = model_json_to_pages(_model_json([[{"type": "chart", "content": None}]]))[0]
 
     assert isinstance(page.blocks[0], ChartBlock)
@@ -417,7 +417,7 @@ def test_chart_none_content_is_normalized_to_empty_string() -> None:
 
 
 def test_raw_title_levels_are_normalized_to_global_hierarchy() -> None:
-    """验证 raw 标题在严格对象化前归一为全局一至六级层级。"""
+    """Verify that raw headers are normalized to the global one to six level hierarchy before strict objectification."""
     page = model_json_to_pages(
         _model_json(
             [
@@ -434,7 +434,7 @@ def test_raw_title_levels_are_normalized_to_global_hierarchy() -> None:
 
 
 def test_pdf_raw_paragraph_title_level_is_clamped_to_six() -> None:
-    """验证带 bbox 的 PDF raw 深层标题在严格对象化前归一为六级。"""
+    """Verify PDF with bbox raw Deep headers are normalized to six levels before strict objectification."""
     page = model_json_to_pages(
         _model_json([[{"type": "paragraph_title", "content": "Deep", "level": 9, "bbox": [0.1, 0.1, 0.9, 0.2]}]])
     )[0]
@@ -444,7 +444,7 @@ def test_pdf_raw_paragraph_title_level_is_clamped_to_six() -> None:
 
 
 def test_office_title_level_is_clamped_before_numbering_and_index_mapping() -> None:
-    """验证 Office 深层标题在编号和目录映射前归一为六级。"""
+    """Verify that Office deep headers are normalized to six levels before numbering and directory mapping."""
     model_list = [
         [
             {
@@ -473,7 +473,7 @@ def test_office_title_level_is_clamped_before_numbering_and_index_mapping() -> N
 
 
 def test_pdf_continuation_is_typed_and_line_metadata_is_removed() -> None:
-    """验证 raw 段落延续在对象化前完成，公开 TextBlock 不保留临时 lines。"""
+    """Verify raw paragraph continuation is completed before objectification, public TextBlock does not retain temporary lines."""
     model_list = [
         [
             {
@@ -500,7 +500,7 @@ def test_pdf_continuation_is_typed_and_line_metadata_is_removed() -> None:
 
 
 def test_pdf_ref_text_continuation_is_typed_and_line_metadata_is_removed() -> None:
-    """验证 ref_text 续段标记越过 raw 边界，严格对象不保留临时 lines。"""
+    """Verify ref_text continuation segment mark crosses raw boundary, strict object does not retain temporary lines."""
     model_list = [
         [
             {
@@ -527,7 +527,7 @@ def test_pdf_ref_text_continuation_is_typed_and_line_metadata_is_removed() -> No
 
 
 def test_pdf_detection_scans_past_empty_first_page() -> None:
-    """验证整份文档 bbox 判定不会把 PDF 空白首页误认为 Office。"""
+    """Verify the entire document bbox to determine that the blank first page of PDF is not mistaken for Office."""
     pages = model_json_to_pages(
         _model_json(
             [
@@ -542,7 +542,7 @@ def test_pdf_detection_scans_past_empty_first_page() -> None:
 
 
 def test_cross_page_table_continuation_remains_raw_postprocess() -> None:
-    """验证连续页表格仍在对象化前写入 continues_prev。"""
+    """Verify that the continuous page table is still writing continues_prev before objectification."""
     html_a = "<table><tr><td>A</td><td>B</td></tr></table>"
     html_b = "<table><tr><td>C</td><td>D</td></tr></table>"
     pages = model_json_to_pages(

@@ -1,4 +1,4 @@
-"""用独立原页事实验证原生 benchmark 修复，避免按候选结果更新真值。"""
+"""Fix native benchmark with independent original page fact verification to avoid updating true values by candidate results."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ MANIFEST = json.loads((ROOT / "tests/fixtures/benchmark_native_manifest.json").r
 
 
 def _model(name: str) -> list[dict]:
-    """校验原件身份后解析全部页，直接验证原生成员与结构。"""
+    """After verifying the identity of the original, all pages are parsed and native members and structures are directly verified."""
     record = next(item for item in MANIFEST["documents"] if item["id"] == name)
     source = (ROOT / record["path"]).read_bytes()
     assert hashlib.sha256(source).hexdigest() == record["sha256"]
@@ -46,7 +46,7 @@ def _model(name: str) -> list[dict]:
     ],
 )
 def test_real_native_table_topology(name: str, shapes: list[tuple[int, int]]) -> None:
-    """真实表格必须输出单元格结构，不能以空间投影或错误细分代替。"""
+    """A real table must output the cell structure and cannot be replaced by spatial projection or false subdivision."""
     tables = [block for block in _model(name) if block["type"] == "table"]
     assert len(tables) == len(shapes)
     for block, (rows, cols) in zip(tables, shapes):
@@ -88,7 +88,7 @@ def test_real_native_table_topology(name: str, shapes: list[tuple[int, int]]) ->
     ],
 )
 def test_real_heading_boundaries(name: str, count: int) -> None:
-    """真实标题数量来自原页层次，同时验证简介未被额外提升为标题。"""
+    """The actual number of titles comes from the original page level, and it is verified that the introduction has not been additionally promoted to titles."""
     blocks = _model(name)
     titles = [block for block in blocks if block["type"] in {"doc_title", "paragraph_title"}]
     assert len(titles) == count
@@ -102,7 +102,7 @@ def test_real_heading_boundaries(name: str, count: int) -> None:
 
 
 def test_real_step_children_stay_before_next_parent() -> None:
-    """原页的第一步骤及六个子步骤必须先于第二步骤，不能被全局切栏拆开。"""
+    """The first step and six sub-steps of the original page must precede the second step and cannot be split by global cut columns."""
     blocks = _model("microscope_steps")
     contents = [block["content"] for block in blocks]
     first = next(i for i, value in enumerate(contents) if value.startswith("1. When changing"))
@@ -112,7 +112,7 @@ def test_real_step_children_stay_before_next_parent() -> None:
 
 
 def test_real_panel_body_follows_its_heading() -> None:
-    """三栏说明必须依次完整输出，不应先扫过三栏标题再扫正文。"""
+    """The three-column description must be output completely in sequence. You should not scan the three-column headings first and then scan the main text."""
     blocks = _model("search_value_panels")
     content = "\n".join(block["content"] for block in blocks)
     assert (
@@ -128,13 +128,13 @@ def test_real_panel_body_follows_its_heading() -> None:
 
 
 def test_real_rotated_axis_labels_follow_page_position() -> None:
-    """日期顺序由横轴几何决定，不能因旋转字框细微高差把后一年的标签提前。"""
+    """The date sequence is determined by the geometry of the horizontal axis, and the labels of the following year cannot be advanced due to the slight height difference of the rotating text frame."""
     image = next(block for block in _model("migration_charts") if block["type"] == "image")
     assert image["content"].index("01/2019") < image["content"].index("01/2020") < image["content"].index("01/2021")
 
 
 def test_real_chart_dates_and_legend_follow_data() -> None:
-    """原页三根柱的日期共享横轴行，底部图例必须在日期之后，不能由对象顺序提前。"""
+    """The dates of the three columns on the original page share the horizontal axis row, and the bottom legend must be after the date and cannot be advanced by the object sequence."""
     image = next(block for block in _model("employment_charts") if block["type"] == "image")
     dates = ["July 2020", "October 2020", "January 2021"]
     assert any(all(date in row for date in dates) for row in image["content"].splitlines())

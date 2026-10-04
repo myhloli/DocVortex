@@ -31,7 +31,7 @@ STRICT_DOCX_REPLACEMENTS = STRICT_OOXML_COMMON_REPLACEMENTS + (
     ),
 )
 
-# 关系类型尾段到 part 内容类型的映射，用于按关系图补全 [Content_Types].xml Override。
+# Mapping of relationship type tail segment to part content type for completion by relationship diagram [Content_Types].xml Override.
 DOCX_REL_CONTENT_TYPES = {
     "officeDocument": "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
     "styles": "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml",
@@ -47,7 +47,7 @@ DOCX_REL_CONTENT_TYPES = {
 
 
 def normalize_docx_package(file_bytes: bytes) -> bytes:
-    """在进入 python-docx 前修复 DOCX 包级容错问题。"""
+    """Fix DOCX packet-level fault tolerance before entering python-docx."""
     with ZipFile(BytesIO(file_bytes)) as source:
         package_members = {info.filename for info in source.infolist()}
         reachable_members, relationship_graph_complete = _collect_relationship_reachable_members(source, package_members)
@@ -72,7 +72,7 @@ def normalize_docx_package(file_bytes: bytes) -> bytes:
         for info, member_data in loaded_members:
             normalized_data = member_data
             if info.filename.endswith(".xml") or info.filename.endswith(".rels"):
-                # ISO Strict 命名空间与关系类型统一改写为 Transitional，python-docx 才能识别。
+                # ISO Strict namespace and relationship type must be rewritten to Transitional in order to be recognized by python-docx.
                 normalized_data = translate_strict_ooxml_uris(normalized_data, STRICT_DOCX_REPLACEMENTS)
                 if normalized_data != member_data:
                     changed = True
@@ -108,7 +108,7 @@ def _collect_relationship_reachable_members(
     source: ZipFile,
     package_members: set[str],
 ) -> tuple[set[str], bool]:
-    """按 OPC relationship 图收集 python-docx/mammoth 可能访问的包成员。"""
+    """The OPC relationship diagram collects the package members that may be accessed by python-docx/mammoth."""
     reachable_members = {"[Content_Types].xml"}
     root_rels = "_rels/.rels"
     if root_rels not in package_members:
@@ -149,7 +149,7 @@ def _iter_internal_relationship_targets(
     rels_filename: str,
     rels_xml: bytes,
 ) -> Iterator[str]:
-    """解析 .rels 文件，逐个返回有效的内部 relationship 目标路径。"""
+    """Parses .rels files, returning valid internal relationship destination paths one by one."""
     parser = etree.XMLParser(resolve_entities=False, remove_blank_text=False)
     root = etree.fromstring(rels_xml, parser)
     for relationship in root:
@@ -167,7 +167,7 @@ def _iter_internal_relationship_targets(
 
 
 def _relationship_part_rels_filename(part_name: str) -> str | None:
-    """根据包内 part 路径推导它对应的 relationship 成员路径。"""
+    """According to the part path in the package, its corresponding relationship member path is deduced."""
     normalized_part_name = part_name.replace("\\", "/")
     if normalized_part_name in {"", "."} or normalized_part_name.startswith("../"):
         return None
@@ -185,7 +185,7 @@ def _read_member_best_effort(
     info: ZipInfo,
     reachable_members: set[str] | None,
 ) -> bytes | None:
-    """读取 ZIP 成员；仅跳过不可达坏成员或可降级媒体，关键成员继续失败。"""
+    """Reading ZIP member; only unreachable bad members or degradable media are skipped, critical members continue to fail."""
     try:
         return source.read(info.filename)
     except ZIP_MEMBER_READ_ERRORS as exc:
@@ -203,7 +203,7 @@ def _is_skippable_corrupt_member(
     filename: str,
     reachable_members: set[str] | None,
 ) -> bool:
-    """判断损坏成员是否可安全丢弃，避免吞掉正文结构损坏。"""
+    """Determine whether damaged members can be safely discarded to avoid ingesting structural damage to the text."""
     if filename.startswith("word/media/"):
         return True
     if _is_docx_embedded_office_member(filename):
@@ -212,12 +212,12 @@ def _is_skippable_corrupt_member(
 
 
 def _is_docx_embedded_office_member(filename: str) -> bool:
-    """判断成员是否为 Word 内嵌 Office/OLE 对象载荷，解析正文时可降级跳过。"""
+    """Determine whether the member is Word embedded Office/OLE object payload, which can be downgraded and skipped when parsing the text."""
     return filename.replace("\\", "/").startswith(DOCX_EMBEDDED_OFFICE_PREFIX)
 
 
 def _is_relationship_element(element: etree._Element) -> bool:
-    """判断 XML 节点是否为 Relationship 元素，兼容缺省命名空间。"""
+    """Determine whether the XML node is a Relationship element and is compatible with the default namespace."""
     if element.tag == RELATIONSHIP_TAG:
         return True
     try:
@@ -232,7 +232,7 @@ def _remove_missing_internal_relationships(
     package_members: set[str],
     skipped_members: set[str],
 ) -> bytes:
-    """删除指向缺失、非法或已跳过成员的关系，避免 python-docx 加载时崩溃。"""
+    """Remove relationships pointing to missing, illegal, or skipped members to avoid python-docx crash on load."""
     try:
         parser = etree.XMLParser(resolve_entities=False, remove_blank_text=False)
         root = etree.fromstring(rels_xml, parser)
@@ -276,7 +276,7 @@ def _resolve_internal_relationship_target(
     rels_filename: str,
     target: str | None,
 ) -> str | None:
-    """把内部 relationship Target 解析成 ZIP 包内成员路径。"""
+    """Parse the internal relationship Target into the ZIP package member path."""
     if not target:
         return None
 

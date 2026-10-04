@@ -1,4 +1,4 @@
-"""验证迁移后的基线工具可在没有 MinerU/pdftext 的安装环境中生成报告。"""
+"""Verify that the migrated baseline tool generates reports in installations without MinerU/pdftext."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from benchmarks.pdf_corpus import corpus_manifest, corpus_paths, discover_demo_p
 
 
 def test_demo_corpus_discovers_new_subdirectory_pdf(tmp_path: Path) -> None:
-    """新 demo PDF 自动进入 demo 与 all 集合，路径只出现一次。"""
+    """New demo PDF automatically enters the set of demo and all, and the path only appears once."""
 
     (tmp_path / "demo/pdfs/nested").mkdir(parents=True)
     sample = tmp_path / "demo/pdfs/nested/new.pdf"
@@ -28,7 +28,7 @@ def test_demo_corpus_discovers_new_subdirectory_pdf(tmp_path: Path) -> None:
 
 
 def test_corpus_manifest_counts_encoded_pdf_pages(tmp_path: Path) -> None:
-    """冻结 XOR 原始字节指纹，同时按解码后的真实 PDF 统计页数。"""
+    """Freeze the original byte fingerprint of XOR and count pages according to the decoded real PDF."""
 
     import hashlib
 
@@ -44,7 +44,7 @@ def test_corpus_manifest_counts_encoded_pdf_pages(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(sys.platform == "win32", reason="基线工具使用 POSIX resource 进程统计")
 def test_native_benchmark_generates_report_and_portable_profile(tmp_path: Path) -> None:
-    """实际运行单页基线与 profiler，检查元数据及安装包路径归一化。"""
+    """Actually run the single-page baseline and profiler to check the metadata and installation package path normalization."""
     root = Path(__file__).parents[1]
     completed = subprocess.run(
         [
@@ -79,7 +79,7 @@ def test_native_benchmark_generates_report_and_portable_profile(tmp_path: Path) 
 
 
 def test_public_pipeline_benchmark_freezes_all_outputs(tmp_path: Path) -> None:
-    """实际比较两次合成 CSV 的七种输出、源字节和独立进程内存报告。"""
+    """Actual comparison of seven output, source bytes, and independent process memory reports for two synthetic CSVs."""
     root = Path(__file__).parents[1]
     for name in ("baseline", "candidate"):
         command = [
@@ -107,7 +107,7 @@ def test_public_pipeline_benchmark_freezes_all_outputs(tmp_path: Path) -> None:
 
 
 def test_pdf_benchmark_compares_both_layouts_and_python_fallback(tmp_path: Path) -> None:
-    """独立进程重放公式和重复图片，检查回退后端、视觉签名及严格基线比较。"""
+    """Independent processes replay formulas and duplicate images, checking fallback backends, visual signatures, and strict baseline comparisons."""
     root = Path(__file__).parents[1]
     for name in ("baseline", "candidate"):
         command = [

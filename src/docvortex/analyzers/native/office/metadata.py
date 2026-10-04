@@ -1,4 +1,4 @@
-"""OOXML 与 OLE 属性读取，不实例化正文转换器。"""
+"""OOXML and OLE properties are read without instantiating the text converter."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ _APP = "{http://schemas.openxmlformats.org/officeDocument/2006/extended-properti
 
 
 def _xml_part(package: ZipFile, name: str) -> etree._Element | None:
-    """读取有界 ZIP XML part，禁用实体扩展和外部网络访问。"""
+    """Read bounded ZIP XML part, entity extension and external network access disabled."""
     if name not in package.namelist():
         return None
     if package.getinfo(name).file_size > MAX_ENTRY_BYTES:
@@ -35,7 +35,7 @@ def _xml_part(package: ZipFile, name: str) -> etree._Element | None:
 
 
 def _element_value(root: etree._Element | None, tag: str) -> str | None:
-    """读取指定命名空间的首个非空属性元素。"""
+    """Read the first non-empty attribute element of the specified namespace."""
     if root is None:
         return None
     for element in root.iter(tag):
@@ -45,7 +45,7 @@ def _element_value(root: etree._Element | None, tag: str) -> str | None:
 
 
 def read_ooxml_properties(data: bytes | str | Path, suffix: str) -> tuple[DocumentProperties, list[str]]:
-    """读取 OOXML 核心属性和结构计数，坏的可选属性不阻止其他读取。"""
+    """Read OOXML core properties and structure count, bad optional properties not preventing other reads."""
     properties = DocumentProperties()
     warnings: list[str] = []
     package_source = BytesIO(data) if isinstance(data, bytes) else data
@@ -111,13 +111,13 @@ def read_ooxml_properties(data: bytes | str | Path, suffix: str) -> tuple[Docume
 
 
 def read_ole_properties(data: bytes, suffix: str) -> tuple[DocumentProperties, list[str]]:
-    """读取受限 OLE 属性流并按声明代码页解码旧 Office 文本。"""
+    """Reads the restricted OLE attribute stream and decodes the old Office text according to the declared code page."""
     from .legacy.ole import BoundedOleReader
 
     properties = DocumentProperties()
     warnings: list[str] = []
     with BoundedOleReader(data) as reader:
-        # 先通过同一读取预算校验属性流，防止 get_metadata 绕过单流上限。
+        # First verify the attribute stream through the same read budget to prevent get_metadata from bypassing the single stream upper limit.
         for name in ("\x05SummaryInformation", "\x05DocumentSummaryInformation"):
             if reader.has_stream(name):
                 reader.read_stream(name)
@@ -137,7 +137,7 @@ def read_ole_properties(data: bytes, suffix: str) -> tuple[DocumentProperties, l
         doc_codepage = getattr(metadata, "codepage_doc", None)
         doc_encoding = f"cp{doc_codepage}" if isinstance(doc_codepage, int) and doc_codepage > 0 else encoding
         properties.languages = property_values(_ole_text(metadata.language, doc_encoding))
-        # OLE FILETIME 明确定义为 UTC，即使 olefile 返回的是无 tzinfo 的 datetime。
+        # OLE FILETIME is explicitly defined as UTC, even though olefile returns datetime without tzinfo.
         created, modified = metadata.create_time, metadata.last_saved_time
         properties.created_at = property_date(
             created.replace(tzinfo=timezone.utc) if isinstance(created, datetime) else created, warnings=warnings
@@ -152,7 +152,7 @@ def read_ole_properties(data: bytes, suffix: str) -> tuple[DocumentProperties, l
 
 
 def _ole_text(value: object, encoding: str) -> str | None:
-    """优先使用 OLE 代码页，不让未解码字节进入共享 JSON。"""
+    """Prioritize the use of the OLE code page and prevent undecoded bytes from entering the shared JSON."""
     if isinstance(value, bytes):
         try:
             value = value.decode(encoding, errors="replace")

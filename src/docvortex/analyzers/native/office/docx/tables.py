@@ -1,4 +1,4 @@
-"""DOCX 表格处理；共享当前 Converter 的单文档状态。"""
+"""DOCX table processing; sharing the current single document status of Converter."""
 
 import base64
 import re
@@ -22,7 +22,7 @@ from ..image import is_valid_vector_image_payload, is_vector_image_part, seriali
 
 @mammoth_images.img_element
 def _convert_mammoth_table_image(image: Any) -> dict[str, str]:
-    """把表格内 WMF/EMF 转为可导出的图片，普通位图保持原始载荷。"""
+    """Convert WMF/EMF in the table to an exportable image, and keep the original load of the ordinary bitmap."""
     with image.open() as stream:
         payload = stream.read()
     if is_vector_image_part(content_type=image.content_type) or is_valid_vector_image_payload(payload):
@@ -33,35 +33,35 @@ def _convert_mammoth_table_image(image: Any) -> dict[str, str]:
 
 
 class _DocxTables:
-    """集中维护表格，不自行创建文档或持有跨文档缓存。"""
+    """Maintain tables centrally, without creating your own documents or holding cross-document caches."""
 
     @staticmethod
     def _mammoth_top_level_table_document(document):
-        """只保留 DOCX 正文顶层表格节点，避免 Mammoth 转换非表格正文。"""
+        """Only retain the top table node of the DOCX text to avoid Mammoth converting non-table text."""
         from mammoth import documents as _mammoth_documents
 
         return document.copy(children=[child for child in document.children if isinstance(child, _mammoth_documents.Table)])
 
     def _preparse_tables_with_mammoth(self, file_bytes: bytes) -> list:
         """
-        使用 mammoth 在完整 DOCX 上下文中预解析所有顶层表格的 HTML。
+        Use mammoth to preparse HTML for all top-level tables in the full DOCX context.
 
-        孤立模式下（仅传入 <w:tbl> XML 片段），mammoth 缺少编号定义
-        （word/numbering.xml）、样式（word/styles.xml）和关系
-        （word/_rels/document.xml.rels）等上下文，在遇到含列表项或图片
-        的单元格时会抛出 AttributeError。这里让 mammoth 读取完整 DOCX
-        包上下文，但通过 transform_document 只转换顶层表格节点，避免把
-        非表格正文转换成巨大的 HTML 字符串。
+        In isolated mode (only <w:tbl> XML fragment passed in), mammoth missing number definition
+        (word/numbering.xml), style (word/styles.xml) and relationships
+        (word/_rels/document.xml.rels) and other contexts, when encountering a list item or picture
+        AttributeError is thrown for cells. Here let mammoth read the complete DOCX
+        package context, but only converts top-level table nodes via transform_document to avoid
+        Non-table text converted to huge HTML string.
 
-        图片会被 mammoth 转换为内联 data-URI base64 格式（<img src="data:...">）。
+        The image will be converted by mammoth to inline data-URI base64 format (<img src="data:...">).
 
-        注意：mammoth 不支持 OMML、Equation XML 或 MTEF OLE 公式，会静默丢弃
-        表格单元格内的公式。本方法在获取 mammoth HTML 后，会同步遍历原始 DOCX XML，
-        将丢失的公式重新注入对应的 HTML 单元格。
+        Note: mammoth does not support OMML, Equation XML or MTEF OLE formulas and will be silently discarded
+        Formulas within table cells. After obtaining mammoth HTML, this method will synchronously traverse the original DOCX XML.
+        Reinject the missing formula into the corresponding HTML cell.
 
         Returns:
-            list[str | None]: 与正文顶层表格对齐的 HTML 列表；None 表示该表格
-                未找到可靠 Mammoth 结果，后续走完整文档上下文回退解析
+            list[str | None]: A list of HTML aligned with the top-level table of the text; None represents the table
+                No reliable Mammoth result found, follow the complete document context fallback analysis
         """
         try:
             import mammoth as _mammoth
@@ -74,11 +74,11 @@ class _DocxTables:
             )
             soup = _BeautifulSoup(result.value, "html.parser")
 
-            # 仅保留顶层表格，排除嵌套在其他表格单元格内的子表格
+            # Keep only top-level tables, exclude subtables nested within other table cells
             all_tables = soup.find_all("table")
             top_level_tables = [t for t in all_tables if not t.find_parent("table")]
 
-            # 同步加载 DOCX XML，获取所有顶层表格元素，用于公式注入
+            # Synchronously load DOCX XML to obtain all top-level table elements for formula injection
             docx_obj = Document(BytesIO(file_bytes))
             xml_top_tables = [elem for elem in docx_obj.element.body if self._local_name(elem) == "tbl"]
 
@@ -101,13 +101,13 @@ class _DocxTables:
         source_part: Any,
     ) -> list:
         """
-        将 Mammoth 输出表格按正文顶层 XML 表格重新对齐。
+        Realign the Mammoth output table to the text top-level XML table.
 
-        某些 DOCX 会在文本框、图片形状或兼容结构中包含表格，Mammoth 完整
-        文档转换时可能把这些结构表格也输出为顶层 HTML table；但正文遍历
-        只会在真实 body/w:tbl 上调用 _handle_tables。这里按 XML 表格的
-        顺序扫描 Mammoth 候选表，跳过不属于正文顶层表格的候选，避免后续
-        _mammoth_table_idx 顺序消费时发生错位。
+        Some DOCX contain tables within text boxes, picture shapes, or compatible structures, Mammoth Complete
+        During document conversion, these structural tables may also be output as top-level HTML table; but the text traversal
+        _handle_tables will only be called on the real body/w:tbl. Here according to XML form
+        Scan the Mammoth candidate table sequentially, skipping candidates that do not belong to the top table of the text to avoid subsequent
+        _mammoth_table_idx Misalignment occurred during sequential consumption.
         """
         aligned_tables = []
         html_index = 0
@@ -143,10 +143,10 @@ class _DocxTables:
     @staticmethod
     def _mammoth_table_matches_xml_table(html_table, xml_table) -> bool:
         """
-        判断 Mammoth HTML 表格是否对应当前正文 XML 表格。
+        Determine whether the Mammoth HTML table corresponds to the current text XML table.
 
-        文本表优先比较去空白后的表格文本，避免同为 1x1 的图片/文本框表格
-        误占正文表格位置；无文本表格再使用结构和图片数量兜底。
+        The text table preferentially compares the table text after removing the blanks to avoid image/text box tables that are both 1x1.
+        Mistakenly occupy the position of the text table; use the structure and number of pictures to hide the table without text.
         """
         xml_signature = _DocxTables._xml_table_signature(xml_table)
         html_signature = _DocxTables._html_table_signature(html_table)
@@ -167,20 +167,20 @@ class _DocxTables:
 
     @staticmethod
     def _xml_table_char_fragment(node: Any) -> str:
-        """按 Mammoth 规则把字符级 OOXML 元素渲染为表格签名文本。
+        """Render character-level OOXML elements into table signature text according to Mammoth rules.
 
-        仅拼接 w:t 会遗漏不间断连字符、软连字符和 Symbol 字符，
-        导致 XML 签名与 Mammoth HTML 签名不一致。未映射的 w:sym 在
-        Mammoth 中会被忽略，此处同样返回空字符串。
+        Splicing only w:t will miss the non-breaking hyphen, soft hyphen and Symbol characters,
+        This causes the XML signature to be inconsistent with the Mammoth HTML signature. Unmapped w:sym in
+        Mammoth will be ignored, and an empty string will be returned here as well.
         """
         w_ns = _DocxConstants._BLIP_NAMESPACES["w"]
         if node.tag == f"{{{w_ns}}}t":
             return node.text or ""
         if node.tag == f"{{{w_ns}}}noBreakHyphen":
-            # NON-BREAKING HYPHEN U+2011，与 Mammoth 的 HTML 渲染一致。
+            # NON-BREAKING HYPHEN U+2011, consistent with HTML rendering of Mammoth.
             return "‑"
         if node.tag == f"{{{w_ns}}}softHyphen":
-            # SOFT HYPHEN U+00AD，与 Mammoth 的 HTML 渲染一致。
+            # SOFT HYPHEN U+00AD, consistent with HTML rendering of Mammoth.
             return "­"
         if node.tag == f"{{{w_ns}}}sym":
             try:
@@ -201,11 +201,11 @@ class _DocxTables:
 
     @staticmethod
     def _xml_table_signature(xml_table) -> dict:
-        """提取与 Mammoth 渲染规则一致的 XML 表格轻量签名。
+        """Extract the XML form lightweight signature consistent with the Mammoth rendering rules.
 
-        按文档顺序收集 w:t 及特殊字符元素，并且只处理 WordprocessingML
-        命名空间，以排除 Mammoth 不渲染的 OMML m:t 公式文本。纵向合并的
-        continuation 单元格会被 Mammoth 折叠掉，因此其整个子树也不参与文本签名。
+        Collect w:t and special character elements in document order, and only process WordprocessingML
+        Namespace to exclude Mammoth OMML m:t formula text that is not rendered. vertically merged
+        The continuation cell will be collapsed by Mammoth, so its entire subtree will not participate in the text signature.
         """
         w_ns = _DocxConstants._BLIP_NAMESPACES["w"]
         char_tags = (
@@ -220,20 +220,20 @@ class _DocxTables:
             vmerge = properties.find(f"{{{w_ns}}}vMerge") if properties is not None else None
             if vmerge is None:
                 continue
-            # Mammoth 将缺少 val 或 val=continue 的单元格视为 continuation，
-            # 并在计算 rowspan 时丢弃该单元格的全部内容。
+            # Mammoth Treat cells missing val or val=continue as continuation,
+            # And discard the entire contents of the cell when calculating rowspan.
             if vmerge.get(f"{{{w_ns}}}val") in (None, "continue"):
                 continuation_nodes.update(cell.iter())
 
         ignored_nodes = set(continuation_nodes)
         mc_ns = "http://schemas.openxmlformats.org/markup-compatibility/2006"
         for alternate in xml_table.iter(f"{{{mc_ns}}}AlternateContent"):
-            # Mammoth 的 Office XML 读取器仅展开 Fallback 分支。
+            # The Office XML reader for Mammoth only expands the Fallback branch.
             for branch in alternate:
                 if branch.tag != f"{{{mc_ns}}}Fallback":
                     ignored_nodes.update(branch.iter())
         for simple_field in xml_table.iter(f"{{{w_ns}}}fldSimple"):
-            # Mammoth 不解析简单域，其内部的缓存文字也不参与匹配。
+            # Mammoth does not parse simple fields, and its internal cached text does not participate in matching.
             ignored_nodes.update(simple_field.iter())
 
         wordml_ns = "http://schemas.microsoft.com/office/word/2010/wordml"
@@ -244,7 +244,7 @@ class _DocxTables:
             content = content_control.find(f"{{{w_ns}}}sdtContent")
             if content is None:
                 continue
-            # Mammoth 以复选框替换内容控件里的首个非空 Text 节点。
+            # Mammoth Replaces the first non-null Text node in the content control with a checkbox.
             first_text = next(
                 (
                     node
@@ -270,14 +270,14 @@ class _DocxTables:
 
     @staticmethod
     def _html_table_signature(html_table) -> dict:
-        """提取 HTML 表格的轻量签名，用于过滤 Mammoth 额外生成的表格。"""
+        """Extract lightweight signature of HTML table, used to filter additional generated tables of Mammoth."""
         text_fragments = []
         for fragment in html_table.strings:
             anchor = fragment.find_parent("a")
             if anchor is not None and anchor.parent.name == "sup":
                 marker = re.fullmatch(r"(footnote|endnote)-ref-(\d+)", anchor.get("id", ""))
                 if marker and anchor.get("href") == f"#{marker.group(1)}-{marker.group(2)}":
-                    # 只忽略 Mammoth 生成的脚注引用，保留正文中的普通 [1]。
+                    # Only footnote references generated by Mammoth are ignored, leaving ordinary [1] in the text.
                     continue
             text_fragments.append(fragment.strip())
         return {
@@ -289,12 +289,12 @@ class _DocxTables:
 
     @staticmethod
     def _normalize_table_match_text(text: str) -> str:
-        """统一表格匹配文本，消除 Word 拆字和 Mammoth 空白差异。"""
+        """Unify table matching text to eliminate Word word splitting and Mammoth whitespace differences."""
         return re.sub(r"\s+", "", text or "")
 
     @staticmethod
     def _table_text_matches(xml_text: str, html_text: str) -> bool:
-        """比较表格文本是否指向同一个正文表格。"""
+        """Compares whether the table text points to the same body table."""
         if not xml_text or not html_text:
             return False
         if xml_text == html_text:
@@ -308,23 +308,23 @@ class _DocxTables:
         source_part: Any,
     ) -> Any:
         """
-        将 DOCX XML 表格中的 OMML/Equation XML/MTEF 公式注入 mammoth HTML 表格。
+        Inject the OMML/Equation XML/MTEF formula from the DOCX XML table into the mammoth HTML table.
 
-        mammoth 会静默丢弃 OMML、Equation XML 与 MTEF OLE 公式，导致含公式
-        的表格单元格在 HTML 中为空。本方法并行遍历 HTML 表格（BeautifulSoup 对象）
-        和 XML 表格（lxml 元素），对含有 OMML 公式的单元格用包含公式占位符的内容
-        替换原来的空内容。
+        mammoth will silently discard OMML, Equation XML and MTEF OLE formulas, resulting in
+        The table cell is empty in HTML. This method traverses the HTML table (BeautifulSoup object) in parallel
+        and the XML table (lxml element), with the content containing formula placeholders for cells containing OMML formulas
+        Replace the original empty content.
 
         Args:
-            html_table: BeautifulSoup 的 Tag 对象，代表 mammoth 生成的 <table> 元素
-            xml_table: lxml 的 Element 对象，代表原始 DOCX 中对应的 <w:tbl> 元素
+            html_table: Tag object of BeautifulSoup, representing the <table> element generated by mammoth
+            xml_table: Element object of lxml, representing the corresponding <w:tbl> element in the original DOCX
 
         Returns:
-            BeautifulSoup Tag: 注入公式后的 <table> 元素（原地修改并返回）
+            BeautifulSoup Tag: <table> element after injecting formula (modify in place and return)
         """
         W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
-        # 快速检查：该表格是否含有任何公式
+        # Quick check: does the table contain any formulas
         if not any(
             kind in _DocxConstants._FORMULA_TOKEN_KINDS for kind, _value in self._docx_formula_tokens(xml_table, source_part)
         ):
@@ -356,7 +356,7 @@ class _DocxTables:
                 ):
                     continue
 
-                # 该单元格含公式，重建其 HTML 内容以保留公式
+                # This cell contains a formula, rebuild its HTML contents to preserve the formula
                 new_content = self._build_cell_html_with_equations(
                     xml_cell,
                     source_part,
@@ -375,17 +375,17 @@ class _DocxTables:
         source_part: Any,
     ) -> str:
         """
-        为含 OMML/Equation XML/MTEF 公式的表格单元格构建 HTML 内容字符串。
+        Constructs a HTML content string for a table cell containing a OMML/Equation XML/MTEF formula.
 
-        遍历单元格内的段落，将普通文本和 OMML/Equation XML/MTEF 公式
-        混合在一起，生成与 mammoth 输出风格一致的 HTML 片段。
+        Iterate through the paragraphs in the cell and combine the normal text and OMML/Equation XML/MTEF formula
+        Mixed together to produce a HTML clip consistent with the mammoth output style.
 
         Args:
-            xml_cell: lxml Element，代表 DOCX 中的 <w:tc> 元素
+            xml_cell: lxml Element, representing the <w:tc> element in DOCX
 
         Returns:
-            str: 单元格内容的 HTML 字符串，如 "<p>text<eq>latex</eq></p>"；
-                 若单元格为空则返回空字符串
+            str: HTML string of cell content, such as "<p>text<eq>latex</eq></p>";
+                 If the cell is empty, returns an empty string
         """
         parts = []
         for child in xml_cell:
@@ -399,7 +399,7 @@ class _DocxTables:
                 )
                 if para_html is not None:
                     parts.append(para_html)
-            # 嵌套表格暂不处理，由外层逻辑负责
+            # Nested tables are not processed for the time being, and are handled by the outer logic.
         return "".join(parts)
 
     def _inject_equations_into_table_html(
@@ -408,7 +408,7 @@ class _DocxTables:
         xml_table: Any,
         source_part: Any,
     ) -> str:
-        """把孤立表格 HTML 包装为 Tag 后复用统一公式注入逻辑。"""
+        """Wrap the isolated table HTML into Tag and reuse the unified formula injection logic."""
 
         from bs4 import BeautifulSoup
 
@@ -430,19 +430,19 @@ class _DocxTables:
         source_part: Any,
     ) -> Optional[str]:
         """
-        为可能含 OMML/Equation XML/MTEF 公式的段落构建 HTML 字符串。
+        Constructs a HTML string for a paragraph that may contain a OMML/Equation XML/MTEF formula.
 
-        使用与 _handle_equations_in_text 相同的迭代逻辑：
-        - 普通 <w:t> 元素的文本直接收集
-        - <m:oMath> 元素转换为 LaTeX 并包装为公式占位符 <eq>...</eq>
-        - <m:t> 等 math 命名空间下的 <t> 元素因标签中含 "math" 而被跳过，
-          避免在 oMath2Latex 已处理整个 oMath 子树后重复提取
+        Use the same iteration logic as _handle_equations_in_text:
+        - The text of ordinary <w:t> elements is collected directly
+        - The <m:oMath> element is converted to LaTeX and wrapped as a formula placeholder <eq>...</eq>
+        - <m:t> and other <t> elements under the math namespace are skipped because the tag contains "math".
+          Avoid repeated extraction after oMath2Latex has processed the entire oMath subtree
 
         Args:
-            xml_para: lxml Element，代表 DOCX 中的 <w:p> 元素
+            xml_para: lxml Element, representing the <w:p> element in DOCX
 
         Returns:
-            str | None: 格式为 "<p>...</p>" 的 HTML 字符串；段落为空时返回 None
+            str | None: HTML string in the format "<p>...</p>"; returns None when the paragraph is empty
         """
         items: list[str] = []
         for token_kind, value in self._docx_formula_tokens(xml_para, source_part):
@@ -456,14 +456,14 @@ class _DocxTables:
         return f"<p>{''.join(items)}</p>"
 
     def _close_mammoth_fallback_context(self) -> None:
-        """关闭当前文档回退解析持有的 ZIP 资源，并清除其缓存。"""
+        """Closes the ZIP resource held by the current document fallback parsing and clears its cache."""
         context = getattr(self, "_mammoth_fallback_context", None)
         self._mammoth_fallback_context = None
         if context is not None:
             context[0].close()
 
     def _mammoth_fallback_html(self, element: BaseOxmlElement) -> str:
-        """在原 DOCX 的样式、编号、关系和图片上下文中转换当前表格。"""
+        """Converts the current table within the style, numbering, relationships, and picture context of the original DOCX."""
         context = self._mammoth_fallback_context
         if context is None:
             file_bytes = self._fallback_docx_bytes
@@ -488,14 +488,14 @@ class _DocxTables:
         table = read_str(element.xml)
 
         def read_selected_table(_root: Any, body_reader: Any) -> Any:
-            """每次获取独立 reader，只解析当前 XML 表格并沿用主文档关系。"""
+            """Each time an independent reader is obtained, only the current XML table is parsed and the main document relationship is inherited."""
             return body_reader.read_all([table])
 
         result = read_part(main_part, read_selected_table)
         return convert_document_element_to_html(result.value[0], **conversion_options).value
 
     def _handle_tables(self, element: BaseOxmlElement) -> None:
-        """按正文顺序输出表格；预匹配失败时使用完整 DOCX 上下文回退。"""
+        """Output tables in text order; use full DOCX context fallback if prematch fails."""
         table_index = self._mammoth_table_idx
         self._mammoth_table_idx += 1
         html = self._mammoth_tables_html[table_index] if table_index < len(self._mammoth_tables_html) else None
@@ -518,26 +518,26 @@ class _DocxTables:
 
     def _normalize_table_colspans(self, html: str) -> str:
         """
-        修正 HTML 表格中因无线表/少线表导致的 colspan 不一致问题。
+        Fixed the colspan inconsistency issue caused by wireless table/less wire table in HTML table.
 
-        在无边框或少边框的 DOCX 表格中，部分行的单元格包含 w:gridSpan 值，
-        该值来自 Word 内部虚拟栅格，并不反映实际视觉列数。mammoth 将这些
-        w:gridSpan 值直接转换为 HTML colspan 属性，导致不同行的有效列数
-        （所有 colspan 之和）不一致，产生行列对不齐的问题。
+        In a borderless or borderless DOCX table, some rows have cells that contain w:gridSpan values.
+        This value comes from the Word internal virtual grid and does not reflect the actual visual column number. mammoth will these
+        The w:gridSpan value is converted directly to the HTML colspan attribute, resulting in a different number of effective columns for the row
+        (The sum of all colspan) is inconsistent, resulting in misalignment of rows and columns.
 
-        本方法检测此类不一致，并将有效列数过多的行的 colspan 缩减至
-        最常见的目标列数，从而恢复表格的正确结构。
+        This method detects such inconsistencies and reduces the colspan for rows with too many valid columns to
+        The most common target column number, thereby restoring the correct structure of the table.
 
-        算法：
-        1. 计算每行的有效列数（该行所有单元格 colspan 之和）
-        2. 取最常见的列数作为目标列数
-        3. 对有效列数超过目标值的行，从第一个 colspan > 1 的单元格开始缩减
+        algorithm:
+        1. Calculate the effective number of columns in each row (sum of all cells colspan in the row)
+        2. Take the most common number of columns as the target number of columns
+        3. For rows where the number of effective columns exceeds the target value, reduce starting from the first cell with colspan > 1
 
         Args:
-            html: 包含表格的 HTML 字符串
+            html: HTML string containing table
 
         Returns:
-            str: 修正后的 HTML 字符串
+            str: Corrected HTML string
         """
         try:
             from collections import Counter
@@ -553,15 +553,15 @@ class _DocxTables:
                 if not rows:
                     continue
 
-                # 若表格中存在 rowspan > 1 的单元格，各行的显式 colspan 之和
-                # 无法反映真实网格宽度（被 rowspan 占据的列不出现在后续行的 td
-                # 列表中），此时算法的假设不成立，跳过该表格以避免误修改合法的
+                # If there are cells in the table with rowspan > 1, the sum of explicit colspan in each row
+                # Does not reflect true grid width (column occupied by rowspan does not appear in subsequent rows of td
+                # list), the assumption of the algorithm does not hold at this time, skip this table to avoid accidentally modifying the legal
                 # colspan。
                 all_cells = table.find_all(["td", "th"])
                 if any(int(c.get("rowspan", 1)) > 1 for c in all_cells):
                     continue
 
-                # 计算每行的有效列数（所有单元格的 colspan 之和）
+                # Calculate the effective number of columns per row (sum of colspan for all cells)
                 row_col_counts = []
                 for row in rows:
                     cells = row.find_all(["td", "th"])
@@ -571,14 +571,14 @@ class _DocxTables:
                 if not row_col_counts:
                     continue
 
-                # 找到目标列数（出现最多的列数）
+                # Find the target column number (the column number that appears the most)
                 count_freq = Counter(row_col_counts)
                 if len(count_freq) == 1:
-                    continue  # 各行列数已一致，无需修正
+                    continue  # The numbers of rows and columns are consistent and no correction is needed.
 
                 target = count_freq.most_common(1)[0][0]
 
-                # 修正有效列数超过目标值的行：缩减 colspan > 1 的单元格
+                # Fix rows where the number of valid columns exceeds the target value: shrink cells with colspan > 1
                 for row, col_count in zip(rows, row_col_counts):
                     if col_count <= target:
                         continue

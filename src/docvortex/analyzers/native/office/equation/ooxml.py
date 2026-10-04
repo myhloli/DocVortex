@@ -1,4 +1,4 @@
-"""现代 Office OOXML 包中的 MathType/Equation OLE 公式解码适配器。"""
+"""MathType/Equation OLE formula decoding adapter in modern Office OOXML package."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ EQUATION_PROG_ID_PREFIX = "equation."
 
 
 def is_mathtype_equation_prog_id(prog_id: object | None) -> bool:
-    """判断 OLE ProgID 是否为 Equation 或带非空版本后缀的 Equation.*。"""
+    """Determine whether OLE ProgID is Equation or Equation.* with a non-empty version suffix."""
 
     if not isinstance(prog_id, str):
         return False
@@ -27,7 +27,7 @@ def is_mathtype_equation_prog_id(prog_id: object | None) -> bool:
 
 @dataclass(slots=True)
 class OoxmlEquationDecoder:
-    """按共享资源上限缓存并解码 OOXML 中的公式 OLE 对象。"""
+    """Cache and decode formula OLE objects in OOXML by shared resource limit."""
 
     total_bytes: int = 0
     _cache: dict[bytes, str | None] = field(default_factory=dict)
@@ -39,7 +39,7 @@ class OoxmlEquationDecoder:
         prog_id: object | None,
         show_as_icon: bool = False,
     ) -> str | None:
-        """校验公式 ProgID、图标模式、CFB 头和资源预算后返回 LaTeX。"""
+        """After verifying the formula ProgID, icon mode, CFB header and resource budget, LaTeX is returned."""
 
         if show_as_icon or not is_mathtype_equation_prog_id(prog_id) or blob is None:
             return None

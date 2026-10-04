@@ -1,4 +1,4 @@
-"""非 CJK 墨迹词界的局部规则、输出物化及真实 PDF 回归。"""
+"""Local rules for non-CJK ink word boundaries, output materialization, and true PDF regression."""
 
 from copy import deepcopy
 import math
@@ -13,7 +13,7 @@ from docvortex.analyzers.native.pdf.models import _LineItem
 
 
 def _char(text, index, x, *, size=10.0, y=0.0):
-    """构造 loose 框互相覆盖而 tight 框具有真实词距的测试字符。"""
+    """Construct test characters in which the loose boxes overlap each other and the tight box has true word spacing."""
     return {
         "char": text,
         "char_idx": index,
@@ -28,7 +28,7 @@ def _char(text, index, x, *, size=10.0, y=0.0):
 
 @pytest.mark.parametrize("gap, expected", [(0, False), (2.49, False), (2.5, False), (2.51, True), (100, True)])
 def test_pair_threshold_without_sample_count(gap, expected):
-    """两个字符即可独立判定，阈值采用严格大于并且只插一个空格。"""
+    """Two characters can be determined independently. The threshold is strictly greater than and only one space is inserted."""
     chars = [_char("A", 0, 0), _char("B", 1, 4 + gap)]
     original = deepcopy(chars)
     assert needs_tight_space(*chars) is expected
@@ -39,13 +39,13 @@ def test_pair_threshold_without_sample_count(gap, expected):
 
 @pytest.mark.parametrize("pair", ["中文", "中A", "A文", "あA", "A한", "𠀀A", "A ", " A", "A,", "(A", "A+", "A²"])
 def test_excluded_boundaries(pair):
-    """CJK、标点、符号及空白即使有大留白也不触发新增规则。"""
+    """CJK, punctuation, symbols and whitespace will not trigger new rules even if there are large spaces."""
     assert not needs_tight_space(_char(pair[0], 0, 0), _char(pair[1], 1, 30))
 
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_direction_and_script_guards(angle):
-    """四个正交方向保留相同词距，错行、上下标和不连续成员被拒绝。"""
+    """The four orthogonal directions retain the same word spacing, and misaligned lines, superscripts, subscripts, and discontinuous members are rejected."""
     from docvortex.document.pdf.text.spacing import _local_box
 
     chars = [_char("A", 0, 0), _char("B", 1, 8)]
@@ -70,14 +70,14 @@ def test_direction_and_script_guards(angle):
     [("tight_bbox", None), ("tight_bbox", (0, 0, float("nan"), 10)), ("writing_angle", 0.3), ("origin", (8, 30))],
 )
 def test_unreliable_geometry_is_unchanged(field, value):
-    """缺失、非有限、倾斜或跨基线证据不能触发新增空格。"""
+    """Missing, non-limited, skewed, or cross-baseline evidence cannot trigger new spaces."""
     chars = [_char("A", 0, 0), _char("B", 1, 8)]
     chars[1][field] = value
     assert not needs_tight_space(*chars)
 
 
 def test_mixed_line_and_final_block_ownership():
-    """混排行内英文可修复，代码和公式不改写，物化幂等且不改变结构。"""
+    """The English in the mixed ranking can be repaired, the code and formulas are not rewritten, the materialization is idempotent and the structure is not changed."""
     chars = [_char(text, i, x) for i, (text, x) in enumerate(zip("中AIML文", [0, 12, 17, 25, 30, 45]))]
     line = _LineItem(text="中AIML文", bbox=(0, 0, 55, 10), angle=0, source_index=0, chars=chars)
     evidence = prepare_spacing_lines([line])
@@ -91,7 +91,7 @@ def test_mixed_line_and_final_block_ownership():
 
 
 def test_real_paper_words_and_cjk_source_preserved():
-    """真实正文的 loose 框重叠仍能补词界，源字符序列不添加伪造空格。"""
+    """loose box overlap of real text still fills in word boundaries, and no spurious spaces are added to the source character sequence."""
     from docvortex.document.pdf import PDFDocument
 
     path = Path(__file__).resolve().parents[1] / "demo/pdfs/中文论文2.pdf"
@@ -109,7 +109,7 @@ def test_real_paper_words_and_cjk_source_preserved():
 
 
 def test_table_cell_spacing_and_script_protection():
-    """单元格物化复用词界且不改源成员；上下标和相邻单元格不参与补空格。"""
+    """Cell materialization reuses word boundaries and does not change source members; superscripts and subscripts and adjacent cells do not participate in filling spaces."""
     from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableGlyph, NativeTableCell
     from docvortex.analyzers.native.pdf.table_text_styles import _render_styled_cell
 
@@ -127,7 +127,7 @@ def test_table_cell_spacing_and_script_protection():
 
 
 def test_table_projection_fallback_spacing():
-    """原生表格恢复失败后的字符投影也能补词界，已有空白不会重复。"""
+    """The character projection after the original table recovery fails can also fill in word boundaries, and existing blanks will not be repeated."""
     from docvortex.analyzers.native.pdf.spatial_text import project_pdf_table_text, project_pdf_spatial_text
 
     chars = [_char("A", 0, 0), _char("B", 1, 8)]
@@ -136,7 +136,7 @@ def test_table_projection_fallback_spacing():
 
 
 def test_transformed_unit_font_size_is_not_a_page_em():
-    """文字矩阵放大的 1pt 原始字号不能让正常 10pt 字形被逐字拆开。"""
+    """The text matrix's enlarged 1pt original font size does not allow the normal 10pt glyph to be broken up word for word."""
     chars = [_char("A", 0, 0, size=1), _char("B", 1, 5, size=1)]
     assert not needs_tight_space(*chars)
     assert join_tight_text(chars) == "AB"
@@ -144,7 +144,7 @@ def test_transformed_unit_font_size_is_not_a_page_em():
 
 @pytest.mark.parametrize("name,flags", [("CourierNew", 0), ("SourceHanMono-Normal", 0), ("Fixture", 1)])
 def test_monospace_ink_gap_is_not_a_word_boundary(name, flags):
-    """等宽字体中的窄字母留白不能把 VirtualBox 或标识符拆开。"""
+    """Narrow letter spacing in a monospaced font cannot break up VirtualBox or the identifier."""
     chars = [_char("i", 0, 0), _char("r", 1, 8)]
     for char in chars:
         char["font"].update(name=name, flags=flags)
@@ -152,13 +152,13 @@ def test_monospace_ink_gap_is_not_a_word_boundary(name, flags):
 
 
 def test_narrow_digits_remain_one_number():
-    """财务表格中的连续窄数字 11 不因墨迹框留白被拆开。"""
+    """Consecutive narrow numbers 11 in financial tables are not broken apart by blank ink boxes."""
     assert not needs_tight_space(_char("1", 0, 0), _char("1", 1, 8))
 
 
 @pytest.mark.parametrize("name", ["中文论文2.pdf", "demo1.pdf", "caibao1.pdf"])
 def test_owned_boundary_indices_match_python(name):
-    """Rust 批量词界与 Python 逐对规则一致，覆盖真实目标和字号尺度反例。"""
+    """Rust batch word boundaries are consistent with Python pairwise rules, covering real targets and font size counterexamples."""
     from docvortex.document.pdf import PDFDocument
     from docvortex._compute_backend import get_native
 
@@ -173,7 +173,7 @@ def test_owned_boundary_indices_match_python(name):
 
 
 def test_spacing_survives_existing_line_end_dehyphenation():
-    """已有跨行去连字符不能让整行的可靠词界投影失效。"""
+    """Existing cross-line hyphenation does not invalidate the reliable word boundary projection of the entire line."""
     from docvortex.analyzers.native.pdf.inline.spacing import PDFTextSpacingLine
 
     lines = [PDFTextSpacingLine((0, 0, 90, 10), "deeplan-", 0, (4,)), PDFTextSpacingLine((0, 10, 90, 20), "guage", 1, ())]
@@ -183,7 +183,7 @@ def test_spacing_survives_existing_line_end_dehyphenation():
 
 
 def test_spacing_is_preserved_inside_link_materialization():
-    """新增空格先于链接区间物化，显示文字和链接目标都保持完整。"""
+    """The new spaces are materialized before the link interval, and the display text and link target remain intact."""
     from docvortex.analyzers.native.pdf.inline.materialize import apply_pdf_inline_evidence
     from docvortex.analyzers.native.pdf.inline.spacing import PDFTextSpacingLine
     from docvortex.analyzers.native.pdf.inline.types import PDFTextLinkLine, PDFTextLinkRange
@@ -199,7 +199,7 @@ def test_spacing_is_preserved_inside_link_materialization():
 
 
 def test_real_flash_public_words_and_table():
-    """完整文档验证 Flash 标题、断词参考文献和原生单元格同时恢复词距。"""
+    """Full document verification Flash Titles, hyphenated references, and native cells simultaneously restore word spacing."""
     from docvortex.analyzers.native import PdfModel
     from docvortex.document.pdf import PDFDocument
     import json

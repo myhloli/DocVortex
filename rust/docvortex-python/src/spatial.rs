@@ -1,9 +1,9 @@
-//! 基线候选、邻行与注释几何的空间索引绑定。
+//! Spatial index binding of baseline candidates, neighbor rows and annotation geometries.
 
 use docvortex_core::geometry::Box4;
 use pyo3::prelude::*;
 
-/// 调用内持有只读区间树，不缓存 Python 行对象。
+/// The call holds a read-only interval tree and does not cache the Python row object.
 #[pyclass(frozen)]
 pub(super) struct BaselineCandidates {
     index: docvortex_core::spatial::IntervalIndex,
@@ -11,7 +11,7 @@ pub(super) struct BaselineCandidates {
 
 #[pymethods]
 impl BaselineCandidates {
-    /// 验证区间后建立纯数值索引，拒绝不完整的分组参数。
+    /// After verifying the interval, a pure numerical index is established, and incomplete grouping parameters are rejected.
     #[new]
     fn new(py: Python<'_>, bounds: Vec<(f64, f64)>, groups: Vec<usize>) -> PyResult<Self> {
         py.detach(move || docvortex_core::spatial::IntervalIndex::new(bounds, groups))
@@ -19,13 +19,13 @@ impl BaselineCandidates {
             .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("invalid interval index"))
     }
 
-    /// 按固定容量查询连续行，最密的一行也不会造成全页平方内存。
+    /// Query consecutive rows according to a fixed capacity, and the densest row will not cause a full page square memory.
     fn rows(&self, py: Python<'_>, start: usize, count: usize, budget: usize) -> Vec<Vec<usize>> {
         py.detach(|| self.index.rows(start, count.min(64), budget.min(8192)))
     }
 }
 
-/// 在一次调用内过滤同行几何，保留原始行框的独立准入路径。
+/// Filter row geometry within a single call, retaining independent access paths to the original row box.
 #[pyclass(frozen)]
 pub(super) struct BaselineGeometryCandidates {
     index: docvortex_core::spatial::BaselineGeometry,
@@ -33,7 +33,7 @@ pub(super) struct BaselineGeometryCandidates {
 
 #[pymethods]
 impl BaselineGeometryCandidates {
-    /// 创建验证后的只读索引，拒绝不支持的传输记录。
+    /// Create a verified read-only index and reject unsupported transmission records.
     #[new]
     fn new(
         py: Python<'_>,
@@ -49,13 +49,13 @@ impl BaselineGeometryCandidates {
         .map(|index| Self { index })
         .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("unsupported baseline geometry"))
     }
-    /// 返回当前原始行序的有限批次，不保存整页行对。
+    /// Return a limited batch of the current original row order, without saving the entire page of row pairs.
     fn rows(&self, py: Python<'_>, start: usize, count: usize, budget: usize) -> Vec<Vec<usize>> {
         py.detach(|| self.index.rows(start, count, budget))
     }
 }
 
-/// 持有走廊片段的纯数值快照，不保留 Python 或 PDF 句柄。
+/// Holds a purely numeric snapshot of the corridor segment, without retaining the Python or PDF handles.
 #[pyclass(frozen)]
 pub(super) struct AnnotationGeometry {
     index: docvortex_core::annotation_geometry::AnnotationGeometry,
@@ -63,7 +63,7 @@ pub(super) struct AnnotationGeometry {
 
 #[pymethods]
 impl AnnotationGeometry {
-    /// 一次验证并打包片段几何，未知输入由 Python 参考实现处理。
+    /// Fragment geometry is verified and packed once, and unknown inputs are handled by the Python reference implementation.
     #[new]
     fn new(
         py: Python<'_>,
@@ -75,7 +75,7 @@ impl AnnotationGeometry {
                 pyo3::exceptions::PyValueError::new_err("unsupported annotation geometry")
             })
     }
-    /// 返回保序来源和坐标索引；非法查询不会静默产生部分结果。
+    /// Return the order-preserving source and coordinate index; illegal queries will not silently produce partial results.
     fn aggregate(
         &self,
         py: Python<'_>,
@@ -88,7 +88,7 @@ impl AnnotationGeometry {
     }
 }
 
-/// 冻结一页行级数值后批量计算上下物理净空。
+/// After freezing a page of row-level values, calculate the upper and lower physical headroom in batches.
 #[pyfunction]
 pub(super) fn title_gaps(
     py: Python<'_>,
@@ -97,7 +97,7 @@ pub(super) fn title_gaps(
     py.detach(move || docvortex_core::spatial::title_gaps(records))
 }
 
-/// 返回邻行索引，供 Python 按原顺序追加原始分析对象。
+/// Return the adjacent row index for Python to append the original analysis objects in the original order.
 #[pyfunction]
 pub(super) fn line_neighbors(
     py: Python<'_>,

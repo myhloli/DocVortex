@@ -1,4 +1,4 @@
-"""仅以可证明的后绘制不透明矩形排除完全遮挡文字，原始文本接口保持不变。"""
+"""Only provably post-drawn opaque rectangles exclude completely occluded text, and the original text interface remains unchanged."""
 
 from __future__ import annotations
 
@@ -19,11 +19,11 @@ from .native_objects import (
 
 
 def _safe_paint_resources(page):
-    """混合、软遮罩、透明组或未知资源均拒绝遮挡推断，避免把不透明外框当作实心覆盖。"""
+    """Blends, soft masks, transparent groups, or unknown resources all reject occlusion inference and avoid treating opaque outlines as solid overlays."""
     visited = set()
 
     def visit(node):
-        """递归核验实际资源中的图形状态和Form，循环引用保守拒绝。"""
+        """Recursively check the graphics status and Form in the actual resource, and conservatively reject circular references."""
         identity = id(node)
         if identity in visited:
             return True
@@ -55,7 +55,7 @@ def _safe_paint_resources(page):
 
 
 def _rectangular_clip(obj):
-    """只接受无裁剪或由轴对齐矩形组成的裁剪，曲线外框不能作为完全覆盖证明。"""
+    """Only no crops or crops consisting of axis-aligned rectangles are accepted, and curved outlines are not accepted as proof of full coverage."""
     clip = raw.FPDFPageObj_GetClipPath(obj)
     for path in range(raw.FPDFClipPath_CountPaths(clip) if clip else 0):
         points = []
@@ -78,7 +78,7 @@ def _rectangular_clip(obj):
 
 
 def _opaque_rectangle(member, page_bbox, rotation):
-    """仅核验顶层单一闭合实心矩形，嵌套透明组与复合路径不参与覆盖推断。"""
+    """Only the top-level single closed solid rectangle is verified. Nested transparent groups and compound paths do not participate in coverage inference."""
     if member.depth != 0 or raw.FPDFPageObj_GetType(member.raw) != raw.FPDF_PAGEOBJ_PATH:
         return None
     if not 4 <= raw.FPDFPath_CountSegments(member.raw) <= 5:
@@ -98,7 +98,7 @@ def _opaque_rectangle(member, page_bbox, rotation):
 
 
 def exclude_fully_overpainted_text(page, page_bbox, rotation, visibility, page_reader):
-    """共享Python/Rust可见性结果，仅在绘制顺序、完整包含和资源状态均证明遮挡时排除对象。"""
+    """Sharing Python/Rust visibility results excludes objects only if draw order, full containment, and resource status all demonstrate occlusion."""
     covers = []
     texts = []
     try:
@@ -140,6 +140,6 @@ def exclude_fully_overpainted_text(page, page_bbox, rotation, visibility, page_r
         if covered and _safe_paint_resources(page_reader()):
             return {address: (False if address in covered else value[0], value[1]) for address, value in visibility.items()}
     except Exception:
-        # 任何读取失败都不能以缺失证据删除正文。
+        # Any read failure will not delete the text as missing evidence.
         pass
     return visibility

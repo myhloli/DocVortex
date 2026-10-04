@@ -1,4 +1,4 @@
-//! 从内部样本一次读取自有数值，最终按原 run 顺序物化统计对象。
+//! Read the own value from the internal sample once, and finally materialize the statistical object according to the original run sequence.
 use super::geometry::{plain_coordinates, shared_coordinates};
 use docvortex_core::geometry;
 use docvortex_core::geometry_runs::{self, Sample};
@@ -9,7 +9,7 @@ use pyo3::{
 };
 use std::collections::HashMap;
 
-/// 仅接收标准内部样本；不支持的结构返回 None，计算和物化错误直接传播。
+/// Only standard internal samples are received; unsupported structures return None, computation and materialization errors are propagated directly.
 #[pyfunction]
 pub(super) fn build_geometry_runs<'py>(
     py: Python<'py>,
@@ -33,7 +33,7 @@ pub(super) fn build_geometry_runs<'py>(
     .map(|v| v.0))
 }
 
-/// 合并 run 统计、跨页样式判定和逐行字号计算，仅在最终边界导出对象。
+/// Merge run statistics, cross-page style determination and line-by-line font size calculation, and only export objects at the final boundary.
 #[pyfunction(signature = (samples, by_line, keys, sample_type, run_type, line_type, page_sizes=None, bbox_type=None))]
 pub(super) fn build_geometry_style<'py>(
     py: Python<'py>,
@@ -66,7 +66,7 @@ pub(super) fn build_geometry_style<'py>(
     )
 }
 
-/// 只读取内置整数，越界和自定义转换明确交回参考实现。
+/// Only built-in integers are read, out-of-bounds and custom conversions are explicitly returned to the reference implementation.
 fn read_index(value: &Bound<'_, PyAny>) -> Option<i64> {
     value
         .is_exact_instance_of::<PyInt>()
@@ -74,7 +74,7 @@ fn read_index(value: &Bound<'_, PyAny>) -> Option<i64> {
         .flatten()
 }
 
-/// 验证有效高度，保留超大整数和特殊数值的 Python 运算路径。
+/// Verify the effective height and retain the Python operation path for extremely large integers and special values.
 fn height(value: &Bound<'_, PyAny>) -> Option<f64> {
     let result = if value.is_exact_instance_of::<PyFloat>() {
         value.extract::<f64>().ok()?
@@ -88,7 +88,7 @@ fn height(value: &Bound<'_, PyAny>) -> Option<f64> {
     result.is_finite().then_some(result)
 }
 
-/// 一次准备数值并复用给多个算法阶段，不在阶段之间重新读取字符对象。
+/// Prepare values once and reuse them to multiple algorithm stages without re-reading character objects between stages.
 fn prepare<'py>(
     py: Python<'py>,
     samples: &Bound<'py, PyList>,
@@ -107,7 +107,7 @@ fn prepare<'py>(
         bool,
     )>,
 > {
-    // 属性名和重复字段只准备一次，减少每个样本的 Python C API 开销。
+    // Attribute names and repeated fields are only prepared once, reducing the Python C API overhead of each sample.
     let attr_angle = pyo3::intern!(py, "angle");
     let attr_chars = pyo3::intern!(py, "chars");
     let attr_effective_height = pyo3::intern!(py, "effective_height");
@@ -149,7 +149,7 @@ fn prepare<'py>(
         if !sample.get_type().is(sample_type) {
             return Ok(None);
         }
-        // 重复的对象身份无法唯一表达成员索引，保留参考路径。
+        // Duplicate object identities cannot uniquely express member indexes, and reference paths are retained.
         if positions.insert(sample.as_ptr() as usize, index).is_some() {
             return Ok(None);
         }
@@ -162,7 +162,7 @@ fn prepare<'py>(
                 return Ok(None);
             };
             let id = run.extract::<usize>()?;
-            // 最多缓存 4096 个内置不可变 run key，自定义哈希仍逐次走 Python 字典。
+            // A maximum of 4096 built-in immutable run key can be cached, and the custom hash still goes through the Python dictionary one by one.
             let plain = key.cast_exact::<PyTuple>().is_ok_and(|key| {
                 key.iter().all(|v| {
                     v.is_exact_instance_of::<PyString>()
@@ -351,7 +351,7 @@ fn prepare<'py>(
     }) else {
         return Ok(None);
     };
-    // 所有输入和计算成功后才回写样本，拒绝输入时不会留下半恢复状态。
+    // The sample is written back only after all inputs and calculations are successful, and the semi-recovery state will not be left when the input is rejected.
     for (repair, raw) in repairs.into_iter().zip(owners) {
         if let Some((index, source, local, angle)) = repair {
             let sample = samples.get_item(index)?;
@@ -379,7 +379,7 @@ fn prepare<'py>(
     Ok(Some((output, inflated, scales, restored)))
 }
 
-/// 为最终 run 生成兼容对象，成员保持为同一批 Python 样本的引用。
+/// Compatible objects are generated for the final run and members remain references to the same batch of Python samples.
 pub(super) fn materialize_runs<'py>(
     py: Python<'py>,
     samples: &Bound<'py, PyList>,

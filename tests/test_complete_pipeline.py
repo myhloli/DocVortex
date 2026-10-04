@@ -1,4 +1,4 @@
-"""验证原生解析、资源生命周期和离线结果包的完整闭环。"""
+"""Verify the complete closed loop of native parsing, resource lifecycle and offline result packages."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from docvortex.document.pdf import PDFDocument
 
 
 def pdf_bytes() -> bytes:
-    """生成可独立重复使用的文本型 PDF，不依赖仓库外部语料。"""
+    """Generate text-based PDF that can be independently reused without relying on external corpus of the warehouse."""
     output = BytesIO()
     canvas = Canvas(output)
     for index in range(30):
@@ -25,10 +25,10 @@ def pdf_bytes() -> bytes:
 
 
 def test_native_parse_never_classifies(monkeypatch: pytest.MonkeyPatch) -> None:
-    """显式原生入口不会隐式调用分类或触发 OCR。"""
+    """Explicit native entry does not implicitly call classification or trigger OCR."""
 
     def forbidden(_document: PDFDocument) -> str:
-        """一旦原生解析调用分类就立即失败。"""
+        """Once native parsing is called, classification fails immediately."""
         raise AssertionError("Native parsing must not classify")
 
     monkeypatch.setattr(PDFDocument, "classify", forbidden)
@@ -38,13 +38,13 @@ def test_native_parse_never_classifies(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_classification_is_cached_in_document(monkeypatch: pytest.MonkeyPatch) -> None:
-    """调用方可以先分类再解析，同一文档不会重复执行分类。"""
+    """The caller can classify first and then parse, and the same document will not be classified repeatedly."""
     from docvortex.document.pdf import _document as module
 
     calls: list[bytes] = []
 
     def classify(_handle: object, payload: bytes) -> str:
-        """记录实际分类调用，返回稳定的文本结果。"""
+        """Log actual classification calls, returning stable text results."""
         calls.append(payload)
         return "txt"
 
@@ -57,7 +57,7 @@ def test_classification_is_cached_in_document(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_bundle_renders_after_source_is_deleted(tmp_path: Path) -> None:
-    """移除源文件后，依靠结果包在七种目标中复用同一份素材。"""
+    """After removing the source files, rely on the results package to reuse the same footage in seven targets."""
     image = BytesIO()
     Image.new("RGB", (20, 10), color="blue").save(image, format="PNG")
     data_uri = "data:image/png;base64," + base64.b64encode(image.getvalue()).decode()
@@ -77,7 +77,7 @@ def test_bundle_renders_after_source_is_deleted(tmp_path: Path) -> None:
 
 
 def test_invalid_bundle_asset_is_rejected(tmp_path: Path) -> None:
-    """损坏素材不会被当作有效结果包静默恢复。"""
+    """Corrupted footage will not be silently restored as a valid result package."""
     from docvortex.assets import AssetStore
     from docvortex.result import DocumentResult
     from docvortex.schema import MiddleJson
@@ -97,7 +97,7 @@ def test_invalid_bundle_asset_is_rejected(tmp_path: Path) -> None:
 
 
 def test_asset_paths_cannot_escape() -> None:
-    """素材索引不允许绝对路径或目录穿越。"""
+    """Material indexing does not allow absolute paths or directory traversals."""
     from docvortex.assets import AssetStore
 
     with pytest.raises(ValueError):
@@ -105,7 +105,7 @@ def test_asset_paths_cannot_escape() -> None:
 
 
 def test_bundle_rejects_unmaterialized_asset_before_writing(tmp_path: Path) -> None:
-    """结果包不能把缺失图片当作成功导出，避免离线恢复后才发现丢失。"""
+    """The result package cannot treat missing images as successfully exported to avoid discovering the loss after offline recovery."""
     from docvortex.result import DocumentResult
     from docvortex.schema import ImageBlock, ImageBodyBlock, MiddleJson, PageInfo
 
@@ -132,7 +132,7 @@ def test_bundle_rejects_unmaterialized_asset_before_writing(tmp_path: Path) -> N
 
 
 def test_materialized_image_does_not_keep_external_render_dependency(tmp_path: Path) -> None:
-    """已有图片字节在副本中改用本地素材，原始来源对象不被修改。"""
+    """Existing image bytes are replaced with local materials in the copy, and the original source object is not modified."""
     from docvortex.result import DocumentResult
     from docvortex.schema import ImageBlock, ImageBodyBlock, MiddleJson, PageInfo
 

@@ -1,4 +1,4 @@
-"""EPUB 3.3 的元数据 XML、导航文档与确定性 OCF 打包。"""
+"""EPUB Metadata XML, navigation documentation and deterministic OCF packaging for 3.3."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ _STYLE_PATH = "EPUB/styles/docvortex.css"
 
 @dataclass(frozen=True, slots=True)
 class EpubMetadata:
-    """保存 package document 所需的规范化书籍元数据。"""
+    """Normalized book metadata required to save package document."""
 
     title: str
     authors: tuple[str, ...]
@@ -36,7 +36,7 @@ class EpubMetadata:
 
 @dataclass(slots=True)
 class NavigationItem:
-    """保存 EPUB toc nav 中一个可链接的层级条目。"""
+    """Save a linkable hierarchy entry in EPUB toc nav."""
 
     title: str
     href: str
@@ -52,7 +52,7 @@ def build_epub_package(
     assets: tuple[EpubAsset, ...],
     has_mathml: bool,
 ) -> bytes:
-    """在内存中按固定成员顺序构造完整 EPUB 3.3 容器。"""
+    """Constructs a complete EPUB 3.3 container in memory in fixed member order."""
     container_xml = _build_container_xml()
     navigation_xhtml = _build_navigation_xhtml(metadata, navigation)
     package_document = _build_package_document(metadata, assets, has_mathml=has_mathml)
@@ -70,7 +70,7 @@ def build_epub_package(
 
 
 def _build_container_xml() -> bytes:
-    """生成指向唯一 OPF package document 的 container.xml。"""
+    """Generate container.xml pointing to the unique OPF package document."""
     root = etree.Element(f"{{{_CONTAINER_NS}}}container", nsmap={None: _CONTAINER_NS}, version="1.0")
     rootfiles = etree.SubElement(root, f"{{{_CONTAINER_NS}}}rootfiles")
     etree.SubElement(
@@ -85,7 +85,7 @@ def _build_container_xml() -> bytes:
 
 
 def _build_package_document(metadata: EpubMetadata, assets: tuple[EpubAsset, ...], *, has_mathml: bool) -> bytes:
-    """生成包含必需元数据、完整 manifest 与单正文 spine 的 OPF。"""
+    """Generates a OPF containing the required metadata, a complete manifest and a single-text spine."""
     root = etree.Element(
         f"{{{_OPF_NS}}}package",
         nsmap={None: _OPF_NS, "dc": _DC_NS},
@@ -145,7 +145,7 @@ def _build_package_document(metadata: EpubMetadata, assets: tuple[EpubAsset, ...
 
 
 def _build_navigation_xhtml(metadata: EpubMetadata, navigation: list[NavigationItem]) -> bytes:
-    """生成恰含一个 toc nav 和一个 landmarks nav 的 EPUB 导航文档。"""
+    """Generates a EPUB navigation document containing exactly one toc nav and one landmarks nav."""
     root = etree.Element(
         f"{{{_XHTML_NS}}}html",
         nsmap={None: _XHTML_NS, "epub": _EPUB_NS},
@@ -198,7 +198,7 @@ def _build_navigation_xhtml(metadata: EpubMetadata, navigation: list[NavigationI
 
 
 def _append_navigation_item(parent: etree._Element, item: NavigationItem) -> None:
-    """递归把一个导航条目及其子项写入有序列表。"""
+    """Recursively writes a navigation item and its children to an ordered list."""
     entry = etree.SubElement(parent, f"{{{_XHTML_NS}}}li")
     link = etree.SubElement(entry, f"{{{_XHTML_NS}}}a", href=item.href)
     link.text = item.title
@@ -209,7 +209,7 @@ def _append_navigation_item(parent: etree._Element, item: NavigationItem) -> Non
 
 
 def _serialize_xml(root: etree._Element, *, doctype: str | None = None) -> bytes:
-    """以 UTF-8 XML 声明和稳定缩进序列化一个 EPUB XML 文档。"""
+    """Serializes a EPUB XML document with a UTF-8 XML declaration and stable indentation."""
     etree.indent(root, space="  ")
     return etree.tostring(
         root,
@@ -228,7 +228,7 @@ def _write_member(
     *,
     compression: int = ZIP_DEFLATED,
 ) -> None:
-    """用固定权限、无 extra 字段和规范时间写入一个 OCF ZIP 成员。"""
+    """Writes a OCF ZIP member with fixed permissions, no extra field, and canonical time."""
     info = ZipInfo(name, date_time=_zip_datetime(modified_at))
     info.compress_type = compression
     info.create_system = 3
@@ -239,7 +239,7 @@ def _write_member(
 
 
 def _zip_datetime(modified_at: datetime) -> tuple[int, int, int, int, int, int]:
-    """把 UTC 修改时间约束到 ZIP DOS 时间范围并截断到双秒。"""
+    """Constrain the UTC modification time to the ZIP DOS time range and truncate to double seconds."""
     year = min(max(modified_at.year, 1980), 2107)
     day = min(modified_at.day, calendar.monthrange(year, modified_at.month)[1])
     second = modified_at.second - modified_at.second % 2

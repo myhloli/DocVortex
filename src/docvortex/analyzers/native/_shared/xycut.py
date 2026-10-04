@@ -1,4 +1,4 @@
-"""基于几何信息实现不依赖语义模型的 XYCut++ 阅读顺序排序。"""
+"""Implement XYCut++ reading order sorting that does not rely on semantic models based on geometric information."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ NARROW_ELEMENT_WIDTH_RATIO: Final = 0.1
 
 @dataclass(frozen=True)
 class _CutInfo:
-    """记录投影切分位置及对应的空白间距。"""
+    """Record the projection segmentation position and the corresponding blank spacing."""
 
     position: float
     gap: float
@@ -26,7 +26,7 @@ class _CutInfo:
 
 @dataclass(frozen=True)
 class _SortableEntry:
-    """保存待排序对象、原始序号及标准化后的绝对坐标。"""
+    """Save objects to be sorted, original serial numbers and standardized absolute coordinates."""
 
     index: int
     payload: dict[str, Any]
@@ -34,47 +34,47 @@ class _SortableEntry:
 
     @property
     def left(self) -> float:
-        """返回左边界。"""
+        """Return left boundary."""
         return self.bbox[0]
 
     @property
     def top(self) -> float:
-        """返回上边界。"""
+        """Return to the upper boundary."""
         return self.bbox[1]
 
     @property
     def right(self) -> float:
-        """返回右边界。"""
+        """Return to the right boundary."""
         return self.bbox[2]
 
     @property
     def bottom(self) -> float:
-        """返回下边界。"""
+        """Return to the lower boundary."""
         return self.bbox[3]
 
     @property
     def width(self) -> float:
-        """返回元素宽度。"""
+        """Returns the element width."""
         return self.right - self.left
 
     @property
     def height(self) -> float:
-        """返回元素高度。"""
+        """Return element height."""
         return self.bottom - self.top
 
     @property
     def area(self) -> float:
-        """返回元素包围盒面积。"""
+        """Return the element bounding box area."""
         return self.width * self.height
 
     @property
     def center_x(self) -> float:
-        """返回元素横向中心。"""
+        """Returns the horizontal center of the element."""
         return (self.left + self.right) / 2.0
 
     @property
     def center_y(self) -> float:
-        """返回元素纵向中心。"""
+        """Returns the longitudinal center of the element."""
         return (self.top + self.bottom) / 2.0
 
 
@@ -84,10 +84,10 @@ def sort_entries(
     beta: float = DEFAULT_BETA,
     density_threshold: float = DEFAULT_DENSITY_THRESHOLD,
 ) -> list[dict[str, Any]]:
-    """按绝对坐标 bbox 对字典对象执行确定性的 XYCut++ 排序。
+    """Perform a deterministic XYCut++ sorting of dictionary objects by absolute coordinates bbox.
 
-    bbox 无效的对象不会参与几何排序，并按输入相对顺序稳定保留在结果末尾。
-    ``MIN_GAP_THRESHOLD`` 使用 PDF point 等绝对坐标单位，调用方不得提前归一化。
+    bbox Invalid objects will not participate in geometric sorting and are stably retained at the end of the result in input relative order.
+    ``MIN_GAP_THRESHOLD`` uses absolute coordinate units such as PDF and point, and the caller must not normalize in advance.
     """
     sortable_entries, invalid_entries = _build_sortable_entries(entries)
     sorted_entries = _recursive_segment(
@@ -101,7 +101,7 @@ def sort_entries(
 def _build_sortable_entries(
     entries: Sequence[dict[str, Any]],
 ) -> tuple[list[_SortableEntry], list[dict[str, Any]]]:
-    """拆分 bbox 有效的排序对象和需要稳定置尾的无效对象。"""
+    """Split bbox valid sorting objects and invalid objects that need stable tailing."""
     sortable_entries: list[_SortableEntry] = []
     invalid_entries: list[dict[str, Any]] = []
     for index, entry in enumerate(entries):
@@ -116,7 +116,7 @@ def _build_sortable_entries(
 def _normalize_bbox(
     bbox: Any,
 ) -> tuple[float, float, float, float] | None:
-    """将合法四元 bbox 转成有限浮点数绝对坐标。"""
+    """Convert legal quaternary bbox into finite floating point absolute coordinates."""
     if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
         return None
 
@@ -140,7 +140,7 @@ def _recursive_segment(
     beta: float,
     density_threshold: float,
 ) -> list[_SortableEntry]:
-    """在当前局部区域重新识别跨栏块、计算密度并递归切分。"""
+    """Re-identify hurdle blocks in the current local area, calculate density and recursively segment."""
     if len(entries) <= 1:
         return list(entries)
 
@@ -165,7 +165,7 @@ def _segment_main_entries(
     beta: float,
     density_threshold: float,
 ) -> list[_SortableEntry]:
-    """依据当前区域密度选择首选轴，并在切分后递归处理子区域。"""
+    """Select the preferred axis according to the current area density, and recursively process the sub-areas after segmentation."""
     if len(entries) <= 1:
         return list(entries)
 
@@ -205,7 +205,7 @@ def _segment_main_entries(
 
 
 def _identify_cross_layout_elements(entries: Sequence[_SortableEntry], beta: float) -> list[_SortableEntry]:
-    """以当前区域中位宽度识别横跨多个栏区的宽元素。"""
+    """Identify wide elements spanning multiple columns with the current region's median width."""
     if len(entries) < 3:
         return []
 
@@ -219,7 +219,7 @@ def _has_minimum_overlaps(
     entries: Sequence[_SortableEntry],
     min_count: int,
 ) -> bool:
-    """判断元素是否在水平方向覆盖至少指定数量的其他元素。"""
+    """Determine whether the element covers at least a specified number of other elements in the horizontal direction."""
     overlap_count = 0
     for other in entries:
         if other.index == entry.index:
@@ -236,7 +236,7 @@ def _calculate_horizontal_overlap_ratio(
     entry1: _SortableEntry,
     entry2: _SortableEntry,
 ) -> float:
-    """计算两个元素相对较窄元素的横向覆盖比例。"""
+    """Calculate the lateral coverage ratio of two elements relative to the narrower element."""
     overlap_width = max(
         0.0,
         min(entry1.right, entry2.right) - max(entry1.left, entry2.left),
@@ -248,7 +248,7 @@ def _calculate_horizontal_overlap_ratio(
 
 
 def _compute_density_ratio(entries: Sequence[_SortableEntry]) -> float:
-    """计算当前区域中元素面积之和与区域面积的比值。"""
+    """Calculate the ratio of the sum of element areas in the current area to the area of the area."""
     region = _calculate_bounding_region(entries)
     if region is None:
         return 1.0
@@ -264,7 +264,7 @@ def _compute_density_ratio(entries: Sequence[_SortableEntry]) -> float:
 def _calculate_bounding_region(
     entries: Sequence[_SortableEntry],
 ) -> tuple[float, float, float, float] | None:
-    """计算当前元素集合的最小外接矩形。"""
+    """Calculate the minimum enclosing rectangle of the current element set."""
     if not entries:
         return None
 
@@ -280,7 +280,7 @@ def _calculate_bounding_region(
 def _find_best_vertical_cut_with_projection(
     entries: Sequence[_SortableEntry],
 ) -> _CutInfo:
-    """寻找纵向最大投影空白，并在必要时忽略窄元素重试。"""
+    """Look for maximum projected white space vertically and try again ignoring narrow elements if necessary."""
     if len(entries) < 2:
         return _CutInfo(0.0, 0.0)
 
@@ -306,7 +306,7 @@ def _find_best_vertical_cut_with_projection(
 def _find_vertical_cut_by_edges(
     entries: Sequence[_SortableEntry],
 ) -> _CutInfo:
-    """根据横向区间投影寻找最大的纵向切分空白。"""
+    """Find the largest vertical segmentation blank according to the horizontal interval projection."""
     sorted_entries = sorted(
         entries,
         key=lambda entry: (entry.left, entry.right, entry.index),
@@ -328,7 +328,7 @@ def _find_vertical_cut_by_edges(
 def _find_best_horizontal_cut_with_projection(
     entries: Sequence[_SortableEntry],
 ) -> _CutInfo:
-    """根据纵向区间投影寻找最大的横向切分空白。"""
+    """Find the largest horizontal segmentation blank according to the longitudinal interval projection."""
     if len(entries) < 2:
         return _CutInfo(0.0, 0.0)
 
@@ -354,7 +354,7 @@ def _split_by_horizontal_cut(
     entries: Sequence[_SortableEntry],
     cut_y: float,
 ) -> list[list[_SortableEntry]]:
-    """按横向切线将元素分成上、下两个区域。"""
+    """Divide the element into upper and lower areas according to transverse tangent lines."""
     above = [entry for entry in entries if entry.center_y < cut_y]
     below = [entry for entry in entries if entry.center_y >= cut_y]
     return [group for group in (above, below) if group]
@@ -364,7 +364,7 @@ def _split_by_vertical_cut(
     entries: Sequence[_SortableEntry],
     cut_x: float,
 ) -> list[list[_SortableEntry]]:
-    """按纵向切线将元素分成左、右两个区域。"""
+    """Divide the element into two regions, left and right, according to longitudinal tangent lines."""
     left = [entry for entry in entries if entry.center_x < cut_x]
     right = [entry for entry in entries if entry.center_x >= cut_x]
     return [group for group in (left, right) if group]
@@ -374,7 +374,7 @@ def _merge_cross_layout_elements(
     sorted_main: Sequence[_SortableEntry],
     cross_layout_entries: Sequence[_SortableEntry],
 ) -> list[_SortableEntry]:
-    """按几何纵向分带回插跨栏元素，避免栏内 y 坐标重置。"""
+    """Insert hurdle elements according to geometric longitudinal division to avoid y coordinate reset in the column."""
     if not cross_layout_entries:
         return list(sorted_main)
     if not sorted_main:
@@ -396,7 +396,7 @@ def _merge_cross_layout_elements(
 def _sort_by_y_then_x(
     entries: Sequence[_SortableEntry],
 ) -> list[_SortableEntry]:
-    """在无法继续投影切分时按上到下、从左到右稳定排序。"""
+    """When the projection segmentation cannot be continued, the sorting is stable from top to bottom and from left to right."""
     return sorted(
         entries,
         key=lambda entry: (entry.top, entry.left, entry.index),

@@ -56,7 +56,7 @@ def normalize_to_int_bbox(
 
 
 def bbox_relative_pos(bbox1: BBox, bbox2: BBox) -> tuple[bool, bool, bool, bool]:
-    """返回 bbox1 相对 bbox2 的左、右、下、上位置关系。"""
+    """Returns the left, right, bottom and top position relationship of bbox1 relative to bbox2."""
     x1, y1, x1b, y1b = bbox1
     x2, y2, x2b, y2b = bbox2
     left = x2b < x1
@@ -67,7 +67,7 @@ def bbox_relative_pos(bbox1: BBox, bbox2: BBox) -> tuple[bool, bool, bool, bool]
 
 
 def bbox_distance(bbox1: BBox, bbox2: BBox) -> float:
-    """计算两个不相交矩形之间的最短欧氏距离。"""
+    """Computes the shortest Euclidean distance between two disjoint rectangles."""
     x1, y1, x1b, y1b = bbox1
     x2, y2, x2b, y2b = bbox2
     left, right, bottom, top = bbox_relative_pos(bbox1, bbox2)
@@ -91,14 +91,14 @@ def bbox_distance(bbox1: BBox, bbox2: BBox) -> float:
 
 
 def bbox_center_distance(bbox1: BBox, bbox2: BBox) -> float:
-    """计算两个矩形中心点之间的欧氏距离。"""
+    """Calculate the Euclidean distance between the center points of two rectangles."""
     center1 = ((bbox1[0] + bbox1[2]) / 2, (bbox1[1] + bbox1[3]) / 2)
     center2 = ((bbox2[0] + bbox2[2]) / 2, (bbox2[1] + bbox2[3]) / 2)
     return math.hypot(center1[0] - center2[0], center1[1] - center2[1])
 
 
 def calculate_overlap_area_2_minbox_area_ratio(bbox1: BBox, bbox2: BBox) -> float:
-    """计算交集面积占两个矩形较小面积的比例。"""
+    """Calculate the intersection area as a proportion of the smaller area of two rectangles."""
     x_left = max(bbox1[0], bbox2[0])
     y_top = max(bbox1[1], bbox2[1])
     x_right = min(bbox1[2], bbox2[2])
@@ -113,7 +113,7 @@ def calculate_overlap_area_2_minbox_area_ratio(bbox1: BBox, bbox2: BBox) -> floa
 
 
 def calculate_overlap_area_in_bbox1_area_ratio(bbox1: BBox, bbox2: BBox) -> float:
-    """计算两个矩形交集面积占 bbox1 面积的比例。"""
+    """Calculate the ratio of the intersection area of two rectangles to the area of bbox1."""
     x_left = max(bbox1[0], bbox2[0])
     y_top = max(bbox1[1], bbox2[1])
     x_right = min(bbox1[2], bbox2[2])

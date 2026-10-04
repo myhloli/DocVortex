@@ -1,4 +1,4 @@
-"""RTF 1.9.1 常用语义的有界状态机 parser。"""
+"""RTF 1.9.1 Bounded state machines with common semantics parser."""
 
 from __future__ import annotations
 
@@ -139,7 +139,7 @@ _CONTROL_RE = re.compile(rb"\\(?P<name>[A-Za-z]+)(?P<param>-?\d+)?(?: )?")
 
 @dataclass(frozen=True, slots=True)
 class _TextStyleOverrides:
-    """保存 stylesheet 中可区分缺省与显式关闭的字符样式覆盖。"""
+    """Save character style overrides in stylesheet that differentiate between default and explicitly turned off."""
 
     bold: bool | None = None
     italic: bool | None = None
@@ -147,7 +147,7 @@ class _TextStyleOverrides:
     strike: bool | None = None
 
     def resolve(self, base: RtfTextStyle = RtfTextStyle()) -> RtfTextStyle:
-        """用当前显式值覆盖基样式，缺省字段继续继承。"""
+        """Overrides the base style with the current explicit value, and default fields continue to be inherited."""
         return RtfTextStyle(
             bold=base.bold if self.bold is None else self.bold,
             italic=base.italic if self.italic is None else self.italic,
@@ -158,7 +158,7 @@ class _TextStyleOverrides:
 
 @dataclass(frozen=True, slots=True)
 class _StyleDefinition:
-    """保存 stylesheet 中与语义投影相关的段落样式。"""
+    """Save paragraph styles associated with semantic projection in stylesheet."""
 
     name: str = ""
     outline_level: int | None = None
@@ -171,20 +171,20 @@ class _StyleDefinition:
 
 @dataclass(frozen=True, slots=True)
 class _ListLevel:
-    """保存 RTF listlevel 的起始值和常用编号格式。"""
+    """Save the starting value and common numbering format of RTF listlevel."""
 
     marker: str = "decimal"
     start: int = 1
 
     @property
     def ordered(self) -> bool:
-        """返回当前 level 是否应按有序列表输出。"""
+        """Returns whether the current level should be output in an ordered list."""
         return self.marker not in {"bullet", "none"}
 
 
 @dataclass(frozen=True, slots=True)
 class _ListDefinition:
-    """保存一个 list override 对应的列表定义。"""
+    """Save a list definition corresponding to list and override."""
 
     identity: int
     levels: tuple[_ListLevel, ...]
@@ -192,7 +192,7 @@ class _ListDefinition:
 
 @dataclass(slots=True)
 class _Prelude:
-    """保存正文解析前从 RTF header tables 收敛出的定义。"""
+    """Save the definition converged from RTF header tables before text parsing."""
 
     default_encoding: str = "cp1252"
     font_encodings: dict[int, str] = field(default_factory=dict)
@@ -203,7 +203,7 @@ class _Prelude:
 
 @dataclass(slots=True)
 class _State:
-    """保存随 RTF group 继承和恢复的字符、段落及 destination 状态。"""
+    """Saves characters, paragraphs, and destination states inherited and restored with RTF group."""
 
     style: RtfTextStyle = RtfTextStyle()
     font_id: int | None = None
@@ -220,7 +220,7 @@ class _State:
 
 @dataclass(slots=True)
 class _CellDefinition:
-    """保存 cellx 处冻结的单元格合并属性。"""
+    """Save frozen cell merge properties at cellx."""
 
     horizontal_merge: Literal["none", "start", "continue"] = "none"
     vertical_merge: Literal["none", "start", "continue"] = "none"
@@ -228,10 +228,10 @@ class _CellDefinition:
 
 
 class _TableBuilder:
-    """把 RTF row/cell 控制按当前 table depth 组装为语义表格。"""
+    """Assemble the RTF row/cell controls into a semantic table according to the current table depth."""
 
     def __init__(self) -> None:
-        """初始化空表格和空 row/cell 状态。"""
+        """Initialize empty table and empty row/cell state."""
         self.rows: list[RtfTableRow] = []
         self._definitions: list[_CellDefinition] = []
         self._cells: list[RtfTableCell] = []
@@ -243,16 +243,16 @@ class _TableBuilder:
         self._total_slots = 0
 
     def _check_cell_budget(self, row_cell_count: int) -> None:
-        """在保存定义或物化 cell 前校验当前表格对象预算。"""
+        """Verify current table object budget before saving definition or materializing cell."""
         limit = min(MAX_GRID_SLOTS, MAX_RTF_TABLE_CELLS)
         if self._total_slots + row_cell_count > limit:
             raise LegacyOfficeResourceLimitError(f"RTF table exceeds max_grid_slots={limit}")
 
     def start_row(self) -> None:
-        """开始新行；若上一行未显式结束则先安全收束。"""
+        """Start a new line; if the previous line does not end explicitly, it is safely ended first."""
         if self._row_open:
             if self._cells or self._cell_blocks:
-                # 嵌套表格的 nesttableprops 位于 cell 内容之后，此处只补写定义。
+                # The nesttableprops of the nested table is located after the content of cell, and only the definition is added here.
                 self._definitions = []
                 return
             self.end_row()
@@ -265,19 +265,19 @@ class _TableBuilder:
         self._row_open = True
 
     def set_header(self) -> None:
-        """把当前行标记为重复表头行。"""
+        """Mark the current row as a duplicate header row."""
         self._row_header = True
 
     def set_horizontal_merge(self, value: Literal["start", "continue"]) -> None:
-        """记录下一个 cellx 使用的横向合并属性。"""
+        """Record the horizontal merge properties used by the next cellx."""
         self._pending_horizontal = value
 
     def set_vertical_merge(self, value: Literal["start", "continue"]) -> None:
-        """记录下一个 cellx 使用的纵向合并属性。"""
+        """Record the vertical merge properties used by the next cellx."""
         self._pending_vertical = value
 
     def add_definition(self, right_boundary: int | None) -> None:
-        """在 cellx 边界冻结当前单元格定义。"""
+        """Freezes the current cell definition at the cellx boundary."""
         if not self._row_open:
             self.start_row()
         self._check_cell_budget(max(len(self._definitions) + 1, len(self._cells)))
@@ -299,13 +299,13 @@ class _TableBuilder:
         self._pending_vertical = "none"
 
     def add_block(self, block: RtfBlock) -> None:
-        """向当前尚未结束的单元格追加语义块。"""
+        """Appends a semantic block to the currently unfinished cell."""
         if not self._row_open:
             self.start_row()
         self._cell_blocks.append(block)
 
     def end_cell(self) -> None:
-        """结束当前单元格，并按同位置 cellx 定义附加合并属性。"""
+        """Ends the current cell and defines additional merge properties at the same location as cellx."""
         if not self._row_open:
             self.start_row()
         self._check_cell_budget(max(len(self._definitions), len(self._cells) + 1))
@@ -322,7 +322,7 @@ class _TableBuilder:
         self._cell_blocks = []
 
     def end_row(self) -> None:
-        """补齐当前行定义的空单元格并写入表格。"""
+        """Fill in the empty cells defined in the current row and write them into the table."""
         if not self._row_open:
             return
         if self._cell_blocks:
@@ -340,14 +340,14 @@ class _TableBuilder:
         self._row_open = False
 
     def finish(self) -> RtfTable | None:
-        """结束未闭合行并返回非空表格。"""
+        """End unclosed rows and return a non-empty table."""
         self.end_row()
         return RtfTable(rows=self.rows) if self.rows else None
 
 
 @dataclass(slots=True)
 class _OutputContext:
-    """隔离正文、脚注及页眉页脚各自的块和表格状态。"""
+    """Isolate the respective block and table states of body text, footnotes, and headers and footers."""
 
     blocks: list[RtfBlock] = field(default_factory=list)
     inlines: list[RtfInline] = field(default_factory=list)
@@ -359,7 +359,7 @@ class _OutputContext:
 
 @dataclass(slots=True)
 class _PictCapture:
-    """保存 pict destination 的格式、hex 和 bin 数据。"""
+    """Save pict destination format, hex and bin data."""
 
     content_type: str = "application/octet-stream"
     extension: str = "bin"
@@ -370,7 +370,7 @@ class _PictCapture:
 
 @dataclass(slots=True)
 class _GroupFrame:
-    """保存一个 group 的父状态和需要在右花括号处收束的 destination。"""
+    """Save the parent state of a group and the destination that needs to be closed at the closing curly brace."""
 
     previous_state: _State
     start: int
@@ -387,19 +387,19 @@ class _GroupFrame:
 
 @dataclass(frozen=True, slots=True)
 class _GroupSpan:
-    """用原始 RTF buffer 上的起止位置表示 group，避免嵌套切片复制。"""
+    """Represent group with the start and end positions on the original RTF buffer to avoid nested slice duplication."""
 
     data: bytes
     start: int
     end: int
 
     def materialize(self) -> bytes:
-        """仅在实际解析匹配 destination 时物化当前 group。"""
+        """Only materialize the current group if the actual resolution matches destination."""
         return self.data[self.start : self.end]
 
 
 def _lookup_encoding(code_page: int, fallback: str = "cp1252") -> str:
-    """把 RTF code page 规范为 Python codec，不支持时返回稳定 fallback。"""
+    """Standardize RTF code page as Python codec. If it is not supported, it will return to stable fallback."""
     candidate = f"cp{code_page}"
     try:
         codecs.lookup(candidate)
@@ -410,7 +410,7 @@ def _lookup_encoding(code_page: int, fallback: str = "cp1252") -> str:
 
 
 def _default_encoding(data: bytes) -> str:
-    """按 RTF header 控制确定默认字符编码。"""
+    """Press the RTF header control to determine the default character encoding."""
     match = re.search(rb"\\ansicpg(?P<code>\d+)", data[:65536], re.IGNORECASE)
     if match is not None:
         return _lookup_encoding(int(match.group("code")))
@@ -424,7 +424,7 @@ def _default_encoding(data: bytes) -> str:
 
 
 def _group_spans(data: bytes, *, direct_only: bool = False) -> list[_GroupSpan]:
-    """按二进制安全 token 边界返回共享原始 buffer 的子 group 范围。"""
+    """Returns a child group range that shares the original buffer by binary-safe token boundary."""
     depth = 0
     starts: list[int] = []
     result: list[_GroupSpan] = []
@@ -441,7 +441,7 @@ def _group_spans(data: bytes, *, direct_only: bool = False) -> list[_GroupSpan]:
 
 
 def _group_destination(group: _GroupSpan) -> str | None:
-    """读取 group 开头最多两个 control word 以识别 destination。"""
+    """Read group starting with up to two control word to identify destination."""
     prefix = group.data[group.start : min(group.end, group.start + 256)]
     controls = list(_CONTROL_RE.finditer(prefix))
     for match in controls[:3]:
@@ -452,12 +452,12 @@ def _group_destination(group: _GroupSpan) -> str | None:
 
 
 def _named_groups(data: bytes, destination: str) -> list[_GroupSpan]:
-    """返回全部匹配 destination 的零拷贝 group 范围。"""
+    """Returns all zero-copy group ranges matching destination."""
     return [group for group in _group_spans(data) if _group_destination(group) == destination]
 
 
 def _decode_group_text(data: bytes, encoding: str) -> str:
-    """解码定义表或 metadata group 中的可见文本，不解释正文结构。"""
+    """Decodes visible text in a definition table or metadata group without interpreting the text structure."""
     parts: list[str] = []
     byte_buffer = bytearray()
     uc_skip = 1
@@ -465,7 +465,7 @@ def _decode_group_text(data: bytes, encoding: str) -> str:
     pending_high: int | None = None
 
     def flush_byte_buffer() -> None:
-        """按当前代码页整体解码连续字节，保留多字节字符边界。"""
+        """Decode contiguous bytes as a whole according to the current code page, preserving multibyte character boundaries."""
         if not byte_buffer:
             return
         parts.append(bytes(byte_buffer).decode(encoding, errors="replace"))
@@ -519,7 +519,7 @@ def _decode_group_text(data: bytes, encoding: str) -> str:
 
 
 def _parse_fonts(data: bytes, default: str) -> dict[int, str]:
-    """解析 fonttbl 中 font id 到字符编码的映射。"""
+    """Parse the mapping of font id to character encodings in fonttbl."""
     groups = _named_groups(data, "fonttbl")
     if not groups:
         return {}
@@ -543,7 +543,7 @@ def _parse_fonts(data: bytes, default: str) -> dict[int, str]:
 
 
 def _style_control_value(data: bytes, name: str) -> bool | None:
-    """读取样式 on/off control 的三态值，缺省时返回空。"""
+    """Read the three-state value of pattern on/off control, which returns empty by default."""
     pattern = re.compile(
         rb"\\" + name.encode("ascii") + rb"(?P<param>-?\d+)?(?=[^A-Za-z]|$)",
         re.IGNORECASE,
@@ -556,7 +556,7 @@ def _style_control_value(data: bytes, name: str) -> bool | None:
 
 
 def _parse_styles(data: bytes, encoding: str) -> dict[int, _StyleDefinition]:
-    """解析 stylesheet 的标题、outline、代码与引用样式。"""
+    """Parse the title, outline, code and citation style of stylesheet."""
     groups = _named_groups(data, "stylesheet")
     if not groups:
         return {}
@@ -603,7 +603,7 @@ def _parse_styles(data: bytes, encoding: str) -> dict[int, _StyleDefinition]:
     resolved: dict[int, _StyleDefinition] = {}
 
     def resolve(style_id: int, visiting: set[int]) -> _StyleDefinition:
-        """递归合并 based-on 样式，循环引用时保留当前显式属性。"""
+        """Recursively merge based-on styles, retaining current explicit attributes when referencing circularly."""
         if style_id in resolved:
             return resolved[style_id]
         current = result.get(style_id, _StyleDefinition())
@@ -630,7 +630,7 @@ def _parse_styles(data: bytes, encoding: str) -> dict[int, _StyleDefinition]:
 
 
 def _parse_lists(data: bytes) -> dict[int, _ListDefinition]:
-    """解析 listtable/listoverridetable 的常见编号格式与 override identity。"""
+    """Parse common numbering formats for listtable/listoverridetable and override for identity."""
     by_list_id: dict[int, tuple[_ListLevel, ...]] = {}
     list_tables = _named_groups(data, "listtable")
     if list_tables:
@@ -682,7 +682,7 @@ def _parse_lists(data: bytes) -> dict[int, _ListDefinition]:
 
 
 def _parse_metadata(data: bytes, encoding: str) -> RtfMetadata:
-    """解析 info destination 中允许公开的四个字符串字段。"""
+    """Parsing info The four string fields allowed to be exposed in destination."""
     info_groups = _named_groups(data, "info")
     if not info_groups:
         return RtfMetadata()
@@ -696,7 +696,7 @@ def _parse_metadata(data: bytes, encoding: str) -> RtfMetadata:
 
 
 def parse_rtf_prelude(data: bytes) -> _Prelude:
-    """解析 RTF header tables、列表和 metadata，供正文 parser 与 doclib 共用。"""
+    """Parse RTF header tables, list and metadata for use by text parser and doclib."""
     offset = rtf_header_offset(data[:128])
     if offset is None:
         raise LegacyOfficeMalformedError("not an RTF document")
@@ -712,7 +712,7 @@ def parse_rtf_prelude(data: bytes) -> _Prelude:
 
 
 def _roman(value: int) -> str:
-    """把受支持正整数格式化为 Roman 编号，越界时安全回退十进制。"""
+    """Format supported positive integers as Roman numbers, safely falling back to decimal when out of bounds."""
     if value <= 0 or value > MAX_RTF_ROMAN_VALUE:
         return str(value)
     pairs = (
@@ -740,7 +740,7 @@ def _roman(value: int) -> str:
 
 
 def _alpha(value: int) -> str:
-    """把正整数格式化为 Excel 风格字母编号。"""
+    """Format positive integers as Excel style letter numbers."""
     if value <= 0:
         return str(value)
     parts: list[str] = []
@@ -752,7 +752,7 @@ def _alpha(value: int) -> str:
 
 
 def _format_marker(marker: str, value: int) -> str:
-    """按常见 RTF levelnfc marker 格式化一个编号。"""
+    """Format a number as common RTF levelnfc marker."""
     if marker == "upper_roman":
         return _roman(value)
     if marker == "lower_roman":
@@ -765,7 +765,7 @@ def _format_marker(marker: str, value: int) -> str:
 
 
 def _capture_picture_group(data: bytes) -> _PictCapture | None:
-    """从独立 pict group 中提取 direct hex/bin，用于 Office Math 图片 fallback。"""
+    """direct hex/bin extracted from standalone pict group for Office Math picture fallback."""
     capture = _PictCapture()
     depth = 0
     for token in RtfLexer(data):
@@ -798,10 +798,10 @@ def _capture_picture_group(data: bytes) -> _PictCapture | None:
 
 
 class RtfParser:
-    """把一个 RTF 字节串解析为无布局、单逻辑页的 typed document。"""
+    """Parses a RTF byte string into an unlayout, single logical page typed document."""
 
     def __init__(self, data: bytes, prelude: _Prelude | None = None) -> None:
-        """校验输入大小和根组，并初始化所有每文档状态。"""
+        """Verify input size and root group, and initialize all per-document state."""
         if len(data) > MAX_RTF_BYTES:
             raise LegacyOfficeResourceLimitError(f"RTF input exceeds max_bytes={MAX_RTF_BYTES}")
         offset = rtf_header_offset(data[:128])
@@ -821,7 +821,7 @@ class RtfParser:
         self._recovered = False
 
     def parse(self) -> RtfDocument:
-        """运行状态机，恢复未闭合组并返回 typed RTF 文档。"""
+        """Runs the state machine, restores the unclosed group and returns the typed RTF document."""
         for token in RtfLexer(self.data):
             if isinstance(token, RtfOpen):
                 self._open_group(token)
@@ -851,7 +851,7 @@ class RtfParser:
         return self.document
 
     def _open_group(self, token: RtfOpen) -> None:
-        """压入当前状态，新的 group 初始继承所有属性。"""
+        """Pushing the current state, the new group initially inherits all properties."""
         self._flush_bytes()
         parent = self._current_frame()
         self.frames.append(_GroupFrame(previous_state=replace(self.state), start=token.start))
@@ -863,7 +863,7 @@ class RtfParser:
                 self.state.destination = "suppressed"
 
     def _close_group(self, token: RtfClose) -> None:
-        """收束当前 destination 并恢复父 group 状态。"""
+        """Contains the current destination and restores the parent group state."""
         self._flush_bytes()
         if not self.frames:
             self._recovered = True
@@ -873,15 +873,15 @@ class RtfParser:
         self.state = frame.previous_state
 
     def _current_frame(self) -> _GroupFrame | None:
-        """返回当前最内层 group frame。"""
+        """Returns the current innermost layer group frame."""
         return self.frames[-1] if self.frames else None
 
     def _nearest_frame(self, destination: str) -> _GroupFrame | None:
-        """从内向外查找负责指定 destination 的 frame。"""
+        """Works from the inside out to find the frame responsible for specifying destination."""
         return next((frame for frame in reversed(self.frames) if frame.destination == destination), None)
 
     def _start_destination(self, name: str) -> bool:
-        """识别 group destination 并初始化其隔离输出或捕获状态。"""
+        """Identify group destination and initialize its isolation output or capture state."""
         frame = self._current_frame()
         if frame is None or frame.destination is not None:
             return False
@@ -979,7 +979,7 @@ class RtfParser:
         return False
 
     def _finish_destination(self, frame: _GroupFrame, end: int) -> None:
-        """在 group 结束处物化 field、note、pict、math 和捕获文本。"""
+        """Materialize field, note, pict, math and capture text at the end of group."""
         destination = frame.destination
         if destination == "field":
             self._finish_field(frame)
@@ -1001,7 +1001,7 @@ class RtfParser:
                 self._append_inline(RtfAnchor(name))
 
     def _finish_field(self, frame: _GroupFrame) -> None:
-        """把安全 HYPERLINK field result 包装回行内 run。"""
+        """Pack the safe HYPERLINK field result back into the line run."""
         self._flush_text_run()
         instruction = "".join(frame.instruction).strip()
         match = _HYPERLINK_RE.search(instruction)
@@ -1019,7 +1019,7 @@ class RtfParser:
                 self.context.inlines[index] = replace(inline, hyperlink=target)
 
     def _finish_note(self, frame: _GroupFrame) -> None:
-        """结束隔离 note context，登记正文并按类型决定是否插入引用。"""
+        """End isolation note context, register the text and decide whether to insert a reference by type."""
         note_context = self.context
         self._finalize_context(note_context)
         parent = frame.parent_context or _OutputContext()
@@ -1032,7 +1032,7 @@ class RtfParser:
             self._append_inline(RtfNoteReference(note_id))
 
     def _finish_auxiliary(self, frame: _GroupFrame, destination: str) -> None:
-        """结束页眉页脚隔离 context，并恢复父正文。"""
+        """End header footer isolates context and restores parent body."""
         auxiliary_context = self.context
         self._finalize_context(auxiliary_context)
         self.context = frame.parent_context or _OutputContext()
@@ -1040,7 +1040,7 @@ class RtfParser:
         target.extend(auxiliary_context.blocks)
 
     def _finish_picture(self, frame: _GroupFrame) -> None:
-        """校验 pict 大小并向当前行内流追加图片。"""
+        """Verify pict size and append image to current inline stream."""
         capture = frame.pict
         if capture is None:
             return
@@ -1049,7 +1049,7 @@ class RtfParser:
             self._append_inline(image)
 
     def _materialize_picture(self, capture: _PictCapture) -> RtfImage | None:
-        """把已捕获 pict 转成有界图片载荷，并累计文档素材预算。"""
+        """Convert captured pict into bounded image payload and accumulate document material budget."""
         if capture.binary is not None:
             payload = capture.binary
         else:
@@ -1077,7 +1077,7 @@ class RtfParser:
         )
 
     def _finish_math(self, frame: _GroupFrame, end: int) -> None:
-        """把 math group 转换为行内或行间 LaTeX，失败时静默保留其余正文。"""
+        """Convert math group to inline or interline LaTeX, silently retaining the rest of the text on failure."""
         formulas, display = parse_rtf_math(
             self.data[frame.start : end],
             encoding=self._current_encoding(),
@@ -1101,7 +1101,7 @@ class RtfParser:
                 self._append_inline(RtfInlineEquation(formula))
 
     def _control_symbol(self, token: RtfControlSymbol) -> None:
-        """处理 ignorable marker、转义结构字符和特殊空白。"""
+        """Handles ignorable marker, escaped structure characters, and special whitespace."""
         self._flush_bytes()
         frame = self._current_frame()
         if token.symbol == "*" and frame is not None:
@@ -1120,7 +1120,7 @@ class RtfParser:
             self._append_text("-")
 
     def _control_word(self, token: RtfControlWord) -> None:
-        """按 destination、文本、表格和列表的固定顺序解释 control word。"""
+        """Explains control word in a fixed order of destination, text, table and list."""
         self._flush_bytes()
         if self._start_destination(token.name):
             return
@@ -1211,7 +1211,7 @@ class RtfParser:
         self._list_control(token)
 
     def _table_control(self, token: RtfControlWord) -> bool:
-        """解释常见 row/cell/table-depth 与合并控制。"""
+        """Explains common row/cell/table-depth and merge controls."""
         name = token.name
         if name == "itap":
             self._set_table_depth(max(token.param or 0, 0))
@@ -1260,7 +1260,7 @@ class RtfParser:
         return False
 
     def _list_control(self, token: RtfControlWord) -> bool:
-        """记录现代 ls/ilvl 及常见 legacy pn marker。"""
+        """Documents modern ls/ilvl and common legacy pn marker."""
         if token.name == "ls" and token.param is not None:
             self.state.list_override_id = token.param
             return True
@@ -1276,7 +1276,7 @@ class RtfParser:
         return False
 
     def _pict_control(self, token: RtfControlWord) -> None:
-        """记录 pict 格式；尺寸与裁剪控制不影响无布局语义。"""
+        """Document pict format; size and crop controls do not affect layout-free semantics."""
         frame = self._nearest_frame("pict")
         capture = frame.pict if frame is not None else None
         if capture is None:
@@ -1293,7 +1293,7 @@ class RtfParser:
             capture.content_type, capture.extension = "image/bmp", "dib"
 
     def _hex_byte(self, token: RtfHexByte) -> None:
-        """把 hex byte 送入 pict 或当前代码页缓冲。"""
+        """Send hex byte into pict or the current code page buffer."""
         if self.state.destination == "pict":
             frame = self._nearest_frame("pict")
             if frame is not None and frame is self._current_frame() and frame.pict is not None:
@@ -1307,7 +1307,7 @@ class RtfParser:
         self._byte_buffer.append(token.value)
 
     def _text_bytes(self, token: RtfTextBytes) -> None:
-        """规范源换行后把文本字节送入 destination 或代码页缓冲。"""
+        """Canonical source wraps text bytes into destination or code page buffer."""
         if self.state.destination == "pict":
             frame = self._nearest_frame("pict")
             if frame is not None and frame is self._current_frame() and frame.pict is not None:
@@ -1323,7 +1323,7 @@ class RtfParser:
         self._byte_buffer.extend(raw)
 
     def _binary(self, token: RtfBinary) -> None:
-        """只允许 pict destination 消费 bin 载荷，其他二进制内容直接跳过。"""
+        """Only pict destination is allowed to consume bin payload, and other binary contents are skipped directly."""
         if self.state.destination != "pict":
             return
         frame = self._nearest_frame("pict")
@@ -1331,7 +1331,7 @@ class RtfParser:
             frame.pict.binary = token.data
 
     def _unicode(self, value: int | None) -> None:
-        """解码有符号 UTF-16 code unit，合并代理对并启动 fallback skip。"""
+        """Decode signed UTF-16 code unit, merge surrogate pairs and start fallback skip."""
         if value is None:
             return
         unit = (value + 65536 if value < 0 else value) & 0xFFFF
@@ -1351,13 +1351,13 @@ class RtfParser:
         self._fallback_skip = self.state.uc_skip
 
     def _current_encoding(self) -> str:
-        """返回当前 font 的代码页或文档默认代码页。"""
+        """Returns the code page of the current font or the document default code page."""
         if self.state.font_id is None:
             return self.prelude.default_encoding
         return self.prelude.font_encodings.get(self.state.font_id, self.prelude.default_encoding)
 
     def _flush_bytes(self) -> None:
-        """使用当前 font code page 解码累计字节并写入当前 destination。"""
+        """Decode accumulated bytes using current font code page and write to current destination."""
         if not self._byte_buffer:
             return
         payload = bytes(self._byte_buffer)
@@ -1365,7 +1365,7 @@ class RtfParser:
         self._append_text(payload.decode(self._current_encoding(), errors="replace"))
 
     def _append_text(self, text: str) -> None:
-        """按当前 destination 把文本写入 field、bookmark、list label 或正文。"""
+        """Press current destination to write text to field, bookmark, list label or text."""
         if not text or self.state.hidden:
             return
         if self.state.destination == "field_instruction":
@@ -1386,7 +1386,7 @@ class RtfParser:
         self.context.text_fragments.append(text)
 
     def _flush_text_run(self) -> None:
-        """把当前 context 的相邻文本片段一次性合并为 typed run。"""
+        """Merge adjacent text fragments of the current context into typed and run at once."""
         if not self.context.text_fragments:
             return
         style = self.context.text_style if self.context.text_style is not None else RtfTextStyle()
@@ -1395,12 +1395,12 @@ class RtfParser:
         self.context.text_style = None
 
     def _append_inline(self, inline: RtfInline) -> None:
-        """先冻结累计文本，再追加公式、图片、锚点等结构行内节点。"""
+        """First freeze the accumulated text, and then add structural inline nodes such as formulas, pictures, anchor points, etc."""
         self._flush_text_run()
         self.context.inlines.append(inline)
 
     def _resolve_list_info(self) -> RtfListInfo | None:
-        """把 paragraph 的 ls/ilvl 和精确 listtext 收敛为显式列表信息。"""
+        """Convergence of ls/ilvl and exact listtext of paragraph into explicit list information."""
         identity = self.state.list_override_id
         label = self.context.pending_list_label
         if identity is None and not label:
@@ -1434,7 +1434,7 @@ class RtfParser:
         )
 
     def _end_paragraph(self) -> None:
-        """把当前行内流冻结为段落，并路由到正文或当前表格单元格。"""
+        """Freeze the current inline flow as a paragraph and route it to the body text or current table cell."""
         self._flush_bytes()
         if self._pending_high_surrogate is not None:
             self._append_text("\ufffd")
@@ -1470,13 +1470,13 @@ class RtfParser:
         self.context.blocks.append(paragraph)
 
     def _table_builder(self, depth: int) -> _TableBuilder:
-        """返回指定 depth 的 builder，并拒绝超出渲染能力的嵌套。"""
+        """Returns builder for the specified depth, rejecting nesting beyond rendering capabilities."""
         if depth < 1 or depth > MAX_RTF_TABLE_DEPTH:
             raise LegacyOfficeResourceLimitError(f"RTF table nesting exceeds max_table_depth={MAX_RTF_TABLE_DEPTH}")
         return self.context.tables.setdefault(depth, _TableBuilder())
 
     def _set_table_depth(self, depth: int) -> None:
-        """切换 table depth，并把已结束的深层表格挂回父 cell。"""
+        """Switch table to depth, and hang the completed deep table back to the parent cell."""
         normalized = min(max(depth, 0), MAX_RTF_TABLE_DEPTH)
         if depth > MAX_RTF_TABLE_DEPTH:
             raise LegacyOfficeResourceLimitError(f"RTF table nesting exceeds max_table_depth={MAX_RTF_TABLE_DEPTH}")
@@ -1494,7 +1494,7 @@ class RtfParser:
         self.state.table_depth = normalized
 
     def _flush_tables(self) -> None:
-        """从深到浅结束当前 context 的全部 table builder。"""
+        """All table builder ending the current context from darkest to lightest."""
         for depth in sorted(self.context.tables, reverse=True):
             table = self.context.tables[depth].finish()
             if table is None:
@@ -1506,7 +1506,7 @@ class RtfParser:
         self.context.tables.clear()
 
     def _finalize_context(self, context: _OutputContext) -> None:
-        """结束一个输出 context 的残留段落和表格。"""
+        """End an output of residual paragraphs and tables for context."""
         if context is not self.context:
             current = self.context
             self.context = context
@@ -1519,7 +1519,7 @@ class RtfParser:
 
 
 def read_rtf_bytes(file_binary: BinaryIO) -> bytes:
-    """从二进制流头部读取有界 RTF 输入，并恢复调用前流位置。"""
+    """Reads the bounded RTF input from the binary stream header and restores the pre-call stream position."""
     try:
         original_position = file_binary.tell()
     except (AttributeError, OSError):
@@ -1535,7 +1535,7 @@ def read_rtf_bytes(file_binary: BinaryIO) -> bytes:
 
 
 def parse_rtf(file_binary: BinaryIO) -> RtfDocument:
-    """读取一个 RTF 二进制流并返回单逻辑页 typed document。"""
+    """Reads a RTF binary stream and returns a single logical page typed document."""
     data = read_rtf_bytes(file_binary)
     prelude = parse_rtf_prelude(data)
     return RtfParser(data, prelude).parse()
