@@ -38,6 +38,29 @@ def test_public_api_manifest_exports_exist() -> None:
                 assert hasattr(imported, name), f"{module}.{name}"
 
 
+def test_public_api_manifest_covers_explicit_exports() -> None:
+    """公开模块的显式导出必须登记，避免清单遗漏已可跨库使用的入口。"""
+    for module, names in PUBLIC_API.items():
+        imported = import_module(module)
+        missing = set(getattr(imported, "__all__", ())) - set(names)
+        assert not missing, f"{module}: {sorted(missing)}"
+
+
+def test_public_api_facades_preserve_shared_types_and_entrypoints() -> None:
+    """顶层便捷入口和渲染门面的类型保持同一对象，确保宿主注解与类型判断兼容。"""
+    root = import_module("docvortex")
+    api = import_module("docvortex.api")
+    results = import_module("docvortex.result")
+    render = import_module("docvortex.render")
+    contracts = import_module("docvortex.render.contracts")
+    for name in ("AnalysisResult", "DocumentResult", "ExportResult", "MetadataResult", "RenderArtifact"):
+        assert getattr(root, name) is getattr(results, name)
+    assert root.postprocess_document is api.postprocess
+    assert root.render_artifact is api.render
+    for name in PUBLIC_API["docvortex.render.contracts"]:
+        assert getattr(render, name) is getattr(contracts, name)
+
+
 def test_new_api_annotations_resolve() -> None:
     """公共类型和函数不依赖调用方预加载旧模块才能解析注解。"""
     for value in (

@@ -24,6 +24,7 @@ from ..line_layout import (
 )
 from ..models import _DocumentBodyProfile, _DocumentTitleProfile, _LineItem, _PreparedPage, _TextLane
 from ..native_text import _fill_native_typography
+from ..inline.detection import _font_styles_from_metadata
 from .body_profile import _line_uses_document_regular_font
 
 from .common import (
@@ -35,6 +36,12 @@ from .common import (
     _line_inside_visual_container,
 )
 from .page_titles import _classify_page_titles
+
+
+def _line_has_bold_font(line: _LineItem) -> bool:
+    """复用样式判定兼容旧 PDFium 的低字重值；只有数字字重或明确粗体元数据才提供证据。"""
+    name, flags = line.font_signature or ("", 0)
+    return "bold" in _font_styles_from_metadata(name, flags, line.dominant_font_weight)
 
 
 def _classify_short_cjk_section_leads(lines: list[_LineItem]) -> None:
@@ -264,7 +271,7 @@ def _classify_native_display_resets(lines, page_size, visual_bboxes, table_bboxe
     # 完整网格上方居中的粗体短题名以表体字号为参照，防止表格内部表头和正文尾句被误收。
     for line in short:
         h = line.effective_height
-        if line.semantic_type is not None or (line.dominant_font_weight or 400) < 600 or h < 1.25 * body:
+        if line.semantic_type is not None or not _line_has_bold_font(line) or h < 1.25 * body:
             continue
         if any(
             0.3 * body <= box[1] - line.bbox[3] <= 2 * body
@@ -597,11 +604,12 @@ def _classify_bold_numbered_heading_rows(
         label = " ".join(member.text.strip() for member in members)
         bounds = _bbox_union_many([member.bbox for member in members])
         if (
-            body.dominant_font_weight is None
-            or body.dominant_font_weight < 600
+            not _line_has_bold_font(body)
             or body.font_coverage < 0.75
             or len(label.split()) > 15
             or re.search(r"[A-Za-z\u3400-\u9fff]", body.text) is None
+            # 连续单字母图例或数学标签不构成附录题名，即使字体明确加粗也不能晋升。
+            or re.fullmatch(r"[A-Z](?:\s+[A-Z])*", body.text.strip()) is not None
             or re.match(r"^\d{4,}(?:\s|$)", label)
             or re.search(r"[.!?。！？:：;；,，]$", label)
             or bounds[2] - bounds[0] > 0.8 * page_size[0]
@@ -625,8 +633,7 @@ def _classify_bold_numbered_heading_rows(
                 and -0.25 * height <= other.bbox[1] - bounds[3] <= 0.75 * height
                 and _bbox_center_y(other.bbox) > _bbox_center_y(bounds) + 0.5 * height
                 and other.bbox[2] <= bounds[2] + height
-                and other.dominant_font_weight is not None
-                and other.dominant_font_weight >= 600
+                and _line_has_bold_font(other)
                 and body.font_signature == other.font_signature
                 and 0.9 <= _line_effective_height(other, other.bbox) / height <= 1.1
             ]

@@ -3469,6 +3469,43 @@ def test_centered_emphasized_summary_heading_above_grid_is_not_body():
     assert len(matches) == 1 and matches[0]['type'] in {'paragraph_title','caption'}
 
 
+@pytest.mark.parametrize("left,width", [(20, 220), (80, 360), (150, 590)])
+@pytest.mark.parametrize("kind", ["numbered", "grid", "legend"])
+@pytest.mark.parametrize("font,weight,expected", [
+    (("Unrelated-Bold", 0), 225, True),
+    (("Another-Semibold", 0), 560, True),
+    (("Generic", 1 << 18), 225, True),
+    (("Generic", 0), 700, True),
+    (("Generic", 0), 560, False),
+    (("Generic", 0), None, False),
+])
+def test_heading_bold_metadata_survives_old_pdfium_weight_values(left, width, kind, font, weight, expected):
+    """独立改变栏宽和字体身份，旧字重必须有明确粗体证据才能支持编号或网格上方标题。"""
+    from docvortex.analyzers.native.pdf.title_analysis.structural import (
+        _classify_bold_numbered_heading_rows,
+        _classify_native_display_resets,
+    )
+    h = 10
+    x = left if kind in {"numbered", "legend"} else left + .5 * width - 60
+    title = _metric_fixture_line(
+        "D E" if kind == "legend" else "3 Other Independent Topic" if kind == "numbered" else "Independent Grid Summary",
+        (x, 50, x + 120, 65), 20, effective_height=15, font_signature=font,
+        dominant_font_weight=weight, font_coverage=1,
+    )
+    if kind in {"numbered", "legend"}:
+        _classify_bold_numbered_heading_rows([title], (left + width + 20, 500), [])
+    else:
+        rows = [title] + [
+            _metric_fixture_line("Ordinary complete prose with several unrelated words.",
+                (left, 300 + index * 14, left + width, 310 + index * 14), index,
+                effective_height=h, font_signature=("Body", 0), dominant_font_weight=400, font_coverage=1)
+            for index in range(8)
+        ]
+        _classify_native_display_resets(rows, (left + width + 20, 500), [], [(left, 77, left + width, 250)],
+            page_index=0, reference_lines=rows)
+    assert (title.semantic_type == "paragraph_title") is (expected and kind != "legend")
+
+
 def test_repeated_light_display_style_titles_survive_equal_native_font_boxes():
     """两个轻字重标题虽与正文字框同高，重复字体和上下区域仍证明独立标题。"""
     blocks = _pages('review_118')[0]

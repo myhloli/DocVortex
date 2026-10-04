@@ -18,6 +18,24 @@
 
 `docvortex.public_api.PUBLIC_API` 是静态模块及符号清单。新增跨库依赖必须同时更新清单、文档和契约测试；不能通过基础实现、私有模块或动态别名绕过边界。
 
+### 0.5.9 公开清单补全
+
+0.5.9 将已有的显式导出补入 `PUBLIC_API`，不改变函数签名、结果协议或默认后端选择。
+
+| 职责 | 支持的入口 |
+| --- | --- |
+| 顶层便捷入口 | `docvortex.postprocess_document`、`docvortex.render_artifact`、`docvortex.__version__` |
+| 结果与诊断类型 | `docvortex.result` 的 `Diagnostic`、`MetadataResult`、`AnalysisResult`、`DocumentResult`、`RenderArtifact`、`ExportResult`；除 `Diagnostic` 外也可从顶层导入 |
+| 统一渲染门面 | `docvortex.render` 的格式、选项、输出类型、素材回调和各格式渲染函数；与 `docvortex.render.contracts` 共用类型对象 |
+| 行内内容变换 | `docvortex.content.inline` 的规范化、文本映射、替换、切片与去首尾空白函数 |
+| Span 构造与变换 | `docvortex.content.spans` 的代码、超链接、文本构造，以及扩展、规范化与切片函数 |
+| 子块遍历与列表标记 | `docvortex.content.tree.iter_child_blocks`；`docvortex.render.fragments` 的 `ListItem`、`ListItemKind`、`OrderedListStyle` |
+
+顶层 `render_artifact` 接收 `MiddleJson` 和可选素材并返回 `RenderArtifact`；`docvortex.render.render`
+接收 `MiddleJson` 并返回 `RenderOutput`（字符串、字节或字典）。两者的职责与签名保持原样，调用方应选择对应层级。
+契约测试同时检查清单符号可导入、显式 `__all__` 导出完整登记，以及门面类型身份一致。
+现有兼容的 MinerU 无需修改调用代码；PDF 原生表格、标题与阅读顺序修复由 DocVortex 内部完成。
+
 ## 结果包素材导出（0.4.3）
 
 跨库调用方可通过 `docvortex.export.materialize_middle(middle_json, assets=None)` 获取图片外置后的文档副本与 `AssetStore`，再通过 `validate_materialized_assets(document, assets)` 验证所有图片引用。直接图片和视觉 HTML 内嵌图片使用安全相对路径，原始图片字节及布局方向扩展保持不变；代码字面量不作为 HTML 素材处理。

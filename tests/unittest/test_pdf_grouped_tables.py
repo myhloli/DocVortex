@@ -16,7 +16,7 @@ from docvortex.document.pdf import PDFDocument
 from test_native_pdf_table import _char_items, _local_to_page_bbox
 
 ROOT = Path(__file__).parents[2]
-TRUTH = json.loads((ROOT / "tests/fixtures/native_pdf_grouped_tables.json").read_text())
+TRUTH = json.loads((ROOT / "tests/fixtures/native_pdf_grouped_tables.json").read_text(encoding="utf-8"))
 SOURCE = ROOT / "tests/unittest/pdfs/grouped_tables/emnlp2022_grouped_tables.pdf"
 
 
