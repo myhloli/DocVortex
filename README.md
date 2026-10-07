@@ -36,15 +36,15 @@ Native parsing works without an OCR or VLM inference service. Use DocVortex dire
 
 ## PDF performance
 
-**The 0.5 series brings a major boost to PDF processing with Rust acceleration: public parsing is 2.76× as fast as 0.4.25 on the tested corpus.**
+**Release 0.5.9 uses Rust acceleration: public parsing is 1.50× as fast as 0.4.25 on the tested corpus.**
 
-| Pipeline | 0.4.25 | 0.5.2 (Rust + session) | Speedup | Time reduction | Peak RSS reduction |
+| Pipeline | 0.4.25 python | 0.5.9 rust | Speedup | Time reduction | Peak RSS reduction |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| DocVortex public `parse()` | 42.36 s | 15.35 s | **2.76×** | **63.77%** | **33.45%** |
-| MinerU Flash | 44.50 s | 15.78 s | **2.82×** | **64.53%** | **32.78%** |
-| MinerU shared PDF processing | 76.28 s | 14.91 s | **5.12×** | **80.45%** | **36.25%** |
+| DocVortex public `parse()` | 42.36 s | 28.20 s | **1.50×** | **33.43%** | **30.77%** |
+| MinerU Flash | 44.50 s | 28.05 s | **1.59×** | **36.95%** | **29.56%** |
+| MinerU shared PDF processing | 76.28 s | 19.19 s | **3.98×** | **74.85%** | **35.70%** |
 
-Same-machine warm-run comparison on 32 PDFs / 299 pages (31 PDFs for Flash); times are sums of per-document medians. RSS reductions are medians of per-document process-tree peak RSS reductions. MinerU results include improvements in both projects. The shared pipeline excludes model computation; excluding the extreme dense-table sample, its speedup is **2.46×**.
+Same-machine warm-run comparison on 32 PDFs / 299 pages (31 PDFs for Flash). The existing 0.4.25 measurements are reused. For 0.5.9, each document is warmed once and timed five times in each of three balanced rounds; times sum the medians of the three per-document medians. RSS reductions are medians of per-document process-tree peak RSS reductions. MinerU results include improvements in both projects. The shared pipeline excludes model computation; excluding the extreme dense-table sample, its speedup is **1.88×**. The table shows released 0.5.9; the unreleased optimization candidate is reported separately.
 
 ## Quick start
 
