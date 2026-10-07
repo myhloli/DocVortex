@@ -4,6 +4,7 @@ from copy import deepcopy
 from random import Random
 from types import SimpleNamespace
 import math
+import sys
 
 import pytest
 
@@ -207,7 +208,8 @@ def test_owned_column_cache_keeps_prefix_order_tolerance_and_epoch(seed):
         packed = [[(f.local_bbox[0], f.local_bbox[2]) for f in row.fragments] for row in rows[:40]]
         expected = native.StableColumnClusters(compensated).extend(packed, 3.0)
         assert owner.count(rows[:40], 4.0, True, _VisualRow, _Fragment) == expected
-        if compensated:
+        # CPython 3.12 起内置 sum 使用补偿求和，参考分支必须匹配当前运行时。
+        if compensated == (sys.version_info >= (3, 12)):
             assert expected == rules._count_stable_columns_python(rows[:40], 4.0)
 
 
