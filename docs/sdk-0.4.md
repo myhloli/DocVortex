@@ -47,6 +47,21 @@ Python／Rust 私有扩展协议由 30 升至 31；安装包须使用同一版�
 本地验证覆盖公开契约、当前 MinerU 的导入边界、文档协议、路由、表格、页面快照与渲染调度；
 性能对照见 [README 性能示例](../README_zh-CN.md#pdf-性能)。
 
+### 图像工具的无 OpenCV 实现（0.5.11）
+
+`docvortex.assets` 的对比度、旋转和 JPEG 裁剪工具不再需要 OpenCV。Rust 位图裁剪的
+连续 BGR 协议保持不变，Python 旋转使用 NumPy，JPEG 共用 Pillow 编码，显式设置
+quality 95、4:2:0 采样、非渐进且不优化编码。临时图像和内存缓冲会在成功与失败时关闭。
+
+`calculate_contrast` 接受 RGB/BGR 三或四通道的 uint8、uint16、float32 图像，沿用灰度舍入、
+忽略 alpha、标准差/均值统计和两位小数。JPEG 高位深输入沿用饱和舍入到 uint8 并忽略 alpha。
+对比度统计的非法形状、空图及不支持的位深使用 `ValueError`；进入 JPEG 编码的非法形状或位深
+同样使用 `ValueError`。空裁框、空裁片和底层 JPEG 编码失败仍返回空字符串。
+`rotate_image_to_upright` 的 90/180/270 度旋转返回独立连续数组，其余角度返回原对象。
+
+公开签名、JSON、素材命名和原生协议 31 保持原样。完整本地验收、性能及 MinerU 自身的
+依赖迁移分析见 [OpenCV 移除报告](opencv-removal.md)。
+
 ## 结果包素材导出（0.4.3）
 
 跨库调用方可通过 `docvortex.export.materialize_middle(middle_json, assets=None)` 获取图片外置后的文档副本与 `AssetStore`，再通过 `validate_materialized_assets(document, assets)` 验证所有图片引用。直接图片和视觉 HTML 内嵌图片使用安全相对路径，原始图片字节及布局方向扩展保持不变；代码字面量不作为 HTML 素材处理。

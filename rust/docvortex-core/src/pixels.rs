@@ -67,7 +67,7 @@ fn blank_top_channels(data: &[u8], width: usize, height: usize, channels: usize)
     }
 }
 
-/// 校验步长和边界，按原方向分类语义返回 OpenCV 所需的连续 BGR 像素。
+/// 校验步长和边界，按原方向分类语义返回连续 BGR 像素，颜色编码由调用方完成。
 pub fn crop_bgr(
     data: &[u8],
     width: usize,

@@ -6,9 +6,15 @@ import ast
 import subprocess
 import sys
 from importlib.util import find_spec
+from importlib.metadata import requires
 from pathlib import Path
 
 import docvortex
+
+
+def test_distribution_does_not_require_opencv() -> None:
+    """安装元数据的必需和可选依赖都不能重新引入图像重依赖。"""
+    assert not any("opencv" in requirement.lower() for requirement in requires("docvortex") or [])
 
 
 def test_engine_does_not_ship_host_protocol_adapters() -> None:
@@ -17,12 +23,20 @@ def test_engine_does_not_ship_host_protocol_adapters() -> None:
     assert not (Path(docvortex.__file__).parent / "compat").exists()
 
 
-def test_source_has_no_host_or_pdftext_imports() -> None:
-    """普通、惰性和类型检查导入均不得依赖宿主或已移除的抽取库。"""
+def test_source_has_no_host_pdftext_or_opencv_imports() -> None:
+    """普通、惰性、类型检查及动态导入均不得依赖已移除的库。"""
     root = Path(docvortex.__file__).parent
     offenders = []
     for path in root.rglob("*.py"):
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        nodes = list(ast.walk(ast.parse(path.read_text(encoding="utf-8"))))
+        # 收集标准动态导入函数的别名，避免只识别 importlib.import_module 属性调用。
+        dynamic_import_names = {"__import__"}
+        for node in nodes:
+            if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module in {"importlib", "builtins"}:
+                dynamic_import_names.update(
+                    item.asname or item.name for item in node.names if item.name in {"import_module", "__import__"}
+                )
+        for node in nodes:
             names = (
                 [item.name for item in node.names]
                 if isinstance(node, ast.Import)
@@ -30,7 +44,15 @@ def test_source_has_no_host_or_pdftext_imports() -> None:
                 if isinstance(node, ast.ImportFrom) and node.level == 0
                 else []
             )
-            if any(name.split(".")[0] in {"mineru", "pdftext"} for name in names):
+            if isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant):
+                if (
+                    isinstance(node.func, ast.Name)
+                    and node.func.id in dynamic_import_names
+                    or (isinstance(node.func, ast.Attribute) and node.func.attr in {"import_module", "__import__"})
+                ):
+                    if isinstance(node.args[0].value, str):
+                        names.append(node.args[0].value)
+            if any(name.split(".")[0] in {"mineru", "pdftext", "cv2"} for name in names):
                 offenders.append(f"{path}:{node.lineno}")
     assert not offenders
 
@@ -39,7 +61,7 @@ def test_engine_tests_do_not_import_host_packages() -> None:
     """测试与辅助模块也必须独立运行，避免依赖宿主安装或测试服务器。"""
     root = Path(__file__).parent
     offenders = []
-    forbidden = {"mineru", "pdftext", "fastapi", "httpx"}
+    forbidden = {"mineru", "pdftext", "fastapi", "httpx", "cv2"}
     for path in root.rglob("*.py"):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             names = (

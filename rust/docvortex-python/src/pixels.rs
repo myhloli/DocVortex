@@ -58,7 +58,7 @@ pub(super) fn blank_top_gray(
     Ok(py.detach(|| docvortex_core::pixels::blank_top_gray(input, width, height)))
 }
 
-/// 将独立位图的一块区域直接转换为连续 BGR 字节，编码继续使用原 OpenCV 配置。
+/// 将独立位图的一块区域直接转换为连续 BGR 字节，编码继续由 Python 图像工具负责。
 #[pyfunction]
 pub fn crop_bitmap_bgr<'py>(
     py: Python<'py>,

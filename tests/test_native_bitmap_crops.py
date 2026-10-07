@@ -2,7 +2,6 @@
 
 from copy import deepcopy
 
-import cv2
 import numpy as np
 import pytest
 from PIL import Image
@@ -22,8 +21,8 @@ def native():
 
 @pytest.mark.parametrize("mode", ["BGR", "BGRX", "BGRA", "RGB", "RGBX", "RGBA", "L"])
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
-def test_padded_bitmap_crop_matches_pillow_and_opencv(native, mode, angle):
-    """随机像素与非零行填充逐字节比对 PIL 解码、OpenCV 旋转及最终 JPEG。"""
+def test_padded_bitmap_crop_matches_pillow(native, mode, angle):
+    """随机像素与非零行填充逐字节比对 Pillow 独立裁剪、旋转及最终 JPEG。"""
     rng = np.random.default_rng(123)
     width, height = 37, 29
     channels = 1 if mode == "L" else len(mode)
@@ -31,13 +30,15 @@ def test_padded_bitmap_crop_matches_pillow_and_opencv(native, mode, angle):
     data = rng.integers(0, 256, size=height * stride, dtype=np.uint8).tobytes()
     dest = "L" if mode == "L" else "RGBA" if mode.endswith("A") else "RGB"
     image = Image.frombytes(dest, (width, height), data, "raw", mode, stride, 1)
-    rgb = np.asarray(image.convert("RGB"))
     bbox = (3, 2, 34, 28)
-    expected = rgb[2:28, 3:34]
-    rotations = {90: cv2.ROTATE_90_COUNTERCLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_CLOCKWISE}
-    if angle:
-        expected = cv2.rotate(expected, rotations[angle])
-    expected = cv2.cvtColor(expected, cv2.COLOR_RGB2BGR)
+    rotations = {90: Image.Transpose.ROTATE_90, 180: Image.Transpose.ROTATE_180, 270: Image.Transpose.ROTATE_270}
+    with image.convert("RGB") as rgb, rgb.crop(bbox) as crop:
+        if angle:
+            with crop.transpose(rotations[angle]) as rotated:
+                expected = np.asarray(rotated).copy()
+        else:
+            expected = np.asarray(crop).copy()
+    expected = expected[..., ::-1]
     pixels, w, h = native.crop_bitmap_bgr(data, width, height, stride, mode, bbox, angle)
     assert bytes(pixels) == expected.tobytes()
     assert (h, w) == expected.shape[:2]
@@ -56,7 +57,10 @@ def test_native_crop_rejects_invalid_bounds(native, bbox):
         native.crop_bitmap_bgr(bytes(48), 4, 4, 12, "BGR", bbox, 0)
 
 
-@pytest.mark.parametrize("data,stride,mode,angle", [(bytes(47), 12, "BGR", 0), (bytes(48), 11, "BGR", 0), (bytes(48), 12, "XYZ", 0), (bytes(48), 12, "BGR", 45)])
+@pytest.mark.parametrize(
+    "data,stride,mode,angle",
+    [(bytes(47), 12, "BGR", 0), (bytes(48), 11, "BGR", 0), (bytes(48), 12, "XYZ", 0), (bytes(48), 12, "BGR", 45)],
+)
 def test_native_crop_rejects_invalid_metadata(native, data, stride, mode, angle):
     """截断缓冲、非法步长、未知格式与非直角方向必须明确报错。"""
     with pytest.raises(ValueError):

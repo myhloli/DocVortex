@@ -1,6 +1,5 @@
 """跨模型共享的轻量图像统计与裁剪原语。"""
 
-import cv2
 import numpy as np
 from PIL import Image
 
@@ -15,14 +14,20 @@ def calculate_contrast(img: np.ndarray, img_mode: str) -> float:
     :Param img_mode = 图像的色彩通道，'rgb' 或 'bgr'
     :return: 图像的对比度值
     """
-    if img_mode == "rgb":
-        # 将RGB图像转换为灰度图
-        gray_img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    elif img_mode == "bgr":
-        # 将BGR图像转换为灰度图
-        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    else:
+    if img_mode not in ("rgb", "bgr"):
         raise ValueError("Invalid image mode. Please provide 'rgb' or 'bgr'.")
+    if not isinstance(img, np.ndarray) or img.ndim != 3 or img.shape[2] not in (3, 4) or img.size == 0:
+        raise ValueError("Expected a non-empty three- or four-channel image")
+
+    rgb = img[..., :3] if img_mode == "rgb" else img[..., 2::-1]
+    if img.dtype in (np.uint8, np.uint16):
+        # 保留既有 15 位定点系数与半值进位；16 位输入的最大累加值也不会超过 int32。
+        values = rgb.astype(np.int32)
+        gray_img = ((values[..., 0] * 9798 + values[..., 1] * 19235 + values[..., 2] * 3735 + 16384) >> 15).astype(img.dtype)
+    elif img.dtype == np.float32:
+        gray_img = rgb[..., 0] * np.float32(0.299) + rgb[..., 1] * np.float32(0.587) + rgb[..., 2] * np.float32(0.114)
+    else:
+        raise ValueError("Unsupported image depth; expected uint8, uint16 or float32")
 
     # 计算均值和标准差
     mean_value = np.mean(gray_img)

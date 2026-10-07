@@ -226,9 +226,9 @@ def _collapse_image_blocks(
 def _attach_owned_bitmap_crops(visual_blocks, bitmap, native, page_index):
     """直接裁剪独立位图，复用原框归一化与 JPEG 编码；原生计算错误明确传播。"""
     import base64
-    import cv2
 
     from ...foundation._geometry import normalize_to_int_bbox
+    from ...foundation._image_operations import _encode_rgb_as_jpeg_bytes
 
     data, width, height, stride, mode = bitmap
     for block_idx, block in visual_blocks:
@@ -245,9 +245,8 @@ def _attach_owned_bitmap_crops(visual_blocks, bitmap, native, page_index):
         pixels, crop_width, crop_height = native.crop_bitmap_bgr(data, width, height, stride, mode, bbox, angle)
         crop_bgr = np.frombuffer(pixels, dtype=np.uint8).reshape(crop_height, crop_width, 3)
         try:
-            success, encoded = cv2.imencode(".jpg", crop_bgr)
-            if not success:
-                raise ValueError("JPEG encoding failure")
-            block["image_base64"] = f"data:image/jpeg;base64,{base64.b64encode(encoded.tobytes()).decode('ascii')}"
+            # 保留原生 BGR 裁剪协议，只在 Pillow 编码边界交换颜色通道。
+            encoded = _encode_rgb_as_jpeg_bytes(crop_bgr[..., ::-1])
+            block["image_base64"] = f"data:image/jpeg;base64,{base64.b64encode(encoded).decode('ascii')}"
         except Exception as exc:
             logger.warning(f"Skipping invalid model visual block crop: page={page_index}, block={block_idx}, error={exc}")
