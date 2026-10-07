@@ -86,6 +86,6 @@ def test_numeric_graphics_import_with_legacy_regex_module(monkeypatch):
     namespace = {"__name__": graphics.__name__, "__package__": graphics.__package__}
     monkeypatch.setitem(sys.modules, "re", legacy)
     path = Path(graphics.__file__)
-    exec(compile(path.read_text(), str(path), "exec"), namespace)
+    exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)
     item = line("12")
     assert namespace["_numeric_graphic_lines"]([item], 0) == ([item] if get_native() is not None else None)
