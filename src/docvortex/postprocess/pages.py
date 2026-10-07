@@ -12,6 +12,7 @@ from .page_blocks import process_page_blocks
 from .paragraphs import merge_para_text_blocks
 from ..content.table import merge_table
 from ..schema import ModelJson, PageInfo
+from ..foundation.language import _code_language_model_scope
 
 PAGE_INFO_LIST_ADAPTER = TypeAdapter(list[PageInfo])
 
@@ -86,14 +87,15 @@ def model_json_to_pages(model_json: ModelJson) -> list[PageInfo]:
         fix_office_paragraph_titles(copied_model_list)
         fix_office_index_title_blocks(copied_model_list)
 
-    raw_pages = [
-        _blocks_to_raw_page_info(
-            page_model_list,
-            page_idx=page_idx,
-            use_bbox=use_bbox,
-        )
-        for page_model_list, page_idx in zip(copied_model_list, page_indices, strict=True)
-    ]
+    with _code_language_model_scope():
+        raw_pages = [
+            _blocks_to_raw_page_info(
+                page_model_list,
+                page_idx=page_idx,
+                use_bbox=use_bbox,
+            )
+            for page_model_list, page_idx in zip(copied_model_list, page_indices, strict=True)
+        ]
     if use_bbox:
         merge_para_text_blocks(raw_pages)
         merge_table(raw_pages)

@@ -1,9 +1,46 @@
 """恢复没有原生文字成员的独立矢量图形，装饰背景和正文仍由原规则处理。"""
 
 import statistics
+import math
+from ...._compute_backend import get_native
 
 from .geometry import _bbox_area, _bbox_distance, _bbox_overlap_in_first, _bbox_overlap_in_smaller, _bbox_union_many
 from .line_layout import _line_effective_height
+
+
+def _isolated_path_groups(source, paths, em):
+    """仅缓存当前页的矩形几何与字号；颜色、文字和最终图体仍每次独立核验。"""
+    boxes = tuple(path.bbox for path in paths)
+    ordinary = (
+        type(em) in (int, float)
+        and math.isfinite(em)
+        and abs(em) <= 2**50
+        and all(
+            type(box) is tuple
+            and len(box) == 4
+            and all(type(v) in (int, float) and math.isfinite(v) and abs(v) <= 2**50 for v in box)
+            for box in boxes
+        )
+    )
+    cache = getattr(source, "isolated_path_cache", {}) if ordinary else {}
+    key = (boxes, em) if ordinary else None
+    indices = cache.get(key) if ordinary else None
+    native = get_native()
+    if indices is None and ordinary and native is not None:
+        indices = native.isolated_path_groups(boxes, em)
+    if indices is None:
+        indices = []
+        for i, path in enumerate(paths):
+            matches = [group for group in indices if any(_bbox_distance(path.bbox, paths[j].bbox) <= 0.35 * em for j in group)]
+            if not matches:
+                indices.append([i])
+            else:
+                merged = [i, *(j for group in matches for j in group)]
+                indices = [group for group in indices if all(group is not match for match in matches)]
+                indices.append(merged)
+    if ordinary:
+        cache[key] = indices
+    return [[paths[i] for i in group] for group in indices]
 
 
 def isolated_vector_components(source):
@@ -21,15 +58,7 @@ def isolated_vector_components(source):
         and path.segment_count >= 8
         and 0 < _bbox_area(path.bbox) <= 0.06 * area
     ]
-    groups = []
-    for path in paths:
-        matches = [group for group in groups if any(_bbox_distance(path.bbox, other.bbox) <= 0.35 * em for other in group)]
-        if not matches:
-            groups.append([path])
-        else:
-            merged = [path, *(member for group in matches for member in group)]
-            groups = [group for group in groups if all(group is not match for match in matches)]
-            groups.append(merged)
+    groups = _isolated_path_groups(source, paths, em)
     output = []
     for group in groups:
         box = _bbox_union_many([path.bbox for path in group])

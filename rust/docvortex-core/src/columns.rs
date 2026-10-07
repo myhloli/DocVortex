@@ -30,6 +30,20 @@ impl Columns {
 
     /// 单调追加行并保持每簇去重后的行覆盖量，溢出后丢弃整个原生状态。
     pub fn extend(&mut self, rows: &[Vec<(f64, f64)>], tolerance: f64) -> Option<(usize, f64)> {
+        self.extend_rows(rows, tolerance)
+    }
+
+    /// 自有页面锚点通过借用片段追加，不再为每个区间复制嵌套数值数组。
+    pub fn extend_refs(&mut self, rows: &[&[(f64, f64)]], tolerance: f64) -> Option<(usize, f64)> {
+        self.extend_rows(rows, tolerance)
+    }
+
+    /// 两种传输形式共用完全相同的累计与稳定聚类实现，保留浮点求和顺序。
+    fn extend_rows<T: AsRef<[(f64, f64)]>>(
+        &mut self,
+        rows: &[T],
+        tolerance: f64,
+    ) -> Option<(usize, f64)> {
         if !self.valid || !tolerance.is_finite() || tolerance < 0.0 {
             return None;
         }
@@ -37,7 +51,7 @@ impl Columns {
             let clusters = &mut self.groups[alignment];
             for (offset, fragments) in rows.iter().enumerate() {
                 let row = self.row_count + offset;
-                for &(left, right) in fragments {
+                for &(left, right) in fragments.as_ref() {
                     let anchor = match alignment {
                         0 => left,
                         1 => (left + right) / 2.0,

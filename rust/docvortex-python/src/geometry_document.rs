@@ -1,4 +1,5 @@
 //! 自有文档入口：坐标与统计在 Rust 连续执行，按后续规则需要决定是否物化字符。
+// 高频字段名按解释器复用不可变字符串，仍由原 Python 属性和字典操作读取当前状态。
 use super::geometry::{plain_coordinates, shared_coordinates};
 use super::geometry_runs::materialize_runs;
 use docvortex_core::{
@@ -240,11 +241,20 @@ impl NativeStyleDocument {
             let mut flags = Vec::with_capacity(lines.len());
             for line in &lines {
                 let line = line.bind(py);
-                let canonical = !line.getattr("formula_candidate_only")?.extract::<bool>()?
-                    && !line.getattr("compact_formula_cluster")?.extract::<bool>()?;
+                let canonical = !line
+                    .getattr(pyo3::intern!(line.py(), "formula_candidate_only"))?
+                    .extract::<bool>()?
+                    && !line
+                        .getattr(pyo3::intern!(line.py(), "compact_formula_cluster"))?
+                        .extract::<bool>()?;
                 let y_eligible = canonical
-                    && line.getattr("angle")?.extract::<i32>()? == 0
-                    && !line.getattr("restored_inline_cluster")?.extract::<bool>()?;
+                    && line
+                        .getattr(pyo3::intern!(line.py(), "angle"))?
+                        .extract::<i32>()?
+                        == 0
+                    && !line
+                        .getattr(pyo3::intern!(line.py(), "restored_inline_cluster"))?
+                        .extract::<bool>()?;
                 flags.push((canonical, y_eligible));
             }
             frames
@@ -371,4 +381,147 @@ impl NativeStyleDocument {
             ))
         }
     }
+}
+
+/// 已冻结的普通字符字体与文字特征只读一次，编码 run 时不为每字符重复调用 Python 字体转换。
+#[pyfunction]
+pub(super) fn owned_font_run_metadata<'py>(
+    py: Python<'py>,
+    chars: &Bound<'py, PyList>,
+    positions: Vec<usize>,
+    angle: i32,
+    run_ids: &Bound<'py, PyDict>,
+    run_keys: &Bound<'py, PyList>,
+    font_metadata: &Bound<'py, PyAny>,
+    script_group: &Bound<'py, PyAny>,
+    run_key: &Bound<'py, PyAny>,
+    anchor_text: &Bound<'py, PyAny>,
+    layout: bool,
+) -> PyResult<Option<Bound<'py, PyList>>> {
+    use pyo3::types::PyString;
+    use std::collections::HashMap;
+    if !chars.is_exact_instance_of::<PyList>()
+        || !run_ids.is_exact_instance_of::<PyDict>()
+        || !run_keys.is_exact_instance_of::<PyList>()
+    {
+        return Ok(None);
+    }
+    let mut fonts = Vec::<Bound<'py, PyDict>>::new();
+    let mut font_ids = HashMap::new();
+    let mut rows = Vec::new();
+    for position in positions {
+        if position >= chars.len() {
+            return Ok(None);
+        }
+        let char = chars.get_item(position)?;
+        let Ok(char) = char.cast_exact::<PyDict>() else {
+            return Ok(None);
+        };
+        let Some(text) = char.get_item(pyo3::intern!(char.py(), "char"))? else {
+            return Ok(None);
+        };
+        let Some(index) = char.get_item(pyo3::intern!(char.py(), "char_idx"))? else {
+            return Ok(None);
+        };
+        if !text.is_exact_instance_of::<PyString>() || !index.is_exact_instance_of::<PyInt>() {
+            return Ok(None);
+        }
+        let Ok(key) = text.extract::<String>() else {
+            return Ok(None);
+        };
+        let font = char.get_item(pyo3::intern!(char.py(), "font"))?;
+        let identity = font
+            .as_ref()
+            .filter(|font| !font.is_none())
+            .map_or(0, |font| font.as_ptr() as usize);
+        let font_id = if let Some(&id) = font_ids.get(&identity) {
+            id
+        } else {
+            let font = if let Some(font) = font.filter(|font| !font.is_none()) {
+                let Ok(font) = font.cast_into_exact::<PyDict>() else {
+                    return Ok(None);
+                };
+                font
+            } else {
+                PyDict::new(py)
+            };
+            // 只接受不会调用用户转换的内置字段，全部核验完成之后才执行标准特征回调。
+            for name in ["name", "size", "flags", "weight"] {
+                if let Some(value) = font.get_item(name)? {
+                    if !value.is_none()
+                        && !value.is_exact_instance_of::<PyString>()
+                        && !value.is_exact_instance_of::<PyFloat>()
+                        && !value.is_exact_instance_of::<PyInt>()
+                        && !value.is_exact_instance_of::<PyBool>()
+                    {
+                        return Ok(None);
+                    }
+                }
+            }
+            let id = fonts.len();
+            fonts.push(font);
+            font_ids.insert(identity, id);
+            id
+        };
+        rows.push((font_id, key, text, index));
+    }
+    let mut metadata = Vec::new();
+    for font in fonts {
+        let result = font_metadata.call1((font,))?;
+        let Ok(result) = result.cast_into_exact::<PyTuple>() else {
+            return Ok(None);
+        };
+        if result.len() != 4 {
+            return Ok(None);
+        }
+        let size = result.get_item(1)?.extract::<f64>()?;
+        if !size.is_finite() {
+            return Ok(None);
+        }
+        metadata.push((result, size));
+    }
+    let mut features = HashMap::<String, (String, bool)>::new();
+    let mut encoded = HashMap::<(usize, String), usize>::new();
+    let output = PyList::empty(py);
+    for (font, key, text, index) in rows {
+        let (script, anchor) = if let Some(value) = features.get(&key) {
+            value.clone()
+        } else {
+            let value = (
+                script_group.call1((&text,))?.extract::<String>()?,
+                anchor_text.call1((&text,))?.extract::<bool>()?,
+            );
+            features.insert(key, value.clone());
+            value
+        };
+        let id = if let Some(&id) = encoded.get(&(font, script.clone())) {
+            id
+        } else {
+            let values = &metadata[font].0;
+            let key = run_key.call1((
+                values.get_item(0)?,
+                values.get_item(1)?,
+                values.get_item(2)?,
+                values.get_item(3)?,
+                angle,
+                &script,
+            ))?;
+            let id = if let Some(id) = run_ids.get_item(&key)? {
+                id.extract::<usize>()?
+            } else {
+                let id = run_keys.len();
+                run_ids.set_item(&key, id)?;
+                run_keys.append(&key)?;
+                id
+            };
+            encoded.insert((font, script), id);
+            id
+        };
+        if layout {
+            output.append((id, metadata[font].1, anchor, index, text))?;
+        } else {
+            output.append((id, metadata[font].1, anchor))?;
+        }
+    }
+    Ok(Some(output))
 }

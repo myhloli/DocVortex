@@ -27,4 +27,7 @@ class Magika(BaseMagika):
         return _MAGIKA_VERSION
 
 
+# 私有会话复用只适用于未替换的标准类和方法；调用方定制仍逐次创建实例。
+_MAGIKA_REUSE_REFERENCES = (Magika, Magika.__init__, Magika.identify_bytes, Magika._init_onnx_session)
+
 __all__ = ["Magika"]

@@ -1,7 +1,35 @@
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 DEFAULT_CODE_LANGUAGE = "txt"
 _INVALID_SURROGATES = re.compile("[\ud800-\udfff]")
+_CODE_LANGUAGE_MODEL_SCOPE = ContextVar("docvortex_code_language_model_scope", default=None)
+
+
+@contextmanager
+def _code_language_model_scope():
+    """单次文档转换只复用标准识别器，退出或嵌套调用后立即恢复原上下文。"""
+    token = _CODE_LANGUAGE_MODEL_SCOPE.set({})
+    try:
+        yield
+    finally:
+        _CODE_LANGUAGE_MODEL_SCOPE.reset(token)
+
+
+def _code_language_classifier():
+    """惰性加载当前模型；仅复用不可变会话，不缓存文字输入或识别结果。"""
+    from .magika import Magika, _MAGIKA_REUSE_REFERENCES
+
+    scope = _CODE_LANGUAGE_MODEL_SCOPE.get()
+    if scope is None or Magika is not _MAGIKA_REUSE_REFERENCES[0]:
+        return Magika()
+    references = (Magika, Magika.__init__, getattr(Magika, "identify_bytes", None), getattr(Magika, "_init_onnx_session", None))
+    if references != _MAGIKA_REUSE_REFERENCES:
+        return Magika()
+    if "classifier" not in scope:
+        scope["classifier"] = Magika()
+    return scope["classifier"]
 
 
 def remove_invalid_surrogates(text: str) -> str:
@@ -43,9 +71,7 @@ def guess_code_language(code: str) -> str:
     if not normalized_code:
         return DEFAULT_CODE_LANGUAGE
     try:
-        from .magika import Magika
-
-        lang = Magika().identify_bytes(normalized_code.encode("utf-8", errors="replace")).prediction.output.label
+        lang = _code_language_classifier().identify_bytes(normalized_code.encode("utf-8", errors="replace")).prediction.output.label
     except Exception:
         return DEFAULT_CODE_LANGUAGE
     return lang if lang != "unknown" else DEFAULT_CODE_LANGUAGE

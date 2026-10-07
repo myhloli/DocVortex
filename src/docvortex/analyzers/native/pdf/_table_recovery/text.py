@@ -8,6 +8,8 @@ import unicodedata
 from dataclasses import dataclass
 
 from .....document.pdf.text._contracts import Char
+from .....document.pdf.text._contracts import Bbox as _CharacterBbox
+from .. import table_geometry as _pending_geometry
 from .....foundation._text import resolve_text_line_boundary
 from .....schema import BBox
 from ..spatial_text import _normalize_table_text
@@ -27,7 +29,62 @@ class _PendingGlyph:
     explicit_break_before: bool = False
 
 
-def _select_pending_glyphs(table_input: NativeTableInput) -> list[_PendingGlyph]:
+
+_PENDING_REFERENCES = (
+    normalize_bbox,
+    normalize_angle,
+    _normalize_table_text,
+    _CharacterBbox.__getattribute__,
+    NativeTableInput.__getattribute__,
+    _PendingGlyph.__init__,
+    _PendingGlyph.__new__,
+    object.__new__,
+)
+_PENDING_FIELDS = _PendingGlyph.__slots__
+_PENDING_SLOTS = tuple(getattr(_PendingGlyph, name) for name in _PENDING_FIELDS)
+
+
+def _select_pending_glyphs(table_input):
+    """一次传输完整普通表格输入，不缓存字符或成员；定制对象完整使用原适配路径。"""
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is not None
+        and type(table_input) is NativeTableInput
+        and (
+            normalize_bbox,
+            normalize_angle,
+            _normalize_table_text,
+            _CharacterBbox.__getattribute__,
+            NativeTableInput.__getattribute__,
+            _PendingGlyph.__init__,
+            _PendingGlyph.__new__,
+            object.__new__,
+        )
+        == _PENDING_REFERENCES
+        and _pending_geometry.normalize_bbox is _PENDING_REFERENCES[0]
+        and tuple(getattr(_PendingGlyph, name, None) for name in _PENDING_FIELDS) == _PENDING_SLOTS
+        and type(table_input.angle) is int
+    ):
+        table_bbox = normalize_bbox(table_input.table_bbox)
+        if table_bbox is None:
+            return []
+        values = native.table_pending_glyphs_owned(
+            table_input.chars,
+            table_bbox,
+            normalize_angle(table_input.angle),
+            _CharacterBbox,
+            _normalize_table_text,
+            _PendingGlyph,
+            _PENDING_REFERENCES[-1],
+        )
+        if values is not None:
+            return values
+    return _select_pending_glyphs_adapter(table_input)
+
+
+def _select_pending_glyphs_adapter(table_input: NativeTableInput) -> list[_PendingGlyph]:
     """批量筛选区域字符，保留 Python 的源索引排序、空白及文本规范化。"""
     from ....._compute_backend import get_native
     from .._native_geometry import raw_bbox
@@ -439,14 +496,31 @@ def build_cell_text(
     return "".join(text for text, _source_index in build_cell_text_parts(glyphs, median_height))
 
 
-def build_cell_text_parts(
-    glyphs: list[NativeTableGlyph],
-    median_height: float,
-) -> list[tuple[str, int | None]]:
-    """按视觉行重建 cell 文本片段，供安全插入字符级语义标签。"""
 
-    if not glyphs:
-        return []
+_CELL_GROUP_REFERENCES = (
+    _assign_visual_rows, bbox_center, statistics.median, NativeTableGlyph.__getattribute__,
+    NativeTableGlyph.bbox, NativeTableGlyph.glyph_id, NativeTableGlyph.visual_row,
+)
+
+
+def _native_cell_visual_groups(glyphs, median_height):
+    """普通字形批量细分几何；任何替换的分组、统计或字段访问均保留原实现。"""
+    from ....._compute_backend import get_native
+    import math
+
+    native = get_native()
+    if (native is None or not hasattr(native, "cell_visual_groups_owned")
+        or type(median_height) not in (float, int) or not math.isfinite(median_height) or abs(median_height) > 2**50
+        or (_assign_visual_rows, bbox_center, statistics.median, NativeTableGlyph.__getattribute__,
+            getattr(NativeTableGlyph, "bbox", None), getattr(NativeTableGlyph, "glyph_id", None),
+            getattr(NativeTableGlyph, "visual_row", None)) != _CELL_GROUP_REFERENCES):
+        return None
+    indices = native.cell_visual_groups_owned(glyphs, median_height, NativeTableGlyph)
+    return None if indices is None else [[glyphs[index] for index in row] for row in indices]
+
+
+def _python_cell_visual_groups(glyphs, median_height):
+    """完整参考路径按原组顺序裁决共线性、字号和双行最少字形数量。"""
     grouped: dict[int, list[NativeTableGlyph]] = {}
     for glyph in glyphs:
         grouped.setdefault(glyph.visual_row, []).append(glyph)
@@ -472,6 +546,19 @@ def build_cell_text_parts(
             refined.extend(local_rows)
         else:
             refined.append(original)
+    return refined
+
+def build_cell_text_parts(
+    glyphs: list[NativeTableGlyph],
+    median_height: float,
+) -> list[tuple[str, int | None]]:
+    """按视觉行重建 cell 文本片段，供安全插入字符级语义标签。"""
+
+    if not glyphs:
+        return []
+    refined = _native_cell_visual_groups(glyphs, median_height)
+    if refined is None:
+        refined = _python_cell_visual_groups(glyphs, median_height)
     grouped = dict(enumerate(refined))
     parts: list[tuple[str, int | None]] = []
     previous_line = ""

@@ -8,6 +8,7 @@ pub struct RuleCandidates {
     on_rule: Vec<bool>,
     fragment_counts: Vec<usize>,
     boxes: Vec<[f64; 4]>,
+    row_centers: Vec<f64>,
     members: Vec<usize>,
     member_offsets: Vec<usize>,
     source_ids: Vec<i64>,
@@ -32,12 +33,14 @@ impl RuleCandidates {
         let mut on_rule = Vec::with_capacity(rows.len());
         let mut fragment_counts = Vec::with_capacity(rows.len());
         let mut boxes = Vec::with_capacity(rows.len());
+        let mut row_centers = Vec::with_capacity(rows.len());
         let mut members = Vec::new();
         let mut member_offsets = Vec::with_capacity(rows.len() + 1);
         let mut source_ids = Vec::new();
         let mut interned = HashMap::new();
         member_offsets.push(0);
         for (center, count, bbox, sources) in rows {
+            row_centers.push(center);
             let band = centers.partition_point(|value| *value < center);
             bands.push(band);
             on_rule.push(centers.get(band) == Some(&center));
@@ -61,11 +64,62 @@ impl RuleCandidates {
             on_rule,
             fragment_counts,
             boxes,
+            row_centers,
             members,
             member_offsets,
             source_ids,
             geometry,
         })
+    }
+
+    /// 按原横线中心完整核验短区间条件，不改变任何列统计或候选认领结果。
+    pub fn short_intervals(
+        &self,
+        first: usize,
+        count: usize,
+        height: f64,
+    ) -> Result<bool, &'static str> {
+        if first
+            .checked_add(count)
+            .is_none_or(|end| end > self.centers.len())
+            || !height.is_finite()
+        {
+            return Err("invalid interval height range");
+        }
+        Ok(count >= 2
+            && self.centers[first..first + count]
+                .windows(2)
+                .all(|pair| pair[1] - pair[0] <= 6.0 * height))
+    }
+
+    /// 同一不可变走廊内稳定按行中心排序并分段，所有成员仍保留且不缓存最终候选。
+    pub fn segments(
+        &self,
+        start: usize,
+        end: usize,
+        height: f64,
+    ) -> Result<Vec<Vec<usize>>, &'static str> {
+        if start > end || end > self.boxes.len() || !height.is_finite() {
+            return Err("invalid row segment range");
+        }
+        let mut ordered: Vec<_> = (start..end).collect();
+        ordered.sort_by(|a, b| {
+            self.row_centers[*a]
+                .partial_cmp(&self.row_centers[*b])
+                .unwrap()
+        });
+        let mut output: Vec<Vec<usize>> = Vec::new();
+        for index in ordered {
+            if output.last().is_none_or(|group| {
+                (self.boxes[index][1] - self.boxes[*group.last().unwrap()][3]).max(0.0)
+                    > 3.0 * height
+            }) {
+                output.push(vec![index]);
+            } else {
+                output.last_mut().unwrap().push(index);
+            }
+        }
+        Ok(output)
     }
 
     /// 保留共享横线两侧的双归属，在同一行扫描中收集多单元证据，不调用 Python。
@@ -170,4 +224,54 @@ fn better(candidate: f64, current: f64, axis: usize) -> bool {
     } else {
         candidate > current
     }
+}
+
+/// 按原顺序筛选、去重和首个匹配分组，统计重复填充行带；不缓存最终表格认领。
+pub fn repeated_fill_bands(boxes: &[[f64; 4]], rule: [f64; 4], em: f64) -> usize {
+    let minimum_width = (8.0 * em).max(0.3 * (rule[2] - rule[0]));
+    let mut candidates: Vec<[f64; 4]> = Vec::new();
+    for &b in boxes {
+        let width = b[2] - b[0];
+        let height = b[3] - b[1];
+        let center = (b[1] + b[3]) / 2.0;
+        let overlap = 0.0_f64.max(b[2].min(rule[2]) - b[0].max(rule[0]));
+        let shorter = width.min(rule[2] - rule[0]);
+        let ratio = if shorter > 0.0 {
+            overlap / shorter
+        } else {
+            0.0
+        };
+        if width < minimum_width
+            || !(0.25 * em <= height && height <= 3.0 * em)
+            || center < rule[1]
+            || center > rule[3]
+            || ratio < 0.8
+        {
+            continue;
+        }
+        if candidates.iter().any(|a| {
+            let width = 0.0_f64.max(b[2].min(a[2]) - b[0].max(a[0]));
+            let height = 0.0_f64.max(b[3].min(a[3]) - b[1].max(a[1]));
+            let smaller = ((b[2] - b[0]) * (b[3] - b[1])).min((a[2] - a[0]) * (a[3] - a[1]));
+            smaller > 0.0 && width * height / smaller >= 0.9
+        }) {
+            continue;
+        }
+        candidates.push(b);
+    }
+    let tolerance = 3.0_f64.max(em);
+    let mut groups: Vec<([f64; 4], usize)> = Vec::new();
+    for b in candidates {
+        let target = groups.iter_mut().find(|(a, _)| {
+            (b[0] - a[0]).abs() <= tolerance
+                && (b[2] - a[2]).abs() <= tolerance
+                && ((b[3] - b[1]) - (a[3] - a[1])).abs() <= tolerance
+        });
+        if let Some((_, count)) = target {
+            *count += 1;
+        } else {
+            groups.push((b, 1));
+        }
+    }
+    groups.iter().map(|(_, count)| *count).max().unwrap_or(0)
 }

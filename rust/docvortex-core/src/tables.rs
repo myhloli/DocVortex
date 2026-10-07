@@ -477,3 +477,74 @@ pub fn row_occupancy(rows: Vec<Vec<f64>>, tracks: Vec<f64>) -> Option<Vec<Vec<us
             .collect(),
     )
 }
+
+/// 单元格一次完成原视觉组的几何细分，只返回完整源索引，不缓存文字或认领结果。
+pub fn cell_visual_groups(
+    boxes: Vec<Box4>,
+    ids: Vec<usize>,
+    visual: Vec<i64>,
+    median_height: f64,
+) -> Option<Vec<Vec<usize>>> {
+    if boxes.len() != ids.len()
+        || boxes.len() != visual.len()
+        || !median_height.is_finite()
+        || boxes
+            .iter()
+            .flatten()
+            .any(|v| !v.is_finite() || v.abs() > 1e100)
+    {
+        return None;
+    }
+    let mut groups = std::collections::BTreeMap::<i64, Vec<usize>>::new();
+    for (index, row) in visual.into_iter().enumerate() {
+        groups.entry(row).or_default().push(index);
+    }
+    let mut refined = Vec::new();
+    for original in groups.into_values() {
+        // 两个合格细分行各至少含两个字形，少于四个时只能保留原组。
+        if original.len() < 4 {
+            refined.push(original);
+            continue;
+        }
+        let local = visual_rows(
+            original.iter().map(|i| boxes[*i]).collect(),
+            original.iter().map(|i| ids[*i]).collect(),
+            median_height,
+        )?;
+        let coherent = local.iter().all(|row| {
+            let centers: Vec<f64> = row
+                .iter()
+                .map(|i| {
+                    let b = boxes[original[*i]];
+                    (b[1] + b[3]) / 2.0
+                })
+                .collect();
+            let low = centers.iter().copied().reduce(f64::min).unwrap();
+            let high = centers.iter().copied().reduce(f64::max).unwrap();
+            high - low <= 0.3 * median_height
+        });
+        if local.len() > 1
+            && coherent
+            && local.iter().all(|row| {
+                let height = crate::median(
+                    row.iter()
+                        .map(|i| {
+                            let b = boxes[original[*i]];
+                            b[3] - b[1]
+                        })
+                        .collect(),
+                );
+                row.len() >= 2 && 0.85 * median_height <= height && height <= 1.25 * median_height
+            })
+        {
+            refined.extend(
+                local
+                    .into_iter()
+                    .map(|row| row.into_iter().map(|i| original[i]).collect()),
+            );
+        } else {
+            refined.push(original);
+        }
+    }
+    Some(refined)
+}

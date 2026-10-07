@@ -22,6 +22,7 @@ from .._script_geometry import (
     paired_script_roles,
 )
 from ..geometry import _rotate_bbox_to_upright
+from ..models import _AxisLine
 from .common import _coerce_bbox, _normalize_match_fragment, _ordered_line_chars
 from .types import (
     _PDF_SCRIPT_AUTHOR_MARKS,
@@ -631,7 +632,53 @@ def _bbox_axis_overlap(first: BBox, second: BBox, *, axis: Literal["x", "y"]) ->
     return max(0.0, min(first[end], second[end]) - max(first[start], second[start]))
 
 
-def _fraction_member_indices(
+_FRACTION_REFERENCES = (
+    _script_char_text,
+    _rotate_bbox_to_upright,
+    _bbox_axis_overlap,
+    statistics.median,
+    _coerce_bbox,
+    _AxisLine.__getattribute__,
+    _AxisLine.bbox,
+)
+
+
+def _fraction_member_indices(page_size, all_chars, tight_bboxes, drawing_lines, angle, prepared_rules=None):
+    """同一输入状态批量计算完整分式几何，普通浮点之外继续使用原逐字符路径。"""
+    if not all_chars or not drawing_lines:
+        return set()
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    from .. import geometry
+
+    if (
+        native is not None
+        and type(drawing_lines) in (list, tuple)
+        and (prepared_rules is None or len(prepared_rules) == len(drawing_lines))
+        and (
+            _script_char_text,
+            _rotate_bbox_to_upright,
+            _bbox_axis_overlap,
+            statistics.median,
+            _coerce_bbox,
+            _AxisLine.__getattribute__,
+            getattr(_AxisLine, "bbox", None),
+        )
+        == _FRACTION_REFERENCES
+        and geometry._rotate_bbox_to_upright is _FRACTION_REFERENCES[1]
+    ):
+        result = (
+            native.fraction_members_owned(all_chars, tight_bboxes, page_size, angle, prepared_rules)
+            if prepared_rules is not None
+            else native.fraction_members_owned(all_chars, tight_bboxes, page_size, angle, drawing_lines, _AxisLine)
+        )
+        if result is not None:
+            return result
+    return _fraction_member_indices_python(page_size, all_chars, tight_bboxes, drawing_lines, angle, prepared_rules)
+
+
+def _fraction_member_indices_python(
     page_size: tuple[float, float],
     all_chars: list[dict[str, Any]],
     tight_bboxes: dict[int, BBox],

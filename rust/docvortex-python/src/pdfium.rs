@@ -114,6 +114,48 @@ pub fn read_pdfium_objects(
 }
 
 type TextVisibilityRecord = (usize, bool, Option<(f64, f64, f64, f64)>);
+type RootPaintRecord = (usize, ObjectRecord);
+type TextPaintRecord = (usize, usize, (f64, f64, f64, f64));
+type PaintVisibilityRecord = (
+    Vec<TextVisibilityRecord>,
+    Vec<RootPaintRecord>,
+    Vec<TextPaintRecord>,
+);
+
+/// 沿用标准 ABI 与页面锁，返回的顶层 Path 地址由适配器在本页内立即核验。
+#[pyfunction]
+pub fn read_pdfium_text_visibility_with_roots(
+    addresses: Vec<usize>,
+    handle: usize,
+    frame: [f64; 4],
+    rotation: i32,
+    max_depth: usize,
+) -> PyResult<PaintVisibilityRecord> {
+    let (texts, paths, bounds) = unsafe {
+        docvortex_pdfium::objects::read_text_visibility_with_roots(
+            addresses, handle, frame, rotation, max_depth,
+        )
+    }
+    .map_err(|error| match error {
+        ReadError::InvalidInput(message) => PyValueError::new_err(message),
+        ReadError::Pdfium(message) => PdfiumReadError::new_err(message),
+        ReadError::Allocation(message) => PyMemoryError::new_err(message),
+    })?;
+    Ok((
+        texts
+            .into_iter()
+            .map(|(a, b, c)| (a, b, c.map(Into::into)))
+            .collect(),
+        paths
+            .into_iter()
+            .map(|(order, (a, b, c, d, e))| (order, (a, b.into(), c.into(), d, e.map(Into::into))))
+            .collect(),
+        bounds
+            .into_iter()
+            .map(|(order, address, bbox)| (order, address, bbox.into()))
+            .collect(),
+    ))
+}
 
 /// 单次 TEXT 遍历返回绘制状态与页面视觉裁剪，供 Python 建立地址索引。
 #[pyfunction]

@@ -25,6 +25,7 @@ from .geometry import (
     _rotate_bbox_to_upright,
     _transform_axis_lines,
 )
+from . import geometry as _fragment_geometry
 from .models import _Fragment, _LineItem, _LocalAxisLine, _PageSource, _SharedLineIndexSet, _TableCandidate, _VisualRow
 from .table_annotations import (
     _PreparedTableNoteBodyMetrics,
@@ -91,13 +92,15 @@ class _RuleBandIndex:
 class _RuleIntervalGroups(list):
     """保留普通分组列表行为，并携带同一次原生扫描产生的区间文本证据。"""
 
-    def __init__(self, groups, rows, rules, height, accepted):
+    def __init__(self, groups, rows, rules, height, accepted, segments=None, short_intervals=False):
         """证据仅供原输入列表和同一行高查询复用，不缓存外部可变对象的跨调用状态。"""
         super().__init__(groups)
         self.source_rows = rows
         self.source_rules = rules
         self.height = height
         self.accepted = accepted
+        self.segments = segments
+        self.short_intervals = short_intervals
 
 
 @dataclass(slots=True)
@@ -115,6 +118,8 @@ class _StableColumnCache:
     results: dict[tuple[float, tuple[int, ...]], tuple[int, float]] = field(default_factory=dict)
     prefixes: dict[tuple[float, int], _StableColumnPrefixState] = field(default_factory=dict)
     prepared_rows: dict[int, tuple[_VisualRow, Any]] = field(default_factory=dict)
+    owned_geometry: bool = False
+    native_geometry: Any = None
 
 
 @dataclass(slots=True)
@@ -223,7 +228,77 @@ def _build_fragments(
     return fragments
 
 
-def _cluster_fragment_rows(
+_FRAGMENT_GROUP_REFERENCE_FUNCTIONS = (_bbox_center_y, statistics.fmean)
+_RULE_MEAN_REFERENCE = statistics.mean
+
+
+def _mean_rule_positions(values):
+    """以精确整数比率批量求均值；非普通浮点、特殊值及替换的统计函数保留原路径。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is not None and statistics.mean is _RULE_MEAN_REFERENCE:
+        result = native.exact_float_mean(values)
+        if result is not None:
+            return result
+    return statistics.mean(values)
+
+
+_FRAGMENT_ROW_REFERENCES = (
+    _fragment_geometry._bbox_union,
+    _bbox_union,
+    _bbox_union_many,
+    _Fragment.__getattribute__,
+    _VisualRow,
+    sum,
+)
+
+
+def _cluster_fragment_rows(fragments, median_height):
+    """仅对普通片段使用批量分组，特殊对象和数值完整保留参考路径。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is None or (
+        _bbox_center_y is not _FRAGMENT_GROUP_REFERENCE_FUNCTIONS[0]
+        or statistics.fmean is not _FRAGMENT_GROUP_REFERENCE_FUNCTIONS[1]
+        or type(median_height) not in (int, float)
+        or not math.isfinite(median_height)
+    ):
+        return _cluster_fragment_rows_python(fragments, median_height)
+    if (
+        _fragment_geometry._bbox_union,
+        _bbox_union,
+        _bbox_union_many,
+        _Fragment.__getattribute__,
+        _VisualRow,
+        sum,
+    ) == _FRAGMENT_ROW_REFERENCES:
+        rows = native.fragment_rows_owned(fragments, median_height, _Fragment, _VisualRow, statistics.fmean, sum)
+        if rows is not None:
+            return rows
+    items = []
+    for fragment in fragments:
+        box = fragment.local_bbox
+        if (
+            type(fragment) is not _Fragment
+            or type(box) not in (tuple, list)
+            or len(box) != 4
+            or any(type(value) not in (int, float) or not math.isfinite(value) or abs(value) > 2**50 for value in box)
+            or (
+                fragment.visual_row_id is not None
+                and (type(fragment.visual_row_id) is not int or not -(2**63) <= fragment.visual_row_id < 2**63)
+            )
+        ):
+            return _cluster_fragment_rows_python(fragments, median_height)
+        items.append((_bbox_center_y(box), box[0], fragment.visual_row_id))
+    indices = native.fragment_row_groups(items, max(2.0, median_height * 0.5), statistics.fmean)
+    if indices is None:
+        return _cluster_fragment_rows_python(fragments, median_height)
+    return _materialize_fragment_rows([[fragments[i] for i in group] for group in indices])
+
+
+def _cluster_fragment_rows_python(
     fragments: list[_Fragment],
     median_height: float,
 ) -> list[_VisualRow]:
@@ -267,6 +342,11 @@ def _cluster_fragment_rows(
             # 仅在组成员变化时使用原有 fmean 重新计算，后续比较直接复用精确结果。
             group_centers[target_index] = statistics.fmean(_bbox_center_y(item.local_bbox) for item in target_group)
 
+    return _materialize_fragment_rows(grouped)
+
+
+def _materialize_fragment_rows(grouped):
+    """在输出边界沿用原框合并、Python sum 与稳定排序，不能近似最终中心。"""
     rows: list[_VisualRow] = []
     for group in grouped:
         group.sort(key=lambda item: item.local_bbox[0])
@@ -302,8 +382,9 @@ def _build_rule_table_candidates(
     candidates: list[_TableCandidate] = []
     path_infos = path_infos or []
     excluded_bboxes = excluded_bboxes or []
-    stable_column_cache = _StableColumnCache()
+    stable_column_cache = _StableColumnCache(owned_geometry=True)
     prepared_path_infos = _prepare_fill_band_infos(path_infos, page_size, angle)
+    native_fill_bands = _prepare_native_fill_bands(prepared_path_infos)
     vertical_axis_lines = [line for line in axis_lines if line.orientation == "vertical"]
     corridor_cache: dict[tuple[float, float], list[_RuleCorridorRow]] = {}
     note_corridor_cache: dict[tuple[float, float], tuple[list[_PreparedTableNoteRow], bool]] = {}
@@ -333,6 +414,8 @@ def _build_rule_table_candidates(
         for first_index, bottom_index in _iter_rule_spans(len(rule_group)):
             if first_index != active_first_index:
                 stable_column_cache.prefixes.clear()
+                if stable_column_cache.native_geometry is not None:
+                    stable_column_cache.native_geometry.clear_prefixes()
                 interval_prefix = None
                 active_first_index = first_index
             top_rule = rule_group[first_index]
@@ -400,14 +483,21 @@ def _build_rule_table_candidates(
             ):
                 continue
 
-            fill_band_count = _count_repeated_fill_bands(
-                path_infos,
-                rule_bbox,
-                page_size,
-                angle,
-                median_height,
-                prepared_path_infos,
+            # 框只属于本次只读构建；每个区间仍独立执行完整行带规则。
+            fill_band_count = (
+                native_fill_bands.count(rule_bbox, median_height)
+                if native_fill_bands is not None and _fill_band_rules_unchanged()
+                else None
             )
+            if fill_band_count is None:
+                fill_band_count = _count_repeated_fill_bands(
+                    path_infos,
+                    rule_bbox,
+                    page_size,
+                    angle,
+                    median_height,
+                    prepared_path_infos,
+                )
             aligned_vertical_count = _count_aligned_vertical_rules(
                 axis_lines,
                 rule_bbox,
@@ -415,7 +505,15 @@ def _build_rule_table_candidates(
                 vertical_axis_lines,
             )
 
-            row_segments = _continuous_table_row_segments(core_rows, median_height)
+            row_segments = (
+                interval_row_groups.segments
+                if type(interval_row_groups) is _RuleIntervalGroups
+                and interval_row_groups.source_rows is core_rows
+                and interval_row_groups.height == median_height
+                and interval_row_groups.segments is not None
+                and _continuous_table_row_segments is _CONTINUOUS_SEGMENTS_REFERENCE
+                else _continuous_table_row_segments(core_rows, median_height)
+            )
             accepted: tuple[list[_VisualRow], list[_VisualRow], int, float] | None = None
             for row_segment in row_segments:
                 dense_rows = [row for row in row_segment if len(row.fragments) >= 2]
@@ -786,11 +884,11 @@ def _closed_grid_vertical_track_positions(
     position_tolerance = max(1.0, 0.1 * median_height)
     position_groups: list[list[float]] = []
     for position in sorted(raw_positions):
-        if position_groups and abs(position - statistics.mean(position_groups[-1])) <= position_tolerance:
+        if position_groups and abs(position - _mean_rule_positions(position_groups[-1])) <= position_tolerance:
             position_groups[-1].append(position)
         else:
             position_groups.append([position])
-    return [statistics.mean(group) for group in position_groups]
+    return [_mean_rule_positions(group) for group in position_groups]
 
 
 def _count_occupied_closed_grid_columns(
@@ -910,11 +1008,11 @@ def _rule_bands_share_grid_tracks(
     ]
     position_groups: list[list[float]] = []
     for position in sorted(raw_positions):
-        if position_groups and abs(position - statistics.mean(position_groups[-1])) <= track_tolerance:
+        if position_groups and abs(position - _mean_rule_positions(position_groups[-1])) <= track_tolerance:
             position_groups[-1].append(position)
         else:
             position_groups.append([position])
-    positions = [statistics.mean(group) for group in position_groups]
+    positions = [_mean_rule_positions(group) for group in position_groups]
     has_outer_tracks = any(abs(position - overlap_left) <= endpoint_tolerance for position in positions) and any(
         abs(position - overlap_right) <= endpoint_tolerance for position in positions
     )
@@ -1245,11 +1343,12 @@ def _partition_rows_by_prepared_bands(
     start, end = interval
     if index.native is not None:
         evidence_safe = type(median_height) is float and math.isfinite(median_height)
-        packed_groups, accepted = index.native.partition(
+        packed_groups, accepted, packed_segments, short = index.native.partition_with_segments(
             start, end, first_index, len(rules), median_height if evidence_safe else 0.0
         )
         groups = [[index.rows[position] for position in group] for group in packed_groups]
-        return _RuleIntervalGroups(groups, rows, rules, median_height, accepted) if evidence_safe else groups
+        segments = [[index.rows[position] for position in group] for group in packed_segments]
+        return _RuleIntervalGroups(groups, rows, rules, median_height, accepted, segments, short) if evidence_safe else groups
     groups: list[list[_VisualRow]] = [[] for _ in range(max(0, len(rules) - 1))]
     for row, band, on_rule in zip(rows, index.bands[start:end], index.on_rule[start:end], strict=True):
         local = band - first_index
@@ -1338,6 +1437,17 @@ def _rule_intervals_are_column_compatible(
 ) -> bool:
     """拒绝跨过长篇栏式正文、导致稳定列数明显塌缩的多表合并区间。"""
 
+    # 同一次原生闭区间扫描已证明全部间距不超过六倍行高时，不再逐候选重复读取每根横线。
+    if (
+        type(interval_row_groups) is _RuleIntervalGroups
+        and interval_row_groups.source_rows is rows
+        and interval_row_groups.source_rules is rule_group
+        and interval_row_groups.height == median_height
+        and interval_row_groups.short_intervals
+        and _bbox_center_y is _SHORT_INTERVAL_CENTER_REFERENCE
+    ):
+        return True
+
     interval_heights = [
         _bbox_center_y(bottom_rule.bbox) - _bbox_center_y(top_rule.bbox)
         for top_rule, bottom_rule in zip(rule_group, rule_group[1:])
@@ -1420,6 +1530,9 @@ def _continuous_table_row_segments(
         else:
             segments[-1].append(row)
     return segments
+
+
+_CONTINUOUS_SEGMENTS_REFERENCE = _continuous_table_row_segments
 
 
 def _table_segment_reaches_boundaries(
@@ -1608,11 +1721,11 @@ def _full_height_vertical_rule_positions(
     deduplicated: list[list[float]] = []
     position_tolerance = max(1.0, 0.1 * median_height)
     for position in sorted(raw_positions):
-        if deduplicated and abs(position - statistics.mean(deduplicated[-1])) <= position_tolerance:
+        if deduplicated and abs(position - _mean_rule_positions(deduplicated[-1])) <= position_tolerance:
             deduplicated[-1].append(position)
         else:
             deduplicated.append([position])
-    return [statistics.mean(group) for group in deduplicated]
+    return [_mean_rule_positions(group) for group in deduplicated]
 
 
 def _looks_like_page_column_prose(
@@ -1696,6 +1809,38 @@ def _count_repeated_fill_bands(
         else:
             target.append(bbox)
     return max((len(group) for group in groups), default=0)
+
+
+_FILL_BAND_REFERENCES = (
+    _count_repeated_fill_bands, _prepare_fill_band_infos,
+    _bbox_center_y, _bbox_axis_overlap_ratio, _bbox_overlap_in_smaller,
+    max, min, abs,
+)
+
+
+def _fill_band_rules_unchanged():
+    """仅在原规则及数值函数均未替换时复用构建内快照，替换规则仍逐区间调用。"""
+    return (
+        _count_repeated_fill_bands, _prepare_fill_band_infos,
+        _bbox_center_y, _bbox_axis_overlap_ratio, _bbox_overlap_in_smaller,
+        max, min, abs,
+    ) == _FILL_BAND_REFERENCES
+
+
+def _prepare_native_fill_bands(prepared):
+    """只为检测器当前只读页面构建准备自有框；重新构建或特殊输入不复用旧状态。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is None
+        or not hasattr(native, "prepare_fill_bands")
+        or not _fill_band_rules_unchanged()
+        or type(prepared) is not list
+        or any(type(item) is not tuple or len(item) != 2 for item in prepared)
+    ):
+        return None
+    return native.prepare_fill_bands([box for _path, box in prepared])
 
 
 def _longest_dense_multi_cell_rows(
@@ -1905,6 +2050,19 @@ def _count_stable_columns(
         return _count_stable_columns_python(rows, median_height, cache, allow_prefix_reuse=allow_prefix_reuse)
     if type(median_height) is not float or not math.isfinite(median_height):
         return _count_stable_columns_python(rows, median_height)
+    # 只有检测器独占且不写入几何的构建阶段启用；普通缓存调用仍保留原有可检查的 Python 状态。
+    if cache is not None and cache.owned_geometry and (
+        _VisualRow.__getattribute__, getattr(_VisualRow, "fragments", None),
+        _Fragment.__getattribute__, getattr(_Fragment, "local_bbox", None),
+    ) == _COLUMN_GEOMETRY_REFERENCES:
+        if cache.native_geometry is None:
+            cache.native_geometry = native.NativeColumnCache(sys.version_info >= (3, 12))
+        result = cache.native_geometry.count(rows, median_height, allow_prefix_reuse, _VisualRow, _Fragment)
+        if result is not None:
+            return result
+        # 特殊输入可能执行调用方代码；完整退回后不再复用此前普通字段的准备状态。
+        cache.owned_geometry = False
+        cache.native_geometry = None
     row_ids = tuple(id(row) for row in rows)
     key = (median_height, row_ids)
     if cache is not None and key in cache.results:
@@ -2068,6 +2226,9 @@ def _merge_owned_table_candidates(candidates):
 
 
 _NATIVE_DRAFT_MATERIALIZE = _RuleCandidateDraft.materialize
+_SHORT_INTERVAL_CENTER_REFERENCE = _bbox_center_y
+_COLUMN_GEOMETRY_REFERENCES = (_VisualRow.__getattribute__, _VisualRow.fragments, _Fragment.__getattribute__, _Fragment.local_bbox)
+
 _NATIVE_MERGE_RULES = {
     function.__name__: function
     for function in (

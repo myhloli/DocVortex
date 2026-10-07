@@ -243,7 +243,7 @@ def _build_index_rows(
 ) -> list[_IndexRow]:
     """按 visual_row_id 复原当前方向的完整视觉行，保留左右分裂成员。"""
 
-    row_groups: dict[tuple[str, int], list[_LineItem]] = {}
+    row_groups: dict[tuple[str, int], list[tuple[_LineItem, BBox]]] = {}
     for line in lines:
         if line.angle != angle or line.semantic_type is not None:
             continue
@@ -252,19 +252,21 @@ def _build_index_rows(
         if local[3] - local[1] > 1.7 * _index_line_height(line, local):
             continue
         key = ("visual", line.visual_row_id) if line.visual_row_id is not None else ("source", line.source_index)
-        row_groups.setdefault(key, []).append(line)
+        row_groups.setdefault(key, []).append((line, local))
 
     rows: list[_IndexRow] = []
     for members in row_groups.values():
-        ordered = sorted(
+        ordered_pairs = sorted(
             members,
-            key=lambda line: (
-                _rotate_bbox_to_upright(line.bbox, page_size, angle)[0],
-                line.run_index,
-                line.source_index,
+            key=lambda pair: (
+                pair[1][0],
+                pair[0].run_index,
+                pair[0].source_index,
             ),
         )
-        local_member_bboxes = [_rotate_bbox_to_upright(line.bbox, page_size, angle) for line in ordered]
+        # 同一次目录分组内没有成员几何写入，复用当前输入的旋转框，避免排序与物化时重复变换。
+        ordered = [line for line, _ in ordered_pairs]
+        local_member_bboxes = [local for _, local in ordered_pairs]
         local_bbox = _bbox_union_many(local_member_bboxes)
         content = " ".join(part for line in ordered if (part := line.text.strip()))
         if not content:

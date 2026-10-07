@@ -1,4 +1,5 @@
 """自有快照样式阶段与 Python 参考逐字段差分，覆盖排序、装饰线及能力边界。"""
+
 from io import BytesIO
 import random
 
@@ -29,6 +30,47 @@ def owned_page():
     return owner, geometry.chars, {id(char): i for i, char in enumerate(geometry.chars)}
 
 
+@pytest.mark.parametrize("seed", range(30))
+def test_glyph_font_groups_match_fresh_character_reference(owned_page, seed):
+    """不同字号、重复和乱序成员、粗斜体与方向过滤保持字体键、计数和前三份样本顺序。"""
+    from types import SimpleNamespace
+    from docvortex.analyzers.native.pdf.inline.glyph_weight import _glyph_font_groups_owned, _glyph_font_groups_python
+
+    owner, chars, identities = owned_page
+    geometry = SimpleNamespace(tight_bboxes={c["char_idx"]: c.get("tight_bbox") for c in chars})
+    rng = random.Random(seed)
+    lines = [
+        _LineItem(
+            "unused", (0.0, 0.0, 300.0, 20.0), rng.choice([0, 0, 90, 180]), i, chars=[rng.choice(chars) for _ in range(100)]
+        )
+        for i in range(3)
+    ]
+    result = _glyph_font_groups_owned(lines, geometry, owner, identities)
+    assert result is not None
+    expected = _glyph_font_groups_python(lines, geometry)
+    assert list(result[0].items()) == list(expected[0].items())
+    assert list(result[1].items()) == list(expected[1].items())
+
+
+@pytest.mark.parametrize("field", ["char", "font", "geometry", "char_idx"])
+def test_owned_glyph_fields_changed_after_snapshot_use_reference(owned_page, monkeypatch, field):
+    """快照建立后修改实际文字、字体、来源或侧表坐标，旧快照不能继续参与字形认领。"""
+    from types import SimpleNamespace
+    from docvortex.analyzers.native.pdf.inline.glyph_weight import _glyph_font_groups_owned
+
+    owner, chars, identities = owned_page
+    char = next(c for c in chars if c["char"].isascii() and c["char"].isalpha())
+    geometry = SimpleNamespace(tight_bboxes={c["char_idx"]: c.get("tight_bbox") for c in chars})
+    line = _LineItem("unused", (0.0, 0.0, 300.0, 20.0), 0, 0, chars=[char])
+    if field == "geometry":
+        geometry.tight_bboxes[char["char_idx"]] = (1.0, 2.0, 3.0, 4.0)
+    elif field == "font":
+        monkeypatch.setitem(char, "font", dict(char["font"], weight=700))
+    else:
+        monkeypatch.setitem(char, field, "Z" if field == "char" else 999)
+    assert _glyph_font_groups_owned([line], geometry, owner, identities) is None
+
+
 @pytest.mark.parametrize("seed", range(100))
 def test_owned_style_geometry_matches_reference(owned_page, seed):
     """随机组合乱序/重复成员、并列来源、旋转行和临界绘图线，完整比对区间及稳定顺序。"""
@@ -48,7 +90,13 @@ def test_owned_style_geometry_matches_reference(owned_page, seed):
         b = rng.choice(boxes)
         height = b[3] - b[1]
         y = rng.choice([b[3], (b[1] + b[3]) / 2, b[3] + height * 0.2, b[3] - height * 0.2])
-        drawings.append(_AxisLine((box[0], y - 0.01, box[2], y + 0.01), height * rng.choice([0.0, 0.1, 0.2, 0.21]), rng.choice(["horizontal", "horizontal", "vertical"])))
+        drawings.append(
+            _AxisLine(
+                (box[0], y - 0.01, box[2], y + 0.01),
+                height * rng.choice([0.0, 0.1, 0.2, 0.21]),
+                rng.choice(["horizontal", "horizontal", "vertical"]),
+            )
+        )
     result = owned_styles.detect_owned_style_lines(owner, lines, drawings, identities)
     assert result is not None
     assert result == detection.detect_pdf_text_style_lines(lines, drawings)

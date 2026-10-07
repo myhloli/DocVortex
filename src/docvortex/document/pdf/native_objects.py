@@ -192,13 +192,21 @@ def _text_object_visibility(
     """一次遍历建立文字对象的绘制状态与有效裁剪；地址只在本次页面提取内使用。"""
     from ._object_bridge import read_text_visibility
 
-    records = read_text_visibility(page, page_bbox, rotation, DRAWING_FORM_MAX_DEPTH)
+    records = read_text_visibility(page, page_bbox, rotation, DRAWING_FORM_MAX_DEPTH, with_roots=paint_page_reader is not None)
     if records is not None:
+        roots = None
+        if paint_page_reader is not None:
+            records, roots, paint = records
         output = {address: (visible, clip) for address, visible, clip in records}
         if paint_page_reader is not None:
             from .text_occlusion import exclude_fully_overpainted_text
 
-            output = exclude_fully_overpainted_text(page, page_bbox, rotation, output, paint_page_reader)
+            if len(output) != len(records):
+                # 非标准重复对象地址需要使用最终映射重新读框，保持原有合并可见性的语义。
+                roots, paint = None, None
+            output = exclude_fully_overpainted_text(
+                page, page_bbox, rotation, output, paint_page_reader, roots=roots, paint=paint
+            )
         return output
     output = {}
     for member in _clipped_objects_of_type(page, pdfium_c.FPDF_PAGEOBJ_TEXT):
@@ -633,6 +641,9 @@ def _path_object_evidence(
     return drawing_lines, path_info
 
 
+_FILLED_RECTANGLE_ROUND = round
+
+
 def _filled_rectangle_bbox(subpath: _PathSubpath) -> BBox | None:
     """仅把四角与直边均轴对齐的填充子路径记录为矩形，曲线和字形轮廓不能借外框冒充柱体。"""
     points = subpath.points
@@ -644,9 +655,17 @@ def _filled_rectangle_bbox(subpath: _PathSubpath) -> BBox | None:
     y0, y1 = min(p[1] for p in points), max(p[1] for p in points)
     if x1 <= x0 or y1 <= y0:
         return None
-    corners = {(round(x, 3), round(y, 3)) for x, y in points}
-    if corners != {(round(x, 3), round(y, 3)) for x in (x0, x1) for y in (y0, y1)}:
-        return None
+    # 已含完整四角时，相同 round 映射后的集合必然相同；近似矩形仍完整执行原容差判定。
+    exact_corners = (
+        round is _FILLED_RECTANGLE_ROUND
+        and type(points) in (list, tuple)
+        and all(type(point) is tuple and len(point) == 2 and type(point[0]) is float and type(point[1]) is float for point in points)
+        and set(points) == {(x0, y0), (x0, y1), (x1, y0), (x1, y1)}
+    )
+    if not exact_corners:
+        corners = {(round(x, 3), round(y, 3)) for x, y in points}
+        if corners != {(round(x, 3), round(y, 3)) for x in (x0, x1) for y in (y0, y1)}:
+            return None
     if any(abs(a[0] - b[0]) > 0.001 and abs(a[1] - b[1]) > 0.001 for a, b in subpath.straight_segments):
         return None
     return (x0, y0, x1, y1)
@@ -1052,12 +1071,14 @@ def _extract_page_image_infos(
             continue
         if image_bbox is None:
             continue
+        fingerprint = _get_raw_image_fingerprint(raw_obj, page)
+        smooth, blank_top = _image_visual_evidence(raw_obj, page, matrix, image_bbox, page_bbox, page_rotation)
         image_infos.append(
             PDFImageInfo(
                 bbox=image_bbox,
-                fingerprint=_get_raw_image_fingerprint(raw_obj, page),
-                smooth_background=_is_smooth_page_background(raw_obj, page, image_bbox, page_bbox),
-                blank_top_bbox=_native_image_blank_top_bbox(raw_obj, page, matrix, image_bbox, page_bbox, page_rotation),
+                fingerprint=fingerprint,
+                smooth_background=smooth,
+                blank_top_bbox=blank_top,
             )
         )
     return sorted(
@@ -1072,11 +1093,23 @@ def _blank_image_top_fraction(image) -> float:
 
     if image.width * image.height > 4_000_000:
         return 0.0
+    from ..._compute_backend import get_native
+
+    native = get_native()
+    # RGB/L 没有透明元数据时白底合成是恒等变换，直接使用独立原像素缓冲。
+    if native is not None and type(image) is Image.Image and "transparency" not in image.info:
+        if image.mode == "RGB":
+            return native.blank_top_rgb(image.tobytes(), image.width, image.height)
+        if image.mode == "L":
+            return native.blank_top_gray(image.tobytes(), image.width, image.height)
     with (
         image.convert("RGBA") as rgba,
         Image.new("RGBA", rgba.size, "white") as background,
         Image.alpha_composite(background, rgba) as flat,
     ):
+        if native is not None:
+            with flat.convert("RGB") as rgb:
+                return native.blank_top_rgb(rgb.tobytes(), rgb.width, rgb.height)
         with (
             flat.convert("RGB") as rgb,
             Image.new("RGB", rgb.size, "white") as white,
@@ -1092,6 +1125,27 @@ def _blank_image_top_fraction(image) -> float:
                     channel.close()
     fraction = bounds[1] / image.height if bounds else 0.0
     return fraction if 0.03 <= fraction <= 0.12 else 0.0
+
+
+_BITMAP_BLANK_REFERENCES = (_blank_image_top_fraction, pdfium.PdfBitmap.to_pil, pdfium.PdfBitmap.__getattribute__)
+
+
+def _bitmap_blank_top_fraction(bitmap):
+    """锁内复制普通无透明位图的独立缓冲，保留 Pillow 通道与白边阈值，透明格式完整回退。"""
+    from ..._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is not None
+        and type(bitmap) is pdfium.PdfBitmap
+        and (_blank_image_top_fraction, pdfium.PdfBitmap.to_pil, pdfium.PdfBitmap.__getattribute__) == _BITMAP_BLANK_REFERENCES
+        and bitmap.mode in ("RGB", "BGR", "RGBX", "BGRX", "L")
+    ):
+        value = native.blank_top_bitmap(bytes(bitmap.buffer), bitmap.width, bitmap.height, bitmap.stride, bitmap.mode)
+        if value is not None:
+            return value
+    with bitmap.to_pil() as original:
+        return _blank_image_top_fraction(original)
 
 
 def _native_image_blank_top_bbox(raw_obj, page, matrix, image_bbox, page_bbox, page_rotation):
@@ -1113,8 +1167,7 @@ def _native_image_blank_top_bbox(raw_obj, page, matrix, image_bbox, page_bbox, p
         if not raw_bitmap:
             return None
         bitmap = pdfium.PdfBitmap.from_raw(raw_bitmap)
-        with bitmap.to_pil() as original:
-            fraction = _blank_image_top_fraction(original)
+        fraction = _bitmap_blank_top_fraction(bitmap)
         top = full[1] + fraction * (full[3] - full[1])
         return (image_bbox[0], top, image_bbox[2], image_bbox[3]) if fraction and top < image_bbox[3] else None
     except Exception:
@@ -1141,18 +1194,86 @@ def _is_smooth_page_background(raw_obj: Any, page: pdfium.PdfPage, image_bbox: B
         if not raw_bitmap:
             return False
         bitmap = pdfium.PdfBitmap.from_raw(raw_bitmap)
-        with bitmap.to_pil() as original, original.convert("RGB") as rgb, rgb.resize((64, 64)) as small:
-            pixels = list(small.get_flattened_data() if hasattr(small, "get_flattened_data") else small.getdata())
-        differences = [
-            max(abs(a - b) for a, b in zip(pixels[y * 64 + x], pixels[(y + dy) * 64 + x + dx]))
-            for y in range(63)
-            for x in range(63)
-            for dx, dy in ((1, 0), (0, 1))
-        ]
-        return sum(value > 12 for value in differences) / len(differences) <= 0.015
+        with bitmap.to_pil() as original:
+            return _smooth_image_background_pixels(original)
     except Exception:
         # 证据读取失败保留图像，不能因损坏对象或不支持的编码删除内容。
         return False
+    finally:
+        if bitmap is not None:
+            bitmap.close()
+
+
+def _smooth_image_background_pixels(original):
+    """独立 RGB 缓冲沿用 Pillow 默认缩放、色差阈值和计数顺序，不修改输入像素。"""
+    with original.convert("RGB") as rgb, rgb.resize((64, 64)) as small:
+        pixels = list(small.get_flattened_data() if hasattr(small, "get_flattened_data") else small.getdata())
+    differences = [
+        max(abs(a - b) for a, b in zip(pixels[y * 64 + x], pixels[(y + dy) * 64 + x + dx]))
+        for y in range(63)
+        for x in range(63)
+        for dx, dy in ((1, 0), (0, 1))
+    ]
+    return sum(value > 12 for value in differences) / len(differences) <= 0.015
+
+
+_IMAGE_VISUAL_REFERENCE_FUNCTIONS = (_is_smooth_page_background, _native_image_blank_top_bbox)
+
+
+def _image_visual_evidence(raw_obj, page, matrix, image_bbox, page_bbox, page_rotation):
+    """同时符合两种像素检查条件时只解码一次，所有转换缓冲独立并在页面锁内释放。"""
+    shared = _shared_image_visual_evidence(raw_obj, page, matrix, image_bbox, page_bbox, page_rotation)
+    if shared is not None:
+        return shared
+    return (
+        _is_smooth_page_background(raw_obj, page, image_bbox, page_bbox),
+        _native_image_blank_top_bbox(raw_obj, page, matrix, image_bbox, page_bbox, page_rotation),
+    )
+
+
+def _shared_image_visual_evidence(raw_obj, page, matrix, image_bbox, page_bbox, page_rotation):
+    """只复用成功解码的只读原图；不支持、损坏或替换参考函数时各自执行旧路径。"""
+    if (_is_smooth_page_background, _native_image_blank_top_bbox) != _IMAGE_VISUAL_REFERENCE_FUNCTIONS:
+        return None
+    area = max(0.0, page_bbox[2] - page_bbox[0]) * max(0.0, page_bbox[3] - page_bbox[1])
+    if (
+        area <= 0
+        or (image_bbox[2] - image_bbox[0]) * (image_bbox[3] - image_bbox[1]) < 0.95 * area
+        or page_rotation != 0
+        or matrix[0] <= 0
+        or matrix[3] <= 0
+        or abs(matrix[1]) + abs(matrix[2]) > 1e-6
+    ):
+        return None
+    full = _image_bbox_from_matrix(matrix, page_bbox, page_rotation)
+    if full is None or abs(full[1] - image_bbox[1]) > 0.5:
+        return None
+    bitmap = None
+    try:
+        metadata = pdfium_c.FPDF_IMAGEOBJ_METADATA()
+        if (
+            not pdfium_c.FPDFImageObj_GetImageMetadata(raw_obj, page, ctypes.byref(metadata))
+            or not 0 < metadata.width * metadata.height <= 4_000_000
+        ):
+            return None
+        raw_bitmap = pdfium_c.FPDFImageObj_GetBitmap(raw_obj)
+        if not raw_bitmap:
+            return None
+        bitmap = pdfium.PdfBitmap.from_raw(raw_bitmap)
+        with bitmap.to_pil() as original:
+            try:
+                smooth = _smooth_image_background_pixels(original)
+            except Exception:
+                smooth = False
+            try:
+                fraction = _blank_image_top_fraction(original)
+                top = full[1] + fraction * (full[3] - full[1])
+                blank_top = (image_bbox[0], top, image_bbox[2], image_bbox[3]) if fraction and top < image_bbox[3] else None
+            except Exception:
+                blank_top = None
+        return smooth, blank_top
+    except Exception:
+        return None
     finally:
         if bitmap is not None:
             bitmap.close()

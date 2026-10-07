@@ -9,6 +9,7 @@ from typing import Sequence
 
 from ....foundation._text import is_hyphen_at_line_end
 from ....schema import BBox
+from ...._compute_backend import get_native
 from .geometry import (
     _bbox_axis_overlap_ratio,
     _bbox_center_x,
@@ -156,10 +157,8 @@ def _line_canonical_style_scale(line: _LineItem, local_bbox: BBox) -> float:
     )
 
 
-def _line_effective_height(line: _LineItem, local_bbox: BBox) -> float:
-    """兼容既有布局调用，并统一转发到 canonical 字体尺度。"""
-
-    return _line_style_scale(line, local_bbox)
+# 兼容既有私有入口，直接绑定同一实现，避免高频布局检查多经过一层 Python 转发。
+_line_effective_height = _line_style_scale
 
 
 def _line_layout_height(_line: _LineItem, local_bbox: BBox) -> float:
@@ -251,15 +250,35 @@ def _effective_body_text_row_gap(
     return _effective_text_row_gap(previous, current)
 
 
-def _infer_text_lanes(
-    line_geometry: list[tuple[_LineItem, BBox]],
-    local_page_width: float,
-    median_height: float,
-    *,
-    recalculate_intervals: bool = True,
-) -> list[_TextLane]:
-    """从重复左右边缘推断稳定栏带，并按需用已分配成员重算边界。"""
+def _lane_batch_native():
+    """参考函数被替换时完整保留 Python 读取和调用行为。"""
+    native = get_native()
+    if native is None or any(
+        actual is not expected
+        for actual, expected in zip(
+            (
+                _line_effective_height,
+                _line_style_scale,
+                _best_lane_coverage,
+                _fits_only_one_lane_ordered,
+                _bbox_center_x,
+                _bbox_center_y,
+            ),
+            _LANE_BATCH_REFERENCE_FUNCTIONS,
+        )
+    ):
+        return None
+    return native
 
+
+def _supported_lane_intervals_native(line_geometry, width, median_height):
+    """完整输入只读一次，锚点与中位数由 Rust 批量生成。"""
+    native = _lane_batch_native()
+    return None if native is None else native.supported_lane_intervals_owned(line_geometry, width, median_height, _LineItem)
+
+
+def _supported_lane_intervals_python(line_geometry, local_page_width, median_height):
+    """保留原贪心锚点、统计中位数和首个支持区间的完整参考。"""
     anchor_tolerance = max(3.0, 0.75 * median_height)
     anchor_geometry = [
         item for item in line_geometry if item[0].semantic_type not in {"header", "footer", "page_number", "aside_text"}
@@ -312,6 +331,43 @@ def _infer_text_lanes(
             )
         ]
 
+    return anchor_geometry, filtered_intervals
+
+
+def _lane_assignments_native(line_geometry, lanes, tolerance, nested=None):
+    """分栏时重新读取当前几何，不复用先前阶段的成员或判定结果。"""
+    native = _lane_batch_native()
+    return (
+        None
+        if native is None
+        else native.lane_assignments_owned(
+            line_geometry,
+            lanes,
+            tolerance,
+            nested,
+            _LineItem,
+            _TextLane,
+        )
+    )
+
+
+def _infer_text_lanes(
+    line_geometry: list[tuple[_LineItem, BBox]],
+    local_page_width: float,
+    median_height: float,
+    *,
+    recalculate_intervals: bool = True,
+) -> list[_TextLane]:
+    """从重复左右边缘推断稳定栏带，并按需用已分配成员重算边界。"""
+
+    anchor_tolerance = max(3.0, 0.75 * median_height)
+    supported = _supported_lane_intervals_native(line_geometry, local_page_width, median_height)
+    if supported is None:
+        anchor_geometry, filtered_intervals = _supported_lane_intervals_python(line_geometry, local_page_width, median_height)
+    else:
+        filtered_intervals, anchor_indices = supported
+        anchor_geometry = [line_geometry[i] for i in anchor_indices]
+
     nested_column_band = None
     if len(filtered_intervals) == 1 and anchor_geometry:
         nested_outer_interval = (
@@ -337,32 +393,42 @@ def _infer_text_lanes(
             right=filtered_intervals[0][1],
         )
         span_lines: list[tuple[_LineItem, BBox]] = []
-        for item in line_geometry:
-            line, bbox = item
-            center_y = _bbox_center_y(bbox)
-            if (
-                line.semantic_type in {"header", "footer", "page_number", "page_footnote", "aside_text"}
-                or not band_top <= center_y <= band_bottom
-            ):
-                fallback_lane.lines.append(item)
-                continue
-            best_lane, best_coverage, second_coverage = _best_lane_coverage(
-                bbox,
-                nested_lanes,
-            )
-            fits_only_one_lane = _fits_only_one_lane_ordered(
-                bbox,
-                best_lane,
-                nested_ordered_lanes,
-                anchor_tolerance,
-            )
-            if second_coverage >= 0.2 and not fits_only_one_lane:
-                span_lines.append(item)
-                continue
-            if best_coverage >= 0.5 or fits_only_one_lane:
-                best_lane.lines.append(item)
-            else:
-                span_lines.append(item)
+        destinations = _lane_assignments_native(line_geometry, nested_lanes, anchor_tolerance, (band_top, band_bottom))
+        if destinations is not None:
+            for item, target in zip(line_geometry, destinations):
+                if target is None:
+                    span_lines.append(item)
+                elif target == len(nested_lanes):
+                    fallback_lane.lines.append(item)
+                else:
+                    nested_lanes[target].lines.append(item)
+        else:
+            for item in line_geometry:
+                line, bbox = item
+                center_y = _bbox_center_y(bbox)
+                if (
+                    line.semantic_type in {"header", "footer", "page_number", "page_footnote", "aside_text"}
+                    or not band_top <= center_y <= band_bottom
+                ):
+                    fallback_lane.lines.append(item)
+                    continue
+                best_lane, best_coverage, second_coverage = _best_lane_coverage(
+                    bbox,
+                    nested_lanes,
+                )
+                fits_only_one_lane = _fits_only_one_lane_ordered(
+                    bbox,
+                    best_lane,
+                    nested_ordered_lanes,
+                    anchor_tolerance,
+                )
+                if second_coverage >= 0.2 and not fits_only_one_lane:
+                    span_lines.append(item)
+                    continue
+                if best_coverage >= 0.5 or fits_only_one_lane:
+                    best_lane.lines.append(item)
+                else:
+                    span_lines.append(item)
         lanes = [lane for lane in nested_lanes if lane.lines]
         if recalculate_intervals:
             _expand_nested_lane_intervals_from_members(
@@ -387,24 +453,32 @@ def _infer_text_lanes(
     lanes = [_TextLane(left=left, right=right) for left, right, _support in filtered_intervals]
     ordered_lanes = sorted(lanes, key=lambda lane: lane.left)
     span_lines: list[tuple[_LineItem, BBox]] = []
-    for item in line_geometry:
-        bbox = item[1]
-        best_lane, best_coverage, second_coverage = _best_lane_coverage(bbox, lanes)
-        fits_only_one_lane = _fits_only_one_lane_ordered(
-            bbox,
-            best_lane,
-            ordered_lanes,
-            anchor_tolerance,
-        )
-        # 同时覆盖两个稳定正文栏的行仍属于跨栏内容；只进入单侧栏且未越过栏沟的
-        # 宽正文行则回到该栏，避免窄图注把正文错误挤入 span lane。
-        if second_coverage >= 0.2 and not fits_only_one_lane:
-            span_lines.append(item)
-            continue
-        if len(lanes) == 1 or fits_only_one_lane:
-            best_lane.lines.append(item)
-        else:
-            span_lines.append(item)
+    destinations = _lane_assignments_native(line_geometry, lanes, anchor_tolerance)
+    if destinations is not None:
+        for item, target in zip(line_geometry, destinations):
+            if target is None:
+                span_lines.append(item)
+            else:
+                lanes[target].lines.append(item)
+    else:
+        for item in line_geometry:
+            bbox = item[1]
+            best_lane, best_coverage, second_coverage = _best_lane_coverage(bbox, lanes)
+            fits_only_one_lane = _fits_only_one_lane_ordered(
+                bbox,
+                best_lane,
+                ordered_lanes,
+                anchor_tolerance,
+            )
+            # 同时覆盖两个稳定正文栏的行仍属于跨栏内容；只进入单侧栏且未越过栏沟的
+            # 宽正文行则回到该栏，避免窄图注把正文错误挤入 span lane。
+            if second_coverage >= 0.2 and not fits_only_one_lane:
+                span_lines.append(item)
+                continue
+            if len(lanes) == 1 or fits_only_one_lane:
+                best_lane.lines.append(item)
+            else:
+                span_lines.append(item)
 
     if recalculate_intervals:
         _expand_nested_lane_intervals_from_members(
@@ -476,6 +550,16 @@ def _fits_only_one_lane(
         sorted(lanes, key=lambda lane: lane.left),
         tolerance,
     )
+
+
+_LANE_BATCH_REFERENCE_FUNCTIONS = (
+    _line_effective_height,
+    _line_style_scale,
+    _best_lane_coverage,
+    _fits_only_one_lane_ordered,
+    _bbox_center_x,
+    _bbox_center_y,
+)
 
 
 def _expand_nested_lane_intervals_from_members(
@@ -766,6 +850,16 @@ def _short_tail_accepts_previous(candidate, lane, median_height, previous) -> bo
     return True
 
 
+_TAIL_REFERENCE_FUNCTIONS = (
+    _line_effective_height,
+    _line_style_scale,
+    _short_tail_accepts_previous,
+    _title_fonts_compatible,
+    _effective_body_text_row_gap,
+    _font_weights_conflict,
+)
+
+
 def _reattach_cross_lane_short_tails(
     lanes: list[_TextLane],
     median_height: float,
@@ -774,6 +868,8 @@ def _reattach_cross_lane_short_tails(
     # 只有一个栏带时不存在“跨栏”归属，直接跳过输入校验和前序扫描；
     # 这不改变成员、顺序或边界，也能让常见单栏页面避开整页重复遍历。
     if len(lanes) < 2:
+        return
+    if _short_tail_lane_events_native(lanes, median_height):
         return
     pending = []
     seen_lines, seen_indices = set(), set()
@@ -796,6 +892,8 @@ def _reattach_cross_lane_short_tails(
             if line.semantic_type is None:
                 pending.append((lane_index, row, ordinal))
     pending.sort(key=lambda item: (item[1][1][1], item[1][1][0], item[1][0].source_index))
+    if _short_tail_native(lanes, pending, median_height):
+        return
     previous = [None] * len(lanes)
     previous_keys = [None] * len(lanes)
     append_ordinal = sum(len(lane.lines) for lane in lanes)
@@ -826,6 +924,60 @@ def _reattach_cross_lane_short_tails(
             if previous_keys[target] is None or key > previous_keys[target]:
                 previous_keys[target], previous[target] = key, row
         position = end
+
+
+def _short_tail_lane_events_native(lanes, median_height):
+    """验证和几何快照一并交给 Rust；完成快照后只迁移原始行对象。"""
+    native = get_native()
+    if native is None or any(
+        actual is not expected
+        for actual, expected in zip(
+            (
+                _line_effective_height,
+                _line_style_scale,
+                _short_tail_accepts_previous,
+                _title_fonts_compatible,
+                _effective_body_text_row_gap,
+                _font_weights_conflict,
+            ),
+            _TAIL_REFERENCE_FUNCTIONS,
+        )
+    ):
+        return False
+    moves = native.short_tail_lane_events(lanes, median_height, _TextLane, _LineItem)
+    if moves is None:
+        return False
+    for source, row, target in moves:
+        lanes[source].lines.remove(row)
+        lanes[target].lines.append(row)
+        lanes[target].lines.sort(key=lambda item: (item[1][1], item[1][0], item[0].source_index))
+    return True
+
+
+def _short_tail_native(lanes, pending, median_height):
+    """预计算每行字体和尺度后批量结算事件；特殊数值维持既有 Python 遍历。"""
+    native = get_native()
+    if native is None:
+        return False
+    if (
+        _line_effective_height is not _TAIL_REFERENCE_FUNCTIONS[0]
+        or _line_style_scale is not _TAIL_REFERENCE_FUNCTIONS[1]
+        or _short_tail_accepts_previous is not _TAIL_REFERENCE_FUNCTIONS[2]
+        or _title_fonts_compatible is not _TAIL_REFERENCE_FUNCTIONS[3]
+        or _effective_body_text_row_gap is not _TAIL_REFERENCE_FUNCTIONS[4]
+        or _font_weights_conflict is not _TAIL_REFERENCE_FUNCTIONS[5]
+    ):
+        return False
+    bounds = [(lane.left, lane.right) for lane in lanes]
+    moves = native.short_tail_destinations_owned(pending, bounds, median_height)
+    if moves is None:
+        return False
+    for index, target in moves:
+        source, row, _ordinal = pending[index]
+        lanes[source].lines.remove(row)
+        lanes[target].lines.append(row)
+        lanes[target].lines.sort(key=lambda item: (item[1][1], item[1][0], item[0].source_index))
+    return True
 
 
 def _reattach_cross_lane_short_tails_python(

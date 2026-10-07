@@ -215,3 +215,115 @@ def test_real_flash_public_words_and_table():
     assert "Proceedings of the 58th Annual Meeting" in content
     assert any("Chatbot Arena" in block.get("content", "") for block in pages[1] if block["type"] == "table")
     assert "LargeLanguageModels" not in content
+
+
+def _original_tight_join(chars, **kwargs):
+    """逐对执行既有规则，作为批量快捷路径的独立差分参照。"""
+    parts = []
+    previous = None
+    for char in chars:
+        if previous is not None and needs_tight_space(previous, char, **kwargs):
+            parts.append(" ")
+        parts.append(str(char.get("char", "")))
+        previous = char
+    return "".join(parts)
+
+
+@pytest.mark.parametrize("seed", range(48))
+def test_tight_candidates_complete_cell_and_mutation(seed):
+    """混合文字、过滤索引及几何变化逐次比较，不允许复用旧输入的判断。"""
+    import random
+    from docvortex.document.pdf.text.spacing import _tight_space_candidates
+    from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableGlyph, NativeTableCell
+    from docvortex.analyzers.native.pdf._table_recovery.text import build_cell_text_parts
+    from docvortex.analyzers.native.pdf.table_text_styles import _render_styled_cell
+
+    rng = random.Random(seed)
+    alphabet = ["A", "B", "中", "文", "1", "٣", "９", "é", "Ω", " ", "", "ab", None, "\ud800"]
+    chars = [_char(rng.choice(alphabet), rng.choice([i, i + 1, None, "0", True, 2**80]), i * 8.0) for i in range(24)]
+    assert join_tight_text(chars) == _original_tight_join(chars)
+    for i, char in enumerate(chars):
+        char["char"] = "AB12中文"[i % 6]
+        char["char_idx"] = i
+        char["font"]["size"] = 6.0 if i % 3 else 10.0
+    assert join_tight_text(chars) == _original_tight_join(chars)
+    overrides = {i: (i * 6.0, 1.0, i * 6.0 + 4.0, 9.0) for i in range(len(chars))}
+    assert join_tight_text(chars, tight_bboxes=overrides) == _original_tight_join(chars, tight_bboxes=overrides)
+    # 用实际单元格路径比较完整 HTML；角色及几何仍逐对重新判定。
+    for iteration in range(2):
+        mapping = {i: char for i, char in enumerate(chars)}
+        glyphs = [NativeTableGlyph(i, i, char["char"], tuple(char["bbox"].bbox), 0) for i, char in enumerate(chars)]
+        candidates = _tight_space_candidates(mapping, tuple(glyphs), NativeTableGlyph)
+        content = "".join(text for text, _index in build_cell_text_parts(glyphs, 10.0))
+        cell = NativeTableCell(0, 0, 1, 1, (0.0, 0.0, 300.0, 10.0), content, tuple(mapping))
+        roles = {i: rng.choice(["body", "sup", "sub"]) for i in mapping if i % 7 == 0}
+        expected = _render_styled_cell(cell, glyphs, 10.0, roles, chars_by_source=mapping, tight_bboxes=overrides)
+        actual = _render_styled_cell(cell, glyphs, 10.0, roles, chars_by_source=mapping, tight_bboxes=overrides,
+                                     _possible_space_indices=candidates)
+        assert actual == expected
+        if candidates is not None:
+            required = {b["char_idx"] for a, b in zip(chars, chars[1:]) if needs_tight_space(a, b, tight_bboxes=overrides)}
+            assert required <= candidates
+        for char in chars:
+            char["char"] = rng.choice(["A", "B", "1", "٣", "中", "文"])
+
+
+def test_unspaced_batch_preserves_custom_index_and_mapping(monkeypatch):
+    """自定义索引、字典及规则替换必须回到 Python，保留运算和调用行为。"""
+    from docvortex.document.pdf.text import spacing
+
+    calls = []
+
+    class Index(int):
+        """记录源索引子类加法，防止原运算被快捷路径绕过。"""
+
+        def __add__(self, value):
+            """执行整数相加并保存被调用证据。"""
+            calls.append(value)
+            return super().__add__(value)
+
+    chars = [_char("A", Index(0), 0), _char("B", 1, 8)]
+    assert join_tight_text(chars) == "A B"
+    assert calls == [1]
+
+    class Mapping(dict):
+        """记录自定义映射读取，验证非普通字典完整回退。"""
+
+        def get(self, key, default=None):
+            """保留映射读取副作用及原返回值。"""
+            calls.append(key)
+            return super().get(key, default)
+
+    custom = [Mapping(_char("中", 0, 0)), _char("文", 1, 8)]
+    calls.clear()
+    assert join_tight_text(custom) == "中文"
+    assert calls == ["char", "char"]
+
+    def changed_rule(left, right, **kwargs):
+        """替换判定函数应使每个相邻对采用新规则。"""
+        return True
+
+    monkeypatch.setattr(spacing, "needs_tight_space", changed_rule)
+    assert join_tight_text([_char("中", 0, 0), _char("文", 1, 8)]) == "中 文"
+
+
+def test_tight_candidates_native_proof_and_fallback():
+    """连续数字及中日韩全部排除，普通英文完整保留；未知索引必须回退。"""
+    from docvortex._compute_backend import get_native
+    from docvortex.document.pdf.text.spacing import _ordinary_non_cjk
+    from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableGlyph
+
+    native = get_native()
+    if native is None:
+        pytest.skip("requires Rust kernel")
+    for text, expected in [("中文", set()), ("123٣９", set()), ("A,B", set()), ("AB", {1})]:
+        chars = {i: _char(value, i, i * 8.0) for i, value in enumerate(text)}
+        glyphs = tuple(NativeTableGlyph(i, i, value, (0.0, 0.0, 4.0, 9.0), 0) for i, value in enumerate(text))
+        assert native.tight_space_candidates(chars, glyphs, NativeTableGlyph, _ordinary_non_cjk) == expected
+    chars = {0: _char("A", 0, 0), 1: _char("B", 1, 8)}
+    glyphs = tuple(NativeTableGlyph(i, i, value, (0.0, 0.0, 4.0, 9.0), 0) for i, value in enumerate("AB"))
+    chars[1]["char_idx"] = 2**80
+    assert native.tight_space_candidates(chars, glyphs, NativeTableGlyph, _ordinary_non_cjk) is None
+    chars[1]["char_idx"] = 1
+    chars[0]["char"] = "\ud800"
+    assert native.tight_space_candidates(chars, glyphs, NativeTableGlyph, _ordinary_non_cjk) is None

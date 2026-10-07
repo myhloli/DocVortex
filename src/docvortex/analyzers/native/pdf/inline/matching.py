@@ -449,9 +449,34 @@ def _filter_line_styles_for_block(
     return output
 
 
+_PROJECT_CONTENT_NORMALIZER = _normalize_match_fragment
+_PROJECT_CONTENT_RECORD = _ProjectedChar
+_PROJECT_CONTENT_RECORD_INIT = _ProjectedChar.__init__
+_PROJECT_CONTENT_RECORD_NEW = _ProjectedChar.__new__
+
+
 def _project_content_chars(content: str) -> list[_ProjectedChar]:
     """把原始文字投影为忽略空白和圆括号公式的可比较字符。"""
 
+    from ....._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is not None
+        and type(content) is str
+        and _normalize_match_fragment is _PROJECT_CONTENT_NORMALIZER
+        and _ProjectedChar is _PROJECT_CONTENT_RECORD
+        and _ProjectedChar.__init__ is _PROJECT_CONTENT_RECORD_INIT
+        and _ProjectedChar.__new__ is _PROJECT_CONTENT_RECORD_NEW
+    ):
+        projected = native.project_content_chars_owned(
+            content,
+            _normalize_match_fragment,
+            _ProjectedChar,
+            _PROJECT_CONTENT_RECORD_NEW,
+        )
+        if projected is not None:
+            return projected
     projected: list[_ProjectedChar] = []
     pending_formula_gap = False
     cursor = 0

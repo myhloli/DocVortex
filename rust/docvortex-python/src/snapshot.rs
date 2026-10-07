@@ -1,4 +1,5 @@
 //! 同库原始读取直接进入自有 canonical 快照，只在兼容边界构造 Python 字符。
+// 高频字段名按解释器复用不可变字符串，仍由原 Python 属性和字典操作读取当前状态。
 use docvortex_core::geometry_risk::{Entry, RunKey};
 use docvortex_core::{
     extraction,
@@ -124,8 +125,14 @@ fn prepare_angles(py: Python<'_>, glyphs: &[snapshot::Glyph]) -> PyResult<HashMa
         output.insert(
             key,
             Angle {
-                cos: math.getattr("cos")?.call1((value,))?.extract()?,
-                sin: math.getattr("sin")?.call1((value,))?.extract()?,
+                cos: math
+                    .getattr(pyo3::intern!(math.py(), "cos"))?
+                    .call1((value,))?
+                    .extract()?,
+                sin: math
+                    .getattr(pyo3::intern!(math.py(), "sin"))?
+                    .call1((value,))?
+                    .extract()?,
                 rounded: number_key(rounded),
                 bucket: round.call1((value * 1000.0,))?.extract()?,
             },
@@ -326,8 +333,8 @@ pub fn read_pdfium_text_snapshot(
     let mut runs = snapshot::writing_runs(&chars);
     let mut directions = HashMap::new();
     let math = py.import("math")?;
-    let hypot = math.getattr("hypot")?;
-    let atan2 = math.getattr("atan2")?;
+    let hypot = math.getattr(pyo3::intern!(math.py(), "hypot"))?;
+    let atan2 = math.getattr(pyo3::intern!(math.py(), "atan2"))?;
     loop {
         let requested = snapshot::advance_writing_angles(&mut chars, &mut runs, &directions);
         if requested.is_empty() {
@@ -409,9 +416,12 @@ impl NativeTextSnapshot {
         py: Python<'_>,
     ) -> PyResult<Option<NativeGeometryEvidence>> {
         let char_geometry = py.import("docvortex.analyzers.native.pdf.char_geometry")?;
-        let script_group = char_geometry.getattr("_script_group")?;
-        let is_anchor_text = char_geometry.getattr("_is_anchor_text")?;
-        let normalize = char_geometry.getattr("_normalized_font_family")?;
+        let script_group =
+            char_geometry.getattr(pyo3::intern!(char_geometry.py(), "_script_group"))?;
+        let is_anchor_text =
+            char_geometry.getattr(pyo3::intern!(char_geometry.py(), "_is_anchor_text"))?;
+        let normalize =
+            char_geometry.getattr(pyo3::intern!(char_geometry.py(), "_normalized_font_family"))?;
         let round = py.import("builtins")?.getattr("round")?;
         let mut groups: HashMap<String, (String, bool)> = HashMap::new();
         let mut families: HashMap<String, String> = HashMap::new();
@@ -820,8 +830,8 @@ impl NativeTextSnapshot {
         };
         let groups = text_content::groups(&assigned, count);
         let unicode = py.import("unicodedata")?;
-        let category = unicode.getattr("category")?;
-        let normalize = unicode.getattr("normalize")?;
+        let category = unicode.getattr(pyo3::intern!(unicode.py(), "category"))?;
+        let normalize = unicode.getattr(pyo3::intern!(unicode.py(), "normalize"))?;
         let mut spaces = HashSet::new();
         let mut ordinary = HashSet::new();
         let mut decimals = HashSet::new();
@@ -966,6 +976,202 @@ impl NativeTextSnapshot {
             self.data.extended,
             self.data.visible_only,
         )
+    }
+    /// 整页一次筛选普通 ASCII 字符，随后复用完整的快照字段校验，不保留旧认领结果。
+    fn glyph_line_font_groups(
+        &self,
+        py: Python<'_>,
+        lines: &Bound<'_, PyAny>,
+        tight: &Bound<'_, PyDict>,
+        identities: &Bound<'_, PyDict>,
+        line_type: &Bound<'_, PyAny>,
+        font_bold: &Bound<'_, PyAny>,
+    ) -> PyResult<Option<Vec<docvortex_core::rule_graphics::GlyphFontGroup>>> {
+        use pyo3::types::{PyInt, PyString};
+        if !lines.is_exact_instance_of::<PyList>() {
+            return Ok(None);
+        }
+        let mut rows = Vec::new();
+        for line in lines.try_iter()? {
+            let line = line?;
+            if !line.get_type().is(line_type) {
+                return Ok(None);
+            }
+            let angle = line.getattr(pyo3::intern!(line.py(), "angle"))?;
+            let chars = line.getattr(pyo3::intern!(line.py(), "chars"))?;
+            if !angle.is_exact_instance_of::<PyInt>() || !chars.is_exact_instance_of::<PyList>() {
+                return Ok(None);
+            }
+            let Ok(angle) = angle.extract::<i64>() else {
+                return Ok(None);
+            };
+            if angle != 0 {
+                continue;
+            }
+            let mut members = Vec::new();
+            for ch in chars.try_iter()? {
+                let ch = ch?;
+                if !ch.is_exact_instance_of::<PyDict>() {
+                    return Ok(None);
+                }
+                let Some(text) = ch.cast::<PyDict>()?.get_item("char")? else {
+                    return Ok(None);
+                };
+                if !text.is_exact_instance_of::<PyString>() {
+                    return Ok(None);
+                }
+                let Ok(text) = text.extract::<String>() else {
+                    return Ok(None);
+                };
+                if text.len() == 1 && text.as_bytes()[0].is_ascii_alphabetic() {
+                    let Some(index) = identities.get_item(ch.as_ptr() as usize)? else {
+                        return Ok(None);
+                    };
+                    let Ok(index) = index.extract::<usize>() else {
+                        return Ok(None);
+                    };
+                    members.push((index, ch));
+                }
+            }
+            rows.push(members);
+        }
+        self.glyph_font_groups(py, rows, tight, font_bold)
+    }
+
+    /// 字形分组先核验所有使用字段；任何文字、字体或几何变化都完整选择参考路径。
+    fn glyph_font_groups(
+        &self,
+        py: Python<'_>,
+        rows: Vec<Vec<(usize, Bound<'_, PyAny>)>>,
+        tight: &Bound<'_, PyDict>,
+        font_bold: &Bound<'_, PyAny>,
+    ) -> PyResult<Option<Vec<docvortex_core::rule_graphics::GlyphFontGroup>>> {
+        use pyo3::types::{PyFloat, PyInt, PyString};
+        let mut indices = Vec::new();
+        // 本次读取在 GIL 内不执行自定义转换；共享字体字典只核验一次，不跨调用保留状态。
+        let mut checked_fonts = HashMap::<usize, usize>::new();
+        for row in rows {
+            let mut members = Vec::new();
+            for (index, value) in row {
+                let Some(ch) = self.data.chars.get(index) else {
+                    return Ok(None);
+                };
+                if !value.is_exact_instance_of::<PyDict>() {
+                    return Ok(None);
+                }
+                let value = value.cast::<PyDict>()?;
+                let Some(text) = value.get_item(pyo3::intern!(value.py(), "char"))? else {
+                    return Ok(None);
+                };
+                if !text.is_exact_instance_of::<PyString>()
+                    || text.extract::<String>().ok().as_deref() != Some(ch.text.as_str())
+                {
+                    return Ok(None);
+                }
+                if ch.text.len() == 1 && ch.text.as_bytes()[0].is_ascii_alphabetic() {
+                    let font = &self.data.fonts[ch.font];
+                    let Some(actual) = value.get_item(pyo3::intern!(value.py(), "font"))? else {
+                        return Ok(None);
+                    };
+                    if !actual.is_exact_instance_of::<PyDict>() {
+                        return Ok(None);
+                    }
+                    let identity = actual.as_ptr() as usize;
+                    if let Some(&previous) = checked_fonts.get(&identity) {
+                        let previous = &self.data.fonts[previous];
+                        if previous.name != font.name
+                            || previous.flags != font.flags
+                            || previous.weight != font.weight
+                        {
+                            return Ok(None);
+                        }
+                    } else {
+                        let actual = actual.cast::<PyDict>()?;
+                        let Some(name) = actual.get_item(pyo3::intern!(actual.py(), "name"))?
+                        else {
+                            return Ok(None);
+                        };
+                        let Some(flags) = actual.get_item(pyo3::intern!(actual.py(), "flags"))?
+                        else {
+                            return Ok(None);
+                        };
+                        let Some(weight) = actual.get_item(pyo3::intern!(actual.py(), "weight"))?
+                        else {
+                            return Ok(None);
+                        };
+                        if !name.is_exact_instance_of::<PyString>()
+                            || name.extract::<String>().ok().as_deref() != Some(font.name.as_str())
+                            || !flags.is_exact_instance_of::<PyInt>()
+                            || flags.extract::<i32>().ok() != Some(font.flags)
+                            || !weight.is_exact_instance_of::<PyInt>()
+                            || weight.extract::<i32>().ok() != Some(font.weight)
+                        {
+                            return Ok(None);
+                        }
+                        checked_fonts.insert(identity, ch.font);
+                    }
+                    let Some(source) = value.get_item(pyo3::intern!(value.py(), "char_idx"))?
+                    else {
+                        return Ok(None);
+                    };
+                    if !source.is_exact_instance_of::<PyInt>()
+                        || source.extract::<usize>().ok() != Some(ch.index)
+                    {
+                        return Ok(None);
+                    }
+                    let actual = tight.get_item(ch.index)?;
+                    let actual = match actual {
+                        Some(box_obj) if !box_obj.is_none() => {
+                            if (!box_obj.is_exact_instance_of::<PyTuple>()
+                                && !box_obj.is_exact_instance_of::<PyList>())
+                                || box_obj.len()? != 4
+                                || box_obj.try_iter()?.any(|v| {
+                                    v.is_err() || !v.unwrap().is_exact_instance_of::<PyFloat>()
+                                })
+                            {
+                                return Ok(None);
+                            }
+                            box_obj.extract::<[f64; 4]>().ok()
+                        }
+                        _ => None,
+                    };
+                    if actual != ch.tight {
+                        return Ok(None);
+                    }
+                    // 侧表为空时参考算法还会读取字符字段，必须同时确认该字段没有被修改。
+                    if actual.is_none()
+                        && value
+                            .get_item(pyo3::intern!(value.py(), "tight_bbox"))?
+                            .is_some_and(|v| !v.is_none())
+                    {
+                        return Ok(None);
+                    }
+                }
+                members.push(index);
+            }
+            indices.push(members);
+        }
+        if indices.iter().all(Vec::is_empty) {
+            return Ok(Some(Vec::new()));
+        }
+        let mut bold = Vec::new();
+        let mut known = HashMap::new();
+        for font in &self.data.fonts {
+            let key = (font.name.clone(), font.flags, font.weight);
+            let value = if let Some(&value) = known.get(&key) {
+                value
+            } else {
+                let value: bool = font_bold
+                    .call1((&font.name, font.flags, font.weight))?
+                    .extract()?;
+                known.insert(key, value);
+                value
+            };
+            bold.push(value);
+        }
+        Ok(Some(py.detach(|| {
+            docvortex_core::rule_graphics::glyph_font_groups(&self.data, &indices, &bold)
+        })))
     }
     /// 直接以快照字符及行成员 ID 生成粗体和装饰线证据，不逐字符往返 Python。
     fn detect_style_lines(

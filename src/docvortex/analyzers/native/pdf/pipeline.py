@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .typography import _font_family_page_scope
+
 import re
 import statistics
 
@@ -48,6 +50,7 @@ from .title_analysis.structural import (
     _freeze_wrapped_bold_title_evidence,
 )
 from .formulas import (
+    _formula_fresh_page_scope,
     classify_repeated_vector_decorations,
     _attach_unmapped_formula_ink,
     _build_formula_like_blocks,
@@ -427,6 +430,8 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
                 lines,
                 text_geometry,
                 (lambda: render_page(page_idx, scale=3.0)) if callable(render_page) else None,
+                owner=native_text,
+                identities=owned[1] if owned is not None else None,
             )
         )
         page_link_lines.append(
@@ -735,6 +740,7 @@ def _mark_native_caption_starts(lines: list[_LineItem]) -> None:
             line.caption_start = True
 
 
+@_font_family_page_scope
 def _prepare_page_source(
     source: _PageSource,
     *,
@@ -1186,6 +1192,8 @@ def _apply_post_aggregation_tight_bboxes(
             block["bbox"] = clipped_bbox
 
 
+@_font_family_page_scope
+@_formula_fresh_page_scope
 def _finalize_prepared_page(
     prepared: _PreparedPage,
     page_index: int,

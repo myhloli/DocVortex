@@ -27,6 +27,8 @@ from .geometry import (
 )
 from .models import _AxisLine, _LineItem
 from .typography import _normalized_font_family
+from ._native_geometry import glyph_flags as _typography_glyph_flags, raw_bbox as _typography_raw_bbox
+from ....document.pdf.text._contracts import Bbox as _TypographyBbox
 
 _PDF_CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
 _PDF_LINE_END_SOFT_HYPHEN_RE = re.compile(r"(?<=[A-Za-z])[\x02\u00ad](?=[\t ]*(?:\n|$))")
@@ -814,6 +816,27 @@ def _detect_leading_typography_width(
     return max(0.1, prefix_bbox[2] - prefix_bbox[0])
 
 
+_TYPOGRAPHY_OWNED_REFERENCES = (
+    _coerce_bbox, _rotate_bbox_to_upright, _normalized_font_family,
+    _typography_glyph_flags, _typography_raw_bbox,
+    _LineItem.__getattribute__, _TypographyBbox.__getattribute__,
+)
+
+
+def _owned_typography_metrics(native, line, page_size, glyph_flags, raw_bbox):
+    """标准行直接批量读取当前字形；自定义坐标、字体转换和替换规则完整沿用原路径。"""
+    if (
+        not hasattr(native, "typography_owned")
+        or type(page_size) not in (tuple, list)
+        or len(page_size) != 2
+        or any(type(v) not in (float, int) or not math.isfinite(v) or abs(v) > 2**50 for v in page_size)
+        or (_coerce_bbox, _rotate_bbox_to_upright, _normalized_font_family, glyph_flags, raw_bbox,
+            _LineItem.__getattribute__, _TypographyBbox.__getattribute__) != _TYPOGRAPHY_OWNED_REFERENCES
+    ):
+        return None
+    return native.typography_owned(line, page_size, _LineItem, _TypographyBbox, glyph_flags, _normalized_font_family)
+
+
 def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> None:
     """按行聚合数值统计；字体类别仍由 Python 编码，缓存只存在于本次调用。"""
     from ...._compute_backend import get_native
@@ -822,6 +845,19 @@ def _fill_native_typography(line: _LineItem, page_size: tuple[float, float]) -> 
     native = get_native()
     if native is None:
         return _fill_native_typography_python(line, page_size)
+    owned = _owned_typography_metrics(native, line, page_size, glyph_flags, raw_bbox)
+    if owned is not None:
+        (height, width, _winner, coverage, weight, emphasis, typography), signature = owned
+        line.effective_height = height
+        line.em_height = line.em_height if line.em_height > 0 else height
+        line.median_glyph_width = width
+        line.font_signature = signature
+        line.font_coverage = coverage
+        line.dominant_font_weight = weight
+        line.leading_emphasis_width = emphasis
+        line.leading_typography_width = typography
+        line.paragraph_terminal = _native_sentence_terminal(line)
+        return
     boxes = native.local_boxes(
         [raw_bbox(char.get("bbox")) if glyph_flags(str(char.get("char") or "")) & 1 else None for char in line.chars],
         page_size,

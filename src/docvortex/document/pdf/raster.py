@@ -40,6 +40,37 @@ def page_to_pixel_file(page: PdfPage, path, dpi: int = DEFAULT_PDF_IMAGE_DPI):
                 bitmap.close()
 
 
+def page_to_shared_pixels(page: PdfPage, name, dpi: int = DEFAULT_PDF_IMAGE_DPI):
+    """复制原始位图到调用方登记的共享内存，关闭 PDFium 句柄后由父进程解码并释放。"""
+    from multiprocessing.shared_memory import SharedMemory
+    from pypdfium2.internal import BitmapTypeToStrReverse
+
+    with pdfium_guard():
+        bitmap = storage = None
+        try:
+            bitmap, scale = _render_page_bitmap(page, dpi, DEFAULT_MAX_RENDER_EDGE)
+            size = len(bitmap.buffer)
+            storage = SharedMemory(name=name, create=True, size=size)
+            storage.buf[:size] = memoryview(bitmap.buffer).cast("B")
+            return {
+                "scale": scale,
+                "mode": BitmapTypeToStrReverse[bitmap.format],
+                "size": (bitmap.width, bitmap.height),
+                "raw_mode": bitmap.mode,
+                "stride": bitmap.stride,
+                "shared_memory": name,
+            }
+        except BaseException:
+            if storage is not None:
+                storage.unlink()
+            raise
+        finally:
+            if storage is not None:
+                storage.close()
+            if bitmap is not None:
+                bitmap.close()
+
+
 def estimate_page_image_bytes(page_size: tuple[float, float], dpi: int = DEFAULT_PDF_IMAGE_DPI) -> int:
     """按现有渲染缩放估算四通道页图字节，用于限制批量驻留内存。"""
     import math

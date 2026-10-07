@@ -52,6 +52,131 @@ def nested_pdf():
     return stream.getvalue()
 
 
+@pytest.mark.parametrize("rotation", [0, 90, 180, 270])
+def test_visibility_collects_only_root_paths(native, monkeypatch, rotation):
+    """同次遍历的额外记录与参考树顶层路径完全相同，Form 中的路径不能作为遮挡证据。"""
+    stream = BytesIO()
+    canvas = Canvas(stream)
+    canvas.drawString(10, 10, "visible")
+    canvas.rect(0, 0, 60, 60, fill=1)
+    canvas.beginForm("inner")
+    canvas.rect(0, 0, 30, 30, fill=1)
+    canvas.drawString(10, 10, "nested")
+    canvas.endForm()
+    canvas.doForm("inner")
+    canvas.save()
+    with pdfium_guard(), pdfium.PdfDocument(stream.getvalue()) as document:
+        with closing(document[0]) as page:
+            page.set_rotation(rotation)
+            values, roots, paint = bridge.read_text_visibility(page, page.get_bbox(), rotation, 15, with_roots=True)
+            assert values == bridge.read_text_visibility(page, page.get_bbox(), rotation, 15)
+            expected = [
+                (order, (ctypes.cast(p.raw, ctypes.c_void_p).value, p.matrix, p.parent_matrix, p.depth, p.clip))
+                for order, p in enumerate(_walk_clipped_objects(page))
+                if p.depth == 0 and raw.FPDFPageObj_GetType(p.raw) == raw.FPDF_PAGEOBJ_PATH
+            ]
+            assert roots == expected
+            from pypdf import PdfReader
+
+            reader = PdfReader(BytesIO(stream.getvalue()))
+            actual = _text_object_visibility(page, page.get_bbox(), rotation, lambda: reader.pages[0])
+            with monkeypatch.context() as context:
+                context.setattr(bridge, "read_text_visibility", lambda *args, **kwargs: None)
+                reference = _text_object_visibility(page, page.get_bbox(), rotation, lambda: reader.pages[0])
+            assert actual == reference
+            assert any(not value[0] for value in actual.values())
+
+
+@pytest.mark.parametrize("kind", ["early", "stroke", "transparent", "late"])
+def test_cover_prefilter_preserves_visibility_and_skips_impossible_bounds(native, monkeypatch, kind):
+    """早绘制、仅描边及透明路径不读文字外框；后绘制覆盖保留全量成员及原资源审计。"""
+    from pypdf import PdfReader
+
+    stream = BytesIO()
+    canvas = Canvas(stream, pagesize=(200, 200))
+    if kind == "early":
+        canvas.rect(0, 0, 100, 100, fill=1, stroke=0)
+    canvas.drawString(10, 10, "earlier")
+    if kind != "early":
+        if kind == "transparent":
+            canvas.setFillAlpha(0.5)
+        canvas.rect(0, 0, 100, 100, fill=int(kind != "stroke"), stroke=int(kind == "stroke"))
+        canvas.setFillAlpha(1)
+    canvas.drawString(10, 10, "later")
+    canvas.save()
+    reader = PdfReader(BytesIO(stream.getvalue()))
+    with pdfium_guard(), pdfium.PdfDocument(stream.getvalue()) as document:
+        with closing(document[0]) as page:
+            _, roots, paint = bridge.read_text_visibility(page, page.get_bbox(), 0, 15, with_roots=True)
+            if kind == "late":
+                assert len(roots) == len(paint) == 1
+                assert paint[0][0] < roots[0][0]
+            else:
+                assert roots == paint == []
+            actual = _text_object_visibility(page, page.get_bbox(), 0, lambda: reader.pages[0])
+            with monkeypatch.context() as scoped:
+                scoped.setattr(bridge, "read_text_visibility", lambda *args, **kwargs: None)
+                expected = _text_object_visibility(page, page.get_bbox(), 0, lambda: reader.pages[0])
+            assert actual == expected
+
+
+def test_replaced_cover_rule_keeps_complete_native_root_evidence(native, monkeypatch):
+    """遮挡规则被替换时禁用必要条件裁剪，原可见性接口仍可返回全部路径和文字外框。"""
+    from docvortex.document.pdf import text_occlusion
+
+    stream = BytesIO()
+    canvas = Canvas(stream)
+    canvas.rect(0, 0, 100, 100, fill=0)
+    canvas.drawString(10, 10, "later")
+    canvas.save()
+
+    def rectangle(*args):
+        """模拟调用方替换的规则，必须使原生预筛选失效。"""
+        return None
+
+    monkeypatch.setattr(text_occlusion, "_opaque_rectangle", rectangle)
+    with pdfium_guard(), pdfium.PdfDocument(stream.getvalue()) as document:
+        with closing(document[0]) as page:
+            _, roots, paint = bridge.read_text_visibility(page, page.get_bbox(), 0, 15, with_roots=True)
+            assert len(roots) == len(paint) == 1
+
+
+@pytest.mark.parametrize("mode", ["RGB", "RGBA"])
+def test_full_page_image_evidence_reuses_decode_without_changing_pixels(monkeypatch, mode):
+    """真实嵌入图片逐项比较背景与白边裁决，同时确认两项检查只借用一次位图。"""
+    from PIL import Image, ImageDraw
+    from reportlab.lib.utils import ImageReader
+    from docvortex.document.pdf import native_objects
+
+    stream = BytesIO()
+    with Image.new(mode, (300, 300), (255, 255, 255) if mode == "RGB" else (255, 255, 255, 0)) as image:
+        ImageDraw.Draw(image).rectangle((0, 15, 299, 299), fill=(30, 120, 190) if mode == "RGB" else (30, 120, 190, 255))
+        canvas = Canvas(stream, pagesize=(300, 300))
+        canvas.drawImage(ImageReader(image), 0, 0, width=300, height=300, mask="auto")
+        canvas.save()
+    with pdfium_guard(), pdfium.PdfDocument(stream.getvalue()) as document:
+        with closing(document[0]) as page:
+            member = next(
+                item for item in _walk_clipped_objects(page) if raw.FPDFPageObj_GetType(item.raw) == raw.FPDF_PAGEOBJ_IMAGE
+            )
+            box = (0.0, 0.0, 300.0, 300.0)
+            expected = (
+                native_objects._is_smooth_page_background(member.raw, page, box, box),
+                native_objects._native_image_blank_top_bbox(member.raw, page, member.matrix, box, box, 0),
+            )
+            getter = raw.FPDFImageObj_GetBitmap
+            calls = []
+
+            def counted(obj):
+                """记录借用次数并使用原有 PDFium 函数和句柄生命周期。"""
+                calls.append(obj)
+                return getter(obj)
+
+            monkeypatch.setattr(raw, "FPDFImageObj_GetBitmap", counted)
+            assert native_objects._image_visual_evidence(member.raw, page, member.matrix, box, box, 0) == expected
+            assert len(calls) == 1
+
+
 @pytest.mark.parametrize("kind", [raw.FPDF_PAGEOBJ_TEXT, raw.FPDF_PAGEOBJ_PATH, raw.FPDF_PAGEOBJ_IMAGE])
 def test_object_bridge_matches_reference(native, kind):
     """同一页面逐字段比较借用对象地址、矩阵、裁剪和遍历顺序。"""

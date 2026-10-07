@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .layout_evidence import build_layout_evidence
+from . import geometry as _code_geometry
 
 import math
 import re
@@ -198,7 +199,7 @@ def _vertical_rule_candidate_height_coverage(
     return overlap / candidate_height
 
 
-def _detect_rule_delimited_code_candidates(
+def _detect_rule_delimited_code_candidates_python(
     source: _PageSource,
     excluded_bboxes: list[BBox],
     claimed_line_indices: set[int],
@@ -281,6 +282,94 @@ def _detect_rule_delimited_code_candidates(
             )
 
     accepted: list[_CodeCandidate] = []
+    for candidate in sorted(raw_candidates, key=lambda item: _bbox_area(item.bbox)):
+        if any(_bbox_overlap_in_smaller(candidate.bbox, existing.bbox) >= 0.85 for existing in accepted):
+            continue
+        accepted.append(candidate)
+    return sorted(accepted, key=lambda item: (item.bbox[1], item.bbox[0]))
+
+
+_CODE_RULE_REFERENCES = (
+    _code_geometry._bbox_union,
+    _code_geometry._bbox_area,
+    _bbox_area,
+    _bbox_center_x,
+    _bbox_center_y,
+    _bbox_overlap_in_first,
+    _bbox_overlap_in_smaller,
+    _bbox_union_many,
+    _vertical_rule_candidate_height_coverage,
+)
+
+
+def _code_native_box(box):
+    """内置小整数可精确进入浮点面积计算，较大整数和自定义坐标保留原路径。"""
+    return (
+        type(box) in (tuple, list)
+        and len(box) == 4
+        and all(
+            type(value) is float and math.isfinite(value) and abs(value) <= 2**50 or type(value) is int and abs(value) <= 2**24
+            for value in box
+        )
+    )
+
+
+def _detect_rule_delimited_code_candidates(source, excluded_bboxes, claimed_line_indices):
+    """几何窗口整批计算，结构、认领及稳定排序继续逐项使用原有规则。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if (
+        native is None
+        or (
+            _code_geometry._bbox_union,
+            _code_geometry._bbox_area,
+            _bbox_area,
+            _bbox_center_x,
+            _bbox_center_y,
+            _bbox_overlap_in_first,
+            _bbox_overlap_in_smaller,
+            _bbox_union_many,
+            _vertical_rule_candidate_height_coverage,
+        )
+        != _CODE_RULE_REFERENCES
+    ):
+        return _detect_rule_delimited_code_candidates_python(source, excluded_bboxes, claimed_line_indices)
+    page_width, page_height = source.page_size
+    if page_width <= 0 or page_height <= 0:
+        return []
+    available = [line for line in source.lines if line.source_index not in claimed_line_indices and line.angle == 0]
+    if len(available) < 5:
+        return []
+    median_height = statistics.median(max(0.1, line.effective_height or line.bbox[3] - line.bbox[1]) for line in available)
+    horizontal = sorted(
+        [
+            line
+            for line in source.drawing_lines
+            if line.orientation == "horizontal" and line.bbox[2] - line.bbox[0] >= 0.22 * page_width
+        ],
+        key=lambda line: (line.bbox[1], line.bbox[0]),
+    )
+    vertical = [line for line in source.drawing_lines if line.orientation == "vertical"]
+    boxes = [line.bbox for line in available]
+    hb, vb = [rule.bbox for rule in horizontal], [rule.bbox for rule in vertical]
+    if not all(_code_native_box(box) for box in [*boxes, *hb, *vb, *excluded_bboxes]) or any(
+        not (
+            type(value) is float and math.isfinite(value) and abs(value) <= 2**50 or type(value) is int and abs(value) <= 2**24
+        )
+        for value in (median_height, page_height)
+    ):
+        return _detect_rule_delimited_code_candidates_python(source, excluded_bboxes, claimed_line_indices)
+    windows = native.code_rule_windows(hb, vb, boxes, excluded_bboxes, median_height, page_height)
+    if windows is None:
+        return _detect_rule_delimited_code_candidates_python(source, excluded_bboxes, claimed_line_indices)
+    raw_candidates = []
+    for top, bottom, indices in windows:
+        bbox = _bbox_union_many([horizontal[top].bbox, horizontal[bottom].bbox])
+        members = [available[index] for index in indices]
+        if _rule_delimited_code_members_are_structured(members, bbox, median_height):
+            raw_candidates.append(_CodeCandidate(bbox, 0, {line.source_index for line in members}))
+    accepted = []
     for candidate in sorted(raw_candidates, key=lambda item: _bbox_area(item.bbox)):
         if any(_bbox_overlap_in_smaller(candidate.bbox, existing.bbox) >= 0.85 for existing in accepted):
             continue

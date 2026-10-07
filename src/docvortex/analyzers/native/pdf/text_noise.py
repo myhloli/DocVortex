@@ -1,8 +1,11 @@
 """按原生绘制颜色和正文嵌套关系排除独立浅灰数字噪声，不依赖字符的具体内容或字体名称。"""
 
 import re
+import math
+from collections import defaultdict
 
 from .geometry import _bbox_overlap_in_first, _bbox_union_many
+from ...._compute_backend import get_native
 
 
 def _gutter_noise_references(source, line, visual_bboxes):
@@ -27,9 +30,71 @@ def _gutter_noise_references(source, line, visual_bboxes):
     return references if len(references) >= 3 else []
 
 
+def _numeric_noise_native(source, visual_bboxes):
+    """当前输入状态一次计算文字特征；特殊签名和数值继续执行 Python 参考路径。"""
+    native = get_native()
+    if native is None:
+        return None
+    lines = source.lines
+    digits = [re.fullmatch(r"\d{1,3}", line.text.strip()) is not None for line in lines]
+    eligible = [
+        line.angle == 0 and line.semantic_type is None and bool(line.font_signature) and digit and line.effective_height > 0
+        for line, digit in zip(lines, digits)
+    ]
+    if not any(eligible):
+        return []
+    if any(
+        line.font_signature is not None
+        and (type(line.font_signature) is not tuple or any(type(v) not in (str, int, type(None)) for v in line.font_signature))
+        for line in lines
+    ):
+        return None
+    numbers = [v for line in lines for v in (*line.bbox, line.effective_height)]
+    numbers += [v for box in visual_bboxes for v in box]
+    if any(type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 2**50 for v in numbers):
+        return None
+    groups, records = {}, []
+    for line, digit, candidate in zip(lines, digits, eligible):
+        font = groups.setdefault(line.font_signature, len(groups))
+        english = len(re.findall(r"[A-Za-z]{2,}", line.text))
+        chinese = len(re.findall(r"[\u3400-\u9fff]", line.text))
+        records.append(
+            (
+                line.bbox,
+                line.effective_height,
+                line.angle == 0,
+                bool(line.font_signature),
+                font,
+                digit,
+                english + chinese >= 5,
+                english >= 5 or chinese >= 12,
+                re.match(r"\s*\d{1,2}[.)、]\s*[A-Za-z\u3400-\u9fff]", line.text) is not None,
+                candidate,
+            )
+        )
+    return [(lines[i], [lines[j] for j in refs]) for i, refs in native.numeric_noise_candidates(records, visual_bboxes)]
+
+
 def _nested_prose_numeric_outliers(source, visual_bboxes=()):
+    """优先批量匹配数值候选，返回同样的原始行对象与有序正文证据。"""
+    candidates = _numeric_noise_native(source, visual_bboxes)
+    return candidates if candidates is not None else _nested_prose_numeric_outliers_python(source, visual_bboxes)
+
+
+def _nested_prose_numeric_outliers_python(source, visual_bboxes=()):
     """寻找独立字体的短数字叠入正常多行正文的情形；图表刻度、同字体数字和小号脚注不列为候选。"""
     candidates = []
+    # 普通字体签名一次分组；非标准替身仍逐项比较，保留原等值与异常行为。
+    font_groups = None
+    if all(
+        peer.font_signature is None
+        or type(peer.font_signature) is tuple
+        and all(type(value) in (str, int, type(None)) for value in peer.font_signature)
+        for peer in source.lines
+    ):
+        font_groups = defaultdict(list)
+        for peer in source.lines:
+            font_groups[peer.font_signature].append(peer)
     for line in source.lines:
         if (
             line.angle != 0
@@ -39,7 +104,11 @@ def _nested_prose_numeric_outliers(source, visual_bboxes=()):
             or line.effective_height <= 0
         ):
             continue
-        same_font = [peer for peer in source.lines if peer.font_signature == line.font_signature]
+        same_font = (
+            font_groups[line.font_signature]
+            if font_groups is not None
+            else [peer for peer in source.lines if peer.font_signature == line.font_signature]
+        )
         gutter = _gutter_noise_references(source, line, visual_bboxes)
         if gutter:
             candidates.append((line, gutter))

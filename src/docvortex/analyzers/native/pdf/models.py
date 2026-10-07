@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     from ....document.pdf.form_structure import _PDFFormInfo
     from .inline.types import PDFTextScriptLine
 
+_MARKER_REGEX_REFERENCES = (re.match, re._compile)
+
 
 class _SharedLineIndexSet(MutableSet[int]):
     """共享只读基底，仅为单个候选记录增删差集，避免复制大型行号集合。"""
@@ -161,6 +163,9 @@ class _LineItem:
     native_math_words: frozenset[str] = field(default_factory=frozenset)
     wrapped_title_parts: tuple[_LineItem, _LineItem] | None = field(compare=False, repr=False, default=None)
     native_title_label_left: float | None = field(compare=False, default=None)
+    _marker_features: tuple | None = field(compare=False, repr=False, default=None)
+    # 数字图形特征只绑定当前文字对象；几何、语义和认领状态每次重新判断。
+    _graphic_numeric_features: tuple | None = field(compare=False, repr=False, default=None)
 
     def __post_init__(self) -> None:
         """为旧调用与合成测试补齐可选来源几何字段。"""
@@ -168,10 +173,18 @@ class _LineItem:
         if self.source_bbox is None:
             self.source_bbox = self.bbox
         # 数字 run 的角色在输入边界冻结，辅助空间分类只消费编号证据，不重新读取整行文字。
-        marker = self.text.strip()
-        self.note_marker_value = marker if marker.isdigit() and 1 <= len(marker) <= 3 else None
-        # 编号标题证据在输入边界冻结，辅助空间分类不重新访问全文。
-        self.numbered_heading_start = re.match(r"^\d+(?:\.\d+)*\.?(?:\s|$)\S", marker) is not None
+        cached = self._marker_features
+        stable_regex = (re.match, re._compile) == _MARKER_REGEX_REFERENCES
+        if type(self.text) is str and stable_regex and type(cached) is tuple and len(cached) == 4 and cached[0] is self.text and cached[1] is re.match:
+            self.note_marker_value, self.numbered_heading_start = cached[2:]
+        else:
+            marker = self.text.strip()
+            self.note_marker_value = marker if marker.isdigit() and 1 <= len(marker) <= 3 else None
+            # 编号标题证据绑定当前行的文字对象；复制只改几何时复用，文字或正则函数改变后重算。
+            self.numbered_heading_start = re.match(r"^\d+(?:\.\d+)*\.?(?:\s|$)\S", marker) is not None
+            self._marker_features = (
+                (self.text, re.match, self.note_marker_value, self.numbered_heading_start) if type(self.text) is str and stable_regex else None
+            )
 
 
 @dataclass(slots=True)
@@ -313,6 +326,8 @@ class _PageSource:
     form_member_sources: dict[BBox, frozenset[int]] = field(default_factory=dict)
     form_path_sources: dict[BBox, frozenset[int]] = field(default_factory=dict)
     retained_page_forms: set[BBox] = field(default_factory=set)
+    compound_baseline_cache: dict = field(default_factory=dict)
+    isolated_path_cache: dict = field(default_factory=dict)
 
 
 @dataclass(slots=True)

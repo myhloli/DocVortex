@@ -4,6 +4,8 @@ from contextlib import contextmanager
 from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
+import os
+import sys
 import threading
 import time
 
@@ -978,3 +980,79 @@ def test_waiting_session_rechecks_legacy_overlap_after_wakeup(session_pdf, monke
         first.close()
         second.close()
         shutdown_pdf_render_sessions()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX shared pixel transport")
+@pytest.mark.parametrize("pixel_format", [1, 2, 3, 4])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_shared_pixel_transport_preserves_all_formats(session_pdf, monkeypatch, pixel_format, reverse):
+    """共享缓冲保留通道顺序、行跨度、旋转及裁剪，释放后图片仍独立持有完整像素。"""
+    from multiprocessing.shared_memory import SharedMemory
+    import secrets
+    from PIL import Image
+    import pypdfium2 as pdfium
+    from docvortex.document.pdf.raster import page_to_image, page_to_shared_pixels
+
+    name = "dvx-test-" + secrets.token_hex(10)
+    with pdfium.PdfDocument(session_pdf) as document:
+        page = document[0]
+        render = page.render
+
+        def configured_render(**kwargs):
+            """保持两种交付方式使用相同真实 PDFium 位图格式及页面变换。"""
+            return render(**kwargs, force_bitmap_format=pixel_format, rev_byteorder=reverse,
+                          rotation=90, crop=(1, 2, 3, 4))
+
+        monkeypatch.setattr(page, "render", configured_render)
+        expected, scale = page_to_image(page, dpi=97)
+        metadata = page_to_shared_pixels(page, name, dpi=97)
+        storage = SharedMemory(name=name)
+        try:
+            actual = Image.frombytes(metadata["mode"], metadata["size"], storage.buf,
+                                     "raw", metadata["raw_mode"], metadata["stride"], 1)
+        finally:
+            storage.unlink()
+            storage.close()
+        assert metadata["scale"] == scale
+        assert actual.mode == expected.mode
+        assert actual.size == expected.size
+        assert actual.tobytes() == expected.tobytes()
+        actual.close()
+        expected.close()
+        page.close()
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="macOS shared pixel transport")
+def test_shared_pixel_decode_failure_reclaims_entire_task(session_pdf, monkeypatch):
+    """首张图片解码失败时也释放所有已生成页图、worker 租约和输入，不依赖资源追踪器退出。"""
+    from multiprocessing.shared_memory import SharedMemory
+    from PIL import Image
+
+    session = PDFRenderSession(session_pdf, threads=1)
+    session.render(image_type="base64_img")
+    names = []
+    receive = session._receive
+
+    def capture_response(*args, **kwargs):
+        """保存真实子进程返回的全部名称，以便异常清理后逐项验证已解除链接。"""
+        result = receive(*args, **kwargs)
+        names.extend(row["shared_memory"] for row in result if "shared_memory" in row)
+        return result
+
+    def fail_decode(*args, **kwargs):
+        """在父进程注入解码错误，子进程继续使用原始位图交付。"""
+        raise ValueError("injected shared pixel decode failure")
+
+    monkeypatch.setattr(session, "_receive", capture_response)
+    monkeypatch.setattr(Image, "frombytes", fail_decode)
+    with pytest.raises(ValueError, match="injected shared pixel"):
+        session.render(0, 4)
+    assert session._closed
+    assert not session._shared_pixel_names
+    assert len(names) == 5
+    assert not session._workers
+    for name in names:
+        with pytest.raises(FileNotFoundError):
+            SharedMemory(name=name)
+    with PDFRenderSession(session_pdf, threads=1) as next_session:
+        assert next_session.render(image_type="base64_img")[0]["img_base64"]

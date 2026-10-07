@@ -181,7 +181,30 @@ def _plain_marker_bbox(value) -> bool:
     return True
 
 
+_MARKER_SOURCE_REFERENCES = (
+    _LineItem.__getattribute__, _LineItem.source_index, _LineItem.text, _LineItem.chars,
+    CharBbox.__getattribute__, CharBbox.bbox, _plain_marker_bbox,
+)
+
+
 def _prepare_marker_line_context(lines):
+    """原生一次校验普通页面来源，特殊对象或被替换的字段规则完整交回 Python。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is None:
+        return False, {}
+    if hasattr(native, "marker_sources_owned") and (
+        _LineItem.__getattribute__, getattr(_LineItem, "source_index", None), getattr(_LineItem, "text", None),
+        getattr(_LineItem, "chars", None), CharBbox.__getattribute__, getattr(CharBbox, "bbox", None), _plain_marker_bbox,
+    ) == _MARKER_SOURCE_REFERENCES:
+        sources = native.marker_sources_owned(lines, _LineItem, CharBbox)
+        if sources is not None:
+            return True, sources
+    return _prepare_marker_line_context_python(lines)
+
+
+def _prepare_marker_line_context_python(lines):
     """同一候选上下文只校验一次 marker 输入，并冻结来源行索引。"""
     from ...._compute_backend import get_native
 
@@ -742,7 +765,23 @@ def _extract_auxiliary_table_note_marker(text: str) -> str | None:
     return marker
 
 
-def _prepare_marker_line(
+def _prepare_marker_line(line, page_size, angle):
+    """字形和局部坐标按当前输入批量准备，Unicode、token 与定制几何仍保留原实现。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is not None and hasattr(native, "marker_glyphs_owned") and (
+        _LineItem.__getattribute__, getattr(_LineItem, "text", None), getattr(_LineItem, "chars", None),
+        CharBbox.__getattribute__, getattr(CharBbox, "bbox", None), _coerce_bbox, _rotate_bbox_to_upright,
+        unicodedata.normalize, _compact_marker_data,
+    ) == _MARKER_GLYPH_REFERENCES:
+        prepared = native.marker_glyphs_owned(line, page_size, angle, _LineItem, CharBbox, unicodedata.normalize, _compact_marker_data)
+        if prepared is not None:
+            return prepared
+    return _prepare_marker_line_python(line, page_size, angle)
+
+
+def _prepare_marker_line_python(
     line: _LineItem, page_size: tuple[float, float], angle: int
 ) -> tuple[list[tuple[str, BBox]], tuple[int, tuple[str, ...]]] | None:
     """仅为普通来源行准备与具体标记无关的局部字形及紧凑 token。"""
@@ -1075,3 +1114,10 @@ def _merge_table_candidate_annotations(
             )
         retained_annotations.append(annotation)
     target.annotations = retained_annotations
+
+
+_MARKER_GLYPH_REFERENCES = (
+    _LineItem.__getattribute__, _LineItem.text, _LineItem.chars,
+    CharBbox.__getattribute__, CharBbox.bbox, _coerce_bbox, _rotate_bbox_to_upright,
+    unicodedata.normalize, _compact_marker_data,
+)

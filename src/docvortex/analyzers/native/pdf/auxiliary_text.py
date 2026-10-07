@@ -416,11 +416,16 @@ def _classify_page_footnotes(
 
     candidate_groups: list[set[int]] = _unruled_numbered_footnote_groups(line_geometry, local_page_size)
     visual_bboxes = visual_bboxes or []
-    candidate_groups.extend(
-        _chart_referenced_note_groups(
-            line_geometry, visual_bboxes, _native_note_reference_values(reference_lines or available), local_page_size
+    # 图体是此规则的必要证据；没有图体时无需读取每个字符的上标编号。
+    if visual_bboxes:
+        candidate_groups.extend(
+            _chart_referenced_note_groups(
+                line_geometry,
+                visual_bboxes,
+                lambda: _native_note_reference_values(reference_lines or available),
+                local_page_size,
+            )
         )
-    )
     for axis_line in local_axis_lines:
         if axis_line.orientation != "horizontal":
             continue
@@ -551,10 +556,11 @@ def _chart_referenced_note_groups(line_geometry, visual_bboxes, references, page
     pattern = re.compile(r"^\s*(\d{1,3})[.)]?\s+\S")
     groups = []
     consumed = set()
+    reference_values = None
     for index, (first, bounds) in enumerate(ordered):
         marker = pattern.match(first.text)
         em = _line_effective_height(first, bounds)
-        if not marker or first.source_index in consumed or marker[1] not in references or bounds[1] < 0.7 * height:
+        if not marker or first.source_index in consumed or bounds[1] < 0.7 * height:
             continue
         charts = [
             box
@@ -565,6 +571,11 @@ def _chart_referenced_note_groups(line_geometry, visual_bboxes, references, page
             and _bbox_axis_overlap_ratio(bounds, box, axis="x") >= 0.6
         ]
         if not charts or (first.dominant_font_weight or 400) >= 600:
+            continue
+        # 只有可能认领的图下注释才读取整页上标，必要证据与原有候选覆盖保持一致。
+        if reference_values is None:
+            reference_values = references() if callable(references) else references
+        if marker[1] not in reference_values:
             continue
         members = [(first, bounds)]
         number = int(marker[1])
@@ -601,7 +612,7 @@ def _unruled_numbered_footnote_groups(
     """用底部编号、字号收缩与正文净空识别无线注释，同字号跨栏注释另需原生上标对应。"""
     width, height = page_size
     ordered = sorted(line_geometry, key=lambda item: (item[1][1], item[1][0]))
-    references = _native_note_reference_values([line for line, _ in ordered])
+    references = None
     marker_pattern = re.compile(r"^\s*(\d{1,3})[.)]\s+\S")
     groups = []
     consumed = set()
@@ -630,13 +641,18 @@ def _unruled_numbered_footnote_groups(
         gap = _effective_text_row_gap(nearest_above, (first, bounds))
         shrunken = first_height <= 0.9 * body_height and gap >= 0.75 * body_height
         body_left = statistics.median(box[0] for _, box in above)
-        spanning_reference = (
-            marker[1] in references
-            and bounds[2] - bounds[0] >= 0.65 * width
+        spanning_geometry = (
+            bounds[2] - bounds[0] >= 0.65 * width
             and first_height <= 1.25 * body_height
             and gap >= 2 * body_height
             and body_left - bounds[0] >= 0.5 * body_height
         )
+        # 缩小字号已足以认领，或者跨栏几何不成立时，不重复扫描整页字符。
+        spanning_reference = False
+        if not shrunken and spanning_geometry:
+            if references is None:
+                references = _native_note_reference_values([line for line, _ in ordered])
+            spanning_reference = marker[1] in references
         if not shrunken and not spanning_reference:
             continue
         members = [(first, bounds)]

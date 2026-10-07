@@ -6,6 +6,7 @@ import statistics
 import math
 
 from ..geometry import _rotate_bbox_to_upright
+from .. import line_layout as _profile_line_layout
 from ..inline.types import PDF_FONT_FORCE_BOLD_FLAG, PDF_FONT_ITALIC_FLAG
 from ..line_layout import _estimate_lane_gap, _font_signatures_share_family, _line_canonical_style_scale, _line_effective_height
 from ..models import _DocumentBodyProfile, _LaneBodyProfile, _LineItem, _PreparedPage, _TextLane
@@ -14,6 +15,15 @@ from ..models import _DocumentBodyProfile, _LaneBodyProfile, _LineItem, _Prepare
 def _plain_profile_number(value) -> bool:
     """仅让有限内置数值进入无回调的阶段缓存，巨大整数保持原异常路径。"""
     return type(value) is float and math.isfinite(value) or type(value) is int and -(2**53) <= value <= 2**53
+
+
+_CONTEXT_REFERENCE_FUNCTIONS = (
+    _plain_profile_number,
+    _line_effective_height,
+    _profile_line_layout._line_style_scale,
+    _LineItem.__getattribute__,
+    _TextLane.__getattribute__,
+)
 
 
 class _LaneProfileContext:
@@ -30,6 +40,24 @@ class _LaneProfileContext:
                 self.plain = False
                 return
             lanes = [*lanes, _TextLane(0.0, 0.0, line_geometry)]
+        from ....._compute_backend import get_native
+
+        native = get_native()
+        if (
+            native is not None
+            and (
+                _plain_profile_number,
+                _line_effective_height,
+                _profile_line_layout._line_style_scale,
+                _LineItem.__getattribute__,
+                _TextLane.__getattribute__,
+            )
+            == _CONTEXT_REFERENCE_FUNCTIONS
+        ):
+            packed = native.lane_profile_context_owned(lanes, _TextLane, _LineItem)
+            if packed is not None:
+                self.heights, self.memberships = packed
+                return
         for lane in lanes:
             if (
                 type(lane) is not _TextLane

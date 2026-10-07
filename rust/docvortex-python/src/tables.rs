@@ -270,3 +270,54 @@ pub(super) fn component_specs(
     }
     Ok(py.detach(move || tables::component_specs(parents, rows, cols)))
 }
+
+/// 只读普通冻结字形的当前几何，特殊对象整体回退；计算阶段使用自有数组。
+#[pyfunction]
+pub(super) fn cell_visual_groups_owned(
+    py: Python<'_>,
+    glyphs: &Bound<'_, PyAny>,
+    height: f64,
+    glyph_type: &Bound<'_, PyAny>,
+) -> PyResult<Option<Vec<Vec<usize>>>> {
+    use pyo3::types::{PyFloat, PyInt, PyList, PyTuple};
+    let Ok(glyphs) = glyphs.cast_exact::<PyList>() else {
+        return Ok(None);
+    };
+    let mut boxes = Vec::with_capacity(glyphs.len());
+    let mut ids = Vec::with_capacity(glyphs.len());
+    let mut visual = Vec::with_capacity(glyphs.len());
+    for glyph in glyphs.iter() {
+        if !glyph.get_type().is(glyph_type) {
+            return Ok(None);
+        }
+        let raw_id = glyph.getattr(pyo3::intern!(py, "glyph_id"))?;
+        let raw_row = glyph.getattr(pyo3::intern!(py, "visual_row"))?;
+        if !raw_id.is_exact_instance_of::<PyInt>() || !raw_row.is_exact_instance_of::<PyInt>() {
+            return Ok(None);
+        }
+        let (Ok(id), Ok(row)) = (raw_id.extract::<i64>(), raw_row.extract::<i64>()) else {
+            return Ok(None);
+        };
+        if id < 0 {
+            return Ok(None);
+        }
+        let bbox = glyph.getattr(pyo3::intern!(py, "bbox"))?;
+        if (!bbox.is_exact_instance_of::<PyList>() && !bbox.is_exact_instance_of::<PyTuple>())
+            || bbox.len()? != 4
+        {
+            return Ok(None);
+        }
+        let mut b = [0.0; 4];
+        for (i, value) in b.iter_mut().enumerate() {
+            let number = bbox.get_item(i)?;
+            if !number.is_exact_instance_of::<PyFloat>() {
+                return Ok(None);
+            }
+            *value = number.extract()?;
+        }
+        boxes.push(b);
+        ids.push(id as usize);
+        visual.push(row);
+    }
+    Ok(py.detach(move || docvortex_core::tables::cell_visual_groups(boxes, ids, visual, height)))
+}

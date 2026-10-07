@@ -7,7 +7,7 @@ from collections import defaultdict
 from typing import Any
 
 from ....document.pdf.text._contracts import Char
-from ....document.pdf.text.spacing import needs_tight_space
+from ....document.pdf.text.spacing import needs_tight_space, _tight_space_candidates, _TIGHT_CANDIDATE_REFERENCES
 from ....schema import BBox
 from ._script_geometry import ScriptRole
 from ._table_recovery.candidate import serialize_native_table_html
@@ -38,6 +38,7 @@ _OWNED_CELL_BATCH_CHAR_LIMIT = 8192
 _owned_cell_batches = 0
 _owned_cell_lines = 0
 _owned_cell_fallbacks = 0
+_TIGHT_GLYPH_SOURCE_SLOT = NativeTableGlyph.source_index
 
 
 def table_script_stats() -> tuple[int, int, int]:
@@ -351,6 +352,7 @@ def _render_styled_cell(
     tight_bboxes: dict[int, BBox] | None = None,
     origins: dict[int, tuple[float, float]] | None = None,
     preserve_font_styles: bool = False,
+    _possible_space_indices: set[int] | None = None,
 ) -> str:
     """按原字符来源安全插入上下标及可选的粗斜体，文字不匹配时保持转义回退。"""
 
@@ -394,6 +396,7 @@ def _render_styled_cell(
             and role == active_role == "body"
             and previous_source in chars_by_source
             and source_index in chars_by_source
+            and (_possible_space_indices is None or source_index in _possible_space_indices)
             and needs_tight_space(
                 chars_by_source[previous_source],
                 chars_by_source[source_index],
@@ -499,6 +502,14 @@ def render_native_table_html_with_scripts(
         if roles:
             cell_roles[key] = roles
 
+    # 仅复用当前表格文字与源索引的必要条件；最终角色、几何和认领仍逐阶段判断。
+    possible_space_indices = (
+        _tight_space_candidates(chars_by_source, result.text.glyphs, NativeTableGlyph)
+        if needs_tight_space is _TIGHT_CANDIDATE_REFERENCES[0]
+        and NativeTableGlyph.__getattribute__ is object.__getattribute__
+        and NativeTableGlyph.source_index is _TIGHT_GLYPH_SOURCE_SLOT
+        else None
+    )
     has_missing_space = False
     for cell in result.cells:
         key = (cell.row, cell.col)
@@ -510,6 +521,7 @@ def render_native_table_html_with_scripts(
                 and roles.get(left.source_index, "body") == roles.get(right.source_index, "body") == "body"
                 and left.source_index in chars_by_source
                 and right.source_index in chars_by_source
+                and (possible_space_indices is None or right.source_index in possible_space_indices)
                 and needs_tight_space(
                     chars_by_source[left.source_index],
                     chars_by_source[right.source_index],
@@ -532,6 +544,7 @@ def render_native_table_html_with_scripts(
             tight_bboxes=tight_bboxes,
             origins=origins,
             preserve_font_styles=preserve_font_styles,
+            _possible_space_indices=possible_space_indices,
         ),
     )
 

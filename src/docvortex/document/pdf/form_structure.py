@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import ctypes as ct
+from io import BytesIO
 import math
 from typing import Any
 
 import pypdfium2.raw as raw
-from pypdf.generic import ContentStream
+from pypdf.generic import ContentStream, read_object
 
 from ..._compute_backend import get_native
 from ...schema import BBox
@@ -31,6 +32,31 @@ from .native_objects import (
 _IDENTITY = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
 
 
+def _form_state_operations(stream, pdf, cache):
+    """按流身份复用状态程序，特殊语法使用完整参考解析，不缓存调用矩阵或资源。"""
+    key = id(stream)
+    cached = cache.get(key)
+    if cached is not None and cached[0] is stream:
+        return cached[1]
+    content = ContentStream(stream, pdf)
+    native = get_native()
+    data = content.get_data()
+    events = native.form_state_program(data) if native is not None and type(data) is bytes else None
+    operations = (
+        content.operations
+        if events is None
+        else [
+            (
+                values if interval is None else [read_object(BytesIO(data[interval[0] : interval[1]]), pdf)],
+                (b"q", b"Q", b"cm", b"Do")[kind],
+            )
+            for kind, values, interval in events
+        ]
+    )
+    cache[key] = (stream, operations)
+    return operations
+
+
 def _visual_bbox(bounds: BBox, matrix: tuple, page_bbox: BBox, rotation: int) -> BBox:
     """把声明框或父坐标框变换到页面视觉坐标，保留未裁剪的页面框架。"""
     return _transform_object_bbox(
@@ -41,6 +67,7 @@ def _visual_bbox(bounds: BBox, matrix: tuple, page_bbox: BBox, rotation: int) ->
 def _read_form_declarations(page: Any) -> dict[tuple[int, ...], tuple[BBox, tuple]]:
     """只沿实际 Do 调用展开 Form，区分重复调用并隔离损坏资源和循环引用。"""
     output: dict[tuple[int, ...], tuple[BBox, tuple]] = {}
+    operations_cache = {}
 
     def walk(stream, resources, matrix: tuple, occurrence: tuple, active: frozenset, depth: int) -> None:
         """传播 q/Q 与 cm 状态，为每个有效 Form 调用分配容器内序号。"""
@@ -48,7 +75,7 @@ def _read_form_declarations(page: Any) -> dict[tuple[int, ...], tuple[BBox, tupl
             return
         stack = []
         form_index = 0
-        for operands, operator in ContentStream(stream, page.pdf).operations:
+        for operands, operator in _form_state_operations(stream, page.pdf, operations_cache):
             if operator == b"q":
                 stack.append(matrix)
             elif operator == b"Q":

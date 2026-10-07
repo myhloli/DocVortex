@@ -5,6 +5,8 @@ from __future__ import annotations
 import atexit
 import multiprocessing
 import os
+import secrets
+import sys
 import tempfile
 import threading
 import time
@@ -152,7 +154,7 @@ def _render_session_worker(connection):
     from .images import _initialize_pdf_render_worker, pdf_page_to_image
     from .pdfium import close_pdfium_child, pdfium_guard
     from ..._compute_backend import get_native
-    from .raster import page_to_pixel_file, page_to_owned_bitmap
+    from .raster import page_to_pixel_file, page_to_owned_bitmap, page_to_shared_pixels
     from .visuals import _attach_prepared_visual_block_images, _attach_owned_bitmap_crops
 
     document = input_document = None
@@ -190,6 +192,14 @@ def _render_session_worker(connection):
                             with pdfium_guard():
                                 page = document[page_id]
                                 if crops is None and image_type == "pil_img":
+                                    if isinstance(output_path, tuple):
+                                        name, output_path = output_path
+                                        try:
+                                            result.append(page_to_shared_pixels(page, name, dpi))
+                                            continue
+                                        except OSError:
+                                            # 不支持或无法分配共享内存时完整沿用既有文件交付路径。
+                                            pass
                                     result.append(page_to_pixel_file(page, output_path, dpi))
                                     continue
                                 if crops is not None and native is not None:
@@ -245,6 +255,7 @@ class PDFRenderSession:
         self._directory = tempfile.TemporaryDirectory(prefix="docvortex-render-")
         self._input = Path(self._directory.name) / "input.pdf"
         self._input.write_bytes(pdf_bytes)
+        self._shared_pixel_names = set()
         self._workers = []
         self._worker_budget = _get_worker_budget()
         self._request_id = 0
@@ -409,6 +420,22 @@ class PDFRenderSession:
             self._workers.clear()
             _worker_available.notify_all()
 
+    def _release_shared_pixels(self):
+        """父进程拥有所有预登记名称；worker 确认关闭后回收异常留下的像素，允许名称尚未创建。"""
+        from multiprocessing.shared_memory import SharedMemory
+
+        for name in tuple(self._shared_pixel_names):
+            try:
+                storage = SharedMemory(name=name)
+            except FileNotFoundError:
+                pass
+            else:
+                try:
+                    storage.unlink()
+                finally:
+                    storage.close()
+            self._shared_pixel_names.discard(name)
+
     @contextmanager
     def _task_lock(self, deadline):
         """同会话并发请求的锁等待计入截止时间，超时不终止另一个任务。"""
@@ -465,8 +492,15 @@ class PDFRenderSession:
                 tasks = [[] for _ in range(count)]
                 for index, page_id in enumerate(range(start_page_id, end + 1)):
                     crops = None if prepared_crops is None else prepared_crops[index]
+                    output_path = str(Path(self._directory.name) / f"page-{page_id}.pixels")
+                    if crops is None and image_type == "pil_img" and sys.platform == "darwin":
+                        # 名称由父进程在发送前登记，进程崩溃或取消也能确定性释放。
+                        # macOS 使用虚拟内存；其他平台沿用文件，避免受 /dev/shm 容量限制。
+                        name = "dvx-" + secrets.token_hex(12)
+                        self._shared_pixel_names.add(name)
+                        output_path = (name, output_path)
                     tasks[index % count].append(
-                        (page_id, dpi, image_type, crops, str(Path(self._directory.name) / f"page-{page_id}.pixels"))
+                        (page_id, dpi, image_type, crops, output_path)
                     )
                 pending = [
                     (worker, self._send(worker, "task", task), task) for worker, task in zip(self._workers, tasks) if task
@@ -477,6 +511,24 @@ class PDFRenderSession:
                     if len(values) != len(task):
                         raise RuntimeError("PDF render task result count mismatch")
                     for specification, value in zip(task, values):
+                        if prepared_crops is None and "shared_memory" in value:
+                            from multiprocessing.shared_memory import SharedMemory
+
+                            name = value["shared_memory"]
+                            storage = SharedMemory(name=name)
+                            try:
+                                image = Image.frombytes(
+                                    value["mode"], value["size"], storage.buf,
+                                    "raw", value["raw_mode"], value["stride"], 1
+                                )
+                                collected.append(image)
+                            finally:
+                                try:
+                                    storage.unlink()
+                                finally:
+                                    storage.close()
+                            self._shared_pixel_names.discard(name)
+                            value = {"scale": value["scale"], "img_pil": image}
                         if prepared_crops is None and "path" in value:
                             path = Path(value["path"])
                             image = Image.frombytes(
@@ -491,6 +543,7 @@ class PDFRenderSession:
                             raise TimeoutError("PDF render session timed out")
                         results.append((specification[0], value))
                 self._release_workers()
+                self._release_shared_pixels()
                 return [value for _, value in sorted(results)]
             except BaseException:
                 for image in collected:
@@ -554,6 +607,7 @@ class PDFRenderSession:
             # 借用者先关闭旧输入再打开新文档，不获取旧会话锁；等待不会形成会话锁环。
             while any(owner is self for owner in _cached_workers.values()):
                 _worker_available.wait()
+        self._release_shared_pixels()
         self._directory.cleanup()
         self._pdf_bytes = None
         atexit.unregister(self.close)

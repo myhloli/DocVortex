@@ -59,3 +59,58 @@ assert 'onnxruntime' not in sys.modules
 """
     result = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
+
+
+def test_language_scope_reuses_only_model_and_recomputes_every_input(monkeypatch):
+    """同一转换只构造一个真实模型，但不同文字及重复文字均执行原识别方法。"""
+    from docvortex.foundation import language, magika as runtime
+
+    samples = ['{"name": "first", "value": 1}', 'print("different input")', '{"name": "first", "value": 1}']
+    expected = [language.guess_code_language(value) for value in samples]
+    with language._code_language_model_scope():
+        first = language._code_language_classifier()
+        assert language._code_language_classifier() is first
+        actual = [language.guess_code_language(value) for value in samples]
+        with language._code_language_model_scope():
+            assert language._code_language_classifier() is not first
+        assert language._code_language_classifier() is first
+    assert actual == expected
+    assert language._CODE_LANGUAGE_MODEL_SCOPE.get() is None
+    assert isinstance(first, runtime.Magika)
+
+
+def test_language_scope_restores_context_after_failure():
+    """异常退出和嵌套调用均不能把模型状态带入下一份文档。"""
+    from docvortex.foundation import language
+
+    with pytest.raises(RuntimeError):
+        with language._code_language_model_scope():
+            assert language._CODE_LANGUAGE_MODEL_SCOPE.get() == {}
+            raise RuntimeError("abort current conversion")
+    assert language._CODE_LANGUAGE_MODEL_SCOPE.get() is None
+
+
+def test_language_scope_custom_factory_keeps_per_call_construction(monkeypatch):
+    """替换为函数工厂时保留每次新实例及输入调用，不能假定工厂具有类的方法。"""
+    from types import SimpleNamespace
+    from docvortex.foundation import language, magika as runtime
+
+    calls = []
+
+    def factory():
+        """用构造序号模拟定制识别器状态，验证复用必须完整回退。"""
+        calls.append("construct")
+        number = len(calls)
+
+        def identify(data):
+            """每次记录原输入并返回该实例独立的结果。"""
+            calls.append(data)
+            return SimpleNamespace(prediction=SimpleNamespace(output=SimpleNamespace(label=f"kind{number}")))
+
+        return SimpleNamespace(identify_bytes=identify)
+
+    monkeypatch.setattr(runtime, "Magika", factory)
+    with language._code_language_model_scope():
+        assert language.guess_code_language("first") == "kind1"
+        assert language.guess_code_language("second") == "kind3"
+    assert calls == ["construct", b"first", "construct", b"second"]

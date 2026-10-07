@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import ctypes
+from ..._compute_backend import get_native
 
 import pypdfium2.raw as raw
 
 from .native_coordinates import _transform_drawing_point
 from .native_objects import (
+    _ClippedObject,
     _clip_object_visual_bbox,
     _filled_rectangle_bbox,
     _get_raw_object_rgba,
@@ -97,12 +99,33 @@ def _opaque_rectangle(member, page_bbox, rotation):
     return _clip_object_visual_bbox(rectangle, member.clip, page_bbox, rotation) if rectangle else None
 
 
-def exclude_fully_overpainted_text(page, page_bbox, rotation, visibility, page_reader):
+_PAINT_COVER_PREFILTER_REFERENCES = (_opaque_rectangle, _get_raw_object_rgba)
+
+
+def _allow_native_cover_prefilter():
+    """替换遮挡规则或透明度读取时保留全部原路径，不能绕过调用方的证据策略。"""
+    return (_opaque_rectangle, _get_raw_object_rgba) == _PAINT_COVER_PREFILTER_REFERENCES
+
+
+def exclude_fully_overpainted_text(page, page_bbox, rotation, visibility, page_reader, *, roots=None, paint=None):
     """共享Python/Rust可见性结果，仅在绘制顺序、完整包含和资源状态均证明遮挡时排除对象。"""
     covers = []
     texts = []
     try:
-        for order, member in enumerate(_walk_clipped_objects(page)):
+        root_covers = None
+        if roots is not None:
+            # 只有顶层单一不透明矩形能够覆盖文字；没有这种证据就无需再读全部文字框。
+            root_covers = {}
+            for order, (address, matrix, parent, depth, clip) in roots:
+                member = _ClippedObject(ctypes.cast(address, raw.FPDF_PAGEOBJECT), matrix, parent, depth, clip)
+                rectangle = _opaque_rectangle(member, page_bbox, rotation)
+                if rectangle is not None:
+                    root_covers[address] = rectangle
+                    covers.append((order, rectangle))
+            if not root_covers:
+                return visibility
+        texts = paint if paint is not None else texts
+        for order, member in enumerate(_walk_clipped_objects(page)) if paint is None else ():
             if raw.FPDFPageObj_GetType(member.raw) == raw.FPDF_PAGEOBJ_TEXT:
                 address = ctypes.cast(member.raw, ctypes.c_void_p).value
                 values = [ctypes.c_float() for _ in range(4)]
@@ -126,17 +149,30 @@ def exclude_fully_overpainted_text(page, page_bbox, rotation, visibility, page_r
                     )
                     texts.append((order, address, bounds))
             else:
-                rectangle = _opaque_rectangle(member, page_bbox, rotation)
+                rectangle = (
+                    root_covers.get(ctypes.cast(member.raw, ctypes.c_void_p).value)
+                    if root_covers is not None
+                    else _opaque_rectangle(member, page_bbox, rotation)
+                )
                 if rectangle:
                     covers.append((order, rectangle))
-        covered = {
-            address
-            for order, address, bounds in texts
-            if any(
-                later > order and box[0] <= bounds[0] and box[1] <= bounds[1] and box[2] >= bounds[2] and box[3] >= bounds[3]
-                for later, box in covers
-            )
-        }
+        native = get_native()
+        covered = (
+            set(native.overpainted_addresses(texts, covers))
+            if paint is not None and native is not None
+            else {
+                address
+                for order, address, bounds in texts
+                if any(
+                    later > order
+                    and box[0] <= bounds[0]
+                    and box[1] <= bounds[1]
+                    and box[2] >= bounds[2]
+                    and box[3] >= bounds[3]
+                    for later, box in covers
+                )
+            }
+        )
         if covered and _safe_paint_resources(page_reader()):
             return {address: (False if address in covered else value[0], value[1]) for address, value in visibility.items()}
     except Exception:

@@ -110,6 +110,19 @@ def needs_tight_space(left, right, *, tight_bboxes=None, origins=None) -> bool:
     return True
 
 
+_TIGHT_CANDIDATE_REFERENCES = (needs_tight_space, _ordinary_non_cjk, _font_allows_spacing, unicodedata.category)
+
+
+def _tight_space_candidates(chars_by_source, glyphs, glyph_type):
+    """本次表格只预计算可能补空格的右侧源索引，未知对象与替换规则完整回退。"""
+    from ...._compute_backend import get_native
+
+    native = get_native()
+    if native is not None and hasattr(native, "tight_space_candidates") and (needs_tight_space, _ordinary_non_cjk, _font_allows_spacing, unicodedata.category) == _TIGHT_CANDIDATE_REFERENCES:
+        return native.tight_space_candidates(chars_by_source, glyphs, glyph_type, _ordinary_non_cjk)
+    return None
+
+
 def join_tight_text(chars, *, tight_bboxes=None, origins=None) -> str:
     """按现有成员顺序重建短行，仅在相邻可靠词界插入单个空格。"""
     parts = []

@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import re
+import math
 import statistics
 import unicodedata
 from dataclasses import dataclass, replace
+from contextvars import ContextVar
+from functools import wraps
 from typing import Any
 
 from ....document.pdf._document import PDFPathInfo
 from ....document.pdf.text._contracts import Char
 from ....foundation._text import build_tagged_formula_content
 from ....schema import BBox
+from ...._compute_backend import get_native
 from .geometry import (
     _bbox_axis_overlap_ratio,
     _bbox_center_x,
@@ -39,6 +43,7 @@ from .line_layout import (
 from .line_merging import _join_formula_visual_row, _merge_overlapping_inline_cluster
 from .models import _AxisLine, _FormulaAnchor, _LineItem, _PageSource, _TextLane
 from .native_text import _sanitize_pdf_control_text
+from ._native_geometry import glyph_flags as _unmapped_glyph_flags
 from .text_roles import has_prose, prose_residue, publication_text
 from .layout_evidence import build_layout_evidence
 
@@ -56,6 +61,53 @@ _VECTOR_FORMULA_MIN_COMPLEX_PATHS = 5
 _VECTOR_FORMULA_MIN_COMPLEX_RATIO = 0.5
 _VECTOR_FORMULA_NUMBER_MIN_PATHS = 3
 _VECTOR_FORMULA_NUMBER_MAX_PATHS = 6
+
+_FORMULA_TEXT_FEATURES = ContextVar("docvortex_formula_text_features", default=None)
+
+
+def _formula_scope(function, fresh):
+    """页面入口隔离纯文字特征，内部 canonical 重放复用相同不可变字符串的计算。"""
+
+    @wraps(function)
+    def scoped(*args, **kwargs):
+        """仅缓存纯字符串特征；成员、字体和几何在每个阶段重新读取。"""
+        current = _FORMULA_TEXT_FEATURES.get()
+        token = _FORMULA_TEXT_FEATURES.set({} if fresh or current is None else current)
+        try:
+            return function(*args, **kwargs)
+        finally:
+            _FORMULA_TEXT_FEATURES.reset(token)
+
+    return scoped
+
+
+def _formula_page_scope(function):
+    """独立调用建立页面上下文，处于同页完成阶段时复用纯文字特征。"""
+    return _formula_scope(function, False)
+
+
+def _formula_fresh_page_scope(function):
+    """每页最终处理建立独立上下文，完成或异常后立即释放有界特征表。"""
+    return _formula_scope(function, True)
+
+
+def _formula_text_feature(function):
+    """只按本次页面输入的普通字符串复用纯特征，文字修改后自然使用新键。"""
+
+    @wraps(function)
+    def feature(text):
+        """自定义字符串和没有页面上下文的调用仍直接执行参考函数。"""
+        cache = _FORMULA_TEXT_FEATURES.get()
+        if cache is None or type(text) is not str:
+            return function(text)
+        key = (function, text)
+        if key not in cache:
+            if len(cache) >= 4096:
+                cache.pop(next(iter(cache)))
+            cache[key] = function(text)
+        return cache[key]
+
+    return feature
 
 
 @dataclass(slots=True)
@@ -756,6 +808,7 @@ def _attach_vector_formula_text_numbers(
     return claimed
 
 
+@_formula_text_feature
 def _standalone_formula_number_marker(text: str) -> str | None:
     """仅接受整行由圆括号公式编号构成的文本，不接纳带正文前缀的后缀。"""
 
@@ -766,6 +819,7 @@ def _standalone_formula_number_marker(text: str) -> str | None:
     return marker if not prefix else None
 
 
+@_formula_page_scope
 def _build_formula_like_blocks(
     lines: list[_LineItem],
     table_bboxes: list[BBox],
@@ -990,14 +1044,23 @@ def _build_formula_like_blocks(
     )
     blocks.extend(recovered)
     claimed_source_indices.update(recovered_indices)
+    # 两次紧邻的连通重放不改写字符、字体或原生变量证据，同次页面输入只求值一次。
+    detached_prose_flags = {id(line): _detached_math_line_has_prose(line) for line in lines}
     detached_blocks, detached_sources = _recover_detached_display_components(
-        [line for line in lines if line.source_index not in claimed_source_indices], table_bboxes, page_size
+        [line for line in lines if line.source_index not in claimed_source_indices],
+        table_bboxes,
+        page_size,
+        _prose_flags=detached_prose_flags,
     )
     blocks.extend(detached_blocks)
     claimed_source_indices.update(detached_sources)
     # 完整二维带只替换缺失成员或重复切割；已有完整公式保留原编号和成员序列。
     whole_blocks, _whole_sources = _recover_detached_display_components(
-        lines, table_bboxes, page_size, drawing_lines=drawing_lines
+        lines,
+        table_bboxes,
+        page_size,
+        drawing_lines=drawing_lines,
+        _prose_flags=detached_prose_flags,
     )
     for whole in whole_blocks:
         members = set(whole.get("_formula_members", []))
@@ -1253,6 +1316,7 @@ def _recover_detached_display_components(
     page_size: tuple[float, float],
     *,
     drawing_lines: list[_AxisLine] | None = None,
+    _prose_flags: dict[int, bool] | None = None,
 ) -> tuple[list[dict[str, Any]], set[int]]:
     """在编号和字体分类前聚合独立二维数学带，正文同行连通时保留为行内内容。"""
     blocks, claimed = [], set()
@@ -1265,7 +1329,13 @@ def _recover_detached_display_components(
         if not geometry:
             continue
         em = statistics.median(_line_effective_height(line, bbox) for line, bbox in geometry)
-        prose = [(line, bbox) for line, bbox in geometry if _detached_math_line_has_prose(line)]
+        # 特征绑定本次输入状态，不跨文本修改或后续认领阶段缓存。
+        prose_flags = (
+            _prose_flags
+            if _prose_flags is not None
+            else {id(line): _detached_math_line_has_prose(line) for line, _ in geometry}
+        )
+        prose = [(line, bbox) for line, bbox in geometry if prose_flags[id(line)]]
         prose_layout = (
             build_layout_evidence([line for line, _ in prose], page_size, barriers=table_bboxes) if angle == 0 else None
         )
@@ -1278,6 +1348,8 @@ def _recover_detached_display_components(
             and not any(_bbox_intersects(line.bbox, table) for table in table_bboxes)
         ]
         pending = set(range(len(candidates)))
+        operator_flags = [_formula_line_has_math_operator(line.text) for line, _ in candidates]
+        neighbors = _detached_formula_neighbors_native(candidates, operator_flags, em)
         while pending:
             seed = min(pending)
             pending.remove(seed)
@@ -1285,14 +1357,21 @@ def _recover_detached_display_components(
             while frontier:
                 current = frontier.pop()
                 _, bbox = candidates[current]
+                if neighbors is not None:
+                    for index in neighbors[current]:
+                        if index in pending:
+                            component.append(index)
+                            frontier.append(index)
+                    pending.difference_update(component)
+                    continue
                 for index in sorted(pending):
                     other = candidates[index][1]
                     # 完整长公式各占一条基线；松行框重叠不能把相邻等式合成一个裁图。
                     if (
                         bbox[2] - bbox[0] > 3 * em
                         and other[2] - other[0] > 3 * em
-                        and _formula_line_has_math_operator(candidates[current][0].text)
-                        and _formula_line_has_math_operator(candidates[index][0].text)
+                        and operator_flags[current]
+                        and operator_flags[index]
                         and abs(_bbox_center_y(bbox) - _bbox_center_y(other)) > 0.75 * em
                     ):
                         continue
@@ -1308,11 +1387,11 @@ def _recover_detached_display_components(
                         frontier.append(index)
                 pending.difference_update(component)
             members = [candidates[index] for index in component]
-            if any(_detached_math_line_has_prose(line) for line, _bbox in members):
+            if any(prose_flags[id(line)] for line, _bbox in members):
                 continue
             bbox = _bbox_union_many([item[1] for item in members])
             calculus = any(any(char in line.text for char in "∂∫∑") for line, _ in members)
-            if not any(_formula_line_has_math_operator(line.text) for line, _ in members):
+            if not any(operator_flags[index] for index in component):
                 continue
             numbered = any(_standalone_formula_number_marker(line.text) for line, _ in members)
             strong_math = any(sum(unicodedata.category(char) == "Sm" for char in line.text) >= 2 for line, _ in members)
@@ -1425,7 +1504,43 @@ def _recover_detached_display_components(
     return blocks, claimed
 
 
+def _detached_formula_neighbors_native(candidates, operators, em):
+    """批量计算独立公式带邻接，特殊数值和过大邻接表完整使用原有扫描。"""
+    native = get_native()
+    if native is None or type(em) not in (int, float) or not math.isfinite(em):
+        return None
+    boxes = [bbox for _, bbox in candidates]
+    if any(type(v) not in (int, float) or abs(v) > 2**50 or not math.isfinite(v) for box in boxes for v in box):
+        return None
+    return native.detached_formula_neighbors(boxes, operators, em)
+
+
+_MATH_WORD_REFERENCES = (_LineItem.__getattribute__, _LineItem.chars, _LineItem.native_math_words, re.finditer, re._compile)
+
+
 def _native_math_word_fragments(line: _LineItem) -> frozenset[str]:
+    """普通原始字形整行批量读取，定制对象或正则实现完整回退到原参考路径。"""
+    from ...._compute_backend import get_native
+
+    if (
+        _LineItem.__getattribute__,
+        getattr(_LineItem, "chars", None),
+        getattr(_LineItem, "native_math_words", None),
+        re.finditer,
+        re._compile,
+    ) == _MATH_WORD_REFERENCES:
+        # 字符已在当前行阶段释放后，只剩冻结的不可变词集合；无需再次构造集合或运行空正则。
+        if type(line) is _LineItem and type(line.chars) is list and not line.chars and type(line.native_math_words) is frozenset:
+            return line.native_math_words
+        native = get_native()
+        if native is not None:
+            words = native.math_words_owned(line, _LineItem, re.finditer)
+            if words is not None:
+                return words
+    return _native_math_word_fragments_python(line)
+
+
+def _native_math_word_fragments_python(line: _LineItem) -> frozenset[str]:
     """短连写变量只有全部斜体或包含独立小号角标时才消除自然语言屏障。"""
     chars = [char for char in line.chars if str(char.get("char", "")).isprintable()]
     text = "".join(str(char.get("char", "")) for char in chars)
@@ -1526,8 +1641,26 @@ def _build_mixed_body_display_formulas(
     return blocks, claimed
 
 
+_UNMAPPED_INK_COERCE = _coerce_bbox
+_UNMAPPED_INK_FLAGS = _unmapped_glyph_flags
+_UNMAPPED_INK_ISFINITE = math.isfinite
+
+
 def _unmapped_formula_ink_bboxes(chars: list[Char]) -> list[BBox]:
     """保留实际绘制、但映射为空白或控制码的高字形几何，不改变公开文本。"""
+
+    from ._native_geometry import glyph_flags
+
+    native = get_native()
+    if native is not None and hasattr(native, "unmapped_formula_ink") and _coerce_bbox is _UNMAPPED_INK_COERCE and glyph_flags is _UNMAPPED_INK_FLAGS and math.isfinite is _UNMAPPED_INK_ISFINITE:
+        values = native.unmapped_formula_ink(chars, glyph_flags)
+        if values is not None:
+            return values
+    return _unmapped_formula_ink_bboxes_python(chars)
+
+
+def _unmapped_formula_ink_bboxes_python(chars: list[Char]) -> list[BBox]:
+    """完整参考筛选保留陌生转换、读取顺序与异常，供批量不支持时直接回退。"""
 
     output: list[BBox] = []
     for char in chars:
@@ -1570,6 +1703,7 @@ def _attach_unmapped_formula_ink(blocks: list[dict[str, Any]], bboxes: list[BBox
                 block["_tight_output_bbox"] = _bbox_union(block["_tight_output_bbox"], bbox)
 
 
+@_formula_text_feature
 def _formula_line_has_math_operator(text: str) -> bool:
     """检查文本行是否具有独立公式常见的数学运算符。"""
 
@@ -1581,6 +1715,7 @@ def _formula_line_has_math_operator(text: str) -> bool:
     )
 
 
+@_formula_text_feature
 def _display_math_has_prose(text: str) -> bool:
     """变量、函数调用及常见数学连接词不构成说明正文，其余完整词和汉字建立屏障。"""
     if len(re.findall(r"[\u3400-\u9fff]", text)) >= 2:
@@ -1593,6 +1728,7 @@ def _display_math_has_prose(text: str) -> bool:
     return any(word.lower() not in mathematical_words and not re.fullmatch(r"[a-z]{0,2}[A-Z]{2,}", word) for word in words)
 
 
+@_formula_text_feature
 def _formula_prefix_has_prose(prefix: str) -> bool:
     """用通用文字数量识别公式前的正文片段，不依赖特定引导词或标点。"""
 
@@ -2553,6 +2689,9 @@ def _grow_formula_spatial_component(
         return []
 
     members = [anchor_geometry, *seeds]
+    additions = _grow_formula_component_native(members, candidates, table_bboxes)
+    if additions is not None:
+        return [*members, *additions]
     member_sources = {line.source_index for line, _bbox in members}
     changed = True
     while changed:
@@ -2575,6 +2714,34 @@ def _grow_formula_spatial_component(
                 member_sources.add(candidate_line.source_index)
                 changed = True
     return members
+
+
+def _grow_formula_component_native(members, candidates, table_bboxes):
+    """只批量执行数值连通；语义屏障、种子和最终公式重放维持原有 Python 路径。"""
+    native = get_native()
+    if native is None:
+        return None
+    items = [*members, *candidates]
+    if any(
+        type(line.source_index) is not int or not -(2**63) <= line.source_index < 2**63 or type(line.angle) is not int
+        for line, _ in items
+    ):
+        return None
+    records = [(bbox, line.bbox, _line_effective_height(line, bbox), line.angle, line.source_index) for line, bbox in items]
+    if any(
+        type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 2**50
+        for box, raw_box, height, _, _ in records
+        for v in (*box, *raw_box, height)
+    ):
+        return None
+    if any(
+        any(type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 2**50 for v in box)
+        or box[2] <= box[0]
+        or box[3] <= box[1]
+        for box in table_bboxes
+    ):
+        return None
+    return [items[i] for i in native.grow_formula_component(records, len(members), table_bboxes)]
 
 
 def _is_formula_body_barrier(

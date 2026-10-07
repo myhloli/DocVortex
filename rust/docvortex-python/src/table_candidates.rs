@@ -52,6 +52,26 @@ impl PreparedRuleCandidates {
         py.detach(|| self.state.partition(start, end, first, rule_count, height))
             .map_err(PyValueError::new_err)
     }
+    /// 一次跨边界取得闭区间证据和完整物理行分段，复用同一走廊输入状态。
+    fn partition_with_segments(
+        &self,
+        py: Python<'_>,
+        start: usize,
+        end: usize,
+        first: usize,
+        rule_count: usize,
+        height: f64,
+    ) -> PyResult<(Vec<Vec<usize>>, bool, Vec<Vec<usize>>, bool)> {
+        py.detach(|| {
+            let (groups, accepted) = self
+                .state
+                .partition(start, end, first, rule_count, height)?;
+            let segments = self.state.segments(start, end, height)?;
+            let short = self.state.short_intervals(first, rule_count, height)?;
+            Ok::<_, &'static str>((groups, accepted, segments, short))
+        })
+        .map_err(PyValueError::new_err)
+    }
     /// 在已准备走廊上完成成员去重和核心几何展开，返回原对象来源索引。
     fn core(
         &self,

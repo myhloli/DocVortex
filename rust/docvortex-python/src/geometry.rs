@@ -1,4 +1,5 @@
 //! 字符几何与坐标转换绑定，保留 Python 坐标对象复用语义。
+// 高频字段名按解释器复用不可变字符串，仍由原 Python 属性和字典操作读取当前状态。
 
 use docvortex_core::extraction;
 use docvortex_core::geometry::{self, Box4, Size};
@@ -317,4 +318,113 @@ pub(super) fn source_rows_plain<'py>(
         }
     }
     Ok(Some(output))
+}
+
+/// 普通字符只读打包，Unicode 分类在每个不同字符串上沿用 Python；不缓存可变字符或页面几何。
+#[pyfunction]
+pub(super) fn plain_source_records_owned<'py>(
+    py: Python<'py>,
+    chars: &Bound<'py, PyAny>,
+    tight: &Bound<'py, PyAny>,
+    loose: &Bound<'py, PyAny>,
+    origins: &Bound<'py, PyAny>,
+    anchors_only: bool,
+    anchor: &Bound<'py, PyAny>,
+    box_type: &Bound<'py, PyAny>,
+) -> PyResult<Option<Bound<'py, PyList>>> {
+    use pyo3::types::{PyDict, PyString};
+    if !chars.is_exact_instance_of::<PyList>()
+        || !tight.is_exact_instance_of::<PyDict>()
+        || !loose.is_exact_instance_of::<PyDict>()
+        || !origins.is_exact_instance_of::<PyDict>()
+    {
+        return Ok(None);
+    }
+    let chars = chars.cast::<PyList>()?;
+    let tight = tight.cast::<PyDict>()?;
+    let loose = loose.cast::<PyDict>()?;
+    let origins = origins.cast::<PyDict>()?;
+    let mut features = std::collections::HashMap::<String, bool>::new();
+    let records = PyList::empty(py);
+    for (position, char) in chars.iter().enumerate() {
+        let Ok(char) = char.cast_exact::<PyDict>() else {
+            return Ok(None);
+        };
+        let Some(text) = char.get_item(pyo3::intern!(char.py(), "char"))? else {
+            return Ok(None);
+        };
+        let Some(index) = char.get_item(pyo3::intern!(char.py(), "char_idx"))? else {
+            return Ok(None);
+        };
+        if !text.is_exact_instance_of::<PyString>() || !index.is_exact_instance_of::<PyInt>() {
+            return Ok(None);
+        }
+        let Ok(key) = text.extract::<String>() else {
+            return Ok(None);
+        };
+        let selected = if let Some(&selected) = features.get(&key) {
+            selected
+        } else {
+            let selected = if anchors_only {
+                anchor.call1((&text,))?.extract::<bool>()?
+            } else {
+                !key.is_empty()
+                    && text.call_method0("isprintable")?.extract::<bool>()?
+                    && !text.call_method0("isspace")?.extract::<bool>()?
+            };
+            features.insert(key, selected);
+            selected
+        };
+        if !selected {
+            continue;
+        }
+        let raw_rotation = char
+            .get_item(pyo3::intern!(char.py(), "rotation"))?
+            .unwrap_or_else(|| py.None().into_bound(py));
+        if !raw_rotation.is_none() && !raw_rotation.is_exact_instance_of::<PyFloat>() {
+            return Ok(None);
+        }
+        let rotation = if raw_rotation.is_none() {
+            0.0
+        } else {
+            raw_rotation.extract::<f64>()?
+        };
+        let raw = raw_source_box(
+            py,
+            char.get_item(pyo3::intern!(char.py(), "bbox"))?,
+            box_type,
+        )?;
+        let side = if rotation.abs() > 1e-9 || !rotation.is_finite() {
+            raw_source_box(py, loose.get_item(&index)?, box_type)?
+        } else {
+            py.None().into_bound(py)
+        };
+        let tight = raw_source_box(py, tight.get_item(&index)?, box_type)?;
+        let origin = origins
+            .get_item(&index)?
+            .unwrap_or_else(|| py.None().into_bound(py));
+        records.append((
+            position,
+            raw,
+            side,
+            tight,
+            origin,
+            if rotation == 0.0 { 0.0 } else { rotation },
+        ))?;
+    }
+    Ok(Some(records))
+}
+
+/// 仅展开参考函数识别的确切 Bbox 类型，其他值原样保留以供数值入口完整拒绝。
+fn raw_source_box<'py>(
+    py: Python<'py>,
+    value: Option<Bound<'py, PyAny>>,
+    box_type: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let value = value.unwrap_or_else(|| py.None().into_bound(py));
+    if value.get_type().is(box_type) {
+        value.getattr(pyo3::intern!(value.py(), "bbox"))
+    } else {
+        Ok(value)
+    }
 }

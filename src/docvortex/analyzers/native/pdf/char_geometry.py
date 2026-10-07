@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, Literal, Sequence, TypeAlias
 
+from ._native_geometry import raw_bbox as _PLAIN_RECORD_RAW_BOX_REFERENCE
+
 from ....document.pdf._document import PDFPageTextGeometry
 from ....schema import BBox
 from .geometry import (
@@ -500,6 +502,9 @@ def _style_line_is_inflated(
     )
 
 
+_PLAIN_RECORD_ANCHOR_REFERENCE = _is_anchor_text
+
+
 def _plain_source_records(line, geometry, anchors_only):
     """普通行只按源顺序打包一次，坐标验证交给 Rust，特殊读取保留旧路径。"""
     from ._native_geometry import raw_bbox
@@ -511,6 +516,22 @@ def _plain_source_records(line, geometry, anchors_only):
         or any(type(values) is not dict for values in (geometry.tight_bboxes, geometry.loose_bboxes, geometry.origins))
     ):
         return None
+    from ...._compute_backend import get_native
+    from ....document.pdf.text._contracts import Bbox
+
+    native = get_native()
+    if native is not None and _is_anchor_text is _PLAIN_RECORD_ANCHOR_REFERENCE and raw_bbox is _PLAIN_RECORD_RAW_BOX_REFERENCE:
+        records = native.plain_source_records_owned(
+            line.chars,
+            geometry.tight_bboxes,
+            geometry.loose_bboxes,
+            geometry.origins,
+            anchors_only,
+            _is_anchor_text,
+            Bbox,
+        )
+        if records is not None:
+            return records
     records = []
     for position, char in enumerate(line.chars):
         if type(char) is not dict or type(char.get("char")) is not str or type(char.get("char_idx")) is not int:
@@ -1975,6 +1996,25 @@ def _prepare_owned_document(lines_by_page, geometries, page_sizes, *, layout=Fal
 
             def metadata(positions):
                 """只为坐标合法的字符编码字体和 Unicode 类别，与原样本准入顺序一致。"""
+                if all(
+                    actual is expected
+                    for actual, expected in zip(
+                        (_font_run_metadata, _script_group, _cached_run_key, _is_anchor_text),
+                        _FONT_BATCH_REFERENCE_FUNCTIONS,
+                    )
+                ):
+                    return native.owned_font_run_metadata(
+                        line.chars,
+                        positions,
+                        line.angle,
+                        run_ids,
+                        run_keys,
+                        _font_run_metadata,
+                        _script_group,
+                        _cached_run_key,
+                        _is_anchor_text,
+                        layout,
+                    )
                 cache = _ReadOnlyFontCache(native_only=True)
                 output = []
                 for position in positions:
@@ -2081,18 +2121,25 @@ def _prepare_layout_document(lines_by_page, geometries, page_sizes, *, with_metr
 def _repair_extreme_local_font_metrics(plan, by_line, page_sizes):
     """用同页重复异常与健康同族行校准极端字体矩阵，不放宽普通跨页样式阈值。"""
     groups = defaultdict(list)
+    families = {}
+
+    def family_name(name):
+        """同一输入状态的字体后缀只解析一次，缓存仅属于当前文档几何修复。"""
+        if name not in families:
+            families[name] = re.sub(r"(?:semibold|demibold|regular|regu|bold|light|medium|italic|ital|oblique)+$", "", name)
+        return families[name]
+
     for key, samples in by_line.items():
         anchors = [sample for sample in samples if sample.is_anchor]
         if len(anchors) < 4:
             continue
         dominant = Counter(sample.run_key for sample in anchors).most_common(1)[0][0]
-        family = re.sub(r"(?:semibold|demibold|regular|regu|bold|light|medium|italic|ital|oblique)+$", "", dominant[0])
+        family = family_name(dominant[0])
         # 描述标志、数字及希腊字符可在同一字体矩阵内变换，不应阻止正文行的尺度校准。
         members = [
             sample
             for sample in anchors
-            if re.sub(r"(?:semibold|demibold|regular|regu|bold|light|medium|italic|ital|oblique)+$", "", sample.run_key[0])
-            == family
+            if family_name(sample.run_key[0]) == family
             and sample.run_key[1] == dominant[1]
             and sample.run_key[4] == dominant[4]
         ]
@@ -2317,6 +2364,9 @@ def apply_line_geometry_repairs(
         line.em_height = style_scale if style_scale is not None else repair.em_height
         if (allow_y_trim or local_metric_repair) and repair.state in {"trim_y", "repair_xy"}:
             line.effective_height = repair.em_height
+
+
+_FONT_BATCH_REFERENCE_FUNCTIONS = (_font_run_metadata, _script_group, _cached_run_key, _is_anchor_text)
 
 
 # 固定默认阈值与规则身份；调用方覆盖配置或辅助规则时保持参考语义。

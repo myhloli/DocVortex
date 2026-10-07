@@ -79,11 +79,11 @@ def read_clipped_objects(page, kind, max_depth):
     return chain.from_iterable(batches)
 
 
-def read_text_visibility(page, page_bbox, rotation, max_depth):
+def read_text_visibility(page, page_bbox, rotation, max_depth, *, with_roots=False):
     """标准 ABI 下一次遍历 TEXT 对象并返回可见性与视觉裁剪。"""
     global _TEXT_VISIBILITY_CALLS, _TEXT_VISIBILITY_UNAVAILABLE_REASON
     native = get_native()
-    reader = getattr(native, "read_pdfium_text_visibility", None)
+    reader = getattr(native, "read_pdfium_text_visibility_with_roots" if with_roots else "read_pdfium_text_visibility", None)
     if native is None or reader is None or type(page) is not pdfium.PdfPage or not page.raw:
         _TEXT_VISIBILITY_UNAVAILABLE_REASON = "python backend or unsupported native extension"
         return None
@@ -117,6 +117,21 @@ def read_text_visibility(page, page_bbox, rotation, max_depth):
             (obj, ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint), ct.POINTER(ct.c_uint)),
         ),
     )
+    if with_roots:
+        specs += (
+            (
+                "FPDFPageObj_GetBounds",
+                ct.c_int,
+                (obj, ct.POINTER(ct.c_float), ct.POINTER(ct.c_float), ct.POINTER(ct.c_float), ct.POINTER(ct.c_float)),
+            ),
+        )
+        from .text_occlusion import _allow_native_cover_prefilter
+
+        if _allow_native_cover_prefilter():
+            specs += (
+                ("FPDFPath_CountSegments", ct.c_int, (obj,)),
+                ("FPDFPath_GetDrawMode", ct.c_int, (obj, ct.POINTER(ct.c_int), ct.POINTER(ct.c_int))),
+            )
     addresses = []
     for name, result, arguments in specs:
         function = getattr(raw, name, None)
