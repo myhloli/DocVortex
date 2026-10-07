@@ -175,7 +175,14 @@ class _LineItem:
         # 数字 run 的角色在输入边界冻结，辅助空间分类只消费编号证据，不重新读取整行文字。
         cached = self._marker_features
         stable_regex = (re.match, re._compile) == _MARKER_REGEX_REFERENCES
-        if type(self.text) is str and stable_regex and type(cached) is tuple and len(cached) == 4 and cached[0] is self.text and cached[1] is re.match:
+        if (
+            type(self.text) is str
+            and stable_regex
+            and type(cached) is tuple
+            and len(cached) == 4
+            and cached[0] is self.text
+            and cached[1] is re.match
+        ):
             self.note_marker_value, self.numbered_heading_start = cached[2:]
         else:
             marker = self.text.strip()
@@ -183,7 +190,9 @@ class _LineItem:
             # 编号标题证据绑定当前行的文字对象；复制只改几何时复用，文字或正则函数改变后重算。
             self.numbered_heading_start = re.match(r"^\d+(?:\.\d+)*\.?(?:\s|$)\S", marker) is not None
             self._marker_features = (
-                (self.text, re.match, self.note_marker_value, self.numbered_heading_start) if type(self.text) is str and stable_regex else None
+                (self.text, re.match, self.note_marker_value, self.numbered_heading_start)
+                if type(self.text) is str and stable_regex
+                else None
             )
 
 

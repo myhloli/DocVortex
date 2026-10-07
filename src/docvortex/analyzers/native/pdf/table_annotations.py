@@ -182,8 +182,13 @@ def _plain_marker_bbox(value) -> bool:
 
 
 _MARKER_SOURCE_REFERENCES = (
-    _LineItem.__getattribute__, _LineItem.source_index, _LineItem.text, _LineItem.chars,
-    CharBbox.__getattribute__, CharBbox.bbox, _plain_marker_bbox,
+    _LineItem.__getattribute__,
+    _LineItem.source_index,
+    _LineItem.text,
+    _LineItem.chars,
+    CharBbox.__getattribute__,
+    CharBbox.bbox,
+    _plain_marker_bbox,
 )
 
 
@@ -194,10 +199,19 @@ def _prepare_marker_line_context(lines):
     native = get_native()
     if native is None:
         return False, {}
-    if hasattr(native, "marker_sources_owned") and (
-        _LineItem.__getattribute__, getattr(_LineItem, "source_index", None), getattr(_LineItem, "text", None),
-        getattr(_LineItem, "chars", None), CharBbox.__getattribute__, getattr(CharBbox, "bbox", None), _plain_marker_bbox,
-    ) == _MARKER_SOURCE_REFERENCES:
+    if (
+        hasattr(native, "marker_sources_owned")
+        and (
+            _LineItem.__getattribute__,
+            getattr(_LineItem, "source_index", None),
+            getattr(_LineItem, "text", None),
+            getattr(_LineItem, "chars", None),
+            CharBbox.__getattribute__,
+            getattr(CharBbox, "bbox", None),
+            _plain_marker_bbox,
+        )
+        == _MARKER_SOURCE_REFERENCES
+    ):
         sources = native.marker_sources_owned(lines, _LineItem, CharBbox)
         if sources is not None:
             return True, sources
@@ -770,12 +784,25 @@ def _prepare_marker_line(line, page_size, angle):
     from ...._compute_backend import get_native
 
     native = get_native()
-    if native is not None and hasattr(native, "marker_glyphs_owned") and (
-        _LineItem.__getattribute__, getattr(_LineItem, "text", None), getattr(_LineItem, "chars", None),
-        CharBbox.__getattribute__, getattr(CharBbox, "bbox", None), _coerce_bbox, _rotate_bbox_to_upright,
-        unicodedata.normalize, _compact_marker_data,
-    ) == _MARKER_GLYPH_REFERENCES:
-        prepared = native.marker_glyphs_owned(line, page_size, angle, _LineItem, CharBbox, unicodedata.normalize, _compact_marker_data)
+    if (
+        native is not None
+        and hasattr(native, "marker_glyphs_owned")
+        and (
+            _LineItem.__getattribute__,
+            getattr(_LineItem, "text", None),
+            getattr(_LineItem, "chars", None),
+            CharBbox.__getattribute__,
+            getattr(CharBbox, "bbox", None),
+            _coerce_bbox,
+            _rotate_bbox_to_upright,
+            unicodedata.normalize,
+            _compact_marker_data,
+        )
+        == _MARKER_GLYPH_REFERENCES
+    ):
+        prepared = native.marker_glyphs_owned(
+            line, page_size, angle, _LineItem, CharBbox, unicodedata.normalize, _compact_marker_data
+        )
         if prepared is not None:
             return prepared
     return _prepare_marker_line_python(line, page_size, angle)
@@ -1117,7 +1144,13 @@ def _merge_table_candidate_annotations(
 
 
 _MARKER_GLYPH_REFERENCES = (
-    _LineItem.__getattribute__, _LineItem.text, _LineItem.chars,
-    CharBbox.__getattribute__, CharBbox.bbox, _coerce_bbox, _rotate_bbox_to_upright,
-    unicodedata.normalize, _compact_marker_data,
+    _LineItem.__getattribute__,
+    _LineItem.text,
+    _LineItem.chars,
+    CharBbox.__getattribute__,
+    CharBbox.bbox,
+    _coerce_bbox,
+    _rotate_bbox_to_upright,
+    unicodedata.normalize,
+    _compact_marker_data,
 )

@@ -1812,18 +1812,28 @@ def _count_repeated_fill_bands(
 
 
 _FILL_BAND_REFERENCES = (
-    _count_repeated_fill_bands, _prepare_fill_band_infos,
-    _bbox_center_y, _bbox_axis_overlap_ratio, _bbox_overlap_in_smaller,
-    max, min, abs,
+    _count_repeated_fill_bands,
+    _prepare_fill_band_infos,
+    _bbox_center_y,
+    _bbox_axis_overlap_ratio,
+    _bbox_overlap_in_smaller,
+    max,
+    min,
+    abs,
 )
 
 
 def _fill_band_rules_unchanged():
     """仅在原规则及数值函数均未替换时复用构建内快照，替换规则仍逐区间调用。"""
     return (
-        _count_repeated_fill_bands, _prepare_fill_band_infos,
-        _bbox_center_y, _bbox_axis_overlap_ratio, _bbox_overlap_in_smaller,
-        max, min, abs,
+        _count_repeated_fill_bands,
+        _prepare_fill_band_infos,
+        _bbox_center_y,
+        _bbox_axis_overlap_ratio,
+        _bbox_overlap_in_smaller,
+        max,
+        min,
+        abs,
     ) == _FILL_BAND_REFERENCES
 
 
@@ -2051,10 +2061,17 @@ def _count_stable_columns(
     if type(median_height) is not float or not math.isfinite(median_height):
         return _count_stable_columns_python(rows, median_height)
     # 只有检测器独占且不写入几何的构建阶段启用；普通缓存调用仍保留原有可检查的 Python 状态。
-    if cache is not None and cache.owned_geometry and (
-        _VisualRow.__getattribute__, getattr(_VisualRow, "fragments", None),
-        _Fragment.__getattribute__, getattr(_Fragment, "local_bbox", None),
-    ) == _COLUMN_GEOMETRY_REFERENCES:
+    if (
+        cache is not None
+        and cache.owned_geometry
+        and (
+            _VisualRow.__getattribute__,
+            getattr(_VisualRow, "fragments", None),
+            _Fragment.__getattribute__,
+            getattr(_Fragment, "local_bbox", None),
+        )
+        == _COLUMN_GEOMETRY_REFERENCES
+    ):
         if cache.native_geometry is None:
             cache.native_geometry = native.NativeColumnCache(sys.version_info >= (3, 12))
         result = cache.native_geometry.count(rows, median_height, allow_prefix_reuse, _VisualRow, _Fragment)
@@ -2227,7 +2244,12 @@ def _merge_owned_table_candidates(candidates):
 
 _NATIVE_DRAFT_MATERIALIZE = _RuleCandidateDraft.materialize
 _SHORT_INTERVAL_CENTER_REFERENCE = _bbox_center_y
-_COLUMN_GEOMETRY_REFERENCES = (_VisualRow.__getattribute__, _VisualRow.fragments, _Fragment.__getattribute__, _Fragment.local_bbox)
+_COLUMN_GEOMETRY_REFERENCES = (
+    _VisualRow.__getattribute__,
+    _VisualRow.fragments,
+    _Fragment.__getattribute__,
+    _Fragment.local_bbox,
+)
 
 _NATIVE_MERGE_RULES = {
     function.__name__: function

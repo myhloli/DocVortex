@@ -499,9 +499,7 @@ class PDFRenderSession:
                         name = "dvx-" + secrets.token_hex(12)
                         self._shared_pixel_names.add(name)
                         output_path = (name, output_path)
-                    tasks[index % count].append(
-                        (page_id, dpi, image_type, crops, output_path)
-                    )
+                    tasks[index % count].append((page_id, dpi, image_type, crops, output_path))
                 pending = [
                     (worker, self._send(worker, "task", task), task) for worker, task in zip(self._workers, tasks) if task
                 ]
@@ -518,8 +516,7 @@ class PDFRenderSession:
                             storage = SharedMemory(name=name)
                             try:
                                 image = Image.frombytes(
-                                    value["mode"], value["size"], storage.buf,
-                                    "raw", value["raw_mode"], value["stride"], 1
+                                    value["mode"], value["size"], storage.buf, "raw", value["raw_mode"], value["stride"], 1
                                 )
                                 collected.append(image)
                             finally:

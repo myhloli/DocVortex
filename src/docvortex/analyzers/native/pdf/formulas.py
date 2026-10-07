@@ -1530,7 +1530,12 @@ def _native_math_word_fragments(line: _LineItem) -> frozenset[str]:
         re._compile,
     ) == _MATH_WORD_REFERENCES:
         # 字符已在当前行阶段释放后，只剩冻结的不可变词集合；无需再次构造集合或运行空正则。
-        if type(line) is _LineItem and type(line.chars) is list and not line.chars and type(line.native_math_words) is frozenset:
+        if (
+            type(line) is _LineItem
+            and type(line.chars) is list
+            and not line.chars
+            and type(line.native_math_words) is frozenset
+        ):
             return line.native_math_words
         native = get_native()
         if native is not None:
@@ -1652,7 +1657,13 @@ def _unmapped_formula_ink_bboxes(chars: list[Char]) -> list[BBox]:
     from ._native_geometry import glyph_flags
 
     native = get_native()
-    if native is not None and hasattr(native, "unmapped_formula_ink") and _coerce_bbox is _UNMAPPED_INK_COERCE and glyph_flags is _UNMAPPED_INK_FLAGS and math.isfinite is _UNMAPPED_INK_ISFINITE:
+    if (
+        native is not None
+        and hasattr(native, "unmapped_formula_ink")
+        and _coerce_bbox is _UNMAPPED_INK_COERCE
+        and glyph_flags is _UNMAPPED_INK_FLAGS
+        and math.isfinite is _UNMAPPED_INK_ISFINITE
+    ):
         values = native.unmapped_formula_ink(chars, glyph_flags)
         if values is not None:
             return values

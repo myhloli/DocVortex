@@ -817,9 +817,13 @@ def _detect_leading_typography_width(
 
 
 _TYPOGRAPHY_OWNED_REFERENCES = (
-    _coerce_bbox, _rotate_bbox_to_upright, _normalized_font_family,
-    _typography_glyph_flags, _typography_raw_bbox,
-    _LineItem.__getattribute__, _TypographyBbox.__getattribute__,
+    _coerce_bbox,
+    _rotate_bbox_to_upright,
+    _normalized_font_family,
+    _typography_glyph_flags,
+    _typography_raw_bbox,
+    _LineItem.__getattribute__,
+    _TypographyBbox.__getattribute__,
 )
 
 
@@ -830,8 +834,16 @@ def _owned_typography_metrics(native, line, page_size, glyph_flags, raw_bbox):
         or type(page_size) not in (tuple, list)
         or len(page_size) != 2
         or any(type(v) not in (float, int) or not math.isfinite(v) or abs(v) > 2**50 for v in page_size)
-        or (_coerce_bbox, _rotate_bbox_to_upright, _normalized_font_family, glyph_flags, raw_bbox,
-            _LineItem.__getattribute__, _TypographyBbox.__getattribute__) != _TYPOGRAPHY_OWNED_REFERENCES
+        or (
+            _coerce_bbox,
+            _rotate_bbox_to_upright,
+            _normalized_font_family,
+            glyph_flags,
+            raw_bbox,
+            _LineItem.__getattribute__,
+            _TypographyBbox.__getattribute__,
+        )
+        != _TYPOGRAPHY_OWNED_REFERENCES
     ):
         return None
     return native.typography_owned(line, page_size, _LineItem, _TypographyBbox, glyph_flags, _normalized_font_family)

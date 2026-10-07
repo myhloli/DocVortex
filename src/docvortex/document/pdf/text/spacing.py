@@ -118,7 +118,11 @@ def _tight_space_candidates(chars_by_source, glyphs, glyph_type):
     from ...._compute_backend import get_native
 
     native = get_native()
-    if native is not None and hasattr(native, "tight_space_candidates") and (needs_tight_space, _ordinary_non_cjk, _font_allows_spacing, unicodedata.category) == _TIGHT_CANDIDATE_REFERENCES:
+    if (
+        native is not None
+        and hasattr(native, "tight_space_candidates")
+        and (needs_tight_space, _ordinary_non_cjk, _font_allows_spacing, unicodedata.category) == _TIGHT_CANDIDATE_REFERENCES
+    ):
         return native.tight_space_candidates(chars_by_source, glyphs, glyph_type, _ordinary_non_cjk)
     return None
 

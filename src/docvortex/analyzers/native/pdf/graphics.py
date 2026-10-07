@@ -39,18 +39,29 @@ from .native_text import _fill_native_typography, _normalize_native_run_text, _s
 _MIN_RASTER_IMAGE_PAGE_AREA_RATIO = 0.0038
 
 _NUMERIC_GRAPHIC_REFERENCES = (
-    re.fullmatch, re._compile, getattr(getattr(re, "_compiler", None), "compile", None),
-    _LineItem.__getattribute__, _LineItem.__setattr__,
+    re.fullmatch,
+    re._compile,
+    getattr(getattr(re, "_compiler", None), "compile", None),
+    _LineItem.__getattribute__,
+    _LineItem.__setattr__,
 )
 
 
 def _numeric_graphic_lines(lines: list[_LineItem], mode: int) -> list[_LineItem] | None:
     """仅批量复用当前文字的数字语法；几何和语义条件仍由每次规则调用裁决。"""
     native = get_native()
-    if native is None or not hasattr(native, "graphic_numeric_lines") or (
-        re.fullmatch, re._compile, getattr(getattr(re, "_compiler", None), "compile", None),
-        _LineItem.__getattribute__, _LineItem.__setattr__,
-    ) != _NUMERIC_GRAPHIC_REFERENCES:
+    if (
+        native is None
+        or not hasattr(native, "graphic_numeric_lines")
+        or (
+            re.fullmatch,
+            re._compile,
+            getattr(getattr(re, "_compiler", None), "compile", None),
+            _LineItem.__getattribute__,
+            _LineItem.__setattr__,
+        )
+        != _NUMERIC_GRAPHIC_REFERENCES
+    ):
         return None
     return native.graphic_numeric_lines(lines, mode, _LineItem, re.fullmatch)
 
@@ -1378,16 +1389,22 @@ def _detect_native_raster_axis_graphics(source: _PageSource) -> list[BBox]:
     text_matches = _numeric_graphic_lines(source.lines, 0)
     if text_matches is None:
         numeric = [
-            line for line in source.lines
-            if line.angle == 0 and line.semantic_type is None and line.effective_height > 0
+            line
+            for line in source.lines
+            if line.angle == 0
+            and line.semantic_type is None
+            and line.effective_height > 0
             and re.fullmatch(r"[+−-]?\d+(?:\.\d+)?", line.text.strip())
             and len(line.text.strip()) <= 8
             and line.bbox[2] - line.bbox[0] <= 4 * line.effective_height
         ]
     else:
         numeric = [
-            line for line in text_matches
-            if line.angle == 0 and line.semantic_type is None and line.effective_height > 0
+            line
+            for line in text_matches
+            if line.angle == 0
+            and line.semantic_type is None
+            and line.effective_height > 0
             and line.bbox[2] - line.bbox[0] <= 4 * line.effective_height
         ]
     output = []

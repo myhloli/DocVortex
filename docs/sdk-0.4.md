@@ -36,6 +36,17 @@
 契约测试同时检查清单符号可导入、显式 `__all__` 导出完整登记，以及门面类型身份一致。
 现有兼容的 MinerU 无需修改调用代码；PDF 原生表格、标题与阅读顺序修复由 DocVortex 内部完成。
 
+### 0.5.10 Rust 优化与 MinerU 兼容性
+
+0.5.10 的优化均位于内部内核与适配层。公开的 41 个模块、321 个符号及类方法签名与 0.5.9 一致，
+`PUBLIC_API`、ModelJson／MiddleJson、结果类型、素材格式与 `auto|python|rust` 选择方式不变。
+Python／Rust 私有扩展协议由 30 升至 31；安装包须使用同一版本的 Python 源码和扩展，不应单独替换旧扩展。
+
+现有兼容的 MinerU 无需修改调用代码或依赖范围。原生文字、表格和图片处理自动使用内部优化，
+`PDFRenderSession` 的签名和资源关闭约定保持原样；macOS 页图使用共享内存传递独立像素，其他平台保持原有文件路径。
+本地验证覆盖公开契约、当前 MinerU 的导入边界、文档协议、路由、表格、页面快照与渲染调度；
+性能与输出对照见 [0.5.10 优化记录](rust-rule-acceleration-0.5.10.md)。
+
 ## 结果包素材导出（0.4.3）
 
 跨库调用方可通过 `docvortex.export.materialize_middle(middle_json, assets=None)` 获取图片外置后的文档副本与 `AssetStore`，再通过 `validate_materialized_assets(document, assets)` 验证所有图片引用。直接图片和视觉 HTML 内嵌图片使用安全相对路径，原始图片字节及布局方向扩展保持不变；代码字面量不作为 HTML 素材处理。

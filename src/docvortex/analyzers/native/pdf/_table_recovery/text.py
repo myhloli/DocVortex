@@ -29,7 +29,6 @@ class _PendingGlyph:
     explicit_break_before: bool = False
 
 
-
 _PENDING_REFERENCES = (
     normalize_bbox,
     normalize_angle,
@@ -496,10 +495,14 @@ def build_cell_text(
     return "".join(text for text, _source_index in build_cell_text_parts(glyphs, median_height))
 
 
-
 _CELL_GROUP_REFERENCES = (
-    _assign_visual_rows, bbox_center, statistics.median, NativeTableGlyph.__getattribute__,
-    NativeTableGlyph.bbox, NativeTableGlyph.glyph_id, NativeTableGlyph.visual_row,
+    _assign_visual_rows,
+    bbox_center,
+    statistics.median,
+    NativeTableGlyph.__getattribute__,
+    NativeTableGlyph.bbox,
+    NativeTableGlyph.glyph_id,
+    NativeTableGlyph.visual_row,
 )
 
 
@@ -509,11 +512,23 @@ def _native_cell_visual_groups(glyphs, median_height):
     import math
 
     native = get_native()
-    if (native is None or not hasattr(native, "cell_visual_groups_owned")
-        or type(median_height) not in (float, int) or not math.isfinite(median_height) or abs(median_height) > 2**50
-        or (_assign_visual_rows, bbox_center, statistics.median, NativeTableGlyph.__getattribute__,
-            getattr(NativeTableGlyph, "bbox", None), getattr(NativeTableGlyph, "glyph_id", None),
-            getattr(NativeTableGlyph, "visual_row", None)) != _CELL_GROUP_REFERENCES):
+    if (
+        native is None
+        or not hasattr(native, "cell_visual_groups_owned")
+        or type(median_height) not in (float, int)
+        or not math.isfinite(median_height)
+        or abs(median_height) > 2**50
+        or (
+            _assign_visual_rows,
+            bbox_center,
+            statistics.median,
+            NativeTableGlyph.__getattribute__,
+            getattr(NativeTableGlyph, "bbox", None),
+            getattr(NativeTableGlyph, "glyph_id", None),
+            getattr(NativeTableGlyph, "visual_row", None),
+        )
+        != _CELL_GROUP_REFERENCES
+    ):
         return None
     indices = native.cell_visual_groups_owned(glyphs, median_height, NativeTableGlyph)
     return None if indices is None else [[glyphs[index] for index in row] for row in indices]
@@ -547,6 +562,7 @@ def _python_cell_visual_groups(glyphs, median_height):
         else:
             refined.append(original)
     return refined
+
 
 def build_cell_text_parts(
     glyphs: list[NativeTableGlyph],

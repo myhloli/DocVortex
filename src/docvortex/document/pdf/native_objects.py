@@ -659,7 +659,9 @@ def _filled_rectangle_bbox(subpath: _PathSubpath) -> BBox | None:
     exact_corners = (
         round is _FILLED_RECTANGLE_ROUND
         and type(points) in (list, tuple)
-        and all(type(point) is tuple and len(point) == 2 and type(point[0]) is float and type(point[1]) is float for point in points)
+        and all(
+            type(point) is tuple and len(point) == 2 and type(point[0]) is float and type(point[1]) is float for point in points
+        )
         and set(points) == {(x0, y0), (x0, y1), (x1, y0), (x1, y1)}
     )
     if not exact_corners:

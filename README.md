@@ -44,7 +44,7 @@ Native parsing works without an OCR or VLM inference service. Use DocVortex dire
 | MinerU Flash | 44.50 s | 28.05 s | **1.59×** | **36.95%** | **29.56%** |
 | MinerU shared PDF processing | 76.28 s | 19.19 s | **3.98×** | **74.85%** | **35.70%** |
 
-Same-machine warm-run comparison on 32 PDFs / 299 pages (31 PDFs for Flash). The existing 0.4.25 measurements are reused. For 0.5.9, each document is warmed once and timed five times in each of three balanced rounds; times sum the medians of the three per-document medians. RSS reductions are medians of per-document process-tree peak RSS reductions. MinerU results include improvements in both projects. The shared pipeline excludes model computation; excluding the extreme dense-table sample, its speedup is **1.88×**. The table shows released 0.5.9; the unreleased optimization candidate is reported separately.
+Same-machine warm-run comparison on 32 PDFs / 299 pages (31 PDFs for Flash). The existing 0.4.25 measurements are reused. For 0.5.9, each document is warmed once and timed five times in each of three balanced rounds; times sum the medians of the three per-document medians. RSS reductions are medians of per-document process-tree peak RSS reductions. MinerU results include improvements in both projects. The shared pipeline excludes model computation; excluding the extreme dense-table sample, its speedup is **1.88×**. The table shows released 0.5.9; the 0.5.10 optimization results are [documented separately](docs/rust-rule-acceleration-0.5.10.md).
 
 ## Quick start
 

@@ -71,7 +71,11 @@ def guess_code_language(code: str) -> str:
     if not normalized_code:
         return DEFAULT_CODE_LANGUAGE
     try:
-        lang = _code_language_classifier().identify_bytes(normalized_code.encode("utf-8", errors="replace")).prediction.output.label
+        lang = (
+            _code_language_classifier()
+            .identify_bytes(normalized_code.encode("utf-8", errors="replace"))
+            .prediction.output.label
+        )
     except Exception:
         return DEFAULT_CODE_LANGUAGE
     return lang if lang != "unknown" else DEFAULT_CODE_LANGUAGE
