@@ -32,7 +32,7 @@ def test_native_parse_never_classifies(monkeypatch: pytest.MonkeyPatch) -> None:
         raise AssertionError("Native parsing must not classify")
 
     monkeypatch.setattr(PDFDocument, "classify", forbidden)
-    result = docvortex.parse(pdf_bytes(), keep_model_json=True)
+    result = docvortex.parse(pdf_bytes(), keep_model_json=True, parse_mode="txt")
     assert result.middle_json.pages
     assert result.model_json is not None
 

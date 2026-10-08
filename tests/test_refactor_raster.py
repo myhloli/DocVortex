@@ -106,7 +106,7 @@ def test_sparse_visual_pages_keep_physical_identity(
     monkeypatch.setattr(PdfModel, "predict", predict)
     use_local_crop_worker(monkeypatch, raster)
     with PDFDocument(make_pdf(5)) as source:
-        result = api.analyze(source, page_range=page_range)
+        result = api.analyze(source, page_range=page_range, parse_mode="txt")
         assert source.page_count == 5
     assert calls == list(range(0, expected_count, 2))
     assert result.model_json.pages == expected
@@ -170,7 +170,7 @@ def test_crop_failure_releases_all_images(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(visuals, "_attach_prepared_visual_block_images", failure)
     with PDFDocument(make_pdf(1)) as document:
         with pytest.raises(RuntimeError, match="crop failed"):
-            api.analyze(document)
+            api.analyze(document, parse_mode="txt")
         assert document.page_count == 1
     with pytest.raises(ValueError):
         image.getpixel((0, 0))

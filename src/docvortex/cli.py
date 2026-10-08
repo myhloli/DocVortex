@@ -20,7 +20,7 @@ def _configure_log_level(level: str) -> None:
     logger.add(sys.stderr, level=level.upper())
 
 
-@click.group(help="DocVortex: native multi-format document parsing and conversion.")
+@click.group(help="DocVortex: multi-format document parsing and conversion with PDF OCR.")
 @click.version_option(__version__)
 @click.option(
     "--log-level",
@@ -46,10 +46,19 @@ def main(log_level: str) -> None:
     type=click.Choice(["markdown", "html", "latex", "docx", "epub", "pdf", "structured_content"]),
 )
 @click.option("--pages", "page_range", default="", help="PDF page selection: 1-5, r1, all.")
+@click.option(
+    "--parse-mode",
+    type=click.Choice(["auto", "txt", "ocr"]),
+    default="auto",
+    show_default=True,
+    help="PDF analysis mode; auto classifies the selected pages.",
+)
 @click.option("--overwrite", is_flag=True)
 @click.option("--pdf-layout", type=click.Choice(["auto", "original", "reflow"]), default="auto", show_default=True)
-def convert_command(source: Path, output: Path, output_format: str, page_range: str, overwrite: bool, pdf_layout: str) -> None:
-    """转换原生文档并写出目标文件及所需素材。"""
+def convert_command(
+    source: Path, output: Path, output_format: str, page_range: str, parse_mode: str, overwrite: bool, pdf_layout: str
+) -> None:
+    """按指定 PDF 模式转换文档，并写出目标文件及所需素材。"""
     from .api import convert
     from .render import PdfLayout, PdfRenderOptions
 
@@ -58,7 +67,13 @@ def convert_command(source: Path, output: Path, output_format: str, page_range: 
             raise ValueError("--pdf-layout requires --format pdf")
         options = PdfRenderOptions(layout=PdfLayout(pdf_layout)) if output_format == "pdf" else None
         result = convert(
-            source, output, output_format=output_format, page_range=page_range, overwrite=overwrite, options=options
+            source,
+            output,
+            output_format=output_format,
+            page_range=page_range,
+            overwrite=overwrite,
+            options=options,
+            parse_mode=parse_mode,
         )
     except (ValueError, OSError) as error:
         raise click.ClickException(str(error)) from error

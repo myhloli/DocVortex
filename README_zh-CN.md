@@ -25,12 +25,14 @@ DocVortex 是一个独立的 Python 文档解析与转换引擎。
 它读取文档中的原生文字与结构，整理为统一的中间表示，
 再按工作流需要导出为不同格式。
 
-- **多格式输入** — 支持文本 PDF、Office、OpenDocument、EPUB、HTML、OFD、CSV 和 TSV。
+- **多格式输入** — 支持文本与扫描 PDF、Office、OpenDocument、EPUB、HTML、OFD、CSV 和 TSV。
 - **一次解析，多种导出** — 同一份结果可生成 Markdown、HTML、LaTeX、DOCX、EPUB、PDF 和结构化 JSON。
 - **结果可携带** — 将文档结构与图像素材保存为 Bundle，离开源文件也能继续导出。
 - **API 可组合** — 直接调用完整流程，或分别接入分析、后处理和渲染阶段。
 
 原生解析无需 OCR 或 VLM 推理服务。您可通过 CLI 或 Python SDK 便捷的使用 DocVortex。
+
+扫描 PDF 使用本地 CPU OCR。首次 OCR 解析会自动从 Hugging Face 下载 PP-DocLayoutV2 与 PP-OCRv6 Tiny Det / Small Rec，失败时切换 ModelScope，缓存到 `~/.docvortex/model/`。六个模型及配置文件合计约 239 MB；缓存完整后可离线解析。
 
 ![DocVortex 转换流程：原生文档经过统一中间表示，导出为 Markdown、HTML、LaTeX、DOCX、EPUB、PDF 或结构化 JSON。](https://gcore.jsdelivr.net/gh/myhloli/DocVortex@main/docs/images/docvortex-overview.jpg)
 
@@ -91,7 +93,7 @@ result.export("output/report.docx", output_format="docx")
 
 | 文档类别 | 文件后缀 |
 | --- | --- |
-| 含原生文字的 PDF | `.pdf` |
+| 含原生文字或扫描页面的 PDF | `.pdf` |
 | Word 与富文本 | `.doc`, `.docx`, `.rtf` |
 | 演示文稿 | `.ppt`, `.pptx` |
 | 电子表格 | `.xls`, `.xlsx`, `.csv`, `.tsv` |
@@ -141,8 +143,11 @@ restored.export("output/report.epub", output_format="epub")
 
 ## 选择适合的处理方式
 
-- **文本 PDF：** 原生解析利用文档已有的文字与结构。需要 OCR 的扫描页面应交给外部 OCR 或推理服务。
-- **PDF 分类：** `docvortex classify report.pdf` 返回 `txt` 或 `ocr`。分类需要显式调用，不会启动推理；解析也不会自动切换后端。
+- **PDF 解析：** 默认 `parse_mode="auto"` 对选定页面分类，自动选择原生文字或本地 CPU OCR。`parse_mode="txt"` 强制原生解析，不分类、不下载模型；`parse_mode="ocr"` 强制 OCR。CLI 使用 `--parse-mode auto|txt|ocr`。显式模式仅适用于 PDF。
+- **PDF OCR：** layout 提供块区域与阅读顺序，文本块使用 Tiny Det / Small Rec。独立公式、图片、图表和印章保留截图，行内公式随文本做普通 OCR。表格输出空间投影文字及截图，不识别单元格结构。首版不使用页面方向分类或去畸变模型；所选文档整体采用一种解析后端。
+
+混合 PDF 若被分类为 `txt`，但包含扫描页，可使用 `parse_mode="ocr"`（CLI：`--parse-mode ocr`）对所选文档整体做 OCR。
+- **PDF 分类：** `docvortex classify report.pdf` 返回 `txt` 或 `ocr`，不推理、不联网。元数据提取及底层 `PdfModel.predict()` 原生文字入口也保持离线。详见[模型来源](licenses/models/README.md)。
 - **PDF 导出：** 具有页面几何的 PDF 来源默认按原始块布局还原，正文可选择，表格优先使用可选择文字的 HTML 结构表，图表保留区域图；其他来源和旧结果继续语义重排。可通过 `--pdf-layout original|reflow` 显式选择，字体、换行与绘图指令不保证无损复现。详见 [PDF 布局选项](docs/USAGE.md#pdf-output-layout)。
 
 ## 文档导航

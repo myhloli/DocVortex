@@ -481,7 +481,7 @@ def test_rotated_cropped_page_keeps_image_position() -> None:
     writer.pages[0].rotate(90)
     source = BytesIO()
     writer.write(source)
-    result = parse(source.getvalue(), file_suffix="pdf")
+    result = parse(source.getvalue(), file_suffix="pdf", parse_mode="txt")
     artifact = render_artifact(result.middle_json, "pdf", assets=result.assets)
     with PDFDocument(source.getvalue()) as original, PDFDocument(artifact.content) as rebuilt:
         assert original.page_size(0) == rebuilt.page_size(0) == (520, 360)

@@ -65,7 +65,7 @@ def _blocks(sample):
     path = root / "flash_review_20261004" / f"review_{sample}.pdf"
     if not path.exists():
         path = root / "flash_review_20261003" / f"review_{sample}.pdf"
-    return parse(path, keep_model_json=True).to_dict()["pages"][0]["blocks"]
+    return parse(path, keep_model_json=True, parse_mode="txt").to_dict()["pages"][0]["blocks"]
 
 
 @pytest.mark.parametrize("sample", [79, 80])
@@ -289,7 +289,7 @@ def test_local_list_html_preserves_separate_items_and_continuations(tmp_path, sa
     path = Path(__file__).parent / f"pdfs/flash_review_20261004/review_{sample}.pdf"
     if not path.exists():
         path = Path(__file__).parent / f"pdfs/flash_review_20261003/review_{sample}.pdf"
-    result = parse(path)
+    result = parse(path, parse_mode="txt")
     destination = tmp_path / "document.html"
     result.export(destination, output_format="html")
     soup = BeautifulSoup(destination.read_text(), "html.parser")

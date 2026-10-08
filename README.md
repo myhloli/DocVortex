@@ -25,12 +25,14 @@ DocVortex is a standalone Python engine for parsing and converting documents.
 It reads native text and document structure into a unified representation,
 then exports the result in the formats your workflow needs.
 
-- **Multi-format input** — read text PDFs, Office files, OpenDocument files, EPUB, HTML, OFD, CSV and TSV.
+- **Multi-format input** — read text and scanned PDFs, Office files, OpenDocument files, EPUB, HTML, OFD, CSV and TSV.
 - **Parse once, export many times** — reuse the same result for Markdown, HTML, LaTeX, DOCX, EPUB, PDF and structured JSON.
 - **Portable results** — save document structure and image assets in a Bundle, then export again without the source file.
 - **Composable APIs** — use the complete pipeline or integrate analysis, postprocessing and rendering separately.
 
 Native parsing works without an OCR or VLM inference service. Use DocVortex directly through its CLI or Python SDK.
+
+Scanned PDFs use local CPU OCR. The first OCR parse automatically downloads PP-DocLayoutV2 and PP-OCRv6 Tiny Det / Small Rec from Hugging Face, falling back to ModelScope, into `~/.docvortex/model/`. The six model and configuration files total about 239 MB; a complete cache works offline.
 
 ![DocVortex pipeline: native documents become a unified representation, then Markdown, HTML, LaTeX, DOCX, EPUB, PDF or structured JSON.](https://gcore.jsdelivr.net/gh/myhloli/DocVortex@main/docs/images/docvortex-overview.jpg)
 
@@ -91,7 +93,7 @@ use `overwrite=True` in Python or `--overwrite` in the CLI to replace them.
 
 | Document family | File extensions |
 | --- | --- |
-| PDF with native text | `.pdf` |
+| PDF with native text or scanned pages | `.pdf` |
 | Word & rich text | `.doc`, `.docx`, `.rtf` |
 | Presentations | `.ppt`, `.pptx` |
 | Spreadsheets | `.xls`, `.xlsx`, `.csv`, `.tsv` |
@@ -142,8 +144,11 @@ reads metadata without parsing the document body.
 
 ## Choose the right workflow
 
-- **Text PDFs:** native parsing uses the document's existing text and structure. Scanned pages requiring OCR need an external OCR or inference service.
-- **PDF classification:** `docvortex classify report.pdf` returns `txt` or `ocr`. Classification is explicit and does not start inference; parsing does not automatically switch backends.
+- **PDF parsing:** `parse_mode="auto"` (default) classifies the selected PDF pages and chooses native text or local CPU OCR. Use `parse_mode="txt"` to force native parsing without classification or model downloads, or `parse_mode="ocr"` to force OCR. The CLI equivalent is `--parse-mode auto|txt|ocr`. Explicit modes apply only to PDF input.
+- **PDF OCR:** layout supplies block regions and reading order; text blocks use Tiny Det / Small Rec. Display formulas, images, charts and seals retain screenshots. Inline formulas pass through ordinary text OCR. Tables contain spatially projected text and a screenshot, without structural cell recognition. No page orientation or unwarping model is used. A selected document uses one backend throughout.
+
+If a mixed PDF is classified as `txt` but contains scanned pages, use `parse_mode="ocr"` (CLI: `--parse-mode ocr`) to OCR the entire selection.
+- **PDF classification:** `docvortex classify report.pdf` returns `txt` or `ocr` without inference or networking. Metadata extraction and the low-level `PdfModel.predict()` native text API also remain offline. See [model provenance](licenses/models/README.md).
 - **PDF export:** PDF sources with page geometry default to block layout restoration, with selectable text and HTML-based tables; charts retain region images. Other sources and older results use semantic reflow. Use `--pdf-layout original|reflow` to select explicitly; fonts, line breaks and drawing instructions are not reproduced losslessly. See [PDF output layout](docs/USAGE.md#pdf-output-layout).
 
 ## Documentation

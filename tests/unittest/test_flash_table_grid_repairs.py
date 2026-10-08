@@ -148,7 +148,7 @@ def _continuation_pdf(left, widths, font_size, kind):
 )
 def test_single_occupied_column_requires_adjacent_matching_terminal_table(left, widths, font_size, kind):
     """孤立网格、插页、正文屏障、图片屏障和任一列轨错位均不能冒充跨页续表。"""
-    result = parse(_continuation_pdf(left, widths, font_size, kind), file_suffix="pdf", keep_model_json=True)
+    result = parse(_continuation_pdf(left, widths, font_size, kind), file_suffix="pdf", keep_model_json=True, parse_mode="txt")
     page = result.model_json.pages[-1]
     tables = [b for b in page if b["type"] == "table"]
     assert bool(tables) == (kind == "continued")

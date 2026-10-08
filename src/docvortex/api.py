@@ -7,7 +7,7 @@ import time
 from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from .assets import AssetStore
 from .document.source import HtmlSourceContext, prepare_source
@@ -39,15 +39,22 @@ def analyze(
     file_suffix: FileSuffix | None = None,
     page_range: str = "",
     source_context: HtmlSourceContext | None = None,
+    parse_mode: Literal["auto", "txt", "ocr"] = "auto",
 ) -> AnalysisResult:
-    """执行原生分析，显式调用者选择不会被隐式分类或 OCR 改写。"""
+    """分析文档，PDF 默认按分类选择原生文字或基础 OCR，显式模式优先。"""
     from .analyzers.native import models
+    from .errors import InvalidRequestError
+
+    if parse_mode not in {"auto", "txt", "ocr"}:
+        raise InvalidRequestError("parse_mode_invalid", "parse_mode must be auto, txt, or ocr", "parse_mode")
 
     started = time.perf_counter()
     native_diagnostics: tuple[Diagnostic, ...] = ()
     extensions = {}
     prepared = prepare_source(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context)
     try:
+        if prepared.file_suffix != "pdf" and parse_mode != "auto":
+            raise InvalidRequestError("parse_mode_invalid", "Explicit parse modes are supported only for PDF", "parse_mode")
         properties = prepared.source_properties
         metadata_diagnostics = tuple(Diagnostic("read_metadata_failed", message) for message in prepared.metadata_warnings)
         if prepared.file_suffix not in {"pdf", "mhtml"}:
@@ -70,8 +77,15 @@ def analyze(
             geometry, geometry_diagnostics = extract_layout_geometry(prepared.document, prepared.page_index_map)
             extensions[LAYOUT_EXTENSION] = geometry
             native_diagnostics += geometry_diagnostics
-            pages = models.PdfModel().predict(prepared.document)
-            attach_visual_block_images_from_pdf(prepared.document, pages)
+            resolved_mode = prepared.document.classify() if parse_mode == "auto" else parse_mode
+            if resolved_mode == "ocr":
+                from .analyzers.ocr.pdf import analyze_pdf_ocr
+
+                pages, ocr_diagnostics = analyze_pdf_ocr(prepared.document, prepared.page_index_map)
+                native_diagnostics += ocr_diagnostics
+            else:
+                pages = models.PdfModel().predict(prepared.document)
+                attach_visual_block_images_from_pdf(prepared.document, pages)
             attach_layout_image_rotations(geometry, pages, prepared.page_index_map)
         elif prepared.file_suffix == "ofd":
             ofd_model = models.OfdModel()
@@ -159,10 +173,11 @@ def parse(
     page_range: str = "",
     source_context: HtmlSourceContext | None = None,
     keep_model_json: bool = False,
+    parse_mode: Literal["auto", "txt", "ocr"] = "auto",
 ) -> DocumentResult:
     """完成输入、分析及后处理，返回可脱离原文件使用的结果。"""
     return postprocess(
-        analyze(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context),
+        analyze(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context, parse_mode=parse_mode),
         keep_model_json=keep_model_json,
     )
 
@@ -235,9 +250,10 @@ def convert(
     source_context: HtmlSourceContext | None = None,
     options: RenderOptions | None = None,
     overwrite: bool = False,
+    parse_mode: Literal["auto", "txt", "ocr"] = "auto",
 ) -> ExportResult:
-    """使用完整原生流程进行一次转换，并返回实际写出的文件路径。"""
-    result = parse(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context)
+    """按指定解析模式完成转换，并返回实际写出的文件路径。"""
+    result = parse(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context, parse_mode=parse_mode)
     return result.export(output_path, output_format=output_format, options=options, overwrite=overwrite)
 
 

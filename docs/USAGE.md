@@ -40,7 +40,7 @@ artifact.write("output/report.docx")
 
 | Stage | Result | Purpose |
 | --- | --- | --- |
-| `analyze(source)` | `AnalysisResult` | Read native content into `model_json` |
+| `analyze(source)` | `AnalysisResult` | Read document content into `model_json`; automatically route PDF OCR |
 | `postprocess(analysis)` | `DocumentResult` | Build `middle_json` and materialize assets |
 | `render(middle_json, format, assets=...)` | `RenderArtifact` | Encode an output without writing files |
 | `artifact.write(path)` | `ExportResult` | Write the main file and required sidecar assets |
@@ -196,17 +196,54 @@ have empty `content` and retain their region images (including detected numbers)
 so all renderers use the existing image fallback. Inline equations are unchanged.
 Old results and caches are not rewritten; reparse to obtain the new output.
 
-## Explicit PDF classification
+## PDF classification and local OCR
 
-DocVortex parses native document content without OCR or VLM inference.
-For scanned or otherwise unsuitable PDFs, applications can classify the document
-and choose their own OCR or inference service.
+`analyze()`, `parse()` and `convert()` accept `parse_mode="auto"` (default),
+`"txt"` or `"ocr"`. Auto mode classifies the selected pages after `page_range`
+has been applied, then uses one backend for the whole selected document. Forced
+text mode skips classification and OCR entirely. Non-PDF input accepts only
+the default auto mode.
+
+If a mixed PDF is classified as `txt` but contains scanned pages, select `ocr`
+explicitly to OCR all selected pages. Auto mode does not switch per page.
+
+```bash
+docvortex convert scan.pdf -o output/scan.md
+docvortex convert scan.pdf -o output/scan.html --parse-mode ocr --pages 1-3
+docvortex convert report.pdf -o output/native.md --parse-mode txt
+```
+
+```python
+import docvortex
+
+result = docvortex.parse("scan.pdf", parse_mode="auto", keep_model_json=True)
+result.export("output/scan.md")
+native = docvortex.parse("report.pdf", parse_mode="txt")
+```
+
+OCR uses CPU ONNX Runtime with PP-DocLayoutV2 and PP-OCRv6 Tiny Det / Small Rec.
+The first OCR parse downloads six fixed model/configuration files (about 239 MB)
+into `~/.docvortex/model/MinerU-4_models_onnx/`, preserving the repository paths.
+Downloads try Hugging Face first and fall back to ModelScope, validate SHA-256,
+and install atomically under a file lock. Complete caches work without networking.
+Failed downloads raise `DocumentError` with code `ocr_model_download_failed` and
+the failed file and sources. Invalid models and inference failures use
+`ocr_model_invalid` and `ocr_inference_failed`, respectively.
+
+Layout supplies reading order and regions. Text blocks use local OCR, tables
+retain spatially projected text and a screenshot, and display formulas retain
+an image with empty content. Inline formulas pass through ordinary text OCR.
+Images, charts and seals retain screenshots. No table structure, formula,
+orientation classification or unwarping model is downloaded. Recognition uses
+the single model's embedded character dictionary without a language selector.
+
+Classification remains separately available without inference or networking:
 
 ```bash
 docvortex classify report.pdf
 ```
 
-The command returns `txt` or `ocr`. The equivalent Python operation is explicit:
+The command returns `txt` or `ocr`. A caller can also inspect the classification:
 
 ```python
 import docvortex
@@ -214,15 +251,15 @@ from docvortex.document.pdf import PDFDocument
 
 with PDFDocument("report.pdf") as document:
     mode = document.classify()
-    if mode == "txt":
-        result = docvortex.parse(document)
-        result.export("output/native.md", output_format="markdown")
-    else:
-        print("This PDF needs an external OCR or inference workflow.")
+    result = docvortex.parse(document, parse_mode=mode)
+    result.export("output/result.md", output_format="markdown")
 ```
 
-Classification does not start inference. Native analysis does not classify
-automatically or switch to another backend.
+Classification and metadata extraction do not start inference. The low-level
+`docvortex.analyzers.native.PdfModel.predict()` continues to perform only native
+text analysis, preserving explicit callers such as MinerU. OCR screenshots are
+materialized into the normal result assets and remain usable after closing or
+deleting the source. See [model provenance](../licenses/models/README.md).
 
 ## Page images and embedded assets
 
@@ -246,8 +283,9 @@ print(image.width, image.height, image.mime_type, image.extension)
 - Supported encodings are `jpeg` (default), `png` and `webp`. Crops are encoded directly to the requested format.
 - The returned `ImageArtifact` is immutable and remains usable after the document closes. `crop_image()` returns JPEG bytes.
 
-`PDFDocument.from_image()` can wrap an image as a PDF document for low-level
-document operations; it does not add OCR to the native parser.
+`PDFDocument.from_image()` can wrap an image as a PDF document. Pass the resulting
+document to `parse(..., parse_mode="ocr")` for OCR; low-level document operations
+themselves do not run inference.
 
 Use `docvortex.assets` to validate embedded images or transcode image bytes:
 
