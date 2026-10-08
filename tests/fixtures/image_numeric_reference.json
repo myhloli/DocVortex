@@ -1,0 +1,1788 @@
+{
+  "reference": "opencv-python 5.0.0.93 arm64; independent source before migration",
+  "cases": [
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        1
+      ],
+      "seed": 903,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "nearest"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35
+      ],
+      "sha256": "f72b12051291c452f36aff416875e4fb5708e8e6361fa182287bb76ff7de656c"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        1
+      ],
+      "seed": 903,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "linear"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35
+      ],
+      "sha256": "1b288e3ed05ffbc08ee532ed0f1b542cd0dad52250c1ffc8148bc9461dc21735"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        1
+      ],
+      "seed": 903,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "cubic"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35
+      ],
+      "sha256": "954c223d60e00651733b172731986240865c94cfc0effbdb1f1ef9cf249700a6"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        1
+      ],
+      "seed": 903,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "area"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35
+      ],
+      "sha256": "7f80ab3a37a9a48b7d3b56d84ee65f36f0bbb263223c145e9dd9ff5a22c100a0"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        1
+      ],
+      "seed": 903,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "lanczos4"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35
+      ],
+      "sha256": "4f5418303019822a4fe0400103d227735ef473ca0ba3bd753598f6866247fe48"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        1
+      ],
+      "seed": 903,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "nearest"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14
+      ],
+      "sha256": "0e24d8bde621133ef752138c57d89a705e180e23bb4ae05e6aa79cea9bf4e90a"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        1
+      ],
+      "seed": 903,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "linear"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14
+      ],
+      "sha256": "0802a6ea2426b24bb28fe57fac35ed4477236ac7560170df8cb99a283154a0e5"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        1
+      ],
+      "seed": 903,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "cubic"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14
+      ],
+      "sha256": "d440db1f75f5e50368a01f7a946924a9aa12e36a4dc4dbd1f5e49e33a0aeaf90"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        1
+      ],
+      "seed": 903,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "area"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14
+      ],
+      "sha256": "d5364641938cc5c30f5af190e748b1e3544b6daed97ee46e4a31c9827703b90e"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        1
+      ],
+      "seed": 903,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "lanczos4"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14
+      ],
+      "sha256": "392aea4ee87c8c7c8cb5641aeb4c30770c61dabde3d6b8944d500cfe13421e98"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        3
+      ],
+      "seed": 905,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "nearest"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35,
+        3
+      ],
+      "sha256": "231f8bc942d4132192ecefed57e4d6b1a6aedf072fc15f2ae2798e55da7beb8e"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        3
+      ],
+      "seed": 905,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "linear"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35,
+        3
+      ],
+      "sha256": "ce5ee0a4fcced46a13756ee07d2d277cb285689480f320da6e9a098dca754460"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        3
+      ],
+      "seed": 905,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "cubic"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35,
+        3
+      ],
+      "sha256": "65996fbf09080d075cd9f9fbbd7c01b4ab0019d91797115c522b0c0813922f08"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        3
+      ],
+      "seed": 905,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "area"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35,
+        3
+      ],
+      "sha256": "0a824e2bc6522e39411c4eece924d63c9701a5473e8ad156be9743a0c786efb6"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        3
+      ],
+      "seed": 905,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "lanczos4"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35,
+        3
+      ],
+      "sha256": "d89c04d9bc94c6bd698dbd335d2e9bccc70c2bd5abf444fd0e0897ff2786b719"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        3
+      ],
+      "seed": 905,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "nearest"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14,
+        3
+      ],
+      "sha256": "f873f290c2211203d3eeb9b16e87d4356cf69547195ac3ed7056119af45e8a63"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        3
+      ],
+      "seed": 905,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "linear"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14,
+        3
+      ],
+      "sha256": "2cb22a9f34987eff9e97a4bfb779d8dcb1e0fedf188de612e5a5a00fdcbf2dae"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        3
+      ],
+      "seed": 905,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "cubic"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14,
+        3
+      ],
+      "sha256": "757840a388d535f4821e7a73c931974fc9fdbb492885b748253f2c3adb9a2f39"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        3
+      ],
+      "seed": 905,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "area"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14,
+        3
+      ],
+      "sha256": "8c055252b01cbf70a5c0339acc880dc35b095da0ab09f0a793236b2b9f559577"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        3
+      ],
+      "seed": 905,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "lanczos4"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14,
+        3
+      ],
+      "sha256": "9b90eccaa3188610635ff81e2aef22f8326c82dcefe0592388041d08def2285c"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 906,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "nearest"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35,
+        4
+      ],
+      "sha256": "5ffaa132d833c58bfc2775efb07c71c259d9f4afdc3c555c0ee7f947f0099b65"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 906,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "linear"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35,
+        4
+      ],
+      "sha256": "dd333b117e9fd166417b2f531cae1cd22b5e056f03a01e0f5575225d487e512c"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 906,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "cubic"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35,
+        4
+      ],
+      "sha256": "e904559db747510cc9ffd4b18706fb7db3d7988b6df3df753047deea3135d8a6"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 906,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "area"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35,
+        4
+      ],
+      "sha256": "82d853e5189f9258706ef19b6090ed34f5b1f54c9a7e26e2ae2ab5ee073ce779"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 906,
+      "args": {
+        "size": [
+          35,
+          23
+        ],
+        "interpolation": "lanczos4"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        23,
+        35,
+        4
+      ],
+      "sha256": "a6a690b3b3b452eefcdaa3979023d1b773713ad224925af12941af084d623fa4"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 906,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "nearest"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14,
+        4
+      ],
+      "sha256": "f26e0864475040e0ac49db83784a2cec860144168d2c5e79c9128b34515c0e59"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 906,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "linear"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14,
+        4
+      ],
+      "sha256": "bf387b1436f07a9764502b6c0594de0c780d0a9692cfabb46860246f407f9022"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 906,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "cubic"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14,
+        4
+      ],
+      "sha256": "843c9216652f6b88c49f4776dab0aa76ce434ad563809ba1c7ea8b8d8db39cad"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 906,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "area"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14,
+        4
+      ],
+      "sha256": "933b1044b3bddf3afa7159bce805b696b211dbd2e0a86b8b834783a662b359d8"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 906,
+      "args": {
+        "size": [
+          14,
+          8
+        ],
+        "interpolation": "lanczos4"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        8,
+        14,
+        4
+      ],
+      "sha256": "3519839ae0e3fd8176599c3c7e3d8ab76dd0a6d8ebc79ce0082f344322e2ac4f"
+    },
+    {
+      "operation": "gray",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 822,
+      "args": {
+        "color_order": "rgb"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        17,
+        29
+      ],
+      "sha256": "826bd68746bb36d9a80c050d5e55e3d7d9f695fe244de973bcd6cf89b36623b1"
+    },
+    {
+      "operation": "gray",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 822,
+      "args": {
+        "color_order": "bgr"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        17,
+        29
+      ],
+      "sha256": "c5881d166a310a56e330d409911db355ac62e04dc93456d33a77f607f38cc470"
+    },
+    {
+      "operation": "gray",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 822,
+      "args": {
+        "color_order": "rgb"
+      },
+      "dtype": "uint16",
+      "output_shape": [
+        17,
+        29
+      ],
+      "sha256": "145f6b5510a791f204b181f53c9d6b0f0b4910c5ab63b1ee06f855f118763f42"
+    },
+    {
+      "operation": "gray",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 822,
+      "args": {
+        "color_order": "bgr"
+      },
+      "dtype": "uint16",
+      "output_shape": [
+        17,
+        29
+      ],
+      "sha256": "2ece922bacd11266d1904a66af7ac492f9b3b47bc13397caf25d028314f49506"
+    },
+    {
+      "operation": "gray",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 822,
+      "args": {
+        "color_order": "rgb"
+      },
+      "dtype": "float32",
+      "output_shape": [
+        17,
+        29
+      ],
+      "sha256": "449a88653f81606533717f1852d5eb2457bda51b2e81b9639c4cad94a95a447d"
+    },
+    {
+      "operation": "gray",
+      "shape": [
+        17,
+        29,
+        4
+      ],
+      "seed": 822,
+      "args": {
+        "color_order": "bgr"
+      },
+      "dtype": "float32",
+      "output_shape": [
+        17,
+        29
+      ],
+      "sha256": "2674213b50fba96fe8cee38029950e772abca3f41e5b5cec8735dad0cc0f644d"
+    },
+    {
+      "operation": "warp",
+      "shape": [
+        20,
+        30,
+        3
+      ],
+      "seed": 198,
+      "args": {
+        "size": [
+          24,
+          18
+        ],
+        "source": [
+          [
+            1.0,
+            1.0
+          ],
+          [
+            21.0,
+            2.0
+          ],
+          [
+            23.0,
+            15.0
+          ],
+          [
+            0.0,
+            17.0
+          ]
+        ],
+        "target": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            24.0,
+            18.0
+          ],
+          [
+            0.0,
+            18.0
+          ]
+        ],
+        "interpolation": "nearest",
+        "border": "replicate"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        18,
+        24,
+        3
+      ],
+      "sha256": "6d41cb2ae9aa3d7021a079b5e16326eaec9c61328a461b2cdddbf265559ef513"
+    },
+    {
+      "operation": "warp",
+      "shape": [
+        20,
+        30,
+        3
+      ],
+      "seed": 198,
+      "args": {
+        "size": [
+          24,
+          18
+        ],
+        "source": [
+          [
+            1.0,
+            1.0
+          ],
+          [
+            21.0,
+            2.0
+          ],
+          [
+            23.0,
+            15.0
+          ],
+          [
+            0.0,
+            17.0
+          ]
+        ],
+        "target": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            24.0,
+            18.0
+          ],
+          [
+            0.0,
+            18.0
+          ]
+        ],
+        "interpolation": "linear",
+        "border": "replicate"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        18,
+        24,
+        3
+      ],
+      "sha256": "460a87dc0d47a1a70db1f0d2c655bd6ece1683cecd8ae868295cedef43cb12ce"
+    },
+    {
+      "operation": "warp",
+      "shape": [
+        20,
+        30,
+        3
+      ],
+      "seed": 198,
+      "args": {
+        "size": [
+          24,
+          18
+        ],
+        "source": [
+          [
+            1.0,
+            1.0
+          ],
+          [
+            21.0,
+            2.0
+          ],
+          [
+            23.0,
+            15.0
+          ],
+          [
+            0.0,
+            17.0
+          ]
+        ],
+        "target": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            24.0,
+            18.0
+          ],
+          [
+            0.0,
+            18.0
+          ]
+        ],
+        "interpolation": "cubic",
+        "border": "replicate"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        18,
+        24,
+        3
+      ],
+      "sha256": "9cb84ab49e09c59f3a94fbdc334d5f833ef3d3fa0356a6b257bb6c18babb49b6"
+    },
+    {
+      "operation": "warp",
+      "shape": [
+        20,
+        30,
+        3
+      ],
+      "seed": 198,
+      "args": {
+        "size": [
+          24,
+          18
+        ],
+        "source": [
+          [
+            1.0,
+            1.0
+          ],
+          [
+            21.0,
+            2.0
+          ],
+          [
+            23.0,
+            15.0
+          ],
+          [
+            0.0,
+            17.0
+          ]
+        ],
+        "target": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            24.0,
+            18.0
+          ],
+          [
+            0.0,
+            18.0
+          ]
+        ],
+        "interpolation": "nearest",
+        "border": "replicate"
+      },
+      "dtype": "uint16",
+      "output_shape": [
+        18,
+        24,
+        3
+      ],
+      "sha256": "d9f63ac0cce76a169f88677cd93d648e9f7d7eea2ec52ac770c884cbf8aac94c"
+    },
+    {
+      "operation": "warp",
+      "shape": [
+        20,
+        30,
+        3
+      ],
+      "seed": 198,
+      "args": {
+        "size": [
+          24,
+          18
+        ],
+        "source": [
+          [
+            1.0,
+            1.0
+          ],
+          [
+            21.0,
+            2.0
+          ],
+          [
+            23.0,
+            15.0
+          ],
+          [
+            0.0,
+            17.0
+          ]
+        ],
+        "target": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            24.0,
+            18.0
+          ],
+          [
+            0.0,
+            18.0
+          ]
+        ],
+        "interpolation": "linear",
+        "border": "replicate"
+      },
+      "dtype": "uint16",
+      "output_shape": [
+        18,
+        24,
+        3
+      ],
+      "sha256": "f01bafbf4af539799e5b4bb38d1e0de3303a7c0459adf58fbbcbf73c786786ab"
+    },
+    {
+      "operation": "warp",
+      "shape": [
+        20,
+        30,
+        3
+      ],
+      "seed": 198,
+      "args": {
+        "size": [
+          24,
+          18
+        ],
+        "source": [
+          [
+            1.0,
+            1.0
+          ],
+          [
+            21.0,
+            2.0
+          ],
+          [
+            23.0,
+            15.0
+          ],
+          [
+            0.0,
+            17.0
+          ]
+        ],
+        "target": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            24.0,
+            18.0
+          ],
+          [
+            0.0,
+            18.0
+          ]
+        ],
+        "interpolation": "cubic",
+        "border": "replicate"
+      },
+      "dtype": "uint16",
+      "output_shape": [
+        18,
+        24,
+        3
+      ],
+      "sha256": "1472686cafdb74b7b39de519d76d6021583a19f7a80f890a638bed36c8de6a9b"
+    },
+    {
+      "operation": "warp",
+      "shape": [
+        20,
+        30,
+        3
+      ],
+      "seed": 198,
+      "args": {
+        "size": [
+          24,
+          18
+        ],
+        "source": [
+          [
+            1.0,
+            1.0
+          ],
+          [
+            21.0,
+            2.0
+          ],
+          [
+            23.0,
+            15.0
+          ],
+          [
+            0.0,
+            17.0
+          ]
+        ],
+        "target": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            24.0,
+            18.0
+          ],
+          [
+            0.0,
+            18.0
+          ]
+        ],
+        "interpolation": "nearest",
+        "border": "replicate"
+      },
+      "dtype": "float32",
+      "output_shape": [
+        18,
+        24,
+        3
+      ],
+      "sha256": "01075d4b9d9dfb35233b8480540200f4c9c5435cb9a08d082ac8b60b17b13a58"
+    },
+    {
+      "operation": "warp",
+      "shape": [
+        20,
+        30,
+        3
+      ],
+      "seed": 198,
+      "args": {
+        "size": [
+          24,
+          18
+        ],
+        "source": [
+          [
+            1.0,
+            1.0
+          ],
+          [
+            21.0,
+            2.0
+          ],
+          [
+            23.0,
+            15.0
+          ],
+          [
+            0.0,
+            17.0
+          ]
+        ],
+        "target": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            24.0,
+            18.0
+          ],
+          [
+            0.0,
+            18.0
+          ]
+        ],
+        "interpolation": "linear",
+        "border": "replicate"
+      },
+      "dtype": "float32",
+      "output_shape": [
+        18,
+        24,
+        3
+      ],
+      "sha256": "d58a034f0547f1950fa399c2c6fc84d31a276525622acbb3bf574a56e3de5a8f"
+    },
+    {
+      "operation": "warp",
+      "shape": [
+        20,
+        30,
+        3
+      ],
+      "seed": 198,
+      "args": {
+        "size": [
+          24,
+          18
+        ],
+        "source": [
+          [
+            1.0,
+            1.0
+          ],
+          [
+            21.0,
+            2.0
+          ],
+          [
+            23.0,
+            15.0
+          ],
+          [
+            0.0,
+            17.0
+          ]
+        ],
+        "target": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            24.0,
+            18.0
+          ],
+          [
+            0.0,
+            18.0
+          ]
+        ],
+        "interpolation": "cubic",
+        "border": "replicate"
+      },
+      "dtype": "float32",
+      "output_shape": [
+        18,
+        24,
+        3
+      ],
+      "sha256": "0741e50b34b7c87f9b90af52f13f56647da1eb3ee266c235dc54234252b142f2"
+    },
+    {
+      "operation": "line",
+      "shape": [
+        50,
+        50
+      ],
+      "seed": 0,
+      "args": {
+        "start": [
+          2,
+          4
+        ],
+        "end": [
+          39,
+          43
+        ],
+        "width": 1
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        50,
+        50
+      ],
+      "sha256": "fbf34471e53405d3b69074a6e3076bbf86ef3b4c11e1d4cd9776be400ea15222"
+    },
+    {
+      "operation": "line",
+      "shape": [
+        50,
+        50
+      ],
+      "seed": 0,
+      "args": {
+        "start": [
+          2,
+          4
+        ],
+        "end": [
+          39,
+          43
+        ],
+        "width": 2
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        50,
+        50
+      ],
+      "sha256": "10ac9efb28af5e5ae7051fd415515c1833015076323c9fa78728c3f3eb20385d"
+    },
+    {
+      "operation": "line",
+      "shape": [
+        50,
+        50
+      ],
+      "seed": 0,
+      "args": {
+        "start": [
+          2,
+          4
+        ],
+        "end": [
+          39,
+          43
+        ],
+        "width": 3
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        50,
+        50
+      ],
+      "sha256": "f2c738b801af75b914524af8ae2079e85a9050314f9432e74a154ca609b1cff9"
+    },
+    {
+      "operation": "line",
+      "shape": [
+        50,
+        50
+      ],
+      "seed": 0,
+      "args": {
+        "start": [
+          2,
+          4
+        ],
+        "end": [
+          39,
+          43
+        ],
+        "width": 4
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        50,
+        50
+      ],
+      "sha256": "37b3cd5127de309f75e5402e4a2afdf6b90ed50bd82ca91ea43339f012f44345"
+    },
+    {
+      "operation": "morph",
+      "shape": [
+        17,
+        23
+      ],
+      "seed": 901,
+      "args": {
+        "kernel": [
+          2,
+          3
+        ],
+        "operation": "dilate"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        17,
+        23
+      ],
+      "sha256": "abfe482e616de6dcc8d4e9dc9a564490868bb4ed03d38ccaf0ad9eaf8bfcd2e0"
+    },
+    {
+      "operation": "morph",
+      "shape": [
+        17,
+        23
+      ],
+      "seed": 901,
+      "args": {
+        "kernel": [
+          2,
+          3
+        ],
+        "operation": "erode"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        17,
+        23
+      ],
+      "sha256": "db6f6097124dc8eaba5c36f64fdc1e3e44201b6c0f3fd6a11fbab4b38657ad6b"
+    },
+    {
+      "operation": "morph",
+      "shape": [
+        17,
+        23
+      ],
+      "seed": 901,
+      "args": {
+        "kernel": [
+          2,
+          3
+        ],
+        "operation": "close"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        17,
+        23
+      ],
+      "sha256": "3fd00cf6b0b2f378db819d07cf20934169694a5fa7345a08b470cb352c5e9bbf"
+    },
+    {
+      "operation": "labels",
+      "shape": [
+        17,
+        23
+      ],
+      "seed": 901,
+      "args": {},
+      "dtype": "uint8",
+      "output_shape": [
+        17,
+        23
+      ],
+      "sha256": "7916089500f41d4906bb67cfa55817df330778779e3bdc8202842b5a79f21b1b"
+    },
+    {
+      "operation": "stats",
+      "shape": [
+        17,
+        23
+      ],
+      "seed": 901,
+      "args": {},
+      "dtype": "uint8",
+      "output_shape": [
+        29,
+        5
+      ],
+      "sha256": "e81a87c9c84be60b418ae86ad673c0a3e87855c72ae8672af8cde159f2a74dad"
+    },
+    {
+      "operation": "contours",
+      "shape": [
+        17,
+        23
+      ],
+      "seed": 901,
+      "args": {
+        "external_only": false
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        120,
+        1,
+        2
+      ],
+      "sha256": "c633fd740a11b5f7724f0ff3549242068d3f06c4e99db26c6f5d131d1d7883d3"
+    },
+    {
+      "operation": "contours",
+      "shape": [
+        17,
+        23
+      ],
+      "seed": 901,
+      "args": {
+        "external_only": true
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        114,
+        1,
+        2
+      ],
+      "sha256": "bc653217b1b474395d4270d67fd77fb45adbf4a6a020a0e113bba38b8c9aab52"
+    },
+    {
+      "operation": "polygon",
+      "shape": [
+        24,
+        24
+      ],
+      "seed": 0,
+      "args": {
+        "points": [
+          [
+            17,
+            -2
+          ],
+          [
+            19,
+            18
+          ],
+          [
+            3,
+            -1
+          ],
+          [
+            4,
+            6
+          ]
+        ]
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        24,
+        24
+      ],
+      "sha256": "b8d410703d857c1ed82474c4ba947d8965af9f2ee1307c5c30f28f09d1e5bc97"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        131,
+        1186,
+        3
+      ],
+      "seed": 1401,
+      "args": {
+        "size": [
+          960,
+          96
+        ],
+        "interpolation": "linear"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        96,
+        960,
+        3
+      ],
+      "sha256": "b01b9943906e2613b3c7b49604a3ffd6d6a77d13bb8cc83fba3a8217393b11b5"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        731,
+        1378,
+        3
+      ],
+      "seed": 1402,
+      "args": {
+        "size": [
+          960,
+          512
+        ],
+        "interpolation": "linear"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        512,
+        960,
+        3
+      ],
+      "sha256": "7646ad7c0296dc49bfedfc6a89544935f189028f71a2d95416c8d29655f197d3"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        186,
+        1372,
+        3
+      ],
+      "seed": 1403,
+      "args": {
+        "size": [
+          960,
+          128
+        ],
+        "interpolation": "linear"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        128,
+        960,
+        3
+      ],
+      "sha256": "7b1099b9556d4f50694ffe17240480718943492a71057866c5f3dd973bc7e0e7"
+    },
+    {
+      "operation": "resize",
+      "shape": [
+        70,
+        323,
+        3
+      ],
+      "seed": 1404,
+      "args": {
+        "size": [
+          222,
+          48
+        ],
+        "interpolation": "linear"
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        48,
+        222,
+        3
+      ],
+      "sha256": "23e173463af4c83aeecfef774eef1d02f8f41d61cf38ef9fda26604e8f6ac0e3"
+    },
+    {
+      "operation": "line",
+      "shape": [
+        50,
+        50
+      ],
+      "seed": 0,
+      "args": {
+        "start": [
+          -30,
+          12
+        ],
+        "end": [
+          70,
+          35
+        ],
+        "width": 1
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        50,
+        50
+      ],
+      "sha256": "9930197042fc4a6f191932869db50117fecab2bc106539bdf04bfbae6cdfbfb1"
+    },
+    {
+      "operation": "line",
+      "shape": [
+        50,
+        50
+      ],
+      "seed": 0,
+      "args": {
+        "start": [
+          -30,
+          12
+        ],
+        "end": [
+          70,
+          35
+        ],
+        "width": 2
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        50,
+        50
+      ],
+      "sha256": "2f9f33c7223a7faf93c41c0aa049d150843db0970e69cc902f76e0f73a321ede"
+    },
+    {
+      "operation": "line",
+      "shape": [
+        50,
+        50
+      ],
+      "seed": 0,
+      "args": {
+        "start": [
+          -6,
+          -2
+        ],
+        "end": [
+          49,
+          38
+        ],
+        "width": 3
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        50,
+        50
+      ],
+      "sha256": "9543d2903b06a253286cb504971f9138f3886600a69a809b68845f502ca96a79"
+    },
+    {
+      "operation": "line",
+      "shape": [
+        50,
+        50
+      ],
+      "seed": 0,
+      "args": {
+        "start": [
+          20,
+          -80
+        ],
+        "end": [
+          23,
+          70
+        ],
+        "width": 4
+      },
+      "dtype": "uint8",
+      "output_shape": [
+        50,
+        50
+      ],
+      "sha256": "9583ebeb92ac3ff214fc1ae71dfeb717440f89301fe3305198d8b958d7d4de59"
+    }
+  ]
+}

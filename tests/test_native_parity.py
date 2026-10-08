@@ -25,6 +25,15 @@ def native():
 def test_native_registration_contract(native):
     """约束重构前的平面扩展接口、签名和类型身份，防止拆分模块时漏注册或改名。"""
     functions = {
+        "image_components": "(data, width, height)",
+        "image_contours": "(data, width, height, external)",
+        "image_resize": "(data, width, height, channels, depth, target_w, target_h, mode, xindices, xweights, yindices, yweights)",
+        "image_warp": "(data, width, height, channels, depth, target_w, target_h, mode, replicate, value, inverse, affine)",
+        "image_minimum_rectangle": "(data)",
+        "image_morphology": "(data, width, height, kw, kh, dilate)",
+        "image_lines": "(data, width, height, channels, lines, value, thickness)",
+        "image_polygons": "(width, height, polygons, value)",
+        "image_solve": "(matrix, rhs)",
         "prepare_fill_bands": "(boxes)",
         "graphic_numeric_lines": "(lines, mode, line_type, matcher)",
         "year_header_groups": "(lines, rules, em)",
@@ -155,7 +164,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 31, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 32, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)

@@ -2,6 +2,35 @@
 
 2026-10-08。本轮基于 main `abfa99c63ce336da9da9916c5c9eb90937bbb3cf` 的 0.5.10、私有原生协议 31。实现纳入 0.5.11。DocVortex 已完成代码修改和本地验收；MinerU 仅做分析及集成验证，源码未修改。实验候选 wheel 沿用 0.5.10 版本用于同版本对照，未作为正式包发布。
 
+## 0.5.12 候选：支持 MinerU 基础依赖迁移
+
+第二轮基于已发布的 0.5.11 `9f3b9936f07cc5b2ad29e929e4e87dcbbdbf4f64`，在独立工作树
+`/Users/myhloli/.codex-workspaces/worktrees/docvortex-opencv-free-20261008/docvortex` 中增加
+`docvortex.image` 公共接口及 Rust/NumPy 参考内核。实现和验收阶段原 main 工作树保持原样，
+本次整合将验收后的改动提交并合并到本地 main。新增通用函数已登记
+`PUBLIC_API`；模型阈值和后处理选择留在 MinerU。接口契约见 [SDK 文档](sdk-0.4.md)。
+
+图像基础数值规则固定保留整数与浮点灰度、线性/三次/区域/Lanczos 缩放、连续透视采样、
+轮廓点序、组件顺序、旋转卡尺、扫描线填充、抗锯齿线及小型主元消元的历史舍入。
+位图裁剪保持原协议；私有扩展因增加图像函数升级为 32。不会按 cv2 的可用性选择回退算法。
+历史参考为本机 OpenCV 5.0.0.93；冻结样本包含宽图通道块的定点误差、非连续数组、uint16/
+float32、边界裁剪、alpha、十六位 PNG、EXIF 和同一图像的 Python/Rust 一致性。
+
+Python 全量测试 9642 passed、14 skipped；Rust workspace 16 项测试通过。完整 MinerU 集成
+3010 passed、4 skipped。真实 ONNX/Torch、UNet 表格、Flash OCR、GGUF standard/advanced
+在阻断 cv2 的进程内完成，协议、九种渲染和已采集模型输入摘要与冻结基线相同；Python 参考后端
+也完成真实 ONNX 同样的输入和输出对照。另核对源 PDF 与基线/候选 PDF 导出，未出现新增视觉差异。
+原有竖排表格导出的版式局限仍可见，本轮未修改它。
+
+四条 MinerU 路径各五对独立进程的稳态中位数相对基线为 Flash -0.31%、ONNX +3.59%、
+Torch +2.62%、表格 +3.24%，满足 <=5% 门槛。第一次表格轮次 +5.13% 超限后，改为连续
+float32 字节传入几何内核并保持完整索引排序，241 项相关测试及 Clippy 通过后重新测量。
+两轮证据保留，完整数值见 MinerU 迁移记录。
+
+原始证据位于 `/tmp/mineru-opencv-free-20261008`，对应 MinerU 仓库的
+`docs/next/opencv-loading.md` 记录完整路径与成对性能。当前 0.5.12 是本地候选，已纳入本地 main，尚未推送或发布；
+以下章节保留 0.5.11 移除直接依赖时的历史验收记录。
+
 ## 实现与公开行为
 
 `pyproject.toml` 删除 OpenCV 依赖，生产代码和引擎测试不再导入 `cv2`。

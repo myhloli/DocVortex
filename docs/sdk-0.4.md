@@ -1,6 +1,7 @@
-# DocVortex 0.4 公共 SDK 与宿主迁移
+# DocVortex 公共 SDK 与宿主迁移
 
-本文记录 0.4 系列的公共模块边界。MinerU 的共享图片导出需要 `docvortex>=0.4.19,<1`，文档协议、解析路由、模型回退与渲染语义保持不变。
+本文记录自 0.4 系列以来的公共模块边界。MinerU 本次无 OpenCV 模型路径需要 `docvortex>=0.5.12,<1`，
+文档协议、解析路由、模型回退与渲染语义保持不变；各历史版本的新增能力和最低版本见下方记录。
 
 ## 公开入口
 
@@ -9,6 +10,7 @@
 | foundation 几何及 PDF 通用坐标原语 | `docvortex.geometry` |
 | foundation 文本与链接规则 | `docvortex.content.text`、`docvortex.content.links` |
 | 图像统计、素材编码与路径校验 | `docvortex.assets` |
+| 通用图像数值内核 | `docvortex.image`（0.5.12） |
 | PDFDocument、PDFPage、字符和几何契约 | `docvortex.document.pdf` |
 | HTML 来源上下文 | `docvortex.document.contracts.HtmlSourceContext` |
 | 原生文字证据、区域表格及 OCR 文本投影 | `docvortex.analyzers.pdf` |
@@ -61,6 +63,39 @@ quality 95、4:2:0 采样、非渐进且不优化编码。临时图像和内存�
 
 公开签名、JSON、素材命名和原生协议 31 保持原样。完整本地验收、性能及 MinerU 自身的
 依赖迁移分析见 [OpenCV 移除报告](opencv-removal.md)。
+
+### 模型图像数值接口（0.5.12 候选）
+
+`docvortex.image` 提供通用图像数值操作，宿主通过此模块调用，不导入 foundation 或原生扩展。
+模块导入只定义接口；NumPy、Pillow 和扩展延迟到真正执行操作时加载。
+公共清单由 41 个模块、321 个符号增加到 42 个模块、343 个符号；新增 19 个函数及
+`Interpolation`、`WarpInterpolation`、`Border` 三个类型别名，既有模块和符号均保持原样。
+
+| 职责 | 公开函数 |
+| --- | --- |
+| 字节解码、灰度与缩放 | `decode_image`、`gray_image`、`resize_image` |
+| 透视、仿射与点变换 | `perspective_matrix`、`affine_matrix`、`rotation_matrix`、`warp_image`、`transform_points` |
+| 轮廓和几何 | `trace_contours`、`simplify_contour`、`minimum_rectangle`、`rectangle_corners`、`contour_area`、`contour_length` |
+| 掩码与推理线 | `label_components`、`morphology`、`rasterize_polygons`、`draw_line`、`draw_lines` |
+
+缩放和采样接受非空 HW/HWC、1–4 通道的 uint8、uint16、float32 数组；灰度转换只接受
+RGB/BGR 三或四通道。输出保留位深、独立且连续可写；HWC 单通道缩放输出 HW。
+解码返回 BGR/BGRA 或灰度，默认保留 alpha、原位深及方向；`color=True` 明确转为三通道，
+`apply_orientation=True` 明确应用 EXIF。十六位多通道 PNG 不经过八位 RGB 中转；无法解码返回 None。
+
+`resize_image(image, (width, height), interpolation="linear")` 使用显式插值名称；可选值为
+nearest、linear、cubic、area、lanczos4。比例入口使用
+`resize_image(image, None, scale=(fx, fy))`，不从舍入后的尺寸反推采样网格。
+`warp_image` 的矩阵表示源到目标，采样逆映射由内核计算；只支持 nearest、linear、cubic，
+边界使用 `constant` 或 `replicate`。最小矩形角度固定在 [-90, 0)，轮廓及八连通域顺序具有确定性。
+抗锯齿推理线接受 uint8 图，批量 `draw_lines` 只在入口物化一次图像。
+
+默认 auto 使用 Rust 数值热循环，Python 参考后端遵守相同契约；两者均不根据 cv2 是否安装
+改变算法。私有扩展协议升级为 32，Python 源码和扩展必须配套。既有 `crop_bitmap_bgr` 协议和
+文档类型、JSON、七种渲染接口保持原样。模型阈值、OCR 排序、UNet 规则及推理策略仍由 MinerU 维护。
+
+本接口和对应 MinerU 依赖迁移使用 0.5.12 本地候选轮子；尚未发布。验收见
+[OpenCV 迁移记录](opencv-removal.md)。
 
 ## 结果包素材导出（0.4.3）
 

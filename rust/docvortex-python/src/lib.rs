@@ -22,6 +22,7 @@ mod marker_geometry;
 mod math_words;
 mod pdfium;
 mod pixels;
+mod image_numeric;
 mod profile_context;
 mod rule_graphics;
 mod rule_tail;
@@ -44,6 +45,15 @@ mod unmapped_ink;
 /// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(image_numeric::image_components, module)?)?;
+    module.add_function(wrap_pyfunction!(image_numeric::image_contours, module)?)?;
+    module.add_function(wrap_pyfunction!(image_numeric::image_resize, module)?)?;
+    module.add_function(wrap_pyfunction!(image_numeric::image_warp, module)?)?;
+    module.add_function(wrap_pyfunction!(image_numeric::image_minimum_rectangle, module)?)?;
+    module.add_function(wrap_pyfunction!(image_numeric::image_morphology, module)?)?;
+    module.add_function(wrap_pyfunction!(image_numeric::image_lines, module)?)?;
+    module.add_function(wrap_pyfunction!(image_numeric::image_polygons, module)?)?;
+    module.add_function(wrap_pyfunction!(image_numeric::image_solve, module)?)?;
     module.add_class::<column_cache::NativeColumnCache>()?;
     module.add_class::<fill_bands::NativeFillBands>()?;
     module.add_function(wrap_pyfunction!(fill_bands::prepare_fill_bands, module)?)?;

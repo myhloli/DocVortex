@@ -9,4 +9,4 @@ codegen-units = 1
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "MIT AND Apache-2.0 AND BSD-3-Clause"

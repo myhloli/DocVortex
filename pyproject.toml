@@ -8,8 +8,8 @@ dynamic = ["version"]
 description = "A fast, multi-format document parsing and conversion engine"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
-license = "MIT"
-license-files = ["LICENSE.md", "licenses/rust/*/LICENSE*", "licenses/rust/README.md"]
+license = "MIT AND Apache-2.0 AND BSD-3-Clause"
+license-files = ["LICENSE.md", "licenses/rust/*/LICENSE*", "licenses/rust/README.md", "licenses/image/*"]
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.10",
