@@ -66,5 +66,5 @@ pub mod pixels;
 
 pub mod inline_styles;
 
-pub mod image_numeric;
 pub mod image_drawing;
+pub mod image_numeric;

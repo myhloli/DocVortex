@@ -17,12 +17,12 @@ mod geometry_risk;
 mod geometry_runs;
 mod glyph_patch;
 mod graphic_numeric;
+mod image_numeric;
 mod inline_styles;
 mod marker_geometry;
 mod math_words;
 mod pdfium;
 mod pixels;
-mod image_numeric;
 mod profile_context;
 mod rule_graphics;
 mod rule_tail;
@@ -49,7 +49,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(image_numeric::image_contours, module)?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_resize, module)?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_warp, module)?)?;
-    module.add_function(wrap_pyfunction!(image_numeric::image_minimum_rectangle, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        image_numeric::image_minimum_rectangle,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_morphology, module)?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_lines, module)?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_polygons, module)?)?;

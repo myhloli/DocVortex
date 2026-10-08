@@ -28,9 +28,15 @@ jobs:
       DOCVORTEX_BUILD_NATIVE: '1'
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
+      # uv 的 Windows 托管 Python 默认可能选 x64；显式使用原生 ARM64 解释器及其导入库。
+      - uses: actions/setup-python@v6
+        id: arm64-minimum
         with:
           python-version: '3.11'
+          architecture: arm64
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ steps.arm64-minimum.outputs.python-path }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: '1.98.1'
@@ -41,11 +47,16 @@ jobs:
       - name: Build actual Windows ARM64 ABI3 wheel
         env:
           CARGO_BUILD_TARGET: aarch64-pc-windows-msvc
-        run: uv build --wheel --python 3.11 --out-dir wheelhouse
+        run: uv build --wheel --python "${{ steps.arm64-minimum.outputs.python-path }}" --out-dir wheelhouse
       - name: Verify binary on minimum Python 3.11
-        run: uv run --no-project --python 3.11 python tools/verify_native_abi.py wheelhouse
+        run: uv run --no-project --python "${{ steps.arm64-minimum.outputs.python-path }}" python tools/verify_native_abi.py wheelhouse
+      - uses: actions/setup-python@v6
+        id: arm64-current
+        with:
+          python-version: '3.14'
+          architecture: arm64
       - name: Verify binary on Python 3.14
-        run: uv run --no-project --python 3.14 python tools/verify_native_abi.py wheelhouse
+        run: uv run --no-project --python "${{ steps.arm64-current.outputs.python-path }}" python tools/verify_native_abi.py wheelhouse
       - uses: actions/upload-artifact@v6
         with:
           name: native-abi-windows-arm64

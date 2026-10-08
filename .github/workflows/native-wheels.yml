@@ -42,9 +42,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
+      # ARM64 验收必须使用原生解释器，避免 uv 自动下载 x64 模拟版本。
+      - uses: actions/setup-python@v6
+        if: matrix.arch == 'ARM64'
+        id: python-arm64
         with:
           python-version: '3.14'
+          architecture: arm64
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ steps.python-arm64.outputs.python-path || '3.14' }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: '1.98.1'
@@ -70,17 +77,17 @@ jobs:
         run: uvx --from "cibuildwheel>=3.1,<4" cibuildwheel --output-dir wheelhouse
       - name: Verify binary ABI on Python 3.14 without optional application dependencies
         if: ${{ !inputs.skip_ci }}
-        run: uv run --no-project --python 3.14 python tools/verify_native_abi.py wheelhouse
+        run: uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || '3.14' }}" python tools/verify_native_abi.py wheelhouse
       - name: Install the exact built artifact on the current supported dependency stack
         if: ${{ !inputs.skip_ci }}
         run: |
-          uv venv --seed --python ${{ matrix.smoke }}
-          uv run --no-project --python ${{ matrix.smoke }} python -c "import pathlib, subprocess, sys; wheels=list(pathlib.Path('wheelhouse').glob('*.whl')); assert len(wheels)==1, wheels; subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0]), 'pytest', 'psutil', 'pypdfium2==5.13.0'])"
+          uv venv --seed --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}"
+          uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python -c "import pathlib, subprocess, sys; wheels=list(pathlib.Path('wheelhouse').glob('*.whl')); assert len(wheels)==1, wheels; subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0]), 'pytest', 'psutil', 'pypdfium2==5.13.0'])"
       - name: Verify installed wheel and real parsing
         if: ${{ !inputs.skip_ci }}
         env:
           DOCVORTEX_COMPUTE_BACKEND: rust
-        run: uv run --no-project --python ${{ matrix.smoke }} python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
+        run: uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
       - name: Verify Windows ARM64 native installation and reportlab fallback
         if: ${{ matrix.arch == 'ARM64' && !inputs.skip_ci }}
         run: uv run --no-project python tools/verify_windows_arm64_install.py
@@ -89,9 +96,9 @@ jobs:
         env:
           DOCVORTEX_COMPUTE_BACKEND: rust
         run: |
-          uv run --no-project --python ${{ matrix.smoke }} python tools/generate_dense_pdf.py dense-table.pdf
-          uv run --no-project --python ${{ matrix.smoke }} python tools/verify_native_wheel.py dense-table.pdf
-          uv run --no-project --python ${{ matrix.smoke }} python -m pytest tests/test_native_inline_styles.py tests/test_native_bitmap_crops.py tests/test_pdfium_bridge.py tests/test_pdf_object_bridge.py tests/test_pdf_classify_page_loading.py tests/test_pdf_classify_resource_graph.py tests/test_pdf_drawing_lines_extraction.py tests/test_pdf_native_graphics_components.py tests/unittest/test_flash_pdf_auxiliary_text.py tests/test_pdf_snapshot.py tests/test_pdf_render_session.py tests/test_native_font_runtime.py tests/test_native_text_pipeline.py tests/test_native_text_snapshot.py tests/test_native_classification.py tests/unittest/test_flash_pdf_char_geometry.py tests/test_native_table_candidates.py tests/test_native_round3.py tests/test_native_round4.py tests/test_native_round5.py tests/test_native_round6.py tests/test_native_round7.py -q
+          uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/generate_dense_pdf.py dense-table.pdf
+          uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/verify_native_wheel.py dense-table.pdf
+          uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python -m pytest tests/test_native_inline_styles.py tests/test_native_bitmap_crops.py tests/test_pdfium_bridge.py tests/test_pdf_object_bridge.py tests/test_pdf_classify_page_loading.py tests/test_pdf_classify_resource_graph.py tests/test_pdf_drawing_lines_extraction.py tests/test_pdf_native_graphics_components.py tests/unittest/test_flash_pdf_auxiliary_text.py tests/test_pdf_snapshot.py tests/test_pdf_render_session.py tests/test_native_font_runtime.py tests/test_native_text_pipeline.py tests/test_native_text_snapshot.py tests/test_native_classification.py tests/unittest/test_flash_pdf_char_geometry.py tests/test_native_table_candidates.py tests/test_native_round3.py tests/test_native_round4.py tests/test_native_round5.py tests/test_native_round6.py tests/test_native_round7.py -q
       # 性能对比仅在本机执行；平台矩阵保留构建、ABI、安装和正确性检查。
       - uses: actions/upload-artifact@v6
         with:
@@ -113,9 +120,14 @@ jobs:
       DOCVORTEX_COMPUTE_BACKEND: rust
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@v6
+        id: python-arm64
         with:
           python-version: ${{ matrix.python }}
+          architecture: arm64
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ steps.python-arm64.outputs.python-path }}
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: amd64_arm64
@@ -125,7 +137,7 @@ jobs:
           path: wheelhouse
       - name: Install the exact ARM64 wheel with regular dependency resolution
         run: |
-          uv venv --seed --python ${{ matrix.python }}
+          uv venv --seed
           uv run --no-project python -c "import pathlib, subprocess, sys; wheel,=pathlib.Path('wheelhouse').glob('*.whl'); subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheel), 'pytest', 'psutil', 'pypdfium2==${{ matrix.pdfium }}'])"
           uv run --no-project python -m pip check
       - name: Verify ABI and actual installed ARM64 extension

@@ -2,7 +2,7 @@
 
 2026-10-08。本轮基于 main `abfa99c63ce336da9da9916c5c9eb90937bbb3cf` 的 0.5.10、私有原生协议 31。实现纳入 0.5.11。DocVortex 已完成代码修改和本地验收；MinerU 仅做分析及集成验证，源码未修改。实验候选 wheel 沿用 0.5.10 版本用于同版本对照，未作为正式包发布。
 
-## 0.5.12 候选：支持 MinerU 基础依赖迁移
+## 0.5.12：支持 MinerU 基础依赖迁移
 
 第二轮基于已发布的 0.5.11 `9f3b9936f07cc5b2ad29e929e4e87dcbbdbf4f64`，在独立工作树
 `/Users/myhloli/.codex-workspaces/worktrees/docvortex-opencv-free-20261008/docvortex` 中增加
@@ -28,7 +28,7 @@ float32 字节传入几何内核并保持完整索引排序，241 项相关测�
 两轮证据保留，完整数值见 MinerU 迁移记录。
 
 原始证据位于 `/tmp/mineru-opencv-free-20261008`，对应 MinerU 仓库的
-`docs/next/opencv-loading.md` 记录完整路径与成对性能。当前 0.5.12 是本地候选，已纳入本地 main，尚未推送或发布；
+`docs/next/opencv-loading.md` 记录完整路径与成对性能。0.5.12 的发行内容包含本节通用图像接口及匹配的原生协议 32；
 以下章节保留 0.5.11 移除直接依赖时的历史验收记录。
 
 ## 实现与公开行为

@@ -28,8 +28,15 @@ from .geometry import (
 )
 from . import geometry as _fragment_geometry
 from .models import (
-    _Fragment, _LineItem, _LocalAxisLine, _PageSource, _PreparedPage,
-    _SharedLineIndexSet, _TableCandidate, _TableContinuationGrid, _VisualRow,
+    _Fragment,
+    _LineItem,
+    _LocalAxisLine,
+    _PageSource,
+    _PreparedPage,
+    _SharedLineIndexSet,
+    _TableCandidate,
+    _TableContinuationGrid,
+    _VisualRow,
 )
 from .table_annotations import (
     _PreparedTableNoteBodyMetrics,
@@ -838,8 +845,15 @@ def _build_closed_rule_grid_candidates(
                 vertical_positions,
             )
             if occupied_columns < 2 and not _matches_previous_table_grid(
-                previous_table_grid, page_index, angle, page_size, median_height,
-                grid_bbox, vertical_positions, rows, leading_obstacles or [],
+                previous_table_grid,
+                page_index,
+                angle,
+                page_size,
+                median_height,
+                grid_bbox,
+                vertical_positions,
+                rows,
+                leading_obstacles or [],
             ):
                 continue
 
@@ -910,7 +924,8 @@ def _trailing_table_continuation_grid(source: _PageSource, prepared: _PreparedPa
     axis_lines = _transform_axis_lines(source.drawing_lines, source.page_size, 0)
     horizontal = sorted(
         [
-            rule for rule in axis_lines
+            rule
+            for rule in axis_lines
             if rule.orientation == "horizontal"
             and abs(rule.bbox[0] - bbox[0]) <= tolerance
             and abs(rule.bbox[2] - bbox[2]) <= tolerance
@@ -918,15 +933,18 @@ def _trailing_table_continuation_grid(source: _PageSource, prepared: _PreparedPa
         ],
         key=lambda rule: _bbox_center_y(rule.bbox),
     )
-    if len(horizontal) < 2 or max(
-        abs(_bbox_center_y(horizontal[0].bbox) - bbox[1]), abs(_bbox_center_y(horizontal[-1].bbox) - bbox[3])
-    ) > tolerance:
+    if (
+        len(horizontal) < 2
+        or max(abs(_bbox_center_y(horizontal[0].bbox) - bbox[1]), abs(_bbox_center_y(horizontal[-1].bbox) - bbox[3]))
+        > tolerance
+    ):
         return None
     positions = _closed_grid_vertical_track_positions(horizontal, axis_lines, em)
     if len(positions) < 3 or max(abs(positions[0] - bbox[0]), abs(positions[-1] - bbox[2])) > tolerance:
         return None
     return _TableContinuationGrid(
-        source.page_index, 0,
+        source.page_index,
+        0,
         tuple(position / source.page_size[0] for position in positions),
         tolerance / source.page_size[0],
     )
@@ -956,15 +974,14 @@ def _native_multicolumn_grid_bboxes(source: _PageSource, em: float, region: BBox
             if not region[1] < band_center < region[3]:
                 continue
             positions = _closed_grid_vertical_track_positions([top, bottom], axis_lines, em)
-            band_rows = [
-                row for row in rows if _bbox_center_y(top.bbox) < row.center_y < _bbox_center_y(bottom.bbox)
-            ]
+            band_rows = [row for row in rows if _bbox_center_y(top.bbox) < row.center_y < _bbox_center_y(bottom.bbox)]
             covered_columns = sum(region[0] < (left + right) / 2 < region[2] for left, right in zip(positions, positions[1:]))
             if covered_columns >= 2 and _count_occupied_closed_grid_columns(band_rows, positions) >= 2:
                 proven_bands.append(positions)
         if any(
             len(first) == len(second) and all(abs(a - b) <= tolerance for a, b in zip(first, second))
-            for index, first in enumerate(proven_bands) for second in proven_bands[index + 1:]
+            for index, first in enumerate(proven_bands)
+            for second in proven_bands[index + 1 :]
         ):
             output.append(bbox)
     return output

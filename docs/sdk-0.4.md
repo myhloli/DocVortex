@@ -79,7 +79,7 @@ quality 95、4:2:0 采样、非渐进且不优化编码。临时图像和内存�
 公开签名、JSON、素材命名和原生协议 31 保持原样。完整本地验收、性能及 MinerU 自身的
 依赖迁移分析见 [OpenCV 移除报告](opencv-removal.md)。
 
-### 模型图像数值接口（0.5.12 候选）
+### 模型图像数值接口（0.5.12）
 
 `docvortex.image` 提供通用图像数值操作，宿主通过此模块调用，不导入 foundation 或原生扩展。
 模块导入只定义接口；NumPy、Pillow 和扩展延迟到真正执行操作时加载。
@@ -109,7 +109,7 @@ nearest、linear、cubic、area、lanczos4。比例入口使用
 改变算法。私有扩展协议升级为 32，Python 源码和扩展必须配套。既有 `crop_bitmap_bgr` 协议和
 文档类型、JSON、七种渲染接口保持原样。模型阈值、OCR 排序、UNet 规则及推理策略仍由 MinerU 维护。
 
-本接口和对应 MinerU 依赖迁移使用 0.5.12 本地候选轮子；尚未发布。验收见
+本接口自 0.5.12 提供；对应 MinerU 依赖迁移使用同版本轮子验收。验收见
 [OpenCV 迁移记录](opencv-removal.md)。
 
 ## 结果包素材导出（0.4.3）

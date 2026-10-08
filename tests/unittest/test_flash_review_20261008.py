@@ -75,7 +75,7 @@ def _matrix(table):
 @pytest.mark.parametrize("page", range(14, 22))
 def test_financial_statement_all_independently_transcribed_cells(page):
     """原页独立转写的全部数据及空值小节逐行核对，不能仅用关键汇总行验收。"""
-    truth = json.loads((Path(__file__).parents[1] / "fixtures/flash_review_20261008_cells.json").read_text())
+    truth = json.loads((Path(__file__).parents[1] / "fixtures/flash_review_20261008_cells.json").read_text(encoding="utf-8"))
     expected = [[_cell_text(row["label"]), *row["values"]] for row in truth["pages"][str(page)]]
     matrix = _matrix(_tables("quarterly_report", page)[0])
     assert matrix[4:] == expected
@@ -89,7 +89,7 @@ def test_financial_statement_all_independently_transcribed_cells(page):
 @pytest.mark.parametrize("key", ["3-0", "4-1", "12-0", "12-1", "12-2"])
 def test_metrics_capital_and_leverage_all_cells(key):
     """指标、原因、资本和杠杆表按原页逐格核对，包含表头和跨行说明。"""
-    truth = json.loads((Path(__file__).parents[1] / "fixtures/flash_review_20261008_cells.json").read_text())
+    truth = json.loads((Path(__file__).parents[1] / "fixtures/flash_review_20261008_cells.json").read_text(encoding="utf-8"))
     page, table_index = map(int, key.split("-"))
     matrix = _matrix(_tables("quarterly_report", page)[table_index])
     # 日期字段在杠杆表占两条物理行；逻辑表头按同一列拼接后再核对。

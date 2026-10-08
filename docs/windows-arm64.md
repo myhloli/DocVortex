@@ -20,6 +20,6 @@ Native wheels 工作流还以同一个发行物建立四个干净环境，覆盖
 
 ## 验证边界
 
-本轮仅修改 DocVortex 的依赖声明、构建、校验及文档，不修改 metafile-render、不执行版本发布。
+0.5.12 将 Windows ARM64 构建与安装校验纳入既有发布流程；metafile-render 保持既有依赖范围。
 
 本机为 macOS ARM64，本机回归不能替代 Windows ARM64 runner 的实际构建和安装结果；跨平台终态须以 CI 日志为准。
