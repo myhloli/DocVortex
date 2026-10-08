@@ -17,6 +17,7 @@ from .geometry import (
     _bbox_axis_overlap_ratio,
     _bbox_center_x,
     _bbox_center_y,
+    _bbox_overlap_in_first,
     _bbox_overlap_in_smaller,
     _bbox_union,
     _bbox_union_many,
@@ -26,7 +27,10 @@ from .geometry import (
     _transform_axis_lines,
 )
 from . import geometry as _fragment_geometry
-from .models import _Fragment, _LineItem, _LocalAxisLine, _PageSource, _SharedLineIndexSet, _TableCandidate, _VisualRow
+from .models import (
+    _Fragment, _LineItem, _LocalAxisLine, _PageSource, _PreparedPage,
+    _SharedLineIndexSet, _TableCandidate, _TableContinuationGrid, _VisualRow,
+)
 from .table_annotations import (
     _PreparedTableNoteBodyMetrics,
     _PreparedTableCoreRows,
@@ -789,6 +793,9 @@ def _build_closed_rule_grid_candidates(
     caption_candidates: list[tuple[_LineItem, BBox]] | None = None,
     *,
     grid_components: list[list[_LocalAxisLine]] | None = None,
+    previous_table_grid: _TableContinuationGrid | None = None,
+    page_index: int | None = None,
+    leading_obstacles: list[BBox] | None = None,
 ) -> list[_TableCandidate]:
     """用闭合物理网格接纳含空行或仅有表头文本的稀疏表格。"""
 
@@ -830,7 +837,10 @@ def _build_closed_rule_grid_candidates(
                 core_rows,
                 vertical_positions,
             )
-            if occupied_columns < 2:
+            if occupied_columns < 2 and not _matches_previous_table_grid(
+                previous_table_grid, page_index, angle, page_size, median_height,
+                grid_bbox, vertical_positions, rows, leading_obstacles or [],
+            ):
                 continue
 
         caption_line = _find_table_caption(
@@ -854,6 +864,110 @@ def _build_closed_rule_grid_candidates(
         candidate.score = float(100 + len(component) + len(vertical_positions))
         candidates.append(candidate)
     return candidates
+
+
+def _matches_previous_table_grid(
+    previous: _TableContinuationGrid | None,
+    page_index: int | None,
+    angle: int,
+    page_size: tuple[float, float],
+    em: float,
+    bbox: BBox,
+    positions: list[float],
+    rows: list[_VisualRow],
+    obstacles: list[BBox],
+) -> bool:
+    """仅相邻页首个完整网格与前页末表全部列轨匹配时，接纳单列有字的续表。"""
+    if previous is None or page_index != previous.page_index + 1 or angle != previous.angle:
+        return False
+    width = page_size[0] if angle in (0, 180) else page_size[1]
+    tolerance = max(previous.tolerance, max(2.0, 0.25 * em) / width)
+    if len(positions) != len(previous.positions) or any(
+        abs(position / width - prior) > tolerance for position, prior in zip(positions, previous.positions)
+    ):
+        return False
+    edge_tolerance = max(2.0, 0.25 * em)
+    return not any(row.bbox[3] < bbox[1] - edge_tolerance for row in rows) and not any(
+        box[3] < bbox[1] - edge_tolerance for box in obstacles
+    )
+
+
+def _trailing_table_continuation_grid(source: _PageSource, prepared: _PreparedPage) -> _TableContinuationGrid | None:
+    """从已物化的末尾横排表提取完整列轨；表后正文、图片或缺轨均撤销跨页提示。"""
+    tables = [block for block in prepared.fixed_blocks if block["type"] == "table" and block.get("angle", 0) == 0]
+    if source.page_index is None or not tables:
+        return None
+    table = max(tables, key=lambda block: block["bbox"][3])
+    bbox = table["bbox"]
+    heights = [line.effective_height for line in source.lines if line.effective_height > 0]
+    em = statistics.median(heights) if heights else 1.0
+    tolerance = max(2.0, 0.25 * em)
+    marginals = {"header", "footer", "page_number"}
+    other_boxes = [block["bbox"] for block in prepared.fixed_blocks if block is not table and block["type"] not in marginals]
+    other_boxes.extend(line.bbox for line in prepared.remaining_lines if line.semantic_type not in marginals)
+    if any(box[3] > bbox[3] + tolerance for box in other_boxes):
+        return None
+    axis_lines = _transform_axis_lines(source.drawing_lines, source.page_size, 0)
+    horizontal = sorted(
+        [
+            rule for rule in axis_lines
+            if rule.orientation == "horizontal"
+            and abs(rule.bbox[0] - bbox[0]) <= tolerance
+            and abs(rule.bbox[2] - bbox[2]) <= tolerance
+            and bbox[1] - tolerance <= _bbox_center_y(rule.bbox) <= bbox[3] + tolerance
+        ],
+        key=lambda rule: _bbox_center_y(rule.bbox),
+    )
+    if len(horizontal) < 2 or max(
+        abs(_bbox_center_y(horizontal[0].bbox) - bbox[1]), abs(_bbox_center_y(horizontal[-1].bbox) - bbox[3])
+    ) > tolerance:
+        return None
+    positions = _closed_grid_vertical_track_positions(horizontal, axis_lines, em)
+    if len(positions) < 3 or max(abs(positions[0] - bbox[0]), abs(positions[-1] - bbox[2])) > tolerance:
+        return None
+    return _TableContinuationGrid(
+        source.page_index, 0,
+        tuple(position / source.page_size[0] for position in positions),
+        tolerance / source.page_size[0],
+    )
+
+
+def _native_multicolumn_grid_bboxes(source: _PageSource, em: float, region: BBox) -> list[BBox]:
+    """用闭合外框及至少两行重复的有字物理列证明表格，排除柱图和 Form 内示意网格。"""
+    axis_lines = _transform_axis_lines(source.drawing_lines, source.page_size, 0)
+    fragments = _build_fragments([line for line in source.lines if line.angle == 0], source.page_size)
+    rows = _cluster_fragment_rows(fragments, em)
+    output = []
+    tolerance = max(2.0, 0.25 * em)
+    for component in _connected_rule_grid_components(axis_lines, em):
+        if len(component) < 4:
+            continue
+        bbox = _bbox_union_many([rule.bbox for rule in component])
+        if _bbox_overlap_in_first(region, bbox) < 0.95:
+            continue
+        if any(_bbox_overlap_in_smaller(bbox, form) >= 0.5 for form in source.form_bboxes):
+            continue
+        outer = _closed_grid_vertical_track_positions(component, axis_lines, em)
+        if len(outer) < 2 or max(abs(outer[0] - bbox[0]), abs(outer[-1] - bbox[2])) > tolerance:
+            continue
+        proven_bands = []
+        for top, bottom in zip(component, component[1:]):
+            band_center = (_bbox_center_y(top.bbox) + _bbox_center_y(bottom.bbox)) / 2
+            if not region[1] < band_center < region[3]:
+                continue
+            positions = _closed_grid_vertical_track_positions([top, bottom], axis_lines, em)
+            band_rows = [
+                row for row in rows if _bbox_center_y(top.bbox) < row.center_y < _bbox_center_y(bottom.bbox)
+            ]
+            covered_columns = sum(region[0] < (left + right) / 2 < region[2] for left, right in zip(positions, positions[1:]))
+            if covered_columns >= 2 and _count_occupied_closed_grid_columns(band_rows, positions) >= 2:
+                proven_bands.append(positions)
+        if any(
+            len(first) == len(second) and all(abs(a - b) <= tolerance for a, b in zip(first, second))
+            for index, first in enumerate(proven_bands) for second in proven_bands[index + 1:]
+        ):
+            output.append(bbox)
+    return output
 
 
 def _closed_grid_vertical_track_positions(

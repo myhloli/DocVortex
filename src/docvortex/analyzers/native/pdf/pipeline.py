@@ -550,9 +550,13 @@ def _prepare_document_sources(
     sources.page_sources.clear()
     sources.page_text_geometries.clear()
     prepared_pages: list[_PreparedPage] = []
+    from .table_rules import _trailing_table_continuation_grid
+
+    previous_table_grid = None
     while pending:
         page_index = len(prepared_pages)
         source, geometry, owned_script = pending.popleft()
+        source.previous_table_grid = previous_table_grid
         prepared_pages.append(
             _prepare_page_source(
                 source,
@@ -567,6 +571,7 @@ def _prepare_document_sources(
                 _owned_script_inputs=owned_script,
             )
         )
+        previous_table_grid = _trailing_table_continuation_grid(source, prepared_pages[-1])
         # 删除对象所有者引用，不清空共享字符容器，公式重建副本仍可安全使用。
         del source, geometry, owned_script
     return prepared_pages

@@ -1733,6 +1733,11 @@ def _detect_native_bar_graphics(source: _PageSource, em: float) -> list[BBox]:
                     bounds = _bbox_union_many(
                         [bounds, *additions, *outlined_labels, *image_parts, *labels, *(line.bbox for line in numeric)]
                     )
+                from .table_rules import _native_multicolumn_grid_bboxes
+
+                if _native_multicolumn_grid_bboxes(source, em, bounds):
+                    # 跨越多个有字单元格的底色不能成为柱图；单格内的真实柱图仍保持图形。
+                    continue
                 outputs.append(bounds)
     return outputs
 

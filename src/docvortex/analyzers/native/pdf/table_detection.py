@@ -112,6 +112,12 @@ def _detect_table_candidates(
                 local_closed_grid_excluded_bboxes,
                 caption_candidates,
                 grid_components=shared_grid_components,
+                previous_table_grid=source.previous_table_grid,
+                page_index=source.page_index,
+                leading_obstacles=[
+                    _rotate_bbox_to_upright(box, source.page_size, angle)
+                    for box in [*excluded_bboxes, *source.image_bboxes, *source.signature_bboxes, *source.form_bboxes]
+                ],
             )
         )
     merged_rule_candidates = [

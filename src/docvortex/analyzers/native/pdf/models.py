@@ -316,6 +316,16 @@ class _FormulaAnchor:
     repeated_number_band: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class _TableContinuationGrid:
+    """仅保留前一物理页末表的方向、归一化列轨和字号容差，不延长字符生命周期。"""
+
+    page_index: int
+    angle: int
+    positions: tuple[float, ...]
+    tolerance: float
+
+
 @dataclass(slots=True)
 class _PageSource:
     """保存单页原生文本分析所需的文本、字符、绘图线和视觉容器。"""
@@ -337,6 +347,7 @@ class _PageSource:
     retained_page_forms: set[BBox] = field(default_factory=set)
     compound_baseline_cache: dict = field(default_factory=dict)
     isolated_path_cache: dict = field(default_factory=dict)
+    previous_table_grid: _TableContinuationGrid | None = None
 
 
 @dataclass(slots=True)
