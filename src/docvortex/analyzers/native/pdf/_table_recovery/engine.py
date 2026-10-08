@@ -9,6 +9,7 @@ from typing import Any
 
 from .candidate import serialize_candidate_html
 from .banded_numeric import build_banded_numeric_candidate
+from .aligned_numeric import build_aligned_numeric_candidate, regroup_numeric_text
 from .contracts import (
     NativeTableCandidate,
     NativeTableInput,
@@ -357,6 +358,16 @@ def _evaluate_native_pdf_table(
         text,
         diagnostics=vector_attempt_records,
     )
+    aligned_text = regroup_numeric_text(text)
+    aligned_candidate = build_aligned_numeric_candidate(table_input, aligned_text)
+    aligned_replaces_vector = aligned_candidate is not None and any(
+        aligned_candidate.rows >= 1.5 * c.rows or aligned_candidate.cols > c.cols for c in vector_candidates
+    )
+    if aligned_candidate is not None:
+        # 多条原生数值行证明旧矢量格发生欠分割时，先撤销错误快速接受，再运行完整恢复。
+        vector_candidates = [
+            c for c in vector_candidates if not (aligned_candidate.rows >= 1.5 * c.rows or aligned_candidate.cols > c.cols)
+        ]
     vector_attempts: tuple[dict[str, Any], ...] = tuple(vector_attempt_records)
     physical_topology_conflict = False
     if any(_is_verified_rect_candidate(candidate) for candidate in vector_candidates):
@@ -429,6 +440,49 @@ def _evaluate_native_pdf_table(
     ]
     candidates = _remove_undercounted_vector_candidates(generated_candidates)
     selected = None if physical_topology_conflict else _select_candidate(candidates)
+    header_undercount = (
+        selected is not None
+        and aligned_candidate is not None
+        and any(
+            cell.colspan >= 3
+            and sum(
+                bool(new.content)
+                and cell.bbox[0] <= new.bbox[0]
+                and new.bbox[2] <= cell.bbox[2]
+                and new.bbox[1] < cell.bbox[3]
+                and cell.bbox[1] < new.bbox[3]
+                for new in aligned_candidate.cells
+            )
+            >= 2
+            for cell in selected.cells[: selected.cols * 2]
+        )
+    )
+    if selected is not None and aligned_candidate is not None and not header_undercount:
+        # 相同组标题的文字及列轨证明跨列，旧候选单格放置会错误地只标注一个年份。
+        header_undercount = any(
+            new.row < 2
+            and new.colspan >= 2
+            and new.content.strip()
+            and any(old.row < 2 and old.colspan == 1 and old.content == new.content for old in selected.cells)
+            for new in aligned_candidate.cells
+        )
+    if (
+        aligned_candidate is not None
+        and not physical_topology_conflict
+        and (
+            aligned_replaces_vector
+            or not existing_candidates
+            or header_undercount
+            or selected is not None
+            and (aligned_candidate.rows >= 1.5 * selected.rows or aligned_candidate.cols > selected.cols)
+        )
+    ):
+        # 完整原生数值列和文字净空同时通过的网格，比只按缺失横线推导的行数更可信。
+        selected = aligned_candidate
+    if selected is aligned_candidate and selected is not None:
+        text = aligned_text
+        generated_candidates.append(aligned_candidate)
+        candidates.append(aligned_candidate)
     if selected is not None:
         first_rejection_gate = None
     elif not generated_candidates:

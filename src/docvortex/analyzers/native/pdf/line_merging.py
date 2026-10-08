@@ -47,7 +47,8 @@ def _inherit_unanimous_structural_membership(merged: _LineItem, members: list[_L
         merged.title_band_id = title_band_id
         merged.structural_title = all(member.structural_title for member in members)
         merged.explicit_section_title = all(member.explicit_section_title for member in members)
-        merged.title_suppressed = all(member.title_suppressed for member in members)
+    # 确认的正文也有标题反证；它不需要标题带身份，同行重建不能丢掉该边界。
+    merged.title_suppressed = all(member.title_suppressed for member in members)
 
 
 def _caption_crosses_left_text(members: list[_LineItem]) -> bool:

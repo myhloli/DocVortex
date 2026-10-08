@@ -125,7 +125,7 @@ def _select_pending_glyphs_adapter(table_input: NativeTableInput) -> list[_Pendi
                 pending_space = True
             continue
         text = _normalize_table_text(raw_text)
-        if not text or text.isspace() or local is None or local[3] - local[1] < 0.5:
+        if not text or text.isspace() or local is None or (local[3] - local[1] < 0.5 and not _contains_cjk(text)):
             continue
         output.append(_PendingGlyph(len(output), source_index, text, local, pending_space, pending_break))
         pending_space = pending_break = False
@@ -177,7 +177,7 @@ def _select_pending_glyphs_python(table_input: NativeTableInput) -> list[_Pendin
             table_bbox,
             angle,
         )
-        if local_bbox is None or local_bbox[3] - local_bbox[1] < 0.5:
+        if local_bbox is None or (local_bbox[3] - local_bbox[1] < 0.5 and not _contains_cjk(text)):
             continue
         output.append(
             _PendingGlyph(

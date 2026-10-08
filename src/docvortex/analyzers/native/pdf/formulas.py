@@ -1097,6 +1097,13 @@ def _build_formula_like_blocks(
         else:
             retained.append(block)
     blocks = retained
+    anchored_blocks, anchored_sources = _recover_number_anchored_inline_display(
+        [line for line in lines if line.source_index not in claimed_source_indices],
+        table_bboxes,
+        page_size,
+    )
+    blocks.extend(anchored_blocks)
+    claimed_source_indices.update(anchored_sources)
     em = statistics.median(_line_effective_height(line, line.bbox) for line in lines) if lines else 10.0
     for block in blocks:
         core = block.get("_tight_output_bbox", block["bbox"])
@@ -1882,6 +1889,77 @@ def _is_wide_tagged_formula_member(
         and 0.75 * lane_width < member_width <= 0.95 * lane_width
         and _formula_line_has_math_operator(member_line.text)
     )
+
+
+def order_equation_markers(blocks):
+    """只将同行独立公式编号后置于其主体，正文中的公式引用不参与重排。"""
+    result = list(blocks)
+    for equation in blocks:
+        if equation.get("type") != "equation":
+            continue
+        box = equation["bbox"]
+        em = max(box[3] - box[1], 1)
+        for marker in blocks:
+            parts = _split_trailing_formula_number(marker.get("content", ""))
+            if (
+                marker.get("type") != "text"
+                or parts is None
+                or re.search(r"[^\s.…·•—-]", parts[0])
+                or marker["bbox"][0] <= box[2]
+                or marker["bbox"][0] - box[2] > 8 * em
+                or abs(_bbox_center_y(marker["bbox"]) - _bbox_center_y(box)) > 0.75 * em
+            ):
+                continue
+            if result.index(marker) < result.index(equation):
+                result.remove(marker)
+                result.insert(result.index(equation) + 1, marker)
+    return result
+
+
+def _recover_number_anchored_inline_display(lines, table_bboxes, page_size):
+    """右侧编号、纯数学主体和独立居中带共同确认单行公式，保留编号独立归属。"""
+    blocks, claimed = [], set()
+    for marker in lines:
+        parts = _split_trailing_formula_number(marker.text)
+        if parts is None or re.search(r"[^\s.…·•—-]", parts[0]) or marker.angle != 0:
+            continue
+        em = max(marker.effective_height, 1)
+        members = [
+            line
+            for line in lines
+            if line is not marker
+            and line.angle == marker.angle
+            and line.source_index not in claimed
+            and line.semantic_type is None
+            and abs(_bbox_center_y(line.bbox) - _bbox_center_y(marker.bbox)) <= 0.65 * em
+            and line.bbox[2] < marker.bbox[0]
+            and marker.bbox[0] - line.bbox[2] <= 16 * em
+        ]
+        if not members:
+            continue
+        text = " ".join(line.text for line in sorted(members, key=lambda line: line.bbox[0]))
+        box = _bbox_union_many([line.bbox for line in members])
+        if (
+            "=" not in text
+            or not re.search(r"[+−*/×÷-]", text)
+            or re.search(r"[\u3400-\u9fff]|[A-Za-z]{4,}", text)
+            or not 0.08 * page_size[0] <= box[2] - box[0] <= 0.6 * page_size[0]
+            or abs(_bbox_center_x(box) - 0.5 * page_size[0]) > 0.2 * page_size[0]
+            or box[3] - box[1] > 2 * em
+            or any(_bbox_intersects(box, table) for table in table_bboxes)
+        ):
+            continue
+        block = _formula_members_to_block(
+            [(line, line.bbox) for line in members],
+            page_size,
+            0,
+            anchor_source_index=members[0].source_index,
+            include_member_ids=True,
+        )
+        if block is not None:
+            blocks.append(block)
+            claimed.update(line.source_index for line in members)
+    return blocks, claimed
 
 
 def _is_single_line_numbered_formula(

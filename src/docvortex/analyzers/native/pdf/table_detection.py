@@ -138,9 +138,21 @@ def _detect_table_candidates(
         if not any(_bbox_overlap_in_first(candidate.core_bbox or candidate.bbox, item.core_bbox) >= 0.9 for item in recovered)
     ]
     year_tables = _detect_year_header_numeric_tables(source, excluded_bboxes)
+    numeric_tables = _detect_aligned_numeric_tables(source, excluded_bboxes)
+    # 新检测只补缺失区域或明显缺列的局部表；完整旧外框交给结构恢复检查欠分割。
+    numeric_tables = [
+        candidate
+        for candidate in numeric_tables
+        if not any(
+            _bbox_overlap_in_smaller(old.core_bbox or old.bbox, candidate.bbox) >= 0.9
+            and (old.bbox[2] - old.bbox[0]) >= 0.95 * (candidate.bbox[2] - candidate.bbox[0])
+            and (old.bbox[3] - old.bbox[1]) >= 0.85 * (candidate.bbox[3] - candidate.bbox[1])
+            for old in [*base, *recovered]
+        )
+    ]
     metric_tables = _detect_ruled_metric_pair_tables(source, excluded_bboxes)
     # 由独立年份表头证明的上下表优先于跨越它们的长候选，数据列仍逐项验证。
-    replacements = year_tables + metric_tables
+    replacements = year_tables + metric_tables + numeric_tables
     base, recovered, replacements = _prefer_complete_table_replacements(base, recovered, replacements)
     base.extend(replacements)
     existing_bounds = [candidate.core_bbox or candidate.bbox for candidate in [*base, *recovered]]
@@ -167,6 +179,56 @@ def _detect_table_candidates(
         candidates,
         key=lambda candidate: (candidate.bbox[1], candidate.bbox[0]),
     )
+
+
+def _detect_aligned_numeric_tables(source: _PageSource, excluded: list[BBox]) -> list[_TableCandidate]:
+    """重复数值列及二维表头补足稀疏续表，完整区域必须通过原生字符网格恢复。"""
+    from ._table_recovery.aligned_numeric import (
+        numeric_row_groups,
+        numeric_region_bounds,
+        regroup_numeric_text,
+        build_aligned_numeric_candidate,
+    )
+    from ._table_recovery.contracts import NativeTableInput
+    from ._table_recovery.text import build_native_table_text
+    from ._table_recovery.sparse_common import _local_rules
+    from ._table_recovery.engine import coerce_native_table_rules, coerce_native_table_rectangles
+
+    if sum(bool(re.fullmatch(r"[+−-]?\(?\d+(?:[.,]\d+)*\)?|[-–—]", line.text.strip())) for line in source.lines) < 9:
+        return []
+    width, height = source.page_size
+    table_input = NativeTableInput(
+        (0.0, 0.0, width, height),
+        source.page_size,
+        0,
+        tuple(source.chars),
+        coerce_native_table_rules(source.drawing_lines),
+        coerce_native_table_rectangles(source.path_infos),
+    )
+    text = build_native_table_text(table_input)
+    if text is None:
+        return []
+    text = regroup_numeric_text(text)
+    rules = _local_rules(table_input, width, height)
+    output = []
+    for rows, anchors in numeric_row_groups(text):
+        if len(rows) < 3 or len(anchors) < 3:
+            continue
+        bounds = numeric_region_bounds(text, rows, anchors, rules)
+        if bounds is None or any(_bbox_overlap_in_smaller(bounds, box) >= 0.5 for box in excluded):
+            continue
+        regional_input = replace(table_input, table_bbox=bounds)
+        regional_text = build_native_table_text(regional_input)
+        if (
+            regional_text is None
+            or build_aligned_numeric_candidate(regional_input, regroup_numeric_text(regional_text)) is None
+        ):
+            continue
+        members = {line.source_index for line in source.lines if _bbox_overlap_in_first(line.bbox, bounds) >= 0.8}
+        output.append(
+            _TableCandidate(bounds, bounds, 0, 120, core_bbox=bounds, line_indices=members, preserve_inline_font_styles=True)
+        )
+    return output
 
 
 _PROSE_RULE_REFERENCE_FUNCTIONS = (_bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_union_many)

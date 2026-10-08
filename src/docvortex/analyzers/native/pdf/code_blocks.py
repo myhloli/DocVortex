@@ -434,6 +434,21 @@ def _rule_delimited_code_members_are_structured(
     if has_line_number_gutter:
         return True
 
+    # 缩进和等行距也常见于规范正文；无行号清单还须有程序语法或等宽拉丁排版证据。
+    syntax_rows = sum(
+        bool(
+            re.search(
+                r"(?:\b(?:if|else|while|for|return|def|function|begin|end)\b|:=|->|[{}]|\w+\s*\([^。]+\)\s*[;:])",
+                line.text,
+                re.I,
+            )
+        )
+        for line in members
+    )
+    monospace_ratio, advances = _monospace_character_support(members)
+    if syntax_rows < 2 and not (monospace_ratio >= 0.8 and _monospace_advances_are_stable(advances)):
+        return False
+
     occupied_width = max(line.bbox[2] for line in members) - min(line.bbox[0] for line in members)
     return occupied_width <= 0.95 * max(
         0.1,

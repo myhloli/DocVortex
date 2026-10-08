@@ -364,6 +364,13 @@ def _index_band_has_stable_layout(
 
     if len(rows) < _INDEX_MIN_ROWS or local_page_width <= 0:
         return False
+    if not explicit_heading:
+        # 无目录题名时，重复金额槽是二维数据证据；条目编号加一个页码仍保留目录资格。
+        numeric_rows = sum(
+            len(re.findall(r"(?<!\S)[(（]?[+-]?\d[\d,]*(?:\.\d+)?[)）]?(?!\S)", row.content)) >= 3 for row in rows
+        )
+        if numeric_rows >= max(3, 0.5 * len(rows)):
+            return False
     page_number_rows = [row for row in rows if row.ends_in_page_number]
     required_page_number_rows = max(
         4,

@@ -2201,6 +2201,9 @@ def _marginal_text_matches(first_text: str, second_text: str) -> bool:
     # 公式编号在数字屏蔽后都会成为同一标记，不能作为重复页脚的文本证据。
     if any(re.fullmatch(r"[（(﹙]\s*[A-Za-z]?\d+(?:[.\-]\d+)*\s*[)）﹚]", text.strip()) for text in (first_text, second_text)):
         return False
+    # 层级条目号携带正文身份，不能把不同条目经数字屏蔽后当作重复刊头。
+    if any(re.fullmatch(r"\d+(?:\.\d+)+", text.strip()) for text in (first_text, second_text)):
+        return False
     first = _normalize_marginal_text(first_text)
     second = _normalize_marginal_text(second_text)
     if not first or not second:

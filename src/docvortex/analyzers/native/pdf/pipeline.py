@@ -792,6 +792,15 @@ def _prepare_page_source(
         if not any(_bbox_overlap_in_smaller(bbox, graphic) >= 0.8 for graphic in caption_graphic_bboxes)
     ]
     strong_graphic_bboxes = _detect_strong_graphic_bboxes(analysis_source) + caption_graphic_bboxes
+    # 原生数值表的多列表头与重复金额列共同证明容器，不能被轴线外观抢先认领为图形。
+    from .table_detection import _detect_aligned_numeric_tables
+
+    numeric_table_evidence = _detect_aligned_numeric_tables(analysis_source, list(source.image_bboxes))
+    strong_graphic_bboxes = [
+        box
+        for box in strong_graphic_bboxes
+        if not any(_bbox_overlap_in_smaller(box, candidate.bbox) >= 0.5 for candidate in numeric_table_evidence)
+    ]
     rule_code_blocks, claimed_rule_code_line_indices = _build_rule_delimited_code_blocks(
         analysis_source,
         form_bboxes + strong_graphic_bboxes + list(source.image_bboxes) + list(source.signature_bboxes),
@@ -997,6 +1006,10 @@ def _prepare_page_source(
         block["bbox"] for block in caption_graphics + form_image_blocks + graphic_blocks + raster_image_blocks
     ]
     _mark_native_caption_starts(remaining_lines)
+    from .title_analysis.native_boundaries import classify_bilingual_term_bands, classify_appendix_title_bands
+
+    classify_bilingual_term_bands(remaining_lines)
+    classify_appendix_title_bands(remaining_lines, source.page_size)
     _mark_emphasized_quote_prose(remaining_lines)
     group_native_inline_formula_prose(
         remaining_lines,
@@ -1015,6 +1028,9 @@ def _prepare_page_source(
         reference_lines=source.lines,
     )
     _classify_image_footnotes(remaining_lines, early_visual_bboxes, table_bboxes, source.drawing_lines, source.page_size)
+    from .title_analysis.native_boundaries import protect_parallel_table_end_fields
+
+    protect_parallel_table_end_fields(remaining_lines, table_bboxes)
     early_footnote_groups = _classify_page_footnotes(
         remaining_lines,
         table_bboxes,
@@ -1302,6 +1318,9 @@ def _finalize_prepared_page(
         document_body_profile=document_body_profile,
         document_title_profile=document_title_profile,
     )
+    from .title_analysis.native_boundaries import suppress_continuous_sentence_titles
+
+    suppress_continuous_sentence_titles(remaining_lines)
     _promote_noninitial_document_title_band(
         remaining_lines,
         prepared.page_size,
@@ -1646,6 +1665,12 @@ def _sort_blocks_with_visual_row_groups(
         )
         output.extend(members)
     output = _stabilize_overlapping_lane_order(output, page_size)
+    from .title_analysis.native_boundaries import order_leading_title_bands
+
+    output = order_leading_title_bands(output, page_size)
+    from .formulas import order_equation_markers
+
+    output = order_equation_markers(output)
     return [
         *_sort_marginal_blocks(top_marginals, page_size),
         *output,

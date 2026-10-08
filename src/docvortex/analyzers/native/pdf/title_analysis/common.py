@@ -10,7 +10,7 @@ from ..line_layout import _effective_text_row_gap, _line_effective_height
 from ..models import _LineItem
 
 _NUMBERED_SECTION_TITLE_RE = re.compile(
-    r"^(?P<number>\d+(?:\s*\.\s*\d+)*)\s+(?P<label>\S.*)$",
+    r"^(?P<number>(?:[A-Z]\s*\.\s*)?\d+(?:\s*\.\s*\d+)*)\s+(?P<label>\S.*)$",
 )
 
 

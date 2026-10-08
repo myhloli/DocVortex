@@ -161,7 +161,11 @@ pub(super) fn table_pending_glyphs_owned<'py>(
         let Some(local) = local else {
             continue;
         };
-        if local[3] - local[1] < 0.5 {
+        // 汉字单横笔画的墨迹框可能不足半点；字符存在时不能丢失小节号等正文。
+        let contains_cjk = normalized
+            .chars()
+            .any(|c| matches!(c, '\u{3400}'..='\u{9fff}'));
+        if local[3] - local[1] < 0.5 && !contains_cjk {
             continue;
         }
         let record = allocator.call1((record_type,))?;
