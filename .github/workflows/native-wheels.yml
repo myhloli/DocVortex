@@ -42,9 +42,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
-      # ARM64 验收必须使用原生解释器，避免 uv 自动下载 x64 模拟版本。
+      # GitHub 字符串比较不区分大小写，须按 runner 限定 Windows ARM64，避免误匹配 macOS arm64。
       - uses: actions/setup-python@v6
-        if: matrix.arch == 'ARM64'
+        if: matrix.os == 'windows-11-arm'
         id: python-arm64
         with:
           python-version: '3.14'
@@ -56,7 +56,7 @@ jobs:
         with:
           toolchain: '1.98.1'
       - name: Configure MSVC for ARM64 dependency builds
-        if: matrix.arch == 'ARM64'
+        if: matrix.os == 'windows-11-arm'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: amd64_arm64
@@ -89,7 +89,7 @@ jobs:
           DOCVORTEX_COMPUTE_BACKEND: rust
         run: uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
       - name: Verify Windows ARM64 native installation and reportlab fallback
-        if: ${{ matrix.arch == 'ARM64' && !inputs.skip_ci }}
+        if: ${{ matrix.os == 'windows-11-arm' && !inputs.skip_ci }}
         run: uv run --no-project python tools/verify_windows_arm64_install.py
       - name: Verify generated dense table with the installed wheel
         if: ${{ !inputs.skip_ci }}
