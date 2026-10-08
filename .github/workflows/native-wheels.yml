@@ -32,12 +32,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-24.04, arch: x86_64, name: linux-x86_64, deployment: '', smoke: '3.14'}
-          - {os: ubuntu-24.04-arm, arch: aarch64, name: linux-aarch64, deployment: '', smoke: '3.14'}
-          - {os: windows-latest, arch: AMD64, name: windows-x86_64, deployment: '', smoke: '3.14'}
-          - {os: macos-15, arch: arm64, name: macos-arm64, deployment: '11.0', smoke: '3.14'}
+          - {os: ubuntu-24.04, arch: x86_64, name: linux-x86_64, deployment: '', smoke: '3.14', build: 'cp310-*'}
+          - {os: ubuntu-24.04-arm, arch: aarch64, name: linux-aarch64, deployment: '', smoke: '3.14', build: 'cp310-*'}
+          - {os: windows-latest, arch: AMD64, name: windows-x86_64, deployment: '', smoke: '3.14', build: 'cp310-*'}
+          - {os: windows-11-arm, arch: ARM64, name: windows-arm64, deployment: '', smoke: '3.14', build: 'cp311-*'}
+          - {os: macos-15, arch: arm64, name: macos-arm64, deployment: '11.0', smoke: '3.14', build: 'cp310-*'}
           # 现有 magika/onnxruntime 依赖尚无 Intel macOS 的 cp314 包；另做 3.14 ABI 检查。
-          - {os: macos-15-intel, arch: x86_64, name: macos-x86_64, deployment: '10.13', smoke: '3.13'}
+          - {os: macos-15-intel, arch: x86_64, name: macos-x86_64, deployment: '10.13', smoke: '3.13', build: 'cp310-*'}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -47,9 +48,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: '1.98.1'
-      - name: Build and test ABI3 wheel on Python 3.10
+      - name: Configure MSVC for ARM64 dependency builds
+        if: matrix.arch == 'ARM64'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64_arm64
+      - name: Build and test ABI3 wheel on the platform's minimum Python
         env:
-          CIBW_BUILD: cp310-*
+          CIBW_BUILD: ${{ matrix.build }}
           CIBW_SKIP: '*-musllinux_*'
           CIBW_ARCHS: ${{ matrix.arch }}
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
@@ -67,7 +73,6 @@ jobs:
         run: uv run --no-project --python 3.14 python tools/verify_native_abi.py wheelhouse
       - name: Install the exact built artifact on the current supported dependency stack
         if: ${{ !inputs.skip_ci }}
-        shell: bash
         run: |
           uv venv --seed --python ${{ matrix.smoke }}
           uv run --no-project --python ${{ matrix.smoke }} python -c "import pathlib, subprocess, sys; wheels=list(pathlib.Path('wheelhouse').glob('*.whl')); assert len(wheels)==1, wheels; subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0]), 'pytest', 'psutil', 'pypdfium2==5.13.0'])"
@@ -76,6 +81,9 @@ jobs:
         env:
           DOCVORTEX_COMPUTE_BACKEND: rust
         run: uv run --no-project --python ${{ matrix.smoke }} python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
+      - name: Verify Windows ARM64 native installation and reportlab fallback
+        if: ${{ matrix.arch == 'ARM64' && !inputs.skip_ci }}
+        run: uv run --no-project python tools/verify_windows_arm64_install.py
       - name: Verify generated dense table with the installed wheel
         if: ${{ !inputs.skip_ci }}
         env:
@@ -90,6 +98,52 @@ jobs:
           name: dist-${{ matrix.name }}
           path: wheelhouse/*.whl
           if-no-files-found: error
+
+  windows-arm64-install:
+    # 同一发行物检查两个 Python 端点和两个 PDFium 版本；pyclipper 缺少 wheel 时允许源码构建。
+    needs: wheels
+    if: ${{ !inputs.skip_ci }}
+    runs-on: windows-11-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.14']
+        pdfium: ['5.10.1', '5.13.0']
+    env:
+      DOCVORTEX_COMPUTE_BACKEND: rust
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64_arm64
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist-windows-arm64
+          path: wheelhouse
+      - name: Install the exact ARM64 wheel with regular dependency resolution
+        run: |
+          uv venv --seed --python ${{ matrix.python }}
+          uv run --no-project python -c "import pathlib, subprocess, sys; wheel,=pathlib.Path('wheelhouse').glob('*.whl'); subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheel), 'pytest', 'psutil', 'pypdfium2==${{ matrix.pdfium }}'])"
+          uv run --no-project python -m pip check
+      - name: Verify ABI and actual installed ARM64 extension
+        run: |
+          uv run --no-project python tools/verify_native_abi.py wheelhouse
+          uv run --no-project python tools/verify_windows_arm64_install.py
+      - name: Verify real PDF and dense table Python/Rust parity
+        run: |
+          uv run --no-project python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
+          uv run --no-project python tools/generate_dense_pdf.py dense-table.pdf
+          uv run --no-project python tools/verify_native_wheel.py dense-table.pdf
+      - name: Verify PDFium bridge, native parity and reportlab PDF export
+        run: >-
+          uv run --no-project python -m pytest
+          tests/test_native_parity.py tests/test_pdfium_bridge.py tests/test_pdf_object_bridge.py
+          tests/unittest/test_pdf_render.py tests/unittest/test_pdf_render_diagnostics.py
+          tests/test_complete_pipeline.py tests/test_public_pipeline.py tests/test_system_font_pdf_pipeline.py
+          tests/test_pdf_render_pool.py tests/test_pdf_render_session.py -q
 
   python-dist:
     runs-on: ubuntu-latest

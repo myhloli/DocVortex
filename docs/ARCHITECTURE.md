@@ -128,6 +128,9 @@ cover a complete sdist, a pure Python wheel and a native wheel built from that s
 The existing CI owns the cross-platform matrix. See [Rust acceleration](rust-acceleration.md)
 for installed-wheel smoke checks, real-document comparisons and benchmark commands.
 
+See [Windows ARM64](windows-arm64.md) for native ABI checks, reportlab compatibility,
+and installation requirements when pyclipper needs a local build.
+
 ## Layout rationale
 
 Keep `src/docvortex` and `rust` while Python remains the public product. Renaming `rust`

@@ -21,6 +21,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  windows-arm64-native-abi:
+    # 独立核验 ARM64 内核 ABI；包含 pyclipper 的应用安装由发行物矩阵验收。
+    runs-on: windows-11-arm
+    env:
+      DOCVORTEX_BUILD_NATIVE: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.11'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
+          targets: aarch64-pc-windows-msvc
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64_arm64
+      - name: Build actual Windows ARM64 ABI3 wheel
+        env:
+          CARGO_BUILD_TARGET: aarch64-pc-windows-msvc
+        run: uv build --wheel --python 3.11 --out-dir wheelhouse
+      - name: Verify binary on minimum Python 3.11
+        run: uv run --no-project --python 3.11 python tools/verify_native_abi.py wheelhouse
+      - name: Verify binary on Python 3.14
+        run: uv run --no-project --python 3.14 python tools/verify_native_abi.py wheelhouse
+      - uses: actions/upload-artifact@v6
+        with:
+          name: native-abi-windows-arm64
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
   test:
     strategy:
       fail-fast: false
