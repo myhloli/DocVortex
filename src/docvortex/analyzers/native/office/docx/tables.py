@@ -6,6 +6,9 @@ from contextlib import ExitStack
 from io import BytesIO
 from typing import Any, Optional
 from docx import Document
+from docx.text.paragraph import Paragraph
+from docx.text.run import Run
+from ..rich_text import OfficeRichTextSegment, build_rich_text_html_from_segments, formatting_to_style_str
 from docx.oxml.xmlchemy import BaseOxmlElement
 from loguru import logger
 from mammoth import docx as mammoth_docx, images as mammoth_images
@@ -15,6 +18,7 @@ from mammoth.options import read_options
 from mammoth.zips import open_zip
 from .office_xml import read_str
 from .....schema import BlockType
+from .....content.links import OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
 
 from .context import _DocxConstants
 from ..image import is_valid_vector_image_payload, is_vector_image_part, serialize_office_image
@@ -444,16 +448,32 @@ class _DocxTables:
         Returns:
             str | None: 格式为 "<p>...</p>" 的 HTML 字符串；段落为空时返回 None
         """
-        items: list[str] = []
-        for token_kind, value in self._docx_formula_tokens(xml_para, source_part):
-            if token_kind == "text":
-                items.append(value)
-            else:
-                items.append(self.equation_bookends.format(EQ=value))
+        paragraph = Paragraph(xml_para, source_part.document)
 
-        if not items:
-            return None
-        return f"<p>{''.join(items)}</p>"
+        def render_node(node: Any, target: str | None = None) -> str:
+            """在链接边界内复用公式 token 与富文本规则，避免按可见标签猜测 URL。"""
+            name = self._local_name(node)
+            if name == "hyperlink":
+                rid = node.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+                anchor = node.get(f"{{{_DocxConstants._BLIP_NAMESPACES['w']}}}anchor")
+                relation = source_part.rels.get(rid) if source_part is not None and rid else None
+                address = str(relation.target_ref) if relation is not None else ""
+                link = f"{address}#{anchor}" if anchor else address
+                return "".join(render_node(child, link or None) for child in node)
+            if name in {"p", "sdt", "sdtContent", "smartTag", "customXml"}:
+                return "".join(render_node(child, target) for child in node)
+            style = formatting_to_style_str(self._get_format_from_run(Run(node, paragraph))) if name == "r" else None
+            parts: list[str] = []
+            for kind, value in self._docx_formula_tokens(node, source_part):
+                if kind == "text":
+                    markup = build_rich_text_html_from_segments([OfficeRichTextSegment(value, style, target)])
+                    parts.append(markup.replace("\n", "<br>"))
+                else:
+                    parts.append(self.equation_bookends.format(EQ=value))
+            return "".join(parts)
+
+        content = render_node(xml_para)
+        return f"<p>{content}</p>" if content else None
 
     def _close_mammoth_fallback_context(self) -> None:
         """关闭当前文档回退解析持有的 ZIP 资源，并清除其缓存。"""
@@ -514,7 +534,25 @@ class _DocxTables:
                 )
         except Exception as exc:
             raise RuntimeError(f"table #{table_index + 1}, {stage}: {exc}") from exc
-        self.cur_page.append({"type": BlockType.TABLE, "content": html})
+        self.cur_page.append({"type": BlockType.TABLE, "content": self._normalize_table_links(html)})
+
+    @staticmethod
+    def _normalize_table_links(markup: str) -> str:
+        """在 Mammoth 表格边界校验链接，非法目标保留原来的可见富文本。"""
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(markup, "html.parser")
+        changed = False
+        for link in soup.find_all("a", href=True):
+            if (
+                sanitize_hyperlink_target(
+                    link["href"], allowed_schemes=OFFICE_EXTERNAL_HYPERLINK_SCHEMES, allow_relative=True, allow_fragment=True
+                )
+                is None
+            ):
+                link.unwrap()
+                changed = True
+        return str(soup) if changed else markup
 
     def _normalize_table_colspans(self, html: str) -> str:
         """

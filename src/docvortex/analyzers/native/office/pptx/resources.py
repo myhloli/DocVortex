@@ -1,6 +1,8 @@
 """PPTX 图片、图表与公式资源，复用当前转换器的单文档状态。"""
 
 from typing import Any, Optional
+from pptx.oxml.text import CT_TextLineBreak
+from ..rich_text import OfficeRichTextSegment, build_rich_text_html_from_segments
 from loguru import logger
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from ..ooxml_chart import extract_chart_html_from_ooxml
@@ -79,6 +81,36 @@ class _PptxResources:
                 equations.append(latex)
         return equations
 
+    def _table_paragraph_html(self, paragraph: Any, shape: Any) -> str:
+        """按 XML 顺序恢复表格中的样式、换行、公式与对应 run 的链接。"""
+        runs = {id(run._r): run for run in paragraph.runs}
+        font_sources = self._get_paragraph_font_sources(shape, paragraph)
+        parts: list[str] = []
+        for node in paragraph._element.content_children:
+            if isinstance(node, CT_TextLineBreak):
+                parts.append("<br>")
+            elif self._is_math_content_node(node):
+                latex = self._convert_math_node_to_latex(node)
+                if latex:
+                    parts.append(f"<eq>{latex}</eq>")
+            else:
+                text = getattr(node, "text", None)
+                if not text:
+                    continue
+                run = runs.get(id(node))
+                parts.append(
+                    build_rich_text_html_from_segments(
+                        [
+                            OfficeRichTextSegment(
+                                text,
+                                self._get_style_str_from_run(run, font_sources) if run is not None else None,
+                                self._resolve_hyperlink_from_run(run, shape) if run is not None else None,
+                            )
+                        ]
+                    )
+                )
+        return "".join(parts)
+
     def _handle_tables(self, shape):
         """将PowerPoint表格转换为HTML格式。
 
@@ -146,9 +178,9 @@ class _PptxResources:
                 attr_str = " " + " ".join(attrs) if attrs else ""
 
                 # 获取单元格文本内容
-                cell_text = cell.text.strip() if cell.text else ""
-                # 转义HTML特殊字符，防止XSS
-                cell_text = cell_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                cell_text = "<br>".join(
+                    self._table_paragraph_html(paragraph, shape) for paragraph in cell.text_frame.paragraphs
+                ).strip()
 
                 html_parts.append(f"    <{tag}{attr_str}>{cell_text}</{tag}>")
 
