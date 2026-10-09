@@ -16,7 +16,6 @@ from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from lxml import etree
-from PIL import Image
 from pydantic import ValidationError
 from pypdf import PdfReader
 from jsonschema import Draft202012Validator
@@ -57,10 +56,11 @@ def _inline(text: str) -> list[dict[str, str]]:
 
 
 def _png() -> bytes:
-    """生成各渲染器都能实际解码的图片，避免占位输出掩盖书签问题。"""
-    output = BytesIO()
-    Image.new("RGB", (40, 20), (30, 80, 130)).save(output, format="PNG")
-    return output.getvalue()
+    """使用生成 EPUB 金样时的固定 PNG 字节，避免平台压缩库差异改变文档标识。"""
+    return base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAACgAAAAUCAIAAABwJOjsAAAAOElEQVR4nO3NQQEAIAwDsVIhaEITyvluBm4PGgNZ+1xN"
+        "8MiqxCCTWZUYY67qEmPMVV1ijLlKn8cPoYcBGCXFq9MAAAAASUVORK5CYII="
+    )
 
 
 def _visual_document(
@@ -152,7 +152,7 @@ def test_annotation_anchor_is_optional_strict_and_roundtrips(block_type: str) ->
 def test_checked_middle_schema_and_structured_anchor_defaults(prefix: str) -> None:
     """验证提交的 JSON Schema 接受说明书签，缺省字段不改变结构化输出。"""
     middle = _visual_document(prefix)
-    schema = json.loads((Path(__file__).resolve().parents[2] / "schemas/middle-2.0.json").read_text())
+    schema = json.loads((Path(__file__).resolve().parents[2] / "schemas/middle-2.0.json").read_text(encoding="utf-8"))
     Draft202012Validator(schema).validate(middle.to_dict())
     assert MiddleJson.from_json(middle.to_json()) == middle
     for child in middle.pages[1].blocks[0].content:
