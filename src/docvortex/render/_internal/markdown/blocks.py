@@ -9,6 +9,7 @@ from ....options import LatexDelimitersConfig
 from ..common.index import strip_index_page_tail
 from ..common.list_items import has_markdown_unordered_marker, reference_list_needs_bullets
 from ..common.planner import PlannedBlock
+from ..common.anchors import visible_block_anchor
 from .assets import build_markdown_image, resolve_image_source
 from .escaping import escape_standalone_marker_rule, escape_text_block_markdown_prefix
 from .inline import (
@@ -66,7 +67,7 @@ def render_planned_block(
     if isinstance(block, TextBlock):
         content = render_joined_inline_contents(planned.text_contents or [block.content], delimiters)
         rendered = escape_standalone_marker_rule(escape_text_block_markdown_prefix(content))
-        return _prepend_markdown_anchor(rendered, block.anchor, emitted_anchors)
+        return _prepend_markdown_anchor(rendered, visible_block_anchor(block), emitted_anchors)
     if isinstance(block, RefTextBlock):
         content = render_joined_inline_contents(planned.text_contents or [block.content], delimiters)
         return escape_standalone_marker_rule(content)
@@ -84,13 +85,13 @@ def render_planned_block(
     if isinstance(block, IndexBlock):
         return _render_index(block, delimiters, anchor_targets=anchor_targets)
     if isinstance(block, ImageBlock):
-        return _render_image_block(block, delimiters, asset_base_url, image_renderer)
+        return _render_image_block(block, delimiters, asset_base_url, image_renderer, emitted_anchors=emitted_anchors)
     if isinstance(block, TableBlock):
-        return _render_table_block(block, delimiters, asset_base_url, image_renderer)
+        return _render_table_block(block, delimiters, asset_base_url, image_renderer, emitted_anchors=emitted_anchors)
     if isinstance(block, ChartBlock):
-        return _render_chart_block(block, delimiters, asset_base_url, image_renderer)
+        return _render_chart_block(block, delimiters, asset_base_url, image_renderer, emitted_anchors=emitted_anchors)
     if isinstance(block, CodeBlock):
-        return _render_code_block(block, delimiters)
+        return _render_code_block(block, delimiters, emitted_anchors=emitted_anchors)
     raise TypeError(f"Unsupported PageBlock type: {type(block).__name__}")
 
 
@@ -132,7 +133,7 @@ def _render_page_footnote(
         'data-block-type="page_footnote"',
         'style="color:#6b7280"',
     ]
-    anchor = _claim_markdown_anchor(block.anchor, emitted_anchors)
+    anchor = _claim_markdown_anchor(visible_block_anchor(block), emitted_anchors)
     if anchor:
         attrs.insert(0, f'id="{html.escape(anchor, quote=True)}"')
     return f"<small><span {' '.join(attrs)}>{rendered}</span></small>"
@@ -164,7 +165,7 @@ def _render_title(
     """渲染带可选 HTML anchor 的 Markdown 标题。"""
     level = min(max(block.level, 1), 6)
     title = f"{'#' * level} {render_title_inline_content(block, delimiters)}"
-    anchor = _claim_markdown_anchor(block.anchor, emitted_anchors)
+    anchor = _claim_markdown_anchor(visible_block_anchor(block), emitted_anchors)
     if not anchor:
         return title
     return f'<a id="{html.escape(anchor, quote=True)}"></a>\n{title}'
@@ -251,6 +252,8 @@ def _render_image_block(
     delimiters: LatexDelimitersConfig,
     asset_base_url: str,
     image_renderer: ImageRenderer | None,
+    *,
+    emitted_anchors: set[str] | None = None,
 ) -> str:
     """按原始子块顺序渲染图片主体及说明文本。"""
     parts: list[str] = []
@@ -264,7 +267,7 @@ def _render_image_block(
                 image_renderer=image_renderer,
             )
         elif isinstance(child, ImageAnnotationBlock):
-            body = render_visual_annotation(child, delimiters)
+            body = render_visual_annotation(child, delimiters, emitted_anchors=emitted_anchors)
         else:
             raise TypeError(f"Unsupported image child: {type(child).__name__}")
         if body:
@@ -277,6 +280,8 @@ def _render_chart_block(
     delimiters: LatexDelimitersConfig,
     asset_base_url: str,
     image_renderer: ImageRenderer | None,
+    *,
+    emitted_anchors: set[str] | None = None,
 ) -> str:
     """按原始子块顺序渲染图表图片、结构内容和说明文本。"""
     parts: list[str] = []
@@ -290,7 +295,7 @@ def _render_chart_block(
                 image_renderer=image_renderer,
             )
         elif isinstance(child, ChartAnnotationBlock):
-            body = render_visual_annotation(child, delimiters)
+            body = render_visual_annotation(child, delimiters, emitted_anchors=emitted_anchors)
         else:
             raise TypeError(f"Unsupported chart child: {type(child).__name__}")
         if body:
@@ -397,6 +402,8 @@ def _render_table_block(
     delimiters: LatexDelimitersConfig,
     asset_base_url: str,
     image_renderer: ImageRenderer | None,
+    *,
+    emitted_anchors: set[str] | None = None,
 ) -> str:
     """按原始子块顺序渲染表格主体及说明文本。"""
     parts: list[str] = []
@@ -410,7 +417,7 @@ def _render_table_block(
                 image_renderer=image_renderer,
             )
         elif isinstance(child, TableAnnotationBlock):
-            body = render_visual_annotation(child, delimiters)
+            body = render_visual_annotation(child, delimiters, emitted_anchors=emitted_anchors)
         else:
             raise TypeError(f"Unsupported table child: {type(child).__name__}")
         if body:
@@ -463,7 +470,12 @@ def _render_table_content(
     return _render_fenced_content(content)
 
 
-def _render_code_block(block: CodeBlock, delimiters: LatexDelimitersConfig) -> str:
+def _render_code_block(
+    block: CodeBlock,
+    delimiters: LatexDelimitersConfig,
+    *,
+    emitted_anchors: set[str] | None = None,
+) -> str:
     """按父块 subtype 渲染普通代码或支持公式的算法。"""
     parts: list[str] = []
     for child in block.content:
@@ -476,7 +488,7 @@ def _render_code_block(block: CodeBlock, delimiters: LatexDelimitersConfig) -> s
                 image_renderer=None,
             )
         elif isinstance(child, CodeAnnotationBlock):
-            body = render_visual_annotation(child, delimiters)
+            body = render_visual_annotation(child, delimiters, emitted_anchors=emitted_anchors)
         else:
             raise TypeError(f"Unsupported code child: {type(child).__name__}")
         if body:
@@ -540,9 +552,14 @@ def _render_visual_body_child(
 def render_visual_annotation(
     block: ImageAnnotationBlock | TableAnnotationBlock | ChartAnnotationBlock | CodeAnnotationBlock,
     delimiters: LatexDelimitersConfig,
+    *,
+    emitted_anchors: set[str] | None = None,
 ) -> str:
-    """把一个视觉说明子块渲染为独立 Markdown 字符串。"""
-    return escape_standalone_marker_rule(render_inline_content(block.content, delimiters))
+    """渲染视觉说明；完整 Markdown 输出附加书签，结构化投影仅保留内容。"""
+    rendered = escape_standalone_marker_rule(render_inline_content(block.content, delimiters))
+    if emitted_anchors is not None:
+        return _prepend_markdown_anchor(rendered, visible_block_anchor(block), emitted_anchors)
+    return rendered
 
 
 def _render_code_body(

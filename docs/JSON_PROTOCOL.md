@@ -92,6 +92,24 @@ The schema version remains 2.0. New readers accept absent source properties in e
 old strict readers require an upgrade to accept this addition. No legacy data is rewritten or
 silently enriched. See [source metadata](METADATA.md) for field and format semantics.
 
+## Optional visual annotation anchors
+
+Image, table, chart and code captions and footnotes accept an optional nullable
+`anchor` string, using the same source bookmark identity as body text and titles.
+The schema version remains 2.0. Existing documents without this field remain
+readable; older strict readers need an upgrade to accept it.
+
+Markdown, HTML, DOCX, PDF, EPUB and LaTeX render visible annotations as internal
+link targets. Empty annotations do not claim a target, and links to duplicate
+anchors resolve to the first visible target in document order. An anchored table
+annotation prevents the default continuation merge from dropping its caption or
+replacing its footnote. Tables without a nonempty annotation anchor retain the
+existing merge behavior.
+
+Structured Content preserves the optional `anchor` in its `captions` and
+`footnotes` entries; their `content` remains plain rendered annotation content
+without an injected target tag.
+
 ## Optional PDF layout geometry
 
 Native PDF analysis adds `extensions.docvortex_layout` and deterministic

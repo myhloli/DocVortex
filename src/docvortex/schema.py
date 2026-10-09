@@ -618,24 +618,28 @@ class ImageAnnotationBlock(InlineContentBlock):
     """图片标题与图片脚注的共享结构。"""
 
     type: Literal[BlockType.IMAGE_CAPTION, BlockType.IMAGE_FOOTNOTE]  # type: ignore[reportIncompatibleVariableOverride]
+    anchor: str | None = None
 
 
 class TableAnnotationBlock(InlineContentBlock):
     """表格标题与表格脚注的共享结构。"""
 
     type: Literal[BlockType.TABLE_CAPTION, BlockType.TABLE_FOOTNOTE]  # type: ignore[reportIncompatibleVariableOverride]
+    anchor: str | None = None
 
 
 class ChartAnnotationBlock(InlineContentBlock):
     """图表标题与图表脚注的共享结构。"""
 
     type: Literal[BlockType.CHART_CAPTION, BlockType.CHART_FOOTNOTE]  # type: ignore[reportIncompatibleVariableOverride]
+    anchor: str | None = None
 
 
 class CodeAnnotationBlock(InlineContentBlock):
     """代码标题与代码脚注的共享结构。"""
 
     type: Literal[BlockType.CODE_CAPTION, BlockType.CODE_FOOTNOTE]  # type: ignore[reportIncompatibleVariableOverride]
+    anchor: str | None = None
 
 
 ListChildBlock: TypeAlias = Annotated[

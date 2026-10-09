@@ -54,6 +54,7 @@ from ....schema import (
 )
 from ...contracts import AssetResolver, EpubRenderOptions
 from ..common.index import strip_index_page_tail
+from ..common.anchors import iter_visual_annotations
 from ..common.list_items import ListItem, parse_list_item_marker, reference_list_needs_bullets
 from ..common.planner import PlannedBlock, build_render_plan
 from .assets import EpubAssetRegistry
@@ -176,6 +177,7 @@ class _AnchorRegistry:
         """按页面与 block 顺序建立目标、来源 anchor 和标题索引。"""
         self._block_targets: dict[tuple[int, int, str], str] = {}
         self._anchor_targets: dict[str, str] = {}
+        self._annotation_targets: dict[str, str] = {}
         self._footnote_targets: set[str] = set()
         self.title_targets: list[_TitleTarget] = []
         used_ids: set[str] = {"content-start"}
@@ -217,6 +219,18 @@ class _AnchorRegistry:
                     )
                     self._footnote_targets.add(target_id)
                 else:
+                    for annotation in iter_visual_annotations(block):
+                        anchor_key = _anchor_key(annotation.anchor)
+                        if not anchor_key or not inline_plain_text(annotation.content).strip():
+                            continue
+                        if anchor_key not in self._anchor_targets:
+                            target_id = _allocate_target_id(
+                                annotation.anchor,
+                                fallback="annotation",
+                                used_ids=used_ids,
+                            )
+                            self._anchor_targets[anchor_key] = target_id
+                            self._annotation_targets[anchor_key] = target_id
                     continue
                 assert block.index is not None
                 self._block_targets[(page.page_idx, block.index, str(block.type))] = target_id
@@ -233,6 +247,10 @@ class _AnchorRegistry:
     def target_for_anchor(self, anchor: str | None) -> str | None:
         """按 producer anchor 返回首次匹配的正文目标。"""
         return self._anchor_targets.get(_anchor_key(anchor))
+
+    def target_for_annotation(self, anchor: str | None) -> str | None:
+        """仅返回首次目标确实属于视觉说明的 id，避免重复挂到正文目标。"""
+        return self._annotation_targets.get(_anchor_key(anchor))
 
     def is_footnote_target(self, target_id: str) -> bool:
         """判断目标是否对应页面脚注，以便标注 noteref 语义。"""
@@ -255,6 +273,7 @@ class _EpubXhtmlRenderer:
         self.metadata = metadata
         self.assets = assets
         self.anchors = anchors
+        self._emitted_annotation_anchors: set[str] = set()
         self.has_mathml = False
 
     def render(self) -> bytes:
@@ -588,7 +607,14 @@ class _EpubXhtmlRenderer:
             attrib={"class": f"{role} {role}--{str(block.type).replace('_', '-')}"},
         )
         self._append_inline_spans(annotation, block.content)
-        return annotation if _has_visible_content(annotation) else None
+        if not _has_visible_content(annotation):
+            return None
+        anchor_key = _anchor_key(block.anchor)
+        target_id = self.anchors.target_for_annotation(block.anchor)
+        if target_id and anchor_key not in self._emitted_annotation_anchors:
+            annotation.set("id", target_id)
+            self._emitted_annotation_anchors.add(anchor_key)
+        return annotation
 
     def _append_inline_spans(
         self,
@@ -1067,9 +1093,17 @@ def _resolve_document_title(middle_json: MiddleJson, explicit_title: str | None)
 
 def _stable_identifier(middle_json: MiddleJson, *, title: str, authors: tuple[str, ...], language: str) -> str:
     """由规范化 MiddleJson 和不随渲染时间变化的元数据生成稳定 UUID URN。"""
+    document_payload = middle_json.model_dump(mode="json")
+    # 新增说明书签的默认空值不参与内容指纹，保留旧文档的确定性 EPUB 标识。
+    for page in document_payload["pages"]:
+        for block in page["blocks"]:
+            if block["type"] in {BlockType.IMAGE, BlockType.TABLE, BlockType.CHART, BlockType.CODE}:
+                for child in block["content"]:
+                    if str(child["type"]).endswith(("caption", "footnote")) and child.get("anchor") is None:
+                        child.pop("anchor", None)
     seed = json.dumps(
         {
-            "middle_json": middle_json.model_dump(mode="json"),
+            "middle_json": document_payload,
             "title": title,
             "authors": authors,
             "language": language,

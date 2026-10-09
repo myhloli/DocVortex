@@ -369,6 +369,60 @@ def test_merge_table_content_replaces_footnote_and_preserves_previous_payloads()
     assert "_cross_page" not in footnotes[0]
 
 
+@pytest.mark.parametrize("table_position", [0, 1])
+@pytest.mark.parametrize("child_position", [0, 2])
+def test_bookmarked_annotations_prevent_lossy_table_merge(table_position: int, child_position: int) -> None:
+    """验证任一表的标题或脚注有书签时拒绝合并，默认渲染保留真实跳转目标。"""
+    from docvortex.render._internal.common.planner import build_render_plan
+    from docvortex.schema import MiddleJson, PageInfo, TableBlock
+
+    previous = _table(
+        1,
+        children=[
+            _caption("Original caption", index=0),
+            _table_body("<table><tr><th>H</th></tr><tr><td>A</td></tr></table>", index=1),
+            _footnote("old", index=2),
+        ],
+    )
+    current = _table(
+        1,
+        children=[
+            _caption("Table 1 (continued)", index=0),
+            _table_body("<table><tr><th>H</th></tr><tr><td>B</td></tr></table>", index=1),
+            _footnote("new", index=2),
+        ],
+    )
+    assert merge_table_content(previous, current) is not None
+    tables = (previous, current)
+    tables[table_position]["content"][child_position]["anchor"] = "description-target"
+    original = deepcopy(tables)
+    assert merge_table_content(previous, current) is None
+    assert tables == original
+    current["continues_prev"] = True
+    for table in tables:
+        for child in table["content"]:
+            if isinstance(child["content"], str) and child["type"] != "table_body":
+                child["content"] = [{"type": "text", "content": child["content"]}]
+    middle = MiddleJson(
+        pages=[PageInfo(page_idx=i, blocks=[TableBlock.model_validate(table)]) for i, table in enumerate(tables)],
+        metadata={"file_suffix": "pdf", "producer": {"name": "docvortex", "version": "test"}},
+        is_full_document=True,
+        extensions={},
+    )
+    planned = build_render_plan(middle)
+    assert not planned[1][0].removed
+    assert middle.pages[1].blocks[0].content[0].content[0].content == "Table 1 (continued)"
+
+
+@pytest.mark.parametrize("anchor", [None, "", "  "])
+def test_empty_annotation_anchor_does_not_block_table_merge(anchor: str | None) -> None:
+    """验证空值或空白说明书签沿用已有续表合并行为。"""
+    previous = _table(0, "<table><tr><th>H</th></tr><tr><td>A</td></tr></table>")
+    current = _table(1, "<table><tr><th>H</th></tr><tr><td>B</td></tr></table>")
+    current["content"].insert(0, {**_caption("Table 1 (continued)"), "anchor": anchor})
+    assert merge_table_content(previous, current) is not None
+
+
 @pytest.mark.parametrize(
     ("previous", "current"),
     [

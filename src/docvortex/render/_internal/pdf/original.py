@@ -33,6 +33,7 @@ from ....schema import (
 from ....document.pdf.layout import LAYOUT_EXTENSION
 from ...contracts import AssetResolver
 from ..common.planner import PlannedBlock
+from ..common.anchors import VISUAL_ANNOTATION_TYPES, visible_block_anchor
 from .assets import PreparedImage
 from .inline import PdfAnchorRegistry
 from .font_plan import BlockFit, PreparedBlock, plan_font_sizes, record_font_plans
@@ -504,7 +505,7 @@ def _original_anchors(middle: MiddleJson) -> Iterable[str]:
         block = pending.pop()
         if isinstance(block, IndexBlock):
             continue
-        anchor = getattr(block, "anchor", None)
+        anchor = visible_block_anchor(block) if isinstance(block, VISUAL_ANNOTATION_TYPES) else getattr(block, "anchor", None)
         if anchor:
             yield anchor
         if isinstance(block, _CONTAINER_TYPES):

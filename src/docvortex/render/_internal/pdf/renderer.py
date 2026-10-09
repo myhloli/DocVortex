@@ -29,6 +29,7 @@ from ....content.inline import inline_plain_text, join_inline_spans
 from ..common.index import strip_index_page_tail
 from ..common.list_items import parse_list_item_marker, reference_list_needs_bullets
 from ..common.planner import PlannedBlock, build_render_plan
+from ..common.anchors import iter_document_anchor_blocks, visible_block_anchor
 from ...contracts import AssetResolver, PdfLayout
 from ....schema import (
     PAGE_AUXILIARY_BLOCK_TYPES,
@@ -62,7 +63,6 @@ from ....schema import (
     TableBodyBlock,
     TextBlock,
     TextSpan,
-    TitleBlockBase,
 )
 from .assets import PdfAssetError, PreparedImage, prepare_block_image, prepare_html_image
 from .diagnostics import report_pdf_diagnostic
@@ -260,7 +260,7 @@ class _PdfRenderer:
         block = planned.block
         if isinstance(block, (TextBlock, RefTextBlock)):
             spans = join_inline_spans(planned.text_contents or [block.content])
-            anchor = block.anchor if isinstance(block, TextBlock) else None
+            anchor = visible_block_anchor(block) if isinstance(block, TextBlock) else None
             return [self._paragraph(spans, self.styles.body, planned.page_idx, block, anchor=anchor)]
         if isinstance(block, (DocTitleBlock, ParagraphTitleBlock)):
             return [
@@ -269,7 +269,7 @@ class _PdfRenderer:
                     self.styles.heading(block.level),
                     planned.page_idx,
                     block,
-                    anchor=block.anchor,
+                    anchor=visible_block_anchor(block),
                 )
             ]
         if isinstance(block, PageFootnoteBlock):
@@ -279,7 +279,7 @@ class _PdfRenderer:
                     self.styles.footnote,
                     planned.page_idx,
                     block,
-                    anchor=block.anchor,
+                    anchor=visible_block_anchor(block),
                 )
             ]
         if isinstance(block, EquationBlock):
@@ -544,7 +544,7 @@ class _PdfRenderer:
     ) -> Paragraph:
         """根据 caption/footnote discriminator 选择弱化说明样式。"""
         style = self.styles.caption if str(block.type).endswith("caption") else self.styles.footnote
-        return self._paragraph(block.content, style, page_idx, block)
+        return self._paragraph(block.content, style, page_idx, block, anchor=visible_block_anchor(block))
 
     def _preformatted(
         self,
@@ -791,13 +791,10 @@ def _resolve_document_title(middle_json: MiddleJson, explicit: str | None) -> st
 
 
 def _iter_document_anchors(middle_json: MiddleJson) -> Iterable[str]:
-    """按文档顺序枚举正文、标题和页面脚注的非空 anchor。"""
-    for page in middle_json.pages:
-        for block in page.blocks:
-            if isinstance(block, (TextBlock, TitleBlockBase)) and block.anchor:
-                yield block.anchor
-            elif isinstance(block, PageFootnoteBlock) and block.anchor:
-                yield block.anchor
+    """按文档顺序枚举正文、标题、页面脚注及视觉说明的非空 anchor。"""
+    for block in iter_document_anchor_blocks(middle_json):
+        if block.anchor:
+            yield block.anchor
 
 
 def _plain_html_text(content: str) -> str:

@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from loguru import logger
 
 from ..common.index import strip_index_page_tail
+from ..common.anchors import iter_document_anchor_blocks, visible_block_anchor
 from ....content.inline import inline_plain_text, normalize_inline_spans
 from ....codecs.html import DOCVORTEX_HTML_VERSION
 from ....codecs.html.contracts import (
@@ -202,7 +203,7 @@ class _HtmlRenderer:
             if not rendered.html:
                 return ""
             attrs = ['class="docvortex-text"']
-            self._append_anchor_attribute(attrs, block.anchor, block_type=str(block.type))
+            self._append_anchor_attribute(attrs, visible_block_anchor(block), block_type=str(block.type))
             return f"<p {' '.join(attrs)}>{rendered.html}</p>"
         if isinstance(block, RefTextBlock):
             rendered = render_joined_inline_contents_html(
@@ -218,7 +219,7 @@ class _HtmlRenderer:
             if not rendered.html:
                 return ""
             attrs = ['class="docvortex-page-footnote"', 'data-block-type="page_footnote"']
-            self._append_anchor_attribute(attrs, block.anchor, block_type=str(block.type))
+            self._append_anchor_attribute(attrs, visible_block_anchor(block), block_type=str(block.type))
             return f"<div {' '.join(attrs)}>{rendered.html}</div>"
         if isinstance(block, PageAuxTextBlock):
             rendered = render_inline_content_html(block.content, anchor_targets=self.anchor_targets)
@@ -252,7 +253,7 @@ class _HtmlRenderer:
             return ""
         level = min(max(block.level, 1), 6)
         attrs = [f'class="docvortex-heading docvortex-heading--{level}"', f'data-heading-level="{block.level}"']
-        self._append_anchor_attribute(attrs, block.anchor, block_type=str(block.type))
+        self._append_anchor_attribute(attrs, visible_block_anchor(block), block_type=str(block.type))
         return f"<h{level} {' '.join(attrs)}>{rendered.html}</h{level}>"
 
     def _append_anchor_attribute(
@@ -608,6 +609,7 @@ class _HtmlRenderer:
         role_class = "docvortex-caption" if is_caption else "docvortex-footnote"
         type_class = html.escape(str(block.type).replace("_", "-"), quote=True)
         attrs = [f'class="{role_class} {role_class}--{type_class}"', *_wire_block_attributes(block)]
+        self._append_anchor_attribute(attrs, visible_block_anchor(block), block_type=str(block.type))
         return f"<p {' '.join(attrs)}>{rendered.html}</p>"
 
     def _render_embedded_content(self, content: str, *, linkify_text: bool = True) -> HtmlInlineResult:
@@ -817,28 +819,21 @@ def _wrap_visual_body(
 
 
 def _collect_document_anchor_ids(middle_json: MiddleJson) -> dict[str, str]:
-    """为正文、标题和页面脚注的首次非空 anchor 分配文档级唯一 HTML id。"""
+    """为正文、标题、页面脚注及视觉说明分配文档级唯一 HTML id。"""
     anchor_ids: dict[str, str] = {}
     used_ids: set[str] = set()
-    for page in middle_json.pages:
-        for block in page.blocks:
-            if isinstance(block, (TextBlock, TitleBlockBase)):
-                visible_content = inline_plain_text(block.content).strip()
-            elif isinstance(block, PageFootnoteBlock):
-                visible_content = inline_plain_text(block.content).strip()
-            else:
-                continue
-            anchor = _anchor_key(block.anchor)
-            if not anchor or not visible_content or anchor in anchor_ids:
-                continue
-            base_id = _html_anchor_base(anchor)
-            candidate = base_id
-            suffix = 2
-            while candidate in used_ids:
-                candidate = f"{base_id}-{suffix}"
-                suffix += 1
-            anchor_ids[anchor] = candidate
-            used_ids.add(candidate)
+    for block in iter_document_anchor_blocks(middle_json):
+        anchor = _anchor_key(block.anchor)
+        if anchor in anchor_ids:
+            continue
+        base_id = _html_anchor_base(anchor)
+        candidate = base_id
+        suffix = 2
+        while candidate in used_ids:
+            candidate = f"{base_id}-{suffix}"
+            suffix += 1
+        anchor_ids[anchor] = candidate
+        used_ids.add(candidate)
     return anchor_ids
 
 

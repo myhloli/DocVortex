@@ -403,6 +403,16 @@ def merge_table_content(previous_table: BlockDict, current_table: BlockDict) -> 
     ):
         return None
 
+    # 合并会丢弃续表标题并替换前表脚注；有独立书签时保留原说明及跳转位置。
+    for table in (previous_table, current_table):
+        if any(
+            child.get("type") in {BlockType.TABLE_CAPTION, BlockType.TABLE_FOOTNOTE}
+            and isinstance(child.get("anchor"), str)
+            and child["anchor"].strip()
+            for child in _table_children(table)
+        ):
+            return None
+
     previous_clone = deepcopy(previous_table)
     current_clone = deepcopy(current_table)
     try:

@@ -8,7 +8,7 @@ from typing import Any
 from ..content.inline import inline_plain_text, slice_inline_spans
 from ..content.spans import inline_span_plain_text, text_spans
 from ..foundation._geometry import calculate_overlap_area_in_bbox1_area_ratio
-from ..schema import BlockType, parse_inline_spans
+from ..schema import RAW_CAPTION, RAW_FOOTNOTE, VISUAL_TYPE_MAPPING, BlockType, parse_inline_spans
 from .visual import _bbox_for_calculation
 
 
@@ -49,20 +49,35 @@ def fix_office_paragraph_titles(model_list: list[list[dict[str, Any]]]) -> None:
 
 
 def fix_office_index_title_blocks(model_list: list[list[dict[str, Any]]]) -> None:
-    """按正文目标 anchor 将 Office 目录文本叶子转换为对应正文或标题类型。"""
+    """按正文、标题或视觉说明目标改写目录叶子，说明引用仍保持合法 text 类型。"""
     target_by_anchor: dict[str, tuple[str, int | None]] = {}
+    annotation_types = {RAW_CAPTION, RAW_FOOTNOTE} | {
+        mapping[role] for mapping in VISUAL_TYPE_MAPPING.values() for role in ("caption", "footnote")
+    }
     for page_model_list in model_list:
         for block in page_model_list:
-            block_type = block.get("type")
-            if block_type not in {BlockType.TEXT, BlockType.DOC_TITLE, BlockType.PARAGRAPH_TITLE}:
-                continue
-            anchor = block.get("anchor")
-            level = block.get("level")
-            if not isinstance(anchor, str) or not anchor.strip():
-                continue
-            if block_type in {BlockType.DOC_TITLE, BlockType.PARAGRAPH_TITLE} and type(level) is not int:
-                continue
-            target_by_anchor.setdefault(anchor.strip(), (block_type, level if type(level) is int else None))
+            candidates = [block]
+            if block.get("type") in VISUAL_TYPE_MAPPING:
+                nested = block.get("content")
+                candidates = nested if isinstance(nested, list) else []
+            for candidate in candidates:
+                if not isinstance(candidate, dict):
+                    continue
+                block_type = candidate.get("type")
+                if block_type not in {BlockType.TEXT, BlockType.DOC_TITLE, BlockType.PARAGRAPH_TITLE} | annotation_types:
+                    continue
+                anchor = candidate.get("anchor")
+                level = candidate.get("level")
+                if not isinstance(anchor, str) or not anchor.strip():
+                    continue
+                if block_type in annotation_types:
+                    content = candidate.get("content")
+                    if not (inline_span_plain_text(content) if isinstance(content, list) else str(content or "")).strip():
+                        continue
+                    block_type, level = BlockType.TEXT, None
+                if block_type in {BlockType.DOC_TITLE, BlockType.PARAGRAPH_TITLE} and type(level) is not int:
+                    continue
+                target_by_anchor.setdefault(anchor.strip(), (block_type, level if type(level) is int else None))
 
     for page_model_list in model_list:
         for block in page_model_list:

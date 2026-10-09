@@ -41,6 +41,15 @@ exact result or fallback reason; a valid empty document has an empty exact resul
 
 ## Related outputs and migration
 
+Visual caption and footnote paragraphs may carry `data-anchor` with the original
+MiddleJson bookmark and an `id` allocated by the document anchor registry. This
+applies to image, table, chart and code annotations. Internal inline and index
+links use that `id`; the exact HTML codec restores the original bookmark on both
+the annotation and its links. Empty descriptions do not emit an `id`, and a
+duplicate bookmark links to the first visible target. This optional addition
+keeps HTML protocol version 1 and does not add an anchor to the visual parent or
+body carrier.
+
 EPUB XHTML and CSS use DocVortex classes and `EPUB/styles/docvortex.css`; its default
 title is also `DocVortex Document`. EPUB uses its own native parser and does not gain
 the HTML v1 envelope merely by sharing the namespace. Markdown's embedded

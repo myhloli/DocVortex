@@ -56,11 +56,11 @@ from ....schema import (
     TableBodyBlock,
     TextBlock,
     TextSpan,
-    TitleBlockBase,
 )
 from ...contracts import AssetResolver
 from ...docx import DocxRenderError
 from ..common.index import strip_index_page_tail
+from ..common.anchors import iter_document_anchor_blocks, visible_block_anchor
 from ..common.list_items import parse_list_item_marker
 from ..common.planner import PlannedBlock, build_render_plan
 from .assets import DocxAssetError, PreparedImage, prepare_block_image, prepare_html_image
@@ -155,7 +155,7 @@ class _DocxRenderer:
                 context=context,
             )
             if isinstance(block, TextBlock):
-                self.bookmarks.attach(paragraph, block.anchor)
+                self.bookmarks.attach(paragraph, visible_block_anchor(block))
             return
         if isinstance(block, (DocTitleBlock, ParagraphTitleBlock)):
             self._render_title(block, context)
@@ -163,7 +163,7 @@ class _DocxRenderer:
         if isinstance(block, PageFootnoteBlock):
             paragraph = self.document.add_paragraph(style=FOOTNOTE_STYLE)
             append_inline_content(paragraph, block.content, context=context)
-            self.bookmarks.attach(paragraph, block.anchor)
+            self.bookmarks.attach(paragraph, visible_block_anchor(block))
             return
         if isinstance(block, EquationBlock):
             self._render_equation(block, context)
@@ -206,7 +206,7 @@ class _DocxRenderer:
         level = min(max(block.level, 1), 9)
         paragraph = self.document.add_paragraph(style=f"Heading {level}")
         append_inline_content(paragraph, block.content, context=context)
-        self.bookmarks.attach(paragraph, block.anchor)
+        self.bookmarks.attach(paragraph, visible_block_anchor(block))
 
     def _render_equation(self, block: EquationBlock, context: InlineRenderContext) -> None:
         """优先写可编辑 OMML，失败时按图片、可见 LaTeX 的顺序回退。"""
@@ -422,6 +422,7 @@ class _DocxRenderer:
             raise TypeError(f"Unsupported annotation type: {block.type}")
         paragraph = self.document.add_paragraph(style=style)
         append_inline_content(paragraph, block.content, context=context)
+        self.bookmarks.attach(paragraph, visible_block_anchor(block))
 
     def _append_block_image(
         self,
@@ -808,13 +809,10 @@ def render_docx(
 
 
 def _iter_document_anchors(middle_json: MiddleJson) -> Iterable[str]:
-    """遍历正文、标题和默认可见页面脚注实际会写入的 bookmark anchor。"""
-    for page in middle_json.pages:
-        for block in page.blocks:
-            if isinstance(block, (TextBlock, TitleBlockBase)) and block.anchor:
-                yield block.anchor
-            elif isinstance(block, PageFootnoteBlock) and block.anchor:
-                yield block.anchor
+    """遍历正文、标题、页面脚注及视觉说明实际会写入的 bookmark anchor。"""
+    for block in iter_document_anchor_blocks(middle_json):
+        if block.anchor:
+            yield block.anchor
 
 
 def _plain_html_text(content: str) -> str:

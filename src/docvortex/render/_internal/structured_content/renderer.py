@@ -162,6 +162,8 @@ def _render_annotation_group(
         annotation_payload: dict[str, Any] = {}
         if child.bbox is not None:
             annotation_payload["bbox"] = list(child.bbox)
+        if child.anchor is not None:
+            annotation_payload["anchor"] = child.anchor
         annotation_payload["content"] = render_visual_annotation(child, delimiters)
         rendered_annotations.append(annotation_payload)
     return rendered_annotations

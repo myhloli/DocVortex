@@ -36,9 +36,9 @@ from ....schema import (
     TableBlock,
     TableBodyBlock,
     TextBlock,
-    TitleBlockBase,
 )
 from ..common.index import strip_index_page_tail
+from ..common.anchors import iter_document_anchor_blocks, visible_block_anchor
 from ..common.list_items import ListItem, parse_list_item_marker, reference_list_needs_bullets
 from ..common.planner import PlannedBlock, build_render_plan
 from .assets import normalize_asset_base_path, remote_block_image_url, resolve_block_image_path, tex_image_path
@@ -120,7 +120,7 @@ class _LatexRenderer:
         block = planned.block
         if isinstance(block, TextBlock):
             content = render_joined_inline_contents(planned.text_contents or [block.content], self.anchors)
-            return self._anchored_paragraph(content, block.anchor)
+            return self._anchored_paragraph(content, visible_block_anchor(block))
         if isinstance(block, RefTextBlock):
             content = render_joined_inline_contents(planned.text_contents or [block.content], self.anchors)
             return _paragraph(content)
@@ -156,7 +156,7 @@ class _LatexRenderer:
         content = render_inline_spans(block.content, self.anchors)
         if not content.strip():
             return ""
-        target = self.anchors.emit_target(block.anchor)
+        target = self.anchors.emit_target(visible_block_anchor(block))
         command = {
             1: "section",
             2: "subsection",
@@ -172,7 +172,7 @@ class _LatexRenderer:
         content = render_inline_spans(block.content, self.anchors)
         if not content.strip():
             return ""
-        target = self.anchors.emit_target(block.anchor)
+        target = self.anchors.emit_target(visible_block_anchor(block))
         footnote = rf"{{\footnotesize\color{{DocVortexGray}} {content}\par}}"
         return "\n".join(part for part in (target, footnote) if part)
 
@@ -350,6 +350,7 @@ class _LatexRenderer:
         content = render_inline_spans(block.content, self.anchors)
         if not content.strip():
             return ""
+        content = self.anchors.emit_target(visible_block_anchor(block)) + content
         if str(block.type).endswith("caption"):
             return rf"{{\small\itshape {content}\par}}"
         return rf"{{\footnotesize\color{{DocVortexGray}} {content}\par}}"
@@ -428,16 +429,8 @@ def _resolve_document_title(middle_json: MiddleJson, explicit: str | None) -> st
 
 
 def _collect_anchor_targets(middle_json: MiddleJson) -> set[str]:
-    """收集真实可见的正文、标题和页面脚注 anchor。"""
-    targets: set[str] = set()
-    for page in middle_json.pages:
-        for block in page.blocks:
-            if not isinstance(block, (TextBlock, TitleBlockBase, PageFootnoteBlock)):
-                continue
-            anchor = (block.anchor or "").strip()
-            if anchor and inline_plain_text(block.content).strip():
-                targets.add(anchor)
-    return targets
+    """收集真实可见的正文、标题、页面脚注及视觉说明 anchor。"""
+    return {(block.anchor or "").strip() for block in iter_document_anchor_blocks(middle_json)}
 
 
 def _classify_list(items: list[ListItem], add_reference_bullets: bool) -> tuple[str, str]:

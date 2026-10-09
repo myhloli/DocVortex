@@ -655,23 +655,31 @@ def _parse_index_leaf(
 def _collect_anchor_target_ids(
     wrappers: list[tuple[etree._Element, int | None]],
 ) -> dict[str, frozenset[str]]:
-    """预收集 renderer 正文和标题 id，供目录 linked carrier 做确定性判定。"""
+    """预收集正文、标题、页面脚注及视觉说明 id，供目录链接精确匹配。"""
     collected: dict[str, set[str]] = {}
     for wrapper, _ in wrappers:
         block_type = (wrapper.get("data-block-type") or "").strip()
-        if block_type not in {BlockType.TEXT, BlockType.DOC_TITLE, BlockType.PARAGRAPH_TITLE}:
-            continue
-        anchor = (wrapper.get("data-anchor") or "").strip()
         children = _element_children(wrapper)
-        if not anchor or len(children) != 1:
+        if len(children) != 1:
             continue
-        identities = {
-            identity
-            for element in [children[0], *children[0].iterdescendants()]
-            if (identity := (element.get("id") or "").strip())
-        }
-        if identities:
-            collected.setdefault(anchor, set()).update(identities)
+        if block_type in {BlockType.TEXT, BlockType.DOC_TITLE, BlockType.PARAGRAPH_TITLE, BlockType.PAGE_FOOTNOTE}:
+            anchor = (wrapper.get("data-anchor") or "").strip()
+            identities = {
+                identity
+                for element in [children[0], *children[0].iterdescendants()]
+                if (identity := (element.get("id") or "").strip())
+            }
+            if anchor and identities:
+                collected.setdefault(anchor, set()).update(identities)
+        elif block_type in VISUAL_TYPE_MAPPING:
+            mapping = VISUAL_TYPE_MAPPING[block_type]
+            for child in _element_children(children[0]):
+                if (child.get("data-block-type") or "").strip() not in {mapping["caption"], mapping["footnote"]}:
+                    continue
+                anchor = (child.get("data-anchor") or "").strip()
+                identity = (child.get("id") or "").strip()
+                if anchor and identity:
+                    collected.setdefault(anchor, set()).add(identity)
     return {anchor: frozenset(identities) for anchor, identities in collected.items()}
 
 

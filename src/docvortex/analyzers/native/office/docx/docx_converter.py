@@ -484,6 +484,8 @@ class DocxConverter(_DocxConstants, _DocxResources, _DocxStyles, _DocxNumbering,
                     "type": RAW_CAPTION,
                     "content": content_text,
                 }
+                if paragraph_anchor:
+                    caption_block["anchor"] = paragraph_anchor
                 self.cur_page.append(caption_block)
         else:
             # 文本样式名称不仅有默认值，还可能有用户自定义值

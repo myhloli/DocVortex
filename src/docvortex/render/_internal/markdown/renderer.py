@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from ....options import LatexDelimitersConfig
-from ....content.inline import inline_plain_text
-from ....schema import PAGE_AUXILIARY_BLOCK_TYPES, MiddleJson, PageFootnoteBlock, TextBlock, TitleBlockBase
+from ....schema import PAGE_AUXILIARY_BLOCK_TYPES, MiddleJson
 from ...contracts import ImageRenderer, RenderMode
 from ..common.planner import PlannedBlock, build_render_plan
+from ..common.anchors import iter_document_anchor_blocks
 from .blocks import render_planned_block
 
 _PAGE_SEPARATOR = "\n\n---\n\n"
@@ -78,16 +78,8 @@ def _render_page(
 
 
 def _collect_markdown_anchor_targets(middle_json: MiddleJson) -> set[str]:
-    """收集真实可见的顶层正文、标题和页面脚注 anchor，供目录链接判定。"""
-    targets: set[str] = set()
-    for page in middle_json.pages:
-        for block in page.blocks:
-            if not isinstance(block, (TextBlock, TitleBlockBase, PageFootnoteBlock)):
-                continue
-            anchor = (block.anchor or "").strip()
-            if anchor and inline_plain_text(block.content).strip():
-                targets.add(anchor)
-    return targets
+    """收集可见正文、标题、页面脚注及视觉说明 anchor，供目录链接判定。"""
+    return {(block.anchor or "").strip() for block in iter_document_anchor_blocks(middle_json)}
 
 
 __all__ = ["render_markdown"]
