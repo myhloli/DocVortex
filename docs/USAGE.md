@@ -237,6 +237,12 @@ Images, charts and seals retain screenshots. No table structure, formula,
 orientation classification or unwarping model is downloaded. Recognition uses
 the single model's embedded character dictionary without a language selector.
 
+Formula numbers merge with adjacent display equations in layout reading order,
+so the equation screenshot includes its number. Trailing numbers take precedence;
+unpaired numbers remain text. `header_image` and `footer_image` regions use OCR
+and become `header` and `footer` text blocks, including empty recognition results.
+They follow the usual page auxiliary filtering in default Markdown/HTML output.
+
 Classification remains separately available without inference or networking:
 
 ```bash
@@ -259,7 +265,7 @@ Classification and metadata extraction do not start inference. The low-level
 `docvortex.analyzers.native.PdfModel.predict()` continues to perform only native
 text analysis, preserving explicit callers such as MinerU. OCR screenshots are
 materialized into the normal result assets and remain usable after closing or
-deleting the source. See [model provenance](../licenses/models/README.md).
+deleting the source. See [model provenance](MODELS.md).
 
 ## Page images and embedded assets
 

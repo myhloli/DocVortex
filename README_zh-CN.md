@@ -147,7 +147,7 @@ restored.export("output/report.epub", output_format="epub")
 - **PDF OCR：** layout 提供块区域与阅读顺序，文本块使用 Tiny Det / Small Rec。独立公式、图片、图表和印章保留截图，行内公式随文本做普通 OCR。表格输出空间投影文字及截图，不识别单元格结构。首版不使用页面方向分类或去畸变模型；所选文档整体采用一种解析后端。
 
 混合 PDF 若被分类为 `txt`，但包含扫描页，可使用 `parse_mode="ocr"`（CLI：`--parse-mode ocr`）对所选文档整体做 OCR。
-- **PDF 分类：** `docvortex classify report.pdf` 返回 `txt` 或 `ocr`，不推理、不联网。元数据提取及底层 `PdfModel.predict()` 原生文字入口也保持离线。详见[模型来源](licenses/models/README.md)。
+- **PDF 分类：** `docvortex classify report.pdf` 返回 `txt` 或 `ocr`，不推理、不联网。元数据提取及底层 `PdfModel.predict()` 原生文字入口也保持离线。详见[模型来源](docs/MODELS.md)。
 - **PDF 导出：** 具有页面几何的 PDF 来源默认按原始块布局还原，正文可选择，表格优先使用可选择文字的 HTML 结构表，图表保留区域图；其他来源和旧结果继续语义重排。可通过 `--pdf-layout original|reflow` 显式选择，字体、换行与绘图指令不保证无损复现。详见 [PDF 布局选项](docs/USAGE.md#pdf-output-layout)。
 
 ## 文档导航

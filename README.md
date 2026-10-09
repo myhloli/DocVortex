@@ -148,7 +148,7 @@ reads metadata without parsing the document body.
 - **PDF OCR:** layout supplies block regions and reading order; text blocks use Tiny Det / Small Rec. Display formulas, images, charts and seals retain screenshots. Inline formulas pass through ordinary text OCR. Tables contain spatially projected text and a screenshot, without structural cell recognition. No page orientation or unwarping model is used. A selected document uses one backend throughout.
 
 If a mixed PDF is classified as `txt` but contains scanned pages, use `parse_mode="ocr"` (CLI: `--parse-mode ocr`) to OCR the entire selection.
-- **PDF classification:** `docvortex classify report.pdf` returns `txt` or `ocr` without inference or networking. Metadata extraction and the low-level `PdfModel.predict()` native text API also remain offline. See [model provenance](licenses/models/README.md).
+- **PDF classification:** `docvortex classify report.pdf` returns `txt` or `ocr` without inference or networking. Metadata extraction and the low-level `PdfModel.predict()` native text API also remain offline. See [model provenance](docs/MODELS.md).
 - **PDF export:** PDF sources with page geometry default to block layout restoration, with selectable text and HTML-based tables; charts retain region images. Other sources and older results use semantic reflow. Use `--pdf-layout original|reflow` to select explicitly; fonts, line breaks and drawing instructions are not reproduced losslessly. See [PDF output layout](docs/USAGE.md#pdf-output-layout).
 
 ## Documentation
