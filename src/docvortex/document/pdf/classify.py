@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from ctypes import byref, c_float, c_int, create_string_buffer
+from ctypes import byref, c_int, create_string_buffer
 from io import BytesIO
 from typing import Any
 
@@ -214,7 +214,8 @@ def classify(pdf_doc: pdfium.PdfDocument, pdf_bytes: bytes) -> str:
                 )
                 return "ocr"
 
-            if _get_high_image_coverage_ratio_from_samples(text_samples) >= HIGH_IMAGE_COVERAGE_THRESHOLD:
+            # 背景大图不能否决正常正文；只将多数正文依赖图片、附加文字不实际绘制的页面判为扫描件。
+            if any(sample.get("image_backed_ocr", False) for sample in text_samples):
                 return "ocr"
 
     except (PdfiumFontError, NativeClassificationError):
@@ -377,7 +378,11 @@ def _collect_pdfium_text_samples(pdf_doc: pdfium.PdfDocument, page_indices: list
                 page = pdf_doc[page_index]
                 sample = _collect_pdfium_text_sample_from_page(page_index, page)
                 # 同一次页面加载顺带统计图像覆盖率，末尾的覆盖检查不再重新加载页面。
-                sample["image_coverage_ratio"] = _page_image_coverage_ratio(page)
+                from .classification_visuals import _image_rectangles, image_text_signal, page_image_coverage
+
+                images = _image_rectangles(page)
+                sample["image_coverage_ratio"] = page_image_coverage(page, images)
+                sample.update(image_text_signal(page, len(sample["cleaned_text"]), CHARS_THRESHOLD, images))
                 text_samples.append(sample)
             finally:
                 close_pdfium_child(page)
@@ -1143,24 +1148,10 @@ def _resolve_pdf_object(obj: Any) -> Any:
 
 
 def _page_image_coverage_ratio(page: Any) -> float:
-    """统计单页图像覆盖率：类型过滤的原生 walk，不逐对象构建 Python 包装。"""
-    from .native_objects import _clipped_objects_of_type
+    """统计应用父变换、累计裁剪和页面范围后的图像矩形并集覆盖率。"""
+    from .classification_visuals import page_image_coverage
 
-    page_bbox = page.get_bbox()
-    page_area = abs((page_bbox[2] - page_bbox[0]) * (page_bbox[3] - page_bbox[1]))
-    if page_area <= 0:
-        return 0.0
-
-    image_area = 0.0
-    # 深度 3 等价旧 page.get_objects(max_depth=3)：页面与两层嵌套 Form 内的图像。
-    for member in _clipped_objects_of_type(page, pdfium_c.FPDF_PAGEOBJ_IMAGE, 3):
-        values = [c_float() for _ in range(4)]
-        if not pdfium_c.FPDFPageObj_GetBounds(member.raw, *(byref(value) for value in values)):
-            continue
-        left, bottom, right, top = (value.value for value in values)
-        image_area += max(0.0, right - left) * max(0.0, top - bottom)
-
-    return min(image_area / page_area, 1.0)
+    return page_image_coverage(page)
 
 
 def get_high_image_coverage_ratio_pdfium(pdf_doc: pdfium.PdfDocument, page_indices: list[int]) -> float:

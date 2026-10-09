@@ -2,7 +2,7 @@
 use crate::ReadError;
 use std::{
     collections::HashMap,
-    ffi::{c_int, c_uint, c_ulong, c_void},
+    ffi::{c_double, c_int, c_uint, c_ulong, c_void},
 };
 
 pub type RawRecord = (u32, bool, bool, usize);
@@ -87,4 +87,50 @@ pub unsafe fn read(
         }
         Ok((records, fonts))
     }
+}
+
+/// 一次跨边界读取图上文字所需的原始记录，过滤规则与 Python 保持一致。
+///
+/// # Safety
+/// 调用方必须验证三个同库函数的 ABI，并在整个调用中持有文本页、函数与 PDFium 锁。
+pub unsafe fn read_image_text(
+    addresses: [usize; 3],
+    handle: usize,
+    count: usize,
+) -> Result<Vec<(u32, usize, [f64; 4])>, ReadError> {
+    if addresses.contains(&0) || handle == 0 || count > c_int::MAX as usize {
+        return Err(ReadError::InvalidInput(
+            "invalid image text ABI or character count",
+        ));
+    }
+    let unicode: unsafe extern "system" fn(*mut c_void, c_int) -> c_uint =
+        std::mem::transmute(addresses[0]);
+    let object: unsafe extern "system" fn(*mut c_void, c_int) -> *mut c_void =
+        std::mem::transmute(addresses[1]);
+    let bounds: unsafe extern "system" fn(
+        *mut c_void,
+        c_int,
+        *mut c_double,
+        *mut c_double,
+        *mut c_double,
+        *mut c_double,
+    ) -> c_int = std::mem::transmute(addresses[2]);
+    let page = handle as *mut c_void;
+    let mut records = Vec::new();
+    for index in 0..count {
+        let index = index as c_int;
+        let code = unicode(page, index);
+        if code == 0 || code > 0x10ffff {
+            continue;
+        }
+        let obj = object(page, index);
+        if obj.is_null() {
+            continue;
+        }
+        let (mut left, mut right, mut bottom, mut top) = (0.0, 0.0, 0.0, 0.0);
+        if bounds(page, index, &mut left, &mut right, &mut bottom, &mut top) != 0 {
+            records.push((code, obj as usize, [left, bottom, right, top]));
+        }
+    }
+    Ok(records)
 }

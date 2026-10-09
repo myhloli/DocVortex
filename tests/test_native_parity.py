@@ -81,6 +81,8 @@ def test_native_registration_contract(native):
         "visual_evidence_stage_stats": "()",
         "geometry_evidence_stats": "()",
         "classification_snapshot_stats": "()",
+        "image_text_snapshot_stats": "()",
+        "read_pdfium_image_text": "(addresses, handle, count, frame, rotation, images, visibility, overlap)",
         "read_pdfium_classification": "(addresses, handle, count, cjk_ranges, allowed_controls, private_range, normalize_font)",
         "script_snapshot_stats": "()",
         "anchor_pairs": "(records, positive_source)",
@@ -144,6 +146,7 @@ def test_native_registration_contract(native):
         "NativeTextSnapshot": ("docvortex._native", None),
         "NativeGeometryEvidence": ("docvortex._native", None),
         "NativeClassificationSnapshot": ("docvortex._native", None),
+        "NativeImageTextSnapshot": ("docvortex._native", None),
         "NativeScriptEvidence": ("docvortex._native", None),
         "NativeFontProvider": (
             "docvortex._native",
@@ -164,7 +167,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 32, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 33, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)

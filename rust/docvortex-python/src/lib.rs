@@ -194,6 +194,15 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<snapshot::NativeTextSnapshot>()?;
     module.add_class::<snapshot::NativeGeometryEvidence>()?;
     module.add_class::<classification::NativeClassificationSnapshot>()?;
+    module.add_class::<classification::NativeImageTextSnapshot>()?;
+    module.add_function(wrap_pyfunction!(
+        classification::read_pdfium_image_text,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        classification::image_text_snapshot_stats,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(
         classification::read_pdfium_classification,
         module

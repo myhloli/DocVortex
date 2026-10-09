@@ -1,8 +1,7 @@
 """classify 抽样页加载次数与图像覆盖统计的等价性（#19 回归）。
 
 宽高比阶段用 FPDF_GetPageSizeByIndexF 免加载；文本采样与图像覆盖共用一次
-页面加载；覆盖统计走深度 3 的类型过滤原生 walk，与旧 pypdfium2
-get_objects(max_depth=3) 的可见图像集合一致。
+页面加载；覆盖统计按原生解析深度应用 Form 变换与累计裁剪，并消除重叠。
 """
 
 from __future__ import annotations
@@ -11,6 +10,7 @@ from importlib import import_module
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
+import pytest
 
 from docvortex.document.pdf import PDFDocument
 
@@ -97,13 +97,9 @@ def _nested_forms_images_pdf() -> bytes:
 
 
 def _clipped_overlapping_images_pdf() -> bytes:
-    """生成裁剪、重叠和缩放 Form 共存的纯图像页，检查旧面积统计语义。"""
+    """生成裁剪、重叠和缩放 Form 共存的纯图像页，检查实际可见面积。"""
     image = b"<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 1 >>\nstream\n\x80\nendstream"
-    content = (
-        b"q 0 0 10 10 re W n 300 0 0 300 30 30 cm /Im Do Q\n"
-        b"q 300 0 0 300 30 30 cm /Im Do Q\n"
-        b"q 2 0 0 2 0 0 cm /F Do Q\n"
-    )
+    content = b"q 0 0 10 10 re W n 300 0 0 300 30 30 cm /Im Do Q\nq 300 0 0 300 30 30 cm /Im Do Q\nq 2 0 0 2 0 0 cm /F Do Q\n"
     form_content = b"q 100 0 0 100 50 50 cm /Im Do Q\n"
     return _pdf(
         [
@@ -185,8 +181,8 @@ def test_aspect_ratio_stage_loads_no_page(monkeypatch):
     assert counter["loads"] == 0
 
 
-def test_native_image_coverage_matches_wrapper_walk():
-    """嵌套 Form 各深度的图像覆盖统计与旧 pypdfium2 包装 walk 一致，深度 3 之外不计入。"""
+def test_native_image_coverage_includes_deep_form_images():
+    """原生解析可见的深层扫描图也参与分类，不再受旧三层包装 walk 限制。"""
     data = _nested_forms_images_pdf()
     with pdfium.PdfDocument(data) as pdf_doc:
         reference = _reference_coverage(pdf_doc, [0])
@@ -197,14 +193,14 @@ def test_native_image_coverage_matches_wrapper_walk():
         finally:
             page.close()
 
-    assert reference == actual
-    # Im0/Im1/Im2 各 200x200pt，合计约 0.25 页面占比；若深度 3 的 Im3
-    # （600x700，近整页）被错误计入，覆盖率会被钳到 1.0。
-    assert 0.15 < per_page < 0.5
+    assert reference == 0
+    assert actual == 1
+    # 深层 Im3 为 [0,0,600,700]，其他三张图片均在该范围内，取并集只计一次。
+    assert per_page == pytest.approx(600 * 700 / (612 * 792))
 
 
-def test_clipped_overlapping_form_images_keep_raw_area_semantics():
-    """图像裁剪、重叠和 Form 变换不改变旧实现的原始面积求和规则。"""
+def test_clipped_overlapping_form_images_use_visible_union():
+    """裁剪外图片面积为零，变换后的 Form 图位于大图内部，不能重复计入覆盖率。"""
     data = _clipped_overlapping_images_pdf()
     with pdfium.PdfDocument(data) as pdf_doc:
         page = pdf_doc[0]
@@ -213,7 +209,9 @@ def test_clipped_overlapping_form_images_keep_raw_area_semantics():
             actual = classify._page_image_coverage_ratio(page)
         finally:
             page.close()
-    assert actual == reference
-    assert 0.1 < actual <= 1.0
+    # 裁剪框 [0,0,10,10] 与第一张图 [30,30,330,330] 无交集；
+    # 第二张图为 300×300，Form 内图片缩放后的 [100,100,300,300] 被它完全包含。
+    assert actual == pytest.approx(300 * 300 / (612 * 792))
+    assert actual < reference
     with PDFDocument(data) as document:
         assert document.classify() == "ocr"

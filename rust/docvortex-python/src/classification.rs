@@ -12,6 +12,8 @@ use std::{
 };
 
 static CALLS: AtomicU64 = AtomicU64::new(0);
+static IMAGE_CALLS: AtomicU64 = AtomicU64::new(0);
+static PIXEL_CALLS: AtomicU64 = AtomicU64::new(0);
 
 #[pyclass(frozen, module = "docvortex._native")]
 pub struct NativeClassificationSnapshot {
@@ -104,4 +106,108 @@ pub fn read_pdfium_classification(
 #[pyfunction]
 pub fn classification_snapshot_stats() -> u64 {
     CALLS.load(Ordering::Relaxed)
+}
+
+#[pyclass(frozen, module = "docvortex._native")]
+pub struct NativeImageTextSnapshot {
+    candidates: docvortex_core::classification_visuals::Candidates,
+}
+
+#[pymethods]
+impl NativeImageTextSnapshot {
+    /// 返回候选字符数，不逐字符物化 Python 字典或元组。
+    #[getter]
+    fn count(&self) -> usize {
+        self.candidates.boxes.len()
+    }
+
+    /// 只描述对象绘制可能性，实际是否被图片遮挡仍由原像素核验裁决。
+    #[getter]
+    fn paints(&self) -> bool {
+        self.candidates.paints
+    }
+
+    /// 仅供诊断和字段级差分测试，返回脱离快照的候选框副本。
+    fn boxes(&self) -> Vec<[f64; 4]> {
+        self.candidates.boxes.clone()
+    }
+
+    /// 批量消费独立的 L 模式差分字节，页面关闭后仍可查询，不持有原生句柄。
+    fn painted_count(
+        &self,
+        py: Python<'_>,
+        data: &Bound<'_, PyBytes>,
+        width: usize,
+        height: usize,
+        page_width: f64,
+        page_height: f64,
+    ) -> PyResult<usize> {
+        if width.checked_mul(height) != Some(data.as_bytes().len())
+            || !page_width.is_finite()
+            || !page_height.is_finite()
+            || page_width <= 0.0
+            || page_height <= 0.0
+        {
+            return Err(PyValueError::new_err(
+                "invalid image text pixel buffer or page size",
+            ));
+        }
+        let bytes = data.as_bytes();
+        let count = py.detach(|| {
+            docvortex_core::classification_visuals::painted_count(
+                bytes,
+                width,
+                height,
+                &self.candidates.boxes,
+                page_width,
+                page_height,
+            )
+        });
+        PIXEL_CALLS.fetch_add(1, Ordering::Relaxed);
+        Ok(count)
+    }
+}
+
+/// 标准 ABI 下同步读取原始字符后释放 PDFium 依赖，纯几何部分可释放 GIL。
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+pub fn read_pdfium_image_text(
+    py: Python<'_>,
+    addresses: [usize; 3],
+    handle: usize,
+    count: usize,
+    frame: [f64; 4],
+    rotation: i32,
+    images: Vec<[f64; 4]>,
+    visibility: Vec<docvortex_core::classification_visuals::Visibility>,
+    overlap: f64,
+) -> PyResult<Option<NativeImageTextSnapshot>> {
+    let records =
+        unsafe { docvortex_pdfium::classification::read_image_text(addresses, handle, count) }
+            .map_err(|error| match error {
+                ReadError::InvalidInput(message) => PyValueError::new_err(message),
+                ReadError::Pdfium(message) => super::pdfium::PdfiumReadError::new_err(message),
+                ReadError::Allocation(message) => PyMemoryError::new_err(message),
+            })?;
+    let candidates = py.detach(|| {
+        docvortex_core::classification_visuals::candidates(
+            &records,
+            frame,
+            rotation,
+            &images,
+            &visibility,
+            overlap,
+        )
+    });
+    IMAGE_CALLS.fetch_add(1, Ordering::Relaxed);
+    Ok(candidates.map(|candidates| NativeImageTextSnapshot { candidates }))
+}
+
+/// 分别报告成功完成的批量读取与像素查询次数，不与原始字体统计混计。
+#[pyfunction]
+pub fn image_text_snapshot_stats() -> (u64, u64) {
+    (
+        IMAGE_CALLS.load(Ordering::Relaxed),
+        PIXEL_CALLS.load(Ordering::Relaxed),
+    )
 }
