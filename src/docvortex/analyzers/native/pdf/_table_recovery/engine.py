@@ -262,6 +262,31 @@ def _has_physical_row_undercount(
     return False
 
 
+def _minimum_columns_after_row_undercount(
+    vector_attempts: tuple[dict[str, Any], ...],
+) -> int:
+    """仅用最终规范化线网格的漏行拒绝保留列数下界，不采信已撤销的轨道假设。"""
+
+    minimum_columns = 0
+    for attempt in vector_attempts:
+        if attempt.get("evidence") != "line_grid" or attempt.get("first_rejection_gate") != "physical_row_undercount":
+            continue
+        grid = attempt.get("grid")
+        tracks = attempt.get("canonical_tracks")
+        if isinstance(grid, dict) and isinstance(tracks, list) and len(tracks) == grid.get("cols", 0) + 1:
+            minimum_columns = max(minimum_columns, grid["cols"])
+    return minimum_columns
+
+
+def _retain_column_consistent_candidates(
+    candidates: list[NativeTableCandidate],
+    minimum_columns: int,
+) -> list[NativeTableCandidate]:
+    """排除丢失已验证叶子列的后备结构，避免完整捕获文本掩盖跨列误并。"""
+
+    return [candidate for candidate in candidates if candidate.cols >= minimum_columns]
+
+
 def _table_primitive_count(table_input: NativeTableInput) -> int:
     """统计实际与目标表格相交的 drawing 和矩形数量。"""
 
@@ -358,8 +383,13 @@ def _evaluate_native_pdf_table(
         text,
         diagnostics=vector_attempt_records,
     )
+    vector_attempts: tuple[dict[str, Any], ...] = tuple(vector_attempt_records)
+    minimum_columns = _minimum_columns_after_row_undercount(vector_attempts)
+    vector_candidates = _retain_column_consistent_candidates(vector_candidates, minimum_columns)
     aligned_text = regroup_numeric_text(text)
     aligned_candidate = build_aligned_numeric_candidate(table_input, aligned_text)
+    if aligned_candidate is not None and aligned_candidate.cols < minimum_columns:
+        aligned_candidate = None
     aligned_replaces_vector = aligned_candidate is not None and any(
         aligned_candidate.rows >= 1.5 * c.rows or aligned_candidate.cols > c.cols for c in vector_candidates
     )
@@ -368,7 +398,6 @@ def _evaluate_native_pdf_table(
         vector_candidates = [
             c for c in vector_candidates if not (aligned_candidate.rows >= 1.5 * c.rows or aligned_candidate.cols > c.cols)
         ]
-    vector_attempts: tuple[dict[str, Any], ...] = tuple(vector_attempt_records)
     physical_topology_conflict = False
     if any(_is_verified_rect_candidate(candidate) for candidate in vector_candidates):
         physical_topology_conflict = _has_attempted_line_rect_grid_conflict(vector_attempts)
@@ -394,9 +423,13 @@ def _evaluate_native_pdf_table(
             sparse_hybrid_allowed = False
     rule_band_candidates = build_rule_band_candidates(table_input, text) if sparse_hybrid_allowed else []
     sparse_hybrid_candidates = (
-        build_sparse_hybrid_candidates(table_input, text) if sparse_hybrid_allowed and not rule_band_candidates else []
+        build_sparse_hybrid_candidates(table_input, text)
+        if sparse_hybrid_allowed and not _retain_column_consistent_candidates(rule_band_candidates, minimum_columns)
+        else []
     )
-    sparse_hybrid_selection = _select_candidate([*rule_band_candidates, *sparse_hybrid_candidates])
+    sparse_hybrid_selection = _select_candidate(
+        _retain_column_consistent_candidates([*rule_band_candidates, *sparse_hybrid_candidates], minimum_columns)
+    )
     text_candidates = (
         build_text_candidates(table_input, text)
         if len(text.rows) >= 2 and vector_selection is None and sparse_hybrid_selection is None
@@ -416,7 +449,9 @@ def _evaluate_native_pdf_table(
         *sparse_hybrid_candidates,
         *text_candidates,
     ]
-    existing_candidates = _remove_undercounted_vector_candidates(existing_generated_candidates)
+    existing_candidates = _retain_column_consistent_candidates(
+        _remove_undercounted_vector_candidates(existing_generated_candidates), minimum_columns
+    )
     existing_verified = any(_passes_verified_threshold(candidate) for candidate in existing_candidates)
     sparse_multiline_allowed = len(text.rows) >= 2 and not physical_topology_conflict and not existing_verified
     if sparse_multiline_allowed:
@@ -430,7 +465,7 @@ def _evaluate_native_pdf_table(
     sparse_multiline_candidates = build_sparse_multiline_candidates(table_input, text) if sparse_multiline_allowed else []
     banded_candidate = (
         build_banded_numeric_candidate(table_input, text, {})
-        if sparse_multiline_allowed and not sparse_multiline_candidates
+        if sparse_multiline_allowed and not _retain_column_consistent_candidates(sparse_multiline_candidates, minimum_columns)
         else None
     )
     generated_candidates = [
@@ -438,7 +473,9 @@ def _evaluate_native_pdf_table(
         *sparse_multiline_candidates,
         *([banded_candidate] if banded_candidate is not None else []),
     ]
-    candidates = _remove_undercounted_vector_candidates(generated_candidates)
+    candidates = _retain_column_consistent_candidates(
+        _remove_undercounted_vector_candidates(generated_candidates), minimum_columns
+    )
     selected = None if physical_topology_conflict else _select_candidate(candidates)
     header_undercount = (
         selected is not None
@@ -488,7 +525,11 @@ def _evaluate_native_pdf_table(
     elif not generated_candidates:
         first_rejection_gate = "candidate_generation"
     elif not candidates:
-        first_rejection_gate = "undercount_guard"
+        first_rejection_gate = (
+            "physical_column_undercount"
+            if minimum_columns and any(candidate.cols < minimum_columns for candidate in generated_candidates)
+            else "undercount_guard"
+        )
     elif not any(_passes_verified_threshold(candidate) for candidate in candidates):
         first_rejection_gate = "verified_threshold"
     else:

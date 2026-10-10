@@ -419,6 +419,26 @@ def _split_rows_by_anchors(
     else:
         anchors = anchor_positions
 
+    centered_leading_owners: dict[int, int] = {}
+    if not group_short_key_runs:
+        for owner, anchor in enumerate(anchors):
+            if anchor == 0 or anchor + 1 >= len(rows):
+                continue
+            leading, key_row, trailing = rows[anchor - 1], rows[anchor], rows[anchor + 1]
+            leading_cols = occupancies_by_index[leading.row_index]
+            # 缺失列的两条基线对称包围关键行，证明首条是当前格的上半行，而非上一记录的续文。
+            if (
+                not leading_cols
+                or leading_cols != occupancies_by_index[trailing.row_index]
+                or leading_cols.intersection(occupancies_by_index[key_row.row_index])
+            ):
+                continue
+            leading_center = (leading.bbox[1] + leading.bbox[3]) / 2.0
+            key_center = (key_row.bbox[1] + key_row.bbox[3]) / 2.0
+            trailing_center = (trailing.bbox[1] + trailing.bbox[3]) / 2.0
+            if abs(leading_center + trailing_center - 2.0 * key_center) <= 0.5 * (key_row.bbox[3] - key_row.bbox[1]):
+                centered_leading_owners[anchor - 1] = owner
+
     groups: list[list[int]] = [[] for _ in anchors]
     for position, row in enumerate(rows):
         owner = 0
@@ -429,6 +449,7 @@ def _split_rows_by_anchors(
                 break
         if position < anchors[0]:
             owner = 0
+        owner = centered_leading_owners.get(position, owner)
         groups[owner].append(row.row_index)
     return [tuple(group) for group in groups if group]
 

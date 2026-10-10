@@ -1212,6 +1212,10 @@ def _physical_row_dense_baseline_pairs(
     text: NativeTableText,
     x_tracks: list[float],
     y_tracks: list[float],
+    *,
+    rules: list[_MergedRule] | None = None,
+    canonical_x_tracks: list[_CanonicalTrack] | None = None,
+    snap_tolerance: float = 0.0,
 ) -> tuple[dict[str, object], ...]:
     """识别同一物理行带内占用集合相同的多条稠密文本基线。"""
 
@@ -1260,14 +1264,24 @@ def _physical_row_dense_baseline_pairs(
     for band, entries in rows_by_band.items():
         if band == 0 and blank_answer_header:
             continue
-        nonempty_entries = [entry for entry in entries if entry[1]]
-        if (
-            len(nonempty_entries) < 2
-            or len(nonempty_entries[0][1]) < dense_column_count
-            or any(entry[1] != nonempty_entries[0][1] for entry in nonempty_entries[1:])
-        ):
+        # 单列说明或错开基线的日期续行不能否定同一行带内重复出现的稠密数据记录。
+        dense_entries = [entry for entry in entries if len(entry[1]) >= dense_column_count]
+        # 日期主行也可能达到最低密度；只比较最大列占用的完整锚点，不把部分续行当成反证。
+        maximum_occupied = max((len(entry[1]) for entry in dense_entries), default=0)
+        dense_entries = [entry for entry in dense_entries if len(entry[1]) == maximum_occupied]
+        if len(dense_entries) < 2 or any(entry[1] != dense_entries[0][1] for entry in dense_entries[1:]):
             continue
-        for previous, current in zip(nonempty_entries, nonempty_entries[1:]):
+        nonempty_entries = [entry for entry in entries if entry[1]]
+        original_dense_support = all(entry[1] == dense_entries[0][1] for entry in nonempty_entries)
+        if not original_dense_support and rules is not None and canonical_x_tracks is not None:
+            # 新增的续行忽略只处理整行被误合并的无列隔断带；真实列框里的多行单元格保持原判定。
+            if any(
+                _separator_coverage_for_track(rules, "vertical", track, y_tracks[band], y_tracks[band + 1], snap_tolerance)
+                >= SEPARATOR_COVERAGE_THRESHOLD
+                for track in canonical_x_tracks[1:-1]
+            ):
+                continue
+        for previous, current in zip(dense_entries, dense_entries[1:]):
             ambiguous_pairs.append(
                 {
                     "physical_row": band,
@@ -1593,6 +1607,9 @@ def _build_vector_tracks(
             text,
             x_tracks,
             y_tracks,
+            rules=rules,
+            canonical_x_tracks=canonical_x_tracks,
+            snap_tolerance=snap_tolerance,
         )
         if is_line_grid
         else ()
