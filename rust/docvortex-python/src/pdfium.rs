@@ -348,6 +348,7 @@ type VisualRecord = (
     Option<(f64, f64, f64, f64)>,
     Option<(f64, f64, f64, f64)>,
     Option<(f64, f64)>,
+    Option<bool>,
 );
 
 /// 原始字符保留在 Rust，每批直接生成最终坐标，省去 Python 几何重打包。
@@ -414,6 +415,7 @@ impl PdfiumVisualCharacterBatches {
                         loose.map(Into::into),
                         tight.map(Into::into),
                         origin.map(Into::into),
+                        record.10,
                     )
                 })
                 .collect()

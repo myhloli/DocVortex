@@ -1,6 +1,7 @@
 """PDF 段落延续关系的 raw model-list 后处理。"""
 
 import math
+import re
 from typing import Any, TypeAlias
 
 from ..content.spans import inline_span_plain_text
@@ -56,6 +57,7 @@ def merge_para_text_blocks(pages: list[dict[str, Any]]) -> None:
             if isinstance(block, dict):
                 ordered_blocks.append((page_idx, order_idx, block))
 
+    roots = {(page_idx, order_idx): block for page_idx, order_idx, block in ordered_blocks}
     for current_index in range(len(ordered_blocks) - 1, -1, -1):
         current_page_idx, _, current_block = ordered_blocks[current_index]
         current_type = current_block.get("type")
@@ -74,10 +76,16 @@ def merge_para_text_blocks(pages: list[dict[str, Any]]) -> None:
             )
             if previous_block is None:
                 continue
-            previous_page_idx, _, previous_text_block = previous_block
+            previous_page_idx, previous_order_idx, previous_text_block = previous_block
             if not _is_same_or_consecutive_page(current_page_idx, previous_page_idx):
                 continue
-            if current_block.get("_reference_start") is False and previous_text_block.get("_reference_start") is not None:
+            # 列表末项必须经过完整正文判据，不能由参考条目侧车绕过句末或几何屏障。
+            previous_is_list_tail = roots[(previous_page_idx, previous_order_idx)].get("type") == BlockType.LIST
+            if (
+                not previous_is_list_tail
+                and current_block.get("_reference_start") is False
+                and previous_text_block.get("_reference_start") is not None
+            ):
                 current_block["continues_prev"] = True
                 continue
             can_merge = (
@@ -199,6 +207,12 @@ def _find_previous_text_block(
     for previous_index in range(current_index - 1, -1, -1):
         previous_block = ordered_blocks[previous_index][2]
         previous_type = previous_block.get("type")
+        if previous_type == BlockType.LIST:
+            tail = _direct_text_list_tail(previous_block)
+            if tail is None or _starts_list_item(_normalized_text_content(ordered_blocks[current_index][2])):
+                return None
+            page_idx, order_idx, _ = ordered_blocks[previous_index]
+            return page_idx, order_idx, tail
         if previous_type in TEXT_MERGE_BARRIER_TYPES:
             return None
         if previous_type != BlockType.TEXT:
@@ -207,6 +221,27 @@ def _find_previous_text_block(
             continue
         return ordered_blocks[previous_index]
     return None
+
+
+def _direct_text_list_tail(block: BlockDict) -> BlockDict | None:
+    """仅把正文列表的最后一个直属 text 成员作为候选，不穿透参考文献或嵌套列表。"""
+    content = block.get("content")
+    if block.get("sub_type") != BlockType.TEXT or not isinstance(content, list) or not content:
+        return None
+    tail = content[-1]
+    return tail if isinstance(tail, dict) and tail.get("type") == BlockType.TEXT else None
+
+
+def _starts_list_item(text: str) -> bool:
+    """新编号或项目符号表示新条目，不能作为上一列表末项的无编号续文。"""
+    return (
+        re.match(
+            r"^(?:[-*+•●○▪▫◦‣⁃–—](?:\s|$)|[（(]?(?:\d+|[A-Za-z]|[IVXLCDMivxlcdm]+)[.．、)）]|"
+            r"[\[［]\d+[\]］]|[一二三四五六七八九十百]+[、.．)）]|[①-⑳])",
+            text,
+        )
+        is not None
+    )
 
 
 def _find_previous_ref_text_block(

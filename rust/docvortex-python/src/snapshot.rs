@@ -319,6 +319,7 @@ pub fn read_pdfium_text_snapshot(
                 index,
                 sources: vec![index],
                 code: r.0,
+                generated: r.10,
                 object,
                 mode: r.8,
                 writing_angle: (rotation as f64) * (std::f64::consts::PI / 180.0) - r.1,
@@ -494,6 +495,7 @@ impl NativeTextSnapshot {
         let key_char_idx = pyo3::intern!(py, "char_idx");
         let key_source_indices = pyo3::intern!(py, "source_indices");
         let key_raw_code = pyo3::intern!(py, "raw_code");
+        let key_is_generated = pyo3::intern!(py, "is_generated");
         let key_text_object_id = pyo3::intern!(py, "text_object_id");
         let key_text_render_mode = pyo3::intern!(py, "text_render_mode");
         let key_writing_angle = pyo3::intern!(py, "writing_angle");
@@ -565,6 +567,9 @@ impl NativeTextSnapshot {
             value.set_item(key_text_render_mode, ch.mode)?;
             value.set_item(key_writing_angle, ch.writing_angle)?;
             value.set_item(key_origin, &origin)?;
+            if let Some(generated) = ch.generated {
+                value.set_item(key_is_generated, generated)?;
+            }
             if self.data.extended {
                 value.set_item(key_loose_bbox, &loose_bbox)?;
                 value.set_item(key_tight_bbox, &tight_bbox)?;

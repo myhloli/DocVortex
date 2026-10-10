@@ -39,6 +39,7 @@ pub type Record = (
     usize,
     Option<i32>,
     Option<Point>,
+    Option<bool>,
 );
 pub type Fonts = Vec<(Vec<u8>, i32)>;
 
@@ -83,7 +84,7 @@ pub unsafe fn read_characters(
     count: usize,
     extended: bool,
 ) -> Result<(Vec<Record>, Fonts), ReadError> {
-    if addresses.len() != 10 || addresses.contains(&0) || handle == 0 || count > c_int::MAX as usize
+    if addresses.len() != 11 || addresses.contains(&0) || handle == 0 || count > c_int::MAX as usize
     {
         return Err(ReadError::InvalidInput("invalid PDFium bridge arguments"));
     }
@@ -124,6 +125,8 @@ pub unsafe fn read_characters(
             *mut c_double,
             *mut c_double,
         ) -> c_int = std::mem::transmute(addresses[9]);
+        let is_generated: unsafe extern "system" fn(*mut c_void, c_int) -> c_int =
+            std::mem::transmute(addresses[10]);
         let page = handle as *mut c_void;
         let mut records = Vec::with_capacity(count);
         let mut fonts: Fonts = Vec::new();
@@ -204,7 +207,21 @@ pub unsafe fn read_characters(
                 None
             };
             records.push((
-                code, rotation, loose, tight, font_id, size, weight, address, mode, origin,
+                code,
+                rotation,
+                loose,
+                tight,
+                font_id,
+                size,
+                weight,
+                address,
+                mode,
+                origin,
+                match is_generated(page, i) {
+                    0 => Some(false),
+                    1 => Some(true),
+                    _ => None,
+                },
             ));
         }
         Ok((records, fonts))

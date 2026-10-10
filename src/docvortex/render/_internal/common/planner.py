@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from .context import claim_owned_document
 
 from ....content.table import merge_table_content
+from ....content.inline import join_inline_spans
 from ...contracts import RenderMode
 from ....schema import (
     MERGE_TRANSPARENT_BLOCK_TYPES,
@@ -51,17 +52,18 @@ def build_render_plan(
         for page in copied.pages
     ]
     flattened = [planned for page in pages for planned in page]
-    _merge_continued_text_blocks(flattened, mode)
+    _merge_continued_text_blocks(flattened, mode, copy_on_merge=owned)
     _merge_continued_list_blocks(flattened, mode, copy_on_merge=owned)
     if mode is RenderMode.DEFAULT:
         _merge_continued_table_blocks(flattened)
     return pages
 
 
-def _merge_continued_text_blocks(blocks: list[PlannedBlock], mode: RenderMode) -> None:
-    """把无独立正文锚点的 continues_prev 文本吸收到最近的前序文本逻辑块。"""
+def _merge_continued_text_blocks(blocks: list[PlannedBlock], mode: RenderMode, *, copy_on_merge: bool = False) -> None:
+    """将续文接入前序正文或正文列表直属末项，保留物理来源及 FULL 的跨页分段。"""
     previous_text: PlannedBlock | None = None
     previous_reference: PlannedBlock | None = None
+    copied_lists: set[int] = set()
     for current in blocks:
         is_text = isinstance(current.block, TextBlock)
         is_reference = isinstance(current.block, RefTextBlock)
@@ -75,10 +77,26 @@ def _merge_continued_text_blocks(blocks: list[PlannedBlock], mode: RenderMode) -
             and previous is not None
             and not (mode is RenderMode.FULL and previous.page_idx != current.page_idx)
         ):
-            previous.text_contents.extend(current.text_contents)
+            if isinstance(previous.block, ListBlock):
+                # 所有格式都直接读取列表成员；只复制实际修改的列表，兼容所有权优化。
+                if copy_on_merge and id(previous) not in copied_lists:
+                    previous.block = previous.block.model_copy(deep=True)
+                    copied_lists.add(id(previous))
+                tail = previous.block.content[-1]
+                tail.content = join_inline_spans([tail.content, *current.text_contents])
+            else:
+                previous.text_contents.extend(current.text_contents)
             current.removed = True
         if is_text and not current.removed:
             previous_text = current
+        elif isinstance(current.block, ListBlock):
+            previous_text = (
+                current
+                if current.block.sub_type == BlockType.TEXT
+                and current.block.content
+                and isinstance(current.block.content[-1], TextBlock)
+                else None
+            )
         if is_reference:
             if not current.removed:
                 previous_reference = current

@@ -1,5 +1,8 @@
 //! 与 Python 参考实现相同的相邻非 CJK 字形词界判定。
-use crate::{geometry::Box4, text_snapshot::TextSnapshot};
+use crate::{
+    geometry::Box4,
+    text_snapshot::{Character, TextSnapshot},
+};
 use std::collections::HashSet;
 
 /// 排除汉字扩展、假名、韩文及兼容字形，不以所在整行的语言决定词界。
@@ -16,6 +19,60 @@ fn local(b: Box4, angle: i32) -> Box4 {
         180 => [-b[2], -b[3], -b[0], -b[1]],
         270 => [-b[3], b[0], -b[1], b[2]],
         _ => b,
+    }
+}
+
+/// 判定单个汉字；与 Python 的中文空格物化范围保持一致。
+fn han(text: &str) -> bool {
+    let mut chars = text.chars();
+    let Some(ch) = chars.next() else { return false };
+    chars.next().is_none()
+        && matches!(ch as u32, 0x3400..=0x4dbf | 0x4e00..=0x9fff | 0xf900..=0xfaff | 0x20000..=0x323af)
+}
+
+/// 只省略有生成证据且位于同向同基线中文边界的空格，不删除快照成员。
+pub fn generated_cjk_space(a: &Character, space: &Character, b: &Character) -> bool {
+    const PUNCTUATION: &str = "、。，；：？！“”‘’（）【】《》〈〉「」『』〔〕［］｛｝—…·";
+    let punctuation = |text: &str| text.chars().count() == 1 && PUNCTUATION.contains(text);
+    if space.text != " "
+        || space.generated != Some(true)
+        || a.index.checked_add(1) != Some(space.index)
+        || space.index.checked_add(1) != Some(b.index)
+        || !((han(&a.text) && (han(&b.text) || punctuation(&b.text)))
+            || (punctuation(&a.text) && han(&b.text)))
+        || !a.writing_angle.is_finite()
+        || !b.writing_angle.is_finite()
+    {
+        return false;
+    }
+    let degrees = a.writing_angle.to_degrees().rem_euclid(360.0);
+    let angle = ((degrees / 90.0).round_ties_even() as i32 * 90) % 360;
+    if ((degrees - angle as f64 + 180.0).rem_euclid(360.0) - 180.0).abs() > 0.1
+        || ((b.writing_angle.to_degrees() - angle as f64 + 180.0).rem_euclid(360.0) - 180.0).abs()
+            > 0.1
+    {
+        return false;
+    }
+    let ab = a.tight.unwrap_or(a.bbox);
+    let bb = b.tight.unwrap_or(b.bbox);
+    if ab.iter().chain(bb.iter()).any(|v| !v.is_finite()) {
+        return false;
+    }
+    let (ab, bb) = (local(ab, angle), local(bb, angle));
+    let (ah, bh) = (ab[3] - ab[1], bb[3] - bb[1]);
+    if ah.min(bh).min(ab[2] - ab[0]).min(bb[2] - bb[0]) <= 0.0
+        || ab[3].min(bb[3]) - ab[1].max(bb[1]) < 0.5 * ah.min(bh)
+        || bb[0] - ab[2] > 0.5 * ah.max(bh)
+    {
+        return false;
+    }
+    let tolerance = 0.15 * ah.max(bh);
+    if let (Some(ao), Some(bo)) = (a.origin, b.origin) {
+        let axis = usize::from(angle != 90 && angle != 270);
+        ao.iter().chain(bo.iter()).all(|v| v.is_finite())
+            && (ao[axis] - bo[axis]).abs() <= tolerance
+    } else {
+        (ab[3] - bb[3]).abs() <= tolerance
     }
 }
 
@@ -115,4 +172,65 @@ pub fn needs_space(
         return false;
     }
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 建立独立字符记录，以页面字形高度验证生成空格而非源字号。
+    fn character(text: &str, index: usize, angle: i32) -> Character {
+        let x = index as f64 * 6.0;
+        let bbox = local([x, 0.0, x + 10.0, 10.0], (360 - angle) % 360);
+        let point = local([x, 10.0, x, 10.0], (360 - angle) % 360);
+        Character {
+            text: text.into(),
+            bbox,
+            rotation: 0.0,
+            font: 0,
+            index,
+            sources: vec![index],
+            code: text.chars().next().unwrap() as u32,
+            generated: Some(text == " "),
+            object: None,
+            mode: None,
+            writing_angle: (angle as f64).to_radians(),
+            origin: Some([point[0], point[1]]),
+            loose: None,
+            tight: Some(bbox),
+            visible: None,
+        }
+    }
+
+    #[test]
+    /// 四个方向和中文标点允许过滤，真实或未知空格、英文词界、异基线保持原样。
+    fn generated_spaces_require_chinese_and_baseline_evidence() {
+        for angle in [0, 90, 180, 270] {
+            let a = character("卫", 0, angle);
+            let mut space = character(" ", 1, angle);
+            let mut b = character("星", 2, angle);
+            assert!(generated_cjk_space(&a, &space, &b));
+            b.text = "、".into();
+            assert!(generated_cjk_space(&a, &space, &b));
+            b.text = "A".into();
+            assert!(!generated_cjk_space(&a, &space, &b));
+            b.text = "星".into();
+            for value in [Some(false), None] {
+                space.generated = value;
+                assert!(!generated_cjk_space(&a, &space, &b));
+            }
+            space.generated = Some(true);
+            b.writing_angle += 0.3;
+            assert!(!generated_cjk_space(&a, &space, &b));
+        }
+        let a = character("卫", 0, 0);
+        let space = character(" ", 1, 0);
+        let mut b = character("星", 2, 0);
+        b.origin = Some([24.0, 30.0]);
+        assert!(!generated_cjk_space(&a, &space, &b));
+        b.origin = None;
+        assert!(generated_cjk_space(&a, &space, &b));
+        b.index = 3;
+        assert!(!generated_cjk_space(&a, &space, &b));
+    }
 }

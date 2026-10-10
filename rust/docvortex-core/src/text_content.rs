@@ -177,6 +177,17 @@ pub fn build(data: &TextSnapshot, groups: &[Vec<usize>], rules: &Rules<'_>) -> V
                 if breaks.contains(value) {
                     continue;
                 }
+                if tight_spacing.get(group_index).copied().unwrap_or(false)
+                    && index > 0
+                    && index + 1 < chars.len()
+                    && crate::text_spacing::generated_cjk_space(
+                        &data.chars[chars[index - 1].2],
+                        &data.chars[source],
+                        &data.chars[chars[index + 1].2],
+                    )
+                {
+                    continue;
+                }
                 text.push_str(value);
                 if let Some(&(next, next_box, next_source)) = chars.get(index + 1) {
                     if (next_box[0] - bbox[2] > median * 0.25

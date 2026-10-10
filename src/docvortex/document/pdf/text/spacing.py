@@ -1,10 +1,74 @@
-"""只根据相邻字形的可靠墨迹留白补一个空格，不改写源字符。"""
+"""自然语言物化时修复可靠词界及中文生成空格，不改写源字符。"""
 
 from __future__ import annotations
 
 import math
 import unicodedata
 from functools import lru_cache
+from ._contracts import Char
+
+
+def _han_letter(text: str) -> bool:
+    """只接受单个汉字及其扩展、兼容字形，不将英文或符号当作中文文字。"""
+    return len(text) == 1 and (
+        0x3400 <= ord(text) <= 0x4DBF
+        or 0x4E00 <= ord(text) <= 0x9FFF
+        or 0xF900 <= ord(text) <= 0xFAFF
+        or 0x20000 <= ord(text) <= 0x323AF
+    )
+
+
+_CHINESE_PUNCTUATION = frozenset("、。，；：？！“”‘’（）【】《》〈〉「」『』〔〕［］｛｝—…·")
+
+
+def is_generated_cjk_space(
+    left: Char,
+    space: Char,
+    right: Char,
+    *,
+    origins: dict[int, tuple[float, float]] | None = None,
+) -> bool:
+    """仅忽略同向同基线中文边界上 PDFium 确认生成的空格，源字符记录保持不变。"""
+    if space.get("char") != " " or space.get("is_generated") is not True:
+        return False
+    a, b = str(left.get("char", "")), str(right.get("char", ""))
+    if not (
+        (_han_letter(a) and (_han_letter(b) or b in _CHINESE_PUNCTUATION)) or (a in _CHINESE_PUNCTUATION and _han_letter(b))
+    ):
+        return False
+    li, si, ri = left.get("char_idx"), space.get("char_idx"), right.get("char_idx")
+    if not all(isinstance(index, int) for index in (li, si, ri)) or si != li + 1 or ri != si + 1:
+        return False
+    try:
+        degrees = math.degrees(float(left["writing_angle"])) % 360
+        angle = int(round(degrees / 90) * 90) % 360
+        difference = (math.degrees(float(right["writing_angle"])) - angle + 180) % 360 - 180
+        if not math.isfinite(degrees) or not math.isfinite(difference):
+            return False
+        if abs((degrees - angle + 180) % 360 - 180) > 0.1 or abs(difference) > 0.1:
+            return False
+        boxes = [tuple(char.get("tight_bbox") or char["bbox"]) for char in (left, right)]
+        if any(len(box) != 4 or not all(math.isfinite(value) for value in box) for box in boxes):
+            return False
+        ab, bb = (_local_box(box, angle) for box in boxes)
+        ah, bh = ab[3] - ab[1], bb[3] - bb[1]
+        if min(ah, bh, ab[2] - ab[0], bb[2] - bb[0]) <= 0:
+            return False
+        if min(ab[3], bb[3]) - max(ab[1], bb[1]) < 0.5 * min(ah, bh):
+            return False
+        # 较大的生成空白可能分隔姓名、表格字段或栏目，不能仅凭中文相邻删除。
+        if bb[0] - ab[2] > 0.5 * max(ah, bh):
+            return False
+        # PDF 的源字号可能为 1，再经文字矩阵放大；容差以页面字形高度为准。
+        lo = (origins or {}).get(li, left.get("origin"))
+        ro = (origins or {}).get(ri, right.get("origin"))
+        tolerance = 0.15 * max(ah, bh)
+        if lo is not None and ro is not None:
+            axis = 0 if angle in (90, 270) else 1
+            return all(math.isfinite(value) for value in (*lo, *ro)) and abs(lo[axis] - ro[axis]) <= tolerance
+        return abs(ab[3] - bb[3]) <= tolerance
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
 
 
 @lru_cache(maxsize=2048)
@@ -129,9 +193,13 @@ def _tight_space_candidates(chars_by_source, glyphs, glyph_type):
 
 def join_tight_text(chars, *, tight_bboxes=None, origins=None) -> str:
     """按现有成员顺序重建短行，仅在相邻可靠词界插入单个空格。"""
+    # 局部成员副本接受生成器，保留已有可迭代输入约定，不修改源字符。
+    chars = tuple(chars)
     parts = []
     previous = None
-    for char in chars:
+    for index, char in enumerate(chars):
+        if 0 < index < len(chars) - 1 and is_generated_cjk_space(chars[index - 1], char, chars[index + 1], origins=origins):
+            continue
         if previous is not None and needs_tight_space(previous, char, tight_bboxes=tight_bboxes, origins=origins):
             parts.append(" ")
         parts.append(str(char.get("char", "")))

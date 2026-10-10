@@ -181,7 +181,9 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
     writing_rotation = math.radians(page_rotation)
     last_font_index = last_size = last_weight = last_font = None
     last_address = last_object_id = None
-    for index, (code, rotation, font_index, size, weight, address, mode, layout, loose, tight, origin) in enumerate(records):
+    for index, (code, rotation, font_index, size, weight, address, mode, layout, loose, tight, origin, generated) in enumerate(
+        records
+    ):
         # 读取桥按固定上限逐批物化记录，已消费批次不与整页最终字符长期重叠。
         if (
             type(font_index) is int
@@ -232,6 +234,8 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
             "writing_angle": writing_rotation - rotation,
             "origin": origin,
         }
+        if generated is not None:
+            char["is_generated"] = generated
         if include_geometry:
             char["loose_bbox"], char["tight_bbox"] = loose, tight
         if clip is None or _clip_visible_character(char, clip):
@@ -327,6 +331,9 @@ def _get_chars_python(
             "writing_angle": math.radians(page_rotation) - rotation,
             "origin": None,
         }
+        generated = raw.FPDFText_IsGenerated(handle, index)
+        if generated in (0, 1):
+            char["is_generated"] = generated == 1
         # 只在当前提取期间持有地址键，输出使用页内整数编号，不保存原生句柄。
         address = None
         try:

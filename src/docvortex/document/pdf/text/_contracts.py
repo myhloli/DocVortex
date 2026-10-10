@@ -179,6 +179,7 @@ class Char(_CharValue, total=False):
 
     source_indices: tuple[int, ...]
     raw_code: int
+    is_generated: bool  # PDFium 的生成字符证据；未确认时省略，不删除原字符。
     text_object_id: int | None
     text_render_mode: int | None
     text_is_visible: bool

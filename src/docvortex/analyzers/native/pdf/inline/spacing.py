@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from .....document.pdf.text.spacing import needs_tight_space
+from .....document.pdf.text.spacing import is_generated_cjk_space, needs_tight_space
 from .....foundation._text import is_hyphen_at_line_end
 from .common import _normalize_match_fragment
 from .matching import _assign_lines_to_blocks, _project_content_chars, _match_line_without_terminal_hyphen
@@ -16,12 +16,11 @@ class PDFTextSpacingLine:
     text: str
     source_index: int
     boundaries: tuple[int, ...]
+    suppressed_boundaries: tuple[int, ...] = ()
 
 
 def prepare_spacing_lines(lines, space_before=None):
     """按原视觉行提取可恢复的词界偏移，原始行文本和字符保持只读。"""
-    if space_before is not None and not space_before:
-        return []
     output = []
     for line in lines:
         if line.formula_candidate_only:
@@ -40,18 +39,29 @@ def prepare_spacing_lines(lines, space_before=None):
         continuation = bool(
             output and output[-1].source_index + 1 == line.source_index and is_hyphen_at_line_end(output[-1].text)
         )
-        if not positions and not continuation:
+        suppressed = {
+            index
+            for index in range(1, len(line.chars) - 1)
+            if is_generated_cjk_space(line.chars[index - 1], line.chars[index], line.chars[index + 1])
+        }
+        if not positions and not continuation and not suppressed:
             continue
-        parts, boundaries = [], []
+        parts, boundaries, suppressed_boundaries = [], [], []
         cursor = 0
         for index, char in enumerate(line.chars):
             if index in positions:
                 boundaries.append(cursor)
+            if index in suppressed:
+                suppressed_boundaries.append(cursor)
             fragment = _normalize_match_fragment(char.get("char"))
             parts.append(fragment)
             cursor += len(fragment)
-        if boundaries or continuation:
-            output.append(PDFTextSpacingLine(line.bbox, "".join(parts), line.source_index, tuple(boundaries)))
+        if boundaries or continuation or suppressed_boundaries:
+            output.append(
+                PDFTextSpacingLine(
+                    line.bbox, "".join(parts), line.source_index, tuple(boundaries), tuple(suppressed_boundaries)
+                )
+            )
     return output
 
 
@@ -65,6 +75,7 @@ def apply_spacing_lines(blocks, lines, page_size):
         projected = _project_content_chars(content)
         text = "".join(token.value for token in projected)
         offsets = set()
+        suppressed_ranges = set()
         cursor = 0
         for line_index, line in enumerate(assigned):
             start = text.find(line.text, cursor)
@@ -83,10 +94,17 @@ def apply_spacing_lines(blocks, lines, page_size):
                 left, right = projected[index - 1], projected[index]
                 if left.raw_end == right.raw_start and not right.formula_gap_before:
                     offsets.add(right.raw_start)
-        if offsets:
+            for boundary in line.suppressed_boundaries:
+                index = start + boundary
+                if 0 < index < len(projected):
+                    left, right = projected[index - 1], projected[index]
+                    if content[left.raw_end : right.raw_start] == " " and not right.formula_gap_before:
+                        suppressed_ranges.add((left.raw_end, right.raw_start))
+        if offsets or suppressed_ranges:
             parts, cursor = [], 0
-            for offset in sorted(offsets):
-                parts.extend((content[cursor:offset], " "))
-                cursor = offset
+            edits = [(offset, offset, " ") for offset in offsets] + [(start, end, "") for start, end in suppressed_ranges]
+            for start, end, replacement in sorted(edits):
+                parts.extend((content[cursor:start], replacement))
+                cursor = end
             parts.append(content[cursor:])
             block["content"] = "".join(parts)

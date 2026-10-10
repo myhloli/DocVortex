@@ -106,11 +106,11 @@ def test_bridge_unavailable_and_error_are_distinct(native, monkeypatch):
 def test_bridge_rejects_null_arguments_before_ffi(native):
     """不允许空句柄或空函数地址进入 unsafe 调用。"""
     with pytest.raises(ValueError, match="invalid PDFium"):
-        native.read_pdfium_chars([0] * 10, 1, 1, True)
+        native.read_pdfium_chars([0] * 11, 1, 1, True)
     with pytest.raises(ValueError, match="invalid PDFium"):
-        native.read_pdfium_chars([1] * 10, 0, 1, True)
+        native.read_pdfium_chars([1] * 11, 0, 1, True)
     with pytest.raises(ValueError, match="invalid PDFium"):
-        native.read_pdfium_char_batches([0] * 10, 1, 1, True)
+        native.read_pdfium_char_batches([0] * 11, 1, 1, True)
 
 
 def test_batched_records_preserve_boundary_indices_and_legacy_reader(native, monkeypatch):

@@ -22,6 +22,7 @@ pub struct Character {
     pub index: usize,
     pub sources: Vec<usize>,
     pub code: u32,
+    pub generated: Option<bool>,
     pub object: Option<usize>,
     pub mode: Option<i32>,
     pub writing_angle: f64,

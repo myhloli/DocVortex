@@ -19,11 +19,11 @@ from test_pdf_classify_image_text import image_text_pdf
 
 @pytest.fixture
 def native():
-    """原生作业必须加载协议 33，纯 Python 作业明确跳过相关扩展断言。"""
+    """原生作业必须加载协议 34，纯 Python 作业明确跳过相关扩展断言。"""
     value = get_native()
     if value is None:
         pytest.skip("Python backend")
-    assert value.PROTOCOL_VERSION == 33
+    assert value.PROTOCOL_VERSION == 34
     return value
 
 

@@ -505,7 +505,7 @@ class InlineContentBlock(BlockBase):
 
 
 class ContinuableTextBlockBase(InlineContentBlock):
-    """正文与参考文献共享的跨块续接结构。"""
+    """顶层正文或参考续文；正文可接前序正文列表的最后一个直属 text，物理块不移动。"""
 
     continues_prev: bool | None = None
 
