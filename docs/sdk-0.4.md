@@ -20,6 +20,10 @@
 
 `docvortex.public_api.PUBLIC_API` 是静态模块及符号清单。新增跨库依赖必须同时更新清单、文档和契约测试；不能通过基础实现、私有模块或动态别名绕过边界。
 
+### 0.5.17 HTML 单文件图片导出
+
+`docvortex.export.embed_html_images(html, assets)` 将已渲染 HTML 中的正文及富文本图片转为内嵌 data URI，返回 HTML 字符串。素材来自显式映射，不访问网络或宿主文件；素材缺失或仍有未物化的外链图片时报错。先调用 `materialize_middle` 和 `validate_materialized_assets`，再渲染 HTML 并内嵌图片。该函数不改变输入语义树或素材集合；需要此能力的宿主使用 `docvortex>=0.5.17,<1`。
+
 ### 0.5.16 中文生成空格接口与原生协议
 
 `docvortex.analyzers.pdf.is_generated_cjk_space(left, space, right, *, origins=None) -> bool`

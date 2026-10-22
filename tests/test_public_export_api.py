@@ -66,6 +66,6 @@ def test_public_export_preserves_payloads_geometry_and_code() -> None:
     assert copied_assets is not assets
     with pytest.raises(ValueError, match="Missing materialized asset"):
         validate_materialized_assets(exported, AssetStore())
-    assert set(PUBLIC_API["docvortex.export"]) == {"materialize_middle", "validate_materialized_assets"}
+    assert set(PUBLIC_API["docvortex.export"]) == {"embed_html_images", "materialize_middle", "validate_materialized_assets"}
     assert get_type_hints(materialize_middle)["return"] == tuple[MiddleJson, AssetStore]
     assert get_type_hints(validate_materialized_assets)["return"] is type(None)
