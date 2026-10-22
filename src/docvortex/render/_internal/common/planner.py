@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 
 from .context import claim_owned_document
 
-from ....content.table import merge_table_content
+from ....content.table.content import _merge_table_content_with_columns
+from ....content.table.grid import _TableColumnMapping
 from ....content.inline import join_inline_spans
 from ...contracts import RenderMode
 from ....schema import (
@@ -136,23 +137,27 @@ def _merge_continued_list_blocks(blocks: list[PlannedBlock], mode: RenderMode, *
 def _merge_continued_table_blocks(blocks: list[PlannedBlock]) -> None:
     """在默认模式中把跨页续表合并到最近的前序表格。"""
     previous: PlannedBlock | None = None
+    previous_source_columns: _TableColumnMapping | None = None
     for current in blocks:
         if current.removed or not isinstance(current.block, TableBlock):
             continue
         if current.block.continues_prev is True and previous is not None and previous.page_idx != current.page_idx:
-            merged = merge_table_content(
+            merged = _merge_table_content_with_columns(
                 previous.block.model_dump(mode="python", exclude_none=True),
                 current.block.model_dump(mode="python", exclude_none=True),
+                previous_source_columns,
             )
             if merged is not None:
                 try:
-                    previous.block = TableBlock.model_validate(merged)
+                    previous.block = TableBlock.model_validate(merged.table)
                 except (TypeError, ValueError):
                     pass
                 else:
                     current.removed = True
+                    previous_source_columns = merged.current_columns
         if not current.removed:
             previous = current
+            previous_source_columns = None
 
 
 __all__ = ["PlannedBlock", "build_render_plan"]

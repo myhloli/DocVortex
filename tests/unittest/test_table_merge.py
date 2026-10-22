@@ -300,7 +300,7 @@ def test_merge_table_content_removes_repeated_rowspan_header_and_appends_data() 
 
 
 def test_merge_table_content_repairs_colspan_on_narrower_current_rows() -> None:
-    """验证较窄的当前页数据行会补齐末单元格 colspan。"""
+    """验证较窄的当前页数据行按照对应边界重建 colspan。"""
     previous = _table(0, "<table><tr><td>A</td><td colspan='2'>B</td></tr></table>")
     current = _table(1, "<table><tr><td>C</td><td>D</td></tr></table>")
 

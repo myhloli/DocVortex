@@ -1,0 +1,22 @@
+{
+  "source": "https://github.com/opendatalab/MinerU/issues/5652",
+  "description": "原PDF本地advanced输出的完整两页表格HTML；真实后置LLM返回14项全零。",
+  "previous_html": "<table><tr><td colspan=\"3\">测试</td><td colspan=\"11\">测试</td></tr><tr><td rowspan=\"2\">测试</td><td colspan=\"3\">1</td><td colspan=\"2\">2</td><td colspan=\"2\">4</td><td colspan=\"6\">5</td></tr><tr><td colspan=\"3\">3</td><td colspan=\"4\">2</td><td colspan=\"4\">4</td><td colspan=\"2\">2</td></tr><tr><td rowspan=\"2\">测试</td><td>1</td><td colspan=\"2\">5</td><td colspan=\"2\">0</td><td colspan=\"8\">123</td></tr><tr><td>2</td><td>3</td><td colspan=\"2\">4</td><td>5</td><td>2</td><td colspan=\"2\">3</td><td colspan=\"2\">5</td><td colspan=\"3\">5</td></tr><tr><td rowspan=\"2\">测试</td><td colspan=\"2\">6</td><td colspan=\"2\">6</td><td colspan=\"2\">6</td><td colspan=\"3\">1</td><td colspan=\"4\">3</td></tr><tr><td colspan=\"2\">6</td><td colspan=\"2\">4</td><td colspan=\"2\">32</td><td colspan=\"3\">1</td><td colspan=\"4\">2</td></tr><tr><td rowspan=\"7\">测试</td><td>1</td><td colspan=\"8\"></td><td colspan=\"4\"></td></tr><tr><td>2</td><td colspan=\"8\"></td><td colspan=\"4\"></td></tr><tr><td>3</td><td colspan=\"8\"></td><td colspan=\"4\"></td></tr><tr><td>4</td><td colspan=\"8\"></td><td colspan=\"4\"></td></tr><tr><td>5</td><td colspan=\"8\"></td><td colspan=\"4\"></td></tr><tr><td>6</td><td colspan=\"8\"></td><td colspan=\"4\"></td></tr><tr><td>7</td><td colspan=\"8\"></td><td colspan=\"4\"></td></tr><tr><td rowspan=\"3\">测试</td><td>序号</td><td colspan=\"8\"></td><td colspan=\"4\"></td></tr><tr><td>1</td><td colspan=\"8\">1</td><td colspan=\"4\">0</td></tr><tr><td>2</td><td colspan=\"8\">2</td><td colspan=\"4\">1</td></tr><tr><td rowspan=\"3\">测试</td><td>序号</td><td colspan=\"6\">名称</td><td colspan=\"2\">测试</td><td colspan=\"4\">测试</td></tr><tr><td rowspan=\"2\">1</td><td rowspan=\"2\" colspan=\"6\">任务1</td><td colspan=\"2\">人1</td><td colspan=\"4\">工1</td></tr><tr><td colspan=\"2\">人2</td><td colspan=\"4\">工2</td></tr></table>",
+  "current_html": "<table><tr><td rowspan=\"2\"></td><td rowspan=\"2\">2</td><td rowspan=\"2\">任务 2</td><td>人 1</td><td>公 3</td></tr><tr><td>人 2</td><td>公 4</td></tr></table>",
+  "cell_merge": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ]
+}
