@@ -11,7 +11,7 @@ from pathlib import Path
 @lru_cache(maxsize=1)
 def table_golden():
     """加载由绝对冻结源码路径及原扩展采集的参数化语义预期。"""
-    return json.loads((Path(__file__).parent / "fixtures/native_table_semantics.json").read_text())
+    return json.loads((Path(__file__).parent / "fixtures/native_table_semantics.json").read_text(encoding="utf-8"))
 
 
 def encode_table_value(value):

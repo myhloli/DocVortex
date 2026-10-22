@@ -13,7 +13,7 @@ from docvortex.analyzers.native.pdf.text_noise import (
 )
 
 
-_CASES = json.loads((Path(__file__).parent / "fixtures/native_rule_06_golden.json").read_text())["cases"]
+_CASES = json.loads((Path(__file__).parent / "fixtures/native_rule_06_golden.json").read_text(encoding="utf-8"))["cases"]
 
 
 def test_detached_formula_adjacency_matches_all_reference_pairs():

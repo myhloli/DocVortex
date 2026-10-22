@@ -15,7 +15,7 @@ import pytest
 from docvortex._compute_backend import get_native
 from docvortex.analyzers.native.pdf.models import _AxisLine, _Fragment, _LineItem, _TableCandidate, _TextLane, _VisualRow
 
-_RULE_CASES = json.loads((Path(__file__).parent / "fixtures/native_rule_06_golden.json").read_text())["cases"]
+_RULE_CASES = json.loads((Path(__file__).parent / "fixtures/native_rule_06_golden.json").read_text(encoding="utf-8"))["cases"]
 
 
 @pytest.mark.parametrize("seed", range(40))

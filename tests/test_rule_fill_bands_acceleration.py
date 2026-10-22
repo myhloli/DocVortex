@@ -10,7 +10,7 @@ import pytest
 from docvortex._compute_backend import get_native
 from docvortex.analyzers.native.pdf import table_rules
 
-_COUNTS = json.loads((Path(__file__).parent / "fixtures/native_fill_band_counts.json").read_text())
+_COUNTS = json.loads((Path(__file__).parent / "fixtures/native_fill_band_counts.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture

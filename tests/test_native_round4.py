@@ -34,7 +34,7 @@ def bits(value):
 
 def stable_golden(compensated=None):
     """读取冻结协议 35 在真实 CPython 3.11/3.14 上生成的静态预期。"""
-    data = json.loads((Path(__file__).parent / "fixtures/native_stable_columns.json").read_text())
+    data = json.loads((Path(__file__).parent / "fixtures/native_stable_columns.json").read_text(encoding="utf-8"))
     compensated = sys.version_info >= (3, 12) if compensated is None else compensated
     return data["compensated" if compensated else "sequential"]
 
