@@ -203,7 +203,8 @@ def test_table_merge_package_keeps_one_way_internal_dependencies() -> None:
         "html.py": {"models"},
         "blocks.py": {"html", "models", "rules"},
         "structure.py": {"blocks", "html", "models"},
-        "content.py": {"blocks", "html", "models", "structure"},
+        "grid.py": {"html", "models"},
+        "content.py": {"blocks", "grid", "html", "models", "structure"},
         "document.py": {"blocks", "models", "structure"},
         "rules.py": set(),
     }
