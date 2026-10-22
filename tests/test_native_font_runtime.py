@@ -23,6 +23,28 @@ def test_native_font_callbacks_use_c_abi_on_every_platform() -> None:
             assert field._flags_ == ctypes.CFUNCTYPE(field._restype_, *field._argtypes_)._flags_
 
 
+def test_native_font_accepts_equivalent_64bit_library_wrappers() -> None:
+    """同库 C 入口及 Windows 64 位等价包装均可用，额外 errno 标志仍由拒绝测试覆盖。"""
+    import ctypes
+    from types import SimpleNamespace
+
+    import pypdfium2.raw as raw
+    from docvortex.document.pdf.font_runtime import _native_font_bridge
+
+    factories = [ctypes.CFUNCTYPE]
+    if os.name == "nt" and ctypes.sizeof(ctypes.c_void_p) == 8:
+        factories.append(ctypes.WINFUNCTYPE)
+    names = ("FPDF_GetDefaultSystemFontInfo", "FPDF_FreeDefaultSystemFontInfo", "FPDF_SetSystemFontInfo")
+    for factory in factories:
+        functions = {}
+        for name in names:
+            original = getattr(raw, name)
+            functions[name] = factory(original.restype, *original.argtypes)(ctypes.cast(original, ctypes.c_void_p).value)
+        facade = SimpleNamespace(FPDF_SYSFONTINFO=raw.FPDF_SYSFONTINFO, **functions)
+        _, accepted, _ = _native_font_bridge(facade)
+        assert accepted == [functions[name] for name in names]
+
+
 def _run_native_font_check(source: str) -> None:
     """仅在兼容原生扩展可用时启动独立解释器执行字体生命周期场景。"""
     get_native()

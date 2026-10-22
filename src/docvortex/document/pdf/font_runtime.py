@@ -202,9 +202,12 @@ def _native_font_bridge(raw: Any) -> Any:
         ("GetFontCharset", integer, (pointer, void)),
         ("DeleteFont", None, (pointer, void)),
     )
-    # FPDF_SYSFONTINFO 字段是普通 C 回调；只有导出的 FPDF_* 函数使用 FPDF_CALLCONV。
+    # FPDF_SYSFONTINFO 字段是普通 C 回调；库入口在支持的 Windows 64 位平台共用同一 ABI。
     callback_type = ctypes.CFUNCTYPE
-    function_type = ctypes.WINFUNCTYPE if os.name == "nt" else ctypes.CFUNCTYPE
+    function_flags = {ctypes.CFUNCTYPE(None)._flags_}
+    if os.name == "nt" and ctypes.sizeof(void) == 8:
+        # pypdfium2 5.13 的 Windows 绑定使用 CDLL；WinDLL 包装在 64 位 ABI 下同样合法。
+        function_flags.add(ctypes.WINFUNCTYPE(None)._flags_)
     fields = dict(raw.FPDF_SYSFONTINFO._fields_)
     alignment = ctypes.alignment(void)
     start = (ctypes.sizeof(integer) + alignment - 1) // alignment * alignment
@@ -239,7 +242,7 @@ def _native_font_bridge(raw: Any) -> Any:
             or getattr(function, "errcheck", None) is not None
         ):
             return _font_bridge_unavailable(f"{name} unsupported function signature or wrapper")
-        if function._flags_ != function_type(result, *arguments)._flags_:
+        if function._flags_ not in function_flags:
             return _font_bridge_unavailable(f"{name} calling convention mismatch")
         functions.append(function)
     _NATIVE_FONT_UNAVAILABLE_REASON = None
