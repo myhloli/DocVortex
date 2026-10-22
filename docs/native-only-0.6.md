@@ -2,12 +2,18 @@
 
 0.6 保留 Python SDK、CLI、文档协议和多格式解析与导出，计算后端统一为必需的 Rust native 扩展。公开函数签名和有效输入的输出语义保持不变。
 
+## 尚未发布的兼容性修复
+
+当前源码已忽略 `DOCVORTEX_COMPUTE_BACKEND`、`DOCVORTEX_BUILD_NATIVE`：任意值均不影响构建或运行，也不修改变量或输出弃用警告。必需扩展的加载、协议检查及错误处理保持原有契约。
+
+此修复尚未发布，已发布的 0.6.0 包仍会拒绝这两个变量。下文保留 0.6.0 迁移时的要求与本地验收事实，其中“拒绝旧环境变量”属于修复前行为。
+
 ## 安装与迁移
 
 - 支持启用 GIL 的 CPython 3.11–3.14；不支持 PyPy 和 free-threaded Python。
 - 依赖为 `pypdfium2>=5.13.0,<6`，测试统一固定 `5.13.0`，删除 5.10 测试矩阵。
 - 正式发行物仅为五个平台的 `cp311-abi3` wheel：Linux x86_64/aarch64（manylinux_2_28）、Windows x86_64/ARM64、macOS arm64（macOS 14+）。不再发布纯 Python wheel 或 sdist。
-- 从 shell、CI 和系统配置中移除 `DOCVORTEX_COMPUTE_BACKEND`、`DOCVORTEX_BUILD_NATIVE`。包括 `rust`、`1`、`auto` 和空字符串在内，任何已设置值都报错；变量在 native 加载缓存建立后出现，也会被拒绝。
+- 0.6.0 发布时要求从 shell、CI 和系统配置中移除 `DOCVORTEX_COMPUTE_BACKEND`、`DOCVORTEX_BUILD_NATIVE`；任何已设置值都会报错，包括缓存建立后出现的变量。当前源码中的后续修复已取消此要求，见上文。
 - 源码开发必须安装 Rust 工具链和平台链接器，再执行 `uv pip install -e ".[test,dev]"`。构建 wheel 使用 `uv build --wheel`。缺少 Cargo 或编译失败不会产生兼容包。
 - 需要旧平台或纯 Python 包的用户可固定使用 `docvortex<0.6`。安装本版本不再提供自动降级。
 

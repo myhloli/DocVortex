@@ -56,7 +56,8 @@ macOS 安装需要 **Apple Silicon 和 macOS 14 或更新版本**；从 0.6.0 �
 0.6 保留 Python SDK 和 CLI，运行时必须使用随包提供的 Rust native 扩展。
 发行物仅包含 Linux x86_64/aarch64（glibc 2.28+）、Windows x86_64/ARM64 和 macOS arm64 的 ABI3 wheel，
 不再发布纯 Python 兼容 wheel 或 sdist；不支持 PyPy 和 free-threaded Python。
-构建或运行前请移除 `DOCVORTEX_BUILD_NATIVE`、`DOCVORTEX_COMPUTE_BACKEND` 环境变量，任何值都会报错。
+当前源码忽略 `DOCVORTEX_BUILD_NATIVE`、`DOCVORTEX_COMPUTE_BACKEND` 环境变量，设置任何值均不影响构建或运行。
+此兼容性修复尚未发布；已发布的 0.6.0 包仍会拒绝这两个变量。
 需要旧平台或兼容包的用户可在迁移期间固定使用 `docvortex<0.6`。
 
 ### 安装

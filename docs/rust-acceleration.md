@@ -16,8 +16,10 @@ create a thread pool. The existing PDFium lock and handle lifetimes are unchange
 DocVortex 0.6 always loads its compatible Rust extension. The Python SDK, CLI,
 public document types and document orchestration remain available. The former
 Python compute backend, runtime selection and silent extension fallback are removed.
-Unset `DOCVORTEX_COMPUTE_BACKEND` and `DOCVORTEX_BUILD_NATIVE` completely; every value,
-including `rust`, `1`, `auto` and the empty string, raises an actionable error.
+The current source ignores `DOCVORTEX_COMPUTE_BACKEND` and `DOCVORTEX_BUILD_NATIVE`,
+including empty strings, former valid values and arbitrary unknown values. It does not
+modify these variables or issue deprecation warnings.
+This compatibility fix is not released yet; the published 0.6.0 package still rejects these variables.
 Missing, unloadable or incompatible extensions fail instead of parsing through a
 second implementation. Rebuild editable extensions after native changes and restart
 existing processes.
@@ -279,5 +281,6 @@ in DocVortex and the matching MinerU checkout. Sessions use Rust when the comput
 backend provides it and support Python when it does not. Rendering errors propagate
 without retrying through the legacy renderer.
 Set `DOCVORTEX_PDF_RENDER_BACKEND=legacy` to explicitly use the previous renderer.
-For the Python reference configuration, also set `DOCVORTEX_COMPUTE_BACKEND=python`. See
+The Python reference setting `DOCVORTEX_COMPUTE_BACKEND=python` describes pre-0.6
+development; it does not select a Python backend in the current source. See
 [pdf-native-kernel.md](pdf-native-kernel.md) for migration and evidence boundaries.

@@ -56,9 +56,10 @@ On macOS, installation requires **Apple Silicon and macOS 14 or newer**; Intel M
 Version 0.6 keeps the Python SDK and CLI and requires its bundled Rust native extension.
 Releases contain ABI3 wheels for Linux x86_64/aarch64 (glibc 2.28+), Windows x86_64/ARM64,
 and macOS arm64. Pure Python wheels and source distributions are no longer published.
-PyPy and free-threaded Python are not supported. Unset the removed
-`DOCVORTEX_BUILD_NATIVE` and `DOCVORTEX_COMPUTE_BACKEND` variables before building or running;
-any value is an error. Existing 0.5 installations can stay on `docvortex<0.6` while migrating.
+PyPy and free-threaded Python are not supported. The current source ignores the retired
+`DOCVORTEX_BUILD_NATIVE` and `DOCVORTEX_COMPUTE_BACKEND` variables, regardless of their values.
+This compatibility fix is not released yet; the published 0.6.0 package still rejects these variables.
+Existing 0.5 installations can stay on `docvortex<0.6` while migrating.
 
 ### Install
 

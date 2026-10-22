@@ -1,5 +1,6 @@
-"""验证源码构建必须包含原生扩展，并明确拒绝旧后端环境变量。"""
+"""验证源码构建必须包含原生扩展，且不受旧后端环境变量影响。"""
 
+import os
 from pathlib import Path
 import platform
 import runpy
@@ -31,8 +32,14 @@ def run_setup() -> None:
     runpy.run_path(str(Path(__file__).resolve().parents[1] / "setup.py"))
 
 
-def test_source_build_always_declares_abi3_extension(build_setup: Mock) -> None:
-    """源码安装始终声明非可选扩展和 cp311 ABI3，不能产出兼容纯包。"""
+@pytest.mark.parametrize("legacy_values", [None, ("python", "0")])
+def test_source_build_always_declares_abi3_extension(
+    build_setup: Mock, monkeypatch: pytest.MonkeyPatch, legacy_values: tuple[str, str] | None
+) -> None:
+    """未设置或显式要求旧 Python 模式时，源码安装始终声明必需的 cp311 ABI3 扩展。"""
+    if legacy_values is not None:
+        monkeypatch.setenv("DOCVORTEX_COMPUTE_BACKEND", legacy_values[0])
+        monkeypatch.setenv("DOCVORTEX_BUILD_NATIVE", legacy_values[1])
     run_setup()
     arguments = build_setup.call_args.kwargs
     assert len(arguments["rust_extensions"]) == 1
@@ -42,16 +49,33 @@ def test_source_build_always_declares_abi3_extension(build_setup: Mock) -> None:
     assert extension["optional"] is False
 
 
-@pytest.mark.parametrize("variable", ["DOCVORTEX_BUILD_NATIVE", "DOCVORTEX_COMPUTE_BACKEND"])
-@pytest.mark.parametrize("value", ["", "0", "1", "auto", "python", "rust"])
-def test_removed_build_switch_is_rejected(
-    build_setup: Mock, monkeypatch: pytest.MonkeyPatch, variable: str, value: str
+@pytest.mark.parametrize(
+    "variables",
+    [
+        ("DOCVORTEX_BUILD_NATIVE",),
+        ("DOCVORTEX_COMPUTE_BACKEND",),
+        ("DOCVORTEX_BUILD_NATIVE", "DOCVORTEX_COMPUTE_BACKEND"),
+    ],
+    ids=["build", "compute", "both"],
+)
+@pytest.mark.parametrize("value", ["", "0", "1", "auto", "python", "rust", "typo"])
+def test_legacy_variables_do_not_change_required_extension(
+    build_setup: Mock, monkeypatch: pytest.MonkeyPatch, variables: tuple[str, ...], value: str, recwarn, caplog
 ) -> None:
-    """任何旧环境变量值（包括空值及过去的 native 值）都要求用户显式移除。"""
-    monkeypatch.setenv(variable, value)
-    with pytest.raises(RuntimeError, match=f"{variable} was removed"):
-        run_setup()
-    build_setup.assert_not_called()
+    """旧变量的单独或组合配置均构建必需 ABI3 扩展，环境原值及警告保持原样。"""
+    for variable in variables:
+        monkeypatch.setenv(variable, value)
+    run_setup()
+    build_setup.assert_called_once()
+    arguments = build_setup.call_args.kwargs
+    assert len(arguments["rust_extensions"]) == 1
+    assert arguments["options"]["bdist_wheel"]["py_limited_api"] == "cp311"
+    extension = sys.modules["setuptools_rust"].RustExtension.call_args.kwargs
+    assert extension["py_limited_api"] is True
+    assert extension["optional"] is False
+    assert {variable: os.environ[variable] for variable in variables} == dict.fromkeys(variables, value)
+    assert not recwarn
+    assert not caplog.records
 
 
 @pytest.mark.parametrize("unsupported", ["pypy", "free-threaded"])

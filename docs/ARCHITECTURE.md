@@ -71,8 +71,9 @@ It does not load another PDFium library, take ownership of handles or close them
 Subsequent numeric geometry conversion can release the GIL after reading finishes.
 
 The extension is required; missing, unloadable or incompatible binaries fail with
-installation guidance. `DOCVORTEX_COMPUTE_BACKEND` and `DOCVORTEX_BUILD_NATIVE` were
-removed in 0.6: unset them entirely, including old `rust`, `1`, `auto` or empty values.
+installation guidance. The current source ignores the retired `DOCVORTEX_COMPUTE_BACKEND`
+and `DOCVORTEX_BUILD_NATIVE` variables regardless of their values.
+This compatibility fix is not released yet; the published 0.6.0 package still rejects these variables.
 Computation errors propagate. The current private protocol is **36**. Rebuild an
 editable extension after changing native sources and restart existing processes. Module-only refactors
 preserve the protocol and all Python-visible registrations.

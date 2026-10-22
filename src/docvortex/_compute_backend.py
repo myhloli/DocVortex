@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib
-import os
 import hashlib
 import sys
 from functools import lru_cache
@@ -11,23 +10,11 @@ from pathlib import Path
 from types import ModuleType
 
 _PROTOCOL_VERSION = 36
-_RETIRED_VARIABLES = ("DOCVORTEX_COMPUTE_BACKEND", "DOCVORTEX_BUILD_NATIVE")
-
-
-def get_native() -> ModuleType:
-    """拒绝已退役配置并返回必需扩展；缓存建立后也不能静默接受旧环境变量。"""
-    retired = [name for name in _RETIRED_VARIABLES if name in os.environ]
-    if retired:
-        raise RuntimeError(
-            f"Remove retired environment variable(s): {', '.join(retired)}. "
-            "DocVortex 0.6 requires its Rust native extension and no longer supports backend selection."
-        )
-    return _load_native()
 
 
 @lru_cache(maxsize=1)
-def _load_native() -> ModuleType:
-    """只缓存成功加载的匹配扩展，安装及协议错误保留原始原因且不降级。"""
+def get_native() -> ModuleType:
+    """惰性加载并缓存匹配协议的必需扩展，安装错误保留原始原因且不降级。"""
     try:
         native = importlib.import_module("docvortex._native")
         if getattr(native, "PROTOCOL_VERSION", None) != _PROTOCOL_VERSION:
@@ -38,10 +25,6 @@ def _load_native() -> ModuleType:
             "Reinstall the platform wheel or rebuild the extension for this checkout."
         ) from exc
     return native
-
-
-# 私有测试和诊断工具沿用缓存清理入口，运行时不再缓存后端选择。
-get_native.cache_clear = _load_native.cache_clear
 
 
 def backend_info() -> dict[str, str | int | None]:

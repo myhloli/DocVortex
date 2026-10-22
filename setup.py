@@ -1,6 +1,5 @@
-"""构建必需的 Rust 原生扩展，拒绝已移除的兼容后端开关。"""
+"""构建必需的 Rust 原生扩展。"""
 
-import os
 import sys
 import sysconfig
 import platform
@@ -8,9 +7,6 @@ import platform
 from setuptools import setup
 from setuptools_rust import Binding, RustExtension
 
-for variable in ("DOCVORTEX_BUILD_NATIVE", "DOCVORTEX_COMPUTE_BACKEND"):
-    if variable in os.environ:
-        raise RuntimeError(f"{variable} was removed in DocVortex 0.6; unset it before building the required native extension")
 supported = (
     platform.python_implementation() == "CPython"
     and not sysconfig.get_config_var("Py_GIL_DISABLED")

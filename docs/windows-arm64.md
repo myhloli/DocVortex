@@ -1,6 +1,8 @@
 # Windows ARM64 原生扩展
 
-DocVortex 的 Windows ARM64 native wheel 面向普通 GIL 版 CPython 3.11–3.14；从 0.6.0 起所有支持平台的 Python 下限统一为 3.11，公共 SDK 和 CLI 保留，Rust 扩展为必需依赖，不再发布纯 Python 兼容 wheel 或 sdist。旧 `DOCVORTEX_BUILD_NATIVE` 和 `DOCVORTEX_COMPUTE_BACKEND` 环境变量必须移除。
+DocVortex 的 Windows ARM64 native wheel 面向普通 GIL 版 CPython 3.11–3.14；从 0.6.0 起所有支持平台的 Python 下限统一为 3.11，公共 SDK 和 CLI 保留，Rust 扩展为必需依赖，不再发布纯 Python 兼容 wheel 或 sdist。
+
+当前源码忽略旧 `DOCVORTEX_BUILD_NATIVE` 和 `DOCVORTEX_COMPUTE_BACKEND` 环境变量，任意值均不影响构建或运行。此兼容性修复尚未发布；已发布的 0.6.0 包仍会拒绝这两个变量。
 
 ## 构建与安装
 
