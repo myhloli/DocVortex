@@ -7,12 +7,11 @@ name = "docvortex"
 dynamic = ["version"]
 description = "A fast, multi-format document parsing and conversion engine"
 readme = "README.md"
-requires-python = ">=3.10,<3.15"
+requires-python = ">=3.11,<3.15"
 license = "MIT AND Apache-2.0 AND BSD-3-Clause"
 license-files = ["LICENSE.md"]
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -31,8 +30,8 @@ dependencies = [
     "reportlab[accel]; sys_platform != 'win32' or (platform_machine != 'ARM64' and platform_machine != 'arm64' and platform_machine != 'aarch64')",
     "ziamath>=0.13,<0.14",
     "mineru-magika>=1.0.3,<1.1.0",
-    "onnxruntime-directml>=1.23,<2; sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'amd64' or platform_machine == 'x86_64')",
-    "onnxruntime>=1.20.1,<2; sys_platform != 'win32' or (platform_machine != 'AMD64' and platform_machine != 'amd64' and platform_machine != 'x86_64')",
+    "onnxruntime-directml>=1.24.4,<2; sys_platform == 'win32' and (platform_machine == 'AMD64' or platform_machine == 'amd64' or platform_machine == 'x86_64')",
+    "onnxruntime>=1.24.4,<2; sys_platform != 'win32' or (platform_machine != 'AMD64' and platform_machine != 'amd64' and platform_machine != 'x86_64')",
 ]
 
 [project.optional-dependencies]
@@ -63,4 +62,4 @@ pythonpath = ["tests", "tests/unittest", "."]
 
 [tool.ruff]
 line-length = 128
-target-version = "py310"
+target-version = "py311"

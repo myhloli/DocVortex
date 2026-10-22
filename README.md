@@ -50,7 +50,8 @@ Same-machine warm-run comparison on 32 PDFs / 299 pages (31 PDFs for Flash). The
 
 ## Quick start
 
-Requires **Python 3.10–3.14**.
+Requires **Python 3.11–3.14** and **ONNX Runtime 1.24.4 or newer** (DirectML on Windows x64).
+On macOS, installation requires **Apple Silicon and macOS 14 or newer**; Intel Macs are no longer supported as of 0.6.0.
 
 ### Install
 

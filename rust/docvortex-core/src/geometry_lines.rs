@@ -178,7 +178,7 @@ mod tests {
     use super::*;
 
     #[test]
-    /// 保留 Python 3.10/3.11 与 3.12+ 的不同求和结果，避免并列主基线改变。
+    /// 保留 Python 3.11 与 3.12+ 的不同求和结果，避免并列主基线改变。
     fn width_sum_matches_python_versions() {
         assert_eq!(width_sum([1e16, 1.0, 1.0].into_iter(), false), Some(1e16));
         assert_eq!(

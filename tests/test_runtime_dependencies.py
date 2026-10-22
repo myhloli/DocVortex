@@ -6,11 +6,12 @@ from importlib import metadata
 
 from packaging.markers import default_environment
 from packaging.requirements import Requirement
+from packaging.specifiers import SpecifierSet
 from packaging.utils import canonicalize_name
 import pytest
 
 
-@pytest.mark.parametrize("python_version", ("3.10", "3.11", "3.12", "3.13", "3.14"))
+@pytest.mark.parametrize("python_version", ("3.11", "3.12", "3.13", "3.14"))
 @pytest.mark.parametrize(
     ("sys_platform", "machine", "expected"),
     (
@@ -47,11 +48,18 @@ def test_installed_metadata_selects_one_runtime(sys_platform: str, machine: str,
     ]
     assert len(selected) == 1, selected
     assert canonicalize_name(selected[0].name) == expected
-    minimum = "1.23" if expected == "onnxruntime-directml" else "1.20.1"
-    unsupported = "1.22.1" if expected == "onnxruntime-directml" else "1.20.0"
-    assert minimum in selected[0].specifier
-    assert unsupported not in selected[0].specifier
+    assert "1.24.4" in selected[0].specifier
+    assert "1.24.3" not in selected[0].specifier
     assert "2" not in selected[0].specifier
+
+
+def test_installed_metadata_requires_python_311_through_314() -> None:
+    """检查实际发行物的 Python 支持边界，避免源码声明与安装包元数据脱节。"""
+    package = metadata.metadata("docvortex")
+    supported = SpecifierSet(package["Requires-Python"])
+    assert all(version in supported for version in ("3.11", "3.12", "3.13", "3.14"))
+    assert all(version not in supported for version in ("3.10", "3.15"))
+    assert "Programming Language :: Python :: 3.10" not in package.get_all("Classifier", [])
 
 
 def test_installed_metadata_requires_runtime_free_magika_fork() -> None:

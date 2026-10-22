@@ -90,7 +90,7 @@ def render_layout_pdf(
     try:
         writer = PdfWriter(clone_from=reader)
     except (RecursionError, PdfReadError) as error:
-        # Python 3.10 下 pypdf 可能包装递归异常；只接受已证明由递归溢出导致的读取失败。
+        # pypdf 可能包装递归异常；只接受已证明由递归溢出导致的读取失败。
         if isinstance(error, PdfReadError) and not isinstance(error.__cause__, RecursionError):
             raise
         # 带深结构树的文档先循环加载全部对象，避免递归克隆，不改全局递归上限或丢弃目录。

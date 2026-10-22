@@ -101,9 +101,10 @@ def verify_binary(binary: Path) -> None:
 
 def verify(directory: Path) -> None:
     """解包唯一构建产物，子进程验证结束后再删除临时二进制。"""
-    assert (3, 10) <= sys.version_info[:2] <= (3, 14), sys.version
+    assert (3, 11) <= sys.version_info[:2] <= (3, 14), sys.version
     wheels = list(directory.glob("*.whl"))
     assert len(wheels) == 1, wheels
+    assert "-cp311-abi3-" in wheels[0].name, wheels[0].name
     with tempfile.TemporaryDirectory(prefix="docvortex-abi-") as temporary:
         with zipfile.ZipFile(wheels[0]) as archive:
             members = [
@@ -116,12 +117,10 @@ def verify(directory: Path) -> None:
                 # 防止 x64 模拟解释器或错误 wheel 标签掩盖 ARM64 指令集构建失败。
                 assert sys.platform == "win32" and platform.machine().lower() in {"arm64", "aarch64"}
                 assert ctypes.sizeof(ctypes.c_void_p) == 8
-                assert sys.version_info[:2] >= (3, 11)
                 assert data[:2] == b"MZ"
                 offset = struct.unpack_from("<I", data, 0x3C)[0]
                 assert data[offset : offset + 4] == b"PE\0\0"
                 assert struct.unpack_from("<H", data, offset + 4)[0] == 0xAA64
-                assert "-cp310-abi3-win_arm64.whl" in wheels[0].name
             binary.write_bytes(data)
         subprocess.run([sys.executable, str(Path(__file__).resolve()), "--binary", str(binary)], check=True)
     print(f"CPython {sys.version_info.major}.{sys.version_info.minor} ABI and native kernels verified: {wheels[0].name}")

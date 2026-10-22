@@ -30,7 +30,7 @@ iteration. These paths do not weaken any parsing decision or output comparison.
 Python owns Unicode classification, normalization, font equality, version-dependent
 rounding, HTML generation and public object construction. Stable table-column means
 use an incremental accumulator matching the running CPython version's float-only
-`sum`: sequential for 3.10–3.11 and compensated for 3.12–3.14. Integer/mixed/custom
+`sum`: sequential for 3.11 and compensated for 3.12–3.14. Integer/mixed/custom
 inputs, other runtimes and intermediate overflow retain Python computation. Rust owns
 numeric batches and returns source ranges or indices. Canonical geometry reuses
 unchanged Python float objects and zero-rotation tuples to bound retained memory. Original `Char` references and
@@ -93,15 +93,15 @@ Cargo is available and otherwise builds pure Python. If a compiler is available 
 compilation fails, installation fails visibly instead of publishing a broken binary.
 Official binary builds always set `DOCVORTEX_BUILD_NATIVE=1`.
 
-GIL-enabled CPython 3.10–3.14 uses `cp310-abi3` wheels for Linux x86_64/aarch64,
-Windows x86_64 and macOS arm64/x86_64. Linux binary builds target manylinux_2_28;
+GIL-enabled CPython 3.11–3.14 uses `cp311-abi3` wheels for Linux x86_64/aarch64,
+Windows x86_64/ARM64 and macOS arm64. Linux binary builds target manylinux_2_28;
 older glibc systems can use the pure Python wheel. Other interpreters can build the
 pure package; this does not extend compatibility guarantees of its dependencies.
 Free-threaded native wheels are not part of this change.
 
 The native wheel workflow tests installed artifacts against Python output and exercises
-real parsing, both on Python 3.10 and 3.14. The regular CI matrix exercises Python and
-Rust backends on Python 3.10–3.14. The release workflow retains the main-CI/tag gate,
+real parsing, both on Python 3.11 and 3.14. The regular CI matrix exercises Python and
+Rust backends on Python 3.11 and 3.14 with ONNX Runtime 1.24.4. The release workflow retains the main-CI/tag gate,
 then builds/tests every artifact before publishing all platform wheels, the pure wheel
 and the source distribution. A local build is not evidence that remote matrix jobs passed.
 Performance comparisons run locally. CI retains cross-platform builds, ABI checks,
@@ -109,11 +109,11 @@ installed-wheel parsing and Python/Rust correctness tests, without full-corpus t
 or benchmark artifact uploads. Workflow-only changes do not require another local
 performance run when production source and extension fingerprints are unchanged.
 
-On Intel macOS, the existing Magika/ONNX Runtime dependency stack currently prevents
-full application installation on Python 3.14. That wheel is tested with full parsing
-on Python 3.10 and 3.13, and its binary kernels are loaded and executed separately on
-Python 3.14. This ABI check is not a claim that the complete dependency stack installs
-there. The Rust change does not alter those existing dependency requirements.
+Since 0.6.0, both ONNX Runtime distributions require version 1.24.4 or newer;
+Windows x64 selects DirectML and other supported platforms select the standard package.
+ONNX Runtime no longer provides Intel macOS wheels at this minimum version, so
+DocVortex no longer supports Intel macOS installation or publishes native wheels
+for that platform. macOS installation requires Apple Silicon and macOS 14 or newer.
 
 ## Benchmarks and regression gates
 

@@ -2187,7 +2187,7 @@ def _count_stable_columns(
     from ...._compute_backend import get_native
 
     native = get_native()
-    if native is None or sys.implementation.name != "cpython" or not (3, 10) <= sys.version_info[:2] <= (3, 14):
+    if native is None or sys.implementation.name != "cpython" or not (3, 11) <= sys.version_info[:2] <= (3, 14):
         return _count_stable_columns_python(rows, median_height, cache, allow_prefix_reuse=allow_prefix_reuse)
     if type(median_height) is not float or not math.isfinite(median_height):
         return _count_stable_columns_python(rows, median_height)

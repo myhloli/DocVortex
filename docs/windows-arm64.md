@@ -1,10 +1,12 @@
 # Windows ARM64 原生扩展
 
-DocVortex 的 Windows ARM64 native wheel 面向普通 GIL 版 CPython 3.11–3.14；其他平台继续支持 Python 3.10，公共 API 不变。
+DocVortex 的 Windows ARM64 native wheel 面向普通 GIL 版 CPython 3.11–3.14；从 0.6.0 起所有支持平台的 Python 下限统一为 3.11，公共 API 不变。
 
 ## 构建与安装
 
-现有静态 Native wheels 矩阵加入 `windows-11-arm`、`ARM64`，使用 Python 3.11 构建，保留 `cp310-abi3-win_arm64` 基线。产物通过原有收集和 Publish 流程发布，无额外发布开关。
+静态 Native wheels 矩阵使用 `windows-11-arm`、`ARM64`，以 Python 3.11 构建 `cp311-abi3-win_arm64` wheel。产物通过原有收集和 Publish 流程发布，无额外发布开关。
+
+ONNX Runtime 最低版本为 1.24.4；Windows ARM64 使用普通 `onnxruntime`，Windows x64 使用同一下限的 `onnxruntime-directml`。
 
 Windows ARM64 依赖普通 `reportlab`，使用其 Python 实现；其他平台继续依赖 `reportlab[accel]`。
 

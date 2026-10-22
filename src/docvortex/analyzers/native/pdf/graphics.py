@@ -41,7 +41,7 @@ _MIN_RASTER_IMAGE_PAGE_AREA_RATIO = 0.0038
 _NUMERIC_GRAPHIC_REFERENCES = (
     re.fullmatch,
     re._compile,
-    getattr(getattr(re, "_compiler", None), "compile", None),
+    re._compiler.compile,
     _LineItem.__getattribute__,
     _LineItem.__setattr__,
 )
@@ -56,7 +56,7 @@ def _numeric_graphic_lines(lines: list[_LineItem], mode: int) -> list[_LineItem]
         or (
             re.fullmatch,
             re._compile,
-            getattr(getattr(re, "_compiler", None), "compile", None),
+            re._compiler.compile,
             _LineItem.__getattribute__,
             _LineItem.__setattr__,
         )

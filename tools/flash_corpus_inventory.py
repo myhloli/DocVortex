@@ -71,11 +71,8 @@ def build_manifest(source_root: Path) -> dict:
             continue
         try:
             with path.open("rb") as source:
-                # 分块读取兼容 Python 3.10，也避免为大文件一次分配全部字节。
-                hasher = hashlib.sha256()
-                for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                    hasher.update(chunk)
-                digest = hasher.hexdigest()
+                # 使用标准库流式计算摘要，避免为大文件一次分配全部字节。
+                digest = hashlib.file_digest(source, "sha256").hexdigest()
         except OSError as exc:
             excluded.append(
                 {

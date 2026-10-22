@@ -14,7 +14,7 @@ if mode not in {"0", "1", "auto"}:
 enabled = mode == "1" or (mode == "auto" and shutil.which("cargo") is not None)
 supported = platform.python_implementation() == "CPython" and not sysconfig.get_config_var("Py_GIL_DISABLED")
 if not supported and mode == "1":
-    raise RuntimeError("Native wheels currently require GIL-enabled CPython 3.10-3.14")
+    raise RuntimeError("Native wheels currently require GIL-enabled CPython 3.11-3.14")
 enabled = enabled and supported
 setup(
     rust_extensions=[
@@ -28,6 +28,6 @@ setup(
     ]
     if enabled
     else [],
-    options={"bdist_wheel": {"py_limited_api": "cp310"}} if enabled else {},
+    options={"bdist_wheel": {"py_limited_api": "cp311"}} if enabled else {},
     zip_safe=False,
 )

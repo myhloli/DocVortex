@@ -1,8 +1,6 @@
 """数字文字批处理对照 Python 的 Unicode 语法及输入状态失效。"""
 import copy
 import re
-import sys
-from pathlib import Path
 from random import Random
 from types import SimpleNamespace
 
@@ -80,12 +78,9 @@ def test_numeric_raster_reads_current_geometry(native, monkeypatch):
         setattr(item, attr, previous)
 
 
-def test_numeric_graphics_import_with_legacy_regex_module(monkeypatch):
-    """模拟 Python 3.10 没有 re._compiler 的模块形状，导入和私有筛选均可正常执行。"""
-    legacy = SimpleNamespace(**{key: value for key, value in vars(re).items() if key != "_compiler"})
-    namespace = {"__name__": graphics.__name__, "__package__": graphics.__package__}
-    monkeypatch.setitem(sys.modules, "re", legacy)
-    path = Path(graphics.__file__)
-    exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)
+def test_numeric_graphics_falls_back_after_regex_compiler_replacement(native, monkeypatch):
+    """替换正则编译器后停用原生缓存，继续尊重调用方当前的正则实现。"""
     item = line("12")
-    assert namespace["_numeric_graphic_lines"]([item], 0) == ([item] if get_native() is not None else None)
+    assert graphics._numeric_graphic_lines([item], 0) == [item]
+    monkeypatch.setattr(re._compiler, "compile", lambda *args, **kwargs: None)
+    assert graphics._numeric_graphic_lines([item], 0) is None

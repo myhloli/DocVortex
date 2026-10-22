@@ -50,7 +50,8 @@ DocVortex 不下载模型，也不执行 PDF OCR。遇到需要 OCR 的文档时
 
 ## 快速开始
 
-需要 **Python 3.10–3.14**。
+需要 **Python 3.11–3.14** 和 **ONNX Runtime 1.24.4 或更新版本**（Windows x64 使用 DirectML）。
+macOS 安装需要 **Apple Silicon 和 macOS 14 或更新版本**；从 0.6.0 起不再支持 Intel Mac。
 
 ### 安装
 

@@ -7,7 +7,7 @@ from contextvars import ContextVar
 from functools import wraps
 
 _FONT_FAMILY_CACHE = ContextVar("docvortex_page_font_family_cache", default=None)
-_FONT_FAMILY_RE_REFERENCES = (re.sub, re._compile, getattr(getattr(re, "_compiler", None), "compile", None))
+_FONT_FAMILY_RE_REFERENCES = (re.sub, re._compile, re._compiler.compile)
 
 
 def _font_family_page_scope(function):
@@ -35,9 +35,7 @@ def _normalized_font_family(
     raw = signature[0]
     cache = _FONT_FAMILY_CACHE.get()
     ordinary = (
-        cache is not None
-        and type(raw) is str
-        and (re.sub, re._compile, getattr(getattr(re, "_compiler", None), "compile", None)) == _FONT_FAMILY_RE_REFERENCES
+        cache is not None and type(raw) is str and (re.sub, re._compile, re._compiler.compile) == _FONT_FAMILY_RE_REFERENCES
     )
     if ordinary and raw in cache:
         return cache[raw]
