@@ -1244,8 +1244,7 @@ def test_shared_line_index_set_exact_conversion_preserves_plain_target_union() -
     merged = table_rules._merge_table_candidates([plain, candidate])
 
     assert len(merged) == 1
-    assert isinstance(merged[0].line_indices, models._SharedLineIndexSet)
-    assert set(merged[0].line_indices) == {1, 3, 4, 5}
+    assert merged[0].line_indices == {1, 3, 4, 5}
 
 
 def test_rule_interval_partition_matches_historical_closed_interval_scan() -> None:

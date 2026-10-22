@@ -1,4 +1,4 @@
-"""按文档交替比较冻结版本和当前版本的两个后端，保存完整输出与进程树 RSS。"""
+"""按文档交替比较冻结版本和当前版本的原生实现，保存完整输出与进程树 RSS。"""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from pdf_corpus import corpus_manifest, corpus_paths
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def measure(path, folder, source, backend, args):
+def measure(path, folder, source, args):
     """每次测量使用独立解释器，检查真实源码与输入；已完成记录可直接续跑。"""
     package = (source / "src/docvortex/__init__.py").resolve()
     if not (folder / "report.json").is_file():
@@ -27,8 +27,6 @@ def measure(path, folder, source, backend, args):
             str(ROOT / "tests/benchmarks/rust_pdf.py"),
             "--suite",
             args.suite,
-            "--backend",
-            backend,
             "--runs",
             str(args.runs),
             "--path",
@@ -41,7 +39,7 @@ def measure(path, folder, source, backend, args):
         subprocess.run(command, cwd=ROOT, env=dict(os.environ, PYTHONPATH=str(package.parents[1])), check=True)
     record = json.loads((folder / "report.json").read_text())["documents"][0]
     assert Path(record["source_package"]) == package
-    assert record["compute"]["backend"] == backend
+    assert record["compute"]["backend"] == "rust"
     assert record["source_code_sha256"] == source_identity(package)["source_code_sha256"]
     assert all(len(values) == args.runs for values in record["seconds"].values())
     if record.get("memory_method") != "isolated-entry-after-one-warmup":
@@ -64,16 +62,12 @@ def measure(path, folder, source, backend, args):
 
 
 def compare(measurements):
-    """输出摘要必须全等，分别计算同版本后端差异及跨版本时间和内存变化。"""
+    """输出摘要必须全等，计算跨版本时间和内存变化。"""
     assert len({item["source_sha256"] for item in measurements.values()}) == 1
     assert len({item["region_input_sha256"] for item in measurements.values()}) == 1
     assert len({item["page_count"] for item in measurements.values()}) == 1
     results = {}
-    for label, before, after in (
-        ("backends", "python-current", "rust-current"),
-        ("rust-revision", "rust-reference", "rust-current"),
-        ("python-revision", "python-reference", "python-current"),
-    ):
+    for label, before, after in (("rust-revision", "rust-reference", "rust-current"),):
         old, new = measurements[before], measurements[after]
         results[label] = {
             "time_ratios": {
@@ -89,7 +83,7 @@ def compare(measurements):
 
 
 def main():
-    """交替四个实现，超过退化门槛时反序复测；不覆盖产物或刷新输出金标。"""
+    """交替两个原生版本，超过退化门槛时反序复测；不覆盖产物或刷新输出金标。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--reference-source", type=Path, required=True)
@@ -110,10 +104,8 @@ def main():
     write_json(args.output / "corpus.json", inputs)
     old = args.reference_source.resolve()
     variants = [
-        ("python-reference", old, "python"),
-        ("rust-reference", old, "rust"),
-        ("python-current", args.candidate_source.resolve(), "python"),
-        ("rust-current", args.candidate_source.resolve(), "rust"),
+        ("rust-reference", old),
+        ("rust-current", args.candidate_source.resolve()),
     ]
     report = {
         "suite": args.suite,
@@ -129,9 +121,9 @@ def main():
     for index, path in enumerate(paths):
         if hashlib.sha256(path.read_bytes()).hexdigest() != inputs[index]["sha256"]:
             raise AssertionError(f"PDF input changed during benchmark: {path}")
-        order = variants[index % 4 :] + variants[: index % 4]
+        order = variants[index % 2 :] + variants[: index % 2]
         folder = args.output / f"{index:02d}-{path.stem}"
-        measurements = {label: measure(path, folder / label, source, backend, args) for label, source, backend in order}
+        measurements = {label: measure(path, folder / label, source, args) for label, source in order}
         record = {
             "path": str(path),
             "pages": next(iter(measurements.values()))["page_count"],
@@ -146,14 +138,12 @@ def main():
         ]
         if repeat_pairs:
             pair_labels = {
-                "backends": ("python-current", "rust-current"),
                 "rust-revision": ("rust-reference", "rust-current"),
-                "python-revision": ("python-reference", "python-current"),
             }
             required = {label for pair in repeat_pairs for label in pair_labels[pair]}
             repeated = {
-                label: measure(path, folder / f"repeat-{label}", source, backend, args)
-                for label, source, backend in reversed(order)
+                label: measure(path, folder / f"repeat-{label}", source, args)
+                for label, source in reversed(order)
                 if label in required
             }
             record["repeat_pairs"] = repeat_pairs

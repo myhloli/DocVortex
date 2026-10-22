@@ -5,8 +5,11 @@ from types import SimpleNamespace
 
 import pytest
 
+from _native_pdf_golden import native_pdf_golden
+
 from docvortex._compute_backend import get_native
 from docvortex.analyzers.native.pdf import table_rules as rules_api
+from docvortex.analyzers.native.pdf import geometry as geometry_api
 from docvortex.analyzers.native.pdf.models import _Fragment, _LocalAxisLine, _VisualRow
 
 
@@ -36,6 +39,10 @@ def _rules(centers):
 def test_all_slices_preserve_boundary_members_and_interval_evidence():
     """穷举行切片和横线跨度，覆盖共享边界、重复行高与紧凑首表头例外。"""
     _native()
+    from _table_golden import table_golden
+
+    golden = table_golden()
+    case = 0
     rows = _rows([-5.0, 0.0, 5.0, 10.0, 10.0, 19.9, 20.0, 25.0, 40.0, 55.0], [1, 1, 1, 2, 3, 0, 1, 2, 1, 2])
     rules = _rules([0.0, 10.0, 20.0, 30.0, 40.0, 50.0])
     index = rules_api._prepare_rule_band_index(rows, rules)
@@ -46,8 +53,8 @@ def test_all_slices_preserve_boundary_members_and_interval_evidence():
             for start in range(len(rows) + 1):
                 for end in range(start, len(rows) + 1):
                     selected_rows = rows[start:end]
-                    expected = rules_api._partition_rows_by_rule_intervals(selected_rows, selected_rules)
-                    for height in (-1.0, 0.0, 4.0, 10.0):
+                    expected = [[selected_rows[index] for index in group] for group in golden["rule_slices"][case]]
+                    for height_index, height in enumerate((-1.0, 0.0, 4.0, 10.0)):
                         groups = rules_api._partition_rows_by_prepared_bands(
                             selected_rows, selected_rules, first, index, height
                         )
@@ -57,13 +64,12 @@ def test_all_slices_preserve_boundary_members_and_interval_evidence():
                             for group, reference in zip(groups, expected, strict=True)
                             for actual, old in zip(group, reference, strict=True)
                         )
-                        expected_evidence = rules_api._every_rule_interval_has_multi_cell_row(
-                            selected_rows, selected_rules, height, expected
-                        )
+                        expected_evidence = golden["rule_slice_evidence"][case * 4 + height_index]
                         assert (
                             rules_api._every_rule_interval_has_multi_cell_row(selected_rows, selected_rules, height, groups)
                             == expected_evidence
                         )
+                    case += 1
     assert rules_api._partition_rows_by_prepared_bands(rows[::-1], rules, 0, index, 4.0) is None
 
 
@@ -89,7 +95,7 @@ def test_core_expansion_preserves_members_geometry_and_signed_zero(angle):
             ]
             members, core = rules_api._prepared_rule_candidate_core(query, rules)
             assert members == {fragment.line_index for row in selected for fragment in row.fragments}
-            expected_core = rules_api._bbox_union(
+            expected_core = geometry_api._bbox_union(
                 rules_api._bbox_union_many([rule.bbox for rule in rules]),
                 rules_api._bbox_union_many([row.bbox for row in selected]),
             )
@@ -97,18 +103,17 @@ def test_core_expansion_preserves_members_geometry_and_signed_zero(angle):
 
 
 def test_special_objects_stay_on_reference_before_native_calculation():
-    """特殊对象、超大来源 ID 和非有限值在准备阶段明确回退，不捕获运算错误。"""
+    """不可建立共享索引的对象进入原生通用分配，超大来源 ID 和非有限值不启用有限索引。"""
     _native()
     rules = _rules([0.0, 10.0, 20.0])
     rows = [SimpleNamespace(center_y=1.0), SimpleNamespace(center_y=10.0)]
     index = rules_api._prepare_rule_band_index(rows, rules)
-    assert index.native is None
-    assert rules_api._partition_rows_by_prepared_bands(rows, rules, 0, index) == rules_api._partition_rows_by_rule_intervals(
-        rows, rules
-    )
+    assert index is None
+    assert rules_api._partition_rows_by_prepared_bands(rows, rules, 0, index) is None
+    assert rules_api._partition_rows_by_rule_intervals(rows, rules) == [[rows[0], rows[1]], [rows[1]]]
     rows = _rows([1.0, 10.0], [1, 2])
     rows[0].fragments[0].line_index = 2**100
-    assert rules_api._prepare_rule_band_index(rows, rules).native is None
+    assert rules_api._prepare_rule_band_index(rows, rules) is None
     rows[0].center_y = float("nan")
     assert rules_api._prepare_rule_band_index(rows, rules) is None
     duplicate = [rules[0], rules[0], rules[1]]
@@ -127,10 +132,10 @@ def test_native_candidate_validation_errors_are_not_swallowed():
         native.PreparedRuleCandidates([10.0, 0.0], [])
 
 
-def test_full_candidate_enumeration_and_deferred_merge_match_reference(monkeypatch):
+def test_full_candidate_enumeration_and_deferred_merge_match_reference():
     """真实构建入口保留全部跨度及延后物化顺序，同时确认共享原生对象确实被使用。"""
     import pickle
-    from docvortex import _compute_backend
+    from _table_golden import table_golden, table_value_hash
     from docvortex.analyzers.native.pdf.models import _LineItem
 
     _native()
@@ -150,15 +155,11 @@ def test_full_candidate_enumeration_and_deferred_merge_match_reference(monkeypat
     ]
     args = (rows, lines, (150.0, 120.0), 0, 5.0, rules)
     before = pickle.dumps(args)
-    with monkeypatch.context() as reference:
-        reference.setattr(_compute_backend, "get_native", lambda: None)
-        expected_drafts = rules_api._build_rule_table_candidates(*args, defer_materialization=True)
-        expected_scores = [draft.score for draft in expected_drafts]
-        expected = rules_api._merge_table_candidates(expected_drafts)
+    expected = table_golden()["lazy_candidates"]
     drafts = rules_api._build_rule_table_candidates(*args, defer_materialization=True)
     assert drafts and any(draft.prepared_candidate is not None for draft in drafts)
-    assert [draft.score for draft in drafts] == expected_scores
-    assert rules_api._merge_table_candidates(drafts) == expected
+    assert [draft.score for draft in drafts] == expected["scores"]
+    assert table_value_hash(rules_api._merge_table_candidates(drafts)) == expected["merged"]
     assert pickle.dumps(args) == before
 
 
@@ -251,7 +252,6 @@ def _decode_merged(rows):
 def test_owned_grid_and_dynamic_merge_match_reference():
     """随机重叠、不同方向、并列分数和注释角色冲突均与完整参考链路一致。"""
     import random
-    from copy import deepcopy
     from docvortex.analyzers.native.pdf.models import _TableAnnotation, _TableCandidate
 
     native = _native()
@@ -277,11 +277,7 @@ def test_owned_grid_and_dynamic_merge_match_reference():
                 candidates.append(
                     _TableCandidate(box, local, angle, float(rng.randrange(3)), None if i % 5 == 0 else box, ids, annotations)
                 )
-            expected = deepcopy(candidates)
-            rules_api._expand_candidates_to_connected_rule_grids(
-                expected, rows, size, angle, 4.0, [], [], prepared_grid_bboxes=grids, grid_member_cache={}
-            )
-            expected = rules_api._merge_table_candidates(expected)
+            expected = native_pdf_golden("_merge_table_candidates:284")
             merger = native.NativeTableMerger()
             for c in sorted(candidates, key=lambda c: c.score, reverse=True):
                 annotations = [(a.kind, a.bbox, list(a.line_indices), list(a.line_bboxes.items())) for a in c.annotations]
@@ -327,8 +323,8 @@ def test_native_merger_validates_before_mutation_and_consumes_once():
         merger.add(box, box, 0, 1.0, box, [], [])
 
 
-def test_owned_merge_rejects_unrepresentable_score_without_mutation():
-    """超大整数分数保留 Python 排序语义，准入失败不修改任何候选。"""
+def test_owned_merge_preserves_unbounded_score_without_mutating_inputs():
+    """Python 任意整数分数保留稳定排序与精确输出，原始候选不受合并修改。"""
     from copy import deepcopy
     from docvortex.analyzers.native.pdf._native_table_merge import merge_owned
     from docvortex.analyzers.native.pdf.models import _TableCandidate
@@ -337,5 +333,9 @@ def test_owned_merge_rejects_unrepresentable_score_without_mutation():
     box = (0.0, 0.0, 10.0, 10.0)
     candidates = [_TableCandidate(box, box, 0, 2**2000, line_indices={1}), _TableCandidate(box, box, 0, 1.0, line_indices={2})]
     before = deepcopy(candidates)
-    assert merge_owned(candidates) is None
+    actual = merge_owned(candidates)
+    assert len(actual) == 1 and actual[0].score == 2**2000
+    assert actual[0].line_indices == {1, 2}
     assert candidates == before
+    assert merge_owned([]) == []
+    assert merge_owned(candidates[:1]) == candidates[:1]

@@ -166,13 +166,7 @@ from .native_objects import (
     _extract_page_paths_and_lines as _extract_page_paths_and_lines,
 )
 from .native_objects import (
-    _extract_path_drawing_lines as _extract_path_drawing_lines,
-)
-from .native_objects import (
     _form_bbox_from_object as _form_bbox_from_object,
-)
-from .native_objects import (
-    _get_path_visibility as _get_path_visibility,
 )
 from .native_objects import (
     _get_raw_image_fingerprint as _get_raw_image_fingerprint,
@@ -182,15 +176,6 @@ from .native_objects import (
 )
 from .native_objects import (
     _get_raw_object_rgba as _get_raw_object_rgba,
-)
-from .native_objects import (
-    _get_raw_stroke_width as _get_raw_stroke_width,
-)
-from .native_objects import (
-    _get_segment_stroke_width as _get_segment_stroke_width,
-)
-from .native_objects import (
-    _get_thin_filled_subpath_line as _get_thin_filled_subpath_line,
 )
 from .native_objects import (
     _image_bbox_from_matrix as _image_bbox_from_matrix,
@@ -221,9 +206,6 @@ from .native_objects import (
 )
 from .native_objects import (
     _merge_orientation_lines as _merge_orientation_lines,
-)
-from .native_objects import (
-    _path_info_from_object as _path_info_from_object,
 )
 from .native_objects import (
     _read_raw_path_subpaths as _read_raw_path_subpaths,
@@ -287,12 +269,10 @@ class PDFPage:
         return self.pdf_doc.get_page_chars_with_geometry(self._idx)
 
     def get_text_snapshot(self):
-        """仅获取独立原生文本证据，不提前解析路径或链接；参考后端返回None。"""
+        """仅获取独立原生文本证据；未准入紧凑表示时返回 None，不提前解析路径或链接。"""
         from ..._compute_backend import get_native
 
         native = get_native()
-        if native is None or not hasattr(native, "NativeTextSnapshot"):
-            return None
         text = self.pdf_doc._get_owned_text_snapshot(self._idx, visible_only=False)
         return text if isinstance(text, native.NativeTextSnapshot) else None
 
@@ -650,7 +630,7 @@ class PDFDocument:
                 text.close()
         return result
 
-    def _extract_owned_text_snapshot(self, page_idx: int, page, *, visible_only: bool, reference: bool = True):
+    def _extract_owned_text_snapshot(self, page_idx: int, page, *, visible_only: bool, materialize: bool = True):
         """只提取并弱缓存自有文本，完整页面快照复用它而不引入额外矢量或链接依赖。"""
         key = (page_idx, visible_only)
         cached = self._owned_text_snapshots.get(key)
@@ -660,7 +640,7 @@ class PDFDocument:
             # 非标准替换入口保留原签名与异常，不把新参数传给旧扩展或失败注入器。
             return (
                 _extract_page_text_geometry(page, include_extended_geometry=True, visible_only=visible_only)
-                if reference
+                if materialize
                 else None
             )
         text = _extract_page_text_geometry(
@@ -668,7 +648,7 @@ class PDFDocument:
             include_extended_geometry=True,
             visible_only=visible_only,
             compact=True,
-            compact_only=not reference,
+            compact_only=not materialize,
             paint_page_reader=(lambda: self._get_form_resource_page(page_idx)) if visible_only else None,
         )
         if text is not None and not isinstance(text, PDFPageTextGeometry):
@@ -679,17 +659,12 @@ class PDFDocument:
 
     def _get_owned_text_snapshot(self, page_idx: int, *, visible_only: bool = False):
         """能力缺失立即返回None；不支持的原始数值只报告参考选择，不提前物化回退字符。"""
-        from ..._compute_backend import get_native
-
-        native = get_native()
-        if native is None or not hasattr(native, "NativeTextSnapshot"):
-            return None
         with pdfium_guard():
             cached = self._owned_text_snapshots.get((page_idx, visible_only))
             if cached is not None:
                 return cached
             with self._open_page(page_idx) as page:
-                return self._extract_owned_text_snapshot(page_idx, page, visible_only=visible_only, reference=False)
+                return self._extract_owned_text_snapshot(page_idx, page, visible_only=visible_only, materialize=False)
 
     def get_page_snapshot(self, page_idx: int) -> PDFPageSnapshot:
         """同页显式快照在消费者存活期间复用，弱缓存不延长全文证据的驻留时间。"""

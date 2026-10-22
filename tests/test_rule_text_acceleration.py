@@ -1,5 +1,7 @@
 """数字噪声的批量几何必须保留 Python 的候选覆盖、边界和参考行顺序。"""
 
+import json
+from pathlib import Path
 from random import Random
 from types import SimpleNamespace
 
@@ -8,15 +10,15 @@ import pytest
 from docvortex._compute_backend import get_native
 from docvortex.analyzers.native.pdf.text_noise import (
     _nested_prose_numeric_outliers,
-    _nested_prose_numeric_outliers_python,
 )
+
+
+_CASES = json.loads((Path(__file__).parent / "fixtures/native_rule_06_golden.json").read_text())["cases"]
 
 
 def test_detached_formula_adjacency_matches_all_reference_pairs():
     """比较随机、退化和临界框的全部有序邻接，避免只验证最终公式数量。"""
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     from docvortex.analyzers.native.pdf.geometry import _bbox_axis_overlap_ratio, _bbox_center_y
 
     rng = Random(853)
@@ -55,8 +57,24 @@ def test_detached_formula_adjacency_matches_all_reference_pairs():
                 ):
                     neighbors.append(j)
             expected.append(neighbors)
-        assert native.detached_formula_neighbors(boxes, operators, em) == expected
-    assert native.detached_formula_neighbors([(0, 0, 1, 1)], [], 1) is None
+        for available in (set(range(len(boxes))), set(range(1, len(boxes), 2))):
+            while available:
+                seed = min(available)
+                component, frontier = [seed], [seed]
+                pending = available - {seed}
+                while frontier:
+                    current = frontier.pop()
+                    for index in expected[current]:
+                        if index in pending:
+                            component.append(index)
+                            frontier.append(index)
+                            pending.remove(index)
+                assert native.detached_formula_component(boxes, operators, em, sorted(available)) == component
+                available.difference_update(component)
+    with pytest.raises(ValueError):
+        native.detached_formula_component([(0, 0, 1, 1)], [], 1, [0])
+    boxes = [(float(index * 10), 0.0, float(index * 10 + 1), 1.0) for index in range(2100)]
+    assert native.detached_formula_component(boxes, [False] * len(boxes), 1.0, list(range(2100))) == [0]
 
 
 @pytest.mark.parametrize("kind", ["note", "no_chart", "ordinary", "upper", "bold"])
@@ -98,13 +116,11 @@ def line(index, text, bbox, font=("body", 1), height=10, angle=0, semantic=None)
 
 def signature(candidates):
     """比较候选与每个参考行的源索引，不能只比较数量或集合。"""
-    return [(item.source_index, [p.source_index for p in refs]) for item, refs in candidates]
+    return [[item.source_index, [p.source_index for p in refs]] for item, refs in candidates]
 
 
-def test_numeric_noise_randomized_differential(monkeypatch):
+def test_numeric_noise_randomized_differential():
     """逐页随机比较字体数量、几何、目录、旋转和语义过滤的全部结果。"""
-    if get_native() is None:
-        pytest.skip("native backend is not selected")
     rng = Random(731)
     texts = [
         "1",
@@ -116,7 +132,7 @@ def test_numeric_noise_randomized_differential(monkeypatch):
         "1. Contents",
         "2、目录项",
     ]
-    for _ in range(300):
+    for trial in range(300):
         lines = []
         for i in range(rng.randrange(1, 65)):
             x, y = rng.randrange(0, 15), rng.randrange(0, 100)
@@ -133,16 +149,12 @@ def test_numeric_noise_randomized_differential(monkeypatch):
             )
         source = SimpleNamespace(lines=lines)
         visual = [(0, 0, 5, 100), (10, 0, 50, 100)]
-        assert signature(_nested_prose_numeric_outliers(source, visual)) == signature(
-            _nested_prose_numeric_outliers_python(source, visual)
-        )
+        assert signature(_nested_prose_numeric_outliers(source, visual)) == _CASES["noise_random"][trial]
 
 
 @pytest.mark.parametrize("kind", ["prose", "directory", "gutter", "same-font-limit"])
 def test_numeric_noise_reference_order_and_boundaries(kind):
     """实际候选覆盖正文、目录和图缝，保留稳定排序及同字体数量上限。"""
-    if get_native() is None:
-        pytest.skip("native backend is not selected")
     if kind == "directory":
         lines = [line(0, "9", (20, 21, 25, 23), ("digit", 2), 5)] + [
             line(i, f"{i}. Contents", (10, y, 100, y + 10), height=20) for i, y in [(1, 40), (2, 0), (3, 80)]
@@ -155,9 +167,9 @@ def test_numeric_noise_reference_order_and_boundaries(kind):
         lines.extend(line(i, "2", (20, 200, 25, 210), ("digit", 2)) for i in range(4, 8))
     visual = [(0, 0, 15, 100), (30, 0, 100, 100)] if kind == "gutter" else []
     source = SimpleNamespace(lines=lines)
-    expected = _nested_prose_numeric_outliers_python(source, visual)
+    expected = _CASES["noise_boundaries"][kind]
     assert bool(expected) == (kind != "same-font-limit")
-    assert signature(_nested_prose_numeric_outliers(source, visual)) == signature(expected)
+    assert signature(_nested_prose_numeric_outliers(source, visual)) == expected
 
 
 def test_numeric_noise_recomputes_mutated_text_and_font():
@@ -174,16 +186,12 @@ def test_numeric_noise_recomputes_mutated_text_and_font():
     assert not _nested_prose_numeric_outliers(source)
 
 
-def test_raster_axis_grouping_randomized_differential(monkeypatch):
+def test_raster_axis_grouping_randomized_differential():
     """等差刻度与随机干扰混排，逐项比较两轴分组、稳定顺序和字号中位数。"""
-    from docvortex import _compute_backend
     from docvortex.analyzers.native.pdf.graphics import _raster_axis_tick_groups
 
-    native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     rng = Random(911)
-    for _ in range(150):
+    for trial in range(150):
         lines = [line(i, str(100 - i * 10), (10, i * 20, 20, i * 20 + 10)) for i in range(7)]
         lines.extend(
             line(i, str(rng.randrange(10)), (x, y, x + 10, y + 10), height=rng.choice([5, 10, 20]))
@@ -191,22 +199,17 @@ def test_raster_axis_grouping_randomized_differential(monkeypatch):
             for x, y in [(rng.randrange(0, 50), rng.randrange(0, 150))]
         )
         rng.shuffle(lines)
-        actual = [(v, [p.source_index for p in ticks], em) for v, ticks, em in _raster_axis_tick_groups(lines)]
-        with monkeypatch.context() as context:
-            context.setattr(_compute_backend, "get_native", lambda: None)
-            expected = [(v, [p.source_index for p in ticks], em) for v, ticks, em in _raster_axis_tick_groups(lines)]
-        assert actual == expected
+        actual = [[v, [p.source_index for p in ticks], em] for v, ticks, em in _raster_axis_tick_groups(lines)]
+        assert actual == _CASES["raster_groups"][trial]
 
 
 def test_formula_growth_randomized_differential():
     """包含旋转、表格阻断、重复源索引和反向传播，核验追加成员的完整次序。"""
-    from docvortex.analyzers.native.pdf.formulas import _formula_lines_are_connected, _grow_formula_component_native
+    from docvortex.analyzers.native.pdf.formulas import _grow_formula_component_native
     from docvortex.analyzers.native.pdf.models import _LineItem
 
-    if get_native() is None:
-        pytest.skip("native backend is not selected")
     rng = Random(927)
-    for _ in range(200):
+    for trial in range(200):
         items = []
         for i in range(35):
             x, y = rng.randrange(0, 80), rng.randrange(0, 80)
@@ -215,18 +218,6 @@ def test_formula_growth_randomized_differential():
             items.append((p, bbox))
         tables = [(30, 10, 40, 70)] if rng.choice([True, False]) else []
         seeds, candidates = items[:2], items[2:]
-        expected = list(seeds)
-        sources = {p.source_index for p, _ in seeds}
-        changed = True
-        while changed:
-            changed = False
-            for p, box in candidates:
-                if p.source_index not in sources and any(
-                    _formula_lines_are_connected(a, ab, p, box, tables) for a, ab in expected
-                ):
-                    expected.append((p, box))
-                    sources.add(p.source_index)
-                    changed = True
         actual = _grow_formula_component_native(seeds, candidates, tables)
-        assert actual is not None
-        assert [id(p) for p, _ in actual] == [id(p) for p, _ in expected[2:]]
+        positions = {id(p): index for index, (p, _) in enumerate(items)}
+        assert [positions[id(p)] for p, _ in actual] == _CASES["formula_growth"][trial]

@@ -7,7 +7,6 @@ from functools import lru_cache
 from typing import Any, Iterable, cast
 
 from .....schema import BBox
-from ....._compute_backend import get_native
 from .types import (
     _LIGATURE_REPLACEMENTS,
     _PDF_CONTROL_CHAR_RE,
@@ -61,7 +60,7 @@ def _ordered_line_chars(line: Any) -> list[dict[str, Any]]:
 def _normalize_match_fragment(value: Any) -> str:
     """把单个字符片段规范为忽略排版空白的确定性匹配文本。"""
     text = str(value or "")
-    if get_native() is not None and len(text) <= 8:
+    if len(text) <= 8:
         return _cached_match_fragment(text)
     return _normalize_match_text(text)
 

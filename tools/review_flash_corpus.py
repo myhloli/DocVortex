@@ -66,9 +66,7 @@ def _environment() -> dict:
         "docvortex_source": str(Path(docvortex.__file__).resolve()),
         "runner_sha256": _sha256(Path(__file__).resolve()),
         "backend": backend_info(),
-        "runtime_overrides": {
-            key: os.environ[key] for key in ("DOCVORTEX_PDF_RENDER_THREADS", "DOCVORTEX_COMPUTE_BACKEND") if key in os.environ
-        },
+        "runtime_overrides": {key: os.environ[key] for key in ("DOCVORTEX_PDF_RENDER_THREADS",) if key in os.environ},
     }
 
 
@@ -493,7 +491,9 @@ def _worker_command(manifest: Path, output: Path, name: str, code: str) -> list[
 def _failed_process(folder: Path, document: dict, code: str, message: str, returncode: int | None = None) -> dict:
     """即使 worker 原生崩溃或超时，也由父进程保存可继续的阶段失败记录。"""
     state = (
-        json.loads((folder / "status.json").read_text(encoding='utf-8')) if (folder / "status.json").is_file() else _new_status(document, code)
+        json.loads((folder / "status.json").read_text(encoding="utf-8"))
+        if (folder / "status.json").is_file()
+        else _new_status(document, code)
     )
     stage = next((name for name in STAGES if state["stages"][name] == "running"), None)
     if stage is None:
@@ -512,7 +512,7 @@ def _run_one(manifest: Path, output: Path, document: dict, code: str, resume: bo
     folder = output / "documents" / document["name"]
     try:
         if folder.exists() and resume and _resumable(folder, document, code):
-            state = json.loads((folder / "status.json").read_text(encoding='utf-8'))
+            state = json.loads((folder / "status.json").read_text(encoding="utf-8"))
             return {**state, "resumed": True}
         if folder.exists() and not resume and any(folder.iterdir()):
             raise FileExistsError("文档输出已存在；使用 --resume 或选择新运行目录")
@@ -545,7 +545,7 @@ def _run_one(manifest: Path, output: Path, document: dict, code: str, resume: bo
                         os.killpg(process.pid, signal.SIGKILL)
                     process.wait()
                 return _failed_process(folder, document, code, f"worker 超过 {timeout:g} 秒超时")
-        state = json.loads((folder / "status.json").read_text(encoding='utf-8'))
+        state = json.loads((folder / "status.json").read_text(encoding="utf-8"))
         if returncode != 0 and state["status"] != "failed":
             return _failed_process(folder, document, code, f"worker 异常退出：{returncode}", returncode)
         if returncode == 0 and state["status"] != "succeeded":

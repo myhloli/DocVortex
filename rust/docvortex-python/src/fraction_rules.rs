@@ -14,11 +14,11 @@ fn float_box(value: &Bound<'_, PyAny>) -> Option<[f64; 4]> {
     let mut out = [0.0_f64; 4];
     for (i, coordinate) in out.iter_mut().enumerate() {
         let obj = value.get_item(i).ok()?;
-        if !obj.is_exact_instance_of::<PyFloat>() {
+        if !obj.is_exact_instance_of::<PyFloat>() && !obj.is_exact_instance_of::<PyInt>() {
             return None;
         }
         *coordinate = obj.extract().ok()?;
-        if !coordinate.is_finite() || coordinate.abs() > 2f64.powi(50) {
+        if !coordinate.is_finite() {
             return None;
         }
     }
@@ -73,7 +73,7 @@ pub(super) fn fraction_members_owned<'py>(
         let Ok(number) = obj.extract::<f64>() else {
             return Ok(None);
         };
-        if !number.is_finite() || number.abs() > 2f64.powi(24) {
+        if !number.is_finite() {
             return Ok(None);
         }
         *value = number;
@@ -113,17 +113,14 @@ pub(super) fn fraction_members_owned<'py>(
         let text = char
             .get_item(pyo3::intern!(char.py(), "char"))?
             .unwrap_or_else(|| PyString::new(py, "").into_any());
-        let Ok(text) = text.cast_into_exact::<PyString>() else {
-            return Ok(None);
-        };
-        let Ok(key) = text.extract::<String>() else {
-            return Ok(None);
-        };
+        let text = text.str()?;
+        // 字符对象由 packed 持有强引用，按身份缓存不要求 Unicode 可编码为 UTF-8。
+        let key = text.as_ptr() as usize;
         let Some(index) = char.get_item(pyo3::intern!(char.py(), "char_idx"))? else {
             continue;
         };
-        if !index.is_exact_instance_of::<PyInt>() {
-            return Ok(None);
+        if !index.is_instance_of::<PyInt>() {
+            continue;
         }
         let Some(b) = tight.cast::<PyDict>()?.get_item(&index)? else {
             continue;
@@ -160,7 +157,12 @@ pub(super) fn fraction_members_owned<'py>(
         }
     }
     if !records.is_empty() && heights.is_empty() {
-        return Ok(None);
+        // 保留原统计规则对全零高度样本抛出的异常类型与文本。
+        return Err(PyErr::from_value(
+            py.import("statistics")?
+                .getattr("StatisticsError")?
+                .call1(("no median for empty data",))?,
+        ));
     }
     let scale = if records.is_empty() {
         8.0

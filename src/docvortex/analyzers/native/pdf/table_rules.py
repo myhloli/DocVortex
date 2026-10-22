@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bisect import bisect_left, bisect_right
+from bisect import bisect_right
 from dataclasses import dataclass, field
 import statistics
 import math
@@ -13,27 +13,23 @@ from typing import Any
 from ....document.pdf._document import PDFPathInfo
 from ....schema import BBox
 from .geometry import (
-    _bbox_area,
     _bbox_axis_overlap_ratio,
     _bbox_center_x,
     _bbox_center_y,
     _bbox_overlap_in_first,
     _bbox_overlap_in_smaller,
-    _bbox_union,
     _bbox_union_many,
     _point_in_bbox,
     _rotate_bbox_from_upright,
     _rotate_bbox_to_upright,
     _transform_axis_lines,
 )
-from . import geometry as _fragment_geometry
 from .models import (
     _Fragment,
     _LineItem,
     _LocalAxisLine,
     _PageSource,
     _PreparedPage,
-    _SharedLineIndexSet,
     _TableCandidate,
     _TableContinuationGrid,
     _VisualRow,
@@ -48,7 +44,6 @@ from .table_annotations import (
     _collect_caption_rows,
     _collect_footnote_rows,
     _find_table_caption,
-    _merge_table_candidate_annotations,
     _prepare_table_note_body_metrics,
     _prepare_table_note_rows,
     _prepare_table_core_rows,
@@ -81,10 +76,8 @@ class _RuleBandIndex:
 
     rows: tuple[_VisualRow, ...]
     positions: dict[int, int]
-    bands: tuple[int, ...]
-    on_rule: tuple[bool, ...]
     rule_count: int
-    native: Any = None
+    native: Any
     shared_core_rows: Any = None
 
     def interval(self, rows: list[_VisualRow]) -> tuple[int, int] | None:
@@ -239,140 +232,18 @@ def _build_fragments(
     return fragments
 
 
-_FRAGMENT_GROUP_REFERENCE_FUNCTIONS = (_bbox_center_y, statistics.fmean)
-_RULE_MEAN_REFERENCE = statistics.mean
-
-
 def _mean_rule_positions(values):
-    """以精确整数比率批量求均值；非普通浮点、特殊值及替换的统计函数保留原路径。"""
+    """由原生均值入口保留宿主精确整数比率和特殊数值的结果类型。"""
     from ...._compute_backend import get_native
 
-    native = get_native()
-    if native is not None and statistics.mean is _RULE_MEAN_REFERENCE:
-        result = native.exact_float_mean(values)
-        if result is not None:
-            return result
-    return statistics.mean(values)
-
-
-_FRAGMENT_ROW_REFERENCES = (
-    _fragment_geometry._bbox_union,
-    _bbox_union,
-    _bbox_union_many,
-    _Fragment.__getattribute__,
-    _VisualRow,
-    sum,
-)
+    return get_native().exact_float_mean(values)
 
 
 def _cluster_fragment_rows(fragments, median_height):
-    """仅对普通片段使用批量分组，特殊对象和数值完整保留参考路径。"""
+    """原生读取片段、稳定分组并物化行，保留当前解释器fmean/sum及原框对象。"""
     from ...._compute_backend import get_native
 
-    native = get_native()
-    if native is None or (
-        _bbox_center_y is not _FRAGMENT_GROUP_REFERENCE_FUNCTIONS[0]
-        or statistics.fmean is not _FRAGMENT_GROUP_REFERENCE_FUNCTIONS[1]
-        or type(median_height) not in (int, float)
-        or not math.isfinite(median_height)
-    ):
-        return _cluster_fragment_rows_python(fragments, median_height)
-    if (
-        _fragment_geometry._bbox_union,
-        _bbox_union,
-        _bbox_union_many,
-        _Fragment.__getattribute__,
-        _VisualRow,
-        sum,
-    ) == _FRAGMENT_ROW_REFERENCES:
-        rows = native.fragment_rows_owned(fragments, median_height, _Fragment, _VisualRow, statistics.fmean, sum)
-        if rows is not None:
-            return rows
-    items = []
-    for fragment in fragments:
-        box = fragment.local_bbox
-        if (
-            type(fragment) is not _Fragment
-            or type(box) not in (tuple, list)
-            or len(box) != 4
-            or any(type(value) not in (int, float) or not math.isfinite(value) or abs(value) > 2**50 for value in box)
-            or (
-                fragment.visual_row_id is not None
-                and (type(fragment.visual_row_id) is not int or not -(2**63) <= fragment.visual_row_id < 2**63)
-            )
-        ):
-            return _cluster_fragment_rows_python(fragments, median_height)
-        items.append((_bbox_center_y(box), box[0], fragment.visual_row_id))
-    indices = native.fragment_row_groups(items, max(2.0, median_height * 0.5), statistics.fmean)
-    if indices is None:
-        return _cluster_fragment_rows_python(fragments, median_height)
-    return _materialize_fragment_rows([[fragments[i] for i in group] for group in indices])
-
-
-def _cluster_fragment_rows_python(
-    fragments: list[_Fragment],
-    median_height: float,
-) -> list[_VisualRow]:
-    """优先复用原生视觉行身份，其余片段按中心线容差聚成表格行。"""
-
-    tolerance = max(2.0, median_height * 0.5)
-    native_groups: dict[int, list[_Fragment]] = {}
-    geometric_fragments: list[_Fragment] = []
-    for fragment in fragments:
-        if fragment.visual_row_id is None:
-            geometric_fragments.append(fragment)
-        else:
-            native_groups.setdefault(fragment.visual_row_id, []).append(fragment)
-
-    # 先锁定同一原生粗行拆出的 run，再允许不同粗行按基线几何合并；
-    # 旋转表格常把同一数据行的各 cell 分成多个 pdftext 粗行，不能只依赖 row id。
-    seed_groups = [*native_groups.values(), *[[fragment] for fragment in geometric_fragments]]
-    prepared_seed_groups = [
-        (
-            seed_group,
-            statistics.fmean(_bbox_center_y(item.local_bbox) for item in seed_group),
-            min(item.local_bbox[0] for item in seed_group),
-        )
-        for seed_group in seed_groups
-    ]
-    prepared_seed_groups.sort(key=lambda item: (item[1], item[2]))
-    grouped: list[list[_Fragment]] = []
-    group_centers: list[float] = []
-    for seed_group, center_y, _left in prepared_seed_groups:
-        target_index: int | None = None
-        for group_index, group_center in enumerate(group_centers):
-            if abs(center_y - group_center) <= tolerance:
-                target_index = group_index
-                break
-        if target_index is None:
-            grouped.append(list(seed_group))
-            group_centers.append(center_y)
-        else:
-            target_group = grouped[target_index]
-            target_group.extend(seed_group)
-            # 仅在组成员变化时使用原有 fmean 重新计算，后续比较直接复用精确结果。
-            group_centers[target_index] = statistics.fmean(_bbox_center_y(item.local_bbox) for item in target_group)
-
-    return _materialize_fragment_rows(grouped)
-
-
-def _materialize_fragment_rows(grouped):
-    """在输出边界沿用原框合并、Python sum 与稳定排序，不能近似最终中心。"""
-    rows: list[_VisualRow] = []
-    for group in grouped:
-        group.sort(key=lambda item: item.local_bbox[0])
-        bbox = _bbox_union_many([item.local_bbox for item in group])
-        visual_row_ids = {item.visual_row_id for item in group if item.visual_row_id is not None}
-        rows.append(
-            _VisualRow(
-                fragments=group,
-                center_y=sum(_bbox_center_y(item.local_bbox) for item in group) / len(group),
-                bbox=bbox,
-                visual_row_id=next(iter(visual_row_ids)) if len(visual_row_ids) == 1 else None,
-            )
-        )
-    rows.sort(key=lambda row: row.center_y)
-    return rows
+    return get_native().fragment_rows_owned(fragments, median_height, _Fragment, _VisualRow, statistics.fmean, sum)
 
 
 def _build_rule_table_candidates(
@@ -495,20 +366,7 @@ def _build_rule_table_candidates(
                 continue
 
             # 框只属于本次只读构建；每个区间仍独立执行完整行带规则。
-            fill_band_count = (
-                native_fill_bands.count(rule_bbox, median_height)
-                if native_fill_bands is not None and _fill_band_rules_unchanged()
-                else None
-            )
-            if fill_band_count is None:
-                fill_band_count = _count_repeated_fill_bands(
-                    path_infos,
-                    rule_bbox,
-                    page_size,
-                    angle,
-                    median_height,
-                    prepared_path_infos,
-                )
+            fill_band_count = native_fill_bands.count(rule_bbox, median_height)
             aligned_vertical_count = _count_aligned_vertical_rules(
                 axis_lines,
                 rule_bbox,
@@ -720,72 +578,35 @@ def _expand_candidates_to_connected_rule_grids(
     if not grid_bboxes:
         return candidates
 
-    tolerance = max(2.0, median_height)
-    if grid_member_cache is None:
-        grid_member_cache = {}
+    from ...._compute_backend import get_native
+    from ._native_table_merge import _annotations
+
+    native = get_native()
+    grid = native.NativeTableGrid(
+        grid_bboxes,
+        [(row.center_y, [(fragment.line_index, fragment.local_bbox) for fragment in row.fragments]) for row in rows],
+        page_size,
+        angle,
+        median_height,
+    )
     for candidate in candidates:
         if candidate.core_bbox is None:
             continue
-        core_local_bbox = _rotate_bbox_to_upright(
-            candidate.core_bbox,
-            page_size,
-            angle,
-        )
-        matches = [
-            grid_bbox
-            for grid_bbox in grid_bboxes
-            if _bbox_axis_overlap_ratio(
-                core_local_bbox,
-                grid_bbox,
-                axis="x",
-            )
-            >= 0.9
-            and core_local_bbox[3] >= grid_bbox[1] - tolerance
-            and core_local_bbox[1] <= grid_bbox[3] + tolerance
-        ]
-        if not matches:
-            continue
-        grid_bbox = max(
-            matches,
-            key=lambda bbox: (
-                min(core_local_bbox[3], bbox[3]) - max(core_local_bbox[1], bbox[1]),
-                _bbox_area(bbox),
-            ),
-        )
-        expanded_core_bbox = _bbox_union(core_local_bbox, grid_bbox)
-        candidate.local_bbox = _bbox_union(candidate.local_bbox, grid_bbox)
-        candidate.core_bbox = _rotate_bbox_from_upright(
-            expanded_core_bbox,
-            page_size,
-            angle,
-        )
-        candidate.bbox = _rotate_bbox_from_upright(
+        merger = native.NativeTableMerger()
+        merger.add(
+            candidate.bbox,
             candidate.local_bbox,
-            page_size,
-            angle,
+            candidate.angle,
+            0.0,
+            candidate.core_bbox,
+            list(candidate.line_indices),
+            _annotations(candidate.annotations),
+            grid=grid,
         )
-        grid_members = grid_member_cache.get(expanded_core_bbox)
-        if grid_members is None:
-            grid_members = frozenset(
-                fragment.line_index
-                for row in rows
-                if expanded_core_bbox[1] <= row.center_y <= expanded_core_bbox[3]
-                for fragment in row.fragments
-                if _point_in_bbox(
-                    (
-                        _bbox_center_x(fragment.local_bbox),
-                        _bbox_center_y(fragment.local_bbox),
-                    ),
-                    expanded_core_bbox,
-                )
-            )
-            grid_member_cache[expanded_core_bbox] = grid_members
-        candidate.line_indices = _SharedLineIndexSet(
-            grid_members,
-            candidate.line_indices,
-        )
-        for annotation in candidate.annotations:
-            candidate.line_indices.difference_update(annotation.line_indices)
+        bbox, local, _, _, core, members, _ = merger.finish()[0]
+        candidate.bbox, candidate.local_bbox = tuple(bbox), tuple(local)
+        candidate.core_bbox = tuple(core) if core is not None else None
+        candidate.line_indices = set(members)
     return candidates
 
 
@@ -1324,29 +1145,16 @@ def _partition_rows_by_rule_intervals(
     rows: list[_VisualRow],
     rule_group: list[_LocalAxisLine],
 ) -> list[list[_VisualRow]]:
-    """一次把候选行分配到相邻横线闭区间，保持共享边界行同时属于两侧区间。"""
+    """由原生层按闭区间分配全部输入行，重复边界和特殊数值沿用宿主 bisect 语义。"""
+    from ...._compute_backend import get_native
 
-    if len(rule_group) < 2:
-        return []
     centers = [_bbox_center_y(rule.bbox) for rule in rule_group]
-    groups: list[list[_VisualRow]] = [[] for _ in range(len(rule_group) - 1)]
-    for row in rows:
-        center_y = row.center_y
-        position = bisect_left(centers, center_y)
-        if position < len(centers) and centers[position] == center_y:
-            if position > 0:
-                groups[position - 1].append(row)
-            if position < len(groups):
-                groups[position].append(row)
-            continue
-        interval_index = position - 1
-        if 0 <= interval_index < len(groups):
-            groups[interval_index].append(row)
-    return groups
+    groups = get_native().PreparedRuleCandidates.partition_generic(centers, [row.center_y for row in rows])
+    return [[rows[index] for index in group] for group in groups]
 
 
 def _prepare_rule_band_index(rows: list[_VisualRow], rules: list[_LocalAxisLine]) -> _RuleBandIndex | None:
-    """为一条精确走廊计算完整横线组的首区间，异常和重复横线回退。"""
+    """为精确走廊建立共享原生索引；不适合索引的输入由原生通用入口处理。"""
 
     if len({id(row) for row in rows}) != len(rows) or any(
         type(row.center_y) is not float or not math.isfinite(row.center_y) for row in rows
@@ -1366,26 +1174,16 @@ def _prepare_rule_band_index(rows: list[_VisualRow], rules: list[_LocalAxisLine]
             return None
         centers.append(center)
     native = _prepare_native_rule_candidates(rows, centers, rules)
-    bands = [bisect_left(centers, row.center_y) for row in rows] if native is None else []
-    return _RuleBandIndex(
-        tuple(rows),
-        {id(row): index for index, row in enumerate(rows)},
-        tuple(bands),
-        tuple(position < len(centers) and centers[position] == row.center_y for position, row in zip(bands, rows))
-        if native is None
-        else (),
-        len(centers),
-        native,
-    )
+    if native is None:
+        return None
+    return _RuleBandIndex(tuple(rows), {id(row): index for index, row in enumerate(rows)}, len(centers), native)
 
 
 def _prepare_native_rule_candidates(rows, centers, rules):
-    """仅为普通有限数据准备共享原生走廊，特殊对象在计算开始前留给参考路径。"""
+    """为普通有限数据准备共享原生走廊，其他数值继续使用原生通用计算。"""
     from ...._compute_backend import get_native
 
     native = get_native()
-    if native is None or not hasattr(native, "PreparedRuleCandidates"):
-        return None
     if any(type(rule) is not _LocalAxisLine for rule in rules):
         return None
     packed = []
@@ -1413,7 +1211,7 @@ def _prepare_native_rule_candidates(rows, centers, rules):
 
 def _prepared_rule_candidate_query(index, rows, prepared_core=None):
     """共享走廊身份只验证一次，后续复用已由 core.interval 验证的保序切片。"""
-    if index is None or index.native is None:
+    if index is None:
         return None
     if prepared_core is not None:
         core, start, end = prepared_core
@@ -1472,25 +1270,13 @@ def _partition_rows_by_prepared_bands(
     if interval is None:
         return None
     start, end = interval
-    if index.native is not None:
-        evidence_safe = type(median_height) is float and math.isfinite(median_height)
-        packed_groups, accepted, packed_segments, short = index.native.partition_with_segments(
-            start, end, first_index, len(rules), median_height if evidence_safe else 0.0
-        )
-        groups = [[index.rows[position] for position in group] for group in packed_groups]
-        segments = [[index.rows[position] for position in group] for group in packed_segments]
-        return _RuleIntervalGroups(groups, rows, rules, median_height, accepted, segments, short) if evidence_safe else groups
-    groups: list[list[_VisualRow]] = [[] for _ in range(max(0, len(rules) - 1))]
-    for row, band, on_rule in zip(rows, index.bands[start:end], index.on_rule[start:end], strict=True):
-        local = band - first_index
-        if on_rule:
-            if 0 <= local - 1 < len(groups):
-                groups[local - 1].append(row)
-            if 0 <= local < len(groups):
-                groups[local].append(row)
-        elif 0 <= local - 1 < len(groups):
-            groups[local - 1].append(row)
-    return groups
+    evidence_safe = type(median_height) is float and math.isfinite(median_height)
+    packed_groups, accepted, packed_segments, short = index.native.partition_with_segments(
+        start, end, first_index, len(rules), median_height if evidence_safe else 0.0
+    )
+    groups = [[index.rows[position] for position in group] for group in packed_groups]
+    segments = [[index.rows[position] for position in group] for group in packed_segments]
+    return _RuleIntervalGroups(groups, rows, rules, median_height, accepted, segments, short) if evidence_safe else groups
 
 
 def _partition_rows_by_rule_intervals_cached(
@@ -1519,7 +1305,10 @@ def _partition_rows_by_rule_intervals_cached(
         reusable = all(first < second for first, second in zip(centers, centers[1:]))
     if reusable:
         low, high = centers[-2:]
-        groups = [*previous.groups, [row for row in rows if low <= row.center_y <= high]]
+        from ...._compute_backend import get_native
+
+        selected = get_native().PreparedRuleCandidates.partition_generic([low, high], [row.center_y for row in rows])[0]
+        groups = [*previous.groups, [rows[index] for index in selected]]
     else:
         groups = _partition_rows_by_rule_intervals(rows, rule_group)
     return groups, _RuleIntervalPrefix(tuple(rows), tuple(rule_group), groups)
@@ -1652,15 +1441,15 @@ def _continuous_table_row_segments(
     rows: list[_VisualRow],
     median_height: float,
 ) -> list[list[_VisualRow]]:
-    """按物理行距切分边界区间，保留单元格换行参与连续性判断。"""
+    """由原生层稳定按行中心排序分段，保留单元格换行及原行身份。"""
+    from ...._compute_backend import get_native
 
-    segments: list[list[_VisualRow]] = []
-    for row in sorted(rows, key=lambda item: item.center_y):
-        if not segments or max(0.0, row.bbox[1] - segments[-1][-1].bbox[3]) > 3.0 * median_height:
-            segments.append([row])
-        else:
-            segments[-1].append(row)
-    return segments
+    segments = get_native().PreparedRuleCandidates.segments_generic(
+        [row.center_y for row in rows],
+        [row.bbox for row in rows],
+        median_height,
+    )
+    return [[rows[index] for index in segment] for segment in segments]
 
 
 _CONTINUOUS_SEGMENTS_REFERENCE = _continuous_table_row_segments
@@ -1682,42 +1471,54 @@ def _table_segment_reaches_boundaries(
 
 
 class _RuleRowBounds:
-    """保存走廊行框索引，只接受身份与顺序完全连续的查询。"""
+    """保存走廊行框索引，非连续查询仍交给同一原生几何接口。"""
 
     def __init__(self, rows):
-        """一次构建有限行框极值树，特殊值和小页面不建立索引。"""
+        """任意页面规模可建立有限行框索引，其他数值在查询时走精确原生比较。"""
         from ...._compute_backend import get_native
 
         self.rows = rows
-        self.positions = {id(row): i for i, row in enumerate(rows)}
+        self.positions = {id(row): index for index, row in enumerate(rows)}
         self.native = None
-        native = get_native()
-        if (
-            native is not None
-            and len(rows) >= 32
-            and len(self.positions) == len(rows)
-            and all(
-                type(row.bbox) in (tuple, list)
-                and len(row.bbox) == 4
-                and all(type(v) is float and math.isfinite(v) for v in row.bbox)
-                for row in rows
-            )
+        if len(self.positions) == len(rows) and all(
+            type(row.bbox) in (tuple, list)
+            and len(row.bbox) == 4
+            and all(type(value) is float and math.isfinite(value) for value in row.bbox)
+            for row in rows
         ):
-            self.native = native.TableRowGeometry([row.bbox for row in rows])
+            self.native = get_native().TableRowGeometry([row.bbox for row in rows])
 
     def bbox(self, rows):
-        """保持重复和非连续行的原遍历；极值来源仍引用原坐标对象。"""
-        if self.native is None or not rows:
+        """连续查询复用极值树；重排、重复行与精确整数由原生通用聚合保持原顺序。"""
+        from ...._compute_backend import get_native
+
+        if not rows:
             return None
         start = self.positions.get(id(rows[0]))
         if (
-            start is None
-            or start + len(rows) > len(self.rows)
-            or any(row is not self.rows[start + offset] for offset, row in enumerate(rows))
+            self.native is not None
+            and start is not None
+            and start + len(rows) <= len(self.rows)
+            and all(row is self.rows[start + offset] for offset, row in enumerate(rows))
         ):
-            return None
-        indices = self.native.union_indices(start, start + len(rows))
-        return tuple(self.rows[index].bbox[axis] for axis, index in enumerate(indices))
+            indices = self.native.union_indices(start, start + len(rows))
+            sources = self.rows
+        else:
+            indices = get_native().TableRowGeometry.union_generic([row.bbox for row in rows])
+            sources = rows
+        return tuple(sources[index].bbox[axis] for axis, index in enumerate(indices))
+
+
+def _native_union_boxes(boxes):
+    """统一由原生层返回并集坐标来源，单框直接保留原对象。"""
+    from ...._compute_backend import get_native
+
+    if not boxes:
+        raise ValueError("bbox sequence must not be empty")
+    if len(boxes) == 1:
+        return boxes[0]
+    indices = get_native().TableRowGeometry.union_generic(boxes)
+    return tuple(boxes[index][axis] for axis, index in enumerate(indices))
 
 
 def _table_rows_align_with_rule_span(
@@ -1730,9 +1531,7 @@ def _table_rows_align_with_rule_span(
 
     if not rows:
         return False
-    rows_bbox = prepared_bounds.bbox(rows) if prepared_bounds is not None else None
-    if rows_bbox is None:
-        rows_bbox = _bbox_union_many([row.bbox for row in rows])
+    rows_bbox = (prepared_bounds if prepared_bounds is not None else _RuleRowBounds(rows)).bbox(rows)
     rule_width = max(0.1, rule_bbox[2] - rule_bbox[0])
     rows_width = max(0.1, rows_bbox[2] - rows_bbox[0])
     overlap = max(
@@ -1902,86 +1701,17 @@ def _count_repeated_fill_bands(
 ) -> int:
     """统计区间内左右端点和高度重复的填充行带，并对重叠 Path 去重。"""
 
-    minimum_width = max(8.0 * median_height, 0.3 * (rule_bbox[2] - rule_bbox[0]))
-    candidates: list[BBox] = []
     prepared = prepared_path_infos
     if prepared is None:
         prepared = _prepare_fill_band_infos(path_infos, page_size, angle)
-    for _path_info, bbox in prepared:
-        width = bbox[2] - bbox[0]
-        height = bbox[3] - bbox[1]
-        if (
-            width < minimum_width
-            or not 0.25 * median_height <= height <= 3.0 * median_height
-            or _bbox_center_y(bbox) < rule_bbox[1]
-            or _bbox_center_y(bbox) > rule_bbox[3]
-            or _bbox_axis_overlap_ratio(bbox, rule_bbox, axis="x") < 0.8
-        ):
-            continue
-        if any(_bbox_overlap_in_smaller(bbox, item) >= 0.9 for item in candidates):
-            continue
-        candidates.append(bbox)
-
-    endpoint_tolerance = max(3.0, median_height)
-    groups: list[list[BBox]] = []
-    for bbox in candidates:
-        target = next(
-            (
-                group
-                for group in groups
-                if abs(bbox[0] - group[0][0]) <= endpoint_tolerance
-                and abs(bbox[2] - group[0][2]) <= endpoint_tolerance
-                and abs((bbox[3] - bbox[1]) - (group[0][3] - group[0][1])) <= endpoint_tolerance
-            ),
-            None,
-        )
-        if target is None:
-            groups.append([bbox])
-        else:
-            target.append(bbox)
-    return max((len(group) for group in groups), default=0)
-
-
-_FILL_BAND_REFERENCES = (
-    _count_repeated_fill_bands,
-    _prepare_fill_band_infos,
-    _bbox_center_y,
-    _bbox_axis_overlap_ratio,
-    _bbox_overlap_in_smaller,
-    max,
-    min,
-    abs,
-)
-
-
-def _fill_band_rules_unchanged():
-    """仅在原规则及数值函数均未替换时复用构建内快照，替换规则仍逐区间调用。"""
-    return (
-        _count_repeated_fill_bands,
-        _prepare_fill_band_infos,
-        _bbox_center_y,
-        _bbox_axis_overlap_ratio,
-        _bbox_overlap_in_smaller,
-        max,
-        min,
-        abs,
-    ) == _FILL_BAND_REFERENCES
+    return _prepare_native_fill_bands(prepared).count(rule_bbox, median_height)
 
 
 def _prepare_native_fill_bands(prepared):
-    """只为检测器当前只读页面构建准备自有框；重新构建或特殊输入不复用旧状态。"""
+    """为当前只读页面准备完整原生框快照，整数及特殊浮点仍由 Rust 计数。"""
     from ...._compute_backend import get_native
 
-    native = get_native()
-    if (
-        native is None
-        or not hasattr(native, "prepare_fill_bands")
-        or not _fill_band_rules_unchanged()
-        or type(prepared) is not list
-        or any(type(item) is not tuple or len(item) != 2 for item in prepared)
-    ):
-        return None
-    return native.prepare_fill_bands([box for _path, box in prepared])
+    return get_native().prepare_fill_bands([box for _path, box in prepared])
 
 
 def _longest_dense_multi_cell_rows(
@@ -2020,17 +1750,21 @@ def _expand_rule_table_candidate(
 ) -> _TableCandidate:
     """合并横线核心与上下注释，并保留注释的独立行身份。"""
 
-    rule_bbox = _bbox_union_many([line.bbox for line in rule_group])
-    native_core = (
-        _prepared_rule_candidate_core(prepared_candidate, rule_group, owned=True)
-        if owned
-        else _prepared_rule_candidate_core(prepared_candidate, rule_group)
-    )
+    from ...._compute_backend import get_native
+
+    rule_boxes = [line.bbox for line in rule_group]
+    rule_bbox = _native_union_boxes(rule_boxes)
+    native_core = _prepared_rule_candidate_core(prepared_candidate, rule_group, owned=owned)
     if owned and native_core is None:
         raise ValueError("owned candidate requires a prepared core")
-    core_line_indices = (
-        native_core[0] if native_core is not None else {fragment.line_index for row in core_rows for fragment in row.fragments}
-    )
+    if native_core is None:
+        members, indices = get_native().PreparedRuleCandidates.core_generic(
+            rule_boxes,
+            [([fragment.line_index for fragment in row.fragments], row.bbox) for row in core_rows],
+        )
+        boxes = [*rule_boxes, *(row.bbox for row in core_rows)]
+        native_core = members, tuple(boxes[index][axis] for axis, index in enumerate(indices))
+    core_line_indices, core_local_bbox = native_core
     caption_rows = _collect_caption_rows(all_rows, caption_line, rule_bbox, median_height)
     footnote_rows = (
         _collect_footnote_rows(
@@ -2049,15 +1783,6 @@ def _expand_rule_table_candidate(
         if has_possible_table_notes
         else []
     )
-    if native_core is not None:
-        core_local_bbox = native_core[1]
-        indexed_bbox = True
-    else:
-        core_rows_bbox = prepared_core[0].bbox(prepared_core[1], prepared_core[2]) if prepared_core is not None else None
-        indexed_bbox = core_rows_bbox is not None
-        if core_rows_bbox is None:
-            core_rows_bbox = _bbox_union_many([row.bbox for row in core_rows])
-        core_local_bbox = _bbox_union(rule_bbox, core_rows_bbox)
     caption_annotation = _build_table_annotation(
         "caption",
         caption_rows,
@@ -2079,16 +1804,8 @@ def _expand_rule_table_candidate(
         if annotations
         else set()
     )
-    if indexed_bbox and all(
-        type(value) is float and math.isfinite(value) for row in (*caption_rows, *footnote_rows) for value in row.bbox
-    ):
-        # 有限极值并集幂等，外层核心始终先参与比较，保留相等坐标的原对象。
-        local_bbox = core_local_bbox
-        for row in (*caption_rows, *footnote_rows):
-            local_bbox = _bbox_union(local_bbox, row.bbox)
-    else:
-        included_rows = [*caption_rows, *core_rows, *footnote_rows]
-        local_bbox = _bbox_union(core_local_bbox, _bbox_union_many([row.bbox for row in included_rows]))
+    included_bbox = _native_union_boxes([row.bbox for row in (*caption_rows, *core_rows, *footnote_rows)])
+    local_bbox = _native_union_boxes([core_local_bbox, included_bbox])
     if owned:
         return (
             _rotate_bbox_from_upright(local_bbox, page_size, angle),
@@ -2109,71 +1826,12 @@ def _expand_rule_table_candidate(
     )
 
 
-def _new_stable_column_clusters() -> dict[str, list[dict[str, Any]]]:
-    """创建与原稳定列算法一致的三组空聚类状态。"""
+def _count_generic_stable_columns(rows, median_height):
+    """打包特殊坐标交给原生通用聚类，保留 Python 数值对象和当前解释器求和语义。"""
+    from ...._compute_backend import get_native
 
-    return {alignment: [] for alignment in ("left", "center", "right")}
-
-
-def _extend_stable_column_clusters(
-    clusters_by_alignment: dict[str, list[dict[str, Any]]],
-    rows: list[_VisualRow],
-    *,
-    start_row_index: int,
-    tolerance: float,
-) -> None:
-    """按原顺序把新增行续入已有聚类状态，不改变均值和首命中规则。"""
-
-    for alignment in ("left", "center", "right"):
-        clusters = clusters_by_alignment[alignment]
-        for row_index, row in enumerate(rows, start=start_row_index):
-            for fragment in row.fragments:
-                left, _top, right, _bottom = fragment.local_bbox
-                if alignment == "left":
-                    anchor = left
-                elif alignment == "center":
-                    anchor = (left + right) / 2
-                else:
-                    anchor = right
-                cluster: dict[str, Any] | None = None
-                for item in clusters:
-                    if abs(anchor - float(item["mean"])) <= tolerance:
-                        cluster = item
-                        break
-                if cluster is None:
-                    clusters.append({"mean": anchor, "values": [anchor], "rows": {row_index}})
-                else:
-                    cluster["values"].append(anchor)
-                    cluster["rows"].add(row_index)
-                    # 保留原实现的 sum/len 计算方式，避免改变临界浮点聚类归属。
-                    cluster["mean"] = sum(cluster["values"]) / len(cluster["values"])
-
-
-def _stable_column_result(
-    clusters_by_alignment: dict[str, list[dict[str, Any]]],
-    row_count: int,
-) -> tuple[int, float]:
-    """从完整聚类状态计算原有稳定列数量与最低覆盖率。"""
-
-    if row_count <= 0:
-        return 0, 0.0
-
-    best_result = (0, 0.0)
-    for alignment in ("left", "center", "right"):
-        clusters = clusters_by_alignment[alignment]
-        stable_coverages: list[float] = []
-        for cluster in clusters:
-            coverage = len(cluster["rows"]) / row_count
-            if coverage >= 0.5:
-                stable_coverages.append(coverage)
-        result = (
-            len(stable_coverages),
-            min(stable_coverages) if stable_coverages else 0.0,
-        )
-        # 仅在结果严格更优时更新，平局时保留既有的左对齐优先级。
-        if result > best_result:
-            best_result = result
-    return best_result
+    anchors = [[(fragment.local_bbox[0], fragment.local_bbox[2]) for fragment in row.fragments] for row in rows]
+    return get_native().StableColumnClusters.count_generic(anchors, max(3.0, median_height * 0.75))
 
 
 def _count_stable_columns(
@@ -2183,14 +1841,12 @@ def _count_stable_columns(
     *,
     allow_prefix_reuse: bool = False,
 ) -> tuple[int, float]:
-    """复用走廊锚点与严格前缀的原生累计状态，特殊数值保留 Python 求和行为。"""
+    """复用原生走廊与严格前缀状态，特殊数值由原生通用聚类保留解释器算术语义。"""
     from ...._compute_backend import get_native
 
     native = get_native()
-    if native is None or sys.implementation.name != "cpython" or not (3, 11) <= sys.version_info[:2] <= (3, 14):
-        return _count_stable_columns_python(rows, median_height, cache, allow_prefix_reuse=allow_prefix_reuse)
     if type(median_height) is not float or not math.isfinite(median_height):
-        return _count_stable_columns_python(rows, median_height)
+        return _count_generic_stable_columns(rows, median_height)
     # 只有检测器独占且不写入几何的构建阶段启用；普通缓存调用仍保留原有可检查的 Python 状态。
     if (
         cache is not None
@@ -2241,14 +1897,14 @@ def _count_stable_columns(
         else:
             values = existing[1]
         if values is None:
-            return _count_stable_columns_python(rows, median_height)
+            return _count_generic_stable_columns(rows, median_height)
         packed.append(values)
     state = prefix.clusters_by_alignment if reuse else native.StableColumnClusters(sys.version_info >= (3, 12))
     result = state.extend(packed, max(3.0, median_height * 0.75))
     if result is None:
         if cache is not None and prefix_key is not None:
             cache.prefixes.pop(prefix_key, None)
-        return _count_stable_columns_python(rows, median_height)
+        return _count_generic_stable_columns(rows, median_height)
     if cache is not None:
         cache.results[key] = result
         if prefix_key is not None and (prefix is None or reuse):
@@ -2256,102 +1912,11 @@ def _count_stable_columns(
     return result
 
 
-def _count_stable_columns_python(
-    rows: list[_VisualRow],
-    median_height: float,
-    cache: _StableColumnCache | None = None,
-    *,
-    allow_prefix_reuse: bool = False,
-) -> tuple[int, float]:
-    """分别聚类片段左边界、中心和右边界，并对严格前缀输入续算已有状态。"""
-
-    row_ids = tuple(id(row) for row in rows)
-    cache_key = (median_height, row_ids)
-    if cache is not None:
-        cached = cache.results.get(cache_key)
-        if cached is not None:
-            return cached
-
-    tolerance = max(3.0, median_height * 0.75)
-    clusters_by_alignment: dict[str, list[dict[str, Any]]]
-    start_row_index = 0
-    prefix_key: tuple[float, int] | None = None
-    prefix_state: _StableColumnPrefixState | None = None
-    reused_prefix = False
-
-    if cache is not None and allow_prefix_reuse and row_ids:
-        prefix_key = (median_height, row_ids[0])
-        prefix_state = cache.prefixes.get(prefix_key)
-        if (
-            prefix_state is not None
-            and len(prefix_state.row_ids) < len(row_ids)
-            and row_ids[: len(prefix_state.row_ids)] == prefix_state.row_ids
-        ):
-            clusters_by_alignment = prefix_state.clusters_by_alignment
-            start_row_index = len(prefix_state.row_ids)
-            reused_prefix = True
-        else:
-            clusters_by_alignment = _new_stable_column_clusters()
-    else:
-        clusters_by_alignment = _new_stable_column_clusters()
-
-    _extend_stable_column_clusters(
-        clusters_by_alignment,
-        rows[start_row_index:],
-        start_row_index=start_row_index,
-        tolerance=tolerance,
-    )
-    result = _stable_column_result(clusters_by_alignment, len(rows))
-
-    if cache is not None:
-        cache.results[cache_key] = result
-        if allow_prefix_reuse and row_ids and prefix_key is not None:
-            if prefix_state is None or reused_prefix:
-                cache.prefixes[prefix_key] = _StableColumnPrefixState(
-                    row_ids=row_ids,
-                    clusters_by_alignment=clusters_by_alignment,
-                )
-    return result
-
-
 def _merge_table_candidates(candidates: list[_TableCandidate]) -> list[_TableCandidate]:
-    """合并同方向且明显重叠的横线候选，避免同一表格重复输出。"""
+    """把业务候选交给唯一原生合并器，保持稳定分数次序与来源成员。"""
+    from ._native_table_merge import merge_owned
 
-    merged: list[_TableCandidate] = []
-    for candidate in sorted(candidates, key=lambda item: item.score, reverse=True):
-        if isinstance(candidate, _RuleCandidateDraft):
-            candidate = candidate.materialize()
-        target = next(
-            (
-                item
-                for item in merged
-                if item.angle == candidate.angle and _bbox_overlap_in_smaller(candidate.bbox, item.bbox) >= 0.2
-            ),
-            None,
-        )
-        if target is None:
-            merged.append(candidate)
-            continue
-        target.bbox = _bbox_union(target.bbox, candidate.bbox)
-        target.local_bbox = _bbox_union(target.local_bbox, candidate.local_bbox)
-        if target.core_bbox is None:
-            target.core_bbox = candidate.core_bbox
-        elif candidate.core_bbox is not None:
-            target.core_bbox = _bbox_union(target.core_bbox, candidate.core_bbox)
-        if isinstance(candidate.line_indices, _SharedLineIndexSet) and not isinstance(
-            target.line_indices,
-            _SharedLineIndexSet,
-        ):
-            # 首个高分候选可能来自闭合网格路径并持有普通 set；转换为候选的
-            # 精确共享基底表示后，后续同网格候选即可合并差集而不重扫全部成员。
-            target.line_indices = _SharedLineIndexSet.from_exact_values(
-                candidate.line_indices.base,
-                target.line_indices,
-            )
-        target.line_indices.update(candidate.line_indices)
-        _merge_table_candidate_annotations(target, candidate)
-        target.score = max(target.score, candidate.score)
-    return sorted(merged, key=lambda item: (item.bbox[1], item.bbox[0]))
+    return merge_owned(candidates)
 
 
 def _median_fragment_height(fragments: list[_Fragment]) -> float:
@@ -2366,14 +1931,10 @@ def _median_fragment_height(fragments: list[_Fragment]) -> float:
 
 
 def _merge_owned_table_candidates(candidates):
-    """检测器独占候选先走自有原生流，特殊输入保持原有可变对象参考语义。"""
-    from ._native_table_merge import merge_owned
-
-    result = merge_owned(candidates)
-    return _merge_table_candidates(candidates) if result is None else result
+    """检测器与通用候选入口共用唯一原生合并流。"""
+    return _merge_table_candidates(candidates)
 
 
-_NATIVE_DRAFT_MATERIALIZE = _RuleCandidateDraft.materialize
 _SHORT_INTERVAL_CENTER_REFERENCE = _bbox_center_y
 _COLUMN_GEOMETRY_REFERENCES = (
     _VisualRow.__getattribute__,
@@ -2381,26 +1942,3 @@ _COLUMN_GEOMETRY_REFERENCES = (
     _Fragment.__getattribute__,
     _Fragment.local_bbox,
 )
-
-_NATIVE_MERGE_RULES = {
-    function.__name__: function
-    for function in (
-        _merge_table_candidates,
-        _expand_rule_table_candidate,
-        _build_table_annotation,
-        _collect_footnote_rows,
-        _collect_caption_rows,
-        _merge_table_candidate_annotations,
-        _expand_candidates_to_connected_rule_grids,
-        _prepared_rule_candidate_core,
-        _bbox_area,
-        _bbox_axis_overlap_ratio,
-        _bbox_overlap_in_smaller,
-        _bbox_union,
-        _rotate_bbox_from_upright,
-        _rotate_bbox_to_upright,
-        _point_in_bbox,
-        _bbox_center_x,
-        _bbox_center_y,
-    )
-}

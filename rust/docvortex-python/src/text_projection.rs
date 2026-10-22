@@ -15,10 +15,10 @@ pub(super) fn project_content_chars_owned<'py>(
     if !content.is_exact_instance_of::<PyString>() {
         return Ok(None);
     }
-    let Ok(content) = content.extract::<String>() else {
-        return Ok(None);
+    let Ok(content_text) = content.extract::<String>() else {
+        return project_unicode_content(py, content, normalizer, record_type, allocator).map(Some);
     };
-    let tokens = py.detach(|| docvortex_core::text_projection::visible_tokens(&content));
+    let tokens = py.detach(|| docvortex_core::text_projection::visible_tokens(&content_text));
     let mut forms = HashMap::new();
     for &(_, value, _) in &tokens {
         if let std::collections::hash_map::Entry::Vacant(entry) = forms.entry(value) {
@@ -81,4 +81,69 @@ pub(super) fn set_frozen_slot(
     } else {
         Err(PyErr::fetch(py))
     }
+}
+
+/// 孤立代理字符无法转为 UTF-8，按 Python Unicode 下标读取并由 Rust 完成同一投影规则。
+fn project_unicode_content<'py>(
+    py: Python<'py>,
+    content: &Bound<'py, PyAny>,
+    normalizer: &Bound<'py, PyAny>,
+    record_type: &Bound<'py, PyAny>,
+    allocator: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyList>> {
+    let keys: Vec<_> = [
+        "value",
+        "raw_start",
+        "raw_end",
+        "existing_styles",
+        "formula_gap_before",
+        "inside_hyperlink",
+    ]
+    .into_iter()
+    .map(|key| PyString::new(py, key))
+    .collect();
+    let styles = PyFrozenSet::empty(py)?;
+    let output = PyList::empty(py);
+    let mut cursor = 0usize;
+    let mut pending_gap = false;
+    while cursor < content.len()? {
+        if content
+            .call_method1("startswith", ("\\(", cursor))?
+            .extract::<bool>()?
+        {
+            let end = content
+                .call_method1("find", ("\\)", cursor + 2))?
+                .extract::<isize>()?;
+            if end >= 0 {
+                cursor = end as usize + 2;
+                pending_gap = true;
+                continue;
+            }
+        }
+        let fragment = normalizer.call1((content.get_item(cursor)?,))?;
+        let count = fragment.len()?;
+        for position in 0..count {
+            let record = allocator.call1((record_type,))?;
+            let fields: [Bound<'py, PyAny>; 6] = [
+                fragment.get_item(position)?,
+                cursor.into_pyobject(py)?.into_any(),
+                (cursor + 1).into_pyobject(py)?.into_any(),
+                styles.clone().into_any(),
+                (pending_gap && position == 0)
+                    .into_pyobject(py)?
+                    .to_owned()
+                    .into_any(),
+                false.into_pyobject(py)?.to_owned().into_any(),
+            ];
+            for (key, value) in keys.iter().zip(fields) {
+                set_frozen_slot(py, &record, key, &value)?;
+            }
+            output.append(record)?;
+        }
+        if count > 0 {
+            pending_gap = false;
+        }
+        cursor += 1;
+    }
+    Ok(output)
 }

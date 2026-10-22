@@ -76,7 +76,7 @@ def main() -> None:
     parser.add_argument("--documents", nargs="*")
     args = parser.parse_args()
     root = args.source_root.resolve()
-    sys.path[:0] = [str(root / "src"), str(root / "tests/unittest")]
+    sys.path[:0] = [str(root / "src"), str(root / "tests"), str(root / "tests/unittest")]
     from loguru import logger
     from _flash_pdf_test_utils import _page_bbox_fingerprint, _page_fingerprint, _visible_text, formula_detection_evidence
     from test_flash_pdf_char_geometry import _read_pdf_fixture

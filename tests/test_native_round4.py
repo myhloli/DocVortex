@@ -1,6 +1,9 @@
 """第四轮密集候选优化的逐前缀数值与完整表注差分。"""
 
 import math
+import hashlib
+import json
+from pathlib import Path
 import random
 import struct
 import sys
@@ -14,21 +17,35 @@ from docvortex.analyzers.native.pdf import table_rules as rules
 
 @pytest.fixture
 def native():
-    """纯 Python 安装跳过内核专用断言，强制 Rust 的加载错误不得吞掉。"""
+    """加载必需原生内核，缺失或协议错误必须让测试失败。"""
     value = get_native()
-    if value is None:
-        pytest.skip("native backend is not selected")
     return value
 
 
 def visual_rows(values):
-    """创建只含聚类所需数值的行，保留传入坐标类型以验证特殊输入回退。"""
+    """创建只含聚类所需数值的行，保留类型以验证原生特殊数值语义。"""
     return [SimpleNamespace(fragments=[SimpleNamespace(local_bbox=(a, 0.0, b, 1.0)) for a, b in row]) for row in values]
 
 
 def bits(value):
     """保留正负零并逐位比较浮点计算结果。"""
     return struct.pack("d", value)
+
+
+def stable_golden(compensated=None):
+    """读取冻结协议 35 在真实 CPython 3.11/3.14 上生成的静态预期。"""
+    data = json.loads((Path(__file__).parent / "fixtures/native_stable_columns.json").read_text())
+    compensated = sys.version_info >= (3, 12) if compensated is None else compensated
+    return data["compensated" if compensated else "sequential"]
+
+
+def column_snapshot_hash(snapshot):
+    """逐位编码所有聚类均值、累计和及成员数量，冻结完整参数化断言。"""
+    values = [
+        [[struct.pack(">d", mean).hex(), struct.pack(">d", total).hex(), count, rows] for mean, total, count, rows in group]
+        for group in snapshot
+    ]
+    return hashlib.sha256(json.dumps(values, separators=(",", ":")).encode()).hexdigest()
 
 
 @pytest.mark.parametrize("seed", range(24))
@@ -44,21 +61,14 @@ def test_stable_columns_every_prefix(native, seed):
     ]
     rows = visual_rows(values)
     state = native.StableColumnClusters(sys.version_info >= (3, 12))
-    reference = rules._new_stable_column_clusters()
+    reference = stable_golden()["prefixes"][seed]
     cache = rules._StableColumnCache()
     for i, row in enumerate(rows):
         result = state.extend([values[i]], 3.0)
-        rules._extend_stable_column_clusters(reference, [row], start_row_index=i, tolerance=3.0)
-        assert result == rules._stable_column_result(reference, i + 1)
+        assert result == tuple(reference[i][0])
         assert rules._count_stable_columns(rows[: i + 1], 4.0, cache, allow_prefix_reuse=True) == result
         assert isinstance(cache.prefixes[(4.0, id(rows[0]))].clusters_by_alignment, native.StableColumnClusters)
-        for expected, actual in zip(reference.values(), state.snapshot()):
-            assert len(expected) == len(actual)
-            for cluster, (mean, total, count, row_count) in zip(expected, actual):
-                assert bits(mean) == bits(cluster["mean"])
-                assert bits(total) == bits(sum(cluster["values"]))
-                assert count == len(cluster["values"])
-                assert row_count == len(cluster["rows"])
+        assert column_snapshot_hash(state.snapshot()) == reference[i][1], (seed, i)
 
 
 @pytest.mark.parametrize(
@@ -74,14 +84,12 @@ def test_stable_sum_cancellation(native, values):
         assert bits(mean) == bits(value if end == 1 else sum(values[:end]) / end)
 
 
-@pytest.mark.parametrize("value", [0, math.inf, math.nan, 1e308])
-def test_stable_columns_special_values(native, value):
-    """特殊输入或中心溢出必须整体回退，不能留下部分更新的可复用状态。"""
+@pytest.mark.parametrize("index,value", list(enumerate([0, math.inf, math.nan, 1e308])))
+def test_stable_columns_special_values(native, index, value):
+    """特殊输入及中心溢出保持冻结结果，不能留下部分更新的可复用状态。"""
     rows = visual_rows([[(value, value)], [(value, value)]])
     cache = rules._StableColumnCache()
-    assert rules._count_stable_columns(rows, 4.0, cache, allow_prefix_reuse=True) == rules._count_stable_columns_python(
-        rows, 4.0
-    )
+    assert rules._count_stable_columns(rows, 4.0, cache, allow_prefix_reuse=True) == tuple(stable_golden()["special"][index])
 
 
 def test_stable_columns_nonprefix_identity(native):
@@ -89,9 +97,9 @@ def test_stable_columns_nonprefix_identity(native):
     rows = visual_rows([[(0.0, 4.0)], [(3.0, 8.0)], [(8.0, 12.0)]])
     coordinates = [r.fragments[0].local_bbox for r in rows]
     cache = rules._StableColumnCache()
-    for batch in [rows[:1], rows, rows[:2], rows[::-1], [rows[0], rows[0], rows[2]], rows]:
-        assert rules._count_stable_columns(batch, 4.0, cache, allow_prefix_reuse=True) == rules._count_stable_columns_python(
-            batch, 4.0
+    for index, batch in enumerate([rows[:1], rows, rows[:2], rows[::-1], [rows[0], rows[0], rows[2]], rows]):
+        assert rules._count_stable_columns(batch, 4.0, cache, allow_prefix_reuse=True) == tuple(
+            stable_golden()["nonprefix"][index]
         )
     assert all(r.fragments[0].local_bbox is b for r, b in zip(rows, coordinates))
 

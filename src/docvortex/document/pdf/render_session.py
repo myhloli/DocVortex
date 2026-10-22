@@ -202,7 +202,7 @@ def _render_session_worker(connection):
                                             pass
                                     result.append(page_to_pixel_file(page, output_path, dpi))
                                     continue
-                                if crops is not None and native is not None:
+                                if crops is not None:
                                     bitmap = page_to_owned_bitmap(page, dpi)
                                 else:
                                     bitmap = None

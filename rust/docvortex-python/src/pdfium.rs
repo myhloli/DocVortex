@@ -93,21 +93,27 @@ impl PdfiumObjectBatches {
 }
 
 /// 同步消费对象遍历；返回地址只能由持有页面的适配器立即使用。
-#[pyfunction]
+#[pyfunction(signature = (addresses, handle, kind, max_depth, root=None))]
 pub fn read_pdfium_objects(
     addresses: Vec<usize>,
     handle: usize,
     kind: i32,
     max_depth: usize,
+    root: Option<(bool, [f64; 6], usize, Option<[f64; 4]>)>,
 ) -> PyResult<PdfiumObjectBatches> {
     // ABI、运行库和页面由适配器保持存活，全程保留 GIL 与既有运行时锁。
-    let records =
-        unsafe { docvortex_pdfium::objects::read_objects(addresses, handle, kind, max_depth) }
-            .map_err(|error| match error {
-                ReadError::InvalidInput(message) => PyValueError::new_err(message),
-                ReadError::Pdfium(message) => PdfiumReadError::new_err(message),
-                ReadError::Allocation(message) => PyMemoryError::new_err(message),
-            })?;
+    let records = unsafe {
+        if let Some(root) = root {
+            docvortex_pdfium::objects::read_objects_from(addresses, handle, kind, max_depth, root)
+        } else {
+            docvortex_pdfium::objects::read_objects(addresses, handle, kind, max_depth)
+        }
+    }
+    .map_err(|error| match error {
+        ReadError::InvalidInput(message) => PyValueError::new_err(message),
+        ReadError::Pdfium(message) => PdfiumReadError::new_err(message),
+        ReadError::Allocation(message) => PyMemoryError::new_err(message),
+    })?;
     Ok(PdfiumObjectBatches {
         records: records.into_iter(),
     })
@@ -523,4 +529,81 @@ fn read_pdfium_data(
             ReadError::Allocation(message) => PyMemoryError::new_err(message),
         },
     )
+}
+
+/// 用共享 Rust 代理对规则更新自有字符字典，未修改的字符仍复用原对象。
+#[pyfunction]
+pub fn restore_surrogate_chars<'py>(
+    py: Python<'py>,
+    chars: &Bound<'py, pyo3::types::PyList>,
+    codes: std::collections::HashMap<usize, u32>,
+    raw_count: usize,
+) -> PyResult<Bound<'py, pyo3::types::PyList>> {
+    use docvortex_core::text_snapshot::{surrogate_replacement, SnapshotError};
+    use pyo3::exceptions::PyKeyError;
+    use pyo3::types::{PyDict, PyList};
+    use std::collections::HashSet;
+    let output = PyList::empty(py);
+    let mut consumed = HashSet::new();
+    let ord = py.import("builtins")?.getattr("ord")?;
+    for item in chars.iter() {
+        let item = item.cast::<PyDict>()?;
+        let text = item
+            .get_item("char")?
+            .unwrap_or_else(|| py.None().into_bound(py));
+        let index = item
+            .get_item("char_idx")?
+            .and_then(|v| v.extract::<usize>().ok());
+        if index.is_some_and(|i| consumed.contains(&i)) {
+            continue;
+        }
+        let code = if text.len().unwrap_or(0) == 1 {
+            ord.call1((&text,))?.extract::<u32>()?
+        } else {
+            0
+        };
+        let suspect = code == 0xfffd || (0xd800..=0xdfff).contains(&code);
+        let pair = if suspect {
+            if let Some(index) = index.filter(|i| *i < raw_count) {
+                let raw = *codes
+                    .get(&index)
+                    .ok_or_else(|| PyKeyError::new_err(index))?;
+                surrogate_replacement(index, raw, raw_count, &codes).map_err(
+                    |error| match error {
+                        SnapshotError::MissingSource(i) => PyKeyError::new_err(i),
+                        SnapshotError::Invalid(message) => PyValueError::new_err(message),
+                    },
+                )?
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if let Some((text, source)) = pair {
+            let index = index.expect("surrogate index checked");
+            if source > index {
+                consumed.insert(source);
+            }
+            let copy = item.copy()?;
+            copy.set_item("char", text)?;
+            let mut sources = if let Some(value) = item.get_item("source_indices")? {
+                value.extract::<Vec<usize>>()?
+            } else {
+                vec![index]
+            };
+            sources.push(source);
+            sources.sort_unstable();
+            sources.dedup();
+            copy.set_item("source_indices", pyo3::types::PyTuple::new(py, sources)?)?;
+            output.append(copy)?;
+        } else if (0xd800..=0xdfff).contains(&code) {
+            let copy = item.copy()?;
+            copy.set_item("char", "\u{fffd}")?;
+            output.append(copy)?;
+        } else {
+            output.append(item)?;
+        }
+    }
+    Ok(output)
 }

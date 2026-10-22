@@ -157,22 +157,7 @@ def exclude_fully_overpainted_text(page, page_bbox, rotation, visibility, page_r
                 if rectangle:
                     covers.append((order, rectangle))
         native = get_native()
-        covered = (
-            set(native.overpainted_addresses(texts, covers))
-            if paint is not None and native is not None
-            else {
-                address
-                for order, address, bounds in texts
-                if any(
-                    later > order
-                    and box[0] <= bounds[0]
-                    and box[1] <= bounds[1]
-                    and box[2] >= bounds[2]
-                    and box[3] >= bounds[3]
-                    for later, box in covers
-                )
-            }
-        )
+        covered = set(native.overpainted_addresses(texts, covers))
         if covered and _safe_paint_resources(page_reader()):
             return {address: (False if address in covered else value[0], value[1]) for address, value in visibility.items()}
     except Exception:

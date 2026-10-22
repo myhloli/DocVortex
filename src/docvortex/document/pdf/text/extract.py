@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import math
-from ctypes import byref, c_double, c_int, c_uint, c_void_p, cast, create_string_buffer
+from ctypes import byref, c_uint
 from typing import Any
 
 import pypdfium2 as pdfium
@@ -42,18 +42,6 @@ def visual_bbox(
     ]
     result = (min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points))
     return result if all(math.isfinite(v) for v in result) and result[2] > result[0] and result[3] > result[1] else None
-
-
-def _font_name(handle: Any, index: int, buffer: Any, flags: c_int) -> tuple[str, int]:
-    """复用字体缓冲区，超长名称按 PDFium 返回长度重新读取。"""
-    try:
-        length = raw.FPDFText_GetFontInfo(handle, index, buffer, len(buffer), byref(flags))
-        if length > len(buffer):
-            buffer = create_string_buffer(length)
-            raw.FPDFText_GetFontInfo(handle, index, buffer, length, byref(flags))
-        return (buffer.value.decode("utf-8", errors="replace"), flags.value) if length > 0 else ("", 0)
-    except pdfium.PdfiumError:
-        return "", 0
 
 
 def _assign_writing_angles(chars: list[Char]) -> None:
@@ -112,7 +100,7 @@ def _mark_visible_objects(chars: list[Char], handle: Any) -> None:
 
 
 def _native_visibility_supported(visibility):
-    """只重排普通不可执行的可见性数据，特殊映射及数值保留参考路径的访问时序。"""
+    """确认可见性适合紧凑快照，其他映射仍由原生字符读取后的对象适配处理。"""
     if visibility is None:
         return True
     if type(visibility) is not dict:
@@ -142,25 +130,9 @@ def get_chars(
     include_geometry: bool = False,
     visibility_by_object: dict[int, tuple[bool, tuple[float, float, float, float] | None]] | None = None,
 ) -> list[Char]:
-    """普通页面使用同库字符批量读取，特殊运行时保留完整 ctypes 参考路径。"""
-    if (
-        type(page_rotation) is int
-        and page_rotation in (0, 90, 180, 270)
-        and type(page_bbox) is list
-        and len(page_bbox) == 4
-        and all(type(value) is float and math.isfinite(value) for value in page_bbox)
-        and get_native() is not None
-        and _native_visibility_supported(visibility_by_object)
-    ):
-        result = _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visibility_by_object)
-        if result is not None:
-            return result
-    return _get_chars_python(
-        textpage,
-        page_bbox,
-        page_rotation,
-        include_geometry=include_geometry,
-        visibility_by_object=visibility_by_object,
+    """通过唯一原生字符读取器提取记录，Python 只负责字体与结果对象物化。"""
+    return _get_chars_native(
+        textpage, [float(value) for value in page_bbox], int(page_rotation), include_geometry, visibility_by_object
     )
 
 
@@ -169,8 +141,6 @@ def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visi
     from ._pdfium_bridge import read_native_chars
 
     batch = read_native_chars(textpage, include_geometry, frame=page_bbox, rotation=page_rotation)
-    if batch is None:
-        return None
     records, raw_fonts = batch
     # 空快照不再构造字体映射或调用空几何批次，仍保持普通列表返回契约。
     if type(records) in (tuple, list) and not records and type(raw_fonts) in (tuple, list) and not raw_fonts:
@@ -258,136 +228,6 @@ def _materialize_native_char_batch(chars, raw_geometry, pending_clips, page_bbox
         if clip is None or _clip_visible_character(char, clip):
             retained.append(char)
     return retained
-
-
-def _get_chars_python(
-    textpage: pdfium.PdfTextPage,
-    page_bbox: list[float],
-    page_rotation: int,
-    *,
-    include_geometry: bool = False,
-    visibility_by_object: dict[int, tuple[bool, tuple[float, float, float, float] | None]] | None = None,
-) -> list[Char]:
-    """读取原始字符记录；原始码值始终保留，随后统一解码和去重。"""
-    handle = textpage.raw
-    left, bottom, right, top = page_bbox
-    width, height = math.ceil(abs(right - left)), math.ceil(abs(top - bottom))
-    rect = raw.FS_RECTF()
-    tight_left, tight_right, tight_bottom, tight_top = c_double(), c_double(), c_double(), c_double()
-    origin_x, origin_y = c_double(), c_double()
-    font_buffer, font_flags = create_string_buffer(256), c_int()
-    fonts: dict[tuple[Any, ...], dict[str, Any]] = {}
-    objects: dict[int, tuple[int, int]] = {}
-    chars: list[Char] = []
-    native = get_native() if page_rotation in (0, 90, 180, 270) else None
-    raw_geometry = []
-    pending_clips = []
-    for index in range(textpage.count_chars()):
-        code = int(raw.FPDFText_GetUnicode(handle, index))
-        rotation = float(raw.FPDFText_GetCharAngle(handle, index))
-        loose: tuple[float, float, float, float] | None = None
-        tight: tuple[float, float, float, float] | None = None
-        if rotation == 0 or include_geometry:
-            try:
-                if raw.FPDFText_GetLooseCharBox(handle, index, rect):
-                    loose = (float(rect.left), float(rect.bottom), float(rect.right), float(rect.top))
-            except Exception:
-                if rotation == 0:
-                    raise
-        if rotation != 0 or include_geometry:
-            try:
-                if raw.FPDFText_GetCharBox(handle, index, tight_left, tight_right, tight_bottom, tight_top):
-                    tight = (tight_left.value, tight_bottom.value, tight_right.value, tight_top.value)
-            except Exception:
-                if rotation != 0:
-                    raise
-        selected = loose if rotation == 0 else tight
-        if selected is None:
-            raise pdfium.PdfiumError("Failed to get charbox.")
-        box = None
-        if native is None:
-            x0, y0, x1, y1 = selected
-            # 布局框保留基线的整数页面高度，原始扩展几何另用浮点页面框。
-            ys = (height - (y0 - bottom), height - (y1 - bottom))
-            box = Bbox([min(x0, x1) - left, min(ys), max(x0, x1) - left, max(ys)])
-            if page_rotation:
-                box = box.rotate(width, height, page_rotation)
-        name, flags = _font_name(handle, index, font_buffer, font_flags)
-        size, weight = raw.FPDFText_GetFontSize(handle, index), raw.FPDFText_GetFontWeight(handle, index)
-        key = (name, flags, size, weight)
-        font = fonts.get(key)
-        if font is None:
-            font = fonts[key] = {"name": name, "flags": flags, "size": size, "weight": weight}
-        char: Char = {
-            "bbox": box,
-            "char": chr(code) if not 0xD800 <= code <= 0xDFFF else "\ufffd",
-            "rotation": rotation,
-            "font": font,
-            "char_idx": index,
-            "source_indices": (index,),
-            "raw_code": code,
-            "text_object_id": None,
-            "text_render_mode": None,
-            "writing_angle": math.radians(page_rotation) - rotation,
-            "origin": None,
-        }
-        generated = raw.FPDFText_IsGenerated(handle, index)
-        if generated in (0, 1):
-            char["is_generated"] = generated == 1
-        # 只在当前提取期间持有地址键，输出使用页内整数编号，不保存原生句柄。
-        address = None
-        try:
-            obj = raw.FPDFText_GetTextObject(handle, index)
-            address = cast(obj, c_void_p).value
-            if address:
-                if address not in objects:
-                    objects[address] = (len(objects), int(raw.FPDFTextObj_GetTextRenderMode(obj)))
-                char["text_object_id"], char["text_render_mode"] = objects[address]
-        except Exception:
-            pass
-        # 两种提取入口都需要原点来区分一字形多码值与独立重复绘制。
-        raw_origin = None
-        try:
-            if raw.FPDFText_GetCharOrigin(handle, index, origin_x, origin_y):
-                raw_origin = (origin_x.value, origin_y.value)
-                if native is None:
-                    origin = transform_point(raw_origin, tuple(page_bbox), page_rotation)
-                    if all(math.isfinite(v) for v in origin):
-                        char["origin"] = origin
-        except Exception:
-            pass
-        if include_geometry and native is None:
-            char["loose_bbox"] = visual_bbox(loose, tuple(page_bbox), page_rotation) if loose else None
-            char["tight_bbox"] = visual_bbox(tight, tuple(page_bbox), page_rotation) if tight else None
-        clip = None
-        if visibility_by_object is not None and address in visibility_by_object:
-            visible, clip = visibility_by_object[address]
-            if not visible:
-                continue
-            if native is None and clip is not None and not _clip_visible_character(char, clip):
-                continue
-        if native is not None:
-            # 只暂存数值；仍在原 textpage 和锁作用域内完成物化及裁剪。
-            raw_geometry.append(
-                (selected, loose if include_geometry else None, tight if include_geometry else None, raw_origin)
-            )
-            pending_clips.append(clip)
-        chars.append(char)
-    if native is not None:
-        prepared = native.materialize_geometry(raw_geometry, page_bbox, (width, height), page_rotation)
-        del raw_geometry
-        retained = []
-        for char, (layout, loose, tight, origin), clip in zip(chars, prepared, pending_clips, strict=True):
-            char["bbox"] = Bbox(layout)
-            char["origin"] = origin
-            if include_geometry:
-                char["loose_bbox"], char["tight_bbox"] = loose, tight
-            if clip is None or _clip_visible_character(char, clip):
-                retained.append(char)
-        chars = retained
-    _assign_writing_angles(chars)
-    _mark_visible_objects(chars, handle)
-    return chars
 
 
 def _clip_visible_character(char: Char, clip: tuple[float, float, float, float]) -> bool:

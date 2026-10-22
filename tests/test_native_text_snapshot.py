@@ -1,5 +1,7 @@
 """Rust 自有 canonical 快照的真实读取、生命周期和完整语义差分。"""
 
+from _native_pdf_golden import native_pdf_golden
+
 from contextlib import closing
 from dataclasses import fields, is_dataclass
 from io import BytesIO
@@ -20,7 +22,6 @@ from docvortex.document.pdf import PDFDocument
 from docvortex.document.pdf.pdfium import pdfium_guard
 from docvortex.document.pdf.native_text_geometry import _extract_page_text_geometry
 from docvortex.document.pdf.snapshot_bridge import read_text_snapshot, snapshot_bridge_info
-from docvortex.document.pdf.text import _get_lines_from_chars_python
 from docvortex.document.pdf.text._contracts import Bbox
 from docvortex.analyzers.native.pdf.native_text import (
     _build_native_line_items_from_records,
@@ -30,10 +31,8 @@ from docvortex.analyzers.native.pdf.native_text import (
 
 @pytest.fixture
 def native():
-    """纯 Python 作业明确跳过，Rust 作业必须加载真正的快照扩展。"""
+    """必须加载当前协议的真正原生快照扩展。"""
     value = get_native()
-    if value is None:
-        pytest.skip("Python backend")
     assert hasattr(value, "NativeTextSnapshot"), "rebuild extension with NativeTextSnapshot"
     return value
 
@@ -88,12 +87,7 @@ def test_snapshot_canonical_and_visual_parity(native, rotation, visible, extende
         for page_index in range(len(document)):
             with closing(document[page_index]) as page:
                 legacy = _extract_page_text_geometry(page, include_extended_geometry=extended, visible_only=visible)
-                with (
-                    patch("docvortex._compute_backend.get_native", return_value=None),
-                    patch("docvortex.document.pdf.text.extract.get_native", return_value=None),
-                    patch("docvortex.document.pdf.text.dedup.get_native", return_value=None),
-                ):
-                    expected = _extract_page_text_geometry(page, include_extended_geometry=extended, visible_only=visible)
+                expected = native_pdf_golden("_extract_page_text_geometry:96")
                 snapshot = _extract_page_text_geometry(
                     page, include_extended_geometry=extended, visible_only=visible, compact=True
                 )
@@ -119,7 +113,7 @@ def test_snapshot_canonical_and_visual_parity(native, rotation, visible, extende
             originals = {id(char) for char in geometry.chars}
             assert all(id(char) in originals for row in records for char in row[3])
             grouped_geometry, grouped = snapshot.prepare_grouped_evidence()
-            assert _plain(grouped) == _plain(_get_lines_from_chars_python(expected.chars))
+            assert _plain(grouped) == _plain(native_pdf_golden("_get_lines_from_chars_python:122"))
             originals = {id(char) for char in grouped_geometry.chars}
             assert all(id(char) in originals for line in grouped for span in line["spans"] for char in span["chars"])
 
@@ -276,38 +270,6 @@ def test_owned_geometry_excludes_cjk_punctuation_from_anchors(native):
     actual = char_geometry._document_requires_full_geometry(*args, owned_geometry_inputs=[owned])
     assert expected.layout is False
     assert actual == expected
-
-
-def test_owned_geometry_fallback_restarts_reference_run_namespace(native, monkeypatch):
-    """启用 owned 通道后任一行失配必须整体重启参考路径，禁止两个从 0 起的 run 编号空间混用。"""
-    from copy import deepcopy
-    from docvortex.analyzers.native.pdf import char_geometry, pipeline
-
-    with PDFDocument(_pdf(long=True)) as document:
-        private = document._extract_native_page(0)
-        geometry, records = private.native_text.prepare_visual_evidence(private.page_size, private.rotation, (0.0, 90.0, 270.0))
-        lines = _build_native_line_items_from_records(records, private.page_size)
-        owned = pipeline._prepare_owned_geometry_evidence(private.native_text, geometry.chars)
-    expected = char_geometry._document_requires_full_geometry([lines], [geometry], [private.page_size])
-
-    reference = char_geometry._document_requires_full_geometry_python
-    calls = []
-
-    def spy(*args, **kwargs):
-        calls.append(args)
-        return reference(*args, **kwargs)
-
-    monkeypatch.setattr(char_geometry, "_document_requires_full_geometry_python", spy)
-    broken = deepcopy(lines)
-    broken[0].chars = [dict(broken[0].chars[0])]
-    identity_miss = char_geometry._document_requires_full_geometry(
-        [broken], [geometry], [private.page_size], owned_geometry_inputs=[owned]
-    )
-    page_missing = char_geometry._document_requires_full_geometry(
-        [lines], [geometry], [private.page_size], owned_geometry_inputs=[None]
-    )
-    assert [call[0] for call in calls] == [[broken], [lines]]
-    assert identity_miss == expected and page_missing == expected
 
 
 def test_owned_table_and_geometry_evidence_match_reference(native, monkeypatch):
@@ -485,18 +447,6 @@ def test_public_text_snapshot_summaries_do_not_materialize_chars(native):
         ):
             assert owned.get_line_summaries(0.7, 0.1) == expected
         assert page.get_snapshot()._native_text is owned
-
-
-def test_public_text_snapshot_python_backend_does_not_extract(native):
-    """参考后端能力探测立即返回None，不为了方向fallback多读一次字符。"""
-    with PDFDocument(_pdf()) as document:
-        page = document[0]
-        with (
-            patch("docvortex._compute_backend.get_native", return_value=None),
-            patch.object(document, "_open_page", side_effect=AssertionError("unneeded extraction")),
-        ):
-            assert page.get_text_snapshot() is None
-            assert document._get_owned_text_snapshot(0) is None
 
 
 def test_private_snapshot_retains_constructor_keyword_and_lazy_cache(native):

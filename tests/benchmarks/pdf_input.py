@@ -62,8 +62,8 @@ def worker(args):
     import_seconds = time.perf_counter() - started
     if Path(docvortex.__file__).resolve() != (args.source / "src/docvortex/__init__.py").resolve():
         raise AssertionError("imported package differs from requested source")
-    if backend_info()["backend"] != args.backend:
-        raise AssertionError("actual compute backend differs from requested backend")
+    if backend_info()["backend"] != "rust":
+        raise AssertionError("native compute backend was not loaded")
     render_mode = resolve_render_mode(args, image_service, PDFDocument)
     shutdown_sessions = None
     if args.render_backend == "session":
@@ -179,7 +179,6 @@ def main():
     parser.add_argument("--path", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--source", type=Path, required=True)
-    parser.add_argument("--backend", choices=("python", "rust"), required=True)
     parser.add_argument("--render-backend", choices=("legacy", "session"), default="legacy")
     parser.add_argument(
         "--render-session-scope",
@@ -202,7 +201,6 @@ def main():
     environment = dict(
         os.environ,
         PYTHONPATH=str((args.source / "src").resolve()),
-        DOCVORTEX_COMPUTE_BACKEND=args.backend,
         DOCVORTEX_PDF_RENDER_BACKEND=args.render_backend,
         LOGURU_LEVEL="WARNING",
     )

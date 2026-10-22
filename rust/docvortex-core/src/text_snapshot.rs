@@ -220,6 +220,40 @@ pub fn advance_writing_angles(
     requested
 }
 
+/// 查询一个 UTF-16 码元的配对结果，紧凑快照和 Python 对象物化共用同一恢复规则。
+pub fn surrogate_replacement(
+    index: usize,
+    code: u32,
+    raw_count: usize,
+    codes: &HashMap<usize, u32>,
+) -> Result<Option<(String, usize)>, SnapshotError> {
+    let pair = if (0xd800..=0xdbff).contains(&code) && index + 1 < raw_count {
+        let low = *codes
+            .get(&(index + 1))
+            .ok_or(SnapshotError::MissingSource(index + 1))?;
+        (0xdc00..=0xdfff)
+            .contains(&low)
+            .then_some((code, low, index + 1))
+    } else if (0xdc00..=0xdfff).contains(&code) && index > 0 {
+        let high = *codes
+            .get(&(index - 1))
+            .ok_or(SnapshotError::MissingSource(index - 1))?;
+        (0xd800..=0xdbff)
+            .contains(&high)
+            .then_some((high, code, index - 1))
+    } else {
+        None
+    };
+    Ok(pair.map(|(high, low, source)| {
+        (
+            char::from_u32(0x10000 + ((high - 0xd800) << 10) + (low - 0xdc00))
+                .unwrap()
+                .to_string(),
+            source,
+        )
+    }))
+}
+
 /// 恢复 PDFium UTF-16 代理对，保持原过滤顺序、代表字符和排序后的来源索引。
 pub fn restore_surrogates(
     chars: Vec<Character>,
@@ -233,27 +267,13 @@ pub fn restore_surrogates(
             continue;
         }
         if ch.text == "\u{fffd}" && ch.index < raw_count {
-            let mut pair = None;
-            if (0xd800..=0xdbff).contains(&ch.code) && ch.index + 1 < raw_count {
-                let low = *codes
-                    .get(&(ch.index + 1))
-                    .ok_or(SnapshotError::MissingSource(ch.index + 1))?;
-                if (0xdc00..=0xdfff).contains(&low) {
-                    consumed.insert(ch.index + 1);
-                    pair = Some((ch.code, low, ch.index + 1));
+            if let Some((text, source)) =
+                surrogate_replacement(ch.index, ch.code, raw_count, &codes)?
+            {
+                if source > ch.index {
+                    consumed.insert(source);
                 }
-            } else if (0xdc00..=0xdfff).contains(&ch.code) && ch.index > 0 {
-                let high = *codes
-                    .get(&(ch.index - 1))
-                    .ok_or(SnapshotError::MissingSource(ch.index - 1))?;
-                if (0xd800..=0xdbff).contains(&high) {
-                    pair = Some((high, ch.code, ch.index - 1));
-                }
-            }
-            if let Some((high, low, source)) = pair {
-                ch.text = char::from_u32(0x10000 + ((high - 0xd800) << 10) + (low - 0xdc00))
-                    .unwrap()
-                    .to_string();
+                ch.text = text;
                 ch.sources.push(source);
                 ch.sources.sort_unstable();
                 ch.sources.dedup();

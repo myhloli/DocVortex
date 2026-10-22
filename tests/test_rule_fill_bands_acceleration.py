@@ -1,5 +1,8 @@
 """填充行带快照必须保留全部筛选边界、重叠去重与首个分组规则。"""
+
+import json
 import math
+from pathlib import Path
 from random import Random
 
 import pytest
@@ -7,13 +10,13 @@ import pytest
 from docvortex._compute_backend import get_native
 from docvortex.analyzers.native.pdf import table_rules
 
+_COUNTS = json.loads((Path(__file__).parent / "fixtures/native_fill_band_counts.json").read_text())
+
 
 @pytest.fixture
 def native():
-    """纯 Python 测试跳过原生内核，Rust 测试验证真实注册接口。"""
+    """加载必需原生内核，缺失扩展时明确失败。"""
     kernel = get_native()
-    if kernel is None:
-        pytest.skip("native backend is not selected")
     return kernel
 
 
@@ -30,11 +33,14 @@ def test_fill_bands_all_queries_match_python(native, seed):
     owner = native.prepare_fill_bands(boxes)
     assert owner is not None
     prepared = [(None, box) for box in boxes]
+    index = 0
     for em in (0.0, -1.0, 0.5, 1.0, 5.0, 10.0):
         for bottom in (0.0, 10.0, 50.0, 100.0):
             rule = (0.0, -20.0, 100.0, bottom)
-            expected = table_rules._count_repeated_fill_bands([], rule, (100.0, 100.0), 0, em, prepared)
+            expected = _COUNTS["random"][seed][index]
             assert owner.count(rule, em) == expected
+            assert table_rules._count_repeated_fill_bands([], rule, (100.0, 100.0), 0, em, prepared) == expected
+            index += 1
 
 
 @pytest.mark.parametrize("delta", [0.0, math.ulp(0.8), -math.ulp(0.8)])
@@ -44,20 +50,24 @@ def test_fill_bands_boundary_deduplication_and_first_group(native, delta):
     boxes += [(20.0 + delta * 100, y, 120.0 + delta * 100, y + 1.0) for y in (2.0, 4.0)]
     boxes += [(3.0, 6.0, 103.0, 7.0), (6.0, 8.0, 106.0, 9.0)]
     rule = (0.0, 0.0, 100.0, 10.0)
-    expected = table_rules._count_repeated_fill_bands([], rule, (100.0, 100.0), 0, 1.0, [(None, box) for box in boxes])
+    index = (0.0, math.ulp(0.8), -math.ulp(0.8)).index(delta)
+    expected = _COUNTS["boundaries"][index]
     assert native.prepare_fill_bands(boxes).count(rule, 1.0) == expected
 
 
-def test_fill_bands_unknown_values_and_rebuilt_geometry(native, monkeypatch):
-    """未知坐标完整回退，新的页面输入状态创建新快照而不沿用先前计数。"""
+def test_fill_bands_special_values_and_rebuilt_geometry(native):
+    """特殊数值保持原计数，新页面输入状态创建新快照而不沿用先前结果。"""
     rule = (0.0, 0.0, 100.0, 10.0)
     first = [(None, (0.0, 0.0, 100.0, 1.0))]
     assert table_rules._prepare_native_fill_bands(first).count(rule, 1.0) == 1
     first.append((None, (0.0, 2.0, 100.0, 3.0)))
     assert table_rules._prepare_native_fill_bands(first).count(rule, 1.0) == 2
-    assert native.prepare_fill_bands([(0.0, 0.0, 100.0, math.nan)]) is None
-    assert native.prepare_fill_bands([[0.0, 0.0, 100.0, 1.0]]) is None
-    assert native.prepare_fill_bands([]).count(rule, math.inf) is None
-    assert native.prepare_fill_bands([]).count((0, 0.0, 100.0, 10.0), 1.0) is None
-    monkeypatch.setattr(table_rules, "_count_repeated_fill_bands", lambda *args: 123)
-    assert table_rules._prepare_native_fill_bands(first) is None
+    assert native.prepare_fill_bands([(0.0, 0.0, 100.0, math.nan)]).count(rule, 1.0) == 0
+    assert native.prepare_fill_bands([[0.0, 0.0, 100.0, 1.0]]).count(rule, 1.0) == 1
+    assert native.prepare_fill_bands([]).count(rule, math.inf) == 0
+    assert native.prepare_fill_bands([]).count((0, 0.0, 100.0, 10.0), 1.0) == 0
+    offset = 2**100
+    large = [(offset, 0, offset + 100, 1), (offset, 2, offset + 100, 3)]
+    assert native.prepare_fill_bands(large).count((offset, 0, offset + 100, 10), 1) == 2
+    with pytest.raises(ValueError, match="four"):
+        native.prepare_fill_bands([(0, 1, 2)])

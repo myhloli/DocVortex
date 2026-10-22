@@ -307,3 +307,28 @@ def test_invalid_and_extreme_geometry_is_conservatively_preserved() -> None:
     cases[2]["bbox"] = Bbox([-1e12, -1e12, 1e12, 1e12])
     for other in cases:
         assert _text(deduplicate_chars(_indexed([_char("A"), other]))) == "AA"
+
+
+def test_native_dedup_accepts_integer_geometry_and_angles() -> None:
+    """普通整数坐标和方向可进入唯一原生去重核，结果继续保留完整来源索引。"""
+    chars = _indexed([_char("A", 10, 20, obj=0), _char("A", 10, 20, obj=1)])
+    result = deduplicate_chars(chars)
+    assert _text(result) == "A"
+    assert result[0]["source_indices"] == (0, 1)
+
+
+def test_native_dedup_handles_coordinates_beyond_i64_bucket_range() -> None:
+    """超大有限字框不能因桶号截断丢失精确重复证据，也不能迫使整页回退。"""
+    chars = _indexed([_char("A", 1e20, 20.0, width=1e6, obj=0), _char("A", 1e20, 20.0, width=1e6, obj=1)])
+    result = deduplicate_chars(chars)
+    assert _text(result) == "A"
+    assert result[0]["source_indices"] == (0, 1)
+
+
+@pytest.mark.parametrize("coordinate", [float("nan"), float("inf"), -float("inf")])
+def test_native_dedup_keeps_characters_without_finite_geometry(coordinate) -> None:
+    """非有限字框缺少可证删除依据，原生去重保守保留所有原文。"""
+    chars = _indexed([_char("A", obj=0), _char("A", obj=1)])
+    for char in chars:
+        char["bbox"] = Bbox([coordinate, 0.0, 10.0, 12.0])
+    assert _text(deduplicate_chars(chars)) == "AA"

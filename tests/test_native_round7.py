@@ -6,6 +6,7 @@ import random
 
 import pytest
 
+
 from docvortex.analyzers.native.pdf.models import _LineItem, _TextLane
 from docvortex.analyzers.native.pdf.title_analysis import body_profile, page_titles
 from docvortex.analyzers.native.pdf import char_geometry
@@ -121,10 +122,8 @@ def test_title_decisions_match_uncached_stage(seed, operation, monkeypatch):
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 @pytest.mark.parametrize("seed", range(16))
-def test_plain_source_geometry_matches_reference(angle, seed, monkeypatch):
+def test_plain_source_geometry_matches_reference(angle, seed, monkeypatch, native_golden):
     """比较原逐字符源框路径，覆盖旋转、裁剪、无效框和字符筛选。"""
-    if get_native() is None:
-        pytest.skip("native backend is not selected")
     rng = random.Random(seed)
     chars, tight, origins, loose = [], {}, {}, {}
     for index in range(40):
@@ -141,10 +140,7 @@ def test_plain_source_geometry_matches_reference(angle, seed, monkeypatch):
     original = deepcopy((line, geometry))
     for anchors in (False, True):
         actual = list(char_geometry._prepared_line_geometry(line, geometry, (100.0, 100.0), anchors_only=anchors))
-        with monkeypatch.context() as patch:
-            patch.setattr("docvortex._compute_backend.get_native", lambda: None)
-            expected = list(char_geometry._prepared_line_geometry(line, geometry, (100.0, 100.0), anchors_only=anchors))
-        assert actual == expected
+        native_golden(actual)
     assert (line, geometry) == original
 
 
@@ -152,8 +148,6 @@ def test_plain_source_geometry_matches_reference(angle, seed, monkeypatch):
 def test_plain_source_rejects_unsupported_coordinates(value):
     """异常或非浮点坐标返回显式不支持，不能吞掉参考路径的异常。"""
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     assert (
         native.source_rows_plain([(0, (0.0, value, 2.0, 3.0), None, (0.0, 1.0, 2.0, 3.0), (0.0, 3.0), 0.0)], (10.0, 10.0), 0)
         is None
@@ -163,8 +157,6 @@ def test_plain_source_rejects_unsupported_coordinates(value):
 def test_plain_source_keeps_zero_bits_and_coordinate_identity():
     """极值与未旋转结果保持原浮点来源及正负零位。"""
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     import struct
 
     box = (-0.0, 0.0, 2.0, 3.0)
@@ -200,7 +192,7 @@ def test_font_cache_is_bounded_and_clears_before_special_conversion():
 
 
 @pytest.mark.parametrize("seed", range(24))
-def test_stream_mapping_matches_exhaustive_sources(seed):
+def test_stream_mapping_matches_exhaustive_sources(seed, native_golden):
     """普通映射流对照原完整分组，包含连字、重复来源和异常汉字映射。"""
     rng = random.Random(seed)
     font = {"name": "A", "size": 10.0, "flags": 0, "weight": 400.0}
@@ -221,7 +213,7 @@ def test_stream_mapping_matches_exhaustive_sources(seed):
             }
         )
     before = deepcopy([{**char, "bbox": tuple(char["bbox"].bbox)} for char in chars])
-    assert dedup._mapping_groups(chars) == dedup._mapping_groups_reference(chars)
+    native_golden(dedup._mapping_groups(chars))
     assert [{**char, "bbox": tuple(char["bbox"].bbox)} for char in chars] == before
     for glyph in dedup._mapping_groups(chars):
         if len(glyph.chars) == 1 and glyph.chars[0] == chars[glyph.chars[0]["char_idx"]]:
@@ -233,8 +225,6 @@ def test_mapping_special_object_preserves_error_order():
     chars = [{"char": "A", "char_idx": 0, "bbox": None, "font": {}, "rotation": None}]
     with pytest.raises(TypeError):
         dedup._mapping_groups(chars)
-    with pytest.raises(TypeError):
-        dedup._mapping_groups_reference(chars)
 
 
 @pytest.mark.parametrize("seed", range(12))
@@ -283,11 +273,9 @@ def test_projection_cache_tracks_content_and_bounds():
     assert len(cache.values) == count and id(long) not in cache.values
 
 
-def test_native_mapping_geometry_keeps_boundaries_and_float_sources():
+def test_native_mapping_geometry_keeps_boundaries_and_float_sources(native_golden):
     """融合准备以原相邻成员比较共享阈值，极值框复用首字符浮点来源。"""
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     chars = []
     font = {"name": "A", "size": 10.0, "flags": 0}
     for index, x in enumerate([-0.0, 0.001, 0.0021, 0.0031]):
@@ -305,14 +293,9 @@ def test_native_mapping_geometry_keeps_boundaries_and_float_sources():
             }
         )
     rows = native.mapping_glyph_rows(chars, Bbox)
-    expected_ranges = []
-    cursor = 0
-    for group in dedup._mapping_char_groups_python(chars):
-        expected_ranges.append((cursor, cursor + len(group)))
-        cursor += len(group)
-    assert [(first, last) for first, last, _box, _angle in rows] == expected_ranges
+    assert [(first, last) for first, last, _box, _angle in rows] == [(0, 1), (1, 2), (2, 4)]
     assert rows[0][2][0] is chars[0]["bbox"].bbox[0]
-    assert dedup._mapping_groups(chars) == dedup._mapping_groups_reference(chars)
+    native_golden(dedup._mapping_groups(chars))
 
 
 def test_stage_profile_special_neighbors_disable_cache():
@@ -346,11 +329,9 @@ def test_empty_script_analysis_preserves_backend_and_truth_callbacks(monkeypatch
     assert events == ["chars", "backend"]
 
 
-def test_native_mapping_keeps_mixed_glyph_groups():
+def test_native_mapping_keeps_mixed_glyph_groups(native_golden):
     """异字符保护组不触发全页二次准备，Unicode 及来源仍与穷举路径一致。"""
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     chars = [
         {
             "char": text,
@@ -365,5 +346,5 @@ def test_native_mapping_keeps_mixed_glyph_groups():
         for index, text in enumerate("⼈人")
     ]
     assert native.mapping_glyph_rows(chars, Bbox) is not None
-    assert dedup._mapping_groups(chars) == dedup._mapping_groups_reference(chars)
+    native_golden(dedup._mapping_groups(chars))
     assert dedup._mapping_groups(chars)[0].chars[0]["source_indices"] == (0, 1)

@@ -107,17 +107,9 @@ def clamp(value: float, minimum: float, maximum: float) -> float:
 def cluster_positions(values: Iterable[float], tolerance: float) -> list[float]:
     """按相邻距离聚类一维坐标，并返回各簇均值。"""
 
-    ordered = sorted(float(value) for value in values)
-    if not ordered:
-        return []
-    clusters: list[list[float]] = [[ordered[0]]]
-    for value in ordered[1:]:
-        current_mean = sum(clusters[-1]) / len(clusters[-1])
-        if abs(value - current_mean) <= tolerance:
-            clusters[-1].append(value)
-        else:
-            clusters.append([value])
-    return [sum(cluster) / len(cluster) for cluster in clusters]
+    from ....._compute_backend import get_native
+
+    return get_native().table_cluster_positions([float(value) for value in values], tolerance)
 
 
 def covered_interval_ratio(
@@ -127,25 +119,10 @@ def covered_interval_ratio(
 ) -> float:
     """返回若干区间在目标区间上的并集覆盖比例。"""
 
-    if end <= start:
-        return 0.0
-    clipped = sorted(
-        (max(start, min(first, second)), min(end, max(first, second)))
-        for first, second in intervals
-        if min(end, max(first, second)) > max(start, min(first, second))
-    )
-    if not clipped:
-        return 0.0
-    covered = 0.0
-    current_start, current_end = clipped[0]
-    for item_start, item_end in clipped[1:]:
-        if item_start <= current_end:
-            current_end = max(current_end, item_end)
-            continue
-        covered += current_end - current_start
-        current_start, current_end = item_start, item_end
-    covered += current_end - current_start
-    return min(1.0, covered / (end - start))
+    from ....._compute_backend import get_native
+
+    rules = [(0, 0.0, first, second) for first, second in intervals]
+    return get_native().coverage_batch(rules, [(0, [0.0], start, end, 0.0)])[0]
 
 
 __all__ = [

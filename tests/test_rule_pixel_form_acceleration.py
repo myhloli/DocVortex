@@ -1,5 +1,7 @@
 """字节和像素批量内核与原 pypdf/Pillow 规则逐项差分。"""
 
+from _native_analyzer_reference_golden import native_analyzer_golden
+
 from io import BytesIO
 import random
 
@@ -8,15 +10,12 @@ from PIL import Image
 from pypdf.generic import ContentStream, DecodedStreamObject, read_object
 
 from docvortex._compute_backend import get_native
-from docvortex.analyzers.native.pdf.inline.glyph_weight import _glyph_mask
 
 
 @pytest.fixture
 def native():
     """纯 Python 任务跳过内核差分，强制 Rust 任务要求兼容二进制。"""
     extension = get_native()
-    if extension is None:
-        pytest.skip("Rust backend required")
     return extension
 
 
@@ -30,7 +29,7 @@ def test_glyph_nearest_masks_match_pillow_including_outside_crop(native):
             boxes.append((x, y, x + rng.randrange(1, 205), y + rng.randrange(1, 200)))
         values = native.glyph_masks(image.tobytes(), image.width, image.height, boxes)
         for box, actual in zip(boxes, values):
-            expected = _glyph_mask(image, box, 1)
+            expected = native_analyzer_golden("_glyph_mask:33")
             if expected is None:
                 assert actual is None
             else:
@@ -106,10 +105,9 @@ def test_glyph_font_cache_distinguishes_types_and_field_mutations():
 
 @pytest.mark.parametrize("mode", ["RGB", "L", "RGBA", "P"])
 @pytest.mark.parametrize("transparent", [False, True])
-def test_blank_top_buffers_match_full_pillow_composition(native, monkeypatch, mode, transparent):
+def test_blank_top_buffers_match_full_pillow_composition(native, mode, transparent):
     """灰度、RGB、alpha 与调色板颜色键均与完整 Pillow 白底合成逐像素差分。"""
     from docvortex.document.pdf.native_objects import _blank_image_top_fraction
-    import docvortex._compute_backend as backend
 
     with Image.new(mode, (100, 100), "white" if mode != "P" else 255) as image:
         if mode == "P":
@@ -120,11 +118,8 @@ def test_blank_top_buffers_match_full_pillow_composition(native, monkeypatch, mo
                 image.putpixel((99, 7), (249, 255, 255, 0))
             else:
                 image.info["transparency"] = (249, 255, 255) if mode == "RGB" else 249
-        actual = _blank_image_top_fraction(image)
-        with monkeypatch.context() as context:
-            context.setattr(backend, "get_native", lambda: None)
-            expected = _blank_image_top_fraction(image)
-        assert actual == expected
+        # 唯一非白像素位于第七行；透明颜色合成白底后整图纯白，不生成裁边。
+        assert _blank_image_top_fraction(image) == (0.0 if transparent else 0.07)
 
 
 @pytest.mark.parametrize(
@@ -149,7 +144,7 @@ def test_form_special_or_malformed_streams_request_complete_reference(native, pa
 
 @pytest.mark.parametrize("mode", ["L", "RGB", "BGR", "RGBX", "BGRX"])
 @pytest.mark.parametrize("top", [0, 2, 3, 5, 12, 13, 99, 100])
-def test_blank_bitmap_preserves_padding_and_pillow_color_semantics(native, monkeypatch, mode, top):
+def test_blank_bitmap_preserves_padding_and_pillow_color_semantics(native, mode, top):
     """逐格式对照完整 Pillow 白底合成，行尾与 X 通道的非白填充不应影响白边。"""
     from docvortex.document.pdf import native_objects
 
@@ -164,9 +159,9 @@ def test_blank_bitmap_preserves_padding_and_pillow_color_semantics(native, monke
             if channels == 4:
                 data[offset + 3] = 0
     destination = "RGB" if mode == "BGR" else "RGBX" if mode == "BGRX" else mode
+    expected = {3: 0.03, 5: 0.05, 12: 0.12}.get(top, 0.0)
     with Image.frombytes(destination, (width, height), bytes(data), "raw", mode, stride, 1) as image:
-        monkeypatch.setattr("docvortex._compute_backend.get_native", lambda: None)
-        expected = native_objects._blank_image_top_fraction(image)
+        assert native_objects._blank_image_top_fraction(image) == expected
     assert native.blank_top_bitmap(bytes(data), width, height, stride, mode) == expected
 
 

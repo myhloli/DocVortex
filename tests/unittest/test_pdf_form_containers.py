@@ -298,20 +298,39 @@ def test_broken_resources_disable_expansion_without_losing_native_content() -> N
     assert sum(block["type"] == "image" for block in _predict(output.getvalue())[0]) == 1
 
 
-def test_python_and_rust_character_ownership_are_equivalent() -> None:
-    """真实重复调用页的 Rust 批量关联与逐字符参考路径得到相同自有证据。"""
-    from unittest.mock import patch
+def test_native_character_ownership_matches_frozen_form_evidence() -> None:
+    """冻结协议 35 的完整 Form 字段，核对重复调用实例及外部重叠正文的精确来源归属。"""
+    from docvortex.document.pdf.native_contracts import _PDFFormInfo
 
-    from docvortex._compute_backend import get_native
-
-    if get_native() is None:
-        pytest.skip("当前环境没有原生扩展")
+    # 由冻结提交 2c1ec66、pypdfium2 5.13.0 的真实页面提取结果确认；测试不执行旧后端。
+    expected = tuple(
+        _PDFFormInfo(
+            instance_id=instance,
+            parent_id=None,
+            occurrence=(instance,),
+            bbox=(left, 400.0, left + 180.0, 500.0),
+            declared_bbox=(left, 400.0, left + 180.0, 500.0),
+            media_bbox=(0.0, 0.0, 600.0, 800.0),
+            matrix=(1.0, 0.0, 0.0, 1.0, left, 300.0),
+            clip=(left, 400.0, left + 180.0, 500.0),
+            paint_order=paint_order,
+            text_indices=frozenset((*range(first, first + 18), *range(first + 20, first + 38))),
+            path_indices=frozenset({instance}),
+            image_bboxes=(),
+            structure_valid=True,
+        )
+        for instance, left, paint_order, first in ((0, 50.0, 0, 0), (1, 330.0, 4, 40))
+    )
     with PDFDocument(_repeated_figure_pdf()) as document:
-        native = document._extract_native_page(0).form_infos
-    with patch("docvortex.document.pdf.form_structure.get_native", return_value=None):
-        with PDFDocument(_repeated_figure_pdf()) as document:
-            reference = document._extract_native_page(0).form_infos
-    assert native == reference
+        snapshot = document._extract_native_page(0)
+    assert snapshot.form_infos == expected
+    chars = snapshot.text_geometry.chars
+    assert [
+        "".join(char["char"] for char in chars if char["char_idx"] in form.text_indices) for form in snapshot.form_infos
+    ] == ["Internal label oneInternal label two"] * 2
+    owned = set().union(*(form.text_indices for form in snapshot.form_infos))
+    external = "".join(char["char"] for char in chars if char["char_idx"] not in owned)
+    assert external.lstrip("\r\n") == "External body overlaps the first figure"
 
 
 def test_underlay_rectangle_is_removed_but_public_geometry_is_preserved() -> None:

@@ -1,0 +1,157 @@
+{
+  "source_commit": "2c1ec66ee52bb37135599af92aa175bd77fc04d7",
+  "source_protocol": 35,
+  "seed": 301,
+  "cases": [
+    {
+      "dtype": "uint8",
+      "interpolation": "nearest",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "f22ced551596a2d5d4893587a9d84f0c60320aa200ec9ff7f227849c83ae1de6"
+    },
+    {
+      "dtype": "uint8",
+      "interpolation": "linear",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "0244862ed3117cb038c659ee7852efe5a65d4bb742f8a8580254254b285e711e"
+    },
+    {
+      "dtype": "uint8",
+      "interpolation": "cubic",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "648b7a5bad6b1ba34f94ea960381fb07a1b4a2d903db64abfa624c108ae1294d"
+    },
+    {
+      "dtype": "uint8",
+      "interpolation": "area",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "726ee41931af9e98fb310228d7d9a9ffb5bab05333644ae762b243636bfbf319"
+    },
+    {
+      "dtype": "uint8",
+      "interpolation": "lanczos4",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "7d9d6f06bf5daa841c7215a3d91cb6198eefc7ba296448655872f85433f21ad7"
+    },
+    {
+      "dtype": "uint16",
+      "interpolation": "nearest",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "10b259798cb71fea2f4b2656024018a06b38288fad57544a75019ebe61b55ad1"
+    },
+    {
+      "dtype": "uint16",
+      "interpolation": "linear",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "b0d22b1bb2af270fc3adb2d1bef38235769f4c01f36ade00720d99bbc3247c72"
+    },
+    {
+      "dtype": "uint16",
+      "interpolation": "cubic",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "b7f2172dd5bc3d7ed0ff0a03b224b134a65dc2b7273cd8d464a64550094aecc2"
+    },
+    {
+      "dtype": "uint16",
+      "interpolation": "area",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "5c101a8f4d36f1b3d4e7f720c638f79ab344c06e11a573c0ed5f5aa315ed51e9"
+    },
+    {
+      "dtype": "uint16",
+      "interpolation": "lanczos4",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "850cd8a04e2a2125d8f6d72ef5ce0e1d514b1cf8fd3bd1adcfcdcc73b81b3cfa"
+    },
+    {
+      "dtype": "float32",
+      "interpolation": "nearest",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "b64ce890bf85ad56011683bbeeae813c3cc55943e993f9a23b1f4fd78114b7df"
+    },
+    {
+      "dtype": "float32",
+      "interpolation": "linear",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "0653182256fe5db32ba7f734f4c44bd24db5d56b5859fb1b932488b0a79738f2"
+    },
+    {
+      "dtype": "float32",
+      "interpolation": "cubic",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "bc2faf23259e465167f07de6dca1bf4a7a1bc56dceee31da2d69f684d75498bc"
+    },
+    {
+      "dtype": "float32",
+      "interpolation": "area",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "cb9dc19faf1e58b43ba066bfff79df24c8ef7c3299625ae5bd40f15aa270d0ff"
+    },
+    {
+      "dtype": "float32",
+      "interpolation": "lanczos4",
+      "shape": [
+        13,
+        21,
+        4
+      ],
+      "sha256": "e44f46b95913291a25fc7763708b9da9be99e0d9150e7d068afb166dbdf10f2b"
+    }
+  ]
+}

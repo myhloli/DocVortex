@@ -6,7 +6,6 @@ import statistics
 import math
 
 from ..geometry import _rotate_bbox_to_upright
-from .. import line_layout as _profile_line_layout
 from ..inline.types import PDF_FONT_FORCE_BOLD_FLAG, PDF_FONT_ITALIC_FLAG
 from ..line_layout import _estimate_lane_gap, _font_signatures_share_family, _line_canonical_style_scale, _line_effective_height
 from ..models import _DocumentBodyProfile, _LaneBodyProfile, _LineItem, _PreparedPage, _TextLane
@@ -15,15 +14,6 @@ from ..models import _DocumentBodyProfile, _LaneBodyProfile, _LineItem, _Prepare
 def _plain_profile_number(value) -> bool:
     """仅让有限内置数值进入无回调的阶段缓存，巨大整数保持原异常路径。"""
     return type(value) is float and math.isfinite(value) or type(value) is int and -(2**53) <= value <= 2**53
-
-
-_CONTEXT_REFERENCE_FUNCTIONS = (
-    _plain_profile_number,
-    _line_effective_height,
-    _profile_line_layout._line_style_scale,
-    _LineItem.__getattribute__,
-    _TextLane.__getattribute__,
-)
 
 
 class _LaneProfileContext:
@@ -43,72 +33,12 @@ class _LaneProfileContext:
         from ....._compute_backend import get_native
 
         native = get_native()
-        if (
-            native is not None
-            and (
-                _plain_profile_number,
-                _line_effective_height,
-                _profile_line_layout._line_style_scale,
-                _LineItem.__getattribute__,
-                _TextLane.__getattribute__,
-            )
-            == _CONTEXT_REFERENCE_FUNCTIONS
-        ):
-            packed = native.lane_profile_context_owned(lanes, _TextLane, _LineItem)
-            if packed is not None:
-                self.heights, self.memberships = packed
-                return
-        for lane in lanes:
-            if (
-                type(lane) is not _TextLane
-                or type(lane.lines) is not list
-                or not all(_plain_profile_number(value) for value in (lane.left, lane.right))
-            ):
-                self.plain = False
-                break
-            for row in lane.lines:
-                if type(row) is not tuple or len(row) != 2:
-                    self.plain = False
-                    break
-                line, box = row
-                if (
-                    type(line) is not _LineItem
-                    or type(line.text) is not str
-                    or type(line.angle) is not int
-                    or type(box) not in (tuple, list)
-                    or len(box) != 4
-                    or not all(_plain_profile_number(value) for value in box)
-                    or not all(
-                        _plain_profile_number(value) for value in (line.em_height, line.effective_height, line.font_coverage)
-                    )
-                    or line.dominant_font_weight is not None
-                    and not _plain_profile_number(line.dominant_font_weight)
-                    or line.semantic_type is not None
-                    and type(line.semantic_type) is not str
-                    or line.visual_row_id is not None
-                    and type(line.visual_row_id) is not int
-                    or type(line.source_index) is not int
-                    or any(
-                        type(value) is not bool
-                        for value in (line.style_scale_repaired, line.restored_inline_cluster, line.split_from_row)
-                    )
-                    or line.font_signature is not None
-                    and (
-                        type(line.font_signature) is not tuple
-                        or len(line.font_signature) != 2
-                        or type(line.font_signature[0]) is not str
-                        or type(line.font_signature[1]) is not int
-                    )
-                ):
-                    self.plain = False
-                    break
-                self.memberships.setdefault(id(line), set()).add(id(lane))
-                self.heights[id(line), id(box)] = _line_effective_height(line, box)
-            if not self.plain:
-                break
-        if not self.plain:
-            self.heights.clear()
-            self.memberships.clear()
+        packed = native.lane_profile_context_owned(lanes, _TextLane, _LineItem)
+        if packed is None:
+            # 非有限业务输入不进入只读缓存；后续仍调用同一套布局业务规则。
+            self.plain = False
+            return
+        self.heights, self.memberships = packed
 
     def profile(self, lane):
         """保留首次统计导致的排序副作用，不把排序前结果缓存到排序后状态。"""

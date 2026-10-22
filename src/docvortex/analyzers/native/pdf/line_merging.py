@@ -112,9 +112,7 @@ def _same_baseline_candidate_pairs(
             return None
         bounds.append((low, high))
 
-    from ...._compute_backend import get_native
-
-    if len(lines) >= 32 and get_native() is not None:
+    if len(lines) >= 32:
         heights = [_line_effective_height(line, box) for line, box in zip(lines, local_bboxes)]
         sources = [line.source_bbox if line.angle == 0 and line.baseline is not None else None for line in lines]
         if (

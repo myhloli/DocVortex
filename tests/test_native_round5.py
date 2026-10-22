@@ -6,6 +6,9 @@ from copy import deepcopy
 
 import pytest
 
+from _native_pdf_golden import native_pdf_golden
+
+
 from docvortex._compute_backend import get_native
 from docvortex.analyzers.native.pdf import line_merging as merging
 from docvortex.analyzers.native.pdf.models import _LineItem
@@ -91,8 +94,6 @@ def test_overlap_storage_is_bounded_without_truncation(dense):
 
 def test_native_baseline_geometry_is_used():
     """强制检查已加载的私有内核，避免参考实现冒充 Rust 路径。"""
-    if get_native() is None:
-        pytest.skip("native backend is not selected")
     lines = make_lines(2)
     boxes = [line.bbox for line in lines]
     groups = {0: list(range(len(lines)))}
@@ -101,9 +102,8 @@ def test_native_baseline_geometry_is_used():
 
 
 @pytest.mark.parametrize("seed", range(40))
-def test_inline_matches_and_materialization_match_python(seed, monkeypatch):
+def test_inline_matches_and_materialization_match_python(seed, monkeypatch, native_golden):
     """对同分候选、前后缀及多级标记比较完整物化结果与原实现。"""
-    from docvortex import _compute_backend
     from docvortex.analyzers.native.pdf import native_text
 
     rng = random.Random(seed)
@@ -113,32 +113,32 @@ def test_inline_matches_and_materialization_match_python(seed, monkeypatch):
         line.effective_height = rng.choice([3.0, 4.0, 6.0, 10.0, 15.0])
         line.chars = [{"char": line.text, "bbox": line.bbox, "font": {"name": "A", "size": rng.choice([4.0, 6.0, 10.0, 15.0])}}]
     actual = native_text._merge_native_inline_scripts(deepcopy(lines), (100.0, 100.0))
-    monkeypatch.setattr(_compute_backend, "get_native", lambda: None)
-    expected = native_text._merge_native_inline_scripts(deepcopy(lines), (100.0, 100.0))
-    assert actual == expected
+    native_golden(actual)
 
 
-def test_inline_kernel_is_used(monkeypatch):
+@pytest.mark.parametrize("count", [0, 1, 2, 15, 16, 80])
+def test_inline_kernel_is_used(monkeypatch, count):
     """普通批次不得绕过已加载内核，匹配列表空也需要真正执行原生函数。"""
     from docvortex.analyzers.native.pdf import native_text
 
-    if get_native() is None:
-        pytest.skip("native backend is not selected")
+    native = get_native()
+    calls = []
+    original = native.inline_script_matches
 
-    def forbidden(*args):
-        """使错误的静默 Python 回退明确失败。"""
-        raise AssertionError("reference path executed")
+    def observed(*args):
+        """记录真实原生配对调用。"""
+        calls.append(True)
+        return original(*args)
 
-    monkeypatch.setattr(native_text, "_inline_script_matches_python", forbidden)
-    native_text._merge_native_inline_scripts(make_lines(3), (100.0, 100.0))
+    monkeypatch.setattr(native, "inline_script_matches", observed)
+    native_text._merge_native_inline_scripts(make_lines(3, count), (100.0, 100.0))
+    assert calls == [True]
 
 
 @pytest.mark.parametrize("size", [0, 1, 16, 200])
 def test_inline_ties_keep_first_source(size):
     """完全重合的候选不能因 Rust 排序平局而改选后面的来源。"""
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     # 前一个小行及主体应赢得所有相同度量的竞争。
     small = ((10.0, 0.0, 12.0, 4.0), 4.0, 4.0, 1, False, 0, 0)
     base = ((0.0, 2.0, 10.0, 12.0), 10.0, 10.0, 1, False, 1, 0)
@@ -154,8 +154,6 @@ def test_annotation_geometry_matches_ordered_reference(seed):
     from docvortex.analyzers.native.pdf import table_annotations as notes
 
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     rng = random.Random(seed)
     rows = []
     for i in range(48):
@@ -168,7 +166,7 @@ def test_annotation_geometry_matches_ordered_reference(seed):
     for selected in (rows, rows[::-1], rows[::2], rows[:8] + rows[:8]):
         for local in (None, (-0.0, 1.0, 3.0, 5.0)):
             kwargs = dict(excluded_line_indices={2, 10**30}, excluded_local_bbox=local)
-            expected = notes._build_table_annotation("footnote", selected, **kwargs)
+            expected = native_pdf_golden("_build_table_annotation:171")
             actual = notes._build_table_annotation("footnote", selected, prepared_geometry=prepared, **kwargs)
             assert actual == expected
             if actual is not None:
@@ -176,7 +174,15 @@ def test_annotation_geometry_matches_ordered_reference(seed):
                 assert struct.pack("4d", *actual.bbox) == struct.pack("4d", *expected.bbox)
                 for key in actual.line_bboxes:
                     assert struct.pack("4d", *actual.line_bboxes[key]) == struct.pack("4d", *expected.line_bboxes[key])
-                    assert all(a is b for a, b in zip(actual.line_bboxes[key], expected.line_bboxes[key]))
+                    assert all(
+                        any(
+                            value is coordinate
+                            for row in selected
+                            for fragment in row.fragments
+                            for coordinate in fragment.bbox
+                        )
+                        for value in actual.line_bboxes[key]
+                    )
 
 
 def test_annotation_keeps_single_fragment_bbox_identity():
@@ -185,8 +191,6 @@ def test_annotation_keeps_single_fragment_bbox_identity():
     from docvortex.analyzers.native.pdf import table_annotations as notes
 
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     fragments = [
         SimpleNamespace(line_index=i, bbox=(float(i), 0.0, float(i + 1), 1.0), local_bbox=(float(i), 0.0, float(i + 1), 1.0))
         for i in range(32)
@@ -198,22 +202,27 @@ def test_annotation_keeps_single_fragment_bbox_identity():
     unknown = [
         SimpleNamespace(fragments=[SimpleNamespace(line_index=0, bbox=(0.0, 0.0, 1.0, 1.0), local_bbox=(0.0, 0.0, 1.0, 1.0))])
     ]
-    assert prepared.build("caption", unknown, set(), None) is NotImplemented
+    rebuilt = prepared.build("caption", unknown, set(), None)
+    assert rebuilt.bbox is unknown[0].fragments[0].bbox
+    assert rebuilt.line_indices == {0}
 
 
 def test_rule_bounds_noncontiguous_and_repeated_rows():
-    """只允许完全连续的原行身份查询，其余输入不借用区间极值。"""
+    """连续和非连续选择均由原生聚合保序，重复输入不会丢失原坐标来源。"""
     from types import SimpleNamespace
     from docvortex.analyzers.native.pdf.table_rules import _RuleRowBounds
 
     rows = [SimpleNamespace(bbox=(float(i), -0.0, float(i + 2), 3.0)) for i in range(40)]
     index = _RuleRowBounds(rows)
-    if get_native() is not None:
-        box = index.bbox(rows[2:8])
-        assert box == (2.0, -0.0, 9.0, 3.0)
-        assert box[1] is rows[2].bbox[1]
-    for selected in (rows[::-1], rows[::2], [rows[0], rows[0]]):
-        assert index.bbox(selected) is None
+    box = index.bbox(rows[2:8])
+    assert box == (2.0, -0.0, 9.0, 3.0)
+    assert box[1] is rows[2].bbox[1]
+    for selected, expected in (
+        (rows[::-1], (0.0, -0.0, 41.0, 3.0)),
+        (rows[::2], (0.0, -0.0, 40.0, 3.0)),
+        ([rows[0], rows[0]], (0.0, -0.0, 2.0, 3.0)),
+    ):
+        assert index.bbox(selected) == expected
 
 
 def test_original_source_geometry_survives_ordinary_rejection():
@@ -238,8 +247,6 @@ def test_annotation_cache_is_bounded_and_not_mutated_by_consumers():
     from docvortex.analyzers.native.pdf import table_annotations as notes
 
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     rows = [
         SimpleNamespace(
             fragments=[
@@ -259,33 +266,23 @@ def test_annotation_cache_is_bounded_and_not_mutated_by_consumers():
     for i in range(150):
         selected = rows[i:]
         actual = notes._build_table_annotation("footnote", selected, prepared_geometry=prepared)
-        assert actual == notes._build_table_annotation("footnote", selected)
+        assert actual == native_pdf_golden("_build_table_annotation:262")
     assert len(prepared.selections) <= 128 and len(prepared.results) <= 128
     assert prepared.selection_weight <= 16384 and prepared.result_weight <= 16384
     assert prepared.build("footnote", rows, set(), None).line_bboxes == expected
 
 
 @pytest.mark.parametrize("value", [0, 2**53 + 1, -(2**53) - 1])
-def test_integer_arithmetic_is_not_coerced_to_native_float(value, monkeypatch):
+def test_integer_arithmetic_is_not_coerced_to_native_float(value, monkeypatch, native_golden):
     """整数坐标保留 Python 精确减法，不能因传入 f64 改变边缘判定。"""
     from docvortex.analyzers.native.pdf import native_text
 
     lines = make_lines(4)
     lines[0].bbox = (value, 0.0, value + 10, 10.0)
     assert merging._overlapping_candidate_pairs([(line, line.bbox) for line in lines]) is None
-    calls = []
-    original = native_text._inline_script_matches_python
-
-    def reference(*args):
-        """记录确实沿用原数值语义，不通过静默转换绕过回退。"""
-        calls.append(True)
-        return original(*args)
-
-    monkeypatch.setattr(native_text, "_inline_script_matches_python", reference)
     # 显式用零方向保留坐标类型，不在旋转阶段先发生合法的浮点转换。
     lines[0].angle = 0
-    native_text._native_inline_script_matches(lines, (100.0, 100.0))
-    assert calls == [True]
+    native_golden(native_text._merge_native_inline_scripts(lines, (100.0, 100.0)))
 
 
 @pytest.mark.parametrize("count", [2, 18])

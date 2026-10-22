@@ -24,24 +24,21 @@ class NativeClassificationError(RuntimeError):
 
 
 def read_classification_snapshot(textpage, count, cjk_ranges, allowed_controls, private_range, normalize_font):
-    """保留原文本页所有者与函数强引用，非标准 ABI 或特殊配置显式选用 Python 参考路径。"""
+    """保留原文本页所有者与函数强引用，在原生调用前验证 ABI 和分类配置。"""
     global _REASON
     native = get_native()
-    if native is None:
-        _REASON = "Python backend"
-        return None
     _REASON = "nonstandard text page, count, or classification rules"
     if type(textpage) is not pdfium.PdfTextPage or not textpage.raw or type(count) is not int or not 0 <= count < 2**31:
-        return None
+        raise NativeClassificationError(_REASON)
     if type(cjk_ranges) not in (tuple, list) or type(allowed_controls) not in (set, frozenset, tuple, list):
-        return None
+        raise NativeClassificationError(_REASON)
     if any(type(pair) not in (tuple, list) or len(pair) != 2 for pair in cjk_ranges):
-        return None
+        raise NativeClassificationError(_REASON)
     if any(
         type(value) is not int or not 0 <= value < 2**32
         for value in [*private_range, *allowed_controls, *(value for pair in cjk_ranges for value in pair)]
     ):
-        return None
+        raise NativeClassificationError(_REASON)
     args = (raw.FPDF_TEXTPAGE, ct.c_int)
     specifications = (
         ("FPDFText_GetUnicode", ct.c_uint, args),
@@ -59,7 +56,7 @@ def read_classification_snapshot(textpage, count, cjk_ranges, allowed_controls, 
             or getattr(function, "errcheck", None) is not None
         ):
             _REASON = f"unsupported symbol or ABI: {name}"
-            return None
+            raise NativeClassificationError(_REASON)
         functions.append(function)
         addresses.append(ct.cast(function, ct.c_void_p).value)
     with pdfium_guard():
@@ -81,16 +78,16 @@ def read_classification_snapshot(textpage, count, cjk_ranges, allowed_controls, 
 
 
 def read_image_text_snapshot(textpage, frame, rotation, images, visibility, overlap):
-    """核验同库字符 ABI 后批量读取几何；非标准替身、无扩展或异常几何保留 Python 参考路径。"""
+    """核验同库字符 ABI 后批量读取几何，输入契约或 ABI 错误显式失败。"""
     global _IMAGE_REASON
     native = get_native()
-    if native is None or type(textpage) is not pdfium.PdfTextPage or not textpage.raw:
-        _IMAGE_REASON = "Python backend or nonstandard text page"
-        return None
+    if type(textpage) is not pdfium.PdfTextPage or not textpage.raw:
+        _IMAGE_REASON = "nonstandard or closed text page"
+        raise NativeClassificationError(_IMAGE_REASON)
     count = textpage.count_chars()
     if type(count) is not int or not 0 <= count < 2**31:
         _IMAGE_REASON = "unsupported character count"
-        return None
+        raise NativeClassificationError(_IMAGE_REASON)
     args = (raw.FPDF_TEXTPAGE, ct.c_int)
     double_pointer = ct.POINTER(ct.c_double)
     specifications = (
@@ -108,7 +105,7 @@ def read_image_text_snapshot(textpage, frame, rotation, images, visibility, over
             or getattr(function, "errcheck", None) is not None
         ):
             _IMAGE_REASON = f"unsupported symbol or ABI: {name}"
-            return None
+            raise NativeClassificationError(_IMAGE_REASON)
         functions.append(function)
         addresses.append(ct.cast(function, ct.c_void_p).value)
     with pdfium_guard():
@@ -122,5 +119,8 @@ def read_image_text_snapshot(textpage, frame, rotation, images, visibility, over
             [(address, value[0], value[1]) for address, value in visibility.items()],
             overlap,
         )
-    _IMAGE_REASON = None if snapshot is not None else "unsupported nonfinite geometry"
+    if snapshot is None:
+        _IMAGE_REASON = "invalid image classification geometry"
+        raise NativeClassificationError(_IMAGE_REASON)
+    _IMAGE_REASON = None
     return snapshot

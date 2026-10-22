@@ -15,6 +15,21 @@ pub(super) fn inline_script_matches(
     py.detach(|| docvortex_core::inline_pairs::matches(records))
 }
 
+/// 为 token 业务精炼返回已确认的数字引用位置，角色和字符数量不一致时显式失败。
+#[pyfunction]
+pub(super) fn numeric_script_indices(
+    py: Python<'_>,
+    records: Vec<docvortex_core::scripts::Record>,
+    roles: Vec<u8>,
+) -> PyResult<Vec<usize>> {
+    if records.len() != roles.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "script role count differs",
+        ));
+    }
+    Ok(py.detach(move || docvortex_core::scripts::numeric_indices(records, &roles)))
+}
+
 /// 一次提取已物化的数值特征，释放 GIL 后计算整段字符角色。
 #[pyfunction]
 pub(super) fn script_roles(

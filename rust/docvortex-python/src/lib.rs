@@ -54,6 +54,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_morphology, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        image_numeric::image_morphology_indices,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_lines, module)?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_polygons, module)?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_solve, module)?)?;
@@ -133,7 +137,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(rule_graphics::form_state_program, module)?)?;
     module.add_function(wrap_pyfunction!(
-        rule_graphics::detached_formula_neighbors,
+        rule_graphics::detached_formula_component,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(
@@ -250,6 +254,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<pdfium::PdfiumDrawingLineBatches>()?;
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_subpaths, module)?)?;
     module.add_function(wrap_pyfunction!(pdfium::read_pdfium_objects, module)?)?;
+    module.add_function(wrap_pyfunction!(pdfium::restore_surrogate_chars, module)?)?;
     module.add_function(wrap_pyfunction!(
         pdfium::read_pdfium_text_visibility,
         module
@@ -290,6 +295,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(tables::table_row_occupancy, module)?)?;
     module.add("PROTOCOL_VERSION", docvortex_core::PROTOCOL_VERSION)?;
     module.add_function(wrap_pyfunction!(scripts::script_roles, module)?)?;
+    module.add_function(wrap_pyfunction!(scripts::numeric_script_indices, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::normalize_boxes, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::visual_runs, module)?)?;
     module.add_function(wrap_pyfunction!(geometry::local_boxes, module)?)?;
@@ -302,6 +308,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(tables::table_boxes, module)?)?;
     module.add_function(wrap_pyfunction!(tables::coverage_batch, module)?)?;
     module.add_function(wrap_pyfunction!(tables::merge_rules, module)?)?;
+    module.add_function(wrap_pyfunction!(tables::table_cluster_positions, module)?)?;
     module.add_function(wrap_pyfunction!(tables::assign_cells, module)?)?;
     module.add_function(wrap_pyfunction!(tables::grid_parents, module)?)?;
     module.add_function(wrap_pyfunction!(tables::component_specs, module)?)?;

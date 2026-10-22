@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import math
 import statistics
 import unicodedata
 from dataclasses import dataclass, replace
@@ -43,7 +42,6 @@ from .line_layout import (
 from .line_merging import _join_formula_visual_row, _merge_overlapping_inline_cluster
 from .models import _AxisLine, _FormulaAnchor, _LineItem, _PageSource, _TextLane
 from .native_text import _sanitize_pdf_control_text
-from ._native_geometry import glyph_flags as _unmapped_glyph_flags
 from .text_roles import has_prose, prose_residue, publication_text
 from .layout_evidence import build_layout_evidence
 
@@ -1354,45 +1352,13 @@ def _recover_detached_display_components(
             and line.semantic_type is None
             and not any(_bbox_intersects(line.bbox, table) for table in table_bboxes)
         ]
-        pending = set(range(len(candidates)))
         operator_flags = [_formula_line_has_math_operator(line.text) for line, _ in candidates]
-        neighbors = _detached_formula_neighbors_native(candidates, operator_flags, em)
+        boxes = [bbox for _, bbox in candidates]
+        pending = set(range(len(candidates)))
+        native = get_native()
         while pending:
-            seed = min(pending)
-            pending.remove(seed)
-            component, frontier = [seed], [seed]
-            while frontier:
-                current = frontier.pop()
-                _, bbox = candidates[current]
-                if neighbors is not None:
-                    for index in neighbors[current]:
-                        if index in pending:
-                            component.append(index)
-                            frontier.append(index)
-                    pending.difference_update(component)
-                    continue
-                for index in sorted(pending):
-                    other = candidates[index][1]
-                    # 完整长公式各占一条基线；松行框重叠不能把相邻等式合成一个裁图。
-                    if (
-                        bbox[2] - bbox[0] > 3 * em
-                        and other[2] - other[0] > 3 * em
-                        and operator_flags[current]
-                        and operator_flags[index]
-                        and abs(_bbox_center_y(bbox) - _bbox_center_y(other)) > 0.75 * em
-                    ):
-                        continue
-                    xgap = max(0.0, bbox[0] - other[2], other[0] - bbox[2])
-                    ygap = max(0.0, bbox[1] - other[3], other[1] - bbox[3])
-                    if (
-                        ygap <= 0.85 * em
-                        and _bbox_axis_overlap_ratio(bbox, other, axis="x") > 0.1
-                        or xgap <= 2 * em
-                        and _bbox_axis_overlap_ratio(bbox, other, axis="y") >= 0.2
-                    ):
-                        component.append(index)
-                        frontier.append(index)
-                pending.difference_update(component)
+            component = native.detached_formula_component(boxes, operator_flags, em, sorted(pending))
+            pending.difference_update(component)
             members = [candidates[index] for index in component]
             if any(prose_flags[id(line)] for line, _bbox in members):
                 continue
@@ -1511,61 +1477,14 @@ def _recover_detached_display_components(
     return blocks, claimed
 
 
-def _detached_formula_neighbors_native(candidates, operators, em):
-    """批量计算独立公式带邻接，特殊数值和过大邻接表完整使用原有扫描。"""
-    native = get_native()
-    if native is None or type(em) not in (int, float) or not math.isfinite(em):
-        return None
-    boxes = [bbox for _, bbox in candidates]
-    if any(type(v) not in (int, float) or abs(v) > 2**50 or not math.isfinite(v) for box in boxes for v in box):
-        return None
-    return native.detached_formula_neighbors(boxes, operators, em)
-
-
-_MATH_WORD_REFERENCES = (_LineItem.__getattribute__, _LineItem.chars, _LineItem.native_math_words, re.finditer, re._compile)
-
-
 def _native_math_word_fragments(line: _LineItem) -> frozenset[str]:
-    """普通原始字形整行批量读取，定制对象或正则实现完整回退到原参考路径。"""
-    from ...._compute_backend import get_native
-
-    if (
-        _LineItem.__getattribute__,
-        getattr(_LineItem, "chars", None),
-        getattr(_LineItem, "native_math_words", None),
-        re.finditer,
-        re._compile,
-    ) == _MATH_WORD_REFERENCES:
-        # 字符已在当前行阶段释放后，只剩冻结的不可变词集合；无需再次构造集合或运行空正则。
-        if (
-            type(line) is _LineItem
-            and type(line.chars) is list
-            and not line.chars
-            and type(line.native_math_words) is frozenset
-        ):
-            return line.native_math_words
-        native = get_native()
-        if native is not None:
-            words = native.math_words_owned(line, _LineItem, re.finditer)
-            if words is not None:
-                return words
-    return _native_math_word_fragments_python(line)
-
-
-def _native_math_word_fragments_python(line: _LineItem) -> frozenset[str]:
-    """短连写变量只有全部斜体或包含独立小号角标时才消除自然语言屏障。"""
-    chars = [char for char in line.chars if str(char.get("char", "")).isprintable()]
-    text = "".join(str(char.get("char", "")) for char in chars)
-    words = set(line.native_math_words)
-    for match in re.finditer(r"\b[a-z]{3,4}\b", text):
-        members = chars[match.start() : match.end()]
-        fonts = [char.get("font") or {} for char in members]
-        sizes = [float(font.get("size", 0) or 0) for font in fonts]
-        if fonts and (
-            all(int(font.get("flags", 0) or 0) & 64 for font in fonts) or min(sizes) > 0 and min(sizes) <= 0.85 * max(sizes)
-        ):
-            words.add(match.group())
-    return frozenset(words)
+    """批量读取原始字形证据，字符释放后直接复用冻结的数学词集合。"""
+    if not line.chars:
+        return line.native_math_words
+    words = get_native().math_words_owned(line, _LineItem, re.finditer)
+    if words is None:
+        raise TypeError("Native math words require standard line and character records")
+    return words
 
 
 def _detached_math_line_has_prose(line: _LineItem) -> bool:
@@ -1653,51 +1572,14 @@ def _build_mixed_body_display_formulas(
     return blocks, claimed
 
 
-_UNMAPPED_INK_COERCE = _coerce_bbox
-_UNMAPPED_INK_FLAGS = _unmapped_glyph_flags
-_UNMAPPED_INK_ISFINITE = math.isfinite
-
-
 def _unmapped_formula_ink_bboxes(chars: list[Char]) -> list[BBox]:
-    """保留实际绘制、但映射为空白或控制码的高字形几何，不改变公开文本。"""
-
+    """原生筛选映射为空白或控制码的高字形几何，不改变公开文本。"""
     from ._native_geometry import glyph_flags
 
-    native = get_native()
-    if (
-        native is not None
-        and hasattr(native, "unmapped_formula_ink")
-        and _coerce_bbox is _UNMAPPED_INK_COERCE
-        and glyph_flags is _UNMAPPED_INK_FLAGS
-        and math.isfinite is _UNMAPPED_INK_ISFINITE
-    ):
-        values = native.unmapped_formula_ink(chars, glyph_flags)
-        if values is not None:
-            return values
-    return _unmapped_formula_ink_bboxes_python(chars)
-
-
-def _unmapped_formula_ink_bboxes_python(chars: list[Char]) -> list[BBox]:
-    """完整参考筛选保留陌生转换、读取顺序与异常，供批量不支持时直接回退。"""
-
-    output: list[BBox] = []
-    for char in chars:
-        value = str(char.get("char", ""))
-        if value.isprintable() and not value.isspace():
-            continue
-        bbox = _coerce_bbox(char.get("tight_bbox"))
-        font = char.get("font") or {}
-        size = float(font.get("size", 0) or 0)
-        if (
-            bbox is not None
-            and size > 0
-            and char.get("text_object_id") is not None
-            and char.get("text_render_mode") not in {3, 7}
-            and bbox[2] - bbox[0] > 0.05 * size
-            and bbox[3] - bbox[1] > 1.5 * size
-        ):
-            output.append(bbox)
-    return output
+    values = get_native().unmapped_formula_ink(chars, glyph_flags)
+    if values is None:
+        raise TypeError("Native formula ink requires standard character records")
+    return values
 
 
 def _attach_unmapped_formula_ink(blocks: list[dict[str, Any]], bboxes: list[BBox]) -> None:
@@ -2840,59 +2722,25 @@ def _grow_formula_spatial_component(
         return []
 
     members = [anchor_geometry, *seeds]
-    additions = _grow_formula_component_native(members, candidates, table_bboxes)
-    if additions is not None:
-        return [*members, *additions]
-    member_sources = {line.source_index for line, _bbox in members}
-    changed = True
-    while changed:
-        changed = False
-        for candidate in candidates:
-            candidate_line, candidate_bbox = candidate
-            if candidate_line.source_index in member_sources:
-                continue
-            if any(
-                _formula_lines_are_connected(
-                    member_line,
-                    member_bbox,
-                    candidate_line,
-                    candidate_bbox,
-                    table_bboxes,
-                )
-                for member_line, member_bbox in members
-            ):
-                members.append(candidate)
-                member_sources.add(candidate_line.source_index)
-                changed = True
-    return members
+    return [*members, *_grow_formula_component_native(members, candidates, table_bboxes)]
 
 
 def _grow_formula_component_native(members, candidates, table_bboxes):
-    """只批量执行数值连通；语义屏障、种子和最终公式重放维持原有 Python 路径。"""
-    native = get_native()
-    if native is None:
-        return None
+    """规范化源索引后执行原生连通扫描，业务种子和表格屏障保持不变。"""
     items = [*members, *candidates]
-    if any(
-        type(line.source_index) is not int or not -(2**63) <= line.source_index < 2**63 or type(line.angle) is not int
-        for line, _ in items
-    ):
-        return None
-    records = [(bbox, line.bbox, _line_effective_height(line, bbox), line.angle, line.source_index) for line, bbox in items]
-    if any(
-        type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 2**50
-        for box, raw_box, height, _, _ in records
-        for v in (*box, *raw_box, height)
-    ):
-        return None
-    if any(
-        any(type(v) not in (int, float) or not math.isfinite(v) or abs(v) > 2**50 for v in box)
-        or box[2] <= box[0]
-        or box[3] <= box[1]
-        for box in table_bboxes
-    ):
-        return None
-    return [items[i] for i in native.grow_formula_component(records, len(members), table_bboxes)]
+    sources, angles = {}, {}
+    records = [
+        (
+            bbox,
+            line.bbox,
+            _line_effective_height(line, bbox),
+            angles.setdefault(line.angle, len(angles)),
+            sources.setdefault(line.source_index, len(sources)),
+        )
+        for line, bbox in items
+    ]
+    additions = get_native().grow_formula_component(records, len(members), table_bboxes)
+    return [items[index] for index in additions]
 
 
 def _is_formula_body_barrier(

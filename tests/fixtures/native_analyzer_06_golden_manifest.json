@@ -1,0 +1,26 @@
+{
+  "source_commit": "2c1ec66ee52bb37135599af92aa175bd77fc04d7",
+  "native_protocol": 35,
+  "pypdfium2": "5.13.0",
+  "python": "CPython 3.14.4",
+  "capture_date": "2026-10-22",
+  "description": "在修改前的冻结源码与已加载的协议 35 扩展中执行原测试，保存固定语义结果；数据不包含旧后端实现。排除不参与 dataclass 值相等的内部缓存。原字体 run 字典由 set 产生，顺序随解释器哈希种子变化，相关用例分别验证当前 run 顺序和固定值。",
+  "inputs": {
+    "tests/test_native_round3.py": "9b484280a28703d39aa9ecb809671895a857959f93cfe83fcc3068eb5e79cfce",
+    "tests/test_native_round5.py": "84e53a7ba1ad2161e42e21bee4c3cf7087d5c8a935248e700c86775ed0f320d9",
+    "tests/test_native_round6.py": "e5d1c18a4c3a0bc103c037ec1cc6fad731e88aeefc0b2f6fcd6323cd7b4cfd7a",
+    "tests/test_native_round7.py": "bf670a13be010ad03287b2238c63ab854f3bff0ba5ddd08c9ac12ea70cf0ca72",
+    "tests/test_native_parity.py": "5641dd3bd6cf49579de79018f86f160c40fa9d111c24c4efb18f6a24ffc5a320",
+    "tests/test_native_statistics.py": "5757b95cc033bfbbd9cc451b8ca96896fd99013bb19dd7f9f78836f0716e734a",
+    "tests/test_rule_layout_batch_acceleration.py": "3a81eccacb5e4b0ad8ff2bb9ea4a6b1ebd7d40b044d96c87c6ed1cb36e859fa5",
+    "tests/test_rule_pixel_form_acceleration.py": "0d47935bf3ee3d2e4222e8b0b6d47f838687ab1e35040d9ec84e8669eadbfe44",
+    "tests/unittest/test_flash_pdf_char_geometry.py": "03eeef83dbf5d0696e45ae4ae7866f85fa487b69dc1b2cc85e57c8fee164d568",
+    "demo/pdfs/caibao1.pdf": "8ed2d930833f2d5528747f74e1748a178e5ebca828034c7f7f72aa73f8e4d9e8",
+    "demo/pdfs/demo1.pdf": "f3b3be345bf2df8979f2491ca9466e078e4fd1d6a216611faa8566e4c44d474b",
+    "demo/pdfs/demo2.pdf": "9e94e95637356e1599510436278747d1150a3dfb822233bdc77a9dcb9a4fc6e4"
+  },
+  "artifacts": {
+    "native_analyzer_06_golden.json.gz": "7551e3b405256ce8761d8c26f070828f6b8547c4380d223a2d8171c86e49ee6f",
+    "native_analyzer_reference_06_golden.json.gz": "6eb8e1c9b04c57d7028deb0404dddf75d5b31e4c8686069992eb2d3c72741455"
+  }
+}

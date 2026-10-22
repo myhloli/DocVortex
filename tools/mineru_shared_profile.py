@@ -23,14 +23,12 @@ def main():
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--docvortex-source", type=Path, required=True)
     parser.add_argument("--mineru-source", type=Path, required=True)
-    parser.add_argument("--backend", default="rust")
     parser.add_argument("--render-backend", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args, _ = parser.parse_known_args()
     if any(flag in sys.argv for flag in ("--record", "--memory", "--verify-inputs")):
         parser.error("Profiler must run separately from recording, memory and input audits")
     os.environ.update(
-        DOCVORTEX_COMPUTE_BACKEND=args.backend,
         DOCVORTEX_PDF_RENDER_BACKEND=args.render_backend,
         LOGURU_LEVEL="WARNING",
         ORT_DISABLE_TELEMETRY="1",

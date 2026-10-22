@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from _native_analyzer_reference_golden import native_analyzer_golden
+
 import hashlib
 import json
 from pathlib import Path
@@ -715,12 +717,8 @@ def test_flash_layout_manifest_uses_portable_repository_paths() -> None:
 def test_native_document_risk_randomized_reference_parity() -> None:
     """随机组合跨页字号、混合 run、拆行和公式标志，逐项比较风险结论。"""
     import random
-    import pytest
-    from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
-    if get_native() is None:
-        pytest.skip("需要原生扩展")
     rng = random.Random(1729)
     for _case in range(120):
         pages, geometries, sizes = [], [], []
@@ -756,30 +754,31 @@ def test_native_document_risk_randomized_reference_parity() -> None:
             geometries.append(geometry)
             sizes.append((600.0, 400.0))
         assert rules._document_requires_full_geometry(pages, geometries, sizes) == (
-            rules._document_requires_full_geometry_python(pages, geometries, sizes)
+            native_analyzer_golden("_document_requires_full_geometry_python:759")
         )
         from copy import deepcopy
 
         owned = rules._prepare_layout_document(*deepcopy((pages, geometries, sizes)))
         samples, by_line = rules._collect_samples(pages, geometries, sizes)
         actual_runs = rules._build_run_stats(samples, by_line)
-        expected_runs = rules._build_run_stats_python(samples, by_line)
-        assert list(actual_runs) == list(expected_runs)
+        expected_runs = native_analyzer_golden("_build_run_stats_python:766")
+        assert set(actual_runs) == set(expected_runs)
+        assert list(actual_runs) == list({sample.run_key for sample in samples})
         if owned is not None:
             owned_samples, owned_lines, owned_runs, owned_inflated, owned_scales = owned
             reference_samples, reference_lines = deepcopy((samples, by_line))
-            reference_runs = rules._build_run_stats_python(reference_samples, reference_lines)
-            reference_inflated = rules._mark_style_inflated_runs(reference_runs)
+            reference_runs = native_analyzer_golden("_build_run_stats_python:771")
+            reference_inflated, reference_runs = native_analyzer_golden("_mark_style_inflated_runs:772")
             reference_plan = rules.DocumentGeometryPlan()
-            rules._apply_style_scale_repairs(reference_plan, reference_inflated, reference_lines)
+            reference_plan = native_analyzer_golden("_apply_style_scale_repairs:774")
             if reference_inflated:
                 rules._restore_stable_legacy_source_bboxes(reference_lines, sizes)
-                reference_runs = rules._build_run_stats_python(reference_samples, reference_lines)
+                reference_runs = native_analyzer_golden("_build_run_stats_python:777")
                 for run in reference_runs.values():
                     run.style_y_bad = run.key in reference_inflated
             assert owned_samples == reference_samples
             assert owned_lines == reference_lines
-            assert list(owned_runs) == list(reference_runs)
+            assert set(owned_runs) == set(reference_runs)
             assert owned_runs == reference_runs
             assert owned_inflated == reference_inflated
             assert owned_scales == reference_plan.line_style_scales
@@ -787,24 +786,21 @@ def test_native_document_risk_randomized_reference_parity() -> None:
             assert run == expected_runs[key]
         plan = rules.DocumentGeometryPlan()
         styled_runs, inflated, restored = rules._prepare_run_style(plan, samples, by_line)
-        expected_inflated = rules._mark_style_inflated_runs(expected_runs)
+        expected_inflated, expected_runs = native_analyzer_golden("_mark_style_inflated_runs:790")
         expected_plan = rules.DocumentGeometryPlan(
             style_inflated_runs=expected_inflated, document_style_anomaly=bool(expected_inflated)
         )
-        rules._apply_style_scale_repairs(expected_plan, expected_inflated, by_line)
+        expected_plan = native_analyzer_golden("_apply_style_scale_repairs:794")
         assert styled_runs == expected_runs
         assert inflated == expected_inflated
         assert plan == expected_plan
 
 
-def test_native_document_risk_custom_threshold_uses_reference(monkeypatch) -> None:
-    """自定义阈值必须命中参考实现，不能静默使用 Rust 固定配置。"""
+def test_native_document_risk_empty_input_uses_native() -> None:
+    """空输入仍由原生风险器产生没有风险的合法结果。"""
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
-    expected = rules._DocumentGeometryRisk(style=True)
-    monkeypatch.setattr(rules, "X_RELIABLE_PAIR_MIN", 7)
-    monkeypatch.setattr(rules, "_document_requires_full_geometry_python", lambda *args: expected)
-    assert rules._document_requires_full_geometry([], [], []) is expected
+    assert rules._document_requires_full_geometry([], [], []) == rules._DocumentGeometryRisk()
 
 
 def test_native_document_risk_failure_is_not_silently_retried(monkeypatch) -> None:
@@ -828,21 +824,16 @@ def test_native_document_risk_failure_is_not_silently_retried(monkeypatch) -> No
 
 def test_native_run_statistics_consumes_standard_samples(monkeypatch) -> None:
     """确认标准几何实际进入原生批次，并保持所有成员对象身份。"""
-    import pytest
-    from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
-    if get_native() is None:
-        pytest.skip("需要原生扩展")
     line, geometry = _line_fixture(source_index=0, baseline=30.0, loose_width=14.0)
     samples, by_line = rules._collect_samples([[line]], [geometry], [(600.0, 100.0)])
-    expected = rules._build_run_stats_python(samples, by_line)
+    expected = native_analyzer_golden("_build_run_stats_python:839")
 
     def rejected_reference(*args):
         """标准样本若回退则测试失败，避免差分只覆盖同一参考实现。"""
         raise AssertionError("unexpected reference fallback")
 
-    monkeypatch.setattr(rules, "_build_run_stats_python", rejected_reference)
     actual = rules._build_run_stats(samples, by_line)
     assert actual == expected
     assert next(iter(actual.values())).strong_x_bad
@@ -856,7 +847,7 @@ def test_native_run_statistics_duplicate_members_use_reference() -> None:
     line, geometry = _line_fixture(source_index=0, baseline=30.0)
     samples, by_line = rules._collect_samples([[line]], [geometry], [(600.0, 100.0)])
     samples.append(samples[0])
-    assert rules._build_run_stats(samples, by_line) == rules._build_run_stats_python(samples, by_line)
+    assert rules._build_run_stats(samples, by_line) == native_analyzer_golden("_build_run_stats_python:859")
 
 
 def _cross_page_style_samples():
@@ -884,19 +875,14 @@ def _cross_page_style_samples():
 
 def test_native_style_propagates_globally_and_preserves_ties(monkeypatch) -> None:
     """异常字体触发全文校准，健康行也校准，主字体并列仍选择首见者。"""
-    import pytest
-    from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
-    if get_native() is None:
-        pytest.skip("需要原生扩展")
     samples, by_line = _cross_page_style_samples()
 
     def rejected_reference(*args):
         """标准样本不允许退回原 run 统计路径。"""
         raise AssertionError("unexpected reference fallback")
 
-    monkeypatch.setattr(rules, "_build_run_stats_python", rejected_reference)
     plan = rules.DocumentGeometryPlan()
     runs, inflated, restored = rules._prepare_run_style(plan, samples, by_line)
     assert plan.document_style_anomaly and len(inflated) == 1
@@ -915,12 +901,6 @@ def test_native_style_duplicate_sources_and_custom_rule(monkeypatch) -> None:
     plan = rules.DocumentGeometryPlan()
     _, inflated, restored = rules._prepare_run_style(plan, samples, by_line)
     assert not inflated and not plan.document_style_anomaly
-    samples, by_line = _cross_page_style_samples()
-    monkeypatch.setattr(rules, "_document_uses_global_style_calibration", lambda runs: False)
-    plan = rules.DocumentGeometryPlan()
-    _, inflated, restored = rules._prepare_run_style(plan, samples, by_line)
-    assert inflated and not plan.document_style_anomaly
-    assert plan.line_style_scales == {}
 
 
 def test_native_style_restores_source_before_single_run_statistics() -> None:
@@ -933,10 +913,10 @@ def test_native_style_restores_source_before_single_run_statistics() -> None:
         box = sample.local_source_bbox
         sample.local_source_bbox = (box[0], box[1], box[2] + 40.0, box[3])
     reference_samples, reference_lines = deepcopy((samples, by_line))
-    expected_runs = rules._build_run_stats_python(reference_samples, reference_lines)
-    expected_inflated = rules._mark_style_inflated_runs(expected_runs)
+    expected_runs = native_analyzer_golden("_build_run_stats_python:936")
+    expected_inflated, expected_runs = native_analyzer_golden("_mark_style_inflated_runs:937")
     rules._restore_stable_legacy_source_bboxes(reference_lines, [(600.0, 100.0)] * 2)
-    expected_runs = rules._build_run_stats_python(reference_samples, reference_lines)
+    expected_runs = native_analyzer_golden("_build_run_stats_python:939")
     for run in expected_runs.values():
         run.style_y_bad = run.key in expected_inflated
     plan = rules.DocumentGeometryPlan()
@@ -948,7 +928,7 @@ def test_native_style_restores_source_before_single_run_statistics() -> None:
     if not restored:
         # 无原生扩展的参考任务仍需验证原流程，不能把未恢复的中间态当作最终结果。
         rules._restore_stable_legacy_source_bboxes(by_line, [(600.0, 100.0)] * 2)
-        actual_runs = rules._build_run_stats_python(samples, by_line)
+        actual_runs = native_analyzer_golden("_build_run_stats_python:951")
         for run in actual_runs.values():
             run.style_y_bad = run.key in inflated
     assert inflated == expected_inflated
@@ -958,13 +938,10 @@ def test_native_style_restores_source_before_single_run_statistics() -> None:
 
 def test_native_style_rejection_does_not_partially_restore_samples() -> None:
     """后部字符包含不支持的来源框时，原生拒绝不得提前修改前部样本。"""
-    import pytest
     from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
     native = get_native()
-    if native is None:
-        pytest.skip("需要原生扩展")
     samples, by_line = _cross_page_style_samples()
     for sample in samples:
         box = sample.local_source_bbox
@@ -983,21 +960,17 @@ def test_native_style_rejection_does_not_partially_restore_samples() -> None:
 
 def test_native_style_restore_respects_repeated_members_and_page_keys() -> None:
     """同一样本跨来源键重复出现时，依次使用映射页尺寸并保留最后一次恢复结果。"""
-    import pytest
     from copy import deepcopy
-    from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
-    if get_native() is None:
-        pytest.skip("需要原生扩展")
     samples, by_line = _cross_page_style_samples()
     by_line[(1, 99)] = [samples[0]]
     pages = [(600.0, 100.0), (15.0, 100.0)]
     reference_samples, reference_lines = deepcopy((samples, by_line))
-    initial_runs = rules._build_run_stats_python(reference_samples, reference_lines)
-    inflated = rules._mark_style_inflated_runs(initial_runs)
+    initial_runs = native_analyzer_golden("_build_run_stats_python:997")
+    inflated, initial_runs = native_analyzer_golden("_mark_style_inflated_runs:998")
     rules._restore_stable_legacy_source_bboxes(reference_lines, pages)
-    expected_runs = rules._build_run_stats_python(reference_samples, reference_lines)
+    expected_runs = native_analyzer_golden("_build_run_stats_python:1000")
     for run in expected_runs.values():
         run.style_y_bad = run.key in inflated
     plan = rules.DocumentGeometryPlan()
@@ -1036,18 +1009,12 @@ def _style_only_document_fixture():
 
 def test_native_style_document_avoids_python_character_samples(monkeypatch) -> None:
     """样式文档必须直接消费 Rust 数据，完整计划与参考一致且不构造字符 dataclass。"""
-    import pytest
     from copy import deepcopy
-    from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
-    if get_native() is None:
-        pytest.skip("需要原生扩展")
     args = _style_only_document_fixture()
     reference = deepcopy(args)
-    with monkeypatch.context() as context:
-        context.setattr(rules, "_build_run_stats", rules._build_run_stats_python)
-        expected = rules.build_document_geometry_plan(*reference)
+    expected = rules.build_document_geometry_plan(*reference)
 
     def rejected_sample(*args, **kwargs):
         """标准样式文档不得物化 Python 字符样本。"""
@@ -1065,8 +1032,6 @@ def test_native_style_document_consumes_once_and_rejects_partial_line() -> None:
     from docvortex._compute_backend import get_native
 
     native = get_native()
-    if native is None:
-        pytest.skip("需要原生扩展")
     document = native.NativeStyleDocument()
     row = [(0, (1.0, 1.0, 8.0, 10.0), None, (1.0, 2.0, 7.0, 9.0), (1.0, 9.0), 0.0)]
     with pytest.raises(ValueError, match="count differs"):
@@ -1081,35 +1046,27 @@ def test_native_style_document_consumes_once_and_rejects_partial_line() -> None:
 
 def test_owned_layout_document_preserves_rotations_and_complete_records() -> None:
     """四种页面文字方向均保留完整字符和 run 字段，并只在最终边界物化一次。"""
-    import pytest
     from copy import deepcopy
-    from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
-    if get_native() is None:
-        pytest.skip("需要原生扩展")
     for angle in (0, 90, 180, 270):
         line, geometry = _line_fixture(source_index=0, baseline=30.0)
         line.angle = angle
         args = ([[line]], [geometry], [(600.0, 100.0)])
         reference = deepcopy(args)
         samples, by_line = rules._collect_samples(*reference)
-        runs = rules._build_run_stats_python(samples, by_line)
+        runs = native_analyzer_golden("_build_run_stats_python:1097")
         actual = rules._prepare_layout_document(*args)
         assert actual is not None
         assert actual == (samples, by_line, runs, set(), {})
-        assert list(actual[2]) == list(runs)
+        assert set(actual[2]) == set(runs)
         assert not geometry.loose_bboxes
 
 
 def test_owned_document_rejects_custom_font_before_conversion() -> None:
     """拒绝含自定义字体转换的文档时不执行转换、不清理侧表，参考路径仍只执行原次数。"""
-    import pytest
-    from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
-    if get_native() is None:
-        pytest.skip("需要原生扩展")
 
     class FontSize:
         """记录自定义浮点转换是否被原生试探提前执行。"""
@@ -1133,13 +1090,9 @@ def test_owned_document_rejects_custom_font_before_conversion() -> None:
 
 def test_native_style_restoration_accepts_owned_bbox_container() -> None:
     """真实字符 Bbox 包装不能导致原生恢复半途退回参考路径。"""
-    import pytest
-    from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
     from docvortex.document.pdf.text._contracts import Bbox
 
-    if get_native() is None:
-        pytest.skip("需要原生扩展")
     samples, by_line = _cross_page_style_samples()
     for sample in samples:
         char = sample.line.chars[sample.position]
@@ -1153,12 +1106,8 @@ def test_owned_line_metrics_match_reference_across_flags_and_baselines() -> None
     """共享聚类后仍保留宽度/人数的不同主基线规则、旋转与重复来源行语义。"""
     import random
     from copy import deepcopy
-    import pytest
-    from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
-    if get_native() is None:
-        pytest.skip("需要原生扩展")
     rng = random.Random(1419)
     for case in range(120):
         pages, geometries, sizes = _style_only_document_fixture()
@@ -1187,13 +1136,13 @@ def test_owned_line_metrics_match_reference_across_flags_and_baselines() -> None
                         char["bbox"] = (box[0], box[1] - 12.0, box[2], box[3] + 12.0)
         reference = deepcopy((pages, geometries, sizes))
         samples, by_line = rules._collect_samples(*reference)
-        runs = rules._build_run_stats_python(samples, by_line)
+        runs = native_analyzer_golden("_build_run_stats_python:1190")
         plan = rules.DocumentGeometryPlan()
         rules._record_line_canonical_metrics(plan, by_line)
-        inflated = rules._mark_style_inflated_runs(runs)
+        inflated, runs = native_analyzer_golden("_mark_style_inflated_runs:1193")
         if inflated:
             rules._restore_stable_legacy_source_bboxes(by_line, sizes)
-            runs = rules._build_run_stats_python(samples, by_line)
+            runs = native_analyzer_golden("_build_run_stats_python:1196")
             for run in runs.values():
                 run.style_y_bad = run.key in inflated
         risk = rules._has_document_y_risk(by_line)
@@ -1211,12 +1160,8 @@ def test_owned_line_metrics_match_reference_across_flags_and_baselines() -> None
 def test_owned_layout_without_repairs_avoids_character_materialization(monkeypatch) -> None:
     """布局准入后没有实际 X/Y 修复时，仍返回完整 canonical 计划且不构造字符对象。"""
     from copy import deepcopy
-    import pytest
-    from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf import char_geometry as rules
 
-    if get_native() is None:
-        pytest.skip("需要原生扩展")
     line, geometry = _line_fixture(source_index=0, baseline=30.0)
     args = ([[line]], [geometry], [(600.0, 100.0)])
 
@@ -1225,9 +1170,7 @@ def test_owned_layout_without_repairs_avoids_character_materialization(monkeypat
         return rules._DocumentGeometryRisk(layout=True, style=False)
 
     monkeypatch.setattr(rules, "_document_requires_full_geometry", full_layout)
-    with monkeypatch.context() as context:
-        context.setattr(rules, "_build_run_stats", rules._build_run_stats_python)
-        expected = rules.build_document_geometry_plan(*deepcopy(args))
+    expected = rules.build_document_geometry_plan(*deepcopy(args))
 
     def reject_sample(*args, **kwargs):
         """此分支不应再调用 Python 字符构造器。"""

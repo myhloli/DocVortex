@@ -104,10 +104,9 @@ pub(super) fn graphic_numeric_lines<'py>(
         let bit = 1 << mode;
         if known & bit == 0 {
             let string = text.cast::<PyString>()?;
-            let Ok(raw) = string.to_str() else {
-                return Ok(None);
-            };
-            if raw.is_ascii() {
+            let raw = string.to_str().ok();
+            if raw.is_some_and(str::is_ascii) {
+                let raw = raw.unwrap();
                 for kind in 0..3 {
                     if ascii_numeric(raw, kind) {
                         matched |= 1 << kind;

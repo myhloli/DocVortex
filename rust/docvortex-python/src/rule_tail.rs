@@ -2,7 +2,7 @@
 // 高频字段名按解释器复用不可变字符串，仍由原 Python 属性和字典操作读取当前状态。
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyFloat, PyInt, PyList, PyString, PyTuple};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// 只接受内置有限数值，特殊对象在转换回调发生之前交回 Python。
 fn number(value: &Bound<'_, PyAny>) -> Option<f64> {
@@ -145,8 +145,6 @@ pub(super) fn short_tail_lane_events(
     let mut bounds = Vec::new();
     let mut records = Vec::new();
     let mut references = Vec::new();
-    let mut seen_lines = HashSet::new();
-    let mut seen_indices = HashSet::new();
     let mut fonts = HashMap::new();
     for (source, lane) in lanes.try_iter().ok()?.enumerate() {
         let lane = lane.ok()?;
@@ -181,10 +179,8 @@ pub(super) fn short_tail_lane_events(
             if !index_obj.is_exact_instance_of::<PyInt>() {
                 return None;
             }
-            let index = index_obj.extract::<i64>().ok()?;
-            if !seen_lines.insert(line.as_ptr() as usize) || !seen_indices.insert(index) {
-                return None;
-            }
+            // 来源编号可以重复；数值内核使用独立记录下标与原序号裁决平局。
+            index_obj.extract::<i64>().ok()?;
             let mut bbox = [0.0; 4];
             for (i, value) in bbox.iter_mut().enumerate() {
                 *value = number(&bbox_obj.get_item(i).ok()?)?;

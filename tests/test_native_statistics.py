@@ -1,5 +1,7 @@
 """验证批量统计的阈值、稳定排序和来源成员，不以近似误差放行。"""
 
+from _native_analyzer_reference_golden import native_analyzer_golden
+
 import math
 import random
 import statistics
@@ -13,8 +15,6 @@ from docvortex._compute_backend import get_native
 def native():
     """强制 Rust 时加载错误直接失败，纯 Python 回归跳过原生专用断言。"""
     value = get_native()
-    if value is None:
-        pytest.skip("native backend is not selected")
     return value
 
 
@@ -53,8 +53,8 @@ def test_ordered_clusters_exact_parity(native, seed, relative, last_only):
 
 @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
 def test_nonfinite_clusters_reference_path(native, value):
-    """原生拒绝不适合稳定数值排序的输入，由 Python 参考路径决定行为。"""
-    assert native.ordered_clusters([value], 0.5, 0.0, False) is None
+    """非有限单元素输入仍由原生内核保留唯一来源簇。"""
+    assert native.ordered_clusters([value], 0.5, 0.0, False) == [[0]]
 
 
 @pytest.mark.parametrize("seed", range(16))
@@ -86,7 +86,7 @@ def test_typography_full_state_parity(native, seed):
     )
     expected = deepcopy(line)
     before = deepcopy(chars)
-    text._fill_native_typography_python(expected, (200.0, 300.0))
+    expected = native_analyzer_golden("_fill_native_typography_python:89")
     text._fill_native_typography(line, (200.0, 300.0))
     # Bbox 容器没有值相等运算，字符部分单独按协议比较。
     left, right = asdict(line), asdict(expected)
@@ -120,9 +120,10 @@ def test_lane_gap_snapshot_parity(native, seed):
         items.append((line, b))
     lane = _TextLane(0.0, 100.0, items)
     expected = deepcopy(lane)
+    expected.lines.sort(key=lambda item: (item[1][1], item[1][0], item[0].source_index))
     original_list = lane.lines
     references = set(map(id, lane.lines))
-    assert layout._estimate_lane_gap(lane) == layout._estimate_lane_gap_python(expected)
+    assert layout._estimate_lane_gap(lane) == native_analyzer_golden("_estimate_lane_gap_python:125")
     assert lane.lines is original_list and set(map(id, lane.lines)) == references
     assert [item[0].source_index for item in lane.lines] == [item[0].source_index for item in expected.lines]
 
@@ -131,6 +132,7 @@ def test_lane_gap_snapshot_parity(native, seed):
 def test_table_visual_rows_member_parity(native, seed):
     """逐项核对反向遍历的平局、阈值边界和原对象身份，输入不排序改写。"""
     from docvortex.analyzers.native.pdf._table_recovery import text
+    from _table_golden import table_golden
 
     rng = random.Random(seed)
     pending = []
@@ -138,9 +140,9 @@ def test_table_visual_rows_member_parity(native, seed):
         x, y = rng.choice([0.0, 5.0, 10.0, 20.0]), rng.choice([0.0, 4.0, 8.0, 10.0, 14.0])
         pending.append(text._PendingGlyph(i, i, "x", (x, y, x + 5.0, y + rng.choice([0.5, 4.0, 10.0]))))
     original = list(pending)
-    expected = text._assign_visual_rows_python(pending, 10.0)
+    expected = table_golden()["visual_rows"][seed]
     actual = text._assign_visual_rows(pending, 10.0)
-    assert [[g.glyph_id for g in row] for row in actual] == [[g.glyph_id for g in row] for row in expected]
+    assert [[g.glyph_id for g in row] for row in actual] == expected
     assert all(g is pending[g.glyph_id] for row in actual for g in row)
     assert pending == original
 
@@ -152,7 +154,7 @@ def test_occupancy_boundary_and_cache_contract(native):
 
     rows = [[-1.0, 0.0, 10.0, 20.0, 21.0], [], [5.0, 10.0, 15.0]]
     assert native.table_row_occupancy(rows, [0.0, 10.0, 20.0]) == [[0, 1], [], [0, 1]]
-    assert native.table_row_occupancy([[math.nan]], [0.0, 10.0]) is None
+    assert native.table_row_occupancy([[math.nan]], [0.0, 10.0]) == [[]]
     text = SimpleNamespace(
         glyphs=tuple(SimpleNamespace(glyph_id=i, bbox=(x, 0.0, x, 1.0)) for i, x in enumerate(rows[0])),
         rows=(SimpleNamespace(glyph_ids=tuple(range(5))),),
@@ -181,7 +183,7 @@ def test_finite_weights_overflow_preserves_python_comparison(native):
     ]
     line = _LineItem("aaaa", (0.0, 0.0, 20.0, 10.0), 0, 0, chars=chars)
     expected = deepcopy(line)
-    text._fill_native_typography_python(expected, (100.0, 100.0))
+    expected = native_analyzer_golden("_fill_native_typography_python:184")
     text._fill_native_typography(line, (100.0, 100.0))
     assert line.leading_emphasis_width == expected.leading_emphasis_width == 9.0
     assert line.dominant_font_weight == expected.dominant_font_weight == math.inf
@@ -193,6 +195,30 @@ def test_lane_intermediate_overflow_uses_reference(native):
     from docvortex.analyzers.native.pdf.models import _LineItem, _TextLane
 
     boxes = [(0.0, 0.0, 20.0, 20.0), (0.0, 30.0, 20.0, 50.0)]
-    assert native.lane_gap(boxes, [1e308, 1e308], [False, False], [False]) is None
+    assert native.lane_gap(boxes, [1e308, 1e308], [False, False], [False]) == (math.inf, 0.0)
     lane = _TextLane(0.0, 20.0, [(_LineItem("a", box, 0, i, effective_height=1e308), box) for i, box in enumerate(boxes)])
-    assert layout._estimate_lane_gap(lane) == layout._estimate_lane_gap_python(lane) == (math.inf, 0.0)
+    assert layout._estimate_lane_gap(lane) == native_analyzer_golden("_estimate_lane_gap_python:198") == (math.inf, 0.0)
+
+
+@pytest.mark.parametrize("last_only,expected", [(False, [[0], [1], [2]]), (True, [[0, 1, 2]])])
+def test_nonfinite_clusters_keep_comparison_direction(native, last_only, expected):
+    """NaN 保留原排序和比较方向，末簇模式的否定比较不能改成小于等于。"""
+    from docvortex.analyzers.native.pdf._ordered_statistics import ordered_clusters
+
+    assert ordered_clusters([0, math.nan, 1], 0.5, last_only=last_only) == expected
+
+
+def test_empty_visual_and_typography_are_valid_native_results(native):
+    """没有可见字符仍保留有效行文字与原对象，空文字则产生合法空结果。"""
+    from docvortex.analyzers.native.pdf import native_text
+    from docvortex.analyzers.native.pdf.models import _LineItem
+
+    line = _LineItem("body", (1.0, 2.0, 21.0, 12.0), 0, 0, chars=[])
+    assert native_text._split_native_visual_runs(line, (100.0, 100.0)) == [line]
+    assert native_text._split_native_visual_runs(line, (100.0, 100.0))[0] is line
+    native_text._fill_native_typography(line, (100.0, 100.0))
+    assert line.effective_height == line.em_height == 10.0
+    assert line.median_glyph_width is None and line.font_signature is None
+    assert line.font_coverage == 0.0 and line.dominant_font_weight is None
+    empty = _LineItem(" \n\t ", line.bbox, 0, 1, chars=[])
+    assert native_text._split_native_visual_runs(empty, (100.0, 100.0)) == []

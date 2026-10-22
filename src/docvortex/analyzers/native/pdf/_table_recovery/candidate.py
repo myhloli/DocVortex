@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import html
-from bisect import bisect_left, bisect_right
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from .....schema import BBox
 from .contracts import NativeTableCandidate, NativeTableCandidateSource, NativeTableCell, NativeTableGlyph, NativeTableText
-from .geometry import bbox_center
-from .text import build_cell_text, glyph_overlap_ratio
+from .text import build_cell_text
 
 MIN_TEXT_CAPTURE = 0.98
 
@@ -70,25 +68,11 @@ def _validate_grid_specs(
     return all(all(row) for row in occupied)
 
 
-def _choose_cell_for_glyph(
-    glyph: NativeTableGlyph,
-    specs: tuple[GridCellSpec, ...],
-) -> tuple[int | None, bool]:
-    """按字符面积交叠选择唯一单元格，并标记近似平局的边界歧义。"""
+def _choose_cell_for_glyph(glyph: NativeTableGlyph, specs: tuple[GridCellSpec, ...]) -> tuple[int | None, bool]:
+    """由原生落格内核选择唯一单元格，并保留边界歧义标记。"""
+    from ....._compute_backend import get_native
 
-    overlaps = [(glyph_overlap_ratio(glyph, spec.bbox), index) for index, spec in enumerate(specs)]
-    overlaps.sort(reverse=True)
-    best_ratio, best_index = overlaps[0]
-    if best_ratio <= 0:
-        center_x, center_y = bbox_center(glyph.bbox)
-        containing = [
-            index
-            for index, spec in enumerate(specs)
-            if spec.bbox[0] <= center_x <= spec.bbox[2] and spec.bbox[1] <= center_y <= spec.bbox[3]
-        ]
-        return (containing[0], False) if len(containing) == 1 else (None, False)
-    ambiguous = len(overlaps) > 1 and overlaps[1][0] >= 0.45 and abs(best_ratio - overlaps[1][0]) <= 0.02
-    return best_index, ambiguous
+    return get_native().assign_cells([glyph.bbox], [spec.bbox for spec in specs], None)[0]
 
 
 def _build_grid_spec_index(
@@ -125,51 +109,14 @@ def _build_grid_spec_index(
 
 
 def _choose_cell_for_glyph_indexed(
-    glyph: NativeTableGlyph,
-    specs: tuple[GridCellSpec, ...],
-    index: _GridSpecIndex,
+    glyph: NativeTableGlyph, specs: tuple[GridCellSpec, ...], index: _GridSpecIndex
 ) -> tuple[int | None, bool]:
-    """只在字符覆盖的邻近原子格中选择逻辑单元格。"""
+    """把已有原子轨道交给原生内核，保持索引与完整落格相同的语义。"""
+    from ....._compute_backend import get_native
 
-    cols = len(index.x_tracks) - 1
-    rows = len(index.y_tracks) - 1
-    left_col = max(0, min(cols - 1, bisect_right(index.x_tracks, glyph.bbox[0]) - 1))
-    right_col = max(
-        0,
-        min(cols - 1, bisect_left(index.x_tracks, glyph.bbox[2]) - 1),
-    )
-    top_row = max(0, min(rows - 1, bisect_right(index.y_tracks, glyph.bbox[1]) - 1))
-    bottom_row = max(
-        0,
-        min(rows - 1, bisect_left(index.y_tracks, glyph.bbox[3]) - 1),
-    )
-    if left_col == right_col and top_row == bottom_row:
-        # 只覆盖一个原子格时仍执行原面积/中心判定，省去候选集合与排序。
-        cell_index = index.owners[top_row][left_col]
-        bbox = specs[cell_index].bbox
-        if glyph_overlap_ratio(glyph, bbox) > 0:
-            return cell_index, False
-        center_x, center_y = bbox_center(glyph.bbox)
-        return (cell_index, False) if bbox[0] <= center_x <= bbox[2] and bbox[1] <= center_y <= bbox[3] else (None, False)
-    candidate_indices = {
-        index.owners[row][col] for row in range(top_row, bottom_row + 1) for col in range(left_col, right_col + 1)
-    }
-    overlaps = [(glyph_overlap_ratio(glyph, specs[cell_index].bbox), cell_index) for cell_index in candidate_indices]
-    overlaps.sort(reverse=True)
-    if not overlaps:
-        return None, False
-    best_ratio, best_index = overlaps[0]
-    if best_ratio <= 0:
-        center_x, center_y = bbox_center(glyph.bbox)
-        containing = [
-            cell_index
-            for cell_index in candidate_indices
-            if specs[cell_index].bbox[0] <= center_x <= specs[cell_index].bbox[2]
-            and specs[cell_index].bbox[1] <= center_y <= specs[cell_index].bbox[3]
-        ]
-        return (containing[0], False) if len(containing) == 1 else (None, False)
-    ambiguous = len(overlaps) > 1 and overlaps[1][0] >= 0.45 and abs(best_ratio - overlaps[1][0]) <= 0.02
-    return best_index, ambiguous
+    return get_native().assign_cells(
+        [glyph.bbox], [spec.bbox for spec in specs], (index.x_tracks, index.y_tracks, index.owners)
+    )[0]
 
 
 def _order_consistency(
@@ -250,23 +197,13 @@ def build_candidate(
     from ....._compute_backend import get_native
 
     native = get_native()
-    prepared_assignments = None
-    if native is not None:
-        prepared_assignments = native.assign_cells(
-            [glyph.bbox for glyph in text.glyphs],
-            [spec.bbox for spec in specs],
-            (grid_index.x_tracks, grid_index.y_tracks, grid_index.owners) if grid_index is not None else None,
-        )
+    prepared_assignments = native.assign_cells(
+        [glyph.bbox for glyph in text.glyphs],
+        [spec.bbox for spec in specs],
+        (grid_index.x_tracks, grid_index.y_tracks, grid_index.owners) if grid_index is not None else None,
+    )
     for position, glyph in enumerate(text.glyphs):
-        cell_index, ambiguous = (
-            prepared_assignments[position]
-            if prepared_assignments is not None
-            else (
-                _choose_cell_for_glyph_indexed(glyph, specs, grid_index)
-                if grid_index is not None
-                else _choose_cell_for_glyph(glyph, specs)
-            )
-        )
+        cell_index, ambiguous = prepared_assignments[position]
         if cell_index is None:
             continue
         assignments[glyph.glyph_id] = cell_index

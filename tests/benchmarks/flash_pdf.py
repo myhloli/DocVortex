@@ -262,12 +262,8 @@ def main() -> None:
     parser.add_argument("--path", action="append", default=[])
     parser.add_argument("--corpus", choices=("demo", "all"), default="all")
     parser.add_argument("--profile", action="store_true", help="额外运行剖析；不计入耗时或 RSS 指标")
-    parser.add_argument(
-        "--backend", choices=("auto", "python", "rust"), default=os.environ.get("DOCVORTEX_COMPUTE_BACKEND", "auto")
-    )
     parser.add_argument("--worker", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
-    os.environ["DOCVORTEX_COMPUTE_BACKEND"] = args.backend
     if args.runs < 0:
         parser.error("--runs must be non-negative")
     if args.worker:
@@ -320,7 +316,6 @@ def main() -> None:
         "platform": platform.platform(),
         "dependencies": {name: importlib.metadata.version(name) for name in ("docvortex", "pypdfium2", "numpy", "pydantic")},
         "runs": args.runs,
-        "requested_backend": args.backend,
         "historical_baseline_sha": manifest["baseline_git_sha"],
         "historical_differences": history_differences,
         "documents": results,

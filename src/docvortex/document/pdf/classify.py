@@ -279,89 +279,33 @@ def get_extreme_aspect_ratio_page_pdfium(
 
 
 def _collect_pdfium_text_sample_from_page(page_index: int, page: Any) -> dict[str, Any]:
-    """从单页 PDFium 对象提取纯 Python 文本统计，并在调用方释放子对象。"""
+    """从单页原生统计快照物化分类字段，并及时释放 PDFium 文本页。"""
+    from .classification_bridge import read_classification_snapshot
+
     text_page = None
     try:
         text_page = page.get_textpage()
         text = text_page.get_text_bounded()
         char_count = text_page.count_chars()
-        # 分类消费去重前原始字符，不用 canonical 字符数或字体名解码替代旧统计。
-        from .classification_bridge import read_classification_snapshot
-
-        functions = (_is_disallowed_control_unicode, _is_cjk_unicode_code, _get_pdfium_char_font_name, _normalize_pdf_font_name)
-        if all(value is original for value, original in zip(functions, _STANDARD_CLASSIFICATION_FUNCTIONS)):
-            try:
-                snapshot = read_classification_snapshot(
-                    text_page,
-                    char_count,
-                    CJK_TEXT_RANGES,
-                    _ALLOWED_CONTROL_CODES,
-                    (_PRIVATE_USE_AREA_START, _PRIVATE_USE_AREA_END),
-                    _normalize_pdf_font_name,
-                )
-                fields = snapshot.to_dict() if snapshot is not None else None
-            except PdfiumFontError:
-                raise
-            except Exception as exc:
-                raise NativeClassificationError("Native PDF classification statistics failed") from exc
-            if fields is not None:
-                return {
-                    "page_index": page_index,
-                    "text": text,
-                    "cleaned_text": re.sub(r"\s+", "", text),
-                    "char_count": char_count,
-                    **fields,
-                }
-        null_char_count = 0
-        replacement_char_count = 0
-        control_char_count = 0
-        private_use_char_count = 0
-        unicode_map_error_count = 0
-        font_name_counts = {}
-        non_generated_char_count = 0
-        font_non_generated_char_counts = {}
-        font_non_generated_cjk_char_counts = {}
-
-        for char_index in range(char_count):
-            unicode_code = pdfium_c.FPDFText_GetUnicode(text_page, char_index)
-            is_generated = pdfium_c.FPDFText_IsGenerated(text_page, char_index) == 1
-            if not is_generated:
-                non_generated_char_count += 1
-
-            if unicode_code == 0:
-                null_char_count += 1
-            elif unicode_code == 0xFFFD:
-                replacement_char_count += 1
-            elif _is_disallowed_control_unicode(unicode_code):
-                control_char_count += 1
-            elif _PRIVATE_USE_AREA_START <= unicode_code <= _PRIVATE_USE_AREA_END:
-                private_use_char_count += 1
-
-            if pdfium_c.FPDFText_HasUnicodeMapError(text_page, char_index):
-                unicode_map_error_count += 1
-
-            font_name = _normalize_pdf_font_name(_get_pdfium_char_font_name(text_page, char_index))
-            if font_name:
-                font_name_counts[font_name] = font_name_counts.get(font_name, 0) + 1
-                if not is_generated:
-                    font_non_generated_char_counts[font_name] = font_non_generated_char_counts.get(font_name, 0) + 1
-                    if _is_cjk_unicode_code(unicode_code):
-                        font_non_generated_cjk_char_counts[font_name] = font_non_generated_cjk_char_counts.get(font_name, 0) + 1
-
+        try:
+            snapshot = read_classification_snapshot(
+                text_page,
+                char_count,
+                CJK_TEXT_RANGES,
+                _ALLOWED_CONTROL_CODES,
+                (_PRIVATE_USE_AREA_START, _PRIVATE_USE_AREA_END),
+                _normalize_pdf_font_name,
+            )
+        except PdfiumFontError:
+            raise
+        except Exception as exc:
+            raise NativeClassificationError("Native PDF classification statistics failed") from exc
         return {
             "page_index": page_index,
             "text": text,
             "cleaned_text": re.sub(r"\s+", "", text),
             "char_count": char_count,
-            "null_char_count": null_char_count,
-            "replacement_char_count": replacement_char_count,
-            "control_char_count": control_char_count,
-            "private_use_char_count": private_use_char_count,
-            "unicode_map_error_count": unicode_map_error_count,
-            "font_name_counts": font_name_counts,
-            "non_generated_char_count": non_generated_char_count,
-            "font_non_generated_char_counts": font_non_generated_char_counts,
-            "font_non_generated_cjk_char_counts": font_non_generated_cjk_char_counts,
+            **snapshot.to_dict(),
         }
     finally:
         close_pdfium_child(text_page)

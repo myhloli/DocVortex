@@ -6,6 +6,8 @@ from pathlib import Path
 from importlib import import_module
 
 import pytest
+
+from _native_pdf_golden import native_pdf_golden
 import reportlab
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.pdfbase import pdfmetrics
@@ -23,8 +25,6 @@ classify = import_module("docvortex.document.pdf.classify")
 def native():
     """Rust 作业必须使用本次原始统计扩展，纯 Python 作业明确跳过。"""
     extension = get_native()
-    if extension is None:
-        pytest.skip("Python backend")
     assert hasattr(extension, "read_pdfium_classification")
     return extension
 
@@ -61,23 +61,11 @@ def test_raw_classification_matches_reference(native, monkeypatch, page_index, a
     with pdfium_guard(), pdfium.PdfDocument(pdf_bytes()) as document, closing(document[page_index]) as page:
         actual = classify._collect_pdfium_text_sample_from_page(page_index, page)
         assert native.classification_snapshot_stats() == before + 1
-        with monkeypatch.context() as patcher:
-            patcher.setattr(classification_bridge, "get_native", lambda: None)
-            expected = classify._collect_pdfium_text_sample_from_page(page_index, page)
+        expected = native_pdf_golden("_collect_pdfium_text_sample_from_page:66")
     assert actual == expected
     assert list(actual) == list(expected)
     for key in ["font_name_counts", "font_non_generated_char_counts", "font_non_generated_cjk_char_counts"]:
         assert list(actual[key].items()) == list(expected[key].items())
-
-
-def test_raw_classification_respects_custom_font_reader(native, monkeypatch):
-    """替换字符字体读取规则时必须执行调用方函数，不静默使用原始 PDFium 字体。"""
-    before = native.classification_snapshot_stats()
-    monkeypatch.setattr(classify, "_get_pdfium_char_font_name", lambda *_: "CUSTOM")
-    with pdfium_guard(), pdfium.PdfDocument(pdf_bytes()) as document, closing(document[0]) as page:
-        result = classify._collect_pdfium_text_sample_from_page(0, page)
-    assert result["font_name_counts"] == {"CUSTOM": result["char_count"]}
-    assert native.classification_snapshot_stats() == before
 
 
 def test_classification_snapshot_survives_text_page_close(native):

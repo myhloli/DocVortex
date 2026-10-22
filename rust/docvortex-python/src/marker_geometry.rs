@@ -48,11 +48,9 @@ pub(super) fn marker_sources_owned<'py>(
     line_type: &Bound<'py, PyAny>,
     bbox_type: &Bound<'py, PyAny>,
 ) -> PyResult<Option<Bound<'py, PyDict>>> {
-    let Ok(lines) = lines.cast_exact::<PyList>() else {
-        return Ok(None);
-    };
     let output = PyDict::new(py);
-    for line in lines.iter() {
+    for line in lines.try_iter()? {
+        let line = line?;
         if !line.get_type().is(line_type)
             || !line
                 .getattr(pyo3::intern!(py, "text"))?
@@ -72,9 +70,6 @@ pub(super) fn marker_sources_owned<'py>(
             let Ok(char) = char.cast_exact::<PyDict>() else {
                 return Ok(None);
             };
-            if !super::conversion::plain_string_keys(char) {
-                return Ok(None);
-            }
             if char
                 .get_item(pyo3::intern!(py, "char"))?
                 .is_some_and(|text| !text.is_none() && !text.is_exact_instance_of::<PyString>())
@@ -119,9 +114,8 @@ pub(super) fn marker_glyphs_owned<'py>(
     {
         return Ok(None);
     }
-    let Ok(angle) = angle.extract::<i32>() else {
-        return Ok(None);
-    };
+    // 超出 i32 的整数不可能是四个标准方向，原旋转规则将它视为未旋转。
+    let angle = angle.extract::<i32>().unwrap_or(0);
     let mut size = [0.0; 2];
     for (i, number) in size.iter_mut().enumerate() {
         let value = page.get_item(i)?;
@@ -146,9 +140,6 @@ pub(super) fn marker_glyphs_owned<'py>(
         let Ok(char) = char.cast_exact::<PyDict>() else {
             return Ok(None);
         };
-        if !super::conversion::plain_string_keys(char) {
-            return Ok(None);
-        }
         let value = match char.get_item(pyo3::intern!(py, "char"))? {
             None => PyString::new(py, ""),
             Some(value) if value.is_none() => PyString::new(py, ""),
@@ -159,9 +150,6 @@ pub(super) fn marker_glyphs_owned<'py>(
                 value.cast_into::<PyString>()?
             }
         };
-        if value.to_str().is_err() {
-            return Ok(None);
-        }
         let bbox = match char.get_item(pyo3::intern!(py, "bbox"))? {
             None => None,
             Some(value) if value.is_none() => None,
@@ -177,7 +165,10 @@ pub(super) fn marker_glyphs_owned<'py>(
     let output = PyList::empty(py);
     let mut features: HashMap<String, Option<Bound<'py, PyAny>>> = HashMap::new();
     for (value, bbox) in inputs {
-        let raw = value.to_str()?;
+        let Ok(raw) = value.to_str() else {
+            // 含孤立代理项的字符串不满足 Python isprintable，按原规则跳过。
+            continue;
+        };
         let normalized = if let Some(feature) = features.get(raw) {
             feature.clone()
         } else {

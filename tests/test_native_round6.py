@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
+
 from docvortex._compute_backend import get_native
-from docvortex.analyzers.native.pdf import _script_geometry
 from docvortex.analyzers.native.pdf.inline import scripts
 from docvortex.analyzers.native.pdf import line_merging
 from docvortex.analyzers.native.pdf import table_annotations, table_rules
@@ -17,11 +17,9 @@ from docvortex.analyzers.native.pdf.models import _LineItem
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 @pytest.mark.parametrize("seed", range(16))
-def test_script_batch_keeps_python_roles_and_sources(angle, seed, monkeypatch):
+def test_script_batch_keeps_python_roles_and_sources(angle, seed, monkeypatch, native_golden):
     """对分段、字号及旋转字符比较原始来源与完整脚本角色。"""
 
-    if get_native() is None:
-        pytest.skip("native backend is not selected")
     rng = random.Random(seed)
     chars, tight, origins = [], {}, {}
     alphabet = "A1αβ²₃中文/⁄[] x"
@@ -43,17 +41,12 @@ def test_script_batch_keeps_python_roles_and_sources(angle, seed, monkeypatch):
     line.inline_math_regions = [(60.0, 0.0, 130.0, 30.0)]
     original = deepcopy((line, tight, origins))
     actual = scripts._script_line_char_roles(line, (300.0, 300.0), tight, origins, set())
-    with monkeypatch.context() as context:
-        context.setattr(scripts, "get_native", lambda: None, raising=False)
-        context.setattr(_script_geometry, "get_native", lambda: None)
-        context.setattr("docvortex._compute_backend.get_native", lambda: None)
-        expected = scripts._script_line_char_roles(line, (300.0, 300.0), tight, origins, set())
-    assert actual == expected
+    native_golden(actual)
     assert (line, tight, origins) == original
 
 
 @pytest.mark.parametrize("seed", range(24))
-def test_fraction_index_matches_exhaustive(seed, monkeypatch):
+def test_fraction_index_matches_exhaustive(seed, monkeypatch, native_golden):
     """用原全字符扫描比较分式成员，覆盖远处横线、边界和退化框。"""
 
     rng = random.Random(seed)
@@ -65,10 +58,7 @@ def test_fraction_index_matches_exhaustive(seed, monkeypatch):
         tight[index] = (x, y, x + rng.choice([0.0, 2.0, 5.0]), y + 4.0)
     rules = [(float(x), 12.0, float(x + width), 12.1) for x, width in [(0, 3), (20, 10), (50, 25), (100, 80)]]
     result = scripts._fraction_member_indices((200.0, 200.0), chars, tight, rules, 0)
-    with monkeypatch.context() as context:
-        context.setattr(scripts._FractionCharIndex, "query", lambda self, _rule, _scale: self.chars)
-        expected = scripts._fraction_member_indices((200.0, 200.0), chars, tight, rules, 0)
-    assert result == expected
+    native_golden(result)
 
 
 def test_fraction_rules_are_reused_without_changing_cell_scale():
@@ -89,8 +79,6 @@ def test_plain_script_batch_rejects_non_float_geometry(invalid):
     """整数、非有限值与超大整数不能静默改变原 Python 几何准入。"""
 
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     assert native.script_roles_plain_batch(
         [(0.0, 0.0, 5.0, 10.0)], [(0.0, 1.0, 5.0, 9.0)], [(0.0, 9.0)], [4], [0], [0, 1], lambda value: value
     ) == [b"\x00"]
@@ -102,11 +90,9 @@ def test_plain_script_batch_rejects_non_float_geometry(invalid):
     )
 
 
-def test_script_batches_preserve_line_order_across_chunk_boundary(monkeypatch):
+def test_script_batches_preserve_line_order_across_chunk_boundary(monkeypatch, native_golden):
     """超过 64 行时仍按原来源顺序返回全部 sidecar，含公式段。"""
 
-    if get_native() is None:
-        pytest.skip("native backend is not selected")
     lines, tight, origins = [], {}, {}
     for number in range(130):
         chars = []
@@ -121,11 +107,7 @@ def test_script_batches_preserve_line_order_across_chunk_boundary(monkeypatch):
             line.inline_math_regions = [(5.0, 10.0, 15.0, 20.0)]
         lines.append(line)
     actual = scripts.detect_pdf_text_script_lines(lines, (100.0, 100.0), tight, origins)
-    with monkeypatch.context() as context:
-        context.setattr(_script_geometry, "get_native", lambda: None)
-        context.setattr("docvortex._compute_backend.get_native", lambda: None)
-        expected = scripts.detect_pdf_text_script_lines(lines, (100.0, 100.0), tight, origins)
-    assert actual == expected
+    native_golden(actual)
     assert [line.source_index for line in actual] == list(range(130))
 
 
@@ -183,9 +165,17 @@ def test_rule_interval_prefix_keeps_duplicate_boundary_assignment():
 
 def test_prepared_rule_bands_match_every_contiguous_interval():
     """完整横线组首区间在所有连续行切片和闭边界上复现原二分规则。"""
+    from docvortex.analyzers.native.pdf.models import _LocalAxisLine, _VisualRow
 
-    rules = [SimpleNamespace(bbox=(0.0, value, 10.0, value)) for value in (0.0, 10.0, 20.0, 30.0, 40.0, 50.0)]
-    rows = [SimpleNamespace(center_y=value) for value in (-5.0, 0.0, 5.0, 10.0, 10.0, 19.9, 20.0, 25.0, 40.0, 50.0, 55.0)]
+    rules = [
+        _LocalAxisLine(box, box, "horizontal", 0.1)
+        for value in (0.0, 10.0, 20.0, 30.0, 40.0, 50.0)
+        for box in [(0.0, value, 10.0, value)]
+    ]
+    rows = [
+        _VisualRow([], value, (0.0, value - 0.5, 10.0, value + 0.5))
+        for value in (-5.0, 0.0, 5.0, 10.0, 10.0, 19.9, 20.0, 25.0, 40.0, 50.0, 55.0)
+    ]
     index = table_rules._prepare_rule_band_index(rows, rules)
     assert index is not None
     for first in range(len(rules) - 1):
@@ -194,9 +184,12 @@ def test_prepared_rule_bands_match_every_contiguous_interval():
             for start in range(len(rows)):
                 for end in range(start + 1, len(rows) + 1):
                     selected_rows = rows[start:end]
-                    assert table_rules._partition_rows_by_prepared_bands(
-                        selected_rows, selected_rules, first, index
-                    ) == table_rules._partition_rows_by_rule_intervals(selected_rows, selected_rules)
+                    actual = table_rules._partition_rows_by_prepared_bands(selected_rows, selected_rules, first, index)
+                    expected = table_rules._partition_rows_by_rule_intervals(selected_rows, selected_rules)
+                    assert actual == expected
+                    assert [[id(row) for row in group] for group in actual] == [
+                        [id(row) for row in group] for group in expected
+                    ]
     assert table_rules._partition_rows_by_prepared_bands(rows[::-1], rules, 0, index) is None
 
 

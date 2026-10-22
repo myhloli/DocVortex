@@ -57,6 +57,42 @@ struct Cluster {
     loose: f64,
 }
 
+/// 复现 CPython 非负整数字符索引集合的槽位次序，保证等距平局仍选择同一正文字符。
+fn body_set_order(indices: &[usize]) -> Vec<usize> {
+    // 按 CPython 的线性探测和扰动序列插入一个来源索引。
+    fn insert(slots: &mut [Option<usize>], value: usize) {
+        let mask = slots.len() - 1;
+        let mut perturb = value;
+        let mut index = value & mask;
+        loop {
+            let probes = if index + 9 <= mask { 9 } else { 0 };
+            for offset in 0..=probes {
+                if slots[index + offset].is_none() {
+                    slots[index + offset] = Some(value);
+                    return;
+                }
+            }
+            perturb >>= 5;
+            index = (index * 5 + 1 + perturb) & mask;
+        }
+    }
+    let mut slots = vec![None; 8];
+    for (position, &index) in indices.iter().enumerate() {
+        insert(&mut slots, index);
+        let used = position + 1;
+        if used * 5 >= (slots.len() - 1) * 3 {
+            let minimum = used * if used > 50000 { 2 } else { 4 };
+            let size = (minimum + 1).next_power_of_two().max(8);
+            let mut resized = vec![None; size];
+            for value in slots.into_iter().flatten() {
+                insert(&mut resized, value);
+            }
+            slots = resized;
+        }
+    }
+    slots.into_iter().flatten().collect()
+}
+
 /// 返回上下标角色：零为正文、一为上标、二为下标。
 fn role(shift: f64) -> u8 {
     if shift > 0.0 {
@@ -360,26 +396,19 @@ fn assign(f: &[Feature], indices: &[usize], roles: &mut [u8]) -> Option<()> {
             continue;
         }
         let mut best: Option<(f64, usize, usize)> = None;
-        let mut tied = false;
-        for &j in &b.indices {
+        for j in body_set_order(&b.indices) {
             let key = (gap(item.tight.unwrap(), f[j].tight.unwrap()), i.abs_diff(j));
             match best {
-                Some((d, n, _)) if key == (d, n) => {
-                    tied = true;
-                }
+                Some((d, n, _)) if key == (d, n) => {}
                 Some((d, n, _)) if key > (d, n) => {}
                 _ => {
                     best = Some((key.0, key.1, j));
-                    tied = false;
                 }
             }
         }
         let Some((distance, _, j)) = best else {
             continue;
         };
-        if tied {
-            return None;
-        }
         let reference = &f[j];
         if distance > 2.5_f64.max(reference.th() * 1.2)
             || item.th() / reference.th().max(1e-6) > 0.88
@@ -540,7 +569,22 @@ fn numeric(f: &[Feature], roles: &[u8]) -> Vec<usize> {
     accepted
 }
 
-/// 分类整批字符；极端浮点或集合顺序平局由参考算法精确处理。
+/// 对后续 token 精炼复用同一数字引用内核，避免维护第二套 Python 基线分类。
+pub fn numeric_indices(records: Vec<Record>, roles: &[u8]) -> Vec<usize> {
+    let features: Vec<_> = records
+        .into_iter()
+        .map(|(loose, tight, origin, flags, font)| Feature {
+            loose,
+            tight,
+            origin,
+            flags,
+            font,
+        })
+        .collect();
+    numeric(&features, roles)
+}
+
+/// 分类整批字符；正文集合平局沿用 CPython 索引顺序。
 pub fn classify(records: Vec<Record>) -> Option<Vec<u8>> {
     let f: Vec<_> = records
         .into_iter()
@@ -557,7 +601,7 @@ pub fn classify(records: Vec<Record>) -> Option<Vec<u8>> {
             .iter()
             .chain(v.tight.iter().flatten())
             .chain(v.origin.iter().flatten())
-            .any(|x| !x.is_finite() || x.abs() > 1e150)
+            .any(|x| !x.is_finite())
     }) {
         return None;
     }

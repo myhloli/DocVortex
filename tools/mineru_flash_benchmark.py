@@ -335,7 +335,6 @@ def spawn_worker(args, kind):
     environment.update(
         {
             "PYTHONPATH": os.pathsep.join((str((args.docvortex_source / "src").resolve()), str(args.mineru_source.resolve()))),
-            "DOCVORTEX_COMPUTE_BACKEND": args.backend,
             "DOCVORTEX_PDF_RENDER_BACKEND": args.render_backend,
             "DOCVORTEX_PDF_RENDER_THREADS": str(args.processes),
             "MINERU_PDF_RENDER_THREADS": str(args.processes),
@@ -357,7 +356,6 @@ def main():
     parser.add_argument("--docvortex-source", type=Path, required=True)
     parser.add_argument("--mineru-source", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True, help="新建的基准目录；memory 模式复用已完成计时目录")
-    parser.add_argument("--backend", choices=("python", "rust"), required=True)
     parser.add_argument("--render-backend", choices=("legacy", "session"), default="legacy")
     parser.add_argument("--mode", choices=("timing", "memory", "both"), default="both")
     parser.add_argument("--runs", type=int, default=5)
@@ -376,7 +374,7 @@ def main():
         "path": str(args.path.resolve()),
         "docvortex_source": str(args.docvortex_source.resolve()),
         "mineru_source": str(args.mineru_source.resolve()),
-        "compute_backend": args.backend,
+        "compute_backend": "rust",
         "render_backend": args.render_backend,
         "runs": args.runs,
         "window": args.window,

@@ -365,7 +365,6 @@ def spawn_worker(config_path, output, config):
     environment.update(
         {
             "PYTHONPATH": str(Path(config["source"]) / "src"),
-            "DOCVORTEX_COMPUTE_BACKEND": config["compute_backend"],
             "DOCVORTEX_PDF_RENDER_BACKEND": config["render_backend"],
             "DOCVORTEX_PDF_RENDER_THREADS": str(config["processes"]),
             "LOGURU_LEVEL": "WARNING",
@@ -386,7 +385,6 @@ def main():
     parser.add_argument("--candidate-source", type=Path)
     parser.add_argument("--baseline-render-backend", choices=("legacy", "session"), default="legacy")
     parser.add_argument("--candidate-render-backend", choices=("legacy", "session"), default="session")
-    parser.add_argument("--backend", choices=("python", "rust"))
     parser.add_argument("--window", type=int, default=4)
     parser.add_argument("--processes", type=int, default=3)
     parser.add_argument("--iterations", type=int, default=5)
@@ -398,8 +396,8 @@ def main():
     if args.worker:
         memory_worker(json.loads(args.worker.read_text()), args.output)
         return
-    if not all((args.path, args.baseline_source, args.candidate_source, args.backend)):
-        parser.error("path, both source roots and backend are required")
+    if not all((args.path, args.baseline_source, args.candidate_source)):
+        parser.error("path and both source roots are required")
     if min(args.window, args.processes, args.iterations, args.timeout, args.memory_budget_ratio) <= 0 or args.output.exists():
         parser.error("positive limits and a new output directory are required")
     read_input, _, source_identity = benchmark_helpers()
@@ -423,7 +421,7 @@ def main():
             "source_sha256": source_hash,
             "payload_sha256": hashlib.sha256(payload).hexdigest(),
             "source_encoding": encoding,
-            "compute_backend": args.backend,
+            "compute_backend": "rust",
             "render_backend": render_backend,
             "window": args.window,
             "processes": args.processes,

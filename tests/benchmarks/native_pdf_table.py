@@ -163,11 +163,7 @@ def main() -> None:
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--external-pdf", type=Path)
     parser.add_argument("--flash-baseline", type=Path)
-    parser.add_argument(
-        "--backend", choices=("auto", "python", "rust"), default=os.environ.get("DOCVORTEX_COMPUTE_BACKEND", "auto")
-    )
     args = parser.parse_args()
-    os.environ["DOCVORTEX_COMPUTE_BACKEND"] = args.backend
     if args.runs < 1 or args.output.exists():
         parser.error("runs must be positive and output must not already exist")
     if args.external_pdf and not args.flash_baseline:

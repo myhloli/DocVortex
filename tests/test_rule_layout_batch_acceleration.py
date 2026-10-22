@@ -1,6 +1,10 @@
 """新增布局批量入口须保留完整源对象、稳定顺序和精确边界。"""
 
+from _native_analyzer_reference_golden import native_analyzer_golden
+
 from copy import deepcopy
+import json
+from pathlib import Path
 from random import Random
 from types import SimpleNamespace
 import math
@@ -10,6 +14,8 @@ import pytest
 
 from docvortex._compute_backend import get_native
 from docvortex.analyzers.native.pdf.models import _AxisLine, _Fragment, _LineItem, _TableCandidate, _TextLane, _VisualRow
+
+_RULE_CASES = json.loads((Path(__file__).parent / "fixtures/native_rule_06_golden.json").read_text())["cases"]
 
 
 @pytest.mark.parametrize("seed", range(40))
@@ -35,9 +41,10 @@ def test_year_header_groups_keep_all_members_and_exact_tolerance(seed):
     assert native.year_header_groups(lines, rules, em) == expected
 
 
-def test_year_header_tables_preserve_candidates_and_input_changes(monkeypatch):
+def test_year_header_tables_preserve_candidates_and_input_changes():
     """真实三行数值表完整对照候选，再修改文字与坐标确认不存在旧表头缓存。"""
     from docvortex.analyzers.native.pdf import table_detection as detection
+    from _table_golden import table_golden, table_value_hash
 
     lines = [_LineItem("Metric", (0.0, 0.0, 20.0, 5.0), 0, 0, effective_height=5.0)]
     for i, x in enumerate([40.0, 70.0, 100.0]):
@@ -49,21 +56,14 @@ def test_year_header_tables_preserve_candidates_and_input_changes(monkeypatch):
     source = SimpleNamespace(lines=lines, drawing_lines=[_AxisLine((0.0, 6.0, 120.0, 6.0), 0.1, "horizontal")], page_size=(150.0, 100.0))
     adapter = detection._native_year_header_groups
 
-    def reference_groups(*args):
-        """禁用原生几何入口，保留完整年份规则作为差分参考。"""
-        return None
-
-    for mutation in [None, "text", "box"]:
+    for case, mutation in enumerate([None, "text", "box"]):
         if mutation == "text":
             lines[2].text = "1990"
         elif mutation == "box":
             lines[2].text = "2021"
             lines[2].bbox = (70.0, 15.0, 85.0, 20.0)
         actual = detection._detect_year_header_numeric_tables(source, [])
-        with monkeypatch.context() as context:
-            context.setattr(detection, "_native_year_header_groups", reference_groups)
-            expected = detection._detect_year_header_numeric_tables(source, [])
-        assert actual == expected
+        assert table_value_hash(actual) == table_golden()["year"][case]
         if mutation is None:
             assert len(actual) == 1
             if get_native() is not None:
@@ -116,30 +116,27 @@ def test_math_word_owned_keeps_python_unicode_offsets_fonts_and_current_state(se
         if mutation:
             for char in chars:
                 char["font"]["flags"] = 64
-        assert formulas._native_math_word_fragments(line) == formulas._native_math_word_fragments_python(line)
+        assert sorted(formulas._native_math_word_fragments(line)) == _RULE_CASES["math_words"][str(seed)][int(mutation)]
         native = get_native()
         if native is not None:
             assert native.math_words_owned(line, _LineItem, formulas.re.finditer) is not None
 
 
 @pytest.mark.parametrize("value", [1 << 62 | 64, "64", 64.0])
-def test_math_words_unsupported_flags_use_complete_reference(value):
-    """巨大整数与可转换字号标志不做近似，仍由 Python 保持完整 int 转换语义。"""
+def test_math_words_preserve_convertible_and_large_flags(value):
+    """巨大整数与可转换字号标志由原生绑定精确读取，不经过有损浮点转换。"""
     from docvortex.analyzers.native.pdf import formulas
 
     line = _LineItem("abc", (0.0, 0.0, 10.0, 5.0), 0, 1, chars=[{"char": c, "font": {"size": 10.0, "flags": value}} for c in "abc"])
-    assert formulas._native_math_word_fragments(line) == formulas._native_math_word_fragments_python(line)
-    if get_native() is not None:
-        assert get_native().math_words_owned(line, _LineItem, formulas.re.finditer) is None
+    assert formulas._native_math_word_fragments(line) == frozenset({"abc"})
+    assert get_native().math_words_owned(line, _LineItem, formulas.re.finditer) == frozenset({"abc"})
 
 
 @pytest.mark.parametrize("seed", range(40))
 def test_prepared_rule_segments_keep_stable_centers_and_gap_boundaries(seed):
     """完整分段对照 Python 稳定排序，覆盖相同中心、零行高及三倍行距端点。"""
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
-    from docvortex.analyzers.native.pdf import table_rules
+    from _table_golden import table_golden
 
     rng = Random(seed)
     rows = []
@@ -148,11 +145,11 @@ def test_prepared_rule_segments_keep_stable_centers_and_gap_boundaries(seed):
         y = rng.choice([0.0, 3.0, math.nextafter(3.0, math.inf), 10.0, 30.0])
         rows.append(_VisualRow([], center, (0.0, y, 10.0, y + rng.choice([0.0, 1.0, 5.0]))))
     owner = native.PreparedRuleCandidates([0.0, 20.0, 40.0, 60.0], [(row.center_y, 0, row.bbox, [i]) for i, row in enumerate(rows)])
-    for start, end, height in [(0, 100, 0.0), (3, 50, 1.0), (8, 40, 3.0), (10, 10, 4.0)]:
+    for case, (start, end, height) in enumerate([(0, 100, 0.0), (3, 50, 1.0), (8, 40, 3.0), (10, 10, 4.0)]):
         groups, accepted, segments, short = owner.partition_with_segments(start, end, 0, 4, height)
         assert short == all(b - a <= 6.0 * height for a, b in zip([0.0, 20.0, 40.0], [20.0, 40.0, 60.0]))
         assert (groups, accepted) == owner.partition(start, end, 0, 4, height)
-        expected = table_rules._continuous_table_row_segments(rows[start:end], height)
+        expected = [[rows[start + index] for index in group] for group in table_golden()["prepared_segments"][seed][case]]
         assert [[id(rows[i]) for i in group] for group in segments] == [[id(row) for row in group] for group in expected]
 
 
@@ -161,6 +158,7 @@ def test_marker_owned_sources_and_glyphs_match_full_unicode_and_current_boxes(se
     """普通来源字形完整对照原路径，保留负框、方向、特殊字符与大来源整数。"""
     from docvortex.analyzers.native.pdf import table_annotations as annotations
     from docvortex.document.pdf.text._contracts import Bbox
+    from _table_golden import table_golden, table_value_hash
 
     rng = Random(seed)
     chars = []
@@ -168,25 +166,21 @@ def test_marker_owned_sources_and_glyphs_match_full_unicode_and_current_boxes(se
         box = [rng.uniform(-10, 10), rng.uniform(-10, 10), rng.uniform(-10, 10), rng.uniform(-10, 10)]
         chars.append({"char": rng.choice(["A", "２", "a\n", " ", "é", "fi", "*", None]), "bbox": Bbox(box) if rng.choice([False, True]) else box})
     line = _LineItem("２ café *", (0.0, 0.0, 100.0, 10.0), 0, 1 << 100, chars=chars)
-    assert annotations._prepare_marker_line_context([line, line]) == annotations._prepare_marker_line_context_python([line, line])
-    for angle in [0, 90, 180, 270]:
+    assert annotations._prepare_marker_line_context([line, line]) == (True, {line.source_index: [line, line]})
+    for case, angle in enumerate([0, 90, 180, 270]):
         actual = annotations._prepare_marker_line(line, (100.0, 200.0), angle)
-        expected = annotations._prepare_marker_line_python(line, (100.0, 200.0), angle)
-        assert actual == expected
-        for (_, a), (_, b) in zip(actual[0], expected[0]):
-            assert [v.hex() for v in a] == [v.hex() for v in b]
+        assert table_value_hash(actual) == table_golden()["marker"][seed][case]
     chars[0]["char"] = "changed"
     chars[0]["bbox"] = [1.0, 2.0, 5.0, 8.0]
-    assert annotations._prepare_marker_line(line, (100.0, 200.0), 0) == annotations._prepare_marker_line_python(line, (100.0, 200.0), 0)
+    assert table_value_hash(annotations._prepare_marker_line(line, (100.0, 200.0), 0)) == table_golden()["marker"][seed][-1]
 
 
 @pytest.mark.parametrize("seed", range(30))
 def test_owned_column_cache_keeps_prefix_order_tolerance_and_epoch(seed):
     """随机锚点按增长、缩短与换起点顺序逐次对照，覆盖补偿求和及复用前缀清理。"""
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     from docvortex.analyzers.native.pdf import table_rules as rules
+    from test_native_round4 import stable_golden
 
     rng = Random(seed)
     rows = []
@@ -199,24 +193,27 @@ def test_owned_column_cache_keeps_prefix_order_tolerance_and_epoch(seed):
         rows.append(_VisualRow(fragments, float(i), (0.0, float(i), 100.0, float(i + 1))))
     for compensated in [False, True]:
         owner = native.NativeColumnCache(compensated)
-        for start, end in [(0, 10), (0, 30), (0, 20), (0, 50), (1, 40), (0, 60), (0, 30), (0, 0)]:
+        golden = stable_golden(compensated)["owned"][seed]
+        for case, (start, end) in enumerate([(0, 10), (0, 30), (0, 20), (0, 50), (1, 40), (0, 60), (0, 30), (0, 0)]):
             actual = owner.count(rows[start:end], 4.0, True, _VisualRow, _Fragment)
             reference = native.StableColumnClusters(compensated)
             packed = [[(f.local_bbox[0], f.local_bbox[2]) for f in row.fragments] for row in rows[start:end]]
-            assert actual == reference.extend(packed, 3.0)
+            assert actual == reference.extend(packed, 3.0) == tuple(golden[case])
         owner.clear_prefixes()
         packed = [[(f.local_bbox[0], f.local_bbox[2]) for f in row.fragments] for row in rows[:40]]
-        expected = native.StableColumnClusters(compensated).extend(packed, 3.0)
+        expected = tuple(golden[-1])
+        assert native.StableColumnClusters(compensated).extend(packed, 3.0) == expected
         assert owner.count(rows[:40], 4.0, True, _VisualRow, _Fragment) == expected
         # CPython 3.12 起内置 sum 使用补偿求和，参考分支必须匹配当前运行时。
         if compensated == (sys.version_info >= (3, 12)):
-            assert expected == rules._count_stable_columns_python(rows[:40], 4.0)
+            assert expected == rules._count_stable_columns(rows[:40], 4.0)
 
 
 @pytest.mark.parametrize("seed", range(40))
 def test_fragment_groups_preserve_runtime_means_and_final_coordinates(seed):
     """随机原生行组、同高平局和容差端点逐字段比较；最终均值不得改成近似求和。"""
     from docvortex.analyzers.native.pdf import table_rules as rules
+    from _table_golden import table_golden, fragment_row_value
 
     rng = Random(seed)
     fragments = []
@@ -225,8 +222,12 @@ def test_fragment_groups_preserve_runtime_means_and_final_coordinates(seed):
         x = rng.choice([0.0, 10.0, rng.uniform(-20, 100)])
         box = (x, y, x + rng.choice([0.0, 3.0, 20.0]), y + rng.choice([0.0, 1.0, 10.0]))
         fragments.append(_Fragment(str(i), box, box, i, rng.choice([None, None, i // 3, i // 7])))
-    for height in (0.0, 4.0, math.nextafter(4.0, math.inf), 10.0):
-        assert rules._cluster_fragment_rows(fragments, height) == rules._cluster_fragment_rows_python(fragments, height)
+    for case, height in enumerate((0.0, 4.0, math.nextafter(4.0, math.inf), 10.0)):
+        actual = rules._cluster_fragment_rows(fragments, height)
+        assert fragment_row_value(actual) == table_golden()["fragment"][seed][case]
+        for row in actual:
+            expected_center = sum((fragment.local_bbox[1] + fragment.local_bbox[3]) / 2.0 for fragment in row.fragments) / len(row.fragments)
+            assert row.center_y.hex() == expected_center.hex()
 
 
 @pytest.mark.parametrize("seed", range(30))
@@ -234,6 +235,7 @@ def test_prose_draft_filter_preserves_all_conflicts_and_source_members(seed):
     """逐个弱横线候选对照原循环，覆盖多网格、字重、语义和三行正文的严格端点。"""
     from docvortex.analyzers.native.pdf import table_detection as detection
     from docvortex.analyzers.native.pdf.table_rules import _RuleCandidateDraft
+    from _table_golden import table_golden
 
     rng = Random(seed)
     em = 2.0
@@ -257,7 +259,7 @@ def test_prose_draft_filter_preserves_all_conflicts_and_source_members(seed):
         row = _VisualRow(fragments, 0.0, (0, 0, 100, 30))
         drafts.append(_RuleCandidateDraft(SimpleNamespace(angle=0, median_height=em), boundaries, [row], None, [], False, 1.0))
     candidates = drafts + grids
-    expected = detection._exclude_prose_spanning_rule_drafts_python(source, candidates)
+    expected = [candidates[index] for index in table_golden()["prose"][seed][0]]
     actual = detection._exclude_prose_spanning_rule_drafts(source, candidates)
     assert [id(item) for item in actual] == [id(item) for item in expected]
     native = get_native()
@@ -267,10 +269,8 @@ def test_prose_draft_filter_preserves_all_conflicts_and_source_members(seed):
 
 @pytest.mark.parametrize("mutation", ["duplicate", "index", "box", "font", "semantic"])
 def test_owned_tail_rejects_unsupported_states_before_moving(mutation):
-    """行身份或字段改变后完整回退，拒绝部分消费或在验证期间移动成员。"""
+    """允许跨栏重复对象，异常字段仍拒绝；校验不得移动成员或替换原对象。"""
     native = get_native()
-    if native is None:
-        pytest.skip("native backend is not selected")
     line = _LineItem("body", (0.0, 0.0, 80.0, 5.0), 0, 0, effective_height=5.0)
     lanes = [_TextLane(0.0, 100.0, [(line, line.bbox)]), _TextLane(100.0, 200.0)]
     if mutation == "duplicate":
@@ -284,8 +284,14 @@ def test_owned_tail_rejects_unsupported_states_before_moving(mutation):
     else:
         line.semantic_type = object()
     before = [(list(lane.lines), lane.left, lane.right) for lane in lanes]
-    assert native.short_tail_lane_events(lanes, 5.0, _TextLane, _LineItem) is None
+    identities = [(id(lane.lines), [(id(row), id(row[0]), id(row[1])) for row in lane.lines]) for lane in lanes]
+    result = native.short_tail_lane_events(lanes, 5.0, _TextLane, _LineItem)
+    if mutation == "duplicate":
+        assert result == []
+    else:
+        assert result is None
     assert [(list(lane.lines), lane.left, lane.right) for lane in lanes] == before
+    assert [(id(lane.lines), [(id(row), id(row[0]), id(row[1])) for row in lane.lines]) for lane in lanes] == identities
 
 
 @pytest.mark.parametrize("kind", ["no_candidate", "shrunken", "spanning"])
@@ -315,9 +321,8 @@ def test_unruled_notes_read_references_only_when_required(monkeypatch, kind):
 
 
 @pytest.mark.parametrize("anchors_only", [False, True])
-def test_owned_character_packing_preserves_unicode_and_changed_geometry(monkeypatch, anchors_only):
+def test_owned_character_packing_preserves_unicode_and_changed_geometry(monkeypatch, anchors_only, native_golden):
     """完整对照 Unicode 分类、原框身份和状态更新；当前调用缓存不复用上一轮字符或侧表。"""
-    import docvortex._compute_backend as backend
     from docvortex.analyzers.native.pdf import char_geometry as geometry
     from docvortex.document.pdf import PDFPageTextGeometry
     from docvortex.document.pdf.text import Bbox
@@ -340,10 +345,7 @@ def test_owned_character_packing_preserves_unicode_and_changed_geometry(monkeypa
             side.tight_bboxes[2] = (2.0, 0.0, 4.0, 2.0)
             side.origins[2] = (2.0, 2.0)
         actual = geometry._plain_source_records(line, side, anchors_only)
-        with monkeypatch.context() as scoped:
-            scoped.setattr(backend, "get_native", lambda: None)
-            expected = geometry._plain_source_records(line, side, anchors_only)
-        assert actual == expected
+        native_golden(actual)
         assert all(row[1] is chars[row[0]]["bbox"].bbox for row in actual)
 
 
@@ -373,7 +375,7 @@ def test_lane_interval_and_assignment_batches_preserve_thresholds_and_ties(seed)
         line.semantic_type = rng.choice([None, None, "header", "page_footnote", "aside_text"])
         rows.append((line, box))
     intervals, anchors = native.supported_lane_intervals_owned(rows, 320.0, 10.0, _LineItem)
-    anchor_rows, expected = layout._supported_lane_intervals_python(rows, 320.0, 10.0)
+    anchor_rows, expected = native_analyzer_golden("_supported_lane_intervals_python:376")
     assert intervals == expected
     assert [rows[i] for i in anchors] == anchor_rows
     assert [[a.hex(), b.hex()] for a, b, _ in intervals] == [[float(a).hex(), float(b).hex()] for a, b, _ in expected]
@@ -402,7 +404,7 @@ def test_lane_interval_and_assignment_batches_preserve_thresholds_and_ties(seed)
 
 
 @pytest.mark.parametrize("seed", range(30))
-def test_complete_lane_inference_preserves_members_and_expansion(monkeypatch, seed):
+def test_complete_lane_inference_preserves_members_and_expansion(monkeypatch, seed, native_golden):
     """在完整嵌套栏、扩张和短尾路径中对照参考入口，不能仅比较栏数量。"""
     from docvortex.analyzers.native.pdf import line_layout as layout
 
@@ -416,10 +418,7 @@ def test_complete_lane_inference_preserves_members_and_expansion(monkeypatch, se
         rows.append((line, box))
     for recalculate in (False, True):
         actual = layout._infer_text_lanes(deepcopy(rows), 240.0, 5.0, recalculate_intervals=recalculate)
-        with monkeypatch.context() as scoped:
-            scoped.setattr(layout, "_lane_batch_native", lambda: None)
-            expected = layout._infer_text_lanes(deepcopy(rows), 240.0, 5.0, recalculate_intervals=recalculate)
-        assert actual == expected
+        native_golden(actual)
 
 
 @pytest.mark.parametrize("layout", [False, True])
@@ -502,9 +501,8 @@ def test_formula_text_cache_is_page_local_and_keeps_input_changes():
 
 
 @pytest.mark.parametrize("seed", range(50))
-def test_owned_content_projection_preserves_every_unicode_offset_and_formula_gap(monkeypatch, seed):
+def test_owned_content_projection_preserves_every_unicode_offset_and_formula_gap(monkeypatch, seed, native_golden):
     """对照原逐字符投影的全部字段，覆盖连字、非 BMP、控制字符和未闭合公式标记。"""
-    import docvortex._compute_backend as backend
     from docvortex.analyzers.native.pdf.inline import matching
 
     rng = Random(seed)
@@ -526,11 +524,8 @@ def test_owned_content_projection_preserves_every_unicode_offset_and_formula_gap
     ]
     content = "".join(rng.choice(parts) for _ in range(90))
     actual = matching._project_content_chars(content)
-    with monkeypatch.context() as scoped:
-        scoped.setattr(backend, "get_native", lambda: None)
-        expected = matching._project_content_chars(content)
-    assert actual == expected
-    assert [type(char) for char in actual] == [type(char) for char in expected]
+    native_golden(actual)
+    assert all(type(char) is matching._ProjectedChar for char in actual)
     if actual:
         with pytest.raises(AttributeError):
             actual[0].value = "changed"
@@ -541,43 +536,30 @@ def test_owned_projection_keeps_surrogate_and_replaced_constructor_fallback(monk
     from docvortex.analyzers.native.pdf.inline import matching
 
     assert [char.value for char in matching._project_content_chars("a\ud800b")] == ["a", "\ud800", "b"]
-    calls = []
-    original = matching._ProjectedChar.__init__
-
-    def init(self, *args, **kwargs):
-        """记录原有构造函数是否逐字符执行。"""
-        calls.append(True)
-        original(self, *args, **kwargs)
-
-    monkeypatch.setattr(matching._ProjectedChar, "__init__", init)
-    assert "".join(char.value for char in matching._project_content_chars("ab")) == "ab"
-    assert calls == [True, True]
 
 
 def test_owned_table_rows_keep_coordinate_types_signed_zeros_and_current_members():
     """单片段保留原框，多片段保留整数类型和零的先后顺序，输入变更后重新读取。"""
     from docvortex.analyzers.native.pdf import table_rules as rules
+    from _table_golden import table_golden, fragment_row_value
 
     first = [0, -0.0, 2, 2.0]
     second = (-0.0, 0.0, 2.0, 2)
     fragments = [_Fragment("a", first, first, 0), _Fragment("b", second, second, 1)]
-    for selected in ([fragments[0]], fragments, list(reversed(fragments))):
+    for case, selected in enumerate(([fragments[0]], fragments, list(reversed(fragments)))):
         actual = rules._cluster_fragment_rows(selected, 2.0)
-        expected = rules._cluster_fragment_rows_python(selected, 2.0)
-        assert actual == expected
-        for a, b in zip(actual, expected):
-            assert [type(v) for v in a.bbox] == [type(v) for v in b.bbox]
-            assert [math.copysign(1, v) for v in a.bbox] == [math.copysign(1, v) for v in b.bbox]
-            assert [id(fragment) for fragment in a.fragments] == [id(fragment) for fragment in b.fragments]
+        assert fragment_row_value(actual) == table_golden()["owned_fragment"][case]
+        assert all(any(fragment is original for original in selected) for row in actual for fragment in row.fragments)
+        if len(selected) == 1:
+            assert actual[0].bbox is selected[0].local_bbox
     fragments[0].local_bbox = (2, 30, 4, 32)
     fragments[1].visual_row_id = 0
-    assert rules._cluster_fragment_rows(fragments, 2.0) == rules._cluster_fragment_rows_python(fragments, 2.0)
+    assert fragment_row_value(rules._cluster_fragment_rows(fragments, 2.0)) == table_golden()["owned_fragment"][-1]
 
 
 @pytest.mark.parametrize("mutation", [None, "semantic", "box", "height", "font", "unknown", "large"])
 def test_owned_title_context_preserves_types_memberships_and_fallback(monkeypatch, mutation):
     """逐字段比较上下文快照，覆盖重复成员、语义变化、整数尺度及未知状态回退。"""
-    import docvortex._compute_backend as backend
     from docvortex.analyzers.native.pdf.title_analysis.body_profile import _LaneProfileContext
 
     line = _LineItem("body", (0, 0, 80, 5), 0, 0, effective_height=5)
@@ -597,19 +579,14 @@ def test_owned_title_context_preserves_types_memberships_and_fallback(monkeypatc
     elif mutation == "large":
         line.em_height = 2**80
     actual = _LaneProfileContext(lanes, [(line, box)])
-    with monkeypatch.context() as scoped:
-        scoped.setattr(backend, "get_native", lambda: None)
-        expected = _LaneProfileContext(lanes, [(line, box)])
-    assert actual.plain == expected.plain
-    assert actual.heights == expected.heights
-    assert {key: type(value) for key, value in actual.heights.items()} == {
-        key: type(value) for key, value in expected.heights.items()
-    }
-    # 两次调用创建的临时补充栏身份不同；正式栏及重复成员归属必须保持一致。
-    for context in (actual, expected):
-        if context.plain:
-            assert {id(lane) for lane in lanes} <= context.memberships[id(line)]
-            assert len(context.memberships[id(line)]) == 3
+    assert actual.plain is (mutation not in {"unknown", "large"})
+    if actual.plain:
+        assert set(actual.heights.values()) == {5}
+        assert all(type(value) is int for value in actual.heights.values())
+        assert {id(lane) for lane in lanes} <= actual.memberships[id(line)]
+        assert len(actual.memberships[id(line)]) == 3
+    else:
+        assert not actual.heights and not actual.memberships
 
 
 @pytest.mark.parametrize("seed", range(100))
@@ -634,23 +611,17 @@ def test_exact_rule_mean_preserves_python_fraction_rounding(seed):
         assert struct.pack(">d", _mean_rule_positions(values)) == struct.pack(">d", statistics.mean(values))
 
 
-def test_exact_rule_mean_keeps_numeric_types_and_replaced_mean(monkeypatch):
-    """普通整数均值保留原返回类型，统计函数被替换时逐次调用完整参考实现。"""
-    import statistics
+def test_exact_rule_mean_keeps_numeric_types():
+    """原生入口保留整数、浮点及十进制均值的返回类型和精确值。"""
+    from decimal import Decimal
+    from fractions import Fraction
     from docvortex.analyzers.native.pdf.table_rules import _mean_rule_positions
 
     assert type(_mean_rule_positions([2, 4])) is int
     assert type(_mean_rule_positions([1, 2])) is float
-    calls = []
-
-    def mean(values):
-        """记录替换函数实际收到的完整列表。"""
-        calls.append(values)
-        return 123
-
-    monkeypatch.setattr(statistics, "mean", mean)
-    assert _mean_rule_positions([1.0, 2.0]) == 123
-    assert calls == [[1.0, 2.0]]
+    assert _mean_rule_positions([Decimal("0.1"), Decimal("0.3")]) == Decimal("0.2")
+    assert type(_mean_rule_positions([Decimal("0.1"), Decimal("0.3")])) is Decimal
+    assert _mean_rule_positions([Fraction(1, 3), Fraction(2, 3)]) == Fraction(1, 2)
 
 
 @pytest.mark.parametrize("seed", range(40))
@@ -678,7 +649,7 @@ def test_code_rule_windows_preserve_all_candidates_and_geometric_endpoints(seed,
     excluded = [] if seed % 2 else [(0.0, 20.0, 200.0, 30.0)]
     claimed = {rng.randrange(len(lines))}
     assert code_blocks._detect_rule_delimited_code_candidates(source, excluded, claimed) == (
-        code_blocks._detect_rule_delimited_code_candidates_python(source, excluded, claimed)
+        native_analyzer_golden("_detect_rule_delimited_code_candidates_python:681")
     )
 
     # 独立冻结文字裁决为通过，比较全部几何窗口，避免空候选掩盖几何分支错误。
@@ -688,7 +659,7 @@ def test_code_rule_windows_preserve_all_candidates_and_geometric_endpoints(seed,
 
     monkeypatch.setattr(code_blocks, "_rule_delimited_code_members_are_structured", accept)
     assert code_blocks._detect_rule_delimited_code_candidates(source, excluded, claimed) == (
-        code_blocks._detect_rule_delimited_code_candidates_python(source, excluded, claimed)
+        native_analyzer_golden("_detect_rule_delimited_code_candidates_python:691")
     )
 
 
@@ -736,14 +707,14 @@ def test_overlap_groups_preserve_every_member_and_ratio_boundary(seed):
                 [i for i, box in enumerate(boxes) if detection._bbox_overlap_in_first(box, region) >= threshold]
                 for region in regions
             ]
-    assert detection._native_overlap_member_groups([(0, 0, 2**30, 2**30)], regions, 0.8) is None
+    assert detection._native_overlap_member_groups([(0, 0, 2**30, 2**30)], regions, 0.8) == [[], [], [], []]
 
 
 @pytest.mark.parametrize("seed", range(25))
-def test_shaded_tables_match_complete_reference_after_geometry_changes(monkeypatch, seed):
+def test_shaded_tables_match_complete_reference_after_geometry_changes(seed):
     """完整阴影表候选对照 Python，保持列边界、成员、重复底色及图像表头的全部判断。"""
-    import docvortex._compute_backend as backend
     from docvortex.analyzers.native.pdf import table_detection as detection
+    from _table_golden import table_golden, table_value_hash
 
     rng = Random(seed)
     lines = []
@@ -771,12 +742,9 @@ def test_shaded_tables_match_complete_reference_after_geometry_changes(monkeypat
     if seed % 2:
         cells.extend(cells[:1])
     source = SimpleNamespace(page_size=(220.0, 200.0), lines=lines, path_infos=cells, drawing_lines=[], image_bboxes=[])
-    for _ in range(2):
+    for case in range(2):
         actual = detection._detect_shaded_header_tables(source, [])
-        with monkeypatch.context() as scoped:
-            scoped.setattr(backend, "get_native", lambda: None)
-            expected = detection._detect_shaded_header_tables(source, [])
-        assert actual == expected
+        assert table_value_hash(actual) == table_golden()["shaded"][seed][case]
         lines[-1].bbox = (0.0, 150.0, 210.0, 155.0)
 
 
@@ -813,7 +781,7 @@ def test_fraction_batch_preserves_complete_members_and_thresholds(seed):
         ]
         rules.append(None)
         actual = scripts._fraction_member_indices(page, chars, boxes, [None] * len(rules), angle, rules)
-        expected = scripts._fraction_member_indices_python(page, chars, boxes, [None] * len(rules), angle, rules)
+        expected = native_analyzer_golden("_fraction_member_indices_python:816")
         assert actual == expected
 
 
@@ -830,8 +798,6 @@ def test_fraction_batch_positive_members_and_state_invalidation(monkeypatch):
     chars[1]["char"] = "β"
     boxes[2] = (70.0, 6.0, 75.0, 10.0)
     assert scripts._fraction_member_indices(*args) == set()
-    monkeypatch.setattr(scripts, "_bbox_axis_overlap", lambda *_args, **_kwargs: 99.0)
-    assert scripts._fraction_member_indices(*args) == scripts._fraction_member_indices_python(*args) == {1, 2}
 
 
 def test_fraction_batch_keeps_reference_empty_height_exception():
@@ -851,6 +817,7 @@ def test_pending_glyph_batch_keeps_frozen_records_and_whitespace_state(seed):
     from docvortex.analyzers.native.pdf._table_recovery import text
     from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableInput
     from docvortex.document.pdf.text._contracts import Bbox
+    from _table_golden import table_golden, table_value_hash
 
     rng = Random(seed)
     chars = []
@@ -864,10 +831,10 @@ def test_pending_glyph_batch_keeps_frozen_records_and_whitespace_state(seed):
                 "bbox": Bbox(raw) if i % 2 else raw,
             }
         )
-    for angle in (0, 90, 180, 270):
+    for case, angle in enumerate((0, 90, 180, 270)):
         table = NativeTableInput((0.0, 0.0, 100.0, 100.0), (100.0, 100.0), angle, tuple(chars), (), ())
         assert text._select_pending_glyphs(table) == text._select_pending_glyphs_adapter(table)
-        assert text._select_pending_glyphs(table) == text._select_pending_glyphs_python(table)
+        assert table_value_hash(text._select_pending_glyphs(table)) == table_golden()["pending"][seed][case]
 
 
 def test_pending_glyph_batch_observes_input_changes_and_constructor(monkeypatch):
@@ -915,7 +882,7 @@ def test_page_fraction_batch_matches_unprepared_drawings(seed):
     drawings.extend([_AxisLine((0.0, 0.0, 15.0, 0.0), 0.1, "horizontal"), _AxisLine((7.0, 8.0, 3.0, 2.0), 0.1, "horizontal")])
     for angle in (0, 90, 180, 270, 17):
         args = ((100.0, 100.0), chars, boxes, drawings, angle)
-        assert scripts._fraction_member_indices(*args) == scripts._fraction_member_indices_python(*args)
+        assert scripts._fraction_member_indices(*args) == native_analyzer_golden("_fraction_member_indices_python:918")
         native = get_native()
         if native is not None:
             assert native.fraction_members_owned(chars, boxes, (100.0, 100.0), angle, drawings, _AxisLine) is not None
@@ -978,10 +945,11 @@ def test_owned_typography_unsupported_font_conversion_keeps_complete_fallback(mo
 
 
 @pytest.mark.parametrize("seed", range(80))
-def test_cell_visual_geometry_retains_complete_text_parts_and_source_refs(monkeypatch, seed):
+def test_cell_visual_geometry_retains_complete_text_parts_and_source_refs(seed):
     """单行、双行、水印、上下标与阈值邻居均比较完整片段，不能丢失或重排任何源字形。"""
     from docvortex.analyzers.native.pdf._table_recovery import text
     from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableGlyph
+    from _table_golden import table_golden
 
     rng = Random(seed)
     glyphs = []
@@ -992,14 +960,10 @@ def test_cell_visual_geometry_retains_complete_text_parts_and_source_refs(monkey
                                      (x, y, x + rng.choice([2.0, 4.0]), y + height), rng.randrange(3),
                                      rng.choice([False, True]), rng.choice([False, True])))
     actual = text.build_cell_text_parts(glyphs, 5.0)
-    with monkeypatch.context() as scoped:
-        scoped.setattr(text, "_native_cell_visual_groups", lambda *args: None)
-        expected = text.build_cell_text_parts(glyphs, 5.0)
-    assert actual == expected
+    expected = table_golden()["cell"][seed]
+    assert actual == [tuple(part) for part in expected["parts"]]
     grouped = text._native_cell_visual_groups(glyphs, 5.0)
-    if grouped is not None:
-        reference = text._python_cell_visual_groups(glyphs, 5.0)
-        assert [[id(g) for g in row] for row in grouped] == [[id(g) for g in row] for row in reference]
+    assert [[id(g) for g in row] for row in grouped] == [[id(glyphs[index]) for index in row] for row in expected["groups"]]
 @pytest.mark.parametrize("seed", range(48))
 def test_unmapped_formula_ink_current_state_and_signed_zero(seed):
     """批量筛选逐项比较文字、透明模式、字号及翻转框，改变输入后必须重新判定。"""
@@ -1016,8 +980,7 @@ def test_unmapped_formula_ink_current_state_and_signed_zero(seed):
     ]
     for iteration in range(2):
         actual = formulas._unmapped_formula_ink_bboxes(chars)
-        expected = formulas._unmapped_formula_ink_bboxes_python(chars)
-        assert [[v.hex() for v in box] for box in actual] == [[v.hex() for v in box] for box in expected]
+        assert [[v.hex() for v in box] for box in actual] == _RULE_CASES["formula_ink"][str(seed)][iteration]
         for char in chars:
             char["char"] = "\x00"
             char["font"]["size"] = 10.0
@@ -1025,8 +988,8 @@ def test_unmapped_formula_ink_current_state_and_signed_zero(seed):
             char["text_object_id"] = 1
 
 
-def test_unmapped_formula_ink_custom_conversion_and_errors(monkeypatch):
-    """特殊转换只在完整回退执行一次，异常字号及替换框函数保持既有行为。"""
+def test_unmapped_formula_ink_custom_conversion_and_errors():
+    """绑定中的数值转换只执行一次，异常字号和溢出坐标保持既有错误。"""
     from docvortex.analyzers.native.pdf import formulas
 
     calls = []
@@ -1052,13 +1015,6 @@ def test_unmapped_formula_ink_custom_conversion_and_errors(monkeypatch):
     with pytest.raises(OverflowError):
         formulas._unmapped_formula_ink_bboxes([char])
     char["tight_bbox"] = (-0.0, 0.0, 5.0, 40.0)
-
-    def replaced_bbox(value):
-        """替换规范化函数必须改变当前筛选结果。"""
-        return None
-
-    monkeypatch.setattr(formulas, "_coerce_bbox", replaced_bbox)
-    assert formulas._unmapped_formula_ink_bboxes([char]) == []
 
 
 def test_font_family_page_cache_state_nesting_and_exception(monkeypatch):

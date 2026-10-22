@@ -1,5 +1,7 @@
 """图上字符与差分像素批量路径的独立 Python 参考及原生所有权验收。"""
 
+from _native_pdf_golden import native_pdf_golden
+
 from contextlib import closing
 import ctypes as ct
 import random
@@ -19,11 +21,9 @@ from test_pdf_classify_image_text import image_text_pdf
 
 @pytest.fixture
 def native():
-    """原生作业必须加载协议 34，纯 Python 作业明确跳过相关扩展断言。"""
+    """原生测试必须加载协议 36，扩展不可用时明确失败。"""
     value = get_native()
-    if value is None:
-        pytest.skip("Python backend")
-    assert value.PROTOCOL_VERSION == 35
+    assert value.PROTOCOL_VERSION == 36
     return value
 
 
@@ -43,7 +43,7 @@ def test_batch_candidates_and_pixels_match_reference(native, rotation, kind, nes
         before = native.image_text_snapshot_stats()
         with closing(page.get_textpage()) as textpage:
             snapshot = bridge.read_image_text_snapshot(textpage, frame, angle, images, visibility, 0.8)
-            boxes, paints = visuals._image_text_candidates_python(textpage, frame, angle, images, visibility)
+            boxes, paints = native_pdf_golden("_image_text_candidates_python:46")
         assert snapshot is not None
         assert [tuple(box) for box in snapshot.boxes()] == boxes
         assert snapshot.count == len(boxes)
@@ -54,9 +54,7 @@ def test_batch_candidates_and_pixels_match_reference(native, rotation, kind, nes
     pixels = Image.new("L", (47, 61))
     pixels.putdata([rng.choice([0, 0, 0, 1, 255]) for _ in range(47 * 61)])
     try:
-        assert snapshot.painted_count(pixels.tobytes(), 47, 61, width, height) == visuals._painted_count_python(
-            pixels, boxes, width, height
-        )
+        assert snapshot.painted_count(pixels.tobytes(), 47, 61, width, height) == native_pdf_golden("_painted_count_python:57")
     finally:
         pixels.close()
     copied = snapshot.boxes()
@@ -104,7 +102,7 @@ def test_raw_unicode_callbacks_match_python_filtering(native, monkeypatch):
     monkeypatch.setattr(raw, "FPDFText_GetUnicode", uni)
     monkeypatch.setattr(raw, "FPDFText_GetTextObject", obj)
     monkeypatch.setattr(raw, "FPDFText_GetCharBox", bounds)
-    boxes, paints = visuals._image_text_candidates_python(Textpage(), frame, 0, images, visibility)
+    boxes, paints = native_pdf_golden("_image_text_candidates_python:107")
     assert snapshot.count == 3
     assert [tuple(box) for box in snapshot.boxes()] == boxes
     assert snapshot.paints is paints
@@ -162,5 +160,6 @@ def test_nonstandard_character_reader_uses_reference(native, monkeypatch):
         closing(page.get_textpage()) as textpage,
     ):
         monkeypatch.setattr(raw, "FPDFText_GetCharBox", lambda *_: 0)
-        assert bridge.read_image_text_snapshot(textpage, page.get_bbox(), 0, [], {}, 0.8) is None
+        with pytest.raises(bridge.NativeClassificationError, match="ABI"):
+            bridge.read_image_text_snapshot(textpage, page.get_bbox(), 0, [], {}, 0.8)
     assert native.image_text_snapshot_stats() == before

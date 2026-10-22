@@ -29,7 +29,6 @@ def main():
     if args.output.exists() or args.runs < 1:
         parser.error("Require unused output and positive runs")
     os.environ.update(
-        DOCVORTEX_COMPUTE_BACKEND="rust",
         DOCVORTEX_PDF_RENDER_BACKEND=args.render_backend,
         ORT_DISABLE_TELEMETRY="1",
         LOGURU_LEVEL="WARNING",

@@ -6,6 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from docvortex._compute_backend import get_native
+
 from docvortex.analyzers.native.pdf import native_text, pipeline
 from docvortex.document.pdf.native_contracts import PDFPageTextGeometry
 from _native_direction_fixtures import actual_direction_case
@@ -21,8 +23,6 @@ def test_actual_full_source_drops_diagonal_rows_and_chars_before_layout(page, ow
     """运输完整实际行/原字，在采集边界排斜水印；模拟快照只测试边界，不冒称重新解析PDF。"""
     from docvortex._compute_backend import get_native
 
-    if owned and get_native() is None:
-        pytest.skip("自有快照协议需要原生扩展；纯 Python 路径由 owned=False 覆盖")
     source = actual_direction_case(f"watermark_actual_direction_source_p{page}", FIXTURE, FIXTURE_SHA)
     raw = source.chars
     geometry = PDFPageTextGeometry(
@@ -41,7 +41,6 @@ def test_actual_full_source_drops_diagonal_rows_and_chars_before_layout(page, ow
 
         def prepare_visual_evidence(self, *_args):
             """原字和已保存视觉行分别运输，行构造入口在下方明确替换。"""
-            from docvortex._compute_backend import get_native
 
             return geometry, get_native().prepare_visual_lines(raw, source.page_size, 0, (0.0, 90.0, 270.0))
 
@@ -100,10 +99,10 @@ def test_actual_full_source_drops_diagonal_rows_and_chars_before_layout(page, ow
 def test_empty_oblique_candidates_do_not_shift_native_visual_row_identity(angle, prefix, oblique):
     """无可靠墨迹的空行不参与几何删除，保留两条路径既有编号契约。"""
     from dataclasses import fields
-    from docvortex.document.pdf.text import _get_lines_from_chars_python
+    from docvortex.document.pdf.text import get_lines_from_chars
     from docvortex.document.pdf.text._contracts import Bbox
 
-    pytest.importorskip("docvortex._native")
+    get_native()
     chars = [
         {
             "char": text,
@@ -124,7 +123,7 @@ def test_empty_oblique_candidates_do_not_shift_native_visual_row_identity(angle,
         }
     )
     angles = (0, 90, 180, 270)
-    expected = native_text._build_native_line_items(_get_lines_from_chars_python(chars), (100, 100), supported_angles=angles)
+    expected = native_text._build_native_line_items(get_lines_from_chars(chars), (100, 100), supported_angles=angles)
     actual = native_text._build_native_line_items_from_chars(chars, (100, 100), supported_angles=angles)
     assert len(expected) == len(actual) == 1
     assert expected[0].text == actual[0].text == "A"

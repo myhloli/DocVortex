@@ -36,7 +36,7 @@ jobs:
           - {os: ubuntu-24.04-arm, arch: aarch64, name: linux-aarch64, deployment: '', smoke: '3.14', build: 'cp311-*'}
           - {os: windows-latest, arch: AMD64, name: windows-x86_64, deployment: '', smoke: '3.14', build: 'cp311-*'}
           - {os: windows-11-arm, arch: ARM64, name: windows-arm64, deployment: '', smoke: '3.14', build: 'cp311-*'}
-          - {os: macos-15, arch: arm64, name: macos-arm64, deployment: '11.0', smoke: '3.14', build: 'cp311-*'}
+          - {os: macos-15, arch: arm64, name: macos-arm64, deployment: '14.0', smoke: '3.14', build: 'cp311-*'}
           # ONNX Runtime 1.24.4 起没有 Intel macOS wheel，0.6.0 不再发布该平台产物。
     runs-on: ${{ matrix.os }}
     steps:
@@ -67,12 +67,11 @@ jobs:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
           CIBW_BEFORE_ALL_LINUX: export CARGO_HOME=/opt/docvortex-cargo RUSTUP_HOME=/opt/docvortex-rustup; curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.98.1
-          CIBW_ENVIRONMENT: DOCVORTEX_BUILD_NATIVE=1 DOCVORTEX_COMPUTE_BACKEND=rust
-          CIBW_ENVIRONMENT_LINUX: 'PATH="/opt/docvortex-cargo/bin:$PATH" CARGO_HOME=/opt/docvortex-cargo RUSTUP_HOME=/opt/docvortex-rustup DOCVORTEX_BUILD_NATIVE=1 DOCVORTEX_COMPUTE_BACKEND=rust'
+          CIBW_ENVIRONMENT_LINUX: 'PATH="/opt/docvortex-cargo/bin:$PATH" CARGO_HOME=/opt/docvortex-cargo RUSTUP_HOME=/opt/docvortex-rustup'
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment }}
-          CIBW_TEST_REQUIRES: pytest psutil
+          CIBW_TEST_REQUIRES: pytest psutil pypdfium2==5.13.0
           CIBW_TEST_SKIP: ${{ inputs.skip_ci && '*' || '' }}
-          CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_rule_graphics_acceleration.py {project}/tests/test_rule_text_acceleration.py {project}/tests/test_rule_pixel_form_acceleration.py {project}/tests/test_rule_layout_batch_acceleration.py {project}/tests/test_rule_numeric_graphics_acceleration.py {project}/tests/test_rule_fill_bands_acceleration.py {project}/tests/test_native_statistics.py {project}/tests/test_native_round3.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py {project}/tests/test_native_round6.py {project}/tests/test_native_round7.py {project}/tests/test_pdfium_bridge.py {project}/tests/test_pdf_object_bridge.py {project}/tests/test_pdf_classify_page_loading.py {project}/tests/test_pdf_classify_resource_graph.py {project}/tests/test_pdf_drawing_lines_extraction.py {project}/tests/test_pdf_native_graphics_components.py {project}/tests/unittest/test_flash_pdf_auxiliary_text.py {project}/tests/test_pdf_snapshot.py {project}/tests/test_native_inline_styles.py {project}/tests/test_native_bitmap_crops.py {project}/tests/test_pdf_render_session.py {project}/tests/test_native_font_runtime.py {project}/tests/test_native_text_pipeline.py {project}/tests/test_native_text_snapshot.py {project}/tests/test_native_classification.py {project}/tests/test_native_image_text_classification.py {project}/tests/unittest/test_pdf_classify_image_text.py {project}/tests/unittest/test_flash_pdf_char_geometry.py {project}/tests/test_native_table_candidates.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q && python -m pip install pypdfium2==5.10.1 && python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo2.pdf && python -m pytest {project}/tests/test_pdfium_bridge.py {project}/tests/test_pdf_object_bridge.py {project}/tests/test_pdf_classify_page_loading.py {project}/tests/test_pdf_classify_resource_graph.py {project}/tests/test_pdf_drawing_lines_extraction.py {project}/tests/test_pdf_native_graphics_components.py {project}/tests/unittest/test_flash_pdf_auxiliary_text.py {project}/tests/test_pdf_snapshot.py {project}/tests/test_native_inline_styles.py {project}/tests/test_native_bitmap_crops.py {project}/tests/test_pdf_render_session.py {project}/tests/test_native_font_runtime.py {project}/tests/test_native_text_pipeline.py {project}/tests/test_native_text_snapshot.py {project}/tests/test_native_classification.py {project}/tests/test_native_image_text_classification.py {project}/tests/unittest/test_pdf_classify_image_text.py {project}/tests/unittest/test_flash_pdf_char_geometry.py {project}/tests/test_native_table_candidates.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py {project}/tests/test_native_round6.py {project}/tests/test_native_round7.py -q
+          CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_rule_graphics_acceleration.py {project}/tests/test_rule_text_acceleration.py {project}/tests/test_rule_pixel_form_acceleration.py {project}/tests/test_rule_layout_batch_acceleration.py {project}/tests/test_rule_numeric_graphics_acceleration.py {project}/tests/test_rule_fill_bands_acceleration.py {project}/tests/test_native_statistics.py {project}/tests/test_native_round3.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py {project}/tests/test_native_round6.py {project}/tests/test_native_round7.py {project}/tests/test_pdfium_bridge.py {project}/tests/test_pdf_object_bridge.py {project}/tests/test_pdf_classify_page_loading.py {project}/tests/test_pdf_classify_resource_graph.py {project}/tests/test_pdf_drawing_lines_extraction.py {project}/tests/test_pdf_native_graphics_components.py {project}/tests/unittest/test_flash_pdf_auxiliary_text.py {project}/tests/test_pdf_snapshot.py {project}/tests/test_native_inline_styles.py {project}/tests/test_native_bitmap_crops.py {project}/tests/test_pdf_render_session.py {project}/tests/test_native_font_runtime.py {project}/tests/test_native_text_pipeline.py {project}/tests/test_native_text_snapshot.py {project}/tests/test_native_classification.py {project}/tests/test_native_image_text_classification.py {project}/tests/unittest/test_pdf_classify_image_text.py {project}/tests/unittest/test_flash_pdf_char_geometry.py {project}/tests/test_native_table_candidates.py {project}/tests/test_native_candidate_boundaries.py {project}/tests/test_native_annotation_geometry.py {project}/tests/unittest/test_native_pdf_table_demo_manifest.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q && python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo2.pdf
         run: uvx --from "cibuildwheel>=3.1,<4" cibuildwheel --output-dir wheelhouse
       - name: Verify binary ABI on Python 3.14 without optional application dependencies
         if: ${{ !inputs.skip_ci }}
@@ -84,20 +83,16 @@ jobs:
           uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python -c "import pathlib, subprocess, sys; wheels=list(pathlib.Path('wheelhouse').glob('*.whl')); assert len(wheels)==1, wheels; subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0]), 'pytest', 'psutil', 'pypdfium2==5.13.0'])"
       - name: Verify installed wheel and real parsing
         if: ${{ !inputs.skip_ci }}
-        env:
-          DOCVORTEX_COMPUTE_BACKEND: rust
         run: uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
       - name: Verify Windows ARM64 native installation and reportlab fallback
         if: ${{ matrix.os == 'windows-11-arm' && !inputs.skip_ci }}
         run: uv run --no-project python tools/verify_windows_arm64_install.py
       - name: Verify generated dense table with the installed wheel
         if: ${{ !inputs.skip_ci }}
-        env:
-          DOCVORTEX_COMPUTE_BACKEND: rust
         run: |
           uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/generate_dense_pdf.py dense-table.pdf
-          uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/verify_native_wheel.py dense-table.pdf
-          uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python -m pytest tests/test_native_inline_styles.py tests/test_native_bitmap_crops.py tests/test_pdfium_bridge.py tests/test_pdf_object_bridge.py tests/test_pdf_classify_page_loading.py tests/test_pdf_classify_resource_graph.py tests/test_pdf_drawing_lines_extraction.py tests/test_pdf_native_graphics_components.py tests/unittest/test_flash_pdf_auxiliary_text.py tests/test_pdf_snapshot.py tests/test_pdf_render_session.py tests/test_native_font_runtime.py tests/test_native_text_pipeline.py tests/test_native_text_snapshot.py tests/test_native_classification.py tests/test_native_image_text_classification.py tests/unittest/test_pdf_classify_image_text.py tests/unittest/test_flash_pdf_char_geometry.py tests/test_native_table_candidates.py tests/test_native_round3.py tests/test_native_round4.py tests/test_native_round5.py tests/test_native_round6.py tests/test_native_round7.py -q
+          uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/verify_native_wheel.py dense-table.pdf --expectation dense-table
+          uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python -m pytest tests/test_native_inline_styles.py tests/test_native_bitmap_crops.py tests/test_pdfium_bridge.py tests/test_pdf_object_bridge.py tests/test_pdf_classify_page_loading.py tests/test_pdf_classify_resource_graph.py tests/test_pdf_drawing_lines_extraction.py tests/test_pdf_native_graphics_components.py tests/unittest/test_flash_pdf_auxiliary_text.py tests/test_pdf_snapshot.py tests/test_pdf_render_session.py tests/test_native_font_runtime.py tests/test_native_text_pipeline.py tests/test_native_text_snapshot.py tests/test_native_classification.py tests/test_native_image_text_classification.py tests/unittest/test_pdf_classify_image_text.py tests/unittest/test_flash_pdf_char_geometry.py tests/test_native_table_candidates.py tests/test_native_candidate_boundaries.py tests/test_native_annotation_geometry.py tests/test_native_round3.py tests/test_native_round4.py tests/test_native_round5.py tests/test_native_round6.py tests/test_native_round7.py -q
       # 性能对比仅在本机执行；平台矩阵保留构建、ABI、安装和正确性检查。
       - uses: actions/upload-artifact@v6
         with:
@@ -106,7 +101,7 @@ jobs:
           if-no-files-found: error
 
   windows-arm64-install:
-    # 同一发行物检查两个 Python 端点和两个 PDFium 版本；pyclipper 缺少 wheel 时允许源码构建。
+    # 同一发行物检查两个 Python 端点和 PDFium 5.13.0；pyclipper 缺少 wheel 时允许源码构建。
     needs: wheels
     if: ${{ !inputs.skip_ci }}
     runs-on: windows-11-arm
@@ -114,9 +109,6 @@ jobs:
       fail-fast: false
       matrix:
         python: ['3.11', '3.14']
-        pdfium: ['5.10.1', '5.13.0']
-    env:
-      DOCVORTEX_COMPUTE_BACKEND: rust
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -137,49 +129,24 @@ jobs:
       - name: Install the exact ARM64 wheel with regular dependency resolution
         run: |
           uv venv --seed
-          uv run --no-project python -c "import pathlib, subprocess, sys; wheel,=pathlib.Path('wheelhouse').glob('*.whl'); subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheel), 'pytest', 'psutil', 'pypdfium2==${{ matrix.pdfium }}'])"
+          uv run --no-project python -c "import pathlib, subprocess, sys; wheel,=pathlib.Path('wheelhouse').glob('*.whl'); subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheel), 'pytest', 'psutil', 'pypdfium2==5.13.0'])"
           uv run --no-project python -m pip check
       - name: Verify ABI and actual installed ARM64 extension
         run: |
           uv run --no-project python tools/verify_native_abi.py wheelhouse
           uv run --no-project python tools/verify_windows_arm64_install.py
-      - name: Verify real PDF and dense table Python/Rust parity
+      - name: Verify real PDF and dense table semantic expectations
         run: |
           uv run --no-project python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
           uv run --no-project python tools/generate_dense_pdf.py dense-table.pdf
-          uv run --no-project python tools/verify_native_wheel.py dense-table.pdf
-      - name: Verify PDFium bridge, native parity and reportlab PDF export
+          uv run --no-project python tools/verify_native_wheel.py dense-table.pdf --expectation dense-table
+      - name: Verify PDFium bridge, native contracts and reportlab PDF export
         run: >-
           uv run --no-project python -m pytest
           tests/test_native_parity.py tests/test_pdfium_bridge.py tests/test_pdf_object_bridge.py
           tests/unittest/test_pdf_render.py tests/unittest/test_pdf_render_diagnostics.py
           tests/test_complete_pipeline.py tests/test_public_pipeline.py tests/test_system_font_pdf_pipeline.py
           tests/test_pdf_render_pool.py tests/test_pdf_render_session.py -q
-
-  python-dist:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: '3.14'
-      - name: Build pure Python wheel and complete sdist
-        env:
-          DOCVORTEX_BUILD_NATIVE: '0'
-        run: uv build
-      - run: uvx twine check dist/*
-      - name: Verify pure installation without native artifacts
-        if: ${{ !inputs.skip_ci }}
-        shell: bash
-        run: |
-          uv venv --seed
-          uv run --no-project python -c "import pathlib, subprocess, sys; wheels=list(pathlib.Path('dist').glob('*-py3-none-any.whl')); assert len(wheels)==1; subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheels[0])])"
-          uv run --no-project python tools/verify_native_wheel.py demo/pdfs/demo2.pdf python
-      - uses: actions/upload-artifact@v6
-        with:
-          name: dist-python
-          path: dist/*
-          if-no-files-found: error
 
   rust-checks:
     if: ${{ !inputs.skip_ci }}

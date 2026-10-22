@@ -452,61 +452,22 @@ def _filter_line_styles_for_block(
     return output
 
 
-_PROJECT_CONTENT_NORMALIZER = _normalize_match_fragment
-_PROJECT_CONTENT_RECORD = _ProjectedChar
-_PROJECT_CONTENT_RECORD_INIT = _ProjectedChar.__init__
 _PROJECT_CONTENT_RECORD_NEW = _ProjectedChar.__new__
 
 
 def _project_content_chars(content: str) -> list[_ProjectedChar]:
-    """把原始文字投影为忽略空白和圆括号公式的可比较字符。"""
-
+    """将原始文字交给原生投影器，保留 Python 文本规范化和对象类型。"""
     from ....._compute_backend import get_native
 
-    native = get_native()
-    if (
-        native is not None
-        and type(content) is str
-        and _normalize_match_fragment is _PROJECT_CONTENT_NORMALIZER
-        and _ProjectedChar is _PROJECT_CONTENT_RECORD
-        and _ProjectedChar.__init__ is _PROJECT_CONTENT_RECORD_INIT
-        and _ProjectedChar.__new__ is _PROJECT_CONTENT_RECORD_NEW
-    ):
-        projected = native.project_content_chars_owned(
-            content,
-            _normalize_match_fragment,
-            _ProjectedChar,
-            _PROJECT_CONTENT_RECORD_NEW,
-        )
-        if projected is not None:
-            return projected
-    projected: list[_ProjectedChar] = []
-    pending_formula_gap = False
-    cursor = 0
-    while cursor < len(content):
-        if content.startswith(r"\(", cursor):
-            formula_end = content.find(r"\)", cursor + 2)
-            if formula_end >= 0:
-                cursor = formula_end + 2
-                pending_formula_gap = True
-                continue
-        raw_char = content[cursor]
-        fragment = _normalize_match_fragment(raw_char)
-        for fragment_index, value in enumerate(fragment):
-            projected.append(
-                _ProjectedChar(
-                    value=value,
-                    raw_start=cursor,
-                    raw_end=cursor + 1,
-                    existing_styles=frozenset(),
-                    formula_gap_before=pending_formula_gap and fragment_index == 0,
-                    inside_hyperlink=False,
-                )
-            )
-        if fragment:
-            pending_formula_gap = False
-        cursor += 1
-    return projected
+    result = get_native().project_content_chars_owned(
+        content,
+        _normalize_match_fragment,
+        _ProjectedChar,
+        _PROJECT_CONTENT_RECORD_NEW,
+    )
+    if result is None:
+        raise ValueError("native content projection rejected normalized text")
+    return result
 
 
 def _all_occurrences(content: str, target: str, start: int) -> list[int]:

@@ -108,12 +108,6 @@ pub fn candidates(
         .iter()
         .chain(images.iter().flatten())
         .any(|v| !v.is_finite())
-        || records.iter().flat_map(|r| r.2).any(|v| !v.is_finite())
-        || visibility
-            .iter()
-            .filter_map(|v| v.2)
-            .flatten()
-            .any(|v| !v.is_finite())
         || !overlap.is_finite()
         || ![0, 90, 180, 270].contains(&rotation)
     {
@@ -198,6 +192,23 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result.boxes.len(), 2);
+        assert!(result.paints);
+    }
+
+    /// 原始异常字框按既有 min/max 与页面裁剪处理，单个 NaN 不使整页失去原生统计。
+    #[test]
+    fn raw_nonfinite_bounds_preserve_clipping() {
+        let records = vec![
+            (65, 1, [f64::NAN, 1.0, 2.0, 2.0]),
+            (66, 1, [1.0, 1.0, 2.0, 2.0]),
+            (67, 1, [f64::INFINITY, 1.0, 2.0, 2.0]),
+        ];
+        let frame = [0.0, 0.0, 10.0, 10.0];
+        let result = candidates(&records, frame, 0, &[frame], &[], 0.8).unwrap();
+        assert_eq!(
+            result.boxes,
+            vec![[1.0, 8.0, 2.0, 9.0], [2.0, 8.0, 10.0, 9.0]]
+        );
         assert!(result.paints);
     }
 

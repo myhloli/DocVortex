@@ -33,7 +33,7 @@ _IDENTITY = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
 
 
 def _form_state_operations(stream, pdf, cache):
-    """按流身份复用状态程序，特殊语法使用完整参考解析，不缓存调用矩阵或资源。"""
+    """按流身份复用状态程序；pypdf 仅解码复杂 PDF 语法，不切换数值计算后端。"""
     key = id(stream)
     cached = cache.get(key)
     if cached is not None and cached[0] is stream:
@@ -41,7 +41,7 @@ def _form_state_operations(stream, pdf, cache):
     content = ContentStream(stream, pdf)
     native = get_native()
     data = content.get_data()
-    events = native.form_state_program(data) if native is not None and type(data) is bytes else None
+    events = native.form_state_program(data)
     operations = (
         content.operations
         if events is None
@@ -115,16 +115,15 @@ def _read_char_form_owners(textpage, owners: dict[int, int]) -> list[int | None]
     getter = raw.FPDFText_GetTextObject
     count = textpage.count_chars()
     native = get_native()
-    reader = getattr(native, "read_pdfium_char_form_owners", None)
+    reader = native.read_pdfium_char_form_owners
     if (
-        reader is not None
-        and isinstance(getter, ct._CFuncPtr)
+        isinstance(getter, ct._CFuncPtr)
         and getter.restype is raw.FPDF_PAGEOBJECT
         and tuple(getter.argtypes or ()) == (raw.FPDF_TEXTPAGE, ct.c_int)
         and getattr(getter, "errcheck", None) is None
     ):
         return reader(ct.cast(getter, ct.c_void_p).value, ct.cast(textpage.raw, ct.c_void_p).value, count, owners)
-    return [owners.get(ct.cast(getter(textpage.raw, index), ct.c_void_p).value) for index in range(count)]
+    raise RuntimeError("FPDFText_GetTextObject unsupported function signature or ABI")
 
 
 def extract_form_structure(page, page_bbox: BBox, rotation: int, reader_page: Any | None) -> tuple[_PDFFormInfo, ...]:

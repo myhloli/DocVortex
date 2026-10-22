@@ -124,9 +124,6 @@ def read_text_snapshot(textpage, frame, rotation, extended, visibility=None):
     """在原锁和 Python textpage 生命周期内读取、规范化与去重。"""
     global _REASON
     native = get_native()
-    if native is None or not hasattr(native, "read_pdfium_text_snapshot"):
-        _REASON = "Python backend or native text snapshot unavailable"
-        return None
     if type(textpage) is not pdfium.PdfTextPage or not _ordinary_snapshot_arguments(
         textpage.raw, frame, rotation, extended, visibility
     ):

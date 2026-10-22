@@ -134,46 +134,74 @@ pub fn numeric_noise_candidates(
 /// 旋转后框、原始框、canonical 字号、角度和源索引，用于公式连通判断。
 pub type FormulaLine = ([f64; 4], [f64; 4], f64, i64, i64);
 
-/// 独立公式带的邻接索引，保持候选升序；Python 继续决定种子、认领与栈遍历。
-pub fn detached_formula_neighbors(
+/// 判断两条独立公式带的几何相邻，保持长公式基线屏障及既有容差。
+fn detached_formula_connected(
+    a: &[f64; 4],
+    b: &[f64; 4],
+    operator_a: bool,
+    operator_b: bool,
+    em: f64,
+) -> bool {
+    if a[2] - a[0] > 3.0 * em
+        && b[2] - b[0] > 3.0 * em
+        && operator_a
+        && operator_b
+        && ((a[1] + a[3]) / 2.0 - (b[1] + b[3]) / 2.0).abs() > 0.75 * em
+    {
+        return false;
+    }
+    let xgap = (a[0] - b[2]).max(b[0] - a[2]).max(0.0);
+    let ygap = (a[1] - b[3]).max(b[1] - a[3]).max(0.0);
+    let shorter_x = (a[2] - a[0]).min(b[2] - b[0]);
+    let shorter_y = (a[3] - a[1]).min(b[3] - b[1]);
+    let xoverlap = if shorter_x > 0.0 {
+        (a[2].min(b[2]) - a[0].max(b[0])).max(0.0) / shorter_x
+    } else {
+        0.0
+    };
+    let yoverlap = if shorter_y > 0.0 {
+        (a[3].min(b[3]) - a[1].max(b[1])).max(0.0) / shorter_y
+    } else {
+        0.0
+    };
+    ygap <= 0.85 * em && xoverlap > 0.1 || xgap <= 2.0 * em && yoverlap >= 0.2
+}
+
+/// 流式扫描当前未认领候选，以最小种子和升序邻接返回单个分量，不构造平方邻接表。
+pub fn detached_formula_component(
     boxes: &[[f64; 4]],
     operators: &[bool],
     em: f64,
-) -> Vec<Vec<usize>> {
-    let mut neighbors = vec![Vec::new(); boxes.len()];
-    for (i, a) in boxes.iter().enumerate() {
-        for (j, b) in boxes.iter().enumerate() {
-            if i == j {
-                continue;
-            }
-            if a[2] - a[0] > 3.0 * em
-                && b[2] - b[0] > 3.0 * em
-                && operators[i]
-                && operators[j]
-                && ((a[1] + a[3]) / 2.0 - (b[1] + b[3]) / 2.0).abs() > 0.75 * em
+    available: &[usize],
+) -> Vec<usize> {
+    let Some(seed) = available.iter().copied().min() else {
+        return Vec::new();
+    };
+    let mut pending = vec![false; boxes.len()];
+    for &index in available {
+        pending[index] = true;
+    }
+    pending[seed] = false;
+    let mut component = vec![seed];
+    let mut frontier = vec![seed];
+    while let Some(current) = frontier.pop() {
+        for index in 0..boxes.len() {
+            if pending[index]
+                && detached_formula_connected(
+                    &boxes[current],
+                    &boxes[index],
+                    operators[current],
+                    operators[index],
+                    em,
+                )
             {
-                continue;
-            }
-            let xgap = (a[0] - b[2]).max(b[0] - a[2]).max(0.0);
-            let ygap = (a[1] - b[3]).max(b[1] - a[3]).max(0.0);
-            let shorter_x = (a[2] - a[0]).min(b[2] - b[0]);
-            let shorter_y = (a[3] - a[1]).min(b[3] - b[1]);
-            let xoverlap = if shorter_x > 0.0 {
-                (a[2].min(b[2]) - a[0].max(b[0])).max(0.0) / shorter_x
-            } else {
-                0.0
-            };
-            let yoverlap = if shorter_y > 0.0 {
-                (a[3].min(b[3]) - a[1].max(b[1])).max(0.0) / shorter_y
-            } else {
-                0.0
-            };
-            if ygap <= 0.85 * em && xoverlap > 0.1 || xgap <= 2.0 * em && yoverlap >= 0.2 {
-                neighbors[i].push(j);
+                pending[index] = false;
+                component.push(index);
+                frontier.push(index);
             }
         }
     }
-    neighbors
+    component
 }
 
 /// 两行数值连通规则，表格阻断始终使用原始页面框。

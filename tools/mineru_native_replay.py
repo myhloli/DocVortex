@@ -23,10 +23,12 @@ def capture(args: argparse.Namespace) -> dict:
     onnxruntime.disable_telemetry_events()
     sys.path.insert(0, str(args.mineru_source.resolve()))
     from loguru import logger
+    import docvortex
     from docvortex._compute_backend import backend_info
     from docvortex.document.pdf import PDFDocument
     from mineru.backend.analysis.pdf import tables
     from mineru.backend.analysis.pdf.text import content
+    from mineru.model.runtime import hybrid
 
     logger.disable("docvortex")
     logger.disable("mineru")
@@ -72,7 +74,7 @@ def capture(args: argparse.Namespace) -> dict:
             with (
                 PDFDocument(payload) as document,
                 patch.object(PDFDocument, "get_page_chars_with_geometry", geometry_once),
-                patch.object(content, "run_ocr_inference", fixed_ocr),
+                patch.object(hybrid, "run_ocr_inference", fixed_ocr),
             ):
                 pages = [document[index] for index in range(len(document))]
                 images = [
@@ -149,6 +151,7 @@ def capture(args: argparse.Namespace) -> dict:
         json.dumps(
             {
                 "compute": backend_info(),
+                "source_package": str(Path(docvortex.__file__).resolve()),
                 "mineru_source": str(args.mineru_source.resolve()),
                 "scope": "Frozen Flash-derived layout, real PDF primitives, fixed low-confidence post-OCR; no model inference",
             },
@@ -164,11 +167,9 @@ def main() -> None:
     parser.add_argument("--mineru-source", type=Path, required=True)
     parser.add_argument("--flash-baseline", type=Path, required=True)
     parser.add_argument("--path", type=Path, action="append", help="额外或指定 PDF，必须存在于冻结区域基线")
-    parser.add_argument("--backend", choices=("python", "rust"), required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--baseline", type=Path)
     args = parser.parse_args()
-    os.environ["DOCVORTEX_COMPUTE_BACKEND"] = args.backend
     output = capture(args)
     if args.baseline:
         assert output == json.loads((args.baseline / "output.json").read_text()), "MinerU native-path replay differs"

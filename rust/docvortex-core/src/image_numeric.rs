@@ -785,6 +785,74 @@ pub fn morphology(
     Ok(pass(&pass(data, false, kw), true, kh))
 }
 
+/// 根据数值排序秩选择原像素索引，保留大整数精度、相等值末次命中和首个 NaN 传播。
+pub fn morphology_indices(
+    ranks: &[u64],
+    width: usize,
+    height: usize,
+    kw: usize,
+    kh: usize,
+    dilate: bool,
+    nan_rank: Option<u64>,
+) -> Result<Vec<u64>, String> {
+    if width.checked_mul(height) != Some(ranks.len()) || kw == 0 || kh == 0 {
+        return Err("invalid morphology rank buffer".into());
+    }
+    if ranks.is_empty() {
+        return Ok(Vec::new());
+    }
+    let replace = |old: usize, new: usize| {
+        let a = ranks[old];
+        let b = ranks[new];
+        Some(a) != nan_rank && (Some(b) == nan_rank || if dilate { a <= b } else { a >= b })
+    };
+    let pass = |input: &[usize], vertical: bool, kernel: usize| {
+        let length = if vertical { height } else { width };
+        let lines = if vertical { width } else { height };
+        let mut output = vec![0; ranks.len()];
+        for line in 0..lines {
+            let mut queue = std::collections::VecDeque::<(usize, usize)>::new();
+            let mut next = 0;
+            for position in 0..length {
+                let left = position.saturating_sub(kernel / 2);
+                let right = position.saturating_add(kernel - kernel / 2).min(length);
+                while next < right {
+                    let index = input[if vertical {
+                        next * width + line
+                    } else {
+                        line * width + next
+                    }];
+                    while queue
+                        .back()
+                        .is_some_and(|&(_, previous)| replace(previous, index))
+                    {
+                        queue.pop_back();
+                    }
+                    queue.push_back((next, index));
+                    next += 1;
+                }
+                while queue
+                    .front()
+                    .is_some_and(|&(coordinate, _)| coordinate < left)
+                {
+                    queue.pop_front();
+                }
+                output[if vertical {
+                    position * width + line
+                } else {
+                    line * width + position
+                }] = queue.front().unwrap().1;
+            }
+        }
+        output
+    };
+    let indices: Vec<usize> = (0..ranks.len()).collect();
+    Ok(pass(&pass(&indices, false, kw), true, kh)
+        .into_iter()
+        .map(|index| index as u64)
+        .collect())
+}
+
 /// 通用凸包保留首个原始索引，并按循环单调输入顺序确定起点。
 pub fn convex_hull(points: &[[f32; 2]]) -> Vec<[f32; 2]> {
     let mut values: Vec<([f32; 2], usize)> = points

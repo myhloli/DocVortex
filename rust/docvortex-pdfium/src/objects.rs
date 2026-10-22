@@ -189,7 +189,7 @@ impl Api {
                     roots.as_deref_mut(),
                     order,
                 );
-            } else if object_kind == kind {
+            } else if kind == -1 || object_kind == kind {
                 let clip = self.clip_bounds(raw, parent, inherited);
                 output.push((*order, (raw as usize, combined, parent, depth, clip)));
             } else if depth == 0
@@ -332,6 +332,7 @@ unsafe fn read_paint_visibility(
         max_depth,
         collect_roots,
         filter,
+        None,
     )?;
     if filtered {
         // 早于全部文字绘制的路径不能覆盖任何文字；保持后绘制候选的完整顺序和覆盖。
@@ -454,7 +455,23 @@ pub unsafe fn read_objects(
     kind: c_int,
     max_depth: usize,
 ) -> Result<Vec<Object>, ReadError> {
-    read_objects_and_roots(addresses, handle, kind, max_depth, false, None)
+    read_objects_and_roots(addresses, handle, kind, max_depth, false, None, None)
+        .map(|v| v.0.into_iter().map(|(_, object)| object).collect())
+}
+
+/// 从已借用的页面或 Form 根开始遍历，沿用统一裁剪和矩阵计算。
+///
+/// # Safety
+///
+/// 调用方须核验同库 ABI，并保证根句柄、父变换及原有页面锁在调用期间有效。
+pub unsafe fn read_objects_from(
+    addresses: Vec<usize>,
+    handle: usize,
+    kind: c_int,
+    max_depth: usize,
+    root: (bool, Matrix, usize, Option<Bounds>),
+) -> Result<Vec<Object>, ReadError> {
+    read_objects_and_roots(addresses, handle, kind, max_depth, false, None, Some(root))
         .map(|v| v.0.into_iter().map(|(_, object)| object).collect())
 }
 
@@ -466,6 +483,7 @@ unsafe fn read_objects_and_roots(
     max_depth: usize,
     collect_roots: bool,
     cover_filter: Option<CoverFilter>,
+    root: Option<(bool, Matrix, usize, Option<Bounds>)>,
 ) -> Result<(Vec<OrderedObject>, Vec<OrderedObject>), ReadError> {
     if addresses.len() != 11 || addresses.contains(&0) || handle == 0 || max_depth > 64 {
         return Err(ReadError::InvalidInput(
@@ -516,12 +534,14 @@ unsafe fn read_objects_and_roots(
     };
     let mut output = Vec::new();
     let mut roots = Vec::new();
+    let (is_form, matrix, depth, clip) =
+        root.unwrap_or((false, [1.0, 0.0, 0.0, 1.0, 0.0, 0.0], 0, None));
     api.walk(
         handle as *mut c_void,
-        false,
-        [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
-        0,
-        None,
+        is_form,
+        matrix,
+        depth,
+        clip,
         max_depth,
         kind,
         &mut output,

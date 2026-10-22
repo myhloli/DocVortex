@@ -62,6 +62,15 @@ def test_installed_metadata_requires_python_311_through_314() -> None:
     assert "Programming Language :: Python :: 3.10" not in package.get_all("Classifier", [])
 
 
+def test_installed_metadata_requires_pdfium_513_or_later_in_v5() -> None:
+    """安装包从 5.13 起接受后续 5.x，明确排除旧兼容基线和未来主版本。"""
+    requirements = [Requirement(value) for value in metadata.requires("docvortex") or ()]
+    pdfium = [requirement for requirement in requirements if canonicalize_name(requirement.name) == "pypdfium2"]
+    assert len(pdfium) == 1 and pdfium[0].marker is None
+    assert all(version in pdfium[0].specifier for version in ("5.13.0", "5.14.0"))
+    assert all(version not in pdfium[0].specifier for version in ("5.10.1", "5.12.0", "6.0.0"))
+
+
 def test_installed_metadata_requires_runtime_free_magika_fork() -> None:
     """确保宿主依赖新发行包，新包自身也不能再次引入任一种 ORT。"""
     requirements = [Requirement(value) for value in metadata.requires("docvortex") or ()]

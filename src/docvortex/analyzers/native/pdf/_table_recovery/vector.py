@@ -53,11 +53,6 @@ class _IndexedRules(list[_MergedRule]):
     def __init__(self, rules: list[_MergedRule]) -> None:
         """按方向分组并保留原始线段顺序，缓存随当前表格调用释放。"""
         super().__init__(rules)
-        self._oriented = {
-            orientation: tuple(rule for rule in rules if rule.orientation == orientation)
-            for orientation in ("horizontal", "vertical")
-        }
-        self._intervals: dict[tuple[str, tuple[float, ...], float], list[tuple[float, float]]] = {}
         self._coverages: dict[tuple[str, tuple[float, ...], float, float, float], float] = {}
 
     def prime_coverages(self, queries: list[tuple[str, tuple[float, ...], float, float, float]]) -> None:
@@ -65,8 +60,6 @@ class _IndexedRules(list[_MergedRule]):
         from ....._compute_backend import get_native
 
         native = get_native()
-        if native is None:
-            return
         queries = list(dict.fromkeys(queries))
         queries = [q for q in queries if (q[0], q[1], q[4], q[2], q[3]) not in self._coverages]
         if not queries:
@@ -78,9 +71,8 @@ class _IndexedRules(list[_MergedRule]):
                 for orientation, aliases, start, end, tolerance in queries
             ],
         )
-        if result is not None:
-            for (orientation, aliases, start, end, tolerance), value in zip(queries, result, strict=True):
-                self._coverages[(orientation, aliases, tolerance, start, end)] = value
+        for (orientation, aliases, start, end, tolerance), value in zip(queries, result, strict=True):
+            self._coverages[(orientation, aliases, tolerance, start, end)] = value
 
     def coverage(self, orientation: str, aliases: tuple[float, ...], start: float, end: float, tolerance: float) -> float:
         """复用轨道匹配和相同查询，区间覆盖仍执行原有裁剪与浮点累加。"""
@@ -89,22 +81,8 @@ class _IndexedRules(list[_MergedRule]):
         cached = self._coverages.get(coverage_key)
         if cached is not None:
             return cached
-        intervals = self._intervals.get(key)
-        if intervals is None:
-            oriented = self._oriented.get(orientation, ())
-            if len(aliases) == 1:
-                coordinate = aliases[0]
-                intervals = [(rule.start, rule.end) for rule in oriented if abs(rule.coordinate - coordinate) <= tolerance]
-            else:
-                intervals = [
-                    (rule.start, rule.end)
-                    for rule in oriented
-                    if any(abs(rule.coordinate - alias) <= tolerance for alias in aliases)
-                ]
-            self._intervals[key] = intervals
-        result = covered_interval_ratio(intervals, start, end)
-        self._coverages[coverage_key] = result
-        return result
+        self.prime_coverages([(orientation, aliases, start, end, tolerance)])
+        return self._coverages[coverage_key]
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,28 +235,12 @@ class _SingleColumnEvidence:
 
 
 class _UnionFind:
-    """维护缺失内部隔断连接的原子网格并查集。"""
+    """保存原生网格连通计算的父节点传输状态。"""
 
     def __init__(self, size: int) -> None:
         """为固定数量原子格初始化各自独立的集合。"""
 
         self._parents = list(range(size))
-
-    def find(self, index: int) -> int:
-        """返回原子格根节点并执行路径压缩。"""
-
-        parent = self._parents[index]
-        if parent != index:
-            self._parents[index] = self.find(parent)
-        return self._parents[index]
-
-    def union(self, first: int, second: int) -> None:
-        """合并两个原子格所属集合。"""
-
-        first_root = self.find(first)
-        second_root = self.find(second)
-        if first_root != second_root:
-            self._parents[second_root] = first_root
 
 
 def _drawing_bbox_to_table_local(
@@ -397,49 +359,20 @@ def _merge_rule_fragments(
     from ....._compute_backend import get_native
 
     native = get_native()
-    if native is not None:
-        coordinates = [
-            (
-                int(orientation == "vertical"),
-                cluster_positions((f.coordinate for f in fragments if f.orientation == orientation), snap_tolerance),
-            )
-            for orientation in ("horizontal", "vertical")
-        ]
-        result = native.merge_rules(
-            [(int(f.orientation == "vertical"), f.coordinate, f.start, f.end) for f in fragments],
-            coordinates,
-            snap_tolerance,
-            join_gap,
+    coordinates = [
+        (
+            int(orientation == "vertical"),
+            cluster_positions((f.coordinate for f in fragments if f.orientation == orientation), snap_tolerance),
         )
-        if result is not None:
-            return [_MergedRule("vertical" if o else "horizontal", c, s, e) for o, c, s, e in result]
-    output: list[_MergedRule] = []
-    for orientation in ("horizontal", "vertical"):
-        oriented = [fragment for fragment in fragments if fragment.orientation == orientation]
-        coordinates = cluster_positions(
-            (fragment.coordinate for fragment in oriented),
-            snap_tolerance,
-        )
-        for coordinate in coordinates:
-            intervals = sorted(
-                (
-                    min(fragment.start, fragment.end),
-                    max(fragment.start, fragment.end),
-                )
-                for fragment in oriented
-                if abs(fragment.coordinate - coordinate) <= snap_tolerance
-            )
-            if not intervals:
-                continue
-            current_start, current_end = intervals[0]
-            for start, end in intervals[1:]:
-                if start <= current_end + join_gap:
-                    current_end = max(current_end, end)
-                    continue
-                output.append(_MergedRule(orientation, coordinate, current_start, current_end))
-                current_start, current_end = start, end
-            output.append(_MergedRule(orientation, coordinate, current_start, current_end))
-    return output
+        for orientation in ("horizontal", "vertical")
+    ]
+    result = native.merge_rules(
+        [(int(f.orientation == "vertical"), f.coordinate, f.start, f.end) for f in fragments],
+        coordinates,
+        snap_tolerance,
+        join_gap,
+    )
+    return [_MergedRule("vertical" if o else "horizontal", c, start, end) for o, c, start, end in result]
 
 
 def _repeated_long_rule_endpoints(
@@ -825,12 +758,7 @@ def _separator_coverage_for_track(
 
     if isinstance(rules, _IndexedRules):
         return rules.coverage(orientation, track.aliases, start, end, snap_tolerance)
-    intervals = [
-        (rule.start, rule.end)
-        for rule in rules
-        if rule.orientation == orientation and any(abs(rule.coordinate - alias) <= snap_tolerance for alias in track.aliases)
-    ]
-    return covered_interval_ratio(intervals, start, end)
+    return _IndexedRules(rules).coverage(orientation, track.aliases, start, end, snap_tolerance)
 
 
 def _rect_lattice_is_repeated(
@@ -904,12 +832,7 @@ def _separator_coverage(
 
     if isinstance(rules, _IndexedRules):
         return rules.coverage(orientation, (coordinate,), start, end, snap_tolerance)
-    intervals = [
-        (rule.start, rule.end)
-        for rule in rules
-        if rule.orientation == orientation and abs(rule.coordinate - coordinate) <= snap_tolerance
-    ]
-    return covered_interval_ratio(intervals, start, end)
+    return _IndexedRules(rules).coverage(orientation, (coordinate,), start, end, snap_tolerance)
 
 
 def _grid_index(row: int, col: int, cols: int) -> int:
@@ -929,45 +852,14 @@ def _build_component_specs(
 
     from ....._compute_backend import get_native
 
-    native = get_native()
-    if native is not None:
-        parents, components = native.component_specs(union_find._parents, rows, cols)
-        union_find._parents = parents
-        if components is None:
-            return None
-        return tuple(
-            GridCellSpec(r, c, rs, cs, (x_tracks[c], y_tracks[r], x_tracks[c + cs], y_tracks[r + rs]))
-            for r, c, rs, cs in components
-        )
-    components: dict[int, list[tuple[int, int]]] = {}
-    for row in range(rows):
-        for col in range(cols):
-            root = union_find.find(_grid_index(row, col, cols))
-            components.setdefault(root, []).append((row, col))
-    specs: list[GridCellSpec] = []
-    for positions in components.values():
-        row_values = [item[0] for item in positions]
-        col_values = [item[1] for item in positions]
-        min_row, max_row = min(row_values), max(row_values)
-        min_col, max_col = min(col_values), max(col_values)
-        expected_size = (max_row - min_row + 1) * (max_col - min_col + 1)
-        if len(positions) != expected_size:
-            return None
-        specs.append(
-            GridCellSpec(
-                row=min_row,
-                col=min_col,
-                rowspan=max_row - min_row + 1,
-                colspan=max_col - min_col + 1,
-                bbox=(
-                    x_tracks[min_col],
-                    y_tracks[min_row],
-                    x_tracks[max_col + 1],
-                    y_tracks[max_row + 1],
-                ),
-            )
-        )
-    return tuple(sorted(specs, key=lambda item: (item.row, item.col)))
+    parents, components = get_native().component_specs(union_find._parents, rows, cols)
+    union_find._parents = parents
+    if components is None:
+        return None
+    return tuple(
+        GridCellSpec(r, c, rs, cs, (x_tracks[c], y_tracks[r], x_tracks[c + cs], y_tracks[r + rs]))
+        for r, c, rs, cs in components
+    )
 
 
 def _occupied_text_rows(
@@ -1658,7 +1550,7 @@ def _build_vector_topology(
     from ....._compute_backend import get_native
 
     native = get_native()
-    if native is not None and isinstance(rules, _IndexedRules):
+    if isinstance(rules, _IndexedRules):
         queries = []
         for row in range(rows):
             for track in canonical_x_tracks[1:-1]:
@@ -1752,11 +1644,7 @@ def _build_vector_topology(
             elif coverage < SEPARATOR_COVERAGE_THRESHOLD:
                 ambiguous_separator_count += 1
 
-    if native is not None:
-        union_find._parents = native.grid_parents(rows * cols, connections)
-    else:
-        for first, second in connections:
-            union_find.union(first, second)
+    union_find._parents = native.grid_parents(rows * cols, connections)
     ambiguous_ratio = ambiguous_separator_count / len(separator_decisions) if separator_decisions else 0.0
     if diagnostics is not None:
         diagnostics["grid"] = {"rows": rows, "cols": cols}

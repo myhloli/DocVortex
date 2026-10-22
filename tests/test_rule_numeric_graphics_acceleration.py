@@ -1,4 +1,5 @@
 """数字文字批处理对照 Python 的 Unicode 语法及输入状态失效。"""
+
 import copy
 import re
 from random import Random
@@ -20,10 +21,8 @@ def line(text):
 
 @pytest.fixture
 def native():
-    """Python 模式跳过内核差分，Rust 模式调用真实扩展。"""
+    """必须加载真实扩展，缺失时由加载器明确失败。"""
     kernel = get_native()
-    if kernel is None:
-        pytest.skip("native backend is not selected")
     return kernel
 
 
@@ -36,14 +35,18 @@ def test_numeric_grammar_and_stable_sources(native, seed):
     texts += ["".join(rng.choices(alphabet, k=rng.randrange(30))) for _ in range(300)]
     lines = [line(text) for text in texts]
     for mode in (2, 0, 1, 0, 2):
-        expected = [item for item in lines if re.fullmatch(PATTERNS[mode], item.text.strip() if mode == 0 else item.text)
-                    and (mode != 0 or len(item.text.strip()) <= 8)]
+        expected = [
+            item
+            for item in lines
+            if re.fullmatch(PATTERNS[mode], item.text.strip() if mode == 0 else item.text)
+            and (mode != 0 or len(item.text.strip()) <= 8)
+        ]
         actual = native.graphic_numeric_lines(lines, mode, _LineItem, re.fullmatch)
         assert [id(item) for item in actual] == [id(item) for item in expected]
 
 
-def test_numeric_cache_text_mutation_copy_and_unknown(native, monkeypatch):
-    """文字变化使缓存失效，语义和几何不写入缓存，未知类型及规则修改完整回退。"""
+def test_numeric_cache_text_mutation_copy_and_unknown(native):
+    """文字变化使缓存失效，语义和几何不写入缓存，非法记录明确失败。"""
     item = line("12")
     assert graphics._numeric_graphic_lines([item], 0) == [item]
     item.text = "abc"
@@ -57,9 +60,9 @@ def test_numeric_cache_text_mutation_copy_and_unknown(native, monkeypatch):
     item.effective_height = 0.0
     assert graphics._numeric_graphic_lines([item], 1) == [item]
     assert native.graphic_numeric_lines([SimpleNamespace(text="1")], 0, _LineItem, re.fullmatch) is None
-    assert native.graphic_numeric_lines([line("\ud800")], 0, _LineItem, re.fullmatch) is None
-    monkeypatch.setattr(re, "fullmatch", lambda *args: None)
-    assert graphics._numeric_graphic_lines([item], 1) is None
+    assert native.graphic_numeric_lines([line("\ud800")], 0, _LineItem, re.fullmatch) == []
+    with pytest.raises(TypeError, match="standard line records"):
+        graphics._numeric_graphic_lines([SimpleNamespace(text="1")], 0)
 
 
 def test_numeric_raster_reads_current_geometry(native, monkeypatch):
@@ -70,17 +73,14 @@ def test_numeric_raster_reads_current_geometry(native, monkeypatch):
     monkeypatch.setattr(graphics, "_raster_axis_tick_groups", lambda values: observed.append(values) or [])
     graphics._detect_native_raster_axis_graphics(source)
     assert observed[-1] == [item]
-    for attr, value in (("angle", 90), ("semantic_type", "formula"), ("effective_height", 0.0), ("bbox", (0.0, 0.0, 100.0, 10.0))):
+    for attr, value in (
+        ("angle", 90),
+        ("semantic_type", "formula"),
+        ("effective_height", 0.0),
+        ("bbox", (0.0, 0.0, 100.0, 10.0)),
+    ):
         previous = getattr(item, attr)
         setattr(item, attr, value)
         graphics._detect_native_raster_axis_graphics(source)
         assert observed[-1] == []
         setattr(item, attr, previous)
-
-
-def test_numeric_graphics_falls_back_after_regex_compiler_replacement(native, monkeypatch):
-    """替换正则编译器后停用原生缓存，继续尊重调用方当前的正则实现。"""
-    item = line("12")
-    assert graphics._numeric_graphic_lines([item], 0) == [item]
-    monkeypatch.setattr(re._compiler, "compile", lambda *args, **kwargs: None)
-    assert graphics._numeric_graphic_lines([item], 0) is None

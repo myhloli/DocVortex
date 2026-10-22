@@ -17,7 +17,6 @@ def child(args):
     """新进程只分析一次，记录返回时刻后才进行输出摘要和来源验证。"""
     entered = time.monotonic_ns()
     os.environ.update(
-        DOCVORTEX_COMPUTE_BACKEND="rust",
         DOCVORTEX_PDF_RENDER_BACKEND=args.render_backend,
         ORT_DISABLE_TELEMETRY="1",
         LOGURU_LEVEL="WARNING",

@@ -8,15 +8,31 @@ pub type Pair = (usize, usize);
 pub type Offset = (usize, usize, f64, f64);
 pub type MappingRecord = (Option<i64>, i64, i64, usize, f64, Option<Size>, Box4, bool);
 
+/// 用浮点整数位型表示桶号，覆盖超出 i64 的有限 PDF 坐标并合并正负零。
+fn bucket(value: f64) -> u64 {
+    let value = value.floor();
+    if value == 0.0 {
+        0.0_f64.to_bits()
+    } else {
+        value.to_bits()
+    }
+}
+
+/// 只访问可由输入浮点数表示的相邻桶，巨大桶号不会因整数截断产生冲突。
+fn neighbors(key: u64) -> Vec<u64> {
+    let value = f64::from_bits(key);
+    let mut keys = Vec::with_capacity(3);
+    for candidate in [value - 1.0, value, value + 1.0] {
+        let candidate = bucket(candidate);
+        if !keys.contains(&candidate) {
+            keys.push(candidate);
+        }
+    }
+    keys
+}
+
 /// 批量识别连续的一对多来源映射，只返回范围，Unicode 合并仍由 Python 执行。
 pub fn mapping_runs(records: Vec<MappingRecord>) -> Option<Vec<(usize, usize)>> {
-    if records.iter().any(|r| {
-        !r.4.is_finite()
-            || r.6.iter().any(|v| !v.is_finite())
-            || r.5.is_some_and(|p| p.iter().any(|v| !v.is_finite()))
-    }) {
-        return None;
-    }
     let mut groups = Vec::new();
     let mut start = 0;
     for i in 1..records.len() {
@@ -62,13 +78,7 @@ fn overlap(a: Box4, b: Box4) -> f64 {
 
 /// 按签名和相邻九桶生成精确重复与平移候选，保留每桶最多 64 项。
 pub fn paint_pairs(records: Vec<PaintRecord>) -> Option<(Vec<Pair>, Vec<Offset>)> {
-    if records
-        .iter()
-        .any(|r| r.0.is_some_and(|b| b.iter().any(|v| v.abs() > 1e15)))
-    {
-        return None;
-    }
-    let mut buckets: HashMap<(usize, i64, i64), Vec<usize>> = HashMap::new();
+    let mut buckets: HashMap<(usize, u64, u64), Vec<usize>> = HashMap::new();
     let mut exact = Vec::new();
     let mut offsets = Vec::new();
     for (i, (box_, origin, signature, object, eligible)) in records.iter().enumerate() {
@@ -78,10 +88,10 @@ pub fn paint_pairs(records: Vec<PaintRecord>) -> Option<(Vec<Pair>, Vec<Offset>)
         let (Some(b), Some(co)) = (box_, origin) else {
             continue;
         };
-        let bx = (b[0] / 2.5).floor() as i64;
-        let by = (b[1] / 2.5).floor() as i64;
-        for x in bx - 1..=bx + 1 {
-            for y in by - 1..=by + 1 {
+        let bx = bucket(b[0] / 2.5);
+        let by = bucket(b[1] / 2.5);
+        for x in neighbors(bx) {
+            for y in neighbors(by) {
                 if let Some(candidates) = buckets.get(&(*signature, x, y)) {
                     if candidates.len() >= 64 {
                         continue;
@@ -164,7 +174,7 @@ pub fn confirmed_offsets(
         .chain(pairs.iter().map(|p| (p.0, p.1)))
         .collect();
     let roots = components(records.len(), &all);
-    let mut bins: HashMap<(usize, i64, i64, i64), Vec<usize>> = HashMap::new();
+    let mut bins: HashMap<(usize, u64, u64, u64), Vec<usize>> = HashMap::new();
     let mut key_order = Vec::new();
     let mut clusters: Vec<Vec<Offset>> = Vec::new();
     for p in pairs {
@@ -172,14 +182,14 @@ pub fn confirmed_offsets(
         let normal = r.1;
         let key = (
             r.2,
-            (p.2 / 0.1).floor() as i64,
-            (p.3 / 0.1).floor() as i64,
-            (normal / 0.1).floor() as i64,
+            bucket(p.2 / 0.1),
+            bucket(p.3 / 0.1),
+            bucket(normal / 0.1),
         );
         let mut found = None;
-        'search: for x in key.1 - 1..=key.1 + 1 {
-            for y in key.2 - 1..=key.2 + 1 {
-                for n in key.3 - 1..=key.3 + 1 {
+        'search: for x in neighbors(key.1) {
+            for y in neighbors(key.2) {
+                for n in neighbors(key.3) {
                     if let Some(ids) = bins.get(&(key.0, x, y, n)) {
                         for &id in ids {
                             let first = clusters[id][0];
@@ -274,12 +284,7 @@ pub type HiddenRecord = (
 
 /// 产生隐藏文本和可见文本的几何配对；Unicode 文本判据仍由 Python 执行。
 pub fn hidden_candidates(records: Vec<HiddenRecord>) -> Option<Vec<(Vec<usize>, Vec<usize>)>> {
-    if records.iter().any(|r| {
-        r.0.is_some_and(|b| b.iter().any(|v| !v.is_finite() || v.abs() > 1e15))
-    }) {
-        return None;
-    }
-    let mut grid: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    let mut grid: HashMap<(u64, u64), Vec<usize>> = HashMap::new();
     let mut key_order = Vec::new();
     let mut runs: Vec<Vec<usize>> = Vec::new();
     for (i, r) in records.iter().enumerate() {
@@ -291,8 +296,8 @@ pub fn hidden_candidates(records: Vec<HiddenRecord>) -> Option<Vec<(Vec<usize>, 
         }
         if [0, 1, 2, 4, 5, 6].contains(&r.3) && r.4 {
             let key = (
-                ((b[0] + b[2]) / 2.0 / 32.0).floor() as i64,
-                ((b[1] + b[3]) / 2.0 / 32.0).floor() as i64,
+                bucket((b[0] + b[2]) / 2.0 / 32.0),
+                bucket((b[1] + b[3]) / 2.0 / 32.0),
             );
             if !grid.contains_key(&key) {
                 key_order.push(key);
@@ -324,20 +329,28 @@ pub fn hidden_candidates(records: Vec<HiddenRecord>) -> Option<Vec<(Vec<usize>, 
         let b = crate::geometry::union(&boxes).unwrap();
         let p = project(b, first.7, first.8);
         let margin = 0.1 * (p[3] - p[1]);
-        let x0 = ((b[0] - margin) / 32.0).floor() as i64;
-        let x1 = ((b[2] + margin) / 32.0).floor() as i64;
-        let y0 = ((b[1] - margin) / 32.0).floor() as i64;
-        let y1 = ((b[3] + margin) / 32.0).floor() as i64;
-        let keys: Vec<_> = if (x1 - x0 + 1) as i128 * (y1 - y0 + 1) as i128 > 4 * grid.len() as i128
+        let x0 = ((b[0] - margin) / 32.0).floor();
+        let x1 = ((b[2] + margin) / 32.0).floor();
+        let y0 = ((b[1] - margin) / 32.0).floor();
+        let y1 = ((b[3] + margin) / 32.0).floor();
+        let keys: Vec<_> = if [x0, x1, y0, y1]
+            .iter()
+            .any(|v| v.abs() >= (1_u64 << 52) as f64)
+            || (x1 - x0 + 1.0) * (y1 - y0 + 1.0) > 4.0 * grid.len() as f64
         {
             key_order
                 .iter()
                 .copied()
-                .filter(|(x, y)| x0 <= *x && *x <= x1 && y0 <= *y && *y <= y1)
+                .filter(|(x, y)| {
+                    let (x, y) = (f64::from_bits(*x), f64::from_bits(*y));
+                    x0 <= x && x <= x1 && y0 <= y && y <= y1
+                })
                 .collect()
         } else {
-            (x0..=x1)
-                .flat_map(|x| (y0..=y1).map(move |y| (x, y)))
+            ((x0 as i64)..=(x1 as i64))
+                .flat_map(|x| {
+                    ((y0 as i64)..=(y1 as i64)).map(move |y| (bucket(x as f64), bucket(y as f64)))
+                })
                 .collect()
         };
         let mut candidates = Vec::new();

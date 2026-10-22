@@ -118,9 +118,6 @@ from .table_annotations import (
     _line_has_superscript_marker as _line_has_superscript_marker,
 )
 from .table_annotations import (
-    _merge_table_candidate_annotations as _merge_table_candidate_annotations,
-)
-from .table_annotations import (
     _table_core_references_marker as _table_core_references_marker,
 )
 from .table_annotations import (

@@ -37,7 +37,6 @@ def main():
     parser.add_argument("--verify-inputs", action="store_true")
     parser.add_argument("--effort", choices=("medium", "high", "xhigh"), default="medium")
     parser.add_argument("--parse-mode", choices=("auto", "txt", "ocr"), default="auto")
-    parser.add_argument("--backend", choices=("python", "rust"), default="rust")
     parser.add_argument("--render-backend", choices=("legacy", "session"), required=True)
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--output", type=Path, required=True)
@@ -53,7 +52,6 @@ def main():
         "mineru": repository_identity(args.mineru_source, "mineru"),
     }
     os.environ.update(
-        DOCVORTEX_COMPUTE_BACKEND=args.backend,
         DOCVORTEX_PDF_RENDER_BACKEND=args.render_backend,
         ORT_DISABLE_TELEMETRY="1",
         LOGURU_LEVEL="WARNING",
@@ -78,7 +76,7 @@ def main():
     import_seconds = time.perf_counter() - started
     assert Path(docvortex.__file__).resolve() == (args.docvortex_source / "src/docvortex/__init__.py").resolve()
     assert Path(mineru.__file__).resolve() == (args.mineru_source / "mineru/__init__.py").resolve()
-    assert backend_info()["backend"] == args.backend
+    assert backend_info()["backend"] == "rust"
     payload = args.path.read_bytes()
     input_sha = hashlib.sha256(payload).hexdigest()
     if args.path.suffix == ".xor":

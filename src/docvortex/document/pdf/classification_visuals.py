@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from ctypes import byref, c_double, cast, c_void_p, c_float
-import math
+from ctypes import byref, c_float
 
 import pypdfium2.raw as raw
 
@@ -115,64 +114,6 @@ def _text_paint_difference(page):
             raise ValueError("Cannot restore PDF text painting")
 
 
-def _image_text_candidates_python(textpage, frame, rotation, images, visibility):
-    """独立参考路径保留原始字符过滤、框顺序和裁剪语义，用于无 Rust 后端及字段级差分。"""
-    width, height = _drawing_page_size(frame, rotation)
-    boxes = []
-    paints = False
-    for index in range(textpage.count_chars()):
-        code = raw.FPDFText_GetUnicode(textpage, index)
-        if not 0 < code <= 0x10FFFF or chr(code).isspace():
-            continue
-        obj = raw.FPDFText_GetTextObject(textpage, index)
-        if not obj:
-            continue
-        visible, clip = visibility.get(cast(obj, c_void_p).value, (True, None))
-        left, right, bottom, top = (c_double() for _ in range(4))
-        if not raw.FPDFText_GetCharBox(textpage, index, byref(left), byref(right), byref(bottom), byref(top)):
-            continue
-        box = _transform_object_bbox(
-            (left.value, bottom.value, right.value, top.value),
-            lambda point: _transform_drawing_point(point, frame, rotation),
-        )
-        box = _intersect_object_bbox(_intersect_object_bbox(box, clip), (0, 0, width, height))
-        area = _area(box)
-        if area and _union_area([_intersect_object_bbox(box, image) for image in images]) >= area * _IMAGE_TEXT_OVERLAP:
-            boxes.append(box)
-            paints |= visible
-    return boxes, paints
-
-
-_REFERENCE_VISUAL_FUNCTIONS = (
-    _drawing_page_size,
-    _transform_drawing_point,
-    _transform_object_bbox,
-    _intersect_object_bbox,
-    _area,
-    _union_area,
-)
-
-
-def _painted_count_python(difference, boxes, width, height):
-    """按原 Pillow 查询逐框计数，不让参考路径依赖 Rust 像素实现。"""
-    sx, sy = difference.width / width, difference.height / height
-    count = 0
-    for box in boxes:
-        crop = difference.crop(
-            (
-                max(0, math.floor(box[0] * sx)),
-                max(0, math.floor(box[1] * sy)),
-                min(difference.width, math.ceil(box[2] * sx)),
-                min(difference.height, math.ceil(box[3] * sy)),
-            )
-        )
-        try:
-            count += crop.getbbox() is not None
-        finally:
-            crop.close()
-    return count
-
-
 def image_text_signal(page, cleaned_char_count: int, min_chars: int, images=None) -> dict:
     """共享当前页图像框并批量核验正文，只有候选数可能达到 OCR 门槛时才进行像素探测。"""
     from .classification_bridge import read_image_text_snapshot
@@ -188,20 +129,8 @@ def image_text_signal(page, cleaned_char_count: int, min_chars: int, images=None
     textpage = page.get_textpage()
     snapshot = None
     try:
-        if (
-            _drawing_page_size,
-            _transform_drawing_point,
-            _transform_object_bbox,
-            _intersect_object_bbox,
-            _area,
-            _union_area,
-        ) == _REFERENCE_VISUAL_FUNCTIONS:
-            snapshot = read_image_text_snapshot(textpage, frame, rotation, images, visibility, _IMAGE_TEXT_OVERLAP)
-        if snapshot is None:
-            boxes, paints = _image_text_candidates_python(textpage, frame, rotation, images, visibility)
-            count = len(boxes)
-        else:
-            count, paints = snapshot.count, snapshot.paints
+        snapshot = read_image_text_snapshot(textpage, frame, rotation, images, visibility, _IMAGE_TEXT_OVERLAP)
+        count, paints = snapshot.count, snapshot.paints
     finally:
         textpage.close()
     result["image_text_chars"] = count
@@ -212,12 +141,9 @@ def image_text_signal(page, cleaned_char_count: int, min_chars: int, images=None
         difference = _text_paint_difference(page)
         try:
             result["pixel_probe_performed"] = True
-            if snapshot is None:
-                result["painted_image_text_chars"] = _painted_count_python(difference, boxes, width, height)
-            else:
-                result["painted_image_text_chars"] = snapshot.painted_count(
-                    difference.tobytes(), difference.width, difference.height, width, height
-                )
+            result["painted_image_text_chars"] = snapshot.painted_count(
+                difference.tobytes(), difference.width, difference.height, width, height
+            )
         finally:
             difference.close()
     unpainted = count - result["painted_image_text_chars"]

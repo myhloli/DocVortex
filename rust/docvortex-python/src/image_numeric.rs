@@ -145,6 +145,45 @@ pub fn image_morphology<'py>(
     Ok(PyBytes::new(py, &output))
 }
 
+/// 通用位深只传排序秩，原生极值返回像素索引以免绑定转换损失精度或 NaN 位模式。
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+pub fn image_morphology_indices<'py>(
+    py: Python<'py>,
+    data: &Bound<'py, PyBytes>,
+    width: usize,
+    height: usize,
+    kw: usize,
+    kh: usize,
+    dilate: bool,
+    nan_rank: Option<u64>,
+) -> PyResult<Bound<'py, PyBytes>> {
+    let bytes = data.as_bytes();
+    if bytes.len() % 8 != 0 {
+        return Err(PyValueError::new_err("invalid morphology rank buffer"));
+    }
+    let output = py
+        .detach(|| {
+            let ranks: Vec<u64> = bytes
+                .as_chunks::<8>()
+                .0
+                .iter()
+                .map(|part| u64::from_ne_bytes(*part))
+                .collect();
+            docvortex_core::image_numeric::morphology_indices(
+                &ranks, width, height, kw, kh, dilate, nan_rank,
+            )
+            .map(|indices| {
+                indices
+                    .into_iter()
+                    .flat_map(u64::to_ne_bytes)
+                    .collect::<Vec<_>>()
+            })
+        })
+        .map_err(PyValueError::new_err)?;
+    Ok(PyBytes::new(py, &output))
+}
+
 /// 批量线段内核只读取自有字节，输出为独立八位图像。
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]

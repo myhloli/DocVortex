@@ -22,12 +22,13 @@ pub(super) fn fragment_rows_owned<'py>(
     row_type: &Bound<'py, PyAny>,
     mean: &Bound<'py, PyAny>,
     total: &Bound<'py, PyAny>,
-) -> PyResult<Option<Bound<'py, PyList>>> {
+) -> PyResult<Bound<'py, PyList>> {
+    let generic = || fragment_rows_generic(py, fragments, height, row_type, mean, total);
     if !fragments.is_exact_instance_of::<PyList>() {
-        return Ok(None);
+        return generic();
     }
     let Some(height) = number(height) else {
-        return Ok(None);
+        return generic();
     };
     let mut references = Vec::new();
     let mut boxes = Vec::new();
@@ -37,20 +38,20 @@ pub(super) fn fragment_rows_owned<'py>(
     for fragment in fragments.try_iter()? {
         let fragment = fragment?;
         if !fragment.get_type().is(fragment_type) {
-            return Ok(None);
+            return generic();
         }
         let box_obj = fragment.getattr(pyo3::intern!(fragment.py(), "local_bbox"))?;
         if (!box_obj.is_exact_instance_of::<PyTuple>() && !box_obj.is_exact_instance_of::<PyList>())
             || box_obj.len()? != 4
         {
-            return Ok(None);
+            return generic();
         }
         let mut box_values = Vec::new();
         let mut bbox = [0.0; 4];
         for (i, value) in bbox.iter_mut().enumerate() {
             let coordinate = box_obj.get_item(i)?;
             let Some(number) = number(&coordinate) else {
-                return Ok(None);
+                return generic();
             };
             *value = number;
             box_values.push(coordinate);
@@ -60,11 +61,11 @@ pub(super) fn fragment_rows_owned<'py>(
             None
         } else if id.is_exact_instance_of::<PyInt>() {
             let Ok(id) = id.extract::<i64>() else {
-                return Ok(None);
+                return generic();
             };
             Some(id)
         } else {
-            return Ok(None);
+            return generic();
         };
         items.push(((bbox[1] + bbox[3]) / 2.0, bbox[0], id));
         references.push(fragment);
@@ -125,5 +126,152 @@ pub(super) fn fragment_rows_owned<'py>(
         rows.push((center, row));
     }
     rows.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-    Ok(Some(PyList::new(py, rows.into_iter().map(|(_, row)| row))?))
+    PyList::new(py, rows.into_iter().map(|(_, row)| row))
+}
+
+/// 通用片段仍在 Rust 执行分组，宿主 fmean/sum 和原坐标对象维持特殊数值及构造语义。
+fn fragment_rows_generic<'py>(
+    py: Python<'py>,
+    fragments: &Bound<'py, PyAny>,
+    height: &Bound<'py, PyAny>,
+    row_type: &Bound<'py, PyAny>,
+    mean: &Bound<'py, PyAny>,
+    total: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyList>> {
+    use pyo3::types::{PyDict, PySet};
+    let operators = py.import("operator")?;
+    let builtins = py.import("builtins")?;
+    let add = operators.getattr("add")?;
+    let sub = operators.getattr("sub")?;
+    let multiply = operators.getattr("mul")?;
+    let divide = operators.getattr("truediv")?;
+    let absolute = operators.getattr("abs")?;
+    let le = operators.getattr("le")?;
+    let minimum = builtins.getattr("min")?;
+    let maximum = builtins.getattr("max")?;
+    let tolerance = maximum.call1((2.0, multiply.call1((height, 0.5))?))?;
+    let mut references = Vec::new();
+    let mut boxes = Vec::new();
+    let mut centers = Vec::new();
+    let mut visual = Vec::new();
+    let mut seeds: Vec<Vec<usize>> = Vec::new();
+    let mut geometric = Vec::new();
+    let native = PyDict::new(py);
+    for fragment in fragments.try_iter()? {
+        let fragment = fragment?;
+        let bbox = fragment.getattr("local_bbox")?;
+        let center = divide.call1((add.call1((bbox.get_item(1)?, bbox.get_item(3)?))?, 2.0))?;
+        let id = fragment.getattr("visual_row_id")?;
+        let index = references.len();
+        if id.is_none() {
+            geometric.push(vec![index]);
+        } else if let Some(group) = native.get_item(&id)? {
+            seeds[group.extract::<usize>()?].push(index);
+        } else {
+            native.set_item(&id, seeds.len())?;
+            seeds.push(vec![index]);
+        }
+        references.push(fragment);
+        boxes.push(bbox);
+        centers.push(center);
+        visual.push(id);
+    }
+    seeds.extend(geometric);
+    let mut seed_centers = Vec::new();
+    let keys = PyList::empty(py);
+    for group in &seeds {
+        let center = mean.call1((PyList::new(py, group.iter().map(|&i| centers[i].clone()))?,))?;
+        let left = minimum.call1((PyList::new(
+            py,
+            group
+                .iter()
+                .map(|&i| boxes[i].get_item(0))
+                .collect::<PyResult<Vec<_>>>()?,
+        )?,))?;
+        keys.append((&center, left))?;
+        seed_centers.push(center);
+    }
+    let mut groups: Vec<Vec<usize>> = Vec::new();
+    let mut group_centers: Vec<Bound<'py, PyAny>> = Vec::new();
+    for index in super::tables::sorted_object_indices(py, &keys)? {
+        let center = &seed_centers[index];
+        let mut target = None;
+        for (position, current) in group_centers.iter().enumerate() {
+            if le
+                .call1((
+                    absolute.call1((sub.call1((center, current))?,))?,
+                    &tolerance,
+                ))?
+                .is_truthy()?
+            {
+                target = Some(position);
+                break;
+            }
+        }
+        if let Some(position) = target {
+            groups[position].extend(&seeds[index]);
+            group_centers[position] = mean.call1((PyList::new(
+                py,
+                groups[position].iter().map(|&i| centers[i].clone()),
+            )?,))?;
+        } else {
+            groups.push(seeds[index].clone());
+            group_centers.push(center.clone());
+        }
+    }
+    let mut rows = Vec::new();
+    let row_keys = PyList::empty(py);
+    for group in groups {
+        let lefts = PyList::new(
+            py,
+            group
+                .iter()
+                .map(|&i| boxes[i].get_item(0))
+                .collect::<PyResult<Vec<_>>>()?,
+        )?;
+        let group: Vec<_> = super::tables::sorted_object_indices(py, &lefts)?
+            .into_iter()
+            .map(|position| group[position])
+            .collect();
+        let members = PyList::new(py, group.iter().map(|&i| references[i].clone()))?;
+        let center = divide.call1((
+            total.call1((PyList::new(py, group.iter().map(|&i| centers[i].clone()))?,))?,
+            group.len(),
+        ))?;
+        let bbox = if group.len() == 1 {
+            boxes[group[0]].clone()
+        } else {
+            let mut coordinates = Vec::new();
+            for axis in 0..4 {
+                let values = PyList::new(
+                    py,
+                    group
+                        .iter()
+                        .map(|&i| boxes[i].get_item(axis))
+                        .collect::<PyResult<Vec<_>>>()?,
+                )?;
+                coordinates.push((if axis < 2 { &minimum } else { &maximum }).call1((values,))?);
+            }
+            PyTuple::new(py, coordinates)?.into_any()
+        };
+        let ids = PySet::empty(py)?;
+        for &i in &group {
+            if !visual[i].is_none() {
+                ids.add(&visual[i])?;
+            }
+        }
+        let id = if ids.len() == 1 {
+            ids.iter().next().unwrap().into_any()
+        } else {
+            py.None().into_bound(py)
+        };
+        row_keys.append(&center)?;
+        rows.push(row_type.call1((members, center, bbox, id))?);
+    }
+    PyList::new(
+        py,
+        super::tables::sorted_object_indices(py, &row_keys)?
+            .into_iter()
+            .map(|index| rows[index].clone()),
+    )
 }

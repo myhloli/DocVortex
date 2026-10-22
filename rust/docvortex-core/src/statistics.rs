@@ -17,11 +17,12 @@ pub fn ordered_clusters(
     relative: f64,
     last_only: bool,
 ) -> Option<Vec<Vec<usize>>> {
-    if values.iter().any(|v| !v.is_finite()) || !tolerance.is_finite() || !relative.is_finite() {
-        return None;
-    }
     let mut order: Vec<_> = (0..values.len()).collect();
-    order.sort_by(|a, b| values[*a].partial_cmp(&values[*b]).unwrap());
+    order.sort_by(|a, b| {
+        values[*a]
+            .partial_cmp(&values[*b])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let mut clusters: Vec<Vec<usize>> = Vec::new();
     for index in order {
         let start = if last_only {
@@ -36,7 +37,12 @@ pub fn ordered_clusters(
             } else {
                 relative * middle
             };
-            (values[index] - middle).abs() <= limit
+            let delta = (values[index] - middle).abs();
+            if last_only {
+                delta.partial_cmp(&limit) != Some(std::cmp::Ordering::Greater)
+            } else {
+                delta <= limit
+            }
         });
         if let Some(target) = target {
             clusters[target].push(index);
@@ -216,9 +222,6 @@ pub fn lane_gap(
         return None;
     }
     let mh = if n == 0 { 1.0 } else { median(heights.clone()) };
-    if !mh.is_finite() {
-        return None;
-    }
     let mut gaps = Vec::new();
     for i in 1..n {
         if skip[i - 1] {
@@ -250,9 +253,6 @@ pub fn lane_gap(
         if ratio < 0.5 && (a[0] - b[0]).abs() > 1.5 * mh {
             continue;
         }
-        if !gap.is_finite() {
-            return None;
-        }
         gaps.push(0.0_f64.max(gap));
     }
     if gaps.is_empty() {
@@ -262,13 +262,7 @@ pub fn lane_gap(
     let count = 1usize.max((gaps.len() as f64 * 0.6).ceil() as usize);
     let lower = gaps[..count].to_vec();
     let regular = median(lower.clone());
-    if !regular.is_finite() {
-        return None;
-    }
     let mad = median(lower.into_iter().map(|g| (g - regular).abs()).collect());
-    if !mad.is_finite() {
-        return None;
-    }
     Some((regular, mad))
 }
 /// 只在一次表格候选构建期间保存排序后的正文高度与来源中心范围。

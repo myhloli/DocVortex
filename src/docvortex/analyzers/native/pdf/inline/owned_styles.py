@@ -38,7 +38,7 @@ def _plain_box(box):
 def detect_owned_style_lines(owner, lines, drawings, identities):
     """仅传行框、成员索引和绘图线，最终才构造公开样式行；能力不适用返回 None。"""
     native = get_native()
-    if native is None or type(owner) is not native.NativeTextSnapshot or identities is None:
+    if type(owner) is not native.NativeTextSnapshot or identities is None:
         return None
     rows = []
     for line in lines:

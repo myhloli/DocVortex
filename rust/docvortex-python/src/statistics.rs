@@ -3,39 +3,44 @@
 use docvortex_core::geometry::Box4;
 use pyo3::prelude::*;
 
-/// 只接受普通浮点列表；整数真除法沿用 CPython Fraction 转 float 的最终舍入语义。
+/// 普通浮点均值由 Rust 精确累积；其他数值类型保留宿主标准库的精确除法与异常契约。
 #[pyfunction]
-pub(super) fn exact_float_mean(py: Python<'_>, values: &Bound<'_, PyAny>) -> PyResult<Option<f64>> {
+pub(super) fn exact_float_mean<'py>(
+    py: Python<'py>,
+    values: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
     use pyo3::types::{PyFloat, PyList};
-    if !values.is_exact_instance_of::<PyList>() {
-        return Ok(None);
-    }
-    let mut numbers = Vec::new();
-    for value in values.try_iter()? {
-        let value = value?;
-        if !value.is_exact_instance_of::<PyFloat>() {
-            return Ok(None);
+    if values.is_exact_instance_of::<PyList>() {
+        let mut numbers = Vec::new();
+        let mut ordinary = true;
+        for value in values.try_iter()? {
+            let value = value?;
+            if !value.is_exact_instance_of::<PyFloat>() {
+                ordinary = false;
+                break;
+            }
+            numbers.push(value.extract::<f64>()?);
         }
-        numbers.push(value.extract::<f64>()?);
+        if ordinary {
+            if let Some((total, power)) = docvortex_core::exact_mean::exact_sum_parts(&numbers) {
+                let mut numerator = total.into_pyobject(py)?.into_any();
+                let mut denominator = numbers.len().into_pyobject(py)?.into_any();
+                if power >= 0 {
+                    numerator = numerator.call_method1("__lshift__", (power,))?;
+                } else {
+                    denominator = denominator.call_method1("__lshift__", (-power,))?;
+                }
+                // 持有 GIL 与两个普通整数，复用 CPython 精确整数真除法的最终舍入。
+                return unsafe {
+                    Bound::<PyAny>::from_owned_ptr_or_err(
+                        py,
+                        pyo3::ffi::PyNumber_TrueDivide(numerator.as_ptr(), denominator.as_ptr()),
+                    )
+                };
+            }
+        }
     }
-    let Some((total, power)) = docvortex_core::exact_mean::exact_sum_parts(&numbers) else {
-        return Ok(None);
-    };
-    let mut numerator = total.into_pyobject(py)?.into_any();
-    let mut denominator = numbers.len().into_pyobject(py)?.into_any();
-    if power >= 0 {
-        numerator = numerator.call_method1("__lshift__", (power,))?;
-    } else {
-        denominator = denominator.call_method1("__lshift__", (-power,))?;
-    }
-    // 安全：持有 GIL 及两个普通整数的强引用；同 Fraction.__float__ 使用精确整数真除法。
-    let result = unsafe {
-        Bound::<PyAny>::from_owned_ptr_or_err(
-            py,
-            pyo3::ffi::PyNumber_TrueDivide(numerator.as_ptr(), denominator.as_ptr()),
-        )?
-    };
-    Ok(Some(result.extract::<f64>()?))
+    py.import("statistics")?.getattr("mean")?.call1((values,))
 }
 
 /// 批量聚类仅返回索引，避免为簇成员复制坐标与公开对象。
@@ -46,10 +51,59 @@ pub(super) fn ordered_clusters(
     tolerance: f64,
     relative: f64,
     last_only: bool,
-) -> Option<Vec<Vec<usize>>> {
-    py.detach(move || {
-        docvortex_core::statistics::ordered_clusters(values, tolerance, relative, last_only)
-    })
+) -> PyResult<Option<Vec<Vec<usize>>>> {
+    if values.iter().all(|v| v.is_finite()) && tolerance.is_finite() && relative.is_finite() {
+        return Ok(py.detach(move || {
+            docvortex_core::statistics::ordered_clusters(values, tolerance, relative, last_only)
+        }));
+    }
+    // NaN 的比较不是全序；借用当前解释器的稳定排序保持原中位数及来源次序。
+    use pyo3::types::{PyDict, PyList};
+    let numbers = PyList::new(py, &values)?;
+    let order = PyList::new(py, 0..values.len())?;
+    let kwargs = PyDict::new(py);
+    kwargs.set_item("key", numbers.getattr("__getitem__")?)?;
+    order.call_method("sort", (), Some(&kwargs))?;
+    let mut clusters: Vec<Vec<usize>> = Vec::new();
+    for index in order.extract::<Vec<usize>>()? {
+        let start = if last_only {
+            clusters.len().saturating_sub(1)
+        } else {
+            0
+        };
+        let mut target = None;
+        for (candidate, cluster) in clusters.iter().enumerate().skip(start) {
+            let sample = PyList::new(py, cluster.iter().map(|i| values[*i]))?;
+            sample.call_method0("sort")?;
+            let sorted = sample.extract::<Vec<f64>>()?;
+            let n = sorted.len();
+            let middle = if n % 2 == 1 {
+                sorted[n / 2]
+            } else {
+                (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
+            };
+            let limit = if relative == 0.0 {
+                tolerance
+            } else {
+                relative * middle
+            };
+            let delta = (values[index] - middle).abs();
+            if if last_only {
+                delta.partial_cmp(&limit) != Some(std::cmp::Ordering::Greater)
+            } else {
+                delta <= limit
+            } {
+                target = Some(candidate);
+                break;
+            }
+        }
+        if let Some(target) = target {
+            clusters[target].push(index);
+        } else {
+            clusters.push(vec![index]);
+        }
+    }
+    Ok(Some(clusters))
 }
 
 /// 聚合已验证的局部框，返回字号、主字体索引和行首特征，不返回重复字符记录。

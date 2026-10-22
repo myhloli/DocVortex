@@ -1,30 +1,27 @@
 """在独立进程验证原生字体回调，避免污染其它测试的 PDFium 全局状态。"""
+
 import os
 import subprocess
 import sys
 
-import pytest
 
 from docvortex._compute_backend import get_native
 
 
 def _run_native_font_check(source: str) -> None:
     """仅在兼容原生扩展可用时启动独立解释器执行字体生命周期场景。"""
-    native = get_native()
-    if native is None or not hasattr(native, "NativeFontProvider"):
-        pytest.skip("native font provider extension unavailable")
+    get_native()
     import pypdfium2.raw as raw
-    from docvortex.document.pdf.font_runtime import _native_font_bridge, native_font_runtime_info
+    from docvortex.document.pdf.font_runtime import _native_font_bridge
 
-    if _native_font_bridge(raw) is None:
-        pytest.skip(native_font_runtime_info()["native_font_provider_unavailable_reason"])
-    environment = dict(os.environ, DOCVORTEX_COMPUTE_BACKEND="rust")
+    _native_font_bridge(raw)
+    environment = dict(os.environ)
     subprocess.run([sys.executable, "-c", source], env=environment, check=True, timeout=60)
 
 
 def test_native_font_names_and_table_bytes() -> None:
     """比较全部别名、五编码、子集前缀和 Unicode 变体，验证表复制与错误隔离。"""
-    _run_native_font_check(r'''
+    _run_native_font_check(r"""
 import ctypes as c
 import pypdfium2.raw as raw
 from docvortex.document.pdf.font_runtime import (
@@ -65,7 +62,7 @@ else:
 info.contents.Release(info)
 info.contents.Release(info)
 assert p.released
-''')
+""")
 
 
 def test_native_font_runtime_allows_serial_thread_transfer() -> None:
@@ -196,7 +193,7 @@ with ThreadPoolExecutor(max_workers=2) as pool:
 
 def test_native_font_abi_fallback_reports_concrete_reason() -> None:
     """非标准调用标志必须保留参考路径，并明确记录拒绝的符号。"""
-    _run_native_font_check(r'''
+    _run_native_font_check(r"""
 import ctypes as c
 from types import SimpleNamespace
 import pypdfium2.raw as raw
@@ -208,8 +205,14 @@ facade = SimpleNamespace(
     FPDF_FreeDefaultSystemFontInfo=raw.FPDF_FreeDefaultSystemFontInfo,
     FPDF_SetSystemFontInfo=raw.FPDF_SetSystemFontInfo,
 )
-assert _native_font_bridge(facade) is None
+from docvortex.document.pdf.font_runtime import PdfiumFontError
+try:
+    _native_font_bridge(facade)
+except PdfiumFontError:
+    pass
+else:
+    raise AssertionError("ABI mismatch did not fail")
 reason = native_font_runtime_info()["native_font_provider_unavailable_reason"]
 assert reason == "FPDF_GetDefaultSystemFontInfo calling convention mismatch", reason
 assert not native_font_runtime_info()["native_font_provider_installed"]
-''')
+""")

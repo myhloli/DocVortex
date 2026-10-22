@@ -38,32 +38,13 @@ from .native_text import _fill_native_typography, _normalize_native_run_text, _s
 
 _MIN_RASTER_IMAGE_PAGE_AREA_RATIO = 0.0038
 
-_NUMERIC_GRAPHIC_REFERENCES = (
-    re.fullmatch,
-    re._compile,
-    re._compiler.compile,
-    _LineItem.__getattribute__,
-    _LineItem.__setattr__,
-)
 
-
-def _numeric_graphic_lines(lines: list[_LineItem], mode: int) -> list[_LineItem] | None:
-    """仅批量复用当前文字的数字语法；几何和语义条件仍由每次规则调用裁决。"""
-    native = get_native()
-    if (
-        native is None
-        or not hasattr(native, "graphic_numeric_lines")
-        or (
-            re.fullmatch,
-            re._compile,
-            re._compiler.compile,
-            _LineItem.__getattribute__,
-            _LineItem.__setattr__,
-        )
-        != _NUMERIC_GRAPHIC_REFERENCES
-    ):
-        return None
-    return native.graphic_numeric_lines(lines, mode, _LineItem, re.fullmatch)
+def _numeric_graphic_lines(lines: list[_LineItem], mode: int) -> list[_LineItem]:
+    """原生批量复用当前文字的数字语法，几何和语义条件仍由每次规则调用裁决。"""
+    values = get_native().graphic_numeric_lines(lines, mode, _LineItem, re.fullmatch)
+    if values is None:
+        raise TypeError("Numeric graphic matching requires standard line records")
+    return values
 
 
 _SIGNATURE_IMAGE_BBOX_DEDUP_TOLERANCE = 0.5
@@ -387,8 +368,6 @@ def _framed_side_caption_members(source: _PageSource, caption: _LineItem) -> lis
 def _graphic_members_are_numeric_grid(members: list[_LineItem]) -> bool:
     """四排以上重复三列数字证明是原生数据网格，防止图题把电子表格误作折线图父对象。"""
     numeric = _numeric_graphic_lines(members, 2)
-    if numeric is None:
-        numeric = [line for line in members if re.fullmatch(r"\s*[-+]?\d+(?:[,.]\d+)*%?\s*", line.text)]
     if len(numeric) < 12:
         return False
     em = statistics.median(_line_effective_height(line, line.bbox) for line in numeric)
@@ -1529,75 +1508,22 @@ def _detect_stacked_column_graphics(source: _PageSource, em: float) -> list[BBox
 
 
 def _raster_axis_tick_groups(numeric):
-    """批量分组数值刻度；非有限或特殊数值继续使用相同 Python 参考规则。"""
-    from ...._compute_backend import get_native
-
-    native = get_native()
+    """原生分组全部数值刻度，返回原行对象并保留排序和字号统计。"""
     records = [(line.bbox, line.effective_height, float(line.text.strip().replace("−", "-"))) for line in numeric]
-    if native is not None and all(
-        type(v) in (int, float) and math.isfinite(v) and abs(v) <= 2**50
-        for box, height, value in records
-        for v in (*box, height, value)
-    ):
-        return [(vertical, [numeric[i] for i in ids], em) for vertical, ids, em in native.raster_axis_groups(records)]
-    output = []
-    for vertical in (True, False):
-        groups = []
-        for line in sorted(numeric, key=lambda item: item.bbox[2] if vertical else _bbox_center_y(item.bbox)):
-            coordinate = line.bbox[2] if vertical else _bbox_center_y(line.bbox)
-            if groups:
-                prior = groups[-1]
-                anchor = statistics.median(item.bbox[2] if vertical else _bbox_center_y(item.bbox) for item in prior)
-                em = statistics.median(item.effective_height for item in [*prior, line])
-            if groups and abs(coordinate - anchor) <= 0.4 * em:
-                groups[-1].append(line)
-            else:
-                groups.append([line])
-        for ticks in groups:
-            if len(ticks) < 5:
-                continue
-            ticks.sort(key=lambda item: _bbox_center_y(item.bbox) if vertical else _bbox_center_x(item.bbox))
-            em = statistics.median(item.effective_height for item in ticks)
-            values = [float(item.text.strip().replace("−", "-")) for item in ticks]
-            steps = [b - a for a, b in zip(values, values[1:])]
-            positions = [_bbox_center_y(item.bbox) if vertical else _bbox_center_x(item.bbox) for item in ticks]
-            gaps = [b - a for a, b in zip(positions, positions[1:])]
-            if (
-                abs(steps[0]) < 1e-8
-                or any(abs(step - steps[0]) > 0.01 * abs(steps[0]) for step in steps)
-                or max(gaps) - min(gaps) > 0.4 * em
-                or min(gaps) < em
-                or min(item.effective_height for item in ticks) < 0.8 * em
-                or max(item.effective_height for item in ticks) > 1.2 * em
-            ):
-                continue
-            output.append((vertical, ticks, em))
-    return output
+    return [(vertical, [numeric[i] for i in ids], em) for vertical, ids, em in get_native().raster_axis_groups(records)]
 
 
 def _detect_native_raster_axis_graphics(source: _PageSource) -> list[BBox]:
     """等差数值刻度与贴邻栅格图共同证明坐标图；完整聚合标签和小图例，独立大标题及远距脚注不扩框。"""
     text_matches = _numeric_graphic_lines(source.lines, 0)
-    if text_matches is None:
-        numeric = [
-            line
-            for line in source.lines
-            if line.angle == 0
-            and line.semantic_type is None
-            and line.effective_height > 0
-            and re.fullmatch(r"[+−-]?\d+(?:\.\d+)?", line.text.strip())
-            and len(line.text.strip()) <= 8
-            and line.bbox[2] - line.bbox[0] <= 4 * line.effective_height
-        ]
-    else:
-        numeric = [
-            line
-            for line in text_matches
-            if line.angle == 0
-            and line.semantic_type is None
-            and line.effective_height > 0
-            and line.bbox[2] - line.bbox[0] <= 4 * line.effective_height
-        ]
+    numeric = [
+        line
+        for line in text_matches
+        if line.angle == 0
+        and line.semantic_type is None
+        and line.effective_height > 0
+        and line.bbox[2] - line.bbox[0] <= 4 * line.effective_height
+    ]
     output = []
     for vertical, ticks, em in _raster_axis_tick_groups(numeric):
         axis = _bbox_union_many([item.bbox for item in ticks])
@@ -1862,9 +1788,8 @@ def _detect_native_bar_graphics(source: _PageSource, em: float) -> list[BBox]:
                     numeric_text_prepared = True
                 numeric = [
                     line
-                    for line in (source.lines if numeric_text is None else numeric_text)
-                    if (numeric_text is not None or re.fullmatch(r"\s*[+−-]?\d+(?:[,.]\d+)?%?\s*", line.text))
-                    and all(_bbox_overlap_in_first(line.bbox, bar) < 0.1 for bar in members)
+                    for line in numeric_text
+                    if all(_bbox_overlap_in_first(line.bbox, bar) < 0.1 for bar in members)
                     and _bbox_distance(line.bbox, bounds) <= 5 * em
                 ]
                 if len(numeric) < 2:

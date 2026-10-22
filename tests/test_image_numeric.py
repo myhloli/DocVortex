@@ -3,36 +3,22 @@
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import numpy as np
 import pytest
 
 from docvortex import image
-from docvortex._compute_backend import get_native
 
 _CASES = json.loads((Path(__file__).parent / "fixtures/image_numeric_reference.json").read_text())["cases"]
 
 
-@pytest.fixture(params=["python", "rust"])
-def image_backend(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
-    """分别验证参考和原生后端，清理进程级选择缓存避免测试相互影响。"""
-    backend = str(request.param)
-    if backend == "rust" and importlib.util.find_spec("docvortex._native") is None:
-        pytest.skip("Native extension is not built")
-    monkeypatch.setenv("DOCVORTEX_COMPUTE_BACKEND", backend)
-    get_native.cache_clear()
-    yield backend
-    get_native.cache_clear()
-
-
 @pytest.mark.parametrize("case", _CASES, ids=lambda case: case["operation"] + "-" + case["dtype"] + "-" + str(case["args"]))
-def test_frozen_numeric_reference(case: dict[str, Any], image_backend: str) -> None:
+def test_frozen_numeric_reference(case: dict[str, Any]) -> None:
     """逐字节验证历史图像输入，覆盖轮廓点序、组件顺序及抗锯齿线。"""
     rng = np.random.default_rng(case["seed"])
     shape, operation, args = tuple(case["shape"]), case["operation"], case["args"]
@@ -74,7 +60,7 @@ def test_frozen_numeric_reference(case: dict[str, Any], image_backend: str) -> N
 
 @pytest.mark.parametrize("dtype", [np.uint8, np.uint16, np.float32])
 @pytest.mark.parametrize("channels", [1, 3, 4])
-def test_numeric_input_contract(dtype: type, channels: int, image_backend: str) -> None:
+def test_numeric_input_contract(dtype: type, channels: int) -> None:
     """非连续、多位深和单通道输入保留类型，结果独立且不改动源数组。"""
     source = np.arange(19 * 29 * channels).reshape(19, 29, channels).astype(dtype)[::2, ::2]
     original = source.copy()
@@ -86,7 +72,7 @@ def test_numeric_input_contract(dtype: type, channels: int, image_backend: str) 
     np.testing.assert_array_equal(source, original)
 
 
-def test_rectangle_degeneracy_and_contour_point_order(image_backend: str) -> None:
+def test_rectangle_degeneracy_and_contour_point_order() -> None:
     """矩形的退化边、负角度以及闭合多边形点序保持裁图约定。"""
     points = np.int32([[0, 0], [10, 0], [10, 20], [0, 20]])
     rectangle = image.minimum_rectangle(points)
@@ -128,7 +114,7 @@ def test_decode_retains_sixteen_bit_channels(channels: int) -> None:
     assert image.decode_image(b"not an image") is None
 
 
-def test_rotation_transform_and_batch_lines(image_backend: str) -> None:
+def test_rotation_transform_and_batch_lines() -> None:
     """批量线与逐条线保持同一数值结果，仿射点变换保留坐标类型。"""
     mask = np.zeros((30, 50), np.uint8)
     lines = np.int32([[2, 3, 24, 28], [1, 15, 47, 15]])
@@ -142,7 +128,7 @@ def test_rotation_transform_and_batch_lines(image_backend: str) -> None:
 
 
 @pytest.mark.parametrize("scale", [(2.0, 2.0), (4.0, 4.0), (1.371, 2.088)])
-def test_independent_scale_uses_original_sampling_grid(scale: tuple[float, float], image_backend: str) -> None:
+def test_independent_scale_uses_original_sampling_grid(scale: tuple[float, float]) -> None:
     """比例入口不从舍入后的尺寸反推坐标，输出按声明比例确定宽高。"""
     source = np.arange(22 * 32 * 3, dtype=np.uint8).reshape(22, 32, 3)
     output = image.resize_image(source, None, scale=scale)
@@ -168,20 +154,42 @@ def test_decode_exif_orientation_is_explicit() -> None:
     np.testing.assert_array_equal(oriented, np.rot90(normal, 3))
 
 
-def test_reference_and_native_agree_for_all_supported_depths(monkeypatch: pytest.MonkeyPatch) -> None:
-    """参考与原生后端对浮点和十六位数组逐像素一致，不经八位图中转。"""
-    if importlib.util.find_spec("docvortex._native") is None:
-        pytest.skip("Native extension is not built")
-    rng = np.random.default_rng(301)
-    try:
-        for dtype in (np.uint8, np.uint16, np.float32):
-            source = (rng.random((17, 29, 4)) * (65535 if dtype == np.uint16 else 255)).astype(dtype)[::2, ::2]
-            for interpolation in ("nearest", "linear", "cubic", "area", "lanczos4"):
-                results = []
-                for backend in ("python", "rust"):
-                    monkeypatch.setenv("DOCVORTEX_COMPUTE_BACKEND", backend)
-                    get_native.cache_clear()
-                    results.append(image.resize_image(source, (21, 13), interpolation=interpolation))
-                np.testing.assert_array_equal(*results)
-    finally:
-        get_native.cache_clear()
+def test_all_supported_depths_match_frozen_native_outputs() -> None:
+    """冻结旧版本真实原生输出，逐字节覆盖高位深和全部缩放插值模式。"""
+    fixture = json.loads((Path(__file__).parent / "fixtures/image_numeric_depth_reference.json").read_text())
+    expected = {(case["dtype"], case["interpolation"]): case for case in fixture["cases"]}
+    rng = np.random.default_rng(fixture["seed"])
+    for dtype in (np.uint8, np.uint16, np.float32):
+        source = (rng.random((17, 29, 4)) * (65535 if dtype == np.uint16 else 255)).astype(dtype)[::2, ::2]
+        for interpolation in ("nearest", "linear", "cubic", "area", "lanczos4"):
+            result = image.resize_image(source, (21, 13), interpolation=interpolation)
+            case = expected[np.dtype(dtype).name, interpolation]
+            assert list(result.shape) == case["shape"]
+            assert hashlib.sha256(result.tobytes()).hexdigest() == case["sha256"]
+
+
+@pytest.mark.parametrize("dtype", [np.int16, np.uint16, np.int64, np.uint64, np.float16, np.float32, np.float64, np.longdouble])
+def test_morphology_preserves_non_uint8_values(dtype: type) -> None:
+    """非八位像素走原生极值索引，保持大整数及各浮点位深的精确值。"""
+    base = 2**63 if dtype == np.uint64 else 0
+    source = np.asarray([[base + 1, base + 5, base + 3], [base + 9, base + 2, base + 7]], dtype=dtype)
+    dilated = image.morphology(source, (2, 2), operation="dilate")
+    eroded = image.morphology(source, (2, 2), operation="erode")
+    np.testing.assert_array_equal(
+        dilated, np.asarray([[base + 1, base + 5, base + 5], [base + 9, base + 9, base + 7]], dtype=dtype)
+    )
+    np.testing.assert_array_equal(
+        eroded, np.asarray([[base + 1, base + 1, base + 3], [base + 1, base + 1, base + 2]], dtype=dtype)
+    )
+    assert dilated.dtype == eroded.dtype == source.dtype
+    assert not np.shares_memory(dilated, source)
+
+
+def test_morphology_nan_propagation_and_signed_zero() -> None:
+    """矩形覆盖 NaN 时传播首个 NaN，相等零值保留窗口内末次命中的符号。"""
+    source = np.asarray([[1.0, np.nan, 3.0], [4.0, 2.0, 5.0]])
+    for operation in ("dilate", "erode"):
+        actual = image.morphology(source, (2, 2), operation=operation)
+        np.testing.assert_array_equal(np.isnan(actual), [[False, True, True], [False, True, True]])
+        zeros = image.morphology(np.asarray([[0.0, -0.0, 0.0]]), (2, 1), operation=operation)
+        np.testing.assert_array_equal(np.signbit(zeros), [[False, True, False]])

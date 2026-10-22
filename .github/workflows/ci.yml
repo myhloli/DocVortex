@@ -12,10 +12,6 @@ on:
 permissions:
   contents: read
 
-env:
-  DOCVORTEX_BUILD_NATIVE: '0'
-  DOCVORTEX_COMPUTE_BACKEND: python
-
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -24,8 +20,6 @@ jobs:
   windows-arm64-native-abi:
     # 独立核验 ARM64 内核 ABI；包含 pyclipper 的应用安装由发行物矩阵验收。
     runs-on: windows-11-arm
-    env:
-      DOCVORTEX_BUILD_NATIVE: '1'
     steps:
       - uses: actions/checkout@v6
       # uv 的 Windows 托管 Python 默认可能选 x64；显式使用原生 ARM64 解释器及其导入库。
@@ -70,15 +64,10 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         # ABI3 轮子验证最低 cp311 与最新 3.14 两个端点。
         python: ['3.11', '3.14']
-        backend: [python, rust]
     runs-on: ${{ matrix.os }}
-    env:
-      DOCVORTEX_BUILD_NATIVE: ${{ matrix.backend == 'rust' && '1' || '0' }}
-      DOCVORTEX_COMPUTE_BACKEND: ${{ matrix.backend }}
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
-        if: matrix.backend == 'rust'
         with:
           toolchain: '1.98.1'
       - uses: astral-sh/setup-uv@v7
@@ -86,31 +75,37 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: uv venv
       - name: Install with the minimum platform ONNX Runtime
-        run: uv pip install ".[test]" "pypdfium2==5.10.1" "${{ matrix.os == 'windows-latest' && 'onnxruntime-directml' || 'onnxruntime' }}==1.24.4"
-      - run: uv run --no-project python -m pytest -q -n auto --deselect tests/unittest/test_native_pdf_table_demo_manifest.py::test_demo_sparse_table_confidence_manifest
+        run: uv pip install ".[test]" "pypdfium2==5.13.0" "${{ matrix.os == 'windows-latest' && 'onnxruntime-directml' || 'onnxruntime' }}==1.24.4"
+      - run: uv run --no-project python -m pytest -q -n auto
       - name: Verify independent installation
         run: uv run --no-project python -c "import importlib.util, docvortex; assert importlib.util.find_spec('docgale') is None; assert importlib.util.find_spec('mineru') is None; assert importlib.util.find_spec('pdftext') is None; assert importlib.util.find_spec('fast_langdetect') is None; assert importlib.util.find_spec('fasttext') is None; assert importlib.util.find_spec('cv2') is None"
       - name: Verify platform runtime distributions
         run: uv run --no-project python tools/verify_runtime_dependencies.py
 
-  pdfium-current:
+  python-minors:
+    # 中间版本验证 Python 数值语义和公开接口，PDFium 统一使用 5.13.0。
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.12', '3.13']
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
       - uses: astral-sh/setup-uv@v7
         with:
-          python-version: '3.13'
+          python-version: ${{ matrix.python }}
       - run: uv venv
       - run: uv pip install ".[test]" "pypdfium2==5.13.0"
-      - run: uv run --no-project python tools/review_flash_regression.py --output history-output
-      - uses: actions/upload-artifact@v6
-        if: ${{ !cancelled() }}
-        with:
-          name: history-geometry-ubuntu-pdfium-current
-          path: history-output/summary.json
-          retention-days: 14
-      - run: uv run --no-project python -m pytest -q -n auto --deselect tests/unittest/test_native_pdf_table_demo_manifest.py::test_demo_sparse_table_confidence_manifest
-        if: ${{ !cancelled() }}
+      - name: Verify native numeric and public contracts
+        run: >-
+          uv run --no-project python -m pytest -q
+          tests/test_compute_backend.py tests/test_native_parity.py
+          tests/test_native_statistics.py tests/test_native_round4.py
+          tests/test_image_numeric.py tests/test_public_pipeline.py
+          tests/test_public_image_api.py tests/test_public_export_api.py
 
   lint:
     runs-on: ubuntu-latest
@@ -133,19 +128,6 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test -p docvortex-core --locked
 
-  baseline-diagnostic:
-    name: Existing sparse-table gold difference (diagnostic)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: '3.13'
-      - run: uv venv
-      - run: uv pip install ".[test]" "pypdfium2==5.10.1"
-      - run: uv run --no-project python -m pytest -q --tb=short tests/unittest/test_native_pdf_table_demo_manifest.py
-
   pydantic-minimum:
     strategy:
       fail-fast: false
@@ -154,12 +136,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
       - run: uv venv
-      - run: uv pip install ".[test]" "pydantic==2.12.5" "pypdfium2==5.10.1"
-      - run: uv run --no-project python -m pytest -q -n auto --deselect tests/unittest/test_native_pdf_table_demo_manifest.py::test_demo_sparse_table_confidence_manifest
+      - run: uv pip install ".[test]" "pydantic==2.12.5" "pypdfium2==5.13.0"
+      - run: uv run --no-project python -m pytest -q -n auto
 
   platform-artifacts:
     strategy:
@@ -169,11 +154,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: '3.14'
       - run: uv venv
-      - run: uv pip install ".[test]" "pydantic==2.12.5" "pypdfium2==5.10.1"
+      - run: uv pip install ".[test]" "pydantic==2.12.5" "pypdfium2==5.13.0"
       - run: uv run --no-project python tools/capture_platform_layout.py --output platform-output
       - uses: actions/upload-artifact@v6
         if: ${{ !cancelled() }}
@@ -191,7 +179,7 @@ jobs:
           retention-days: 14
 
   font-platform-consistency:
-    needs: [platform-artifacts, pdfium-current]
+    needs: platform-artifacts
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
@@ -221,9 +209,6 @@ jobs:
       - name: Diff history geometry against the macOS reference (windows-latest)
         if: ${{ !cancelled() }}
         run: uv run --no-project python tools/diff_history_geometry.py history/history-geometry-macos-latest history/history-geometry-windows-latest --output history-diff-windows-latest.json
-      - name: Diff history geometry against the macOS reference (ubuntu pdfium-current)
-        if: ${{ !cancelled() }}
-        run: uv run --no-project python tools/diff_history_geometry.py history/history-geometry-macos-latest history/history-geometry-ubuntu-pdfium-current --output history-diff-ubuntu-pdfium-current.json
       - uses: actions/upload-artifact@v6
         if: ${{ !cancelled() }}
         with:

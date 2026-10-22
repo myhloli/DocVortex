@@ -6,8 +6,10 @@ import math
 
 import pytest
 
+from docvortex._compute_backend import get_native
+
 from docvortex.analyzers.native.pdf import native_text
-from docvortex.document.pdf.text import _get_lines_from_chars_python
+from docvortex.document.pdf.text import get_lines_from_chars
 from docvortex.document.pdf.text._contracts import Bbox
 
 
@@ -149,7 +151,7 @@ def test_superscript_and_separate_baselines_do_not_form_a_diagonal_line():
 @pytest.mark.parametrize("rotation", (0, 90, 180, 270))
 def test_python_and_native_visual_builders_share_geometry_filter(rotation):
     """原始字列表经 Python 与 Rust 视觉组行后得到相同剩余成员和行字段。"""
-    pytest.importorskip("docvortex._native")
+    get_native()
     chars = [
         *_row(0, offset=(20, 30), page_rotation=rotation, text="b"),
         *_row(20, offset=(20, 100), page_rotation=rotation, text="w"),
@@ -159,7 +161,7 @@ def test_python_and_native_visual_builders_share_geometry_filter(rotation):
     before = deepcopy([(char["char_idx"], char["origin"], char["tight_bbox"]) for char in chars])
     angles = (0, 90, 180, 270)
     expected = native_text._build_native_line_items(
-        _get_lines_from_chars_python(chars), (400, 400), page_rotation=rotation, supported_angles=angles
+        get_lines_from_chars(chars), (400, 400), page_rotation=rotation, supported_angles=angles
     )
     actual = native_text._build_native_line_items_from_chars(chars, (400, 400), page_rotation=rotation, supported_angles=angles)
     assert {char["char_idx"] for line in actual for char in line.chars} == set(range(8))

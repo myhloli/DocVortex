@@ -1,5 +1,7 @@
 """核对 Rust 对象树遍历的矩阵、裁剪、顺序和异常边界。"""
 
+from _native_pdf_golden import native_pdf_golden
+
 from contextlib import closing
 import ctypes
 from io import BytesIO
@@ -13,16 +15,14 @@ from reportlab.pdfgen.canvas import Canvas
 from docvortex._compute_backend import get_native
 from docvortex.document.pdf import _object_bridge as bridge
 from docvortex.document.pdf.native_objects import _text_object_visibility, _walk_clipped_objects
-from docvortex.document.pdf.native_objects import _read_raw_path_subpaths, _read_raw_path_subpaths_python
+from docvortex.document.pdf.native_objects import _read_raw_path_subpaths
 from docvortex.document.pdf.pdfium import pdfium_guard
 
 
 @pytest.fixture
 def native():
-    """强制 Rust 任务不能静默跳过，纯 Python 任务保持参考测试模式。"""
+    """必须加载当前协议的真正原生扩展，不允许静默跳过。"""
     extension = get_native()
-    if extension is None:
-        pytest.skip("native backend is not selected")
     return extension
 
 
@@ -80,10 +80,8 @@ def test_visibility_collects_only_root_paths(native, monkeypatch, rotation):
 
             reader = PdfReader(BytesIO(stream.getvalue()))
             actual = _text_object_visibility(page, page.get_bbox(), rotation, lambda: reader.pages[0])
-            with monkeypatch.context() as context:
-                context.setattr(bridge, "read_text_visibility", lambda *args, **kwargs: None)
-                reference = _text_object_visibility(page, page.get_bbox(), rotation, lambda: reader.pages[0])
-            assert actual == reference
+            reference = native_pdf_golden("_text_object_visibility:85")
+            assert list(actual.values()) == list(reference.values())
             assert any(not value[0] for value in actual.values())
 
 
@@ -114,10 +112,8 @@ def test_cover_prefilter_preserves_visibility_and_skips_impossible_bounds(native
             else:
                 assert roots == paint == []
             actual = _text_object_visibility(page, page.get_bbox(), 0, lambda: reader.pages[0])
-            with monkeypatch.context() as scoped:
-                scoped.setattr(bridge, "read_text_visibility", lambda *args, **kwargs: None)
-                expected = _text_object_visibility(page, page.get_bbox(), 0, lambda: reader.pages[0])
-            assert actual == expected
+            expected = native_pdf_golden("_text_object_visibility:119")
+            assert list(actual.values()) == list(expected.values())
 
 
 def test_replaced_cover_rule_keeps_complete_native_root_evidence(native, monkeypatch):
@@ -202,39 +198,27 @@ def test_text_visibility_bridge_matches_reference(native, monkeypatch, rotation)
             assert actual is not None
             assert info["pdfium_text_visibility_bridge_calls"] == before + 1
             assert info["pdfium_text_visibility_bridge_unavailable_reason"] is None
-            with monkeypatch.context() as context:
-                context.setattr(bridge, "read_text_visibility", lambda *args, **kwargs: None)
-                expected = _text_object_visibility(page, page.get_bbox(), rotation)
-            assert {address: (visible, clip) for address, visible, clip in actual} == expected
+            expected = native_pdf_golden("_text_object_visibility:207")
+            assert [(visible, clip) for _, visible, clip in actual] == list(expected.values())
             assert any(visible for _, visible, _ in actual)
             assert any(clip is not None for _, _, clip in actual)
 
 
 def test_text_visibility_bridge_fallback_and_compute_failure(native, monkeypatch):
-    """ABI 不兼容回退 Python；已进入 Rust 的异常必须原样传播。"""
+    """ABI 不兼容明确报错；已进入 Rust 的异常必须原样传播。"""
     assert hasattr(native, "read_pdfium_text_visibility")
     with pdfium_guard(), pdfium.PdfDocument(nested_pdf()) as document:
         with closing(document[0]) as page:
             bbox, rotation = page.get_bbox(), 0
             with monkeypatch.context() as context:
                 context.setattr(raw, "FPDFTextObj_GetTextRenderMode", Mock())
-                assert bridge.read_text_visibility(page, bbox, rotation, 15) is None
+                with pytest.raises(RuntimeError, match="ABI"):
+                    bridge.read_text_visibility(page, bbox, rotation, 15)
                 assert "ABI" in bridge.bridge_info()["pdfium_text_visibility_bridge_unavailable_reason"]
             with monkeypatch.context() as context:
                 context.setattr(native, "read_pdfium_text_visibility", Mock(side_effect=ValueError("failed")))
                 with pytest.raises(ValueError, match="failed"):
                     bridge.read_text_visibility(page, bbox, rotation, 15)
-
-
-def test_text_visibility_python_backend_reports_reference_choice(monkeypatch):
-    """纯 Python 后端只记录能力选择，不把扩展不存在伪装成执行成功。"""
-
-    before = bridge.bridge_info()["pdfium_text_visibility_bridge_calls"]
-    monkeypatch.setattr(bridge, "get_native", lambda: None)
-    assert bridge.read_text_visibility(object(), (0, 0, 10, 10), 0, 15) is None
-    info = bridge.bridge_info()
-    assert info["pdfium_text_visibility_bridge_calls"] == before
-    assert info["pdfium_text_visibility_bridge_unavailable_reason"] == "python backend or unsupported native extension"
 
 
 def test_text_visibility_bridge_rejects_invalid_addresses(native):
@@ -251,12 +235,13 @@ def test_text_visibility_bridge_rejects_invalid_addresses(native):
 
 
 def test_object_bridge_abi_fallback_and_compute_failure(native, monkeypatch):
-    """仅能力不兼容允许参考回退，已进入 Rust 的异常必须传播。"""
+    """ABI 不兼容和原生计算错误均必须明确传播。"""
     with pdfium_guard(), pdfium.PdfDocument(nested_pdf()) as document:
         with closing(document[0]) as page:
             with monkeypatch.context() as context:
                 context.setattr(raw, "FPDFPageObj_GetMatrix", Mock())
-                assert bridge.read_clipped_objects(page, raw.FPDF_PAGEOBJ_TEXT, 15) is None
+                with pytest.raises(RuntimeError, match="ABI"):
+                    bridge.read_clipped_objects(page, raw.FPDF_PAGEOBJ_TEXT, 15)
             with monkeypatch.context() as context:
                 context.setattr(native, "read_pdfium_objects", Mock(side_effect=ValueError("failed")))
                 with pytest.raises(ValueError, match="failed"):
@@ -280,7 +265,8 @@ def test_drawing_bridge_fallback_and_compute_failure(native, monkeypatch):
             assert "complex" in bridge.bridge_info()["pdfium_drawing_line_bridge_unavailable_reason"]
             with monkeypatch.context() as context:
                 context.setattr(raw, "FPDFPageObj_GetStrokeWidth", Mock())
-                assert bridge.read_drawing_lines(page, bbox, 0) is None
+                with pytest.raises(RuntimeError, match="ABI"):
+                    bridge.read_drawing_lines(page, bbox, 0)
                 assert "ABI" in bridge.bridge_info()["pdfium_drawing_line_bridge_unavailable_reason"]
             with monkeypatch.context() as context:
                 context.setattr(native, "read_pdfium_drawing_lines", Mock(side_effect=ValueError("failed")))
@@ -308,7 +294,7 @@ def test_native_subpaths_match_reference_and_share_endpoints(native):
             ]
             assert paths
             for path in paths:
-                expected = _read_raw_path_subpaths_python(path)
+                expected = native_pdf_golden("_read_raw_path_subpaths_python:311")
                 actual = _read_raw_path_subpaths(path)
                 assert actual == expected
                 for subpath in actual:

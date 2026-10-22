@@ -59,11 +59,23 @@ jobs:
       id-token: write
       contents: write
     steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
       - uses: actions/download-artifact@v7
         with:
           pattern: dist-*
           merge-multiple: true
           path: dist/
+      # 发行物结构和版本始终检查；skip_ci 只影响前面的测试，不跳过此门禁。
+      - name: Verify the complete native-only release artifact set
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || github.ref_name }}
+        run: python tools/verify_release_artifacts.py dist "$RELEASE_TAG"
+      - uses: astral-sh/setup-uv@v7
+      - name: Check metadata for every published wheel
+        run: uvx twine check dist/*.whl
       - uses: pypa/gh-action-pypi-publish@release/v1
       # 使用工作流令牌发布草稿，避免再次触发 release 发布流程。
       - name: Publish GitHub release after manual distribution

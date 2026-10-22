@@ -13,6 +13,23 @@ fn plain_integer(value: &Bound<'_, PyAny>) -> Option<i64> {
         .flatten()
 }
 
+/// 读取自有坐标，非有限值保留到几何有效性判定，不回退到 Python 算法。
+fn coordinates<const N: usize>(value: &Bound<'_, PyAny>) -> Option<Option<[f64; N]>> {
+    if value.is_none() {
+        return Some(None);
+    }
+    if (!value.is_instance_of::<PyList>() && !value.is_instance_of::<PyTuple>())
+        || value.len().ok()? != N
+    {
+        return None;
+    }
+    let mut result = [0.0; N];
+    for (index, number) in result.iter_mut().enumerate() {
+        *number = value.get_item(index).ok()?.extract::<f64>().ok()?;
+    }
+    Some(Some(result))
+}
+
 /// 直接借用现有字符列表，一次准备映射保护区间与 Glyph 行框，不重新打包旧分组内核。
 #[pyfunction]
 pub(super) fn mapping_glyph_rows<'py>(
@@ -54,7 +71,9 @@ pub(super) fn mapping_glyph_rows<'py>(
         };
         if !text.is_exact_instance_of::<PyString>()
             || !font.is_exact_instance_of::<PyDict>()
-            || !rotation.is_exact_instance_of::<PyFloat>()
+            || !(rotation.is_exact_instance_of::<PyFloat>()
+                || rotation.is_exact_instance_of::<PyInt>()
+                || rotation.is_exact_instance_of::<PyBool>())
         {
             return Ok(None);
         }
@@ -85,13 +104,13 @@ pub(super) fn mapping_glyph_rows<'py>(
         } else {
             raw
         };
-        let Some(Some(box4)) = super::geometry::plain_coordinates::<4>(&raw) else {
+        let Some(Some(box4)) = coordinates::<4>(&raw) else {
             return Ok(None);
         };
         let origin = char
             .get_item(pyo3::intern!(py, "origin"))?
             .unwrap_or_else(|| py.None().into_bound(py));
-        let Some(origin) = super::geometry::plain_coordinates::<2>(&origin) else {
+        let Some(origin) = coordinates::<2>(&origin) else {
             return Ok(None);
         };
         let object = char
@@ -102,16 +121,16 @@ pub(super) fn mapping_glyph_rows<'py>(
         }
         let rotation = rotation.extract::<f64>()?;
         let angle = if let Some(value) = char.get_item(pyo3::intern!(py, "writing_angle"))? {
-            if !value.is_exact_instance_of::<PyFloat>() {
+            if !(value.is_exact_instance_of::<PyFloat>()
+                || value.is_exact_instance_of::<PyInt>()
+                || value.is_exact_instance_of::<PyBool>())
+            {
                 return Ok(None);
             }
             value.extract::<f64>()?
         } else {
             -rotation
         };
-        if !rotation.is_finite() || !angle.is_finite() {
-            return Ok(None);
-        }
         let last_source =
             if let Some(source) = char.get_item(pyo3::intern!(py, "source_indices"))? {
                 if !source.is_exact_instance_of::<PyTuple>() || source.len()? == 0 {
@@ -174,7 +193,11 @@ pub(super) fn mapping_glyph_rows<'py>(
             // 异字符保护组也返回完整区间；Unicode 转换在全部准备完成后由 Python 执行。
             output.last_mut().expect("mapping group exists").1 = position + 1;
         } else {
-            let box_tuple = if box4[2] > box4[0] && box4[3] > box4[1] {
+            let box_tuple = if angle.is_finite()
+                && box4.iter().all(|v| v.is_finite())
+                && box4[2] > box4[0]
+                && box4[3] > box4[1]
+            {
                 Some(PyTuple::new(
                     py,
                     (0..4)

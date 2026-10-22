@@ -222,7 +222,6 @@ def main() -> None:
     parser.add_argument("--baseline", type=Path)
     parser.add_argument("--flash-baseline", type=Path)
     parser.add_argument("--suite", choices=("public", "shared"), default="public")
-    parser.add_argument("--backend", choices=("python", "rust", "auto"), required=True)
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--path", type=Path, action="append")
     parser.add_argument("--corpus", choices=("demo", "all"), default="all")
@@ -232,7 +231,6 @@ def main() -> None:
         parser.error("runs must be positive and output must not already exist")
     if args.suite == "shared" and args.flash_baseline is None:
         parser.error("shared benchmarks require --flash-baseline with frozen region inputs")
-    os.environ["DOCVORTEX_COMPUTE_BACKEND"] = args.backend
     # 子进程渲染器另行初始化日志，使用环境变量避免 DEBUG I/O 混入正式计时。
     os.environ["LOGURU_LEVEL"] = "WARNING"
     if args.worker:
@@ -254,8 +252,6 @@ def main() -> None:
             str(path.resolve()),
             "--output",
             str(folder.resolve()),
-            "--backend",
-            args.backend,
             "--suite",
             args.suite,
             "--runs",
@@ -297,7 +293,7 @@ def main() -> None:
         records.append(record)
     report = {
         "suite": args.suite,
-        "backend": args.backend,
+        "backend": "rust",
         "python": sys.version,
         "platform": platform.platform(),
         "git_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),

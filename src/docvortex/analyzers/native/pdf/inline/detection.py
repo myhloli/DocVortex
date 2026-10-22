@@ -217,10 +217,8 @@ def _build_line_candidate(line: Any, prepared_style=None) -> _LineCandidate | No
     from ....._compute_backend import get_native
 
     native = get_native()
-    prepared = (
-        native.normalize_boxes([getattr(char.get("bbox"), "bbox", char.get("bbox")) for char in chars], True, _coerce_bbox)
-        if native is not None
-        else None
+    prepared = native.normalize_boxes(
+        [getattr(char.get("bbox"), "bbox", char.get("bbox")) for char in chars], True, _coerce_bbox
     )
     visible_chars: list[_VisibleChar] = []
     for char_index, char in enumerate(chars):

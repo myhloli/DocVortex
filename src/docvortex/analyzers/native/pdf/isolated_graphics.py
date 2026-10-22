@@ -4,7 +4,7 @@ import statistics
 import math
 from ...._compute_backend import get_native
 
-from .geometry import _bbox_area, _bbox_distance, _bbox_overlap_in_first, _bbox_overlap_in_smaller, _bbox_union_many
+from .geometry import _bbox_area, _bbox_overlap_in_first, _bbox_overlap_in_smaller, _bbox_union_many
 from .line_layout import _line_effective_height
 
 
@@ -26,18 +26,10 @@ def _isolated_path_groups(source, paths, em):
     key = (boxes, em) if ordinary else None
     indices = cache.get(key) if ordinary else None
     native = get_native()
-    if indices is None and ordinary and native is not None:
-        indices = native.isolated_path_groups(boxes, em)
     if indices is None:
-        indices = []
-        for i, path in enumerate(paths):
-            matches = [group for group in indices if any(_bbox_distance(path.bbox, paths[j].bbox) <= 0.35 * em for j in group)]
-            if not matches:
-                indices.append([i])
-            else:
-                merged = [i, *(j for group in matches for j in group)]
-                indices = [group for group in indices if all(group is not match for match in matches)]
-                indices.append(merged)
+        indices = native.isolated_path_groups(boxes, em)
+        if indices is None:
+            raise ValueError("native path grouping rejected normalized geometry")
     if ordinary:
         cache[key] = indices
     return [[paths[i] for i in group] for group in indices]

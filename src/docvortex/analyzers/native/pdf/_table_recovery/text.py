@@ -7,14 +7,13 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
-from .....document.pdf.text._contracts import Char
 from .....document.pdf.text._contracts import Bbox as _CharacterBbox
 from .. import table_geometry as _pending_geometry
 from .....foundation._text import resolve_text_line_boundary
 from .....schema import BBox
 from ..spatial_text import _normalize_table_text
 from .contracts import NativeTableGlyph, NativeTableInput, NativeTableText, NativeTableTextRow, NativeTableToken
-from .geometry import bbox_center, bbox_intersection, bbox_union, normalize_angle, normalize_bbox, page_bbox_to_table_local
+from .geometry import bbox_intersection, bbox_union, normalize_angle, normalize_bbox
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,8 +48,7 @@ def _select_pending_glyphs(table_input):
 
     native = get_native()
     if (
-        native is not None
-        and type(table_input) is NativeTableInput
+        type(table_input) is NativeTableInput
         and (
             normalize_bbox,
             normalize_angle,
@@ -89,8 +87,6 @@ def _select_pending_glyphs_adapter(table_input: NativeTableInput) -> list[_Pendi
     from .._native_geometry import raw_bbox
 
     native = get_native()
-    if native is None:
-        return _select_pending_glyphs_python(table_input)
     table_bbox = normalize_bbox(table_input.table_bbox)
     if table_bbox is None:
         return []
@@ -100,8 +96,6 @@ def _select_pending_glyphs_adapter(table_input: NativeTableInput) -> list[_Pendi
         normalize_angle(table_input.angle),
         normalize_bbox,
     )
-    if prepared is None:
-        return _select_pending_glyphs_python(table_input)
     selected = []
     for index, _absolute, local in prepared:
         char = table_input.chars[index]
@@ -132,157 +126,14 @@ def _select_pending_glyphs_adapter(table_input: NativeTableInput) -> list[_Pendi
     return output
 
 
-def _select_pending_glyphs_python(table_input: NativeTableInput) -> list[_PendingGlyph]:
-    """按字符中心选择表格内可见字符，并转换到正向局部坐标。"""
-
-    table_bbox = normalize_bbox(table_input.table_bbox)
-    if table_bbox is None:
-        return []
-    selected: list[tuple[int, int, Char, BBox]] = []
-    for fallback_index, char in enumerate(table_input.chars):
-        char_bbox = normalize_bbox(char.get("bbox"))
-        if char_bbox is None:
-            continue
-        center_x, center_y = bbox_center(char_bbox)
-        if not (table_bbox[0] <= center_x <= table_bbox[2] and table_bbox[1] <= center_y <= table_bbox[3]):
-            continue
-        try:
-            source_index = int(char.get("char_idx", fallback_index))
-        except (TypeError, ValueError):
-            source_index = fallback_index
-        selected.append((source_index, fallback_index, char, char_bbox))
-
-    selected.sort(key=lambda item: (item[0], item[1]))
-    output: list[_PendingGlyph] = []
-    angle = normalize_angle(table_input.angle)
-    pending_space = False
-    pending_break = False
-    for source_index, _fallback_index, char, absolute_bbox in selected:
-        raw_text = str(char.get("char") or "")
-        if not raw_text:
-            continue
-        if raw_text in {"\r", "\n"}:
-            pending_break = True
-            pending_space = False
-            continue
-        if raw_text.isspace():
-            if not pending_break:
-                pending_space = True
-            continue
-        text = _normalize_table_text(raw_text)
-        if not text or text.isspace():
-            continue
-        local_bbox = page_bbox_to_table_local(
-            absolute_bbox,
-            table_bbox,
-            angle,
-        )
-        if local_bbox is None or (local_bbox[3] - local_bbox[1] < 0.5 and not _contains_cjk(text)):
-            continue
-        output.append(
-            _PendingGlyph(
-                glyph_id=len(output),
-                source_index=source_index,
-                text=text,
-                bbox=local_bbox,
-                explicit_space_before=pending_space,
-                explicit_break_before=pending_break,
-            )
-        )
-        pending_space = False
-        pending_break = False
-    return output
-
-
-def _vertical_overlap_ratio(first: BBox, second: BBox) -> float:
-    """返回两个字符框相对较小高度的垂直交叠比例。"""
-
-    overlap = min(first[3], second[3]) - max(first[1], second[1])
-    minimum_height = min(first[3] - first[1], second[3] - second[1])
-    if overlap <= 0 or minimum_height <= 0:
-        return 0.0
-    return min(1.0, overlap / minimum_height)
-
-
 def _assign_visual_rows(pending: list[_PendingGlyph], median_height: float) -> list[list[_PendingGlyph]]:
-    """整表批量返回成员索引，原 Python 字形和其来源记录保持共享。"""
+    """由原生组行返回成员索引，保留原字形对象以及特殊坐标的解释器语义。"""
     from ....._compute_backend import get_native
 
-    native = get_native()
-    if native is not None and all(type(glyph.glyph_id) is int and 0 <= glyph.glyph_id <= (1 << 63) - 1 for glyph in pending):
-        rows = native.table_visual_rows([glyph.bbox for glyph in pending], [glyph.glyph_id for glyph in pending], median_height)
-        if rows is not None:
-            return [[pending[index] for index in row] for row in rows]
-    return _assign_visual_rows_python(pending, median_height)
-
-
-def _assign_visual_rows_python(
-    pending: list[_PendingGlyph],
-    median_height: float,
-) -> list[list[_PendingGlyph]]:
-    """按垂直交叠和中心距离把字符聚成稳定视觉行。"""
-
-    sorted_glyphs = sorted(
-        pending,
-        key=lambda glyph: (
-            (glyph.bbox[1] + glyph.bbox[3]) / 2.0,
-            glyph.bbox[0],
-            glyph.glyph_id,
-        ),
+    rows = get_native().table_visual_rows(
+        [glyph.bbox for glyph in pending], [glyph.glyph_id for glyph in pending], median_height
     )
-    rows: list[list[_PendingGlyph]] = []
-    row_bboxes: list[BBox] = []
-    prefix_max_bottoms: list[float] = []
-    center_tolerance = max(0.75, median_height * 0.40)
-    for glyph in sorted_glyphs:
-        glyph_center_y = (glyph.bbox[1] + glyph.bbox[3]) / 2.0
-        best_index: int | None = None
-        best_distance = float("inf")
-        for row_index in range(len(row_bboxes) - 1, -1, -1):
-            row_bbox = row_bboxes[row_index]
-            row_center_y = (row_bbox[1] + row_bbox[3]) / 2.0
-            distance = abs(glyph_center_y - row_center_y)
-            if (
-                _vertical_overlap_ratio(glyph.bbox, row_bbox) >= 0.45 or distance <= center_tolerance
-            ) and distance < best_distance:
-                best_index = row_index
-                best_distance = distance
-            if (
-                glyph_center_y >= row_center_y
-                and glyph_center_y - row_center_y > center_tolerance
-                and glyph.bbox[1] > prefix_max_bottoms[row_index]
-            ):
-                break
-        if best_index is None:
-            rows.append([glyph])
-            row_bboxes.append(glyph.bbox)
-            prefix_max_bottoms.append(
-                max(
-                    prefix_max_bottoms[-1] if prefix_max_bottoms else glyph.bbox[3],
-                    glyph.bbox[3],
-                )
-            )
-        else:
-            rows[best_index].append(glyph)
-            # 两框合并保持原 min/max 顺序，避免为每个字符建立通用迭代器。
-            previous_bbox = row_bboxes[best_index]
-            row_bboxes[best_index] = (
-                min(previous_bbox[0], glyph.bbox[0]),
-                min(previous_bbox[1], glyph.bbox[1]),
-                max(previous_bbox[2], glyph.bbox[2]),
-                max(previous_bbox[3], glyph.bbox[3]),
-            )
-            for row_index in range(best_index, len(row_bboxes)):
-                prefix_max_bottoms[row_index] = max(
-                    prefix_max_bottoms[row_index - 1] if row_index > 0 else row_bboxes[row_index][3],
-                    row_bboxes[row_index][3],
-                )
-
-    ordered = sorted(
-        zip(rows, row_bboxes),
-        key=lambda item: (item[1][1], item[1][0]),
-    )
-    return [sorted(row, key=lambda glyph: (glyph.bbox[0], glyph.bbox[1], glyph.glyph_id)) for row, _bbox in ordered]
+    return [[pending[index] for index in row] for row in rows]
 
 
 def _contains_cjk(text: str) -> bool:
@@ -495,73 +346,12 @@ def build_cell_text(
     return "".join(text for text, _source_index in build_cell_text_parts(glyphs, median_height))
 
 
-_CELL_GROUP_REFERENCES = (
-    _assign_visual_rows,
-    bbox_center,
-    statistics.median,
-    NativeTableGlyph.__getattribute__,
-    NativeTableGlyph.bbox,
-    NativeTableGlyph.glyph_id,
-    NativeTableGlyph.visual_row,
-)
-
-
 def _native_cell_visual_groups(glyphs, median_height):
-    """普通字形批量细分几何；任何替换的分组、统计或字段访问均保留原实现。"""
+    """原生读取当前字形并细分视觉行，结果继续引用调用方的完整字形对象。"""
     from ....._compute_backend import get_native
-    import math
 
-    native = get_native()
-    if (
-        native is None
-        or not hasattr(native, "cell_visual_groups_owned")
-        or type(median_height) not in (float, int)
-        or not math.isfinite(median_height)
-        or abs(median_height) > 2**50
-        or (
-            _assign_visual_rows,
-            bbox_center,
-            statistics.median,
-            NativeTableGlyph.__getattribute__,
-            getattr(NativeTableGlyph, "bbox", None),
-            getattr(NativeTableGlyph, "glyph_id", None),
-            getattr(NativeTableGlyph, "visual_row", None),
-        )
-        != _CELL_GROUP_REFERENCES
-    ):
-        return None
-    indices = native.cell_visual_groups_owned(glyphs, median_height, NativeTableGlyph)
-    return None if indices is None else [[glyphs[index] for index in row] for row in indices]
-
-
-def _python_cell_visual_groups(glyphs, median_height):
-    """完整参考路径按原组顺序裁决共线性、字号和双行最少字形数量。"""
-    grouped: dict[int, list[NativeTableGlyph]] = {}
-    for glyph in glyphs:
-        grouped.setdefault(glyph.visual_row, []).append(glyph)
-    # 整表聚行可能被其他列的垂直居中文字接桥；只细分有多个足高文字行的原组，保留已确认行和上下标。
-    refined = []
-    for index in sorted(grouped):
-        original = grouped[index]
-        local_rows = _assign_visual_rows(original, median_height)
-        # 松字框可跨越真实行距；要求每条行内字框中心共线，排除斜穿单元格的水印字串。
-        coherent = all(
-            max(bbox_center(g.bbox)[1] for g in row) - min(bbox_center(g.bbox)[1] for g in row) <= 0.3 * median_height
-            for row in local_rows
-        )
-        if (
-            len(local_rows) > 1
-            and coherent
-            and all(
-                len(row) >= 2
-                and 0.85 * median_height <= statistics.median(g.bbox[3] - g.bbox[1] for g in row) <= 1.25 * median_height
-                for row in local_rows
-            )
-        ):
-            refined.extend(local_rows)
-        else:
-            refined.append(original)
-    return refined
+    indices = get_native().cell_visual_groups_owned(glyphs, median_height, NativeTableGlyph)
+    return [[glyphs[index] for index in row] for row in indices]
 
 
 def build_cell_text_parts(
@@ -573,8 +363,6 @@ def build_cell_text_parts(
     if not glyphs:
         return []
     refined = _native_cell_visual_groups(glyphs, median_height)
-    if refined is None:
-        refined = _python_cell_visual_groups(glyphs, median_height)
     grouped = dict(enumerate(refined))
     parts: list[tuple[str, int | None]] = []
     previous_line = ""

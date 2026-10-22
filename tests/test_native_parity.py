@@ -2,10 +2,10 @@
 
 import pickle
 import random
-from copy import deepcopy
 from pathlib import Path
 
 import pytest
+
 
 from docvortex._compute_backend import get_native
 from docvortex.analyzers.native.pdf import _script_geometry as scripts
@@ -17,8 +17,6 @@ from docvortex.document.pdf.text import Bbox
 def native():
     """纯 Python 任务允许跳过，强制 Rust 任务缺失扩展时必须失败。"""
     extension = get_native()
-    if extension is None:
-        pytest.skip("native backend is not selected")
     return extension
 
 
@@ -31,6 +29,7 @@ def test_native_registration_contract(native):
         "image_warp": "(data, width, height, channels, depth, target_w, target_h, mode, replicate, value, inverse, affine)",
         "image_minimum_rectangle": "(data)",
         "image_morphology": "(data, width, height, kw, kh, dilate)",
+        "image_morphology_indices": "(data, width, height, kw, kh, dilate, nan_rank)",
         "image_lines": "(data, width, height, channels, lines, value, thickness)",
         "image_polygons": "(width, height, polygons, value)",
         "image_solve": "(matrix, rhs)",
@@ -65,7 +64,7 @@ def test_native_registration_contract(native):
         "numeric_noise_candidates": "(lines, visual)",
         "raster_axis_groups": "(lines)",
         "grow_formula_component": "(lines, seed_count, tables)",
-        "detached_formula_neighbors": "(boxes, operators, em)",
+        "detached_formula_component": "(boxes, operators, em, available)",
         "short_tail_destinations": "(lines, lanes, median)",
         "isolated_path_groups": "(boxes, em)",
         "overpainted_addresses": "(texts, covers)",
@@ -110,8 +109,9 @@ def test_native_registration_contract(native):
         "read_pdfium_subpaths": "(addresses, handle)",
         "read_pdfium_text_snapshot": "(addresses, color_addresses, handle, count, extended, frame, rotation, visibility)",
         "read_pdfium_chars": "(addresses, handle, count, extended)",
+        "restore_surrogate_chars": "(chars, codes, raw_count)",
         "read_pdfium_char_form_owners": "(function, handle, count, owners)",
-        "read_pdfium_objects": "(addresses, handle, kind, max_depth)",
+        "read_pdfium_objects": "(addresses, handle, kind, max_depth, root=None)",
         "read_pdfium_text_visibility": "(addresses, handle, frame, rotation, max_depth)",
         "read_pdfium_text_visibility_with_roots": "(addresses, handle, frame, rotation, max_depth)",
         "read_pdfium_drawing_lines": "(addresses, handle, bbox, rotation)",
@@ -119,6 +119,7 @@ def test_native_registration_contract(native):
         "read_pdfium_path_evidence": "(addresses, handle, frame, rotation, max_depth, want_lines, want_infos)",
         "read_pdfium_visual_batches": "(addresses, handle, count, extended, frame, angle)",
         "script_roles": "(records)",
+        "numeric_script_indices": "(records, roles)",
         "script_roles_raw": "(loose, tight, origins, flags, fonts, fallback)",
         "script_roles_raw_batch": "(loose, tight, origins, flags, fonts, offsets, fallback)",
         "script_roles_plain_batch": "(loose, tight, origins, flags, fonts, offsets, fallback)",
@@ -126,6 +127,7 @@ def test_native_registration_contract(native):
         "source_rows_plain": "(records, size, angle)",
         "table_boxes": "(values, table, angle, fallback)",
         "table_row_occupancy": "(rows, tracks)",
+        "table_cluster_positions": "(values, tolerance)",
         "cell_visual_groups_owned": "(glyphs, height, glyph_type)",
         "tight_space_candidates": "(chars_by_source, glyphs, glyph_type, ordinary)",
         "unmapped_formula_ink": "(chars, glyph_flags)",
@@ -167,7 +169,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 35, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 36, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)
@@ -190,7 +192,7 @@ def test_native_registration_contract(native):
 
 
 @pytest.mark.parametrize("seed", range(40))
-def test_script_geometry_random_parity(native, seed):
+def test_script_geometry_random_parity(native, seed, native_golden):
     """随机改变字体、尺寸、基线和字符类别，覆盖组件分组及角色精炼。"""
     rng = random.Random(seed)
     alphabet = "Ab09０９中文 αβ²₃,-—/⁄()\n\t\ufffd"
@@ -213,30 +215,22 @@ def test_script_geometry_random_parity(native, seed):
                 origins[i] = (x, y)
         protected = {i for i in range(len(chars)) if rng.random() < 0.04}
         before = pickle.dumps((chars, tight, origins))
-        expected = scripts._classify_char_script_roles_python(
-            chars, tight_bboxes=tight, origins=origins, protected_body_indices=protected
-        )
-        assert (
+        native_golden(
             scripts.classify_char_script_roles(chars, tight_bboxes=tight, origins=origins, protected_body_indices=protected)
-            == expected
         )
         assert pickle.dumps((chars, tight, origins)) == before
 
 
 @pytest.mark.parametrize("name", ["caibao1", "demo1", "demo2"])
-def test_real_page_script_parity(native, name):
+def test_real_page_script_parity(native, name, native_golden):
     """逐页比较真实字符和 side-map，源文件和输入对象保持不变。"""
     path = Path(__file__).parents[1] / "demo/pdfs" / f"{name}.pdf"
     with PDFDocument(str(path)) as document:
         for index in range(len(document)):
             page = document[index]
             geometry = page.get_chars_with_geometry()
-            expected = scripts._classify_char_script_roles_python(
-                geometry.chars, tight_bboxes=geometry.tight_bboxes, origins=geometry.origins
-            )
-            assert (
+            native_golden(
                 scripts.classify_char_script_roles(geometry.chars, tight_bboxes=geometry.tight_bboxes, origins=geometry.origins)
-                == expected
             )
 
 
@@ -244,18 +238,22 @@ def test_native_script_path_is_exercised(native, monkeypatch):
     """确认普通输入真实执行扩展，不能用参考实现冒充原生通过。"""
     chars = [{"char": "a", "char_idx": 0, "bbox": Bbox([0, 0, 5, 10])}]
 
-    def reject(*args, **kwargs):
-        """阻止本测试悄悄使用参考计算。"""
-        raise AssertionError("reference path executed")
+    calls = []
+    original = native.script_roles_raw
 
-    monkeypatch.setattr(scripts, "_classify_char_script_roles_python", reject)
+    def observed(*args, **kwargs):
+        """记录真实原生分类调用。"""
+        calls.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(native, "script_roles_raw", observed)
     assert scripts.classify_char_script_roles(chars, tight_bboxes={0: (0, 0, 5, 9)}, origins={0: (0, 9)}) == ["body"]
+    assert calls == [True]
 
 
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
-def test_visual_runs_and_typography_parity(native, monkeypatch, angle):
+def test_visual_runs_and_typography_parity(native, monkeypatch, angle, native_golden):
     """随机字距、空白、反向框及字体权重下比较完整行对象和引用关系。"""
-    from docvortex import _compute_backend
     from docvortex.analyzers.native.pdf import native_text
     from docvortex.analyzers.native.pdf.models import _LineItem
 
@@ -274,17 +272,14 @@ def test_visual_runs_and_typography_parity(native, monkeypatch, angle):
             chars.append(char)
         line = _LineItem("".join(c["char"] for c in chars), (0, 20, x + 5, 30), angle, 0, chars=chars)
         before = pickle.dumps(line)
-        with monkeypatch.context() as context:
-            context.setattr(_compute_backend, "get_native", lambda: None)
-            expected = native_text._split_native_visual_runs_python(deepcopy(line), (1000, 1000))
         actual = native_text._split_native_visual_runs(line, (1000, 1000))
-        assert pickle.dumps(actual) == pickle.dumps(expected)
+        native_golden(actual)
         assert all(any(c is source for source in chars) for item in actual for c in item.chars)
         assert pickle.dumps(line) == before
 
 
 @pytest.mark.parametrize("seed", range(20))
-def test_dedup_layers_and_hidden_parity(native, monkeypatch, seed):
+def test_dedup_layers_and_hidden_parity(native, monkeypatch, seed, native_golden):
     """对混合重复绘制、平移阴影和隐藏副本逐值比较，并检查来源引用不被改写。"""
     from docvortex.document.pdf.text import dedup
     from test_pdf_text_dedup import _char, _indexed
@@ -298,11 +293,8 @@ def test_dedup_layers_and_hidden_parity(native, monkeypatch, seed):
             chars.append(_char(c, i * 10 + dx, 20 + dy, obj=layer, mode=3 if layer == 2 else 0))
     chars = _indexed(chars)
     before = pickle.dumps(chars)
-    with monkeypatch.context() as context:
-        context.setattr(dedup, "get_native", lambda: None)
-        expected = dedup.deduplicate_chars(chars)
     actual = dedup.deduplicate_chars(chars)
-    assert pickle.dumps(actual) == pickle.dumps(expected)
+    native_golden(actual)
     assert pickle.dumps(chars) == before
 
 
@@ -365,7 +357,7 @@ def test_invalid_parent_cycle_is_rejected(native):
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
 def test_canonical_coordinate_sharing(native, angle):
     """长期存活的 canonical 样本复用未变坐标，旋转输出仍逐值匹配 Python。"""
-    from docvortex.analyzers.native.pdf import char_geometry as geometry
+    from docvortex.analyzers.native.pdf import geometry
 
     raw = tuple(float(str(v)) for v in (1.25, 2.5, 6.75, 8.5))
     tight = tuple(float(str(v)) for v in (1.5, 3.0, 6.25, 8.0))

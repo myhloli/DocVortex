@@ -8,13 +8,31 @@ pub type GridIndex = (Vec<f64>, Vec<f64>, Vec<Vec<usize>>);
 type CoverageCache = HashMap<(u8, Vec<u64>, u64), Vec<(f64, f64)>>;
 pub type ComponentSpecs = (Vec<usize>, Option<Vec<(usize, usize, usize, usize)>>);
 
+/// 按 Python 双参数 min 保留首项、相等零及 NaN 比较语义。
+fn minimum(first: f64, second: f64) -> f64 {
+    if second < first {
+        second
+    } else {
+        first
+    }
+}
+
+/// 按 Python 双参数 max 保留首项、相等零及 NaN 比较语义。
+fn maximum(first: f64, second: f64) -> f64 {
+    if second > first {
+        second
+    } else {
+        first
+    }
+}
+
 /// 取得矩形交集，边界相接仍视为无面积。
 fn intersection(a: Box4, b: Box4) -> Option<Box4> {
     let c = [
-        a[0].max(b[0]),
-        a[1].max(b[1]),
-        a[2].min(b[2]),
-        a[3].min(b[3]),
+        maximum(a[0], b[0]),
+        maximum(a[1], b[1]),
+        minimum(a[2], b[2]),
+        minimum(a[3], b[3]),
     ];
     if c[2] > c[0] && c[3] > c[1] {
         Some(c)
@@ -31,9 +49,18 @@ pub fn select_boxes(
 ) -> Vec<(usize, Box4, Option<Box4>)> {
     let mut result = Vec::new();
     for (i, b) in values.into_iter().enumerate() {
-        let Some(b) = geometry::normalize(b, false) else {
+        let Some(mut b) = b else {
             continue;
         };
+        if b[2] < b[0] {
+            b.swap(0, 2);
+        }
+        if b[3] < b[1] {
+            b.swap(1, 3);
+        }
+        if b[2] <= b[0] || b[3] <= b[1] {
+            continue;
+        }
         let x = (b[0] + b[2]) / 2.0;
         let y = (b[1] + b[3]) / 2.0;
         if !(table[0] <= x && x <= table[2] && table[1] <= y && y <= table[3]) {
@@ -64,8 +91,8 @@ fn coverage(intervals: &[(f64, f64)], start: f64, end: f64) -> f64 {
     let mut clipped: Vec<_> = intervals
         .iter()
         .filter_map(|(a, b)| {
-            let left = start.max(a.min(*b));
-            let right = end.min(a.max(*b));
+            let left = maximum(start, minimum(*a, *b));
+            let right = minimum(end, maximum(*a, *b));
             if right > left {
                 Some((left, right))
             } else {
@@ -80,7 +107,7 @@ fn coverage(intervals: &[(f64, f64)], start: f64, end: f64) -> f64 {
     let mut covered = 0.0;
     for &(a, b) in &clipped[1..] {
         if a <= right {
-            right = right.max(b);
+            right = maximum(right, b);
         } else {
             covered += right - left;
             left = a;
@@ -88,22 +115,11 @@ fn coverage(intervals: &[(f64, f64)], start: f64, end: f64) -> f64 {
         }
     }
     covered += right - left;
-    1.0_f64.min(covered / (end - start))
+    minimum(1.0, covered / (end - start))
 }
 
 /// 在一次调用中复用轨道区间，避免每个 separator 单独跨语言调用。
 pub fn coverage_batch(rules: Vec<Rule>, queries: Vec<Query>) -> Option<Vec<f64>> {
-    if rules
-        .iter()
-        .any(|r| ![r.1, r.2, r.3].iter().all(|v| v.is_finite()))
-        || queries.iter().any(|q| {
-            q.1.iter()
-                .chain([q.2, q.3, q.4].iter())
-                .any(|v| !v.is_finite())
-        })
-    {
-        return None;
-    }
     let mut cache = CoverageCache::new();
     Some(
         queries
@@ -176,14 +192,14 @@ pub fn merge_rules(
 
 /// 计算字符相交面积比例，维持原来的上界截断。
 fn overlap(glyph: Box4, cell: Box4) -> f64 {
-    let area = (glyph[2] - glyph[0]) * (glyph[3] - glyph[1]);
+    let area = maximum(0.0, glyph[2] - glyph[0]) * maximum(0.0, glyph[3] - glyph[1]);
     let Some(b) = intersection(glyph, cell) else {
         return 0.0;
     };
     if area <= 0.0 {
         0.0
     } else {
-        1.0_f64.min((b[2] - b[0]) * (b[3] - b[1]) / area)
+        minimum(1.0, (b[2] - b[0]) * (b[3] - b[1]) / area)
     }
 }
 
@@ -197,7 +213,7 @@ fn contains(cell: Box4, glyph: Box4) -> bool {
 /// 将二分位置限制在实际原子轨道范围内。
 fn track_index(tracks: &[f64], value: f64, right: bool) -> usize {
     let at = if right {
-        tracks.partition_point(|v| *v <= value)
+        tracks.partition_point(|v| value.partial_cmp(v) != Some(std::cmp::Ordering::Less))
     } else {
         tracks.partition_point(|v| *v < value)
     };
@@ -210,19 +226,12 @@ pub fn assign_cells(
     specs: Vec<Box4>,
     index: Option<GridIndex>,
 ) -> Option<Vec<(Option<usize>, bool)>> {
-    if specs.is_empty()
-        || glyphs
-            .iter()
-            .chain(&specs)
-            .flatten()
-            .any(|v| !v.is_finite())
-    {
+    if specs.is_empty() {
         return None;
     }
     if let Some((x, y, owners)) = &index {
         if x.len() < 2
             || y.len() < 2
-            || x.iter().chain(y).any(|v| !v.is_finite())
             || owners.len() != y.len() - 1
             || owners
                 .iter()
@@ -448,14 +457,6 @@ pub fn visual_rows(
 
 /// 整表计算列占用；公共边界仍归属从左到右第一个符合区间的列。
 pub fn row_occupancy(rows: Vec<Vec<f64>>, tracks: Vec<f64>) -> Option<Vec<Vec<usize>>> {
-    if rows
-        .iter()
-        .flatten()
-        .chain(tracks.iter())
-        .any(|v| !v.is_finite())
-    {
-        return None;
-    }
     Some(
         rows.into_iter()
             .map(|row| {

@@ -33,21 +33,7 @@ def compound_baseline_flags(source, em):
         pending.append(boxes)
         keys.append(key)
     native = get_native()
-    if native is not None:
-        values = native.compound_baselines(pending, em) if pending else []
-    else:
-        values = [
-            tuple(
-                any(
-                    sum(min(abs(box[e] - baseline) for e in (edge, edge + 2)) <= 0.35 * em for box in boxes)
-                    >= 0.75 * len(boxes)
-                    for seed in boxes
-                    for baseline in (seed[edge], seed[edge + 2])
-                )
-                for edge in (0, 1)
-            )
-            for boxes in pending
-        ]
+    values = native.compound_baselines(pending, em) if pending else []
     for key, boxes, flags in zip(keys, pending, values):
         cache[key] = (boxes, flags)
         output[id(boxes)] = flags

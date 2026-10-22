@@ -1,32 +1,23 @@
 //! 原始行字形的文字与字体证据批量读取，正则边界仍由当前 Python 实现裁决。
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString};
+use pyo3::types::{PyDict, PyFloat, PyFrozenSet, PyInt, PyList, PySet, PyString};
 use std::collections::HashMap;
 
-/// 仅转换普通有限字号与整数标志；其他可转换对象完整交回原 Python 路径。
-fn plain_number(value: Option<Bound<'_, PyAny>>, flags: bool) -> Option<f64> {
-    let Some(value) = value else { return Some(0.0) };
-    if value.is_none() {
-        return Some(0.0);
+/// 沿用 Python 的 float/int 转换，巨大标志先取目标位，避免经过浮点或 i64 截断。
+fn plain_number(value: Option<Bound<'_, PyAny>>, flags: bool) -> PyResult<f64> {
+    let Some(value) = value else { return Ok(0.0) };
+    if !value.is_truthy()? {
+        return Ok(0.0);
     }
+    let py = value.py();
     if flags {
-        if value.is_exact_instance_of::<PyInt>() || value.is_exact_instance_of::<PyBool>() {
-            return value
-                .extract::<i64>()
-                .ok()
-                .filter(|v| v.unsigned_abs() <= 1 << 50)
-                .map(|v| v as f64);
-        }
-        return None;
+        py.get_type::<PyInt>()
+            .call1((value,))?
+            .call_method1(pyo3::intern!(py, "__and__"), (64,))?
+            .extract()
+    } else {
+        py.get_type::<PyFloat>().call1((value,))?.extract()
     }
-    if value.is_exact_instance_of::<PyFloat>()
-        || value.is_exact_instance_of::<PyInt>()
-        || value.is_exact_instance_of::<PyBool>()
-    {
-        let number = value.extract::<f64>().ok()?;
-        return (number.is_finite() && number.abs() <= 2f64.powi(50)).then_some(number);
-    }
-    None
 }
 
 /// 保留完整可打印文字、Python 正则偏移、原字形切片及最小字号首项语义；不缓存认领结果。
@@ -79,6 +70,13 @@ pub(super) fn math_words_owned<'py>(
             }
         };
         let Ok(raw) = value.to_str() else {
+            // 未配对代理码不属于可打印字符，与 Python 的字符筛选一致。
+            if !value
+                .call_method0(pyo3::intern!(py, "isprintable"))?
+                .extract::<bool>()?
+            {
+                continue;
+            }
             return Ok(None);
         };
         let keep = if let Some(keep) = printable.get(raw) {
@@ -119,12 +117,8 @@ pub(super) fn math_words_owned<'py>(
                     if !super::conversion::plain_string_keys(font) {
                         return Ok(None);
                     }
-                    let (Some(size), Some(flags)) = (
-                        plain_number(font.get_item(pyo3::intern!(py, "size"))?, false),
-                        plain_number(font.get_item(pyo3::intern!(py, "flags"))?, true),
-                    ) else {
-                        return Ok(None);
-                    };
+                    let size = plain_number(font.get_item(pyo3::intern!(py, "size"))?, false)?;
+                    let flags = plain_number(font.get_item(pyo3::intern!(py, "flags"))?, true)?;
                     (size, flags)
                 }
             };

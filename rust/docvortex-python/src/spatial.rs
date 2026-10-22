@@ -63,7 +63,7 @@ pub(super) struct AnnotationGeometry {
 
 #[pymethods]
 impl AnnotationGeometry {
-    /// 一次验证并打包片段几何，未知输入由 Python 参考实现处理。
+    /// 一次验证并打包普通浮点片段，其他数值使用同一类的精确聚合入口。
     #[new]
     fn new(
         py: Python<'_>,
@@ -75,6 +75,103 @@ impl AnnotationGeometry {
                 pyo3::exceptions::PyValueError::new_err("unsupported annotation geometry")
             })
     }
+    /// 整数、非有限值及极端坐标在 Rust 内执行相同聚合，算术借用解释器以保留精确值和首见来源。
+    #[staticmethod]
+    fn aggregate_generic(
+        py: Python<'_>,
+        fragments: Vec<(usize, Vec<Py<PyAny>>, Vec<Py<PyAny>>)>,
+        selected: Vec<usize>,
+        excluded: Vec<usize>,
+        local: Option<Vec<Py<PyAny>>>,
+    ) -> PyResult<docvortex_core::annotation_geometry::Output> {
+        use std::collections::{HashMap, HashSet};
+        if fragments.iter().any(|f| f.1.len() != 4 || f.2.len() != 4)
+            || selected.iter().any(|i| *i >= fragments.len())
+            || local.as_ref().is_some_and(|b| b.len() != 4)
+        {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "invalid annotation query",
+            ));
+        }
+        let operators = py.import("operator")?;
+        let builtins = py.import("builtins")?;
+        let lt = operators.getattr("lt")?;
+        let gt = operators.getattr("gt")?;
+        let ge = operators.getattr("ge")?;
+        let subtract = operators.getattr("sub")?;
+        let divide = operators.getattr("truediv")?;
+        let minimum = builtins.getattr("min")?;
+        let maximum = builtins.getattr("max")?;
+        let combine = |a: [usize; 4], b: [usize; 4]| -> PyResult<[usize; 4]> {
+            let mut result = a;
+            for axis in 0..4 {
+                let before = fragments[a[axis]].1[axis].bind(py);
+                let next = fragments[b[axis]].1[axis].bind(py);
+                let selected = if axis < 2 {
+                    lt.call1((next, before))?
+                } else {
+                    gt.call1((next, before))?
+                };
+                if selected.is_truthy()? {
+                    result[axis] = b[axis];
+                }
+            }
+            Ok(result)
+        };
+        let excluded: HashSet<_> = excluded.into_iter().collect();
+        let mut positions = HashMap::new();
+        let mut lines: Vec<(usize, [usize; 4], usize)> = Vec::new();
+        for index in selected {
+            let (source, _, bbox) = &fragments[index];
+            if excluded.contains(source) {
+                continue;
+            }
+            if let Some(region) = &local {
+                if gt
+                    .call1((bbox[3].bind(py), region[1].bind(py)))?
+                    .is_truthy()?
+                {
+                    let overlap = maximum.call1((
+                        0.0,
+                        subtract.call1((
+                            minimum.call1((bbox[2].bind(py), region[2].bind(py)))?,
+                            maximum.call1((bbox[0].bind(py), region[0].bind(py)))?,
+                        ))?,
+                    ))?;
+                    let shorter = minimum.call1((
+                        subtract.call1((bbox[2].bind(py), bbox[0].bind(py)))?,
+                        subtract.call1((region[2].bind(py), region[0].bind(py)))?,
+                    ))?;
+                    let ratio = if gt.call1((&shorter, 0))?.is_truthy()? {
+                        divide.call1((overlap, shorter))?
+                    } else {
+                        0.0_f64.into_pyobject(py)?.into_any()
+                    };
+                    if ge.call1((ratio, 0.05))?.is_truthy()? {
+                        continue;
+                    }
+                }
+            }
+            if let Some(&position) = positions.get(source) {
+                let line: &mut (usize, [usize; 4], usize) = &mut lines[position];
+                line.1 = combine(line.1, [index; 4])?;
+                line.2 += 1;
+            } else {
+                positions.insert(*source, lines.len());
+                lines.push((*source, [index; 4], 1));
+            }
+        }
+        let mut union = None;
+        for (_, bbox, _) in &lines {
+            union = Some(if let Some(previous) = union {
+                combine(previous, *bbox)?
+            } else {
+                *bbox
+            });
+        }
+        Ok((lines, union))
+    }
+
     /// 返回保序来源和坐标索引；非法查询不会静默产生部分结果。
     fn aggregate(
         &self,

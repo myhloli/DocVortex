@@ -1083,49 +1083,44 @@ def test_extract_page_form_bboxes_skips_one_bad_object(monkeypatch: pytest.Monke
     ) == [(10.0, 20.0, 30.0, 40.0)]
 
 
+def _skip_first_native_path(monkeypatch):
+    """用合法 ctypes ABI 让首条 Path 报告无可读段，验证实际 Rust 遍历的逐对象隔离。"""
+    import ctypes
+
+    getter = pdf_document.pdfium_c.FPDFPath_CountSegments
+    first = []
+    calls = []
+
+    def count_segments(obj):
+        """只损坏首次遇到的对象，后续查询继续调用同库 PDFium。"""
+        address = ctypes.cast(obj, ctypes.c_void_p).value
+        if not first:
+            first.append(address)
+        calls.append(address)
+        return 0 if address == first[0] else getter(obj)
+
+    factory = ctypes.WINFUNCTYPE if hasattr(ctypes, "WINFUNCTYPE") else ctypes.CFUNCTYPE
+    callback = factory(getter.restype, *getter.argtypes)(count_segments)
+    monkeypatch.setattr(pdf_document.pdfium_c, "FPDFPath_CountSegments", callback)
+    return calls
+
+
 def test_get_page_drawing_lines_skips_one_bad_path(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证单个 Path 解析异常不会丢失同页其他有效绘图线。"""
-    original_extract = pdf_document._extract_path_drawing_lines
-    call_count = 0
-
-    def flaky_extract(*args: Any, **kwargs: Any) -> list[pdf_document.PDFDrawingLine]:
-        """仅让首个 Path 失败，后续对象仍调用真实实现。"""
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise RuntimeError("broken path")
-        return original_extract(*args, **kwargs)
-
-    monkeypatch.setattr(native_objects, "_extract_path_drawing_lines", flaky_extract)
+    """首条原生 Path 无有效段时，其余页面绘图线仍完整保留。"""
+    calls = _skip_first_native_path(monkeypatch)
     with pdf_document.PDFDocument(_build_drawing_pdf()) as doc:
         lines = doc.get_page_drawing_lines(0)
-
-    assert call_count >= 5
+    assert len(calls) >= 5
     assert len(lines) == 3
-    assert all(line.start[1] != pytest.approx(20.0) for line in lines)
     assert [line.start[1] for line in lines] == pytest.approx([40.0, 60.25, 100.0])
 
 
 def test_get_page_path_infos_skips_one_bad_path(monkeypatch: pytest.MonkeyPatch) -> None:
-    """验证单个 Path 信息解析失败不会丢失同页其他有效对象。"""
-
-    original_extract = pdf_document._path_info_from_object
-    call_count = 0
-
-    def flaky_extract(*args: Any, **kwargs: Any) -> pdf_document.PDFPathInfo | None:
-        """仅让首个 Path 失败，后续对象仍调用真实实现。"""
-
-        nonlocal call_count
-        call_count += 1
-        if call_count == 1:
-            raise RuntimeError("broken path")
-        return original_extract(*args, **kwargs)
-
-    monkeypatch.setattr(native_objects, "_path_info_from_object", flaky_extract)
+    """首条原生 Path 无有效段时，其他路径摘要保留原来源编号。"""
+    calls = _skip_first_native_path(monkeypatch)
     with pdf_document.PDFDocument(_build_drawing_pdf()) as doc:
         path_infos = doc.get_page_path_infos(0)
-
-    assert call_count >= 8
+    assert len(calls) >= 8
     assert len(path_infos) == 6
     assert all(item.source_index != 0 for item in path_infos)
 
@@ -1198,22 +1193,21 @@ def test_native_page_snapshot_opens_once_and_closes_after_failure(monkeypatch: p
 
 
 def test_native_page_snapshot_decodes_each_path_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    """同一 Path 解码由绘图线和路径信息共享，避免独立接口的重复工作。"""
-    from docvortex.document.pdf import _object_bridge
+    """通过真实 ABI 统计段读取，联合原生快照避免单独查询的重复解码。"""
+    import ctypes
 
-    counts: list[object] = []
-    original = pdf_document._read_raw_path_subpaths
+    counts = []
+    original = pdf_document.pdfium_c.FPDFPath_GetPathSegment
 
-    def record_decode(raw_object: Any) -> list[pdf_document._PathSubpath]:
-        """统计真实 Path 解码次数，不替换解码结果。"""
+    def record_decode(raw_object, index):
+        """返回原始段地址并记录读取，保持同库句柄和函数签名。"""
+        counts.append((ctypes.cast(raw_object, ctypes.c_void_p).value, index))
+        return ctypes.cast(original(raw_object, index), ctypes.c_void_p).value
 
-        counts.append(raw_object)
-        return original(raw_object)
-
-    monkeypatch.setattr(native_objects, "_read_raw_path_subpaths", record_decode)
-    # 本例验证 Python 联合解码；原生批量路径和简单绘图线各有独立桥接测试。
-    monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
-    monkeypatch.setattr(_object_bridge, "read_drawing_lines", lambda *args, **kwargs: None)
+    factory = ctypes.WINFUNCTYPE if hasattr(ctypes, "WINFUNCTYPE") else ctypes.CFUNCTYPE
+    callback = factory(ctypes.c_void_p, *original.argtypes)(record_decode)
+    callback.restype = original.restype
+    monkeypatch.setattr(pdf_document.pdfium_c, "FPDFPath_GetPathSegment", callback)
     with pdf_document.PDFDocument(_build_drawing_pdf()) as document:
         document.get_page_drawing_lines(0)
         document.get_page_path_infos(0)
@@ -1222,6 +1216,9 @@ def test_native_page_snapshot_decodes_each_path_once(monkeypatch: pytest.MonkeyP
         document._extract_native_page(0)
         shared_count = len(counts)
         with document._open_page(0) as page:
-            expected_count = len(list(pdf_document._iter_raw_path_objects_with_depth(page)))
+            expected_count = sum(
+                pdf_document.pdfium_c.FPDFPath_CountSegments(item[0])
+                for item in pdf_document._iter_raw_path_objects_with_depth(page)
+            )
         assert shared_count == expected_count
         assert shared_count < separate_count

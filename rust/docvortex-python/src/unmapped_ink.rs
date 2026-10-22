@@ -1,50 +1,47 @@
 //! 当前字符的可打印状态与公式墨迹几何批量筛选；不缓存公式认领结果。
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString, PyTuple};
+use pyo3::types::{PyBool, PyDict, PyFloat, PyInt, PyList, PyString};
 use std::collections::HashMap;
 
-/// 只接受普通可转换数值，特殊对象和溢出整数在原 Python 路径保留异常语义。
-fn number(value: &Bound<'_, PyAny>) -> Option<f64> {
-    if value.is_exact_instance_of::<PyFloat>()
-        || value.is_exact_instance_of::<PyInt>()
-        || value.is_exact_instance_of::<PyBool>()
-    {
-        value.extract().ok()
-    } else {
-        None
-    }
+/// 由解释器进行原有 float 转换，保留字符串、巨大整数及转换错误的语义。
+fn number(value: &Bound<'_, PyAny>) -> PyResult<f64> {
+    value.py().get_type::<PyFloat>().call1((value,))?.extract()
 }
 
-/// 普通四元框按 Python 稳定排序规范化，退化及非有限框返回已知空结果。
-fn bbox(value: Option<Bound<'_, PyAny>>) -> Option<Option<[f64; 4]>> {
+/// 完整转换坐标后再检查长度与有限性，转换溢出传播而无效形状返回空几何。
+fn bbox(value: Option<Bound<'_, PyAny>>) -> PyResult<Option<[f64; 4]>> {
     let Some(value) = value else {
-        return Some(None);
+        return Ok(None);
     };
-    if value.is_none() {
-        return Some(None);
-    }
-    let values: Vec<Bound<'_, PyAny>> = if let Ok(values) = value.cast_exact::<PyTuple>() {
-        values.iter().collect()
-    } else if let Ok(values) = value.cast_exact::<PyList>() {
-        values.iter().collect()
-    } else {
-        return None;
+    let py = value.py();
+    let iterator = match value.try_iter() {
+        Ok(iterator) => iterator,
+        Err(error) if error.is_instance_of::<pyo3::exceptions::PyTypeError>(py) => return Ok(None),
+        Err(error) => return Err(error),
     };
-    if values.len() != 4 {
-        // 原路径在解包前转换全部元素，异常长度也可能触发转换错误，必须完整回退。
-        return None;
+    let mut values = Vec::new();
+    for item in iterator {
+        match number(&item?) {
+            Ok(number) => values.push(number),
+            Err(error)
+                if error.is_instance_of::<pyo3::exceptions::PyTypeError>(py)
+                    || error.is_instance_of::<pyo3::exceptions::PyValueError>(py) =>
+            {
+                return Ok(None)
+            }
+            Err(error) => return Err(error),
+        }
     }
-    let mut result = [0.0; 4];
-    for (target, value) in result.iter_mut().zip(values.iter()) {
-        *target = number(value)?;
-    }
+    let Ok(mut result) = <[f64; 4]>::try_from(values) else {
+        return Ok(None);
+    };
     if result[2] < result[0] {
         result.swap(0, 2);
     }
     if result[3] < result[1] {
         result.swap(1, 3);
     }
-    Some(
+    Ok(
         (result.iter().all(|v| v.is_finite()) && result[2] > result[0] && result[3] > result[1])
             .then_some(result),
     )
@@ -98,9 +95,7 @@ pub(super) fn unmapped_formula_ink<'py>(
         if visible {
             continue;
         }
-        let Some(box_value) = bbox(char.get_item(pyo3::intern!(py, "tight_bbox"))?) else {
-            return Ok(None);
-        };
+        let box_value = bbox(char.get_item(pyo3::intern!(py, "tight_bbox"))?)?;
         let size = match char.get_item(pyo3::intern!(py, "font"))? {
             None => 0.0,
             Some(value) if value.is_none() => 0.0,
@@ -113,13 +108,8 @@ pub(super) fn unmapped_formula_ink<'py>(
                 }
                 match font.get_item(pyo3::intern!(py, "size"))? {
                     None => 0.0,
-                    Some(value) if value.is_none() => 0.0,
-                    Some(value) => {
-                        let Some(size) = number(&value) else {
-                            return Ok(None);
-                        };
-                        size
-                    }
+                    Some(value) if value.is_truthy()? => number(&value)?,
+                    Some(_) => 0.0,
                 }
             }
         };
@@ -137,11 +127,15 @@ pub(super) fn unmapped_formula_ink<'py>(
         }
         let mode = char.get_item(pyo3::intern!(py, "text_render_mode"))?;
         if let Some(value) = mode {
-            if let Some(value) = number(&value) {
-                if value == 3.0 || value == 7.0 {
+            if value.is_instance_of::<PyInt>()
+                || value.is_instance_of::<PyFloat>()
+                || value.is_instance_of::<PyBool>()
+            {
+                let mode = number(&value)?;
+                if mode == 3.0 || mode == 7.0 {
                     continue;
                 }
-            } else if !value.is_none() && !value.is_exact_instance_of::<PyString>() {
+            } else if !value.is_none() && !value.is_instance_of::<PyString>() {
                 return Ok(None);
             }
         }

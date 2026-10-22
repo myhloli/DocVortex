@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from ._native_table_merge import _NativeCoreLineSet
 
-from bisect import bisect_left, bisect_right
 from collections import OrderedDict
 from dataclasses import dataclass, field
 import statistics
@@ -15,12 +14,10 @@ from typing import Any, Literal
 from ....schema import BBox
 from ....document.pdf.text._contracts import Bbox as CharBbox
 from ...._compute_backend import get_native
-from .models import _LineItem, _TableAnnotation, _TableCandidate, _VisualRow
+from .models import _LineItem, _TableAnnotation, _VisualRow
 from .geometry import (
     _bbox_axis_overlap_ratio,
     _bbox_center_y,
-    _bbox_union,
-    _bbox_union_many,
     _coerce_bbox,
     _rotate_bbox_to_upright,
 )
@@ -162,95 +159,10 @@ class _PreparedTableCoreRows:
         return self.marker_prepared.prepare(line, page_size, angle)
 
 
-def _plain_marker_bbox(value) -> bool:
-    """按 marker 快路径的既有规则校验字符 bbox 形状和数值范围。"""
-    if type(value) not in (tuple, list, CharBbox):
-        return False
-    raw = value.bbox if type(value) is CharBbox else value
-    if type(raw) not in (tuple, list) or len(raw) != 4:
-        return False
-    for number in raw:
-        if type(number) is float:
-            if not math.isfinite(number):
-                return False
-        elif type(number) is int:
-            if not -(2**53) <= number <= 2**53:
-                return False
-        else:
-            return False
-    return True
-
-
-_MARKER_SOURCE_REFERENCES = (
-    _LineItem.__getattribute__,
-    _LineItem.source_index,
-    _LineItem.text,
-    _LineItem.chars,
-    CharBbox.__getattribute__,
-    CharBbox.bbox,
-    _plain_marker_bbox,
-)
-
-
 def _prepare_marker_line_context(lines):
-    """原生一次校验普通页面来源，特殊对象或被替换的字段规则完整交回 Python。"""
-    from ...._compute_backend import get_native
-
-    native = get_native()
-    if native is None:
-        return False, {}
-    if (
-        hasattr(native, "marker_sources_owned")
-        and (
-            _LineItem.__getattribute__,
-            getattr(_LineItem, "source_index", None),
-            getattr(_LineItem, "text", None),
-            getattr(_LineItem, "chars", None),
-            CharBbox.__getattribute__,
-            getattr(CharBbox, "bbox", None),
-            _plain_marker_bbox,
-        )
-        == _MARKER_SOURCE_REFERENCES
-    ):
-        sources = native.marker_sources_owned(lines, _LineItem, CharBbox)
-        if sources is not None:
-            return True, sources
-    return _prepare_marker_line_context_python(lines)
-
-
-def _prepare_marker_line_context_python(lines):
-    """同一候选上下文只校验一次 marker 输入，并冻结来源行索引。"""
-    from ...._compute_backend import get_native
-
-    if get_native() is None:
-        return False, {}
-    source_lines: dict[int, list[_LineItem]] = {}
-    # 直接单次遍历替代多层生成式，避免同一 char/bbox 字典键被重复读取；
-    # 任一特殊输入立即返回 False，保持原参考路径整体回退的语义。
-    for line in lines:
-        if (
-            type(line) is not _LineItem
-            or type(line.source_index) is not int
-            or type(line.text) is not str
-            or type(line.chars) is not list
-        ):
-            return False, {}
-        plain_chars = True
-        for char in line.chars:
-            if type(char) is not dict:
-                plain_chars = False
-                break
-            text = char.get("char")
-            if text is not None and type(text) is not str:
-                plain_chars = False
-                break
-            if not _plain_marker_bbox(char.get("bbox")) and char.get("bbox") is not None:
-                plain_chars = False
-                break
-        if not plain_chars:
-            return False, {}
-        source_lines.setdefault(line.source_index, []).append(line)
-    return True, source_lines
+    """由原生层一次验证来源行并保留完整对象，特殊字段仅禁用该上下文缓存。"""
+    sources = get_native().marker_sources_owned(lines, _LineItem, CharBbox)
+    return (False, {}) if sources is None else (True, sources)
 
 
 def _prepare_table_core_rows(
@@ -308,7 +220,7 @@ class _PreparedTableNoteRows(list):
 
         native = get_native()
         self.geometry = None
-        if native is not None and all(
+        if all(
             type(row.row.bbox) in (tuple, list)
             and len(row.row.bbox) == 4
             and all(type(value) is float and math.isfinite(value) for value in row.row.bbox)
@@ -361,36 +273,27 @@ class _PreparedAnnotationGeometry:
         self.positions = {}
         self.sources = {}
         records = []
-        self.native = None
+        ordinary = True
         for row in rows:
             for fragment in row.fragments:
                 if id(fragment) in self.positions:
                     continue
-                if type(fragment.line_index) is not int or any(
-                    type(box) not in (tuple, list)
-                    or len(box) != 4
-                    or any(type(v) is not float or not math.isfinite(v) or abs(v) > 1e100 for v in box)
+                ordinary = ordinary and all(
+                    type(box) in (tuple, list)
+                    and len(box) == 4
+                    and all(type(value) is float and math.isfinite(value) and abs(value) <= 1e100 for value in box)
                     for box in (fragment.bbox, fragment.local_bbox)
-                ):
-                    return
+                )
                 self.positions[id(fragment)] = len(self.fragments)
                 self.fragments.append(fragment)
                 source = self.sources.setdefault(fragment.line_index, len(self.sources))
                 records.append((source, fragment.bbox, fragment.local_bbox))
         self.source_values = list(self.sources)
-        self.native = native.AnnotationGeometry(records)
+        self.backend = native
+        self.native = native.AnnotationGeometry(records) if ordinary else None
 
     def build(self, kind, rows, excluded, local):
-        """按原顺序构造注释，未知片段或特殊输入明确交回参考路径。"""
-        if self.native is None or (
-            local is not None
-            and (
-                type(local) not in (tuple, list)
-                or len(local) != 4
-                or any(type(v) is not float or not math.isfinite(v) or abs(v) > 1e100 for v in local)
-            )
-        ):
-            return NotImplemented
+        """按原顺序调用原生聚合；新片段建立新索引，任意数值保留原对象及解释器算术。"""
         if not rows:
             return None
         row_key = tuple(id(row) for row in rows)
@@ -402,11 +305,9 @@ class _PreparedAnnotationGeometry:
                 for fragment in row.fragments:
                     index = self.positions.get(id(fragment))
                     if index is None or self.fragments[index] is not fragment:
-                        return NotImplemented
+                        return _PreparedAnnotationGeometry(rows, self.backend).build(kind, rows, excluded, local)
                     selected.append(index)
                     sources.add(fragment.line_index)
-            if len(selected) < 16:
-                return NotImplemented
             selection = (tuple(rows), selected, frozenset(sources))
             if len(selected) <= 16384:
                 self.selections[row_key] = selection
@@ -424,7 +325,16 @@ class _PreparedAnnotationGeometry:
             self.results.move_to_end(key)
             return self._clone(cached[1])
         excluded_ids = [self.sources[value] for value in relevant_excluded]
-        lines, union = self.native.aggregate(selected, excluded_ids, local)
+        ordinary_local = local is None or (
+            type(local) in (tuple, list)
+            and len(local) == 4
+            and all(type(value) is float and math.isfinite(value) and abs(value) <= 1e100 for value in local)
+        )
+        if self.native is not None and ordinary_local:
+            lines, union = self.native.aggregate(selected, excluded_ids, local)
+        else:
+            records = [(self.sources[fragment.line_index], fragment.bbox, fragment.local_bbox) for fragment in self.fragments]
+            lines, union = self.backend.AnnotationGeometry.aggregate_generic(records, selected, excluded_ids, local)
         if union is None:
             self._remember(key, selection[0], None)
             return None
@@ -469,14 +379,10 @@ class _PreparedAnnotationGeometry:
 
 
 def _prepare_annotation_geometry(rows):
-    """只为较大候选组准备一次数值快照，小页面保留原物化开销。"""
+    """为所有候选规模准备原生几何索引，保留原片段及坐标对象的物化引用。"""
     from ...._compute_backend import get_native
 
-    native = get_native()
-    if native is None or len(rows) < 32:
-        return None
-    prepared = _PreparedAnnotationGeometry(rows, native)
-    return prepared if prepared.native is not None else None
+    return _PreparedAnnotationGeometry(rows, get_native())
 
 
 def _build_table_annotation(
@@ -489,39 +395,8 @@ def _build_table_annotation(
 ) -> _TableAnnotation | None:
     """把已确认视觉行压缩成一个带精确来源行集合的表格注释记录。"""
 
-    excluded_line_indices = excluded_line_indices or set()
-    if prepared_geometry is not None:
-        result = prepared_geometry.build(kind, rows, excluded_line_indices, excluded_local_bbox)
-        if result is not NotImplemented:
-            return result
-    fragments = [
-        fragment
-        for row in rows
-        for fragment in row.fragments
-        if fragment.line_index not in excluded_line_indices
-        and not (
-            excluded_local_bbox is not None
-            and fragment.local_bbox[3] > excluded_local_bbox[1]
-            and _bbox_axis_overlap_ratio(
-                fragment.local_bbox,
-                excluded_local_bbox,
-                axis="x",
-            )
-            >= 0.05
-        )
-    ]
-    if not fragments:
-        return None
-    line_bboxes: dict[int, BBox] = {}
-    for fragment in fragments:
-        existing_bbox = line_bboxes.get(fragment.line_index)
-        line_bboxes[fragment.line_index] = fragment.bbox if existing_bbox is None else _bbox_union(existing_bbox, fragment.bbox)
-    return _TableAnnotation(
-        kind=kind,
-        bbox=_bbox_union_many(list(line_bboxes.values())),
-        line_indices=set(line_bboxes),
-        line_bboxes=line_bboxes,
-    )
+    prepared = prepared_geometry if prepared_geometry is not None else _prepare_annotation_geometry(rows)
+    return prepared.build(kind, rows, excluded_line_indices or set(), excluded_local_bbox)
 
 
 def _collect_caption_rows(
@@ -633,7 +508,7 @@ def _prepare_table_note_body_metrics(
 
     native = get_native()
     prepared_native = None
-    if native is not None and all(
+    if all(
         type(index) is int
         and -(2**63) <= index < 2**63
         and type(center) is float
@@ -780,69 +655,10 @@ def _extract_auxiliary_table_note_marker(text: str) -> str | None:
 
 
 def _prepare_marker_line(line, page_size, angle):
-    """字形和局部坐标按当前输入批量准备，Unicode、token 与定制几何仍保留原实现。"""
-    from ...._compute_backend import get_native
-
-    native = get_native()
-    if (
-        native is not None
-        and hasattr(native, "marker_glyphs_owned")
-        and (
-            _LineItem.__getattribute__,
-            getattr(_LineItem, "text", None),
-            getattr(_LineItem, "chars", None),
-            CharBbox.__getattribute__,
-            getattr(CharBbox, "bbox", None),
-            _coerce_bbox,
-            _rotate_bbox_to_upright,
-            unicodedata.normalize,
-            _compact_marker_data,
-        )
-        == _MARKER_GLYPH_REFERENCES
-    ):
-        prepared = native.marker_glyphs_owned(
-            line, page_size, angle, _LineItem, CharBbox, unicodedata.normalize, _compact_marker_data
-        )
-        if prepared is not None:
-            return prepared
-    return _prepare_marker_line_python(line, page_size, angle)
-
-
-def _prepare_marker_line_python(
-    line: _LineItem, page_size: tuple[float, float], angle: int
-) -> tuple[list[tuple[str, BBox]], tuple[int, tuple[str, ...]]] | None:
-    """仅为普通来源行准备与具体标记无关的局部字形及紧凑 token。"""
-
-    if (
-        type(line) is not _LineItem
-        or type(line.text) is not str
-        or type(line.chars) is not list
-        or type(page_size) not in (tuple, list)
-        or len(page_size) != 2
-        or any(type(value) is not float or not math.isfinite(value) for value in page_size)
-        or type(angle) is not int
-    ):
-        return None
-    glyphs = []
-    for char in line.chars:
-        if type(char) is not dict or type(char.get("char")) not in (str, type(None)):
-            return None
-        value = char.get("bbox")
-        raw = value.bbox if type(value) is CharBbox else value
-        if raw is not None and (
-            type(raw) not in (tuple, list)
-            or len(raw) != 4
-            or any(type(number) is not float or not math.isfinite(number) for number in raw)
-        ):
-            return None
-        raw_char = str(char.get("char") or "")
-        if not raw_char.isprintable() or raw_char.isspace():
-            continue
-        bbox = _coerce_bbox(value)
-        if bbox is None:
-            continue
-        glyphs.append((unicodedata.normalize("NFKC", raw_char).casefold(), _rotate_bbox_to_upright(bbox, page_size, angle)))
-    return glyphs, _compact_marker_data(line.text)
+    """原生准备当前字形与局部坐标，Unicode及token使用宿主解释器的规范化规则。"""
+    return get_native().marker_glyphs_owned(
+        line, page_size, angle, _LineItem, CharBbox, unicodedata.normalize, _compact_marker_data
+    )
 
 
 def _table_core_references_marker(
@@ -983,31 +799,23 @@ def _table_note_body_reference_height(
         result = prepared_metrics.native.height(exclusion_top, exclusion_bottom, list(core_line_indices), 1.25 * median_height)
         if result is not None:
             return result
-    heights: list[float] = []
     if prepared_metrics is None:
+        items = []
         for line in lines:
-            if line.angle != angle or line.source_index in core_line_indices:
+            if line.angle != angle:
                 continue
             local_bbox = _rotate_bbox_to_upright(line.bbox, page_size, angle)
-            if exclusion_top <= _bbox_center_y(local_bbox) <= exclusion_bottom:
-                continue
-            heights.append(_line_effective_height(line, local_bbox))
+            items.append((line.source_index, _bbox_center_y(local_bbox), _line_effective_height(line, local_bbox)))
     else:
-        left_end = bisect_left(prepared_metrics.centers, exclusion_top)
-        right_start = bisect_right(prepared_metrics.centers, exclusion_bottom)
-        for item_index in range(left_end):
-            source_index, _center_y, height = prepared_metrics.items[item_index]
-            if source_index not in core_line_indices:
-                heights.append(height)
-        for item_index in range(right_start, len(prepared_metrics.items)):
-            source_index, _center_y, height = prepared_metrics.items[item_index]
-            if source_index not in core_line_indices:
-                heights.append(height)
-    if len(heights) < 4:
-        return 1.25 * median_height
-    heights.sort()
-    upper_quartile_count = max(1, (len(heights) + 3) // 4)
-    return statistics.median(heights[-upper_quartile_count:])
+        items = prepared_metrics.items
+    return get_native().TableNoteMetrics.height_generic(
+        items,
+        exclusion_top,
+        exclusion_bottom,
+        list(core_line_indices),
+        1.25 * median_height,
+        prepared_metrics is not None,
+    )
 
 
 def _visual_row_text(row: _VisualRow) -> str:
@@ -1094,63 +902,3 @@ def _find_caption_number_peers(
         peers,
         key=lambda peer: _rotate_bbox_to_upright(peer.bbox, page_size, angle)[0],
     )
-
-
-def _merge_table_candidate_annotations(
-    target: _TableCandidate,
-    candidate: _TableCandidate,
-) -> None:
-    """按类型合并重复候选注释，并以表体优先消解来源行角色冲突。"""
-
-    for annotation in candidate.annotations:
-        existing = next(
-            (item for item in target.annotations if item.kind == annotation.kind),
-            None,
-        )
-        if existing is None:
-            target.annotations.append(
-                _TableAnnotation(
-                    kind=annotation.kind,
-                    bbox=annotation.bbox,
-                    line_indices=set(annotation.line_indices),
-                    line_bboxes=dict(annotation.line_bboxes),
-                )
-            )
-            continue
-        existing.bbox = _bbox_union(existing.bbox, annotation.bbox)
-        existing.line_indices.update(annotation.line_indices)
-        for line_index, bbox in annotation.line_bboxes.items():
-            existing_bbox = existing.line_bboxes.get(line_index)
-            existing.line_bboxes[line_index] = bbox if existing_bbox is None else _bbox_union(existing_bbox, bbox)
-
-    # 重复候选发生角色冲突时以任一候选确认的表体成员为准，避免表头被并入 caption。
-    retained_annotations: list[_TableAnnotation] = []
-    for annotation in target.annotations:
-        # 注释成员通常很少，逐个查询大型共享表体集合比反向遍历表体成员更省时。
-        annotation.line_indices = {
-            line_index for line_index in annotation.line_indices if line_index not in target.line_indices
-        }
-        annotation.line_bboxes = {
-            line_index: bbox for line_index, bbox in annotation.line_bboxes.items() if line_index in annotation.line_indices
-        }
-        if not annotation.line_indices:
-            continue
-        if annotation.line_bboxes:
-            annotation.bbox = _bbox_union_many(
-                list(annotation.line_bboxes.values()),
-            )
-        retained_annotations.append(annotation)
-    target.annotations = retained_annotations
-
-
-_MARKER_GLYPH_REFERENCES = (
-    _LineItem.__getattribute__,
-    _LineItem.text,
-    _LineItem.chars,
-    CharBbox.__getattribute__,
-    CharBbox.bbox,
-    _coerce_bbox,
-    _rotate_bbox_to_upright,
-    unicodedata.normalize,
-    _compact_marker_data,
-)

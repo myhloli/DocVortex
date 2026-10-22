@@ -33,18 +33,20 @@ def bridge_info():
     }
 
 
-def read_clipped_objects(page, kind, max_depth):
-    """标准运行时在 Rust 内完成树遍历，特殊 ctypes 替身保持 Python 参考路径。"""
+def read_clipped_objects(page, kind, max_depth, *, root=None):
+    """在 Rust 内完成树遍历，ABI 或句柄错误在解引用前显式失败。"""
     global _CALLS, _UNAVAILABLE_REASON
     native = get_native()
-    if native is None or type(page) is not pdfium.PdfPage or not page.raw:
-        _UNAVAILABLE_REASON = "python backend or nonstandard/closed page"
-        return None
+    form_root = root is not None and root[0]
+    handle = page if form_root else getattr(page, "raw", None)
+    if not handle or (type(page) is not raw.FPDF_PAGEOBJECT if form_root else type(page) is not pdfium.PdfPage):
+        _UNAVAILABLE_REASON = "nonstandard or closed page"
+        raise RuntimeError(_UNAVAILABLE_REASON)
     if ct.sizeof(raw.FS_MATRIX) != 24 or any(
         getattr(raw.FS_MATRIX, name).offset != offset * 4 for offset, name in enumerate("abcdef")
     ):
         _UNAVAILABLE_REASON = "FS_MATRIX ABI mismatch"
-        return None
+        raise RuntimeError(_UNAVAILABLE_REASON)
     obj, clip, segment = raw.FPDF_PAGEOBJECT, raw.FPDF_CLIPPATH, raw.FPDF_PATHSEGMENT
     specs = (
         ("FPDFPage_CountObjects", ct.c_int, (raw.FPDF_PAGE,)),
@@ -69,11 +71,11 @@ def read_clipped_objects(page, kind, max_depth):
             or getattr(function, "errcheck", None) is not None
         ):
             _UNAVAILABLE_REASON = f"unsupported symbol or ABI: {name}"
-            return None
+            raise RuntimeError(_UNAVAILABLE_REASON)
         functions.append(function)
         addresses.append(ct.cast(function, ct.c_void_p).value)
     with pdfium_guard():
-        batches = native.read_pdfium_objects(addresses, ct.cast(page.raw, ct.c_void_p).value, kind, max_depth)
+        batches = native.read_pdfium_objects(addresses, ct.cast(handle, ct.c_void_p).value, kind, max_depth, root)
     _CALLS += 1
     _UNAVAILABLE_REASON = None
     return chain.from_iterable(batches)
@@ -84,14 +86,14 @@ def read_text_visibility(page, page_bbox, rotation, max_depth, *, with_roots=Fal
     global _TEXT_VISIBILITY_CALLS, _TEXT_VISIBILITY_UNAVAILABLE_REASON
     native = get_native()
     reader = getattr(native, "read_pdfium_text_visibility_with_roots" if with_roots else "read_pdfium_text_visibility", None)
-    if native is None or reader is None or type(page) is not pdfium.PdfPage or not page.raw:
-        _TEXT_VISIBILITY_UNAVAILABLE_REASON = "python backend or unsupported native extension"
-        return None
+    if type(page) is not pdfium.PdfPage or not page.raw:
+        _TEXT_VISIBILITY_UNAVAILABLE_REASON = "nonstandard or closed page"
+        raise RuntimeError(_TEXT_VISIBILITY_UNAVAILABLE_REASON)
     if ct.sizeof(raw.FS_MATRIX) != 24 or any(
         getattr(raw.FS_MATRIX, name).offset != offset * 4 for offset, name in enumerate("abcdef")
     ):
         _TEXT_VISIBILITY_UNAVAILABLE_REASON = "FS_MATRIX ABI mismatch"
-        return None
+        raise RuntimeError(_TEXT_VISIBILITY_UNAVAILABLE_REASON)
     obj, clip, segment = raw.FPDF_PAGEOBJECT, raw.FPDF_CLIPPATH, raw.FPDF_PATHSEGMENT
     specs = (
         ("FPDFPage_CountObjects", ct.c_int, (raw.FPDF_PAGE,)),
@@ -142,7 +144,7 @@ def read_text_visibility(page, page_bbox, rotation, max_depth, *, with_roots=Fal
             or getattr(function, "errcheck", None) is not None
         ):
             _TEXT_VISIBILITY_UNAVAILABLE_REASON = f"unsupported symbol or ABI: {name}"
-            return None
+            raise RuntimeError(_TEXT_VISIBILITY_UNAVAILABLE_REASON)
         addresses.append(ct.cast(function, ct.c_void_p).value)
     try:
         with pdfium_guard():
@@ -161,17 +163,17 @@ def read_text_visibility(page, page_bbox, rotation, max_depth, *, with_roots=Fal
 
 
 def read_drawing_lines(page, page_bbox, rotation):
-    """仅对兼容 ABI 的简单描边页执行 Rust 轴线提取，复杂页返回参考路径。"""
+    """简单描边页使用原生轴线快路径，复杂页交给完整原生路径证据读取。"""
     global _DRAWING_CALLS, _DRAWING_UNAVAILABLE_REASON
     native = get_native()
-    if native is None or type(page) is not pdfium.PdfPage or not page.raw:
-        _DRAWING_UNAVAILABLE_REASON = "python backend or nonstandard/closed page"
-        return None
+    if type(page) is not pdfium.PdfPage or not page.raw:
+        _DRAWING_UNAVAILABLE_REASON = "nonstandard or closed page"
+        raise RuntimeError(_DRAWING_UNAVAILABLE_REASON)
     if ct.sizeof(raw.FS_MATRIX) != 24 or any(
         getattr(raw.FS_MATRIX, name).offset != offset * 4 for offset, name in enumerate("abcdef")
     ):
         _DRAWING_UNAVAILABLE_REASON = "FS_MATRIX ABI mismatch"
-        return None
+        raise RuntimeError(_DRAWING_UNAVAILABLE_REASON)
     obj, clip, segment = raw.FPDF_PAGEOBJECT, raw.FPDF_CLIPPATH, raw.FPDF_PATHSEGMENT
     specs = (
         ("FPDFPage_CountObjects", ct.c_int, (raw.FPDF_PAGE,)),
@@ -208,12 +210,12 @@ def read_drawing_lines(page, page_bbox, rotation):
             or getattr(function, "errcheck", None) is not None
         ):
             _DRAWING_UNAVAILABLE_REASON = f"unsupported symbol or ABI: {name}"
-            return None
+            raise RuntimeError(_DRAWING_UNAVAILABLE_REASON)
         addresses.append(ct.cast(function, ct.c_void_p).value)
     with pdfium_guard():
         batches = native.read_pdfium_drawing_lines(addresses, ct.cast(page.raw, ct.c_void_p).value, page_bbox, rotation)
     if batches is None:
-        _DRAWING_UNAVAILABLE_REASON = "complex path, transform, or clip requires Python reference"
+        _DRAWING_UNAVAILABLE_REASON = "complex path, transform, or clip uses full native path evidence"
         return None
     _DRAWING_CALLS += 1
     _DRAWING_UNAVAILABLE_REASON = None
@@ -221,10 +223,10 @@ def read_drawing_lines(page, page_bbox, rotation):
 
 
 def read_path_subpaths(raw_object):
-    """标准 ABI 使用原生路径解码，替身或未升级扩展保留显式参考路径。"""
+    """核验 ABI 后使用唯一原生路径解码器。"""
     native = get_native()
-    if native is None or type(raw_object) is not raw.FPDF_PAGEOBJECT or not raw_object:
-        return None
+    if type(raw_object) is not raw.FPDF_PAGEOBJECT or not raw_object:
+        raise RuntimeError("Invalid PDFium path handle or ABI")
     obj, segment = raw.FPDF_PAGEOBJECT, raw.FPDF_PATHSEGMENT
     specs = (
         ("FPDFPath_CountSegments", ct.c_int, (obj,)),
@@ -242,7 +244,7 @@ def read_path_subpaths(raw_object):
             or tuple(function.argtypes or ()) != arguments
             or getattr(function, "errcheck", None) is not None
         ):
-            return None
+            raise RuntimeError("Invalid PDFium path handle or ABI")
         functions.append(function)
         addresses.append(ct.cast(function, ct.c_void_p).value)
     with pdfium_guard():
@@ -250,18 +252,18 @@ def read_path_subpaths(raw_object):
 
 
 def read_path_evidence(page, page_bbox, rotation, max_depth, *, want_lines, want_path_infos):
-    """一次原生遍历同时生成 Path 绘图线与摘要，供标准参考路径差分。"""
+    """一次原生遍历同时生成 Path 绘图线与摘要。"""
     global _PATH_EVIDENCE_CALLS, _PATH_EVIDENCE_UNAVAILABLE_REASON
     native = get_native()
     reader = getattr(native, "read_pdfium_path_evidence", None)
-    if native is None or reader is None or type(page) is not pdfium.PdfPage or not page.raw:
-        _PATH_EVIDENCE_UNAVAILABLE_REASON = "python backend or unsupported native extension"
-        return None
+    if type(page) is not pdfium.PdfPage or not page.raw:
+        _PATH_EVIDENCE_UNAVAILABLE_REASON = "nonstandard or closed page"
+        raise RuntimeError(_PATH_EVIDENCE_UNAVAILABLE_REASON)
     if ct.sizeof(raw.FS_MATRIX) != 24 or any(
         getattr(raw.FS_MATRIX, name).offset != offset * 4 for offset, name in enumerate("abcdef")
     ):
         _PATH_EVIDENCE_UNAVAILABLE_REASON = "FS_MATRIX ABI mismatch"
-        return None
+        raise RuntimeError(_PATH_EVIDENCE_UNAVAILABLE_REASON)
     obj, clip, segment = raw.FPDF_PAGEOBJECT, raw.FPDF_CLIPPATH, raw.FPDF_PATHSEGMENT
     specs = (
         ("FPDFPage_CountObjects", ct.c_int, (raw.FPDF_PAGE,)),
@@ -303,7 +305,7 @@ def read_path_evidence(page, page_bbox, rotation, max_depth, *, want_lines, want
             or getattr(function, "errcheck", None) is not None
         ):
             _PATH_EVIDENCE_UNAVAILABLE_REASON = f"unsupported symbol or ABI: {name}"
-            return None
+            raise RuntimeError(_PATH_EVIDENCE_UNAVAILABLE_REASON)
         addresses.append(ct.cast(function, ct.c_void_p).value)
     try:
         with pdfium_guard():

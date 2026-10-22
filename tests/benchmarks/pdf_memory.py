@@ -56,7 +56,7 @@ class EntryMemorySampler(MemorySampler):
 def memory_worker(config: dict, folder: Path) -> None:
     """只预热实际入口，在采样停止后序列化并与原计时输出做完整差分。"""
     os.environ["ORT_DISABLE_TELEMETRY"] = "1"
-    os.environ["DOCVORTEX_COMPUTE_BACKEND"] = config["compute"]["backend"]
+    assert config["compute"]["backend"] == "rust", "Only native benchmark records are supported"
     os.environ["LOGURU_LEVEL"] = "WARNING"
     import onnxruntime
 

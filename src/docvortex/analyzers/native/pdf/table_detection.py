@@ -7,7 +7,6 @@ import statistics
 from dataclasses import replace
 from ....schema import BBox
 from .models import _AxisLine, _LineItem, _PageSource, _TableAnnotation, _TableCandidate
-from . import geometry as _overlap_geometry
 from .geometry import (
     _bbox_area,
     _bbox_axis_overlap_ratio,
@@ -282,183 +281,70 @@ def _detect_aligned_numeric_tables(source: _PageSource, excluded: list[BBox]) ->
     return output
 
 
-_PROSE_RULE_REFERENCE_FUNCTIONS = (_bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_union_many)
-
-
-def _prose_rule_native_box(value):
-    """只接受内置有限框，异常或自定义数值不触发转换回调而直接回退。"""
-    return (
-        type(value) in (tuple, list)
-        and len(value) == 4
-        and all(type(v) in (int, float) and math.isfinite(v) and abs(v) <= 2**50 for v in value)
-    )
-
-
 def _prose_rule_native_flags(source, candidates):
-    """文字特征按输入行计算一次；把完整成员集合和几何传给批量筛选。"""
+    """Python准备表格业务资格，原生完整筛选正文冲突；来源编号按值无损压缩。"""
     from ...._compute_backend import get_native
 
     native = get_native()
-    if native is None or any(
-        actual is not expected
-        for actual, expected in zip(
-            (_bbox_axis_overlap_ratio, _bbox_center_x, _bbox_center_y, _bbox_union_many), _PROSE_RULE_REFERENCE_FUNCTIONS
-        )
-    ):
-        return None
-    grids = []
-    drafts = []
-    indices = []
-    for i, candidate in enumerate(candidates):
+    grids, drafts, indices = [], [], []
+    for index, candidate in enumerate(candidates):
         if isinstance(candidate, _TableCandidate) and candidate.angle == 0:
-            box = candidate.core_bbox or candidate.bbox
-            if type(candidate) is not _TableCandidate or not _prose_rule_native_box(box):
-                return None
-            grids.append(box)
+            grids.append(candidate.core_bbox or candidate.bbox)
         elif isinstance(candidate, _RuleCandidateDraft):
-            if type(candidate) is not _RuleCandidateDraft:
-                return None
             if candidate.context.angle or candidate.caption is not None:
                 continue
             em = candidate.context.median_height
-            if type(em) not in (int, float) or not math.isfinite(em) or abs(em) > 2**50:
-                return None
             if em <= 0 or not candidate.boundaries:
                 continue
             boxes = [rule.bbox for rule in candidate.boundaries]
-            if not all(_prose_rule_native_box(box) for box in boxes):
-                return None
             drafts.append((em, min(box[1] for box in boxes), max(box[3] for box in boxes), _bbox_union_many(boxes), []))
-            indices.append(i)
+            indices.append(index)
     if not grids or not drafts:
         return set()
-    # 只在全部必要几何条件成立后读取成员，避免为密集弱线组合复制整个表体。
-    eligible = native.prose_rule_eligible(drafts, grids)
+    identifiers = {}
+    ordinary = all(
+        type(value) is float and math.isfinite(value) and abs(value) <= 2**50
+        for draft in drafts
+        for value in (*draft[:3], *draft[3])
+    ) and all(type(value) is float and math.isfinite(value) and abs(value) <= 2**50 for box in grids for value in box)
+    # 特殊数值不经过有限浮点预筛，完整判定仍由原生通用算术执行。
+    eligible = native.prose_rule_eligible(drafts, grids) if ordinary else [True] * len(drafts)
     active_drafts, active_indices = [], []
-    for draft, index, accepted in zip(drafts, indices, eligible):
-        if not accepted:
-            continue
-        candidate = candidates[index]
-        members = [fragment.line_index for row in candidate.rows for fragment in row.fragments]
-        if any(type(member) is not int or not -(2**63) <= member < 2**63 for member in members):
-            return None
-        active_drafts.append((*draft[:4], members))
-        active_indices.append(index)
-    drafts, indices = active_drafts, active_indices
-    if not drafts:
+    for draft, index, accepted in zip(drafts, indices, eligible, strict=True):
+        if accepted:
+            members = [
+                identifiers.setdefault(fragment.line_index, len(identifiers))
+                for row in candidates[index].rows
+                for fragment in row.fragments
+            ]
+            active_drafts.append((*draft[:4], members))
+            active_indices.append(index)
+    if not active_drafts:
         return set()
-    rules = []
-    for rule in source.drawing_lines:
-        if (
-            type(rule) is not _AxisLine
-            or rule.orientation not in ("vertical", "horizontal")
-            or not _prose_rule_native_box(rule.bbox)
-        ):
-            return None
-        rules.append((rule.bbox, rule.orientation == "vertical"))
+    rules = [
+        (rule.bbox, rule.orientation == "vertical")
+        for rule in source.drawing_lines
+        if rule.orientation in {"vertical", "horizontal"}
+    ]
     lines = []
     for line in source.lines:
-        if type(line) is not _LineItem or type(line.text) is not str or not _prose_rule_native_box(line.bbox):
-            return None
-        if type(line.source_index) is not int or not -(2**63) <= line.source_index < 2**63:
-            return None
-        weight = line.dominant_font_weight
-        if weight is not None and (type(weight) not in (int, float) or not math.isfinite(weight)):
-            return None
         eligible = (
             line.angle == 0
             and not line.caption_start
             and not line.formula_candidate_only
             and not line.semantic_type
-            and (weight or 400) < 600
+            and (line.dominant_font_weight or 400) < 600
             and len(re.findall(r"\b[A-Za-z]{2,}\b", line.text)) >= 6
         )
-        lines.append((line.bbox, line.source_index, bool(eligible)))
-    flags = native.prose_rule_conflicts(drafts, grids, rules, lines)
-    return None if flags is None else {index for index, conflict in zip(indices, flags) if conflict}
+        lines.append((line.bbox, identifiers.setdefault(line.source_index, len(identifiers)), bool(eligible)))
+    flags = native.prose_rule_conflicts(active_drafts, grids, rules, lines)
+    return {index for index, conflict in zip(active_indices, flags, strict=True) if conflict}
 
 
 def _exclude_prose_spanning_rule_drafts(source, candidates):
-    """批量筛选只移除原规则确认的冲突候选，特殊输入保留完整 Python 判断。"""
+    """只移除原生确认跨越独立正文的弱线草稿，保留候选对象及原有顺序。"""
     conflicts = _prose_rule_native_flags(source, candidates)
-    if conflicts is None:
-        return _exclude_prose_spanning_rule_drafts_python(source, candidates)
-    return [candidate for i, candidate in enumerate(candidates) if i not in conflicts]
-
-
-def _exclude_prose_spanning_rule_drafts_python(source: _PageSource, candidates: list) -> list:
-    """闭合列线和上下边界确认表顶时，跨越上方独立正文的弱横线区间不能扩大表体。"""
-    grids = [candidate for candidate in candidates if isinstance(candidate, _TableCandidate) and candidate.angle == 0]
-    if not grids:
-        return candidates
-    result = []
-    for draft in candidates:
-        if not isinstance(draft, _RuleCandidateDraft) or draft.context.angle or draft.caption is not None:
-            result.append(draft)
-            continue
-        em = draft.context.median_height
-        if em <= 0 or not draft.boundaries:
-            result.append(draft)
-            continue
-        first = min(rule.bbox[1] for rule in draft.boundaries)
-        last = max(rule.bbox[3] for rule in draft.boundaries)
-        boundary_box = _bbox_union_many([rule.bbox for rule in draft.boundaries])
-        members = {fragment.line_index for row in draft.rows for fragment in row.fragments}
-        conflict = False
-        for grid in grids:
-            core = grid.core_bbox or grid.bbox
-            width, height = core[2] - core[0], core[3] - core[1]
-            if width < 8 * em or height < 4 * em or core[1] - first < 5 * em:
-                continue
-            if not core[1] - em <= last <= core[3] + em:
-                continue
-            if _bbox_axis_overlap_ratio(boundary_box, core, axis="x") < 0.9:
-                continue
-            verticals = [
-                rule
-                for rule in source.drawing_lines
-                if rule.orientation == "vertical"
-                and core[0] - 0.5 * em <= _bbox_center_x(rule.bbox) <= core[2] + 0.5 * em
-                and rule.bbox[1] <= core[1] + 0.5 * em
-                and rule.bbox[3] >= core[3] - 0.5 * em
-            ]
-            tracks = []
-            for x in sorted(_bbox_center_x(rule.bbox) for rule in verticals):
-                if not tracks or x - tracks[-1] > 0.3 * em:
-                    tracks.append(x)
-            horizontals = [
-                rule
-                for rule in source.drawing_lines
-                if rule.orientation == "horizontal" and _bbox_axis_overlap_ratio(rule.bbox, core, axis="x") >= 0.9
-            ]
-            if len(tracks) < 3 or not all(
-                any(abs(_bbox_center_y(rule.bbox) - y) <= 0.5 * em for rule in horizontals) for y in (core[1], core[3])
-            ):
-                continue
-            prose = [
-                line
-                for line in source.lines
-                if line.angle == 0
-                and line.source_index in members
-                and first + 0.5 * em < _bbox_center_y(line.bbox) < core[1] - em
-                and line.bbox[2] - line.bbox[0] >= 0.65 * width
-                and _bbox_axis_overlap_ratio(line.bbox, core, axis="x") >= 0.9
-                and len(re.findall(r"\b[A-Za-z]{2,}\b", line.text)) >= 6
-                and not line.caption_start
-                and not line.formula_candidate_only
-                and not line.semantic_type
-                and (line.dominant_font_weight or 400) < 600
-            ]
-            rows = []
-            for y in sorted(_bbox_center_y(line.bbox) for line in prose):
-                if not rows or y - rows[-1] > 0.6 * em:
-                    rows.append(y)
-            if len(rows) >= 3:
-                conflict = True
-                break
-        if not conflict:
-            result.append(draft)
-    return result
+    return [candidate for index, candidate in enumerate(candidates) if index not in conflicts]
 
 
 def _trim_unruled_table_prose_tail(source: _PageSource, candidate: _TableCandidate) -> None:
@@ -866,58 +752,11 @@ def _prefer_complete_table_replacements(base, recovered, replacements):
     return [item for item in base if keep_old(item)], [item for item in recovered if keep_old(item)], replacements
 
 
-_YEAR_GEOMETRY_REFERENCES = (
-    _LineItem.__getattribute__,
-    _AxisLine.__getattribute__,
-    _LineItem.bbox,
-    _AxisLine.bbox,
-    _LineItem.text,
-    _LineItem.paragraph_terminal,
-    re.fullmatch,
-    re.search,
-)
-
-
 def _native_year_header_groups(lines, rules, em):
-    """逐输入状态读取所有普通框，完整几何批量匹配；不缓存表头、年份或最终成员。"""
+    """原生按当前完整框匹配表头，整数和特殊数值使用原解释器比较语义。"""
     from ...._compute_backend import get_native
 
-    native = get_native()
-    if (
-        native is None
-        or (
-            _LineItem.__getattribute__,
-            _AxisLine.__getattribute__,
-            getattr(_LineItem, "bbox", None),
-            getattr(_AxisLine, "bbox", None),
-            getattr(_LineItem, "text", None),
-            getattr(_LineItem, "paragraph_terminal", None),
-            re.fullmatch,
-            re.search,
-        )
-        != _YEAR_GEOMETRY_REFERENCES
-    ):
-        return None
-    if any(
-        type(line) is not _LineItem or type(line.text) is not str or type(line.paragraph_terminal) is not bool for line in lines
-    ) or any(type(rule) is not _AxisLine for rule in rules):
-        return None
-    boxes, rule_boxes = [line.bbox for line in lines], [rule.bbox for rule in rules]
-    if (
-        type(em) not in (int, float)
-        or abs(em) > 2**50
-        or not math.isfinite(em)
-        or not all(
-            type(box) in (tuple, list)
-            and len(box) == 4
-            and all(
-                type(v) is float and math.isfinite(v) and abs(v) <= 2**50 or type(v) is int and abs(v) <= 2**24 for v in box
-            )
-            for box in [*boxes, *rule_boxes]
-        )
-    ):
-        return None
-    return native.year_header_groups(boxes, rule_boxes, em)
+    return get_native().year_header_groups([line.bbox for line in lines], [rule.bbox for rule in rules], em)
 
 
 def _detect_year_header_numeric_tables(source: _PageSource, excluded: list[BBox]) -> list[_TableCandidate]:
@@ -939,18 +778,7 @@ def _detect_year_header_numeric_tables(source: _PageSource, excluded: list[BBox]
     seeds = []
     header_groups = _native_year_header_groups(lines, rules, em)
     for rule_index, rule in enumerate(rules):
-        header = sorted(
-            [
-                line
-                for line in lines
-                if rule.bbox[0] - 0.3 * em <= line.bbox[0]
-                and line.bbox[2] <= rule.bbox[2] + 0.3 * em
-                and 0 <= rule.bbox[1] - line.bbox[3] <= 0.8 * em
-            ]
-            if header_groups is None
-            else [lines[index] for index in header_groups[rule_index]],
-            key=lambda line: line.bbox[0],
-        )
+        header = sorted([lines[index] for index in header_groups[rule_index]], key=lambda line: line.bbox[0])
         if (
             not 4 <= len(header) <= 10
             or not all(re.fullmatch(r"\d{4}[A-Za-z]?", line.text.strip()) for line in header[1:])
@@ -1927,29 +1755,11 @@ def _detect_short_caption_ruled_tables(source: _PageSource, excluded_bboxes: lis
     return output
 
 
-_OVERLAP_MEMBER_REFERENCES = (_bbox_overlap_in_first, _overlap_geometry._bbox_area)
-
-
 def _native_overlap_member_groups(boxes, regions, threshold):
-    """完整框匹配仅接受普通数值，较大整数、自定义框及替换的几何规则完整回退。"""
+    """原生统一匹配框覆盖率，按源顺序返回每一区域的完整成员。"""
     from ...._compute_backend import get_native
 
-    native = get_native()
-    if native is None or (_bbox_overlap_in_first, _overlap_geometry._bbox_area) != _OVERLAP_MEMBER_REFERENCES:
-        return None
-    if type(boxes) not in (tuple, list) or type(regions) not in (tuple, list):
-        return None
-    if not all(
-        type(box) in (tuple, list)
-        and len(box) == 4
-        and all(
-            type(value) is float and math.isfinite(value) and abs(value) <= 2**50 or type(value) is int and abs(value) <= 2**24
-            for value in box
-        )
-        for box in [*boxes, *regions]
-    ):
-        return None
-    return native.overlap_member_groups(boxes, regions, threshold)
+    return get_native().overlap_member_groups(boxes, regions, threshold)
 
 
 def _detect_shaded_header_tables(source: _PageSource, excluded_bboxes: list[BBox]) -> list[_TableCandidate]:
@@ -1980,53 +1790,24 @@ def _detect_shaded_header_tables(source: _PageSource, excluded_bboxes: list[BBox
         else:
             headers.append(cell)
     # 表格截图可仅提供底色与线条；原生文字层的多列表头和重复栏缘仍能证实其结构。
-    boxes = (
-        [line.bbox for line in lines]
-        if (
-            (
-                _native_clip_stage_grid,
-                _bbox_axis_overlap_ratio,
-                _bbox_center_x,
-                _bbox_center_y,
-                _bbox_union,
-                _bbox_union_many,
-                _LineItem.__getattribute__,
-            )
-            == _SHADED_GROUP_STATE_REFERENCES
-            and all(type(line) is _LineItem for line in lines)
-        )
-        else None
-    )
+    boxes = [line.bbox for line in lines]
     image_groups = _native_overlap_member_groups(boxes, source.image_bboxes, 0.9)
     for image_index, image in enumerate(source.image_bboxes):
-        inside = (
-            [lines[i] for i in image_groups[image_index]]
-            if image_groups is not None
-            else [line for line in lines if _bbox_overlap_in_first(line.bbox, image) >= 0.9]
-        )
+        inside = [lines[index] for index in image_groups[image_index]]
         if len(inside) >= 20:
             top = min(line.bbox[1] for line in inside)
             headers.append((image[0], top - 0.2 * em, image[2], top + 1.5 * em))
     output = []
     ordered_headers = sorted(headers, key=lambda box: box[1])
     groups = _native_overlap_member_groups(boxes, ordered_headers, 0.8)
-    cell_groups = _native_overlap_member_groups(header_cells, ordered_headers, 0.9) if boxes is not None else None
+    cell_groups = _native_overlap_member_groups(header_cells, ordered_headers, 0.9)
     for header_index, header in enumerate(ordered_headers):
-        labels = (
-            [lines[i] for i in groups[header_index]]
-            if groups is not None
-            else [line for line in lines if _bbox_overlap_in_first(line.bbox, header) >= 0.8]
-        )
+        labels = [lines[index] for index in groups[header_index]]
         labels.sort(key=lambda line: line.bbox[0])
         if not 3 <= len(labels) <= 8 or any(a.bbox[2] + em > b.bbox[0] for a, b in zip(labels, labels[1:])):
             continue
         columns = [line.bbox[0] for line in labels]
-        cells = sorted(
-            [header_cells[i] for i in cell_groups[header_index]]
-            if cell_groups is not None
-            else [cell for cell in header_cells if _bbox_overlap_in_first(cell, header) >= 0.9],
-            key=lambda box: box[0],
-        )
+        cells = sorted([header_cells[index] for index in cell_groups[header_index]], key=lambda box: box[0])
         raster_support = any(
             _bbox_overlap_in_first(header, image) >= 0.9 and image[3] - header[3] >= 8 * em for image in source.image_bboxes
         )

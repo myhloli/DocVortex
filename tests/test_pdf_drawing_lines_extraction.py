@@ -7,11 +7,14 @@
 
 from __future__ import annotations
 
+from _native_pdf_golden import native_pdf_golden
+
 import random
 import ctypes
 from importlib import import_module
 
 import pytest
+
 
 from docvortex.document.pdf import PDFDocument, native_objects
 from docvortex.document.pdf.native_contracts import PDFDrawingLine
@@ -127,14 +130,14 @@ def test_cluster_start_merge_matches_full_rescan(seed: int) -> None:
 def test_drawing_lines_skip_path_info_construction(monkeypatch) -> None:
     """get_page_drawing_lines 不再构建随即丢弃的 PDFPathInfo，结果与全量提取一致。"""
     counter = {"calls": 0}
-    original = native_objects._path_info_from_object
+    original = native_objects.PDFPathInfo
 
     def counting(*args, **kwargs):
         """统计绘图线专用入口意外构建路径信息的次数。"""
         counter["calls"] += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(native_objects, "_path_info_from_object", counting)
+    monkeypatch.setattr(native_objects, "PDFPathInfo", counting)
 
     data = _vector_page_pdf(600)
     with PDFDocument(data) as document:
@@ -142,7 +145,7 @@ def test_drawing_lines_skip_path_info_construction(monkeypatch) -> None:
     assert counter["calls"] == 0
     assert lines_only
 
-    monkeypatch.setattr(native_objects, "_path_info_from_object", original)
+    monkeypatch.setattr(native_objects, "PDFPathInfo", original)
     with PDFDocument(data) as document:
         with document._open_page(0) as page:
             from docvortex.document.pdf.native_coordinates import _normalize_pdf_page_bbox
@@ -156,30 +159,6 @@ def test_drawing_lines_skip_path_info_construction(monkeypatch) -> None:
     assert path_infos
 
 
-def test_path_dual_consumption_reads_draw_state_once(monkeypatch) -> None:
-    """同一 Path 同时产出线与摘要时，绘制状态只允许读取一次。"""
-    from docvortex.document.pdf import _object_bridge
-
-    original = native_objects._get_path_visibility
-    calls = 0
-
-    def counted(*args, **kwargs):
-        """包装参考实现，用于确认联合消费没有重复读取属性。"""
-        nonlocal calls
-        calls += 1
-        return original(*args, **kwargs)
-
-    monkeypatch.setattr(native_objects, "_get_path_visibility", counted)
-    # 联合属性读取是 Python 参考路径的约束；原生批量路径另由桥接命中测试覆盖。
-    monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
-    with PDFDocument(_vector_page_pdf(5)) as document:
-        vector = document[0].get_vector_geometry()
-        lines, path_infos = vector.drawing_lines, vector.path_infos
-    assert lines
-    assert len(path_infos) == 5
-    assert calls == 5
-
-
 def test_native_path_evidence_matches_python_reference(monkeypatch) -> None:
     """批量原生 Path 证据与逐对象 Python 参考输出逐字段且按顺序一致。"""
     from docvortex.document.pdf import _object_bridge
@@ -191,8 +170,7 @@ def test_native_path_evidence_matches_python_reference(monkeypatch) -> None:
         with document._open_page(0) as page:
             bbox = _normalize_pdf_page_bbox(page.get_bbox())
             native_lines, native_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
-            monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
-            reference_lines, reference_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+            reference_lines, reference_infos = native_pdf_golden("_extract_page_paths_and_lines:195")
 
     monkeypatch.setattr(_object_bridge, "read_path_evidence", original_reader)
     assert native_lines == reference_lines
@@ -238,8 +216,7 @@ def test_native_open_filled_path_edges_match_reference(monkeypatch, path_command
         with document._open_page(0) as page:
             bbox = _normalize_pdf_page_bbox(page.get_bbox())
             native_lines, native_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
-            monkeypatch.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
-            reference_lines, reference_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+            reference_lines, reference_infos = native_pdf_golden("_extract_page_paths_and_lines:242")
 
     monkeypatch.setattr(_object_bridge, "read_path_evidence", original_reader)
     assert native_lines == reference_lines
@@ -247,11 +224,8 @@ def test_native_open_filled_path_edges_match_reference(monkeypatch, path_command
     assert len(native_lines) == expected_line_count
     with PDFDocument(_open_filled_path_pdf(path_commands)) as document:
         native_page = document.get_page_vector_geometry(0)
-    with monkeypatch.context() as reference:
-        reference.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
-        with PDFDocument(_open_filled_path_pdf(path_commands)) as document:
-            reference_page = document.get_page_vector_geometry(0)
-    assert native_page == reference_page
+    assert native_page.drawing_lines == tuple(reference_lines)
+    assert native_page.path_infos == tuple(reference_infos)
     if get_native() is not None and hasattr(get_native(), "read_pdfium_path_evidence"):
         assert backend_info()["pdfium_path_evidence_bridge_calls"] > calls_before
 
@@ -262,7 +236,6 @@ def test_native_path_failed_fill_color_keeps_unknown_rgba(monkeypatch) -> None:
 
     from docvortex._compute_backend import get_native
     from docvortex.analyzers.native.pdf.code_blocks import _path_has_visible_nonwhite_fill
-    from docvortex.document.pdf import _object_bridge
     from docvortex.document.pdf.native_coordinates import _normalize_pdf_page_bbox
 
     if get_native() is None:
@@ -276,9 +249,7 @@ def test_native_path_failed_fill_color_keeps_unknown_rgba(monkeypatch) -> None:
         with document._open_page(0) as page:
             bbox = _normalize_pdf_page_bbox(page.get_bbox())
             native_lines, native_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
-            with monkeypatch.context() as reference:
-                reference.setattr(_object_bridge, "read_path_evidence", lambda *args, **kwargs: None)
-                reference_lines, reference_infos = native_objects._extract_page_paths_and_lines(page, bbox, 0)
+            reference_lines, reference_infos = native_pdf_golden("_extract_page_paths_and_lines:281")
     assert native_lines == reference_lines
     assert native_infos == reference_infos
     assert len(native_infos) == 1 and native_infos[0].fill_rgba is None

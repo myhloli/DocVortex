@@ -212,15 +212,6 @@ class _RowOccupancy:
         if cacheable and tracks in self.cache:
             return self.cache[tracks]
         result = self.native.table_row_occupancy(self.rows, tracks)
-        if result is None:
-            result = []
-            for row in self.rows:
-                columns = set()
-                for center in row:
-                    col = next((i for i, (left, right) in enumerate(zip(tracks, tracks[1:])) if left <= center <= right), None)
-                    if col is not None:
-                        columns.add(col)
-                result.append(columns)
         result = tuple(frozenset(row) for row in result)
         if cacheable:
             self.cache[tracks] = result
@@ -237,18 +228,11 @@ def _row_glyph_occupancy(
 
     if occupancy is not None:
         return set(occupancy.columns(x_tracks)[occupancy.positions[id(row)]])
+    from ....._compute_backend import get_native
+
     glyph_by_id = {glyph.glyph_id: glyph for glyph in text.glyphs}
-    occupied: set[int] = set()
-    for glyph_id in row.glyph_ids:
-        glyph = glyph_by_id[glyph_id]
-        center = (glyph.bbox[0] + glyph.bbox[2]) / 2.0
-        col = next(
-            (index for index, (left, right) in enumerate(zip(x_tracks, x_tracks[1:])) if left <= center <= right),
-            None,
-        )
-        if col is not None:
-            occupied.add(col)
-    return occupied
+    centers = [(glyph_by_id[index].bbox[0] + glyph_by_id[index].bbox[2]) / 2.0 for index in row.glyph_ids]
+    return set(get_native().table_row_occupancy([centers], x_tracks)[0])
 
 
 def _track_support(
@@ -794,7 +778,7 @@ def build_sparse_hybrid_candidates(
     from ....._compute_backend import get_native
 
     native = get_native()
-    occupancy = _RowOccupancy(text, native) if native is not None else None
+    occupancy = _RowOccupancy(text, native)
     hypotheses = _build_track_hypotheses(
         table_input,
         text,

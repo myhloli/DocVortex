@@ -6,7 +6,6 @@ import random
 import pytest
 from reportlab.pdfgen.canvas import Canvas
 
-from docvortex._compute_backend import get_native
 from docvortex.document.pdf import PDFDocument
 from docvortex.analyzers.native.pdf.models import _AxisLine, _LineItem
 from docvortex.analyzers.native.pdf.inline import detection, owned_styles
@@ -15,8 +14,6 @@ from docvortex.analyzers.native.pdf.inline import detection, owned_styles
 @pytest.fixture(scope="module")
 def owned_page():
     """从真实 PDF 获得独立快照，全部测试均在文档关闭后消费字符与字体证据。"""
-    if get_native() is None:
-        pytest.skip("Python reference backend")
     output = BytesIO()
     canvas = Canvas(output, pagesize=(300, 300))
     for row, font in enumerate(["Helvetica", "Helvetica-Bold", "Times-Bold", "Courier", "Helvetica-Bold"]):
@@ -34,7 +31,7 @@ def owned_page():
 def test_glyph_font_groups_match_fresh_character_reference(owned_page, seed):
     """不同字号、重复和乱序成员、粗斜体与方向过滤保持字体键、计数和前三份样本顺序。"""
     from types import SimpleNamespace
-    from docvortex.analyzers.native.pdf.inline.glyph_weight import _glyph_font_groups_owned, _glyph_font_groups_python
+    from docvortex.analyzers.native.pdf.inline.glyph_weight import _glyph_font_groups_owned, _prepare_glyph_font_groups
 
     owner, chars, identities = owned_page
     geometry = SimpleNamespace(tight_bboxes={c["char_idx"]: c.get("tight_bbox") for c in chars})
@@ -47,7 +44,7 @@ def test_glyph_font_groups_match_fresh_character_reference(owned_page, seed):
     ]
     result = _glyph_font_groups_owned(lines, geometry, owner, identities)
     assert result is not None
-    expected = _glyph_font_groups_python(lines, geometry)
+    expected = _prepare_glyph_font_groups(lines, geometry)
     assert list(result[0].items()) == list(expected[0].items())
     assert list(result[1].items()) == list(expected[1].items())
 

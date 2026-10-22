@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from importlib.metadata import distribution
 from pathlib import Path
 import sys
 
@@ -13,6 +14,12 @@ def verify_release_package(pdf_path: Path, release_tag: str) -> None:
     """校验已安装 wheel 的版本、来源和真实 PDF 元数据解析能力。"""
     version = release_tag.removeprefix("v")
     assert docvortex.__version__ == version, (docvortex.__version__, version)
+    installed = distribution("docvortex")
+    assert installed.version == version
+    wheel_metadata = installed.read_text("WHEEL") or ""
+    tags = [line.removeprefix("Tag: ") for line in wheel_metadata.splitlines() if line.startswith("Tag: ")]
+    assert tags and all(tag.startswith("cp311-abi3-") for tag in tags), tags
+    assert "Root-Is-Purelib: false" in wheel_metadata, wheel_metadata
 
     package_path = Path(docvortex.__file__).resolve()
     environment_path = Path(sys.prefix).resolve()

@@ -29,15 +29,9 @@ def read_native_chars(textpage, extended, *, frame=None, rotation=0):
     """在同一 textpage 和锁内完成原始读取，特殊输入及非标准函数留给参考实现。"""
     global _CALLS, _EMPTY_PAGES, _UNAVAILABLE_REASON, _RECORD_BATCH_SIZE
     native = get_native()
-    if native is None:
-        _UNAVAILABLE_REASON = "python backend"
-        return None
-    if not hasattr(native, "read_pdfium_chars"):
-        _UNAVAILABLE_REASON = "batch reader unavailable; rebuild extension"
-        return None
     if type(textpage) is not pdfium.PdfTextPage or not textpage.raw or type(extended) is not bool:
         _UNAVAILABLE_REASON = "nonstandard or closed text page"
-        return None
+        raise RuntimeError(_UNAVAILABLE_REASON)
     # 零字符页没有需要借用的字符函数地址；在原锁内确认后直接返回空快照，
     # 单独计数，不能把未执行的 Rust FFI 调用记为桥接成功。
     with pdfium_guard():
@@ -64,7 +58,7 @@ def read_native_chars(textpage, extended, *, frame=None, rotation=0):
         getattr(raw.FS_RECTF, name).offset != offset for name, offset in (("left", 0), ("top", 4), ("right", 8), ("bottom", 12))
     ):
         _UNAVAILABLE_REASON = "FS_RECTF ABI mismatch"
-        return None
+        raise RuntimeError(_UNAVAILABLE_REASON)
     functions, addresses = [], []
     for name, result, arguments in specs:
         function = getattr(raw, name, None)
@@ -75,7 +69,7 @@ def read_native_chars(textpage, extended, *, frame=None, rotation=0):
             or getattr(function, "errcheck", None) is not None
         ):
             _UNAVAILABLE_REASON = f"unsupported symbol or ABI: {name}"
-            return None
+            raise RuntimeError(_UNAVAILABLE_REASON)
         functions.append(function)
         addresses.append(ct.cast(function, ct.c_void_p).value)
     # 本地列表在原生调用结束前保留函数强引用；textpage 参数保留页面及运行库的生命周期。
@@ -83,14 +77,14 @@ def read_native_chars(textpage, extended, *, frame=None, rotation=0):
         count = textpage.count_chars()
         if count < 0:
             _UNAVAILABLE_REASON = "negative character count"
-            return None
+            raise RuntimeError(_UNAVAILABLE_REASON)
         try:
             if frame is not None:
                 result = native.read_pdfium_visual_batches(
                     addresses, ct.cast(textpage.raw, ct.c_void_p).value, count, extended, frame, rotation
                 )
             else:
-                reader = getattr(native, "read_pdfium_char_batches", native.read_pdfium_chars)
+                reader = native.read_pdfium_char_batches
                 result = reader(addresses, ct.cast(textpage.raw, ct.c_void_p).value, count, extended)
         except native.PdfiumReadError as exc:
             raise pdfium.PdfiumError(str(exc)) from exc

@@ -149,10 +149,8 @@ fn prepare<'py>(
         if !sample.get_type().is(sample_type) {
             return Ok(None);
         }
-        // 重复的对象身份无法唯一表达成员索引，保留参考路径。
-        if positions.insert(sample.as_ptr() as usize, index).is_some() {
-            return Ok(None);
-        }
+        // 重复样本仍按输入顺序计入统计；行映射引用首个同身份样本即可保留相同几何。
+        positions.entry(sample.as_ptr() as usize).or_insert(index);
         let key = sample.getattr(attr_run_key)?;
         let identity = key.as_ptr() as usize;
         let run = if let Some((_, id)) = run_cache.get(&identity) {

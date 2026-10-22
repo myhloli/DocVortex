@@ -1,4 +1,4 @@
-"""选择进程内的私有计算后端，不改变公共 Python 类型或错误语义。"""
+"""惰性加载进程内必需的 Rust 扩展，不改变公共 Python 类型。"""
 
 from __future__ import annotations
 
@@ -10,31 +10,38 @@ from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-_PROTOCOL_VERSION = 35
-_SELECTED_MODE = None
-_LOAD_FAILURE = None
+_PROTOCOL_VERSION = 36
+_RETIRED_VARIABLES = ("DOCVORTEX_COMPUTE_BACKEND", "DOCVORTEX_BUILD_NATIVE")
+
+
+def get_native() -> ModuleType:
+    """拒绝已退役配置并返回必需扩展；缓存建立后也不能静默接受旧环境变量。"""
+    retired = [name for name in _RETIRED_VARIABLES if name in os.environ]
+    if retired:
+        raise RuntimeError(
+            f"Remove retired environment variable(s): {', '.join(retired)}. "
+            "DocVortex 0.6 requires its Rust native extension and no longer supports backend selection."
+        )
+    return _load_native()
 
 
 @lru_cache(maxsize=1)
-def get_native() -> ModuleType | None:
-    """默认 auto 优先 Rust，首次使用时固定后端；仅 auto 允许加载失败回退，计算异常直接传播。"""
-    global _SELECTED_MODE, _LOAD_FAILURE
-    mode = os.environ.get("DOCVORTEX_COMPUTE_BACKEND", "auto")
-    _SELECTED_MODE, _LOAD_FAILURE = mode, None
-    if mode not in {"auto", "python", "rust"}:
-        raise ValueError("DOCVORTEX_COMPUTE_BACKEND must be auto, python or rust")
-    if mode == "python":
-        return None
+def _load_native() -> ModuleType:
+    """只缓存成功加载的匹配扩展，安装及协议错误保留原始原因且不降级。"""
     try:
         native = importlib.import_module("docvortex._native")
         if getattr(native, "PROTOCOL_VERSION", None) != _PROTOCOL_VERSION:
             raise ImportError("DocVortex native protocol mismatch; rebuild the extension")
     except (ImportError, OSError) as exc:
-        _LOAD_FAILURE = f"{type(exc).__name__}: {exc}"
-        if mode == "rust":
-            raise RuntimeError("DOCVORTEX_COMPUTE_BACKEND=rust requires a compatible native extension") from exc
-        return None
+        raise RuntimeError(
+            "DocVortex 0.6 requires a compatible Rust native extension. "
+            "Reinstall the platform wheel or rebuild the extension for this checkout."
+        ) from exc
     return native
+
+
+# 私有测试和诊断工具沿用缓存清理入口，运行时不再缓存后端选择。
+get_native.cache_clear = _load_native.cache_clear
 
 
 def backend_info() -> dict[str, str | int | None]:
@@ -46,35 +53,30 @@ def backend_info() -> dict[str, str | int | None]:
     fonts = sys.modules.get("docvortex.document.pdf.font_runtime")
     snapshots = sys.modules.get("docvortex.document.pdf.snapshot_bridge")
     classification = sys.modules.get("docvortex.document.pdf.classification_bridge")
-    snapshot_stats = getattr(native, "text_snapshot_stats", None)
-    span_calls, span_unsupported, span_contents = snapshot_stats() if snapshot_stats is not None else (0, 0, 0)
-    image_stats = native.image_text_snapshot_stats() if native is not None else (0, 0)
+    span_calls, span_unsupported, span_contents = native.text_snapshot_stats()
+    image_stats = native.image_text_snapshot_stats()
     return {
-        "native_inline_style_batches": native.inline_style_stats() if native is not None else 0,
+        "native_inline_style_batches": native.inline_style_stats(),
         "native_span_content_calls": span_contents,
         **(
             classification.classification_bridge_info()
             if classification is not None
             else {"native_classification_unavailable_reason": "not probed"}
         ),
-        "native_classification_snapshot_calls": native.classification_snapshot_stats() if native is not None else 0,
+        "native_classification_snapshot_calls": native.classification_snapshot_stats(),
         "native_image_text_snapshot_calls": image_stats[0],
         "native_image_text_pixel_queries": image_stats[1],
-        "native_script_snapshot_batches": native.script_snapshot_stats() if native is not None else 0,
+        "native_script_snapshot_batches": native.script_snapshot_stats(),
         "native_span_assignment_calls": span_calls,
         "native_table_script_cell_batches": table_scripts.table_script_stats()
         if (table_scripts := sys.modules.get("docvortex.analyzers.native.pdf.table_text_styles")) is not None
         else (0, 0, 0),
-        "native_geometry_evidence_stats": native.geometry_evidence_stats()
-        if native is not None and hasattr(native, "geometry_evidence_stats")
-        else (0, 0, 0),
+        "native_geometry_evidence_stats": native.geometry_evidence_stats(),
         "native_span_assignment_unsupported": span_unsupported,
-        "backend": "rust" if native is not None else "python",
+        "backend": "rust",
         "protocol": getattr(native, "PROTOCOL_VERSION", None),
         "extension": path,
         "extension_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest() if path else None,
-        "requested_backend": _SELECTED_MODE,
-        "unavailable_reason": _LOAD_FAILURE,
         **(
             snapshots.snapshot_bridge_info()
             if snapshots is not None
