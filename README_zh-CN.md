@@ -50,8 +50,14 @@ DocVortex 不下载模型，也不执行 PDF OCR。遇到需要 OCR 的文档时
 
 ## 快速开始
 
-需要 **Python 3.11–3.14** 和 **ONNX Runtime 1.24.4 或更新版本**（Windows x64 使用 DirectML）。
+需要 **启用 GIL 的 CPython 3.11–3.14**、**pypdfium2 >=5.13.0,<6** 和 **ONNX Runtime 1.24.4 或更新版本**（Windows x64 使用 DirectML）。
 macOS 安装需要 **Apple Silicon 和 macOS 14 或更新版本**；从 0.6.0 起不再支持 Intel Mac。
+
+0.6 保留 Python SDK 和 CLI，运行时必须使用随包提供的 Rust native 扩展。
+发行物仅包含 Linux x86_64/aarch64（glibc 2.28+）、Windows x86_64/ARM64 和 macOS arm64 的 ABI3 wheel，
+不再发布纯 Python 兼容 wheel 或 sdist；不支持 PyPy 和 free-threaded Python。
+构建或运行前请移除 `DOCVORTEX_BUILD_NATIVE`、`DOCVORTEX_COMPUTE_BACKEND` 环境变量，任何值都会报错。
+需要旧平台或兼容包的用户可在迁移期间固定使用 `docvortex<0.6`。
 
 ### 安装
 
@@ -161,11 +167,13 @@ restored.export("output/report.epub", output_format="epub")
 | [JSON 协议](https://github.com/myhloli/DocVortex/blob/main/docs/JSON_PROTOCOL.md) | 文档结构、扩展字段与协议迁移 |
 | [HTML 协议](https://github.com/myhloli/DocVortex/blob/main/docs/HTML_PROTOCOL.md) | 语义标记与往返转换 |
 | [公共 SDK 与迁移](https://github.com/myhloli/DocVortex/blob/main/docs/sdk-0.4.md) | 公开集成边界与 0.4 升级说明 |
+| [0.6 原生后端迁移](docs/native-only-0.6.md) | 安装边界、旧配置退役与本地验收记录 |
 | [渲染职责](https://github.com/myhloli/DocVortex/blob/main/docs/RENDER_OWNERSHIP.md) | DocVortex 导出与 MinerU 专属渲染器 |
 
 ## 开发
 
-请先阅读[仓库架构](docs/ARCHITECTURE.md)，了解目录职责、Python/Rust 边界，以及纯 Python 和原生扩展的开发与验证命令。
+请先阅读[仓库架构](docs/ARCHITECTURE.md)，了解目录职责、Python/Rust 边界及原生扩展的开发与验证命令。
+源码构建需要 `rust-toolchain.toml` 指定的 Rust 工具链和平台 C/C++ 链接器。
 
 在本地仓库目录中运行：
 
@@ -175,7 +183,7 @@ uv pip install -e ".[test,dev]"
 uv run --no-project python -m pytest -q
 uv run --no-project ruff check src
 uv run --no-project ruff format --check src
-uv build
+uv build --wheel
 ```
 
 欢迎反馈问题和贡献代码。报告解析问题时，请在

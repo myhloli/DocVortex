@@ -1,7 +1,7 @@
-# Optional Rust PDF kernels
+# Required Rust native backend
 
 See [Repository architecture](ARCHITECTURE.md) for the Python/Rust ownership boundary
-and binding-module layout. The current private extension protocol is **11**, shared by
+and binding-module layout. The current private extension protocol is **36**, shared by
 the Python loader and Rust core. Protocol 4, 5, 6, 7 and 8 references below describe historical
 interfaces or rollout stages, not the current loader requirement. Rebuild editable
 native installs and restart existing processes after updating native sources.
@@ -11,32 +11,23 @@ The private `docvortex._native` extension accelerates batches of already materia
 numbers and indices. It does not bundle or call a second PDFium library and does not
 create a thread pool. The existing PDFium lock and handle lifetimes are unchanged.
 
-## Runtime selection
+## Runtime contract
 
-Set `DOCVORTEX_COMPUTE_BACKEND` before the first PDF computation in a process:
+DocVortex 0.6 always loads its compatible Rust extension. The Python SDK, CLI,
+public document types and document orchestration remain available. The former
+Python compute backend, runtime selection and silent extension fallback are removed.
+Unset `DOCVORTEX_COMPUTE_BACKEND` and `DOCVORTEX_BUILD_NATIVE` completely; every value,
+including `rust`, `1`, `auto` and the empty string, raises an actionable error.
+Missing, unloadable or incompatible extensions fail instead of parsing through a
+second implementation. Rebuild editable extensions after native changes and restart
+existing processes.
 
-| Value | Behavior |
-| --- | --- |
-| `auto` (default) | Load a compatible native extension when available; otherwise use Python. |
-| `python` | Use the Python reference kernels without importing the extension. |
-| `rust` | Require the extension and its matching private protocol; missing or incompatible binaries raise an error. |
-
-Selection is cached for the process. Restart the process after changing the variable
-or rebuilding an editable extension. Computation errors are never silently retried
-in Python. The few explicit algorithmic reference paths preserve extreme coordinates,
-unusual Python inputs, and script-reference ties whose choice depends on Python set
-iteration. These paths do not weaken any parsing decision or output comparison.
-
-Python owns Unicode classification, normalization, font equality, version-dependent
-rounding, HTML generation and public object construction. Stable table-column means
-use an incremental accumulator matching the running CPython version's float-only
-`sum`: sequential for 3.11 and compensated for 3.12–3.14. Integer/mixed/custom
-inputs, other runtimes and intermediate overflow retain Python computation. Rust owns
-numeric batches and returns source ranges or indices. Canonical geometry reuses
-unchanged Python float objects and zero-rotation tuples to bound retained memory. Original `Char` references and
-copy-on-merge source-index behavior are retained. Process-wide caches contain only
-immutable Unicode features. Geometry, font and table preparation caches retain input
-references only for the active analysis or candidate build, and never retain native handles.
+Python owns Unicode preparation, normalization, HTML generation and public object
+construction. Rust owns native computations and returns source ranges or indices.
+Canonical geometry reuses unchanged Python float objects and zero-rotation tuples.
+Original character references and copy-on-merge source indices remain part of the
+contract. Process-wide caches contain only immutable features; document preparation
+caches do not retain native handles beyond their active operation.
 
 ## Kernels
 
@@ -51,8 +42,8 @@ references only for the active analysis or candidate build, and never retain nat
 - Character extraction: the private bridge borrows function pointers from the active
   pypdfium2 instance and reads characters in one synchronous call under the original
   lock and GIL. It owns no PDFium handles or callbacks and loads no second library.
-  Unsupported ctypes ABI/inputs use the reference reader with a recorded reason;
-  errors after entering the bridge propagate. Coordinate conversion can then release
+  Unsupported ctypes ABI/inputs fail with a diagnostic; errors after entering the
+  bridge propagate. Coordinate conversion can then release
   the GIL. Raw numerical records stay within the call; Python records and coordinate
   results are materialized in batches of at most 1,024. Font sharing, object/source IDs
   and writing-direction assignment retain whole-page scope. The original protocol-4
@@ -77,43 +68,59 @@ references only for the active analysis or candidate build, and never retain nat
 
 ## Development and distribution
 
-The Cargo workspace contains a Python-independent core crate and a PyO3 binding crate.
-`rust-toolchain.toml` pins the compiler; `Cargo.lock` pins dependencies. Build release
-kernels even for editable performance testing:
+`rust-toolchain.toml` pins the compiler and `Cargo.lock` pins dependencies. Install the
+platform's C/C++ linker and build the required release extension even for editable work:
 
 ```sh
-DOCVORTEX_BUILD_NATIVE=1 python -m pip install -e .
-DOCVORTEX_COMPUTE_BACKEND=rust python -m pytest tests/test_native_parity.py
+python -m pip install -e ".[test,dev]"
+python -m pytest tests/test_native_parity.py
 cargo test -p docvortex-core --locked
 cargo clippy --workspace --all-targets -- -D warnings
+uv build --wheel
 ```
 
-`DOCVORTEX_BUILD_NATIVE=0` builds a pure Python wheel. `auto` builds native code when
-Cargo is available and otherwise builds pure Python. If a compiler is available but
-compilation fails, installation fails visibly instead of publishing a broken binary.
-Official binary builds always set `DOCVORTEX_BUILD_NATIVE=1`.
+Source checkout builds always require Rust. Missing compilers and build failures
+stop installation. No build option produces a pure Python compatibility package.
+Official releases publish exactly five `cp311-abi3` wheels and no sdist:
 
-GIL-enabled CPython 3.11–3.14 uses `cp311-abi3` wheels for Linux x86_64/aarch64,
-Windows x86_64/ARM64 and macOS arm64. Linux binary builds target manylinux_2_28;
-older glibc systems can use the pure Python wheel. Other interpreters can build the
-pure package; this does not extend compatibility guarantees of its dependencies.
-Free-threaded native wheels are not part of this change.
+| Platform | Native wheel target |
+| --- | --- |
+| Linux x86_64 | manylinux_2_28_x86_64 |
+| Linux aarch64 | manylinux_2_28_aarch64 |
+| Windows x86_64 | win_amd64 |
+| Windows ARM64 | win_arm64 |
+| macOS Apple Silicon | macosx_14_0_arm64 |
 
-The native wheel workflow tests installed artifacts against Python output and exercises
-real parsing, both on Python 3.11 and 3.14. The regular CI matrix exercises Python and
-Rust backends on Python 3.11 and 3.14 with ONNX Runtime 1.24.4. The release workflow retains the main-CI/tag gate,
-then builds/tests every artifact before publishing all platform wheels, the pure wheel
-and the source distribution. A local build is not evidence that remote matrix jobs passed.
-Performance comparisons run locally. CI retains cross-platform builds, ABI checks,
-installed-wheel parsing and Python/Rust correctness tests, without full-corpus timing
-or benchmark artifact uploads. Workflow-only changes do not require another local
-performance run when production source and extension fingerprints are unchanged.
+The supported interpreter is GIL-enabled CPython 3.11–3.14. PyPy, free-threaded
+Python, 32-bit systems, musl Linux and Intel macOS are outside this wheel matrix.
+The required runtime stack includes pypdfium2 >=5.13.0,<6 and ONNX Runtime >=1.24.4;
+Windows x64 selects DirectML, while the other supported platforms use the standard
+ONNX Runtime package. macOS requires Apple Silicon and macOS 14 or newer.
 
-Since 0.6.0, both ONNX Runtime distributions require version 1.24.4 or newer;
-Windows x64 selects DirectML and other supported platforms select the standard package.
-ONNX Runtime no longer provides Intel macOS wheels at this minimum version, so
-DocVortex no longer supports Intel macOS installation or publishes native wheels
-for that platform. macOS installation requires Apple Silicon and macOS 14 or newer.
+The main CI tests native execution on Linux, Windows and macOS with Python 3.11/3.14.
+The five-platform wheel workflow checks the installed artifact on both Python
+endpoints, native ABI, real PDFs and a generated dense table with all 840 expected
+cells. Windows ARM64 uses the actual ARM64 interpreter and verifies the PE architecture.
+The release workflow retains the main-CI/tag gate and verifies every artifact's
+version, ABI3 platform tag, extension payload and metadata before publishing.
+A local build does not establish that remote matrix jobs passed.
+
+Installed-wheel checks run outside the checkout with `PYTHONPATH` removed. They verify
+package/extension provenance, SDK/CLI/producer versions, native bridge calls, nonempty
+outputs, and fixed document semantics. An explicit full JSON baseline can additionally
+check complete model/middle output, Markdown, diagnostics and asset hashes:
+
+```sh
+python tools/verify_native_wheel.py demo/pdfs/demo2.pdf --output output/wheel-demo2.json
+python tools/generate_dense_pdf.py output/dense-table.pdf
+python tools/verify_native_wheel.py output/dense-table.pdf --expectation dense-table
+python tools/verify_native_wheel.py sample.pdf --baseline accepted-sample.json
+```
+
+Unknown inputs require `--baseline` or a JSON `--expectations` file specifying
+`page_count`, `required_text` and optional `min_tables`/`min_assets` counts. Fixed demo
+expectations are tied to the input SHA256. This is a semantic smoke gate, not a substitute
+for the full revision regression corpus.
 
 ## Benchmarks and regression gates
 
@@ -122,14 +129,11 @@ Every output directory must be new. Run CPU benchmarks without concurrent tests/
 The independent process-tree memory auditor additionally requires `psutil`.
 
 ```sh
-python tests/benchmarks/flash_pdf.py --backend python --runs 5 --profile --output output/rust/reference
-python tests/benchmarks/flash_pdf.py --backend rust --runs 5 --profile --output output/rust/native --baseline output/rust/reference
-python tests/benchmarks/native_pdf_table.py --backend python --runs 5 --output output/rust/table-python
-python tests/benchmarks/native_pdf_table.py --backend rust --runs 5 --output output/rust/table-rust --baseline output/rust/table-python
-python tests/benchmarks/rust_pdf.py --backend python --suite public --output output/rust/public-python
-python tests/benchmarks/rust_pdf.py --backend rust --suite public --output output/rust/public-rust --baseline output/rust/public-python
-python tests/benchmarks/rust_pdf.py --backend python --suite shared --flash-baseline output/rust/reference --output output/rust/shared-python
-python tests/benchmarks/rust_pdf.py --backend rust --suite shared --flash-baseline output/rust/reference --output output/rust/shared-rust --baseline output/rust/shared-python
+python tests/benchmarks/flash_pdf.py --runs 5 --profile --output output/rust/native
+python tests/benchmarks/native_pdf_table.py --runs 5 --output output/rust/table-native
+python tests/benchmarks/rust_pdf.py --suite public --output output/rust/public-native
+python tests/benchmarks/rust_pdf.py --suite shared --flash-baseline output/rust/native --output output/rust/shared-native
+python tests/benchmarks/compare_pdf_revisions.py --reference-source OLD_CHECKOUT --output output/rust/revisions
 ```
 
 The public/shared benchmark defaults to `--corpus all`: the layout manifest, recursively
@@ -154,9 +158,7 @@ record any remaining performance gap explicitly.
 Optional host replay lives outside the independent engine test tree:
 
 ```sh
-python tools/mineru_native_replay.py --mineru-source ../Magic-PDF --backend python --flash-baseline output/rust/reference --output output/rust/host-python
-python tools/mineru_native_replay.py --mineru-source ../Magic-PDF --backend rust --flash-baseline output/rust/reference --output output/rust/host-rust --baseline output/rust/host-python
-python tests/benchmarks/compare_native_corpus.py --runs 5 --output output/rust/corpus
+python tools/mineru_native_replay.py --mineru-source ../Magic-PDF --flash-baseline output/rust/native --output output/rust/host-native
 ```
 
 Host replay compares actual medium/high native stages with frozen model inputs and
@@ -170,6 +172,12 @@ The frozen third-round source reproduces the unadapted mock failures too. Real w
 behavior is checked separately with engine tests and complete PDF/asset comparisons;
 the plugin does not change MinerU application code or production dispatch.
 
+
+## Historical migration notes (0.5 and earlier)
+
+The following records describe earlier rollout stages and their then-current reference
+paths. Their protocol numbers, backend switches and commands are historical evidence,
+not configuration instructions for 0.6. Use the current commands above for new runs.
 
 Fourth-round kernels require private protocol 5. Rebuild editable native installs after
 updating Python sources; an older extension is rejected by forced Rust selection.

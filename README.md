@@ -50,8 +50,15 @@ Same-machine warm-run comparison on 32 PDFs / 299 pages (31 PDFs for Flash). The
 
 ## Quick start
 
-Requires **Python 3.11–3.14** and **ONNX Runtime 1.24.4 or newer** (DirectML on Windows x64).
+Requires **GIL-enabled CPython 3.11–3.14**, **pypdfium2 5.13.0 or newer**, and **ONNX Runtime 1.24.4 or newer** (DirectML on Windows x64).
 On macOS, installation requires **Apple Silicon and macOS 14 or newer**; Intel Macs are no longer supported as of 0.6.0.
+
+Version 0.6 keeps the Python SDK and CLI and requires its bundled Rust native extension.
+Releases contain ABI3 wheels for Linux x86_64/aarch64 (glibc 2.28+), Windows x86_64/ARM64,
+and macOS arm64. Pure Python wheels and source distributions are no longer published.
+PyPy and free-threaded Python are not supported. Unset the removed
+`DOCVORTEX_BUILD_NATIVE` and `DOCVORTEX_COMPUTE_BACKEND` variables before building or running;
+any value is an error. Existing 0.5 installations can stay on `docvortex<0.6` while migrating.
 
 ### Install
 
@@ -167,7 +174,8 @@ reads metadata without parsing the document body.
 ## Development
 
 See [Repository architecture](docs/ARCHITECTURE.md) for directory responsibilities,
-the Python/Rust boundary, and pure Python or native development commands.
+the Python/Rust boundary, and native development commands. Source builds require the
+Rust toolchain pinned in `rust-toolchain.toml` and the platform's C/C++ linker.
 
 From a local checkout:
 
@@ -177,7 +185,7 @@ uv pip install -e ".[test,dev]"
 uv run --no-project python -m pytest -q
 uv run --no-project ruff check src
 uv run --no-project ruff format --check src
-uv build
+uv build --wheel
 ```
 
 Bug reports and contributions are welcome. When reporting a parsing issue,

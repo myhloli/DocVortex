@@ -1,6 +1,6 @@
 # Windows ARM64 原生扩展
 
-DocVortex 的 Windows ARM64 native wheel 面向普通 GIL 版 CPython 3.11–3.14；从 0.6.0 起所有支持平台的 Python 下限统一为 3.11，公共 API 不变。
+DocVortex 的 Windows ARM64 native wheel 面向普通 GIL 版 CPython 3.11–3.14；从 0.6.0 起所有支持平台的 Python 下限统一为 3.11，公共 SDK 和 CLI 保留，Rust 扩展为必需依赖，不再发布纯 Python 兼容 wheel 或 sdist。旧 `DOCVORTEX_BUILD_NATIVE` 和 `DOCVORTEX_COMPUTE_BACKEND` 环境变量必须移除。
 
 ## 构建与安装
 
@@ -18,7 +18,7 @@ Windows ARM64 依赖普通 `reportlab`，使用其 Python 实现；其他平台�
 
 主 CI 独立检查同一 ARM64 wheel 在 Python 3.11、3.14 上的 ABI。工具核验真实 ARM64 解释器、64 位指针、wheel 标签、PE 指令集 `0xAA64` 和实际安装来源。
 
-Native wheels 工作流还以同一个发行物建立四个干净环境，覆盖 Python 3.11/3.14 与 PDFium 5.10.1/5.13.0 的组合；执行 `pip check`、原生加载、真实 PDF 与密集表格的 Python/Rust 输出一致性、PDFium 桥接及无 rl_accel 的 PDF 导出检查。安装校验允许 pyclipper，要求环境不包含 rl-accel，且 reportlab 使用 Python 实现。
+Native wheels 工作流还以同一个发行物建立两个干净环境，覆盖 Python 3.11/3.14 和 PDFium 5.13.0；执行 `pip check`、原生加载、真实 PDF 的固定语义预期、密集表格全部 840 个单元格、PDFium 桥接及无 rl_accel 的 PDF 导出检查。安装校验允许 pyclipper，要求环境不包含 rl-accel，且 reportlab 使用 Python 实现。
 
 ## 验证边界
 
