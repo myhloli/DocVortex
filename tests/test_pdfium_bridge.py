@@ -1,6 +1,7 @@
 """核对同库 PDFium 批量读取与 ctypes 参考的原始字符和生命周期。"""
 
 from _native_pdf_golden import native_pdf_golden
+from _stable_pdf_fonts import stable_font_pdf
 
 from io import BytesIO
 from contextlib import closing
@@ -53,7 +54,7 @@ def sample_pdf(rotation):
     canvas.showPage()
     canvas.showPage()
     canvas.save()
-    return stream.getvalue()
+    return stable_font_pdf(stream.getvalue())
 
 
 @pytest.mark.parametrize("rotation", (0, 90, 180, 270))
@@ -77,7 +78,7 @@ def test_raw_character_bridge_parity(native, rotation, extended):
 def test_real_font_and_geometry_bridge_parity(native, name):
     """真实中文字体与数学字符在解码、代理对恢复和去重前已经完全相同。"""
     path = Path(__file__).parents[1] / "demo/pdfs" / f"{name}.pdf"
-    with pdfium_guard(), pdfium.PdfDocument(path) as document:
+    with pdfium_guard(), pdfium.PdfDocument(stable_font_pdf(path)) as document:
         with closing(document[0]) as page, closing(page.get_textpage()) as textpage:
             box = list(page.get_bbox())
             expected = native_pdf_golden("_get_chars_python:85")
@@ -130,7 +131,7 @@ def test_batched_records_preserve_boundary_indices_and_legacy_reader(native, mon
     monkeypatch.setattr(
         bridge.raw, "FPDFText_GetUnicode", factory(unicode_reader.restype, *unicode_reader.argtypes)(unicode_value)
     )
-    with pdfium_guard(), pdfium.PdfDocument(stream.getvalue()) as document:
+    with pdfium_guard(), pdfium.PdfDocument(stable_font_pdf(stream.getvalue())) as document:
         with closing(document[0]) as page, closing(page.get_textpage()) as textpage:
             assert textpage.count_chars() > 1024
             box = list(page.get_bbox())

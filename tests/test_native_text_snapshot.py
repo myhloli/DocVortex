@@ -1,6 +1,7 @@
 """Rust 自有 canonical 快照的真实读取、生命周期和完整语义差分。"""
 
 from _native_pdf_golden import native_pdf_golden
+from _stable_pdf_fonts import stable_font_pdf
 
 from contextlib import closing
 from dataclasses import fields, is_dataclass
@@ -62,7 +63,7 @@ def _pdf(rotation=0, long=False):
     canvas.showPage()
     canvas.showPage()
     canvas.save()
-    return output.getvalue()
+    return stable_font_pdf(output.getvalue())
 
 
 def _plain(value):

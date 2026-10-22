@@ -1,6 +1,7 @@
 """图上字符与差分像素批量路径的独立 Python 参考及原生所有权验收。"""
 
 from _native_pdf_golden import native_pdf_golden
+from _stable_pdf_fonts import stable_font_pdf
 
 from contextlib import closing
 import ctypes as ct
@@ -32,7 +33,10 @@ def native():
 @pytest.mark.parametrize("nested", [False, True])
 def test_batch_candidates_and_pixels_match_reference(native, rotation, kind, nested):
     """真实旋转、Form 和裁剪下候选顺序、可见性及像素计数都与独立参考相同。"""
-    with pdfium.PdfDocument(image_text_pdf(kind, rotation=rotation, nested=nested)) as doc, closing(doc[0]) as page:
+    with (
+        pdfium.PdfDocument(stable_font_pdf(image_text_pdf(kind, rotation=rotation, nested=nested))) as doc,
+        closing(doc[0]) as page,
+    ):
         frame, angle = page.get_bbox(), page.get_rotation()
         width, height = _drawing_page_size(frame, angle)
         images = [

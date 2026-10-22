@@ -6,13 +6,14 @@ use std::ffi::{c_char, c_int, c_ulong, c_void, CStr};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::Arc;
 
+// PDFium 字体接口字段使用 C 调用约定，导出的库函数单独保留 system ABI。
 #[repr(C)]
 pub struct FontInfo {
     version: c_int,
-    release: Option<unsafe extern "system" fn(*mut FontInfo)>,
-    enum_fonts: Option<unsafe extern "system" fn(*mut FontInfo, *mut c_void)>,
+    release: Option<unsafe extern "C" fn(*mut FontInfo)>,
+    enum_fonts: Option<unsafe extern "C" fn(*mut FontInfo, *mut c_void)>,
     map_font: Option<
-        unsafe extern "system" fn(
+        unsafe extern "C" fn(
             *mut FontInfo,
             c_int,
             c_int,
@@ -22,15 +23,13 @@ pub struct FontInfo {
             *mut c_int,
         ) -> *mut c_void,
     >,
-    get_font: Option<unsafe extern "system" fn(*mut FontInfo, *const c_char) -> *mut c_void>,
-    get_data: Option<
-        unsafe extern "system" fn(*mut FontInfo, *mut c_void, u32, *mut u8, c_ulong) -> c_ulong,
-    >,
-    get_name: Option<
-        unsafe extern "system" fn(*mut FontInfo, *mut c_void, *mut c_char, c_ulong) -> c_ulong,
-    >,
-    get_charset: Option<unsafe extern "system" fn(*mut FontInfo, *mut c_void) -> c_int>,
-    delete_font: Option<unsafe extern "system" fn(*mut FontInfo, *mut c_void)>,
+    get_font: Option<unsafe extern "C" fn(*mut FontInfo, *const c_char) -> *mut c_void>,
+    get_data:
+        Option<unsafe extern "C" fn(*mut FontInfo, *mut c_void, u32, *mut u8, c_ulong) -> c_ulong>,
+    get_name:
+        Option<unsafe extern "C" fn(*mut FontInfo, *mut c_void, *mut c_char, c_ulong) -> c_ulong>,
+    get_charset: Option<unsafe extern "C" fn(*mut FontInfo, *mut c_void) -> c_int>,
+    delete_font: Option<unsafe extern "C" fn(*mut FontInfo, *mut c_void)>,
 }
 #[derive(Clone, Copy)]
 enum Handle {
@@ -51,7 +50,7 @@ pub struct FontProvider {
     cache_name: Vec<u8>,
     aliases: HashMap<String, i32>,
     suffixes: Vec<String>,
-    classify_legacy: unsafe extern "system" fn(*const u8, usize, i32) -> i32,
+    classify_legacy: unsafe extern "C" fn(*const u8, usize, i32) -> i32,
     handles: RefCell<HashMap<usize, Handle>>,
     requests: RefCell<HashMap<Vec<u8>, i32>>,
     next: Cell<usize>,
@@ -120,7 +119,7 @@ impl FontProvider {
             aliases,
             suffixes,
             classify_legacy: unsafe {
-                std::mem::transmute::<usize, unsafe extern "system" fn(*const u8, usize, i32) -> i32>(
+                std::mem::transmute::<usize, unsafe extern "C" fn(*const u8, usize, i32) -> i32>(
                     classify_legacy,
                 )
             },
@@ -303,7 +302,7 @@ unsafe fn face_bytes<'a>(face: *const c_char) -> &'a [u8] {
     }
 }
 /// 释放默认提供器后归还安装时增加的强引用，最后一步才可能销毁对象。
-unsafe extern "system" fn release(info: *mut FontInfo) {
+unsafe extern "C" fn release(info: *mut FontInfo) {
     let p = unsafe { &*(info as *const FontProvider) };
     let was_installed = {
         let _guard = p.lock.lock();
@@ -320,7 +319,7 @@ unsafe extern "system" fn release(info: *mut FontInfo) {
     }
 }
 /// 枚举期间禁止替换原字体元数据，并允许默认提供器重入其它回调。
-unsafe extern "system" fn enumerate(info: *mut FontInfo, mapper: *mut c_void) {
+unsafe extern "C" fn enumerate(info: *mut FontInfo, mapper: *mut c_void) {
     unsafe {
         guarded(info, (), "_enum_fonts", |p| {
             let default = p.default.get();
@@ -336,7 +335,7 @@ unsafe extern "system" fn enumerate(info: *mut FontInfo, mapper: *mut c_void) {
     }
 }
 /// 按请求记录字符集；系统代理保留原权重、斜体、pitch 与 exact 指针。
-unsafe extern "system" fn map_font(
+unsafe extern "C" fn map_font(
     info: *mut FontInfo,
     weight: i32,
     italic: i32,
@@ -369,7 +368,7 @@ unsafe extern "system" fn map_font(
     }
 }
 /// 名称查询复用最近请求的字符集，保留稳定字库缓存身份。
-unsafe extern "system" fn get_font(info: *mut FontInfo, face: *const c_char) -> *mut c_void {
+unsafe extern "C" fn get_font(info: *mut FontInfo, face: *const c_char) -> *mut c_void {
     unsafe {
         guarded(info, std::ptr::null_mut(), "_get_font", |p| {
             let name = face_bytes(face);
@@ -397,7 +396,7 @@ unsafe extern "system" fn get_font(info: *mut FontInfo, face: *const c_char) -> 
     }
 }
 /// 返回所需字节数，小缓冲区完全不写入；固定字库直接复制原切片。
-unsafe extern "system" fn get_data(
+unsafe extern "C" fn get_data(
     info: *mut FontInfo,
     handle: *mut c_void,
     table: u32,
@@ -434,7 +433,7 @@ unsafe extern "system" fn get_data(
     }
 }
 /// 固定字库使用带哈希名称，系统句柄则返回原始提供器名称。
-unsafe extern "system" fn get_name(
+unsafe extern "C" fn get_name(
     info: *mut FontInfo,
     handle: *mut c_void,
     buffer: *mut c_char,
@@ -460,7 +459,7 @@ unsafe extern "system" fn get_name(
     }
 }
 /// 保持每个固定句柄的请求字符集及系统接口缺省值。
-unsafe extern "system" fn get_charset(info: *mut FontInfo, handle: *mut c_void) -> i32 {
+unsafe extern "C" fn get_charset(info: *mut FontInfo, handle: *mut c_void) -> i32 {
     unsafe {
         guarded(info, 1, "_get_font_charset", |p| match p.lookup(handle) {
             Handle::Bundled(value) => value,
@@ -474,7 +473,7 @@ unsafe extern "system" fn get_charset(info: *mut FontInfo, handle: *mut c_void) 
     }
 }
 /// 先移除自有 ID，再释放系统句柄，避免重入或重复释放同一资源。
-unsafe extern "system" fn delete_font(info: *mut FontInfo, handle: *mut c_void) {
+unsafe extern "C" fn delete_font(info: *mut FontInfo, handle: *mut c_void) {
     unsafe {
         guarded(info, (), "_delete_font", |p| {
             let value = p

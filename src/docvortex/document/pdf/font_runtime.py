@@ -202,7 +202,9 @@ def _native_font_bridge(raw: Any) -> Any:
         ("GetFontCharset", integer, (pointer, void)),
         ("DeleteFont", None, (pointer, void)),
     )
-    callback_type = ctypes.WINFUNCTYPE if os.name == "nt" else ctypes.CFUNCTYPE
+    # FPDF_SYSFONTINFO 字段是普通 C 回调；只有导出的 FPDF_* 函数使用 FPDF_CALLCONV。
+    callback_type = ctypes.CFUNCTYPE
+    function_type = ctypes.WINFUNCTYPE if os.name == "nt" else ctypes.CFUNCTYPE
     fields = dict(raw.FPDF_SYSFONTINFO._fields_)
     alignment = ctypes.alignment(void)
     start = (ctypes.sizeof(integer) + alignment - 1) // alignment * alignment
@@ -237,7 +239,7 @@ def _native_font_bridge(raw: Any) -> Any:
             or getattr(function, "errcheck", None) is not None
         ):
             return _font_bridge_unavailable(f"{name} unsupported function signature or wrapper")
-        if function._flags_ != callback_type(result, *arguments)._flags_:
+        if function._flags_ != function_type(result, *arguments)._flags_:
             return _font_bridge_unavailable(f"{name} calling convention mismatch")
         functions.append(function)
     _NATIVE_FONT_UNAVAILABLE_REASON = None

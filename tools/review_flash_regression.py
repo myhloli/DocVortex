@@ -70,13 +70,15 @@ def main() -> None:
     """隔离导入指定 checkout，保存完整历史输出和变化页清单。"""
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--source-root", type=Path, help="显式从指定 checkout 导入；默认验证已安装的发行包")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--compare-to", type=Path)
     parser.add_argument("--documents", nargs="*")
     args = parser.parse_args()
-    root = args.source_root.resolve()
-    sys.path[:0] = [str(root / "src"), str(root / "tests"), str(root / "tests/unittest")]
+    root = (args.source_root or Path(__file__).resolve().parents[1]).resolve()
+    sys.path[:0] = [str(root / "tests"), str(root / "tests/unittest")]
+    if args.source_root is not None:
+        sys.path.insert(0, str(root / "src"))
     from loguru import logger
     from _flash_pdf_test_utils import _page_bbox_fingerprint, _page_fingerprint, _visible_text, formula_detection_evidence
     from test_flash_pdf_char_geometry import _read_pdf_fixture
@@ -89,9 +91,13 @@ def main() -> None:
     manifest = json.loads((root / "tests/fixtures/flash_layout_geometry_manifest.json").read_text(encoding="utf-8"))
     environment = _capture_environment(root)
     summaries = []
+    import docvortex
+
+    package = Path(docvortex.__file__).resolve().parent
+    environment["source_package"] = str(package)
     source_hash = hashlib.sha256()
-    for path in sorted((root / "src").rglob("*.py")):
-        source_hash.update(str(path.relative_to(root)).encode())
+    for path in sorted(package.rglob("*.py")):
+        source_hash.update(("src/docvortex/" + path.relative_to(package).as_posix()).encode())
         source_hash.update(path.read_bytes())
     for document in manifest["documents"]:
         name = Path(document["path"]).name.removesuffix(".xor").removesuffix(".pdf")

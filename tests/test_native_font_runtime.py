@@ -8,6 +8,21 @@ import sys
 from docvortex._compute_backend import get_native
 
 
+def test_native_font_callbacks_use_c_abi_on_every_platform() -> None:
+    """Windows 也必须接受 C 字体回调，并分别校验带 FPDF_CALLCONV 的库入口。"""
+    import ctypes
+    import pypdfium2.raw as raw
+    from docvortex.document.pdf.font_runtime import _native_font_bridge
+
+    native, functions, callback_type = _native_font_bridge(raw)
+    assert native is get_native()
+    assert len(functions) == 3
+    assert callback_type is ctypes.CFUNCTYPE
+    for name, field in raw.FPDF_SYSFONTINFO._fields_:
+        if name != "version":
+            assert field._flags_ == ctypes.CFUNCTYPE(field._restype_, *field._argtypes_)._flags_
+
+
 def _run_native_font_check(source: str) -> None:
     """仅在兼容原生扩展可用时启动独立解释器执行字体生命周期场景。"""
     get_native()
@@ -135,7 +150,7 @@ default = raw.FPDF_SYSFONTINFO(version=1, **callbacks)
 get_default = factory(c.c_void_p)(lambda: c.addressof(default))
 free_default = factory(None, ptr)(lambda value: freed.append(c.addressof(value.contents)))
 set_default = factory(None, ptr)(lambda value: None)
-legacy = factory(c.c_int, c.POINTER(c.c_ubyte), c.c_size_t, c.c_int)(lambda face, size, charset: -1)
+legacy = c.CFUNCTYPE(c.c_int, c.POINTER(c.c_ubyte), c.c_size_t, c.c_int)(lambda face, size, charset: -1)
 data, tables = _load_font()
 provider = get_native().NativeFontProvider(
     [c.cast(f, c.c_void_p).value for f in (get_default, free_default, set_default)],
