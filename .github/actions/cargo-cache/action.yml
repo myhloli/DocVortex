@@ -1,0 +1,48 @@
+name: Cargo dependency cache
+description: Restore compatible Rust dependencies while rebuilding workspace crates.
+inputs:
+  key:
+    description: Build profile, Python ABI and packaging configuration discriminator.
+    required: true
+  python-command:
+    description: Python command for ABI binding and clean-cache recovery.
+    default: uv run --no-project python
+  disabled:
+    description: Set to true to run on a clean runner without restoring Cargo caches.
+    default: 'false'
+outputs:
+  cache-hit:
+    description: True only for an exact cache key match; false can include partial restores.
+    value: ${{ steps.restore.outputs.cache-hit }}
+runs:
+  using: composite
+  steps:
+    - name: Bind PyO3 to the selected Python
+      shell: bash
+      run: ${{ inputs.python-command }} tools/ci_build_metrics.py prepare-cache
+    # 此版本自动区分 OS/架构、rustc host/release/hash、Cargo.lock、crate 清单与编译环境。
+    - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      id: restore
+      if: ${{ inputs.disabled != 'true' }}
+      continue-on-error: true
+      with:
+        prefix-key: docvortex-ci-v1
+        key: ${{ inputs.key }}
+        env-vars: PYO3 SETUPTOOLS_RUST MACOSX_DEPLOYMENT_TARGET
+        cache-bin: 'false'
+        # 仅复用依赖；当前仓库的三个 crate 仍由本次源码构建，不能直接交付旧扩展。
+        cache-workspace-crates: 'false'
+        cache-on-failure: 'false'
+    # 上游恢复错误也可能返回 false 而不改变 outcome；非精确命中统一回到干净构建。
+    - name: Start clean without an exact Cargo cache
+      id: clean
+      if: ${{ inputs.disabled != 'true' && steps.restore.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: ${{ inputs.python-command }} tools/ci_build_metrics.py clean-cargo-cache
+    - name: Record Cargo cache outcome
+      shell: bash
+      env:
+        CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
+        CACHE_OUTCOME: ${{ steps.restore.outcome }}
+        CACHE_CLEANED: ${{ steps.clean.outcome == 'success' }}
+      run: printf 'CI_CARGO_CACHE_HIT=%s\nCI_CARGO_CACHE_OUTCOME=%s\nCI_CARGO_CACHE_CLEANED=%s\n' "$CACHE_HIT" "$CACHE_OUTCOME" "$CACHE_CLEANED" >> "$GITHUB_ENV"
