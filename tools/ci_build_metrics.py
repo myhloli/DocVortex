@@ -163,7 +163,11 @@ def installed_identity() -> dict:
     binary = Path(get_native().__file__).resolve()
     if package.is_relative_to(ROOT / "src") or not binary.is_relative_to(Path(sys.prefix).resolve()):
         raise RuntimeError(f"Expected independent installation, got {package} and {binary}")
-    expected = re.search(r"^_PROTOCOL_VERSION = (\d+)$", (ROOT / "src/docvortex/_compute_backend.py").read_text(), re.MULTILINE)
+    expected = re.search(
+        r"^_PROTOCOL_VERSION = (\d+)$",
+        (ROOT / "src/docvortex/_compute_backend.py").read_text(encoding="utf-8"),
+        re.MULTILINE,
+    )
     assert expected is not None and get_native().PROTOCOL_VERSION == int(expected[1])
     digest = file_sha256(binary)
     built = [path for path in (ROOT / "build").glob("lib*/docvortex/_native.*") if path.suffix in {".so", ".pyd"}]

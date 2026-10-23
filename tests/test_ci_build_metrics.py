@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 import sys
 from types import SimpleNamespace
 import zipfile
@@ -151,7 +152,14 @@ def test_installed_extension_must_match_this_build(tmp_path, monkeypatch, mismat
     build.mkdir(parents=True)
     (build / binary.name).write_bytes(b"stale binary" if mismatch else binary.read_bytes())
     (root / "src/docvortex").mkdir(parents=True)
-    (root / "src/docvortex/_compute_backend.py").write_text("_PROTOCOL_VERSION = 36\n")
+    (root / "src/docvortex/_compute_backend.py").write_text('"""验证原生协议。"""\n_PROTOCOL_VERSION = 36\n', encoding="utf-8")
+    original_read_text = Path.read_text
+
+    def read_with_windows_default(path, encoding=None, errors=None):
+        """模拟 Windows 默认代码页，确保中文协议源码必须显式按 UTF-8 读取。"""
+        return original_read_text(path, encoding=encoding or "cp1252", errors=errors)
+
+    monkeypatch.setattr(Path, "read_text", read_with_windows_default)
     monkeypatch.setattr(metrics, "ROOT", root)
     monkeypatch.setattr(sys, "prefix", str(environment))
     monkeypatch.setitem(sys.modules, "docvortex", SimpleNamespace(__file__=str(package / "__init__.py")))
