@@ -63,8 +63,9 @@ def build_context(profile: str) -> dict:
     inputs += sorted((ROOT / "rust").rglob("*.rs")) + sorted((ROOT / "rust").rglob("*.toml"))
     inputs += sorted((ROOT / ".cargo").glob("config*"))
     fingerprints = {path.relative_to(ROOT).as_posix(): file_sha256(path) for path in sorted(inputs) if path.is_file()}
-    rustc = command_output("rustc", "-vV")
-    host = next(line.removeprefix("host: ") for line in rustc.splitlines() if line.startswith("host: "))
+    # wheel 消费端不调用编译器；真实构建身份由下载产物的生产清单提供。
+    rustc = command_output("rustc", "-vV") if profile != "wheel" else None
+    host = next(line.removeprefix("host: ") for line in rustc.splitlines() if line.startswith("host: ")) if rustc else None
     return {
         "git_commit": command_output("git", "rev-parse", "HEAD"),
         "github_run_id": os.environ.get("GITHUB_RUN_ID"),
@@ -77,7 +78,7 @@ def build_context(profile: str) -> dict:
         "profile": profile,
         "target": os.environ.get("CARGO_BUILD_TARGET") or host,
         "rustc": rustc,
-        "cargo": command_output("cargo", "--version"),
+        "cargo": command_output("cargo", "--version") if rustc else None,
         "build_environment": {name: os.environ[name] for name in BUILD_ENV if name in os.environ},
         "native_build_inputs": fingerprints,
         "native_build_inputs_sha256": hashlib.sha256(json.dumps(fingerprints, sort_keys=True).encode()).hexdigest(),
@@ -154,14 +155,15 @@ def run_measured(command: list[str], output: Path, name: str, profile: str, requ
     return returncode
 
 
-def installed_identity() -> dict:
+def installed_identity(wheel_directory: Path | None = None) -> dict:
     """核验实际安装来源、原生协议和本次构建产物摘要，拒绝从 checkout 导入旧扩展。"""
     import docvortex
     from docvortex._compute_backend import get_native
 
     package = Path(docvortex.__file__).resolve()
     binary = Path(get_native().__file__).resolve()
-    if package.is_relative_to(ROOT / "src") or not binary.is_relative_to(Path(sys.prefix).resolve()):
+    prefix = Path(sys.prefix).resolve()
+    if package.is_relative_to(ROOT / "src") or not package.is_relative_to(prefix) or not binary.is_relative_to(prefix):
         raise RuntimeError(f"Expected independent installation, got {package} and {binary}")
     expected = re.search(
         r"^_PROTOCOL_VERSION = (\d+)$",
@@ -170,8 +172,11 @@ def installed_identity() -> dict:
     )
     assert expected is not None and get_native().PROTOCOL_VERSION == int(expected[1])
     digest = file_sha256(binary)
-    built = [path for path in (ROOT / "build").glob("lib*/docvortex/_native.*") if path.suffix in {".so", ".pyd"}]
-    matching = [str(path.resolve()) for path in built if file_sha256(path) == digest]
+    if wheel_directory is None:
+        built = [path for path in (ROOT / "build").glob("lib*/docvortex/_native.*") if path.suffix in {".so", ".pyd"}]
+        matching = [str(path.resolve()) for path in built if file_sha256(path) == digest]
+    else:
+        matching = [item["path"] for item in wheel_identities(wheel_directory) if item["native_sha256"] == digest]
     if not matching:
         raise RuntimeError("Installed native extension does not match this checkout's built artifact")
     distribution = metadata.distribution("docvortex")
@@ -180,6 +185,7 @@ def installed_identity() -> dict:
         "extension": str(binary),
         "extension_sha256": digest,
         "matching_build_artifacts": matching,
+        "artifact_source": "source-build" if wheel_directory is None else "downloaded-wheel",
         "protocol": get_native().PROTOCOL_VERSION,
         "version": distribution.version,
         "wheel_metadata": distribution.read_text("WHEEL"),

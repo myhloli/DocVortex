@@ -17,6 +17,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build-wheels:
+    # 每个平台仅用最低 CPython 构建一次 ABI3 wheel，其他环境独立解析并安装依赖。
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.98.1'
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.11'
+      - run: uv venv
+      - uses: ./.github/actions/cargo-cache
+        with:
+          key: release-abi3-py3.11-${{ hashFiles('Cargo.toml', 'setup.py', 'pyproject.toml') }}
+          disabled: ${{ vars.DOCVORTEX_DISABLE_CARGO_CACHE == '1' }}
+      - name: Build current platform ABI3 wheel
+        run: >-
+          uv run --no-project python tools/ci_build_metrics.py run --name build --require-cargo --
+          uv build --wheel --out-dir wheelhouse
+      - name: Verify minimum Python ABI
+        run: uv run --no-project python tools/verify_native_abi.py wheelhouse
+      - name: Bind wheel to this source and workflow run
+        run: uv run --no-project python tools/ci_wheel_reuse.py publish wheelhouse
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ci-wheel-${{ github.sha }}-${{ matrix.os }}
+          path: wheelhouse/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: ci-metrics-build-wheels-${{ matrix.os }}
+          path: build/ci-metrics/
+          retention-days: 14
+
   windows-arm64-native-abi:
     # 独立核验 ARM64 内核 ABI；包含 pyclipper 的应用安装由发行物矩阵验收。
     runs-on: windows-11-arm
@@ -77,6 +118,7 @@ jobs:
           retention-days: 14
 
   test:
+    needs: build-wheels
     strategy:
       fail-fast: false
       matrix:
@@ -86,25 +128,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.98.1'
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
       - run: uv venv
-      - uses: ./.github/actions/cargo-cache
+      - uses: actions/download-artifact@v7
         with:
-          key: release-abi3-py${{ matrix.python }}-${{ hashFiles('Cargo.toml', 'setup.py', 'pyproject.toml') }}
-          disabled: ${{ vars.DOCVORTEX_DISABLE_CARGO_CACHE == '1' }}
+          name: ci-wheel-${{ github.sha }}-${{ matrix.os }}
+          path: wheelhouse
       - name: Install with the minimum platform ONNX Runtime
         run: >-
-          uv run --no-project python tools/ci_build_metrics.py run --name install --require-cargo --
-          uv pip install --verbose ".[test]" "pypdfium2==5.13.0" "${{ matrix.os == 'windows-latest' && 'onnxruntime-directml' || 'onnxruntime' }}==1.24.4"
-      - name: Record installed native artifact
-        run: uv run --no-project python tools/ci_build_metrics.py installed
+          uv run --no-project python tools/ci_wheel_reuse.py install wheelhouse "pypdfium2==5.13.0" "${{ matrix.os == 'windows-latest' && 'onnxruntime-directml' || 'onnxruntime' }}==1.24.4"
+      - name: Verify shared wheel ABI on this Python
+        run: uv run --no-project python tools/verify_native_abi.py wheelhouse
       - name: Test installed package
-        run: uv run --no-project python tools/ci_build_metrics.py run --name tests -- uv run --no-project python -m pytest -q -n auto
+        run: uv run --no-project python tools/ci_build_metrics.py run --profile wheel --name tests -- uv run --no-project python -m pytest -q -n auto
       - name: Verify independent installation
         run: uv run --no-project python -c "import importlib.util, docvortex; assert importlib.util.find_spec('docgale') is None; assert importlib.util.find_spec('mineru') is None; assert importlib.util.find_spec('pdftext') is None; assert importlib.util.find_spec('fast_langdetect') is None; assert importlib.util.find_spec('fasttext') is None; assert importlib.util.find_spec('cv2') is None"
       - name: Verify platform runtime distributions
@@ -117,6 +155,7 @@ jobs:
           retention-days: 14
 
   python-minors:
+    needs: build-wheels
     # 中间版本验证 Python 数值语义和公开接口，PDFium 统一使用 5.13.0。
     strategy:
       fail-fast: false
@@ -125,26 +164,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.98.1'
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
       - run: uv venv
-      - uses: ./.github/actions/cargo-cache
+      - uses: actions/download-artifact@v7
         with:
-          key: release-abi3-py${{ matrix.python }}-${{ hashFiles('Cargo.toml', 'setup.py', 'pyproject.toml') }}
-          disabled: ${{ vars.DOCVORTEX_DISABLE_CARGO_CACHE == '1' }}
-      - name: Install from current source
+          name: ci-wheel-${{ github.sha }}-ubuntu-latest
+          path: wheelhouse
+      - name: Install verified wheel
         run: >-
-          uv run --no-project python tools/ci_build_metrics.py run --name install --require-cargo --
-          uv pip install --verbose ".[test]" "pypdfium2==5.13.0"
-      - name: Record installed native artifact
-        run: uv run --no-project python tools/ci_build_metrics.py installed
+          uv run --no-project python tools/ci_wheel_reuse.py install wheelhouse "pypdfium2==5.13.0"
       - name: Verify native numeric and public contracts
         run: >-
-          uv run --no-project python tools/ci_build_metrics.py run --name tests --
+          uv run --no-project python tools/ci_build_metrics.py run --profile wheel --name tests --
           uv run --no-project python -m pytest -q
           tests/test_compute_backend.py tests/test_native_parity.py
           tests/test_native_statistics.py tests/test_native_round4.py
@@ -162,8 +195,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
-      - run: uvx ruff==0.14.2 check src tools/ci_build_metrics.py
-      - run: uvx ruff==0.14.2 format --check src tools/ci_build_metrics.py
+      - run: uvx ruff==0.14.2 check src tools/ci_build_metrics.py tools/ci_wheel_reuse.py
+      - run: uvx ruff==0.14.2 format --check src tools/ci_build_metrics.py tools/ci_wheel_reuse.py
 
   # native-wheels.yml 不再随 push/PR 触发后，Rust 静态检查与单元测试由本工作流把守。
   rust-checks:
@@ -192,6 +225,7 @@ jobs:
           retention-days: 14
 
   pydantic-minimum:
+    needs: build-wheels
     strategy:
       fail-fast: false
       matrix:
@@ -199,25 +233,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.98.1'
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
       - run: uv venv
-      - uses: ./.github/actions/cargo-cache
+      - uses: actions/download-artifact@v7
         with:
-          key: release-abi3-py${{ matrix.python }}-${{ hashFiles('Cargo.toml', 'setup.py', 'pyproject.toml') }}
-          disabled: ${{ vars.DOCVORTEX_DISABLE_CARGO_CACHE == '1' }}
+          name: ci-wheel-${{ github.sha }}-ubuntu-latest
+          path: wheelhouse
       - name: Install with minimum Pydantic
         run: >-
-          uv run --no-project python tools/ci_build_metrics.py run --name install --require-cargo --
-          uv pip install --verbose ".[test]" "pydantic==2.12.5" "pypdfium2==5.13.0"
-      - name: Record installed native artifact
-        run: uv run --no-project python tools/ci_build_metrics.py installed
+          uv run --no-project python tools/ci_wheel_reuse.py install wheelhouse "pydantic==2.12.5" "pypdfium2==5.13.0"
       - name: Test installed package
-        run: uv run --no-project python tools/ci_build_metrics.py run --name tests -- uv run --no-project python -m pytest -q -n auto
+        run: uv run --no-project python tools/ci_build_metrics.py run --profile wheel --name tests -- uv run --no-project python -m pytest -q -n auto
       - uses: actions/upload-artifact@v6
         if: ${{ always() }}
         with:
@@ -226,6 +254,7 @@ jobs:
           retention-days: 14
 
   platform-artifacts:
+    needs: build-wheels
     strategy:
       fail-fast: false
       matrix:
@@ -233,32 +262,26 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: '1.98.1'
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: '3.14'
       - run: uv venv
-      - uses: ./.github/actions/cargo-cache
+      - uses: actions/download-artifact@v7
         with:
-          key: release-abi3-py314-${{ hashFiles('Cargo.toml', 'setup.py', 'pyproject.toml') }}
-          disabled: ${{ vars.DOCVORTEX_DISABLE_CARGO_CACHE == '1' }}
+          name: ci-wheel-${{ github.sha }}-${{ matrix.os }}
+          path: wheelhouse
       - name: Install platform artifact environment
         run: >-
-          uv run --no-project python tools/ci_build_metrics.py run --name install --require-cargo --
-          uv pip install --verbose ".[test]" "pydantic==2.12.5" "pypdfium2==5.13.0"
-      - name: Record installed native artifact
-        run: uv run --no-project python tools/ci_build_metrics.py installed
+          uv run --no-project python tools/ci_wheel_reuse.py install wheelhouse "pydantic==2.12.5" "pypdfium2==5.13.0"
       - name: Capture platform layout
-        run: uv run --no-project python tools/ci_build_metrics.py run --name platform-layout -- uv run --no-project python tools/capture_platform_layout.py --output platform-output
+        run: uv run --no-project python tools/ci_build_metrics.py run --profile wheel --name platform-layout -- uv run --no-project python tools/capture_platform_layout.py --output platform-output
       - uses: actions/upload-artifact@v6
         if: ${{ !cancelled() }}
         with:
           name: platform-layout-${{ matrix.os }}
           path: platform-output/
           retention-days: 14
-      - run: uv run --no-project python tools/ci_build_metrics.py run --name history-geometry -- uv run --no-project python tools/review_flash_regression.py --output history-output
+      - run: uv run --no-project python tools/ci_build_metrics.py run --profile wheel --name history-geometry -- uv run --no-project python tools/review_flash_regression.py --output history-output
         if: ${{ !cancelled() }}
       - uses: actions/upload-artifact@v6
         if: ${{ !cancelled() }}
