@@ -43,6 +43,12 @@ def test_source_identity_ignores_generated_bytecode_and_separately_checked_binar
 
 def test_native_worker_preserves_both_outputs_when_repeated_result_changes(tmp_path: Path, monkeypatch) -> None:
     """中途输出不稳定时保存参考和失败轮的完整内容，避免只有摘要而无法裁决。"""
+    from loguru import logger
+
+    def preserve_logging(_name):
+        """直接测试 worker 时保留同一进程后续日志诊断回归所需的状态。"""
+
+    monkeypatch.setattr(logger, "disable", preserve_logging)
     monkeypatch.syspath_prepend(str(Path(__file__).parent / "benchmarks"))
     benchmark = importlib.import_module("rust_pdf")
     source = tmp_path / "input.pdf"
