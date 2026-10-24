@@ -7,6 +7,7 @@ import argparse
 import importlib.machinery
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -21,6 +22,13 @@ ROOT = Path(__file__).resolve().parents[1]
 @pytest.fixture
 def pair(monkeypatch):
     """独立载入工具模块，并为已有基准辅助模块提供测试导入路径。"""
+    from loguru import logger
+
+    def preserve_logging(_name):
+        """测试直接调用子进程入口时，阻止其关闭整个 pytest 进程的日志。"""
+
+    monkeypatch.setattr(logger, "disable", preserve_logging)
+    monkeypatch.setenv("LOGURU_LEVEL", os.environ.get("LOGURU_LEVEL", "DEBUG"))
     monkeypatch.syspath_prepend(str(ROOT / "tests" / "benchmarks"))
     spec = importlib.util.spec_from_file_location("benchmark_native_pair", ROOT / "tools" / "benchmark_native_pair.py")
     module = importlib.util.module_from_spec(spec)

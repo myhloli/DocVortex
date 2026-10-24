@@ -8,6 +8,7 @@ from io import BytesIO
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -15,6 +16,29 @@ from PIL import Image
 import pytest
 
 from benchmarks import export_files
+
+
+@pytest.fixture
+def worker_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    """进程内单测使用实际已安装包身份，源码选择合同由独立子进程回归覆盖。"""
+    import docvortex
+    from docvortex._compute_backend import backend_info
+
+    monkeypatch.syspath_prepend(str(Path(__file__).parent / "benchmarks"))
+    from rust_pdf import environment_identity, source_identity
+
+    def current_runtime(_source_root: Path) -> dict:
+        """仍读取真实源码、原生扩展及依赖摘要，只隔离本单测无关的目录选择。"""
+        package = Path(docvortex.__file__).resolve()
+        compute = backend_info()
+        return {
+            "source_package": str(package),
+            **source_identity(package),
+            "environment": environment_identity(),
+            "compute": {name: compute[name] for name in ("backend", "protocol", "extension", "extension_sha256")},
+        }
+
+    monkeypatch.setattr(export_files, "runtime_identity", current_runtime)
 
 
 def test_export_fixture_is_deterministic_and_decodable() -> None:
@@ -67,7 +91,7 @@ def test_export_sampler_reports_background_failure_after_valid_endpoint(monkeypa
         sampler.finish()
 
 
-def test_worker_detects_input_mutation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_worker_detects_input_mutation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, worker_runtime: None) -> None:
     """注入导出后原对象污染，保证成功写盘仍不能绕过基准正确性门禁。"""
     original = export_files.invoke
 
@@ -86,10 +110,16 @@ def test_worker_detects_input_mutation(tmp_path: Path, monkeypatch: pytest.Monke
 def test_export_benchmark_round_trip_and_baseline(tmp_path: Path) -> None:
     """运行九种小型实际事务并比较基线，检查所有文件和独立 RSS 进程记录。"""
     root = Path(__file__).resolve().parents[1]
+    import docvortex
+
+    selected = tmp_path / "installed-source"
+    shutil.copytree(Path(docvortex.__file__).parent, selected / "src/docvortex", ignore=shutil.ignore_patterns("__pycache__"))
     for name in ("baseline", "candidate"):
         command = [
             sys.executable,
             str(root / "tests/benchmarks/export_files.py"),
+            "--source-root",
+            str(selected),
             "--files",
             "2",
             "--payload-bytes",
@@ -105,8 +135,8 @@ def test_export_benchmark_round_trip_and_baseline(tmp_path: Path) -> None:
         assert completed.returncode == 0, completed.stdout + completed.stderr
     report = json.loads((tmp_path / "candidate/report.json").read_text(encoding="utf-8"))
     assert len(report["records"]) == 9
-    assert report["source_root"] == str(root.resolve())
-    assert Path(report["source_package"]) == (root / "src/docvortex/__init__.py").resolve()
+    assert report["source_root"] == str(selected.resolve())
+    assert Path(report["source_package"]) == (selected / "src/docvortex/__init__.py").resolve()
     assert report["source_code_sha256"] and report["compute"]["extension_sha256"]
     assert report["environment"]["dependencies"]["pydantic"]
     assert all(item["equal"] for item in report["comparison"])
@@ -196,7 +226,9 @@ def test_export_rejects_identity_drift(monkeypatch: pytest.MonkeyPatch, field: s
         export_files.assert_runtime_unchanged(expected, export_files.ROOT)
 
 
-def test_memory_reuses_timed_expectation_before_validation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_memory_reuses_timed_expectation_before_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, worker_runtime: None
+) -> None:
     """RSS 重放复用已校验结果，只在停止采样后进行一次完整 bundle 回读校验。"""
     config = {"entry": "save_bundle", "mode": "same", "files": 1, "payload_bytes": 128, "runs": 1}
     timing = tmp_path / "timing"
