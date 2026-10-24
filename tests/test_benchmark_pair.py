@@ -244,7 +244,7 @@ def test_worker_separates_memory_replay_and_preserves_full_output(pair, monkeypa
         """模拟独立 RSS 子进程并检查落盘证据先于内存重放。"""
         events.append("memory_subprocess")
         assert json.loads((folder / "output.json").read_text(encoding="utf-8")) == evidence.output
-        assert env["PYTHONPATH"] == "/before/src"
+        assert env["PYTHONPATH"] == str(args.source_root.resolve() / "src")
         config = json.loads(Path(command[command.index("--worker") + 1]).read_text(encoding="utf-8"))
         assert config["environment"] == identity["environment"]
         target = Path(command[command.index("--output") + 1])

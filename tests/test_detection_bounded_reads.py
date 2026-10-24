@@ -209,5 +209,9 @@ def test_missing_and_directory_inputs_keep_io_errors(tmp_path) -> None:
     """头部探测的容错不吞掉公开入口最终的缺失文件或目录错误。"""
     with pytest.raises(FileNotFoundError):
         detection.guess_suffix_by_path(tmp_path / "missing.pdf")
-    with pytest.raises(IsADirectoryError):
+    # Windows 读取目录报 PermissionError，其他平台可能报 IsADirectoryError，均须保留原始 I/O 错误。
+    with pytest.raises(OSError) as native_error:
+        tmp_path.read_bytes()
+    with pytest.raises(type(native_error.value)) as detection_error:
         detection.guess_suffix_by_path(tmp_path)
+    assert detection_error.value.errno == native_error.value.errno
