@@ -35,6 +35,9 @@ from .native_coordinates import (
 
 logger = logging.getLogger("docvortex.document.pdf._document")
 
+# 仅供同一次页面提取共享；键中的地址不持有对象，页面关闭前必须清空。
+_FormExtentCache = dict[tuple[int, BBox, int], BBox | None]
+
 
 @dataclass(frozen=True)
 class _ClippedObject:
@@ -140,6 +143,19 @@ def _clipped_form_extent(raw: Any, page_bbox: BBox, rotation: int) -> BBox | Non
     if not boxes:
         return (0.0, 0.0, 0.0, 0.0)
     return min(b[0] for b in boxes), min(b[1] for b in boxes), max(b[2] for b in boxes), max(b[3] for b in boxes)
+
+
+def _shared_clipped_form_extent(raw: Any, page_bbox: BBox, rotation: int, cache: _FormExtentCache | None) -> BBox | None:
+    """在页面锁内按根对象和完整几何参数共享结果；无裁剪也缓存，异常不缓存。"""
+    if cache is None:
+        return _clipped_form_extent(raw, page_bbox, rotation)
+    address = ctypes.cast(raw, ctypes.c_void_p).value
+    if address is None:
+        return _clipped_form_extent(raw, page_bbox, rotation)
+    key = (address, page_bbox, rotation)
+    if key not in cache:
+        cache[key] = _clipped_form_extent(raw, page_bbox, rotation)
+    return cache[key]
 
 
 def _clipped_objects_of_type(
@@ -922,6 +938,8 @@ def _extract_page_form_bboxes(
     page: pdfium.PdfPage,
     page_bbox: BBox,
     page_rotation: int,
+    *,
+    extent_cache: _FormExtentCache | None = None,
 ) -> list[BBox]:
     """在调用方持有 PDFium 锁时提取顶层 Form bbox，并隔离单对象异常。"""
 
@@ -929,7 +947,7 @@ def _extract_page_form_bboxes(
     for raw_obj in _iter_raw_root_form_objects(page):
         try:
             form_bbox = _form_bbox_from_object(raw_obj, page_bbox, page_rotation)
-            clipped = _clipped_form_extent(raw_obj, page_bbox, page_rotation)
+            clipped = _shared_clipped_form_extent(raw_obj, page_bbox, page_rotation, extent_cache)
             if form_bbox is not None and clipped is not None:
                 form_bbox = _intersect_object_bbox(form_bbox, clipped)
                 if form_bbox[2] <= form_bbox[0] or form_bbox[3] <= form_bbox[1]:

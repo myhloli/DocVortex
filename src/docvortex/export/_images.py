@@ -102,8 +102,20 @@ def _materialize_images(
     image_resolver: Callable[[ImagePayloadBlock, int], tuple[bytes, str] | None] | None = None,
     asset_resolver: Callable[[str], bytes] | None = None,
 ) -> tuple[MiddleJson, AssetStore]:
-    """复制文档及素材索引，在同一次树遍历中完成命名和引用回填。"""
-    document = middle_json.model_copy(deep=True)
+    """先复制调用方文档，再在独占副本上完成素材命名和引用回填。"""
+    return _materialize_owned_images(
+        middle_json.model_copy(deep=True), assets, image_resolver=image_resolver, asset_resolver=asset_resolver
+    )
+
+
+def _materialize_owned_images(
+    document: MiddleJson,
+    assets: AssetStore | None = None,
+    *,
+    image_resolver: Callable[[ImagePayloadBlock, int], tuple[bytes, str] | None] | None = None,
+    asset_resolver: Callable[[str], bytes] | None = None,
+) -> tuple[MiddleJson, AssetStore]:
+    """原地物化内部独占文档，始终复制素材索引；失败后的局部文档由调用方丢弃。"""
     result = assets.copy() if assets is not None else AssetStore()
     for page in document.pages:
         pending = [(block, block) for block in reversed(page.blocks)]

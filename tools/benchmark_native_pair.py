@@ -1,78 +1,264 @@
-"""在相同运行时交替比较两个冻结源码，保留逐文档耗时、公开输出指纹与进程树峰值内存。"""
+"""交替比较冻结源码；完整输出及输入、源码、扩展身份通过后才汇总性能。"""
 
 from __future__ import annotations
 
 import argparse
+import gc
 import hashlib
+import importlib.machinery
 import json
 import os
 from pathlib import Path
 import statistics
 import subprocess
 import sys
-import threading
-import time
+
+
+BENCHMARKS = Path(__file__).resolve().parents[1] / "tests" / "benchmarks"
+
+
+def _helpers():
+    """复用已有完整输出协议；调用方须先选择生产源码再进入此处。"""
+    sys.path.insert(1, str(BENCHMARKS))
+    import rust_pdf
+
+    return rust_pdf
+
+
+def _write_json(path: Path, value: object) -> None:
+    """及时保存成功或失败证据，已完成的记录不会因后续异常丢失。"""
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _input_manifest(folder: Path) -> list[dict]:
+    """冻结有序 PDF 集合及原始字节身份，拒绝空集合。"""
+    manifest = []
+    for source in sorted(folder.glob("*.pdf")):
+        if not source.is_file():
+            raise ValueError(f"PDF input is not a file: {source}")
+        payload = source.read_bytes()
+        manifest.append(
+            {
+                "name": source.name,
+                "path": str(source.resolve()),
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        )
+    if not manifest:
+        raise ValueError(f"No PDF inputs: {folder}")
+    return manifest
+
+
+def _source_snapshot(root: Path, helpers, extension_suffixes: list[str] | None = None) -> dict:
+    """按 Python 扩展查找规则冻结指定源码和二进制，拒绝借用安装包或外部软链。"""
+    root = root.resolve()
+    package = root / "src" / "docvortex" / "__init__.py"
+    if not package.is_file() or not package.resolve().is_relative_to(root):
+        raise ValueError(f"Source package is missing or outside source root: {package}")
+    finder = importlib.machinery.FileFinder(
+        str(package.parent),
+        (importlib.machinery.ExtensionFileLoader, extension_suffixes or importlib.machinery.EXTENSION_SUFFIXES),
+    )
+    spec = finder.find_spec("docvortex._native")
+    if spec is None or spec.origin is None:
+        raise ValueError(f"Native extension is missing from source root: {root}")
+    extension = Path(spec.origin).resolve()
+    if not extension.is_relative_to(root):
+        raise ValueError(f"Native extension is outside source root: {extension}")
+    return {
+        "source_root": str(root),
+        "source_package": str(package.resolve()),
+        **helpers.source_identity(package),
+        "extension": str(extension),
+        "extension_sha256": hashlib.sha256(extension.read_bytes()).hexdigest(),
+    }
+
+
+def _runtime_identity(root: Path, expected: dict, helpers) -> dict:
+    """核对实际导入路径、源码摘要与原生扩展，避免环境串用形成错误结论。"""
+    import docvortex
+    from docvortex._compute_backend import backend_info
+
+    package = Path(docvortex.__file__).resolve()
+    compute = backend_info()
+    actual = {
+        "source_root": str(root.resolve()),
+        "source_package": str(package),
+        **helpers.source_identity(package),
+        "extension": str(Path(compute["extension"]).resolve()),
+        "extension_sha256": compute["extension_sha256"],
+    }
+    if actual != expected:
+        raise AssertionError(f"Imported source or extension differs: expected={expected!r}, actual={actual!r}")
+    if compute["backend"] != "rust" or not isinstance(compute.get("protocol"), int):
+        raise AssertionError(f"Invalid native backend identity: {compute!r}")
+    return {
+        **actual,
+        "compute": compute,
+        "python": str(Path(sys.executable).resolve()),
+        "environment": helpers.environment_identity(),
+    }
+
+
+def _run_command(command: list[str], folder: Path, *, env: dict | None = None) -> None:
+    """保留子进程日志，失败时由调用方记录报告并以非零状态退出。"""
+    with (folder / "stdout.log").open("w", encoding="utf-8") as stdout:
+        with (folder / "stderr.log").open("w", encoding="utf-8") as stderr:
+            subprocess.run(command, env=env, stdout=stdout, stderr=stderr, check=True)
+
+
+def _check_memory(record: dict, config: dict) -> None:
+    """独立内存重放必须与计时输出和全部身份一致。"""
+    from pdf_memory import peak_rss, validate_identity
+
+    validate_identity(record, config)
+    peak_rss(record)
+    if record.get("equal") is not True or record["full_output_sha256"] != config["full_output_sha256"]:
+        raise AssertionError("Memory replay differs in full public output")
 
 
 def _worker(args: argparse.Namespace) -> None:
-    """预热后计量公共 parse，内存包含当前进程及渲染子进程，输出指纹不进入解析计时。"""
+    """分离计时和独立 RSS 进程；逐文档保留完整公开输出及失败进度。"""
     sys.path.insert(0, str(args.source_root.resolve() / "src"))
-    import psutil
-    from loguru import logger
-    from docvortex.api import parse
-    from docvortex._compute_backend import backend_info
-
-    logger.remove()
-    sources = sorted(args.input_dir.glob("*.pdf"))
-    for index in sorted({0, len(sources) // 4, len(sources) // 2, 3 * len(sources) // 4, len(sources) - 1}):
-        parse(sources[index])
-    process = psutil.Process()
-    stop = threading.Event()
-    peak = [0]
-
-    def sample() -> None:
-        """用低频采样记录同一进程树的 RSS 总量，不累计已经退出的子进程峰值。"""
-        while not stop.is_set():
-            resident = 0
-            for member in [process, *process.children(recursive=True)]:
-                try:
-                    resident += member.memory_info().rss
-                except psutil.Error:
-                    pass
-            peak[0] = max(peak[0], resident)
-            stop.wait(0.05)
-
-    sampler = threading.Thread(target=sample, daemon=True)
-    sampler.start()
-    documents = []
+    os.environ["ORT_DISABLE_TELEMETRY"] = "1"
+    os.environ["LOGURU_LEVEL"] = "WARNING"
+    evidence = args.output.with_suffix("")
+    evidence.mkdir(parents=True, exist_ok=False)
+    record = {"status": "starting", "documents": []}
     try:
-        for source in sources:
-            started = time.perf_counter()
-            result = parse(source, keep_model_json=True)
-            elapsed = time.perf_counter() - started
-            model = json.dumps(result.model_json.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-            documents.append(
-                {"name": source.stem, "seconds": elapsed, "model_sha256": hashlib.sha256(model.encode()).hexdigest()}
+        helpers = _helpers()
+        config = json.loads(args.config.read_text(encoding="utf-8"))
+        expected = config["sources"][args.kind]
+        manifest = config["inputs"]
+        if _input_manifest(args.input_dir) != manifest:
+            raise AssertionError("Input collection or bytes changed before worker")
+        record.update(_runtime_identity(args.source_root, expected, helpers), inputs=manifest)
+        _write_json(args.output, record)
+        import onnxruntime
+        from docvortex import parse
+        from loguru import logger
+
+        onnxruntime.disable_telemetry_events()
+        logger.disable("docvortex")
+        warmup_indices = sorted({0, len(manifest) // 4, len(manifest) // 2, 3 * len(manifest) // 4, len(manifest) - 1})
+        for index in warmup_indices:
+            parse(Path(manifest[index]["path"]).read_bytes(), file_suffix="pdf", keep_model_json=True)
+        record.update(status="timing", warmup_documents=len(warmup_indices))
+        for index, source in enumerate(manifest):
+            payload = Path(source["path"]).read_bytes()
+            if hashlib.sha256(payload).hexdigest() != source["sha256"]:
+                raise AssertionError(f"PDF input changed: {source['path']}")
+            gc.collect()
+            durations, output = helpers.public_once(payload)
+            folder = evidence / f"{index:04d}"
+            folder.mkdir()
+            _write_json(folder / "output.json", output)
+            record["documents"].append(
+                {
+                    **source,
+                    "seconds": durations["parse"],
+                    "full_output_sha256": helpers.digest(output),
+                    "artifact": str((folder / "output.json").relative_to(args.output.parent)),
+                }
             )
-    finally:
-        stop.set()
-        sampler.join()
-    args.output.write_text(
-        json.dumps(
-            {
-                "seconds": sum(item["seconds"] for item in documents),
-                "peak_tree_rss_bytes": peak[0],
-                "backend": backend_info(),
-                "python": sys.executable,
-                "documents": documents,
-            },
-            indent=2,
+            del output
+            _write_json(args.output, record)
+        record.update(status="memory", seconds=sum(item["seconds"] for item in record["documents"]))
+        _write_json(args.output, record)
+        for index, item in enumerate(record["documents"]):
+            folder = evidence / f"{index:04d}"
+            memory_config = {
+                **record,
+                "path": item["path"],
+                "source_sha256": item["sha256"],
+                "region_input_sha256": None,
+                "suite": "public",
+                "flash_baseline": None,
+                "full_output_sha256": item["full_output_sha256"],
+            }
+            memory_config.pop("documents")
+            _write_json(folder / "memory-input.json", memory_config)
+            _run_command(
+                [
+                    sys.executable,
+                    str(BENCHMARKS / "pdf_memory.py"),
+                    "--worker",
+                    str(folder / "memory-input.json"),
+                    "--output",
+                    str(folder / "memory"),
+                ],
+                folder,
+                env={**os.environ, "PYTHONPATH": str(args.source_root.resolve() / "src")},
+            )
+            memory = json.loads((folder / "memory" / "result.json").read_text(encoding="utf-8"))
+            _check_memory(memory, memory_config)
+            item["memory"] = memory["memory"]
+            item["memory_artifact"] = str((folder / "memory" / "result.json").relative_to(args.output.parent))
+            _write_json(args.output, record)
+        if _input_manifest(args.input_dir) != manifest or _source_snapshot(args.source_root, helpers) != expected:
+            raise AssertionError("Inputs, source or extension changed during worker")
+        record.update(
+            status="complete",
+            peak_tree_rss_bytes=max(item["memory"]["sampled_tree_peak_rss_bytes"] for item in record["documents"]),
+            memory_method="maximum_of_isolated_document_replays_before_serialization",
         )
-    )
+    except Exception as exc:
+        record.update(status="failed", error=f"{type(exc).__name__}: {exc}")
+        raise
+    finally:
+        _write_json(args.output, record)
+
+
+def _validate_runs(runs: dict, manifest: list[dict], sources: dict, folder: Path, helpers) -> None:
+    """同时阻止输入漂移、单版本不稳定及稳定但跨版本不等价的结果。"""
+    expected_output = None
+    expected_python = None
+    expected_environment = None
+    for kind, records in runs.items():
+        expected_runtime = None
+        for record in records:
+            if record["status"] != "complete" or record["inputs"] != manifest:
+                raise AssertionError(f"Incomplete run or different input collection: {kind}")
+            if {key: record[key] for key in sources[kind]} != sources[kind]:
+                raise AssertionError(f"Different source or extension identity: {kind}")
+            if any(record["compute"].get(key) != sources[kind][key] for key in ("extension", "extension_sha256")):
+                raise AssertionError(f"Different loaded extension identity: {kind}")
+            if record["compute"]["backend"] != "rust" or not isinstance(record["compute"].get("protocol"), int):
+                raise AssertionError(f"Invalid native backend identity: {kind}")
+            if expected_python is not None and record["python"] != expected_python:
+                raise AssertionError("Different Python runtime between versions")
+            expected_python = record["python"]
+            if expected_environment is not None and record["environment"] != expected_environment:
+                raise AssertionError("Different environment within or between versions")
+            expected_environment = record["environment"]
+            runtime = (record["python"], record["compute"]["backend"], record["compute"]["protocol"])
+            if expected_runtime is not None and runtime != expected_runtime:
+                raise AssertionError(f"Runtime identity changed between rounds: {kind}")
+            expected_runtime = runtime
+            if len(record["documents"]) != len(manifest):
+                raise AssertionError(f"Different document collection: {kind}")
+            outputs = []
+            for source, document in zip(manifest, record["documents"], strict=True):
+                if {key: document[key] for key in source} != source:
+                    raise AssertionError(f"Different PDF input: {kind}, {source['name']}")
+                output = json.loads((folder / document["artifact"]).read_text(encoding="utf-8"))
+                if set(output) != {"model", "middle", "assets", "diagnostics"}:
+                    raise AssertionError(f"Incomplete public output: {kind}, {source['name']}")
+                actual = helpers.digest(output)
+                if actual != document["full_output_sha256"]:
+                    raise AssertionError(f"Output artifact differs from recorded hash: {kind}, {source['name']}")
+                outputs.append(actual)
+            if expected_output is not None and outputs != expected_output:
+                changed = [
+                    source["name"] for source, old, new in zip(manifest, expected_output, outputs, strict=True) if old != new
+                ]
+                raise AssertionError(f"Full public output differs within or across versions: {kind}, {changed}")
+            expected_output = outputs
 
 
 def main() -> None:
-    """五轮默认按 AB、BA 交替执行，检查同一源码的输出稳定性后汇总配对耗时与内存。"""
+    """交替完成 AB/BA 测量，全部门禁通过后才写性能比例，失败保留原始证据。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline-root", type=Path)
     parser.add_argument("--candidate-root", type=Path)
@@ -80,52 +266,108 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--rounds", type=int, default=5)
-    parser.add_argument("--source-root", type=Path)
-    parser.add_argument("--worker", action="store_true")
+    parser.add_argument("--source-root", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--config", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--kind", choices=("before", "after"), help=argparse.SUPPRESS)
+    parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.worker:
+        if args.source_root is None or args.config is None or args.kind is None:
+            parser.error("worker requires --source-root, --config and --kind")
         _worker(args)
         return
-    args.output.mkdir(parents=True, exist_ok=False)
-    runs = {"before": [], "after": []}
-    roots = {"before": args.baseline_root.resolve(), "after": args.candidate_root.resolve()}
-    for round_index in range(args.rounds):
-        for kind in ["before", "after"] if round_index % 2 == 0 else ["after", "before"]:
-            result_path = args.output / f"{round_index + 1}-{kind}.json"
-            env = {**os.environ, "PYTHONPATH": str(roots[kind] / "src")}
-            subprocess.run(
+    if args.baseline_root is None or args.candidate_root is None:
+        parser.error("--baseline-root and --candidate-root are required")
+    if args.output.exists():
+        parser.error("output must not already exist")
+    args.output = args.output.resolve()
+    args.output.mkdir(parents=True)
+    report = {
+        "status": "running",
+        "rounds": args.rounds,
+        "order": "AB/BA alternating",
+        "timing_scope": "public_parse_excluding_serialization",
+        "memory_method": "maximum_of_isolated_document_replays_before_serialization",
+        "runs": {"before": [], "after": []},
+    }
+    _write_json(args.output / "report.json", report)
+    try:
+        if args.rounds < 1:
+            raise ValueError("rounds must be positive")
+        helpers = _helpers()
+        manifest = _input_manifest(args.input_dir)
+        roots = {"before": args.baseline_root.resolve(), "after": args.candidate_root.resolve()}
+        # --python 可以选择另一 ABI；父进程不能用自身的扩展后缀替代目标解释器。
+        extension_suffixes = json.loads(
+            subprocess.check_output(
                 [
                     args.python,
-                    str(Path(__file__).resolve()),
-                    "--worker",
-                    "--source-root",
-                    str(roots[kind]),
-                    "--input-dir",
-                    str(args.input_dir.resolve()),
-                    "--output",
-                    str(result_path),
+                    "-c",
+                    "import importlib.machinery,json; print(json.dumps(importlib.machinery.EXTENSION_SUFFIXES))",
                 ],
-                env=env,
-                check=True,
+                text=True,
             )
-            record = json.loads(result_path.read_text())
-            runs[kind].append(record)
-            print(
-                round_index + 1, kind, round(record["seconds"], 3), round(record["peak_tree_rss_bytes"] / 2**20, 1), flush=True
-            )
-    for kind, records in runs.items():
-        fingerprints = [{item["name"]: item["model_sha256"] for item in record["documents"]} for record in records]
-        assert all(fingerprint == fingerprints[0] for fingerprint in fingerprints), kind
-    report = {"rounds": args.rounds, "order": "AB/BA alternating", "warmup_documents_per_process": 5}
-    for kind, records in runs.items():
-        report[kind] = {
-            "median_seconds": statistics.median(record["seconds"] for record in records),
-            "median_peak_tree_rss_bytes": statistics.median(record["peak_tree_rss_bytes"] for record in records),
-        }
-    report["time_ratio"] = report["after"]["median_seconds"] / report["before"]["median_seconds"]
-    report["rss_ratio"] = report["after"]["median_peak_tree_rss_bytes"] / report["before"]["median_peak_tree_rss_bytes"]
-    (args.output / "report.json").write_text(json.dumps(report, indent=2))
-    print(json.dumps(report, indent=2))
+        )
+        sources = {kind: _source_snapshot(root, helpers, extension_suffixes) for kind, root in roots.items()}
+        config = {"inputs": manifest, "sources": sources}
+        _write_json(args.output / "config.json", config)
+        runs = {"before": [], "after": []}
+        for round_index in range(args.rounds):
+            for kind in ["before", "after"] if round_index % 2 == 0 else ["after", "before"]:
+                run_name = f"{round_index + 1}-{kind}"
+                result_path = args.output / f"{run_name}.json"
+                logs = args.output / f"{run_name}-logs"
+                logs.mkdir()
+                report["runs"][kind].append(result_path.name)
+                _write_json(args.output / "report.json", report)
+                _run_command(
+                    [
+                        args.python,
+                        str(Path(__file__).resolve()),
+                        "--worker",
+                        "--source-root",
+                        str(roots[kind]),
+                        "--kind",
+                        kind,
+                        "--config",
+                        str(args.output / "config.json"),
+                        "--input-dir",
+                        str(args.input_dir.resolve()),
+                        "--output",
+                        str(result_path),
+                    ],
+                    logs,
+                    env={**os.environ, "PYTHONPATH": str(roots[kind] / "src")},
+                )
+                runs[kind].append(json.loads(result_path.read_text(encoding="utf-8")))
+                _validate_runs(runs, manifest, sources, args.output, helpers)
+                print(f"{run_name}: evidence recorded", flush=True)
+        if _input_manifest(args.input_dir) != manifest:
+            raise AssertionError("Input collection or bytes changed during benchmark")
+        for kind, root in roots.items():
+            if _source_snapshot(root, helpers, extension_suffixes) != sources[kind]:
+                raise AssertionError(f"Source or native extension changed during benchmark: {kind}")
+        summary = {}
+        for kind, records in runs.items():
+            summary[kind] = {
+                "median_seconds": statistics.median(record["seconds"] for record in records),
+                "median_peak_tree_rss_bytes": statistics.median(record["peak_tree_rss_bytes"] for record in records),
+            }
+        if any(value <= 0 for entry in summary.values() for value in entry.values()):
+            raise AssertionError("Timing and RSS measurements must be positive")
+        report.update(
+            summary,
+            status="complete",
+            full_output_equal=True,
+            time_ratio=summary["after"]["median_seconds"] / summary["before"]["median_seconds"],
+            rss_ratio=summary["after"]["median_peak_tree_rss_bytes"] / summary["before"]["median_peak_tree_rss_bytes"],
+        )
+    except Exception as exc:
+        report.update(status="failed", error=f"{type(exc).__name__}: {exc}")
+        raise
+    finally:
+        _write_json(args.output / "report.json", report)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

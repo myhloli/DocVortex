@@ -124,6 +124,7 @@ from .native_text import (
     _sanitize_pdf_control_text,
 )
 from .tables import _connected_horizontal_rule_bboxes, _detect_table_candidates, _materialize_table_blocks
+from .table_filled_grid import _native_cjk_metric_scope
 from .text_assembly.annotations import (
     _merge_fragmented_header_blocks,
     _merge_front_matter_column_blocks,
@@ -480,10 +481,13 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
 
     paint_reader = getattr(pdf_doc, "_get_page_text_paint", None)
     for source in page_sources:
+        # 图形规则只读取原始字符度量；噪声过滤在作用域外替换字符视图。
+        with _native_cjk_metric_scope():
+            strong_graphic_bboxes = _detect_strong_graphic_bboxes(source)
         exclude_faint_native_noise(
             source,
             (lambda indices, page=source.page_index: paint_reader(page, indices)) if callable(paint_reader) else None,
-            _detect_strong_graphic_bboxes(source),
+            strong_graphic_bboxes,
         )
         group_native_raster_chart_descriptions(source)
 
@@ -755,6 +759,7 @@ def _mark_native_caption_starts(lines: list[_LineItem]) -> None:
 
 
 @_font_family_page_scope
+@_native_cjk_metric_scope()
 def _prepare_page_source(
     source: _PageSource,
     *,
@@ -769,6 +774,8 @@ def _prepare_page_source(
     _owned_script_inputs=None,
 ) -> _PreparedPage:
     """先认领视觉容器，再标注辅助文本并留下可跨页比较的轻量文本行。"""
+
+    # 本阶段几何校准只修改行或构造字符副本；原始字符字典不变，过滤视图分别计算。
 
     if page_index == 0:
         _classify_first_page_correspondence_footnotes(source)

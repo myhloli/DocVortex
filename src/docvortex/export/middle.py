@@ -102,12 +102,16 @@ def _commit_export_files(files: dict[Path, bytes], *, overwrite: bool) -> None:
 def _validate_export_path_relationships(relative_paths: list[str]) -> None:
     """拒绝任一导出文件占用另一文件的父目录，避免提交阶段才产生冲突。"""
     path_parts = {relative_path: Path(relative_path).parts for relative_path in relative_paths}
+    first_descendant: dict[tuple[str, ...], str] = {}
+    # 按输入顺序只登记各严格父路径的首个子文件，常见浅层路径不再两两比较。
     for relative_path, parts in path_parts.items():
-        for other_path, other_parts in path_parts.items():
-            if relative_path == other_path or len(parts) >= len(other_parts):
-                continue
-            if other_parts[: len(parts)] == parts:
-                raise ValueError(f"Export file path conflicts with a required directory: {relative_path} -> {other_path}")
+        for length in range(len(parts)):
+            first_descendant.setdefault(parts[:length], relative_path)
+    # 仍按父文件的原始顺序报错，保持旧实现选择的冲突对及原始路径文字。
+    for relative_path, parts in path_parts.items():
+        other_path = first_descendant.get(parts)
+        if other_path is not None:
+            raise ValueError(f"Export file path conflicts with a required directory: {relative_path} -> {other_path}")
 
 
 def _export_middle_json(

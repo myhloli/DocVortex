@@ -21,11 +21,12 @@ from .native_coordinates import (
     _transform_drawing_point,
 )
 from .native_objects import (
+    _FormExtentCache,
     _clip_object_visual_bbox,
-    _clipped_form_extent,
     _image_bbox_from_matrix,
     _intersect_object_bbox,
     _object_clip_bbox,
+    _shared_clipped_form_extent,
     _transform_object_bbox,
 )
 
@@ -126,7 +127,14 @@ def _read_char_form_owners(textpage, owners: dict[int, int]) -> list[int | None]
     raise RuntimeError("FPDFText_GetTextObject unsupported function signature or ABI")
 
 
-def extract_form_structure(page, page_bbox: BBox, rotation: int, reader_page: Any | None) -> tuple[_PDFFormInfo, ...]:
+def extract_form_structure(
+    page,
+    page_bbox: BBox,
+    rotation: int,
+    reader_page: Any | None,
+    *,
+    extent_cache: _FormExtentCache | None = None,
+) -> tuple[_PDFFormInfo, ...]:
     """在当前页面锁内收集调用树和成员；声明匹配失败时保留未知 Form，不猜测展开。"""
     forms: list[dict] = []
     text_objects: dict[int, int] = {}
@@ -163,7 +171,7 @@ def extract_form_structure(page, page_bbox: BBox, rotation: int, reader_page: An
                     _visual_bbox(bounds, parent_matrix, page_bbox, rotation), effective_clip, page_bbox, rotation
                 )
                 if not ancestor_ids:
-                    clipped = _clipped_form_extent(obj, page_bbox, rotation)
+                    clipped = _shared_clipped_form_extent(obj, page_bbox, rotation, extent_cache)
                     if bbox is not None and clipped is not None:
                         bbox = _intersect_object_bbox(bbox, clipped)
                 if bbox is not None:

@@ -308,30 +308,25 @@ def _guess_ole2_suffix_by_bytes(file_bytes: bytes) -> str | None:
 
 
 def _guess_ole2_suffix_by_path(file_path: Path) -> str | None:
-    """从文件路径读取 OLE2 容器并识别旧 Office 格式。"""
+    """先检查有界 magic，仅对 OLE2 候选读取完整容器并识别旧 Office 格式。"""
     try:
-        with open(file_path, "rb") as f:
+        # 无缓冲句柄避免读过 magic 后，read() 拼接缓冲前缀与剩余正文时额外复制整份 OLE。
+        with open(file_path, "rb", buffering=0) as f:
+            if f.read(len(OLE2_SIG_BYTES)) != OLE2_SIG_BYTES:
+                return None
+            f.seek(0)
             return _guess_ole2_suffix_by_bytes(f.read())
     except OSError:
         return None
 
 
-def _has_pdf_signature_by_path(file_path: Path) -> bool:
-    """读取文件头判断路径指向的内容是否具有 PDF 强签名。"""
+def _read_signature_header_by_path(file_path: Path) -> bytes:
+    """一次读取 PDF/RTF 共用的有界文件头，读取失败时保留后续探测与报错路径。"""
     try:
         with open(file_path, "rb") as file:
-            return file.read(len(PDF_SIG_BYTES)) == PDF_SIG_BYTES
+            return file.read(128)
     except OSError:
-        return False
-
-
-def _has_rtf_signature_by_path(file_path: Path) -> bool:
-    """读取有限文件头并按共享规则识别 RTF 根组。"""
-    try:
-        with open(file_path, "rb") as file:
-            return rtf_header_offset(file.read(128)) is not None
-    except OSError:
-        return False
+        return b""
 
 
 def _resolve_signatureless_csv_suffix(detected_suffix: str, file_path: str | Path | None) -> str:
@@ -455,11 +450,12 @@ def guess_suffix_by_bytes(file_bytes: bytes, file_path: str | None = None) -> st
 
 
 def guess_suffix_by_path(file_path: str | Path) -> str:
-    """读取文件签名和有界 MIME 头，保持路径与字节入口一致。"""
+    """读取有界文件头与容器身份，保留路径入口既有的强签名优先级。"""
     if not isinstance(file_path, Path):
         file_path = Path(file_path)
 
-    if _has_rtf_signature_by_path(file_path):
+    header = _read_signature_header_by_path(file_path)
+    if rtf_header_offset(header) is not None:
         return "rtf"
 
     ofd_suffix = _guess_ofd_suffix_by_path(file_path)
@@ -482,7 +478,8 @@ def guess_suffix_by_path(file_path: str | Path) -> str:
     if ole2_suffix:
         return ole2_suffix
 
-    if _has_pdf_signature_by_path(file_path):
+    # 路径入口原本优先识别尾部 ZIP 包；不能因前置读取 PDF 头而改变混合文件判型。
+    if header.startswith(PDF_SIG_BYTES):
         return "pdf"
 
     with file_path.open("rb") as source:

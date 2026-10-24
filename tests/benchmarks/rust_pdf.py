@@ -8,7 +8,7 @@ from copy import deepcopy
 from dataclasses import asdict
 import gc
 import hashlib
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 import json
 import os
 from pathlib import Path
@@ -33,6 +33,55 @@ def digest(value: object) -> str:
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
 
 
+def environment_identity() -> dict:
+    """记录解释器和实际依赖版本，阻止环境变化后复用旧计时或内存记录。"""
+    dependencies = {}
+    for name in (
+        "pypdfium2",
+        "pypdf",
+        "numpy",
+        "pydantic",
+        "pillow",
+        "reportlab",
+        "psutil",
+        "onnxruntime",
+        "onnxruntime-directml",
+        "mineru-magika",
+        "ftfy",
+        "fonttools",
+        "beautifulsoup4",
+        "lxml",
+        "nh3",
+        "python-docx",
+        "pypptx-with-oxml",
+        "mammoth",
+        "openpyxl",
+        "olefile",
+        "pylatexenc",
+        "latex2mathml",
+        "mathml2omml",
+        "resvg_py",
+        "ziamath",
+        "metafile-render",
+        "click",
+        "loguru",
+    ):
+        try:
+            dependencies[name] = version(name)
+        except PackageNotFoundError:
+            # 平台互斥依赖也记录缺失状态，后续安装或移除时可识别环境变化。
+            dependencies[name] = None
+    return {
+        "implementation": platform.python_implementation(),
+        "python": sys.version,
+        "executable": str(Path(sys.executable).resolve()),
+        "prefix": str(Path(sys.prefix).resolve()),
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "dependencies": dependencies,
+    }
+
+
 def source_identity(package: Path) -> dict:
     """记录真正导入的源码指纹，冻结副本不能借用父目录仓库的 HEAD。"""
     package = package.resolve()
@@ -40,10 +89,17 @@ def source_identity(package: Path) -> dict:
     marker = source_root / "benchmark-revision.json"
     commit = None
     if marker.is_file():
-        commit = json.loads(marker.read_text())["commit"]
+        commit = json.loads(marker.read_text(encoding="utf-8"))["commit"]
     elif (source_root / ".git").exists():
         commit = subprocess.check_output(["git", "-C", str(source_root), "rev-parse", "HEAD"], text=True).strip()
-    files = list(package.parent.rglob("*.py"))
+    # 字体、配置等包内资源同样影响输出；扩展另由 compute 身份校验，缓存字节码不参与源码摘要。
+    files = [
+        path
+        for path in package.parent.rglob("*")
+        if path.is_file()
+        and "__pycache__" not in path.parts
+        and path.suffix not in {".pyc", ".pyo", ".so", ".pyd", ".dll", ".dylib"}
+    ]
     if (source_root / "Cargo.toml").is_file():
         files += list((source_root / "rust").rglob("*.rs"))
         files += list((source_root / "rust").rglob("*.toml"))
@@ -57,6 +113,16 @@ def source_identity(package: Path) -> dict:
     return {"source_commit": commit, "source_code_sha256": fingerprint.hexdigest()}
 
 
+def public_output(result) -> dict:
+    """统一公开解析结果的完整比较协议，计时和独立 RSS 重放使用相同字段。"""
+    return {
+        "model": result.model_json.model_dump(mode="json"),
+        "middle": result.middle_json.model_dump(mode="json"),
+        "assets": {key: hashlib.sha256(value).hexdigest() for key, value in result.assets.items()},
+        "diagnostics": [asdict(item) for item in result.diagnostics],
+    }
+
+
 def public_once(payload: bytes) -> tuple[dict, dict]:
     """测量完整公开 parse，结果序列化和素材摘要不计入解析耗时。"""
     from docvortex import parse
@@ -64,12 +130,7 @@ def public_once(payload: bytes) -> tuple[dict, dict]:
     started = time.perf_counter()
     result = parse(payload, file_suffix="pdf", keep_model_json=True)
     elapsed = time.perf_counter() - started
-    return {"parse": elapsed}, {
-        "model": result.model_json.model_dump(mode="json"),
-        "middle": result.middle_json.model_dump(mode="json"),
-        "assets": {key: hashlib.sha256(value).hexdigest() for key, value in result.assets.items()},
-        "diagnostics": [asdict(item) for item in result.diagnostics],
-    }
+    return {"parse": elapsed}, public_output(result)
 
 
 def shared_once(payload: bytes, model: list) -> tuple[dict, dict]:
@@ -144,6 +205,7 @@ def worker(args: argparse.Namespace) -> None:
 
     logger.disable("docvortex")
     identity = source_identity(Path(docvortex.__file__))
+    environment = environment_identity()
     path = Path(args.worker)
     payload = path.read_bytes()
     source_hash = hashlib.sha256(payload).hexdigest()
@@ -153,11 +215,11 @@ def worker(args: argparse.Namespace) -> None:
     model = None
     regions_hash = None
     if args.suite == "shared":
-        baseline = json.loads((args.flash_baseline / "report.json").read_text())
+        baseline = json.loads((args.flash_baseline / "report.json").read_text(encoding="utf-8"))
         record = next((r for r in baseline["documents"] if r["source_sha256"] == source_hash), None)
         if record is None:
             raise ValueError("Source PDF is missing from the frozen Flash baseline")
-        model = json.loads((args.flash_baseline / record["artifact"] / "output.json").read_text())["model_list"]
+        model = json.loads((args.flash_baseline / record["artifact"] / "output.json").read_text(encoding="utf-8"))["model_list"]
         regions_hash = digest(model)
     times = defaultdict(list)
     expected = None
@@ -167,6 +229,7 @@ def worker(args: argparse.Namespace) -> None:
         "source_sha256": source_hash,
         "source_package": str(Path(docvortex.__file__).resolve()),
         "compute": backend_info(),
+        "environment": environment,
         **identity,
         "status": "timing",
         "onnxruntime_telemetry": "disabled_before_import",
@@ -179,10 +242,15 @@ def worker(args: argparse.Namespace) -> None:
         durations, output = public_once(payload) if args.suite == "public" else shared_once(payload, model)
         current = digest(output)
         if expected is not None and current != expected:
+            write_json(args.output / f"output-run-{run}-mismatch.json", output)
+            progress.update(status="failed", failed_run=run, actual_full_output_sha256=current)
+            write_json(args.output / "progress.json", progress)
             raise AssertionError(f"Non-deterministic output: {path}")
         expected = current
         if run == 0:
             first = durations
+            # 先保留完整预热输出，后续不稳定时可同时检查参考与失败那一轮的全部字段。
+            write_json(args.output / "output.json", output)
         else:
             for stage, value in durations.items():
                 times[stage].append(value)
@@ -209,6 +277,7 @@ def worker(args: argparse.Namespace) -> None:
         "source_version": __version__,
         "source_package": str(Path(docvortex.__file__).resolve()),
         "compute": backend_info(),
+        "environment": environment,
         **identity,
     }
     write_json(args.output / "timing-result.json", record)
@@ -260,14 +329,14 @@ def main() -> None:
         if args.flash_baseline:
             command += ["--flash-baseline", str(args.flash_baseline.resolve())]
         subprocess.run(command, cwd=ROOT, check=True)
-        record = json.loads((folder / "timing-result.json").read_text())
+        record = json.loads((folder / "timing-result.json").read_text(encoding="utf-8"))
         config = {
             **record,
             "suite": args.suite,
             "flash_baseline": str(args.flash_baseline.resolve()) if args.flash_baseline else None,
         }
         write_json(folder / "memory-input.json", config)
-        progress = json.loads((folder / "progress.json").read_text())
+        progress = json.loads((folder / "progress.json").read_text(encoding="utf-8"))
         progress["status"] = "memory"
         write_json(folder / "progress.json", progress)
         subprocess.run(
@@ -282,7 +351,7 @@ def main() -> None:
             cwd=ROOT,
             check=True,
         )
-        memory = json.loads((folder / "isolated-memory/result.json").read_text())
+        memory = json.loads((folder / "isolated-memory/result.json").read_text(encoding="utf-8"))
         assert memory["equal"] and memory["full_output_sha256"] == record["full_output_sha256"]
         record["memory"] = memory["memory"]
         record["memory_method"] = memory["method"]
@@ -304,7 +373,7 @@ def main() -> None:
         "documents": records,
     }
     if args.baseline:
-        old = json.loads((args.baseline / "report.json").read_text())
+        old = json.loads((args.baseline / "report.json").read_text(encoding="utf-8"))
         if old["suite"] != args.suite or len(old["documents"]) != len(records):
             raise AssertionError("Different benchmark suite or corpus")
         comparisons = []

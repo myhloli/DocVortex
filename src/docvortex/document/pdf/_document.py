@@ -706,12 +706,19 @@ class PDFDocument:
                 raw_rotation = 0
             rotation = raw_rotation if raw_rotation in {0, 90, 180, 270} else 0
             drawings, paths = _extract_page_paths_and_lines(page, page_bbox, raw_rotation)
-            form_bboxes = _extract_page_form_bboxes(page, page_bbox, raw_rotation)
-            form_infos = ()
-            if form_bboxes:
-                from .form_structure import extract_form_structure
+            # 只在两个只读 Form 消费者之间复用，正常或异常退出均在页面关闭前释放。
+            form_extents = {}
+            try:
+                form_bboxes = _extract_page_form_bboxes(page, page_bbox, raw_rotation, extent_cache=form_extents)
+                form_infos = ()
+                if form_bboxes:
+                    from .form_structure import extract_form_structure
 
-                form_infos = extract_form_structure(page, page_bbox, rotation, self._get_form_resource_page(page_idx))
+                    form_infos = extract_form_structure(
+                        page, page_bbox, rotation, self._get_form_resource_page(page_idx), extent_cache=form_extents
+                    )
+            finally:
+                form_extents.clear()
             text = self._extract_owned_text_snapshot(page_idx, page, visible_only=True)
             native_text = None if isinstance(text, PDFPageTextGeometry) else text
             return _PDFPageSnapshot(

@@ -144,7 +144,7 @@ def postprocess(
     analysis: AnalysisResult | ModelJson, *, assets: AssetStore | None = None, keep_model_json: bool = False
 ) -> DocumentResult:
     """执行确定性后处理并物化结果素材，智能增强由上层显式调用。"""
-    from .export.files import materialize_middle
+    from .export._images import _materialize_owned_images
     from .postprocess.document import model_json_to_middle_json
 
     if isinstance(analysis, AnalysisResult):
@@ -160,7 +160,8 @@ def postprocess(
             if diagnostic.code == "broken_page" and diagnostic.page_index is not None:
                 pages.setdefault(diagnostic.page_index, PageInfo(page_idx=diagnostic.page_index))
         middle.pages = [pages[index] for index in sorted(pages)]
-    middle, result_assets = materialize_middle(middle, assets)
+    # 转换层已深复制页面、metadata 和 extensions；此新文档尚未交给外部调用方。
+    middle, result_assets = _materialize_owned_images(middle, assets)
     return DocumentResult(middle, result_assets, model if keep_model_json else None, diagnostics)
 
 

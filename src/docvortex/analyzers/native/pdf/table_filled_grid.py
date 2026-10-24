@@ -1,6 +1,9 @@
 """PDF 填充单元格候选；保留原有认领顺序与判定规则。"""
 
 from __future__ import annotations
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 import re
 import statistics
 
@@ -19,6 +22,25 @@ from .table_constants import (
     _FILLED_GRID_MIN_PAGE_HEIGHT_RATIO,
     _FILLED_GRID_MIN_PAGE_WIDTH_RATIO,
 )
+
+
+_NATIVE_CJK_METRIC_CACHE: ContextVar[dict[int, tuple[list, bool]] | None] = ContextVar(
+    "docvortex_native_cjk_metric_scope", default=None
+)
+
+
+@contextmanager
+def _native_cjk_metric_scope() -> Iterator[None]:
+    """仅在原始字符度量不变的页面阶段复用判断，退出即释放字符视图引用。"""
+    parent = _NATIVE_CJK_METRIC_CACHE.get()
+    token = _NATIVE_CJK_METRIC_CACHE.set({})
+    try:
+        yield
+    finally:
+        _NATIVE_CJK_METRIC_CACHE.reset(token)
+        if parent is not None:
+            # 重入阶段可能修复同一批字符；返回外层后重新计算，避免恢复过期证据。
+            parent.clear()
 
 
 def _detect_tiled_fill_table_candidates(source: _PageSource, excluded: list[BBox]) -> list[_TableCandidate]:
@@ -154,6 +176,20 @@ def _detect_tiled_fill_table_candidates(source: _PageSource, excluded: list[BBox
 
 
 def has_inflated_native_cjk_metrics(chars: list) -> bool:
+    """同一只读阶段共享精确字符视图的判断，独立调用始终读取当前可变输入。"""
+    cache = _NATIVE_CJK_METRIC_CACHE.get()
+    if cache is None or not isinstance(chars, list):
+        return _compute_inflated_native_cjk_metrics(chars)
+    cached = cache.get(id(chars))
+    if cached is not None and cached[0] is chars:
+        return cached[1]
+    result = _compute_inflated_native_cjk_metrics(chars)
+    # 保留实际对象并核对身份，False 同样复用；引用只活到本页当前阶段结束。
+    cache[id(chars)] = (chars, result)
+    return result
+
+
+def _compute_inflated_native_cjk_metrics(chars: list) -> bool:
     """汉字墨迹正常而宽松框高度超过两倍字宽时，允许用路径补偿失真的文本行尺度。"""
     anchors = [
         char
