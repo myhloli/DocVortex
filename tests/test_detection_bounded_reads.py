@@ -132,13 +132,16 @@ def test_ole_magic_probe_does_not_duplicate_full_container(tmp_path, monkeypatch
 
 
 @pytest.mark.parametrize("suffix", ["docx", "pptx", "xlsx", "odt", "ods", "odp", "epub", "ofd"])
-@pytest.mark.parametrize("prefix,byte_suffix,path_suffix", [
-    (b"%PDF-1.7\n%%EOF\n", "pdf", None),
-    (b"{\\rtf1 body}\n", "rtf", "rtf"),
-    (b'Content-Type: multipart/related; boundary="x"\r\n\r\n', "mhtml", None),
-    (b"arbitrary self-extracting prefix\n", None, None),
-    (detection.OLE2_SIG_BYTES + b"\0" * 512, None, None),
-])
+@pytest.mark.parametrize(
+    "prefix,byte_suffix,path_suffix",
+    [
+        (b"%PDF-1.7\n%%EOF\n", "pdf", None),
+        (b"{\\rtf1 body}\n", "rtf", "rtf"),
+        (b'Content-Type: multipart/related; boundary="x"\r\n\r\n', "mhtml", None),
+        (b"arbitrary self-extracting prefix\n", None, None),
+        (detection.OLE2_SIG_BYTES + b"\0" * 512, None, None),
+    ],
+)
 def test_prefixed_zip_keeps_existing_entrypoint_priorities(suffix, prefix, byte_suffix, path_suffix, tmp_path) -> None:
     """锁定 PDF/MHTML 与尾部 ZIP 的既有入口差异，不把性能修改变成判型迁移。"""
     data = prefix + source_payload(suffix)
@@ -148,10 +151,28 @@ def test_prefixed_zip_keeps_existing_entrypoint_priorities(suffix, prefix, byte_
     assert detection.guess_suffix_by_bytes(data, str(source)) == (byte_suffix or suffix)
 
 
-@pytest.mark.parametrize("suffix", [
-    "pdf", "doc", "docx", "ppt", "pptx", "xls", "xlsx", "rtf", "csv", "tsv", "html",
-    "mhtml", "epub", "ofd", "odt", "ods", "odp",
-])
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        "pdf",
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "xls",
+        "xlsx",
+        "rtf",
+        "csv",
+        "tsv",
+        "html",
+        "mhtml",
+        "epub",
+        "ofd",
+        "odt",
+        "ods",
+        "odp",
+    ],
+)
 def test_supported_formats_keep_bytes_and_path_results(suffix, tmp_path) -> None:
     """真实样例及有效合成容器在路径和字节入口得到既有格式结论。"""
     data = source_payload(suffix)
@@ -160,13 +181,16 @@ def test_supported_formats_keep_bytes_and_path_results(suffix, tmp_path) -> None
     assert detection.guess_suffix_by_path(str(source)) == detection.guess_suffix_by_bytes(data, str(source)) == suffix
 
 
-@pytest.mark.parametrize("data", [
-    detection.OLE2_SIG_BYTES + b"\0" * 512,
-    b"PK\x03\x04truncated zip",
-    b"%PD fake signature",
-    b"not an office container",
-    b"",
-])
+@pytest.mark.parametrize(
+    "data",
+    [
+        detection.OLE2_SIG_BYTES + b"\0" * 512,
+        b"PK\x03\x04truncated zip",
+        b"%PD fake signature",
+        b"not an office container",
+        b"",
+    ],
+)
 @pytest.mark.parametrize("extension,expected", [("doc", "unknown"), ("docx", "unknown"), ("csv", "csv"), ("htm", "html")])
 def test_invalid_headers_and_packages_keep_verified_fallbacks(data, extension, expected, tmp_path, monkeypatch) -> None:
     """伪造头部与损坏包不能绕过 Office 身份验证，文本扩展名回退保持不变。"""

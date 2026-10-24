@@ -59,15 +59,18 @@ def _track_documents(monkeypatch) -> list[tuple[object, object]]:
     return documents
 
 
-@pytest.mark.parametrize("arguments,expected", [
-    ({}, [0, 1, 2, 3, 4, 5]),
-    ({"start_page_id": 1, "end_page_id": 3}, [1, 2, 3]),
-    ({"start_page_id": -2, "end_page_id": 2}, [0, 1, 2]),
-    ({"start_page_id": 4, "end_page_id": 99}, [4, 5]),
-    ({"start_page_id": 3, "end_page_id": -1}, [3, 4, 5]),
-    ({"page_indices": [5, 1, 1, -1, 50, 0]}, [0, 1, 5]),
-    ({"page_indices": [4, 2], "start_page_id": 0, "end_page_id": 0}, [2, 4]),
-])
+@pytest.mark.parametrize(
+    "arguments,expected",
+    [
+        ({}, [0, 1, 2, 3, 4, 5]),
+        ({"start_page_id": 1, "end_page_id": 3}, [1, 2, 3]),
+        ({"start_page_id": -2, "end_page_id": 2}, [0, 1, 2]),
+        ({"start_page_id": 4, "end_page_id": 99}, [4, 5]),
+        ({"start_page_id": 3, "end_page_id": -1}, [3, 4, 5]),
+        ({"page_indices": [5, 1, 1, -1, 50, 0]}, [0, 1, 5]),
+        ({"page_indices": [4, 2], "start_page_id": 0, "end_page_id": 0}, [2, 4]),
+    ],
+)
 def test_rewrite_maps_actual_imported_pages_without_reopening(payload, arguments, expected, monkeypatch) -> None:
     """标准化只执行一次、原文只打开一次，实际输出内容与映射逐页对应。"""
     documents = _track_documents(monkeypatch)
@@ -99,10 +102,15 @@ def test_byte_helpers_keep_return_type_and_actual_selected_content(payload, entr
     assert _page_states(result) == [_page_states(payload)[index] for index in [0, 4]]
 
 
-@pytest.mark.parametrize("arguments", [
-    {"page_indices": []}, {"page_indices": [-1, 99]}, {"start_page_id": 5, "end_page_id": 2},
-    {"start_page_id": 99},
-])
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"page_indices": []},
+        {"page_indices": [-1, 99]},
+        {"start_page_id": 5, "end_page_id": 2},
+        {"start_page_id": 99},
+    ],
+)
 def test_empty_selection_keeps_raw_empty_and_safe_original(payload, arguments, monkeypatch) -> None:
     """低层空选择仍返回空字节，安全入口仍回退原文且不提供虚假页号。"""
     documents = _track_documents(monkeypatch)
@@ -227,10 +235,20 @@ def test_font_error_still_propagates_after_cleanup(payload, failing_attempt, mon
 
 
 @pytest.mark.parametrize("caller_owned", [False, True])
-@pytest.mark.parametrize("selection,expected", [
-    ("", None), ("all", None), ("1,3,3,r1", [0, 2, 5]), ("2-4", [1, 2, 3]),
-    ("4-99", [3, 4, 5]), ("r3-r1", [3, 4, 5]), ("99", "error"), ("3-1", "error"), ("r99", "error"),
-])
+@pytest.mark.parametrize(
+    "selection,expected",
+    [
+        ("", None),
+        ("all", None),
+        ("1,3,3,r1", [0, 2, 5]),
+        ("2-4", [1, 2, 3]),
+        ("4-99", [3, 4, 5]),
+        ("r3-r1", [3, 4, 5]),
+        ("99", "error"),
+        ("3-1", "error"),
+        ("r99", "error"),
+    ],
+)
 def test_prepare_source_mapping_metadata_and_ownership(payload, caller_owned, selection, expected, monkeypatch) -> None:
     """上层选页保留源属性与原页号，成功和失败均不得关闭调用方借出的文档。"""
     documents = _track_documents(monkeypatch)
