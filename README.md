@@ -48,6 +48,8 @@ DocVortex does not download models or perform PDF OCR. When OCR is required, it 
 
 Same-machine warm-run comparison on 32 PDFs / 299 pages (31 PDFs for Flash). The existing 0.4.25 measurements are reused. For 0.5.10, each document is warmed once and timed five times in each of three balanced rounds; times sum the medians of the three per-document medians. RSS reductions are medians of per-document process-tree peak RSS reductions. MinerU results include improvements in both projects. The shared pipeline excludes model computation; excluding the extreme dense-table sample, its speedup is **2.87×**.
 
+The [non-PDF optimization report](https://github.com/myhloli/DocVortex/blob/main/docs/optimization-final-report-2026-10-25.md) records the original-to-final comparison, per-format timings, memory checks and remaining hotspots.
+
 ## Quick start
 
 Requires **GIL-enabled CPython 3.11–3.14**, **pypdfium2 5.13.0 or newer**, and **ONNX Runtime 1.24.4 or newer** (DirectML on Windows x64).

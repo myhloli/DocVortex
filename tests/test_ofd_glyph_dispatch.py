@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.parametrize("embedded", [False, True])
-@pytest.mark.parametrize("count", [7, 8, 16, 24, 31, 32, 33, 255, 256, 257])
+@pytest.mark.parametrize("count", [7, 8, 16, 24, 31, 32, 33, 63, 64, 65, 255, 256, 257])
 def test_dispatch_keeps_complete_glyphs_and_independent_budgets(embedded: bool, count: int) -> None:
     """只改变原生分流门槛，三个实现的字形、坐标、类型、样式及全部预算保持一致。"""
     content = (
@@ -56,7 +56,7 @@ def test_dispatch_keeps_complete_glyphs_and_independent_budgets(embedded: bool, 
                 after = native.ofd_glyph_geometry_stats()
             metrics.close()
     assert _exact(results[0]) == _exact(results[1]) == _exact(results[2])
-    assert after[1] - before[1] == (count if count >= (32 if embedded else 8) else 0)
+    assert after[1] - before[1] == (count if count >= (64 if embedded else 8) else 0)
 
 
 def test_real_embedded_font_uses_scalar_short_text_and_keeps_public_output(monkeypatch: pytest.MonkeyPatch) -> None:

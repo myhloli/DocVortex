@@ -4,7 +4,7 @@
 
 本轮先消除已确认的重复扫描、复制、解析和投影，再根据剩余热点选择连续计算阶段迁移 Rust。保持公开 API、完整 ModelJson/MiddleJson、素材、诊断和导出语义。此前 B0–B8 的结果继续有效，B5 仍按既有决定不实施。
 
-当前进度：N0–N6、R1、R2、R3A、R3B、R4A、R4B和R4C均已完成本机验收，分别见 [首轮报告](optimization-nonpdf-round1-report.md)、[R1报告](optimization-r1-report.md)、[R2报告](optimization-r2-report.md)、[R3A报告](optimization-r3a-report.md)、[R3B报告](optimization-r3b-report.md)、[R4A报告](optimization-r4a-report.md)、[R4B报告](optimization-r4b-report.md)、[R4C报告](optimization-r4c-report.md)。R4C保持协议40，每字体至多1024项成功原始边界复用，两份重复压力合计热耗时下降46.70%、普通真实OFD约-12.64%；13447项测试、59份完整输出、406次实际导出和两个Python安装验证通过。全新字形主测约+8.07%/1.79ms，反序约+3.58%/0.68ms，成本完整保留。跨平台交付收口尚待执行。此前暂停记录见 [R1暂停检查点](optimization-r1-checkpoint-2026-10-25.md)。
+当前进度：N0–N6、R1、R2、R3A、R3B、R4A、R4B和R4C均已完成本机验收，分别见 [首轮报告](optimization-nonpdf-round1-report.md)、[R1报告](optimization-r1-report.md)、[R2报告](optimization-r2-report.md)、[R3A报告](optimization-r3a-report.md)、[R3B报告](optimization-r3b-report.md)、[R4A报告](optimization-r4a-report.md)、[R4B报告](optimization-r4b-report.md)、[R4C报告](optimization-r4c-report.md)。R4C保持协议40，每字体至多1024项成功原始边界复用，两份重复压力合计热耗时下降46.70%、普通真实OFD约-12.64%；13447项测试、59份完整输出、406次实际导出和两个Python安装验证通过。全新字形主测约+8.07%/1.79ms，反序约+3.58%/0.68ms，成本完整保留。R5跨平台CI20/20及发行矩阵8/8已通过；最终累计对照与R6修正见 [总报告](optimization-final-report-2026-10-25.md)。此前暂停记录见 [R1暂停检查点](optimization-r1-checkpoint-2026-10-25.md)。
 
 ## 1. 工作区和基线
 
@@ -45,7 +45,7 @@ R3A已于2026-10-25完成本机验收：OFD连接与拓扑使用方向/坐标索
 
 R3B已于2026-10-25完成本机验收：最多256字的Rust批次完成逐字矩阵组合、quad外接框和裁剪，保留Python的Delta/原点/距离/字体解释与所有预算。46份累计输入完整输出一致，14份首次调用及RSS检查通过。整数裁剪框保留原类型路径；普通真实OFD初测超过5%，反序复测约+4.65%，该成本不以压力场景收益掩盖。
 
-OFD阅读方向/基线投影及原始字形边界复用、HTML/EPUB Span内部连续处理、旧DOC/PPT区间处理、CSV输出构造、PDF Form桥接和裁图调度保留为后续独立项，先按新profile选择。WMF/EMF热点属于 `metafile-render` 依赖边界，不混入本轮DocVortex补丁。MTEF已有结果缓存，暂不重复造缓存或整体重写。
+OFD阅读方向/基线投影及原始字形边界复用已在R4B/R4C完成。HTML/EPUB Span内部连续处理、旧DOC/PPT区间处理、CSV输出构造、PDF Form桥接和裁图调度保留为后续独立项，先按新profile选择。WMF/EMF热点属于 `metafile-render` 依赖边界，不混入本轮DocVortex补丁。MTEF已有结果缓存，暂不重复造缓存或整体重写。
 
 ## 3.1. R4后续批次
 
@@ -53,6 +53,8 @@ OFD阅读方向/基线投影及原始字形边界复用、HTML/EPUB Span内部�
 - **R4B（本机验收通过）**：单次bbox/长行基线复用旋转系数，一次合段内最多64项不可变bbox身份缓存；三份目标压力合计热耗时下降26.96%，13199项测试、56份完整输出、392次导出和Python3.11/3.14安装通过。Rust与协议40不变，无需新增原生接口；真实issue121约+4.96%成本完整保留，见 [R4B报告](optimization-r4b-report.md)。
 - **R4C（本机验收通过）**：新profile确认成功字形重复描边仍显著后，按本次只读字体缓存最多1024项原始边界，满后停止新增；缩放、advance hint、空/失败重试和关闭生命周期保持原行为。两份重复压力合计约-46.70%，13447项测试、59份完整输出、406次实际导出和Python3.11/3.14同wheel安装通过；全新字形主测+8.07%、反序+3.58%的未命中成本保留，见 [R4C报告](optimization-r4c-report.md)。
 - **R5累计交付收口**：已补常规CI、五平台wheel和Windows ARM64双Python的非PDF真实入口及2363项统一分批回归，本机Python3.11/3.14的安装验收通过。机制及本机结果见 [R5报告](optimization-r5-report.md)；跨平台结论以相同提交的Actions及R5证据目录记录为准。之后对HTML/EPUB、旧DOC/PPT、CSV的剩余成本重新排序；提交、推送和发布分别记录。
+
+- **R6最终收口**：共同原始基线直接对照54份最终输入，真实14份约-5.29%、压力30份约-50.16%、全部54份约-29.38%；嵌入字体门槛调整为64以消除累计发现的短批次GC回退。完整结果及候选排序见 [总报告](optimization-final-report-2026-10-25.md)。
 
 ## 4. 验收要求
 

@@ -494,8 +494,8 @@ def _build_glyph_items(
     object_clip: BBox,
 ) -> list[GlyphItem]:
     """长TextCode默认走原生小批，短文本和自定义合同保留原逐字调用链。"""
-    # 嵌入字体的短批次由FontTools描边主导，至少32字再摊销传输与物化成本；普通回退字体保持8字门槛。
-    minimum_count = 32 if type(font) is FontResource and font.font_part is not None else 8
+    # 边界复用后短嵌入批次的临时对象可能触发额外GC，至少64字再摊销传输与物化；回退字体仍为8字。
+    minimum_count = 64 if type(font) is FontResource and font.font_part is not None else 8
     if (
         len(text) >= minimum_count
         and len(text) == len(origins)
