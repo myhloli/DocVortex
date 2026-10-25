@@ -71,7 +71,7 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment }}
           CIBW_TEST_REQUIRES: pytest psutil pypdfium2==5.13.0
           CIBW_TEST_SKIP: ${{ inputs.skip_ci && '*' || '' }}
-          CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_rule_graphics_acceleration.py {project}/tests/test_rule_text_acceleration.py {project}/tests/test_rule_pixel_form_acceleration.py {project}/tests/test_rule_layout_batch_acceleration.py {project}/tests/test_rule_numeric_graphics_acceleration.py {project}/tests/test_rule_fill_bands_acceleration.py {project}/tests/test_native_statistics.py {project}/tests/test_native_round3.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py {project}/tests/test_native_round6.py {project}/tests/test_native_round7.py {project}/tests/test_pdfium_bridge.py {project}/tests/test_pdf_object_bridge.py {project}/tests/test_pdf_classify_page_loading.py {project}/tests/test_pdf_classify_resource_graph.py {project}/tests/test_pdf_drawing_lines_extraction.py {project}/tests/test_pdf_native_graphics_components.py {project}/tests/unittest/test_flash_pdf_auxiliary_text.py {project}/tests/test_pdf_snapshot.py {project}/tests/test_native_inline_styles.py {project}/tests/test_native_bitmap_crops.py {project}/tests/test_pdf_render_session.py {project}/tests/test_native_font_runtime.py {project}/tests/test_native_text_pipeline.py {project}/tests/test_native_text_snapshot.py {project}/tests/test_native_classification.py {project}/tests/test_native_image_text_classification.py {project}/tests/unittest/test_pdf_classify_image_text.py {project}/tests/unittest/test_flash_pdf_char_geometry.py {project}/tests/test_native_table_candidates.py {project}/tests/test_native_candidate_boundaries.py {project}/tests/test_native_annotation_geometry.py {project}/tests/unittest/test_native_pdf_table_demo_manifest.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q && python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo2.pdf
+          CIBW_TEST_COMMAND: python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo1.pdf && python -m pytest {project}/tests/test_native_parity.py {project}/tests/test_rule_graphics_acceleration.py {project}/tests/test_rule_text_acceleration.py {project}/tests/test_rule_pixel_form_acceleration.py {project}/tests/test_rule_layout_batch_acceleration.py {project}/tests/test_rule_numeric_graphics_acceleration.py {project}/tests/test_rule_fill_bands_acceleration.py {project}/tests/test_native_statistics.py {project}/tests/test_native_round3.py {project}/tests/test_native_round4.py {project}/tests/test_native_round5.py {project}/tests/test_native_round6.py {project}/tests/test_native_round7.py {project}/tests/test_pdfium_bridge.py {project}/tests/test_pdf_object_bridge.py {project}/tests/test_pdf_classify_page_loading.py {project}/tests/test_pdf_classify_resource_graph.py {project}/tests/test_pdf_drawing_lines_extraction.py {project}/tests/test_pdf_native_graphics_components.py {project}/tests/unittest/test_flash_pdf_auxiliary_text.py {project}/tests/test_pdf_snapshot.py {project}/tests/test_native_inline_styles.py {project}/tests/test_native_bitmap_crops.py {project}/tests/test_pdf_render_session.py {project}/tests/test_native_font_runtime.py {project}/tests/test_native_text_pipeline.py {project}/tests/test_native_text_snapshot.py {project}/tests/test_native_classification.py {project}/tests/test_native_image_text_classification.py {project}/tests/unittest/test_pdf_classify_image_text.py {project}/tests/unittest/test_flash_pdf_char_geometry.py {project}/tests/test_native_table_candidates.py {project}/tests/test_native_candidate_boundaries.py {project}/tests/test_native_annotation_geometry.py {project}/tests/unittest/test_native_pdf_table_demo_manifest.py {project}/tests/test_pdf_analysis_api.py {project}/tests/test_pdf_cpu_evidence.py -q && python {project}/tools/verify_native_wheel.py {project}/demo/pdfs/demo2.pdf && python {project}/tools/verify_nonpdf_wheel.py --output {project}/build/nonpdf-cp311 --run-tests
         run: uvx --from "cibuildwheel>=3.1,<4" cibuildwheel --output-dir wheelhouse
       - name: Verify binary ABI on Python 3.14 without optional application dependencies
         if: ${{ !inputs.skip_ci }}
@@ -84,6 +84,17 @@ jobs:
       - name: Verify installed wheel and real parsing
         if: ${{ !inputs.skip_ci }}
         run: uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
+      - name: Verify non-PDF installed wheel and bounded regressions
+        if: ${{ !inputs.skip_ci }}
+        run: uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/verify_nonpdf_wheel.py --output build/nonpdf-current --run-tests
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() && !inputs.skip_ci }}
+        with:
+          name: nonpdf-release-${{ matrix.name }}
+          path: |
+            build/nonpdf-cp311/
+            build/nonpdf-current/
+          retention-days: 14
       - name: Verify Windows ARM64 native installation and reportlab fallback
         if: ${{ matrix.os == 'windows-11-arm' && !inputs.skip_ci }}
         run: uv run --no-project python tools/verify_windows_arm64_install.py
@@ -140,6 +151,14 @@ jobs:
           uv run --no-project python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
           uv run --no-project python tools/generate_dense_pdf.py dense-table.pdf
           uv run --no-project python tools/verify_native_wheel.py dense-table.pdf --expectation dense-table
+      - name: Verify non-PDF ARM64 wheel on both Python endpoints
+        run: uv run --no-project python tools/verify_nonpdf_wheel.py --output build/nonpdf-arm64 --run-tests
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: nonpdf-windows-arm64-${{ matrix.python }}
+          path: build/nonpdf-arm64/
+          retention-days: 14
       - name: Verify PDFium bridge, native contracts and reportlab PDF export
         run: >-
           uv run --no-project python -m pytest

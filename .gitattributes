@@ -11,3 +11,6 @@
 *.json text eol=lf
 *.py text eol=lf
 *.ttf binary
+# 多格式安装验收按原字节摘要绑定网页输入，禁止Windows检出改写换行。
+/demo/web_docs/*.html -text
+/demo/web_docs/*.mhtml -text

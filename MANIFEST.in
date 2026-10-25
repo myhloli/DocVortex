@@ -10,4 +10,5 @@ global-exclude __pycache__ *.py[cod] .DS_Store
 include Cargo.toml Cargo.lock rust-toolchain.toml
 recursive-include rust *.toml *.rs
 include tools/verify_native_wheel.py tools/verify_native_abi.py tools/verify_windows_arm64_install.py tools/verify_runtime_dependencies.py
+include tools/verify_nonpdf_wheel.py tools/prepare_nonpdf_corpus.py tools/verify_release_package.py
 global-exclude *.so *.pyd

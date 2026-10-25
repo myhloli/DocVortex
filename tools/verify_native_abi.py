@@ -97,6 +97,28 @@ def verify_binary(binary: Path) -> None:
     assert native.lane_gap([], [], [], []) == (0.35, 0.0)
     assert native.grid_parents(4, [(0, 1)]) == [0, 0, 2, 3]
     assert native.coverage_batch([(0, 1, 0, 10)], [(0, [1], 0, 10, 0)]) == [1.0]
+    # 用非空输入真正执行协议37至40新增内核，不能只核对导出名称。
+    points = [(0, 0), (0, 1)]
+    regions = [([(0, 0), (0, 1)], (0, 0, 0, 1))]
+    assert native.spreadsheet_discover_regions(points, points, [], 1, 2, 0) == regions
+    assert native.spreadsheet_select_regions(points, points, [], points, [], 1, 2) == (1, 0.0, regions, [0], [])
+    assert native.spreadsheet_keep_maximal_semantic_sets([[(0, 0)], points, points]) == [1, 2]
+    assert native.spreadsheet_region_stats() == (1, 1, 1)
+    assert native.rtf_group_spans(b"{x{y}}", False, 100, 10) == ([(2, 5)], None)
+    assert native.rtf_group_stats() == (1, 6, 1, 0)
+    lines = [(True, y, 0.0, 10.0) for y in (0.0, 5.0, 10.0)] + [(False, x, 0.0, 10.0) for x in (0.0, 5.0, 10.0)]
+    assert native.ofd_table_components(lines, 0, 1000) == ([[0, 1, 2, 3, 4, 5]], 15, False)
+    assert native.ofd_table_logical_cells([0.0, 5.0, 10.0], [0.0, 5.0, 10.0], lines, 0, 1000) == (
+        [[0, 0, 1, 1], [0, 1, 1, 2], [1, 0, 2, 1], [1, 1, 2, 2]],
+        24,
+        False,
+    )
+    assert native.ofd_table_stats()[:2] == (1, 1)
+    identity = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+    assert native.ofd_glyph_geometries(
+        identity, identity, [(1.0, 2.0)], [(0.0, -1.0, 2.0, 3.0)], (-100.0, -100.0, 100.0, 100.0)
+    ) == [((1.0, 1.0, 3.0, 5.0), ((1.0, 1.0), (3.0, 1.0), (3.0, 5.0), (1.0, 5.0)), (1.0, 2.0))]
+    assert native.ofd_glyph_geometry_stats() == (1, 1, 1)
 
 
 def verify(directory: Path) -> None:

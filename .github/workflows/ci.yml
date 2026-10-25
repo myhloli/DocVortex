@@ -141,8 +141,16 @@ jobs:
           uv run --no-project python tools/ci_wheel_reuse.py install wheelhouse "pypdfium2==5.13.0" "${{ matrix.os == 'windows-latest' && 'onnxruntime-directml' || 'onnxruntime' }}==1.24.4"
       - name: Verify shared wheel ABI on this Python
         run: uv run --no-project python tools/verify_native_abi.py wheelhouse
+      - name: Verify non-PDF installed public paths
+        run: uv run --no-project python tools/verify_nonpdf_wheel.py --output build/nonpdf-wheel
       - name: Test installed package
         run: uv run --no-project python tools/ci_build_metrics.py run --profile wheel --name tests -- uv run --no-project python -m pytest -q -n auto
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: nonpdf-wheel-${{ matrix.os }}-${{ matrix.python }}
+          path: build/nonpdf-wheel/
+          retention-days: 14
       - name: Verify independent installation
         run: uv run --no-project python -c "import importlib.util, docvortex; assert importlib.util.find_spec('docgale') is None; assert importlib.util.find_spec('mineru') is None; assert importlib.util.find_spec('pdftext') is None; assert importlib.util.find_spec('fast_langdetect') is None; assert importlib.util.find_spec('fasttext') is None; assert importlib.util.find_spec('cv2') is None"
       - name: Verify platform runtime distributions
@@ -175,6 +183,14 @@ jobs:
       - name: Install verified wheel
         run: >-
           uv run --no-project python tools/ci_wheel_reuse.py install wheelhouse "pypdfium2==5.13.0"
+      - name: Verify non-PDF numeric and parser contracts
+        run: uv run --no-project python tools/verify_nonpdf_wheel.py --output build/nonpdf-wheel --run-tests
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() }}
+        with:
+          name: nonpdf-wheel-python-${{ matrix.python }}
+          path: build/nonpdf-wheel/
+          retention-days: 14
       - name: Verify native numeric and public contracts
         run: >-
           uv run --no-project python tools/ci_build_metrics.py run --profile wheel --name tests --
@@ -195,8 +211,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
-      - run: uvx ruff==0.14.2 check src tools/ci_build_metrics.py tools/ci_wheel_reuse.py
-      - run: uvx ruff==0.14.2 format --check src tools/ci_build_metrics.py tools/ci_wheel_reuse.py
+      - run: uvx ruff==0.14.2 check src tools/ci_build_metrics.py tools/ci_wheel_reuse.py tools/verify_nonpdf_wheel.py tools/verify_native_abi.py
+      - run: uvx ruff==0.14.2 format --check src tools/ci_build_metrics.py tools/ci_wheel_reuse.py tools/verify_nonpdf_wheel.py tools/verify_native_abi.py
 
   # native-wheels.yml 不再随 push/PR 触发后，Rust 静态检查与单元测试由本工作流把守。
   rust-checks:
