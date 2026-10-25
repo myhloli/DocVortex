@@ -123,12 +123,27 @@ def public_output(result) -> dict:
     }
 
 
-def public_once(payload: bytes) -> tuple[dict, dict]:
+def public_parse_options(file_suffix: str = "pdf", source_context: dict | None = None) -> dict:
+    """固定公开字节入口及 HTML 来源；拒绝未冻结的本地资源目录。"""
+    options = {"file_suffix": file_suffix, "keep_model_json": True}
+    if source_context is not None:
+        from docvortex.document.contracts import HtmlSourceContext
+
+        if not isinstance(source_context, dict) or set(source_context) - {"source_uri", "transport_encoding"}:
+            raise ValueError("Benchmark source_context only supports source_uri and transport_encoding")
+        if any(value is not None and not isinstance(value, str) for value in source_context.values()):
+            raise ValueError("Benchmark source_context values must be strings or null")
+        options["source_context"] = HtmlSourceContext(**source_context)
+    return options
+
+
+def public_once(payload: bytes, *, file_suffix: str = "pdf", source_context: dict | None = None) -> tuple[dict, dict]:
     """测量完整公开 parse，结果序列化和素材摘要不计入解析耗时。"""
     from docvortex import parse
 
+    options = public_parse_options(file_suffix, source_context)
     started = time.perf_counter()
-    result = parse(payload, file_suffix="pdf", keep_model_json=True)
+    result = parse(payload, **options)
     elapsed = time.perf_counter() - started
     return {"parse": elapsed}, public_output(result)
 

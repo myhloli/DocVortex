@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import sys
 from typing import Iterator, TypeAlias, Union
 
+from ....._compute_backend import get_native
 from ..errors import LegacyOfficeMalformedError, LegacyOfficeResourceLimitError
 from ..limits import MAX_RECORDS
 
@@ -197,6 +199,42 @@ class RtfLexer:
             if token_count > MAX_RECORDS:
                 raise LegacyOfficeResourceLimitError(f"RTF token count exceeds max_tokens={MAX_RECORDS}")
             yield token
+
+
+_ORIGINAL_LEXER = RtfLexer
+_ORIGINAL_INIT = RtfLexer.__init__
+_ORIGINAL_ITER = RtfLexer.__iter__
+_ORIGINAL_LETTER = _is_ascii_letter
+_ORIGINAL_DIGIT = _is_ascii_digit
+_ORIGINAL_GROUP_TYPES = (RtfOpen, RtfClose)
+
+
+def _native_group_spans(data: bytes, direct_only: bool) -> list[tuple[int, int]] | None:
+    """默认词法合同下批量收集组偏移，动态词法替换继续交给原生成器。"""
+    if (
+        type(data) is not bytes
+        or type(direct_only) is not bool
+        or RtfLexer is not _ORIGINAL_LEXER
+        or RtfLexer.__init__ is not _ORIGINAL_INIT
+        or RtfLexer.__iter__ is not _ORIGINAL_ITER
+        or _is_ascii_letter is not _ORIGINAL_LETTER
+        or _is_ascii_digit is not _ORIGINAL_DIGIT
+        or (RtfOpen, RtfClose) != _ORIGINAL_GROUP_TYPES
+        or any(type(value) is not int or not 0 <= value <= sys.maxsize for value in (MAX_RECORDS, MAX_RTF_GROUP_DEPTH))
+        or type(MAX_RTF_CONTROL_PARAMETER_DIGITS) is not int
+        or MAX_RTF_CONTROL_PARAMETER_DIGITS != 10
+        or type(MIN_RTF_CONTROL_PARAMETER) is not int
+        or MIN_RTF_CONTROL_PARAMETER != -(2**31)
+        or type(MAX_RTF_CONTROL_PARAMETER) is not int
+        or MAX_RTF_CONTROL_PARAMETER != 2**31 - 1
+    ):
+        return None
+    spans, error = get_native().rtf_group_spans(data, direct_only, MAX_RECORDS, MAX_RTF_GROUP_DEPTH)
+    if error is not None:
+        resource_limit, message = error
+        error_type = LegacyOfficeResourceLimitError if resource_limit else LegacyOfficeMalformedError
+        raise error_type(message)
+    return spans
 
 
 __all__ = [

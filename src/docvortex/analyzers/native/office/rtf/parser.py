@@ -13,6 +13,7 @@ from ..._shared.hyperlink import sanitize_hyperlink_target
 from .....document.filetypes import rtf_header_offset
 from ..errors import LegacyOfficeMalformedError, LegacyOfficeResourceLimitError
 from ..limits import MAX_ASSET_TOTAL_BYTES, MAX_ENTRY_BYTES, MAX_GRID_SLOTS
+from . import lexer as lexer_module
 from .lexer import RtfBinary, RtfClose, RtfControlSymbol, RtfControlWord, RtfHexByte, RtfLexer, RtfOpen, RtfTextBytes
 from .math import parse_rtf_math
 from .models import (
@@ -425,6 +426,10 @@ def _default_encoding(data: bytes) -> str:
 
 def _group_spans(data: bytes, *, direct_only: bool = False) -> list[_GroupSpan]:
     """按二进制安全 token 边界返回共享原始 buffer 的子 group 范围。"""
+    if RtfLexer is lexer_module._ORIGINAL_LEXER and (RtfOpen, RtfClose) == lexer_module._ORIGINAL_GROUP_TYPES:
+        native_spans = lexer_module._native_group_spans(data, direct_only)
+        if native_spans is not None:
+            return [_GroupSpan(data, start, end) for start, end in native_spans]
     depth = 0
     starts: list[int] = []
     result: list[_GroupSpan] = []
@@ -454,6 +459,22 @@ def _group_destination(group: _GroupSpan) -> str | None:
 def _named_groups(data: bytes, destination: str) -> list[_GroupSpan]:
     """返回全部匹配 destination 的零拷贝 group 范围。"""
     return [group for group in _group_spans(data) if _group_destination(group) == destination]
+
+
+def _prelude_group_index(data: bytes) -> dict[str, list[_GroupSpan]]:
+    """一次完整校验后按原闭合顺序索引前导信息组，不保留无关正文组。"""
+    groups: dict[str, list[_GroupSpan]] = {
+        "fonttbl": [],
+        "stylesheet": [],
+        "listtable": [],
+        "listoverridetable": [],
+        "info": [],
+    }
+    for group in _group_spans(data):
+        destination = _group_destination(group)
+        if destination is not None and destination in groups:
+            groups[destination].append(group)
+    return groups
 
 
 def _decode_group_text(data: bytes, encoding: str) -> str:
@@ -518,9 +539,8 @@ def _decode_group_text(data: bytes, encoding: str) -> str:
     return "".join(parts)
 
 
-def _parse_fonts(data: bytes, default: str) -> dict[int, str]:
+def _parse_fonts(groups: list[_GroupSpan], default: str) -> dict[int, str]:
     """解析 fonttbl 中 font id 到字符编码的映射。"""
-    groups = _named_groups(data, "fonttbl")
     if not groups:
         return {}
     result: dict[int, str] = {}
@@ -555,9 +575,8 @@ def _style_control_value(data: bytes, name: str) -> bool | None:
     return raw_param is None or int(raw_param) != 0
 
 
-def _parse_styles(data: bytes, encoding: str) -> dict[int, _StyleDefinition]:
+def _parse_styles(groups: list[_GroupSpan], encoding: str) -> dict[int, _StyleDefinition]:
     """解析 stylesheet 的标题、outline、代码与引用样式。"""
-    groups = _named_groups(data, "stylesheet")
     if not groups:
         return {}
     result: dict[int, _StyleDefinition] = {}
@@ -629,10 +648,9 @@ def _parse_styles(data: bytes, encoding: str) -> dict[int, _StyleDefinition]:
     return resolved
 
 
-def _parse_lists(data: bytes) -> dict[int, _ListDefinition]:
+def _parse_lists(list_tables: list[_GroupSpan], override_tables: list[_GroupSpan]) -> dict[int, _ListDefinition]:
     """解析 listtable/listoverridetable 的常见编号格式与 override identity。"""
     by_list_id: dict[int, tuple[_ListLevel, ...]] = {}
-    list_tables = _named_groups(data, "listtable")
     if list_tables:
         list_table = list_tables[0].materialize()
         for list_span in _named_groups(list_table, "list"):
@@ -653,7 +671,6 @@ def _parse_lists(data: bytes) -> dict[int, _ListDefinition]:
             by_list_id[int(id_match.group("id"))] = tuple(levels)
 
     result: dict[int, _ListDefinition] = {}
-    override_tables = _named_groups(data, "listoverridetable")
     if override_tables:
         override_table = override_tables[0].materialize()
         for override_span in _named_groups(override_table, "listoverride"):
@@ -681,9 +698,8 @@ def _parse_lists(data: bytes) -> dict[int, _ListDefinition]:
     return result
 
 
-def _parse_metadata(data: bytes, encoding: str) -> RtfMetadata:
+def _parse_metadata(info_groups: list[_GroupSpan], encoding: str) -> RtfMetadata:
     """解析 info destination 中允许公开的四个字符串字段。"""
-    info_groups = _named_groups(data, "info")
     if not info_groups:
         return RtfMetadata()
     info_group = info_groups[0].materialize()
@@ -702,12 +718,13 @@ def parse_rtf_prelude(data: bytes) -> _Prelude:
         raise LegacyOfficeMalformedError("not an RTF document")
     normalized = data[offset:]
     default = _default_encoding(normalized)
+    groups = _prelude_group_index(normalized)
     return _Prelude(
         default_encoding=default,
-        font_encodings=_parse_fonts(normalized, default),
-        styles=_parse_styles(normalized, default),
-        lists=_parse_lists(normalized),
-        metadata=_parse_metadata(normalized, default),
+        font_encodings=_parse_fonts(groups["fonttbl"], default),
+        styles=_parse_styles(groups["stylesheet"], default),
+        lists=_parse_lists(groups["listtable"], groups["listoverridetable"]),
+        metadata=_parse_metadata(groups["info"], default),
     )
 
 

@@ -315,12 +315,81 @@ def region_semantic_positions(region: ConnectedRegion, has_semantic_content: Con
 
 def keep_maximal_by_semantic_sets(semantic_sets: Sequence[set[tuple[int, int]]]) -> list[int]:
     """返回语义坐标集不被其它候选严格包含的下标。"""
-    kept_indices: list[int] = []
-    for index, semantic_set in enumerate(semantic_sets):
-        if any(semantic_set < semantic_sets[other_index] for other_index in range(len(semantic_sets)) if other_index != index):
-            continue
-        kept_indices.append(index)
-    return kept_indices
+    from ....._compute_backend import get_native
+
+    return get_native().spreadsheet_keep_maximal_semantic_sets([list(points) for points in semantic_sets])
+
+
+def _native_regions(records: list) -> list[ConnectedRegion]:
+    """在 Python 返回边界恢复原有不可变区域类型及成员集合。"""
+    return [ConnectedRegion(frozenset(cells), *bounds) for cells, bounds in records]
+
+
+def discover_sparse_regions(
+    starts: Sequence[tuple[int, int]],
+    content_points: Sequence[tuple[int, int]],
+    content_rectangles: Sequence[tuple[int, int, int, int]],
+    max_row: int,
+    max_col: int,
+    gap_tolerance: int,
+) -> list[ConnectedRegion]:
+    """把稳定连接快照一次交给 Rust，避免在每个邻居位置跨语言调用。"""
+    from ....._compute_backend import get_native
+
+    return _native_regions(
+        get_native().spreadsheet_discover_regions(starts, content_points, content_rectangles, max_row, max_col, gap_tolerance)
+    )
+
+
+def select_sparse_regions(
+    starts: Sequence[tuple[int, int]],
+    content_points: Sequence[tuple[int, int]],
+    content_rectangles: Sequence[tuple[int, int, int, int]],
+    semantic_positions: Sequence[tuple[int, int]],
+    spans: Sequence[tuple[int, int, int, int]],
+    max_row: int,
+    max_col: int,
+) -> tuple[int, float, list[ConnectedRegion], list[int]]:
+    """连续选择三档候选，子集索引仅适用于与评分共享同一语义点集的调用方。"""
+    from ....._compute_backend import get_native
+
+    gap, penalty, regions, kept, _ = get_native().spreadsheet_select_regions(
+        starts, content_points, content_rectangles, semantic_positions, spans, max_row, max_col
+    )
+    return gap, penalty, _native_regions(regions), kept
+
+
+def native_region_contract_unchanged() -> bool:
+    """只在既有候选配置和计算钩子保持默认时绕过 Python 回调编排。"""
+    return (
+        type(AUTO_GAP_TOLERANCE_CANDIDATES) is tuple
+        and all(type(value) is int for value in AUTO_GAP_TOLERANCE_CANDIDATES)
+        and AUTO_GAP_TOLERANCE_CANDIDATES == (0, 1, 2)
+        and type(AUTO_GAP_TOLERANCE_PREFERENCE) is dict
+        and all(type(key) is int and type(value) is int for key, value in AUTO_GAP_TOLERANCE_PREFERENCE.items())
+        and AUTO_GAP_TOLERANCE_PREFERENCE == {1: 0, 0: 1, 2: 2}
+        and type(AUTO_GAP_TOLERANCE_PREFERENCE_MARGIN) is float
+        and AUTO_GAP_TOLERANCE_PREFERENCE_MARGIN == 0.15
+        and all(globals()[name] is original for name, original in _DEFAULT_NATIVE_REGION_FUNCTIONS.items())
+    )
+
+
+_DEFAULT_NATIVE_REGION_FUNCTIONS = {
+    name: globals()[name]
+    for name in (
+        "ConnectedRegion",
+        "discover_connected_regions",
+        "_flood_fill_region",
+        "count_max_consecutive_true",
+        "_build_region_content_mask",
+        "_is_real_singleton_region",
+        "_summarize_single_region",
+        "summarize_connected_regions",
+        "gap_candidate_penalty",
+        "select_best_gap_candidate",
+        "region_semantic_positions",
+    )
+}
 
 
 __all__ = [
@@ -330,9 +399,12 @@ __all__ = [
     "ConnectedRegion",
     "count_max_consecutive_true",
     "discover_connected_regions",
+    "discover_sparse_regions",
     "gap_candidate_penalty",
     "keep_maximal_by_semantic_sets",
+    "native_region_contract_unchanged",
     "region_semantic_positions",
     "select_best_gap_candidate",
+    "select_sparse_regions",
     "summarize_connected_regions",
 ]

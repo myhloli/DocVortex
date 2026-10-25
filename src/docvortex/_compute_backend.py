@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-_PROTOCOL_VERSION = 36
+_PROTOCOL_VERSION = 40
 
 
 @lru_cache(maxsize=1)
@@ -40,6 +40,10 @@ def backend_info() -> dict[str, str | int | None]:
     image_stats = native.image_text_snapshot_stats()
     return {
         "native_inline_style_batches": native.inline_style_stats(),
+        "native_spreadsheet_region_batches": native.spreadsheet_region_stats(),
+        "native_rtf_group_scans": native.rtf_group_stats(),
+        "native_ofd_table_batches": native.ofd_table_stats(),
+        "native_ofd_glyph_geometry_batches": native.ofd_glyph_geometry_stats(),
         "native_span_content_calls": span_contents,
         **(
             classification.classification_bridge_info()

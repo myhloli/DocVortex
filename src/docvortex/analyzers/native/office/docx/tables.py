@@ -68,6 +68,16 @@ class _DocxTables:
                 未找到可靠 Mammoth 结果，后续走完整文档上下文回退解析
         """
         try:
+            # 仅在当前 convert 的字节对象和文档同时有效时复用；独立调用不能借用上一份文档。
+            docx_obj = (
+                self.docx_obj
+                if self._fallback_docx_bytes is file_bytes and self.docx_obj is not None
+                else Document(BytesIO(file_bytes))
+            )
+            xml_top_tables = [elem for elem in docx_obj.element.body if self._local_name(elem) == "tbl"]
+            if not xml_top_tables:
+                return []
+
             import mammoth as _mammoth
             from bs4 import BeautifulSoup as _BeautifulSoup
 
@@ -81,10 +91,6 @@ class _DocxTables:
             # 仅保留顶层表格，排除嵌套在其他表格单元格内的子表格
             all_tables = soup.find_all("table")
             top_level_tables = [t for t in all_tables if not t.find_parent("table")]
-
-            # 同步加载 DOCX XML，获取所有顶层表格元素，用于公式注入
-            docx_obj = Document(BytesIO(file_bytes))
-            xml_top_tables = [elem for elem in docx_obj.element.body if self._local_name(elem) == "tbl"]
 
             logger.debug(f"Pre-parsed {len(top_level_tables)} top-level tables via filtered mammoth conversion")
 
@@ -116,13 +122,17 @@ class _DocxTables:
         aligned_tables = []
         html_index = 0
         matched_count = 0
+        html_signatures = {}
 
         for xml_table in xml_tables:
+            xml_signature = self._xml_table_signature(xml_table)
             matched_html_table = None
             scan_index = html_index
             while scan_index < len(html_tables):
                 candidate = html_tables[scan_index]
-                if self._mammoth_table_matches_xml_table(candidate, xml_table):
+                if scan_index not in html_signatures:
+                    html_signatures[scan_index] = self._html_table_signature(candidate)
+                if self._table_signatures_match(xml_signature, html_signatures[scan_index]):
                     matched_html_table = candidate
                     html_index = scan_index + 1
                     matched_count += 1
@@ -154,7 +164,11 @@ class _DocxTables:
         """
         xml_signature = _DocxTables._xml_table_signature(xml_table)
         html_signature = _DocxTables._html_table_signature(html_table)
+        return _DocxTables._table_signatures_match(xml_signature, html_signature)
 
+    @staticmethod
+    def _table_signatures_match(xml_signature: dict, html_signature: dict) -> bool:
+        """比较已提取的表格签名，供一次对齐过程复用未修改候选的统计。"""
         if xml_signature["text"] or html_signature["text"]:
             if not _DocxTables._table_text_matches(xml_signature["text"], html_signature["text"]):
                 return False

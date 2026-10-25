@@ -13,6 +13,7 @@ from fontTools.pens.boundsPen import BoundsPen
 from loguru import logger
 from lxml import etree  # type: ignore[reportMissingImports]
 
+from ...._compute_backend import get_native
 from ....content.spans import text_spans
 from ....schema import BBox
 from .constants import MAX_DELTA_TOKENS, MAX_EXPANDED_GLYPHS, MAX_EXPANDED_TEXT_BYTES, MAX_FONT_BYTES, MAX_GLYPH_TOKENS
@@ -38,6 +39,8 @@ _GLYPH_TOKEN_RE = re.compile(r"\S+")
 _DELTA_TOKEN_RE = re.compile(r"[^,\s]+")
 _HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
 _TEXT_CODE_DECODE_CHUNK_SIZE = 64 * 1024
+_MAX_CACHED_GLYPH_BOUNDS = 1024
+_ORIGINAL_BOUNDS_PEN = BoundsPen
 
 
 @dataclass(slots=True)
@@ -91,6 +94,8 @@ class _LoadedFont:
     advances: dict[str, tuple[int, int]]
     char_to_name: dict[int, str]
     name_to_char: dict[str, str]
+    # 只由本解析器加载的只读字体启用；手动构造对象保持逐次描边。
+    bounds_cache: dict[str, BBox] | None = None
 
 
 class FontMetricResolver:
@@ -138,6 +143,7 @@ class FontMetricResolver:
                 advances=advances,
                 char_to_name=char_to_name,
                 name_to_char=name_to_char,
+                bounds_cache={},
             )
         except Exception as exc:
             logger.warning(f"OFD_FONT_INVALID: part={resource.font_part!r}, error={type(exc).__name__}")
@@ -175,9 +181,22 @@ class FontMetricResolver:
         if loaded is not None and glyph_name is not None and glyph_name in loaded.glyph_set:
             scale = size / loaded.units_per_em
             try:
-                pen = BoundsPen(loaded.glyph_set)
-                loaded.glyph_set[glyph_name].draw(pen)
-                bounds = pen.bounds
+                # 复用字体单位下的成功边界，缩放和advance仍按本次参数计算。
+                cache = loaded.bounds_cache if type(loaded) is _LoadedFont and BoundsPen is _ORIGINAL_BOUNDS_PEN else None
+                bounds = cache.get(glyph_name) if cache is not None else None
+                if bounds is None:
+                    pen = BoundsPen(loaded.glyph_set)
+                    loaded.glyph_set[glyph_name].draw(pen)
+                    bounds = pen.bounds
+                    if (
+                        cache is not None
+                        and len(cache) < _MAX_CACHED_GLYPH_BOUNDS
+                        and type(bounds) is tuple
+                        and len(bounds) == 4
+                        and all(type(value) in (int, float) for value in bounds)
+                    ):
+                        # 达到容量后只保留已有条目，避免全新字形流持续淘汰。
+                        cache[glyph_name] = bounds
             except Exception:
                 bounds = None
             advance = float(loaded.advances.get(glyph_name, (loaded.units_per_em, 0))[0]) * scale * hscale
@@ -199,6 +218,9 @@ class FontMetricResolver:
         for loaded in self._cache.values():
             if loaded is None:
                 continue
+            if type(loaded) is _LoadedFont and loaded.bounds_cache is not None:
+                loaded.bounds_cache.clear()
+                loaded.bounds_cache = None
             close = getattr(loaded.font, "close", None)
             if callable(close):
                 close()
@@ -374,6 +396,161 @@ def format_line_html(text: str, styles: tuple[str, ...]) -> str:
     return rendered
 
 
+def _native_geometry_contract(direction: Affine, font_metrics: FontMetricResolver, clip: BBox) -> bool:
+    """仅对默认几何和字体解释方法批量运算，动态钩子继续按原顺序逐字执行。"""
+    return (
+        Affine is _ORIGINAL_AFFINE
+        and type(direction) is _ORIGINAL_AFFINE
+        and GlyphItem is _ORIGINAL_GLYPH_ITEM
+        and FontMetricResolver is _ORIGINAL_FONT_RESOLVER
+        and type(font_metrics) is _ORIGINAL_FONT_RESOLVER
+        and (
+            Affine.__init__,
+            Affine.compose,
+            Affine.apply,
+            getattr(Affine.translation, "__func__", None),
+            getattr(Affine.rotation, "__func__", None),
+            GlyphItem.__init__,
+            rect_quad,
+            transform_quad,
+            quad_bbox,
+            bbox_intersection,
+            math.radians,
+            math.sin,
+            math.cos,
+            math.isfinite,
+            math.dist,
+        )
+        == _ORIGINAL_GEOMETRY_FUNCTIONS
+        and all(
+            getattr(getattr(font_metrics, name, None), "__func__", None) is method for name, method in _ORIGINAL_FONT_METHODS
+        )
+        and type(clip) is tuple
+        and len(clip) == 4
+        and all(type(value) is float for value in clip)
+        and all(
+            type(value) is float for value in (direction.a, direction.b, direction.c, direction.d, direction.e, direction.f)
+        )
+    )
+
+
+def _native_glyph_items(
+    text: str,
+    origins: list[tuple[float, float]],
+    glyph_by_position: dict[int, int],
+    global_position: int,
+    font_metrics: FontMetricResolver,
+    font: FontResource | None,
+    size: float,
+    hscale: float,
+    direction_transform: Affine,
+    char_direction: float,
+    object_clip: BBox,
+) -> list[GlyphItem]:
+    """以最多256字的小批构造原GlyphItem，字体回调与相邻距离仍在Python中执行。"""
+    native = get_native()
+    rotation = Affine.rotation(char_direction)
+    direction_record = (
+        direction_transform.a,
+        direction_transform.b,
+        direction_transform.c,
+        direction_transform.d,
+        direction_transform.e,
+        direction_transform.f,
+    )
+    rotation_record = (rotation.a, rotation.b, rotation.c, rotation.d, rotation.e, rotation.f)
+    output: list[GlyphItem] = []
+    for start in range(0, len(text), 256):
+        end = min(start + 256, len(text))
+        metadata = []
+        boxes = []
+        for index in range(start, end):
+            glyph_id = glyph_by_position.get(global_position + index)
+            character = font_metrics.resolve_character(font, glyph_id, text[index])
+            advance_hint = math.dist(origins[index], origins[index + 1]) if index + 1 < len(origins) else None
+            boxes.append(
+                font_metrics.glyph_bbox(font, glyph_id, character, size=size, hscale=hscale, advance_hint=advance_hint)
+            )
+            metadata.append((character, glyph_id))
+        geometries = native.ofd_glyph_geometries(direction_record, rotation_record, origins[start:end], boxes, object_clip)
+        for (character, glyph_id), geometry in zip(metadata, geometries, strict=True):
+            if geometry is not None:
+                bbox, quad, origin = geometry
+                output.append(GlyphItem(text=character, bbox=bbox, quad=quad, origin=origin, glyph_id=glyph_id))
+    return output
+
+
+def _build_glyph_items(
+    text: str,
+    origins: list[tuple[float, float]],
+    glyph_by_position: dict[int, int],
+    global_position: int,
+    font_metrics: FontMetricResolver,
+    font: FontResource | None,
+    size: float,
+    hscale: float,
+    direction_transform: Affine,
+    char_direction: float,
+    object_clip: BBox,
+) -> list[GlyphItem]:
+    """长TextCode默认走原生小批，短文本和自定义合同保留原逐字调用链。"""
+    # 嵌入字体的短批次由FontTools描边主导，至少32字再摊销传输与物化成本；普通回退字体保持8字门槛。
+    minimum_count = 32 if type(font) is FontResource and font.font_part is not None else 8
+    if (
+        len(text) >= minimum_count
+        and len(text) == len(origins)
+        and _native_geometry_contract(direction_transform, font_metrics, object_clip)
+    ):
+        return _native_glyph_items(
+            text,
+            origins,
+            glyph_by_position,
+            global_position,
+            font_metrics,
+            font,
+            size,
+            hscale,
+            direction_transform,
+            char_direction,
+            object_clip,
+        )
+    glyph_items: list[GlyphItem] = []
+    for index, (character, origin) in enumerate(zip(text, origins, strict=True)):
+        glyph_id = glyph_by_position.get(global_position + index)
+        resolved_character = font_metrics.resolve_character(font, glyph_id, character)
+        advance_hint = None
+        if index + 1 < len(origins):
+            advance_hint = math.dist(origin, origins[index + 1])
+        local_bbox = font_metrics.glyph_bbox(
+            font,
+            glyph_id,
+            resolved_character,
+            size=size,
+            hscale=hscale,
+            advance_hint=advance_hint,
+        )
+        char_transform = direction_transform.compose(Affine.translation(origin[0], origin[1])).compose(
+            Affine.rotation(char_direction)
+        )
+        quad = transform_quad(rect_quad(local_bbox), char_transform)
+        glyph_bbox = quad_bbox(quad)
+        if glyph_bbox is None:
+            continue
+        clipped_glyph_bbox = bbox_intersection(glyph_bbox, object_clip)
+        if clipped_glyph_bbox is None:
+            continue
+        glyph_items.append(
+            GlyphItem(
+                text=resolved_character,
+                bbox=clipped_glyph_bbox,
+                quad=quad,
+                origin=char_transform.apply((0.0, 0.0)),
+                glyph_id=glyph_id,
+            )
+        )
+    return glyph_items
+
+
 def build_text_lines(
     text_object: etree._Element,
     *,
@@ -451,40 +628,19 @@ def build_text_lines(
         for index in range(delta_count):
             previous = origins[-1]
             origins.append((previous[0] + delta_x[index], previous[1] + delta_y[index]))
-        glyph_items: list[GlyphItem] = []
-        for index, (character, origin) in enumerate(zip(text, origins, strict=True)):
-            glyph_id = glyph_by_position.get(global_position + index)
-            resolved_character = font_metrics.resolve_character(font, glyph_id, character)
-            advance_hint = None
-            if index + 1 < len(origins):
-                advance_hint = math.dist(origin, origins[index + 1])
-            local_bbox = font_metrics.glyph_bbox(
-                font,
-                glyph_id,
-                resolved_character,
-                size=size,
-                hscale=hscale,
-                advance_hint=advance_hint,
-            )
-            char_transform = direction_transform.compose(Affine.translation(origin[0], origin[1])).compose(
-                Affine.rotation(char_direction)
-            )
-            quad = transform_quad(rect_quad(local_bbox), char_transform)
-            glyph_bbox = quad_bbox(quad)
-            if glyph_bbox is None:
-                continue
-            clipped_glyph_bbox = bbox_intersection(glyph_bbox, object_clip)
-            if clipped_glyph_bbox is None:
-                continue
-            glyph_items.append(
-                GlyphItem(
-                    text=resolved_character,
-                    bbox=clipped_glyph_bbox,
-                    quad=quad,
-                    origin=char_transform.apply((0.0, 0.0)),
-                    glyph_id=glyph_id,
-                )
-            )
+        glyph_items = _build_glyph_items(
+            text,
+            origins,
+            glyph_by_position,
+            global_position,
+            font_metrics,
+            font,
+            size,
+            hscale,
+            direction_transform,
+            char_direction,
+            object_clip,
+        )
         global_position += len(text)
         if not glyph_items:
             continue
@@ -508,6 +664,31 @@ def build_text_lines(
             )
         )
     return lines
+
+
+_ORIGINAL_AFFINE = Affine
+_ORIGINAL_GLYPH_ITEM = GlyphItem
+_ORIGINAL_FONT_RESOLVER = FontMetricResolver
+_ORIGINAL_GEOMETRY_FUNCTIONS = (
+    Affine.__init__,
+    Affine.compose,
+    Affine.apply,
+    Affine.translation.__func__,
+    Affine.rotation.__func__,
+    GlyphItem.__init__,
+    rect_quad,
+    transform_quad,
+    quad_bbox,
+    bbox_intersection,
+    math.radians,
+    math.sin,
+    math.cos,
+    math.isfinite,
+    math.dist,
+)
+_ORIGINAL_FONT_METHODS = tuple(
+    (name, getattr(FontMetricResolver, name)) for name in ("resolve_character", "glyph_bbox", "_load")
+)
 
 
 __all__ = [

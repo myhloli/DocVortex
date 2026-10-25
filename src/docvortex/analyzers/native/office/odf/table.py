@@ -13,8 +13,10 @@ from ..limits import MAX_GRID_SLOTS
 from ..spreadsheet.region_discovery import (
     discover_connected_regions,
     keep_maximal_by_semantic_sets,
+    native_region_contract_unchanged,
     region_semantic_positions,
     select_best_gap_candidate,
+    select_sparse_regions,
 )
 from .constants import MAX_EXPANSION_TEXT_BYTES, qname
 from .errors import OdfResourceLimitError
@@ -64,6 +66,22 @@ class _TableGridReservation:
             return
         self.budget.charge_grid_slots(projected_slots - self.reserved_slots)
         self.reserved_slots = projected_slots
+
+
+class _BuildingTableGrid(TableGrid):
+    """仅在解析器独占构建期间记录单调增长的宽度，避免逐格扫描已有行。"""
+
+    __slots__ = ("_building_width",)
+
+    def __init__(self) -> None:
+        """从空网格开始构建，最终裁剪仍返回支持任意行修改的普通网格。"""
+        super().__init__()
+        self._building_width = 0
+
+    @property
+    def width(self) -> int:
+        """返回经统一扩容入口更新的构建期宽度。"""
+        return self._building_width
 
 
 def _positive_int(value: str | None, default: int = 1) -> int:
@@ -155,6 +173,8 @@ def _ensure_row(
     row = grid.rows[row_index]
     if len(row) < width:
         row.extend([None] * (width - len(row)))
+        if isinstance(grid, _BuildingTableGrid):
+            grid._building_width = max(grid._building_width, width)
     return row
 
 
@@ -170,7 +190,7 @@ def parse_table_grid(
     expansion_budget: OdfTableExpansionBudget | None = None,
 ) -> TableGrid:
     """展开受限重复行列与合并单元格，构造规范二维网格。"""
-    grid = TableGrid()
+    grid = _BuildingTableGrid()
     reservation = expansion_budget.start_table() if expansion_budget is not None else None
     duplicated_text_bytes = 0
     row_index = 0
@@ -377,19 +397,79 @@ def split_table_regions(grid: TableGrid) -> list[TableGrid]:
         cell = _grid_cell_at(grid, row, col)
         return (cell.row_span, cell.col_span) if cell is not None else (1, 1)
 
-    _, _, best_regions = select_best_gap_candidate(
-        lambda tolerance: discover_connected_regions(has_content, starts, max_row, max_col, tolerance),
-        has_semantic_content,
-        span_at,
-    )
-    semantic_sets = [region_semantic_positions(region, has_semantic_content) for region in best_regions]
+    snapshot = _snapshot_grid_regions(grid, starts, max_row, max_col)
+    if snapshot is not None:
+        content_points, spans = snapshot
+        _, _, best_regions, kept_indices = select_sparse_regions(starts, content_points, [], starts, spans, max_row, max_col)
+        # 选中区域及成员已独立返回，裁剪网格前释放输入快照，避免两份大坐标集合同时驻留。
+        del snapshot, starts, content_points, spans
+    else:
+        _, _, best_regions = select_best_gap_candidate(
+            lambda tolerance: discover_connected_regions(has_content, starts, max_row, max_col, tolerance),
+            has_semantic_content,
+            span_at,
+        )
+        semantic_sets = [region_semantic_positions(region, has_semantic_content) for region in best_regions]
+        kept_indices = keep_maximal_by_semantic_sets(semantic_sets)
     regions: list[TableGrid] = []
-    for index in keep_maximal_by_semantic_sets(semantic_sets):
+    for index in kept_indices:
         region = best_regions[index]
         cropped = crop_table_grid(grid, (region.row_start, region.row_end, region.col_start, region.col_end))
         if cropped.rows:
             regions.append(cropped)
     return regions
+
+
+def _snapshot_grid_regions(
+    grid: TableGrid,
+    starts: list[tuple[int, int]],
+    max_row: int,
+    max_col: int,
+) -> tuple[list[tuple[int, int]], list[tuple[int, int, int, int]]] | None:
+    """把已展开网格的连接占位与原点跨度一次送入原生层，保留自定义回调语义。"""
+    if not native_region_contract_unchanged() or any(
+        globals()[name] is not original for name, original in _DEFAULT_GRID_REGION_HELPERS.items()
+    ):
+        return None
+    if any(not (0 <= row <= max_row and 0 <= col <= max_col) for row, col in starts):
+        return None
+    if any(
+        cell is not None and getattr(type(cell), "has_content", None) is not _DEFAULT_GRID_CELL_HAS_CONTENT
+        for cells in grid.rows
+        for cell in cells
+    ):
+        return None
+    content_points = {(row, col) for row, col in grid.covered if 0 <= row <= max_row and 0 <= col <= max_col}
+    spans = []
+    for row, cells in enumerate(grid.rows):
+        for col, cell in enumerate(cells):
+            if cell is None:
+                continue
+            # 手工网格的非整数或超大跨度仍交给原回调裁剪，避免原生整数边界改变既有行为。
+            if (
+                type(cell.row_span) is not int
+                or type(cell.col_span) is not int
+                or not 1 <= cell.row_span <= 2**63 - 1
+                or not 1 <= cell.col_span <= 2**63 - 1
+            ):
+                return None
+            if not (0 <= row <= max_row and 0 <= col <= max_col):
+                continue
+            if cell.has_content or cell.row_span > 1 or cell.col_span > 1:
+                content_points.add((row, col))
+            if cell.row_span != 1 or cell.col_span != 1:
+                spans.append((row, col, cell.row_span, cell.col_span))
+    return list(content_points), spans
+
+
+_DEFAULT_GRID_REGION_HELPERS = {
+    "discover_connected_regions": discover_connected_regions,
+    "select_best_gap_candidate": select_best_gap_candidate,
+    "region_semantic_positions": region_semantic_positions,
+    "keep_maximal_by_semantic_sets": keep_maximal_by_semantic_sets,
+    "_grid_cell_at": _grid_cell_at,
+}
+_DEFAULT_GRID_CELL_HAS_CONTENT = GridCell.has_content
 
 
 def _render_html_row(grid: TableGrid, row_index: int, *, header: bool) -> str:

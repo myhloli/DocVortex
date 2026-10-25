@@ -1,4 +1,4 @@
-"""交替比较冻结源码；完整输出及输入、源码、扩展身份通过后才汇总性能。"""
+"""交替比较冻结源码；PDF 目录或多格式字节清单的完整输出与身份通过后才汇总性能。"""
 
 from __future__ import annotations
 
@@ -48,6 +48,16 @@ def _input_manifest(folder: Path) -> list[dict]:
     if not manifest:
         raise ValueError(f"No PDF inputs: {folder}")
     return manifest
+
+
+def _workload_manifest(args: argparse.Namespace) -> list[dict]:
+    """兼容既有 PDF 目录，并让非 PDF 两版本共享显式冻结的字节和解析参数。"""
+    manifest = getattr(args, "manifest", None)
+    if manifest is not None:
+        from prepare_nonpdf_corpus import load_frozen_manifest
+
+        return load_frozen_manifest(manifest)
+    return _input_manifest(args.input_dir)
 
 
 def _source_snapshot(root: Path, helpers, extension_suffixes: list[str] | None = None) -> dict:
@@ -131,7 +141,7 @@ def _worker(args: argparse.Namespace) -> None:
         config = json.loads(args.config.read_text(encoding="utf-8"))
         expected = config["sources"][args.kind]
         manifest = config["inputs"]
-        if _input_manifest(args.input_dir) != manifest:
+        if _workload_manifest(args) != manifest:
             raise AssertionError("Input collection or bytes changed before worker")
         record.update(_runtime_identity(args.source_root, expected, helpers), inputs=manifest)
         _write_json(args.output, record)
@@ -141,16 +151,30 @@ def _worker(args: argparse.Namespace) -> None:
 
         onnxruntime.disable_telemetry_events()
         logger.disable("docvortex")
-        warmup_indices = sorted({0, len(manifest) // 4, len(manifest) // 2, 3 * len(manifest) // 4, len(manifest) - 1})
+        warmup_indices = (
+            list(range(len(manifest)))
+            if getattr(args, "manifest", None) is not None
+            else sorted({0, len(manifest) // 4, len(manifest) // 2, 3 * len(manifest) // 4, len(manifest) - 1})
+        )
         for index in warmup_indices:
-            parse(Path(manifest[index]["path"]).read_bytes(), file_suffix="pdf", keep_model_json=True)
+            item = manifest[index]
+            options = (
+                helpers.public_parse_options(item["file_suffix"], item.get("source_context"))
+                if "file_suffix" in item
+                else {"file_suffix": "pdf", "keep_model_json": True}
+            )
+            parse(Path(item["path"]).read_bytes(), **options)
         record.update(status="timing", warmup_documents=len(warmup_indices))
         for index, source in enumerate(manifest):
             payload = Path(source["path"]).read_bytes()
             if hashlib.sha256(payload).hexdigest() != source["sha256"]:
-                raise AssertionError(f"PDF input changed: {source['path']}")
+                raise AssertionError(f"Document input changed: {source['path']}")
             gc.collect()
-            durations, output = helpers.public_once(payload)
+            durations, output = (
+                helpers.public_once(payload, file_suffix=source["file_suffix"], source_context=source.get("source_context"))
+                if "file_suffix" in source
+                else helpers.public_once(payload)
+            )
             folder = evidence / f"{index:04d}"
             folder.mkdir()
             _write_json(folder / "output.json", output)
@@ -176,6 +200,8 @@ def _worker(args: argparse.Namespace) -> None:
                 "suite": "public",
                 "flash_baseline": None,
                 "full_output_sha256": item["full_output_sha256"],
+                "file_suffix": item.get("file_suffix", "pdf"),
+                "source_context": item.get("source_context"),
             }
             memory_config.pop("documents")
             _write_json(folder / "memory-input.json", memory_config)
@@ -196,7 +222,7 @@ def _worker(args: argparse.Namespace) -> None:
             item["memory"] = memory["memory"]
             item["memory_artifact"] = str((folder / "memory" / "result.json").relative_to(args.output.parent))
             _write_json(args.output, record)
-        if _input_manifest(args.input_dir) != manifest or _source_snapshot(args.source_root, helpers) != expected:
+        if _workload_manifest(args) != manifest or _source_snapshot(args.source_root, helpers) != expected:
             raise AssertionError("Inputs, source or extension changed during worker")
         record.update(
             status="complete",
@@ -241,7 +267,7 @@ def _validate_runs(runs: dict, manifest: list[dict], sources: dict, folder: Path
             outputs = []
             for source, document in zip(manifest, record["documents"], strict=True):
                 if {key: document[key] for key in source} != source:
-                    raise AssertionError(f"Different PDF input: {kind}, {source['name']}")
+                    raise AssertionError(f"Different document input: {kind}, {source['name']}")
                 output = json.loads((folder / document["artifact"]).read_text(encoding="utf-8"))
                 if set(output) != {"model", "middle", "assets", "diagnostics"}:
                     raise AssertionError(f"Incomplete public output: {kind}, {source['name']}")
@@ -262,7 +288,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline-root", type=Path)
     parser.add_argument("--candidate-root", type=Path)
-    parser.add_argument("--input-dir", type=Path, required=True)
+    inputs = parser.add_mutually_exclusive_group(required=True)
+    inputs.add_argument("--input-dir", type=Path)
+    inputs.add_argument("--manifest", type=Path, help="已冻结的非 PDF 字节、后缀和来源上下文清单")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--rounds", type=int, default=5)
@@ -295,7 +323,7 @@ def main() -> None:
         if args.rounds < 1:
             raise ValueError("rounds must be positive")
         helpers = _helpers()
-        manifest = _input_manifest(args.input_dir)
+        manifest = _workload_manifest(args)
         roots = {"before": args.baseline_root.resolve(), "after": args.candidate_root.resolve()}
         # --python 可以选择另一 ABI；父进程不能用自身的扩展后缀替代目标解释器。
         extension_suffixes = json.loads(
@@ -331,8 +359,11 @@ def main() -> None:
                         kind,
                         "--config",
                         str(args.output / "config.json"),
-                        "--input-dir",
-                        str(args.input_dir.resolve()),
+                        *(
+                            ["--manifest", str(args.manifest.resolve())]
+                            if args.manifest is not None
+                            else ["--input-dir", str(args.input_dir.resolve())]
+                        ),
                         "--output",
                         str(result_path),
                     ],
@@ -342,7 +373,7 @@ def main() -> None:
                 runs[kind].append(json.loads(result_path.read_text(encoding="utf-8")))
                 _validate_runs(runs, manifest, sources, args.output, helpers)
                 print(f"{run_name}: evidence recorded", flush=True)
-        if _input_manifest(args.input_dir) != manifest:
+        if _workload_manifest(args) != manifest:
             raise AssertionError("Input collection or bytes changed during benchmark")
         for kind, root in roots.items():
             if _source_snapshot(root, helpers, extension_suffixes) != sources[kind]:
@@ -355,8 +386,28 @@ def main() -> None:
             }
         if any(value <= 0 for entry in summary.values() for value in entry.values()):
             raise AssertionError("Timing and RSS measurements must be positive")
+        documents = []
+        for index, item in enumerate(manifest):
+            medians = {
+                kind: {
+                    "seconds": statistics.median(record["documents"][index]["seconds"] for record in records),
+                    "peak_tree_rss_bytes": statistics.median(
+                        record["documents"][index]["memory"]["sampled_tree_peak_rss_bytes"] for record in records
+                    ),
+                }
+                for kind, records in runs.items()
+            }
+            documents.append(
+                {
+                    **item,
+                    "medians": medians,
+                    "time_ratio": medians["after"]["seconds"] / medians["before"]["seconds"],
+                    "rss_ratio": medians["after"]["peak_tree_rss_bytes"] / medians["before"]["peak_tree_rss_bytes"],
+                }
+            )
         report.update(
             summary,
+            documents=documents,
             status="complete",
             full_output_equal=True,
             time_ratio=summary["after"]["median_seconds"] / summary["before"]["median_seconds"],

@@ -23,6 +23,17 @@ def native():
 def test_native_registration_contract(native):
     """约束重构前的平面扩展接口、签名和类型身份，防止拆分模块时漏注册或改名。"""
     functions = {
+        "ofd_glyph_geometries": "(direction, rotation, origins, boxes, clip)",
+        "ofd_glyph_geometry_stats": "()",
+        "ofd_table_components": "(lines, count, limit)",
+        "ofd_table_logical_cells": "(xs, ys, lines, count, limit)",
+        "ofd_table_stats": "()",
+        "rtf_group_spans": "(data, direct_only, max_tokens, max_depth)",
+        "rtf_group_stats": "()",
+        "spreadsheet_select_regions": "(starts, content_points, content_rectangles, semantic_positions, spans, max_row, max_col, diagnostics=False)",
+        "spreadsheet_discover_regions": "(starts, content_points, content_rectangles, max_row, max_col, gap_tolerance)",
+        "spreadsheet_keep_maximal_semantic_sets": "(semantic_sets)",
+        "spreadsheet_region_stats": "()",
         "image_components": "(data, width, height)",
         "image_contours": "(data, width, height, external)",
         "image_resize": "(data, width, height, channels, depth, target_w, target_h, mode, xindices, xweights, yindices, yweights)",
@@ -169,7 +180,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 36, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 40, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)

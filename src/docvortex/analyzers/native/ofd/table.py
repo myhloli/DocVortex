@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import html
+import math
+import sys
 from dataclasses import dataclass, replace
 
+from ...._compute_backend import get_native
 from ....schema import BBox
 from .constants import MAX_TABLE_INTERSECTION_CHECKS
 from .errors import OfdResourceLimitError
@@ -122,8 +125,66 @@ def _normalize_axis_lines(lines: list[AxisLine]) -> list[AxisLine]:
     return output
 
 
+def _native_axis_snapshot(lines: list[AxisLine], budget: OfdTableBudget) -> list[tuple[bool, float, float, float]] | None:
+    """默认数值和预算合同下打包一次线段，定制对象及解释钩子保留原 Python 行为。"""
+    if (
+        type(lines) is not list
+        or len(lines) > 2_000
+        or type(budget) is not _ORIGINAL_BUDGET
+        or OfdTableBudget is not _ORIGINAL_BUDGET
+        or OfdTableBudget.charge_intersection_check is not _ORIGINAL_CHARGE
+        or _line_coord is not _ORIGINAL_LINE_COORD
+        or _line_interval is not _ORIGINAL_LINE_INTERVAL
+        or type(_COORD_TOLERANCE) is not float
+        or _COORD_TOLERANCE != 0.6
+        or type(_INTERSECTION_TOLERANCE) is not float
+        or _INTERSECTION_TOLERANCE != 0.8
+        or any(
+            type(value) is not int or not 0 <= value < min(sys.maxsize, 2**63 - 1)
+            for value in (budget.intersection_check_count, MAX_TABLE_INTERSECTION_CHECKS)
+        )
+    ):
+        return None
+    snapshot = []
+    for line in lines:
+        if (
+            type(line) is not AxisLine
+            or type(line.orientation) is not str
+            or line.orientation not in {"horizontal", "vertical"}
+            or type(line.bbox) is not tuple
+            or len(line.bbox) != 4
+            or any(
+                type(value) not in (int, float) or (type(value) is int and abs(value) > 2**53) or not math.isfinite(value)
+                for value in line.bbox
+            )
+        ):
+            return None
+        coordinate = _line_coord(line)
+        start, end = _line_interval(line)
+        if not math.isfinite(coordinate) or start > end:
+            return None
+        snapshot.append((line.orientation == "horizontal", coordinate, float(start), float(end)))
+    return snapshot
+
+
+def _finish_native_budget(budget: OfdTableBudget, count: int, exceeded: bool) -> None:
+    """更新到原第一次比较失败的位置，再抛出既有 OFD 资源异常。"""
+    budget.intersection_check_count = count
+    if exceeded:
+        raise OfdResourceLimitError(
+            f"OFD resource limit exceeded: max_table_intersection_checks={MAX_TABLE_INTERSECTION_CHECKS}"
+        )
+
+
 def _components(lines: list[AxisLine], budget: OfdTableBudget) -> list[list[AxisLine]]:
     """按线段相交关系构造确定性的连通分量。"""
+    snapshot = _native_axis_snapshot(lines, budget) if _touches is _ORIGINAL_TOUCHES else None
+    if snapshot is not None:
+        groups, count, exceeded = get_native().ofd_table_components(
+            snapshot, budget.intersection_check_count, MAX_TABLE_INTERSECTION_CHECKS
+        )
+        _finish_native_budget(budget, count, exceeded)
+        return [[lines[index] for index in group] for group in groups]
     parents = list(range(len(lines)))
 
     def find(index: int) -> int:
@@ -226,6 +287,30 @@ def _logical_cells(
     xs: list[float], ys: list[float], lines: list[AxisLine], budget: OfdTableBudget
 ) -> tuple[OfdTableCell, ...] | None:
     """按真实分隔边连通基础格，拒绝局部断边和非矩形合并区域。"""
+    snapshot = (
+        _native_axis_snapshot(lines, budget)
+        if _covers_interval is _ORIGINAL_COVERS
+        and OfdTableCell is _ORIGINAL_CELL
+        and OfdTableCell.__init__ is _ORIGINAL_CELL_INIT
+        and all(
+            type(axis) is list
+            and len(axis) >= 2
+            and all(
+                type(value) in (int, float) and (type(value) is not int or abs(value) <= 2**53) and math.isfinite(value)
+                for value in axis
+            )
+            and all(start < end for start, end in zip(axis[:-1], axis[1:], strict=True))
+            for axis in (xs, ys)
+        )
+        and (len(xs) - 1) * (len(ys) - 1) <= 10_000
+        else None
+    )
+    if snapshot is not None:
+        cells, count, exceeded = get_native().ofd_table_logical_cells(
+            xs, ys, snapshot, budget.intersection_check_count, MAX_TABLE_INTERSECTION_CHECKS
+        )
+        _finish_native_budget(budget, count, exceeded)
+        return None if cells is None else tuple(OfdTableCell(*cell) for cell in cells)
     rows, columns = len(ys) - 1, len(xs) - 1
     parents = list(range(rows * columns))
 
@@ -407,6 +492,16 @@ def recover_tables(
         _serialize_grid(table, images or [])
         for table in sorted(selected, key=lambda item: (item.bbox[1], item.bbox[0], item.paint_order))
     ]
+
+
+_ORIGINAL_BUDGET = OfdTableBudget
+_ORIGINAL_CHARGE = OfdTableBudget.charge_intersection_check
+_ORIGINAL_LINE_COORD = _line_coord
+_ORIGINAL_LINE_INTERVAL = _line_interval
+_ORIGINAL_TOUCHES = _touches
+_ORIGINAL_COVERS = _covers_interval
+_ORIGINAL_CELL = OfdTableCell
+_ORIGINAL_CELL_INIT = OfdTableCell.__init__
 
 
 __all__ = ["OfdTableBudget", "OfdTableRegion", "recover_tables"]

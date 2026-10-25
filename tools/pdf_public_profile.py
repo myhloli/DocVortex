@@ -83,9 +83,6 @@ def main():
         "_prepare_document_sources",
         "build_document_geometry_plan",
         "_prepare_page_source",
-        "detect_pdf_text_style_lines",
-        "detect_pdf_text_link_lines",
-        "detect_pdf_text_script_lines",
         "_classify_document_text",
         "_finalize_prepared_page",
         "_materialize_document_inline",
@@ -140,6 +137,8 @@ def main():
         "stages": dict(stages),
         "compute_before": before,
         "compute_after": after,
+        "native_inline_style_batches": after["native_inline_style_batches"] - before["native_inline_style_batches"],
+        "instrumentation_scope": "high_level_orchestration_only; detector_function_identities_preserved",
         "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
     }
     (args.output / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))

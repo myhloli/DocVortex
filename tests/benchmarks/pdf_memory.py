@@ -13,7 +13,7 @@ import subprocess
 import sys
 import psutil
 
-from rust_pdf import digest, environment_identity, public_output, shared_once, source_identity, write_json
+from rust_pdf import digest, environment_identity, public_output, public_parse_options, shared_once, source_identity, write_json
 from pipeline import MemorySampler
 
 
@@ -58,6 +58,9 @@ def validate_identity(record: dict, expected: dict) -> None:
     """比较输入、源码、原生二进制和区域身份，不把运行计数等动态字段当成构建身份。"""
     _require_identity(record)
     _require_identity(expected)
+    for field, default in (("file_suffix", "pdf"), ("source_context", None)):
+        if record.get(field, default) != expected.get(field, default):
+            raise ValueError(f"Benchmark identity mismatch: {field}")
     for field in _IDENTITY_FIELDS:
         actual, wanted = record[field], expected[field]
         if field in {"path", "source_package"}:
@@ -107,7 +110,15 @@ def region_model(source_sha256: str, flash_baseline: Path | None) -> list:
     return json.loads((flash_baseline / entries[0]["artifact"] / "output.json").read_text(encoding="utf-8"))["model_list"]
 
 
-def benchmark_identity(path: Path, package: Path, suite: str, flash_baseline: Path | None) -> dict:
+def benchmark_identity(
+    path: Path,
+    package: Path,
+    suite: str,
+    flash_baseline: Path | None,
+    *,
+    file_suffix: str = "pdf",
+    source_context: dict | None = None,
+) -> dict:
     """重新读取当前输入和运行身份，已存在报告也必须通过同一恢复校验。"""
     source_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     return {
@@ -115,6 +126,8 @@ def benchmark_identity(path: Path, package: Path, suite: str, flash_baseline: Pa
         "path": str(path.resolve()),
         "source_sha256": source_sha256,
         "suite": suite,
+        "file_suffix": file_suffix,
+        "source_context": source_context,
         "region_input_sha256": digest(region_model(source_sha256, flash_baseline)) if suite == "shared" else None,
     }
 
@@ -196,12 +209,15 @@ def memory_worker(config: dict, folder: Path) -> None:
         "compute": backend_info(),
         "environment": environment_identity(),
         "suite": config["suite"],
+        "file_suffix": config.get("file_suffix", "pdf"),
+        "source_context": config.get("source_context"),
         "region_input_sha256": digest(model) if model is not None else None,
     }
     validate_identity(config, current_identity)
     folder.mkdir(parents=True, exist_ok=False)
+    options = public_parse_options(config.get("file_suffix", "pdf"), config.get("source_context"))
     if model is None:
-        warmed = docvortex.parse(payload, file_suffix="pdf", keep_model_json=True)
+        warmed = docvortex.parse(payload, **options)
     else:
         warmed = shared_once(payload, model)
     del warmed
@@ -209,9 +225,7 @@ def memory_worker(config: dict, folder: Path) -> None:
     sampler = EntryMemorySampler()
     sampler.thread.start()
     try:
-        result = (
-            docvortex.parse(payload, file_suffix="pdf", keep_model_json=True) if model is None else shared_once(payload, model)
-        )
+        result = docvortex.parse(payload, **options) if model is None else shared_once(payload, model)
     finally:
         memory = sampler.finish()
     if model is None:
@@ -249,6 +263,8 @@ def measure(config: dict, folder: Path) -> dict:
         Path(config["source_package"]),
         config["suite"],
         Path(config["flash_baseline"]) if config.get("flash_baseline") else None,
+        file_suffix=config.get("file_suffix", "pdf"),
+        source_context=config.get("source_context"),
     )
     validate_identity(config, current)
     if not (folder / "result.json").exists():

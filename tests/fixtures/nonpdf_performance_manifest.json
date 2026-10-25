@@ -1,0 +1,27 @@
+{
+  "description": "真实非 PDF 输入及固定规模压力场景；先用 prepare_nonpdf_corpus.py 冻结字节，再供 AB/BA 两版本共用。",
+  "cases": [
+    {"name": "real-doc", "category": "real", "file_suffix": "doc", "path": "demo/ms_office_docs/docx_01.doc"},
+    {"name": "real-docx", "category": "real", "file_suffix": "docx", "path": "demo/ms_office_docs/docx_01.docx"},
+    {"name": "real-ppt", "category": "real", "file_suffix": "ppt", "path": "demo/ms_office_docs/pptx_01.ppt"},
+    {"name": "real-pptx", "category": "real", "file_suffix": "pptx", "path": "demo/ms_office_docs/pptx_01.pptx"},
+    {"name": "real-xls", "category": "real", "file_suffix": "xls", "path": "demo/ms_office_docs/xlsx_01.xls"},
+    {"name": "real-xlsx", "category": "real", "file_suffix": "xlsx", "path": "demo/ms_office_docs/xlsx_01.xlsx"},
+    {"name": "real-rtf", "category": "real", "file_suffix": "rtf", "path": "demo/ms_office_docs/rtf_01.rtf"},
+    {"name": "real-odt", "category": "real", "file_suffix": "odt", "path": "demo/open_office_docs/docx_01.odt"},
+    {"name": "real-ods", "category": "real", "file_suffix": "ods", "path": "demo/open_office_docs/xlsx_01.ods"},
+    {"name": "real-odp", "category": "real", "file_suffix": "odp", "path": "demo/open_office_docs/pptx_01.odp"},
+    {"name": "real-html", "category": "real", "file_suffix": "html", "path": "demo/web_docs/html_01.html", "source_context": {"source_uri": "https://blog.csdn.net/OpenDataLab/article/details/162423644"}},
+    {"name": "real-mhtml", "category": "real", "file_suffix": "mhtml", "path": "demo/web_docs/mhtml_01.mhtml"},
+    {"name": "real-epub", "category": "real", "file_suffix": "epub", "path": "demo/ebook/epub_01.epub"},
+    {"name": "real-ofd", "category": "real", "file_suffix": "ofd", "path": "demo/ofd/ofd_01.ofd"},
+    {"name": "fixture-csv", "category": "fixture", "file_suffix": "csv", "generator": "csv", "parameters": {"rows": 2, "columns": 2}},
+    {"name": "fixture-tsv", "category": "fixture", "file_suffix": "tsv", "generator": "tsv", "parameters": {"rows": 2, "columns": 2}},
+    {"name": "pressure-ods-600x10", "category": "pressure", "file_suffix": "ods", "generator": "ods", "parameters": {"rows": 600, "columns": 10}},
+    {"name": "pressure-xlsx-1000x10", "category": "pressure", "file_suffix": "xlsx", "generator": "xlsx", "parameters": {"rows": 1000, "columns": 10}},
+    {"name": "pressure-docx-1000-paragraphs", "category": "pressure", "file_suffix": "docx", "generator": "docx_paragraphs", "parameters": {"paragraphs": 1000}},
+    {"name": "pressure-docx-20-tables", "category": "pressure", "file_suffix": "docx", "generator": "docx_tables", "parameters": {"tables": 20, "rows": 10, "columns": 5}},
+    {"name": "pressure-rtf-2000-paragraphs", "category": "pressure", "file_suffix": "rtf", "generator": "rtf", "parameters": {"paragraphs": 2000}},
+    {"name": "pressure-csv-10000x10", "category": "pressure", "file_suffix": "csv", "generator": "csv", "parameters": {"rows": 10000, "columns": 10}}
+  ]
+}
