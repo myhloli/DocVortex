@@ -231,7 +231,7 @@ def test_public_rtf_entry_uses_native_and_matches_frozen_lexer(monkeypatch: pyte
 
 def test_frozen_lexer_still_matches_unmodified_public_generator() -> None:
     """组扫描迁移不修改公开 lexer；冻结文件身份和独立预算保持可追溯。"""
-    source = Path(lexer.__file__).read_text()
+    source = Path(lexer.__file__).read_text(encoding="utf-8")
     original_prefix = source[: source.index("_ORIGINAL_LEXER =")]
     original_prefix = original_prefix.replace("import sys\n", "").replace("from ....._compute_backend import get_native\n", "")
     original_prefix = original_prefix.rstrip() + "\n\n\n" + source[source.index("__all__ =") :]

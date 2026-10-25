@@ -26,5 +26,6 @@
 - 两端点均核对432个包文件；电子表格实际批次为`[10,3,6]`，RTF扫描`[63,149929,2486,0]`，OFD表格`[5,5,57,32,0]`，字形几何`[4,288,288]`。这是工作量证据，不是性能比较。
 - 新ABI验证在两个Python端点通过；40项验证器/交接门禁回归通过；actionlint、Ruff及`git diff --check`通过，新增14个函数均有中文文档字符串。
 - 初版验证器的上下文/导出接口导入错误在本地运行中发现并修正，失败报告保留于`local-314-01/02`，最终只采用`local-*-final`记录。
+- 首轮远端发行wheel矩阵的Linux x86_64、Linux ARM64和macOS ARM64通过；Windows x86_64/ARM64的20份公开输入与导出通过，但同一源码身份回归使用默认CP1252读取UTF-8 lexer而失败（其余2362项通过）。已将读取改为显式UTF-8，保持生产代码不变，并按修正提交重新运行矩阵；原失败日志和产物保存在`initial-windows-failures`。
 
 证据根目录：`/Users/myhloli/Documents/Codex/docvortex-nonpdf-optimization-20261025/R5`。累计优化和CI改动分别提交；远端矩阵只构建和验收分支产物，不修改版本、合并main、创建标签或发布PyPI。
