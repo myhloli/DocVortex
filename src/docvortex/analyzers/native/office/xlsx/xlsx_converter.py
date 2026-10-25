@@ -5,10 +5,11 @@ import re
 import xml.etree.ElementTree as ET
 import zipfile
 from io import BytesIO
-from typing import BinaryIO, cast
+from typing import Any, BinaryIO, cast
 
 from loguru import logger
 from openpyxl import load_workbook
+from openpyxl.cell.cell import Cell
 from openpyxl.drawing.image import Image as XlsImage
 from openpyxl.utils.cell import range_to_tuple
 from openpyxl.worksheet.worksheet import Worksheet
@@ -56,6 +57,7 @@ class XlsxConverter(SpreadsheetProjector):
         self._suppressed_ole_previews: set[tuple[tuple[int, int], str]] = set()
         self._ooxml_equation_decoder = OoxmlEquationDecoder()
         self._image_equation_decoder = OfficeImageEquationDecoder()
+        self._reset_conversion_caches()
 
     def convert(
         self,
@@ -91,6 +93,24 @@ class XlsxConverter(SpreadsheetProjector):
         self._suppressed_ole_previews = set()
         self._ooxml_equation_decoder = OoxmlEquationDecoder()
         self._image_equation_decoder = OfficeImageEquationDecoder()
+        self._reset_conversion_caches()
+
+    def _reset_conversion_caches(self) -> None:
+        """释放只在当前 XLSX 只读投影期间有效的样式和成功媒体结果。"""
+        self._projection_cache_enabled = False
+        self._cell_style_cache: dict[tuple[int, ...], dict[str, Any]] = {}
+        self._resolved_cell_image_cache: dict[str, str] = {}
+
+    def _extract_cell_style(self, cell: Any) -> dict[str, Any]:
+        """在当前工作簿投影期间复用相同样式值，并为每格返回独立字典。"""
+        if not self._projection_cache_enabled or type(cell) is not Cell or cell.parent.parent is not self.workbook:
+            return super()._extract_cell_style(cell)
+        style_key = tuple(cell._style) if cell._style is not None else ()
+        style = self._cell_style_cache.get(style_key)
+        if style is None:
+            style = super()._extract_cell_style(cell)
+            self._cell_style_cache[style_key] = style
+        return dict(style)
 
     def _convert_package_bytes(self, file_bytes: bytes) -> None:
         """用独立字节流解析 XLSX 包，便于原始包失败后用规范化包重试。"""
@@ -99,6 +119,7 @@ class XlsxConverter(SpreadsheetProjector):
     def _convert_package_stream(self, file_stream: BinaryIO) -> None:
         """直接使用可复位的 XLSX 流解析正常路径，避免提前复制完整包字节。"""
         self._reset_state()
+        self._projection_cache_enabled = True
         try:
             self.zf = zipfile.ZipFile(file_stream)
             self._sheet_part_by_title = workbook_sheet_parts(self.zf)
@@ -135,6 +156,7 @@ class XlsxConverter(SpreadsheetProjector):
             else:
                 logger.error("工作簿未初始化。")
         finally:
+            self._reset_conversion_caches()
             if self.zf:
                 self.zf.close()
                 self.zf = None
@@ -648,6 +670,9 @@ class XlsxConverter(SpreadsheetProjector):
             logger.warning(f"图片目标文件不存在，image_id={image_id}, target={zip_target_path}")
             return ""
 
+        if self._projection_cache_enabled and zip_target_path in self._resolved_cell_image_cache:
+            return self._resolved_cell_image_cache[zip_target_path]
+
         try:
             image_payload = self._read_xlsx_image_member(zip_target_path)
             if image_payload is None:
@@ -657,16 +682,40 @@ class XlsxConverter(SpreadsheetProjector):
                 part_name=zip_target_path,
             )
             if latex:
-                return EQUATION_BOOKENDS.format(EQ=latex)
+                result = EQUATION_BOOKENDS.format(EQ=latex)
+                if self._projection_cache_enabled:
+                    self._resolved_cell_image_cache[zip_target_path] = result
+                return result
             img_base64 = serialize_office_image(
                 image_payload,
                 part_name=zip_target_path,
                 content_type=None,
             )
-            return rf'<img src="{img_base64}" />' if img_base64 is not None else ""
+            result = rf'<img src="{img_base64}" />' if img_base64 is not None else ""
+            if result and self._projection_cache_enabled and self._is_cacheable_cell_bitmap(image_payload, zip_target_path):
+                self._resolved_cell_image_cache[zip_target_path] = result
+            return result
         except Exception as e:
             logger.warning(f"读取单元格图片失败，image_id={image_id}, target={zip_target_path}, error={e}")
             return ""
+
+    @staticmethod
+    def _is_cacheable_cell_bitmap(image_payload: bytes, part_name: str) -> bool:
+        """仅复用常见位图的成功序列化，保留矢量降级及部分渲染的逐次诊断。"""
+        if posixpath.splitext(part_name)[1].casefold() not in {
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".bmp",
+            ".tif",
+            ".tiff",
+            ".webp",
+        }:
+            return False
+        return image_payload.startswith(
+            (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"GIF87a", b"GIF89a", b"BM", b"II*\x00", b"MM\x00*")
+        ) or (image_payload.startswith(b"RIFF") and image_payload[8:12] == b"WEBP")
 
     def _load_cell_image_mappings(self):
         if self.cell_image_map:

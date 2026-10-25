@@ -10,7 +10,7 @@ from typing import Any
 
 from ....schema import BBox, BlockType
 from .geometry import bbox_union
-from .models import TextLine
+from .models import GlyphItem, TextLine
 from .text import format_line_html, format_line_spans
 
 _LIST_START = re.compile(r"^\s*(?:[•●▪◆]|[-*]\s|\d+[.)、]\s*|[一二三四五六七八九十]+[、）])")
@@ -23,15 +23,64 @@ def upright_point(x: float, y: float, angle: int) -> tuple[float, float]:
     return cosine * x + sine * y, -sine * x + cosine * y
 
 
+def _default_projection(angle: int) -> bool:
+    """仅复用默认纯数值投影，非标准角度及动态三角函数/投影钩子继续逐点执行。"""
+    return (
+        type(angle) is int
+        and 0 <= angle < 360
+        and upright_point is _ORIGINAL_UPRIGHT_POINT
+        and (math.radians, math.cos, math.sin, round) == _ORIGINAL_ROTATION_FUNCTIONS
+    )
+
+
+def _plain_numbers(values: tuple) -> bool:
+    """限制优化路径为无自定义运算的内置数值，超大整数保持旧错误顺序。"""
+    return all(type(value) is float or (type(value) is int and abs(value) <= 2**53) for value in values)
+
+
 def upright_box(bbox: BBox, angle: int) -> BBox:
     """在文字方向坐标内计算矩形外接框。"""
-    points = [upright_point(x, y, angle) for x in (bbox[0], bbox[2]) for y in (bbox[1], bbox[3])]
+    if type(bbox) is tuple and len(bbox) == 4 and _default_projection(angle) and _plain_numbers(bbox):
+        radians = math.radians(angle)
+        cosine, sine = round(math.cos(radians), 12), round(math.sin(radians), 12)
+        # 保留原点序和乘零运算，不能将直角投影直接简化为交换坐标。
+        points = [(cosine * x + sine * y, -sine * x + cosine * y) for x in (bbox[0], bbox[2]) for y in (bbox[1], bbox[3])]
+    else:
+        points = [upright_point(x, y, angle) for x in (bbox[0], bbox[2]) for y in (bbox[1], bbox[3])]
     return min(p[0] for p in points), min(p[1] for p in points), max(p[0] for p in points), max(p[1] for p in points)
+
+
+def _plain_origins(glyphs: list[GlyphItem]) -> list[tuple[float, float]] | None:
+    """单次提取标准不可变浮点原点，遇到定制对象即保留旧逐点路径，不逐字创建检查生成器。"""
+    origins = []
+    for glyph in glyphs:
+        if type(glyph) is not GlyphItem:
+            return None
+        origin = glyph.origin
+        if type(origin) is not tuple or len(origin) != 2 or type(origin[0]) is not float or type(origin[1]) is not float:
+            return None
+        origins.append(origin)
+    return origins
 
 
 def line_baseline(line: TextLine) -> float:
     """优先读取真实字形基线，缺少字形时才退回视觉框中心。"""
     if line.glyphs:
+        if (
+            type(line) is TextLine
+            and TextLine.__getattribute__ is object.__getattribute__
+            and GlyphItem.__getattribute__ is object.__getattribute__
+            and statistics.median is _ORIGINAL_MEDIAN
+            and type(line.glyphs) is list
+            and len(line.glyphs) >= 8
+            and _default_projection(line.angle)
+            and GlyphItem.origin is _ORIGINAL_GLYPH_ORIGIN
+        ):
+            origins = _plain_origins(line.glyphs)
+            if origins is not None:
+                radians = math.radians(line.angle)
+                cosine, sine = round(math.cos(radians), 12), round(math.sin(radians), 12)
+                return statistics.median(-sine * x + cosine * y for x, y in origins)
         return statistics.median(upright_point(*glyph.origin, line.angle)[1] for glyph in line.glyphs)
     box = upright_box(line.bbox, line.angle)
     return (box[1] + box[3]) / 2
@@ -120,15 +169,33 @@ def _paragraph_separator(previous: str, current: str) -> str:
     return " " if (last.isalnum() or last in '.,;:!?)]}"') and (first.isalnum() or first in '(["') else ""
 
 
+def _paragraph_box(bbox: BBox, angle: int, cache: dict) -> BBox:
+    """只在本次合段内缓存至多64个不可变数值框，按对象身份保留正负零并防止ID复用。"""
+    if upright_box is _ORIGINAL_UPRIGHT_BOX and type(bbox) is tuple and len(bbox) == 4 and _default_projection(angle):
+        key = (id(bbox), angle)
+        entry = cache.get(key)
+        if entry is not None and entry[0] is bbox:
+            return entry[1]
+        if _plain_numbers(bbox):
+            projected = upright_box(bbox, angle)
+            if len(cache) >= 64:
+                del cache[next(iter(cache))]
+            # 强引用保存原tuple；同值但零符号不同的框不会共用记录。
+            cache[key] = (bbox, projected)
+            return projected
+    return upright_box(bbox, angle)
+
+
 def merge_paragraph_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """在阅读顺序内按局部栏宽、行距及缩进合段，视觉块和辅助块作为屏障。"""
     output: list[dict[str, Any]] = []
+    projection_cache: dict = {}
     for index, block in enumerate(blocks):
         if block["type"] != BlockType.TEXT:
             output.append(block)
             continue
         angle = block["angle"]
-        current_box = upright_box(block["bbox_mm"], angle)
+        current_box = _paragraph_box(block["bbox_mm"], angle, projection_cache)
         size = block["font_size_mm"]
         # 只观察邻近且横向重叠的正文，防止另一栏或远处区域影响本栏尺度。
         neighbors: list[dict[str, Any]] = []
@@ -144,13 +211,13 @@ def merge_paragraph_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]
                     or candidate["text_scope"] != block["text_scope"]
                 ):
                     break
-                box = upright_box(candidate["bbox_mm"], angle)
+                box = _paragraph_box(candidate["bbox_mm"], angle, projection_cache)
                 if abs(box[1] - current_box[1]) > 20 * size or min(box[2], current_box[2]) <= max(box[0], current_box[0]):
                     break
                 if abs(box[0] - current_box[0]) <= 3 * size:
                     neighbors.append(candidate)
         context = neighbors + [block]
-        boxes = [upright_box(item["bbox_mm"], angle) for item in context]
+        boxes = [_paragraph_box(item["bbox_mm"], angle, projection_cache) for item in context]
         right = max(box[2] for box in boxes)
         baselines = sorted({item["baseline_mm"] for item in context})
         gaps = [b - a for a, b in zip(baselines[:-1], baselines[1:], strict=True) if b - a >= 0.5 * size]
@@ -163,7 +230,7 @@ def merge_paragraph_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]
             and previous["text_scope"] == block["text_scope"]
         )
         if can_merge:
-            last_box = upright_box(previous["line_bboxes_mm"][-1], angle)
+            last_box = _paragraph_box(previous["line_bboxes_mm"][-1], angle, projection_cache)
             previous_size = previous["font_size_mm"]
             delta = block["baseline_mm"] - previous["baseline_mm"]
             previous_text, current_text = _block_text(previous).strip(), _block_text(block).strip()
@@ -190,3 +257,10 @@ def merge_paragraph_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]
             # 复制将被追加的列表，确保组段不会修改调用方的原始视觉行。
             output.append({**block, "content": list(block["content"]), "line_bboxes_mm": list(block["line_bboxes_mm"])})
     return output
+
+
+_ORIGINAL_UPRIGHT_POINT = upright_point
+_ORIGINAL_UPRIGHT_BOX = upright_box
+_ORIGINAL_ROTATION_FUNCTIONS = (math.radians, math.cos, math.sin, round)
+_ORIGINAL_MEDIAN = statistics.median
+_ORIGINAL_GLYPH_ORIGIN = GlyphItem.origin

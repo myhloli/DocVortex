@@ -1,0 +1,177 @@
+{
+  "schema": "docvortex.nonpdf-wheel-expectations",
+  "schema_version": 1,
+  "provenance": "Semantic anchors from locally accepted R4C public ModelJson; native exact parity covered separately by frozen algorithm tests.",
+  "cases": [
+    {
+      "name": "real-doc",
+      "path": "demo/ms_office_docs/docx_01.doc",
+      "file_suffix": "doc",
+      "source_context": null,
+      "sha256": "6aae60b01f0e020c59d2299f217dbd5904df08182a31384db40953937f322fd1",
+      "page_count": 3,
+      "required_text": [
+        "MinerU supports DOCX document parsing now",
+        "github主页"
+      ]
+    },
+    {
+      "name": "real-docx",
+      "path": "demo/ms_office_docs/docx_01.docx",
+      "file_suffix": "docx",
+      "source_context": null,
+      "sha256": "86393df4b91412b946c7331e27e762440889b916a0d2ec9331700913f06a7a1b",
+      "page_count": 3,
+      "required_text": [
+        "MinerU supports DOCX document parsing now",
+        "github主页"
+      ]
+    },
+    {
+      "name": "real-ppt",
+      "path": "demo/ms_office_docs/pptx_01.ppt",
+      "file_suffix": "ppt",
+      "source_context": null,
+      "sha256": "2215ba7ee3d845ad745714a6b35ca8d652ec0c2f373e15f56dd520570b0eab6a",
+      "page_count": 6,
+      "required_text": [
+        "Test Table Slide",
+        "中断列表第3项（正文后继续编号）"
+      ]
+    },
+    {
+      "name": "real-pptx",
+      "path": "demo/ms_office_docs/pptx_01.pptx",
+      "file_suffix": "pptx",
+      "source_context": null,
+      "sha256": "77eec640e70e927d0d5dda6b69dc4317596cb01c220a58b83d9933a58ff0ecc2",
+      "page_count": 6,
+      "required_text": [
+        "Test Table Slide",
+        "中断列表第3项（正文后继续编号）"
+      ]
+    },
+    {
+      "name": "real-xls",
+      "path": "demo/ms_office_docs/xlsx_01.xls",
+      "file_suffix": "xls",
+      "source_context": null,
+      "sha256": "733225d6eb2659b1503abccc3cf46483dbe15b028cb2b0898cb57ec81c4d3cc0",
+      "page_count": 3,
+      "required_text": [
+        "first 123 second 123 third 123 1 5 9 2 4 6 3 3 3",
+        ") header (f) second third 1 2 3 3 4 5 6 7 8 9 10"
+      ]
+    },
+    {
+      "name": "real-xlsx",
+      "path": "demo/ms_office_docs/xlsx_01.xlsx",
+      "file_suffix": "xlsx",
+      "source_context": null,
+      "sha256": "fe3e77a6c16bca8eeccb970e7d788cb7f3a3e4f3ac9c793589892ac190e6b874",
+      "page_count": 3,
+      "required_text": [
+        "first 123 second 123 third 123 1 5 9 2 4 6 3 3 3",
+        ") header (f) second third 1 2 3 3 4 5 6 7 8 9 10"
+      ]
+    },
+    {
+      "name": "real-rtf",
+      "path": "demo/ms_office_docs/rtf_01.rtf",
+      "file_suffix": "rtf",
+      "source_context": null,
+      "sha256": "9420c7d8c4964f0058b6f03e21a270eebb30bfa48fa03b52ee7b56f0ad2a36b5",
+      "page_count": 1,
+      "required_text": [
+        "Algorithm 1 KVCache-centric Scheduling Algorithm",
+        "y, Conductor assigns the request to the instance"
+      ]
+    },
+    {
+      "name": "real-odt",
+      "path": "demo/open_office_docs/docx_01.odt",
+      "file_suffix": "odt",
+      "source_context": null,
+      "sha256": "a641c696247dfe0fda3de88df6cf862d07f4d9523f2cddbffaf7b7e3b3dfb1d8",
+      "page_count": 3,
+      "required_text": [
+        "MinerU supports DOCX document parsing now",
+        "github主页"
+      ]
+    },
+    {
+      "name": "real-ods",
+      "path": "demo/open_office_docs/xlsx_01.ods",
+      "file_suffix": "ods",
+      "source_context": null,
+      "sha256": "725076ff5241bcd1a567ae10b5fc5dccc573ea292cfc5a7bd84eaf02c87daabd",
+      "page_count": 3,
+      "required_text": [
+        "first 123 second 123 third 123 1 5 9 2 4 6 3 3 3",
+        ") header (f) second third 1 2 3 3 4 5 6 7 8 9 10"
+      ]
+    },
+    {
+      "name": "real-odp",
+      "path": "demo/open_office_docs/pptx_01.odp",
+      "file_suffix": "odp",
+      "source_context": null,
+      "sha256": "6a5f6cb67e9475c120bdc07285f6fdcd7bf6067c036ab2cba437e5d61d4258c2",
+      "page_count": 6,
+      "required_text": [
+        "Test Table Slide",
+        "中断列表第3项（正文后继续编号）"
+      ]
+    },
+    {
+      "name": "real-html",
+      "path": "demo/web_docs/html_01.html",
+      "file_suffix": "html",
+      "source_context": {
+        "source_uri": "https://blog.csdn.net/OpenDataLab/article/details/162423644"
+      },
+      "sha256": "55809fff359524fad21d7279116b83f3452eadce151d0c7704ae8e0789847557",
+      "page_count": 1,
+      "required_text": [
+        "MinerU 团队新产品 | Sciverse 科学数据基座，把可信的科学知识接入你的 AI 工",
+        "不是替用户“自动写完论文”，而是让科研 Agent 能够基于真实、可追溯、可调用的科学证据工作。"
+      ]
+    },
+    {
+      "name": "real-mhtml",
+      "path": "demo/web_docs/mhtml_01.mhtml",
+      "file_suffix": "mhtml",
+      "source_context": null,
+      "sha256": "311d294a4bc4e5be3f7c9603f51153a05ecec18cea64904cc24ec39fb42fa917",
+      "page_count": 1,
+      "required_text": [
+        "MinerU 4.0 正式发布：让复杂文档成为 Agent 可用的知识基础设施",
+        "发布于 2026-09-18 18:04・上海"
+      ]
+    },
+    {
+      "name": "real-epub",
+      "path": "demo/ebook/epub_01.epub",
+      "file_suffix": "epub",
+      "source_context": null,
+      "sha256": "6b79f2d23b804172816e81c463dbcea689593bbde63ef200d52b6c0da7ef629c",
+      "page_count": 15,
+      "required_text": [
+        "The Project Gutenberg eBook of Alice's Adventure",
+        "o our email newsletter to hear about new eBooks."
+      ]
+    },
+    {
+      "name": "real-ofd",
+      "path": "demo/ofd/ofd_01.ofd",
+      "file_suffix": "ofd",
+      "source_context": null,
+      "sha256": "0b05a754cbd95d8f2106b9e82d90c5d4c1fbb35e76c8bdfcb63f017ee1394d78",
+      "page_count": 2,
+      "required_text": [
+        "BMP格式 JPG格式 PNG格式 TIF格式 GIF格式 二值BMP",
+        "符合标准的阅读器应同时看到以上的多个图片"
+      ]
+    }
+  ]
+}

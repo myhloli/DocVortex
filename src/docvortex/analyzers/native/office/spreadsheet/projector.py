@@ -20,9 +20,15 @@ from .models import AnchoredBlock, DataRegion, ExcelCell, ExcelTable, FormulaMap
 from .region_discovery import (
     ConnectedRegion,
     discover_connected_regions,
+    discover_sparse_regions,
     keep_maximal_by_semantic_sets,
+    native_region_contract_unchanged,
     select_best_gap_candidate,
+    select_sparse_regions,
 )
+
+_DEFAULT_DISCOVER_CONNECTED_REGIONS = discover_connected_regions
+_DEFAULT_SELECT_BEST_GAP_CANDIDATE = select_best_gap_candidate
 
 
 class _MergedCellLookup:
@@ -400,17 +406,116 @@ class SpreadsheetProjector:
     def _select_best_gap_candidate(self, sheet: Worksheet) -> tuple[int, float, list[ExcelTable]]:
         """按固定候选与偏好顺序选择最稳定的 gap tolerance。"""
         bounds: DataRegion = self._find_true_data_bounds(sheet)
-        has_semantic_content, span_at = self._sheet_semantic_predicates(sheet)
-        gap_tolerance, penalty, best_regions = select_best_gap_candidate(
-            lambda tolerance: self._discover_sheet_regions(sheet, bounds, tolerance),
-            has_semantic_content,
-            span_at,
-        )
+        selected = None
+        if self._supports_sparse_region_selection():
+            merged_lookup = self._get_merged_cell_lookup(sheet)
+            if self._supports_sparse_merged_lookup(merged_lookup):
+                snapshot = self._snapshot_sheet_regions(sheet, bounds, merged_lookup, include_semantics=True)
+                if snapshot is not None:
+                    starts, points, rectangles, semantic_positions, spans = snapshot
+                    selected = select_sparse_regions(
+                        starts, points, rectangles, list(semantic_positions), spans, bounds.max_row - 1, bounds.max_col - 1
+                    )
+                    # 原生层已返回独立区域，先释放输入快照，避免与后续 ExcelCell 物化共同占用峰值内存。
+                    del snapshot, starts, points, rectangles, semantic_positions, spans
+        if selected is None:
+            # DISPIMG 的失败/矢量回退会产生逐次诊断，保留原候选顺序与逐格解析访问。
+            has_semantic_content, span_at = self._sheet_semantic_predicates(sheet)
+            gap_tolerance, penalty, best_regions = select_best_gap_candidate(
+                lambda tolerance: self._discover_sheet_regions(sheet, bounds, tolerance),
+                has_semantic_content,
+                span_at,
+            )
+        else:
+            gap_tolerance, penalty, best_regions, _ = selected
         merged_lookup = self._get_merged_cell_lookup(sheet)
+        # 评分用的原始文本/媒体语义与富文本物化后的语义不同，必须保留全部候选物化后再做子集过滤。
         tables = self._filter_semantic_subset_tables(
             [self._materialize_region(sheet, region, merged_lookup) for region in best_regions]
         )
         return gap_tolerance, penalty, tables
+
+    def _supports_sparse_region_selection(self) -> bool:
+        """仅在被批处理替代的发现与语义钩子未被覆写时使用完整原生选择。"""
+        if (
+            not native_region_contract_unchanged()
+            or discover_connected_regions is not _DEFAULT_DISCOVER_CONNECTED_REGIONS
+            or select_best_gap_candidate is not _DEFAULT_SELECT_BEST_GAP_CANDIDATE
+        ):
+            return False
+        return all(
+            getattr(getattr(self, name), "__func__", None) is original
+            for name, original in _DEFAULT_SPARSE_SELECTION_METHODS.items()
+        )
+
+    @staticmethod
+    def _supports_sparse_merged_lookup(lookup: _MergedCellLookup) -> bool:
+        """只读索引快照不得绕过调用方替换的合并覆盖或跨度查询。"""
+        for name, original in _DEFAULT_MERGED_LOOKUP_METHODS.items():
+            method = getattr(lookup, name, None)
+            if getattr(method, "__func__", method) is not original:
+                return False
+        return True
+
+    def _snapshot_sheet_regions(
+        self,
+        sheet: Worksheet,
+        bounds: DataRegion,
+        merged_lookup: _MergedCellLookup,
+        *,
+        include_semantics: bool,
+    ) -> (
+        tuple[
+            list[tuple[int, int]],
+            list[tuple[int, int]],
+            list[tuple[int, int, int, int]],
+            set[tuple[int, int]],
+            list[tuple[int, int, int, int]],
+        ]
+        | None
+    ):
+        """一次提取稀疏连接证据和纯语义，遇到有解析副作用的 DISPIMG 保留回调路径。"""
+        max_row, max_col = bounds.max_row - 1, bounds.max_col - 1
+        starts = self._get_non_empty_cell_positions(sheet, bounds)
+        points: list[tuple[int, int]] = []
+        semantic_positions: set[tuple[int, int]] = set()
+        for (source_row, source_col), cell in sheet._cells.items():
+            row, col = source_row - 1, source_col - 1
+            if cell.value is None or not (0 <= row <= max_row and 0 <= col <= max_col):
+                continue
+            points.append((row, col))
+            if include_semantics:
+                raw_text = str(cell.value)
+                if "DISPIMG" in raw_text:
+                    return None
+                if raw_text.strip():
+                    semantic_positions.add((row, col))
+        rectangles = [
+            (row, row, max(0, start_col), min(max_col, end_col))
+            for row, intervals in merged_lookup._merged_row_intervals.items()
+            if 0 <= row <= max_row
+            for start_col, end_col in intervals
+            if start_col <= max_col and end_col >= 0
+        ]
+        spans = []
+        if include_semantics:
+            for (row, col), media in self.table_image_map.items():
+                if (
+                    0 <= row <= max_row
+                    and 0 <= col <= max_col
+                    and (row, col) not in semantic_positions
+                    and any(value.strip() for value in media)
+                ):
+                    semantic_positions.add((row, col))
+            for (row, col), equations in self.math_map.items():
+                if equations and 0 <= row <= max_row and 0 <= col <= max_col:
+                    semantic_positions.add((row, col))
+            spans = [
+                (row, col, row_span, col_span)
+                for (row, col), (row_span, col_span) in merged_lookup._anchor_spans.items()
+                if 0 <= row <= max_row and 0 <= col <= max_col
+            ]
+        return starts, points, rectangles, semantic_positions, spans
 
     def _select_best_tables(self, sheet: Worksheet) -> list[ExcelTable]:
         """选择并记录当前工作表的最佳表格候选集合。"""
@@ -476,6 +581,20 @@ class SpreadsheetProjector:
         """对当前工作表按 gap_tolerance 洪水填充发现连通数据区域。"""
         merged_lookup = self._get_merged_cell_lookup(sheet)
         max_row, max_col = bounds.max_row - 1, bounds.max_col - 1
+
+        if (
+            type(gap_tolerance) is int
+            and gap_tolerance in (0, 1, 2)
+            and native_region_contract_unchanged()
+            and discover_connected_regions is _DEFAULT_DISCOVER_CONNECTED_REGIONS
+            and getattr(self._get_non_empty_cell_positions, "__func__", None)
+            is _DEFAULT_SPARSE_SELECTION_METHODS["_get_non_empty_cell_positions"]
+            and self._supports_sparse_merged_lookup(merged_lookup)
+        ):
+            snapshot = self._snapshot_sheet_regions(sheet, bounds, merged_lookup, include_semantics=False)
+            assert snapshot is not None
+            starts, points, rectangles, _, _ = snapshot
+            return discover_sparse_regions(starts, points, rectangles, max_row, max_col, gap_tolerance)
 
         def has_content(row: int, col: int) -> bool:
             """检查指定单元格（0-based索引）是否有内容（有值或属于合并区域）。"""
@@ -716,6 +835,20 @@ class SpreadsheetProjector:
                 if isinstance(color, str) and len(color) == 8:
                     style["background-color"] = "#" + color[2:]
         return style
+
+
+_DEFAULT_SPARSE_SELECTION_METHODS = {
+    name: getattr(SpreadsheetProjector, name)
+    for name in (
+        "_discover_sheet_regions",
+        "_sheet_semantic_predicates",
+        "_get_non_empty_cell_positions",
+        "_get_merged_cell_lookup",
+    )
+}
+_DEFAULT_MERGED_LOOKUP_METHODS = {
+    name: getattr(_MergedCellLookup, name) for name in ("contains_merged_cell", "get_anchor_span", "_contains_interval")
+}
 
 
 __all__ = ["SpreadsheetProjector"]

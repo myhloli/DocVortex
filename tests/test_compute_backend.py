@@ -57,7 +57,7 @@ def test_missing_or_broken_extension_fails_without_fallback(monkeypatch, error, 
     assert load.call_count == 2
 
 
-@pytest.mark.parametrize("protocol", [None, -1, 28, 35])
+@pytest.mark.parametrize("protocol", [None, -1, 28, 35, 36, 37, 38, 39])
 def test_old_or_missing_protocol_is_rejected(monkeypatch, protocol):
     """旧 editable 编译产物不能通过新协议验证，也不会成为 Python 降级入口。"""
     monkeypatch.setattr(backend.importlib, "import_module", Mock(return_value=SimpleNamespace(PROTOCOL_VERSION=protocol)))

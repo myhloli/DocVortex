@@ -1,6 +1,6 @@
 //! 不访问 Python 对象或 PDFium 的单线程批量计算内核。
 
-pub const PROTOCOL_VERSION: u32 = 36;
+pub const PROTOCOL_VERSION: u32 = 40;
 pub mod classification_visuals;
 pub mod columns;
 pub mod form_events;
@@ -69,3 +69,7 @@ pub mod inline_styles;
 
 pub mod image_drawing;
 pub mod image_numeric;
+pub mod ofd_tables;
+pub mod ofd_text_geometry;
+pub mod rtf_groups;
+pub mod spreadsheet_regions;

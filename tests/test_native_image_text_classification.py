@@ -22,9 +22,9 @@ from test_pdf_classify_image_text import image_text_pdf
 
 @pytest.fixture
 def native():
-    """原生测试必须加载协议 36，扩展不可用时明确失败。"""
+    """原生测试必须加载协议 40，扩展不可用时明确失败。"""
     value = get_native()
-    assert value.PROTOCOL_VERSION == 36
+    assert value.PROTOCOL_VERSION == 40
     return value
 
 

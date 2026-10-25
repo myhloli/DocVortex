@@ -48,6 +48,8 @@ DocVortex 不下载模型，也不执行 PDF OCR。遇到需要 OCR 的文档时
 
 同机热运行对比，覆盖 32 份 PDF／299 页（Flash 为 31 份）。0.4.25 沿用既有测量结果；0.5.10 逐文档预热一次、计时五次，进行三轮平衡配对，取三轮中位数的中位数后求和。RSS 降幅为逐文档进程树峰值 RSS 降幅的中位数。MinerU 数据包含双仓优化收益；共享路径不含模型计算，剔除极端密集表格样本后为 **2.87×**。
 
+[非 PDF 优化总报告](https://github.com/myhloli/DocVortex/blob/main/docs/optimization-final-report-2026-10-25.md)记录了共同原始基线对照、逐格式耗时、内存复核和剩余热点。
+
 ## 快速开始
 
 需要 **启用 GIL 的 CPython 3.11–3.14**、**pypdfium2 >=5.13.0,<6** 和 **ONNX Runtime 1.24.4 或更新版本**（Windows x64 使用 DirectML）。

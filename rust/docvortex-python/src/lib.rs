@@ -21,15 +21,19 @@ mod image_numeric;
 mod inline_styles;
 mod marker_geometry;
 mod math_words;
+mod ofd_tables;
+mod ofd_text_geometry;
 mod pdfium;
 mod pixels;
 mod profile_context;
+mod rtf_groups;
 mod rule_graphics;
 mod rule_tail;
 mod script_snapshot;
 mod scripts;
 mod snapshot;
 mod spatial;
+mod spreadsheet_regions;
 mod statistics;
 mod table_candidates;
 mod table_merge;
@@ -45,6 +49,38 @@ mod unmapped_ink;
 /// 注册私有扩展及协议号；公开 Python 接口仍由原模块提供。
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_function(wrap_pyfunction!(
+        ofd_text_geometry::ofd_glyph_geometries,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        ofd_text_geometry::ofd_glyph_geometry_stats,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(ofd_tables::ofd_table_components, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        ofd_tables::ofd_table_logical_cells,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(ofd_tables::ofd_table_stats, module)?)?;
+    module.add_function(wrap_pyfunction!(rtf_groups::rtf_group_spans, module)?)?;
+    module.add_function(wrap_pyfunction!(rtf_groups::rtf_group_stats, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        spreadsheet_regions::spreadsheet_select_regions,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        spreadsheet_regions::spreadsheet_discover_regions,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        spreadsheet_regions::spreadsheet_keep_maximal_semantic_sets,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        spreadsheet_regions::spreadsheet_region_stats,
+        module
+    )?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_components, module)?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_contours, module)?)?;
     module.add_function(wrap_pyfunction!(image_numeric::image_resize, module)?)?;
