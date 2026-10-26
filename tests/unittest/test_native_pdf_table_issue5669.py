@@ -17,7 +17,7 @@ from docvortex.analyzers.native.pdf._table_recovery import (
 )
 from docvortex.analyzers.native.pdf._table_recovery.engine import diagnose_native_pdf_table
 from docvortex.analyzers.native.pdf._table_recovery.contracts import NativeTableResult
-from docvortex.analyzers.native.pdf._table_recovery.hierarchical import find_nested_table_evidence
+from docvortex.analyzers.native.pdf._table_recovery.hierarchical import _subset_text, find_nested_table_evidence
 from docvortex.analyzers.native.pdf._table_recovery.text import build_native_table_text
 from test_native_pdf_table import _char_items, _local_to_page_bbox
 
@@ -190,3 +190,42 @@ def test_missing_hierarchy_boundary_does_not_invent_rowspan() -> None:
     text = build_native_table_text(table_input)
     assert text is not None
     assert find_nested_table_evidence(table_input, text) == ()
+
+
+@pytest.mark.parametrize("writing_angle", [90, 180, 270, None])
+def test_hierarchy_does_not_reinterpret_cross_direction_rows(writing_angle: int | None) -> None:
+    """同一物理分隔下出现旋转或未定向字符时，不用横向文本行证明嵌套子表。"""
+    source = _synthetic_nested_table()
+    text = build_native_table_text(source)
+    assert text is not None
+    assert find_nested_table_evidence(source, text)
+    mixed = replace(text, glyphs=(replace(text.glyphs[0], writing_angle=writing_angle), *text.glyphs[1:]))
+    assert find_nested_table_evidence(source, mixed) == ()
+
+
+def test_child_region_translation_preserves_all_character_geometry() -> None:
+    """裁取右下子表时，落格框、排版框和基线共同平移，保持输入及来源索引不变。"""
+    source = _synthetic_nested_table()
+    text = build_native_table_text(source)
+    assert text is not None
+    text = replace(
+        text,
+        glyphs=tuple(
+            replace(
+                glyph,
+                advance_bbox=(glyph.bbox[0] - 1, glyph.bbox[1] - 1, glyph.bbox[2] + 1, glyph.bbox[3] + 1),
+                origin=(glyph.bbox[0], glyph.bbox[3]),
+            )
+            for glyph in text.glyphs
+        ),
+    )
+    before = deepcopy(text)
+    child = _subset_text(text, (100, 80, 300, 240))
+    assert child is not None
+    first = child.glyphs[0]
+    assert first.text == "I"
+    assert first.bbox[:2] == (10, 4)
+    assert first.advance_bbox is not None and first.advance_bbox[:2] == (9, 3)
+    assert first.origin == (10, 12)
+    assert first.source_index in {glyph.source_index for glyph in text.glyphs}
+    assert text == before

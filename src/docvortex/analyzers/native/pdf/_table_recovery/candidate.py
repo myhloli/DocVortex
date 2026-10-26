@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from .....schema import BBox
 from .contracts import NativeTableCandidate, NativeTableCandidateSource, NativeTableCell, NativeTableGlyph, NativeTableText
-from .text import build_cell_text
+from .text import build_cell_text, build_cell_text_parts, cell_writing_angle
 
 MIN_TEXT_CAPTURE = 0.98
 
@@ -225,6 +225,10 @@ def build_candidate(
         if diagnostics is not None:
             diagnostics["candidate_rejection_gate"] = "token_split"
         return None
+    if any(cell_writing_angle(glyphs) is None for glyphs in cell_glyphs):
+        if diagnostics is not None:
+            diagnostics["candidate_rejection_gate"] = "cell_writing_direction"
+        return None
     cells = tuple(
         NativeTableCell(
             row=spec.row,
@@ -237,6 +241,12 @@ def build_candidate(
                 text.median_glyph_height,
             ),
             source_char_indices=tuple(
+                source_index
+                for _text, source_index in build_cell_text_parts(cell_glyphs[index], text.median_glyph_height)
+                if source_index is not None
+            )
+            if any(glyph.writing_angle for glyph in cell_glyphs[index])
+            else tuple(
                 glyph.source_index
                 for glyph in sorted(
                     cell_glyphs[index],

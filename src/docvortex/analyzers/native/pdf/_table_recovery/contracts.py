@@ -65,6 +65,11 @@ class NativeTableGlyph:
     visual_row: int
     explicit_space_before: bool = False
     explicit_break_before: bool = False
+    # 相对整表正向坐标的书写角度；None 表示有方向证据但不属于支持的标准方向。
+    writing_angle: int | None = 0
+    # 旋转文字的排版 advance 框仅参与词间距，不能替换物理落格框。
+    advance_bbox: BBox | None = None
+    origin: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True, slots=True)

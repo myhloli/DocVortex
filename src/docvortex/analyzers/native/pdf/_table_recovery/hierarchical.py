@@ -53,7 +53,13 @@ def _subset_text(text: NativeTableText, bbox: BBox) -> NativeTableText | None:
         text,
         rows=tuple(rows),
         glyphs=tuple(
-            replace(glyph, bbox=_shift_bbox(glyph.bbox, left, top), visual_row=mapping[glyph.visual_row])
+            replace(
+                glyph,
+                bbox=_shift_bbox(glyph.bbox, left, top),
+                advance_bbox=_shift_bbox(glyph.advance_bbox, left, top) if glyph.advance_bbox is not None else None,
+                origin=(glyph.origin[0] - left, glyph.origin[1] - top) if glyph.origin is not None else None,
+                visual_row=mapping[glyph.visual_row],
+            )
             for glyph in text.glyphs
             if glyph.glyph_id in glyph_ids
         ),
@@ -104,6 +110,9 @@ def _local_input(table_input: NativeTableInput) -> NativeTableInput:
 
 def find_nested_table_evidence(table_input: NativeTableInput, text: NativeTableText) -> tuple[NestedTableEvidence, ...]:
     """仅在局部竖线、重复右侧横线和完整子列同时成立时认定嵌套区域。"""
+    # 层级网格依赖横向文本行；旋转或未定向字符交给其他候选，避免把跨方向字形当成重复子行。
+    if any(glyph.writing_angle != 0 for glyph in text.glyphs):
+        return ()
     width, height = table_local_size(table_input.table_bbox, normalize_angle(table_input.angle))
     rules = _local_rules(table_input, width, height)
     vertical = [rule for rule in rules if rule.orientation == "vertical"]
