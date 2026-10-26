@@ -19,6 +19,7 @@ from .contracts import (
     NativeTableText,
 )
 from .geometry import bbox_intersection, normalize_bbox
+from .hierarchical import build_hierarchical_candidate, find_nested_table_evidence, preserves_nested_cells
 from .sparse_hybrid import build_sparse_hybrid_candidates, diagnose_sparse_hybrid_candidate_builds
 from .sparse_multiline import build_sparse_multiline_candidates, diagnose_sparse_multiline_candidate_builds
 from .rule_band import build_rule_band_candidates
@@ -378,6 +379,8 @@ def _evaluate_native_pdf_table(
             "native_text",
         )
     vector_attempt_records: list[dict[str, Any]] = []
+    nested_evidence = find_nested_table_evidence(table_input, text)
+    hierarchical_candidate = build_hierarchical_candidate(table_input, text, nested_evidence)
     vector_candidates = build_vector_candidates(
         table_input,
         text,
@@ -388,6 +391,8 @@ def _evaluate_native_pdf_table(
     vector_candidates = _retain_column_consistent_candidates(vector_candidates, minimum_columns)
     aligned_text = regroup_numeric_text(text)
     aligned_candidate = build_aligned_numeric_candidate(table_input, aligned_text)
+    if aligned_candidate is not None and not preserves_nested_cells(aligned_candidate, nested_evidence):
+        aligned_candidate = None
     if aligned_candidate is not None and aligned_candidate.cols < minimum_columns:
         aligned_candidate = None
     aligned_replaces_vector = aligned_candidate is not None and any(
@@ -411,7 +416,13 @@ def _evaluate_native_pdf_table(
             is not None
         ):
             physical_topology_conflict = False
-    vector_selection = None if physical_topology_conflict else _select_candidate(vector_candidates)
+    vector_selection = (
+        None
+        if physical_topology_conflict
+        else _select_candidate(
+            [candidate for candidate in vector_candidates if preserves_nested_cells(candidate, nested_evidence)]
+        )
+    )
     sparse_hybrid_allowed = len(text.rows) >= 2 and vector_selection is None and not physical_topology_conflict
     if sparse_hybrid_allowed:
         if not vector_attempts:
@@ -445,6 +456,7 @@ def _evaluate_native_pdf_table(
             text_candidates = []
     existing_generated_candidates = [
         *vector_candidates,
+        *([hierarchical_candidate] if hierarchical_candidate is not None else []),
         *rule_band_candidates,
         *sparse_hybrid_candidates,
         *text_candidates,
@@ -452,6 +464,7 @@ def _evaluate_native_pdf_table(
     existing_candidates = _retain_column_consistent_candidates(
         _remove_undercounted_vector_candidates(existing_generated_candidates), minimum_columns
     )
+    existing_candidates = [candidate for candidate in existing_candidates if preserves_nested_cells(candidate, nested_evidence)]
     existing_verified = any(_passes_verified_threshold(candidate) for candidate in existing_candidates)
     sparse_multiline_allowed = len(text.rows) >= 2 and not physical_topology_conflict and not existing_verified
     if sparse_multiline_allowed:
@@ -476,6 +489,7 @@ def _evaluate_native_pdf_table(
     candidates = _retain_column_consistent_candidates(
         _remove_undercounted_vector_candidates(generated_candidates), minimum_columns
     )
+    candidates = [candidate for candidate in candidates if preserves_nested_cells(candidate, nested_evidence)]
     selected = None if physical_topology_conflict else _select_candidate(candidates)
     header_undercount = (
         selected is not None
@@ -526,7 +540,9 @@ def _evaluate_native_pdf_table(
         first_rejection_gate = "candidate_generation"
     elif not candidates:
         first_rejection_gate = (
-            "physical_column_undercount"
+            "nested_cell_undercount"
+            if nested_evidence
+            else "physical_column_undercount"
             if minimum_columns and any(candidate.cols < minimum_columns for candidate in generated_candidates)
             else "undercount_guard"
         )
