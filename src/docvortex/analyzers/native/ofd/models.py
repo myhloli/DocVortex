@@ -82,6 +82,8 @@ class TextLine:
     template_id: int | None
     styles: tuple[str, ...] = ()
     runs: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    # 仅确认单行时保留源对象布局范围；组行可合并该范围，公开 bbox 仍使用字形框。
+    source_bbox: BBox | None = None
 
 
 @dataclass(frozen=True, slots=True)

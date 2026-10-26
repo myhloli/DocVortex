@@ -13,7 +13,17 @@ from .geometry import bbox_union
 from .models import GlyphItem, TextLine
 from .text import format_line_html, format_line_spans
 
-_LIST_START = re.compile(r"^\s*(?:[•●▪◆]|[-*]\s|\d+[.)、]\s*|[一二三四五六七八九十]+[、）])")
+_LIST_START = re.compile(
+    r"^\s*(?:[•●▪◆]|[-*]\s|\d+[.)、]\s*|[一二三四五六七八九十]+[、）]|(?P<article>第[零〇一二三四五六七八九十百千万两\d]+条))"
+)
+# 复杂碎片行继续使用既有规则，限制新增邻域证据扫描和字符串拼接的最坏开销。
+_MAX_SOURCE_ROW_FRAGMENTS = 64
+
+
+def starts_new_article(text: str) -> bool:
+    """识别独立条款开头，将同一段落边界约束传递给页内合段和公共跨页续接。"""
+    match = _LIST_START.match(text)
+    return match is not None and match.lastgroup == "article"
 
 
 def upright_point(x: float, y: float, angle: int) -> tuple[float, float]:
@@ -114,9 +124,8 @@ def _fragment_separator(first: TextLine, second: TextLine) -> str:
     return " " if second_box[0] - first_box[2] >= threshold else ""
 
 
-def merge_same_baseline_lines(lines: list[TextLine]) -> list[TextLine]:
-    """按真实基线聚行并沿阅读方向拼接，保留样式及层和模板隔离。"""
-    metrics = {id(line): (line_baseline(line), upright_box(line.bbox, line.angle)) for line in lines}
+def _baseline_rows(lines: list[TextLine], metrics: dict[int, tuple[float, BBox]]) -> list[list[TextLine]]:
+    """按相同来源和首片段基线分行，供原有紧邻拼接与源布局补充规则复用。"""
     ordered = sorted(lines, key=lambda line: (line.angle, line.layer_type, line.template_id or -1, metrics[id(line)][0]))
     rows: list[list[TextLine]] = []
     for line in ordered:
@@ -129,8 +138,30 @@ def merge_same_baseline_lines(lines: list[TextLine]) -> list[TextLine]:
             rows[-1].append(line)
         else:
             rows.append([line])
+    return rows
+
+
+def _join_text_lines(first: TextLine, second: TextLine, separator: str) -> TextLine:
+    """新建保留局部样式和真实字形框的合并行，源布局证据仅在两侧都有效时延续。"""
+    return replace(
+        first,
+        text=first.text + separator + second.text,
+        bbox=bbox_union((first.bbox, second.bbox)) or first.bbox,
+        glyphs=first.glyphs + second.glyphs,
+        paint_order=min(first.paint_order, second.paint_order),
+        runs=line_runs(first) + (((separator, ()),) if separator else ()) + line_runs(second),
+        source_bbox=(
+            bbox_union((first.source_bbox, second.source_bbox))
+            if first.source_bbox is not None and second.source_bbox is not None else None
+        ),
+    )
+
+
+def merge_same_baseline_lines(lines: list[TextLine]) -> list[TextLine]:
+    """按真实基线聚行并沿阅读方向拼接，保留样式及层和模板隔离。"""
+    metrics = {id(line): (line_baseline(line), upright_box(line.bbox, line.angle)) for line in lines}
     output: list[TextLine] = []
-    for row in rows:
+    for row in _baseline_rows(lines, metrics):
         fragments = sorted(row, key=lambda line: (metrics[id(line)][1][0], line.paint_order))
         assembled: list[TextLine] = []
         for line in fragments:
@@ -141,19 +172,113 @@ def merge_same_baseline_lines(lines: list[TextLine]) -> list[TextLine]:
                 gap = second_box[0] - first_box[2]
                 if size > 0 and max(previous.font_size, line.font_size) <= 1.35 * size and -0.25 * size <= gap <= 0.8 * size:
                     separator = _fragment_separator(previous, line)
-                    runs = line_runs(previous) + (((separator, ()),) if separator else ()) + line_runs(line)
-                    assembled[-1] = replace(
-                        previous,
-                        text=previous.text + separator + line.text,
-                        bbox=bbox_union((previous.bbox, line.bbox)) or previous.bbox,
-                        glyphs=previous.glyphs + line.glyphs,
-                        paint_order=min(previous.paint_order, line.paint_order),
-                        runs=runs,
-                    )
+                    assembled[-1] = _join_text_lines(previous, line, separator)
                     continue
             assembled.append(line)
         output.extend(assembled)
     return output
+
+
+def _source_row_supported(
+    left: TextLine,
+    right: TextLine,
+    previous_row: list[TextLine],
+    following_row: list[TextLine],
+    metrics: dict[int, tuple[float, BBox]],
+    barriers: list[BBox],
+) -> bool:
+    """仅在源框相邻、紧接的正文跨过间隙且没有分栏或视觉屏障时补充同行关联。"""
+    if left.source_bbox is None or right.source_bbox is None or left.angle not in {0, 90, 180, 270}:
+        return False
+    size = min(left.font_size, right.font_size)
+    if size <= 0 or max(left.font_size, right.font_size) > 1.35 * size:
+        return False
+    left_box, right_box = upright_box(left.bbox, left.angle), metrics[id(right)][1]
+    baseline = line_baseline(left)
+    if abs(baseline - metrics[id(right)][0]) > 0.2 * size or right_box[0] - left_box[2] <= 0.8 * size:
+        return False
+    left_source, right_source = upright_box(left.source_bbox, left.angle), upright_box(right.source_bbox, right.angle)
+    if not 0 <= right_source[0] - left_source[2] <= 0.8 * size:
+        return False
+    # 只信任贴近真实文字的相向容器边，防止大幅留白的单行容器制造虚假邻接。
+    if left_source[2] - left_box[2] > size or right_box[0] - right_source[0] > size:
+        return False
+    scope = (left.angle, left.layer_type, left.template_id)
+    previous_boxes = [
+        metrics[id(line)][1] for line in previous_row
+        if (line.angle, line.layer_type, line.template_id) == scope
+        and 0.5 * size <= baseline - metrics[id(line)][0] <= 3 * size
+    ]
+    if (
+        any(box[0] < left_box[2] and box[2] <= right_box[0] for box in previous_boxes)
+        and any(box[0] >= left_box[2] and box[2] > right_box[0] for box in previous_boxes)
+        and not any(box[0] <= left_box[2] and box[2] >= right_box[0] for box in previous_boxes)
+    ):
+        return False
+    for following in following_row:
+        if (following.angle, following.layer_type, following.template_id) != scope:
+            continue
+        following_baseline, box = metrics[id(following)]
+        if (
+            max(size, following.font_size) > 1.25 * min(size, following.font_size)
+            or not 0.5 * size <= following_baseline - baseline <= 3 * size
+            or not -2.5 * size <= box[0] - left_box[0] <= 0.8 * size
+            or not (box[0] <= left_box[2] and box[2] >= right_box[0])
+            or len(following.text.strip()) <= 4
+            or _LIST_START.match(following.text)
+        ):
+            continue
+        # 此处只证明同行间隙属于连续正文；末行是否写满由完整组行后的合段规则判断。
+        region = bbox_union((left_box, right_box, box))
+        assert region is not None
+        if any(
+            min(region[2], barrier[2]) > max(region[0], barrier[0])
+            and min(region[3], barrier[3]) > max(region[1], barrier[1])
+            for barrier in barriers
+        ):
+            continue
+        return True
+    return False
+
+
+def merge_source_adjacent_lines(
+    lines: list[TextLine], *, barriers: list[BBox] | None = None, excluded_line_ids: frozenset[int] = frozenset()
+) -> list[TextLine]:
+    """仅替换既有组行结果中证据充分的片段，不重排其他行或跨中间行寻找通栏证据。"""
+    if sum(line.source_bbox is not None and id(line) not in excluded_line_ids for line in lines) < 2:
+        return lines
+    metrics = {id(line): (line_baseline(line), upright_box(line.bbox, line.angle)) for line in lines}
+    rows = _baseline_rows(lines, metrics)
+    projected_barriers: dict[int, list[BBox]] = {}
+    replacements: dict[int, TextLine] = {}
+    consumed: set[int] = set()
+    anchors: dict[int, int] = {}
+    for index, row in enumerate(rows):
+        if any(len(neighbor) > _MAX_SOURCE_ROW_FRAGMENTS for neighbor in rows[max(0, index - 1):index + 2]):
+            continue
+        previous_row = [line for line in rows[index - 1] if id(line) not in excluded_line_ids] if index else []
+        following_row = (
+            [line for line in rows[index + 1] if id(line) not in excluded_line_ids] if index + 1 < len(rows) else []
+        )
+        assembled: list[TextLine] = []
+        for line in sorted(row, key=lambda item: (metrics[id(item)][1][0], item.paint_order)):
+            previous = assembled[-1] if assembled else None
+            if previous is not None and id(previous) not in excluded_line_ids and id(line) not in excluded_line_ids:
+                if line.angle not in projected_barriers:
+                    projected_barriers[line.angle] = [upright_box(box, line.angle) for box in barriers or []]
+                if _source_row_supported(
+                    previous, line, previous_row, following_row, metrics, projected_barriers[line.angle]
+                ):
+                    separator = "" if previous.text[-1:].isspace() or line.text[:1].isspace() else " "
+                    merged = _join_text_lines(previous, line, separator)
+                    anchor = anchors.pop(id(previous), id(previous))
+                    anchors[id(merged)] = anchor
+                    replacements[anchor] = merged
+                    consumed.add(id(line))
+                    assembled[-1] = merged
+                    continue
+            assembled.append(line)
+    return [replacements.get(id(line), line) for line in lines if id(line) not in consumed]
 
 
 def _block_text(block: dict[str, Any]) -> str:

@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import math
 
 from loguru import logger
 from lxml import etree  # type: ignore[reportMissingImports]
 
 from ....schema import BBox
+from .assembly import upright_box
 from .constants import MAX_OBJECT_RECURSION, MAX_PAGE_COUNT, OFD_NAMESPACES
 from .errors import OfdParseError, OfdResourceLimitError
 from .geometry import Affine, bbox_intersection, parse_affine, parse_st_box, transform_bbox
 from .images import build_image_item
-from .models import OfdPageScene, PageBuildContext, PageRef, ResourceRegistry, TemplateRef
+from .models import OfdPageScene, PageBuildContext, PageRef, ResourceRegistry, TemplateRef, TextLine
 from .package import OfdPackage, element_text, first_child, first_descendant, local_name, namespace_name, parse_int
 from .path import OfdPathBudget, build_axis_lines
 from .resources import merge_registries, parse_resource_part, resolve_draw_param, drawing_attributes, merge_drawing_attributes
@@ -242,6 +244,36 @@ class OfdSceneBuilder:
             return context
         return replace(context, vector_clips=context.vector_clips + clips)
 
+    def _attach_text_source_bbox(
+        self, element: etree._Element, context: PageBuildContext, lines: list[TextLine]
+    ) -> None:
+        """只为确认单行且容器高度合理的文字保留裁剪后源框，不改变字形构造和原生批处理。"""
+        codes = [child for child in element if local_name(child.tag) == "TextCode"]
+        if len(lines) != 1 or len(codes) != 1:
+            return
+        # 显式纵向步进保守地不提供单行证据，避免后续字形被裁掉后掩盖真实折行。
+        if (codes[0].get("DeltaY") or "").strip():
+            return
+        line = lines[0]
+        if line.angle not in {0, 90, 180, 270} or not math.isfinite(line.font_size) or not line.glyphs:
+            return
+        boundary = parse_st_box(element.get("Boundary"))
+        source = transform_bbox(boundary, context.transform) if boundary is not None else None
+        if source is None:
+            return
+        box = upright_box(source, line.angle)
+        # 多行或高容器不能因裁剪后只剩一行而成为邻接证据。
+        if box[3] - box[1] > 1.5 * line.font_size:
+            return
+        source = bbox_intersection(source, context.clip_bbox)
+        if source is None:
+            return
+        axis = 1 if line.angle in {0, 180} else 0
+        baselines = [glyph.origin[axis] for glyph in line.glyphs]
+        if max(baselines) - min(baselines) > 0.2 * line.font_size:
+            return
+        line.source_bbox = source
+
     def _walk(
         self,
         element: etree._Element,
@@ -291,6 +323,7 @@ class OfdSceneBuilder:
                     template_id=context.template_id,
                     resolved_style=self._resolved_style(child, context, resources),
                 )
+                self._attach_text_source_bbox(child, context, lines)
                 scene.text_lines.extend(lines)
                 self._paint_order += max(1, len(lines))
                 continue
