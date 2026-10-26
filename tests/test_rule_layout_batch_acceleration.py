@@ -833,8 +833,18 @@ def test_pending_glyph_batch_keeps_frozen_records_and_whitespace_state(seed):
         )
     for case, angle in enumerate((0, 90, 180, 270)):
         table = NativeTableInput((0.0, 0.0, 100.0, 100.0), (100.0, 100.0), angle, tuple(chars), (), ())
-        assert text._select_pending_glyphs(table) == text._select_pending_glyphs_adapter(table)
-        assert table_value_hash(text._select_pending_glyphs(table)) == table_golden()["pending"][seed][case]
+        pending = text._select_pending_glyphs(table)
+        assert pending == text._select_pending_glyphs_adapter(table)
+        # 协议 35 基线只包含原有六个字段；新增方向元数据单独核验，保留旧字段的逐位冻结预期。
+        assert all((glyph.writing_angle, glyph.advance_bbox, glyph.origin) == (0, None, None) for glyph in pending)
+        frozen_records = [
+            {
+                name: getattr(glyph, name)
+                for name in ("glyph_id", "source_index", "text", "bbox", "explicit_space_before", "explicit_break_before")
+            }
+            for glyph in pending
+        ]
+        assert table_value_hash(frozen_records) == table_golden()["pending"][seed][case]
 
 
 def test_pending_glyph_batch_observes_input_changes_and_constructor(monkeypatch):

@@ -24,7 +24,7 @@ from test_native_pdf_table import _char_items, _local_to_page_bbox
 
 def issue5669_input(region: str = "hybrid") -> NativeTableInput:
     """加载原页字符和完整绘图证据，表框来自真实产品入口。"""
-    fixture = json.loads((Path(__file__).parents[1] / "fixtures/native_pdf_table_issue5669.json").read_text())
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/native_pdf_table_issue5669.json").read_text(encoding="utf-8"))
     assert fixture["source_sha256"] == "dfc5383cf68f63b98d155cad55fa8007bcf80c86b007a975a6f378b8091366e1"
     return NativeTableInput(
         table_bbox=tuple(fixture["regions"][region]),
