@@ -244,9 +244,7 @@ class OfdSceneBuilder:
             return context
         return replace(context, vector_clips=context.vector_clips + clips)
 
-    def _attach_text_source_bbox(
-        self, element: etree._Element, context: PageBuildContext, lines: list[TextLine]
-    ) -> None:
+    def _attach_text_source_bbox(self, element: etree._Element, context: PageBuildContext, lines: list[TextLine]) -> None:
         """只为确认单行且容器高度合理的文字保留裁剪后源框，不改变字形构造和原生批处理。"""
         codes = [child for child in element if local_name(child.tag) == "TextCode"]
         if len(lines) != 1 or len(codes) != 1:

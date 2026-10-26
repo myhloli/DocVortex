@@ -152,7 +152,8 @@ def _join_text_lines(first: TextLine, second: TextLine, separator: str) -> TextL
         runs=line_runs(first) + (((separator, ()),) if separator else ()) + line_runs(second),
         source_bbox=(
             bbox_union((first.source_bbox, second.source_bbox))
-            if first.source_bbox is not None and second.source_bbox is not None else None
+            if first.source_bbox is not None and second.source_bbox is not None
+            else None
         ),
     )
 
@@ -205,7 +206,8 @@ def _source_row_supported(
         return False
     scope = (left.angle, left.layer_type, left.template_id)
     previous_boxes = [
-        metrics[id(line)][1] for line in previous_row
+        metrics[id(line)][1]
+        for line in previous_row
         if (line.angle, line.layer_type, line.template_id) == scope
         and 0.5 * size <= baseline - metrics[id(line)][0] <= 3 * size
     ]
@@ -232,8 +234,7 @@ def _source_row_supported(
         region = bbox_union((left_box, right_box, box))
         assert region is not None
         if any(
-            min(region[2], barrier[2]) > max(region[0], barrier[0])
-            and min(region[3], barrier[3]) > max(region[1], barrier[1])
+            min(region[2], barrier[2]) > max(region[0], barrier[0]) and min(region[3], barrier[3]) > max(region[1], barrier[1])
             for barrier in barriers
         ):
             continue
@@ -254,21 +255,17 @@ def merge_source_adjacent_lines(
     consumed: set[int] = set()
     anchors: dict[int, int] = {}
     for index, row in enumerate(rows):
-        if any(len(neighbor) > _MAX_SOURCE_ROW_FRAGMENTS for neighbor in rows[max(0, index - 1):index + 2]):
+        if any(len(neighbor) > _MAX_SOURCE_ROW_FRAGMENTS for neighbor in rows[max(0, index - 1) : index + 2]):
             continue
         previous_row = [line for line in rows[index - 1] if id(line) not in excluded_line_ids] if index else []
-        following_row = (
-            [line for line in rows[index + 1] if id(line) not in excluded_line_ids] if index + 1 < len(rows) else []
-        )
+        following_row = [line for line in rows[index + 1] if id(line) not in excluded_line_ids] if index + 1 < len(rows) else []
         assembled: list[TextLine] = []
         for line in sorted(row, key=lambda item: (metrics[id(item)][1][0], item.paint_order)):
             previous = assembled[-1] if assembled else None
             if previous is not None and id(previous) not in excluded_line_ids and id(line) not in excluded_line_ids:
                 if line.angle not in projected_barriers:
                     projected_barriers[line.angle] = [upright_box(box, line.angle) for box in barriers or []]
-                if _source_row_supported(
-                    previous, line, previous_row, following_row, metrics, projected_barriers[line.angle]
-                ):
+                if _source_row_supported(previous, line, previous_row, following_row, metrics, projected_barriers[line.angle]):
                     separator = "" if previous.text[-1:].isspace() or line.text[:1].isspace() else " "
                     merged = _join_text_lines(previous, line, separator)
                     anchor = anchors.pop(id(previous), id(previous))

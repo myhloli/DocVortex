@@ -34,7 +34,12 @@ def _repro_payload(*, reverse: bool = False, angle: int = 0) -> bytes:
     ):
         objects.append(
             text_object(
-                object_id, text, boundary=boundary, size=size, x=1.41, y=4.85,
+                object_id,
+                text,
+                boundary=boundary,
+                size=size,
+                x=1.41,
+                y=4.85,
                 delta_x=" ".join(["5.63"] * (len(text) - 1)),
             ).replace('Font="1"', f'Font="{font}"')
         )
@@ -187,8 +192,7 @@ def test_three_source_fragments_share_one_row() -> None:
 def test_dense_fragment_rows_keep_the_existing_assembly_result() -> None:
     """大量分离片段不进入新增邻域扫描，保持原有顺序并限制额外拼接成本。"""
     lines = [
-        _layout_line("文字片段", (20 + i * 20, 10, 32 + i * 20, 15), 15, (19 + i * 20, 10, 36 + i * 20, 15))
-        for i in range(65)
+        _layout_line("文字片段", (20 + i * 20, 10, 32 + i * 20, 15), 15, (19 + i * 20, 10, 36 + i * 20, 15)) for i in range(65)
     ]
     lines.append(_layout_line("后面一行跨越全部片段", (10, 20, 1400, 25), 25, (10, 20, 1405, 25)))
     assert assembly.merge_source_adjacent_lines(lines) == lines
@@ -219,17 +223,28 @@ def test_new_numbered_paragraph_is_not_joined_to_previous(marker: str) -> None:
 def test_article_boundary_survives_public_cross_page_postprocessing() -> None:
     """即使两页行宽对齐且上一页没有句末标点，新条款也不能被公共后处理标记为续段。"""
     scenes = [
-        OfdPageScene(0, (0, 0, 210, 297), None, [
-            _layout_line("第一页接近页尾的正文", (10, 250, 100, 255), 255, None),
-            _layout_line("第一页最后一行没有结束标点", (10, 258, 100, 263), 263, None),
-        ]),
-        OfdPageScene(1, (0, 0, 210, 297), None, [
-            _layout_line("第二条 这是新条款的正文", (10, 20, 100, 25), 25, None),
-            _layout_line("新条款仍在继续的正文", (10, 28, 100, 33), 33, None),
-        ]),
+        OfdPageScene(
+            0,
+            (0, 0, 210, 297),
+            None,
+            [
+                _layout_line("第一页接近页尾的正文", (10, 250, 100, 255), 255, None),
+                _layout_line("第一页最后一行没有结束标点", (10, 258, 100, 263), 263, None),
+            ],
+        ),
+        OfdPageScene(
+            1,
+            (0, 0, 210, 297),
+            None,
+            [
+                _layout_line("第二条 这是新条款的正文", (10, 20, 100, 25), 25, None),
+                _layout_line("新条款仍在继续的正文", (10, 28, 100, 33), 33, None),
+            ],
+        ),
     ]
     model = ModelJson(
-        pages=OfdReadingOrderProjector(scenes).project(), page_index_map=[],
+        pages=OfdReadingOrderProjector(scenes).project(),
+        page_index_map=[],
         metadata={"file_suffix": "ofd", "producer": {"name": "test", "version": "1"}},
     )
     middle = model_json_to_middle_json(model)

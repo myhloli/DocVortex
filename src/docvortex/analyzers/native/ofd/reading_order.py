@@ -176,7 +176,8 @@ class OfdReadingOrderProjector:
         consumed_images = {image_id for table in tables for image_id in table.consumed_image_ids}
         merged_lines = merge_same_baseline_lines([line for line in scene.text_lines if id(line) not in consumed])
         protected = [
-            line for line in merged_lines
+            line
+            for line in merged_lines
             if _auxiliary_type(line, scene, self.repeated) is not None or line.font_size >= 1.45 * self.body_size
         ]
         merged_lines = merge_source_adjacent_lines(
