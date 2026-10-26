@@ -11,7 +11,14 @@ from ....schema import BlockType
 from .geometry import bbox_center, normalize_bbox
 from .models import OfdPageScene, TextLine
 from .table import OfdTableBudget, OfdTableRegion, recover_tables
-from .assembly import line_baseline, line_spans, merge_paragraph_blocks, merge_same_baseline_lines
+from .assembly import (
+    line_baseline,
+    line_spans,
+    merge_paragraph_blocks,
+    merge_same_baseline_lines,
+    merge_source_adjacent_lines,
+    starts_new_article,
+)
 
 _PAGE_NUMBER_RE = re.compile(r"^(?:\d+|[IVXLCDM]+)$", re.IGNORECASE)
 
@@ -133,6 +140,8 @@ class OfdReadingOrderProjector:
         }
         if level is not None:
             block["level"] = level
+        if block_type == BlockType.TEXT and starts_new_article(line.text):
+            block["_paragraph_boundary"] = True
         return block
 
     def _table_block(self, table: OfdTableRegion) -> dict[str, Any]:
@@ -166,6 +175,18 @@ class OfdReadingOrderProjector:
         consumed = {line_id for table in tables for line_id in table.consumed_line_ids}
         consumed_images = {image_id for table in tables for image_id in table.consumed_image_ids}
         merged_lines = merge_same_baseline_lines([line for line in scene.text_lines if id(line) not in consumed])
+        protected = [
+            line
+            for line in merged_lines
+            if _auxiliary_type(line, scene, self.repeated) is not None or line.font_size >= 1.45 * self.body_size
+        ]
+        merged_lines = merge_source_adjacent_lines(
+            merged_lines,
+            barriers=(
+                [table.bbox for table in tables] + [image.bbox for image in scene.images] + [line.bbox for line in protected]
+            ),
+            excluded_line_ids=frozenset(id(line) for line in protected),
+        )
         blocks = [self._text_block(line, scene) for line in merged_lines]
         blocks.extend(self._table_block(table) for table in tables)
         blocks.extend(self._image_block(image) for image in scene.images if id(image) not in consumed_images)
@@ -209,6 +230,8 @@ class OfdReadingOrderProjector:
                 result["level"] = block["level"]
             if "image_base64" in block:
                 result["image_base64"] = block["image_base64"]
+            if block.get("_paragraph_boundary"):
+                result["_paragraph_boundary"] = True
             line_bboxes = [normalize_bbox(item, scene.physical_box) for item in block.get("line_bboxes_mm", [])]
             valid_line_bboxes = [item for item in line_bboxes if item is not None]
             if valid_line_bboxes:
