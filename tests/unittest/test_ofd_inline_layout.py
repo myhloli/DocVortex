@@ -23,15 +23,20 @@ from docvortex.render import render_html, render_markdown
 from docvortex.schema import ModelJson
 
 
-def _repro_payload(*, reverse: bool = False, angle: int = 0) -> bytes:
-    """在内存中复建 issue 5666 的四个对象，保留字号、位置、步进和不同字体资源。"""
+def _repro_payload(*, reverse: bool = False, angle: int = 0, source_width: float = 19.6, split_marker: bool = False) -> bytes:
+    """复建 issue 5666/43，覆盖容器重叠和拆分条号，同时保留字号、位置及字体资源。"""
     objects = []
-    for object_id, text, boundary, size, font in (
+    marker_objects = (
+        [(21, "第", f"36.9 88.96 {source_width} 5.64", 5.63, 1), (24, "一条", "42.53 88.96 18.37 5.64", 5.63, 1)]
+        if split_marker
+        else [(21, "第一条", f"36.9 88.96 {source_width} 5.64", 5.63, 1)]
+    )
+    for object_id, text, boundary, size, font in [
         (20, "测试文档", "75.0 48.7 60.0 7.58", 6.35, 1),
-        (21, "第一条", "36.9 88.96 19.6 5.64", 5.63, 1),
+        *marker_objects,
         (22, "这是一段用于复现同行块排序问题的正文文本，", "59.4 88.96 130.0 5.64", 5.63, 2),
         (23, "正文在下一行继续，完整句子应当连贯阅读。", "25.6 98.65 160.0 5.64", 5.63, 2),
-    ):
+    ]:
         objects.append(
             text_object(
                 object_id,
@@ -71,10 +76,17 @@ def _repro_payload(*, reverse: bool = False, angle: int = 0) -> bytes:
 
 @pytest.mark.parametrize("reverse", [False, True])
 @pytest.mark.parametrize("angle", [0, 90, 180, 270])
-def test_issue_5666_preserves_inline_order_and_continues_paragraph(reverse: bool, angle: int) -> None:
-    """正序及逆序 XML 均恢复条号、同行正文和续行，结构化结果与真实导出一致。"""
-    result = parse(_repro_payload(reverse=reverse, angle=angle), file_suffix="ofd", keep_model_json=True)
-    expected = "第一条 这是一段用于复现同行块排序问题的正文文本，正文在下一行继续，完整句子应当连贯阅读。"
+@pytest.mark.parametrize("source_width,split_marker", [(19.6, False), (24.0, False), (24.0, True)])
+def test_issue_5666_and_43_preserve_inline_order_and_text(
+    reverse: bool, angle: int, source_width: float, split_marker: bool
+) -> None:
+    """容器相邻或重叠、条号拆分、XML 逆序和旋转均保持阅读顺序，导出不得添加中文空格。"""
+    result = parse(
+        _repro_payload(reverse=reverse, angle=angle, source_width=source_width, split_marker=split_marker),
+        file_suffix="ofd",
+        keep_model_json=True,
+    )
+    expected = "第一条这是一段用于复现同行块排序问题的正文文本，正文在下一行继续，完整句子应当连贯阅读。"
     assert [inline_text(block["content"]) for block in result.model_json.pages[0]] == ["测试文档", expected]
     assert [len(block["lines"]) for block in result.model_json.pages[0]] == [1, 2]
     assert [inline_text(block.content) for block in result.middle_json.pages[0].blocks] == ["测试文档", expected]
@@ -110,27 +122,30 @@ def test_source_supported_row_keeps_styles_geometry_and_input(angle: int) -> Non
     lines[1] = replace(lines[1], styles=("italic",))
     result = assembly.merge_source_adjacent_lines(assembly.merge_same_baseline_lines(list(reversed(lines))))
     assert len(result) == 2
-    assert result[0].text == "任意前缀 这是同行的完整正文"
-    assert assembly.line_html(result[0]) == "<strong>任意前缀</strong> <em>这是同行的完整正文</em>"
+    assert result[0].text == "任意前缀这是同行的完整正文"
+    assert assembly.line_html(result[0]) == "<strong>任意前缀</strong><em>这是同行的完整正文</em>"
     assert assembly.upright_box(result[0].bbox, angle) == pytest.approx((20, 10, 100, 15))
     assert result[0].glyphs == lines[0].glyphs + lines[1].glyphs
     assert [line.text for line in lines] == ["任意前缀", "这是同行的完整正文", "这是同一段的后续文字"]
 
 
 @pytest.mark.parametrize(
-    "case", ["missing", "wide", "padding", "overlap", "no-following", "columns", "previous-columns", "template", "baseline"]
+    "case",
+    ["missing", "wide", "padding", "overlap-wide", "no-following", "columns", "previous-columns", "template", "baseline"],
 )
-def test_source_adjacency_requires_independent_continuation_evidence(case: str) -> None:
-    """缺失或不可靠的源框、独立双栏及不相容来源均不能用新规则强行组行。"""
+@pytest.mark.parametrize("source_end", [36, 41, 105])
+def test_source_adjacency_requires_independent_continuation_evidence(case: str, source_end: float) -> None:
+    """容器相邻或重叠均要求独立续行证据，缺失源框、双栏及不相容来源不能强行组行。"""
     left, right, following = _inline_lines()
+    left = replace(left, source_bbox=(20, 10, source_end, 15))
     if case == "missing":
         left = replace(left, source_bbox=None)
     elif case == "wide":
         left = replace(left, source_bbox=(20, 10, 33, 15))
     elif case == "padding":
         left = replace(left, bbox=(20, 10, 28, 15))
-    elif case == "overlap":
-        left = replace(left, source_bbox=(20, 10, 41, 15))
+    elif case == "overlap-wide":
+        left = _layout_line(left.text, (20, 10, 28, 15), 15, (20, 10, 41, 15))
     elif case == "template":
         right = replace(right, template_id=7)
     elif case == "baseline":
@@ -150,6 +165,51 @@ def test_source_adjacency_requires_independent_continuation_evidence(case: str) 
             *lines,
         ]
     assert assembly.merge_source_adjacent_lines(lines) == lines
+
+
+@pytest.mark.parametrize("angle", [0, 90, 180, 270])
+@pytest.mark.parametrize("source_end", [41, 105])
+def test_overlapping_containers_use_visible_gap(angle: int, source_end: float) -> None:
+    """只改变容器留白不应改变同行关系，字形间隙和续行证据仍需成立。"""
+    left, right, following = _inline_lines(angle=angle)
+    left = replace(left, source_bbox=assembly.upright_box((20, 10, source_end, 15), -angle))
+    result = assembly.merge_source_adjacent_lines([right, following, left])
+    assert [line.text for line in result] == [following.text, left.text + right.text]
+    assert assembly.upright_box(result[1].bbox, angle) == pytest.approx((20, 10, 100, 15))
+    assert len(assembly.merge_source_adjacent_lines([left, right])) == 2
+    barrier = assembly.upright_box((33, 11, 38, 14), -angle)
+    assert len(assembly.merge_source_adjacent_lines([left, right, following], barriers=[barrier])) == 3
+
+
+@pytest.mark.parametrize("mode", ["tight", "source", "overlap"])
+@pytest.mark.parametrize(
+    "first,second,expected",
+    [
+        ("第一", "条", "第一条"),
+        ("中文，", "正文", "中文，正文"),
+        ("第12", "条", "第12条"),
+        ("12", "34", "1234"),
+        ("ＡＢ", "ＣＤ", "ＡＢＣＤ"),
+        ("hello", "world", "hello world"),
+        ("中文 ", "正文", "中文 正文"),
+        ("中文", " 正文", "中文 正文"),
+        ("12", " 34", "12 34"),
+    ],
+)
+def test_inline_fragment_spacing_preserves_source_text(mode: str, first: str, second: str, expected: str) -> None:
+    """紧邻及源布局补充组行共用分隔规则，数字不被拆开，英文词距和原有空白得到保留。"""
+    left, right, following = _inline_lines()
+    left, right = replace(left, text=first), replace(right, text=second)
+    if mode == "tight":
+        right = _layout_line(second, (34, 10, 100, 15), 15, (33, 10, 105, 15))
+    elif mode == "overlap":
+        left = replace(left, source_bbox=(20, 10, 41, 15))
+    # 仅构造分隔判断所需的边缘字形，避免把整段宽度误当成单字宽度。
+    left = replace(left, glyphs=_layout_line(first[-1:], (27, 10, 32, 15), 15, None).glyphs)
+    right_x = right.bbox[0]
+    right = replace(right, glyphs=_layout_line(second[:1], (right_x, 10, right_x + 5, 15), 15, None).glyphs)
+    merged = assembly.merge_source_adjacent_lines(assembly.merge_same_baseline_lines([left, right, following]))
+    assert [line.text for line in merged] == [expected, following.text]
 
 
 @pytest.mark.parametrize("barrier", [(33, 11, 38, 14), (10, 16, 105, 19)])
@@ -186,7 +246,7 @@ def test_three_source_fragments_share_one_row() -> None:
     middle = _layout_line("中间文字", (40, 10, 60, 15), 15, (39, 10, 64, 15))
     right = _layout_line("最后文字", (68, 10, 100, 15), 15, (67, 10, 105, 15))
     lines = assembly.merge_source_adjacent_lines(assembly.merge_same_baseline_lines([right, following, middle, left]))
-    assert [line.text for line in lines] == ["任意前缀 中间文字 最后文字", following.text]
+    assert [line.text for line in lines] == ["任意前缀中间文字最后文字", following.text]
 
 
 def test_dense_fragment_rows_keep_the_existing_assembly_result() -> None:

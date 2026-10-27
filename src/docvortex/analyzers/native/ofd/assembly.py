@@ -112,10 +112,12 @@ def line_html(line: TextLine) -> str:
 
 
 def _fragment_separator(first: TextLine, second: TextLine) -> str:
-    """仅在英文单词片段之间存在可见词间距时补空格。"""
+    """仅在英文单词片段之间存在可见词间距时补空格，中文及数字串保持直接连接。"""
     if not first.text or not second.text:
         return ""
     if not (first.text[-1].isascii() and second.text[0].isascii() and first.text[-1].isalnum() and second.text[0].isalnum()):
+        return ""
+    if first.text[-1].isdigit() and second.text[0].isdigit():
         return ""
     first_box = upright_box(first.glyphs[-1].bbox if first.glyphs else first.bbox, first.angle)
     second_box = upright_box(second.glyphs[0].bbox if second.glyphs else second.bbox, second.angle)
@@ -188,7 +190,7 @@ def _source_row_supported(
     metrics: dict[int, tuple[float, BBox]],
     barriers: list[BBox],
 ) -> bool:
-    """仅在源框相邻、紧接的正文跨过间隙且没有分栏或视觉屏障时补充同行关联。"""
+    """源框相邻或留白重叠时，结合字形间隙、紧接续行及分栏和视觉屏障判断同行关联。"""
     if left.source_bbox is None or right.source_bbox is None or left.angle not in {0, 90, 180, 270}:
         return False
     size = min(left.font_size, right.font_size)
@@ -196,14 +198,20 @@ def _source_row_supported(
         return False
     left_box, right_box = upright_box(left.bbox, left.angle), metrics[id(right)][1]
     baseline = line_baseline(left)
-    if abs(baseline - metrics[id(right)][0]) > 0.2 * size or right_box[0] - left_box[2] <= 0.8 * size:
+    glyph_gap = right_box[0] - left_box[2]
+    if abs(baseline - metrics[id(right)][0]) > 0.2 * size or glyph_gap <= 0.8 * size:
         return False
     left_source, right_source = upright_box(left.source_bbox, left.angle), upright_box(right.source_bbox, right.angle)
-    if not 0 <= right_source[0] - left_source[2] <= 0.8 * size:
-        return False
-    # 只信任贴近真实文字的相向容器边，防止大幅留白的单行容器制造虚假邻接。
-    if left_source[2] - left_box[2] > size or right_box[0] - right_source[0] > size:
-        return False
+    source_gap = right_source[0] - left_source[2]
+    if source_gap < 0:
+        # 容器可包含任意尾部留白；重叠时改用真实字形间隙，至多接受两个全角字符宽的留白。
+        # 仍需后面的跨间隙续行和分栏检查，不能仅凭容器重叠就把两栏拼成一行。
+        if glyph_gap > 2 * size:
+            return False
+    else:
+        # 不重叠的源框继续要求相向容器边贴近文字，保留原有邻接约束。
+        if source_gap > 0.8 * size or left_source[2] - left_box[2] > size or right_box[0] - right_source[0] > size:
+            return False
     scope = (left.angle, left.layer_type, left.template_id)
     previous_boxes = [
         metrics[id(line)][1]
@@ -266,7 +274,7 @@ def merge_source_adjacent_lines(
                 if line.angle not in projected_barriers:
                     projected_barriers[line.angle] = [upright_box(box, line.angle) for box in barriers or []]
                 if _source_row_supported(previous, line, previous_row, following_row, metrics, projected_barriers[line.angle]):
-                    separator = "" if previous.text[-1:].isspace() or line.text[:1].isspace() else " "
+                    separator = _fragment_separator(previous, line)
                     merged = _join_text_lines(previous, line, separator)
                     anchor = anchors.pop(id(previous), id(previous))
                     anchors[id(merged)] = anchor
