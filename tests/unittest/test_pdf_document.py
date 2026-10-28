@@ -744,22 +744,18 @@ def test_get_page_drawing_lines_extracts_forms_filled_rectangles_and_merges_segm
         lines = doc.get_page_drawing_lines(0)
 
     assert [line.orientation for line in lines] == ["horizontal"] * 4
-    assert [line.start for line in lines] == pytest.approx(
-        [
-            (10.0, 20.0),
-            (10.0, 40.0),
-            (10.0, 60.25),
-            (30.0, 100.0),
-        ]
-    )
-    assert [line.end for line in lines] == pytest.approx(
-        [
-            (90.0, 20.0),
-            (90.0, 40.0),
-            (90.0, 60.25),
-            (70.0, 100.0),
-        ]
-    )
+    assert [line.start for line in lines] == [
+        pytest.approx((10.0, 20.0)),
+        pytest.approx((10.0, 40.0)),
+        pytest.approx((10.0, 60.25)),
+        pytest.approx((30.0, 100.0)),
+    ]
+    assert [line.end for line in lines] == [
+        pytest.approx((90.0, 20.0)),
+        pytest.approx((90.0, 40.0)),
+        pytest.approx((90.0, 60.25)),
+        pytest.approx((70.0, 100.0)),
+    ]
     assert [line.width for line in lines] == pytest.approx([1.0, 1.0, 0.5, 1.0])
     assert lines[2].bbox == pytest.approx((10.0, 60.0, 90.0, 60.5))
 
@@ -847,13 +843,11 @@ def test_get_page_image_bboxes_applies_forms_crop_box_rotation_and_clipping() ->
         image_bboxes = doc.get_page_image_bboxes(0)
 
     assert page_size == pytest.approx((180.0, 90.0))
-    assert image_bboxes == pytest.approx(
-        [
-            (160.0, 0.0, 180.0, 15.0),
-            (10.0, 5.0, 50.0, 35.0),
-            (76.0, 47.0, 88.0, 53.0),
-        ]
-    )
+    assert image_bboxes == [
+        pytest.approx((160.0, 0.0, 180.0, 15.0)),
+        pytest.approx((10.0, 5.0, 50.0, 35.0)),
+        pytest.approx((76.0, 47.0, 88.0, 53.0)),
+    ]
 
 
 def test_get_page_image_infos_preserves_bboxes_and_fingerprints_reused_images() -> None:
@@ -862,13 +856,11 @@ def test_get_page_image_infos_preserves_bboxes_and_fingerprints_reused_images() 
     with pdf_document.PDFDocument(_build_rotated_cropped_image_pdf()) as doc:
         image_infos = doc.get_page_image_infos(0)
 
-    assert [info.bbox for info in image_infos] == pytest.approx(
-        [
-            (160.0, 0.0, 180.0, 15.0),
-            (10.0, 5.0, 50.0, 35.0),
-            (76.0, 47.0, 88.0, 53.0),
-        ]
-    )
+    assert [info.bbox for info in image_infos] == [
+        pytest.approx((160.0, 0.0, 180.0, 15.0)),
+        pytest.approx((10.0, 5.0, 50.0, 35.0)),
+        pytest.approx((76.0, 47.0, 88.0, 53.0)),
+    ]
     assert len({info.fingerprint for info in image_infos}) == 1
     assert image_infos[0].fingerprint is not None
 
@@ -910,7 +902,7 @@ def test_get_page_form_bboxes_reads_root_forms_and_nested_content_bounds() -> No
     with pdf_document.PDFDocument(_build_drawing_pdf()) as doc:
         form_bboxes = doc.get_page_form_bboxes(0)
 
-    assert form_bboxes == pytest.approx([(30.0, 99.0, 70.0, 100.0)])
+    assert form_bboxes == [pytest.approx((30.0, 99.0, 70.0, 100.0))]
 
 
 def test_get_page_form_bboxes_applies_crop_box_rotation_and_clipping() -> None:
@@ -920,7 +912,7 @@ def test_get_page_form_bboxes_applies_crop_box_rotation_and_clipping() -> None:
         form_bboxes = doc.get_page_form_bboxes(0)
 
     assert page_size == pytest.approx((180.0, 90.0))
-    assert form_bboxes == pytest.approx([(76.0, 47.0, 88.0, 53.0)])
+    assert form_bboxes == [pytest.approx((76.0, 47.0, 88.0, 53.0))]
 
 
 def test_get_page_signature_bboxes_filters_visibility_and_applies_page_geometry() -> None:
@@ -931,12 +923,10 @@ def test_get_page_signature_bboxes_filters_visibility_and_applies_page_geometry(
         signature_bboxes = doc.get_page_signature_bboxes(0)
 
     assert page_size == pytest.approx((180.0, 90.0))
-    assert signature_bboxes == pytest.approx(
-        [
-            (160.0, 0.0, 180.0, 15.0),
-            (10.0, 5.0, 50.0, 35.0),
-        ]
-    )
+    assert signature_bboxes == [
+        pytest.approx((160.0, 0.0, 180.0, 15.0)),
+        pytest.approx((10.0, 5.0, 50.0, 35.0)),
+    ]
 
 
 def test_pdf_document_extracts_safe_external_link_annotations() -> None:

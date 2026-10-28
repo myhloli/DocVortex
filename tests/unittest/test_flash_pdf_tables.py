@@ -581,12 +581,10 @@ def test_disconnected_stacked_rule_grids_remain_separate() -> None:
 
     grid_bboxes = tables._connected_rule_grid_bboxes(axis_lines, 5.0)
 
-    assert grid_bboxes == pytest.approx(
-        [
-            (0.0, 8.0, 110.0, 58.1),
-            (0.0, 90.0, 110.0, 140.1),
-        ]
-    )
+    assert grid_bboxes == [
+        pytest.approx((0.0, 8.0, 110.0, 58.1)),
+        pytest.approx((0.0, 90.0, 110.0, 140.1)),
+    ]
 
 
 def _closed_sparse_grid_fixture(
