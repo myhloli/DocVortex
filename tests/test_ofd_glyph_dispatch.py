@@ -15,7 +15,7 @@ from docvortex.analyzers.native.ofd import scene, text
 from docvortex.analyzers.native.ofd.geometry import Affine
 from docvortex.analyzers.native.ofd.models import FontResource, ResourceRegistry
 from docvortex.analyzers.native.ofd.package import OfdPackage
-from test_native_ofd_text_geometry import _exact, _public_output
+from test_native_ofd_text_geometry import _exact, _historical_line_fields, _public_output
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,7 +51,7 @@ def test_dispatch_keeps_complete_glyphs_and_independent_budgets(embedded: bool, 
                 layer_type="Body",
                 template_id=3,
             )
-            results.append(([asdict(line) for line in lines], asdict(budget)))
+            results.append(([_historical_line_fields(line) for line in lines], asdict(budget)))
             if build is text.build_text_lines:
                 after = native.ofd_glyph_geometry_stats()
             metrics.close()

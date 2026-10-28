@@ -250,8 +250,8 @@ class OfdSceneBuilder:
         codes = [child for child in element if local_name(child.tag) == "TextCode"]
         if len(lines) != 1 or len(codes) != 1:
             return
-        # 显式纵向步进保守地不提供单行证据，避免后续字形被裁掉后掩盖真实折行。
-        if (codes[0].get("DeltaY") or "").strip():
+        # 全零步进等价于省略属性；真实纵移或未知证据仍拒绝，不能由裁剪后的字形推断。
+        if (codes[0].get("DeltaY") or "").strip() and lines[0].has_nonzero_delta_y is not False:
             return
         line = lines[0]
         if line.angle not in {0, 90, 180, 270} or not math.isfinite(line.font_size) or not line.glyphs:

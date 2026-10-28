@@ -36,6 +36,13 @@ def _exact(value):
     return value
 
 
+def _historical_line_fields(line):
+    """只移除新增单行证据，冻结对照仍逐位核验全部历史字段及独立预算。"""
+    record = asdict(line)
+    del record["has_nonzero_delta_y"]
+    return record
+
+
 def _expected_geometry(direction, rotation, origins, boxes, clip):
     """使用冻结Python矩阵和外接框助手计算独立预期，保持原点及quad所有字段。"""
     output = []
@@ -119,7 +126,7 @@ def _build_both(source: bytes, *, parent_transform: Affine = Affine(), parent_cl
                 layer_type="Body",
                 template_id=7,
             )
-            results.append(([asdict(line) for line in lines], asdict(budget)))
+            results.append(([_historical_line_fields(line) for line in lines], asdict(budget)))
             metrics.close()
     return results
 

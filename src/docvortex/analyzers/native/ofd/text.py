@@ -661,6 +661,7 @@ def build_text_lines(
                 layer_type=layer_type,
                 template_id=template_id,
                 styles=styles,
+                has_nonzero_delta_y=any(value != 0 for value in delta_y),
             )
         )
     return lines
