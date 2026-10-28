@@ -17,6 +17,7 @@ from .assembly import (
     merge_paragraph_blocks,
     merge_same_baseline_lines,
     merge_source_adjacent_lines,
+    source_inline_order_groups,
     starts_new_article,
 )
 
@@ -97,6 +98,28 @@ def _upright_bbox(bbox: list[float], scene: OfdPageScene, angle: int) -> list[fl
     return [x0, y0, x1, y1]
 
 
+def _restore_inline_order(blocks: list[dict[str, Any]], groups: list[tuple[int, ...]]) -> list[dict[str, Any]]:
+    """合段后仅重排连续的单行正文片段组，不跨过非成员块，也不修改内容或段落组成。"""
+    if not groups:
+        return blocks
+    positions = {
+        block["_source_line_id"]: index
+        for index, block in enumerate(blocks)
+        if block["type"] == BlockType.TEXT and len(block.get("line_bboxes_mm", [])) == 1 and "_source_line_id" in block
+    }
+    output = list(blocks)
+    for group in groups:
+        if any(line_id not in positions for line_id in group):
+            continue
+        indices = [positions[line_id] for line_id in group]
+        start, end = min(indices), max(indices)
+        if end - start + 1 != len(group):
+            continue
+        # 片段组来自互不相交的视觉行链；等长替换只改变本区间内部的顺序。
+        output[start : end + 1] = [blocks[index] for index in indices]
+    return output
+
+
 class OfdReadingOrderProjector:
     """执行表格认领、辅助类型判定和 OFD-aware XYCut++。"""
 
@@ -137,6 +160,7 @@ class OfdReadingOrderProjector:
             "angle": line.angle,
             "paint_order": line.paint_order,
             "line_bboxes_mm": [line.bbox],
+            "_source_line_id": id(line),
         }
         if level is not None:
             block["level"] = level
@@ -180,13 +204,14 @@ class OfdReadingOrderProjector:
             for line in merged_lines
             if _auxiliary_type(line, scene, self.repeated) is not None or line.font_size >= 1.45 * self.body_size
         ]
+        barriers = [table.bbox for table in tables] + [image.bbox for image in scene.images] + [line.bbox for line in protected]
+        excluded_line_ids = frozenset(id(line) for line in protected)
         merged_lines = merge_source_adjacent_lines(
             merged_lines,
-            barriers=(
-                [table.bbox for table in tables] + [image.bbox for image in scene.images] + [line.bbox for line in protected]
-            ),
-            excluded_line_ids=frozenset(id(line) for line in protected),
+            barriers=barriers,
+            excluded_line_ids=excluded_line_ids,
         )
+        inline_order_groups = source_inline_order_groups(merged_lines, barriers=barriers, excluded_line_ids=excluded_line_ids)
         blocks = [self._text_block(line, scene) for line in merged_lines]
         blocks.extend(self._table_block(table) for table in tables)
         blocks.extend(self._image_block(image) for image in scene.images if id(image) not in consumed_images)
@@ -211,7 +236,7 @@ class OfdReadingOrderProjector:
             sortable.append({"bbox": [value * 72.0 / 25.4 for value in upright], "payload": block})
         ordered_body = [entry["payload"] for entry in sort_entries(sortable)]
         ordered = sorted(top, key=lambda block: (block["bbox_mm"][1], block["bbox_mm"][0], block["paint_order"]))
-        ordered.extend(merge_paragraph_blocks(ordered_body))
+        ordered.extend(_restore_inline_order(merge_paragraph_blocks(ordered_body), inline_order_groups))
         ordered.extend(sorted(bottom, key=lambda block: (block["bbox_mm"][1], block["bbox_mm"][0], block["paint_order"])))
         output: list[dict[str, Any]] = []
         for block in ordered:

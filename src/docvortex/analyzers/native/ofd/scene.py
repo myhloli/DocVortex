@@ -32,6 +32,7 @@ class OfdSceneBuilder:
         self.path_budget = OfdPathBudget()
         self.font_metrics = FontMetricResolver(package)
         self._paint_order = 0
+        self._source_container_order = 0
         self._page_count = 0
 
     def build(self) -> list[OfdPageScene]:
@@ -285,7 +286,10 @@ class OfdSceneBuilder:
         """按绘制顺序递归展开页面、模板和复合图元对象。"""
         if depth > MAX_OBJECT_RECURSION:
             raise OfdResourceLimitError(f"OFD resource limit exceeded: max_object_recursion={MAX_OBJECT_RECURSION}")
-        for child in element:
+        # 同一模板或复合资源可能被多次引用，每次展开都必须使用独立来源，不能跨实例建立邻接。
+        container_order = self._source_container_order
+        self._source_container_order += 1
+        for child_index, child in enumerate(element):
             if not isinstance(child.tag, str):
                 continue
             name = local_name(child.tag)
@@ -322,6 +326,8 @@ class OfdSceneBuilder:
                     resolved_style=self._resolved_style(child, context, resources),
                 )
                 self._attach_text_source_bbox(child, context, lines)
+                if len(lines) == 1 and lines[0].source_bbox is not None:
+                    lines[0].source_order = (container_order, child_index, child_index)
                 scene.text_lines.extend(lines)
                 self._paint_order += max(1, len(lines))
                 continue

@@ -143,6 +143,17 @@ def _baseline_rows(lines: list[TextLine], metrics: dict[int, tuple[float, BBox]]
     return rows
 
 
+def _joined_source_order(
+    first: tuple[int, int, int] | None, second: tuple[int, int, int] | None
+) -> tuple[int, int, int] | None:
+    """仅合并同一 XML 容器内连续且不重叠的来源区间，允许文字位置与 XML 顺序相反。"""
+    if first is None or second is None or first[0] != second[0]:
+        return None
+    if first[2] + 1 != second[1] and second[2] + 1 != first[1]:
+        return None
+    return first[0], min(first[1], second[1]), max(first[2], second[2])
+
+
 def _join_text_lines(first: TextLine, second: TextLine, separator: str) -> TextLine:
     """新建保留局部样式和真实字形框的合并行，源布局证据仅在两侧都有效时延续。"""
     return replace(
@@ -157,6 +168,7 @@ def _join_text_lines(first: TextLine, second: TextLine, separator: str) -> TextL
             if first.source_bbox is not None and second.source_bbox is not None
             else None
         ),
+        source_order=_joined_source_order(first.source_order, second.source_order),
     )
 
 
@@ -182,6 +194,59 @@ def merge_same_baseline_lines(lines: list[TextLine]) -> list[TextLine]:
     return output
 
 
+def _source_pair_geometry(
+    left: TextLine,
+    right: TextLine,
+    metrics: dict[int, tuple[float, BBox]],
+) -> tuple[float, float, BBox, BBox] | None:
+    """复用源框、基线和字形间隙约束；此处只返回几何证据，不决定拼行或排序。"""
+    if left.source_bbox is None or right.source_bbox is None or left.angle not in {0, 90, 180, 270}:
+        return None
+    size = min(left.font_size, right.font_size)
+    if size <= 0 or max(left.font_size, right.font_size) > 1.35 * size:
+        return None
+    left_box, right_box = upright_box(left.bbox, left.angle), metrics[id(right)][1]
+    baseline = line_baseline(left)
+    glyph_gap = right_box[0] - left_box[2]
+    if abs(baseline - metrics[id(right)][0]) > 0.2 * size or glyph_gap <= 0.8 * size:
+        return None
+    left_source, right_source = upright_box(left.source_bbox, left.angle), upright_box(right.source_bbox, right.angle)
+    source_gap = right_source[0] - left_source[2]
+    if source_gap < 0:
+        # 容器可包含任意尾部留白；重叠时改用真实字形间隙，至多接受两个全角字符宽的留白。
+        # 调用方仍需检查续行或 XML 来源、分栏及视觉屏障，不能仅凭容器重叠关联两栏。
+        if glyph_gap > 2 * size:
+            return None
+    else:
+        # 不重叠的源框继续要求相向容器边贴近文字，保留原有邻接约束。
+        if source_gap > 0.8 * size or left_source[2] - left_box[2] > size or right_box[0] - right_source[0] > size:
+            return None
+    return size, baseline, left_box, right_box
+
+
+def _row_has_separate_columns(
+    row: list[TextLine],
+    metrics: dict[int, tuple[float, BBox]],
+    scope: tuple[int, str, int | None],
+    geometry: tuple[float, float, BBox, BBox],
+    *,
+    following: bool = False,
+) -> bool:
+    """检查紧邻行是否分居间隙两侧且没有跨间隙文字，前后行分别判断以保留局部栏结构。"""
+    size, baseline, left_box, right_box = geometry
+    boxes = [
+        metrics[id(line)][1]
+        for line in row
+        if (line.angle, line.layer_type, line.template_id) == scope
+        and 0.5 * size <= (metrics[id(line)][0] - baseline if following else baseline - metrics[id(line)][0]) <= 3 * size
+    ]
+    return (
+        any(box[0] < left_box[2] and box[2] <= right_box[0] for box in boxes)
+        and any(box[0] >= left_box[2] and box[2] > right_box[0] for box in boxes)
+        and not any(box[0] <= left_box[2] and box[2] >= right_box[0] for box in boxes)
+    )
+
+
 def _source_row_supported(
     left: TextLine,
     right: TextLine,
@@ -191,39 +256,12 @@ def _source_row_supported(
     barriers: list[BBox],
 ) -> bool:
     """源框相邻或留白重叠时，结合字形间隙、紧接续行及分栏和视觉屏障判断同行关联。"""
-    if left.source_bbox is None or right.source_bbox is None or left.angle not in {0, 90, 180, 270}:
+    geometry = _source_pair_geometry(left, right, metrics)
+    if geometry is None:
         return False
-    size = min(left.font_size, right.font_size)
-    if size <= 0 or max(left.font_size, right.font_size) > 1.35 * size:
-        return False
-    left_box, right_box = upright_box(left.bbox, left.angle), metrics[id(right)][1]
-    baseline = line_baseline(left)
-    glyph_gap = right_box[0] - left_box[2]
-    if abs(baseline - metrics[id(right)][0]) > 0.2 * size or glyph_gap <= 0.8 * size:
-        return False
-    left_source, right_source = upright_box(left.source_bbox, left.angle), upright_box(right.source_bbox, right.angle)
-    source_gap = right_source[0] - left_source[2]
-    if source_gap < 0:
-        # 容器可包含任意尾部留白；重叠时改用真实字形间隙，至多接受两个全角字符宽的留白。
-        # 仍需后面的跨间隙续行和分栏检查，不能仅凭容器重叠就把两栏拼成一行。
-        if glyph_gap > 2 * size:
-            return False
-    else:
-        # 不重叠的源框继续要求相向容器边贴近文字，保留原有邻接约束。
-        if source_gap > 0.8 * size or left_source[2] - left_box[2] > size or right_box[0] - right_source[0] > size:
-            return False
+    size, baseline, left_box, right_box = geometry
     scope = (left.angle, left.layer_type, left.template_id)
-    previous_boxes = [
-        metrics[id(line)][1]
-        for line in previous_row
-        if (line.angle, line.layer_type, line.template_id) == scope
-        and 0.5 * size <= baseline - metrics[id(line)][0] <= 3 * size
-    ]
-    if (
-        any(box[0] < left_box[2] and box[2] <= right_box[0] for box in previous_boxes)
-        and any(box[0] >= left_box[2] and box[2] > right_box[0] for box in previous_boxes)
-        and not any(box[0] <= left_box[2] and box[2] >= right_box[0] for box in previous_boxes)
-    ):
+    if _row_has_separate_columns(previous_row, metrics, scope, geometry):
         return False
     for following in following_row:
         if (following.angle, following.layer_type, following.template_id) != scope:
@@ -284,6 +322,70 @@ def merge_source_adjacent_lines(
                     continue
             assembled.append(line)
     return [replacements.get(id(line), line) for line in lines if id(line) not in consumed]
+
+
+def _source_order_pair_supported(
+    left: TextLine,
+    right: TextLine,
+    previous_row: list[TextLine],
+    following_row: list[TextLine],
+    metrics: dict[int, tuple[float, BBox]],
+    barriers: list[BBox],
+) -> bool:
+    """以 XML 相邻性补充无续行时的同行排序证据，明确的几何方向及分栏和屏障约束始终优先。"""
+    if _joined_source_order(left.source_order, right.source_order) is None:
+        return False
+    geometry = _source_pair_geometry(left, right, metrics)
+    if geometry is None:
+        return False
+    size, _baseline, left_box, right_box = geometry
+    if right_box[0] - left_box[2] > 2 * size:
+        return False
+    scope = (left.angle, left.layer_type, left.template_id)
+    if _row_has_separate_columns(previous_row, metrics, scope, geometry) or _row_has_separate_columns(
+        following_row, metrics, scope, geometry, following=True
+    ):
+        return False
+    region = bbox_union((left_box, right_box))
+    assert region is not None
+    return not any(
+        min(region[2], barrier[2]) > max(region[0], barrier[0]) and min(region[3], barrier[3]) > max(region[1], barrier[1])
+        for barrier in barriers
+    )
+
+
+def source_inline_order_groups(
+    lines: list[TextLine], *, barriers: list[BBox] | None = None, excluded_line_ids: frozenset[int] = frozenset()
+) -> list[tuple[int, ...]]:
+    """记录有局部来源证据的同行片段组及阅读方向顺序，原文字行和既有拼行结果保持不变。"""
+    if sum(line.source_order is not None and id(line) not in excluded_line_ids for line in lines) < 2:
+        return []
+    metrics = {id(line): (line_baseline(line), upright_box(line.bbox, line.angle)) for line in lines}
+    rows = _baseline_rows(lines, metrics)
+    projected_barriers: dict[int, list[BBox]] = {}
+    groups: list[tuple[int, ...]] = []
+    for index, row in enumerate(rows):
+        if any(len(neighbor) > _MAX_SOURCE_ROW_FRAGMENTS for neighbor in rows[max(0, index - 1) : index + 2]):
+            continue
+        previous_row = [line for line in rows[index - 1] if id(line) not in excluded_line_ids] if index else []
+        following_row = [line for line in rows[index + 1] if id(line) not in excluded_line_ids] if index + 1 < len(rows) else []
+        chain: list[TextLine] = []
+        for line in sorted(row, key=lambda item: (metrics[id(item)][1][0], item.paint_order)):
+            previous = chain[-1] if chain else None
+            if previous is not None and id(previous) not in excluded_line_ids and id(line) not in excluded_line_ids:
+                if line.angle not in projected_barriers:
+                    projected_barriers[line.angle] = [upright_box(box, line.angle) for box in barriers or []]
+                if _source_order_pair_supported(
+                    previous, line, previous_row, following_row, metrics, projected_barriers[line.angle]
+                ):
+                    chain.append(line)
+                    continue
+            if len(chain) > 1:
+                groups.append(tuple(id(item) for item in chain))
+            chain = [line]
+        if len(chain) > 1:
+            groups.append(tuple(id(item) for item in chain))
+    return groups
 
 
 def _block_text(block: dict[str, Any]) -> str:
