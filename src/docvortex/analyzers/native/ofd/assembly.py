@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import re
 import statistics
+import unicodedata
 from dataclasses import replace
 from typing import Any
 
@@ -388,6 +389,107 @@ def source_inline_order_groups(
     return groups
 
 
+def _parallel_row_supported(
+    members: list[TextLine],
+    context: list[TextLine],
+    lines: list[TextLine],
+    metrics: dict[int, tuple[float, BBox]],
+    barriers: list[BBox],
+) -> bool:
+    """用连续通栏上下文确认孤立并列双块，拒绝栏续行、未知方向及区域中的第三方对象。"""
+    left, right = members
+    if left.angle not in {0, 90, 180, 270} or _joined_source_order(left.source_order, right.source_order) is None:
+        return False
+    if left.source_bbox is None or right.source_bbox is None:
+        return False
+    size = min(line.font_size for line in [*members, *context])
+    if size <= 0 or max(line.font_size for line in [*members, *context]) > 1.35 * size:
+        return False
+    scope = (left.angle, left.layer_type, left.template_id)
+    if any((line.angle, line.layer_type, line.template_id) != scope for line in [right, *context]):
+        return False
+    for line in members:
+        directions = {unicodedata.bidirectional(character) for character in line.text}
+        if "L" not in directions or directions & {
+            "R",
+            "AL",
+            "AN",
+            "RLE",
+            "RLO",
+            "RLI",
+            "LRE",
+            "LRO",
+            "LRI",
+            "FSI",
+            "PDI",
+            "PDF",
+        }:
+            return False
+    baseline, left_box = metrics[id(left)]
+    right_baseline, right_box = metrics[id(right)]
+    if abs(baseline - right_baseline) > 0.2 * size or right_box[0] - left_box[2] <= 2 * size:
+        return False
+    # 宽间距仅用于排序分组；仍拒绝容器互相侵入的模糊布局，不复用正文拼接阈值。
+    if upright_box(right.source_bbox, left.angle)[0] < upright_box(left.source_bbox, left.angle)[2]:
+        return False
+    before, previous = context
+    if not (
+        0.5 * size <= baseline - metrics[id(previous)][0] <= 4 * size
+        and 0.5 * size <= metrics[id(previous)][0] - metrics[id(before)][0] <= 3 * size
+    ):
+        return False
+    context_boxes = [metrics[id(line)][1] for line in context]
+    if not all(box[0] <= left_box[2] and box[2] >= right_box[0] for box in context_boxes):
+        return False
+    region = bbox_union([left_box, right_box, *context_boxes])
+    assert region is not None
+    if any(
+        min(region[2], box[2]) > max(region[0], box[0]) and min(region[3], box[3]) > max(region[1], box[1]) for box in barriers
+    ):
+        return False
+    selected = {id(line) for line in [*members, *context]}
+    for line in lines:
+        if id(line) in selected:
+            continue
+        box = metrics[id(line)][1] if line.angle == left.angle else upright_box(line.bbox, left.angle)
+        if min(region[2], box[2]) > max(region[0], box[0]) and min(region[3], box[3]) > max(region[1], box[1]):
+            return False
+        # 后续任一侧存在独立续行即保留栏序，不能只在两栏都继续时才拒绝。
+        following_baseline = metrics[id(line)][0] if line.angle == left.angle else (box[1] + box[3]) / 2
+        if (
+            0.5 * size <= following_baseline - baseline <= 4 * size
+            and not (box[0] <= left_box[2] and box[2] >= right_box[0])
+            and any(min(box[2], member[2]) > max(box[0], member[0]) for member in (left_box, right_box))
+        ):
+            return False
+    return True
+
+
+def source_parallel_row_groups(
+    lines: list[TextLine], *, barriers: list[BBox] | None = None, excluded_line_ids: frozenset[int] = frozenset()
+) -> list[tuple[int, int]]:
+    """记录连续通栏之后的孤立并列双块，仅为 XYCut 提供临时排序组，不拼接文字。"""
+    if len(lines) < 4 or sum(line.source_order is not None and id(line) not in excluded_line_ids for line in lines) < 2:
+        return []
+    metrics = {id(line): (line_baseline(line), upright_box(line.bbox, line.angle)) for line in lines}
+    rows = _baseline_rows(lines, metrics)
+    projected_barriers: dict[int, list[BBox]] = {}
+    groups: list[tuple[int, int]] = []
+    for index, row in enumerate(rows):
+        if len(row) != 2 or index < 2 or any(len(previous) != 1 for previous in rows[index - 2 : index]):
+            continue
+        context = [previous[0] for previous in rows[index - 2 : index]]
+        if any(id(line) in excluded_line_ids for line in [*row, *context]):
+            continue
+        members = sorted(row, key=lambda line: (metrics[id(line)][1][0], line.paint_order))
+        angle = members[0].angle
+        if angle not in projected_barriers:
+            projected_barriers[angle] = [upright_box(box, angle) for box in barriers or []]
+        if _parallel_row_supported(members, context, lines, metrics, projected_barriers[angle]):
+            groups.append((id(members[0]), id(members[1])))
+    return groups
+
+
 def _block_text(block: dict[str, Any]) -> str:
     """读取 OFD 私有视觉行文本，避免依赖公共 Span 的序列化细节。"""
     return block.get("text_line", "")
@@ -474,6 +576,7 @@ def merge_paragraph_blocks(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]
                 and right - last_box[2] <= 1.5 * size
                 and min(last_box[2], current_box[2]) > max(last_box[0], current_box[0])
                 and not _LIST_START.match(current_text)
+                and not block.get("_paragraph_boundary")
                 and not (len(previous_text) <= 4 or len(current_text) <= 4)
             )
         if can_merge:

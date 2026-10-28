@@ -8,7 +8,7 @@ from typing import Any
 
 from .._shared.xycut import sort_entries
 from ....schema import BlockType
-from .geometry import bbox_center, normalize_bbox
+from .geometry import bbox_center, bbox_union, normalize_bbox
 from .models import OfdPageScene, TextLine
 from .table import OfdTableBudget, OfdTableRegion, recover_tables
 from .assembly import (
@@ -18,6 +18,7 @@ from .assembly import (
     merge_same_baseline_lines,
     merge_source_adjacent_lines,
     source_inline_order_groups,
+    source_parallel_row_groups,
     starts_new_article,
 )
 
@@ -120,6 +121,44 @@ def _restore_inline_order(blocks: list[dict[str, Any]], groups: list[tuple[int, 
     return output
 
 
+def _sort_body_with_parallel_rows(
+    blocks: list[dict[str, Any]], scene: OfdPageScene, groups: list[tuple[int, int]]
+) -> list[dict[str, Any]]:
+    """把已确认的并列行暂作整体参与 XYCut，再展开原块以保留内容、类型及几何。"""
+    by_line = {block["_source_line_id"]: block for block in blocks if "_source_line_id" in block}
+    members_by_id: dict[int, list[dict[str, Any]]] = {}
+    for group in groups:
+        if any(line_id not in by_line or line_id in members_by_id for line_id in group):
+            continue
+        members = [by_line[line_id] for line_id in group]
+        if any(block["type"] != BlockType.TEXT or len(block.get("line_bboxes_mm", [])) != 1 for block in members):
+            continue
+        members_by_id.update((line_id, members) for line_id in group)
+    consumed: set[int] = set()
+    sortable: list[dict[str, Any]] = []
+    for block in blocks:
+        if id(block) in consumed:
+            continue
+        members = members_by_id.get(block.get("_source_line_id"), [block])
+        consumed.update(id(member) for member in members)
+        bbox = block["bbox_mm"] if len(members) == 1 else bbox_union([member["bbox_mm"] for member in members])
+        assert bbox is not None
+        upright = _upright_bbox(list(bbox), scene, int(block.get("angle", 0) or 0) % 360)
+        sortable.append({"bbox": [value * 72.0 / 25.4 for value in upright], "members": members})
+    ordered: list[dict[str, Any]] = []
+    previous_parallel = False
+    for entry in sort_entries(sortable):
+        members = entry["members"]
+        parallel = len(members) > 1
+        for member in members:
+            # 并列成员与其后正文不互相续接；复用既有私有边界，防止旋转后公共合段重新拼接。
+            if (parallel or previous_parallel) and member["type"] == BlockType.TEXT:
+                member = {**member, "_paragraph_boundary": True}
+            ordered.append(member)
+            previous_parallel = parallel
+    return ordered
+
+
 class OfdReadingOrderProjector:
     """执行表格认领、辅助类型判定和 OFD-aware XYCut++。"""
 
@@ -212,6 +251,7 @@ class OfdReadingOrderProjector:
             excluded_line_ids=excluded_line_ids,
         )
         inline_order_groups = source_inline_order_groups(merged_lines, barriers=barriers, excluded_line_ids=excluded_line_ids)
+        parallel_row_groups = source_parallel_row_groups(merged_lines, barriers=barriers, excluded_line_ids=excluded_line_ids)
         blocks = [self._text_block(line, scene) for line in merged_lines]
         blocks.extend(self._table_block(table) for table in tables)
         blocks.extend(self._image_block(image) for image in scene.images if id(image) not in consumed_images)
@@ -230,11 +270,7 @@ class OfdReadingOrderProjector:
         ]
         bottom_ids = {id(block) for block in bottom}
         body = [block for block in blocks if id(block) not in top_ids and id(block) not in bottom_ids]
-        sortable: list[dict[str, Any]] = []
-        for block in body:
-            upright = _upright_bbox(list(block["bbox_mm"]), scene, int(block.get("angle", 0) or 0) % 360)
-            sortable.append({"bbox": [value * 72.0 / 25.4 for value in upright], "payload": block})
-        ordered_body = [entry["payload"] for entry in sort_entries(sortable)]
+        ordered_body = _sort_body_with_parallel_rows(body, scene, parallel_row_groups)
         ordered = sorted(top, key=lambda block: (block["bbox_mm"][1], block["bbox_mm"][0], block["paint_order"]))
         ordered.extend(_restore_inline_order(merge_paragraph_blocks(ordered_body), inline_order_groups))
         ordered.extend(sorted(bottom, key=lambda block: (block["bbox_mm"][1], block["bbox_mm"][0], block["paint_order"])))
