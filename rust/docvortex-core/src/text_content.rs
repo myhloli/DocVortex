@@ -93,7 +93,7 @@ pub struct Rules<'a> {
     pub compositions: &'a HashMap<(String, String), String>,
     pub spaces: &'a HashSet<char>,
     pub breaks: &'a HashSet<String>,
-    pub private_range: (u32, u32),
+    pub private_ranges: &'a [(u32, u32)],
 }
 
 /// 使用本次调用固定的字符规则构造所有片段，避免重新读取可变 Python 配置。
@@ -107,7 +107,7 @@ pub fn build(data: &TextSnapshot, groups: &[Vec<usize>], rules: &Rules<'_>) -> V
         compositions,
         spaces,
         breaks,
-        private_range,
+        private_ranges,
     } = rules;
     groups
         .iter()
@@ -127,7 +127,10 @@ pub fn build(data: &TextSnapshot, groups: &[Vec<usize>], rules: &Rules<'_>) -> V
                         continue;
                     }
                     result.text_count += 1;
-                    if private_range.0 <= ch as u32 && ch as u32 <= private_range.1 {
+                    if private_ranges
+                        .iter()
+                        .any(|&(start, end)| start <= ch as u32 && ch as u32 <= end)
+                    {
                         result.private_count += 1;
                         run += 1;
                         result.private_run = result.private_run.max(run);
@@ -214,4 +217,64 @@ pub fn build(data: &TextSnapshot, groups: &[Vec<usize>], rules: &Rules<'_>) -> V
             result
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::text_snapshot::{Character, Font};
+
+    /// 三个私用区参与同一连续段统计，空白中断连续段，原始文本及边界外字符保持不变。
+    #[test]
+    fn supplementary_private_ranges_preserve_text() {
+        let text = "A\u{e000}\u{f0000} \u{1001b0}B\u{f900}\u{ffffe}\u{20000}";
+        let data = TextSnapshot {
+            chars: text
+                .chars()
+                .enumerate()
+                .map(|(index, ch)| Character {
+                    text: ch.to_string(),
+                    bbox: [index as f64 * 5.0, 0.0, index as f64 * 5.0 + 5.0, 10.0],
+                    rotation: 0.0,
+                    font: 0,
+                    index,
+                    sources: vec![index],
+                    code: ch as u32,
+                    generated: Some(false),
+                    object: Some(0),
+                    mode: Some(0),
+                    writing_angle: 0.0,
+                    origin: None,
+                    loose: None,
+                    tight: None,
+                    visible: Some(true),
+                })
+                .collect(),
+            fonts: vec![Font {
+                name: "TestFont".into(),
+                name_id: 0,
+                flags: 0,
+                size: 10.0,
+                weight: 400,
+            }],
+            extended: true,
+            visible_only: false,
+        };
+        let rules = Rules {
+            ordinary: &HashSet::new(),
+            decimals: &HashSet::new(),
+            tight_spacing: &[false],
+            modifiers: &HashMap::new(),
+            threshold: 0.5,
+            compositions: &HashMap::new(),
+            spaces: &HashSet::from([' ']),
+            breaks: &HashSet::new(),
+            private_ranges: &[(0xe000, 0xf8ff), (0xf0000, 0xffffd), (0x100000, 0x10fffd)],
+        };
+        let result = build(&data, &[(0..data.chars.len()).collect()], &rules);
+        assert_eq!(result[0].text.as_deref(), Some(text));
+        assert_eq!(result[0].text_count, 8);
+        assert_eq!(result[0].private_count, 3);
+        assert_eq!(result[0].private_run, 2);
+    }
 }

@@ -789,7 +789,7 @@ impl NativeTextSnapshot {
         Ok(Some(result))
     }
     /// 正文已有共享上下标侧车时，字符归属及内容构造连续完成，仅输出每个 span 的文本和 PUA 计数。
-    #[pyo3(signature = (span_bboxes, median_height, stop_flags, start_flags, height_ratio, break_flags, modifiers, overlap_threshold, private_range, tight_spacing=None))]
+    #[pyo3(signature = (span_bboxes, median_height, stop_flags, start_flags, height_ratio, break_flags, modifiers, overlap_threshold, private_ranges, tight_spacing=None))]
     fn prepare_span_texts<'py>(
         &self,
         py: Python<'py>,
@@ -801,7 +801,7 @@ impl NativeTextSnapshot {
         break_flags: Vec<String>,
         modifiers: HashMap<String, String>,
         overlap_threshold: f64,
-        private_range: (u32, u32),
+        private_ranges: Vec<(u32, u32)>,
         tight_spacing: Option<Vec<bool>>,
     ) -> PyResult<Option<Bound<'py, PyList>>> {
         if !overlap_threshold.is_finite()
@@ -908,7 +908,7 @@ impl NativeTextSnapshot {
                     compositions: &compositions,
                     spaces: &spaces,
                     breaks: &breaks,
-                    private_range,
+                    private_ranges: &private_ranges,
                 },
             )
         });
