@@ -7,6 +7,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from loguru import logger
+
 from .candidate import serialize_candidate_html
 from .banded_numeric import build_banded_numeric_candidate
 from .aligned_numeric import build_aligned_numeric_candidate, regroup_numeric_text
@@ -24,6 +26,7 @@ from .sparse_hybrid import build_sparse_hybrid_candidates, diagnose_sparse_hybri
 from .sparse_multiline import build_sparse_multiline_candidates, diagnose_sparse_multiline_candidate_builds
 from .rule_band import build_rule_band_candidates
 from .text import build_native_table_text
+from .text_quality import TableTextQuality, measure_table_input_quality, measure_table_text_quality
 from .text_grid import build_text_candidates, diagnose_text_candidate_builds
 from .vector import MAX_PRIMITIVES_PER_TABLE, build_vector_candidates, diagnose_vector_candidate_builds
 
@@ -57,6 +60,7 @@ class _CandidateEvaluation:
     selected: NativeTableCandidate | None
     physical_topology_conflict: bool
     first_rejection_gate: str | None
+    text_quality: tuple[TableTextQuality, ...] = ()
 
 
 def _is_verified_line_candidate(candidate: NativeTableCandidate) -> bool:
@@ -367,6 +371,9 @@ def _evaluate_native_pdf_table(
             False,
             "primitive_limit",
         )
+    input_quality = measure_table_input_quality(table_input)
+    if input_quality.rejected:
+        return _CandidateEvaluation(primitive_count, None, (), (), None, False, "text_quality", (input_quality,))
     text = build_native_table_text(table_input)
     if text is None:
         return _CandidateEvaluation(
@@ -550,6 +557,13 @@ def _evaluate_native_pdf_table(
         first_rejection_gate = "verified_threshold"
     else:
         first_rejection_gate = "topology_conflict"
+    text_quality = (input_quality,)
+    if selected is not None:
+        output_quality = measure_table_text_quality((cell.content for cell in selected.cells), stage="output")
+        text_quality += (output_quality,)
+        if output_quality.rejected:
+            selected = None
+            first_rejection_gate = "text_quality"
     return _CandidateEvaluation(
         primitive_count,
         text,
@@ -558,6 +572,7 @@ def _evaluate_native_pdf_table(
         selected,
         physical_topology_conflict,
         first_rejection_gate,
+        text_quality,
     )
 
 
@@ -685,6 +700,7 @@ def diagnose_native_pdf_table(table_input: NativeTableInput) -> dict[str, Any]:
         "glyph_count": len(evaluation.text.glyphs) if evaluation.text else 0,
         "visual_text_rows": len(evaluation.text.rows) if evaluation.text else 0,
         "first_rejection_gate": first_rejection_gate,
+        "text_quality": [quality.diagnostic() for quality in evaluation.text_quality],
         "line_rect_topology_conflict": (
             evaluation.physical_topology_conflict or _has_line_rect_topology_conflict(evaluation.candidates)
         ),
@@ -707,6 +723,13 @@ def recover_native_pdf_table(
     evaluation = _evaluate_native_pdf_table(table_input)
     selected = evaluation.selected
     if selected is None or evaluation.text is None:
+        for quality in evaluation.text_quality:
+            if quality.rejected:
+                logger.bind(table_text_quality=quality.diagnostic()).debug(
+                    "Native table rejected: reason=text_quality, "
+                    f"stage={quality.stage}, text_chars={quality.text_chars}, "
+                    f"abnormal_chars={quality.abnormal_chars}, abnormal_ratio={quality.abnormal_ratio:.4f}"
+                )
         return None
     diagnostics = tuple(
         [
