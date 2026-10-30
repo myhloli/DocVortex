@@ -11,6 +11,7 @@ from loguru import logger
 
 from .candidate import serialize_candidate_html
 from .banded_numeric import build_banded_numeric_candidate
+from .banded_rowspan import build_banded_rowspan_candidate
 from .aligned_numeric import build_aligned_numeric_candidate, regroup_numeric_text
 from .contracts import (
     NativeTableCandidate,
@@ -541,6 +542,18 @@ def _evaluate_native_pdf_table(
         text = aligned_text
         generated_candidates.append(aligned_candidate)
         candidates.append(aligned_candidate)
+    rowspan_candidate = build_banded_rowspan_candidate(table_input, text, aligned_text) if sparse_hybrid_allowed else None
+    if (
+        rowspan_candidate is not None
+        and rowspan_candidate.cols >= minimum_columns
+        and preserves_nested_cells(rowspan_candidate, nested_evidence)
+    ):
+        generated_candidates.append(rowspan_candidate)
+        candidates.append(rowspan_candidate)
+        if selected is None or (selected.cols == rowspan_candidate.cols and selected.rows < rowspan_candidate.rows):
+            # 重复横线带内的独立数值行证明旧视觉行桥接；仅首列有跨行证据。
+            selected = rowspan_candidate
+            text = aligned_text
     if selected is not None:
         first_rejection_gate = None
     elif not generated_candidates:
