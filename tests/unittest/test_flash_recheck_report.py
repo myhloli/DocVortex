@@ -116,7 +116,7 @@ def test_root_adjudication_overrides_and_keeps_history(run: Path) -> None:
     value["pages"][0]["finding_decisions"][0]["status"] = "fixed"
     write_json(run / "reviews/root.json", value)
     assert aggregate(run)["decision_status"] == {"fixed": 1}
-    coverage = json.loads((run / "coverage.json").read_text())
+    coverage = json.loads((run / "coverage.json").read_text(encoding="utf-8"))
     assert len(coverage["pages"][0]["review"]["review_history"]) == 2
 
 
@@ -126,12 +126,12 @@ def test_cross_page_supplementary_evidence_is_visible(run: Path) -> None:
     value["pages"][0]["evidence"].append("documents/d-test/source-0002.png")
     write_json(run / "reviews/recheck-b.json", value)
     aggregate(run)
-    html = (run / "findings.html").read_text()
+    html = (run / "findings.html").read_text(encoding="utf-8")
     assert '补充证据（1）' in html
     assert '<a href="documents/d-test/source-0002.png" target="_blank">' in html
     assert 'width="32" height="48"' in html
     assert "hashchange" in html
-    assert "并不自动表示最新版引入的回归" in (run / "REPORT.md").read_text()
+    assert "并不自动表示最新版引入的回归" in (run / "REPORT.md").read_text(encoding="utf-8")
 
 
 def test_resolved_history_includes_partially_improved_pages(run: Path) -> None:
@@ -143,7 +143,7 @@ def test_resolved_history_includes_partially_improved_pages(run: Path) -> None:
     value["pages"][0]["current_findings"] = [finding]
     write_json(run / "reviews/recheck-b.json", value)
     aggregate(run)
-    html = (run / "findings.html").read_text()
+    html = (run / "findings.html").read_text(encoding="utf-8")
     assert 'data-active="true" data-status="partial" data-resolved="true"' in html
     assert "section.dataset.resolved==='true'" in html
 
@@ -156,7 +156,7 @@ def publication_fixture(root: Path) -> bytes:
     value["pages"].append(second)
     write_json(root / "reviews/recheck-b.json", value)
     original = b"<!doctype html><title>old evidence</title>"
-    manifest = json.loads((root / "manifest.json").read_text())
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
     manifest["baseline_artifact_sha256"] = {"findings.html": hashlib.sha256(original).hexdigest()}
     write_json(root / "manifest.json", manifest)
     (Path(manifest["baseline_run"]) / "findings.html").write_bytes(original)
@@ -179,8 +179,8 @@ def test_publication_preserves_exact_old_html_and_is_repeatable(run: Path) -> No
     archive = Path(publication["archive"])
     assert archive.read_bytes() == original
     assert publication["reviewed_pages"] == 2
-    assert "location.replace" in Path(publication["entry"]).read_text()
-    assert "findings-20261011.html" in (run / "findings.html").read_text()
+    assert "location.replace" in Path(publication["entry"]).read_text(encoding="utf-8")
+    assert "findings-20261011.html" in (run / "findings.html").read_text(encoding="utf-8")
     assert publish_baseline_entry(run) == publication
     assert archive.read_bytes() == original
 
@@ -189,17 +189,17 @@ def test_publication_refuses_changed_old_entry(run: Path) -> None:
     """旧入口在冻结后被外部改动时必须拒绝覆盖，避免丢失用户的新改动。"""
     publication_fixture(run)
     entry = run.parent / "flash-pdf-test-20261011/findings.html"
-    entry.write_text("user changes")
+    entry.write_text("user changes", encoding="utf-8")
     with pytest.raises(ValueError, match="changed outside"):
         publish_baseline_entry(run)
-    assert entry.read_text() == "user changes"
+    assert entry.read_text(encoding="utf-8") == "user changes"
 
 
 def test_publication_refuses_conflicting_archive(run: Path) -> None:
     """已有同名归档若不匹配冻结哈希，不能覆盖或继续发布。"""
     original = publication_fixture(run)
     baseline = run.parent / "flash-pdf-test-20261011"
-    (baseline / "findings-20261011.html").write_text("unrelated archive")
+    (baseline / "findings-20261011.html").write_text("unrelated archive", encoding="utf-8")
     with pytest.raises(ValueError, match="archive hash mismatch"):
         publish_baseline_entry(run)
     assert (baseline / "findings.html").read_bytes() == original
@@ -236,7 +236,7 @@ def test_current_block_indices_are_not_old_array_offsets(run: Path) -> None:
 @pytest.mark.parametrize("field", ["source_sha256", "code_sha256"])
 def test_frozen_old_identity_must_match(run: Path, field: str) -> None:
     """旧问题的源和源码绑定不能被本轮版本覆盖或任意替换。"""
-    prior = json.loads((run / "prior-findings.json").read_text())
+    prior = json.loads((run / "prior-findings.json").read_text(encoding="utf-8"))
     prior[0][field] = "d" * 64
     write_json(run / "prior-findings.json", prior)
     with pytest.raises(ValueError, match="Prior .* hash mismatch"):
@@ -246,7 +246,7 @@ def test_frozen_old_identity_must_match(run: Path, field: str) -> None:
 def test_current_index_identity_must_match(run: Path) -> None:
     """新页索引必须与当前解析源及源码身份一致。"""
     review(run)
-    index = json.loads((run / "documents/d-test/page-index.json").read_text())
+    index = json.loads((run / "documents/d-test/page-index.json").read_text(encoding="utf-8"))
     index["code_sha256"] = "d" * 64
     write_json(run / "documents/d-test/page-index.json", index)
     with pytest.raises(ValueError, match="Page index identity"):
@@ -277,7 +277,7 @@ def test_retained_finding_keeps_new_location_and_history(run: Path) -> None:
     value["pages"][0]["current_findings"] = [current_finding()]
     write_json(run / "reviews/recheck-b.json", value)
     summary = aggregate(run)
-    actual = json.loads((run / "unresolved-findings.json").read_text())[0]
+    actual = json.loads((run / "unresolved-findings.json").read_text(encoding="utf-8"))[0]
     assert actual["prior_ids"] == ["prior-1"]
     assert actual["current_code_sha256"] == "b" * 64
     assert actual["baseline_code_sha256"] == "c" * 64
@@ -289,7 +289,7 @@ def test_uncertain_without_duplicate_finding_stays_visible(run: Path) -> None:
     """待确认旧问题即使没有重复新建 finding，也不得从默认未修清单消失。"""
     review(run, "uncertain")
     summary = aggregate(run)
-    actual = json.loads((run / "unresolved-findings.json").read_text())[0]
+    actual = json.loads((run / "unresolved-findings.json").read_text(encoding="utf-8"))[0]
     assert actual["status"] == "uncertain"
     assert summary["unresolved_current_findings"] == 1
 
@@ -317,7 +317,7 @@ def test_retained_without_ids_is_not_a_general_escape(run: Path, page: int, base
     value = review(run, "unfixed", page=page)
     value["pages"][0]["current_findings"] = [{**current_finding(), "prior_ids": []}]
     write_json(run / "reviews/recheck-b.json", value)
-    queue = json.loads((run / "queue.json").read_text())
+    queue = json.loads((run / "queue.json").read_text(encoding="utf-8"))
     queue["pages"][page - 1]["baseline_status"] = baseline_status
     write_json(run / "queue.json", queue)
     with pytest.raises(ValueError, match="Retained finding requires"):
@@ -330,10 +330,10 @@ def test_html_defaults_to_open_has_three_columns_and_escapes(run: Path) -> None:
     value["pages"][0]["note"] = "<script>alert(1)</script>"
     write_json(run / "reviews/recheck-b.json", value)
     aggregate(run)
-    page = (run / "findings.html").read_text()
+    page = (run / "findings.html").read_text(encoding="utf-8")
     assert '<option value="open">当前未修与新增</option>' in page
     assert 'grid-template-columns:repeat(3,minmax(0,1fr))' in page
     assert 'target="_blank"' in page
     assert '&lt;script&gt;alert(1)&lt;/script&gt;' in page
     assert '<script>alert(1)</script>' not in page
-    assert (run / "index.html").read_text() == (run / "overview.html").read_text()
+    assert (run / "index.html").read_text(encoding="utf-8") == (run / "overview.html").read_text(encoding="utf-8")

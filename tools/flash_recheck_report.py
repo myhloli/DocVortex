@@ -50,7 +50,7 @@ def _box(value: Any, location: str) -> list:
 def required_evidence(root: Path, baseline: Path, document_id: str, page: int) -> list[str]:
     """返回同一物理页原图、旧框和新框三图的相对引用。"""
     return [f"documents/{document_id}/source-{page:04d}.png",
-            os.path.relpath(baseline / "documents" / document_id / f"layout-{page:04d}.png", root),
+            Path(os.path.relpath(baseline / "documents" / document_id / f"layout-{page:04d}.png", root)).as_posix(),
             f"documents/{document_id}/layout-{page:04d}.png"]
 
 
@@ -340,7 +340,7 @@ def render_html(root: Path, manifest: dict, summary: dict, coverage: list[dict],
     </script>"""
     baseline = Path(manifest["baseline_run"])
     history = baseline / "findings-20261011.html"
-    history_reference = os.path.relpath(history if history.exists() else baseline / "findings.html", root)
+    history_reference = Path(os.path.relpath(history if history.exists() else baseline / "findings.html", root)).as_posix()
     (root / "findings.html").write_text('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
                                         f'<title>Flash 当前问题证据</title><style>{styles}</style><h1>Flash 当前问题证据</h1>'
                                         '<nav><a href="overview.html">复核总览</a> · <a href="REPORT.md">报告</a> · '
@@ -413,7 +413,7 @@ def publish_baseline_entry(root: Path) -> dict:
             raise ValueError("Baseline entry changed outside this publication; refusing to overwrite")
     if not archive.exists():
         archive.write_bytes(original)
-    destination = os.path.relpath(root / "findings.html", baseline)
+    destination = Path(os.path.relpath(root / "findings.html", baseline)).as_posix()
     escaped = _escape(destination)
     redirect = ('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
                 '<title>Flash 最新问题证据</title>'
