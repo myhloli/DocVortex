@@ -95,6 +95,7 @@ class DocImagePayload:
     content_type: str
     equation_latex: str | None = None
     render_size_emu: tuple[int, int] | None = None
+    limit_reason: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

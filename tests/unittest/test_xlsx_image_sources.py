@@ -15,6 +15,7 @@ from PIL import Image
 
 import docvortex
 from docvortex.analyzers.native.office.errors import LegacyOfficeResourceLimitError
+from docvortex.analyzers.native.office.equation.image import OfficeImageProbe
 from docvortex.analyzers.native.office.xlsx import xlsx_converter as module
 from docvortex.analyzers.native.office.xlsx.ooxml_ole import workbook_sheet_parts
 from docvortex.analyzers.native.office.xlsx.xlsx_converter import XlsxConverter
@@ -152,12 +153,12 @@ def test_fallback_decoder_receives_no_invented_source_path(monkeypatch: pytest.M
     """备用读取向公式解码和序列化传入空 part，原始图片仍能正常输出。"""
     converter = XlsxConverter()
     converter.workbook = load_workbook(BytesIO(_workbook(["PNG", "PNG"])))
-    decode = Mock(return_value=None)
+    probe = Mock(return_value=OfficeImageProbe())
     serialize = Mock(return_value="data:image/png;base64,test")
-    converter._image_equation_decoder = Mock(decode=decode)
+    converter._image_equation_decoder = Mock(probe=probe)
     monkeypatch.setattr(module, "serialize_office_image", serialize)
     assert len(converter._collect_sheet_images(converter.workbook.active)) == 2
-    assert all(call.kwargs["part_name"] is None for call in decode.call_args_list + serialize.call_args_list)
+    assert all(call.kwargs["part_name"] is None for call in probe.call_args_list + serialize.call_args_list)
 
 
 @pytest.mark.parametrize("image_format", ["PNG", "BMP"])

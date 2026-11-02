@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
+import hashlib
 import struct
 import zlib
 
@@ -12,6 +13,7 @@ from loguru import logger
 from ..image import ensure_bmp_header
 from ..errors import LegacyOfficeImageLimitError, LegacyOfficeResourceLimitError
 from ..limits import MAX_ASSET_TOTAL_BYTES, MAX_ENTRY_BYTES, MAX_PICTURE_RECORDS, MAX_RECORD_DEPTH
+from ..equation.image import OfficeImageEquationDecoder
 
 OFFICEART_CONTAINER_VERSION = 0xF
 OFFICEART_DGG_CONTAINER = 0xF000
@@ -48,6 +50,61 @@ class OfficeImagePayload:
     extension: str
     content_type: str
     render_size_emu: tuple[int, int] | None = None
+    limit_reason: str | None = None
+    source_digest: bytes | None = None
+
+
+@dataclass(slots=True)
+class OfficeImageBudget:
+    """按文档共享图片预算，拒绝的图片只保存摘要与占位原因。"""
+
+    max_bytes: int = MAX_ASSET_TOTAL_BYTES
+    equation_decoder: OfficeImageEquationDecoder = field(default_factory=OfficeImageEquationDecoder)
+    total: int = 0
+    _accepted: dict[bytes, bytes] = field(default_factory=dict)
+    _rejected: dict[bytes, str] = field(default_factory=dict)
+
+    def reject(self, payload: OfficeImagePayload, reason: str, *, source: str) -> OfficeImagePayload:
+        """清除被拒绝的图片载荷，按摘要去重安全告警并保留定位信息。"""
+        digest = payload.source_digest or hashlib.sha256(payload.data).digest()
+        if digest not in self._rejected:
+            self._rejected[digest] = reason
+            logger.warning(
+                "OFFICE_IMAGE_LIMIT: source={!r}, payload_sha256={}: {}. Using placeholder.",
+                source,
+                digest.hex()[:16],
+                reason,
+            )
+        return replace(payload, data=b"", limit_reason=self._rejected[digest], source_digest=digest)
+
+    def admit(self, payload: OfficeImagePayload, *, source: str) -> OfficeImagePayload:
+        """只接收预算内且通过图片探测的载荷，重复图片复用同一份字节。"""
+        if payload.limit_reason is not None:
+            return replace(payload, data=b"")
+        digest = payload.source_digest or hashlib.sha256(payload.data).digest()
+        payload = replace(payload, source_digest=digest)
+        if digest in self._rejected:
+            return replace(payload, data=b"", limit_reason=self._rejected[digest])
+        if digest in self._accepted:
+            return replace(payload, data=self._accepted[digest])
+        if self.total + len(payload.data) > self.max_bytes:
+            return self.reject(
+                payload,
+                f"embedded assets exceed max_asset_total_bytes={self.max_bytes}",
+                source=source,
+            )
+        probe = self.equation_decoder.probe(
+            payload.data,
+            part_name=source,
+            content_type=payload.content_type,
+        )
+        if probe.limit_reason is not None:
+            # probe 已记录同一摘要的超限告警，此处仅保留拒绝状态。
+            self._rejected[digest] = probe.limit_reason
+            return replace(payload, data=b"", limit_reason=probe.limit_reason)
+        self.total += len(payload.data)
+        self._accepted[digest] = payload.data
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -341,12 +398,13 @@ def decode_bstore(
     *,
     charge: Callable[[], None] | None = None,
     delay_stream: bytes | None = None,
+    image_budget: OfficeImageBudget | None = None,
 ) -> dict[int, OfficeImagePayload]:
     """按一基 BSE 序号解码 drawing group 中的图片资源。"""
 
     bse_records = [record for record in iter_descendants(data, charge=charge) if record.record_type == OFFICEART_BSE]
     result: dict[int, OfficeImagePayload] = {}
-    asset_total = 0
+    image_budget = image_budget if image_budget is not None else OfficeImageBudget(max_bytes=MAX_ASSET_TOTAL_BYTES)
     for index, bse in enumerate(bse_records[:MAX_PICTURE_RECORDS], start=1):
         try:
             decoded = _decode_bse_body(
@@ -355,14 +413,15 @@ def decode_bstore(
                 delay_stream=delay_stream,
             )
         except LegacyOfficeImageLimitError as exc:
-            logger.warning("LEGACY_OFFICE_IMAGE_LIMIT: skipped BSE {} at offset {}: {}", index, bse.offset, exc)
+            result[index] = image_budget.reject(
+                OfficeImagePayload(bse.payload, "bin", "application/octet-stream"),
+                str(exc),
+                source=f"BSE {index} at offset {bse.offset}",
+            )
             continue
         if decoded is None:
             continue
-        asset_total += len(decoded.data)
-        if asset_total > MAX_ASSET_TOTAL_BYTES:
-            raise LegacyOfficeResourceLimitError(f"embedded assets exceed max_asset_total_bytes={MAX_ASSET_TOTAL_BYTES}")
-        result[index] = decoded
+        result[index] = image_budget.admit(decoded, source=f"BSE {index} at offset {bse.offset}.{decoded.extension}")
     if len(bse_records) > MAX_PICTURE_RECORDS:
         logger.warning(
             "LEGACY_OFFICE_PICTURE_LIMIT: ignored BSE records after {}",

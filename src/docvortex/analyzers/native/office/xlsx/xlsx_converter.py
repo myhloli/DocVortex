@@ -381,12 +381,13 @@ class XlsxConverter(SpreadsheetProjector):
                 if key in seen:
                     continue
                 seen.add(key)
-                latex = self._image_equation_decoder.decode(
+                latex = self._image_equation_decoder.probe(
                     artifact.payload,
                     part_name=artifact.part_name,
-                )
+                ).latex
                 image_base64 = serialize_office_image(
                     artifact.payload,
+                    equation_decoder=self._image_equation_decoder,
                     part_name=artifact.part_name,
                     content_type=None,
                 )
@@ -416,13 +417,14 @@ class XlsxConverter(SpreadsheetProjector):
                 if key in seen:
                     continue
                 seen.add(key)
-                latex = self._image_equation_decoder.decode(
+                latex = self._image_equation_decoder.probe(
                     payload,
                     part_name=part_name,
                     content_type=content_type,
-                )
+                ).latex
                 image_base64 = serialize_office_image(
                     payload,
+                    equation_decoder=self._image_equation_decoder,
                     part_name=part_name,
                     content_type=content_type,
                 )
@@ -677,10 +679,10 @@ class XlsxConverter(SpreadsheetProjector):
             image_payload = self._read_xlsx_image_member(zip_target_path)
             if image_payload is None:
                 return ""
-            latex = self._image_equation_decoder.decode(
+            latex = self._image_equation_decoder.probe(
                 image_payload,
                 part_name=zip_target_path,
-            )
+            ).latex
             if latex:
                 result = EQUATION_BOOKENDS.format(EQ=latex)
                 if self._projection_cache_enabled:
@@ -688,6 +690,7 @@ class XlsxConverter(SpreadsheetProjector):
                 return result
             img_base64 = serialize_office_image(
                 image_payload,
+                equation_decoder=self._image_equation_decoder,
                 part_name=zip_target_path,
                 content_type=None,
             )

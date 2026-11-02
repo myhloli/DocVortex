@@ -155,6 +155,9 @@ class RtfConverter:
 
     def convert(self, file_binary: BinaryIO) -> None:
         """解析 RTF 二进制流并生成固定单逻辑页 model-list。"""
+        self.pages = []
+        self.document = None
+        self._image_equations = OfficeImageEquationDecoder()
         document = parse_rtf(file_binary)
         self.document = document
         self._note_numbers = _note_numbers(document)
@@ -232,15 +235,16 @@ class RtfConverter:
                 return {"type": BlockType.TEXT, "content": text_spans(image.alt.strip())}
             return None
         payload, part_name, content_type = normalized
-        latex = self._image_equations.decode(
+        latex = self._image_equations.probe(
             payload,
             part_name=part_name,
             content_type=content_type,
-        )
+        ).latex
         if latex:
             return {"type": BlockType.EQUATION, "content": latex}
         image_base64 = serialize_office_image(
             payload,
+            equation_decoder=self._image_equations,
             part_name=part_name,
             content_type=content_type,
         )
@@ -485,16 +489,17 @@ class RtfConverter:
                         parts.append(escape(inline.alt, quote=False))
                     continue
                 payload, part_name, content_type = normalized
-                latex = self._image_equations.decode(
+                latex = self._image_equations.probe(
                     payload,
                     part_name=part_name,
                     content_type=content_type,
-                )
+                ).latex
                 if latex:
                     parts.append(f"<eq>{escape(latex, quote=False)}</eq>")
                     continue
                 source = serialize_office_image(
                     payload,
+                    equation_decoder=self._image_equations,
                     part_name=part_name,
                     content_type=content_type,
                 )

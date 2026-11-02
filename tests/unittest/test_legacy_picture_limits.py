@@ -1,4 +1,4 @@
-"""回归 #36：单张 BLIP 超限仅跳过图片，文档级预算仍然硬失败。"""
+"""回归 #36/#46：图片超限保留占位图，文档结构安全限制仍然硬失败。"""
 
 from io import BytesIO
 from pathlib import Path
@@ -19,6 +19,7 @@ from docvortex.analyzers.native.office.doc.images import ImageStore, inline_pict
 from docvortex.analyzers.native.office.doc.records import DocBudget
 from docvortex.analyzers.native.office.errors import LegacyOfficeImageLimitError, LegacyOfficeResourceLimitError
 from docvortex.analyzers.native.office.legacy import officeart
+from docvortex.analyzers.native.office.image import get_image_limit_placeholder_data_uri
 from docvortex.analyzers.native.office.ppt import parser as ppt_parser
 from docvortex.analyzers.native.office.ppt.records import PptRecord, RecordBudget
 from docvortex.schema import BlockType
@@ -92,8 +93,8 @@ def test_bitmap_limit_is_also_recoverable(monkeypatch: pytest.MonkeyPatch, recor
 
 
 @pytest.mark.parametrize("kind", ["shared", "ppt"])
-def test_bstore_skips_bad_image_without_renumbering(kind: str) -> None:
-    """坏图夹在正常图片之间时只留序号一和三，并发出可定位告警。"""
+def test_bstore_replaces_bad_image_without_renumbering(kind: str) -> None:
+    """坏图夹在正常图片之间时保留占位序号，并发出可定位告警。"""
     good = _record(0xF01E, b"\x00" * 17 + b"png-payload")
     bad = _metafile(b"small", declared=officeart.MAX_ENTRY_BYTES + 1)
     data = b"".join(_record(0xF007, b"\x00" * 36 + item) for item in (good, bad, good))
@@ -103,19 +104,24 @@ def test_bstore_skips_bad_image_without_renumbering(kind: str) -> None:
         result = _collect(data, kind)
     finally:
         logger.remove(sink)
-    assert list(result) == [1, 3]
+    assert list(result) == [1, 2, 3]
     assert result[1].data == result[3].data == b"png-payload"
-    assert any("skipped BSE 2" in str(message) for message in messages)
+    assert result[2].data == b"" and result[2].limit_reason is not None
+    assert any("BSE 2" in str(message) for message in messages)
 
 
 @pytest.mark.parametrize("kind", ["shared", "ppt"])
-def test_bstore_asset_total_remains_fatal(monkeypatch: pytest.MonkeyPatch, kind: str) -> None:
-    """累计图片预算不能被单图降级路径吞掉。"""
+def test_bstore_asset_total_rejects_only_excess_images(monkeypatch: pytest.MonkeyPatch, kind: str) -> None:
+    """累计预算拒绝大图后仍可接收剩余空间内的小图，重复图不重复计费。"""
     module = officeart if kind == "shared" else ppt_parser
     monkeypatch.setattr(module, "MAX_ASSET_TOTAL_BYTES", 3)
     good = _record(0xF007, b"\x00" * 36 + _record(0xF01E, b"\x00" * 17 + b"xx"))
-    with pytest.raises(LegacyOfficeResourceLimitError, match="max_asset_total_bytes"):
-        _collect(good + good, kind)
+    excess = _record(0xF007, b"\x00" * 36 + _record(0xF01E, b"\x00" * 17 + b"yy"))
+    small = _record(0xF007, b"\x00" * 36 + _record(0xF01E, b"\x00" * 17 + b"z"))
+    result = _collect(good + excess + good + small, kind)
+    assert [item.data for item in result.values()] == [b"xx", b"", b"xx", b"z"]
+    assert "max_asset_total_bytes=3" in result[2].limit_reason
+    assert result[1].data is result[3].data
 
 
 @pytest.mark.parametrize("kind", ["shared", "ppt"])
@@ -133,9 +139,10 @@ def test_doc_limit_does_not_fall_back_to_magic_scan() -> None:
     """超限 BLIP 中的 PNG magic 不能触发原始字节恢复。"""
     art = _metafile(b"\x89PNG\r\n\x1a\n", declared=officeart.MAX_ENTRY_BYTES + 1, compression=0xFE)
     picf = struct.pack("<IH", 6 + len(art), 6) + art
-    store = Mock(spec=ImageStore)
-    assert inline_picture(picf, offset=0, store=store, budget=DocBudget()) is None
-    store.add.assert_not_called()
+    store = ImageStore()
+    result = inline_picture(picf, offset=0, store=store, budget=DocBudget())
+    assert result.data == b"" and result.limit_reason is not None
+    assert store.total == 0
 
 
 def test_doc_keeps_body_and_normal_images_around_bad_inline_picture(tmp_path: Path) -> None:
@@ -150,14 +157,16 @@ def test_doc_keeps_body_and_normal_images_around_bad_inline_picture(tmp_path: Pa
     data = data.replace("\x14\x01\x15\r".encode("utf-16le"), "中\x01后\r".encode("utf-16le"))
     pages = DocModel().predict(BytesIO(data))
     blocks = [block for page in pages for block in page]
-    assert len([block for block in blocks if block["type"] == BlockType.IMAGE]) == 2
+    images = [block for block in blocks if block["type"] == BlockType.IMAGE]
+    assert len(images) == 3
+    assert images[1]["image_base64"] == get_image_limit_placeholder_data_uri()
     texts = [inline_text(block["content"]) for block in blocks if block["type"] == BlockType.TEXT]
     assert len(texts) == 3
     assert all("前 EMBED Equation.3 中后" in text for text in texts)
     output = tmp_path / "oversized-picture.md"
     docvortex.convert(data, output, file_suffix="doc")
     markdown = output.read_text(encoding="utf-8")
-    assert markdown.count("![") == 2
+    assert markdown.count("![") == 3
     assert markdown.count("前 EMBED Equation.3 中后") == 3
 
 
@@ -188,7 +197,10 @@ def test_native_document_survives_oversized_preview(suffix: str) -> None:
         assert data.count(needle) == 1
         data = data.replace(needle, struct.pack("<I", oversized) + needle[4:])
         pages = model.predict(BytesIO(data))
-    assert not any(block["type"] == BlockType.IMAGE for page in pages for block in page)
+    if suffix != "xls":
+        images = [block for page in pages for block in page if block["type"] == BlockType.IMAGE]
+        assert len(images) == 1
+        assert images[0]["image_base64"] == get_image_limit_placeholder_data_uri()
     if suffix == "xls":
         assert "正文" in str(pages)
     else:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from io import BytesIO
-from unittest.mock import Mock
 
 import pytest
 from _legacy_doc_test_utils import build_doc, utf16_cp
@@ -11,6 +10,7 @@ from _span_test_utils import inline, inline_items, inline_text, inline_urls
 from docvortex.analyzers.native import DocModel
 from docvortex.analyzers.native._shared.hyperlink import OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
 from docvortex.analyzers.native.office.doc.images import ImageStore
+from docvortex.analyzers.native.office.equation.image import OfficeImageEquationDecoder
 from docvortex.analyzers.native.office.doc.models import DocCharStyle, DocTableCell
 from docvortex.analyzers.native.office.doc.parser import _materialize_table_rows, _RawTableRow
 from docvortex.analyzers.native.office.doc.records import DocBudget
@@ -28,8 +28,7 @@ from docvortex.schema import BlockType
 
 def test_doc_image_store_distinguishes_render_size_without_double_accounting() -> None:
     """验证相同图片的不同 ptSize 独立缓存，但原始 bytes 只计费和解码一次。"""
-    decoder = Mock()
-    decoder.decode.return_value = None
+    decoder = OfficeImageEquationDecoder()
     store = ImageStore(equation_decoder=decoder)
     data = b"same-standard-wmf"
 
@@ -42,7 +41,7 @@ def test_doc_image_store_distinguishes_render_size_without_double_accounting() -
     assert portrait is not landscape
     assert landscape_again is landscape
     assert store.total == len(data)
-    decoder.decode.assert_called_once()
+    assert len(decoder._probes) == 1
 
 
 def test_doc_model_preserves_empty_sections_and_ignores_page_breaks() -> None:
