@@ -453,6 +453,10 @@ class OfficeImageEquationDecoder:
     _warned: set[tuple[str, bytes]] = field(default_factory=set)
     _probes: dict[tuple[str, bytes], OfficeImageProbe] = field(default_factory=dict)
 
+    def check_limit(self, image_data: bytes, part_name: str, content_type: str) -> str | None:
+        """向通用图片预算提供检查回调，避免二进制层反向依赖公式实现。"""
+        return self.probe(image_data, part_name=part_name, content_type=content_type).limit_reason
+
     def probe(
         self,
         image_data: object | None,

@@ -29,7 +29,7 @@ class ImageStore:
 
     def __post_init__(self) -> None:
         """让内联图片和浮动 BStore 共享本次文档的预算及探测缓存。"""
-        self.image_budget = OfficeImageBudget(max_bytes=MAX_ASSET_TOTAL_BYTES, equation_decoder=self.equation_decoder)
+        self.image_budget = OfficeImageBudget(max_bytes=MAX_ASSET_TOTAL_BYTES, check_image=self.equation_decoder.check_limit)
 
     @property
     def total(self) -> int:

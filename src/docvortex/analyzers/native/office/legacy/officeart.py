@@ -13,7 +13,6 @@ from loguru import logger
 from ..image import ensure_bmp_header
 from ..errors import LegacyOfficeImageLimitError, LegacyOfficeResourceLimitError
 from ..limits import MAX_ASSET_TOTAL_BYTES, MAX_ENTRY_BYTES, MAX_PICTURE_RECORDS, MAX_RECORD_DEPTH
-from ..equation.image import OfficeImageEquationDecoder
 
 OFFICEART_CONTAINER_VERSION = 0xF
 OFFICEART_DGG_CONTAINER = 0xF000
@@ -59,7 +58,7 @@ class OfficeImageBudget:
     """按文档共享图片预算，拒绝的图片只保存摘要与占位原因。"""
 
     max_bytes: int = MAX_ASSET_TOTAL_BYTES
-    equation_decoder: OfficeImageEquationDecoder = field(default_factory=OfficeImageEquationDecoder)
+    check_image: Callable[[bytes, str, str], str | None] | None = None
     total: int = 0
     _accepted: dict[bytes, bytes] = field(default_factory=dict)
     _rejected: dict[bytes, str] = field(default_factory=dict)
@@ -93,15 +92,12 @@ class OfficeImageBudget:
                 f"embedded assets exceed max_asset_total_bytes={self.max_bytes}",
                 source=source,
             )
-        probe = self.equation_decoder.probe(
-            payload.data,
-            part_name=source,
-            content_type=payload.content_type,
-        )
-        if probe.limit_reason is not None:
-            # probe 已记录同一摘要的超限告警，此处仅保留拒绝状态。
-            self._rejected[digest] = probe.limit_reason
-            return replace(payload, data=b"", limit_reason=probe.limit_reason)
+        # 图片探测由格式层注入，通用二进制层不依赖公式解析实现。
+        limit_reason = self.check_image(payload.data, source, payload.content_type) if self.check_image else None
+        if limit_reason is not None:
+            # 上层检查器已记录同一摘要的超限告警，此处仅保留拒绝状态。
+            self._rejected[digest] = limit_reason
+            return replace(payload, data=b"", limit_reason=limit_reason)
         self.total += len(payload.data)
         self._accepted[digest] = payload.data
         return payload

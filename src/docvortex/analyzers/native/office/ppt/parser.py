@@ -1418,9 +1418,10 @@ def _picture_map(
     """按 BStore 中 1-based BSE 序号建立图片资源映射。"""
 
     result: dict[int, _ImagePayload] = {}
+    image_decoder = image_decoder if image_decoder is not None else OfficeImageEquationDecoder()
     image_budget = OfficeImageBudget(
         max_bytes=MAX_ASSET_TOTAL_BYTES,
-        equation_decoder=image_decoder if image_decoder is not None else OfficeImageEquationDecoder(),
+        check_image=image_decoder.check_limit,
     )
     bse_records = [record for record in iter_descendants(document, budget=budget) if record.record_type == RT_OFFICEART_BSE]
     for index, bse in enumerate(bse_records[:MAX_PICTURE_RECORDS], start=1):

@@ -341,9 +341,10 @@ def _read_globals(
     for payload in extern_payloads:
         globals_.extern_sheets.extend(_read_extern_sheets(payload, internal_supbooks))
     if drawing_chunks:
+        image_decoder = image_decoder if image_decoder is not None else OfficeImageEquationDecoder()
         image_budget = OfficeImageBudget(
             max_bytes=MAX_ASSET_TOTAL_BYTES,
-            equation_decoder=image_decoder if image_decoder is not None else OfficeImageEquationDecoder(),
+            check_image=image_decoder.check_limit,
         )
         globals_.images = decode_bstore(b"".join(drawing_chunks), charge=budget.charge, image_budget=image_budget)
     return globals_
