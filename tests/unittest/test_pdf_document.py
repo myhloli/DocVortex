@@ -438,9 +438,15 @@ def test_pdf_document_methods_keep_page_access_inside_pdfium_lock(monkeypatch: p
             events.append(f"doc.close:{lock.depth}")
 
     def fake_get_chars(
-        textpage: _FakeTextPage, page_bbox: list[float], page_rotation: int, *, include_geometry: bool = False
+        textpage: _FakeTextPage,
+        page_bbox: list[float],
+        page_rotation: int,
+        *,
+        include_geometry: bool = False,
+        unicode_fallback: Callable[[list[int]], dict[int, int]] | None = None,
     ) -> list[dict[str, Any]]:
         """记录文本抽取时的锁深度，避免依赖旧模块级 get_page_chars 钩子。"""
+        assert callable(unicode_fallback)
         events.append(f"get_chars:{lock.depth}:{page_bbox}:{page_rotation}")
         return [
             {

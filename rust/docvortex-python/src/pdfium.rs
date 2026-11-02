@@ -431,18 +431,22 @@ impl PdfiumVisualCharacterBatches {
 
 /// 借用当前运行库同步读取；之后的坐标转换只依赖自有 Rust 数据。
 #[pyfunction]
+#[pyo3(signature=(addresses, handle, count, extended, frame, angle, unicode_fallback=None))]
 pub fn read_pdfium_visual_batches(
+    py: Python<'_>,
     addresses: Vec<usize>,
     handle: usize,
     count: usize,
     extended: bool,
     frame: [f64; 4],
     angle: i32,
+    unicode_fallback: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<(PdfiumVisualCharacterBatches, Fonts)> {
     if !frame.iter().all(|value| value.is_finite()) || ![0, 90, 180, 270].contains(&angle) {
         return Err(PyValueError::new_err("invalid PDFium visual frame"));
     }
-    let (records, fonts) = read_pdfium_data(addresses, handle, count, extended)?;
+    let (mut records, fonts) = read_pdfium_data(addresses, handle, count, extended)?;
+    apply_unicode_fallback(py, &mut records, unicode_fallback)?;
     Ok((
         PdfiumVisualCharacterBatches {
             records: records.into_iter(),
@@ -495,14 +499,17 @@ pub fn read_pdfium_chars(
 
 /// 同一次 PDFium 调用的结果按数值缓冲保存，随后有界地交给 Python 物化。
 #[pyfunction]
+#[pyo3(signature=(addresses, handle, count, extended, unicode_fallback=None))]
 pub fn read_pdfium_char_batches(
     py: Python<'_>,
     addresses: Vec<usize>,
     handle: usize,
     count: usize,
     extended: bool,
+    unicode_fallback: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<(Py<PdfiumCharacterBatches>, Fonts)> {
-    let (records, fonts) = read_pdfium_data(addresses, handle, count, extended)?;
+    let (mut records, fonts) = read_pdfium_data(addresses, handle, count, extended)?;
+    apply_unicode_fallback(py, &mut records, unicode_fallback)?;
     Ok((
         Py::new(
             py,
@@ -512,6 +519,38 @@ pub fn read_pdfium_char_batches(
         )?,
         fonts,
     ))
+}
+
+/// 仅在真实文字读出 NUL 时调用宿主的资源恢复器，保留所有几何、对象和源索引。
+pub(crate) fn apply_unicode_fallback(
+    _py: Python<'_>,
+    records: &mut [Record],
+    fallback: Option<&Bound<'_, PyAny>>,
+) -> PyResult<()> {
+    let Some(fallback) = fallback else {
+        return Ok(());
+    };
+    let indices: Vec<usize> = records
+        .iter()
+        .enumerate()
+        .filter_map(|(i, r)| (r.0 == 0 && r.7 != 0 && r.10 == Some(false)).then_some(i))
+        .collect();
+    if indices.is_empty() {
+        return Ok(());
+    }
+    let replacements: std::collections::HashMap<usize, u32> =
+        fallback.call1((&indices,))?.extract()?;
+    for (&index, &code) in &replacements {
+        if indices.binary_search(&index).is_err()
+            || char::from_u32(code).is_none_or(|ch| ch.is_control() || ch == '\u{fffd}')
+        {
+            return Err(PyValueError::new_err("invalid PDF Unicode fallback result"));
+        }
+    }
+    for (index, code) in replacements {
+        records[index].0 = code;
+    }
+    Ok(())
 }
 
 /// 保留持锁和持有 GIL 的同步边界，将纯 Rust 错误转换为已有 Python 异常。

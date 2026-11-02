@@ -25,7 +25,7 @@ def bridge_info():
     }
 
 
-def read_native_chars(textpage, extended, *, frame=None, rotation=0):
+def read_native_chars(textpage, extended, *, frame=None, rotation=0, unicode_fallback=None):
     """在同一 textpage 和锁内完成原始读取，特殊输入及非标准函数留给参考实现。"""
     global _CALLS, _EMPTY_PAGES, _UNAVAILABLE_REASON, _RECORD_BATCH_SIZE
     native = get_native()
@@ -79,13 +79,14 @@ def read_native_chars(textpage, extended, *, frame=None, rotation=0):
             _UNAVAILABLE_REASON = "negative character count"
             raise RuntimeError(_UNAVAILABLE_REASON)
         try:
+            options = {"unicode_fallback": unicode_fallback} if unicode_fallback is not None else {}
             if frame is not None:
                 result = native.read_pdfium_visual_batches(
-                    addresses, ct.cast(textpage.raw, ct.c_void_p).value, count, extended, frame, rotation
+                    addresses, ct.cast(textpage.raw, ct.c_void_p).value, count, extended, frame, rotation, **options
                 )
             else:
                 reader = native.read_pdfium_char_batches
-                result = reader(addresses, ct.cast(textpage.raw, ct.c_void_p).value, count, extended)
+                result = reader(addresses, ct.cast(textpage.raw, ct.c_void_p).value, count, extended, **options)
         except native.PdfiumReadError as exc:
             raise pdfium.PdfiumError(str(exc)) from exc
     _CALLS += 1

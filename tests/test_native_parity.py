@@ -114,11 +114,11 @@ def test_native_registration_contract(native):
         "normalize_boxes": "(values, strict, fallback)",
         "ordered_clusters": "(values, tolerance, relative, last_only)",
         "paint_pairs": "(records)",
-        "read_pdfium_char_batches": "(addresses, handle, count, extended)",
+        "read_pdfium_char_batches": "(addresses, handle, count, extended, unicode_fallback=None)",
         "group_text_lines": "(chars, height_threshold, distance)",
         "prepare_visual_lines": "(chars, size, page_rotation, supported_angles)",
         "read_pdfium_subpaths": "(addresses, handle)",
-        "read_pdfium_text_snapshot": "(addresses, color_addresses, handle, count, extended, frame, rotation, visibility)",
+        "read_pdfium_text_snapshot": "(addresses, color_addresses, handle, count, extended, frame, rotation, visibility, unicode_fallback=None)",
         "read_pdfium_chars": "(addresses, handle, count, extended)",
         "restore_surrogate_chars": "(chars, codes, raw_count)",
         "read_pdfium_char_form_owners": "(function, handle, count, owners)",
@@ -128,7 +128,7 @@ def test_native_registration_contract(native):
         "read_pdfium_drawing_lines": "(addresses, handle, bbox, rotation)",
         "pdfium_drawing_line_stage_stats": "()",
         "read_pdfium_path_evidence": "(addresses, handle, frame, rotation, max_depth, want_lines, want_infos)",
-        "read_pdfium_visual_batches": "(addresses, handle, count, extended, frame, angle)",
+        "read_pdfium_visual_batches": "(addresses, handle, count, extended, frame, angle, unicode_fallback=None)",
         "script_roles": "(records)",
         "numeric_script_indices": "(records, roles)",
         "script_roles_raw": "(loose, tight, origins, flags, fonts, fallback)",
@@ -180,7 +180,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 42, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 43, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)

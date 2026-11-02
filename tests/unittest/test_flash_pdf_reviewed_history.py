@@ -43,3 +43,12 @@ def test_mixed_elements_ligature_words_match_visible_source() -> None:
         assert sum(_visible_text(block) == expected for block in pages[index]) == 1
     for index in (2, 4):
         assert sum(block["type"] == "header" and _visible_text(block) == "Inflammopharmacology" for block in pages[index]) == 1
+
+
+def test_demo2_figure_keeps_native_minus_glyph() -> None:
+    """图中视差公式的减号由 /minus 恢复，不能为匹配旧缺字金标而再次丢弃。"""
+    document = next(item for item in MANIFEST["documents"] if item["name"] == "demo2")
+    with PDFDocument(_read_pdf_fixture(ROOT / document["path"])) as pdf:
+        pages = _analyze_native_document(pdf)
+    figures = [block for block in pages[0] if block["type"] == "image"]
+    assert sum("dp =¯x − x" in _visible_text(block) for block in figures) == 1

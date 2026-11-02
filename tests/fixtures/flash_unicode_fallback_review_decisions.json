@@ -1,0 +1,30 @@
+{
+  "source": "demo/pdfs/demo2.pdf",
+  "source_sha256": "9e94e95637356e1599510436278747d1150a3dfb822233bdc77a9dcb9a4fc6e4",
+  "baseline_revision": "60cd0d55e4843e076dac05e5e72fb79e53e6f4ea",
+  "baseline_code_sha256": "ce8212a816070f4ec073ed197050c65062e5ef8c05b8235c9f08d802f7eb48a9",
+  "candidate_code_sha256": "a2d1a345c0a433dcaf465d80b6f88a916c2739a8cb5ae39c35c3c73d462db1df",
+  "compared_documents": 19,
+  "compared_pages": 168,
+  "changed_pages": [
+    {
+      "document": "demo2",
+      "page": 1
+    }
+  ],
+  "decisions": [
+    {
+      "page": 1,
+      "decision": "accept_improvement",
+      "change": "dp =¯x  x -> dp =¯x − x",
+      "reason": "原页图中减号可见；源字体 /minus 被错误 ToUnicode 映射为 NUL。恢复后仅 image 文本改变，块类型、阅读顺序、行框和块框保持不变。bbox_fingerprint 包含文本哈希，因此也需随正确文本更新。",
+      "visual_review": "output/pdf/biomni-unicode-20261102/review/demo2-1-comparison.png",
+      "visual_sha256": "a51a771cabf82c18f1a8567e23ef8351677b41da1cb54ec23e117708be3f9eba",
+      "assertion": "test_demo2_figure_keeps_native_minus_glyph",
+      "old_fingerprint": "7acd5e327408854773beddb7ad93b6e3c775792ec4f75c51a04a000a5e9a9b18",
+      "new_fingerprint": "ec3e60d2433492c362003212610f8f13ee4272433202257c1986060b8ab4d4b7",
+      "old_bbox_fingerprint": "b45d538513a66a87cfb0467e3c1d7ed6701d28c100eda4f30d9e589e3535177c",
+      "new_bbox_fingerprint": "1ae3eebb8cc9ef551c7d930df1d459c6e7a82c05f7ccc727ae4f90a5f91e6efb"
+    }
+  ]
+}

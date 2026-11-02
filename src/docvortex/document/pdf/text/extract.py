@@ -7,6 +7,7 @@ from __future__ import annotations
 import math
 from ctypes import byref, c_uint
 from typing import Any
+from collections.abc import Callable
 
 import pypdfium2 as pdfium
 import pypdfium2.raw as raw
@@ -129,18 +130,26 @@ def get_chars(
     *,
     include_geometry: bool = False,
     visibility_by_object: dict[int, tuple[bool, tuple[float, float, float, float] | None]] | None = None,
+    unicode_fallback: Callable[[list[int]], dict[int, int]] | None = None,
 ) -> list[Char]:
     """通过唯一原生字符读取器提取记录，Python 只负责字体与结果对象物化。"""
     return _get_chars_native(
-        textpage, [float(value) for value in page_bbox], int(page_rotation), include_geometry, visibility_by_object
+        textpage,
+        [float(value) for value in page_bbox],
+        int(page_rotation),
+        include_geometry,
+        visibility_by_object,
+        unicode_fallback,
     )
 
 
-def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visibility_by_object):
+def _get_chars_native(textpage, page_bbox, page_rotation, include_geometry, visibility_by_object, unicode_fallback=None):
     """物化已批量读取的记录，保持字体共享、页内对象编号、裁剪和写入方向语义。"""
     from ._pdfium_bridge import read_native_chars
 
-    batch = read_native_chars(textpage, include_geometry, frame=page_bbox, rotation=page_rotation)
+    batch = read_native_chars(
+        textpage, include_geometry, frame=page_bbox, rotation=page_rotation, unicode_fallback=unicode_fallback
+    )
     records, raw_fonts = batch
     # 空快照不再构造字体映射或调用空几何批次，仍保持普通列表返回契约。
     if type(records) in (tuple, list) and not records and type(raw_fonts) in (tuple, list) and not raw_fonts:

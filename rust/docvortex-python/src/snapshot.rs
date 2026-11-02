@@ -208,6 +208,7 @@ pub fn geometry_evidence_stats() -> (u64, u64, u64) {
 
 /// 同步借用 PDFium 读取原始字符；函数和句柄由已核验 ABI 的宿主 guard 保活。
 #[pyfunction]
+#[pyo3(signature=(addresses, color_addresses, handle, count, extended, frame, rotation, visibility, unicode_fallback=None))]
 pub fn read_pdfium_text_snapshot(
     py: Python<'_>,
     addresses: Vec<usize>,
@@ -218,13 +219,15 @@ pub fn read_pdfium_text_snapshot(
     frame: [f64; 4],
     rotation: i32,
     visibility: Option<HashMap<usize, (bool, Option<[f64; 4]>)>>,
+    unicode_fallback: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Option<NativeTextSnapshot>> {
     if color_addresses.contains(&0) || ![0, 90, 180, 270].contains(&rotation) {
         return Err(PyValueError::new_err("invalid snapshot ABI or rotation"));
     }
-    let (records, raw_fonts) =
+    let (mut records, raw_fonts) =
         unsafe { docvortex_pdfium::read_characters(addresses, handle, count, extended) }
             .map_err(read_error)?;
+    super::pdfium::apply_unicode_fallback(py, &mut records, unicode_fallback)?;
     if !supported(&records, frame)
         || visibility.as_ref().is_some_and(|items| {
             items.values().any(|(_, clip)| {
