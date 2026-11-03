@@ -17,7 +17,7 @@ FIXTURES = Path(__file__).parents[1] / "fixtures"
 
 def _sample_model(name: str) -> ModelJson:
     """读取保留原始行框的真实模型夹具，不重新解析 PDF 或初始化推理模型。"""
-    fixture = json.loads((FIXTURES / "paragraph_uppercase_continuation_samples.json").read_text())
+    fixture = json.loads((FIXTURES / "paragraph_uppercase_continuation_samples.json").read_text(encoding="utf-8"))
     return ModelJson.model_validate(fixture["samples"][name]["model"])
 
 
@@ -102,7 +102,7 @@ def test_saved_demo1_continuation_is_independent_of_other_page_availability() ->
 @pytest.mark.parametrize("case_index", range(5))
 def test_real_mixed_page_regions_do_not_gain_false_continuations(case_index: int) -> None:
     """人工原页确认的作者、摘要、参考条目、表格标签和公式说明继续保持独立。"""
-    fixture = json.loads((FIXTURES / "paragraph_uppercase_layout_regressions.json").read_text())
+    fixture = json.loads((FIXTURES / "paragraph_uppercase_layout_regressions.json").read_text(encoding="utf-8"))
     case = fixture["cases"][case_index]
     page = case["page"]
     merge_para_text_blocks([page])
