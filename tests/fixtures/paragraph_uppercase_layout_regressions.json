@@ -1,0 +1,6618 @@
+{
+  "description": "来自已人工核对原页的正文续段反例：作者、摘要、参考条目、居中表格标签及同栏公式说明必须独立。",
+  "cases": [
+    {
+      "name": "demo3-p1",
+      "source": "demo/pdfs/demo3.pdf",
+      "source_sha256": "7fa1e7e571b093a671c5daff7c1d4838144114ceca80fd57c127537f4da3a5c2",
+      "baseline_commit": "e6d820d468d66912f6c66c87ee6e4dc9426de7eb",
+      "expected_independent_indices": [
+        2,
+        3,
+        17
+      ],
+      "page": {
+        "page_idx": 0,
+        "blocks": [
+          {
+            "type": "doc_title",
+            "bbox": [
+              0.122,
+              0.092,
+              0.878,
+              0.11
+            ],
+            "content": [],
+            "lines": [
+              {
+                "bbox": [
+                  0.122,
+                  0.092,
+                  0.878,
+                  0.11
+                ]
+              }
+            ],
+            "index": 0
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.272,
+              0.124,
+              0.419,
+              0.161
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Jingfeng Yang",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": "∗",
+                "styles": [
+                  "superscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "Luheng He",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": "†",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.272,
+                  0.124,
+                  0.404,
+                  0.144
+                ]
+              },
+              {
+                "bbox": [
+                  0.315,
+                  0.144,
+                  0.419,
+                  0.161
+                ]
+              }
+            ],
+            "index": 1
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.421,
+              0.127,
+              0.549,
+              0.158
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Aditya Gupta",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": "† ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "Rahul Goel",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": "†",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.421,
+                  0.127,
+                  0.547,
+                  0.144
+                ]
+              },
+              {
+                "bbox": [
+                  0.443,
+                  0.144,
+                  0.549,
+                  0.158
+                ]
+              }
+            ],
+            "index": 2
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.571,
+              0.127,
+              0.731,
+              0.158
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Shyam Upadhyay",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": "† ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "Shachi Paul",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " †",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.571,
+                  0.127,
+                  0.731,
+                  0.144
+                ]
+              },
+              {
+                "bbox": [
+                  0.573,
+                  0.144,
+                  0.688,
+                  0.158
+                ]
+              }
+            ],
+            "index": 3
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.369,
+              0.162,
+              0.636,
+              0.178
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "?Georgia Institute of Technology",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.369,
+                  0.162,
+                  0.636,
+                  0.178
+                ]
+              }
+            ],
+            "index": 4
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.429,
+              0.177,
+              0.577,
+              0.194
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "†Google Assistant",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.429,
+                  0.177,
+                  0.577,
+                  0.194
+                ]
+              }
+            ],
+            "index": 5
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.347,
+              0.197,
+              0.649,
+              0.21
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "jingfengyangpku@gmail.com",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.347,
+                  0.197,
+                  0.649,
+                  0.21
+                ]
+              }
+            ],
+            "index": 6
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.369,
+              0.213,
+              0.637,
+              0.227
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "tableformer@google.com",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.369,
+                  0.213,
+                  0.637,
+                  0.227
+                ]
+              }
+            ],
+            "index": 7
+          },
+          {
+            "type": "paragraph_title",
+            "bbox": [
+              0.264,
+              0.255,
+              0.341,
+              0.267
+            ],
+            "content": [],
+            "lines": [
+              {
+                "bbox": [
+                  0.264,
+                  0.255,
+                  0.341,
+                  0.267
+                ]
+              }
+            ],
+            "index": 8
+          },
+          {
+            "index": 9,
+            "type": "table",
+            "content": [],
+            "bbox": [
+              0.613,
+              0.267,
+              0.782,
+              0.304
+            ]
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.513,
+              0.31,
+              0.857,
+              0.368
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Question:",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " Of all song lengths, which one is the longest? ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "Gold Answer:",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " 5:02 ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "TAPAS:",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " 5:00 ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "TAPAS after row order perturbation:",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " 5:02 ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "TABLEFORMER:",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " 5:02",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.513,
+                  0.31,
+                  0.857,
+                  0.323
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.322,
+                  0.637,
+                  0.332
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.334,
+                  0.598,
+                  0.344
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.346,
+                  0.788,
+                  0.358
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.358,
+                  0.657,
+                  0.368
+                ]
+              }
+            ],
+            "index": 10
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.512,
+              0.373,
+              0.884,
+              0.407
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "(a) TAPAS predicts incorrect answer based on the original table, while it gives the correct answer if the first row is moved to the end of the table.",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.513,
+                  0.373,
+                  0.884,
+                  0.385
+                ]
+              },
+              {
+                "bbox": [
+                  0.512,
+                  0.385,
+                  0.882,
+                  0.397
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.397,
+                  0.634,
+                  0.407
+                ]
+              }
+            ],
+            "index": 11
+          },
+          {
+            "index": 12,
+            "type": "table",
+            "content": [],
+            "bbox": [
+              0.562,
+              0.424,
+              0.834,
+              0.474
+            ]
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.513,
+              0.481,
+              0.882,
+              0.57
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Question:",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " Which nation received 2 silver medals? ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "Gold Answer:",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " Spain, Ukraine ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "TAPAS:",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " Spain ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "TABLEFORMER:",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " Spain, Ukraine ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "TABLEFORMER w/o a proposed structural bias:",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " Spain (b) TAPAS gives incomplete answer due to its limited cell grounding ability.",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.513,
+                  0.481,
+                  0.82,
+                  0.493
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.493,
+                  0.701,
+                  0.505
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.505,
+                  0.605,
+                  0.517
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.517,
+                  0.72,
+                  0.529
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.528,
+                  0.863,
+                  0.54
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.546,
+                  0.882,
+                  0.558
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.558,
+                  0.622,
+                  0.57
+                ]
+              }
+            ],
+            "_paragraph_boundary": true,
+            "index": 13
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.513,
+              0.582,
+              0.88,
+              0.638
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Figure 1: Examples showing the limitations of existing models (a) vulnerable to perturbations, and (b) lacking structural biases. In contrast, our proposed TABLE-FORMER predicts correct answers for both questions.",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.513,
+                  0.582,
+                  0.88,
+                  0.596
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.597,
+                  0.88,
+                  0.61
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.611,
+                  0.879,
+                  0.624
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.625,
+                  0.872,
+                  0.638
+                ]
+              }
+            ],
+            "_paragraph_boundary": true,
+            "index": 14
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.648,
+              0.885,
+              0.92
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "tables or rows into word sequences (Yu et al., 2020; Liu et al., 2021), where original position ids are used as positional information. Due to the usage of row/column ids and global position ids, prior strategies to linearize table structures introduced spurious row and column order biases (Herzig et al., 2020; Eisenschlos et al., 2020, 2021; Zhang et al., 2020; Yin et al., 2020). Therefore, those models are vulnerable to row or column order perturbations. But, ideally, the model should make consistent pre-dictions regardless of the row or column ordering for all practical purposes. For instance, in Figure 1, the predicted answer of TAPAS model (Herzig et al., 2020) for Question (a) “Of all song lengths, which one is the longest?” based on the original table is “5:00”, which is incorrect. However, if the first row is adjusted to the end of the table during inference,",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.513,
+                  0.648,
+                  0.883,
+                  0.662
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.664,
+                  0.882,
+                  0.678
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.68,
+                  0.882,
+                  0.695
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.697,
+                  0.883,
+                  0.711
+                ]
+              },
+              {
+                "bbox": [
+                  0.514,
+                  0.713,
+                  0.882,
+                  0.727
+                ]
+              },
+              {
+                "bbox": [
+                  0.514,
+                  0.729,
+                  0.884,
+                  0.743
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.745,
+                  0.884,
+                  0.759
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.761,
+                  0.882,
+                  0.774
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.777,
+                  0.885,
+                  0.791
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.793,
+                  0.879,
+                  0.807
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.809,
+                  0.882,
+                  0.823
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.825,
+                  0.884,
+                  0.839
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.841,
+                  0.884,
+                  0.855
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.858,
+                  0.882,
+                  0.871
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.874,
+                  0.882,
+                  0.888
+                ]
+              },
+              {
+                "bbox": [
+                  0.508,
+                  0.89,
+                  0.883,
+                  0.903
+                ]
+              },
+              {
+                "bbox": [
+                  0.513,
+                  0.906,
+                  0.884,
+                  0.92
+                ]
+              }
+            ],
+            "index": 15
+          },
+          {
+            "type": "aside_text",
+            "bbox": [
+              0.029,
+              0.311,
+              0.063,
+              0.719
+            ],
+            "content": [],
+            "index": 16
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.145,
+              0.283,
+              0.461,
+              0.677
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Understanding tables is an important aspect of natural language understanding. Existing models for table understanding require linearization of the table structure, where row or column order is encoded as an unwanted bias. Such spurious biases make the model vulnerable to row and column order perturbations. Additionally, prior work has not thoroughly modeled the table structures or table-text alignments, hindering the table-text understanding ability. In this work, we propose a robust and structurally aware table-text encoding architecture TABLEFORMER, where tabular structural biases are incorporated completely through learnable attention biases. TABLEFORMER is (1) strictly invariant to row and column orders, and, (2) could understand tables better due to its tabular inductive biases. Our evaluations showed that TABLEFORMER outperforms strong baselines in all settings on SQA, WTQ and TABFACT table reasoning datasets, and achieves state-of-the-art performance on SQA, especially when facing answer-invariant row and column order perturbations (6% improvement over the best baseline), because pre-vious SOTA models’ performance drops by 4% - 6% when facing such perturbations while TABLEFORMER is not affected.",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "1",
+                "styles": [
+                  "superscript"
+                ]
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.146,
+                  0.283,
+                  0.46,
+                  0.296
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.297,
+                  0.456,
+                  0.31
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.311,
+                  0.456,
+                  0.324
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.325,
+                  0.456,
+                  0.337
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.339,
+                  0.461,
+                  0.35
+                ]
+              },
+              {
+                "bbox": [
+                  0.147,
+                  0.354,
+                  0.456,
+                  0.367
+                ]
+              },
+              {
+                "bbox": [
+                  0.147,
+                  0.368,
+                  0.461,
+                  0.381
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.382,
+                  0.459,
+                  0.395
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.396,
+                  0.456,
+                  0.409
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.41,
+                  0.458,
+                  0.423
+                ]
+              },
+              {
+                "bbox": [
+                  0.147,
+                  0.425,
+                  0.459,
+                  0.438
+                ]
+              },
+              {
+                "bbox": [
+                  0.147,
+                  0.439,
+                  0.455,
+                  0.452
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.453,
+                  0.458,
+                  0.465
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.467,
+                  0.459,
+                  0.48
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.481,
+                  0.458,
+                  0.492
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.496,
+                  0.456,
+                  0.509
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.51,
+                  0.459,
+                  0.522
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.524,
+                  0.456,
+                  0.535
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.538,
+                  0.456,
+                  0.551
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.552,
+                  0.46,
+                  0.565
+                ]
+              },
+              {
+                "bbox": [
+                  0.145,
+                  0.567,
+                  0.46,
+                  0.58
+                ]
+              },
+              {
+                "bbox": [
+                  0.147,
+                  0.581,
+                  0.459,
+                  0.594
+                ]
+              },
+              {
+                "bbox": [
+                  0.147,
+                  0.595,
+                  0.459,
+                  0.608
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.609,
+                  0.456,
+                  0.622
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.623,
+                  0.456,
+                  0.636
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.638,
+                  0.459,
+                  0.651
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.652,
+                  0.458,
+                  0.665
+                ]
+              },
+              {
+                "bbox": [
+                  0.146,
+                  0.664,
+                  0.366,
+                  0.677
+                ]
+              }
+            ],
+            "index": 17
+          },
+          {
+            "type": "paragraph_title",
+            "bbox": [
+              0.119,
+              0.693,
+              0.26,
+              0.705
+            ],
+            "content": [],
+            "lines": [
+              {
+                "bbox": [
+                  0.119,
+                  0.693,
+                  0.26,
+                  0.705
+                ]
+              }
+            ],
+            "index": 18
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.117,
+              0.719,
+              0.487,
+              0.829
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Recently, semi-structured data (e.g. variable length tables without a fixed data schema) has attracted more attention because of its ubiquitous presence on the web. On a wide range of various table reasoning tasks, Transformer based architecture along with pretraining has shown to perform well (Eisenschlos et al., 2021; Liu et al., 2021).",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.118,
+                  0.719,
+                  0.487,
+                  0.733
+                ]
+              },
+              {
+                "bbox": [
+                  0.118,
+                  0.735,
+                  0.487,
+                  0.748
+                ]
+              },
+              {
+                "bbox": [
+                  0.118,
+                  0.751,
+                  0.487,
+                  0.765
+                ]
+              },
+              {
+                "bbox": [
+                  0.118,
+                  0.767,
+                  0.484,
+                  0.781
+                ]
+              },
+              {
+                "bbox": [
+                  0.118,
+                  0.783,
+                  0.487,
+                  0.797
+                ]
+              },
+              {
+                "bbox": [
+                  0.117,
+                  0.799,
+                  0.484,
+                  0.813
+                ]
+              },
+              {
+                "bbox": [
+                  0.118,
+                  0.815,
+                  0.383,
+                  0.829
+                ]
+              }
+            ],
+            "index": 19
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.118,
+              0.832,
+              0.488,
+              0.862
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "In a nutshell, prior work used the Transformer architecture in a BERT like fashion by serializing",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.136,
+                  0.832,
+                  0.488,
+                  0.846
+                ]
+              },
+              {
+                "bbox": [
+                  0.118,
+                  0.848,
+                  0.487,
+                  0.862
+                ]
+              }
+            ],
+            "index": 20
+          },
+          {
+            "type": "page_footnote",
+            "bbox": [
+              0.146,
+              0.87,
+              0.412,
+              0.883
+            ],
+            "content": [],
+            "index": 21
+          },
+          {
+            "type": "page_footnote",
+            "bbox": [
+              0.118,
+              0.882,
+              0.49,
+              0.917
+            ],
+            "content": [],
+            "index": 22
+          }
+        ]
+      }
+    },
+    {
+      "name": "fornax-p13",
+      "source": "tests/unittest/pdfs/flash_layout/annotated/fornax.pdf",
+      "source_sha256": "1ba2c42478b66fcb39c0bb5b19abafb2ed726aa4048df6215bc65d262d15c08f",
+      "baseline_commit": "e6d820d468d66912f6c66c87ee6e4dc9426de7eb",
+      "expected_independent_indices": [
+        15,
+        21,
+        30,
+        59
+      ],
+      "page": {
+        "page_idx": 12,
+        "blocks": [
+          {
+            "type": "header",
+            "bbox": [
+              0.299,
+              0.04,
+              0.701,
+              0.052
+            ],
+            "content": [],
+            "index": 0
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.069,
+              0.493,
+              0.132
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "measured at 150 pc from the centre, decreases more in the orbit with the smaller pericentric radius ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "r",
+                "styles": [
+                  "superscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": "peri. Thus, our simulations provide further indications that an ρ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "150",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": "-r",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "peri",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " anticorrelation is not a straightforward consequence of the dynamical interaction of the dwarf satellites with the tidal field of the MW.",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.069,
+                  0.492,
+                  0.082
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.082,
+                  0.491,
+                  0.096
+                ]
+              },
+              {
+                "bbox": [
+                  0.06,
+                  0.095,
+                  0.492,
+                  0.109
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.108,
+                  0.493,
+                  0.121
+                ]
+              },
+              {
+                "bbox": [
+                  0.06,
+                  0.121,
+                  0.395,
+                  0.132
+                ]
+              }
+            ],
+            "index": 1
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.134,
+              0.492,
+              0.277
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "The main result of this work is that, though our initial conditions would permit a wide variety of initial stellar mass distributions for Fornax, for the final stellar and DM density distributions to be consistent with the ones observed at the present day, the stellar mass loss must have been very low (≲ 3%). Thus, it appears rather unlikely that loss of mass from Fornax to the MW could be the explanation of the anomalously high fraction of stellar mass that in Fornax resides in GCs, which remains a problem (despite the significant uncertainty in the adopted GC mass-to-light ratio) for GC formation scenarios that postulate that GCs were originally much more massive.",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.086,
+                  0.134,
+                  0.486,
+                  0.147
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.147,
+                  0.486,
+                  0.16
+                ]
+              },
+              {
+                "bbox": [
+                  0.06,
+                  0.16,
+                  0.486,
+                  0.173
+                ]
+              },
+              {
+                "bbox": [
+                  0.06,
+                  0.173,
+                  0.491,
+                  0.186
+                ]
+              },
+              {
+                "bbox": [
+                  0.06,
+                  0.186,
+                  0.492,
+                  0.199
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.199,
+                  0.492,
+                  0.212
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.212,
+                  0.486,
+                  0.225
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.225,
+                  0.492,
+                  0.238
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.238,
+                  0.486,
+                  0.251
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.251,
+                  0.491,
+                  0.264
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.264,
+                  0.306,
+                  0.277
+                ]
+              }
+            ],
+            "_paragraph_boundary": true,
+            "index": 2
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.283,
+              0.492,
+              0.389
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Acknowledgements. PFDC wishes to acknowledge funding by “Fondazione Cassa di Risparmio di Firenze\" under the project HIPERCRHEL for the use of high performance computing resources at the University of Firenze. The research activities described in this paper have been co-funded by the European Union – NextGenerationEU within PRIN 2022 project n.20229YBSAN - Globular clusters in cosmological simulations and in lensed fields: from their birth to the present epoch. G.I. acknowledges financial support under the National Recovery and Resilience Plan (NRRP), Mission 4, Component 2, Investment 1.4, - Call for tender No. 3138 of 18/12/2021 of Italian Ministry of University and Research funded by the European Union – NextGenerationEU.",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.283,
+                  0.492,
+                  0.294
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.294,
+                  0.492,
+                  0.305
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.304,
+                  0.487,
+                  0.315
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.315,
+                  0.492,
+                  0.326
+                ]
+              },
+              {
+                "bbox": [
+                  0.06,
+                  0.326,
+                  0.487,
+                  0.336
+                ]
+              },
+              {
+                "bbox": [
+                  0.06,
+                  0.336,
+                  0.492,
+                  0.347
+                ]
+              },
+              {
+                "bbox": [
+                  0.06,
+                  0.347,
+                  0.487,
+                  0.358
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.357,
+                  0.491,
+                  0.368
+                ]
+              },
+              {
+                "bbox": [
+                  0.061,
+                  0.368,
+                  0.492,
+                  0.379
+                ]
+              },
+              {
+                "bbox": [
+                  0.06,
+                  0.378,
+                  0.4,
+                  0.389
+                ]
+              }
+            ],
+            "_paragraph_boundary": true,
+            "index": 3
+          },
+          {
+            "type": "paragraph_title",
+            "bbox": [
+              0.062,
+              0.422,
+              0.157,
+              0.433
+            ],
+            "content": [],
+            "lines": [
+              {
+                "bbox": [
+                  0.062,
+                  0.422,
+                  0.157,
+                  0.433
+                ]
+              }
+            ],
+            "index": 4
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.442,
+              0.491,
+              0.462
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Andrade, K. E., Kaplinghat, M., & Valli, M. 2023, arXiv e-prints, arXiv:2311.01528",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.442,
+                  0.491,
+                  0.453
+                ]
+              },
+              {
+                "bbox": [
+                  0.077,
+                  0.453,
+                  0.177,
+                  0.462
+                ]
+              }
+            ],
+            "index": 5
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.463,
+              0.438,
+              0.474
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Battaglia, G., Helmi, A., Morrison, H., et al. 2005, MNRAS, 364, 433",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.463,
+                  0.438,
+                  0.474
+                ]
+              }
+            ],
+            "index": 6
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.474,
+              0.378,
+              0.485
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Battaglia, G. & Nipoti, C. 2022, Nature Astronomy, 6, 659",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.474,
+                  0.378,
+                  0.485
+                ]
+              }
+            ],
+            "index": 7
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.484,
+              0.417,
+              0.495
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Battaglia, G., Sollima, A., & Nipoti, C. 2015, MNRAS, 454, 2401",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.484,
+                  0.417,
+                  0.495
+                ]
+              }
+            ],
+            "index": 8
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.495,
+              0.468,
+              0.506
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Battaglia, G., Taibi, S., Thomas, G. F., & Fritz, T. K. 2022, A&A, 657, A54",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.495,
+                  0.468,
+                  0.506
+                ]
+              }
+            ],
+            "index": 9
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.505,
+              0.408,
+              0.516
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Battaglia, G., Tolstoy, E., Helmi, A., et al. 2006, A&A, 459, 423",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.505,
+                  0.408,
+                  0.516
+                ]
+              }
+            ],
+            "index": 10
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.516,
+              0.36,
+              0.526
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Baumgardt, H. & Kroupa, P. 2007, MNRAS, 380, 1589",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.516,
+                  0.36,
+                  0.526
+                ]
+              }
+            ],
+            "index": 11
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.526,
+              0.409,
+              0.537
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Baumgardt, H., Sollima, A., & Hilker, M. 2020, PASA, 37, e046",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.526,
+                  0.409,
+                  0.537
+                ]
+              }
+            ],
+            "index": 12
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.536,
+              0.254,
+              0.547
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Binney, J. 1981, MNRAS, 196, 455",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.536,
+                  0.254,
+                  0.547
+                ]
+              }
+            ],
+            "index": 13
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.547,
+              0.369,
+              0.558
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Bird, S. A., Xue, X.-X., Liu, C., et al. 2021, ApJ, 919, 66",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.547,
+                  0.369,
+                  0.558
+                ]
+              }
+            ],
+            "index": 14
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.557,
+              0.491,
+              0.578
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Borukhovetskaya, A., Errani, R., Navarro, J. F., Fattahi, A., & Santos-Santos, I. 2022, MNRAS, 509, 5330",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.557,
+                  0.491,
+                  0.568
+                ]
+              },
+              {
+                "bbox": [
+                  0.077,
+                  0.568,
+                  0.221,
+                  0.578
+                ]
+              }
+            ],
+            "index": 15
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.578,
+              0.22,
+              0.589
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Bovy, J. 2015, ApJS, 216, 29",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.578,
+                  0.22,
+                  0.589
+                ]
+              }
+            ],
+            "index": 16
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.589,
+              0.345,
+              0.6
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Bullock, J. S. & Johnston, K. V. 2005, ApJ, 635, 931",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.589,
+                  0.345,
+                  0.6
+                ]
+              }
+            ],
+            "index": 17
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.061,
+              0.599,
+              0.388,
+              0.61
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Calura, F., Ciotti, L., & Nipoti, C. 2014, MNRAS, 440, 3341",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.061,
+                  0.599,
+                  0.388,
+                  0.61
+                ]
+              }
+            ],
+            "index": 18
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.061,
+              0.61,
+              0.487,
+              0.631
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Calura, F., D’Ercole, A., Vesperini, E., Vanzella, E., & Sollima, A. 2019, MN-RAS, 489, 3269",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.061,
+                  0.61,
+                  0.487,
+                  0.621
+                ]
+              },
+              {
+                "bbox": [
+                  0.077,
+                  0.62,
+                  0.166,
+                  0.631
+                ]
+              }
+            ],
+            "index": 19
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.061,
+              0.631,
+              0.455,
+              0.642
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Calura, F., Few, C. G., Romano, D., & D’Ercole, A. 2015, ApJ, 814, L14",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.061,
+                  0.631,
+                  0.455,
+                  0.642
+                ]
+              }
+            ],
+            "index": 20
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.061,
+              0.641,
+              0.491,
+              0.662
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Cardona-Barrero, S., Battaglia, G., Nipoti, C., & Di Cintio, A. 2023, MNRAS, 522, 3058",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.061,
+                  0.641,
+                  0.491,
+                  0.652
+                ]
+              },
+              {
+                "bbox": [
+                  0.077,
+                  0.652,
+                  0.133,
+                  0.662
+                ]
+              }
+            ],
+            "index": 21
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.061,
+              0.662,
+              0.422,
+              0.673
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Choi, J.-H., Weinberg, M. D., & Katz, N. 2007, MNRAS, 381, 987",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.061,
+                  0.662,
+                  0.422,
+                  0.673
+                ]
+              }
+            ],
+            "index": 22
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.061,
+              0.673,
+              0.447,
+              0.684
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Contigiani, O., Rossi, E. M., & Marchetti, T. 2019, MNRAS, 487, 4025",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.061,
+                  0.673,
+                  0.447,
+                  0.684
+                ]
+              }
+            ],
+            "index": 23
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.683,
+              0.462,
+              0.694
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "D’Antona, F., Vesperini, E., D’Ercole, A., et al. 2016, MNRAS, 458, 2122",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.683,
+                  0.462,
+                  0.694
+                ]
+              }
+            ],
+            "index": 24
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.694,
+              0.491,
+              0.715
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Darragh-Ford, E., Nadler, E. O., McLaughlin, S., & Wechsler, R. H. 2021, ApJ, 915, 48",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.694,
+                  0.491,
+                  0.705
+                ]
+              },
+              {
+                "bbox": [
+                  0.077,
+                  0.704,
+                  0.12,
+                  0.715
+                ]
+              }
+            ],
+            "index": 25
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.061,
+              0.715,
+              0.415,
+              0.726
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "de Boer, T. J. L., Tolstoy, E., Hill, V., et al. 2012, A&A, 544, A73",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.061,
+                  0.715,
+                  0.415,
+                  0.726
+                ]
+              }
+            ],
+            "index": 26
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.725,
+              0.415,
+              0.736
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Decressin, T., Baumgardt, H., & Kroupa, P. 2008, A&A, 492, 101",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.725,
+                  0.415,
+                  0.736
+                ]
+              }
+            ],
+            "index": 27
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.736,
+              0.491,
+              0.756
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Decressin, T., Meynet, G., Charbonnel, C., Prantzos, N., & Ekström, S. 2007, A&A, 464, 1029",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.736,
+                  0.491,
+                  0.747
+                ]
+              },
+              {
+                "bbox": [
+                  0.077,
+                  0.746,
+                  0.17,
+                  0.756
+                ]
+              }
+            ],
+            "index": 28
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.757,
+              0.391,
+              0.768
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Dehnen, W. 2002, Journal of Computational Physics, 179, 27",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.757,
+                  0.391,
+                  0.768
+                ]
+              }
+            ],
+            "index": 29
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.767,
+              0.491,
+              0.788
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "D’Ercole, A., Vesperini, E., D’Antona, F., McMillan, S. L. W., & Recchi, S. 2008, MNRAS, 391, 825",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.767,
+                  0.491,
+                  0.778
+                ]
+              },
+              {
+                "bbox": [
+                  0.077,
+                  0.778,
+                  0.214,
+                  0.788
+                ]
+              }
+            ],
+            "index": 30
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.788,
+              0.376,
+              0.799
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Dubath, P., Meylan, G., & Mayor, M. 1992, ApJ, 400, 510",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.788,
+                  0.376,
+                  0.799
+                ]
+              }
+            ],
+            "index": 31
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.799,
+              0.477,
+              0.81
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Elias, L. M., Sales, L. V., Helmi, A., & Hernquist, L. 2020, MNRAS, 495, 29",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.799,
+                  0.477,
+                  0.81
+                ]
+              }
+            ],
+            "index": 32
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.809,
+              0.288,
+              0.82
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Elmegreen, B. G. 1999, Ap&SS, 269, 469",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.809,
+                  0.288,
+                  0.82
+                ]
+              }
+            ],
+            "index": 33
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.82,
+              0.416,
+              0.83
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Errani, R., Penarrubia, J., & Tormen, G. 2015, MNRAS, 449, L46",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.82,
+                  0.416,
+                  0.83
+                ]
+              }
+            ],
+            "index": 34
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.061,
+              0.83,
+              0.492,
+              0.851
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Garavito-Camargo, N., Besla, G., Laporte, C. F. P., et al. 2021, The Astrophysical Journal, 919, 109",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.061,
+                  0.83,
+                  0.492,
+                  0.841
+                ]
+              },
+              {
+                "bbox": [
+                  0.077,
+                  0.841,
+                  0.173,
+                  0.851
+                ]
+              }
+            ],
+            "index": 35
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.061,
+              0.851,
+              0.475,
+              0.861
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Genina, A., Read, J. I., Fattahi, A., & Frenk, C. S. 2022, MNRAS, 510, 2186",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.061,
+                  0.851,
+                  0.475,
+                  0.861
+                ]
+              }
+            ],
+            "index": 36
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.061,
+              0.862,
+              0.469,
+              0.872
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Gibbons, S. L. J., Belokurov, V., & Evans, N. W. 2014, MNRAS, 445, 3788",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.061,
+                  0.862,
+                  0.469,
+                  0.872
+                ]
+              }
+            ],
+            "index": 37
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.061,
+              0.872,
+              0.487,
+              0.882
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "GRAVITY Collaboration, Abuter, R., Amorim, A., et al. 2018, A&A, 615, L15",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.061,
+                  0.872,
+                  0.487,
+                  0.882
+                ]
+              }
+            ],
+            "index": 38
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.882,
+              0.246,
+              0.893
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Hernquist, L. 1990, ApJ, 356, 359",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.882,
+                  0.246,
+                  0.893
+                ]
+              }
+            ],
+            "index": 39
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.06,
+              0.893,
+              0.373,
+              0.904
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Huang, K.-W. & Koposov, S. E. 2021, MNRAS, 500, 986",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.06,
+                  0.893,
+                  0.373,
+                  0.904
+                ]
+              }
+            ],
+            "index": 40
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.07,
+              0.918,
+              0.081
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Iorio, G., Nipoti, C., Battaglia, G., & Sollima, A. 2019, MNRAS, 487, 5692",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.07,
+                  0.918,
+                  0.081
+                ]
+              }
+            ],
+            "index": 41
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.081,
+              0.879,
+              0.092
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Johnston, K. V., Spergel, D. N., & Hernquist, L. 1995, ApJ, 451, 598",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.081,
+                  0.879,
+                  0.092
+                ]
+              }
+            ],
+            "index": 42
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.092,
+              0.855,
+              0.103
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Kaplinghat, M., Valli, M., & Yu, H.-B. 2019, MNRAS, 490, 231",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.092,
+                  0.855,
+                  0.103
+                ]
+              }
+            ],
+            "index": 43
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.102,
+              0.85,
+              0.113
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Kazantzidis, S., Magorrian, J., & Moore, B. 2004, ApJ, 601, 37",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.102,
+                  0.85,
+                  0.113
+                ]
+              }
+            ],
+            "index": 44
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.113,
+              0.939,
+              0.135
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Khalaj, P. & Baumgardt, H. 2016, Monthly Notices of the Royal Astronomical Society, 457, 479",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.113,
+                  0.939,
+                  0.124
+                ]
+              },
+              {
+                "bbox": [
+                  0.525,
+                  0.124,
+                  0.62,
+                  0.135
+                ]
+              }
+            ],
+            "index": 45
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.134,
+              0.874,
+              0.145
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Koposov, S. E., Erkal, D., Li, T. S., et al. 2023, MNRAS, 521, 4936",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.134,
+                  0.874,
+                  0.145
+                ]
+              }
+            ],
+            "index": 46
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.145,
+              0.939,
+              0.165
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Kowalczyk, K., del Pino, A., Łokas, E. L., & Valluri, M. 2019, MNRAS, 482, 5241",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.145,
+                  0.939,
+                  0.156
+                ]
+              },
+              {
+                "bbox": [
+                  0.525,
+                  0.156,
+                  0.553,
+                  0.165
+                ]
+              }
+            ],
+            "index": 47
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.166,
+              0.704,
+              0.177
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Kroupa, P. 2001, MNRAS, 322, 231",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.166,
+                  0.704,
+                  0.177
+                ]
+              }
+            ],
+            "index": 48
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.177,
+              0.939,
+              0.198
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Kruijssen, J. M. D., Pfeffer, J. L., Reina-Campos, M., Crain, R. A., & Bastian, N. 2019, MNRAS, 486, 3180",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.177,
+                  0.939,
+                  0.188
+                ]
+              },
+              {
+                "bbox": [
+                  0.525,
+                  0.188,
+                  0.685,
+                  0.198
+                ]
+              }
+            ],
+            "index": 49
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.198,
+              0.935,
+              0.208
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Larsen, S. S., Brodie, J. P., Wasserman, A., & Strader, J. 2018, A&A, 613, A56",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.198,
+                  0.935,
+                  0.208
+                ]
+              }
+            ],
+            "index": 50
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.209,
+              0.846,
+              0.219
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Larsen, S. S., Strader, J., & Brodie, J. P. 2012, A&A, 544, L14",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.209,
+                  0.846,
+                  0.219
+                ]
+              }
+            ],
+            "index": 51
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.22,
+              0.836,
+              0.23
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Letarte, B., Hill, V., Jablonka, P., et al. 2006, A&A, 453, 547",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.22,
+                  0.836,
+                  0.23
+                ]
+              }
+            ],
+            "index": 52
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.23,
+              0.9,
+              0.241
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Lilleengen, S., Petersen, M. S., Erkal, D., et al. 2023, MNRAS, 518, 774",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.23,
+                  0.9,
+                  0.241
+                ]
+              }
+            ],
+            "index": 53
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.241,
+              0.94,
+              0.262
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Londrillo, P., Nipoti, C., & Ciotti, L. 2003, Memorie della Societa Astronomica Italiana Supplementi, 1, 18",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.241,
+                  0.94,
+                  0.252
+                ]
+              },
+              {
+                "bbox": [
+                  0.525,
+                  0.252,
+                  0.672,
+                  0.262
+                ]
+              }
+            ],
+            "index": 54
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.262,
+              0.905,
+              0.273
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Massari, D., Aguado-Agelet, F., Monelli, M., et al. 2023, A&A, 680, A20",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.262,
+                  0.905,
+                  0.273
+                ]
+              }
+            ],
+            "index": 55
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.273,
+              0.939,
+              0.294
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Miller, T. B., van den Bosch, F. C., Green, S. B., & Ogiya, G. 2020, MNRAS, 495, 4496",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.273,
+                  0.939,
+                  0.284
+                ]
+              },
+              {
+                "bbox": [
+                  0.525,
+                  0.283,
+                  0.581,
+                  0.294
+                ]
+              }
+            ],
+            "index": 56
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.294,
+              0.89,
+              0.304
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Milone, A. P., Marino, A. F., Piotto, G., et al. 2015, MNRAS, 447, 927",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.294,
+                  0.89,
+                  0.304
+                ]
+              }
+            ],
+            "index": 57
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.305,
+              0.768,
+              0.316
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Miyamoto, M. & Nagai, R. 1975, PASJ, 27, 533",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.305,
+                  0.768,
+                  0.316
+                ]
+              }
+            ],
+            "index": 58
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.315,
+              0.935,
+              0.337
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Moreno-Hilario, E., Martinez-Medina, L. A., Li, H., Souza, S. O., & Pérez-Villegas, A. 2024, MNRAS, 527, 2765",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.315,
+                  0.935,
+                  0.326
+                ]
+              },
+              {
+                "bbox": [
+                  0.525,
+                  0.326,
+                  0.735,
+                  0.337
+                ]
+              }
+            ],
+            "index": 59
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.337,
+              0.939,
+              0.356
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Mori, A., Di Matteo, P., Salvadori, S., et al. 2024, arXiv e-prints, arXiv:2401.13737",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.337,
+                  0.939,
+                  0.348
+                ]
+              },
+              {
+                "bbox": [
+                  0.525,
+                  0.347,
+                  0.625,
+                  0.356
+                ]
+              }
+            ],
+            "index": 60
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.358,
+              0.935,
+              0.379
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Mucciarelli, A. & Massari, D. 2023, in Memorie della Societa Astronomica Italiana, Vol. 94, 173",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.358,
+                  0.935,
+                  0.368
+                ]
+              },
+              {
+                "bbox": [
+                  0.525,
+                  0.369,
+                  0.621,
+                  0.379
+                ]
+              }
+            ],
+            "index": 61
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.379,
+              0.683,
+              0.39
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Mulder, W. A. 1983, aap, 117, 9",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.379,
+                  0.683,
+                  0.39
+                ]
+              }
+            ],
+            "index": 62
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.39,
+              0.937,
+              0.401
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Muni, C., Pontzen, A., Read, J. I., et al. 2024, arXiv e-prints, arXiv:2407.14579",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.39,
+                  0.937,
+                  0.401
+                ]
+              }
+            ],
+            "index": 63
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.401,
+              0.78,
+              0.412
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Nipoti, C. & Binney, J. 2015, MNRAS, 446, 1820",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.401,
+                  0.78,
+                  0.412
+                ]
+              }
+            ],
+            "index": 64
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.411,
+              0.901,
+              0.422
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Nipoti, C., Cherchi, G., Iorio, G., & Calura, F. 2021, MNRAS, 503, 4221",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.411,
+                  0.901,
+                  0.422
+                ]
+              }
+            ],
+            "index": 65
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.422,
+              0.843,
+              0.433
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Nipoti, C., Londrillo, P., & Ciotti, L. 2003, MNRAS, 342, 501",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.422,
+                  0.843,
+                  0.433
+                ]
+              }
+            ],
+            "index": 66
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.433,
+              0.843,
+              0.443
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Nipoti, C., Londrillo, P., & Ciotti, L. 2006, MNRAS, 370, 681",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.433,
+                  0.843,
+                  0.443
+                ]
+              }
+            ],
+            "index": 67
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.443,
+              0.879,
+              0.454
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Pace, A. B., Walker, M. G., Koposov, S. E., et al. 2021, ApJ, 923, 77",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.443,
+                  0.879,
+                  0.454
+                ]
+              }
+            ],
+            "index": 68
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.454,
+              0.893,
+              0.465
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Pascale, R., Posti, L., Nipoti, C., & Binney, J. 2018, MNRAS, 480, 927",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.454,
+                  0.893,
+                  0.465
+                ]
+              }
+            ],
+            "index": 69
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.464,
+              0.866,
+              0.475
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Petts, J. A., Read, J. I., & Gualandris, A. 2016, MNRAS, 463, 858",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.464,
+                  0.866,
+                  0.475
+                ]
+              }
+            ],
+            "index": 70
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.475,
+              0.876,
+              0.486
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Piffl, T., Binney, J., McMillan, P. J., et al. 2014, MNRAS, 445, 3133",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.475,
+                  0.876,
+                  0.486
+                ]
+              }
+            ],
+            "index": 71
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.486,
+              0.873,
+              0.496
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Power, C., Navarro, J. F., Jenkins, A., et al. 2003, MNRAS, 338, 14",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.486,
+                  0.873,
+                  0.496
+                ]
+              }
+            ],
+            "index": 72
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.496,
+              0.862,
+              0.507
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Read, J. I., Walker, M. G., & Steger, P. 2019, MNRAS, 484, 1401",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.496,
+                  0.862,
+                  0.507
+                ]
+              }
+            ],
+            "index": 73
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.507,
+              0.939,
+              0.528
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Read, J. I., Wilkinson, M. I., Evans, N. W., Gilmore, G., & Kleyna, J. T. 2006, MNRAS, 366, 429",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.507,
+                  0.939,
+                  0.518
+                ]
+              },
+              {
+                "bbox": [
+                  0.525,
+                  0.518,
+                  0.629,
+                  0.528
+                ]
+              }
+            ],
+            "index": 74
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.528,
+              0.939,
+              0.539
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Rodriguez, C. L., Weatherford, N. C., Coughlin, S. C., et al. 2022, ApJS, 258, 22",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.528,
+                  0.939,
+                  0.539
+                ]
+              }
+            ],
+            "index": 75
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.539,
+              0.699,
+              0.55
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Salpeter, E. E. 1955, ApJ, 121, 161",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.539,
+                  0.699,
+                  0.55
+                ]
+              }
+            ],
+            "index": 76
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.55,
+              0.691,
+              0.561
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Schechter, P. 1976, ApJ, 203, 297",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.55,
+                  0.691,
+                  0.561
+                ]
+              }
+            ],
+            "index": 77
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.56,
+              0.722,
+              0.571
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Schönrich, R. 2012, MNRAS, 427, 274",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.56,
+                  0.722,
+                  0.571
+                ]
+              }
+            ],
+            "index": 78
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.571,
+              0.873,
+              0.582
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Schönrich, R., Binney, J., & Dehnen, W. 2010, MNRAS, 403, 1829",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.571,
+                  0.873,
+                  0.582
+                ]
+              }
+            ],
+            "index": 79
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.582,
+              0.878,
+              0.593
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Shchelkanova, G., Hayashi, K., & Blinnikov, S. 2021, ApJ, 909, 147",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.582,
+                  0.878,
+                  0.593
+                ]
+              }
+            ],
+            "index": 80
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.592,
+              0.816,
+              0.603
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Silich, S. & Tenorio-Tagle, G. 2018, MNRAS, 478, 5112",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.592,
+                  0.816,
+                  0.603
+                ]
+              }
+            ],
+            "index": 81
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.603,
+              0.811,
+              0.613
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Strader, J., Caldwell, N., & Seth, A. C. 2011, AJ, 142, 8",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.603,
+                  0.811,
+                  0.613
+                ]
+              }
+            ],
+            "index": 82
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.614,
+              0.71,
+              0.624
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Vasiliev, E. 2024, MNRAS, 527, 437",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.614,
+                  0.71,
+                  0.624
+                ]
+              }
+            ],
+            "index": 83
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.624,
+              0.867,
+              0.634
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Vasiliev, E., Belokurov, V., & Erkal, D. 2021, MNRAS, 501, 2279",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.624,
+                  0.867,
+                  0.634
+                ]
+              }
+            ],
+            "index": 84
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.635,
+              0.901,
+              0.646
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Wang, M. Y., Koposov, S., Drlica-Wagner, A., et al. 2019, ApJ, 875, L13",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.635,
+                  0.901,
+                  0.646
+                ]
+              }
+            ],
+            "index": 85
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.508,
+              0.646,
+              0.939,
+              0.666
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Wang, M.-Y., Strigari, L. E., Lovell, M. R., Frenk, C. S., & Zentner, A. R. 2016, MNRAS, 457, 4248",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.508,
+                  0.646,
+                  0.939,
+                  0.656
+                ]
+              },
+              {
+                "bbox": [
+                  0.525,
+                  0.656,
+                  0.635,
+                  0.666
+                ]
+              }
+            ],
+            "index": 86
+          },
+          {
+            "type": "footer",
+            "bbox": [
+              0.756,
+              0.916,
+              0.939,
+              0.928
+            ],
+            "content": [],
+            "index": 87
+          }
+        ]
+      }
+    },
+    {
+      "name": "deep_structure_catalog-p275",
+      "source": "tests/unittest/pdfs/flash_layout/deep_structure_catalog.pdf",
+      "source_sha256": "6e0eccd9bbcbf0a91715a212477e133151e13bdeacf6f15df70461d9211a2042",
+      "baseline_commit": "e6d820d468d66912f6c66c87ee6e4dc9426de7eb",
+      "expected_independent_indices": [
+        20
+      ],
+      "page": {
+        "page_idx": 274,
+        "blocks": [
+          {
+            "type": "paragraph_title",
+            "bbox": [
+              0.117,
+              0.095,
+              0.348,
+              0.109
+            ],
+            "content": [],
+            "lines": [
+              {
+                "bbox": [
+                  0.117,
+                  0.095,
+                  0.348,
+                  0.109
+                ]
+              }
+            ],
+            "index": 0
+          },
+          {
+            "type": "paragraph_title",
+            "bbox": [
+              0.117,
+              0.134,
+              0.221,
+              0.147
+            ],
+            "content": [],
+            "lines": [
+              {
+                "bbox": [
+                  0.117,
+                  0.134,
+                  0.221,
+                  0.147
+                ]
+              }
+            ],
+            "index": 1
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.334,
+              0.164,
+              0.583,
+              0.177
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Round Minimum Maximum",
+                "styles": [
+                  "bold"
+                ]
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.334,
+                  0.164,
+                  0.583,
+                  0.177
+                ]
+              }
+            ],
+            "index": 2
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.606,
+              0.165,
+              0.654,
+              0.177
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Mean",
+                "styles": [
+                  "bold"
+                ]
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.606,
+                  0.165,
+                  0.654,
+                  0.177
+                ]
+              }
+            ],
+            "index": 3
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.7,
+              0.155,
+              0.776,
+              0.168
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Standard",
+                "styles": [
+                  "bold"
+                ]
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.7,
+                  0.155,
+                  0.776,
+                  0.168
+                ]
+              }
+            ],
+            "index": 4
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.699,
+              0.174,
+              0.778,
+              0.186
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Deviation",
+                "styles": [
+                  "bold"
+                ]
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.699,
+                  0.174,
+                  0.778,
+                  0.186
+                ]
+              }
+            ],
+            "index": 5
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.815,
+              0.164,
+              0.878,
+              0.177
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Median",
+                "styles": [
+                  "bold"
+                ]
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.815,
+                  0.164,
+                  0.878,
+                  0.177
+                ]
+              }
+            ],
+            "index": 6
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.355,
+              0.196,
+              0.366,
+              0.208
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "1",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.355,
+                  0.196,
+                  0.366,
+                  0.208
+                ]
+              }
+            ],
+            "index": 7
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.434,
+              0.196,
+              0.456,
+              0.208
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "34",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.434,
+                  0.196,
+                  0.456,
+                  0.208
+                ]
+              }
+            ],
+            "index": 8
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.53,
+              0.196,
+              0.551,
+              0.208
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "52",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.53,
+                  0.196,
+                  0.551,
+                  0.208
+                ]
+              }
+            ],
+            "index": 9
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.611,
+              0.196,
+              0.648,
+              0.208
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "42.9",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.611,
+                  0.196,
+                  0.648,
+                  0.208
+                ]
+              }
+            ],
+            "index": 10
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.72,
+              0.196,
+              0.766,
+              0.208
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "5.422",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.72,
+                  0.196,
+                  0.766,
+                  0.208
+                ]
+              }
+            ],
+            "index": 11
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.834,
+              0.196,
+              0.856,
+              0.208
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "40",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.834,
+                  0.196,
+                  0.856,
+                  0.208
+                ]
+              }
+            ],
+            "index": 12
+          },
+          {
+            "index": 13,
+            "type": "table",
+            "content": [],
+            "bbox": [
+              0.324,
+              0.21,
+              0.886,
+              0.885
+            ]
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.132,
+              0.235,
+              0.238,
+              0.266
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Grade 3 Mathematics",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.152,
+                  0.235,
+                  0.216,
+                  0.248
+                ]
+              },
+              {
+                "bbox": [
+                  0.132,
+                  0.253,
+                  0.238,
+                  0.266
+                ]
+              }
+            ],
+            "index": 14
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.132,
+              0.354,
+              0.238,
+              0.385
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Grade 4 Mathematics",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.151,
+                  0.354,
+                  0.216,
+                  0.367
+                ]
+              },
+              {
+                "bbox": [
+                  0.132,
+                  0.373,
+                  0.238,
+                  0.385
+                ]
+              }
+            ],
+            "index": 15
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.132,
+              0.473,
+              0.238,
+              0.505
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Grade 5 Mathematics",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.149,
+                  0.473,
+                  0.214,
+                  0.486
+                ]
+              },
+              {
+                "bbox": [
+                  0.132,
+                  0.492,
+                  0.238,
+                  0.505
+                ]
+              }
+            ],
+            "index": 16
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.132,
+              0.592,
+              0.238,
+              0.624
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Grade 6 Mathematics",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.152,
+                  0.592,
+                  0.217,
+                  0.605
+                ]
+              },
+              {
+                "bbox": [
+                  0.132,
+                  0.611,
+                  0.238,
+                  0.624
+                ]
+              }
+            ],
+            "index": 17
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.132,
+              0.711,
+              0.238,
+              0.743
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Grade 7 Mathematics",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.151,
+                  0.711,
+                  0.215,
+                  0.724
+                ]
+              },
+              {
+                "bbox": [
+                  0.132,
+                  0.73,
+                  0.238,
+                  0.743
+                ]
+              }
+            ],
+            "index": 18
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.132,
+              0.83,
+              0.238,
+              0.862
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Grade 8 Mathematics",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.149,
+                  0.83,
+                  0.214,
+                  0.843
+                ]
+              },
+              {
+                "bbox": [
+                  0.132,
+                  0.849,
+                  0.238,
+                  0.862
+                ]
+              }
+            ],
+            "index": 19
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.259,
+              0.214,
+              0.315,
+              0.227
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level II",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.259,
+                  0.214,
+                  0.315,
+                  0.227
+                ]
+              }
+            ],
+            "index": 20
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.256,
+              0.274,
+              0.317,
+              0.287
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level III",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.256,
+                  0.274,
+                  0.317,
+                  0.287
+                ]
+              }
+            ],
+            "index": 21
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.259,
+              0.333,
+              0.315,
+              0.346
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level II",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.259,
+                  0.333,
+                  0.315,
+                  0.346
+                ]
+              }
+            ],
+            "index": 22
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.256,
+              0.393,
+              0.317,
+              0.406
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level III",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.256,
+                  0.393,
+                  0.317,
+                  0.406
+                ]
+              }
+            ],
+            "index": 23
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.259,
+              0.453,
+              0.315,
+              0.465
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level II",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.259,
+                  0.453,
+                  0.315,
+                  0.465
+                ]
+              }
+            ],
+            "index": 24
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.256,
+              0.512,
+              0.317,
+              0.525
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level III",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.256,
+                  0.512,
+                  0.317,
+                  0.525
+                ]
+              }
+            ],
+            "index": 25
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.259,
+              0.572,
+              0.315,
+              0.585
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level II",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.259,
+                  0.572,
+                  0.315,
+                  0.585
+                ]
+              }
+            ],
+            "index": 26
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.256,
+              0.631,
+              0.317,
+              0.644
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level III",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.256,
+                  0.631,
+                  0.317,
+                  0.644
+                ]
+              }
+            ],
+            "index": 27
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.259,
+              0.691,
+              0.315,
+              0.704
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level II",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.259,
+                  0.691,
+                  0.315,
+                  0.704
+                ]
+              }
+            ],
+            "index": 28
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.256,
+              0.75,
+              0.317,
+              0.763
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level III",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.256,
+                  0.75,
+                  0.317,
+                  0.763
+                ]
+              }
+            ],
+            "index": 29
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.259,
+              0.81,
+              0.315,
+              0.823
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level II",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.259,
+                  0.81,
+                  0.315,
+                  0.823
+                ]
+              }
+            ],
+            "index": 30
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.256,
+              0.869,
+              0.317,
+              0.882
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Level III",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.256,
+                  0.869,
+                  0.317,
+                  0.882
+                ]
+              }
+            ],
+            "index": 31
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.355,
+              0.888,
+              0.366,
+              0.901
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "3",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.355,
+                  0.888,
+                  0.366,
+                  0.901
+                ]
+              }
+            ],
+            "index": 32
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.434,
+              0.888,
+              0.455,
+              0.901
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "63",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.434,
+                  0.888,
+                  0.455,
+                  0.901
+                ]
+              }
+            ],
+            "index": 33
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.53,
+              0.888,
+              0.551,
+              0.901
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "72",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.53,
+                  0.888,
+                  0.551,
+                  0.901
+                ]
+              }
+            ],
+            "index": 34
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.612,
+              0.888,
+              0.648,
+              0.901
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "68.8",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.612,
+                  0.888,
+                  0.648,
+                  0.901
+                ]
+              }
+            ],
+            "index": 35
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.73,
+              0.888,
+              0.756,
+              0.901
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "2.2",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.73,
+                  0.888,
+                  0.756,
+                  0.901
+                ]
+              }
+            ],
+            "index": 36
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.834,
+              0.888,
+              0.856,
+              0.901
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "69",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.834,
+                  0.888,
+                  0.856,
+                  0.901
+                ]
+              }
+            ],
+            "index": 37
+          },
+          {
+            "type": "page_number",
+            "bbox": [
+              0.447,
+              0.955,
+              0.554,
+              0.969
+            ],
+            "content": [],
+            "index": 38
+          }
+        ]
+      }
+    },
+    {
+      "name": "outside_crop_ship_design-p57",
+      "source": "tests/unittest/pdfs/flash_layout/outside_crop_ship_design.pdf",
+      "source_sha256": "a086bf1a5cbad91654cd3c79d71ea70f9f77c9e39cde8a1089eb1e2ebded29bf",
+      "baseline_commit": "e6d820d468d66912f6c66c87ee6e4dc9426de7eb",
+      "expected_independent_indices": [
+        6
+      ],
+      "page": {
+        "page_idx": 56,
+        "blocks": [
+          {
+            "type": "header",
+            "bbox": [
+              0.076,
+              0.046,
+              0.71,
+              0.062
+            ],
+            "content": [],
+            "index": 0
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.077,
+              0.077,
+              0.261,
+              0.097
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "BM",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": "T",
+                "styles": [
+                  "bold",
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " ",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "values",
+                "styles": [
+                  "bold"
+                ]
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.077,
+                  0.077,
+                  0.261,
+                  0.097
+                ]
+              }
+            ],
+            "index": 1
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.105,
+              0.626,
+              0.141
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "For any vessel, BMT I T m See Figure 4.3 V",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.352,
+                  0.105,
+                  0.365,
+                  0.119
+                ]
+              },
+              {
+                "bbox": [
+                  0.362,
+                  0.112,
+                  0.409,
+                  0.129
+                ]
+              },
+              {
+                "bbox": [
+                  0.076,
+                  0.114,
+                  0.315,
+                  0.133
+                ]
+              },
+              {
+                "bbox": [
+                  0.355,
+                  0.127,
+                  0.378,
+                  0.141
+                ]
+              },
+              {
+                "bbox": [
+                  0.466,
+                  0.114,
+                  0.626,
+                  0.133
+                ]
+              }
+            ],
+            "index": 2
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.151,
+              0.156,
+              0.166
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "where:",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.151,
+                  0.156,
+                  0.166
+                ]
+              }
+            ],
+            "index": 3
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.172,
+              0.911,
+              0.193
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "I",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "T",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " transverse moment of inertia about the waterplane’s centreline in m",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "4",
+                "styles": [
+                  "superscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": ",",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.13,
+                  0.172,
+                  0.911,
+                  0.193
+                ]
+              },
+              {
+                "bbox": [
+                  0.076,
+                  0.175,
+                  0.1,
+                  0.192
+                ]
+              }
+            ],
+            "index": 4
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.193,
+              0.641,
+              0.252
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "V volume of displacement in cubic metres. L ( /) 12 B",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "3",
+                "styles": [
+                  "superscript"
+                ]
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.193,
+                  0.591,
+                  0.212
+                ]
+              },
+              {
+                "bbox": [
+                  0.565,
+                  0.231,
+                  0.595,
+                  0.248
+                ]
+              },
+              {
+                "bbox": [
+                  0.508,
+                  0.234,
+                  0.527,
+                  0.248
+                ]
+              },
+              {
+                "bbox": [
+                  0.557,
+                  0.234,
+                  0.641,
+                  0.252
+                ]
+              }
+            ],
+            "index": 5
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.244,
+              0.665,
+              0.297
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "For a box-shaped vessel, BMT L B H CB B2",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.244,
+                  0.358,
+                  0.262
+                ]
+              },
+              {
+                "bbox": [
+                  0.387,
+                  0.245,
+                  0.444,
+                  0.262
+                ]
+              },
+              {
+                "bbox": [
+                  0.256,
+                  0.279,
+                  0.286,
+                  0.297
+                ]
+              },
+              {
+                "bbox": [
+                  0.481,
+                  0.256,
+                  0.665,
+                  0.274
+                ]
+              }
+            ],
+            "index": 6
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.292,
+              0.35,
+              0.319
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "So BMT m 12 H",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.292,
+                  0.107,
+                  0.306
+                ]
+              },
+              {
+                "bbox": [
+                  0.137,
+                  0.293,
+                  0.193,
+                  0.311
+                ]
+              },
+              {
+                "bbox": [
+                  0.323,
+                  0.296,
+                  0.35,
+                  0.307
+                ]
+              },
+              {
+                "bbox": [
+                  0.23,
+                  0.305,
+                  0.259,
+                  0.319
+                ]
+              },
+              {
+                "bbox": [
+                  0.289,
+                  0.305,
+                  0.314,
+                  0.319
+                ]
+              }
+            ],
+            "index": 7
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.331,
+              0.927,
+              0.349
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "For shipshape vessels, instead of using 1/12, the coefficient ‘’ is used. This",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.331,
+                  0.927,
+                  0.349
+                ]
+              }
+            ],
+            "index": 8
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.349,
+              0.927,
+              0.368
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "is an inertia coefficient. 1/12 changes to ‘’ because the shape of each",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.349,
+                  0.927,
+                  0.368
+                ]
+              }
+            ],
+            "index": 9
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.368,
+              0.396,
+              0.413
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "waterline is not rectangular. B2",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.368,
+                  0.396,
+                  0.387
+                ]
+              },
+              {
+                "bbox": [
+                  0.328,
+                  0.395,
+                  0.358,
+                  0.413
+                ]
+              }
+            ],
+            "index": 10
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.408,
+              0.397,
+              0.438
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Hence BMT m H CB",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.408,
+                  0.152,
+                  0.422
+                ]
+              },
+              {
+                "bbox": [
+                  0.182,
+                  0.409,
+                  0.238,
+                  0.426
+                ]
+              },
+              {
+                "bbox": [
+                  0.37,
+                  0.412,
+                  0.397,
+                  0.422
+                ]
+              },
+              {
+                "bbox": [
+                  0.275,
+                  0.42,
+                  0.363,
+                  0.438
+                ]
+              }
+            ],
+            "index": 11
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.449,
+              0.761,
+              0.468
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "where , H and C",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "B",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " are variables changing at each waterline.",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.449,
+                  0.761,
+                  0.468
+                ]
+              }
+            ],
+            "index": 12
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.472,
+              0.645,
+              0.493
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "For Worked example 4.1, B",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "2",
+                "styles": [
+                  "superscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " 18.3 18.3 334.9",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.472,
+                  0.645,
+                  0.493
+                ]
+              }
+            ],
+            "index": 13
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.499,
+              0.927,
+              0.518
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Research by the author has shown that for C",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "W",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " of 0.692–0.893, for Merchant",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.499,
+                  0.927,
+                  0.518
+                ]
+              }
+            ],
+            "index": 14
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.518,
+              0.73,
+              0.56
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "ships: 0.084 (C",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "W",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": ")",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "2",
+                "styles": [
+                  "superscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " C.B. Barrass (1991)",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.518,
+                  0.145,
+                  0.536
+                ]
+              },
+              {
+                "bbox": [
+                  0.415,
+                  0.537,
+                  0.481,
+                  0.56
+                ]
+              },
+              {
+                "bbox": [
+                  0.322,
+                  0.543,
+                  0.384,
+                  0.557
+                ]
+              },
+              {
+                "bbox": [
+                  0.515,
+                  0.542,
+                  0.73,
+                  0.56
+                ]
+              }
+            ],
+            "index": 15
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.567,
+              0.5,
+              0.617
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Thus for the vessel being considered: 28.13 (C",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "W",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " )",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "2",
+                "styles": [
+                  "superscript"
+                ]
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.567,
+                  0.5,
+                  0.586
+                ]
+              },
+              {
+                "bbox": [
+                  0.253,
+                  0.596,
+                  0.415,
+                  0.617
+                ]
+              }
+            ],
+            "index": 16
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.609,
+              0.758,
+              0.639
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Any BMT m, at each waterline or draft H CB",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.158,
+                  0.61,
+                  0.215,
+                  0.627
+                ]
+              },
+              {
+                "bbox": [
+                  0.076,
+                  0.609,
+                  0.13,
+                  0.628
+                ]
+              },
+              {
+                "bbox": [
+                  0.29,
+                  0.621,
+                  0.378,
+                  0.639
+                ]
+              },
+              {
+                "bbox": [
+                  0.423,
+                  0.611,
+                  0.758,
+                  0.626
+                ]
+              }
+            ],
+            "index": 17
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.653,
+              0.786,
+              0.757
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "For example, at 8 m draft, where C",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "W",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " 0.801, C",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "B",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " 0.701, then: 28.13 0.801 0.801 BM",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "T",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " 8.0 0.701 BMT 3.22 m",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.521,
+                  0.653,
+                  0.625,
+                  0.67
+                ]
+              },
+              {
+                "bbox": [
+                  0.655,
+                  0.653,
+                  0.786,
+                  0.669
+                ]
+              },
+              {
+                "bbox": [
+                  0.429,
+                  0.684,
+                  0.58,
+                  0.698
+                ]
+              },
+              {
+                "bbox": [
+                  0.61,
+                  0.684,
+                  0.67,
+                  0.698
+                ]
+              },
+              {
+                "bbox": [
+                  0.487,
+                  0.705,
+                  0.523,
+                  0.72
+                ]
+              },
+              {
+                "bbox": [
+                  0.552,
+                  0.705,
+                  0.612,
+                  0.72
+                ]
+              },
+              {
+                "bbox": [
+                  0.424,
+                  0.74,
+                  0.5,
+                  0.754
+                ]
+              },
+              {
+                "bbox": [
+                  0.076,
+                  0.653,
+                  0.491,
+                  0.671
+                ]
+              },
+              {
+                "bbox": [
+                  0.335,
+                  0.693,
+                  0.392,
+                  0.711
+                ]
+              },
+              {
+                "bbox": [
+                  0.339,
+                  0.74,
+                  0.394,
+                  0.757
+                ]
+              }
+            ],
+            "index": 18
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.077,
+              0.767,
+              0.927,
+              0.786
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "‘’, the inertia coefficient may also be assumed to be 1/12 or 0.8333, thereby",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.077,
+                  0.767,
+                  0.927,
+                  0.786
+                ]
+              }
+            ],
+            "index": 19
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.786,
+              0.926,
+              0.805
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "with respect to transverse stability erring slightly on the lower and safer side.",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.786,
+                  0.926,
+                  0.805
+                ]
+              }
+            ],
+            "index": 20
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.834,
+              0.552,
+              0.855
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Transverse Metacentre (KM",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": "T",
+                "styles": [
+                  "bold",
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": ")",
+                "styles": [
+                  "bold"
+                ]
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.834,
+                  0.552,
+                  0.855
+                ]
+              }
+            ],
+            "index": 21
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.856,
+              0.857,
+              0.906
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "There are two formulae for KM",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "T",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": ": KMT KG GMT and KMT KB BM",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "T",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " See Figure 4.3",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.856,
+                  0.452,
+                  0.873
+                ]
+              },
+              {
+                "bbox": [
+                  0.145,
+                  0.887,
+                  0.276,
+                  0.904
+                ]
+              },
+              {
+                "bbox": [
+                  0.306,
+                  0.887,
+                  0.589,
+                  0.904
+                ]
+              },
+              {
+                "bbox": [
+                  0.62,
+                  0.887,
+                  0.857,
+                  0.906
+                ]
+              }
+            ],
+            "index": 22
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.915,
+              0.751,
+              0.934
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "For a ship to be in stable equilibrium, G must be below M",
+                "styles": []
+              },
+              {
+                "type": "text",
+                "content": "T",
+                "styles": [
+                  "subscript"
+                ]
+              },
+              {
+                "type": "text",
+                "content": ".",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.915,
+                  0.751,
+                  0.934
+                ]
+              }
+            ],
+            "index": 23
+          }
+        ]
+      }
+    },
+    {
+      "name": "outside_crop_ship_design-p210",
+      "source": "tests/unittest/pdfs/flash_layout/outside_crop_ship_design.pdf",
+      "source_sha256": "a086bf1a5cbad91654cd3c79d71ea70f9f77c9e39cde8a1089eb1e2ebded29bf",
+      "baseline_commit": "e6d820d468d66912f6c66c87ee6e4dc9426de7eb",
+      "expected_independent_indices": [
+        5
+      ],
+      "page": {
+        "page_idx": 209,
+        "blocks": [
+          {
+            "type": "header",
+            "bbox": [
+              0.705,
+              0.046,
+              0.926,
+              0.062
+            ],
+            "content": [],
+            "index": 0
+          },
+          {
+            "index": 1,
+            "type": "image",
+            "content": [],
+            "bbox": [
+              0.104,
+              0.083,
+              0.898,
+              0.361
+            ]
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.107,
+              0.495,
+              0.896,
+              0.512
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "A Passenger–cargo ship has the following natural hull frequencies (measured",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.107,
+                  0.495,
+                  0.896,
+                  0.512
+                ]
+              }
+            ],
+            "index": 3
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.107,
+              0.545,
+              0.896,
+              0.611
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "2NV 123 2NH 180 3NV 237 4NV 315 This vessel is to be fitted with a three-bladed propeller or a four-bladed propeller each operating at 105 rpm. In order to reduce vibration problems,",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.237,
+                  0.545,
+                  0.766,
+                  0.558
+                ]
+              },
+              {
+                "bbox": [
+                  0.107,
+                  0.575,
+                  0.896,
+                  0.593
+                ]
+              },
+              {
+                "bbox": [
+                  0.107,
+                  0.594,
+                  0.896,
+                  0.611
+                ]
+              }
+            ],
+            "index": 4
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.076,
+              0.438,
+              0.849,
+              0.84
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Which propeller to fit? Worked example 20.1",
+                "styles": [
+                  "bold"
+                ]
+              },
+              {
+                "type": "text",
+                "content": " in cycles/min): determine which is the better propeller to fit to this vessel: For the three-bladed propeller, the 1st harmonics 123, 180, 237 and 315 For the three-bladed propeller, the 2nd harmonics 123/3, 180/3, 237/3 blades fitted on the propeller: For the four-bladed propeller, the 1st harmonics 123, 180, 237 and 315 For the four-bladed propeller, the 2nd harmonics 123/4, 180/4, 237/4",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.076,
+                  0.438,
+                  0.447,
+                  0.459
+                ]
+              },
+              {
+                "bbox": [
+                  0.107,
+                  0.475,
+                  0.344,
+                  0.492
+                ]
+              },
+              {
+                "bbox": [
+                  0.107,
+                  0.513,
+                  0.266,
+                  0.531
+                ]
+              },
+              {
+                "bbox": [
+                  0.108,
+                  0.613,
+                  0.706,
+                  0.63
+                ]
+              },
+              {
+                "bbox": [
+                  0.107,
+                  0.644,
+                  0.848,
+                  0.661
+                ]
+              },
+              {
+                "bbox": [
+                  0.107,
+                  0.67,
+                  0.849,
+                  0.687
+                ]
+              },
+              {
+                "bbox": [
+                  0.107,
+                  0.765,
+                  0.413,
+                  0.782
+                ]
+              },
+              {
+                "bbox": [
+                  0.107,
+                  0.796,
+                  0.84,
+                  0.813
+                ]
+              },
+              {
+                "bbox": [
+                  0.107,
+                  0.822,
+                  0.842,
+                  0.84
+                ]
+              }
+            ],
+            "index": 5
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.641,
+              0.689,
+              0.75,
+              0.704
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "and 315/3",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.641,
+                  0.689,
+                  0.75,
+                  0.704
+                ]
+              }
+            ],
+            "index": 6
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.666,
+              0.715,
+              0.848,
+              0.731
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "41, 60, 79 and 105",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.666,
+                  0.715,
+                  0.848,
+                  0.731
+                ]
+              }
+            ],
+            "index": 7
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.107,
+              0.746,
+              0.897,
+              0.764
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Note how the 2nd harmonics are the 1st harmonics divided by the number of",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.107,
+                  0.746,
+                  0.897,
+                  0.764
+                ]
+              }
+            ],
+            "index": 8
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.634,
+              0.841,
+              0.743,
+              0.856
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "and 315/4",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.634,
+                  0.841,
+                  0.743,
+                  0.856
+                ]
+              }
+            ],
+            "index": 9
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.639,
+              0.868,
+              0.896,
+              0.883
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "30.75, 45, 59.25 and 78.75",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.639,
+                  0.868,
+                  0.896,
+                  0.883
+                ]
+              }
+            ],
+            "index": 10
+          },
+          {
+            "type": "text",
+            "bbox": [
+              0.107,
+              0.899,
+              0.896,
+              0.935
+            ],
+            "content": [
+              {
+                "type": "text",
+                "content": "Figure 20.11 shows that the propeller revolutions of 105 would be synchronous with the highest value of the 2nd harmonics. Consequently, severe and",
+                "styles": []
+              }
+            ],
+            "lines": [
+              {
+                "bbox": [
+                  0.107,
+                  0.899,
+                  0.889,
+                  0.916
+                ]
+              },
+              {
+                "bbox": [
+                  0.108,
+                  0.917,
+                  0.896,
+                  0.935
+                ]
+              }
+            ],
+            "index": 11
+          }
+        ]
+      }
+    }
+  ]
+}

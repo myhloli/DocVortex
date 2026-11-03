@@ -1,0 +1,2507 @@
+{
+  "description": "真实已解析的 ModelJson，保留段落文字、行框、类型和顺序；测试只运行后处理，不加载模型或读取 PDF。",
+  "samples": {
+    "emnlp": {
+      "source": "tests/unittest/pdfs/form_containers/2022.emnlp-main.614.pdf",
+      "source_sha256": "b10fa41a07177c40a45fd292d7e8147f4905fc41466fa3b61fed25271e2b281b",
+      "captured_request": "已完成的 DocVortex 原生 txt 整本解析；仅提取原第 7、8 页用于后处理回归",
+      "omitted_non_paragraph_fields": [
+        "visual_block.image_base64",
+        "extensions.docvortex_layout"
+      ],
+      "model": {
+        "metadata": {
+          "file_suffix": "pdf",
+          "producer": {
+            "name": "docvortex",
+            "version": "0.6.11"
+          },
+          "document": {
+            "title": null,
+            "authors": [],
+            "subject": null,
+            "keywords": [],
+            "description": null,
+            "languages": [],
+            "identifiers": [],
+            "publisher": null,
+            "created_at": "2024-04-05T17:48:03+02:00",
+            "modified_at": "2024-04-05T17:48:03+02:00",
+            "creator_application": "LaTeX with hyperref",
+            "producer_application": "pdfTeX-1.40.26",
+            "page_count": 18,
+            "page_count_kind": "physical"
+          }
+        },
+        "extensions": {},
+        "schema_version": "2.0",
+        "schema": "docvortex.model",
+        "pages": [
+          [
+            {
+              "type": "table",
+              "bbox": [
+                0.119,
+                0.084,
+                0.486,
+                0.182
+              ],
+              "angle": 0,
+              "content": "<table><tbody><tr><td>e</td><td>k = 2</td><td>k = 4</td><td>k = 8</td><td>Avg.</td></tr><tr><td>4</td><td>0.6187</td><td>0.6300</td><td>0.6566</td><td>0.6351</td></tr><tr><td>8</td><td>0.6280</td><td>0.6414</td><td>0.6721</td><td>0.6472</td></tr><tr><td>16</td><td>0.6195</td><td>0.6400</td><td>0.6736</td><td>0.6444</td></tr><tr><td>32</td><td>0.6039</td><td>0.6209</td><td>0.6477</td><td>0.6242</td></tr><tr><td>64</td><td>0.5597</td><td>0.5729</td><td>0.5843</td><td>0.5723</td></tr><tr><td>all</td><td>0.5723</td><td>0.5771</td><td>0.5828</td><td>0.5774</td></tr></tbody></table>"
+            },
+            {
+              "type": "caption",
+              "bbox": [
+                0.119,
+                0.194,
+                0.486,
+                0.237
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Table 2: Recall@1000 results on the test set with varying number of expansion terms e from each relevant document. Results are averaged over the shuffles."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.119,
+                    0.194,
+                    0.483,
+                    0.208
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.208,
+                    0.486,
+                    0.223
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.223,
+                    0.45,
+                    0.237
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.119,
+                0.264,
+                0.486,
+                0.312
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "it will rank documents higher that are strongly pre-ferred by one ranking model than documents that are weakly preferred by multiple models."
+                },
+                {
+                  "type": "text",
+                  "content": "9",
+                  "styles": [
+                    "superscript"
+                  ]
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.119,
+                    0.264,
+                    0.483,
+                    0.28
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.28,
+                    0.486,
+                    0.296
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.295,
+                    0.428,
+                    0.312
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph_title",
+              "bbox": [
+                0.119,
+                0.327,
+                0.212,
+                0.345
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "6 Results"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.119,
+                    0.327,
+                    0.212,
+                    0.345
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph_title",
+              "bbox": [
+                0.119,
+                0.354,
+                0.458,
+                0.372
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "6.1 2"
+                },
+                {
+                  "type": "text",
+                  "content": "nd",
+                  "styles": [
+                    "superscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": " Stage Retrieval: Query Expansion"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.119,
+                    0.354,
+                    0.458,
+                    0.372
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.118,
+                0.378,
+                0.489,
+                0.603
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "We report recall@1000 results of the second stage retrieval with varying number of expansion terms e in Table 2. Note that by increasing e the performance increases, reaching a maximum at e = 8. However, when further increasing e, the recall drops. We observe qualitatively that extracting more terms per document also includes more non-specific terms or even stop words which hurt performance. Based on the recall@1000 performance on the validation set (see Appendix I) we use the documents obtained by extracting e = 16 terms for the final re-ranking step. In this work, we do not focus on the first stage retrieval. For completeness, we report the results in Appendix B."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.118,
+                    0.378,
+                    0.486,
+                    0.394
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.394,
+                    0.486,
+                    0.41
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.41,
+                    0.483,
+                    0.426
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.426,
+                    0.489,
+                    0.442
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.443,
+                    0.486,
+                    0.458
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.459,
+                    0.486,
+                    0.474
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.475,
+                    0.483,
+                    0.49
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.491,
+                    0.483,
+                    0.506
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.507,
+                    0.486,
+                    0.523
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.523,
+                    0.486,
+                    0.539
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.539,
+                    0.486,
+                    0.555
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.555,
+                    0.486,
+                    0.571
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.571,
+                    0.488,
+                    0.587
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.118,
+                    0.587,
+                    0.385,
+                    0.603
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph_title",
+              "bbox": [
+                0.119,
+                0.617,
+                0.36,
+                0.634
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "6.2 Re-Ranking Performance"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.119,
+                    0.617,
+                    0.36,
+                    0.634
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.118,
+                0.64,
+                0.488,
+                0.881
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "We report the nDCG@20 ranking performance in Table 3 and additional zero-shot baselines in Appendix C. We first note that increasing the amount of relevance feedback k generally improves performance. Furthermore, we observe that BM25-QE already performs well. Neither the kNN approach, nor the Cross-Encoder zero-shot and Query FT, nor the wide variety of zero-shot models are able to outperform BM25-QE, except on TREC-Covid. We note a superior performance on Webis-Touché, although this task is the most challenging for neural models in our test suite. This agrees with related work that indicates that BM25 beats all other methods on this task (Thakur et al., 2021). When looking at the CE experiments, we observe incremental"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.118,
+                    0.64,
+                    0.486,
+                    0.656
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.118,
+                    0.656,
+                    0.483,
+                    0.672
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.672,
+                    0.486,
+                    0.688
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.688,
+                    0.483,
+                    0.704
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.704,
+                    0.486,
+                    0.72
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.721,
+                    0.488,
+                    0.736
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.737,
+                    0.486,
+                    0.752
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.753,
+                    0.483,
+                    0.768
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.769,
+                    0.486,
+                    0.784
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.785,
+                    0.483,
+                    0.801
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.801,
+                    0.486,
+                    0.817
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.817,
+                    0.486,
+                    0.833
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.118,
+                    0.833,
+                    0.483,
+                    0.849
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.849,
+                    0.483,
+                    0.865
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.865,
+                    0.486,
+                    0.881
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.14,
+                0.893,
+                0.145,
+                0.902
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "9"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.14,
+                    0.893,
+                    0.145,
+                    0.902
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "bbox": [
+                0.518,
+                0.084,
+                0.877,
+                0.603
+              ],
+              "angle": 0,
+              "content": "<table><tbody><tr><td></td><td>Robust</td><td>Covid</td><td>News</td><td>Touché</td><td>Avg.</td></tr><tr><td colspan=\"6\">BM25-QE</td></tr><tr><td>k = 2</td><td>0.4480</td><td>0.5632</td><td>0.3846</td><td>0.2602</td><td>0.4140</td></tr><tr><td>k = 4</td><td>0.4843</td><td>0.6079</td><td>0.3877</td><td>0.2558</td><td>0.4339</td></tr><tr><td>k = 8</td><td>0.5568</td><td>0.6606</td><td>0.4049</td><td>0.2982</td><td>0.4801</td></tr><tr><td>Avg.</td><td>0.4964</td><td>0.6106</td><td>0.3924</td><td>0.2714</td><td>0.4427</td></tr><tr><td colspan=\"6\">kNN</td></tr><tr><td>k = 2</td><td>0.4259</td><td>0.6736</td><td>0.3492</td><td>0.1646</td><td>0.4033</td></tr><tr><td>k = 4</td><td>0.4342</td><td>0.6789</td><td>0.3539</td><td>0.1697</td><td>0.4092</td></tr><tr><td>k = 8</td><td>0.4698</td><td>0.7069</td><td>0.3925</td><td>0.1904</td><td>0.4399</td></tr><tr><td>Avg.</td><td>0.4433</td><td>0.6865</td><td>0.3652</td><td>0.1749</td><td>0.4175</td></tr><tr><td colspan=\"6\">CE Zero-Shot</td></tr><tr><td>k = 2</td><td>0.3937</td><td>0.6917</td><td>0.2955</td><td>0.1731</td><td>0.3885</td></tr><tr><td>k = 4</td><td>0.4185</td><td>0.7018</td><td>0.3189</td><td>0.1767</td><td>0.4040</td></tr><tr><td>k = 8</td><td>0.4335</td><td>0.7150</td><td>0.3285</td><td>0.1799</td><td>0.4142</td></tr><tr><td>Avg.</td><td>0.4152</td><td>0.7028</td><td>0.3143</td><td>0.1766</td><td>0.4022</td></tr><tr><td colspan=\"6\">CE Query-FT</td></tr><tr><td>k = 2</td><td>0.4375</td><td>0.6833</td><td>0.2942</td><td>0.1887</td><td>0.4009</td></tr><tr><td>k = 4</td><td>0.4786</td><td>0.7182</td><td>0.3463</td><td>0.2080</td><td>0.4378</td></tr><tr><td>k = 8</td><td>0.5376</td><td>0.7677</td><td>0.3645</td><td>0.1975</td><td>0.4668</td></tr><tr><td>Avg.</td><td>0.4846</td><td>0.7231</td><td>0.3350</td><td>0.1981</td><td>0.4352</td></tr><tr><td colspan=\"6\">CE MAML + Query FT</td></tr><tr><td>k = 2</td><td>0.4529</td><td>0.7129</td><td>0.2526</td><td>0.2212</td><td>0.4099</td></tr><tr><td>k = 4</td><td>0.5079</td><td>0.7498</td><td>0.3358</td><td>0.2292</td><td>0.4557</td></tr><tr><td>k = 8</td><td>0.5572</td><td>0.7449</td><td>0.3557</td><td>0.2201</td><td>0.4695</td></tr><tr><td>Avg.</td><td>0.5060</td><td>0.7359</td><td>0.3147</td><td>0.2235</td><td>0.4450</td></tr><tr><td colspan=\"6\">Rank Fusion: kNN &amp; BM25-QE</td></tr><tr><td>k = 2</td><td>0.4635</td><td>0.6903</td><td>0.3783</td><td>0.2263</td><td>0.4396</td></tr><tr><td>k = 4</td><td>0.5020</td><td>0.6858</td><td>0.4228</td><td>0.2438</td><td>0.4636</td></tr><tr><td>k = 8</td><td>0.5574</td><td>0.7470</td><td>0.4359</td><td>0.2744</td><td>0.5037</td></tr><tr><td>Avg.</td><td>0.5076</td><td>0.7077</td><td>0.4123</td><td>0.2482</td><td>0.4689</td></tr><tr><td colspan=\"6\">Rank Fusion: CE MAML + Query FT &amp; BM25-QE</td></tr><tr><td>k = 2</td><td>0.5164</td><td>0.7269</td><td>0.3934</td><td>0.2670</td><td>0.4759</td></tr><tr><td>k = 4</td><td>0.5576</td><td>0.7449</td><td>0.4084</td><td>0.2701</td><td>0.4953</td></tr><tr><td>k = 8</td><td>0.6380</td><td>0.7489</td><td>0.4148</td><td>0.2809</td><td>0.5207</td></tr><tr><td>Avg.</td><td>0.5707</td><td>0.7402</td><td>0.4055</td><td>0.2727</td><td>0.4973</td></tr></tbody></table>"
+            },
+            {
+              "type": "caption",
+              "bbox": [
+                0.514,
+                0.614,
+                0.881,
+                0.67
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Table 3: nDCG@20 test set results averaged over three seeds with a varying number of feedback documents (k). In bold, the best performing model, the runner-up is underlined."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.514,
+                    0.614,
+                    0.881,
+                    0.628
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.628,
+                    0.881,
+                    0.642
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.642,
+                    0.881,
+                    0.656
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.656,
+                    0.605,
+                    0.67
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "footnote",
+              "bbox": [
+                0.528,
+                0.319,
+                0.611,
+                0.332
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "CE Query-FT"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.528,
+                    0.319,
+                    0.611,
+                    0.332
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.514,
+                0.694,
+                0.881,
+                0.855
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "performance increases when the relevance feedback is integrated. CE zero-shot is outperformed by query fine-tuning, which is subsequently outperformed when MAML training is added. This shows that our proposed direct integration of relevance feedback in the model is effective and that the parameters obtained by MAML training are better able to adapt to new queries given the relevance feedback. This method also slightly outperforms BM25-QE."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.514,
+                    0.694,
+                    0.878,
+                    0.71
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.71,
+                    0.881,
+                    0.726
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.726,
+                    0.878,
+                    0.742
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.742,
+                    0.881,
+                    0.758
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.758,
+                    0.881,
+                    0.774
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.775,
+                    0.878,
+                    0.79
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.791,
+                    0.881,
+                    0.806
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.807,
+                    0.881,
+                    0.822
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.823,
+                    0.881,
+                    0.838
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.839,
+                    0.596,
+                    0.855
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.514,
+                0.856,
+                0.881,
+                0.92
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Finally, combining the rankings of the lexical retrieval and neural re-ranker is particularly effective. While different methods excel at each dataset (e.g. BM25 on Webis-Touché or neural models on"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.533,
+                    0.856,
+                    0.881,
+                    0.871
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.872,
+                    0.878,
+                    0.887
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.888,
+                    0.881,
+                    0.904
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.904,
+                    0.881,
+                    0.92
+                  ]
+                }
+              ],
+              "_paragraph_boundary": true
+            },
+            {
+              "type": "page_footnote",
+              "bbox": [
+                0.119,
+                0.895,
+                0.486,
+                0.918
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "For example, if h"
+                },
+                {
+                  "type": "text",
+                  "content": "0",
+                  "styles": [
+                    "subscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": "(d"
+                },
+                {
+                  "type": "text",
+                  "content": "0",
+                  "styles": [
+                    "subscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": ") = 5, h"
+                },
+                {
+                  "type": "text",
+                  "content": "1",
+                  "styles": [
+                    "subscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": "(d"
+                },
+                {
+                  "type": "text",
+                  "content": "0",
+                  "styles": [
+                    "subscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": ") = 15, h"
+                },
+                {
+                  "type": "text",
+                  "content": "0",
+                  "styles": [
+                    "subscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": "(d"
+                },
+                {
+                  "type": "text",
+                  "content": "1",
+                  "styles": [
+                    "subscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": ") = 10 and h"
+                },
+                {
+                  "type": "text",
+                  "content": "1",
+                  "styles": [
+                    "subscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": "(d"
+                },
+                {
+                  "type": "text",
+                  "content": "1",
+                  "styles": [
+                    "subscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": ") = 10 then s0 > s1."
+                }
+              ]
+            },
+            {
+              "type": "page_number",
+              "bbox": [
+                0.484,
+                0.928,
+                0.52,
+                0.944
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "8994"
+                }
+              ]
+            }
+          ],
+          [
+            {
+              "type": "text",
+              "bbox": [
+                0.118,
+                0.085,
+                0.486,
+                0.246
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "TREC-Covid), the rank fusion is able to mitigate the weaknesses of one model successfully. Moreover, combining two rankings often outperforms the single ranking, showing that query expansion and neural re-ranking are highly complementary."
+                },
+                {
+                  "type": "text",
+                  "content": "10",
+                  "styles": [
+                    "superscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": " We analyze the intersection of the top documents between BM25-QE and the two re-rankers. We find that in more than 50% of the queries in the test set, BM25-QE and the re-ranking model only agree on 5 or fewer documents in the top 20."
+                },
+                {
+                  "type": "text",
+                  "content": "11",
+                  "styles": [
+                    "superscript"
+                  ]
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.118,
+                    0.085,
+                    0.486,
+                    0.101
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.101,
+                    0.483,
+                    0.117
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.118,
+                    0.486,
+                    0.133
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.134,
+                    0.486,
+                    0.149
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.148,
+                    0.485,
+                    0.165
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.118,
+                    0.166,
+                    0.486,
+                    0.181
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.182,
+                    0.486,
+                    0.198
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.198,
+                    0.486,
+                    0.214
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.214,
+                    0.486,
+                    0.23
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.229,
+                    0.46,
+                    0.246
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph_title",
+              "bbox": [
+                0.119,
+                0.257,
+                0.335,
+                0.274
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "6.3 Re-Ranking Ablations"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.119,
+                    0.257,
+                    0.335,
+                    0.274
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.118,
+                0.279,
+                0.486,
+                0.327
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "To gain further insights into where our performance improvements are coming from, we conduct a series of ablation studies, reported in Table 4."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.118,
+                    0.279,
+                    0.486,
+                    0.295
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.295,
+                    0.483,
+                    0.311
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.311,
+                    0.437,
+                    0.327
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.118,
+                0.328,
+                0.489,
+                0.488
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "First, we ablate the influence of query expansion and the feedback documents on lexical retrieval. We retrieve only using the query and remove the feedback documents from the retrieval and evaluation, i.e. we use the residual collection, even though the feedback documents are not used. From the first section of Table 4 we can observe a large performance drop. This shows that BM25-QE is successfully able to exploit the feedback documents and retrieve more relevant documents."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.137,
+                    0.328,
+                    0.486,
+                    0.343
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.344,
+                    0.489,
+                    0.359
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.118,
+                    0.36,
+                    0.486,
+                    0.376
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.376,
+                    0.483,
+                    0.392
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.392,
+                    0.486,
+                    0.408
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.408,
+                    0.486,
+                    0.424
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.424,
+                    0.483,
+                    0.44
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.44,
+                    0.483,
+                    0.456
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.457,
+                    0.486,
+                    0.472
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.473,
+                    0.368,
+                    0.488
+                  ]
+                }
+              ],
+              "_paragraph_boundary": true
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.119,
+                0.489,
+                0.486,
+                0.601
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "For the kNN approach, we compare the performance by using only the query-document similarity for obtaining the relevance score (i.e. dropping the second term in Equation 1). On average this results in a drop of 5.6 percentage points, proving the effectiveness of injecting feedback documents in the kNN re-ranking approach."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.137,
+                    0.489,
+                    0.483,
+                    0.505
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.505,
+                    0.486,
+                    0.521
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.521,
+                    0.486,
+                    0.537
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.537,
+                    0.486,
+                    0.553
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.553,
+                    0.483,
+                    0.569
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.57,
+                    0.486,
+                    0.585
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.586,
+                    0.312,
+                    0.601
+                  ]
+                }
+              ],
+              "_paragraph_boundary": true
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.118,
+                0.602,
+                0.489,
+                0.859
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "For the CE experiments, we ablate if optimizing only the bias layers compared to fully fine-tuning the model affects the performance. We, therefore, repeat our query fine-tuning experiment but optimize all parameters of the model. On average, optimizing only the biases results in a 0.8% performance drop. However, the biases account only for 26k parameters, which is 0.11% of the entire model. This result is in line with other research showing that optimizing only a small subset of parameters results in comparable performance (Houlsby et al., 2019; Pfeiffer et al., 2020; Ben Zaken et al., 2022). This finding supports the query fine-tuning applicability from a memory perspective. While there might be many queries in a deployed system, and therefore many fine-tuned models, the required"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.137,
+                    0.602,
+                    0.486,
+                    0.618
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.618,
+                    0.486,
+                    0.634
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.634,
+                    0.488,
+                    0.65
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.65,
+                    0.483,
+                    0.666
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.666,
+                    0.488,
+                    0.682
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.682,
+                    0.483,
+                    0.698
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.699,
+                    0.486,
+                    0.714
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.715,
+                    0.489,
+                    0.73
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.118,
+                    0.731,
+                    0.486,
+                    0.746
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.747,
+                    0.486,
+                    0.762
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.763,
+                    0.488,
+                    0.779
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.779,
+                    0.489,
+                    0.795
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.118,
+                    0.795,
+                    0.483,
+                    0.811
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.811,
+                    0.486,
+                    0.827
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.827,
+                    0.486,
+                    0.843
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.119,
+                    0.843,
+                    0.486,
+                    0.859
+                  ]
+                }
+              ],
+              "_paragraph_boundary": true
+            },
+            {
+              "type": "table",
+              "bbox": [
+                0.518,
+                0.084,
+                0.877,
+                0.354
+              ],
+              "angle": 0,
+              "content": "<table><tbody><tr><td></td><td>Robust</td><td>Covid</td><td>News</td><td>Touché</td><td>Avg.</td></tr><tr><td colspan=\"6\">BM25 without feedback documents</td></tr><tr><td></td><td>0.0459</td><td>0.1615</td><td>0.0551</td><td>0.1052</td><td>0.0919</td></tr><tr><td colspan=\"6\">kNN (Query Only)</td></tr><tr><td>k = 2</td><td>0.3531</td><td>0.6611</td><td>0.2537</td><td>0.1637</td><td>0.3579</td></tr><tr><td>k = 4</td><td>0.3652</td><td>0.6486</td><td>0.2512</td><td>0.1649</td><td>0.3575</td></tr><tr><td>k = 8</td><td>0.3677</td><td>0.6854</td><td>0.2578</td><td>0.1687</td><td>0.3699</td></tr><tr><td>Avg.</td><td>0.3620</td><td>0.6650</td><td>0.2542</td><td>0.1658</td><td>0.3618</td></tr><tr><td colspan=\"6\">CE Query-FT (full)</td></tr><tr><td>k = 2</td><td>0.4721</td><td>0.7168</td><td>0.3279</td><td>0.1797</td><td>0.4241</td></tr><tr><td>k = 4</td><td>0.5110</td><td>0.6872</td><td>0.3487</td><td>0.1858</td><td>0.4332</td></tr><tr><td>k = 8</td><td>0.5778</td><td>0.7644</td><td>0.3477</td><td>0.2021</td><td>0.4730</td></tr><tr><td>Avg.</td><td>0.5203</td><td>0.7228</td><td>0.3414</td><td>0.1892</td><td>0.4434</td></tr><tr><td colspan=\"6\">CE supervised + Query-FT (bias)</td></tr><tr><td>k = 2</td><td>0.4540</td><td>0.7303</td><td>0.2716</td><td>0.2251</td><td>0.4203</td></tr><tr><td>k = 4</td><td>0.4896</td><td>0.7227</td><td>0.3657</td><td>0.2172</td><td>0.4488</td></tr><tr><td>k = 8</td><td>0.5353</td><td>0.7221</td><td>0.3390</td><td>0.2104</td><td>0.4517</td></tr><tr><td>Avg.</td><td>0.4930</td><td>0.7250</td><td>0.3254</td><td>0.2176</td><td>0.4403</td></tr></tbody></table>"
+            },
+            {
+              "type": "caption",
+              "bbox": [
+                0.514,
+                0.365,
+                0.883,
+                0.507
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Table 4: nDCG@20 results of ablations studies on the test set. The first experiment shows BM25 without using query expansion and removing the feedback documents from the evaluation. The next experiment ablates the performance of kNN by removing the influence of the relevant feedback documents. The third row shows results for fully fine-tuning the Cross-Encoder model, ablating fine-tuning only the bias layers. The last experiment ablates the MAML training, comparing it to standard supervised learning."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.514,
+                    0.365,
+                    0.881,
+                    0.379
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.379,
+                    0.881,
+                    0.393
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.393,
+                    0.878,
+                    0.408
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.408,
+                    0.881,
+                    0.422
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.422,
+                    0.882,
+                    0.436
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.436,
+                    0.881,
+                    0.45
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.45,
+                    0.883,
+                    0.464
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.464,
+                    0.878,
+                    0.479
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.479,
+                    0.881,
+                    0.493
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.493,
+                    0.71,
+                    0.507
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.514,
+                0.537,
+                0.881,
+                0.617
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "memory would not grow significantly. Furthermore, the memory requirements could be further reduced by only fine-tuning biases of certain components (Ben Zaken et al., 2022) or transformer layers (Rücklé et al., 2021)."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.514,
+                    0.537,
+                    0.878,
+                    0.553
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.553,
+                    0.881,
+                    0.569
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.569,
+                    0.878,
+                    0.585
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.585,
+                    0.881,
+                    0.601
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.601,
+                    0.717,
+                    0.617
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.513,
+                0.62,
+                0.884,
+                0.796
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Finally, we investigate the impact of metalearning by comparing it with supervised training. We follow the same setup as in MAML but replace meta-learning with standard supervised learning. We find that MAML training results in 0.5% improvement. We also note that supervised training is less stable than MAML. When increasing k, the performance intermittently drops (e.g. in TREC-Covid from k = 2 → 4 and TREC-News from k = 4 → 8), while MAML does not experience performance decreases."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.533,
+                    0.62,
+                    0.878,
+                    0.635
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.636,
+                    0.884,
+                    0.651
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.513,
+                    0.652,
+                    0.881,
+                    0.667
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.668,
+                    0.884,
+                    0.684
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.513,
+                    0.684,
+                    0.878,
+                    0.7
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.7,
+                    0.881,
+                    0.716
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.716,
+                    0.881,
+                    0.732
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.732,
+                    0.878,
+                    0.748
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.748,
+                    0.881,
+                    0.773
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.764,
+                    0.881,
+                    0.789
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.781,
+                    0.686,
+                    0.796
+                  ]
+                }
+              ],
+              "_paragraph_boundary": true
+            },
+            {
+              "type": "paragraph_title",
+              "bbox": [
+                0.514,
+                0.814,
+                0.828,
+                0.831
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "6.4 Retrieval and Re-Ranking Latency"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.514,
+                    0.814,
+                    0.828,
+                    0.831
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.514,
+                0.84,
+                0.884,
+                0.92
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Results for the speed performance are reported in Figure 2. First, we note that performing query expansion does significantly increase retrieval speed. Depending on the number of feedback documents this is a 2.8 (k = 2) – 7.6 (k = 8) fold increase"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.514,
+                    0.84,
+                    0.881,
+                    0.855
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.856,
+                    0.878,
+                    0.871
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.872,
+                    0.884,
+                    0.887
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.888,
+                    0.881,
+                    0.904
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.514,
+                    0.904,
+                    0.881,
+                    0.92
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "page_footnote",
+              "bbox": [
+                0.119,
+                0.87,
+                0.488,
+                0.905
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "10"
+                },
+                {
+                  "type": "text",
+                  "content": "We",
+                  "styles": [
+                    "subscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": " have also experimented with combining BM25-QE, kNN and CE MAML + Query FT, however, have found it not to crucially outperform fusing only two rankings."
+                }
+              ]
+            },
+            {
+              "type": "page_footnote",
+              "bbox": [
+                0.135,
+                0.907,
+                0.428,
+                0.917
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "11"
+                },
+                {
+                  "type": "text",
+                  "content": "See",
+                  "styles": [
+                    "subscript"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "content": " Appendix D for details on the distribution."
+                }
+              ]
+            },
+            {
+              "type": "page_number",
+              "bbox": [
+                0.484,
+                0.928,
+                0.52,
+                0.944
+              ],
+              "angle": 0,
+              "content": [
+                {
+                  "type": "text",
+                  "content": "8995"
+                }
+              ]
+            }
+          ]
+        ],
+        "page_index_map": [
+          6,
+          7
+        ]
+      }
+    },
+    "demo1": {
+      "source": "demo/pdfs/demo1.pdf",
+      "source_sha256": "f3b3be345bf2df8979f2491ca9466e078e4fd1d6a216611faa8566e4c44d474b",
+      "captured_request": "MinerUParser(tier=standard, parse_mode=auto, image_analysis=True), page_range=10",
+      "omitted_non_paragraph_fields": [
+        "visual_block.image_base64",
+        "extensions.docvortex_layout"
+      ],
+      "model": {
+        "metadata": {
+          "file_suffix": "pdf",
+          "producer": {
+            "name": "mineru",
+            "version": "4.1.5"
+          },
+          "document": {
+            "title": "doi:10.1016/j.jhydrol.2005.01.006",
+            "authors": [],
+            "subject": null,
+            "keywords": [],
+            "description": null,
+            "languages": [],
+            "identifiers": [],
+            "publisher": null,
+            "created_at": "2005-06-15T17:23:11",
+            "modified_at": "2005-06-15T17:23:17+05:30",
+            "creator_application": "Elsevier",
+            "producer_application": "Acrobat Distiller 4.05 for Windows",
+            "page_count": 13,
+            "page_count_kind": "physical"
+          }
+        },
+        "extensions": {
+          "mineru": {
+            "tier": "standard",
+            "parse_mode": "txt"
+          }
+        },
+        "schema_version": "2.0",
+        "schema": "docvortex.model",
+        "pages": [
+          [
+            {
+              "type": "page_number",
+              "bbox": [
+                0.084,
+                0.094,
+                0.111,
+                0.106
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "262"
+                }
+              ]
+            },
+            {
+              "type": "header",
+              "bbox": [
+                0.315,
+                0.093,
+                0.693,
+                0.107
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "P.N.J. Lane et al. / Journal of Hydrology 310 (2005) 253–265"
+                }
+              ]
+            },
+            {
+              "type": "chart",
+              "bbox": [
+                0.083,
+                0.123,
+                0.486,
+                0.283
+              ],
+              "content": null
+            },
+            {
+              "type": "chart",
+              "bbox": [
+                0.082,
+                0.295,
+                0.487,
+                0.453
+              ],
+              "content": null
+            },
+            {
+              "type": "chart",
+              "bbox": [
+                0.088,
+                0.464,
+                0.487,
+                0.639
+              ],
+              "content": null
+            },
+            {
+              "type": "caption",
+              "bbox": [
+                0.081,
+                0.647,
+                0.485,
+                0.689
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Fig. 5. Number of zero flow days for average rainfall following afforestation for Stewarts Creek 5, Redhill and Pine Creek, Australia."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.085,
+                    0.649,
+                    0.482,
+                    0.66
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.085,
+                    0.662,
+                    0.482,
+                    0.673
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.086,
+                    0.676,
+                    0.145,
+                    0.686
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.081,
+                0.698,
+                0.487,
+                0.896
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "substantially varying spatial scales, soils and geology, species planted and climatic environments. Although there were poor results for individual deciles, the FDCs at eight of the 10 catchments were adequately described by Eq. (2). The results of the statistical tests in which the rainfall term was significant for most deciles demonstrated the model structure was appropriate for adjusting the FDCs for climatic (rainfall) variability. The comparisons of our results with published paired catchment analyses are satisfactory, although the different methodologies make direct comparisons of deciles with total flow uncertain. Low flows at"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.085,
+                    0.7,
+                    0.481,
+                    0.714
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.085,
+                    0.717,
+                    0.483,
+                    0.73
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.087,
+                    0.734,
+                    0.482,
+                    0.746
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.087,
+                    0.751,
+                    0.482,
+                    0.762
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.087,
+                    0.767,
+                    0.481,
+                    0.779
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.086,
+                    0.783,
+                    0.48,
+                    0.795
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.085,
+                    0.798,
+                    0.482,
+                    0.812
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.087,
+                    0.816,
+                    0.482,
+                    0.828
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.086,
+                    0.832,
+                    0.482,
+                    0.844
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.087,
+                    0.849,
+                    0.481,
+                    0.861
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.087,
+                    0.865,
+                    0.483,
+                    0.877
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.087,
+                    0.881,
+                    0.484,
+                    0.893
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.519,
+                0.122,
+                0.928,
+                0.525
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Lambrechtsbos B appear to be over-estimated by our model, which is unsurprising as the model fit was poor. The remaining four South African catchments, and also Redhill and Stewarts Creek are in good agreement with the published values, particularly when the deviation of average rainfall is considered. Glendhu 2 reductions are close to the reported 27%, but our model produces a heavier impact on the lower flows. Overall, it appears there are no significant discrepancies with the published paired catchment analyses. We suggest our technique represents an alternative to the paired-catchment method for assessing hydrologic response to vegetation treatment, where paired data are unavailable. The method has not yet resulted in a predictive model, but has increased our knowledge of afforestation impacts. This is a valuable outcome given the contentious issue of afforestation in Australia and other countries, and a current paucity of data on inter-annual flows. It should be noted that nine of the 10 catchment were pine species. More data is required to compare the impact of hardwood species, particularly eucalypts, on the FDC. Unfortunately these data are currently scarce. There are substantial data on the physiological controls of eucalypt water use (see Whitehead and Beadle, 2004), but not at the catchment scale."
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.525,
+                    0.125,
+                    0.923,
+                    0.136
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.141,
+                    0.922,
+                    0.153
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.157,
+                    0.923,
+                    0.169
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.172,
+                    0.923,
+                    0.186
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.188,
+                    0.924,
+                    0.201
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.205,
+                    0.922,
+                    0.217
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.221,
+                    0.922,
+                    0.233
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.237,
+                    0.922,
+                    0.249
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.253,
+                    0.923,
+                    0.265
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.27,
+                    0.921,
+                    0.282
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.286,
+                    0.923,
+                    0.297
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.302,
+                    0.922,
+                    0.314
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.318,
+                    0.923,
+                    0.329
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.334,
+                    0.922,
+                    0.345
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.35,
+                    0.922,
+                    0.361
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.366,
+                    0.923,
+                    0.377
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.383,
+                    0.923,
+                    0.394
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.399,
+                    0.923,
+                    0.41
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.414,
+                    0.921,
+                    0.427
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.43,
+                    0.924,
+                    0.443
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.446,
+                    0.921,
+                    0.459
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.462,
+                    0.922,
+                    0.474
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.479,
+                    0.922,
+                    0.491
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.496,
+                    0.923,
+                    0.507
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.527,
+                    0.512,
+                    0.67,
+                    0.522
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.519,
+                0.525,
+                0.929,
+                0.897
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "The model fits show we have quantified the net impact of afforestation for the majority of the flow percentiles in the 10 catchments. Results for the 10–50th percentiles were particularly encouraging. It is not surprising that the relationship between rainfall and flow diminishes at lower flows (60–100th percentile), where seasonal storage effects and rainfall distribution become more important drivers for runoff generation. The poorest model fits were gained for Lambrechtsbos A and B. The likely reason at Lambrechtsbos A is an observed annual decrease in stand water use after 12 years (Scott et al., 2000) which does not conform to the sigmoidal form of our model over the full 19 years of record. The failure of the model to fit the lower flows at Lambrechtsbos B is not as explicable. A decrease in stand water use in this catchment is observed as the plantation ages, but does not occur during the first 20 years after treatment (Scott et al., 2000). Other data from South Africa (Scott et al., 2000) indicate there are diminished flow reductions as plantations age, but again, generally after 20 years. Our use of an asymptotic curve assumes a new equilibrium of stand water use is reached. The results of the model fitting generally justify"
+                }
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.548,
+                    0.527,
+                    0.923,
+                    0.538
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.543,
+                    0.923,
+                    0.555
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.56,
+                    0.923,
+                    0.571
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.576,
+                    0.923,
+                    0.588
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.592,
+                    0.922,
+                    0.603
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.607,
+                    0.922,
+                    0.619
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.624,
+                    0.922,
+                    0.636
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.64,
+                    0.923,
+                    0.652
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.656,
+                    0.923,
+                    0.668
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.672,
+                    0.923,
+                    0.684
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.689,
+                    0.923,
+                    0.7
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.524,
+                    0.704,
+                    0.923,
+                    0.717
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.72,
+                    0.923,
+                    0.731
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.736,
+                    0.923,
+                    0.748
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.752,
+                    0.923,
+                    0.764
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.769,
+                    0.922,
+                    0.78
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.784,
+                    0.923,
+                    0.797
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.801,
+                    0.923,
+                    0.813
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.817,
+                    0.922,
+                    0.829
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.832,
+                    0.922,
+                    0.846
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.526,
+                    0.85,
+                    0.922,
+                    0.861
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.525,
+                    0.865,
+                    0.923,
+                    0.877
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.524,
+                    0.881,
+                    0.921,
+                    0.894
+                  ]
+                }
+              ]
+            }
+          ]
+        ],
+        "page_index_map": [
+          9
+        ]
+      }
+    }
+  }
+}
