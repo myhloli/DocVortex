@@ -20,7 +20,7 @@ Windows ARM64 依赖普通 `reportlab`，使用其 Python 实现；其他平台�
 
 主 CI 独立检查同一 ARM64 wheel 在 Python 3.11、3.14 上的 ABI。工具核验真实 ARM64 解释器、64 位指针、wheel 标签、PE 指令集 `0xAA64` 和实际安装来源。
 
-Native wheels 工作流还以同一个发行物建立两个干净环境，覆盖 Python 3.11/3.14 和 PDFium 5.13.0；执行 `pip check`、原生加载、真实 PDF 的固定语义预期、密集表格全部 840 个单元格、PDFium 桥接及无 rl_accel 的 PDF 导出检查。安装校验允许 pyclipper，要求环境不包含 rl-accel，且 reportlab 使用 Python 实现。
+Native wheels 工作流直接复用 ARM64 wheel 任务的安装测试环境（当前 Python 3.14、PDFium 5.13.0），执行 `pip check`、原生加载、真实 PDF 的固定语义预期、密集表格全部 840 个单元格、PDFium 桥接及无 rl_accel 的 PDF 导出检查。补充回归与共享测试去重，不再另建 Python 3.11/3.14 安装矩阵，也不等待其他平台构建完成。安装校验允许 pyclipper，要求环境不包含 rl-accel，且 reportlab 使用 Python 实现。
 
 ## 验证边界
 

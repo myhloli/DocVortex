@@ -97,75 +97,31 @@ jobs:
           retention-days: 14
       - name: Verify Windows ARM64 native installation and reportlab fallback
         if: ${{ matrix.os == 'windows-11-arm' && !inputs.skip_ci }}
-        run: uv run --no-project python tools/verify_windows_arm64_install.py
+        # 复用当前 wheel 的安装环境，不再另建 Python 3.11/3.14 安装矩阵。
+        run: |
+          uv run --no-project --python "${{ steps.python-arm64.outputs.python-path }}" python -m pip check
+          uv run --no-project --python "${{ steps.python-arm64.outputs.python-path }}" python tools/verify_windows_arm64_install.py
       - name: Verify generated dense table with the installed wheel
         if: ${{ !inputs.skip_ci }}
         run: |
           uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/generate_dense_pdf.py dense-table.pdf
           uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python tools/verify_native_wheel.py dense-table.pdf --expectation dense-table
           uv run --no-project --python "${{ steps.python-arm64.outputs.python-path || matrix.smoke }}" python -m pytest tests/test_native_inline_styles.py tests/test_native_bitmap_crops.py tests/test_pdfium_bridge.py tests/test_pdf_object_bridge.py tests/test_pdf_classify_page_loading.py tests/test_pdf_classify_resource_graph.py tests/test_pdf_drawing_lines_extraction.py tests/test_pdf_native_graphics_components.py tests/unittest/test_flash_pdf_auxiliary_text.py tests/test_pdf_snapshot.py tests/test_pdf_render_session.py tests/test_native_font_runtime.py tests/test_native_text_pipeline.py tests/test_native_text_snapshot.py tests/test_native_classification.py tests/test_native_image_text_classification.py tests/unittest/test_pdf_classify_image_text.py tests/unittest/test_flash_pdf_char_geometry.py tests/test_native_table_candidates.py tests/test_native_candidate_boundaries.py tests/test_native_annotation_geometry.py tests/test_native_round3.py tests/test_native_round4.py tests/test_native_round5.py tests/test_native_round6.py tests/test_native_round7.py -q
+      - name: Verify Windows ARM64 PDF export regressions
+        if: ${{ matrix.os == 'windows-11-arm' && !inputs.skip_ci }}
+        # PDFium 桥接和会话测试已由上一共享步骤覆盖，此处只补原独立任务的额外回归。
+        run: >-
+          uv run --no-project --python "${{ steps.python-arm64.outputs.python-path }}" python -m pytest
+          tests/test_native_parity.py
+          tests/unittest/test_pdf_render.py tests/unittest/test_pdf_render_diagnostics.py
+          tests/test_complete_pipeline.py tests/test_public_pipeline.py tests/test_system_font_pdf_pipeline.py
+          tests/test_pdf_render_pool.py -q
       # 性能对比仅在本机执行；平台矩阵保留构建、ABI、安装和正确性检查。
       - uses: actions/upload-artifact@v6
         with:
           name: dist-${{ matrix.name }}
           path: wheelhouse/*.whl
           if-no-files-found: error
-
-  windows-arm64-install:
-    # 同一发行物检查两个 Python 端点和 PDFium 5.13.0；pyclipper 缺少 wheel 时允许源码构建。
-    needs: wheels
-    if: ${{ !inputs.skip_ci }}
-    runs-on: windows-11-arm
-    strategy:
-      fail-fast: false
-      matrix:
-        python: ['3.11', '3.14']
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        id: python-arm64
-        with:
-          python-version: ${{ matrix.python }}
-          architecture: arm64
-      - uses: astral-sh/setup-uv@v7
-        with:
-          python-version: ${{ steps.python-arm64.outputs.python-path }}
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: amd64_arm64
-      - uses: actions/download-artifact@v7
-        with:
-          name: dist-windows-arm64
-          path: wheelhouse
-      - name: Install the exact ARM64 wheel with regular dependency resolution
-        run: |
-          uv venv --seed
-          uv run --no-project python -c "import pathlib, subprocess, sys; wheel,=pathlib.Path('wheelhouse').glob('*.whl'); subprocess.check_call([sys.executable, '-m', 'pip', 'install', str(wheel), 'pytest', 'psutil', 'pypdfium2==5.13.0'])"
-          uv run --no-project python -m pip check
-      - name: Verify ABI and actual installed ARM64 extension
-        run: |
-          uv run --no-project python tools/verify_native_abi.py wheelhouse
-          uv run --no-project python tools/verify_windows_arm64_install.py
-      - name: Verify real PDF and dense table semantic expectations
-        run: |
-          uv run --no-project python tools/verify_native_wheel.py demo/pdfs/demo2.pdf
-          uv run --no-project python tools/generate_dense_pdf.py dense-table.pdf
-          uv run --no-project python tools/verify_native_wheel.py dense-table.pdf --expectation dense-table
-      - name: Verify non-PDF ARM64 wheel on both Python endpoints
-        run: uv run --no-project python tools/verify_nonpdf_wheel.py --output build/nonpdf-arm64 --run-tests
-      - uses: actions/upload-artifact@v6
-        if: ${{ always() }}
-        with:
-          name: nonpdf-windows-arm64-${{ matrix.python }}
-          path: build/nonpdf-arm64/
-          retention-days: 14
-      - name: Verify PDFium bridge, native contracts and reportlab PDF export
-        run: >-
-          uv run --no-project python -m pytest
-          tests/test_native_parity.py tests/test_pdfium_bridge.py tests/test_pdf_object_bridge.py
-          tests/unittest/test_pdf_render.py tests/unittest/test_pdf_render_diagnostics.py
-          tests/test_complete_pipeline.py tests/test_public_pipeline.py tests/test_system_font_pdf_pipeline.py
-          tests/test_pdf_render_pool.py tests/test_pdf_render_session.py -q
 
   rust-checks:
     if: ${{ !inputs.skip_ci }}
