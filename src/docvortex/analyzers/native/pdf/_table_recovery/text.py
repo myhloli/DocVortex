@@ -14,6 +14,7 @@ from .....foundation._text import resolve_text_line_boundary
 from .....schema import BBox
 from ..spatial_text import _normalize_table_text
 from .contracts import NativeTableGlyph, NativeTableInput, NativeTableText, NativeTableTextRow, NativeTableToken
+from .ink_geometry import calibrate_inflated_table_glyphs
 from .geometry import (
     bbox_intersection,
     bbox_union,
@@ -387,6 +388,11 @@ def build_native_table_text(table_input: NativeTableInput) -> NativeTableText | 
     median_width = max(0.1, float(statistics.median(widths)) if widths else 1.0)
     median_height = max(0.1, float(statistics.median(heights)) if heights else 1.0)
     pending_rows = _assign_visual_rows(pending, median_height)
+    calibrated = calibrate_inflated_table_glyphs(table_input, pending, pending_rows, median_height=median_height)
+    if calibrated is not None:
+        pending = calibrated
+        median_height = max(0.1, float(statistics.median(glyph.bbox[3] - glyph.bbox[1] for glyph in pending)))
+        pending_rows = _assign_visual_rows(pending, median_height)
 
     glyphs: list[NativeTableGlyph] = []
     rows: list[NativeTableTextRow] = []
