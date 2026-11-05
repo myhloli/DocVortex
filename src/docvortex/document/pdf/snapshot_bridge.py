@@ -46,6 +46,9 @@ def _standard_character_symbols():
         ("FPDFTextObj_GetTextRenderMode", ct.c_int, (raw.FPDF_PAGEOBJECT,)),
         ("FPDFText_GetCharOrigin", ct.c_int, (*args, double_pointer, double_pointer)),
         ("FPDFText_IsGenerated", ct.c_int, args),
+        ("FPDFTextObj_GetFont", raw.FPDF_FONT, (raw.FPDF_PAGEOBJECT,)),
+        ("FPDFFont_GetIsEmbedded", ct.c_int, (raw.FPDF_FONT,)),
+        ("FPDFFont_GetFontData", ct.c_int, (raw.FPDF_FONT, ct.POINTER(ct.c_ubyte), ct.c_size_t, ct.POINTER(ct.c_size_t))),
     )
     functions, addresses = [], []
     for name, result, arguments in specs:

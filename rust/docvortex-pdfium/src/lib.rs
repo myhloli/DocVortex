@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::ffi::{c_double, c_float, c_int, c_uint, c_ulong, c_void};
 pub mod classification;
 pub mod drawing_lines;
+mod font_weight;
 pub mod fonts;
 pub mod objects;
 pub mod path_evidence;
@@ -84,7 +85,7 @@ pub unsafe fn read_characters(
     count: usize,
     extended: bool,
 ) -> Result<(Vec<Record>, Fonts), ReadError> {
-    if addresses.len() != 11 || addresses.contains(&0) || handle == 0 || count > c_int::MAX as usize
+    if addresses.len() != 14 || addresses.contains(&0) || handle == 0 || count > c_int::MAX as usize
     {
         return Err(ReadError::InvalidInput("invalid PDFium bridge arguments"));
     }
@@ -128,6 +129,7 @@ pub unsafe fn read_characters(
         let is_generated: unsafe extern "system" fn(*mut c_void, c_int) -> c_int =
             std::mem::transmute(addresses[10]);
         let page = handle as *mut c_void;
+        let mut font_weights = font_weight::FontWeights::new(&addresses[11..]);
         let mut records = Vec::with_capacity(count);
         let mut fonts: Fonts = Vec::new();
         let mut font_ids: HashMap<Vec<u8>, HashMap<i32, usize>> = HashMap::new();
@@ -190,11 +192,11 @@ pub unsafe fn read_characters(
                     id
                 };
             let size = font_size(page, i);
-            let weight = font_weight(page, i);
+            let object = text_object(page, i);
+            let weight = font_weights.resolve(font_weight(page, i), object);
             if code > 0x10ffff {
                 return Err(ReadError::InvalidInput("chr() arg not in range(0x110000)"));
             }
-            let object = text_object(page, i);
             let address = object as usize;
             let mode = if object.is_null() {
                 None

@@ -53,6 +53,9 @@ def read_native_chars(textpage, extended, *, frame=None, rotation=0, unicode_fal
         ("FPDFTextObj_GetTextRenderMode", ct.c_int, (raw.FPDF_PAGEOBJECT,)),
         ("FPDFText_GetCharOrigin", ct.c_int, (*args, double_pointer, double_pointer)),
         ("FPDFText_IsGenerated", ct.c_int, args),
+        ("FPDFTextObj_GetFont", raw.FPDF_FONT, (raw.FPDF_PAGEOBJECT,)),
+        ("FPDFFont_GetIsEmbedded", ct.c_int, (raw.FPDF_FONT,)),
+        ("FPDFFont_GetFontData", ct.c_int, (raw.FPDF_FONT, ct.POINTER(ct.c_ubyte), ct.c_size_t, ct.POINTER(ct.c_size_t))),
     )
     if ct.sizeof(raw.FS_RECTF) != 16 or any(
         getattr(raw.FS_RECTF, name).offset != offset for name, offset in (("left", 0), ("top", 4), ("right", 8), ("bottom", 12))
