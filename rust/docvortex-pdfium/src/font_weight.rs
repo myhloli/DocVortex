@@ -25,9 +25,9 @@ impl FontWeights {
     /// 三个地址必须依次对应 GetFont、GetIsEmbedded、GetFontData，且非空并持续有效。
     pub(crate) unsafe fn new(addresses: &[usize]) -> Self {
         Self {
-            object_font: std::mem::transmute(addresses[0]),
-            is_embedded: std::mem::transmute(addresses[1]),
-            font_data: std::mem::transmute(addresses[2]),
+            object_font: std::mem::transmute::<usize, ObjectFont>(addresses[0]),
+            is_embedded: std::mem::transmute::<usize, IsEmbedded>(addresses[1]),
+            font_data: std::mem::transmute::<usize, FontData>(addresses[2]),
             fonts: HashMap::new(),
             objects: HashMap::new(),
         }
@@ -96,7 +96,7 @@ fn sfnt_weight(bytes: &[u8]) -> Option<i32> {
     }
     let count = u16::from_be_bytes(bytes.get(4..6)?.try_into().ok()?) as usize;
     let directory = bytes.get(12..12 + count * 16)?;
-    for entry in directory.chunks_exact(16) {
+    for entry in directory.as_chunks::<16>().0 {
         if &entry[..4] != b"OS/2" {
             continue;
         }
