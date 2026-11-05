@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from copy import deepcopy
 from dataclasses import dataclass
 
-from bs4 import Tag
+from bs4 import NavigableString, Tag
 
+from ...foundation._text import is_hyphen_at_line_end, resolve_text_line_boundary
 from ...schema import BlockType
 
 from .blocks import _build_post_body_child_index, _build_table_state, _table_children
@@ -29,12 +31,92 @@ from .models import BlockDict, TableMergeState
 from .structure import _expand_header_count_by_rowspan, can_merge_tables, detect_table_headers
 
 
+_CELL_TEXT_INLINE_TAGS = frozenset(
+    {
+        "a",
+        "abbr",
+        "b",
+        "bdi",
+        "bdo",
+        "big",
+        "cite",
+        "del",
+        "em",
+        "font",
+        "i",
+        "ins",
+        "mark",
+        "s",
+        "small",
+        "span",
+        "strike",
+        "strong",
+        "sub",
+        "sup",
+        "u",
+    }
+)
+
+
 @dataclass(frozen=True)
 class _TableContentMergeResult:
     """返回合并副本及当前原页到结果网格的映射，不向公共协议写入状态。"""
 
     table: BlockDict
     current_columns: _TableColumnMapping
+
+
+def _iter_cell_boundary_text(cell: Tag, *, from_end: bool) -> Iterator[NavigableString | None]:
+    """沿指定方向读取连续行内文字，以空值阻断结构节点和公式、代码等载荷。"""
+    if (
+        cell.get("data-block-type") in {"equation", "code", "code_body", "algorithm", "algorithm_body"}
+        or cell.has_attr("data-docvortex-latex")
+        or cell.has_attr("data-formula-display")
+        or "docvortex-math" in (cell.get("class") or [])
+    ):
+        yield None
+        return
+    children = reversed(cell.contents) if from_end else iter(cell.contents)
+    for child in children:
+        # 只接收普通文字，注释等 NavigableString 子类不参与可见边界判断。
+        if type(child) is NavigableString:
+            if child:
+                yield child
+        elif isinstance(child, Tag):
+            if child.name in _CELL_TEXT_INLINE_TAGS:
+                yield from _iter_cell_boundary_text(child, from_end=from_end)
+            else:
+                yield None
+
+
+def _cell_boundary_text(cell: Tag, *, from_end: bool) -> tuple[str, NavigableString | None]:
+    """返回边界连续文字及最靠近接缝的文本叶子，不跨越显式结构分隔。"""
+    nodes: list[NavigableString] = []
+    for node in _iter_cell_boundary_text(cell, from_end=from_end):
+        if node is None:
+            break
+        nodes.append(node)
+    if not nodes:
+        return "", None
+    boundary_node = nodes[0]
+    if from_end:
+        nodes.reverse()
+    return "".join(nodes), boundary_node
+
+
+def _append_cell_content(target: Tag, source: Tag) -> None:
+    """按共享正文规则修复缺失的文字分隔，再原样转移单元格的 HTML 子节点。"""
+    previous, last_node = _cell_boundary_text(target, from_end=True)
+    current, _ = _cell_boundary_text(source, from_end=False)
+    if previous and current and not previous[-1].isspace() and not current[0].isspace():
+        processed, separator = resolve_text_line_boundary(previous, next_content=current)
+        # 只能删除规则确认的一个末尾断词符，不能把可见投影回填而丢失样式和属性。
+        if last_node is not None and processed == previous[:-1] and is_hyphen_at_line_end(previous):
+            last_node.replace_with(NavigableString(str(last_node)[:-1]))
+        if separator:
+            target.append(NavigableString(separator))
+    for child in list(source.children):
+        target.append(child.extract())
 
 
 def _cell_has_semantic_content(cell: Tag) -> bool:
@@ -197,8 +279,7 @@ def _apply_cell_merge(
             continue
         if id(source.cell) in transferred_sources or id(target.cell) in transferred_targets:
             continue
-        for child in list(source.cell.children):
-            target.cell.append(child.extract())
+        _append_cell_content(target.cell, source.cell)
         transferred_sources.add(id(source.cell))
         transferred_targets.add(id(target.cell))
 

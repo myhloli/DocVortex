@@ -52,7 +52,7 @@ def test_merge_table_content_applies_partial_cell_merge_from_table() -> None:
     merged = merge_table_content(previous_table, current_table)
 
     assert merged is not None
-    assert _row_texts(merged) == [["AB", "X"], ["", "Y"]]
+    assert _row_texts(merged) == [["A B", "X"], ["", "Y"]]
     assert previous_table == previous_original
     assert current_table == current_original
 
@@ -72,7 +72,7 @@ def test_merge_table_content_applies_full_cell_merge_and_removes_consumed_row() 
     merged = merge_table_content(previous_table, current_table)
 
     assert merged is not None
-    assert _row_texts(merged) == [["AB", "XY"], ["C", "Z"]]
+    assert _row_texts(merged) == [["A B", "X Y"], ["C", "Z"]]
 
 
 def test_merge_table_content_supports_fully_consumed_only_current_row() -> None:
@@ -90,4 +90,4 @@ def test_merge_table_content_supports_fully_consumed_only_current_row() -> None:
     merged = merge_table_content(previous_table, current_table)
 
     assert merged is not None
-    assert _row_texts(merged) == [["AB", "XY"]]
+    assert _row_texts(merged) == [["A B", "X Y"]]
