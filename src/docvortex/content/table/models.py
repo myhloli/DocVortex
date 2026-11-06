@@ -40,12 +40,17 @@ class RowSignature:
 
 @dataclass
 class RenderedCellSegment:
-    """记录渲染单元格的视觉列区间，并标识文本之外的语义内容。"""
+    """记录渲染单元格的列区间、语义内容及原始跨行范围。
+
+    行范围相对传入的 rows 从零计数，end_row 不包含结束行；虚拟占位的行范围为 None。
+    """
 
     text: str
     start_col: int
     end_col: int
     has_non_text_content: bool = False
+    start_row: int | None = None
+    end_row: int | None = None
 
 
 @dataclass

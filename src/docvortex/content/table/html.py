@@ -342,30 +342,56 @@ def build_row_rendered_cell_segments(
     current_start_col: int | None = None
     current_text = ""
     current_has_non_text = False
+    current_start_row: int | None = None
+    current_end_row: int | None = None
 
     # 连续视觉列来自同一个源单元格时，合并为一个渲染段。
     for col_idx in range(total_cols):
         marker = target_occupied.get(col_idx)
         if marker is None:
             if current_marker is not None and current_start_col is not None:
-                segments.append(RenderedCellSegment(current_text, current_start_col, col_idx, current_has_non_text))
+                segments.append(
+                    RenderedCellSegment(
+                        current_text,
+                        current_start_col,
+                        col_idx,
+                        current_has_non_text,
+                        start_row=current_start_row,
+                        end_row=current_end_row,
+                    )
+                )
             current_marker = None
             current_start_col = None
             current_text = ""
             current_has_non_text = False
+            current_start_row = None
+            current_end_row = None
             continue
 
         if marker != current_marker:
             if current_marker is not None and current_start_col is not None:
-                segments.append(RenderedCellSegment(current_text, current_start_col, col_idx, current_has_non_text))
+                segments.append(
+                    RenderedCellSegment(
+                        current_text,
+                        current_start_col,
+                        col_idx,
+                        current_has_non_text,
+                        start_row=current_start_row,
+                        end_row=current_end_row,
+                    )
+                )
             current_marker = marker
             current_start_col = col_idx
             source_row_idx, source_cell_idx = marker
             current_text = ""
             current_has_non_text = False
+            current_start_row = None
+            current_end_row = None
             if source_row_idx >= 0:
                 source_cells = rows[source_row_idx].find_all(["td", "th"])
                 if source_cell_idx < len(source_cells):
+                    current_start_row = source_row_idx
+                    current_end_row = source_row_idx + _rowspan(source_cells[source_cell_idx])
                     current_text = _display_cell_text(source_cells[source_cell_idx])
                     current_has_non_text = (
                         source_cells[source_cell_idx].find(
@@ -375,7 +401,16 @@ def build_row_rendered_cell_segments(
                     )
 
     if current_marker is not None and current_start_col is not None:
-        segments.append(RenderedCellSegment(current_text, current_start_col, total_cols, current_has_non_text))
+        segments.append(
+            RenderedCellSegment(
+                current_text,
+                current_start_col,
+                total_cols,
+                current_has_non_text,
+                start_row=current_start_row,
+                end_row=current_end_row,
+            )
+        )
 
     return segments
 
