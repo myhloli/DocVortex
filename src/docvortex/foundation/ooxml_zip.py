@@ -22,6 +22,10 @@ _OOXML_MARKERS = frozenset(
 )
 
 
+class _NotZipFile(BadZipFile):
+    """输入没有 ZIP 结束记录，允许文件类型识别继续尝试其他格式。"""
+
+
 def _read_at(stream: BinaryIO, offset: int, size: int) -> bytes:
     """从明确位置读取小块结构，截断或负偏移按损坏 ZIP 处理。"""
     if offset < 0:
@@ -79,7 +83,7 @@ def _directory_bounds(stream: BinaryIO) -> tuple[int, int, int]:
     tail = _read_at(stream, length - tail_size, tail_size)
     index = tail.rfind(b"PK\x05\x06")
     if index < 0 or index + 22 > len(tail):
-        raise BadZipFile("File is not a zip file")
+        raise _NotZipFile("File is not a zip file")
     _, disk, directory_disk, disk_count, count, size, offset, comment_size = struct.unpack_from("<4s4H2IH", tail, index)
     if index + 22 + comment_size > len(tail):
         raise BadZipFile("Truncated ZIP comment")
@@ -153,7 +157,13 @@ class OoxmlZipFile(ZipFile):
             stream = open(file, "rb")
             self._owned_stream = stream
         try:
-            _check_directory_before_open(stream)
+            try:
+                _check_directory_before_open(stream)
+            except _NotZipFile:
+                raise
+            except BadZipFile as exc:
+                # 已找到 ZIP 结构却未通过预检时，禁止其他判型器重新无约束地打开原包。
+                raise DocumentError("open_failed", f"Invalid ZIP directory: {exc}") from exc
             super().__init__(stream, mode="r")
             self.is_ooxml = any(name in self.NameToInfo for name in _OOXML_MARKERS)
             if not ooxml_only or self.is_ooxml:

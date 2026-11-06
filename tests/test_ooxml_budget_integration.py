@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
+import struct
 from unittest.mock import Mock
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -77,6 +78,21 @@ def test_ooxml_budget_precedes_other_zip_detectors(by_path: bool, tmp_path: Path
     monkeypatch.setattr(detection, "_guess_ofd_suffix_by_path" if by_path else "_guess_ofd_suffix_by_bytes", detector)
     with pytest.raises(ResourceLimitError):
         (detection.guess_suffix_by_path if by_path else detection.guess_suffix_by_bytes)(path if by_path else payload)
+    detector.assert_not_called()
+
+
+@pytest.mark.parametrize("by_path", [False, True])
+def test_invalid_zip_directory_cannot_skip_guard(by_path: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """目录预检拒绝的包不能交给另一判型器按不同规则重新打开。"""
+    payload = bytearray(_office_payload("docx"))
+    ending = payload.rfind(b"PK\x05\x06")
+    struct.pack_into("<H", payload, ending + 4, 1)
+    path = tmp_path / "invalid.docx"
+    path.write_bytes(payload)
+    detector = Mock(side_effect=AssertionError("损坏目录不得绕过已执行的检查"))
+    monkeypatch.setattr(detection, "_guess_ofd_suffix_by_path" if by_path else "_guess_ofd_suffix_by_bytes", detector)
+    with pytest.raises(DocumentError, match="Invalid ZIP directory"):
+        (detection.guess_suffix_by_path if by_path else detection.guess_suffix_by_bytes)(path if by_path else bytes(payload))
     detector.assert_not_called()
 
 
