@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .context import claim_owned_document
+from .sources import SourceNode
 
 from ....content.table.content import _merge_table_content_with_columns
 from ....content.table.grid import _TableColumnMapping
@@ -32,11 +33,14 @@ class PlannedBlock:
     block: PageBlock
     text_contents: list[list[InlineSpan]] = field(default_factory=list)
     removed: bool = False
+    sources: SourceNode | None = None
 
 
 def build_render_plan(
     middle_json: MiddleJson,
     mode: RenderMode = RenderMode.DEFAULT,
+    *,
+    include_source_map: bool = False,
 ) -> list[list[PlannedBlock]]:
     """深拷贝 MiddleJson，并按模式生成不污染输入的逐页逻辑块计划。"""
     owned = claim_owned_document(middle_json)
@@ -46,6 +50,7 @@ def build_render_plan(
             PlannedBlock(
                 page_idx=page.page_idx,
                 block=block,
+                sources=SourceNode.capture(block, page.page_idx, block.index) if include_source_map else None,
                 text_contents=[block.content] if isinstance(block, ContinuableTextBlockBase) else [],
             )
             for block in page.blocks
@@ -85,8 +90,12 @@ def _merge_continued_text_blocks(blocks: list[PlannedBlock], mode: RenderMode, *
                     copied_lists.add(id(previous))
                 tail = previous.block.content[-1]
                 tail.content = join_inline_spans([tail.content, *current.text_contents])
+                if previous.sources is not None and current.sources is not None:
+                    previous.sources.children[-1].refs.extend(current.sources.refs)
             else:
                 previous.text_contents.extend(current.text_contents)
+            if previous.sources is not None and current.sources is not None:
+                previous.sources.refs.extend(current.sources.refs)
             current.removed = True
         if is_text and not current.removed:
             previous_text = current
@@ -129,6 +138,9 @@ def _merge_continued_list_blocks(blocks: list[PlannedBlock], mode: RenderMode, *
                 previous.block = previous.block.model_copy(deep=True)
                 copied.add(id(previous))
             previous.block.content.extend(current.block.content)
+            if previous.sources is not None and current.sources is not None:
+                previous.sources.refs.extend(current.sources.refs)
+                previous.sources.children.extend(current.sources.children)
             current.removed = True
         if not current.removed:
             previous_list = previous_reference_list = current
@@ -149,15 +161,36 @@ def _merge_continued_table_blocks(blocks: list[PlannedBlock]) -> None:
             )
             if merged is not None:
                 try:
-                    previous.block = TableBlock.model_validate(merged.table)
+                    merged_block = TableBlock.model_validate(merged.table)
                 except (TypeError, ValueError):
                     pass
                 else:
+                    _merge_table_sources(previous, current)
+                    previous.block = merged_block
                     current.removed = True
                     previous_source_columns = merged.current_columns
         if not current.removed:
             previous = current
             previous_source_columns = None
+
+
+def _merge_table_sources(previous: PlannedBlock, current: PlannedBlock) -> None:
+    """按成功续表的正文拼接和末页脚注替换同步来源，保留原始子路径。"""
+    if previous.sources is None or current.sources is None:
+        return
+    previous.sources.refs.extend(current.sources.refs)
+    kept = [
+        (child, node)
+        for child, node in zip(previous.block.content, previous.sources.children, strict=True)
+        if child.type != BlockType.TABLE_FOOTNOTE
+    ]
+    current_children = list(zip(current.block.content, current.sources.children, strict=True))
+    previous_body = next(node for child, node in kept if child.type == BlockType.TABLE_BODY)
+    current_body = next(node for child, node in current_children if child.type == BlockType.TABLE_BODY)
+    previous_body.refs.extend(current_body.refs)
+    previous.sources.children = [node for _, node in kept] + [
+        node for child, node in current_children if child.type == BlockType.TABLE_FOOTNOTE
+    ]
 
 
 __all__ = ["PlannedBlock", "build_render_plan"]

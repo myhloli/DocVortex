@@ -81,11 +81,14 @@ class HtmlRenderOptions:
     asset_base_url: str = ""
     standalone: bool = True
     document_title: str | None = None
+    include_source_map: bool = False
 
     def __post_init__(self) -> None:
         """在构造时校验 HTML 文档形态与标题选项。"""
         _validate_mode(self.mode)
         _validate_asset_base_url(self.asset_base_url)
+        if not isinstance(self.include_source_map, bool):
+            raise TypeError("include_source_map must be a bool")
         if not isinstance(self.standalone, bool):
             raise TypeError("standalone must be a bool")
         if self.document_title is not None and not isinstance(self.document_title, str):

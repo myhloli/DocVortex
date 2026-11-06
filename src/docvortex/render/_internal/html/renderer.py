@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import re
 from functools import lru_cache
 from importlib import resources
@@ -27,6 +28,7 @@ from ....codecs.html.contracts import (
 )
 from ..common.list_items import ListItem, parse_list_item_marker, reference_list_needs_bullets
 from ..common.planner import PlannedBlock, build_render_plan
+from ..common.sources import SourceRef
 from .inline import (
     HtmlInlineResult,
     render_inline_content_html,
@@ -115,8 +117,12 @@ class _HtmlRenderer:
         asset_base_url: str,
         standalone: bool,
         document_title: str | None,
+        include_source_map: bool,
     ) -> None:
         """保存严格输入和调用选项，并预收集真实正文标题 anchor。"""
+        self.include_source_map = include_source_map
+        self.source_by_block: dict[int, list[SourceRef]] = {}
+        self.emitted_trace_ids: set[str] = set()
         self.middle_json = middle_json
         self.mode = mode
         self.asset_base_url = asset_base_url
@@ -130,7 +136,11 @@ class _HtmlRenderer:
 
     def render(self) -> str:
         """生成 fragment article，并按需包装完整 HTML 文档。"""
-        planned_pages = build_render_plan(self.middle_json, self.mode)
+        planned_pages = build_render_plan(self.middle_json, self.mode, include_source_map=self.include_source_map)
+        for page in planned_pages:
+            for planned in page:
+                if planned.sources is not None and not planned.removed:
+                    planned.sources.bind(planned.block, self.source_by_block)
         if self.mode is RenderMode.FULL:
             body = self._render_full_pages(planned_pages)
         else:
@@ -189,7 +199,7 @@ class _HtmlRenderer:
             f'class="{WIRE_BLOCK_CLASS}"',
             f'data-page-idx="{planned.page_idx}"',
         ]
-        attrs.extend(_wire_block_attributes(block))
+        attrs.extend(self._block_attributes(block))
         return f"<div {' '.join(attrs)}>\n{content}\n</div>"
 
     def _render_block_content(self, planned: PlannedBlock) -> str:
@@ -320,13 +330,13 @@ class _HtmlRenderer:
                 items.append(
                     {
                         "content": "",
-                        "attrs": ['class="docvortex-list-item--markerless"', *_wire_block_attributes(child)],
+                        "attrs": ['class="docvortex-list-item--markerless"', *self._block_attributes(child)],
                         "nested": [],
                     }
                 )
                 continue
 
-            attrs = _wire_block_attributes(child)
+            attrs = self._block_attributes(child)
             if class_name == "docvortex-list--explicit":
                 attrs.append('class="docvortex-list-item--explicit"')
             if container_tag == "ol" and parsed.kind == "ordered" and parsed.value is not None:
@@ -364,7 +374,7 @@ class _HtmlRenderer:
         if not rendered_items:
             return ""
 
-        container_attrs = [f'class="docvortex-list {class_name}"', *_wire_block_attributes(block)]
+        container_attrs = [f'class="docvortex-list {class_name}"', *self._block_attributes(block)]
         if list_type:
             container_attrs.append(f'type="{list_type}"')
         if container_tag == "ol" and parsed_leaves and parsed_leaves[0].value not in (None, 1):
@@ -388,7 +398,7 @@ class _HtmlRenderer:
             rendered, attrs = self._render_index_leaf(child)
             items.append({"content": rendered, "attrs": attrs, "nested": []})
         inner = _serialize_index_items(items)
-        attrs = [f'class="{WIRE_INDEX_CLASS}"', 'aria-label="Table of contents"', *_wire_block_attributes(block)]
+        attrs = [f'class="{WIRE_INDEX_CLASS}"', 'aria-label="Table of contents"', *self._block_attributes(block)]
         return f"<nav {' '.join(attrs)}><ul>{inner}</ul></nav>" if inner else ""
 
     def _render_index_list(self, block: IndexBlock) -> str:
@@ -407,7 +417,7 @@ class _HtmlRenderer:
             rendered, attrs = self._render_index_leaf(child)
             items.append({"content": rendered, "attrs": attrs, "nested": []})
         inner = _serialize_index_items(items)
-        attrs = _wire_block_attributes(block)
+        attrs = self._block_attributes(block)
         return f"<ul {' '.join(attrs)}>{inner}</ul>" if inner else ""
 
     def _render_index_leaf(self, block: TextBlock | TitleBlockBase) -> tuple[str, list[str]]:
@@ -416,12 +426,12 @@ class _HtmlRenderer:
         rendered = render_inline_content_html(content, anchor_targets=self.anchor_targets)
         self._observe_inline(rendered)
         if not rendered.html:
-            return "", _wire_block_attributes(block)
+            return "", self._block_attributes(block)
         anchor = _anchor_key(block.anchor)
         if anchor and (anchor_id := self.anchor_targets.get(anchor)):
             href = quote(anchor_id, safe="-._~")
-            return f'<a href="#{href}">{rendered.html}</a>', _wire_block_attributes(block)
-        return rendered.html, _wire_block_attributes(block)
+            return f'<a href="#{href}">{rendered.html}</a>', self._block_attributes(block)
+        return rendered.html, self._block_attributes(block)
 
     def _render_image_block(self, block: ImageBlock) -> str:
         """按原始子块顺序渲染图片主体及重复说明。"""
@@ -443,7 +453,7 @@ class _HtmlRenderer:
             mermaid_source = _extract_mermaid_flowchart_source(block.content)
             if mermaid_source is not None:
                 rendered = self._render_flowchart_body(block, mermaid_source)
-                return _wrap_visual_body(rendered, block, "image")
+                return self._wrap_visual_body(rendered, block, "image")
         source = self._safe_block_image_source(block)
         content = self._render_embedded_content(block.content, linkify_text=parent.sub_type != "flowchart")
         alt = _plain_content_text(block.content) or parent.sub_type or "image"
@@ -453,7 +463,7 @@ class _HtmlRenderer:
                 parts.append(self._render_details(content.html, parent.sub_type or "image content"))
             else:
                 parts.append(content.html)
-        return _wrap_visual_body("".join(parts), block, "image")
+        return self._wrap_visual_body("".join(parts), block, "image")
 
     def _render_flowchart_body(self, block: ImageBodyBlock, mermaid_source: str) -> str:
         """原图作为主视图，折叠区展示 Mermaid 图；无原图时保留失败源码回退。"""
@@ -496,17 +506,17 @@ class _HtmlRenderer:
             if source_soup.find("table") is not None:
                 rendered = self._render_embedded_content(content)
                 if rendered.html and _contains_usable_table(rendered.html):
-                    return _wrap_visual_body(rendered.html, block, "table")
+                    return self._wrap_visual_body(rendered.html, block, "table")
                 source = self._safe_block_image_source(block)
                 if source:
                     rendered_image = self._render_image(source, alt="table", class_name="docvortex-table-image")
-                    return _wrap_visual_body(rendered_image, block, "table")
-                return _wrap_visual_body(_render_raw_fallback(content), block, "table")
+                    return self._wrap_visual_body(rendered_image, block, "table")
+                return self._wrap_visual_body(_render_raw_fallback(content), block, "table")
             rendered_text = f'<pre class="docvortex-table-text">{html.escape(normalized_content, quote=False)}</pre>'
-            return _wrap_visual_body(rendered_text, block, "table")
+            return self._wrap_visual_body(rendered_text, block, "table")
         source = self._safe_block_image_source(block)
         rendered_image = self._render_image(source, alt="table", class_name="docvortex-table-image") if source else ""
-        return _wrap_visual_body(rendered_image, block, "table")
+        return self._wrap_visual_body(rendered_image, block, "table")
 
     def _render_chart_block(self, block: ChartBlock) -> str:
         """按原始子块顺序渲染 chart 图片、结构内容及说明。"""
@@ -534,7 +544,7 @@ class _HtmlRenderer:
                 parts.append(self._render_details(content.html, parent.sub_type or "chart content"))
             else:
                 parts.append(content.html)
-        return _wrap_visual_body("".join(parts), block, "chart")
+        return self._wrap_visual_body("".join(parts), block, "chart")
 
     def _render_chart_content(self, content: str) -> HtmlInlineResult:
         """按 HTML、严格 GFM 表格、普通行内内容的顺序渲染 chart content。"""
@@ -574,13 +584,13 @@ class _HtmlRenderer:
                 raise TypeError("code subtype requires CodeBodyBlock")
             escaped = html.escape(_replace_html_controls(block.content), quote=False)
             if not block.content:
-                return _wrap_visual_body('<pre class="docvortex-code"><code></code></pre>', block, "code")
+                return self._wrap_visual_body('<pre class="docvortex-code"><code></code></pre>', block, "code")
             language = _normalize_prism_language(parent.guess_lang)
             class_attr = f' class="language-{language}"' if language else ""
             pre_class = f"docvortex-code language-{language}" if language else "docvortex-code"
             self.has_prism = bool(language) or self.has_prism
             rendered = f'<pre class="{pre_class}"><code{class_attr}>{escaped}</code></pre>'
-            return _wrap_visual_body(rendered, block, "code")
+            return self._wrap_visual_body(rendered, block, "code")
         if parent.sub_type == RAW_ALGORITHM:
             if not isinstance(block, AlgorithmBodyBlock):
                 raise TypeError("algorithm subtype requires AlgorithmBodyBlock")
@@ -593,7 +603,7 @@ class _HtmlRenderer:
             )
             self._observe_inline(rendered)
             algorithm = f'<div class="docvortex-algorithm">{rendered.html}</div>' if rendered.html else ""
-            return _wrap_visual_body(algorithm, block, "code")
+            return self._wrap_visual_body(algorithm, block, "code")
         raise ValueError(f"Unsupported code subtype: {parent.sub_type}")
 
     def _render_annotation(
@@ -608,7 +618,7 @@ class _HtmlRenderer:
         is_caption = str(block.type).endswith("caption")
         role_class = "docvortex-caption" if is_caption else "docvortex-footnote"
         type_class = html.escape(str(block.type).replace("_", "-"), quote=True)
-        attrs = [f'class="{role_class} {role_class}--{type_class}"', *_wire_block_attributes(block)]
+        attrs = [f'class="{role_class} {role_class}--{type_class}"', *self._block_attributes(block)]
         self._append_anchor_attribute(attrs, visible_block_anchor(block), block_type=str(block.type))
         return f"<p {' '.join(attrs)}>{rendered.html}</p>"
 
@@ -701,6 +711,22 @@ class _HtmlRenderer:
             "</html>"
         )
 
+    def _block_attributes(self, block: BlockBase) -> list[str]:
+        """为实际输出节点附加来源属性，每个目标只登记一次。"""
+        attrs = _wire_block_attributes(block)
+        refs = self.source_by_block.get(id(block), [])
+        if refs and refs[0].key not in self.emitted_trace_ids:
+            key = refs[0].key
+            self.emitted_trace_ids.add(key)
+            value = json.dumps([ref.as_dict() for ref in refs], ensure_ascii=True, separators=(",", ":"))
+            attrs.extend([f'data-docvortex-trace-id="{key}"', f'data-docvortex-sources="{html.escape(value, quote=True)}"'])
+        return attrs
+
+    def _wrap_visual_body(self, content: str, block: BlockBase, kind: str) -> str:
+        """给视觉主体挂载其独立物理来源和固定 wire 容器。"""
+        attrs = [f'class="{WIRE_VISUAL_BODY_CLASS} {WIRE_VISUAL_BODY_CLASS}--{kind}"', *self._block_attributes(block)]
+        return f"<div {' '.join(attrs)}>{content}</div>"
+
 
 def render_html(
     middle_json: MiddleJson,
@@ -709,6 +735,7 @@ def render_html(
     asset_base_url: str = "",
     standalone: bool = True,
     document_title: str | None = None,
+    include_source_map: bool = False,
 ) -> str:
     """把严格 MiddleJson 无副作用地渲染为 HTML 文档或单根 fragment。"""
     if not isinstance(middle_json, MiddleJson):
@@ -717,6 +744,8 @@ def render_html(
         raise TypeError("mode must be a RenderMode value")
     if not isinstance(asset_base_url, str):
         raise TypeError("asset_base_url must be a string")
+    if not isinstance(include_source_map, bool):
+        raise TypeError("include_source_map must be a bool")
     if not isinstance(standalone, bool):
         raise TypeError("standalone must be a bool")
     if document_title is not None and not isinstance(document_title, str):
@@ -727,6 +756,7 @@ def render_html(
         asset_base_url=asset_base_url,
         standalone=standalone,
         document_title=document_title,
+        include_source_map=include_source_map,
     ).render()
 
 
@@ -806,16 +836,6 @@ def _wire_block_attributes(block: BlockBase) -> list[str]:
     if type(level) is int:
         attrs.append(f'data-level="{level}"')
     return attrs
-
-
-def _wrap_visual_body(
-    content: str,
-    block: ImageBodyBlock | TableBodyBlock | ChartBodyBlock | CodeBodyBlock | AlgorithmBodyBlock,
-    kind: str,
-) -> str:
-    """为视觉主体添加不参与 CSS 类型推断的精确机器容器。"""
-    attrs = [f'class="{WIRE_VISUAL_BODY_CLASS} {WIRE_VISUAL_BODY_CLASS}--{kind}"', *_wire_block_attributes(block)]
-    return f"<div {' '.join(attrs)}>{content}</div>"
 
 
 def _collect_document_anchor_ids(middle_json: MiddleJson) -> dict[str, str]:
