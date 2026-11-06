@@ -18,4 +18,12 @@ class InvalidRequestError(DocumentError):
     """表示页范围或格式选项不符合文档输入契约。"""
 
 
-__all__ = ["DocumentError", "InvalidRequestError"]
+class ResourceLimitError(DocumentError):
+    """输入超过解析器的固定资源预算。"""
+
+    def __init__(self, message: str, param: str | None = None) -> None:
+        """统一预算错误码，供宿主保留每个文件的失败原因。"""
+        super().__init__("resource_limit", message, param)
+
+
+__all__ = ["DocumentError", "InvalidRequestError", "ResourceLimitError"]

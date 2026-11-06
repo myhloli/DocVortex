@@ -1,6 +1,8 @@
 from io import BytesIO
 import re
-from zipfile import BadZipFile, ZipFile, ZipInfo
+from zipfile import BadZipFile, ZipInfo
+
+from .....foundation.ooxml_zip import OoxmlZipFile
 import xml.etree.ElementTree as ET
 
 from ..opc import write_zip_package
@@ -36,7 +38,7 @@ MAX_EXCEL_COLUMN = "XFD"
 def normalize_xlsx_package(file_bytes: bytes) -> bytes:
     """在进入 openpyxl 前修复常见 XLSX 包级兼容问题。"""
     try:
-        with ZipFile(BytesIO(file_bytes)) as source:
+        with OoxmlZipFile(BytesIO(file_bytes)) as source:
             rewritten_members: list[tuple[ZipInfo, bytes]] = []
             changed = False
 
@@ -60,7 +62,7 @@ def strip_xlsx_ole_objects_for_openpyxl(file_bytes: bytes) -> bytes:
     """仅为 openpyxl 读取副本移除会被误判为列定义的 oleObjects。"""
 
     try:
-        with ZipFile(BytesIO(file_bytes)) as source:
+        with OoxmlZipFile(BytesIO(file_bytes)) as source:
             rewritten_members: list[tuple[ZipInfo, bytes]] = []
             changed = False
             for info in source.infolist():

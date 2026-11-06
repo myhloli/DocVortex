@@ -14,6 +14,7 @@ from .....schema import RAW_CAPTION
 from .equationxml import DocxEquationXmlDecoder
 from .package_normalizer import normalize_docx_package
 from .....schema import BlockType
+from .....foundation.ooxml_zip import validate_ooxml_package
 from .....content.spans import (
     append_text_span,
     extend_inline_spans,
@@ -151,6 +152,7 @@ class DocxConverter(_DocxConstants, _DocxResources, _DocxStyles, _DocxNumbering,
         self._reset_document_state()
         # 读取文件字节，以便 mammoth 和 python-docx 各自使用独立读取流
         file_bytes = self._sanitize_missing_internal_relationships(file_stream.read())
+        validate_ooxml_package(file_bytes)
         self._fallback_docx_bytes = file_bytes
         try:
             # 正文和表格对齐共享本次转换的文档，避免重复解压并构建同一棵 OOXML 树。

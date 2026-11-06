@@ -227,6 +227,7 @@ PUBLIC_API: dict[str, tuple[str, ...]] = {
     "docvortex.errors": (
         "DocumentError",
         "InvalidRequestError",
+        "ResourceLimitError",
     ),
     "docvortex.geometry": (
         "bbox_center",

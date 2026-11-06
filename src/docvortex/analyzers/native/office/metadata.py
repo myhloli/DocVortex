@@ -13,7 +13,7 @@ import lxml.etree as etree
 from ....document.properties import property_count, property_date, property_text, property_values
 from ....errors import DocumentError
 from ....schema import DocumentProperties
-from .limits import MAX_ENTRY_BYTES
+from ....foundation.ooxml_zip import MAX_ENTRY_BYTES, OoxmlZipFile
 
 _DC = "{http://purl.org/dc/elements/1.1/}"
 _DCT = "{http://purl.org/dc/terms/}"
@@ -49,10 +49,8 @@ def read_ooxml_properties(data: bytes | str | Path, suffix: str) -> tuple[Docume
     properties = DocumentProperties()
     warnings: list[str] = []
     package_source = BytesIO(data) if isinstance(data, bytes) else data
-    with ZipFile(package_source) as package:
+    with OoxmlZipFile(package_source) as package:
         infos = package.infolist()
-        if len(infos) > 100_000:
-            raise DocumentError("resource_limit", "OOXML metadata package has too many members")
         if len({info.filename for info in infos}) != len(infos):
             raise DocumentError("open_failed", "Duplicate OOXML package members")
         if _xml_part(package, "[Content_Types].xml") is None:

@@ -4,6 +4,8 @@ from io import BytesIO
 from typing import Iterator
 from zipfile import BadZipFile, ZipFile, ZipInfo
 
+from .....foundation.ooxml_zip import OoxmlZipFile
+
 from loguru import logger
 from lxml import etree
 
@@ -48,7 +50,7 @@ DOCX_REL_CONTENT_TYPES = {
 
 def normalize_docx_package(file_bytes: bytes) -> bytes:
     """在进入 python-docx 前修复 DOCX 包级容错问题。"""
-    with ZipFile(BytesIO(file_bytes)) as source:
+    with OoxmlZipFile(BytesIO(file_bytes)) as source:
         package_members = {info.filename for info in source.infolist()}
         reachable_members, relationship_graph_complete = _collect_relationship_reachable_members(source, package_members)
         trusted_reachable_members = reachable_members if relationship_graph_complete else None

@@ -16,6 +16,9 @@ from openpyxl.utils.datetime import MAC_EPOCH, WINDOWS_EPOCH, from_excel
 from openpyxl.workbook.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
+from ....errors import ResourceLimitError
+from ....foundation.ooxml_zip import validate_ooxml_package
+
 _CHART_NS: Final = "http://schemas.openxmlformats.org/drawingml/2006/chart"
 _DRAWING_NS: Final = "http://schemas.openxmlformats.org/drawingml/2006/main"
 _NS: Final = {"c": _CHART_NS, "a": _DRAWING_NS}
@@ -78,11 +81,14 @@ def html_table_from_excel_bytes(excel_bytes: bytes) -> str:
         return ""
 
     try:
+        validate_ooxml_package(excel_bytes)
         workbook = load_workbook(
             filename=BytesIO(excel_bytes),
             data_only=True,
             read_only=True,
         )
+    except ResourceLimitError:
+        raise
     except Exception:
         return ""
 
@@ -289,11 +295,14 @@ def parse_chart_spec_from_ooxml(chart_xml: bytes) -> ChartSpec | None:
 def render_chart_html_from_workbook(spec: ChartSpec, workbook_bytes: bytes) -> str:
     """根据图表公式从嵌入工作簿读取数据并渲染 HTML 表格。"""
     try:
+        validate_ooxml_package(workbook_bytes)
         workbook = load_workbook(
             filename=BytesIO(workbook_bytes),
             data_only=True,
             read_only=True,
         )
+    except ResourceLimitError:
+        raise
     except Exception:
         return ""
 

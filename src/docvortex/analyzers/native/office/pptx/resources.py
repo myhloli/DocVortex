@@ -6,6 +6,7 @@ from ..rich_text import OfficeRichTextSegment, build_rich_text_html_from_segment
 from loguru import logger
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from ..ooxml_chart import extract_chart_html_from_ooxml
+from .....errors import ResourceLimitError
 from ..image import serialize_office_image
 from ..equation.ooxml import is_mathtype_equation_prog_id
 from .....schema import BlockType
@@ -217,6 +218,8 @@ class _PptxResources:
 
         try:
             chart_html = extract_chart_html_from_ooxml(chart_xml, workbook_bytes)
+        except ResourceLimitError:
+            raise
         except Exception as e:
             logger.warning(f"Warning: chart HTML cannot be extracted: {e}")
             return

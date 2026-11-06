@@ -3,7 +3,6 @@ import hashlib
 import posixpath
 import re
 import xml.etree.ElementTree as ET
-import zipfile
 from io import BytesIO
 from typing import Any, BinaryIO, cast
 
@@ -25,6 +24,7 @@ from ..spreadsheet.html import EQUATION_BOOKENDS, render_spreadsheet_table
 from ..spreadsheet.models import AnchoredBlock, FormulaMap, SheetImage
 from ..spreadsheet.projector import SpreadsheetProjector
 from .package_normalizer import normalize_xlsx_package, strip_xlsx_ole_objects_for_openpyxl
+from .resource_budget import validate_xlsx_merge_budget
 from .ooxml_ole import (
     XlsxOleEquationArtifact,
     package_has_sheet_ole_objects,
@@ -33,6 +33,8 @@ from .ooxml_ole import (
     workbook_sheet_parts,
 )
 from .....schema import BlockType
+from .....errors import DocumentError
+from .....foundation.ooxml_zip import OoxmlZipFile
 
 
 class XlsxConverter(SpreadsheetProjector):
@@ -67,6 +69,8 @@ class XlsxConverter(SpreadsheetProjector):
             try:
                 self._convert_package_stream(file_stream)
                 return
+            except (DocumentError, LegacyOfficeResourceLimitError, MemoryError):
+                raise
             except Exception as exc:
                 file_bytes = read_stream_bytes_from_start(file_stream)
                 self._retry_convert_package_bytes_after_normalization(file_bytes, exc)
@@ -75,6 +79,8 @@ class XlsxConverter(SpreadsheetProjector):
         file_bytes = file_stream.read()
         try:
             self._convert_package_bytes(file_bytes)
+        except (DocumentError, LegacyOfficeResourceLimitError, MemoryError):
+            raise
         except Exception as exc:
             self._retry_convert_package_bytes_after_normalization(file_bytes, exc)
 
@@ -121,13 +127,14 @@ class XlsxConverter(SpreadsheetProjector):
         self._reset_state()
         self._projection_cache_enabled = True
         try:
-            self.zf = zipfile.ZipFile(file_stream)
-            self._sheet_part_by_title = workbook_sheet_parts(self.zf)
-        except Exception as e:
-            logger.warning(f"Failed to open zip file: {e}")
-            self.zf = None
-
-        try:
+            self.zf = OoxmlZipFile(file_stream)
+            validate_xlsx_merge_budget(self.zf)
+            try:
+                self._sheet_part_by_title = workbook_sheet_parts(self.zf)
+            except (DocumentError, LegacyOfficeResourceLimitError, MemoryError):
+                raise
+            except Exception as exc:
+                logger.warning(f"Failed to map XLSX worksheet resources: {exc}")
             workbook_stream: BinaryIO = file_stream
             if self.zf is not None and package_has_sheet_ole_objects(
                 self.zf,
@@ -135,6 +142,9 @@ class XlsxConverter(SpreadsheetProjector):
             ):
                 file_bytes = read_stream_bytes_from_start(file_stream)
                 workbook_stream = BytesIO(strip_xlsx_ole_objects_for_openpyxl(file_bytes))
+                with OoxmlZipFile(workbook_stream) as normalized_archive:
+                    validate_xlsx_merge_budget(normalized_archive)
+                rewind_stream(workbook_stream)
             else:
                 rewind_stream(file_stream)
             self.workbook = load_workbook(

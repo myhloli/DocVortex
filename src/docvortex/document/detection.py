@@ -11,6 +11,9 @@ from zipfile import BadZipFile, ZipFile
 from loguru import logger
 from typing import TYPE_CHECKING
 
+from ..errors import DocumentError
+from ..foundation.ooxml_zip import OoxmlZipFile
+
 if TYPE_CHECKING:
     from ..foundation.magika import Magika
 
@@ -152,6 +155,8 @@ def _guess_ooxml_suffix_from_zip(package: ZipFile) -> str | None:
     非标准包的 Content_Types Override 可能缺失或指向不存在的 part，关系类型也可能
     是 ISO Strict 变体；Override 判定失败时按主文档 part 根元素兜底，再退到惯例路径。
     """
+    if isinstance(package, OoxmlZipFile) and not package.is_ooxml:
+        return None
     try:
         rels_root = ElementTree.fromstring(package.read(OOXML_ROOT_RELS))
     except (KeyError, ElementTree.ParseError):
@@ -185,8 +190,10 @@ def _guess_ooxml_suffix_from_zip(package: ZipFile) -> str | None:
 def _guess_ooxml_suffix_by_bytes(file_bytes: bytes) -> str | None:
     """优先用 OOXML 包结构识别 docx/pptx/xlsx，避免 Magika 被内嵌对象误导。"""
     try:
-        with ZipFile(BytesIO(file_bytes)) as package:
+        with OoxmlZipFile(BytesIO(file_bytes), ooxml_only=True) as package:
             return _guess_ooxml_suffix_from_zip(package)
+    except DocumentError:
+        raise
     except (
         BadZipFile,
         KeyError,
@@ -201,8 +208,10 @@ def _guess_ooxml_suffix_by_bytes(file_bytes: bytes) -> str | None:
 def _guess_ooxml_suffix_by_path(file_path: Path) -> str | None:
     """从文件路径读取 OOXML 包结构；失败时交给 Magika 原有逻辑兜底。"""
     try:
-        with ZipFile(file_path) as package:
+        with OoxmlZipFile(file_path, ooxml_only=True) as package:
             return _guess_ooxml_suffix_from_zip(package)
+    except DocumentError:
+        raise
     except (
         BadZipFile,
         KeyError,
@@ -371,7 +380,7 @@ def _has_office_container(source: bytes | Path, extension: str) -> bool:
     """验证扩展名对应的 ZIP/OPC 或 OLE2 容器，拒绝普通未知二进制的 Office 回退。"""
     if extension in OOXML_PACKAGE_SUFFIXES:
         try:
-            with ZipFile(BytesIO(source) if isinstance(source, bytes) else source) as package:
+            with OoxmlZipFile(BytesIO(source) if isinstance(source, bytes) else source) as package:
                 content_types = ElementTree.fromstring(package.read(OOXML_CONTENT_TYPES))
                 relationships = ElementTree.fromstring(package.read(OOXML_ROOT_RELS))
                 return content_types.tag in {
@@ -381,6 +390,8 @@ def _has_office_container(source: bytes | Path, extension: str) -> bool:
                     f"{{{OOXML_PACKAGE_REL_NS}}}Relationships",
                     "Relationships",
                 }
+        except DocumentError:
+            raise
         except (BadZipFile, KeyError, ElementTree.ParseError, RuntimeError, OSError, ValueError):
             return False
     try:
@@ -415,6 +426,8 @@ def guess_suffix_by_bytes(file_bytes: bytes, file_path: str | None = None) -> st
     if has_mhtml_header(file_bytes):
         return "mhtml"
 
+    # 先约束 OOXML 的目录和真实解压量，避免其他 ZIP 判型器提前读入恶意成员。
+    ooxml_suffix = _guess_ooxml_suffix_by_bytes(file_bytes)
     ofd_suffix = _guess_ofd_suffix_by_bytes(file_bytes)
     if ofd_suffix:
         return ofd_suffix
@@ -423,7 +436,6 @@ def guess_suffix_by_bytes(file_bytes: bytes, file_path: str | None = None) -> st
     if epub_suffix:
         return epub_suffix
 
-    ooxml_suffix = _guess_ooxml_suffix_by_bytes(file_bytes)
     if ooxml_suffix:
         return ooxml_suffix
 
@@ -458,6 +470,8 @@ def guess_suffix_by_path(file_path: str | Path) -> str:
     if rtf_header_offset(header) is not None:
         return "rtf"
 
+    # 保留强内容身份的返回顺序，同时先完成潜在 OOXML 的资源检查。
+    ooxml_suffix = _guess_ooxml_suffix_by_path(file_path)
     ofd_suffix = _guess_ofd_suffix_by_path(file_path)
     if ofd_suffix:
         return ofd_suffix
@@ -466,7 +480,6 @@ def guess_suffix_by_path(file_path: str | Path) -> str:
     if epub_suffix:
         return epub_suffix
 
-    ooxml_suffix = _guess_ooxml_suffix_by_path(file_path)
     if ooxml_suffix:
         return ooxml_suffix
 

@@ -65,6 +65,8 @@ def analyze(
                 properties = extracted.metadata.document
                 metadata_diagnostics = extracted.diagnostics
             except DocumentError as exc:
+                if exc.code == "resource_limit":
+                    raise
                 # 正文读取器仍负责输入有效性；可选属性提取失败不能阻断正文解析。
                 metadata_diagnostics = (Diagnostic(exc.code, str(exc)),)
         if prepared.file_suffix == "pdf":
