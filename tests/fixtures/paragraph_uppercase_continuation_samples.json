@@ -2502,6 +2502,903 @@
           9
         ]
       }
+    },
+    "demo1_basic_page7": {
+      "source": "demo/pdfs/demo1.pdf",
+      "source_sha256": "f3b3be345bf2df8979f2491ca9466e078e4fd1d6a216611faa8566e4c44d474b",
+      "captured_request": "MinerU Basic 默认 auto 解析原第 7 页，实际模式为 txt；保留真实行框与公式末尾句号",
+      "omitted_non_paragraph_fields": [
+        "visual_block.image_base64",
+        "extensions.docvortex_layout"
+      ],
+      "model": {
+        "metadata": {
+          "file_suffix": "pdf",
+          "producer": {
+            "name": "mineru",
+            "version": "4.1.7"
+          },
+          "document": {
+            "title": "doi:10.1016/j.jhydrol.2005.01.006",
+            "authors": [],
+            "subject": null,
+            "keywords": [],
+            "description": null,
+            "languages": [],
+            "identifiers": [],
+            "publisher": null,
+            "created_at": "2005-06-15T17:23:11",
+            "modified_at": "2005-06-15T17:23:17+05:30",
+            "creator_application": "Elsevier",
+            "producer_application": "Acrobat Distiller 4.05 for Windows",
+            "page_count": 13,
+            "page_count_kind": "physical"
+          }
+        },
+        "extensions": {
+          "mineru": {
+            "tier": "basic",
+            "parse_mode": "txt"
+          }
+        },
+        "schema_version": "2.0",
+        "schema": "docvortex.model",
+        "pages": [
+          [
+            {
+              "type": "header",
+              "bbox": [
+                0.306,
+                0.093,
+                0.684,
+                0.107
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "P.N.J. Lane et al. / Journal of Hydrology 310 (2005) 253–265"
+                }
+              ]
+            },
+            {
+              "type": "page_number",
+              "bbox": [
+                0.888,
+                0.094,
+                0.915,
+                0.105
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "259"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.071,
+                0.122,
+                0.478,
+                0.412
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.077,
+                    0.125,
+                    0.473,
+                    0.136
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.141,
+                    0.473,
+                    0.153
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.078,
+                    0.155,
+                    0.473,
+                    0.169
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.076,
+                    0.172,
+                    0.474,
+                    0.186
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.078,
+                    0.189,
+                    0.473,
+                    0.2
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.078,
+                    0.205,
+                    0.473,
+                    0.217
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.076,
+                    0.22,
+                    0.473,
+                    0.233
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.078,
+                    0.237,
+                    0.472,
+                    0.249
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.253,
+                    0.474,
+                    0.266
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.076,
+                    0.268,
+                    0.474,
+                    0.281
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.285,
+                    0.475,
+                    0.297
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.302,
+                    0.472,
+                    0.313
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.076,
+                    0.316,
+                    0.474,
+                    0.331
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.333,
+                    0.474,
+                    0.345
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.35,
+                    0.474,
+                    0.361
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.366,
+                    0.473,
+                    0.378
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.382,
+                    0.473,
+                    0.394
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.076,
+                    0.398,
+                    0.285,
+                    0.41
+                  ]
+                }
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "the coefficient of efficiency (E) for each flow percentile at all the catchments. The majority of fits (77%) returned "
+                },
+                {
+                  "type": "equation_inline",
+                  "content": "E   >   0 . 7 ."
+                },
+                {
+                  "type": "text",
+                  "content": " , with 60% 0.8 or better. The significance of the rainfall and time terms is given in Table 3 for all deciles, where solutions were found. There were not enough data to fit the model in five instances because of extended periods of zero flows. This problem is addressed to some extent in the zero flow analysis. If the rainfall signal is to be separated from the vegetation signal the rainfall terms must be significant. This term, b, was significant for 75% of the deciles at the 0.05 level, and a further 9% at the 0.10 level. The incidence of significance was greatest for the 10–50th percentiles at 45 of the 50 data sets at the 0.05 level. The time term, Y returned similar results, with 80% of the deciles significant at 0.05 level. There were an additional 9% of deciles significant at the 0.10 level."
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.072,
+                0.411,
+                0.478,
+                0.591
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.099,
+                    0.414,
+                    0.473,
+                    0.425
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.429,
+                    0.475,
+                    0.442
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.446,
+                    0.474,
+                    0.459
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.462,
+                    0.473,
+                    0.475
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.076,
+                    0.478,
+                    0.474,
+                    0.49
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.076,
+                    0.495,
+                    0.474,
+                    0.506
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.51,
+                    0.473,
+                    0.523
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.527,
+                    0.473,
+                    0.539
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.542,
+                    0.474,
+                    0.555
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.559,
+                    0.474,
+                    0.572
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.078,
+                    0.576,
+                    0.425,
+                    0.587
+                  ]
+                }
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "The poorest E values were those from Lambrechtsbos A and B. The high E for 50–100th deciles at Biesievlei, where b was not significant are notable. In general the model fits the higher flows (lower deciles) better, most of the poorer fits are in the 80–100 percentile range. This can be expected given the results of the significance tests for b. The results of the sensitivity analysis suggested that the E values for Glendhu 2 and for 10th and 20th percentiles from Cathedral Peak 3 may exaggerate the goodness of fit to the exact form of the model (Lane et al., 2003)."
+                }
+              ]
+            },
+            {
+              "type": "paragraph_title",
+              "bbox": [
+                0.073,
+                0.606,
+                0.46,
+                0.622
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.077,
+                    0.608,
+                    0.456,
+                    0.62
+                  ]
+                }
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "4.2. Adjusted FDCs—magnitude of flow reductions"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.071,
+                0.638,
+                0.479,
+                0.897
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.099,
+                    0.639,
+                    0.474,
+                    0.652
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.078,
+                    0.656,
+                    0.473,
+                    0.668
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.67,
+                    0.473,
+                    0.685
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.076,
+                    0.688,
+                    0.473,
+                    0.701
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.075,
+                    0.704,
+                    0.474,
+                    0.716
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.076,
+                    0.72,
+                    0.474,
+                    0.733
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.078,
+                    0.736,
+                    0.473,
+                    0.748
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.752,
+                    0.474,
+                    0.766
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.768,
+                    0.474,
+                    0.781
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.076,
+                    0.784,
+                    0.473,
+                    0.798
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.8,
+                    0.474,
+                    0.814
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.075,
+                    0.815,
+                    0.474,
+                    0.83
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.076,
+                    0.833,
+                    0.473,
+                    0.845
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.078,
+                    0.849,
+                    0.474,
+                    0.861
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.865,
+                    0.474,
+                    0.878
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.077,
+                    0.879,
+                    0.474,
+                    0.895
+                  ]
+                }
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Following the successful fitting of (2) to the observed percentiles, the FDCs were adjusted for climate by setting "
+                },
+                {
+                  "type": "equation_inline",
+                  "content": "\\Delta P"
+                },
+                {
+                  "type": "text",
+                  "content": " to zero, representing long term average annual rainfall. The climate adjusted FDCs produce an estimation of the change in flow percentiles over time for each catchment due to afforestation that may be viewed in two forms: new FDCs, adjusted for climate, as exemplified in Fig. 3 for Stewarts Creek 5, and a comparison between all catchments of the maximum change in yield (given by Y) for each flow percentile from baseline flows (given by "
+                },
+                {
+                  "type": "equation_inline",
+                  "content": "a   +   Y )"
+                },
+                {
+                  "type": "text",
+                  "content": " as shown in Fig. 4. Where the new equilibrium of maximum water use is reached, the adjusted FDCs for individual years should be identical if rainfall variability has been accounted for. The new equilibrium is approximately reached for "
+                },
+                {
+                  "type": "equation_inline",
+                  "content": "T   =   2 T _ { \\mathrm { h a l f } } ."
+                }
+              ]
+            },
+            {
+              "type": "chart",
+              "bbox": [
+                0.512,
+                0.125,
+                0.917,
+                0.357
+              ]
+            },
+            {
+              "type": "caption",
+              "bbox": [
+                0.512,
+                0.366,
+                0.917,
+                0.407
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.517,
+                    0.369,
+                    0.913,
+                    0.378
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.516,
+                    0.382,
+                    0.914,
+                    0.392
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.394,
+                    0.576,
+                    0.406
+                  ]
+                }
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Fig. 3. Examples of observed and flow duration curves adjusted for average rainfall following afforestation for Stewarts Creek 5, Australia."
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.512,
+                0.425,
+                0.917,
+                0.506
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.516,
+                    0.426,
+                    0.913,
+                    0.441
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.444,
+                    0.913,
+                    0.455
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.516,
+                    0.459,
+                    0.912,
+                    0.473
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.476,
+                    0.912,
+                    0.488
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.516,
+                    0.492,
+                    0.772,
+                    0.505
+                  ]
+                }
+              ],
+              "content": [
+                {
+                  "type": "equation_inline",
+                  "content": "T _ { \\mathrm { h a l f } }"
+                },
+                {
+                  "type": "text",
+                  "content": " values are given in Table 4. Fig. 3 shows that for most deciles the adjusted FDCs are identical for 12 and 20 years after treatment. This figure clearly demonstrates the necessity for FDC adjustment, particularly for the 20 years FDC."
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.511,
+                0.506,
+                0.919,
+                0.815
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.538,
+                    0.507,
+                    0.914,
+                    0.521
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.522,
+                    0.913,
+                    0.538
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.541,
+                    0.914,
+                    0.553
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.557,
+                    0.914,
+                    0.568
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.574,
+                    0.912,
+                    0.585
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.59,
+                    0.913,
+                    0.601
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.606,
+                    0.913,
+                    0.617
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.518,
+                    0.622,
+                    0.912,
+                    0.633
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.638,
+                    0.913,
+                    0.65
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.654,
+                    0.913,
+                    0.665
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.67,
+                    0.913,
+                    0.682
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.687,
+                    0.913,
+                    0.698
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.516,
+                    0.702,
+                    0.914,
+                    0.715
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.719,
+                    0.915,
+                    0.73
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.735,
+                    0.913,
+                    0.747
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.751,
+                    0.913,
+                    0.763
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.516,
+                    0.767,
+                    0.914,
+                    0.779
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.784,
+                    0.913,
+                    0.796
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.517,
+                    0.801,
+                    0.645,
+                    0.811
+                  ]
+                }
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "The relative net flow change due to afforestation is given by "
+                },
+                {
+                  "type": "equation_inline",
+                  "content": "Y / ( Y   +   a )"
+                },
+                {
+                  "type": "text",
+                  "content": " , which represents the change from the old equilibrium water use condition of pre-treatment vegetation to the new equilibrium condition at forest canopy closure. This quantity is plotted for all catchments in Fig. 4. Some deciles have been removed from the data set, the 10th and 50th percentile for Glendhu 2 and the 10th and 20th percentiles from Cathedral Peak 3. The optimised value of a was zero or near zero for these cases, which is not consistent with the conceptual model. The changes shown in Fig. 4 are variable. However, there are some commonalities between catchment responses. Two types of responses (groups) were identified. Group 1 catchments show a substantial increase in the number of zero flow days, with a greater proportional reduction in low flows than high flows. Group 2 catchments show a more uniform proportional reduction in flows across all percentiles, albeit with some variability. The catchments in each group are:"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.513,
+                0.826,
+                0.88,
+                0.842
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.517,
+                    0.829,
+                    0.875,
+                    0.841
+                  ]
+                }
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Group 1: Stewarts Creek, Pine Creek, and Redhill"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "bbox": [
+                0.513,
+                0.842,
+                0.917,
+                0.891
+              ],
+              "lines": [
+                {
+                  "bbox": [
+                    0.518,
+                    0.845,
+                    0.912,
+                    0.857
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.59,
+                    0.861,
+                    0.913,
+                    0.873
+                  ]
+                },
+                {
+                  "bbox": [
+                    0.591,
+                    0.877,
+                    0.708,
+                    0.889
+                  ]
+                }
+              ],
+              "content": [
+                {
+                  "type": "text",
+                  "content": "Group 2: Cathedral Peak 2 and 3, Lambrechtsbos A, Lambrechtsbos B, Glendhu 2, Biesievlei and Traralgon Creek"
+                }
+              ]
+            }
+          ]
+        ],
+        "page_index_map": [
+          6
+        ]
+      }
     }
   }
 }

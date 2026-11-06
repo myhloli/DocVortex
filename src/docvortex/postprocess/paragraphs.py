@@ -8,7 +8,9 @@ from typing import Any, TypeAlias
 from ..content.spans import inline_span_plain_text
 from ..schema import MERGE_TRANSPARENT_BLOCK_TYPES, BlockType
 
-LINE_STOP_FLAG = (".", "!", "?", "。", "！", "？", ")", "）", '"', "”", ":", "：", ";", "；")
+# 可信缩进与续排几何只放宽普通句末符，括号、引号、冒号和分号继续作为边界。
+SENTENCE_END_FLAGS = (".", "!", "?", "。", "！", "？")
+LINE_STOP_FLAG = (*SENTENCE_END_FLAGS, ")", "）", '"', "”", ":", "：", ";", "；")
 SECTION_MERGE_BARRIER_TYPES = {
     BlockType.DOC_TITLE,
     BlockType.PARAGRAPH_TITLE,
@@ -96,7 +98,7 @@ def merge_para_text_blocks(pages: list[dict[str, Any]]) -> None:
             ):
                 current_block["continues_prev"] = True
                 continue
-            allow_uppercase_start = (
+            allow_layout_continuation = (
                 not is_ref_text
                 and not previous_is_list_tail
                 and current_block.get("_reference_start") is None
@@ -110,7 +112,7 @@ def merge_para_text_blocks(pages: list[dict[str, Any]]) -> None:
                 require_current_leading_edge=not is_ref_text,
                 reject_digit_start=not is_ref_text,
                 reject_uppercase_start=not is_ref_text,
-                allow_uppercase_start=allow_uppercase_start,
+                allow_layout_continuation=allow_layout_continuation,
             )
             if can_merge or _can_auto_merge_multiline_to_single_line(
                 current_block,
@@ -122,7 +124,7 @@ def merge_para_text_blocks(pages: list[dict[str, Any]]) -> None:
                 require_current_leading_edge=not is_ref_text,
                 reject_digit_start=not is_ref_text,
                 reject_uppercase_start=not is_ref_text,
-                allow_uppercase_start=allow_uppercase_start,
+                allow_layout_continuation=allow_layout_continuation,
             ):
                 current_block["continues_prev"] = True
         elif current_type == BlockType.LIST:
@@ -175,7 +177,7 @@ def _can_auto_merge_continuable_text_blocks(
     require_current_leading_edge: bool,
     reject_digit_start: bool,
     reject_uppercase_start: bool,
-    allow_uppercase_start: bool = False,
+    allow_layout_continuation: bool = False,
 ) -> bool:
     """复用正文与参考文献的公共文本边界、方向及几何续接规则。"""
     current_metric_lines = _metric_line_bboxes(current_block)
@@ -197,13 +199,14 @@ def _can_auto_merge_continuable_text_blocks(
     previous_is_vertical = _is_vertical_text_block_by_lines(previous_metric_lines)
     if current_is_vertical != previous_is_vertical:
         return False
-    # 普通分支只能用多行正文确认首行贴左；单行大写必须交给后续行参照分支。
-    relax_uppercase = allow_uppercase_start and not current_is_vertical and len(current_metric_lines) > 1
+    # 多行正文由自身行框确认首行贴左；单行的大写与句末放宽均交给后续行参照分支。
+    relax_text_boundary = allow_layout_continuation and not current_is_vertical and len(current_metric_lines) > 1
     if not _has_mergeable_text_boundary(
         current_content,
         previous_content,
         reject_digit_start=reject_digit_start,
-        reject_uppercase_start=reject_uppercase_start and not relax_uppercase,
+        reject_uppercase_start=reject_uppercase_start and not relax_text_boundary,
+        allow_sentence_end=relax_text_boundary,
     ):
         return False
     if current_is_vertical:
@@ -415,7 +418,7 @@ def _is_indented_body_paragraph(block: BlockDict) -> bool:
 
 
 def _is_forward_column_wrap(current_block: BlockDict, previous_block: BlockDict) -> bool:
-    """新大写放宽仅用于向右跨栏且首行回到前段末行上方，避免同栏重叠与并排标签误接。"""
+    """版面证据放宽仅用于向右跨栏且首行回到前段末行上方，避免同栏重叠与并排标签误接。"""
     current_lines = _metric_line_bboxes(current_block)
     previous_lines = _metric_line_bboxes(previous_block)
     if not current_lines or not previous_lines:
@@ -429,9 +432,10 @@ def _has_mergeable_text_boundary(
     *,
     reject_digit_start: bool,
     reject_uppercase_start: bool,
+    allow_sentence_end: bool = False,
 ) -> bool:
-    """使用前块结尾和后块开头字符排除明显的新段落边界。"""
-    if previous_content.endswith(LINE_STOP_FLAG):
+    """检查文本首尾边界，仅在续排版面证据成立时放宽前块的普通句末符。"""
+    if previous_content.endswith(LINE_STOP_FLAG) and not (allow_sentence_end and previous_content.endswith(SENTENCE_END_FLAGS)):
         return False
     first_char = current_content[0]
     if reject_digit_start and first_char.isdigit():
@@ -526,7 +530,7 @@ def _can_auto_merge_multiline_to_single_line(
     require_current_leading_edge: bool,
     reject_digit_start: bool,
     reject_uppercase_start: bool,
-    allow_uppercase_start: bool = False,
+    allow_layout_continuation: bool = False,
 ) -> bool:
     """用后续五行或列补足单行主轴尺寸，再复用原横排或竖排连接规则。"""
     current_lines = _metric_line_bboxes(current_block)
@@ -558,9 +562,9 @@ def _can_auto_merge_multiline_to_single_line(
     previous_content = _normalized_text_content(previous_block)
     if current_bbox is None or previous_bbox is None or not current_content or not previous_content:
         return False
-    # 页开关仅解除大写否决；必须由当前页至少三条同栏后续行独立证明单行贴左。
-    relax_uppercase = (
-        allow_uppercase_start
+    # 单行的大写与句末放宽都要求当前页至少三条同栏后续行独立证明贴左。
+    relax_text_boundary = (
+        allow_layout_continuation
         and not current_is_vertical
         and abs(current_lines[0][0] - median(line[0] for line in aligned_lines)) < _line_height(current_lines[0]) / 2
     )
@@ -568,7 +572,8 @@ def _can_auto_merge_multiline_to_single_line(
         current_content,
         previous_content,
         reject_digit_start=reject_digit_start,
-        reject_uppercase_start=reject_uppercase_start and not relax_uppercase,
+        reject_uppercase_start=reject_uppercase_start and not relax_text_boundary,
+        allow_sentence_end=relax_text_boundary,
     ):
         return False
 

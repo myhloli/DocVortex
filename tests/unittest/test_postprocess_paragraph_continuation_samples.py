@@ -78,6 +78,34 @@ def test_saved_standard_demo1_single_page_keeps_order_and_joins_continuation() -
     assert sum(text.startswith("The model fits show") for text in paragraphs) == 1
 
 
+def test_saved_basic_demo1_sentence_end_joins_across_chart() -> None:
+    """Basic 第七页凭缩进与跨栏几何接续公式句号后的正文，并核对图表和导出段落。"""
+    model = _sample_model("demo1_basic_page7")
+    original = model.model_copy(deep=True)
+    middle = model_json_to_middle_json(model)
+    assert model == original
+    page = middle.pages[0]
+    assert page.page_idx == 6
+    assert [block.index for block in page.blocks] == [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11]
+    assert [block.index for block in page.blocks if isinstance(block, TextBlock) and block.continues_prev] == [8]
+    previous = next(block for block in page.blocks if block.index == 5)
+    assert previous.content[-1].type == "equation_inline"
+    assert previous.content[-1].content.endswith(".")
+
+    markdown = render_markdown(middle)
+    html = BeautifulSoup(render_html(middle), "html.parser")
+    paragraphs = [" ".join(node.get_text(" ", strip=True).split()) for node in html.find_all("p")]
+    for rendered_paragraphs in (markdown.split("\n\n"), paragraphs):
+        joined = [text for text in rendered_paragraphs if text.startswith("Following the successful fitting")]
+        assert len(joined) == 1
+        assert "values are given in Table 4." in joined[0]
+        assert "particularly for the 20 years FDC." in joined[0]
+        assert sum(text.startswith("The relative net flow change") for text in rendered_paragraphs) == 1
+    caption = "Fig. 3. Examples of observed and flow duration curves"
+    assert markdown.count(caption) == 1
+    assert html.get_text().count(caption) == 1
+
+
 def test_saved_single_emnlp_page_never_invents_missing_previous_page() -> None:
     """只提供第八页 JSON 时保留独立开头，不能因有缩进证据而虚构前页正文。"""
     model = _sample_model("emnlp")

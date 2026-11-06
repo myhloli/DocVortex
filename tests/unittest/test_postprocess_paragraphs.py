@@ -1093,10 +1093,14 @@ def test_merge_para_text_blocks_cleans_nested_lines_and_invalid_stale_markers() 
     assert "lines" not in invalid_text
 
 
-def _uppercase_continuation_blocks() -> tuple[dict, dict, dict]:
-    """构造左栏未完正文、右栏大写续段及唯一的同页首行缩进样本。"""
-    previous = _horizontal_multiline_block(0, "the comparison includes", left=0.1, right=0.45, top=0.65, line_count=3)
-    current = _horizontal_multiline_block(1, "Orion observations continue here.", left=0.55, right=0.9, top=0.1, line_count=3)
+def _layout_continuation_blocks(*, previous_ending: str = "", current_start: str = "Orion") -> tuple[dict, dict, dict]:
+    """构造可指定首尾文本的跨栏正文及唯一的同页首行缩进样本。"""
+    previous = _horizontal_multiline_block(
+        0, f"the comparison includes{previous_ending}", left=0.1, right=0.45, top=0.65, line_count=3
+    )
+    current = _horizontal_multiline_block(
+        1, f"{current_start} observations continue here.", left=0.55, right=0.9, top=0.1, line_count=3
+    )
     witness = _horizontal_multiline_block(
         2,
         "A separate paragraph supplies indentation evidence.",
@@ -1111,9 +1115,11 @@ def _uppercase_continuation_blocks() -> tuple[dict, dict, dict]:
 
 
 @pytest.mark.parametrize("placement", ["same_page_before", "same_page_after", "cross_page_after"])
-def test_uppercase_continuation_uses_one_witness_on_current_page(placement: str) -> None:
-    """只需后段所在页一个可靠缩进正文，且预扫描不受样本前后顺序影响。"""
-    previous, current, witness = _uppercase_continuation_blocks()
+@pytest.mark.parametrize("previous_ending", ["", ".", "!", "?", "。", "！", "？"])
+@pytest.mark.parametrize("current_start", ["Orion", "continued"])
+def test_layout_continuation_uses_one_witness_on_current_page(placement: str, previous_ending: str, current_start: str) -> None:
+    """同页可信缩进与续排几何可同时放宽普通句末符和大写开头，并保持内容及幂等性。"""
+    previous, current, witness = _layout_continuation_blocks(previous_ending=previous_ending, current_start=current_start)
     if placement == "cross_page_after":
         pages = [{"page_idx": 0, "blocks": [previous]}, {"page_idx": 1, "blocks": [current, witness]}]
     else:
@@ -1154,9 +1160,12 @@ def test_uppercase_continuation_uses_one_witness_on_current_page(placement: str)
         "vertical",
     ],
 )
-def test_uppercase_continuation_rejects_unreliable_or_other_page_witnesses(witness_kind: str) -> None:
-    """其他页、非正文角色和未证实首行回落的块不能解除大写否决。"""
-    previous, current, witness = _uppercase_continuation_blocks()
+@pytest.mark.parametrize("previous_ending,current_start", [("", "Orion"), (".", "continued")])
+def test_layout_continuation_rejects_unreliable_or_other_page_witnesses(
+    witness_kind: str, previous_ending: str, current_start: str
+) -> None:
+    """其他页、非正文角色和未证实首行回落的块不能解除大写或句末否决。"""
+    previous, current, witness = _layout_continuation_blocks(previous_ending=previous_ending, current_start=current_start)
     blocks = [previous, current, witness]
     pages = [{"page_idx": 1, "blocks": blocks}]
     if witness_kind in {"absent", "previous_page", "next_page"}:
@@ -1204,9 +1213,10 @@ def test_uppercase_continuation_rejects_unreliable_or_other_page_witnesses(witne
     "boundary",
     ["indent", "hard_break", "digit", "terminal", "short_tail", "width", "title", "invalid_line", "list_tail", "reference"],
 )
-def test_uppercase_permission_preserves_existing_boundaries(boundary: str) -> None:
+@pytest.mark.parametrize("previous_ending,current_start", [("", "Orion"), (".", "continued")])
+def test_layout_permission_preserves_existing_boundaries(boundary: str, previous_ending: str, current_start: str) -> None:
     """同页缩进证据不能绕过候选自身段界、数字、语义屏障和现有几何保护。"""
-    previous, current, witness = _uppercase_continuation_blocks()
+    previous, current, witness = _layout_continuation_blocks(previous_ending=previous_ending, current_start=current_start)
     blocks = [previous, current, witness]
     if boundary == "indent":
         current["lines"][0]["bbox"][0] += 0.04
@@ -1215,7 +1225,7 @@ def test_uppercase_permission_preserves_existing_boundaries(boundary: str) -> No
     elif boundary == "digit":
         current["content"] = _inline("2026 observations continue here.")
     elif boundary == "terminal":
-        previous["content"] = _inline("The comparison is complete.")
+        previous["content"] = _inline("The comparison includes:")
     elif boundary == "short_tail":
         previous["lines"][-1]["bbox"][2] -= 0.1
     elif boundary == "width":
@@ -1233,11 +1243,22 @@ def test_uppercase_permission_preserves_existing_boundaries(boundary: str) -> No
     assert not current.get("continues_prev", False)
 
 
+@pytest.mark.parametrize("ending", [")", "）", '"', "”", ":", "：", ";", "；", ".)", '."', "。”"])
+def test_layout_permission_preserves_structural_endings(ending: str) -> None:
+    """可信缩进只放宽普通句末符，闭括号、引号、冒号和分号仍构成边界。"""
+    previous, current, witness = _layout_continuation_blocks(previous_ending=ending, current_start="continued")
+    merge_para_text_blocks([{"page_idx": 0, "blocks": [previous, current, witness]}])
+    assert not current.get("continues_prev", False)
+
+
 @pytest.mark.parametrize("line_count,offset,expected", [(3, 0, True), (2, 0, False), (3, 0.02, False), (3, 0.019, True)])
-def test_single_line_uppercase_requires_current_page_peer_left_edge(line_count: int, offset: float, expected: bool) -> None:
-    """单行大写续段须由至少三条后续同栏行证明贴左，半行高临界偏移仍拒绝。"""
-    previous, _, witness = _uppercase_continuation_blocks()
-    current = _horizontal_single_line_block(1, "Orion.", left=0.55 + offset, right=0.67, top=0.1)
+@pytest.mark.parametrize("previous_ending,current_start", [("", "Orion"), (".", "continued")])
+def test_single_line_layout_permission_requires_current_page_peer_left_edge(
+    line_count: int, offset: float, expected: bool, previous_ending: str, current_start: str
+) -> None:
+    """单行的大写与句末放宽须由至少三条后续同栏行证明贴左，半行高临界偏移仍拒绝。"""
+    previous, _, witness = _layout_continuation_blocks(previous_ending=previous_ending)
+    current = _horizontal_single_line_block(1, f"{current_start}.", left=0.55 + offset, right=0.67, top=0.1)
     peers = _horizontal_multiline_block(2, "another paragraph.", left=0.55, right=0.9, top=0.2, line_count=line_count)
     # 隔断后续行查找，确保证据段只开启页开关，不替不足三行的局部参照凑数。
     barrier = {"type": BlockType.PARAGRAPH_TITLE, "index": 3, "content": _inline("Next section")}
@@ -1247,29 +1268,39 @@ def test_single_line_uppercase_requires_current_page_peer_left_edge(line_count: 
 
 
 @pytest.mark.parametrize("wide", [False, True])
-def test_single_line_uppercase_cannot_bypass_peer_check_on_normal_path(wide: bool) -> None:
+@pytest.mark.parametrize("previous_ending,current_start", [("", "Orion"), (".", "continued")])
+def test_single_line_layout_permission_cannot_bypass_peer_check_on_normal_path(
+    wide: bool, previous_ending: str, current_start: str
+) -> None:
     """单行即使宽度直接满足普通连接分支，也不能以自身块框证明贴左。"""
-    previous, _, witness = _uppercase_continuation_blocks()
-    current = _horizontal_single_line_block(1, "Orion.", left=0.58, right=0.9 if wide else 0.67, top=0.1)
+    previous, _, witness = _layout_continuation_blocks(previous_ending=previous_ending)
+    current = _horizontal_single_line_block(1, f"{current_start}.", left=0.58, right=0.9 if wide else 0.67, top=0.1)
     merge_para_text_blocks([{"page_idx": 0, "blocks": [previous, current, witness]}])
     assert not current.get("continues_prev", False)
 
 
 @pytest.mark.parametrize("location", ["same_page", "previous_page"])
-def test_cross_page_uppercase_uses_destination_page_only(location: str) -> None:
-    """跨页只使用后段所在页的缩进证据，不能借用前段所在页。"""
-    previous, current, witness = _uppercase_continuation_blocks()
-    pages = [{"page_idx": 3, "blocks": [previous]}, {"page_idx": 4, "blocks": [current]}]
+@pytest.mark.parametrize("previous_ending,current_start", [("", "Orion"), (".", "continued")])
+@pytest.mark.parametrize("page_gap", [1, 2])
+def test_cross_page_layout_permission_uses_consecutive_destination_page_only(
+    location: str, previous_ending: str, current_start: str, page_gap: int
+) -> None:
+    """大写与句末放宽只使用相邻后页的缩进证据，跨缺页或前页证据仍拒绝。"""
+    previous, current, witness = _layout_continuation_blocks(previous_ending=previous_ending, current_start=current_start)
+    pages = [{"page_idx": 3, "blocks": [previous]}, {"page_idx": 3 + page_gap, "blocks": [current]}]
     pages[1 if location == "same_page" else 0]["blocks"].append(witness)
     merge_para_text_blocks(pages)
-    assert current.get("continues_prev", False) is (location == "same_page")
+    assert current.get("continues_prev", False) is (location == "same_page" and page_gap == 1)
 
 
 @pytest.mark.parametrize("scale,shift,width", [(0.7, 0.05, 0.35), (1, 0, 0.28), (1.1, -0.05, 0.31)])
 @pytest.mark.parametrize("word", ["Orion", "NASA", "Different"])
-def test_uppercase_rule_depends_on_layout_instead_of_specific_text(scale: float, shift: float, width: float, word: str) -> None:
+@pytest.mark.parametrize("previous_ending", ["", "."])
+def test_layout_permission_depends_on_layout_instead_of_specific_text(
+    scale: float, shift: float, width: float, word: str, previous_ending: str
+) -> None:
     """独立改变正文、栏宽、位置和尺度后，单个同页缩进样本仍提供相同判断。"""
-    previous, current, witness = _uppercase_continuation_blocks()
+    previous, current, witness = _layout_continuation_blocks(previous_ending=previous_ending)
     current["content"] = _inline(f"{word} observations continue here.")
     for block in (previous, current, witness):
         left = block["bbox"][0]
@@ -1282,9 +1313,10 @@ def test_uppercase_rule_depends_on_layout_instead_of_specific_text(scale: float,
     assert current.get("continues_prev") is True
 
 
-def test_page_uppercase_permission_is_batch_independent_and_not_public_default() -> None:
+@pytest.mark.parametrize("previous_ending,current_start", [("", "Orion"), (".", "continued")])
+def test_page_layout_permission_is_batch_independent_and_not_public_default(previous_ending: str, current_start: str) -> None:
     """增加其他页不会改变页内候选判断，缺少页面上下文的双块公开函数仍保持保守。"""
-    previous, current, witness = _uppercase_continuation_blocks()
+    previous, current, witness = _layout_continuation_blocks(previous_ending=previous_ending, current_start=current_start)
     assert not can_auto_merge_text_blocks(current, previous)
     standalone = [{"page_idx": 7, "blocks": [previous, current, witness]}]
     batched = [{"page_idx": 6, "blocks": []}, *deepcopy(standalone), {"page_idx": 8, "blocks": []}]
@@ -1294,19 +1326,24 @@ def test_page_uppercase_permission_is_batch_independent_and_not_public_default()
     assert current.get("continues_prev") is True
 
 
-def test_horizontal_witness_does_not_relax_vertical_uppercase() -> None:
-    """同页横排缩进样本不能改变竖排正文的大写开头保护。"""
+@pytest.mark.parametrize("previous_ending,current_start", [("", "Orion"), (".", "continued")])
+def test_horizontal_witness_does_not_relax_vertical_boundaries(previous_ending: str, current_start: str) -> None:
+    """同页横排缩进样本不能改变竖排正文的大写开头与句末保护。"""
     previous, current = _vertical_pair()
-    current["content"] = _inline("Uppercase vertical text")
-    _, _, witness = _uppercase_continuation_blocks()
+    previous["content"] = _inline(f"previous vertical text{previous_ending}")
+    current["content"] = _inline(f"{current_start} vertical text")
+    _, _, witness = _layout_continuation_blocks()
     merge_para_text_blocks([{"page_idx": 0, "blocks": [previous, current, witness]}])
     assert not current.get("continues_prev", False)
 
 
 @pytest.mark.parametrize("indent,expected", [(0.019, False), (0.02, True), (0.021, True)])
-def test_two_line_witness_uses_existing_half_height_threshold(indent: float, expected: bool) -> None:
+@pytest.mark.parametrize("previous_ending,current_start", [("", "Orion"), (".", "continued")])
+def test_two_line_witness_uses_existing_half_height_threshold(
+    indent: float, expected: bool, previous_ending: str, current_start: str
+) -> None:
     """两行正文也可证明首行回落，并严格锁定既有半行高缩进门槛两侧。"""
-    previous, current, witness = _uppercase_continuation_blocks()
+    previous, current, witness = _layout_continuation_blocks(previous_ending=previous_ending, current_start=current_start)
     witness["lines"] = witness["lines"][:2]
     witness["lines"][0]["bbox"][0] = 0.55 + indent
     merge_para_text_blocks([{"page_idx": 0, "blocks": [previous, current, witness]}])
@@ -1314,9 +1351,10 @@ def test_two_line_witness_uses_existing_half_height_threshold(indent: float, exp
 
 
 @pytest.mark.parametrize("layout", ["same_column_overlap", "backward_column", "side_by_side_labels", "centered_witness"])
-def test_page_indentation_does_not_join_unrelated_layout_regions(layout: str) -> None:
+@pytest.mark.parametrize("previous_ending", ["", "."])
+def test_page_indentation_does_not_join_unrelated_layout_regions(layout: str, previous_ending: str) -> None:
     """真实回归中的同栏条目、逆向摘要、并排作者与居中表格标签均不得借页证据误接。"""
-    previous, current, witness = _uppercase_continuation_blocks()
+    previous, current, witness = _layout_continuation_blocks()
     if layout == "same_column_overlap":
         previous = _text_block(0, "Other author, 2025, volume 12", [0.1, 0.5, 0.4, 0.52], [[0.1, 0.5, 0.4, 0.52]])
         current = _text_block(
@@ -1340,5 +1378,8 @@ def test_page_indentation_does_not_join_unrelated_layout_regions(layout: str) ->
     elif layout == "centered_witness":
         witness["lines"][0]["bbox"][2] = 0.86
         witness["content"] = _inline("Grade eight Mathematics")
+    previous["content"] = _inline(f"{inline_text(previous['content'])}{previous_ending}")
+    if previous_ending:
+        current["content"] = _inline(inline_text(current["content"]).lower())
     merge_para_text_blocks([{"page_idx": 0, "blocks": [previous, current, witness]}])
     assert not current.get("continues_prev", False)
