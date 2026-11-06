@@ -89,7 +89,7 @@ def test_shared_colspan_cell_preserves_both_dimensions() -> None:
 
 def test_badcase111_correct_flags_join_shared_regions_across_three_pages() -> None:
     """重放真实 OCR 结果，31号折叠为一行，33号共享字段跨五行且不吞掉独立子项。"""
-    fixture = json.loads((Path(__file__).parents[1] / "fixtures/table_merge_blank_continuation.json").read_text())
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/table_merge_blank_continuation.json").read_text(encoding="utf-8"))
     tables = fixture["tables"]
     for table, flags in zip(tables, fixture["flags"]):
         if flags is not None:
