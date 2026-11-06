@@ -126,18 +126,18 @@ pub unsafe fn read(addresses: Vec<usize>, objects: Vec<usize>) -> Result<MarkedC
             let label = read_string(|buffer, size, used| name(handle, buffer, size, used))?
                 .unwrap_or_default();
             let mut marker = -1;
-            integer(handle, b"MCID\0".as_ptr().cast(), &mut marker);
+            integer(handle, c"MCID".as_ptr(), &mut marker);
             let actual = read_blob(|buffer, size, used| {
-                string(handle, b"ActualText\0".as_ptr().cast(), buffer, size, used)
+                string(handle, c"ActualText".as_ptr(), buffer, size, used)
             })?;
             let language = read_blob(|buffer, size, used| {
-                string(handle, b"Lang\0".as_ptr().cast(), buffer, size, used)
+                string(handle, c"Lang".as_ptr(), buffer, size, used)
             })?;
             let kind = read_blob(|buffer, size, used| {
-                string(handle, b"Type\0".as_ptr().cast(), buffer, size, used)
+                string(handle, c"Type".as_ptr(), buffer, size, used)
             })?;
             let subtype = read_blob(|buffer, size, used| {
-                string(handle, b"Subtype\0".as_ptr().cast(), buffer, size, used)
+                string(handle, c"Subtype".as_ptr(), buffer, size, used)
             })?;
             let next_id = sequence_ids.len();
             string_bytes += label.len()
