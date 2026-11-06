@@ -97,7 +97,7 @@ def test_issue_5652_cell_flags_never_move_work_text_into_person_column() -> None
     assert merged is not None
     assert _row_texts(_html(merged))[-3:] == [
         ["人2人 1", "工2公 3"],
-        ["", "2", "任务 2", "", ""],
+        ["", "2", "任务 2"],
         ["人 2", "公 4"],
     ]
     assert "人2公" not in _html(merged)
@@ -120,11 +120,13 @@ def test_narrower_previous_and_current_keep_cell_flags_in_original_grid(reverse:
 
     assert merged is not None
     expected_first = [f"{left} {right}" if flag else left for left, right, flag in zip(first, second, flags)]
-    expected_second = ["" if flag else text for text, flag in zip(second, flags)]
+    expected_second = [text for text, flag in zip(second, flags) if not flag]
     expected_rows = [expected_first] + ([expected_second] if any(expected_second) else [])
     assert _row_texts(_html(merged)) == expected_rows
     state = build_table_state_from_html(_html(merged))
     assert state is not None and state.total_cols == 3
+    if flags == [1, 0]:
+        assert state.rows[0].td["rowspan"] == "2"
 
 
 def test_inherited_rowspan_owner_receives_only_its_matching_column() -> None:
@@ -135,7 +137,8 @@ def test_inherited_rowspan_owner_receives_only_its_matching_column() -> None:
     merged = merge_table_content(previous, current)
 
     assert merged is not None
-    assert _row_texts(_html(merged)) == [["组A组B", "X1"], ["X2"], ["", "Y"]]
+    assert _row_texts(_html(merged)) == [["组A组B", "X1"], ["X2"], ["Y"]]
+    assert BeautifulSoup(_html(merged), "html.parser").td["rowspan"] == "3"
 
 
 def test_repeated_rowspan_header_is_removed_after_grid_alignment() -> None:
@@ -238,10 +241,12 @@ def test_renderer_tracks_original_middle_page_grid_after_full_consumption(consum
     rendered = render_markdown(document)
 
     assert rendered.count("<table>") == 1
-    expected = [["A C", "B D F"], ["E", ""]] if consume_middle_page else [["A", "B"], ["C", "D F"], ["E", ""]]
+    expected = [["A C", "B D F"], ["E"]] if consume_middle_page else [["A", "B"], ["C", "D F"], ["E"]]
     assert _row_texts(rendered) == expected
-    for row in BeautifulSoup(rendered, "html.parser").find_all("tr"):
-        assert [cell["colspan"] for cell in row.find_all("td")] == ["3", "3"]
+    rows = BeautifulSoup(rendered, "html.parser").find_all("tr")
+    assert rows[-2].find_all("td")[-1]["rowspan"] == "2"
+    for row in rows:
+        assert all(cell["colspan"] == "3" for cell in row.find_all("td"))
     assert document == original
     assert "boundaries" not in document.model_dump_json()
 
@@ -256,5 +261,5 @@ def test_renderer_projects_original_flags_when_previous_grid_expands_again(last_
     rendered = render_markdown(_middle(first, second, third))
 
     assert rendered.count("<table>") == 1
-    expected = [["A C", "B"], ["", "D F"], ["E", ""]] if last_flags[-1] else [["A C", "B"], ["", "D"], ["E", "F"]]
+    expected = [["A C", "B"], ["D F"], ["E"]] if last_flags[-1] else [["A C", "B"], ["D"], ["E", "F"]]
     assert _row_texts(rendered) == expected

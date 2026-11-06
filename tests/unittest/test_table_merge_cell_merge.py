@@ -36,7 +36,7 @@ def _row_texts(table: dict[str, Any]) -> list[list[str]]:
 
 
 def test_merge_table_content_applies_partial_cell_merge_from_table() -> None:
-    """验证部分视觉列续接后保留当前首行并清空已迁移单元格。"""
+    """部分视觉列续接后由上一行单元格跨行覆盖，其他列保留独立单元格。"""
     previous_table = _build_table_block(
         0,
         "<table><tr><td>A</td><td>X</td></tr></table>",
@@ -52,7 +52,8 @@ def test_merge_table_content_applies_partial_cell_merge_from_table() -> None:
     merged = merge_table_content(previous_table, current_table)
 
     assert merged is not None
-    assert _row_texts(merged) == [["A B", "X"], ["", "Y"]]
+    assert _row_texts(merged) == [["A B", "X"], ["Y"]]
+    assert BeautifulSoup(merged["content"][0]["content"], "html.parser").td["rowspan"] == "2"
     assert previous_table == previous_original
     assert current_table == current_original
 

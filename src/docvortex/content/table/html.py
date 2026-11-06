@@ -341,32 +341,41 @@ def build_row_rendered_cell_segments(
     current_marker: tuple[int, int] | None = None
     current_start_col: int | None = None
     current_text = ""
+    current_has_non_text = False
 
     # 连续视觉列来自同一个源单元格时，合并为一个渲染段。
     for col_idx in range(total_cols):
         marker = target_occupied.get(col_idx)
         if marker is None:
             if current_marker is not None and current_start_col is not None:
-                segments.append(RenderedCellSegment(text=current_text, start_col=current_start_col, end_col=col_idx))
+                segments.append(RenderedCellSegment(current_text, current_start_col, col_idx, current_has_non_text))
             current_marker = None
             current_start_col = None
             current_text = ""
+            current_has_non_text = False
             continue
 
         if marker != current_marker:
             if current_marker is not None and current_start_col is not None:
-                segments.append(RenderedCellSegment(text=current_text, start_col=current_start_col, end_col=col_idx))
+                segments.append(RenderedCellSegment(current_text, current_start_col, col_idx, current_has_non_text))
             current_marker = marker
             current_start_col = col_idx
             source_row_idx, source_cell_idx = marker
             current_text = ""
+            current_has_non_text = False
             if source_row_idx >= 0:
                 source_cells = rows[source_row_idx].find_all(["td", "th"])
                 if source_cell_idx < len(source_cells):
                     current_text = _display_cell_text(source_cells[source_cell_idx])
+                    current_has_non_text = (
+                        source_cells[source_cell_idx].find(
+                            ["img", "svg", "math", "eq", "table", "figure", "object", "embed", "canvas"]
+                        )
+                        is not None
+                    )
 
     if current_marker is not None and current_start_col is not None:
-        segments.append(RenderedCellSegment(text=current_text, start_col=current_start_col, end_col=total_cols))
+        segments.append(RenderedCellSegment(current_text, current_start_col, total_cols, current_has_non_text))
 
     return segments
 

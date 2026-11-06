@@ -163,12 +163,12 @@ def test_cell_merge_does_not_cross_structural_boundaries(barrier: str, at_target
     assert str(cell) == str(BeautifulSoup(f"<td>{previous}{current}</td>", "html.parser").td)
 
 
-def test_empty_source_cell_is_not_consumed() -> None:
-    """无语义源格维持既有不消费行为，不能为了补空格改写目标或删除当前行。"""
+def test_empty_source_cell_with_merge_flag_is_consumed() -> None:
+    """显式续接标记同样连接空白区域，不向目标添加额外文字。"""
     merged = merge_table_content(_table("in"), _table("<span></span>", continued=True))
     assert merged is not None
     soup = BeautifulSoup(merged["content"][0]["content"], "html.parser")
-    assert [cell.get_text() for cell in soup.find_all("td")] == ["in", ""]
+    assert [cell.get_text() for cell in soup.find_all("td")] == ["in"]
 
 
 @pytest.mark.parametrize("at_target", [True, False])
@@ -215,16 +215,17 @@ def test_live_enhancement_fixture_renders_correct_boundary_without_mutating_sour
     middle = MiddleJson.model_validate_json(fixture.read_text(encoding="utf-8"))
     original = middle.model_dump_json()
     markdown = render_markdown(middle)
-    assert "| The agreement remains in force until December 2027. | 100 |" in markdown
-    assert "|  | 200 |" in markdown
+    assert '<td rowspan="2">The agreement remains in force until December 2027.</td>' in markdown
+    assert "<tr><td>200</td></tr>" in markdown
     html = render_html(middle, standalone=False)
     soup = BeautifulSoup(html, "html.parser")
     assert len(soup.find_all("table")) == 1
     assert [[cell.get_text() for cell in row.find_all(["td", "th"])] for row in soup.find_all("tr")] == [
         ["Terms", "Amount"],
         ["The agreement remains in force until December 2027.", "100"],
-        ["", "200"],
+        ["200"],
     ]
+    assert soup.find_all("tr")[1].td["rowspan"] == "2"
     assert "inforce" not in markdown + html
     assert "| The agreement remains in | 100 |" in render_markdown(middle, mode=RenderMode.FULL)
     assert len(BeautifulSoup(render_html(middle, mode=RenderMode.FULL), "html.parser").find_all("table")) == 2

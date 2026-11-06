@@ -127,11 +127,6 @@ def _cell_has_semantic_content(cell: Tag) -> bool:
     return cell.find(["img", "svg", "math", "eq", "table", "figure", "object", "embed", "canvas"]) is not None
 
 
-def _row_has_semantic_content(row: Tag) -> bool:
-    """判断整行是否仍保留未并回的语义内容。"""
-    return any(_cell_has_semantic_content(cell) for cell in row.find_all(["td", "th"]))
-
-
 def _insert_cell_before_visual_column(rows: list[Tag], target_row_index: int, start_vcol: int, cell: Tag) -> None:
     """将单元格插入到目标行中对应视觉列之前。"""
     target_row = rows[target_row_index]
@@ -144,34 +139,6 @@ def _insert_cell_before_visual_column(rows: list[Tag], target_row_index: int, st
             return
 
     target_row.append(cell)
-
-
-def _carry_rowspan_structure_to_next_row(rows: list[Tag], row_idx: int) -> None:
-    """下沉空白结构占位单元格，避免删除当前行后破坏后续列对齐。"""
-    next_row_idx = row_idx + 1
-    if next_row_idx >= len(rows):
-        return
-
-    current_row = rows[row_idx]
-    current_cells = current_row.find_all(["td", "th"])
-    current_vcol_map = build_visual_col_mapping(rows, row_idx)
-    carried_cells = []
-
-    for cell, start_vcol in zip(current_cells, current_vcol_map):
-        rowspan = _rowspan(cell)
-        if rowspan <= 1 or _cell_has_semantic_content(cell):
-            continue
-
-        carried_cell = deepcopy(cell)
-        new_rowspan = rowspan - 1
-        if new_rowspan > 1:
-            carried_cell["rowspan"] = str(new_rowspan)
-        else:
-            carried_cell.attrs.pop("rowspan", None)
-        carried_cells.append((start_vcol, carried_cell))
-
-    for start_vcol, carried_cell in sorted(carried_cells, key=lambda item: item[0], reverse=True):
-        _insert_cell_before_visual_column(rows, next_row_idx, start_vcol, carried_cell)
 
 
 def _clip_overlapped_blank_rowspan_cells(
@@ -250,7 +217,7 @@ def _apply_cell_merge(
     header_count: int,
     cell_merge: list[int] | None,
 ) -> bool:
-    """只在统一网格中按完全相同的列区间一对一转移内容，包含继承单元格。"""
+    """在统一网格中按相同列区间连接内容与跨行范围，空白续接同样消费源格。"""
     if cell_merge is None or len(cell_merge) != previous_state.total_cols:
         return False
 
@@ -270,7 +237,7 @@ def _apply_cell_merge(
     transferred_sources: set[int] = set()
     transferred_targets: set[int] = set()
     for source in combined_grid.cells:
-        if source.row_index != previous_row_count or not _cell_has_semantic_content(source.cell):
+        if source.row_index != previous_row_count:
             continue
         if any(flag != 1 for flag in cell_merge[source.start_col : source.end_col]):
             continue
@@ -279,12 +246,26 @@ def _apply_cell_merge(
             continue
         if id(source.cell) in transferred_sources or id(target.cell) in transferred_targets:
             continue
-        _append_cell_content(target.cell, source.cell)
+        if _cell_has_semantic_content(source.cell):
+            _append_cell_content(target.cell, source.cell)
+        # 目标可能继承自上页更早的一行；跨度必须按完整网格坐标计算。
+        target.cell["rowspan"] = str(source.row_index + _rowspan(source.cell) - target.row_index)
+        source.cell.extract()
         transferred_sources.add(id(source.cell))
         transferred_targets.add(id(target.cell))
 
-    if transferred_sources and not _row_has_semantic_content(first_data_row):
-        _carry_rowspan_structure_to_next_row(rows2, header_count)
+    if transferred_sources and not first_data_row.find_all(["td", "th"], recursive=False):
+        # 只有整行的显式单元格均已连接才折叠该行；标记为 0 的空格也保留边界。
+        for placement in combined_grid.cells:
+            if placement.row_index >= previous_row_count:
+                continue
+            span = _rowspan(placement.cell)
+            if placement.row_index + span <= previous_row_count:
+                continue
+            if span > 2:
+                placement.cell["rowspan"] = str(span - 1)
+            else:
+                placement.cell.attrs.pop("rowspan", None)
         first_data_row.extract()
         rows2.pop(header_count)
 
