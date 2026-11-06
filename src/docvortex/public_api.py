@@ -405,7 +405,7 @@ PUBLIC_API: dict[str, tuple[str, ...]] = {
         "parse_inline_span",
         "parse_inline_spans",
     ),
-    "docvortex.visualization": ("render_layout_pdf",),
+    "docvortex.visualization": ("LayoutRegion", "collect_layout_regions", "render_layout_pdf"),
 }
 
 __all__ = ["PUBLIC_API"]

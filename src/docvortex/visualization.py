@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from io import BytesIO
+from typing import cast
 import warnings
 
 from pypdf import PageObject, PdfReader, PdfWriter
@@ -48,6 +50,54 @@ _LABEL_PADDING = 1.0
 _LABEL_GAP = 1.0
 
 
+@dataclass(frozen=True, slots=True)
+class LayoutRegion:
+    """共享 PDF 标注与交互预览的原始区域，子路径与 HTML 来源映射使用相同规则。"""
+
+    page_idx: int
+    block_index: int
+    child_path: tuple[int, ...]
+    bbox: BBox
+    type: str
+    index: int | None
+    color: tuple[float, float, float]
+
+
+def collect_layout_regions(pages: Sequence[PageInfo]) -> list[LayoutRegion]:
+    """按原始页和块树顺序收集布局，保留辅助块、子块编号及显示方向下的归一化坐标。"""
+    if any(not isinstance(page, PageInfo) for page in pages):
+        raise TypeError("pages must contain PageInfo instances")
+    if len({page.page_idx for page in pages}) != len(pages):
+        raise ValueError("pages must have unique page_idx values")
+    return [
+        region
+        for page in pages
+        for block in page.blocks
+        for region in _iter_layout_regions(block, page.page_idx, cast(int, block.index))
+    ]
+
+
+def _iter_layout_regions(
+    block: BlockBase, page_idx: int, block_index: int, child_path: tuple[int, ...] = ()
+) -> Iterable[LayoutRegion]:
+    """视觉父块由子块提供标注，列表保留层级。无坐标节点仍继续遍历其子树。"""
+    if block.bbox is not None and block.type not in _VISUAL_PARENT_TYPES:
+        kind = str(block.type)
+        yield LayoutRegion(
+            page_idx=page_idx,
+            block_index=block_index,
+            child_path=child_path,
+            bbox=block.bbox,
+            type=kind,
+            index=block.index,
+            color=_BLOCK_COLORS.get(kind, (0.90, 0.10, 0.10)),
+        )
+    content = getattr(block, "content", None)
+    children = [child for child in content if isinstance(child, BlockBase)] if isinstance(content, list) else []
+    for position, child in enumerate(children):
+        yield from _iter_layout_regions(child, page_idx, block_index, (*child_path, position))
+
+
 def render_layout_pdf(
     pdf_bytes: bytes,
     pages: Sequence[PageInfo],
@@ -62,11 +112,9 @@ def render_layout_pdf(
     没有对应解析结果的页面原样保留，映射长度错误时抛出 ValueError。
     每个边框标注自身类型和原始 index，缺失 index 显示 -；标签文字可被 PDF 提取。
     """
-    if any(not isinstance(page, PageInfo) for page in pages):
-        raise TypeError("pages must contain PageInfo instances")
-    pages_by_index = {page.page_idx: page for page in pages}
-    if len(pages_by_index) != len(pages):
-        raise ValueError("pages must have unique page_idx values")
+    regions_by_page: dict[int, list[LayoutRegion]] = {}
+    for region in collect_layout_regions(pages):
+        regions_by_page.setdefault(region.page_idx, []).append(region)
 
     reader = PdfReader(BytesIO(pdf_bytes))
     indices = tuple(range(len(reader.pages))) if page_indices is None else tuple(page_indices)
@@ -97,9 +145,9 @@ def render_layout_pdf(
         warnings.warn("Loading all PDF objects after recursive layout clone exceeded its limit", RuntimeWarning, stacklevel=2)
         writer = PdfWriter(reader, full=True)
     for page_copy, original_index in zip(writer.pages, indices):
-        middle_page = pages_by_index.get(original_index)
-        if middle_page is not None:
-            overlay = _build_page_overlay(page_copy, middle_page)
+        regions = regions_by_page.get(original_index)
+        if regions:
+            overlay = _build_page_overlay(page_copy, regions)
             if overlay is not None:
                 page_copy.merge_page(overlay)
 
@@ -120,21 +168,17 @@ def _effective_page_box(page: PageObject) -> RectangleObject:
     )
 
 
-def _build_page_overlay(page: PageObject, middle_page: PageInfo) -> PageObject | None:
+def _build_page_overlay(page: PageObject, boxes: Sequence[LayoutRegion]) -> PageObject | None:
     """先绘制边框，再按显示方向放置标签，保留原页方向和页面框。"""
     visible_box = _effective_page_box(page)
     if visible_box.width <= 0 or visible_box.height <= 0:
         return None
-    boxes = list(_iter_overlay_boxes(middle_page.blocks))
-    if not boxes:
-        return None
-
     packet = BytesIO()
     painter = canvas.Canvas(packet, pagesize=(float(page.mediabox.width), float(page.mediabox.height)))
     painter.setLineWidth(1.0)
-    for block_type, bbox, _ in boxes:
-        x0, y0, x1, y1 = _normalized_bbox_to_pdf(bbox, page)
-        painter.setStrokeColorRGB(*_BLOCK_COLORS.get(block_type, (0.90, 0.10, 0.10)))
+    for region in boxes:
+        x0, y0, x1, y1 = _normalized_bbox_to_pdf(region.bbox, page)
+        painter.setStrokeColorRGB(*region.color)
         painter.rect(x0, y0, max(0.5, x1 - x0), max(0.5, y1 - y0), stroke=1, fill=0)
     _draw_overlay_labels(painter, page, boxes)
     painter.save()
@@ -146,22 +190,7 @@ def _build_page_overlay(page: PageObject, middle_page: PageInfo) -> PageObject |
     return overlay
 
 
-def _iter_overlay_boxes(blocks: Iterable[BlockBase]) -> Iterable[tuple[str, BBox, int | None]]:
-    """遍历当前 block 树并保留自身 index；视觉父块只画子块，列表保留层级框。"""
-    for block in blocks:
-        if block.bbox is not None and block.type not in _VISUAL_PARENT_TYPES:
-            yield str(block.type), block.bbox, block.index
-        content = getattr(block, "content", None)
-        children = [child for child in content if isinstance(child, BlockBase)] if isinstance(content, list) else []
-        if block.type in _VISUAL_PARENT_TYPES:
-            for child in children:
-                if child.bbox is not None:
-                    yield str(child.type), child.bbox, child.index
-        elif children:
-            yield from _iter_overlay_boxes(children)
-
-
-def _draw_overlay_labels(painter: canvas.Canvas, page: PageObject, boxes: Sequence[tuple[str, BBox, int | None]]) -> None:
+def _draw_overlay_labels(painter: canvas.Canvas, page: PageObject, boxes: Sequence[LayoutRegion]) -> None:
     """在显示方向的左下原点坐标系中绘制正向标签，并用白底保护文字可读性。"""
     visible_box = _effective_page_box(page)
     left, bottom = float(visible_box.left), float(visible_box.bottom)
@@ -179,15 +208,15 @@ def _draw_overlay_labels(painter: canvas.Canvas, page: PageObject, boxes: Sequen
         width, height = height, width
     ascent, descent = pdfmetrics.getAscentDescent(_LABEL_FONT, _LABEL_FONT_SIZE)
     label_height = ascent - descent + 2 * _LABEL_PADDING
-    for block_type, bbox, index in boxes:
-        label = f"{block_type}: {index if index is not None else '-'}"
+    for region in boxes:
+        label = f"{region.type}: {region.index if region.index is not None else '-'}"
         text_width = pdfmetrics.stringWidth(label, _LABEL_FONT, _LABEL_FONT_SIZE)
         label_width = min(text_width + 2 * _LABEL_PADDING, width)
-        rect = _place_label(bbox[0] * width, (1 - bbox[1]) * height, label_width, label_height, width, height)
+        rect = _place_label(region.bbox[0] * width, (1 - region.bbox[1]) * height, label_width, label_height, width, height)
         x0, y0, x1, y1 = rect
         painter.setFillColorRGB(1, 1, 1)
         painter.rect(x0, y0, x1 - x0, y1 - y0, stroke=0, fill=1)
-        painter.setFillColorRGB(*_BLOCK_COLORS.get(block_type, (0.90, 0.10, 0.10)))
+        painter.setFillColorRGB(*region.color)
         text = painter.beginText(x0 + _LABEL_PADDING, y0 + _LABEL_PADDING - descent)
         text.setFont(_LABEL_FONT, _LABEL_FONT_SIZE)
         # 极窄页面仅压缩标签的水平宽度，不让右侧文字越过 CropBox。
@@ -229,4 +258,4 @@ def _normalized_bbox_to_pdf(bbox: BBox, page: PageObject) -> BBox:
     return left + x0 * width, bottom + (1 - y1) * height, left + x1 * width, bottom + (1 - y0) * height
 
 
-__all__ = ["render_layout_pdf"]
+__all__ = ["LayoutRegion", "collect_layout_regions", "render_layout_pdf"]

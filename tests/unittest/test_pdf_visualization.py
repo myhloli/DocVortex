@@ -16,7 +16,7 @@ from reportlab.pdfgen import canvas
 
 from docvortex.document.pdf._document import PDFDocument
 from docvortex.schema import PageInfo
-from docvortex.visualization import render_layout_pdf
+from docvortex.visualization import collect_layout_regions, render_layout_pdf
 
 
 def _source_pdf(
@@ -45,7 +45,7 @@ def _source_pdf(
     return output.getvalue()
 
 
-def _text_block(index: int = 0, **updates: Any) -> dict[str, Any]:
+def _text_block(index: int | None = 0, **updates: Any) -> dict[str, Any]:
     """建立有固定归一化 bbox 的文字块，允许针对具体语义覆盖字段。"""
     return {
         "type": "text",
@@ -111,6 +111,53 @@ def _render_pixels(data: bytes) -> np.ndarray:
         finally:
             bitmap.close()
             page.close()
+
+
+def test_layout_regions_preserve_original_identity_and_auxiliary_blocks() -> None:
+    """共享描述保留缺号子块、辅助块及完整子路径，并与 PDF 标注使用相同类型和颜色。"""
+    body = {"type": "table_body", "index": 4, "bbox": (0.1, 0.3, 0.8, 0.6), "content": ""}
+    caption = _text_block(3, type="table_caption", bbox=(0.1, 0.2, 0.8, 0.25))
+    table = {"type": "table", "index": 4, "bbox": body["bbox"], "content": [caption, body]}
+    nested = {"type": "list", "content": [_text_block(index=None)]}
+    listing = {"type": "list", "index": 7, "bbox": (0.1, 0.7, 0.8, 0.9), "content": [nested]}
+    page = _page(9, [_text_block(0, type="header"), table, listing])
+    before = page.model_dump()
+    regions = collect_layout_regions([page])
+    assert page.model_dump() == before
+    assert [(item.page_idx, item.block_index, item.child_path, item.type, item.index) for item in regions] == [
+        (9, 0, (), "header", 0),
+        (9, 4, (0,), "table_caption", 3),
+        (9, 4, (1,), "table_body", 4),
+        (9, 7, (), "list", 7),
+        (9, 7, (0, 0), "text", None),
+    ]
+    outlines = _outlines(render_layout_pdf(_source_pdf(), [page], page_indices=[9]))
+    assert np.asarray([color for color, _ in outlines]) == pytest.approx(
+        np.asarray([region.color for region in regions]), abs=1e-6
+    )
+
+
+def test_layout_regions_match_html_source_paths() -> None:
+    """跨页续段合并后的每个来源仍能命中对应页的原始布局编号。"""
+    import json
+
+    from bs4 import BeautifulSoup
+
+    from docvortex.render import render_html
+    from docvortex.schema import MiddleJson
+
+    middle = MiddleJson(
+        pages=[_page(2, [_text_block(8)]), _page(5, [_text_block(2, continues_prev=True)])],
+        is_full_document=False,
+        metadata={"file_suffix": "pdf", "producer": {"name": "test", "version": "1"}},
+    )
+    regions = collect_layout_regions(middle.pages)
+    document = BeautifulSoup(render_html(middle, include_source_map=True), "html.parser")
+    sources = json.loads(document.select_one("[data-docvortex-sources]")["data-docvortex-sources"])
+    assert [(source["page_idx"], source["block_index"], tuple(source["child_path"])) for source in sources] == [
+        (region.page_idx, region.block_index, region.child_path) for region in regions
+    ]
+    assert [region.index for region in regions] == [8, 2]
 
 
 @pytest.mark.parametrize(
@@ -388,9 +435,7 @@ def test_outside_crop_uses_effective_visible_box(rotation: int, unit: int, media
     mask[: round(height * 0.2) - 2] = False
     y, x = np.where(mask)
     assert x.size > 0
-    assert (x.min(), y.min(), x.max(), y.max()) == pytest.approx(
-        (width * 0.1, height * 0.2, width * 0.6, height * 0.4), abs=2
-    )
+    assert (x.min(), y.min(), x.max(), y.max()) == pytest.approx((width * 0.1, height * 0.2, width * 0.6, height * 0.4), abs=2)
 
 
 @pytest.mark.parametrize("marked", [False, True])
