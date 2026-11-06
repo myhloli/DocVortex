@@ -153,7 +153,8 @@ restored.export("output/report.epub", output_format="epub")
 
 ## 选择适合的处理方式
 
-- **PDF 解析：** 默认 `parse_mode="auto"` 对选定页面整体分类；判为 `txt` 时进行原生解析，判为 `ocr` 时抛出错误码为 `pdf_ocr_unsupported` 的 `DocumentError`，并提供 MinerU 下载地址。`parse_mode="txt"` 强制原生解析，跳过分类。CLI 使用 `--parse-mode auto|txt|ocr`，显式模式仅适用于 PDF。
+- **PDF 结构解析**默认使用 `pdf_structure="auto"`，优先利用 Tagged PDF 的语义和阅读顺序，未覆盖内容交给 Flash 规则。`pdf_structure="off"` 选择几何解析，CLI 对应 `--pdf-structure auto|off`。原始角色和块关联保存在 `docvortex_pdf_structure` 扩展中。[结构解析用法](docs/USAGE.md#tagged-pdf-and-pdfua-native-parsing)
+- **PDF 解析模式**默认使用 `parse_mode="auto"`，先接受足够的结构证据，再对需要判断的选定页面整体分类。`txt` 使用原生解析，`ocr` 返回 `pdf_ocr_unsupported` 和 MinerU 下载地址。`parse_mode="txt"` 强制原生解析。CLI 使用 `--parse-mode auto|txt|ocr`，显式模式适用于 PDF。
 - **PDF OCR：** `parse_mode="ocr"` 和 `--parse-mode ocr` 仅保留为兼容性入口，对 PDF 始终返回 `pdf_ocr_unsupported`。需要 OCR 时请下载并安装 [MinerU](https://github.com/opendatalab/MinerU)。DocVortex 不会自动安装或调用 MinerU。
 - **混合 PDF：** auto 模式不逐页分类或切换后端。整体判为 `txt` 时继续原生解析；其中扫描页需要 OCR 时，请使用 MinerU。
 - **PDF 分类：** `docvortex classify report.pdf` 返回 `txt` 或 `ocr`，不推理、不联网。元数据提取及底层 `PdfModel.predict()` 原生文字入口也保持离线。

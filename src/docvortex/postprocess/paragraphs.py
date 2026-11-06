@@ -83,6 +83,8 @@ def merge_para_text_blocks(pages: list[dict[str, Any]]) -> None:
             if previous_block is None:
                 continue
             previous_page_idx, previous_order_idx, previous_text_block = previous_block
+            if "_pdf_structure" in previous_text_block:
+                continue
             if not _is_same_or_consecutive_page(current_page_idx, previous_page_idx):
                 continue
             # 列表末项必须经过完整正文判据，不能由参考条目侧车绕过句末或几何屏障。

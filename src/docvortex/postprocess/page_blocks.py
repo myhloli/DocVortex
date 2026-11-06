@@ -186,6 +186,10 @@ def process_page_blocks(
 ) -> list[BlockDict]:
     """按固定阶段将单页 raw model-list 转换为可对象化的顶层 blocks。"""
     resolved_use_bbox = any(block.get("bbox") for block in page_model_list) if use_bbox is None else use_bbox
+    if any("_pdf_structure" in block for block in page_model_list):
+        from .pdf_structure import process_structure_blocks
+
+        return process_structure_blocks(page_model_list, use_bbox=resolved_use_bbox)
     blocks = _normalize_raw_blocks(page_model_list)
     _apply_caption_fallbacks(blocks, use_bbox=resolved_use_bbox)
     text_blocks, ref_text_blocks, list_blocks, index_blocks = _prepare_lists_and_indices(

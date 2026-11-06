@@ -9,6 +9,21 @@ use docvortex_pdfium::{Fonts, ReadError, Record};
 
 pub const RECORD_BATCH_SIZE: usize = 1024;
 
+/// 在已核验 ABI 和页面锁内批量复制标记栈，不保留任何借用句柄。
+#[pyfunction]
+pub fn read_pdfium_marked_content(
+    addresses: Vec<usize>,
+    objects: Vec<usize>,
+) -> PyResult<docvortex_pdfium::marked_content::MarkedContent> {
+    unsafe { docvortex_pdfium::marked_content::read(addresses, objects) }.map_err(|error| {
+        match error {
+            ReadError::InvalidInput(message) => PyValueError::new_err(message),
+            ReadError::Pdfium(message) => PdfiumReadError::new_err(message),
+            ReadError::Allocation(message) => PyMemoryError::new_err(message),
+        }
+    })
+}
+
 /// 在现有锁和文本页生命周期内批量读取字符 Form 编号，结果不含借用地址。
 #[pyfunction]
 pub fn read_pdfium_char_form_owners(

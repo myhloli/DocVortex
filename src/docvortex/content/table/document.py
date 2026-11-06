@@ -92,6 +92,8 @@ def merge_table(page_info_list: list[PageInfoDict]) -> None:
         previous_table_block = _find_boundary_table(previous_blocks, from_end=True)
         if current_table_block is None or previous_table_block is None:
             continue
+        if "_pdf_structure" in current_table_block or "_pdf_structure" in previous_table_block:
+            continue
 
         current_state = _get_or_create_table_state(current_table_block, state_cache)
         previous_state = _get_or_create_table_state(previous_table_block, state_cache)

@@ -57,9 +57,23 @@ def main(log_level: str) -> None:
     ),
 )
 @click.option("--overwrite", is_flag=True)
+@click.option(
+    "--pdf-structure",
+    type=click.Choice(["auto", "off"]),
+    default="auto",
+    show_default=True,
+    help="Use authored PDF structure when available, or select geometric Flash parsing.",
+)
 @click.option("--pdf-layout", type=click.Choice(["auto", "original", "reflow"]), default="auto", show_default=True)
 def convert_command(
-    source: Path, output: Path, output_format: str, page_range: str, parse_mode: str, overwrite: bool, pdf_layout: str
+    source: Path,
+    output: Path,
+    output_format: str,
+    page_range: str,
+    parse_mode: str,
+    overwrite: bool,
+    pdf_layout: str,
+    pdf_structure: str,
 ) -> None:
     """按指定 PDF 模式转换文档，并写出目标文件及所需素材。"""
     from .api import convert
@@ -77,6 +91,7 @@ def convert_command(
             overwrite=overwrite,
             options=options,
             parse_mode=parse_mode,
+            pdf_structure=pdf_structure,
         )
     except (ValueError, OSError) as error:
         raise click.ClickException(str(error)) from error

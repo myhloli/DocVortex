@@ -302,12 +302,13 @@ def test_pdf_single_character_objects_preserve_rotated_scripts(angle: int, scrip
     assert [item.get_text() for item in soup.find_all(tag)] == ["2"]
 
 
-def test_full_catalog_rotated_row_headers_keep_reading_order() -> None:
+@pytest.mark.parametrize("pdf_structure", ["auto", "off"])
+def test_full_catalog_rotated_row_headers_keep_reading_order(pdf_structure: str) -> None:
     """完整重放真实长文档，逐页锁定纵向行标题及合并单元格内的正常阅读顺序。"""
     from docvortex import parse
 
     source = Path(__file__).parent / "pdfs/flash_layout/deep_structure_catalog.pdf"
-    result = parse(source, parse_mode="txt", keep_model_json=True)
+    result = parse(source, parse_mode="txt", pdf_structure=pdf_structure, keep_model_json=True)
     assert result.model_json is not None
     assert len(result.model_json.pages) == 328
     for page in (36, 53, 54, *range(185, 213)):
@@ -319,7 +320,7 @@ def test_full_catalog_rotated_row_headers_keep_reading_order() -> None:
         ]
         assert len(tables) == 1
         soup = BeautifulSoup(tables[0]["content"], "html.parser")
-        texts = [cell.get_text() for cell in soup.find_all("td")]
+        texts = [cell.get_text() for cell in soup.find_all(["td", "th"])]
         expected = ("Day 1", "Day 2") if page in {36, 54} else ("Current Position",)
         for label in expected:
             assert texts.count(label) == 1, (page, label, texts)

@@ -35,6 +35,7 @@ def _remove_private_block_metadata(block: dict[str, Any]) -> None:
         "_reference_start",
         "_paragraph_boundary",
         "_native_annotation_parent_bbox",
+        "_pdf_structure",
     ):
         block.pop(field_name, None)
     content = block.get("content")
@@ -78,7 +79,7 @@ def blocks_to_page_info(
     return PageInfo.model_validate(raw_page)
 
 
-def model_json_to_pages(model_json: ModelJson) -> list[PageInfo]:
+def model_json_to_pages(model_json: ModelJson, *, structure_extension: dict | None = None) -> list[PageInfo]:
     """从严格 ModelJson 无副作用地构造可递归序列化的 PageInfo。"""
     page_indices = model_json.resolved_page_indices
     copied_model_list = deepcopy(model_json.pages)
@@ -99,6 +100,11 @@ def model_json_to_pages(model_json: ModelJson) -> list[PageInfo]:
     if use_bbox:
         merge_para_text_blocks(raw_pages)
         merge_table(raw_pages)
+
+    if any("_pdf_structure" in block for page in raw_pages for block in page["blocks"]):
+        from .pdf_structure import finish_structure_pages
+
+        finish_structure_pages(raw_pages, structure_extension)
 
     for page in raw_pages:
         for block in page["blocks"]:

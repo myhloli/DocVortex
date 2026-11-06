@@ -196,11 +196,46 @@ have empty `content` and retain their region images (including detected numbers)
 so all renderers use the existing image fallback. Inline equations are unchanged.
 Old results and caches are not rewritten; reparse to obtain the new output.
 
+## Tagged PDF and PDF/UA native parsing
+
+`analyze()`, `parse()`, `convert()` and `PdfModel.predict()` accept
+`pdf_structure="auto"` (default) or `"off"`. Automatic parsing uses the PDF's
+structure tree for supported semantics and reading order, with geometric Flash
+analysis for uncovered or rejected content. The same path accepts ordinary
+Tagged PDF files and PDFs declaring PDF/UA.
+
+```python
+import docvortex
+
+result = docvortex.parse("accessible.pdf", pdf_structure="auto", page_range="1-3")
+geometry_result = docvortex.parse("accessible.pdf", pdf_structure="off")
+```
+
+```bash
+docvortex convert accessible.pdf -o output/accessible.md --pdf-structure auto
+```
+
+The native path covers paragraphs, headings, nested lists, table cells and spans,
+figures, captions, links and formulas. `Title` uses `doc_title`, while `Hn` uses
+`paragraph_title` at `min(n + 1, 6)`. MathML and explicit TeX annotations use the
+existing formula representation. Graphical formulas can use region images.
+
+The versioned `docvortex_pdf_structure` document extension retains source roles,
+heading levels, language, alternate text, attributes and final block paths.
+Diagnostics report rejected references, table spans and reading-order conflicts.
+Page selection reads structure from the original document and preserves original
+page identities. Result bundles carry the semantic output, extension and assets.
+
+`pdf_structure="off"` selects geometric parsing. An explicit `off` value on a
+non-PDF input reports `pdf_structure_invalid`. Code blocks on the structure path
+use declared language information or `txt`.
+
 ## PDF classification and OCR requirements
 
 `analyze()`, `parse()` and `convert()` accept `parse_mode="auto"` (default),
-`"txt"` or `"ocr"`. Auto mode classifies the selected pages as a whole after
-`page_range` has been applied. A `txt` classification uses native parsing; an
+`"txt"` or `"ocr"`. Auto mode first accepts sufficient native structure evidence.
+Otherwise, it classifies the selected pages as a whole after `page_range` has
+been applied. A `txt` classification uses native parsing; an
 `ocr` classification raises `DocumentError` with code `pdf_ocr_unsupported`.
 Forced text mode skips classification. The `ocr` value is retained for
 compatibility and immediately raises the same error for PDF input, without

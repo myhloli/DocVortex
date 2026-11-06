@@ -329,6 +329,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(tables::table_visual_rows, module)?)?;
     module.add_function(wrap_pyfunction!(tables::cell_visual_groups_owned, module)?)?;
     module.add_function(wrap_pyfunction!(tables::table_row_occupancy, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        pdfium::read_pdfium_marked_content,
+        module
+    )?)?;
     module.add("PROTOCOL_VERSION", docvortex_core::PROTOCOL_VERSION)?;
     module.add_function(wrap_pyfunction!(scripts::script_roles, module)?)?;
     module.add_function(wrap_pyfunction!(scripts::numeric_script_indices, module)?)?;

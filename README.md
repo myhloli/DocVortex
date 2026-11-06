@@ -155,7 +155,8 @@ reads metadata without parsing the document body.
 
 ## Choose the right workflow
 
-- **PDF parsing:** `parse_mode="auto"` (default) classifies the selected PDF pages as a whole. A `txt` result uses native parsing; an `ocr` result raises `DocumentError` with code `pdf_ocr_unsupported` and a MinerU download link. Use `parse_mode="txt"` to force native parsing without classification. The CLI equivalent is `--parse-mode auto|txt|ocr`; explicit modes apply only to PDF input.
+- **PDF parsing** defaults to `pdf_structure="auto"`, which uses available Tagged PDF semantics and reading order, with Flash rules for uncovered content. `pdf_structure="off"` selects geometric parsing. The CLI accepts `--pdf-structure auto|off`. Original roles and block associations are recorded in `docvortex_pdf_structure` extensions. [Tagged PDF usage](docs/USAGE.md#tagged-pdf-and-pdfua-native-parsing)
+- **PDF classification** under `parse_mode="auto"` first accepts sufficient structure evidence, then classifies the selected pages as a whole when needed. A `txt` result uses native parsing. An `ocr` result raises `DocumentError` with code `pdf_ocr_unsupported` and a MinerU download link. `parse_mode="txt"` forces native parsing. The CLI accepts `--parse-mode auto|txt|ocr` for PDF input.
 - **PDF OCR:** `parse_mode="ocr"` and `--parse-mode ocr` are retained for compatibility and always report `pdf_ocr_unsupported` for PDF input. Download and install [MinerU](https://github.com/opendatalab/MinerU) for OCR. DocVortex does not install or invoke MinerU automatically.
 - **Mixed PDFs:** auto mode does not classify or switch backends per page. A selection classified as `txt` keeps native parsing even if it contains scanned pages. Use MinerU when those pages need OCR.
 - **PDF classification:** `docvortex classify report.pdf` returns `txt` or `ocr` without inference or networking. Metadata extraction and the low-level `PdfModel.predict()` native text API also remain offline.

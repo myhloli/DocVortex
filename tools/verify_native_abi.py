@@ -32,6 +32,13 @@ def verify_binary(binary: Path) -> None:
     assert native.crop_bitmap_bgr(bytes([1, 2, 3]), 1, 1, 3, "RGB", (0, 0, 1, 1), 0) == (bytes([3, 2, 1]), 1, 1)
     assert native.inline_style_stats() == 0
     assert native.PROTOCOL_VERSION == _expected_protocol_version()
+    # 结构标记桥接在解引用之前拒绝无效地址，同时验证当前解释器的参数转换与异常 ABI。
+    try:
+        native.read_pdfium_marked_content([0] * 6, [1])
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Marked-content bridge accepted invalid addresses")
     assert native.source_rows_plain([], (100.0, 100.0), 0) == []
     assert native.script_roles_raw_batch(
         [(0.0, 0.0, 5.0, 10.0), (0.0, 0.0, 5.0, 10.0)],

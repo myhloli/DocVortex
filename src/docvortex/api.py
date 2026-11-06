@@ -40,6 +40,7 @@ def analyze(
     page_range: str = "",
     source_context: HtmlSourceContext | None = None,
     parse_mode: Literal["auto", "txt", "ocr"] = "auto",
+    pdf_structure: Literal["auto", "off"] = "auto",
 ) -> AnalysisResult:
     """分析原生文档；PDF 自动分类或显式模式需要 OCR 时提示改用 MinerU。"""
     from .analyzers.native import models
@@ -47,12 +48,22 @@ def analyze(
 
     if parse_mode not in {"auto", "txt", "ocr"}:
         raise InvalidRequestError("parse_mode_invalid", "parse_mode must be auto, txt, or ocr", "parse_mode")
+    if pdf_structure not in {"auto", "off"}:
+        raise InvalidRequestError("pdf_structure_invalid", "pdf_structure must be auto or off", "pdf_structure")
 
     started = time.perf_counter()
     native_diagnostics: tuple[Diagnostic, ...] = ()
     extensions = {}
-    prepared = prepare_source(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context)
+    prepared = prepare_source(
+        source,
+        file_suffix=file_suffix,
+        page_range=page_range,
+        source_context=source_context,
+        preserve_pdf_structure=pdf_structure == "auto" and parse_mode != "ocr",
+    )
     try:
+        if prepared.file_suffix != "pdf" and pdf_structure != "auto":
+            raise InvalidRequestError("pdf_structure_invalid", "pdf_structure is supported only for PDF", "pdf_structure")
         if prepared.file_suffix != "pdf" and parse_mode != "auto":
             raise InvalidRequestError("parse_mode_invalid", "Explicit parse modes are supported only for PDF", "parse_mode")
         properties = prepared.source_properties
@@ -74,7 +85,15 @@ def analyze(
             from .document.pdf.visuals import attach_visual_block_images_from_pdf
 
             assert prepared.document is not None
-            resolved_mode = prepared.document.classify() if parse_mode == "auto" else parse_mode
+            pdf_model = models.PdfModel()
+            tagged = (
+                pdf_model._prepare_structure(prepared.document) if pdf_structure == "auto" and parse_mode != "ocr" else None
+            )
+            resolved_mode = (
+                ("txt" if tagged is not None and tagged.complete else prepared.document.classify())
+                if parse_mode == "auto"
+                else parse_mode
+            )
             if resolved_mode == "ocr":
                 raise DocumentError(
                     "pdf_ocr_unsupported",
@@ -84,7 +103,13 @@ def analyze(
             geometry, geometry_diagnostics = extract_layout_geometry(prepared.document, prepared.page_index_map)
             extensions[LAYOUT_EXTENSION] = geometry
             native_diagnostics += geometry_diagnostics
-            pages = models.PdfModel().predict(prepared.document)
+            pages = (
+                pdf_model.predict(prepared.document)
+                if pdf_structure == "auto"
+                else pdf_model.predict(prepared.document, pdf_structure=pdf_structure)
+            )
+            native_diagnostics += pdf_model.diagnostics
+            extensions.update(pdf_model.extensions)
             attach_visual_block_images_from_pdf(prepared.document, pages)
             attach_layout_image_rotations(geometry, pages, prepared.page_index_map)
         elif prepared.file_suffix == "ofd":
@@ -138,8 +163,7 @@ def analyze(
         )
         return AnalysisResult(model, diagnostics=diagnostics, elapsed_seconds=time.perf_counter() - started)
     finally:
-        if prepared.owns_document and prepared.document is not None:
-            prepared.document.close()
+        prepared.close()
 
 
 def postprocess(
@@ -175,10 +199,18 @@ def parse(
     source_context: HtmlSourceContext | None = None,
     keep_model_json: bool = False,
     parse_mode: Literal["auto", "txt", "ocr"] = "auto",
+    pdf_structure: Literal["auto", "off"] = "auto",
 ) -> DocumentResult:
     """完成输入、分析及后处理，返回可脱离原文件使用的结果。"""
     return postprocess(
-        analyze(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context, parse_mode=parse_mode),
+        analyze(
+            source,
+            file_suffix=file_suffix,
+            page_range=page_range,
+            source_context=source_context,
+            parse_mode=parse_mode,
+            pdf_structure=pdf_structure,
+        ),
         keep_model_json=keep_model_json,
     )
 
@@ -252,9 +284,17 @@ def convert(
     options: RenderOptions | None = None,
     overwrite: bool = False,
     parse_mode: Literal["auto", "txt", "ocr"] = "auto",
+    pdf_structure: Literal["auto", "off"] = "auto",
 ) -> ExportResult:
     """按指定解析模式完成转换，并返回实际写出的文件路径。"""
-    result = parse(source, file_suffix=file_suffix, page_range=page_range, source_context=source_context, parse_mode=parse_mode)
+    result = parse(
+        source,
+        file_suffix=file_suffix,
+        page_range=page_range,
+        source_context=source_context,
+        parse_mode=parse_mode,
+        pdf_structure=pdf_structure,
+    )
     return result.export(output_path, output_format=output_format, options=options, overwrite=overwrite)
 
 

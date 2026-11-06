@@ -41,7 +41,12 @@ def _attach_visual_block_images(
 def _prepare_page_visual_blocks(page_model_list: list[dict[str, Any]]) -> list[tuple[int, dict[str, Any]]]:
     """先折叠视觉容器，再记录原始块索引，供按需页图任务复用。"""
     _collapse_image_blocks(page_model_list)
-    return [(index, block) for index, block in enumerate(page_model_list) if block.get("type") in MODEL_JSON_VISUAL_BLOCK_TYPES]
+    return [
+        (index, block)
+        for index, block in enumerate(page_model_list)
+        if block.get("type") in MODEL_JSON_VISUAL_BLOCK_TYPES
+        and not (block.get("_pdf_structure", {}).get("image_ready") and block.get("image_base64"))
+    ]
 
 
 def _visual_page_ranges(

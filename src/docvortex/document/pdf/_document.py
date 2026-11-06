@@ -342,6 +342,10 @@ class PDFDocument:
         self._page_rotations: dict[int, Literal[0, 90, 180, 270]] = {}
         self._form_reader = None
         self._form_reader_ready = False
+        self._structure_cache = None
+        self._structure_ready = False
+        self._structure_source = None
+        self._structure_page_indices = None
         self._unicode_fallbacks: dict[int, dict[int, int]] = {}
         self.render_scale = render_scale
         self.render_max_edge = render_max_edge
@@ -455,6 +459,9 @@ class PDFDocument:
         finally:
             self._form_reader = None
             self._form_reader_ready = False
+            self._structure_cache = None
+            self._structure_ready = False
+            self._structure_source = None
             if hasattr(self, "_unicode_fallbacks"):
                 self._unicode_fallbacks.clear()
             if getattr(self, "_pdf_doc_opened", None) is not None:
@@ -745,18 +752,39 @@ class PDFDocument:
                 link_annotations=_extract_page_link_annotations(page, self._pdf_doc.raw, page_bbox, raw_rotation),
             )
 
+    def _get_object_reader(self):
+        """共享元数据、结构树、Form 和字体的对象读取器，避免重复解码交叉引用。"""
+        with _pdfium_lock:
+            if not self._form_reader_ready:
+                try:
+                    from pypdf import PdfReader
+
+                    self._form_reader = PdfReader(BytesIO(self._pdf_bytes))
+                except Exception:
+                    self._form_reader = None
+                self._form_reader_ready = True
+            return self._form_reader
+
+    def _get_structure(self):
+        """惰性保存自有结构快照，普通 PDF 的缺失结果也只探测一次。"""
+        with _pdfium_lock:
+            if not self._structure_ready:
+                from pypdf.errors import PdfReadError
+                from ...result import Diagnostic
+                from .structure import PDFStructure, read_pdf_structure
+
+                try:
+                    self._structure_cache = read_pdf_structure(self)
+                except (PdfReadError, ValueError, TypeError, KeyError, IndexError, RecursionError) as error:
+                    self._structure_cache = PDFStructure((), (Diagnostic("pdf_structure_invalid", str(error)),))
+                self._structure_ready = True
+            return self._structure_cache
+
     def _get_form_resource_page(self, page_idx: int):
         """为 Form 或异常字体按需读取资源字典，复用 reader 并隔离损坏 PDF。"""
-        if not self._form_reader_ready:
-            self._form_reader_ready = True
-            try:
-                from pypdf import PdfReader
-
-                self._form_reader = PdfReader(BytesIO(self._pdf_bytes))
-            except Exception:
-                self._form_reader = None
+        reader = self._get_object_reader()
         try:
-            return self._form_reader.pages[page_idx] if self._form_reader is not None else None
+            return reader.pages[page_idx] if reader is not None else None
         except Exception:
             return None
 

@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from io import BytesIO
 from typing import TYPE_CHECKING
 
 from ...schema import DocumentProperties
 from ..properties import property_date, property_text, property_values
+from .pdfium import pdfium_guard
 
 if TYPE_CHECKING:
     from ._document import PDFDocument
 
 
+@pdfium_guard()
 def read_pdf_properties(document: PDFDocument) -> tuple[DocumentProperties, list[str]]:
     """优先保留 Info 字段，用 XMP 补缺；可选属性损坏不丢失物理页数。"""
     properties = DocumentProperties(page_count=document.page_count, page_count_kind="physical")
@@ -29,10 +30,11 @@ def read_pdf_properties(document: PDFDocument) -> tuple[DocumentProperties, list
     except Exception as exc:
         warnings.append(f"PDF Info: {exc}")
     try:
-        from pypdf import PdfReader
         from pypdf.generic import DictionaryObject
 
-        reader = PdfReader(BytesIO(document.bytes), strict=False)
+        reader = document._get_object_reader()
+        if reader is None:
+            raise ValueError("PDF object reader unavailable")
         catalog = reader.trailer["/Root"]
         if isinstance(catalog, DictionaryObject):
             properties.languages = property_values(catalog.get("/Lang"))

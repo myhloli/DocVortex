@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO, Literal
 
 from docvortex.document.contracts import HtmlSourceContext
 
@@ -11,16 +11,48 @@ if TYPE_CHECKING:
 
 
 class PdfModel:
-    """将 Flash 原生 PDF 流水线包装为无状态模型。"""
+    """编排结构优先 PDF 解析并保存最近一次结果的来源和诊断。"""
 
-    def predict(self, pdf_doc: PDFDocument) -> list[list[dict[str, Any]]]:
+    def __init__(self) -> None:
+        """保存本次结构分析结果与诊断，各文档间使用独立实例状态。"""
+        self.diagnostics = ()
+        self.extensions = {}
+        self._tagged = None
+        self._prepared_document = None
+
+    def _prepare_structure(self, pdf_doc: PDFDocument):
+        """在自动分类前获取结构覆盖证据，随后 predict 复用同一次读取。"""
+        from .pdf.tagged import prepare_tagged_analysis
+
+        if self._prepared_document is not pdf_doc:
+            self._tagged = prepare_tagged_analysis(pdf_doc)
+            self._prepared_document = pdf_doc
+        return self._tagged
+
+    def predict(self, pdf_doc: PDFDocument, *, pdf_structure: Literal["auto", "off"] = "auto") -> list[list[dict[str, Any]]]:
         """分析调用方持有的 PDFDocument，在所有文字匹配结束后统一输出可见英数。"""
         from ...content import normalize_pdf_model_text
         from .pdf import pipeline
+        from ...errors import InvalidRequestError
 
-        pages = pipeline._analyze_native_document(pdf_doc)
-        normalize_pdf_model_text(pages)
-        return pages
+        if pdf_structure not in {"auto", "off"}:
+            raise InvalidRequestError("pdf_structure_invalid", "pdf_structure must be auto or off", "pdf_structure")
+        self.diagnostics, self.extensions = (), {}
+        try:
+            tagged = self._prepare_structure(pdf_doc) if pdf_structure == "auto" else None
+            if tagged is None:
+                pages = pipeline._analyze_native_document(pdf_doc)
+            else:
+                from ...document.pdf.structure import STRUCTURE_EXTENSION
+
+                pages = tagged.predict()
+                self.diagnostics = tuple(tagged.diagnostics)
+                self.extensions[STRUCTURE_EXTENSION] = tagged.extension()
+            normalize_pdf_model_text(pages)
+            return pages
+        finally:
+            self._tagged = None
+            self._prepared_document = None
 
 
 class CsvModel:
