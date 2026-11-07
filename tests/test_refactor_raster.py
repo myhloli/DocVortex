@@ -203,12 +203,14 @@ def test_public_visual_raster_rejects_page_count_before_mutation() -> None:
 
 
 @pytest.mark.parametrize("timeout,threads", [(None, None), (17, 2)])
+@pytest.mark.parametrize("invalid_bbox", [False, True])
 def test_public_visual_raster_matches_eager_crops(
     monkeypatch: pytest.MonkeyPatch,
     timeout: int | None,
     threads: int | None,
+    invalid_bbox: bool,
 ) -> None:
-    """以旧全页裁图为参考，验证稀疏筛页、容器、旋转、边界和显式配置透传。"""
+    """验证稀疏裁图与全页裁图的一致性，以及无效素材报错后的资源释放。"""
     from docvortex.document.pdf import visuals
 
     pages = [
@@ -217,7 +219,7 @@ def test_public_visual_raster_matches_eager_crops(
         [{"type": "chart", "bbox": [0.1, 0.1, 0.9, 0.9], "angle": 90}],
         [{"type": "table", "bbox": [-0.1, -0.1, 1.1, 1.1]}],
         [{"type": "equation", "bbox": [0.1, 0.1, 0.9, 0.9], "angle": 270}],
-        [{"type": "image", "bbox": [0.5, 0.5, 0.5, 0.8]}],
+        [{"type": "image", "bbox": [0.5, 0.5, 0.5 if invalid_bbox else 0.8, 0.8]}],
         [],
     ]
 
@@ -229,7 +231,11 @@ def test_public_visual_raster_matches_eager_crops(
 
     expected = deepcopy(pages)
     reference = [{"img_pil": page_image(i)} for i in range(len(pages))]
-    visuals.attach_visual_block_images(expected, reference)
+    if invalid_bbox:
+        with pytest.raises(ValueError, match="generation failed: page=5, block=0"):
+            visuals.attach_visual_block_images(expected, reference)
+    else:
+        visuals.attach_visual_block_images(expected, reference)
     for item in reference:
         item["img_pil"].close()
     calls: list[tuple[int, int]] = []
@@ -247,10 +253,15 @@ def test_public_visual_raster_matches_eager_crops(
 
     use_local_crop_worker(monkeypatch, raster)
     with PDFDocument(make_pdf(len(pages))) as document:
-        visuals.attach_visual_block_images_from_pdf(document, pages, window_size=2, timeout=timeout, threads=threads)
+        if invalid_bbox:
+            with pytest.raises(ValueError, match="generation failed: page=5, block=0"):
+                visuals.attach_visual_block_images_from_pdf(document, pages, window_size=2, timeout=timeout, threads=threads)
+        else:
+            visuals.attach_visual_block_images_from_pdf(document, pages, window_size=2, timeout=timeout, threads=threads)
         assert document.page_count == len(pages)
     assert calls == [(1, 1), (2, 3), (4, 5)]
-    assert pages == expected
+    if not invalid_bbox:
+        assert pages == expected
     for image in created:
         with pytest.raises(ValueError):
             image.getpixel((0, 0))

@@ -68,14 +68,14 @@ def test_native_crop_rejects_invalid_metadata(native, data, stride, mode, angle)
 
 
 def test_crop_compute_failure_is_not_silently_skipped(native):
-    """原生计算异常传播，只有既有无效视觉框允许跳过。"""
+    """原生计算异常明确传播，不能静默跳过已选视觉素材。"""
     with pytest.raises(ValueError, match="buffer"):
         _attach_owned_bitmap_crops([(0, {"bbox": [0, 0, 1, 1]})], (b"", 4, 4, 12, "BGR"), native, 0)
 
 
-@pytest.mark.parametrize("bbox", [None, [], [float("nan"), 0, 1, 1], [-3, -3, -1, -1], [0.05, 0.1, 0.9, 0.85], [-1, 1, 8, 8]])
+@pytest.mark.parametrize("bbox", [[0.05, 0.1, 0.9, 0.85], [-1, 1, 8, 8]])
 def test_crop_normalization_matches_reference(native, bbox):
-    """边缘、归一化框、非有限值和完全越界框遵循旧路径的裁剪或跳过结果。"""
+    """有效归一化框和部分越界框在两条路径上保持一致裁剪结果。"""
     image = Image.new("RGB", (4, 5), (20, 30, 40))
     specs = [[(0, {"bbox": bbox, "angle": -90})]]
     expected = deepcopy(specs)
@@ -83,3 +83,19 @@ def test_crop_normalization_matches_reference(native, bbox):
     _attach_owned_bitmap_crops(specs[0], (image.tobytes(), 4, 5, 12, "RGB"), native, 0)
     assert specs[0][0][1].get("image_base64") == expected[0][0][1].get("image_base64")
     image.close()
+
+
+@pytest.mark.parametrize("bbox", [None, [], [float("nan"), 0, 1, 1], [-3, -3, -1, -1], [0.5, 0.5, 0.5, 0.8]])
+def test_invalid_selected_crop_reports_context_in_both_paths(native, bbox):
+    """已选素材的无效、非有限、完全越界和零面积框在两条路径都带上下文报错。"""
+    with Image.new("RGB", (4, 5), (20, 30, 40)) as image:
+        specs = [[(2, {"type": "image", "bbox": bbox, "angle": -90})]]
+        reference = deepcopy(specs)
+        with pytest.raises(ValueError, match="generation failed: page=3, block=2") as eager_failure:
+            _attach_prepared_visual_block_images(reference, [{"img_pil": image}], page_start_index=3)
+        with pytest.raises(ValueError, match="geometry invalid: page=3, block=2") as native_failure:
+            _attach_owned_bitmap_crops(specs[0], (image.tobytes(), 4, 5, 12, "RGB"), native, 3)
+        assert eager_failure.value.__cause__ is not None
+        assert native_failure.value.__cause__ is not None
+        assert "image_base64" not in reference[0][0][1]
+        assert "image_base64" not in specs[0][0][1]
