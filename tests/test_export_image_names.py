@@ -96,23 +96,26 @@ def test_callbacks_receive_original_page_and_validated_relative_path() -> None:
     def image_resolver(block: ImagePayloadBlock, page_idx: int) -> tuple[bytes, str]:
         """记录原始页号，模拟宿主从源 PDF 或本地文件取得载荷。"""
         calls.append((block.type, page_idx))
-        return b"direct", ".PNG"
+        return b"\x89PNG\r\n\x1a\ndirect", ".PNG"
 
     def asset_resolver(path: str) -> bytes:
         """接收完成 URL 解码及安全检查后的相对路径。"""
         calls.append(path)
-        return b"inline"
+        return b"\xff\xd8\xffinline"
 
     saved, assets = materialize_middle(middle, image_resolver=image_resolver, asset_resolver=asset_resolver)
     assert calls == [("table_body", 5), "图 片.JPEG"]
-    assert dict(assets) == {"images/page_5_table_3.png": b"direct", "images/page_5_table_image_3_1.jpeg": b"inline"}
+    assert dict(assets) == {
+        "images/page_5_table_3.png": b"\x89PNG\r\n\x1a\ndirect",
+        "images/page_5_table_image_3_1.jpeg": b"\xff\xd8\xffinline",
+    }
     assert saved.pages[0].blocks[0].content[0].content == '<img src="images/page_5_table_image_3_1.jpeg">'
     assert middle.pages[0].blocks[0].content[0].image_base64 == _uri()
     validate_materialized_assets(saved, assets)
 
 
 def test_callback_none_preserves_payload_without_default_fallback() -> None:
-    """宿主获取失败不会隐式回退，兼容 Gradio 忽略非法直接载荷的行为。"""
+    """宿主获取失败不会隐式回退，由调用者的交付边界负责校验保留载荷。"""
     middle = _document(image_base64="invalid")
 
     def unavailable(block: ImagePayloadBlock, page_idx: int) -> None:
@@ -143,7 +146,7 @@ def test_historical_paths_stay_unchanged_and_missing_assets_still_fail() -> None
     inline = "images/page_5_table_body_3_1.jpg"
     middle = _document(f'<img src="{inline}">')
     middle.pages[0].blocks[0].content[0].image_path = direct
-    supplied = AssetStore({direct: b"old-direct", inline: b"old-inline"})
+    supplied = AssetStore({direct: b"\xff\xd8\xffold-direct", inline: b"\xff\xd8\xffold-inline"})
     saved, assets = materialize_middle(middle, supplied)
     assert saved == middle and dict(assets) == dict(supplied)
     validate_materialized_assets(saved, assets)

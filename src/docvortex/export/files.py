@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from ..assets import AssetStore
+from ..assets import AssetStore, validate_image_payload
 from ..content.tree import iter_child_blocks
 from ..result import ExportResult, RenderArtifact
 from ..schema import ImagePayloadBlock, MiddleJson
@@ -39,8 +39,10 @@ def validate_materialized_assets(middle_json: MiddleJson, assets: AssetStore) ->
         block = pending.pop()
         pending.extend(iter_child_blocks(block))
         image_path = getattr(block, "image_path", None)
-        if image_path and image_path not in assets:
-            raise ValueError(f"Missing materialized asset: {image_path}")
+        if image_path:
+            if image_path not in assets:
+                raise ValueError(f"Missing materialized asset: {image_path}")
+            validate_image_payload(assets[image_path], Path(image_path).suffix)
         content = getattr(block, "content", None)
         if str(block.type) not in {"table_body", "chart_body", "image_body"} or not isinstance(content, str):
             continue
@@ -50,8 +52,10 @@ def validate_materialized_assets(middle_json: MiddleJson, assets: AssetStore) ->
             reference = image.get("src")
             if reference and _is_external_reference(reference):
                 continue
-            if reference and reference not in assets:
-                raise ValueError(f"Missing materialized HTML image: {reference}")
+            if reference:
+                if reference not in assets:
+                    raise ValueError(f"Missing materialized HTML image: {reference}")
+                validate_image_payload(assets[reference], Path(reference).suffix)
 
 
 def write_artifact(artifact: RenderArtifact, path: Path, *, overwrite: bool) -> ExportResult:

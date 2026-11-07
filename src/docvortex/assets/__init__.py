@@ -1,6 +1,6 @@
 """文档素材的显式字节所有权、图像转码与读取接口。"""
 
-from ..foundation._image_payload import parse_image_data_uri_strict, validate_image_sidecar_path
+from ..foundation._image_payload import parse_image_data_uri_strict, validate_image_payload, validate_image_sidecar_path
 from ..foundation.image_encoding import ImageArtifact, ImageFormat, transcode_image
 from .images import (
     ImageArray,
@@ -20,6 +20,7 @@ __all__ = [
     "parse_image_data_uri_strict",
     "transcode_image",
     "validate_image_sidecar_path",
+    "validate_image_payload",
     "calculate_contrast",
     "crop_pil_image",
     "image_size",

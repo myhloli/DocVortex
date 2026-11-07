@@ -78,6 +78,7 @@ PUBLIC_API: dict[str, tuple[str, ...]] = {
         "rotate_image_to_upright",
         "transcode_image",
         "validate_image_sidecar_path",
+        "validate_image_payload",
     ),
     "docvortex.image": (
         "Interpolation",

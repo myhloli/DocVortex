@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from loguru import logger
 
 from ...assets import image_size as _normalize_page_size
 from ...foundation._coordinates import convert_bbox
@@ -118,9 +117,12 @@ def attach_visual_block_images_from_pdf(
         if len(crops) != end - start + 1:
             raise ValueError("PDF visual crop page count mismatch")
         for offset, page_crops in enumerate(crops, start=start):
-            for block_index, payload in page_crops:
-                if payload is not None:
-                    model_list[offset][block_index]["image_base64"] = payload
+            received = dict(page_crops)
+            for block_index, block in prepared_visuals[offset]:
+                payload = received.get(block_index)
+                if not payload:
+                    raise ValueError(f"PDF visual asset missing: page={offset}, block={block_index}, type={block.get('type')}")
+                model_list[offset][block_index]["image_base64"] = payload
 
 
 def _attach_prepared_visual_block_images(
@@ -138,8 +140,9 @@ def _attach_prepared_visual_block_images(
         page_index = page_start_index + page_offset
         page_pil_image = image_dict.get("img_pil")
         if page_pil_image is None:
-            logger.warning(f"Skipping model visual block crops without page image: page={page_index}")
-            continue
+            raise ValueError(
+                f"PDF visual asset page image missing: page={page_index}, blocks={[index for index, _ in visual_blocks]}"
+            )
 
         converted_page_image = None
         try:
@@ -166,11 +169,11 @@ def _attach_prepared_visual_block_images(
                         raise ValueError("empty crop or JPEG encoding failure")
                     block["image_base64"] = image_base64
                 except Exception as exc:
-                    logger.warning(
-                        "Skipping invalid model visual block crop: "
+                    raise ValueError(
+                        "PDF visual asset generation failed: "
                         f"page={page_index}, block={block_idx}, type={block.get('type')}, "
                         f"bbox={block.get('bbox')}, error={exc}"
-                    )
+                    ) from exc
         finally:
             if converted_page_image is not None:
                 converted_page_image.close()
@@ -244,14 +247,16 @@ def _attach_owned_bitmap_crops(visual_blocks, bitmap, native, page_index):
                 raise ValueError("invalid bbox")
             angle = _normalize_visual_block_angle(block.get("angle", 0))
         except Exception as exc:
-            logger.warning(f"Skipping invalid model visual block crop: page={page_index}, block={block_idx}, error={exc}")
-            continue
+            raise ValueError(f"PDF visual asset geometry invalid: page={page_index}, block={block_idx}, error={exc}") from exc
         # 计算异常不能被无效输入的兼容跳过逻辑吞掉，也不能静默切回 Python。
-        pixels, crop_width, crop_height = native.crop_bitmap_bgr(data, width, height, stride, mode, bbox, angle)
-        crop_bgr = np.frombuffer(pixels, dtype=np.uint8).reshape(crop_height, crop_width, 3)
+        try:
+            pixels, crop_width, crop_height = native.crop_bitmap_bgr(data, width, height, stride, mode, bbox, angle)
+            crop_bgr = np.frombuffer(pixels, dtype=np.uint8).reshape(crop_height, crop_width, 3)
+        except Exception as exc:
+            raise ValueError(f"PDF visual asset crop failed: page={page_index}, block={block_idx}, error={exc}") from exc
         try:
             # 保留原生 BGR 裁剪协议，只在 Pillow 编码边界交换颜色通道。
             encoded = _encode_rgb_as_jpeg_bytes(crop_bgr[..., ::-1])
             block["image_base64"] = f"data:image/jpeg;base64,{base64.b64encode(encoded).decode('ascii')}"
         except Exception as exc:
-            logger.warning(f"Skipping invalid model visual block crop: page={page_index}, block={block_idx}, error={exc}")
+            raise ValueError(f"PDF visual asset encoding failed: page={page_index}, block={block_idx}, error={exc}") from exc

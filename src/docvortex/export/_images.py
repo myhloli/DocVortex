@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import PurePosixPath
 from urllib.parse import unquote
 
-from ..assets import AssetStore, parse_image_data_uri_strict, validate_image_sidecar_path
+from ..assets import AssetStore, parse_image_data_uri_strict, validate_image_payload, validate_image_sidecar_path
 from ..content.tree import iter_child_blocks
 from ..schema import (
     AlgorithmBodyBlock,
@@ -46,6 +46,7 @@ def _register_image(
     extension = extension.lower().lstrip(".") or "jpg"
     if extension not in _IMAGE_EXTENSIONS:
         raise ValueError(f"Unsupported image extension: {extension}")
+    validate_image_payload(payload, extension)
     if owner.index is None:
         raise ValueError("Image owner must have a block index")
     kind = str(owner.type)

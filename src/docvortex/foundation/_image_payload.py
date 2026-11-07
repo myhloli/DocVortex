@@ -124,6 +124,15 @@ def parse_image_data_uri_strict(data_uri: str) -> tuple[bytes, str]:
         payload = base64.b64decode(encoded_payload, validate=True)
     except (binascii.Error, ValueError) as exc:
         raise ValueError("Invalid base64 image payload") from exc
+    validate_image_payload(payload, extension)
+    return payload, extension
+
+
+def validate_image_payload(payload: bytes, extension: str) -> None:
+    """校验已有素材字节的格式、大小和签名，不解码重采样或改变图片方向。"""
+    extension = normalize_image_extension(extension.lower().lstrip("."))
+    payload_limit = MAX_GENERATED_SVG_BYTES if extension == "svg" else MAX_RASTER_IMAGE_BYTES
+    mime_subtype = extension
     if not payload:
         raise ValueError("Image payload must not be empty")
     if len(payload) > payload_limit:
@@ -132,7 +141,7 @@ def parse_image_data_uri_strict(data_uri: str) -> tuple[bytes, str]:
 
     if extension == "svg":
         _parse_svg_root_strict(payload)
-        return payload, extension
+        return
 
     signatures: dict[str, tuple[bytes, ...]] = {
         "jpg": (b"\xff\xd8\xff",),
@@ -149,7 +158,6 @@ def parse_image_data_uri_strict(data_uri: str) -> tuple[bytes, str]:
         raise ValueError(f"Image signature does not match MIME subtype: {mime_subtype}")
     if extension == "webp" and (len(payload) < 12 or payload[8:12] != b"WEBP"):
         raise ValueError("Image signature does not match MIME subtype: webp")
-    return payload, extension
 
 
 def _decode_png_data_uri(value: str) -> bytes:
