@@ -703,7 +703,7 @@ impl NativeTextSnapshot {
     fn supports_span_matching(&self) -> bool {
         self.data.chars.iter().all(|ch| {
             let degrees = ch.rotation * (180.0 / std::f64::consts::PI);
-            [0.0, 90.0, 180.0, 270.0]
+            [0.0, 90.0, 180.0, 270.0, 360.0]
                 .iter()
                 .any(|angle| (degrees - angle).abs() < 0.1)
         })

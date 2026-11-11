@@ -79,6 +79,47 @@ def _plain(value):
     return value
 
 
+@pytest.mark.parametrize(
+    ("degrees", "expected"),
+    [
+        (0, True),
+        (0.05, True),
+        (-0.05, True),
+        (0.099, True),
+        (-0.099, True),
+        (0.101, False),
+        (-0.101, False),
+        (45, False),
+        (90, True),
+        (180, True),
+        (270, True),
+    ],
+)
+def test_snapshot_span_matching_covers_zero_wrap(degrees: float, expected: bool) -> None:
+    """使用实际 PDF 字符验证近零方向的快路径资格与真实分配结果，并保留斜向过滤。"""
+    output = BytesIO()
+    canvas = Canvas(output, pagesize=(450.5, 650.25))
+    canvas.translate(200, 300)
+    canvas.rotate(degrees)
+    canvas.setFont("Helvetica", 16)
+    canvas.drawString(0, 0, "AB")
+    canvas.showPage()
+    canvas.save()
+    with PDFDocument(stable_font_pdf(output.getvalue())) as document:
+        page = document[0]
+        owner = page.get_text_snapshot()
+        chars = page.get_chars()
+        bbox = (
+            min(char["bbox"][0] for char in chars) - 2,
+            min(char["bbox"][1] for char in chars) - 2,
+            max(char["bbox"][2] for char in chars) + 2,
+            max(char["bbox"][3] for char in chars) + 2,
+        )
+        assert owner.supports_span_matching() is expected
+        assignments = owner.assign_spans([bbox], bbox[3] - bbox[1], [], [], 0.5)
+        assert assignments == ([0, 0] if expected else None)
+
+
 @pytest.mark.parametrize("rotation", [0, 90, 180, 270])
 @pytest.mark.parametrize("visible", [False, True])
 @pytest.mark.parametrize("extended", [False, True])
