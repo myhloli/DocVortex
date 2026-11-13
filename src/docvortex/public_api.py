@@ -133,6 +133,8 @@ PUBLIC_API: dict[str, tuple[str, ...]] = {
     "docvortex.content.table": (
         "build_row_rendered_cell_segments",
         "RenderedCellSegment",
+        "TableMergeDecision",
+        "TableMergeRejection",
         "build_table_state_from_html",
         "calculate_row_rendered_segments",
         "can_merge_by_structure",

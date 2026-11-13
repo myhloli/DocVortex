@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from bs4 import BeautifulSoup
 
-from docvortex.content.table import merge_table, merge_table_content
+from docvortex.content.table import TableMergeDecision, TableMergeRejection, merge_table, merge_table_content
 from docvortex.schema import BlockType
 
 DEFAULT_HTML = "<table><tr><td>A</td><td>B</td></tr></table>"
@@ -443,3 +443,143 @@ def test_merge_table_content_returns_none_for_invalid_input(
     assert merge_table_content(previous, current) is None
     assert previous == previous_original
     assert current == current_original
+
+
+def test_merge_table_reports_successful_decisions_in_page_order() -> None:
+    """验证成功诊断保留原标记行为，并按原倒序检测顺序报告。"""
+    tables = [_table(index) for index in range(3)]
+    pages = [_page(index, [table]) for index, table in enumerate(tables)]
+    decisions: list[TableMergeDecision] = []
+
+    merge_table(pages, on_decision=decisions.append)
+
+    assert [table.get("continues_prev") for table in tables] == [None, True, True]
+    assert [(item.previous_page_idx, item.current_page_idx) for item in decisions] == [(1, 2), (0, 1)]
+    assert all(item.mergeable and item.rejection is None for item in decisions)
+    assert [(item.previous_table_index, item.current_table_index) for item in decisions] == [(1, 2), (0, 1)]
+
+
+@pytest.mark.parametrize(
+    ("previous", "current", "expected_rejection"),
+    [
+        (
+            _table(0),
+            _table(1, children=[_caption("Table 1"), _table_body(index=1)]),
+            TableMergeRejection.CONTINUATION_CAPTION_REQUIRED,
+        ),
+        (
+            _table(0, children=[_table_body(), _footnote("one", index=1), _footnote("two", index=2)]),
+            _table(1, children=[_caption("Table 1 (continued)"), _table_body(index=1)]),
+            TableMergeRejection.MULTIPLE_PREVIOUS_FOOTNOTES,
+        ),
+        (
+            _table(0, children=[_table_body(), _footnote("old")]),
+            _table(1),
+            TableMergeRejection.PREVIOUS_FOOTNOTES_REQUIRE_CAPTION,
+        ),
+        (
+            _table(0),
+            _table(1, bbox=[0.06, 0.1, 0.94, 0.9]),
+            TableMergeRejection.INCOMPATIBLE_TABLE_WIDTHS,
+        ),
+        (
+            _table(0, "<table><tr><td colspan='4'>H</td></tr><tr><td colspan='2'>A</td><td>B</td></tr></table>"),
+            _table(1, "<table><tr><td colspan='2'>C</td></tr></table>"),
+            TableMergeRejection.INCOMPATIBLE_TABLE_STRUCTURE,
+        ),
+    ],
+)
+def test_merge_table_diagnoses_rejected_table_rules(
+    previous: dict[str, Any],
+    current: dict[str, Any],
+    expected_rejection: TableMergeRejection,
+) -> None:
+    """验证题注、脚注、宽度和列结构拒绝原因。"""
+    previous = deepcopy(previous)
+    current = deepcopy(current)
+    decisions: list[TableMergeDecision] = []
+
+    merge_table([_page(0, [previous]), _page(1, [current])], on_decision=decisions.append)
+
+    assert "continues_prev" not in current
+    assert len(decisions) == 1
+    assert decisions[0].mergeable is False
+    assert decisions[0].rejection is expected_rejection
+
+
+@pytest.mark.parametrize(
+    ("pages", "expected_rejection", "expected_blocker_page", "expected_blocker_type"),
+    [
+        (
+            [_page(0, [_table(0), _noise(BlockType.TEXT)]), _page(1, [_table(1)])],
+            TableMergeRejection.BOUNDARY_BLOCKED,
+            0,
+            BlockType.TEXT,
+        ),
+        (
+            [_page(0, []), _page(1, [_table(1)])],
+            TableMergeRejection.BOUNDARY_TABLE_MISSING,
+            None,
+            None,
+        ),
+        (
+            [_page(0, [_table(0)]), _page(2, [_table(1)])],
+            TableMergeRejection.NON_CONSECUTIVE_PAGES,
+            None,
+            None,
+        ),
+        (
+            ["invalid", _page(1, [_table(1)])],
+            TableMergeRejection.INVALID_PAGE,
+            None,
+            None,
+        ),
+        (
+            [_page(0, [_table(0)]), _page(1, [_table(1, "<table></table>")])],
+            TableMergeRejection.INVALID_TABLE_STRUCTURE,
+            None,
+            None,
+        ),
+    ],
+)
+def test_merge_table_diagnoses_page_and_boundary_rejections(
+    pages: list[dict[str, Any]],
+    expected_rejection: TableMergeRejection,
+    expected_blocker_page: int | None,
+    expected_blocker_type: str | None,
+) -> None:
+    """验证页面、边界与表格结构拒绝原因及阻断位置。"""
+    pages = deepcopy(pages)
+    decisions: list[TableMergeDecision] = []
+
+    merge_table(pages, on_decision=decisions.append)
+
+    assert len(decisions) == 1
+    decision = decisions[0]
+    assert decision.rejection is expected_rejection
+    assert decision.blocker_page_idx == expected_blocker_page
+    assert decision.blocker_block_type == expected_blocker_type
+
+
+def test_merge_table_diagnoses_preserved_pdf_structure() -> None:
+    """验证原生PDF结构块的保留决策可诊断。"""
+    current = _table(1)
+    current["_pdf_structure"] = {}
+    decisions: list[TableMergeDecision] = []
+
+    merge_table([_page(0, [_table(0)]), _page(1, [current])], on_decision=decisions.append)
+
+    assert len(decisions) == 1
+    assert decisions[0].rejection is TableMergeRejection.PDF_STRUCTURE_PRESERVED
+
+
+def test_merge_table_rejects_invalid_diagnostic_callback_before_mutation() -> None:
+    """验证非法诊断回调在校验阶段拒绝，不清理已有标记。"""
+    current = _table(1)
+    current["continues_prev"] = True
+    pages = [_page(0, [_table(0)]), _page(1, [current])]
+
+    with pytest.raises(TypeError, match="on_decision"):
+        merge_table(pages, on_decision="diagnostics")
+
+    assert current["continues_prev"] is True

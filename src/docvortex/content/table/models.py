@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, TypeAlias
 
 MAX_HEADER_ROWS = 5
@@ -10,6 +11,40 @@ MAX_HEADER_ROWS = 5
 BlockDict: TypeAlias = dict[str, Any]
 PageInfoDict: TypeAlias = dict[str, Any]
 CalculationBBox: TypeAlias = tuple[int, int, int, int]
+
+
+class TableMergeRejection(str, Enum):
+    """跨页表格延续检测的拒绝原因。"""
+
+    INVALID_PAGE = "invalid_page"
+    NON_CONSECUTIVE_PAGES = "non_consecutive_pages"
+    BOUNDARY_TABLE_MISSING = "boundary_table_missing"
+    BOUNDARY_BLOCKED = "boundary_blocked"
+    PDF_STRUCTURE_PRESERVED = "pdf_structure_preserved"
+    INVALID_TABLE_STRUCTURE = "invalid_table_structure"
+    CONTINUATION_CAPTION_REQUIRED = "continuation_caption_required"
+    MULTIPLE_PREVIOUS_FOOTNOTES = "multiple_previous_footnotes"
+    PREVIOUS_FOOTNOTES_REQUIRE_CAPTION = "previous_footnotes_require_caption"
+    INCOMPATIBLE_TABLE_WIDTHS = "incompatible_table_widths"
+    INCOMPATIBLE_TABLE_STRUCTURE = "incompatible_table_structure"
+
+
+@dataclass(frozen=True, slots=True)
+class TableMergeDecision:
+    """记录一次相邻页表格检测的结果，不包含论文正文。"""
+
+    previous_page_idx: int | None
+    current_page_idx: int | None
+    previous_table_index: int | None
+    current_table_index: int | None
+    rejection: TableMergeRejection | None
+    blocker_page_idx: int | None = None
+    blocker_block_type: str | None = None
+
+    @property
+    def mergeable(self) -> bool:
+        """返回相邻页表格是否通过延续检测。"""
+        return self.rejection is None
 
 
 @dataclass

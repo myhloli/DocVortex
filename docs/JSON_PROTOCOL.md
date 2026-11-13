@@ -110,6 +110,20 @@ Structured Content preserves the optional `anchor` in its `captions` and
 `footnotes` entries; their `content` remains plain rendered annotation content
 without an injected target tag.
 
+## Cross-page table detection diagnostics
+
+`merge_table()` accepts an optional `on_decision` callback for callers that need to
+explain why a page pair was not marked as a continuation. Each immutable
+`TableMergeDecision` contains the two page indices, available table block indices,
+and a `TableMergeRejection` reason. `decision.mergeable` is true only when the
+existing continuation checks accept the pair. Boundary rejections also identify the
+blocking page and block type.
+
+The callback reports detection decisions in the existing reverse page order. It does
+not report whether a later renderer can merge the table content, and it does not
+include table text. Omitting the callback preserves the existing behavior and output;
+no document schema or serialized diagnostic fields are added.
+
 ## Optional PDF layout geometry
 
 Native PDF analysis adds `extensions.docvortex_layout` and deterministic
