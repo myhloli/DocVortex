@@ -210,6 +210,28 @@ def test_merge_table_applies_caption_and_footnote_rules(
     assert current_table.get("continues_prev", False) is expected
 
 
+@pytest.mark.parametrize(
+    ("current_caption", "expected"),
+    [
+        ("续表 2-1 临床信息表", True),
+        ("续表2-1 临床信息表", True),
+        ("续上表 2-1 临床信息表", True),
+        ("Continued table 2-1 Clinical information", True),
+        ("CONTINUED TABLE A1 Clinical information", True),
+        ("续表说明见正文", False),
+        ("Continued table of contents", False),
+        ("Previous table 2-1", False),
+    ],
+)
+def test_merge_table_scopes_leading_continuation_markers(current_caption: str, expected: bool) -> None:
+    """验证带编号的中英前置续表标记，并拒绝相似普通文字。"""
+    current_table = _table(1, children=[_caption(current_caption), _table_body(index=1)])
+
+    merge_table([_page(0, [_table(0)]), _page(1, [current_table])])
+
+    assert current_table.get("continues_prev", False) is expected
+
+
 def test_post_table_non_continuation_caption_does_not_block_merge() -> None:
     """验证 table body 下方的非续表 caption 不参与阻断判断。"""
     current_children = [
