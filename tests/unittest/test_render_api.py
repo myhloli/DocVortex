@@ -173,6 +173,25 @@ def test_unified_render_rejects_legacy_format_and_mismatched_options() -> None:
         render(middle, RenderFormat.PDF, options=DocxRenderOptions())
 
 
+def test_structured_content_options_forward_table_merge(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证统一入口传递续表合并开关。"""
+    received = {}
+
+    def render_stub(middle_json, **kwargs):
+        received.update(kwargs)
+        return {}
+
+    monkeypatch.setattr("docvortex.render.api.render_structured_content", render_stub)
+    result = render(
+        _middle(_page(0)),
+        RenderFormat.STRUCTURED_CONTENT,
+        options=StructuredContentRenderOptions(merge_continued_tables=True),
+    )
+
+    assert result == {}
+    assert received["merge_continued_tables"] is True
+
+
 def test_public_options_validate_fields() -> None:
     """验证 Options 构造期的严格字段类型检查。"""
     with pytest.raises(TypeError, match="RenderMode"):
@@ -191,6 +210,8 @@ def test_public_options_validate_fields() -> None:
             options_type(mode=RenderMode.DEFAULT)
     with pytest.raises(TypeError, match="asset_base_url"):
         StructuredContentRenderOptions(asset_base_url=1)
+    with pytest.raises(TypeError, match="merge_continued_tables"):
+        StructuredContentRenderOptions(merge_continued_tables=1)
     with pytest.raises(TypeError, match="standalone"):
         HtmlRenderOptions(standalone=1)
     with pytest.raises(TypeError, match="document_title"):

@@ -364,6 +364,66 @@ def test_structured_content_keeps_table_image_source_and_cross_page_metadata() -
     assert image_only_output["image_source"] == "images/image-only-table.png"
 
 
+def test_structured_content_option_merges_only_continued_tables() -> None:
+    """验证可选续表合并不改变续段行为，也不污染输入文档。"""
+    bbox = [0.1, 0.1, 0.9, 0.9]
+    first = TableBlock.model_validate(
+        {
+            "type": "table",
+            "index": 0,
+            "bbox": bbox,
+            "content": [
+                {"type": "table_caption", "index": 0, "content": _inline("Table 1")},
+                {
+                    "type": "table_body",
+                    "index": 0,
+                    "bbox": bbox,
+                    "content": "<table><tr><th>A</th></tr><tr><td>1</td></tr></table>",
+                },
+                {"type": "table_footnote", "index": 2, "content": _inline("old note")},
+            ],
+        }
+    )
+    second = TableBlock.model_validate(
+        {
+            "type": "table",
+            "index": 0,
+            "bbox": bbox,
+            "continues_prev": True,
+            "content": [
+                {"type": "table_caption", "index": 0, "content": _inline("Table 1 (continued)")},
+                {
+                    "type": "table_body",
+                    "index": 0,
+                    "bbox": bbox,
+                    "content": "<table><tr><th>A</th></tr><tr><td>2</td></tr></table>",
+                },
+                {"type": "table_footnote", "index": 2, "content": _inline("new note")},
+            ],
+        }
+    )
+    middle = _middle(
+        _page(0, first, TextBlock(type="text", index=3, content=_inline("first-"))),
+        _page(
+            1,
+            second,
+            TextBlock(type="text", index=3, content=_inline("continued"), continues_prev=True),
+        ),
+    )
+    original = deepcopy(middle)
+
+    result = render_structured_content(middle, merge_continued_tables=True)
+
+    assert [block["type"] for block in result["pages"][0]["blocks"]] == ["table", "text"]
+    assert result["pages"][0]["blocks"][0]["content"] == "| A |\n| --- |\n| 1 |\n| 2 |"
+    assert result["pages"][0]["blocks"][0]["captions"] == [{"content": "Table 1"}]
+    assert result["pages"][0]["blocks"][0]["footnotes"] == [{"content": "new note"}]
+    assert result["pages"][0]["blocks"][1]["content"] == "first-"
+    assert result["pages"][1]["blocks"] == [{"type": "text", "content": "continued", "continues_prev": True}]
+    _assert_output_field_contract(result)
+    assert middle == original
+
+
 def test_structured_content_keeps_chart_content_separate_from_base64_source(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

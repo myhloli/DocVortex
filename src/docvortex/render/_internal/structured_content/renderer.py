@@ -13,6 +13,7 @@ from ..markdown.blocks import (
 )
 from ..markdown.assets import normalize_image_source, resolve_image_source
 from ..markdown.escaping import escape_standalone_marker_rule, escape_text_block_markdown_prefix
+from ..common.planner import PlannedBlock, _merge_continued_table_blocks
 from ..markdown.inline import render_inline_content
 from ....schema import (
     BlockType,
@@ -61,10 +62,13 @@ def render_structured_content(
     *,
     asset_base_url: str = "",
     latex_delimiters: LatexDelimitersConfig | None = None,
+    merge_continued_tables: bool = False,
 ) -> dict[str, Any]:
     """把严格 MiddleJson 无副作用地渲染为树形 Markdown structured_content。"""
     if not isinstance(middle_json, MiddleJson):
         raise TypeError("render_structured_content expects a MiddleJson instance")
+    if not isinstance(merge_continued_tables, bool):
+        raise TypeError("merge_continued_tables must be a bool")
 
     delimiters = latex_delimiters or LatexDelimitersConfig()
     document_fields = middle_json.model_dump(
@@ -72,19 +76,32 @@ def render_structured_content(
         exclude={"pages", "schema_id", "schema_version"},
         exclude_defaults=True,
     )
+    render_middle = middle_json
+    render_blocks_by_source_id: dict[int, PageBlock] = {}
+    removed_block_ids: set[int] = set()
+    if merge_continued_tables:
+        render_middle = middle_json.model_copy(deep=True)
+        planned_blocks = [
+            PlannedBlock(page_idx=page.page_idx, block=block) for page in render_middle.pages for block in page.blocks
+        ]
+        planned_blocks_by_source_id = {id(planned.block): planned for planned in planned_blocks}
+        _merge_continued_table_blocks(planned_blocks)
+        render_blocks_by_source_id = {source_id: planned.block for source_id, planned in planned_blocks_by_source_id.items()}
+        removed_block_ids = {id(planned.block) for planned in planned_blocks if planned.removed}
     pages = [
         {
             "page_idx": page.page_idx,
             "blocks": [
                 _render_content_block(
-                    block,
+                    render_blocks_by_source_id.get(id(block), block),
                     delimiters=delimiters,
                     asset_base_url=asset_base_url,
                 )
                 for block in page.blocks
+                if id(block) not in removed_block_ids
             ],
         }
-        for page in middle_json.pages
+        for page in render_middle.pages
     ]
     return {"pages": pages, **document_fields}
 
