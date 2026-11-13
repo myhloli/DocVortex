@@ -3,12 +3,14 @@
 from .content import merge_table_content
 from .document import merge_table
 from .html import build_row_rendered_cell_segments, build_table_state_from_html, calculate_row_rendered_segments
-from .models import RenderedCellSegment
+from .models import RenderedCellSegment, TableMergeDecision, TableMergeRejection
 from .structure import can_merge_by_structure, detect_table_headers
 from .structure import _expand_header_count_by_rowspan as expand_header_count_by_rowspan
 
 __all__ = [
     "RenderedCellSegment",
+    "TableMergeDecision",
+    "TableMergeRejection",
     "merge_table",
     "merge_table_content",
     "build_table_state_from_html",

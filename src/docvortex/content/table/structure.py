@@ -10,7 +10,7 @@ from ...schema import BlockType
 
 from .blocks import _bbox_for_calculation, _is_continuation_caption, _is_post_table_non_continuation_caption, _table_children
 from .html import _colspan, _rowspan, calculate_row_rendered_segments
-from .models import MAX_HEADER_ROWS, TableMergeState
+from .models import MAX_HEADER_ROWS, TableMergeRejection, TableMergeState
 
 
 def detect_table_headers(
@@ -153,13 +153,16 @@ def _table_widths_are_compatible(current_bbox: Any, previous_bbox: Any) -> bool:
     return min_width > 0 and abs(current_width - previous_width) / min_width < 0.1
 
 
-def can_merge_tables(current_state: TableMergeState, previous_state: TableMergeState) -> bool:
-    """根据 dict 表格的辅助文本、宽度和 HTML 结构判断是否可合并。"""
+def _table_merge_rejection_reason(
+    current_state: TableMergeState,
+    previous_state: TableMergeState,
+) -> TableMergeRejection | None:
+    """按原判定顺序返回首个拒绝原因，成功时返回空。"""
     current_table_block = current_state.owner_block
     previous_table_block = previous_state.owner_block
 
     if not isinstance(previous_table_block, dict) or not isinstance(current_table_block, dict):
-        return False
+        return TableMergeRejection.INVALID_TABLE_STRUCTURE
 
     previous_children = _table_children(previous_table_block)
     current_children = _table_children(current_table_block)
@@ -172,17 +175,24 @@ def can_merge_tables(current_state: TableMergeState, previous_state: TableMergeS
         has_continuation_marker = any(_is_continuation_caption(block) for block in merge_caption_blocks)
 
         if not has_continuation_marker:
-            return False
+            return TableMergeRejection.CONTINUATION_CAPTION_REQUIRED
 
         if footnote_count > 1:
-            return False
+            return TableMergeRejection.MULTIPLE_PREVIOUS_FOOTNOTES
     elif footnote_count > 0:
-        return False
+        return TableMergeRejection.PREVIOUS_FOOTNOTES_REQUIRE_CAPTION
 
     if not _table_widths_are_compatible(current_table_block.get("bbox"), previous_table_block.get("bbox")):
-        return False
+        return TableMergeRejection.INCOMPATIBLE_TABLE_WIDTHS
 
-    return can_merge_by_structure(current_state, previous_state)
+    if not can_merge_by_structure(current_state, previous_state):
+        return TableMergeRejection.INCOMPATIBLE_TABLE_STRUCTURE
+    return None
+
+
+def can_merge_tables(current_state: TableMergeState, previous_state: TableMergeState) -> bool:
+    """根据 dict 表格的辅助文本、宽度和 HTML 结构判断是否可合并。"""
+    return _table_merge_rejection_reason(current_state, previous_state) is None
 
 
 def check_rows_match(previous_state: TableMergeState, current_state: TableMergeState) -> bool:
