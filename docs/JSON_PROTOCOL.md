@@ -69,7 +69,12 @@ wrapper JSON need not equal the underlying Middle JSON byte for byte.
 DocVortex retains its AssetStore and explicit sidecar export behavior.
 
 Structured Content keeps its own content projection, shares metadata/extensions,
-and carries no Model/Middle schema identity. Content List V1/V2 remain MinerU outputs.
+and carries no Model/Middle schema identity. By default, its per-page blocks retain
+continued-table markers without merging content. Set `merge_continued_tables=True`
+in `StructuredContentRenderOptions`, or pass it to `render_structured_content()`, to
+merge marked table continuations through the shared table renderer. This option does
+not merge continued text or lists, keeps empty source pages, and does not mutate the
+input MiddleJson. Content List V1/V2 remain MinerU outputs.
 Bundle manifests now use `docvortex.bundle` version `2.0`, with current document
 JSON and the existing asset paths, sizes and hashes. Old bundles are rejected.
 

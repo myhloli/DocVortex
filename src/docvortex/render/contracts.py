@@ -184,10 +184,13 @@ class StructuredContentRenderOptions:
     latex_delimiters: LatexDelimitersConfig | None = None
 
     asset_base_url: str = ""
+    merge_continued_tables: bool = False
 
     def __post_init__(self) -> None:
-        """在构造时校验图片资源根地址。"""
+        """在构造时校验图片资源根地址与续表合并开关。"""
         _validate_asset_base_url(self.asset_base_url)
+        if not isinstance(self.merge_continued_tables, bool):
+            raise TypeError("merge_continued_tables must be a bool")
 
 
 RenderOptions: TypeAlias = (

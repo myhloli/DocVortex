@@ -193,6 +193,7 @@ def render(
             middle_json,
             latex_delimiters=resolved_options.latex_delimiters,
             asset_base_url=resolved_options.asset_base_url,
+            merge_continued_tables=resolved_options.merge_continued_tables,
         )
 
     raise ValueError(f"Unsupported RenderFormat: {output_format}")
