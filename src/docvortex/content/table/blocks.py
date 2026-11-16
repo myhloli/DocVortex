@@ -11,7 +11,7 @@ from ...schema import BlockType
 
 from .html import _build_front_cache, _scan_rows
 from .models import MAX_HEADER_ROWS, BlockDict, CalculationBBox, TableMergeState
-from .rules import is_table_continuation_text
+from .rules import _matches_continuation_caption_prefix, is_table_continuation_text
 
 
 def _bbox_for_calculation(bbox: Any) -> CalculationBBox | None:
@@ -72,7 +72,8 @@ def _block_text(block: BlockDict) -> str:
 
 def _is_continuation_caption(caption_block: BlockDict) -> bool:
     """判断 dict caption 文本是否带有续表标记。"""
-    return is_table_continuation_text(_block_text(caption_block))
+    text = _block_text(caption_block)
+    return is_table_continuation_text(text) or _matches_continuation_caption_prefix(text)
 
 
 def _is_post_table_non_continuation_caption(table_block: BlockDict, caption_block: BlockDict) -> bool:

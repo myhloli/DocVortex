@@ -18,6 +18,28 @@ CONTINUATION_INLINE_MARKERS = [
     "(continued)",
 ]
 
+# 前缀仅供已归组 caption 使用，独立维护以免扩大正文提升范围。
+_CONTINUATION_PREFIX_MARKERS = (
+    "续表",
+    "续上表",
+    "continued",
+    "cont.",
+    "cont’d",
+)
+
+
+def _matches_continuation_caption_prefix(text: str) -> bool:
+    """仅匹配 caption 的续表前缀，英文标记后不得紧接字母。"""
+    continuation_text = full_to_half((text or "").strip()).lower()
+    for marker in _CONTINUATION_PREFIX_MARKERS:
+        if not continuation_text.startswith(marker):
+            continue
+        # 中文标记允许紧接标题，英文标记保留词边界，均不解析表号。
+        if marker[0].isascii() and len(continuation_text) > len(marker) and continuation_text[len(marker)].isalpha():
+            continue
+        return True
+    return False
+
 
 def is_table_continuation_text(text: str) -> bool:
     """判断文本是否表达续表语义，供表格归组和跨页合并共同复用。"""
