@@ -81,6 +81,27 @@ strict. Successfully converted batches can be cached and compacted when their
 metadata/extensions/full-document flags agree; ordinary reads never rewrite files.
 Unknown or damaged formats still require source reparse.
 
+## Table continuation relationships
+
+For a top-level table, `continues_prev=True` refers to the nearest preceding
+top-level table in reading order, which must be on the immediately preceding
+physical page (`previous.page_idx + 1 == current.page_idx`). Other block types
+do not change this predecessor. Same-page tables, missing pages and interleaved
+relationships that cannot be expressed by this boolean remain separate fragments.
+PDF structure identities establish a continuation only when they select this same
+predecessor; source associations are retained even when no continuation is marked.
+
+The marker confirms a relationship, not guaranteed content merging. Reading
+renderers consume it without repeating caption, footnote-count or physical-width
+heuristics, but retain HTML, grid, span and annotation-anchor safety checks. An
+unsafe merge preserves the fragments. Full/page-oriented output and Structured
+Content retain their existing physical representation.
+
+The public `merge_table_content()` function accepts arbitrary pairs and still
+checks their relationship, even if the second table carries `continues_prev=True`.
+No schema fields or versions change. Previously stored incorrect markers cannot
+reliably recover their intended target; regenerate them from Model JSON or the source.
+
 ## Optional source properties (DocVortex 0.2.5)
 
 `metadata.document` optionally carries a typed `DocumentProperties` object. Its descriptive,

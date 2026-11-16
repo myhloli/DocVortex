@@ -65,6 +65,7 @@ def process_structure_blocks(page_model_list: list[dict], *, use_bbox: bool) -> 
 def finish_structure_pages(pages: list[dict], extension: dict | None) -> None:
     """按源节点身份标记跨页续接，并记录后处理完成后的块路径。"""
     previous: dict[tuple[str, str], tuple[int, dict]] = {}
+    previous_table: dict | None = None
     links: dict[str, list[dict]] = {}
 
     def visit(block, page_index, path):
@@ -79,7 +80,7 @@ def finish_structure_pages(pages: list[dict], extension: dict | None) -> None:
                 if len(path) == 1:
                     key = marker.get("logical_id", identity), kind
                     prior = previous.get(key)
-                    if prior is not None and prior[0] + 1 == page_index:
+                    if prior is not None and prior[0] + 1 == page_index and (kind != "table" or prior[1] is previous_table):
                         block["continues_prev"] = True
                     previous[key] = page_index, block
         content = block.get("content")
@@ -91,6 +92,9 @@ def finish_structure_pages(pages: list[dict], extension: dict | None) -> None:
     for page in pages:
         for index, block in enumerate(page["blocks"]):
             visit(block, page["page_idx"], [index])
+            # bool 只能指向最近的顶层表格；普通表格也占据前驱位置，嵌套表格不参与。
+            if block["type"] == "table":
+                previous_table = block
     if extension is not None:
         extension["blocks"] = links
 

@@ -451,6 +451,25 @@ def test_cross_page_table_projects_rowspans_and_preserves_identity():
         assert all(cell["rowspan"] == "1" for cell in soup.find_all("td"))
 
 
+def test_interleaved_tagged_table_keeps_physical_fragments():
+    """真实结构树中的交错 A、B、A 不能用 bool 让 A 续片误接到 B。"""
+    builder = TaggedPdfBuilder(2)
+    first = builder.node("TR", [builder.node("TD", [builder.text("A first")])])
+    continued = builder.node("TR", [builder.node("TD", [builder.text("A next", page=1)], page=1)], page=1)
+    table_a = builder.node("Table", [first, continued])
+    table_b = builder.node("Table", [builder.node("TR", [builder.node("TD", [builder.text("B only", y=200)])])])
+    result = docvortex.parse(builder.finish([table_a, table_b]))
+
+    assert [len(page.blocks) for page in result.middle_json.pages] == [2, 1]
+    assert result.middle_json.pages[1].blocks[0].continues_prev is None
+    output = render(result.middle_json, "html").content.decode()
+    from bs4 import BeautifulSoup
+
+    tables = BeautifulSoup(output, "html.parser").find_all("table")
+    assert len(tables) == 3
+    assert [table.get_text(strip=True) for table in tables] == ["A first", "B only", "A next"]
+
+
 def test_link_objr_and_explicit_span_styles():
     """OBJR 注释关联输出超链接，结构样式属性保留为现有行内样式。"""
     builder = TaggedPdfBuilder()

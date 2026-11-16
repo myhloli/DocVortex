@@ -347,10 +347,11 @@ def _perform_table_content_merge(
 def merge_table_content(previous_table: BlockDict, current_table: BlockDict) -> BlockDict | None:
     """纯函数式合并两张跨页表格的内容，失败时返回 ``None``。
 
+    任意两表仍须通过关系检查，已有 continues_prev 标记不绕过此保护。
     两个输入都会先深拷贝；返回块保留前表外层信息，只改克隆表体 HTML
     并用当前表 footnote 替换前表 footnote，不会修改任何输入对象。
     """
-    result = _merge_table_content_with_columns(previous_table, current_table)
+    result = _merge_table_content_with_columns(previous_table, current_table, check_relationship=True)
     return result.table if result is not None else None
 
 
@@ -358,8 +359,13 @@ def _merge_table_content_with_columns(
     previous_table: BlockDict,
     current_table: BlockDict,
     previous_source_columns: _TableColumnMapping | None = None,
+    *,
+    check_relationship: bool,
 ) -> _TableContentMergeResult | None:
-    """供渲染器合并多页链，返回最近原页的网格映射且不改变公共函数签名。"""
+    """复用安全内容操作；仅渲染器已确认的续表关系可跳过身份启发式。
+
+    返回最近原页到累计网格的映射，HTML、网格与锚点保护始终执行。
+    """
     if (
         not isinstance(previous_table, dict)
         or not isinstance(current_table, dict)
@@ -385,7 +391,7 @@ def _merge_table_content_with_columns(
         current_state = _build_table_state(current_clone)
         if previous_state is None or current_state is None:
             return None
-        if not can_merge_tables(current_state, previous_state):
+        if check_relationship and not can_merge_tables(current_state, previous_state):
             return None
         current_columns = _perform_table_content_merge(
             previous_state,

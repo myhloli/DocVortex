@@ -147,17 +147,24 @@ def _merge_continued_list_blocks(blocks: list[PlannedBlock], mode: RenderMode, *
 
 
 def _merge_continued_table_blocks(blocks: list[PlannedBlock]) -> None:
-    """在默认模式中把跨页续表合并到最近的前序表格。"""
-    previous: PlannedBlock | None = None
+    """按最近原片段及相邻物理页消费续表标记，安全拼接到当前累计表。"""
+    previous_fragment: PlannedBlock | None = None
+    merge_target: PlannedBlock | None = None
     previous_source_columns: _TableColumnMapping | None = None
     for current in blocks:
         if current.removed or not isinstance(current.block, TableBlock):
             continue
-        if current.block.continues_prev is True and previous is not None and previous.page_idx != current.page_idx:
+        if (
+            current.block.continues_prev is True
+            and previous_fragment is not None
+            and previous_fragment.page_idx + 1 == current.page_idx
+            and merge_target is not None
+        ):
             merged = _merge_table_content_with_columns(
-                previous.block.model_dump(mode="python", exclude_none=True),
+                merge_target.block.model_dump(mode="python", exclude_none=True),
                 current.block.model_dump(mode="python", exclude_none=True),
                 previous_source_columns,
+                check_relationship=False,
             )
             if merged is not None:
                 try:
@@ -165,13 +172,16 @@ def _merge_continued_table_blocks(blocks: list[PlannedBlock]) -> None:
                 except (TypeError, ValueError):
                     pass
                 else:
-                    _merge_table_sources(previous, current)
-                    previous.block = merged_block
+                    _merge_table_sources(merge_target, current)
+                    merge_target.block = merged_block
                     current.removed = True
                     previous_source_columns = merged.current_columns
         if not current.removed:
-            previous = current
+            # 失败或未标记时从当前片段重新累计，不能跳过它接回更早的表。
+            merge_target = current
             previous_source_columns = None
+        # 即使片段已被累计表消费，也必须推进原始前驱，保留物理页与列映射语义。
+        previous_fragment = current
 
 
 def _merge_table_sources(previous: PlannedBlock, current: PlannedBlock) -> None:

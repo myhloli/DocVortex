@@ -89,13 +89,17 @@ def test_table_body_and_replaced_footnote_sources() -> None:
                 ],
             )
         )
-    nodes = _targets(_middle(*[[table] for table in tables]))
+    middle = _middle(*[[table] for table in tables])
+    # 表格只允许相邻物理页续接；抽页起点仍保留原始页号。
+    for page_idx, page in enumerate(middle.pages, start=2):
+        page.page_idx = page_idx
+    nodes = _targets(middle)
     body = next(refs for node, refs in nodes if node.get("data-block-type") == "table_body")
-    assert [ref["page_idx"] for ref in body] == [2, 5, 8]
+    assert [ref["page_idx"] for ref in body] == [2, 3, 4]
     caption = next(refs for node, refs in nodes if node.get("data-block-type") == "table_caption")
     note = next(refs for node, refs in nodes if node.get("data-block-type") == "table_footnote")
     assert caption[0]["page_idx"] == 2
-    assert note[0]["page_idx"] == 8 and note[0]["child_path"] == [2]
+    assert note[0]["page_idx"] == 4 and note[0]["child_path"] == [2]
 
 
 def test_missing_child_geometry_and_hidden_auxiliary() -> None:
