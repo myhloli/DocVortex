@@ -21,6 +21,60 @@ from docvortex.schema import (
     TableBodyBlock,
 )
 
+_DATA_URI = "data:image/png;base64," + "A" * 40000
+
+
+@pytest.mark.parametrize("kind", ["image", "equation", "table", "chart"])
+@pytest.mark.parametrize("source_field", ["image_base64", "image_path", "image_url"])
+def test_empty_callback_suppresses_all_visual_image_fallbacks(kind: str, source_field: str) -> None:
+    """显式空回调必须抑制所有素材来源，默认导出仍然保留图片。"""
+    source = {"image_base64": _DATA_URI, "image_path": "images/test.png", "image_url": "https://example.com/image.png"}[
+        source_field
+    ]
+    if kind == "equation":
+        block = EquationBlock(type=BlockType.EQUATION, content="", **{source_field: source})
+    else:
+        parent_type, body_type = {
+            "image": (ImageBlock, ImageBodyBlock),
+            "table": (TableBlock, TableBodyBlock),
+            "chart": (ChartBlock, ChartBodyBlock),
+        }[kind]
+        body = body_type(type=f"{kind}_body", content="", **{source_field: source})
+        block = parent_type(type=kind, content=[body])
+    original = block.model_dump()
+    callback = Mock(return_value="")
+
+    assert render_single_block(block, delimiters=_delimiters(), asset_base_url="", image_renderer=callback) == ""
+    callback.assert_called_once_with(block)
+    assert source in render_single_block(block, delimiters=_delimiters(), asset_base_url="")
+    assert block.model_dump() == original
+
+
+@pytest.mark.parametrize("kind", ["image", "chart", "table"])
+@pytest.mark.parametrize("replacement", ["", "![Visual](doc:aaaaaaa/tier:flash/page:1/block:1)"])
+def test_custom_callback_keeps_visual_text_without_embedded_images(kind: str, replacement: str) -> None:
+    """带文字的图表也遵守回调，并移除视觉内容中的 HTML 图片且不修改原文。"""
+    parent_type, body_type = {
+        "image": (ImageBlock, ImageBodyBlock),
+        "table": (TableBlock, TableBodyBlock),
+        "chart": (ChartBlock, ChartBodyBlock),
+    }[kind]
+    content = f'<table><tr><td>recognized text<img src="{_DATA_URI}"></td></tr></table>'
+    body = body_type(type=f"{kind}_body", content=content, image_base64=_DATA_URI)
+    block = parent_type(type=kind, content=[body])
+    original = block.model_dump()
+    callback = Mock(return_value=replacement)
+
+    rendered = render_single_block(block, delimiters=_delimiters(), asset_base_url="", image_renderer=callback)
+
+    assert "recognized text" in rendered
+    assert "base64" not in rendered and "<img" not in rendered
+    if kind != "table":
+        callback.assert_called_once_with(block)
+        assert replacement in rendered
+    assert _DATA_URI in render_single_block(block, delimiters=_delimiters(), asset_base_url="")
+    assert block.model_dump() == original
+
 
 def _delimiters() -> LatexDelimitersConfig:
     """提供显式默认定界符，不读取宿主全局配置。"""

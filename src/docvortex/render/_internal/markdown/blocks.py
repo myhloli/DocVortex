@@ -190,9 +190,7 @@ def _render_equation(
     if latex:
         return f"{delimiters.display.left}\n{latex}\n{delimiters.display.right}"
     if image_renderer is not None:
-        rendered = image_renderer(block)
-        if rendered:
-            return rendered
+        return image_renderer(block)
     source = resolve_image_source(block, asset_base_url)
     return build_markdown_image(source) if source else ""
 
@@ -313,7 +311,9 @@ def _render_media_body(
     parent_block: ImageBlock,
 ) -> str:
     """渲染图片载荷，并将识别内容放入折叠详情。image_renderer 优先于 image_path。"""
-    rendered_content = _render_media_content(block, delimiters, asset_base_url)
+    rendered_content = _render_media_content(
+        block, delimiters, asset_base_url, strip_embedded_images=image_renderer is not None
+    )
     if image_renderer is not None:
         image_ref = image_renderer(parent_block)
         parts = [image_ref] if image_ref else []
@@ -329,9 +329,11 @@ def _render_media_content(
     block: ImageBodyBlock,
     delimiters: LatexDelimitersConfig,
     asset_base_url: str,
+    *,
+    strip_embedded_images: bool = False,
 ) -> str:
     """渲染图片识别内容，不添加图片语法或折叠详情包装。"""
-    content = block.content.strip()
+    content = (_strip_embedded_images(block.content) if strip_embedded_images else block.content).strip()
     if not content:
         return ""
     return format_embedded_html(content, asset_base_url=asset_base_url, delimiters=delimiters)
@@ -346,28 +348,28 @@ def _render_chart_body(
     image_renderer: ImageRenderer | None,
     parent_block: ChartBlock,
 ) -> str:
-    """渲染 chart 图片，并统一转换其 HTML 表格内容。内容为空时回退到 image_renderer 或图片。"""
-    rendered_content = _render_chart_content(block.content, delimiters, asset_base_url)
-    if rendered_content:
-        return _render_chart_with_details(rendered_content, block, asset_base_url, summary)
+    """渲染图表文字和图片；自定义回调的空结果明确抑制图片，不再回退素材。"""
+    rendered_content = _render_chart_content(
+        block.content, delimiters, asset_base_url, strip_embedded_images=image_renderer is not None
+    )
     if image_renderer is not None:
-        rendered = image_renderer(parent_block)
-        if rendered:
-            return rendered
-    source = resolve_image_source(block, asset_base_url)
-    return build_markdown_image(source) if source else ""
+        image_ref = image_renderer(parent_block)
+    else:
+        source = resolve_image_source(block, asset_base_url)
+        image_ref = build_markdown_image(source) if source else ""
+    if rendered_content:
+        return _render_chart_with_details(rendered_content, image_ref, summary)
+    return image_ref
 
 
 def _render_chart_with_details(
     rendered_content: str,
-    block: ChartBodyBlock,
-    asset_base_url: str,
+    image_ref: str,
     summary: str,
 ) -> str:
-    """chart 有结构化内容时，附上图片与折叠详情。"""
-    source = resolve_image_source(block, asset_base_url)
-    if source:
-        parts = [build_markdown_image(source), _render_details(rendered_content, summary)]
+    """复用已按宿主策略生成的图片引用，不绕过自定义回调读取素材。"""
+    if image_ref:
+        parts = [image_ref, _render_details(rendered_content, summary)]
         return "\n\n".join(part for part in parts if part)
     return rendered_content
 
@@ -376,9 +378,11 @@ def _render_chart_content(
     content: str,
     delimiters: LatexDelimitersConfig,
     asset_base_url: str,
+    *,
+    strip_embedded_images: bool = False,
 ) -> str:
     """把 chart 内容中的简单 HTML 表格转为 GFM，其他内容保持原表示。"""
-    normalized = content.strip()
+    normalized = (_strip_embedded_images(content) if strip_embedded_images else content).strip()
     if not normalized:
         return ""
     html_table = render_html_table(
@@ -442,9 +446,7 @@ def _render_table_body(
     if rendered_content:
         return rendered_content
     if image_renderer is not None:
-        rendered = image_renderer(parent_block)
-        if rendered:
-            return rendered
+        return image_renderer(parent_block)
     source = resolve_image_source(block, asset_base_url)
     return build_markdown_image(source) if source else ""
 

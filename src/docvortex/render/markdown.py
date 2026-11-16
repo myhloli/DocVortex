@@ -15,7 +15,7 @@ def render_markdown(
     image_renderer: ImageRenderer | None = None,
     latex_delimiters: LatexDelimitersConfig | None = None,
 ) -> str:
-    """惰性加载 Markdown 实现并渲染严格 MiddleJson。"""
+    """渲染严格 MiddleJson；显式图片回调接管素材输出，返回空串可抑制图片。"""
     from ._internal.markdown.renderer import render_markdown as _render_markdown
 
     return _render_markdown(
