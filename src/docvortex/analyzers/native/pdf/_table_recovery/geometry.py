@@ -8,6 +8,13 @@ from .....schema import BBox
 from ..table_geometry import normalize_bbox, rotate_local_bbox
 
 
+def sorted_group_median(group, key):
+    """对已按 key 升序排列的非空组，只读取中间一项或两项。"""
+    middle = len(group) // 2
+    right = key(group[middle])
+    return right if len(group) % 2 else (key(group[middle - 1]) + right) / 2
+
+
 def normalize_angle(value: object) -> int:
     """把输入角度限制为表格流程支持的四个标准方向。"""
 

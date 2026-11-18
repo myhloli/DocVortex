@@ -193,3 +193,21 @@ def test_morphology_nan_propagation_and_signed_zero() -> None:
         np.testing.assert_array_equal(np.isnan(actual), [[False, True, True], [False, True, True]])
         zeros = image.morphology(np.asarray([[0.0, -0.0, 0.0]]), (2, 1), operation=operation)
         np.testing.assert_array_equal(np.signbit(zeros), [[False, True, False]])
+
+
+@pytest.mark.parametrize("shape", [(16, 18), (16, 18, 3), (16, 18, 4)])
+def test_draw_lines_uses_independent_canvas_for_strided_input(shape: tuple[int, ...]) -> None:
+    """多线按输入顺序覆盖，空批和非连续视图都必须返回独立像素。"""
+    source = np.random.default_rng(7).integers(0, 256, shape, dtype=np.uint8)[:, ::2]
+    original = source.copy()
+    lines = [(0, 0, 8, 15), (2, 15, 8, -1), (1, 7, 9, 7)]
+    expected = source
+    for x0, y0, x1, y1 in lines:
+        expected = image.draw_line(expected, (x0, y0), (x1, y1), value=93, width=2)
+    actual = image.draw_lines(source, np.array(lines), value=93, width=2)
+    empty = image.draw_lines(source, np.empty((0, 4), dtype=np.int32))
+    np.testing.assert_array_equal(actual, expected)
+    np.testing.assert_array_equal(empty, original)
+    np.testing.assert_array_equal(source, original)
+    assert not np.shares_memory(actual, source)
+    assert not np.shares_memory(empty, source)

@@ -24,7 +24,7 @@ from test_pdf_classify_image_text import image_text_pdf
 def native():
     """原生测试必须加载协议 45，扩展不可用时明确失败。"""
     value = get_native()
-    assert value.PROTOCOL_VERSION == 45
+    assert value.PROTOCOL_VERSION == 46
     return value
 
 

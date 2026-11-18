@@ -1759,6 +1759,8 @@ def _native_overlap_member_groups(boxes, regions, threshold):
     """原生统一匹配框覆盖率，按源顺序返回每一区域的完整成员。"""
     from ...._compute_backend import get_native
 
+    if not boxes or not regions:
+        return [[] for _ in regions]
     return get_native().overlap_member_groups(boxes, regions, threshold)
 
 

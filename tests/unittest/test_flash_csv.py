@@ -213,3 +213,15 @@ def test_tsv_uses_shared_csv_engine_and_records_independent_file_suffix() -> Non
     markdown = render_markdown(middle)
     assert "张三" in markdown
     assert "30" in markdown
+
+
+def test_csv_ascii_and_escaped_fields_share_exact_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    """普通 ASCII 与需转义字段混排时，最后一个输出字节仍计入同一预算。"""
+    rows = [[" /+%,-.", "A\t&B"], ["中文", "x\r\ny"]]
+    expected = csv_module._rows_to_html(rows, has_header=True)
+    size = len(expected.encode("utf-8"))
+    monkeypatch.setattr(csv_module, "MAX_CSV_RENDERED_BYTES", size)
+    assert csv_module._rows_to_html(rows, has_header=True) == expected
+    monkeypatch.setattr(csv_module, "MAX_CSV_RENDERED_BYTES", size - 1)
+    with pytest.raises(ValueError, match="max_rendered_bytes"):
+        csv_module._rows_to_html(rows, has_header=True)

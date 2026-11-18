@@ -414,7 +414,14 @@ class SpreadsheetProjector:
                 if snapshot is not None:
                     starts, points, rectangles, semantic_positions, spans = snapshot
                     selected = select_sparse_regions(
-                        starts, points, rectangles, list(semantic_positions), spans, bounds.max_row - 1, bounds.max_col - 1
+                        starts,
+                        points,
+                        rectangles,
+                        list(semantic_positions),
+                        spans,
+                        bounds.max_row - 1,
+                        bounds.max_col - 1,
+                        include_kept=False,
                     )
                     # 原生层已返回独立区域，先释放输入快照，避免与后续 ExcelCell 物化共同占用峰值内存。
                     del snapshot, starts, points, rectangles, semantic_positions, spans

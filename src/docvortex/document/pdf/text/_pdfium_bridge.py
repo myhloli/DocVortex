@@ -25,20 +25,12 @@ def bridge_info():
     }
 
 
-def read_native_chars(textpage, extended, *, frame=None, rotation=0, unicode_fallback=None):
-    """在同一 textpage 和锁内完成原始读取，特殊输入及非标准函数留给参考实现。"""
-    global _CALLS, _EMPTY_PAGES, _UNAVAILABLE_REASON, _RECORD_BATCH_SIZE
-    native = get_native()
-    if type(textpage) is not pdfium.PdfTextPage or not textpage.raw or type(extended) is not bool:
-        _UNAVAILABLE_REASON = "nonstandard or closed text page"
-        raise RuntimeError(_UNAVAILABLE_REASON)
-    # 零字符页没有需要借用的字符函数地址；在原锁内确认后直接返回空快照，
-    # 单独计数，不能把未执行的 Rust FFI 调用记为桥接成功。
-    with pdfium_guard():
-        if textpage.count_chars() == 0:
-            _EMPTY_PAGES += 1
-            _UNAVAILABLE_REASON = None
-            return (), ()
+def _standard_character_symbols():
+    """核验字符读取所需 ABI，并返回函数强引用和 Rust 可调用的地址。"""
+    if ct.sizeof(raw.FS_RECTF) != 16 or any(
+        getattr(raw.FS_RECTF, name).offset != offset for name, offset in (("left", 0), ("top", 4), ("right", 8), ("bottom", 12))
+    ):
+        return None, "FS_RECTF ABI mismatch"
     args = (raw.FPDF_TEXTPAGE, ct.c_int)
     double_pointer = ct.POINTER(ct.c_double)
     specs = (
@@ -57,11 +49,6 @@ def read_native_chars(textpage, extended, *, frame=None, rotation=0, unicode_fal
         ("FPDFFont_GetIsEmbedded", ct.c_int, (raw.FPDF_FONT,)),
         ("FPDFFont_GetFontData", ct.c_int, (raw.FPDF_FONT, ct.POINTER(ct.c_ubyte), ct.c_size_t, ct.POINTER(ct.c_size_t))),
     )
-    if ct.sizeof(raw.FS_RECTF) != 16 or any(
-        getattr(raw.FS_RECTF, name).offset != offset for name, offset in (("left", 0), ("top", 4), ("right", 8), ("bottom", 12))
-    ):
-        _UNAVAILABLE_REASON = "FS_RECTF ABI mismatch"
-        raise RuntimeError(_UNAVAILABLE_REASON)
     functions, addresses = [], []
     for name, result, arguments in specs:
         function = getattr(raw, name, None)
@@ -71,10 +58,31 @@ def read_native_chars(textpage, extended, *, frame=None, rotation=0, unicode_fal
             or tuple(function.argtypes or ()) != arguments
             or getattr(function, "errcheck", None) is not None
         ):
-            _UNAVAILABLE_REASON = f"unsupported symbol or ABI: {name}"
-            raise RuntimeError(_UNAVAILABLE_REASON)
+            return None, f"unsupported symbol or ABI: {name}"
         functions.append(function)
         addresses.append(ct.cast(function, ct.c_void_p).value)
+    return (functions, addresses), None
+
+
+def read_native_chars(textpage, extended, *, frame=None, rotation=0, unicode_fallback=None):
+    """在同一 textpage 和锁内完成原始读取，特殊输入及非标准函数留给参考实现。"""
+    global _CALLS, _EMPTY_PAGES, _UNAVAILABLE_REASON, _RECORD_BATCH_SIZE
+    native = get_native()
+    if type(textpage) is not pdfium.PdfTextPage or not textpage.raw or type(extended) is not bool:
+        _UNAVAILABLE_REASON = "nonstandard or closed text page"
+        raise RuntimeError(_UNAVAILABLE_REASON)
+    # 零字符页没有需要借用的字符函数地址；在原锁内确认后直接返回空快照，
+    # 单独计数，不能把未执行的 Rust FFI 调用记为桥接成功。
+    with pdfium_guard():
+        if textpage.count_chars() == 0:
+            _EMPTY_PAGES += 1
+            _UNAVAILABLE_REASON = None
+            return (), ()
+    symbols, reason = _standard_character_symbols()
+    if symbols is None:
+        _UNAVAILABLE_REASON = reason
+        raise RuntimeError(reason)
+    functions, addresses = symbols
     # 本地列表在原生调用结束前保留函数强引用；textpage 参数保留页面及运行库的生命周期。
     with pdfium_guard():
         count = textpage.count_chars()

@@ -711,6 +711,16 @@ pub fn analyze_regions(
     input: RegionInput,
     gap_tolerance: Option<i64>,
 ) -> Result<Selection, &'static str> {
+    select_regions(input, gap_tolerance, true, true)
+}
+
+/// 按调用方所需物化选区、语义子集及诊断候选，评分始终使用同一份原始语义。
+pub fn select_regions(
+    input: RegionInput,
+    gap_tolerance: Option<i64>,
+    include_kept: bool,
+    diagnostics: bool,
+) -> Result<Selection, &'static str> {
     let prepared = PreparedInput::new(&input)?;
     let gaps = gap_tolerance.map_or_else(|| vec![0, 1, 2], |gap| vec![gap]);
     let mut candidates = Vec::with_capacity(gaps.len());
@@ -730,17 +740,29 @@ pub fn analyze_regions(
     } else {
         choose_candidates(&candidates)?
     };
-    let best = &candidates[selected];
-    let semantic_sets: Vec<_> = best
-        .regions
-        .iter()
-        .map(|region| prepared.semantic_positions(region))
-        .collect();
+    let gap_tolerance = candidates[selected].gap_tolerance;
+    let penalty = candidates[selected].penalty;
+    let regions = if diagnostics {
+        candidates[selected].regions.clone()
+    } else {
+        let best = candidates.swap_remove(selected);
+        candidates.clear();
+        best.regions
+    };
+    let kept_indices = if include_kept {
+        let semantic_sets: Vec<_> = regions
+            .iter()
+            .map(|region| prepared.semantic_positions(region))
+            .collect();
+        keep_maximal_by_semantic_sets(&semantic_sets)
+    } else {
+        Vec::new()
+    };
     Ok(Selection {
-        gap_tolerance: best.gap_tolerance,
-        penalty: best.penalty,
-        regions: best.regions.clone(),
-        kept_indices: keep_maximal_by_semantic_sets(&semantic_sets),
+        gap_tolerance,
+        penalty,
+        regions,
+        kept_indices,
         candidates,
     })
 }

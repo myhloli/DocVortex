@@ -116,6 +116,8 @@ def _materialize_table_blocks(
     annotation_blocks: list[dict[str, Any]] = []
     accepted_candidate_bboxes: list[BBox] = []
     claimed: set[int] = set()
+    if not candidates:
+        return table_blocks, annotation_blocks, claimed
     # 只复制已有强证据校准的字符，保持原始来源记录及字符身份不变；未校准文档继续原路径。
     calibrated = {**_overlapping_table_character_repairs(source), **(calibrated_char_bboxes or {})}
     native_chars = (

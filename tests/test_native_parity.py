@@ -30,7 +30,7 @@ def test_native_registration_contract(native):
         "ofd_table_stats": "()",
         "rtf_group_spans": "(data, direct_only, max_tokens, max_depth)",
         "rtf_group_stats": "()",
-        "spreadsheet_select_regions": "(starts, content_points, content_rectangles, semantic_positions, spans, max_row, max_col, diagnostics=False)",
+        "spreadsheet_select_regions": "(starts, content_points, content_rectangles, semantic_positions, spans, max_row, max_col, diagnostics=False, *, include_kept=True)",
         "spreadsheet_discover_regions": "(starts, content_points, content_rectangles, max_row, max_col, gap_tolerance)",
         "spreadsheet_keep_maximal_semantic_sets": "(semantic_sets)",
         "spreadsheet_region_stats": "()",
@@ -181,7 +181,7 @@ def test_native_registration_contract(native):
         "TableNoteMetrics": ("builtins", "(items)"),
         "TableRowGeometry": ("builtins", "(boxes)"),
     }
-    constants = {"PROTOCOL_VERSION": 45, "PDFIUM_RECORD_BATCH_SIZE": 1024}
+    constants = {"PROTOCOL_VERSION": 46, "PDFIUM_RECORD_BATCH_SIZE": 1024}
     assert {name for name in dir(native) if not name.startswith("__")} == functions.keys() | classes.keys() | constants.keys()
     for name, signature in functions.items():
         function = getattr(native, name)

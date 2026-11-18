@@ -674,10 +674,15 @@ def draw_lines(
             width,
         )
         return np.frombuffer(output, np.uint8).reshape(array.shape).copy()
-    output = array.copy()
-    for x1, y1, x2, y2 in coordinates:
-        output = draw_line(output, (int(x1), int(y1)), (int(x2), int(y2)), value=value, width=width, antialias=antialias)
-    return output
+    if not len(coordinates):
+        return array.copy()
+    from PIL import ImageDraw
+
+    with Image.fromarray(array) as canvas:
+        drawing = ImageDraw.Draw(canvas)
+        for line in coordinates:
+            drawing.line(tuple(map(int, line)), fill=value, width=width)
+        return np.array(canvas)
 
 
 def contour_area(points: np.ndarray) -> float:

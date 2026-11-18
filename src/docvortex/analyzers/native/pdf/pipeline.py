@@ -339,14 +339,16 @@ class _DocumentSources:
     page_spacing_lines: list[list[Any]] = field(default_factory=list)
 
 
-def _prepare_owned_geometry_evidence(owner, chars):
+def _prepare_owned_geometry_evidence(owner, chars, identities=None):
     """一次准备全文风险所需的页面级 Rust 几何记录和原字符身份表。"""
     if not hasattr(owner, "prepare_geometry_evidence"):
         return None
     evidence = owner.prepare_geometry_evidence()
     if evidence is None:
         return None
-    return evidence, {id(char): index for index, char in enumerate(chars)}
+    if identities is None:
+        identities = {id(char): index for index, char in enumerate(chars)}
+    return evidence, identities
 
 
 def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
@@ -394,10 +396,14 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
         page_spacing_lines.append(prepare_spacing_lines(lines, space_before))
         # 只保留纯 Rust 脚本/几何记录与本页身份映射，不延长 PDFium 页面或文档句柄生命周期。
         # 过滤视图不压缩 owner 的原始下标；脚本及几何证据仍连接完整原字符序列。
-        page_owned_scripts.append(_prepare_owned_script_evidence(native_text, raw_chars) if native_text is not None else None)
-        page_geometry_evidence.append(
-            _prepare_owned_geometry_evidence(native_text, raw_chars) if native_text is not None else None
+        owned = _prepare_owned_script_evidence(native_text, raw_chars) if native_text is not None else None
+        geometry_evidence = (
+            _prepare_owned_geometry_evidence(native_text, raw_chars, owned[1] if owned is not None else None)
+            if native_text is not None
+            else None
         )
+        page_owned_scripts.append(owned)
+        page_geometry_evidence.append(geometry_evidence)
         drawing_lines = _coerce_pdf_drawing_lines(snapshot.drawing_lines)
         raster_em = sorted(line.em_height for line in lines if line.em_height > 0)
         if raster_em:
@@ -425,7 +431,6 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
         drawing_lines.extend(decorative_rules)
         from .inline.owned_styles import detect_owned_style_lines
 
-        owned = page_owned_scripts[-1]
         style_lines = (
             detect_owned_style_lines(native_text, lines, drawing_lines, owned[1] if owned is not None else None)
             if detect_pdf_text_style_lines is _STANDARD_STYLE_DETECTOR
@@ -808,18 +813,19 @@ def _prepare_page_source(
         if not any(_bbox_overlap_in_smaller(bbox, graphic) >= 0.8 for graphic in caption_graphic_bboxes)
     ]
     strong_graphic_bboxes = _detect_strong_graphic_bboxes(analysis_source) + caption_graphic_bboxes
-    # 原生数值表的多列表头与重复金额列共同证明容器，不能被轴线外观抢先认领为图形。
-    from .table_detection import _detect_aligned_numeric_tables
+    if strong_graphic_bboxes:
+        # 原生数值表的多列表头与重复金额列共同证明容器，不能被轴线外观抢先认领为图形。
+        from .table_detection import _detect_aligned_numeric_tables
 
-    numeric_table_evidence = _detect_aligned_numeric_tables(analysis_source, list(source.image_bboxes))
-    strong_graphic_bboxes = [
-        box
-        for box in strong_graphic_bboxes
-        if not any(
-            _bbox_overlap_in_smaller(box, candidate.bbox) >= 0.5 and _bbox_area(box) >= 0.25 * _bbox_area(candidate.bbox)
-            for candidate in numeric_table_evidence
-        )
-    ]
+        numeric_table_evidence = _detect_aligned_numeric_tables(analysis_source, list(source.image_bboxes))
+        strong_graphic_bboxes = [
+            box
+            for box in strong_graphic_bboxes
+            if not any(
+                _bbox_overlap_in_smaller(box, candidate.bbox) >= 0.5 and _bbox_area(box) >= 0.25 * _bbox_area(candidate.bbox)
+                for candidate in numeric_table_evidence
+            )
+        ]
     rule_code_blocks, claimed_rule_code_line_indices = _build_rule_delimited_code_blocks(
         analysis_source,
         form_bboxes + strong_graphic_bboxes + list(source.image_bboxes) + list(source.signature_bboxes),

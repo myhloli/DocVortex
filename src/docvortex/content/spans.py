@@ -108,7 +108,11 @@ def slice_span_dicts(
 ) -> list[dict[str, Any]]:
     """按可见字符偏移裁剪 raw Span，并保留样式和链接。"""
     parsed = parse_inline_spans(list(spans))
-    visible_length = len(_typed_plain_text(parsed))
+    return _slice_parsed_spans(parsed, start, end, len(_typed_plain_text(parsed)))
+
+
+def _slice_parsed_spans(parsed: list[InlineSpan], start: int, end: int | None, visible_length: int) -> list[dict[str, Any]]:
+    """在已校验的片段序列及已知可见长度上裁剪，输出保留独立的样式与链接。"""
     resolved_start = min(max(start, 0), visible_length)
     resolved_end = visible_length if end is None else min(max(end, resolved_start), visible_length)
     output: list[InlineSpan] = []
@@ -134,7 +138,7 @@ def strip_span_dicts(spans: Iterable[dict[str, Any] | InlineSpan]) -> list[dict[
     visible = _typed_plain_text(parsed)
     start = len(visible) - len(visible.lstrip())
     end = len(visible.rstrip())
-    return slice_span_dicts(parsed, start, end)
+    return _slice_parsed_spans(parsed, start, end, len(visible))
 
 
 def _typed_plain_text(spans: Iterable[InlineSpan]) -> str:

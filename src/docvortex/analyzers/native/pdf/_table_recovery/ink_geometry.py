@@ -5,12 +5,13 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 import math
+from operator import attrgetter
 import statistics
 from typing import TYPE_CHECKING
 
 from .....schema import BBox
 from .contracts import NativeTableInput
-from .geometry import bbox_union, normalize_angle, normalize_bbox, page_bbox_to_table_local
+from .geometry import bbox_union, normalize_angle, normalize_bbox, page_bbox_to_table_local, sorted_group_median
 
 if TYPE_CHECKING:
     from .text import _PendingGlyph
@@ -46,14 +47,15 @@ def _body_ink_height(heights: Sequence[float]) -> float:
 def _baseline_bands(anchors: list[_InkAnchor], body_height: float) -> list[_InkBand]:
     """按基线中位数聚带，只保留具有独立复数字形支撑的组。"""
     groups: list[list[_InkAnchor]] = []
+    baseline = attrgetter("baseline")
     for anchor in sorted(anchors, key=lambda item: (item.baseline, item.bbox[0], item.source_index)):
-        if groups and abs(anchor.baseline - statistics.median(item.baseline for item in groups[-1])) <= 0.15 * body_height:
+        if groups and abs(anchor.baseline - sorted_group_median(groups[-1], baseline)) <= 0.15 * body_height:
             groups[-1].append(anchor)
         else:
             groups.append([anchor])
     return [
         _InkBand(
-            baseline=float(statistics.median(item.baseline for item in group)),
+            baseline=float(sorted_group_median(group, baseline)),
             height=_body_ink_height([item.bbox[3] - item.bbox[1] for item in group]),
             bbox=bbox_union(item.bbox for item in group),
             layout_bbox=(

@@ -10,6 +10,7 @@ import pypdfium2.raw as raw
 
 from ..._compute_backend import get_native
 from .pdfium import pdfium_guard
+from .text._pdfium_bridge import _standard_character_symbols
 from .text.extract import _native_visibility_supported
 
 _CALLS = 0
@@ -24,45 +25,6 @@ def snapshot_bridge_info():
         "native_text_snapshot_empty_pages": _EMPTY,
         "native_text_snapshot_unavailable_reason": _REASON,
     }
-
-
-def _standard_character_symbols():
-    """核验字符读取所需 ABI，并返回函数强引用和 Rust 可调用的地址。"""
-    if ct.sizeof(raw.FS_RECTF) != 16 or any(
-        getattr(raw.FS_RECTF, name).offset != offset for name, offset in (("left", 0), ("top", 4), ("right", 8), ("bottom", 12))
-    ):
-        return None, "FS_RECTF ABI mismatch"
-    args = (raw.FPDF_TEXTPAGE, ct.c_int)
-    double_pointer = ct.POINTER(ct.c_double)
-    specs = (
-        ("FPDFText_GetUnicode", ct.c_uint, args),
-        ("FPDFText_GetCharAngle", ct.c_float, args),
-        ("FPDFText_GetLooseCharBox", ct.c_int, (*args, ct.POINTER(raw.FS_RECTF))),
-        ("FPDFText_GetCharBox", ct.c_int, (*args, double_pointer, double_pointer, double_pointer, double_pointer)),
-        ("FPDFText_GetFontInfo", ct.c_ulong, (*args, ct.c_void_p, ct.c_ulong, ct.POINTER(ct.c_int))),
-        ("FPDFText_GetFontSize", ct.c_double, args),
-        ("FPDFText_GetFontWeight", ct.c_int, args),
-        ("FPDFText_GetTextObject", raw.FPDF_PAGEOBJECT, args),
-        ("FPDFTextObj_GetTextRenderMode", ct.c_int, (raw.FPDF_PAGEOBJECT,)),
-        ("FPDFText_GetCharOrigin", ct.c_int, (*args, double_pointer, double_pointer)),
-        ("FPDFText_IsGenerated", ct.c_int, args),
-        ("FPDFTextObj_GetFont", raw.FPDF_FONT, (raw.FPDF_PAGEOBJECT,)),
-        ("FPDFFont_GetIsEmbedded", ct.c_int, (raw.FPDF_FONT,)),
-        ("FPDFFont_GetFontData", ct.c_int, (raw.FPDF_FONT, ct.POINTER(ct.c_ubyte), ct.c_size_t, ct.POINTER(ct.c_size_t))),
-    )
-    functions, addresses = [], []
-    for name, result, arguments in specs:
-        function = getattr(raw, name, None)
-        if (
-            not isinstance(function, ct._CFuncPtr)
-            or function.restype is not result
-            or tuple(function.argtypes or ()) != arguments
-            or getattr(function, "errcheck", None) is not None
-        ):
-            return None, f"unsupported symbol or ABI: {name}"
-        functions.append(function)
-        addresses.append(ct.cast(function, ct.c_void_p).value)
-    return (functions, addresses), None
 
 
 def _color_symbols():

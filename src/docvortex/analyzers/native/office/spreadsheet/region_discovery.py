@@ -349,12 +349,14 @@ def select_sparse_regions(
     spans: Sequence[tuple[int, int, int, int]],
     max_row: int,
     max_col: int,
+    *,
+    include_kept: bool = True,
 ) -> tuple[int, float, list[ConnectedRegion], list[int]]:
     """连续选择三档候选，子集索引仅适用于与评分共享同一语义点集的调用方。"""
     from ....._compute_backend import get_native
 
     gap, penalty, regions, kept, _ = get_native().spreadsheet_select_regions(
-        starts, content_points, content_rectangles, semantic_positions, spans, max_row, max_col
+        starts, content_points, content_rectangles, semantic_positions, spans, max_row, max_col, include_kept=include_kept
     )
     return gap, penalty, _native_regions(regions), kept
 

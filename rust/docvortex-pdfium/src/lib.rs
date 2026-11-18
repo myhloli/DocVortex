@@ -76,6 +76,59 @@ pub unsafe fn read_char_form_owners(
     Ok(output)
 }
 
+// 字段名、函数签名和宿主地址顺序使用同一份声明，避免增删符号时两处漂移。
+macro_rules! character_functions {
+    ($($name:ident: $signature:ty),+ $(,)?) => {
+        struct CharacterFunctions {
+            $($name: $signature),+
+        }
+
+        impl CharacterFunctions {
+            /// 将宿主核验过的同库地址解包成具名函数。
+            ///
+            /// # Safety
+            /// 每个地址须符合相应的函数签名，且在整次读取期间保持有效。
+            unsafe fn from_addresses(addresses: &[usize]) -> Result<Self, ReadError> {
+                let &[$($name),+] = addresses else {
+                    return Err(ReadError::InvalidInput("invalid PDFium bridge arguments"));
+                };
+                if addresses.contains(&0) {
+                    return Err(ReadError::InvalidInput("invalid PDFium bridge arguments"));
+                }
+                Ok(Self {
+                    $($name: std::mem::transmute::<usize, $signature>($name)),+
+                })
+            }
+        }
+    }
+}
+
+character_functions! {
+    unicode: unsafe extern "system" fn(*mut c_void, c_int) -> c_uint,
+    angle: unsafe extern "system" fn(*mut c_void, c_int) -> c_float,
+    loose_box: unsafe extern "system" fn(*mut c_void, c_int, *mut RectF) -> c_int,
+    tight_box: unsafe extern "system" fn(
+        *mut c_void,
+        c_int,
+        *mut c_double,
+        *mut c_double,
+        *mut c_double,
+        *mut c_double,
+    ) -> c_int,
+    font_info:
+        unsafe extern "system" fn(*mut c_void, c_int, *mut c_void, c_ulong, *mut c_int) -> c_ulong,
+    font_size: unsafe extern "system" fn(*mut c_void, c_int) -> c_double,
+    font_weight: unsafe extern "system" fn(*mut c_void, c_int) -> c_int,
+    text_object: unsafe extern "system" fn(*mut c_void, c_int) -> *mut c_void,
+    render_mode: unsafe extern "system" fn(*mut c_void) -> c_int,
+    char_origin:
+        unsafe extern "system" fn(*mut c_void, c_int, *mut c_double, *mut c_double) -> c_int,
+    is_generated: unsafe extern "system" fn(*mut c_void, c_int) -> c_int,
+    object_font: font_weight::ObjectFont,
+    is_embedded: font_weight::IsEmbedded,
+    font_data: font_weight::FontData,
+}
+
 /// 在调用方持有运行时锁期间同步读取字符，结果不拥有任何 PDFium 句柄。
 ///
 /// # Safety
@@ -86,51 +139,18 @@ pub unsafe fn read_characters(
     count: usize,
     extended: bool,
 ) -> Result<(Vec<Record>, Fonts), ReadError> {
-    if addresses.len() != 14 || addresses.contains(&0) || handle == 0 || count > c_int::MAX as usize
-    {
+    if handle == 0 || count > c_int::MAX as usize {
         return Err(ReadError::InvalidInput("invalid PDFium bridge arguments"));
     }
     // 安全边界：仅接受适配器持有强引用的 ctypes 函数，使用当前平台 FPDF_CALLCONV 对应的 system ABI。
     unsafe {
-        let unicode: unsafe extern "system" fn(*mut c_void, c_int) -> c_uint =
-            std::mem::transmute(addresses[0]);
-        let angle: unsafe extern "system" fn(*mut c_void, c_int) -> c_float =
-            std::mem::transmute(addresses[1]);
-        let loose_box: unsafe extern "system" fn(*mut c_void, c_int, *mut RectF) -> c_int =
-            std::mem::transmute(addresses[2]);
-        let tight_box: unsafe extern "system" fn(
-            *mut c_void,
-            c_int,
-            *mut c_double,
-            *mut c_double,
-            *mut c_double,
-            *mut c_double,
-        ) -> c_int = std::mem::transmute(addresses[3]);
-        let font_info: unsafe extern "system" fn(
-            *mut c_void,
-            c_int,
-            *mut c_void,
-            c_ulong,
-            *mut c_int,
-        ) -> c_ulong = std::mem::transmute(addresses[4]);
-        let font_size: unsafe extern "system" fn(*mut c_void, c_int) -> c_double =
-            std::mem::transmute(addresses[5]);
-        let font_weight: unsafe extern "system" fn(*mut c_void, c_int) -> c_int =
-            std::mem::transmute(addresses[6]);
-        let text_object: unsafe extern "system" fn(*mut c_void, c_int) -> *mut c_void =
-            std::mem::transmute(addresses[7]);
-        let render_mode: unsafe extern "system" fn(*mut c_void) -> c_int =
-            std::mem::transmute(addresses[8]);
-        let char_origin: unsafe extern "system" fn(
-            *mut c_void,
-            c_int,
-            *mut c_double,
-            *mut c_double,
-        ) -> c_int = std::mem::transmute(addresses[9]);
-        let is_generated: unsafe extern "system" fn(*mut c_void, c_int) -> c_int =
-            std::mem::transmute(addresses[10]);
+        let functions = CharacterFunctions::from_addresses(&addresses)?;
         let page = handle as *mut c_void;
-        let mut font_weights = font_weight::FontWeights::new(&addresses[11..]);
+        let mut font_weights = font_weight::FontWeights::new(
+            functions.object_font,
+            functions.is_embedded,
+            functions.font_data,
+        );
         let mut records = Vec::with_capacity(count);
         let mut fonts: Fonts = Vec::new();
         let mut font_ids: HashMap<Vec<u8>, HashMap<i32, usize>> = HashMap::new();
@@ -142,9 +162,11 @@ pub unsafe fn read_characters(
         let mut flags = 0;
         for index in 0..count {
             let i = index as c_int;
-            let code = unicode(page, i);
-            let rotation = angle(page, i) as f64;
-            let loose = if (rotation == 0.0 || extended) && loose_box(page, i, &mut rect) != 0 {
+            let code = (functions.unicode)(page, i);
+            let rotation = (functions.angle)(page, i) as f64;
+            let loose = if (rotation == 0.0 || extended)
+                && (functions.loose_box)(page, i, &mut rect) != 0
+            {
                 Some((
                     rect.left as f64,
                     rect.bottom as f64,
@@ -155,7 +177,7 @@ pub unsafe fn read_characters(
                 None
             };
             let tight = if (rotation != 0.0 || extended)
-                && tight_box(page, i, &mut left, &mut right, &mut bottom, &mut top) != 0
+                && (functions.tight_box)(page, i, &mut left, &mut right, &mut bottom, &mut top) != 0
             {
                 Some((left, bottom, right, top))
             } else {
@@ -164,14 +186,15 @@ pub unsafe fn read_characters(
             if (rotation == 0.0 && loose.is_none()) || (rotation != 0.0 && tight.is_none()) {
                 return Err(ReadError::Pdfium("Failed to get charbox."));
             }
-            let length = font_info(page, i, font_buffer.as_mut_ptr().cast(), 256, &mut flags);
+            let length =
+                (functions.font_info)(page, i, font_buffer.as_mut_ptr().cast(), 256, &mut flags);
             let mut long_buffer = Vec::new();
             let bytes: &[u8] = if length > 256 {
                 long_buffer
                     .try_reserve_exact(length as usize)
                     .map_err(|_| ReadError::Allocation("PDFium font buffer allocation failed"))?;
                 long_buffer.resize(length as usize, 0u8);
-                font_info(page, i, long_buffer.as_mut_ptr().cast(), length, &mut flags);
+                (functions.font_info)(page, i, long_buffer.as_mut_ptr().cast(), length, &mut flags);
                 long_buffer.as_slice()
             } else if length > 0 {
                 &font_buffer
@@ -192,9 +215,9 @@ pub unsafe fn read_characters(
                         .insert(font_flags, id);
                     id
                 };
-            let size = font_size(page, i);
-            let object = text_object(page, i);
-            let weight = font_weights.resolve(font_weight(page, i), object);
+            let size = (functions.font_size)(page, i);
+            let object = (functions.text_object)(page, i);
+            let weight = font_weights.resolve((functions.font_weight)(page, i), object);
             if code > 0x10ffff {
                 return Err(ReadError::InvalidInput("chr() arg not in range(0x110000)"));
             }
@@ -202,9 +225,13 @@ pub unsafe fn read_characters(
             let mode = if object.is_null() {
                 None
             } else {
-                Some(*modes.entry(address).or_insert_with(|| render_mode(object)))
+                Some(
+                    *modes
+                        .entry(address)
+                        .or_insert_with(|| (functions.render_mode)(object)),
+                )
             };
-            let origin = if char_origin(page, i, &mut x, &mut y) != 0 {
+            let origin = if (functions.char_origin)(page, i, &mut x, &mut y) != 0 {
                 Some((x, y))
             } else {
                 None
@@ -220,7 +247,7 @@ pub unsafe fn read_characters(
                 address,
                 mode,
                 origin,
-                match is_generated(page, i) {
+                match (functions.is_generated)(page, i) {
                     0 => Some(false),
                     1 => Some(true),
                     _ => None,

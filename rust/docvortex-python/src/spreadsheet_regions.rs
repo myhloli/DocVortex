@@ -58,7 +58,7 @@ fn summary_record(py: Python<'_>, summary: &RegionSummary) -> PyResult<Py<PyDict
 
 /// 一次执行三档区域发现、评分和稳定选择，默认只返回获选区域的成员。
 #[pyfunction]
-#[pyo3(signature = (starts, content_points, content_rectangles, semantic_positions, spans, max_row, max_col, diagnostics=false))]
+#[pyo3(signature = (starts, content_points, content_rectangles, semantic_positions, spans, max_row, max_col, diagnostics=false, *, include_kept=true))]
 pub(super) fn spreadsheet_select_regions(
     py: Python<'_>,
     starts: Vec<Point>,
@@ -69,6 +69,7 @@ pub(super) fn spreadsheet_select_regions(
     max_row: i64,
     max_col: i64,
     diagnostics: bool,
+    include_kept: bool,
 ) -> PyResult<SelectionRecord> {
     let input = RegionInput {
         starts,
@@ -80,25 +81,21 @@ pub(super) fn spreadsheet_select_regions(
         max_col,
     };
     let result = py
-        .detach(move || core::analyze_regions(input, None))
+        .detach(move || core::select_regions(input, None, include_kept, diagnostics))
         .map_err(pyo3::exceptions::PyValueError::new_err)?;
     SELECT_BATCHES.fetch_add(1, Ordering::Relaxed);
-    let candidates = if diagnostics {
-        result
-            .candidates
-            .into_iter()
-            .map(|candidate| {
-                Ok((
-                    candidate.gap_tolerance,
-                    candidate.penalty,
-                    region_records(candidate.regions),
-                    summary_record(py, &candidate.summary)?,
-                ))
-            })
-            .collect::<PyResult<Vec<_>>>()?
-    } else {
-        Vec::new()
-    };
+    let candidates = result
+        .candidates
+        .into_iter()
+        .map(|candidate| {
+            Ok((
+                candidate.gap_tolerance,
+                candidate.penalty,
+                region_records(candidate.regions),
+                summary_record(py, &candidate.summary)?,
+            ))
+        })
+        .collect::<PyResult<Vec<_>>>()?;
     Ok((
         result.gap_tolerance,
         result.penalty,

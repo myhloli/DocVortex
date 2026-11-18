@@ -29,9 +29,10 @@ def test_hyperlinked_whitespace_is_filtered_after_materialization(monkeypatch: p
     original = projector_module.select_sparse_regions
     selections = []
 
-    def observe(*args: object) -> tuple:
+    def observe(*args: object, include_kept: bool) -> tuple:
         """记录原生评分筛选结果，确认格式适配最终仍按物化语义决定保留集合。"""
-        selected = original(*args)
+        assert include_kept is False
+        selected = original(*args, include_kept=include_kept)
         selections.append(selected)
         return selected
 
@@ -39,7 +40,7 @@ def test_hyperlinked_whitespace_is_filtered_after_materialization(monkeypatch: p
     _, _, tables = projector._select_best_gap_candidate(sheet)
 
     assert len(selections) == 1
-    assert selections[0][3] == [1]
+    assert selections[0][3] == []
     assert [table.anchor for table in tables] == [(0, 0), (5, 9)]
     assert tables[0].data[0].text == '<a href="https://example.test/whitespace"> </a>'
 
@@ -56,10 +57,11 @@ def test_hidden_merged_media_does_not_replace_materialized_semantics(monkeypatch
     snapshots = []
     selections = []
 
-    def observe(*args: object) -> tuple:
+    def observe(*args: object, include_kept: bool) -> tuple:
         """记录连接矩形、评分语义和跨度，核对三类证据没有提前合并。"""
         snapshots.append(args)
-        selected = original(*args)
+        assert include_kept is False
+        selected = original(*args, include_kept=include_kept)
         selections.append(selected)
         return selected
 
@@ -69,7 +71,7 @@ def test_hidden_merged_media_does_not_replace_materialized_semantics(monkeypatch
     assert snapshots[0][2] == [(0, 0, 0, 1)]
     assert set(snapshots[0][3]) == {(0, 1), (9, 5)}
     assert snapshots[0][4] == [(0, 0, 1, 2)]
-    assert selections[0][3] == [0, 1]
+    assert selections[0][3] == []
     assert [table.anchor for table in tables] == [(5, 9)]
 
 

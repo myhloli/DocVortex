@@ -5,9 +5,10 @@ use std::ffi::{c_int, c_void};
 
 const MAX_FONT_BYTES: usize = 64 * 1024 * 1024;
 
-type ObjectFont = unsafe extern "system" fn(*mut c_void) -> *mut c_void;
-type IsEmbedded = unsafe extern "system" fn(*mut c_void) -> c_int;
-type FontData = unsafe extern "system" fn(*mut c_void, *mut u8, usize, *mut usize) -> c_int;
+pub(super) type ObjectFont = unsafe extern "system" fn(*mut c_void) -> *mut c_void;
+pub(super) type IsEmbedded = unsafe extern "system" fn(*mut c_void) -> c_int;
+pub(super) type FontData =
+    unsafe extern "system" fn(*mut c_void, *mut u8, usize, *mut usize) -> c_int;
 
 /// 缓存只在一次文本页读取期间存活，按真实句柄区分同名但不同字重的字体。
 pub(crate) struct FontWeights {
@@ -19,15 +20,16 @@ pub(crate) struct FontWeights {
 }
 
 impl FontWeights {
-    /// 接收宿主已验证的同库 ABI 地址，调用方继续负责句柄与共享锁的生命周期。
-    ///
-    /// # Safety
-    /// 三个地址必须依次对应 GetFont、GetIsEmbedded、GetFontData，且非空并持续有效。
-    pub(crate) unsafe fn new(addresses: &[usize]) -> Self {
+    /// 复用已解码的同库函数字段，字体与对象缓存只属于本次读取。
+    pub(crate) fn new(
+        object_font: ObjectFont,
+        is_embedded: IsEmbedded,
+        font_data: FontData,
+    ) -> Self {
         Self {
-            object_font: std::mem::transmute::<usize, ObjectFont>(addresses[0]),
-            is_embedded: std::mem::transmute::<usize, IsEmbedded>(addresses[1]),
-            font_data: std::mem::transmute::<usize, FontData>(addresses[2]),
+            object_font,
+            is_embedded,
+            font_data,
             fonts: HashMap::new(),
             objects: HashMap::new(),
         }

@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
 
-_PROTOCOL_VERSION = 45
+_PROTOCOL_VERSION = 46
 
 
 @lru_cache(maxsize=1)

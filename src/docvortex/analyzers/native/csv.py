@@ -27,6 +27,7 @@ _HEADER_SAMPLE_ROWS: Final = 50
 _HEADER_KIND_DOMINANCE_NUM: Final = 9
 _HEADER_KIND_DOMINANCE_DEN: Final = 10
 _MAX_HEADER_LABEL_CHARS: Final = 64
+_PLAIN_ASCII_FIELD = re.compile(r"[A-Za-z0-9 _.,/+%-]*")
 _SEP_DIRECTIVE_RE = re.compile(r"\Asep=(?P<delimiter>[,;\t|])(?:\r\n|\n|\r|$)", re.IGNORECASE)
 _DISALLOWED_CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\ud800-\udfff]")
 _DATE_RE = re.compile(r"^\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}(?:[ T]\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?Z?)?$")
@@ -315,11 +316,15 @@ def _rows_to_html(rows: list[list[str]], *, has_header: bool) -> str:
             cell_prefix = f"\n    <{tag}>"
             cell_suffix = f"</{tag}>"
             rendered_bytes = _charge_rendered_bytes(rendered_bytes, len(cell_prefix) + len(cell_suffix))
-            remaining_budget = MAX_CSV_RENDERED_BYTES - rendered_bytes
-            field_bytes = _rendered_field_utf8_bytes(value, remaining_budget)
-            rendered_bytes = _charge_rendered_bytes(rendered_bytes, field_bytes)
+            if _PLAIN_ASCII_FIELD.fullmatch(value):
+                rendered_bytes = _charge_rendered_bytes(rendered_bytes, len(value))
+                rendered = value
+            else:
+                field_bytes = _rendered_field_utf8_bytes(value, MAX_CSV_RENDERED_BYTES - rendered_bytes)
+                rendered_bytes = _charge_rendered_bytes(rendered_bytes, field_bytes)
+                rendered = _render_field_html(value)
             output.write(cell_prefix)
-            output.write(_render_field_html(value))
+            output.write(rendered)
             output.write(cell_suffix)
         row_suffix = "\n  </tr>"
         rendered_bytes = _charge_rendered_bytes(rendered_bytes, len(row_suffix))

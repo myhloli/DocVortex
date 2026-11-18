@@ -4,28 +4,29 @@ from __future__ import annotations
 
 from dataclasses import replace
 import re
-import statistics
 from .contracts import NativeTableText, NativeTableTextRow
 from .text import _tokenize_row
-from .geometry import bbox_union
+from .geometry import bbox_union, sorted_group_median
 from .candidate import GridCellSpec, build_candidate
 from .geometry import table_local_size, normalize_angle
 from .sparse_common import _local_rules
 
 
+def _glyph_center_y(glyph):
+    """读取数值表字形的纵向中心，用于排序及行中心判定。"""
+    return (glyph.bbox[1] + glyph.bbox[3]) / 2
+
+
 def regroup_numeric_text(text):
     """金额处于换行标签中间时按独立字形中心组行，避免高数字框桥接两行汉字。"""
     groups = []
-    centers = []
     em = text.median_glyph_height
-    for glyph in sorted(text.glyphs, key=lambda g: ((g.bbox[1] + g.bbox[3]) / 2, g.bbox[0])):
-        y = (glyph.bbox[1] + glyph.bbox[3]) / 2
-        if not groups or y - centers[-1] > max(0.75, 0.3 * em):
+    for glyph in sorted(text.glyphs, key=lambda g: (_glyph_center_y(g), g.bbox[0])):
+        y = _glyph_center_y(glyph)
+        if not groups or y - sorted_group_median(groups[-1], _glyph_center_y) > max(0.75, 0.3 * em):
             groups.append([glyph])
-            centers.append(y)
         else:
             groups[-1].append(glyph)
-            centers[-1] = statistics.median((g.bbox[1] + g.bbox[3]) / 2 for g in groups[-1])
     glyphs, rows = [], []
     for index, group in enumerate(groups):
         members = sorted([replace(g, visual_row=index) for g in group], key=lambda g: g.bbox[0])

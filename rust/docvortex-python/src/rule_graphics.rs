@@ -1,5 +1,6 @@
 //! 图形数值批量绑定，返回布尔标志而不重复物化框坐标。
 use pyo3::prelude::*;
+use pyo3::types::{PyFloat, PyList, PyTuple};
 
 /// 完整几何快照批量匹配，纯数值自有缓冲在释放 GIL 后计算，不访问源对象。
 #[pyfunction]
@@ -9,6 +10,20 @@ pub(super) fn overlap_member_groups(
     regions: &Bound<'_, PyAny>,
     threshold: f64,
 ) -> PyResult<Vec<Vec<usize>>> {
+    if threshold.is_finite() {
+        if let Some(member_boxes) = finite_float_boxes(members)? {
+            if let Some(region_boxes) = finite_float_boxes(regions)? {
+                return Ok(py.detach(|| {
+                    docvortex_core::rule_graphics::overlap_member_groups(
+                        &member_boxes,
+                        &region_boxes,
+                        threshold,
+                    )
+                }));
+            }
+        }
+    }
+    // 特殊序列仍走原始下标和二次提取流程，保留自定义数值、迭代器及异常的语义。
     let member_objects = super::tables::object_boxes(members)?;
     let region_objects = super::tables::object_boxes(regions)?;
     if ordinary_table_boxes(py, &member_objects)
@@ -62,6 +77,36 @@ pub(super) fn overlap_member_groups(
         output.push(selected);
     }
     Ok(output)
+}
+
+/// 普通列表和元组在一次读取中核验并收集浮点框，不调用自定义容器或数值方法。
+fn finite_float_boxes(values: &Bound<'_, PyAny>) -> PyResult<Option<Vec<[f64; 4]>>> {
+    if !values.is_exact_instance_of::<PyList>() && !values.is_exact_instance_of::<PyTuple>() {
+        return Ok(None);
+    }
+    let mut boxes = Vec::with_capacity(values.len()?);
+    for row in values.try_iter()? {
+        let row = row?;
+        if !(row.is_exact_instance_of::<PyList>() || row.is_exact_instance_of::<PyTuple>())
+            || row.len()? != 4
+        {
+            return Ok(None);
+        }
+        let mut bbox = [0.0; 4];
+        for (axis, coordinate) in bbox.iter_mut().enumerate() {
+            let value = row.get_item(axis)?;
+            let Ok(value) = value.cast_exact::<PyFloat>() else {
+                return Ok(None);
+            };
+            let value = value.value();
+            if !value.is_finite() || value.abs() > 2f64.powi(50) {
+                return Ok(None);
+            }
+            *coordinate = value;
+        }
+        boxes.push(bbox);
+    }
+    Ok(Some(boxes))
 }
 
 /// 普通有限浮点继续使用无 GIL 批量内核，其他合法数值交由原生通用算术保持精度。

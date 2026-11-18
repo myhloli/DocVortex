@@ -595,5 +595,6 @@ def test_flash_consumes_and_releases_owned_script_pages(native, monkeypatch):
     with PDFDocument(_pdf()) as document:
         sources = pipeline._collect_document_sources(document)
     assert sources.page_owned_scripts and sources.page_owned_scripts[0] is not None
+    assert sources.page_owned_scripts[0][1] is sources.page_geometry_evidence[0][1]
     pipeline._prepare_document_sources(sources)
     assert sources.page_owned_scripts == sources.page_sources == sources.page_text_geometries == []
