@@ -137,12 +137,15 @@ Native PDF analysis adds `extensions.docvortex_layout` and deterministic
 postprocessing preserves it in Middle JSON and result bundles:
 
 ```json
-{"docvortex_layout":{"version":1,"pages":[{"page_idx":0,"width_pt":595.28,"height_pt":841.89}]}}
+{"docvortex_layout":{"version":1,"pages":[{"page_idx":0,"width_pt":595,"height_pt":842}]}}
 ```
 
 `page_idx` is the original zero-based source index, including for page selections.
-Dimensions are finite positive PDF points (72 points per inch), in the same
-visible-page orientation as normalized block bboxes. Page rotation is already
+Dimensions are positive integers in PDF points (72 points per inch), in the same
+visible-page orientation as normalized block bboxes. Round each dimension to the
+nearest point, with ties rounded up (342.5 pt becomes 343). Model and Middle JSON
+apply the same rule when loading older v1 layout records with fractional dimensions.
+A page whose width or height rounds to zero has no layout entry. Page rotation is already
 accounted for; consumers must not rotate these coordinates again. Blank pages
 also have geometry. Producers should provide an entry for each result page.
 Duplicate indices, unsupported extension versions, and missing/invalid dimensions

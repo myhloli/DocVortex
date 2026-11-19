@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-import math
 import json
 from copy import deepcopy
 from typing import TYPE_CHECKING
 
+from ...foundation._pdf_layout import LAYOUT_EXTENSION, normalize_layout_dimensions, round_layout_dimension
 from ...result import Diagnostic
 from ...schema import MiddleJson
 
 if TYPE_CHECKING:
     from ._document import PDFDocument
-
-
-LAYOUT_EXTENSION = "docvortex_layout"
 
 
 def remap_layout_geometry(extension: dict, page_indices: list[int] | None) -> dict:
@@ -26,6 +23,7 @@ def remap_layout_geometry(extension: dict, page_indices: list[int] | None) -> di
             if not 0 <= local_idx < len(page_indices):
                 raise ValueError(f"Layout page_idx={local_idx} is outside page_index_map")
             page["page_idx"] = page_indices[local_idx]
+    normalize_layout_dimensions(copied)
     return copied
 
 
@@ -51,6 +49,7 @@ def merge_layout_extensions(previous: dict, current: dict, current_page_indices:
             for idx in current_page_indices:
                 pages.pop(idx, None)
         left[LAYOUT_EXTENSION] = {"version": 1, "pages": [pages[idx] for idx in sorted(pages)]}
+        normalize_layout_dimensions(left[LAYOUT_EXTENSION])
     return left
 
 
@@ -61,9 +60,11 @@ def extract_layout_geometry(document: PDFDocument, page_indices: list[int] | Non
     diagnostics: list[Diagnostic] = []
     for local_index, page_index in enumerate(indices):
         try:
-            width, height = document.page_size(local_index)
-            if not all(math.isfinite(value) and value > 0 for value in (width, height)):
-                raise ValueError("page dimensions must be finite and positive")
+            raw_width, raw_height = document.page_size(local_index)
+            width = round_layout_dimension(raw_width)
+            height = round_layout_dimension(raw_height)
+            if not width or not height:
+                raise ValueError("page dimensions must round to positive integer points")
         except Exception as exc:
             diagnostics.append(Diagnostic("pdf_layout_geometry_unavailable", f"page_idx={page_index}: {exc}", page_index))
             continue
@@ -71,7 +72,7 @@ def extract_layout_geometry(document: PDFDocument, page_indices: list[int] | Non
     return {"version": 1, "pages": pages}, tuple(diagnostics)
 
 
-def read_layout_geometry(middle: MiddleJson) -> dict[int, tuple[float, float]]:
+def read_layout_geometry(middle: MiddleJson) -> dict[int, tuple[int, int]]:
     """严格读取扩展并验证全部输出页的尺寸及顶层定位，不猜测历史页尺寸。"""
     extension = middle.extensions.get(LAYOUT_EXTENSION)
     if not isinstance(extension, dict):
@@ -81,17 +82,18 @@ def read_layout_geometry(middle: MiddleJson) -> dict[int, tuple[float, float]]:
     pages = extension.get("pages")
     if not isinstance(pages, list):
         raise ValueError(f"{LAYOUT_EXTENSION}.pages must be a list")
-    sizes: dict[int, tuple[float, float]] = {}
+    sizes: dict[int, tuple[int, int]] = {}
     for page in pages:
         if not isinstance(page, dict):
             raise ValueError("Layout page geometry must be an object")
         page_idx = page.get("page_idx")
         if type(page_idx) is not int or page_idx < 0 or page_idx in sizes:
             raise ValueError(f"Invalid or duplicate layout page_idx={page_idx}")
-        dimensions = (page.get("width_pt"), page.get("height_pt"))
-        if any(type(value) not in (int, float) or not math.isfinite(value) or value <= 0 for value in dimensions):
+        width = round_layout_dimension(page.get("width_pt"))
+        height = round_layout_dimension(page.get("height_pt"))
+        if not width or not height:
             raise ValueError(f"Invalid layout page dimensions: page_idx={page_idx}")
-        sizes[page_idx] = (float(dimensions[0]), float(dimensions[1]))
+        sizes[page_idx] = (width, height)
         rotations = page.get("image_rotations", {})
         if not isinstance(rotations, dict) or any(
             not isinstance(key, str)

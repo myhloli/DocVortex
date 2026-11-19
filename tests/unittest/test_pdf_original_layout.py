@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from io import BytesIO
@@ -17,7 +18,7 @@ from reportlab.lib.utils import ImageReader
 from docvortex import load_bundle, parse, render_artifact
 from docvortex.cli import main
 from docvortex.document.pdf import PDFDocument
-from docvortex.document.pdf.layout import attach_layout_image_rotations, extract_layout_geometry
+from docvortex.document.pdf.layout import attach_layout_image_rotations, extract_layout_geometry, read_layout_geometry
 from docvortex.render import PdfLayout, PdfRenderOptions, RenderFormat, render, render_pdf
 from docvortex.render._internal.pdf.formula import FormulaRenderer, PdfFormulaError
 from docvortex.schema import MiddleJson, PageInfo, Producer
@@ -61,10 +62,10 @@ def _png_uri() -> str:
 def _source_pdf() -> bytes:
     """生成包含旋转、非 A4、空白页及横向页的真实源 PDF。"""
     output = BytesIO()
-    canvas = Canvas(output, pagesize=(400, 600))
+    canvas = Canvas(output, pagesize=(342.72, 468))
     canvas.drawString(40, 500, "FIRST PAGE")
     canvas.showPage()
-    canvas.setPageSize((320, 480))
+    canvas.setPageSize((320.25, 480.5))
     canvas.showPage()
     canvas.setPageSize((600, 400))
     canvas.drawString(40, 300, "THIRD PAGE")
@@ -345,12 +346,26 @@ def test_pdf_parse_and_bundle_retain_selected_page_geometry(tmp_path) -> None:
     extension = result.middle_json.extensions["docvortex_layout"]
     assert extension == result.model_json.extensions["docvortex_layout"]
     assert extension["pages"] == [
-        {"page_idx": 0, "width_pt": 400, "height_pt": 600},
+        {"page_idx": 0, "width_pt": 343, "height_pt": 468},
         {"page_idx": 2, "width_pt": 600, "height_pt": 400},
     ]
     before = result.middle_json.to_dict()
-    result.save_bundle(tmp_path / "bundle")
-    restored = load_bundle(tmp_path / "bundle")
+    bundle = tmp_path / "bundle"
+    result.save_bundle(bundle)
+    for name in ("model.json", "middle.json"):
+        path = bundle / name
+        document = json.loads(path.read_bytes())
+        pages = document["extensions"]["docvortex_layout"]["pages"]
+        assert pages == extension["pages"]
+        assert all(type(page[key]) is int for page in pages for key in ("width_pt", "height_pt"))
+        # 模拟已有 bundle，只改历史版本实际写为浮点数的两个字段。
+        pages[0].update(width_pt=342.7200012207031, height_pt=468.0)
+        path.write_text(json.dumps(document), encoding="utf-8")
+    restored = load_bundle(bundle)
+    for document in (restored.model_json, restored.middle_json):
+        page = json.loads(document.to_json())["extensions"]["docvortex_layout"]["pages"][0]
+        assert page == extension["pages"][0]
+        assert type(page["width_pt"]) is int and type(page["height_pt"]) is int
     payload = render_artifact(restored.middle_json, "pdf", assets=restored.assets).content
     assert len(_reader(payload).pages) == 2
     assert restored.middle_json.to_dict() == before == result.middle_json.to_dict()
@@ -361,8 +376,44 @@ def test_rotation_and_blank_page_geometry_survive_parsing() -> None:
     result = parse(_source_pdf(), file_suffix="pdf", parse_mode="txt")
     reader = _reader(render_pdf(result.middle_json))
     assert len(reader.pages) == 3
-    assert tuple(reader.pages[1].mediabox)[2:] == (480, 320)
+    assert tuple(reader.pages[1].mediabox)[2:] == (481, 320)
     assert reader.pages[1].extract_text() == ""
+
+
+def test_layout_rounding_only_changes_v1_page_dimensions() -> None:
+    """旧数据读入只影响已知尺寸，调用方字典、其他扩展和未知版本均保持原值。"""
+    payload = _middle([{"page_idx": 0}]).to_dict()
+    page = payload["extensions"]["docvortex_layout"]["pages"][0]
+    page.update(width_pt=342.5, height_pt=468.49, image_rotations={"1": 90}, extra=2.5)
+    payload["extensions"]["other"] = {"width_pt": 2.5}
+    for version in (1, 2, True):
+        payload["extensions"]["docvortex_layout"]["version"] = version
+        before = deepcopy(payload)
+        middle = MiddleJson.from_dict(payload)
+        assert payload == before
+        if type(version) is int and version == 1:
+            size = read_layout_geometry(middle)[0]
+            assert size == (343, 468) and all(type(value) is int for value in size)
+            before["extensions"]["docvortex_layout"]["pages"][0].update(width_pt=343, height_pt=468)
+        assert middle.to_dict()["extensions"] == before["extensions"]
+
+
+def test_subpoint_page_geometry_uses_existing_fallback() -> None:
+    """不足半点的页面省略几何并回退重排，恰好半点的页面正常记录为 1 pt。"""
+    writer = PdfWriter()
+    writer.add_blank_page(width=0.49, height=50)
+    writer.add_blank_page(width=0.5, height=50)
+    stream = BytesIO()
+    writer.write(stream)
+    with PDFDocument(stream.getvalue()) as document:
+        geometry, diagnostics = extract_layout_geometry(document, [2, 7])
+    assert geometry["pages"] == [{"page_idx": 7, "width_pt": 1, "height_pt": 50}]
+    assert [(item.code, item.page_index) for item in diagnostics] == [("pdf_layout_geometry_unavailable", 2)]
+    middle = _middle([{"page_idx": 2}, {"page_idx": 7}], sizes=[(2, 0.49, 50), (7, 0.5, 50)])
+    assert middle.extensions["docvortex_layout"] == geometry
+    assert [item.code for item in render_artifact(middle, "pdf").diagnostics] == ["pdf_layout_reflow_fallback"]
+    with pytest.raises(ValueError, match="page_idx=2"):
+        render_pdf(middle, layout=PdfLayout.ORIGINAL)
 
 
 def test_geometry_failure_is_nonfatal_during_analysis() -> None:

@@ -57,7 +57,7 @@ class OriginalPdfRenderer(_PdfRenderer):
         *,
         asset_resolver: AssetResolver | None,
         document_title: str | None,
-        page_sizes: dict[int, tuple[float, float]],
+        page_sizes: dict[int, tuple[int, int]],
     ) -> None:
         """持有当前结果的源页尺寸，正文和素材仍由既有实现解析。"""
         super().__init__(middle_json, asset_resolver=asset_resolver, document_title=document_title)

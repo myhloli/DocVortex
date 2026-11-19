@@ -20,6 +20,7 @@ from pydantic import (
 )
 
 from .foundation._hyperlink import OFFICE_EXTERNAL_HYPERLINK_SCHEMES, sanitize_hyperlink_target
+from .foundation._pdf_layout import LAYOUT_EXTENSION, normalize_layout_dimensions
 
 # 这些字符串不能作为公开 Block.type discriminator，只用于 raw 阶段或 Block 内部枚举值。
 RawBlockType: TypeAlias = Literal[
@@ -950,6 +951,13 @@ class DocumentModel(_StrictMiddleModel):
     extensions: dict[str, JsonValue] = Field(default_factory=dict)
     schema_version: Literal["2.0"] = "2.0"
     schema_id: str = Field(alias="schema")
+
+    @field_validator("extensions")
+    @classmethod
+    def _normalize_layout_dimensions(cls, extensions: dict[str, JsonValue]) -> dict[str, JsonValue]:
+        """在已校验的 JSON 副本中升级旧浮点页尺寸，Model 和 Middle 共用此入口。"""
+        normalize_layout_dimensions(extensions.get(LAYOUT_EXTENSION))
+        return extensions
 
     def to_dict(
         self,
