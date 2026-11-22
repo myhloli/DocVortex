@@ -8,6 +8,7 @@ from ...contracts import ImageRenderer, RenderMode
 from ..common.planner import PlannedBlock, build_render_plan
 from ..common.anchors import iter_document_anchor_blocks
 from .blocks import render_planned_block
+from .pdf_links import prepare_pdf_markdown_links
 
 _PAGE_SEPARATOR = "\n\n---\n\n"
 
@@ -27,7 +28,8 @@ def render_markdown(
         raise TypeError("mode must be a RenderMode value")
 
     delimiters = latex_delimiters or LatexDelimitersConfig()
-    planned_pages = build_render_plan(middle_json, mode)
+    links = prepare_pdf_markdown_links(middle_json)
+    planned_pages = build_render_plan(links.document, mode)
     anchor_targets = _collect_markdown_anchor_targets(middle_json)
     emitted_anchors: set[str] = set()
     rendered_pages = [
@@ -39,6 +41,8 @@ def render_markdown(
             image_renderer=image_renderer,
             anchor_targets=anchor_targets,
             emitted_anchors=emitted_anchors,
+            footnote_targets=links.footnote_targets,
+            reference_targets=links.reference_targets,
         )
         for page in planned_pages
     ]
@@ -56,6 +60,8 @@ def _render_page(
     image_renderer: ImageRenderer | None = None,
     anchor_targets: set[str] | None = None,
     emitted_anchors: set[str] | None = None,
+    footnote_targets: set[str] | None = None,
+    reference_targets: dict[str, str] | None = None,
 ) -> str:
     """渲染单页逻辑块，并在默认模式中过滤重复页元素。"""
     rendered: list[str] = []
@@ -71,6 +77,8 @@ def _render_page(
             image_renderer=image_renderer,
             anchor_targets=anchor_targets,
             emitted_anchors=emitted_anchors,
+            footnote_targets=footnote_targets,
+            reference_targets=reference_targets,
         )
         if text and text.strip():
             rendered.append(text.strip("\n"))

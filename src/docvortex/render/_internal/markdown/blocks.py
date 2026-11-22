@@ -19,6 +19,7 @@ from .inline import (
     render_internal_link,
     render_joined_inline_contents,
 )
+from .pdf_links import reference_label
 from .table import _strip_embedded_images, format_embedded_html, render_html_table
 from ...contracts import ImageRenderer
 from ....schema import (
@@ -61,19 +62,26 @@ def render_planned_block(
     image_renderer: ImageRenderer | None = None,
     anchor_targets: set[str] | None = None,
     emitted_anchors: set[str] | None = None,
+    footnote_targets: set[str] | None = None,
+    reference_targets: dict[str, str] | None = None,
 ) -> str:
     """按具体 Pydantic block 类型分发 Markdown 渲染。"""
     block = planned.block
     if isinstance(block, TextBlock):
-        content = render_joined_inline_contents(planned.text_contents or [block.content], delimiters)
+        content = render_joined_inline_contents(planned.text_contents or [block.content], delimiters, footnote_targets)
         rendered = escape_standalone_marker_rule(escape_text_block_markdown_prefix(content))
         return _prepend_markdown_anchor(rendered, visible_block_anchor(block), emitted_anchors)
     if isinstance(block, RefTextBlock):
         content = render_joined_inline_contents(planned.text_contents or [block.content], delimiters)
-        return escape_standalone_marker_rule(content)
+        label = reference_label(block.content) if reference_targets and not block.continues_prev else None
+        anchor = reference_targets.get(label) if label is not None and reference_targets else None
+        return _prepend_markdown_anchor(escape_standalone_marker_rule(content), anchor, emitted_anchors)
     if isinstance(block, (DocTitleBlock, ParagraphTitleBlock)):
-        return _render_title(block, delimiters, emitted_anchors)
+        return _render_title(block, delimiters, emitted_anchors, footnote_targets)
     if isinstance(block, PageFootnoteBlock):
+        if footnote_targets and block.anchor in footnote_targets:
+            content = render_inline_content(block.content, delimiters).strip()
+            return f"[^{block.anchor}]: " + content.replace("\n", "\n    ")
         return _render_page_footnote(block, delimiters, emitted_anchors)
     if isinstance(block, PageAuxTextBlock):
         content = escape_text_block_markdown_prefix(render_inline_content(block.content, delimiters))
@@ -81,7 +89,7 @@ def render_planned_block(
     if isinstance(block, EquationBlock):
         return _render_equation(block, delimiters, asset_base_url, image_renderer)
     if isinstance(block, ListBlock):
-        return _render_list(block, delimiters)
+        return _render_list(block, delimiters, footnote_targets=footnote_targets, reference_targets=reference_targets)
     if isinstance(block, IndexBlock):
         return _render_index(block, delimiters, anchor_targets=anchor_targets)
     if isinstance(block, ImageBlock):
@@ -161,10 +169,11 @@ def _render_title(
     block: DocTitleBlock | ParagraphTitleBlock,
     delimiters: LatexDelimitersConfig,
     emitted_anchors: set[str] | None = None,
+    footnote_targets: set[str] | None = None,
 ) -> str:
     """渲染带可选 HTML anchor 的 Markdown 标题。"""
     level = min(max(block.level, 1), 6)
-    title = f"{'#' * level} {render_title_inline_content(block, delimiters)}"
+    title = f"{'#' * level} {render_inline_content(block.content, delimiters, footnote_targets)}"
     anchor = _claim_markdown_anchor(visible_block_anchor(block), emitted_anchors)
     if not anchor:
         return title
@@ -195,20 +204,33 @@ def _render_equation(
     return build_markdown_image(source) if source else ""
 
 
-def _render_list(block: ListBlock, delimiters: LatexDelimitersConfig, depth: int = 0) -> str:
+def _render_list(
+    block: ListBlock,
+    delimiters: LatexDelimitersConfig,
+    depth: int = 0,
+    *,
+    footnote_targets: set[str] | None = None,
+    reference_targets: dict[str, str] | None = None,
+) -> str:
     """递归渲染列表，并给多数条目无数字前缀的参考文献补无序标记。"""
     add_ref_bullets = reference_list_needs_bullets(block)
     lines: list[str] = []
     for child in block.content:
         if isinstance(child, ListBlock):
-            nested = _render_list(child, delimiters, depth + 1)
+            nested = _render_list(
+                child, delimiters, depth + 1, footnote_targets=footnote_targets, reference_targets=reference_targets
+            )
             if nested:
                 lines.extend(nested.splitlines())
             continue
-        item = render_inline_content(child.content, delimiters)
+        item = render_inline_content(child.content, delimiters, footnote_targets)
         if not item:
             continue
         item = escape_standalone_marker_rule(item)
+        if reference_targets and isinstance(child, RefTextBlock):
+            label = reference_label(child.content)
+            if label is not None and (anchor := reference_targets.get(label)):
+                item = f'<a id="{anchor}"></a>{item}'
         indent = "    " * depth
         item_lines = item.splitlines() or [item]
         if add_ref_bullets and not has_markdown_unordered_marker(child.content):
