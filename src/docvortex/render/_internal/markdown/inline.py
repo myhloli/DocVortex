@@ -21,19 +21,25 @@ _SIMPLE_STYLE_WRAPPERS = {
 }
 
 
-def render_inline_content(content: list[InlineSpan], delimiters: LatexDelimitersConfig) -> str:
+def render_inline_content(
+    content: list[InlineSpan], delimiters: LatexDelimitersConfig, footnote_targets: set[str] | None = None
+) -> str:
     """把一段 MiddleJson 行内内容渲染为 Markdown。"""
-    return render_inline_spans(content, delimiters)
+    return render_inline_spans(content, delimiters, footnote_targets)
 
 
-def render_joined_inline_contents(contents: list[list[InlineSpan]], delimiters: LatexDelimitersConfig) -> str:
+def render_joined_inline_contents(
+    contents: list[list[InlineSpan]], delimiters: LatexDelimitersConfig, footnote_targets: set[str] | None = None
+) -> str:
     """按物理段落边界规则合并多段 content 后渲染 Markdown。"""
-    return render_inline_spans(join_inline_spans(contents), delimiters)
+    return render_inline_spans(join_inline_spans(contents), delimiters, footnote_targets)
 
 
-def render_inline_spans(spans: list[InlineSpan], delimiters: LatexDelimitersConfig) -> str:
+def render_inline_spans(
+    spans: list[InlineSpan], delimiters: LatexDelimitersConfig, footnote_targets: set[str] | None = None
+) -> str:
     """把行内 Span 序列化为 Markdown 与必要的安全 HTML。"""
-    return "".join(_render_inline_span(span, delimiters) for span in spans)
+    return "".join(_render_inline_span(span, delimiters, footnote_targets) for span in spans)
 
 
 def render_inline_spans_in_html_context(spans: list[InlineSpan], delimiters: LatexDelimitersConfig) -> str:
@@ -41,7 +47,7 @@ def render_inline_spans_in_html_context(spans: list[InlineSpan], delimiters: Lat
     return "".join(_render_inline_span_in_html_context(span, delimiters) for span in spans)
 
 
-def _render_inline_span(span: InlineSpan, delimiters: LatexDelimitersConfig) -> str:
+def _render_inline_span(span: InlineSpan, delimiters: LatexDelimitersConfig, footnote_targets: set[str] | None) -> str:
     """渲染单个结构化行内 Span。"""
     if isinstance(span, TextSpan):
         content = _escape_plain_markdown_text(span.content)
@@ -51,6 +57,8 @@ def _render_inline_span(span: InlineSpan, delimiters: LatexDelimitersConfig) -> 
     if isinstance(span, EquationInlineSpan):
         return f"{delimiters.inline.left}{span.content}{delimiters.inline.right}"
     if isinstance(span, HyperlinkSpan):
+        if footnote_targets and span.url.startswith("#") and span.url[1:] in footnote_targets:
+            return f"[^{span.url[1:]}]"
         label = render_inline_spans(list(span.content), delimiters)
         return _render_link(label, span.url, _requires_html_link(list(span.content)))
     raise TypeError(f"Unsupported inline span: {type(span).__name__}")

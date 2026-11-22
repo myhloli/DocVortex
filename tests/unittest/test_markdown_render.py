@@ -198,6 +198,93 @@ def test_page_footnote_does_not_interrupt_continued_text_rendering() -> None:
     )
 
 
+def test_pdf_markdown_links_ocr_footnotes_and_preserves_equations() -> None:
+    bbox = (0.1, 0.1, 0.9, 0.3)
+    middle = _middle(
+        _page(
+            0,
+            TextBlock(
+                type="text",
+                index=0,
+                bbox=bbox,
+                content=[
+                    {"type": "text", "content": "The formula "},
+                    {"type": "equation_inline", "content": "x^{89}"},
+                    {"type": "text", "content": " has two explanations:"},
+                    {"type": "equation_inline", "content": "^{89}"},
+                ],
+            ),
+            PageFootnoteBlock(
+                type="page_footnote",
+                index=1,
+                bbox=bbox,
+                content=_inline("8 First note."),
+            ),
+            PageFootnoteBlock(
+                type="page_footnote",
+                index=2,
+                bbox=bbox,
+                content=[{"type": "equation_inline", "content": "^{9}"}, {"type": "text", "content": " Next note begins"}],
+            ),
+        ),
+        _page(
+            1,
+            TextBlock(
+                type="text",
+                index=0,
+                bbox=bbox,
+                content=[
+                    {"type": "text", "content": "Another example."},
+                    {"type": "text", "content": "8", "styles": ["superscript"]},
+                ],
+            ),
+            PageFootnoteBlock(type="page_footnote", index=1, bbox=bbox, content=_inline("on the preceding page.")),
+            PageFootnoteBlock(type="page_footnote", index=2, bbox=bbox, content=_inline("8 Reused label.")),
+        ),
+        file_suffix="pdf",
+    )
+    before = middle.to_json()
+
+    assert render_markdown(middle) == (
+        "The formula $x^{89}$ has two explanations:[^note-1-8][^note-1-9]\n\n"
+        "[^note-1-8]: First note.\n\n[^note-1-9]: Next note begins on the preceding page.\n\n"
+        "Another example.[^note-2-8]\n\n[^note-2-8]: Reused label."
+    )
+    assert middle.to_json() == before
+
+
+def test_pdf_markdown_links_citation_groups_to_unique_bibliography_entries() -> None:
+    bbox = (0.1, 0.1, 0.9, 0.3)
+    middle = _middle(
+        _page(
+            0,
+            TextBlock(
+                type="text",
+                index=0,
+                bbox=bbox,
+                content=[
+                    {"type": "text", "content": "See "},
+                    {"type": "equation_inline", "content": "[1, 2]"},
+                    {"type": "text", "content": " and [3]. Compare [4] and incomplete [1, 5]. Set x = "},
+                    {"type": "equation_inline", "content": "[1, 2]"},
+                ],
+            ),
+        ),
+        _page(
+            1,
+            RefTextBlock(type="ref_text", index=0, bbox=bbox, content=_inline("[1] First work.")),
+            _list(1, "[2] Second work.", "[3] Third work.", "[4] Ambiguous.", "[4] Duplicate.", sub_type="ref_text"),
+        ),
+        file_suffix="pdf",
+    )
+
+    assert render_markdown(middle) == (
+        "See [[1](#ref-1), [2](#ref-2)] and [[3](#ref-3)]. Compare [4] and incomplete [1, 5]. Set x = $[1, 2]$\n\n"
+        '<a id="ref-1"></a>\n[1] First work.\n\n<a id="ref-2"></a>[2] Second work.\n'
+        '<a id="ref-3"></a>[3] Third work.\n[4] Ambiguous.\n[4] Duplicate.'
+    )
+
+
 def test_full_mode_preserves_empty_page_boundaries() -> None:
     """验证 FULL 对空白页仍保留相邻页分割线。"""
     middle = _middle(_page(0), _page(1, TextBlock(type="text", index=0, content=_inline("x"))), _page(2))
