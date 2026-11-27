@@ -256,12 +256,21 @@ def read_marked_page(document, page_index: int) -> MarkedPage:
 
 
 def render_marked_visuals(
-    document, page_index: int, blocks: list[dict], background_members: frozenset[int] = frozenset()
+    document,
+    page_index: int,
+    blocks: list[dict],
+    background_members: frozenset[int] = frozenset(),
+    *,
+    marked_page: MarkedPage | None = None,
+    frame_parents: dict[str, str] | None = None,
+    raster_sibling_parents: dict[str, str] | None = None,
 ) -> None:
     """渲染所属成员和装饰背景，避免组合矢量图的矩形裁图带入邻近正文。"""
     from ...foundation._image import crop_pil_image
     from ...foundation.image_encoding import encode_image
     from .raster import page_to_image
+    from .drawing_visibility import hide_drawings
+    from .marked_visibility import marked_visibility_patches, fully_covered_figures
 
     candidates = [
         block
@@ -288,31 +297,42 @@ def render_marked_visuals(
                     collect(obj, True, depth + 1)
 
         collect(page.raw)
-        for block in candidates:
-            selected = set(block["_pdf_structure"]["members"]) | background_members
-            changed = []
-            image = crop = None
-            try:
-                for index, (obj, kind) in enumerate(objects):
-                    if index in selected or kind == raw.FPDF_PAGEOBJ_FORM:
-                        continue
-                    active = ct.c_int()
-                    if not raw.FPDFPageObj_GetIsActive(obj, ct.byref(active)):
-                        raise RuntimeError("Cannot inspect PDF object activity")
-                    if active.value:
-                        if not raw.FPDFPageObj_SetIsActive(obj, 0):
-                            raise RuntimeError("Cannot isolate PDF graphic members")
-                        changed.append(obj)
-                image, _ = page_to_image(page)
-                crop = crop_pil_image(tuple(block["bbox"]), image)
-                artifact = encode_image(crop, image_format="png")
+        hidden = (
+            fully_covered_figures(page, marked_page, objects, blocks, raster_sibling_parents)
+            if marked_page is not None and raster_sibling_parents
+            else set()
+        )
+        if hidden:
+            candidates = [block for block in candidates if id(block) not in hidden]
+        patches = (
+            marked_visibility_patches(page, marked_page, objects, candidates, frame_parents or {}, blocks)
+            if marked_page is not None
+            else {}
+        )
+        absorbed = {id(component) for _, _, components in patches.values() for component in components}
+        try:
+            for block in candidates:
+                if id(block) in absorbed:
+                    continue
+                selected = set(block["_pdf_structure"]["members"]) | background_members
+                with hide_drawings(
+                    obj for index, (obj, kind) in enumerate(objects) if index not in selected and kind != raw.FPDF_PAGEOBJ_FORM
+                ):
+                    image, _ = page_to_image(page)
+                with image, crop_pil_image(tuple(block["bbox"]), image) as crop:
+                    if (patch := patches.get(id(block))) is not None:
+                        crop.paste(patch[0], (0, 0), patch[1])
+                    artifact = encode_image(crop, image_format="png")
                 block["image_base64"] = "data:image/png;base64," + base64.b64encode(artifact.data).decode("ascii")
-                block["_pdf_structure"]["image_ready"] = True
-            finally:
-                restored = [raw.FPDFPageObj_SetIsActive(obj, 1) for obj in changed]
-                if crop is not None:
-                    crop.close()
-                if image is not None:
-                    image.close()
-                if not all(restored):
-                    raise RuntimeError("Cannot restore PDF object activity")
+                marker = block["_pdf_structure"]
+                marker["image_ready"] = True
+                if patch is not None and patch[2]:
+                    markers = [component["_pdf_structure"] for component in patch[2]]
+                    marker["component_node_ids"] = [component["node_id"] for component in markers]
+                    marker["members"] = sorted(set(marker["members"]).union(*(entry["members"] for entry in markers)))
+            if removed := absorbed | hidden:
+                blocks[:] = [block for block in blocks if id(block) not in removed]
+        finally:
+            for pixels, mask, _ in patches.values():
+                pixels.close()
+                mask.close()

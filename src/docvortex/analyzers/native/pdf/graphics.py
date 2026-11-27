@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from .layout_evidence import build_layout_evidence
-from .annotation_text import _is_strong_caption_text
+from .layout_diagnostics import retain_line_members
+from .annotation_text import _FOOTNOTE_RE, _is_strong_caption_text
 
 import math
 import re
@@ -33,7 +34,15 @@ from .geometry import (
 )
 from .line_layout import _infer_text_lanes, _line_effective_height, _font_signatures_share_family
 from .line_merging import _join_formula_visual_row
-from .models import _AxisLine, _DrawingComponentSummary, _GraphicCandidate, _LineItem, _PageSource, _TextLane
+from .models import (
+    _AxisLine,
+    _DeferredFilledRegion,
+    _DrawingComponentSummary,
+    _GraphicCandidate,
+    _LineItem,
+    _PageSource,
+    _TextLane,
+)
 from .native_text import _fill_native_typography, _normalize_native_run_text, _sanitize_pdf_control_text
 
 _MIN_RASTER_IMAGE_PAGE_AREA_RATIO = 0.0038
@@ -160,6 +169,7 @@ def _build_caption_graphic_blocks(
                     "_font_signatures": {line.font_signature for line in side_members if line.font_signature},
                 }
             )
+            retain_line_members(blocks[-1], side_members, enabled=source.collect_layout_diagnostics)
             claimed.update(line.source_index for line in side_members)
             continue
         cb = caption.bbox
@@ -293,6 +303,7 @@ def _build_caption_graphic_blocks(
                 "_native_numeric_grid": _graphic_members_are_numeric_grid(members),
             }
         )
+        retain_line_members(blocks[-1], members, enabled=source.collect_layout_diagnostics)
         claimed.update(line.source_index for line in members)
     return blocks, claimed
 
@@ -606,6 +617,51 @@ def _select_form_image_bboxes(source: _PageSource) -> list[BBox]:
     return sorted(output, key=lambda bbox: (bbox[1], bbox[0], bbox[3], bbox[2]))
 
 
+def _panel_credit_members(source: _PageSource, form_bboxes: list[BBox]) -> dict[int, int]:
+    """将另行绘在同一张并列卡片底板内的来源行及紧邻续行归入裁图。"""
+    from .form_roles import repeated_panel_bbox
+
+    owners = {}
+    if not any(_FOOTNOTE_RE.match(line.text) for line in source.lines):
+        return owners
+    for form in source.form_infos:
+        if not form.path_indices:
+            continue
+        index = next(
+            (
+                i
+                for i, box in enumerate(form_bboxes)
+                if box == form.bbox
+                or (
+                    form.text_indices
+                    and source.form_member_sources.get(box) == form.text_indices
+                    and _bbox_overlap_in_first(box, form.bbox) >= 0.99
+                )
+            ),
+            None,
+        )
+        if index is None or (panel := repeated_panel_bbox(source, form)) is None:
+            continue
+        inside = sorted(
+            (line for line in source.lines if not line.angle and _bbox_overlap_in_first(line.bbox, panel) >= 0.99),
+            key=lambda line: (line.bbox[1], line.bbox[0]),
+        )
+        previous = None
+        for line in inside:
+            em = _line_effective_height(line, line.bbox)
+            if _FOOTNOTE_RE.match(line.text) or (
+                previous is not None
+                and -0.2 * em <= line.bbox[1] - previous.bbox[3] <= 0.65 * em
+                and abs(line.bbox[0] - previous.bbox[0]) <= 0.5 * em
+                and abs(em - _line_effective_height(previous, previous.bbox)) <= 0.2 * em
+            ):
+                owners[line.source_index] = index
+                previous = line
+            else:
+                previous = None
+    return owners
+
+
 def _build_form_image_blocks(
     source: _PageSource,
     form_bboxes: list[BBox],
@@ -615,7 +671,22 @@ def _build_form_image_blocks(
 
     if not form_bboxes:
         return [], set()
+    parallel_grids = {form.bbox for form in source.form_infos if form.parallel_rules_only}
+    if parallel_grids:
+        # 相同坐标可能来自相异 Form；其中任一来源不能确认为纯网格，就保留裁片。
+        parallel_grids.difference_update(form.bbox for form in source.form_infos if not form.parallel_rules_only)
+        # 此处的大裁片已通过表格等排除，且将实际渲染相同纸面墨迹；小框只包含网格线。
+        form_bboxes = [
+            bbox
+            for bbox in form_bboxes
+            if bbox not in parallel_grids
+            or not any(
+                _bbox_area(container) >= 4 * _bbox_area(bbox) and _bbox_overlap_in_first(bbox, container) >= 0.999
+                for container in form_bboxes
+            )
+        ]
     members_by_candidate: list[list[_LineItem]] = [[] for _ in form_bboxes]
+    credits = _panel_credit_members(source, form_bboxes)
     claimed: set[int] = set()
     for line in source.lines:
         if line.source_index in claimed_line_indices:
@@ -625,6 +696,8 @@ def _build_form_image_blocks(
             for candidate_index, bbox in enumerate(form_bboxes)
             if _owned_form_member_bbox(source, line, bbox) is not None
         ]
+        if not matching_indices and line.source_index in credits:
+            matching_indices.append(credits[line.source_index])
         if not matching_indices:
             continue
         candidate_index = min(
@@ -643,6 +716,9 @@ def _build_form_image_blocks(
         }
         for bbox, members in zip(form_bboxes, members_by_candidate, strict=True)
     ]
+    if source.collect_layout_diagnostics:
+        for block, members in zip(blocks, members_by_candidate, strict=True):
+            retain_line_members(block, members, enabled=True)
     blocks.sort(key=lambda block: (block["bbox"][1], block["bbox"][0]))
     return blocks, claimed
 
@@ -652,9 +728,15 @@ def _build_graphic_like_blocks(
     table_bboxes: list[BBox],
     claimed_line_indices: set[int],
     strong_core_bboxes: list[BBox] | None = None,
+    *,
+    deferred: list[_DeferredFilledRegion] | None = None,
+    all_lines: list[_LineItem] | None = None,
+    fully_linked_line_indices: frozenset[int] = frozenset(),
+    members_by_block: dict[int, set[int]] | None = None,
 ) -> tuple[list[dict[str, Any]], set[int]]:
     """在表格认领后把紧凑绘图组件及其短标签聚成内部图形文本块。"""
 
+    from .filled_graphics import detect_labeled_filled_regions
     from .isolated_graphics import isolated_vector_components
 
     isolated = isolated_vector_components(source)
@@ -671,7 +753,8 @@ def _build_graphic_like_blocks(
             ],
             set(),
         )
-    if len(source.drawing_lines) < 4 and not strong_core_bboxes:
+    # 矢量轮廓可以没有足够的横纵直线；保留已认领的原生容器再提出新图核。
+    if len(source.drawing_lines) < 4 and not strong_core_bboxes and len(source.path_infos) < 4:
         return [], set()
 
     effective_heights = [
@@ -687,6 +770,16 @@ def _build_graphic_like_blocks(
     ]
     median_height = statistics.median(effective_heights)
     median_height = _native_graphic_em(source, median_height)
+    filled_regions = detect_labeled_filled_regions(
+        source,
+        lines,
+        table_bboxes + strong_core_bboxes,
+        median_height,
+        all_lines=all_lines,
+        already_claimed=claimed_line_indices,
+    )
+    if len(source.drawing_lines) < 4 and not strong_core_bboxes and not filled_regions:
+        return [], set()
     # 已有复杂填充容器可容许外框角落擦过长正文行，但不认领该正文或近旁标签。
     isolated.extend(
         box
@@ -703,6 +796,14 @@ def _build_graphic_like_blocks(
         table_bboxes,
         component_summaries=_drawing_component_summaries(source, max(2.0, 0.75 * median_height)),
     )
+    if source.discarded_raster_forms:
+        from .watermark_forms import carries_filled_prose_panel
+
+        line_candidates = [
+            candidate
+            for candidate in line_candidates
+            if not carries_filled_prose_panel(source, candidate.core_bbox, lines, median_height)
+        ]
     # 复杂 Path 或成对坐标轴形成的强图形核心优先于普通绘图线组件，
     # 避免同一图表被拆成多个相互重叠的 image。
     raster_axis_cores = _detect_native_raster_axis_graphics(source)
@@ -736,6 +837,15 @@ def _build_graphic_like_blocks(
         for core_bbox in strong_core_bboxes
         if not any(_bbox_overlap_in_smaller(core_bbox, table_bbox) >= 0.5 for table_bbox in table_bboxes)
     )
+    new_regions = [
+        region
+        for region in filled_regions
+        if not any(_bbox_overlap_in_smaller(region.bbox, candidate.core_bbox) >= 0.25 for candidate in candidates)
+    ]
+    if deferred is None:
+        candidates.extend(_GraphicCandidate(region.bbox, lane_index=-1, strict_core_members=True) for region in new_regions)
+    else:
+        deferred.extend(new_regions)
     if not candidates:
         return [], set()
 
@@ -770,6 +880,12 @@ def _build_graphic_like_blocks(
         matches: list[tuple[int, float, int]] = []
         for candidate_index, candidate in enumerate(candidates):
             if candidate.lane_index >= 0 and candidate.lane_index != row_lane_index:
+                continue
+            if any(
+                line.source_index in fully_linked_line_indices
+                and _is_external_raster_link(line, candidate.core_bbox, source.image_bboxes)
+                for line in row_lines
+            ):
                 continue
             member_flags = [
                 _bbox_overlap_in_first(line.bbox, candidate.core_bbox) >= 0.95
@@ -819,11 +935,67 @@ def _build_graphic_like_blocks(
         if block is None:
             continue
         block["_native_numeric_grid"] = _graphic_members_are_numeric_grid(members)
+        retain_line_members(block, members, enabled=source.collect_layout_diagnostics)
         blocks.append(block)
-        claimed.update(line.source_index for line in members)
+        member_indices = {line.source_index for line in members}
+        claimed.update(member_indices)
+        if members_by_block is not None:
+            members_by_block[id(block)] = member_indices
 
     blocks.sort(key=lambda block: (block["bbox"][1], block["bbox"][0]))
     return blocks, claimed
+
+
+def materialize_deferred_filled_regions(
+    blocks: list[dict[str, Any]],
+    regions: list[_DeferredFilledRegion],
+    page_size: tuple[float, float],
+    *,
+    collect_layout_diagnostics: bool = False,
+) -> None:
+    """只有装配块完整覆盖原有标签且不混入其他成员，才在排序前把它们挪入图。"""
+    for region in regions:
+        expected = {line.source_index: line for line in region.members}
+        removed = set()
+        found = set()
+        for index, block in enumerate(blocks):
+            box = block["bbox"]
+            if _bbox_overlap_in_smaller(box, region.bbox) <= 0:
+                continue
+            lines = block.get("_text_lines")
+            if (
+                block["type"] not in {"text", "header", "footer", "paragraph_title"}
+                or not lines
+                or _bbox_overlap_in_first(box, region.bbox) < 0.98
+            ):
+                break
+            ids = {line.source_index for line in lines}
+            if not ids <= expected.keys() or ids & found or len(ids) != len(lines):
+                break
+            # 只允许几何已证的孤立候选短标题回图，已经结构化的标题仍保留。
+            if any(
+                line.structural_title
+                or line.explicit_section_title
+                or line.title_band_id is not None
+                or "".join(line.text.split()) != "".join(expected[line.source_index].text.split())
+                or _bbox_overlap_in_smaller(line.bbox, expected[line.source_index].bbox) < 0.9
+                for line in lines
+            ):
+                break
+            removed.add(index)
+            found.update(ids)
+        else:
+            if found == expected.keys():
+                blocks[:] = [block for index, block in enumerate(blocks) if index not in removed]
+                blocks.append(
+                    {
+                        "type": "image",
+                        "content": _image_members_to_content(list(region.members), page_size),
+                        "bbox": region.bbox,
+                        "angle": 0,
+                    }
+                )
+                retain_line_members(blocks[-1], region.members, enabled=collect_layout_diagnostics)
 
 
 def _parallel_graphic_rule_pairs(
@@ -2215,6 +2387,18 @@ def _drawing_component_summaries(source: _PageSource, tolerance: float) -> list[
     return summaries
 
 
+def _is_external_raster_link(line: _LineItem, core: BBox, rasters: list[BBox]) -> bool:
+    """实际全行链接位于有位图支撑的图形左下外侧时，保留外部导航正文。"""
+    ink = line.ink_bbox or line.bbox
+    em = _line_effective_height(line, ink)
+    return (
+        line.angle == 0
+        and 0 <= ink[1] - core[3] <= 1.5 * em
+        and abs(ink[0] - core[0]) <= em
+        and any(_bbox_overlap_in_first(core, bbox) >= 0.95 for bbox in rasters)
+    )
+
+
 def _is_graphic_label_member(
     line: _LineItem,
     core_bbox: BBox,
@@ -2610,6 +2794,8 @@ def _build_raster_image_blocks(
     source: _PageSource,
     container_blocks: list[dict[str, Any]],
     claimed_line_indices: set[int],
+    *,
+    confirmed_bboxes: list[BBox] | None = None,
 ) -> tuple[list[dict[str, Any]], set[int]]:
     """过滤点阵图并接纳签名框，避让高优先级容器后唯一认领内部文本。"""
 
@@ -2637,7 +2823,7 @@ def _build_raster_image_blocks(
     ]
     raster_bboxes: list[BBox] = []
     for bbox in _merge_vertical_raster_tiles(
-        _deduplicate_contained_photo_frames(source, clipped_raster_bboxes),
+        _deduplicate_contained_photo_frames(source, clipped_raster_bboxes, container_bboxes),
         source.page_size,
     ):
         from .isolated_graphics import meaningful_small_raster
@@ -2655,7 +2841,12 @@ def _build_raster_image_blocks(
         if any(_image_bboxes_are_near_equal(bbox, signature_bbox) for signature_bbox in signature_bboxes):
             continue
         raster_bboxes.append(bbox)
-    if not raster_bboxes and not signature_bboxes:
+    card_labels = {}
+    if source.raster_composite_infos:
+        from .raster_composites import merge_raster_composites
+
+        raster_bboxes, card_labels = merge_raster_composites(source, raster_bboxes)
+    if not raster_bboxes and not signature_bboxes and not confirmed_bboxes:
         return [], set()
 
     candidate_specs = (
@@ -2668,7 +2859,17 @@ def _build_raster_image_blocks(
         if raster_bboxes
         else []
     )
+    # 切片与行内图组合后，再按最终裁片和行归属消除同位置叠印，保留不同位置的合法复用。
+    candidate_specs = list(dict.fromkeys(candidate_specs))
+    if source.raster_composite_infos:
+        from .raster_composites import remove_occluded_rasters
+
+        # 只移除仍有公开图体接管的源层，保留先前筛掉或归入其他容器的关系。
+        candidate_specs = remove_occluded_rasters(source, candidate_specs)
     candidate_specs.extend((bbox, None) for bbox in signature_bboxes)
+    if confirmed_bboxes:
+        # 已按原绘制与障碍核验的合成裁片跳过普通位图的消重与拼条。
+        candidate_specs.extend((bbox, None) for bbox in confirmed_bboxes)
     candidate_specs.sort(key=lambda item: (item[0][1], item[0][0], item[0][3], item[0][2]))
     candidate_bboxes = [bbox for bbox, _row_id in candidate_specs]
 
@@ -2705,6 +2906,9 @@ def _build_raster_image_blocks(
         }
         if visual_row_id is not None:
             block["_inline_visual_row_id"] = visual_row_id
+        if members and bbox in card_labels:
+            block["_raster_card_label_bbox"] = card_labels[bbox]
+        retain_line_members(block, members, enabled=source.collect_layout_diagnostics)
         blocks.append(block)
     blocks.sort(key=lambda block: (block["bbox"][1], block["bbox"][0]))
     return blocks, claimed
@@ -2719,15 +2923,21 @@ def _raster_is_native_text_background(source: _PageSource, bbox: BBox) -> bool:
     return len(long) >= 8 and sum(len(line.text) for line in members) >= 300
 
 
-def _deduplicate_contained_photo_frames(source, bboxes):
+def _deduplicate_contained_photo_frames(source, bboxes, container_bboxes=()):
     """近乎等大的照片和阴影边框合为一幅；独立内嵌小图及边框中的原生文字继续保留。"""
+    proven = {
+        (info.bbox, inner)
+        for info in source.raster_composite_infos
+        for inner in info.occluded_inner_bboxes + ((info.raster_pair[0],) if info.raster_pair else ())
+    }
     consumed = set()
     for index, outer in enumerate(bboxes):
         width, height = outer[2] - outer[0], outer[3] - outer[1]
         if min(width, height) <= 0:
             continue
         for other, inner in enumerate(bboxes):
-            if index == other or _bbox_area(inner) >= _bbox_area(outer):
+            # 精确配对留给源证据与文字归属裁决；其余图体沿用近框规则。
+            if index == other or (outer, inner) in proven or _bbox_area(inner) >= _bbox_area(outer):
                 continue
             if not (
                 _bbox_overlap_in_first(inner, outer) >= 0.999
@@ -2738,6 +2948,9 @@ def _deduplicate_contained_photo_frames(source, bboxes):
                 and 0 <= outer[3] - inner[3] <= 0.08 * height
             ):
                 continue
+            # 外框即将让给表格或 Form 时，不能提前消费仍能独立物化的内图。
+            if any(_bbox_overlap_in_smaller(outer, box) >= _IMAGE_CONTAINER_OVERLAP_THRESHOLD for box in container_bboxes):
+                break
             if any(
                 _point_in_bbox((_bbox_center_x(line.bbox), _bbox_center_y(line.bbox)), outer)
                 and not _point_in_bbox((_bbox_center_x(line.bbox), _bbox_center_y(line.bbox)), inner)

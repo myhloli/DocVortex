@@ -277,9 +277,9 @@ class PDFPage:
         text = self.pdf_doc._get_owned_text_snapshot(self._idx, visible_only=False)
         return text if isinstance(text, native.NativeTextSnapshot) else None
 
-    def get_snapshot(self) -> PDFPageSnapshot:
-        """一次打开页面取得共享证据，快照可在文档关闭后继续使用。"""
-        return self.pdf_doc.get_page_snapshot(self._idx)
+    def get_snapshot(self, *, visible_only: bool = False) -> PDFPageSnapshot:
+        """取得可脱离文档使用的页面证据，可选择仅保留页面实际绘制的文字。"""
+        return self.pdf_doc.get_page_snapshot(self._idx, visible_only=visible_only)
 
     def get_drawing_lines(self) -> list[PDFDrawingLine]:
         """读取当前页已规范到视觉页面坐标的横竖 drawing。"""
@@ -326,7 +326,7 @@ class PDFDocument:
         self._render_session_lock = threading.Lock()
         self._classification: Literal["ocr", "txt"] | None = None
         self._snapshot_owner = object()
-        self._page_snapshots: WeakValueDictionary[int, PDFPageSnapshot] = WeakValueDictionary()
+        self._page_snapshots: WeakValueDictionary[tuple[int, bool], PDFPageSnapshot] = WeakValueDictionary()
         self._owned_text_snapshots: WeakValueDictionary = WeakValueDictionary()
         if isinstance(pdf_bytes_or_path, bytes):
             self._pdf_bytes: bytes = pdf_bytes_or_path
@@ -338,6 +338,8 @@ class PDFDocument:
         self._pdf_doc_opened: pdfium.PdfDocument | None = None
         self._page_count: int | None = None
         self._page_char_counts: dict[int, int] = {}
+        # 只保存页号，不延长PDFium地址或页面句柄的生命周期。
+        self._uncertain_text_visibility_pages: set[int] = set()
         self._page_sizes: dict[int, tuple[float, float]] = {}
         self._page_rotations: dict[int, Literal[0, 90, 180, 270]] = {}
         self._form_reader = None
@@ -347,6 +349,7 @@ class PDFDocument:
         self._structure_source = None
         self._structure_page_indices = None
         self._unicode_fallbacks: dict[int, dict[int, int]] = {}
+        self._unicode_font_repairs = {}
         self.render_scale = render_scale
         self.render_max_edge = render_max_edge
 
@@ -464,6 +467,9 @@ class PDFDocument:
             self._structure_source = None
             if hasattr(self, "_unicode_fallbacks"):
                 self._unicode_fallbacks.clear()
+                self._unicode_font_repairs.clear()
+            if hasattr(self, "_uncertain_text_visibility_pages"):
+                self._uncertain_text_visibility_pages.clear()
             if getattr(self, "_pdf_doc_opened", None) is not None:
                 with _pdfium_lock:
                     _try_close(self._pdf_doc_opened)
@@ -641,6 +647,20 @@ class PDFDocument:
                 text.close()
         return result
 
+    def _visible_callout_underlay(self, page_idx: int, base: BBox, callout: BBox, normalized_box: BBox) -> str | None:
+        """打开当前页，按最终裁图的采样位置取出被说明框遮挡后仍可见的底图。"""
+        from .callout_projection import visible_callout_underlay
+
+        with self._open_page(page_idx) as page:
+            return visible_callout_underlay(page, base, callout, normalized_box)
+
+    def _verify_raster_repaint(self, page_idx: int, base: BBox, overlay: BBox, vector: BBox) -> bool:
+        """在实际布局提出矢量冲突时，按原序回绘验证两层位图的可见区域。"""
+        from .raster_repaints import verify_raster_repaint
+
+        with self._open_page(page_idx) as page:
+            return verify_raster_repaint(page, base, overlay, vector)
+
     def _extract_owned_text_snapshot(self, page_idx: int, page, *, visible_only: bool, materialize: bool = True):
         """只提取并弱缓存自有文本，完整页面快照复用它而不引入额外矢量或链接依赖。"""
         key = (page_idx, visible_only)
@@ -654,15 +674,21 @@ class PDFDocument:
                 if materialize
                 else None
             )
+        uncertain_coverage = set() if visible_only else None
         text = _extract_page_text_geometry(
             page,
             include_extended_geometry=True,
             visible_only=visible_only,
             compact=True,
+            uncertain_coverage=uncertain_coverage,
             compact_only=not materialize,
             paint_page_reader=(lambda: self._get_form_resource_page(page_idx)) if visible_only else None,
             unicode_resolver=partial(self._resolve_page_unicode, page_idx),
         )
+        if uncertain_coverage:
+            if not hasattr(self, "_uncertain_text_visibility_pages"):
+                self._uncertain_text_visibility_pages = set()
+            self._uncertain_text_visibility_pages.add(page_idx)
         if text is not None and not isinstance(text, PDFPageTextGeometry):
             self._owned_text_snapshots[key] = text
             if type(page_idx) is int and callable(getattr(text, "raw_char_count", None)):
@@ -678,10 +704,11 @@ class PDFDocument:
             with self._open_page(page_idx) as page:
                 return self._extract_owned_text_snapshot(page_idx, page, visible_only=visible_only, materialize=False)
 
-    def get_page_snapshot(self, page_idx: int) -> PDFPageSnapshot:
-        """同页显式快照在消费者存活期间复用，弱缓存不延长全文证据的驻留时间。"""
+    def get_page_snapshot(self, page_idx: int, *, visible_only: bool = False) -> PDFPageSnapshot:
+        """按页和文字可见性复用快照，弱缓存不延长页面证据的驻留时间。"""
+        key = (page_idx, visible_only)
         with pdfium_guard():
-            cached = self._page_snapshots.get(page_idx)
+            cached = self._page_snapshots.get(key)
             if cached is not None:
                 return cached
             with self._open_page(page_idx) as page:
@@ -692,7 +719,7 @@ class PDFDocument:
                     rotation = 0
                 rotation = rotation if rotation in {0, 90, 180, 270} else 0
                 drawings, paths = _extract_page_paths_and_lines(page, bbox, rotation)
-                text = self._extract_owned_text_snapshot(page_idx, page, visible_only=False)
+                text = self._extract_owned_text_snapshot(page_idx, page, visible_only=visible_only)
                 native_text = None if isinstance(text, PDFPageTextGeometry) else text
                 snapshot = PDFPageSnapshot(
                     page_idx,
@@ -704,7 +731,7 @@ class PDFDocument:
                     self._snapshot_owner,
                     native_text,
                 )
-            self._page_snapshots[page_idx] = snapshot
+            self._page_snapshots[key] = snapshot
             return snapshot
 
     def _extract_native_page(self, page_idx: int) -> _PDFPageSnapshot:
@@ -720,6 +747,7 @@ class PDFDocument:
             drawings, paths = _extract_page_paths_and_lines(page, page_bbox, raw_rotation)
             # 只在两个只读 Form 消费者之间复用，正常或异常退出均在页面关闭前释放。
             form_extents = {}
+            form_raster_ids = {}
             try:
                 form_bboxes = _extract_page_form_bboxes(page, page_bbox, raw_rotation, extent_cache=form_extents)
                 form_infos = ()
@@ -727,7 +755,12 @@ class PDFDocument:
                     from .form_structure import extract_form_structure
 
                     form_infos = extract_form_structure(
-                        page, page_bbox, rotation, self._get_form_resource_page(page_idx), extent_cache=form_extents
+                        page,
+                        page_bbox,
+                        rotation,
+                        self._get_form_resource_page(page_idx),
+                        extent_cache=form_extents,
+                        raster_ids=form_raster_ids,
                     )
             finally:
                 form_extents.clear()
@@ -740,9 +773,12 @@ class PDFDocument:
                 native_text=native_text,
                 drawing_lines=drawings,
                 path_infos=paths,
-                image_infos=_extract_page_image_infos(page, page_bbox, raw_rotation),
+                image_infos=_extract_page_image_infos(
+                    page, page_bbox, raw_rotation, **({"form_raster_ids": form_raster_ids} if form_raster_ids else {})
+                ),
                 form_bboxes=form_bboxes,
                 form_infos=form_infos,
+                text_visibility_uncertain=page_idx in getattr(self, "_uncertain_text_visibility_pages", ()),
                 signature_bboxes=_extract_page_signature_bboxes(
                     page,
                     page_bbox,
@@ -789,11 +825,13 @@ class PDFDocument:
             return None
 
     def _resolve_page_unicode(self, page_idx: int, textpage: pdfium.PdfTextPage, indices: list[int]) -> dict[int, int]:
-        """首次 NUL 读取才检查字体，仅缓存无句柄的索引映射，正常页面不访问 pypdf。"""
+        """仅在读取到可疑字符时核实当前资源和原字符码，缓存不含页面句柄。"""
         if page_idx not in self._unicode_fallbacks:
-            from .unicode_fallback import recover_null_unicode
+            from .unicode_fallback import recover_page_unicode
 
-            self._unicode_fallbacks[page_idx] = recover_null_unicode(textpage, indices, self._get_form_resource_page(page_idx))
+            self._unicode_fallbacks[page_idx] = recover_page_unicode(
+                textpage, indices, self._get_form_resource_page(page_idx), self._unicode_font_repairs
+            )
         replacements = self._unicode_fallbacks[page_idx]
         return {index: replacements[index] for index in indices if index in replacements}
 
@@ -812,9 +850,15 @@ class PDFDocument:
             )
             return _extract_page_text_geometry(page, include_extended_geometry=include_extended_geometry, **options)
 
-    def get_page_lines(self, page_idx: int) -> list[Line]:
-        chars = self.get_page_chars(page_idx)
-        return get_lines_from_chars(chars)
+    def get_page_lines(self, page_idx: int, *, visible_only: bool = False) -> list[Line]:
+        """返回页内源行；需要核对图框归属时仅取实际可见图层的文字。"""
+        if not visible_only:
+            return get_lines_from_chars(self.get_page_chars(page_idx))
+        with self._open_page(page_idx) as page:
+            text = self._extract_owned_text_snapshot(page_idx, page, visible_only=True)
+        if isinstance(text, PDFPageTextGeometry):
+            return get_lines_from_chars(text.chars)
+        return text.prepare_grouped_evidence(0.7, 0.1)[1]
 
     # ------------------------------------------------------------------ #
     #  Drawing geometry

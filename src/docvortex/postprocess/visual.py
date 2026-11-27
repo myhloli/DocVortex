@@ -277,11 +277,14 @@ def find_stacked_table_caption_cluster(
     """按几何位置收集紧贴 table 上方的 caption/text/footnote 标题簇。"""
     table_bbox = _block_bbox(table_block)
     table_top = table_bbox[1]
+    # 同栏的前一张表或节标题会结束上一组表题，不能跨过它们把正文接到下一张表。
+    barriers = {BlockType.TABLE, BlockType.TABLE_BODY, BlockType.DOC_TITLE, BlockType.PARAGRAPH_TITLE}
+    allowed = STACKED_TABLE_CAPTION_CLUSTER_TYPES | barriers
     above_candidates = [
         block
         for block in blocks
         if block is not table_block
-        and _block_type(block) in STACKED_TABLE_CAPTION_CLUSTER_TYPES
+        and _block_type(block) in allowed
         and _block_bbox(block)[3] <= table_top
         and is_horizontally_near_table(block, table_block)
     ]
@@ -296,6 +299,8 @@ def find_stacked_table_caption_cluster(
         key=lambda x: (_block_bbox(x)[1], _block_index(x)),
         reverse=True,
     ):
+        if _block_type(block) in barriers:
+            break
         block_bbox = _block_bbox(block)
         block_height = max(block_bbox[3] - block_bbox[1], 1)
         max_allowed_gap = stacked_caption_max_gap(max(max_child_height, block_height))

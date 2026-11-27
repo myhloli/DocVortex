@@ -61,6 +61,32 @@ def test_snapshot_consumers_do_not_reopen_pdf():
     assert pickle.dumps(table) == pickle.dumps(expected_table)
 
 
+@pytest.mark.parametrize("first_visible", [False, True])
+def test_snapshot_caches_visibility_modes_separately(first_visible: bool) -> None:
+    """同页按可见性分别复用快照，切换读取次序也不会把被覆盖的文字泄漏给另一种模式。"""
+    stream = BytesIO()
+    canvas = Canvas(stream, pagesize=(200, 100))
+    canvas.drawString(10, 65, "Covered")
+    canvas.setFillColorRGB(1, 1, 1)
+    canvas.rect(5, 55, 100, 30, fill=1, stroke=0)
+    canvas.setFillColorRGB(0, 0, 0)
+    canvas.drawString(10, 25, "Visible")
+    canvas.linkURL("https://example.com", (10, 20, 50, 40))
+    canvas.save()
+
+    with PDFDocument(stream.getvalue()) as document:
+        page = document[0]
+        first = page.get_snapshot(visible_only=first_visible)
+        second = page.get_snapshot(visible_only=not first_visible)
+        visible, ordinary = (first, second) if first_visible else (second, first)
+        assert page.get_snapshot() is ordinary
+        assert document.get_page_snapshot(0, visible_only=True) is visible
+    assert "".join(c["char"] for c in ordinary.text_geometry.chars if c["char"].strip()) == "CoveredVisible"
+    assert "".join(c["char"] for c in visible.text_geometry.chars if c["char"].strip()) == "Visible"
+    assert visible.vector_geometry == ordinary.vector_geometry
+    assert visible.link_annotations == ordinary.link_annotations
+
+
 def test_snapshot_rejects_wrong_page_and_mixed_geometry():
     """拒绝跨页、跨文档和显式几何混用，而不是静默接受错误证据。"""
     with PDFDocument(pdf_bytes()) as first, PDFDocument(pdf_bytes()) as second:

@@ -107,7 +107,7 @@ def _allow_native_cover_prefilter():
     return (_opaque_rectangle, _get_raw_object_rgba) == _PAINT_COVER_PREFILTER_REFERENCES
 
 
-def exclude_fully_overpainted_text(page, page_bbox, rotation, visibility, page_reader, *, roots=None, paint=None):
+def exclude_fully_overpainted_text(page, page_bbox, rotation, visibility, page_reader, *, roots=None, paint=None, uncertain_coverage=None):
     """共享Python/Rust可见性结果，仅在绘制顺序、完整包含和资源状态均证明遮挡时排除对象。"""
     covers = []
     texts = []
@@ -158,8 +158,12 @@ def exclude_fully_overpainted_text(page, page_bbox, rotation, visibility, page_r
                     covers.append((order, rectangle))
         native = get_native()
         covered = set(native.overpainted_addresses(texts, covers))
-        if covered and _safe_paint_resources(page_reader()):
-            return {address: (False if address in covered else value[0], value[1]) for address, value in visibility.items()}
+        if covered:
+            if _safe_paint_resources(page_reader()):
+                return {address: (False if address in covered else value[0], value[1]) for address, value in visibility.items()}
+            if uncertain_coverage is not None:
+                # 这里只报告证据缺口；不删除可能还代表后绘可见副本的原字符。
+                uncertain_coverage.update(covered)
     except Exception:
         # 任何读取失败都不能以缺失证据删除正文。
         pass

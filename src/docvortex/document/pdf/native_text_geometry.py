@@ -72,6 +72,7 @@ def _extract_page_text_geometry(
     compact: bool = False,
     compact_only: bool = False,
     paint_page_reader=None,
+    uncertain_coverage=None,
     unicode_resolver: Callable[[pdfium.PdfTextPage, list[int]], dict[int, int]] | None = None,
 ) -> PDFPageTextGeometry | None:
     """在调用方持有的页面和锁内读取字符，使批量提取与独立接口共用实现。"""
@@ -84,7 +85,8 @@ def _extract_page_text_geometry(
         except Exception:
             pass
         visibility = (
-            _text_object_visibility(page, tuple(raw_page_bbox), page_rotation, paint_page_reader) if visible_only else None
+            _text_object_visibility(page, tuple(raw_page_bbox), page_rotation, paint_page_reader,
+                                    **({"uncertain_coverage": uncertain_coverage} if uncertain_coverage is not None else {})) if visible_only else None
         )
         textpage = page.get_textpage()
         unicode_fallback = partial(unicode_resolver, textpage) if unicode_resolver is not None else None

@@ -409,6 +409,7 @@ def build_native_table_text(table_input: NativeTableInput) -> NativeTableText | 
                 writing_angle=_baseline_writing_angle(item),
                 advance_bbox=item.advance_bbox,
                 origin=item.origin,
+                calibrated_connector=calibrated is not None and len(item.text) == 1 and unicodedata.category(item.text) == "Pc",
             )
             for item in pending_row
         ]
@@ -493,6 +494,37 @@ def _cell_baseline_supports_angle(glyphs: list[NativeTableGlyph], angle: int) ->
     return True
 
 
+def _connector_reading_glyphs(glyphs: list[NativeTableGlyph]) -> list[NativeTableGlyph]:
+    """使紧墨迹低于词干的细连接符在同一格按相邻源字的印刷基线阅读，保留原字形的物理归属。"""
+    marked = [g for g in glyphs if g.calibrated_connector and g.origin is not None]
+    if not marked:
+        return glyphs
+    by_source = {g.source_index: g for g in glyphs}
+    replacements = {}
+    for mark in marked:
+        x0, y0, x1, y1 = mark.bbox
+        for idx in (mark.source_index - 1, mark.source_index + 1):
+            neighbor = by_source.get(idx)
+            if neighbor is None or neighbor.origin is None or not neighbor.text.isalnum():
+                continue
+            left, right = (neighbor, mark) if idx < mark.source_index else (mark, neighbor)
+            if right.explicit_space_before or right.explicit_break_before or left.bbox[0] >= right.bbox[0]:
+                continue
+            top, bottom = neighbor.bbox[1], neighbor.bbox[3]
+            height = bottom - top
+            if (
+                height > 0
+                and y1 - y0 < 0.4 * height
+                and y0 >= bottom - 0.1 * height
+                and y1 <= bottom + 0.5 * height
+                and abs(mark.origin[1] - neighbor.origin[1]) <= 0.25 * height
+                and -0.4 * height <= right.bbox[0] - left.bbox[2] <= 0.25 * height
+            ):
+                replacements[mark.source_index] = replace(mark, bbox=(x0, top, x1, bottom), visual_row=neighbor.visual_row)
+                break
+    return [replacements.get(g.source_index, g) for g in glyphs] if replacements else glyphs
+
+
 def cell_text_rows(
     glyphs: list[NativeTableGlyph],
     median_height: float,
@@ -502,7 +534,7 @@ def cell_text_rows(
     if angle is None:
         raise ValueError("ambiguous cell writing direction")
     if not angle:
-        return _native_cell_visual_groups(glyphs, median_height), median_height
+        return _native_cell_visual_groups(_connector_reading_glyphs(glyphs), median_height), median_height
     from ....._compute_backend import get_native
 
     upright = [

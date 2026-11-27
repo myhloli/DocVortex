@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ..layout_evidence import build_layout_evidence
+from ..layout_diagnostics import glyph_ranges
 
 import re
 import statistics
@@ -346,6 +347,8 @@ def _freeze_wrapped_bold_title_evidence(line: _LineItem, page_size: tuple[float,
             line, text=text, bbox=bounds, source_bbox=bounds, ink_bbox=None, chars=list(chars), wrapped_title_parts=None
         )
         _fill_native_typography(part, page_size)
+        if line.layout_glyph_ranges:
+            part.layout_glyph_ranges = glyph_ranges(chars)
         part.chars.clear()
         parts.append(part)
     line.wrapped_title_parts = (parts[0], parts[1])
@@ -429,6 +432,10 @@ def _numbered_title_label_left(line: _LineItem) -> float:
     """同排序号并入标题时用实际标签首字左缘，不能把序号的悬挂缩进当成正文续行偏移。"""
     if line.native_title_label_left is not None:
         return line.native_title_label_left
+    if re.match(r"^\d+(?:\.\d+)*\s+[^\W\d_]", line.text) and line.chars:
+        first = next((char for char in line.chars if char.get("char", "").isalpha()), None)
+        if first is not None:
+            return float(first["bbox"][0])
     if re.match(r"^(?:[A-Za-z]|\d{1,2})[.)]\s+", line.text) and line.chars:
         marker_ended = False
         for char in line.chars:
@@ -438,6 +445,45 @@ def _numbered_title_label_left(line: _LineItem) -> float:
             if text in {".", ")"}:
                 marker_ended = True
     return line.bbox[0]
+
+
+def restore_hanging_title_rows(lines: list[_LineItem]) -> None:
+    """已确认的编号题名若悬挂排版，续行须对齐编号后首字、同字号同字体且连续紧排。"""
+    for head in lines:
+        if (
+            head.angle
+            or head.semantic_type != "paragraph_title"
+            or head.paragraph_group is not None
+            or not head.numbered_heading_start
+        ):
+            continue
+        left = _numbered_title_label_left(head)
+        em = _line_effective_height(head, head.bbox)
+        if left - head.bbox[0] < em or not head.font_signature or head.font_coverage < 0.9:
+            continue
+        members = [head]
+        for row in sorted(
+            (row for row in lines if row.bbox[1] > head.bbox[1] and row.bbox[0] < head.bbox[2] and row.bbox[2] > left),
+            key=lambda row: row.bbox[1],
+        ):
+            if (
+                row.angle
+                or row.semantic_type is not None
+                or row.paragraph_group is not None
+                or row.caption_start
+                or row.title_suppressed
+                or row.numbered_heading_start
+                or row.font_signature != head.font_signature
+                or row.font_coverage < 0.9
+                or row.bbox[2] > members[-1].bbox[2] + em
+                or abs(row.bbox[0] - left) > 0.3 * em
+                or abs(_line_effective_height(row, row.bbox) - em) > 0.1 * em
+                or not -0.15 * em <= row.bbox[1] - members[-1].bbox[3] <= 0.55 * em
+            ):
+                break
+            members.append(row)
+        if len(members) > 1:
+            _set_native_title_band(members, lines)
 
 
 def _restore_short_heading_with_image_displaced_prose(lines: list[_LineItem], image_bboxes: list[BBox]) -> None:
@@ -574,11 +620,18 @@ def _classify_repeated_multiline_display_bands(short, body, page_size, page_inde
 
 
 def _classify_bold_numbered_heading_rows(
-    lines: list[_LineItem], page_size: tuple[float, float], containers: list[BBox], *, appendix_only: bool = False
+    lines: list[_LineItem],
+    page_size: tuple[float, float],
+    containers: list[BBox],
+    *,
+    appendix_only: bool = False,
+    respect_protected_roles: bool = False,
 ) -> None:
     """由粗体、编号、同基线和留白恢复数字或附录字母标题，保持成员一致。"""
     available = [line for line in lines if line.angle == 0 and line.semantic_type in {None, "paragraph_title"}]
     for line in available:
+        if respect_protected_roles and line.title_suppressed:
+            continue
         if line.title_band_id is not None and line.structural_title:
             continue
         text = line.text.strip()
@@ -593,6 +646,7 @@ def _classify_bold_numbered_heading_rows(
                 other
                 for other in available
                 if other is not line
+                and (not respect_protected_roles or not other.title_suppressed)
                 and other.bbox[0] >= line.bbox[2]
                 and other.bbox[0] - line.bbox[2] <= 2 * height
                 and _bbox_axis_overlap_ratio(other.bbox, line.bbox, axis="y") >= 0.6
@@ -619,12 +673,18 @@ def _classify_bold_numbered_heading_rows(
             )
         ):
             continue
+        if respect_protected_roles and (
+            _is_adjacent_quantity_operand(label, bounds, height, available)
+            or _has_numbered_prose_continuation(line, body, label, bounds, height, available)
+        ):
+            continue
         # 粗体长标题在编号后的文字栏缩进续行；即使续行以数字开头，也继承同一段界身份。
         if len(label.split()) >= 5:
             continuations = [
                 other
                 for other in available
                 if other not in members
+                and (not respect_protected_roles or not other.title_suppressed)
                 and (
                     height < other.bbox[0] - bounds[0] <= 3 * height
                     or abs(other.bbox[0] - bounds[0]) <= 0.25 * height
@@ -648,6 +708,53 @@ def _classify_bold_numbered_heading_rows(
     if not appendix_only:
         _classify_display_roman_heading_rows(lines, page_size, containers)
     _classify_headings_after_extreme_local_metric_repair(lines, page_size, containers)
+
+
+def _is_adjacent_quantity_operand(label: str, bounds: BBox, height: float, lines: list[_LineItem]) -> bool:
+    """紧邻同基线关系符的短量值是等式右项，游离的量值标题仍沿用章节证据。"""
+    if not re.fullmatch(r"\d+(?:[.,]\d+)?\s+[A-Za-zµμΩ°]{1,3}(?:[−–-]?\d+)?", label):
+        return False
+    return any(
+        other.text.strip() in {"=", "≈", "≃", "≅", "≠", "≤", "≥", "<", ">"}
+        and 0 <= bounds[0] - other.bbox[2] <= 0.65 * height
+        and _bbox_axis_overlap_ratio(bounds, other.bbox, axis="y") >= 0.8
+        for other in lines
+    )
+
+
+def _has_numbered_prose_continuation(line, body, label, bounds, height, available):
+    """同字体、正文行距的悬挂小写续行表明编号后的长句仍未结束。"""
+    marker = re.match(r"^(\d+(?:\.\d+)*)\.?\s+", label)
+    if marker is None or len(label.split()) < 8 or body.font_signature is None:
+        return False
+    counter = marker[1].split(".")
+    has_prose_peer = False
+    for peer in available:
+        if peer is line or abs(peer.bbox[0] - bounds[0]) > 0.4 * height or peer.font_signature != body.font_signature:
+            continue
+        other_marker = re.match(r"^\s*(\d+(?:\.\d+)*)\.?\s+", peer.text)
+        if other_marker is None or len(peer.text.split()) < 7 or not re.search(r"[.!?;:,]$", peer.text.rstrip()):
+            continue
+        other_counter = other_marker[1].split(".")
+        if counter[:-1] == other_counter[:-1] and abs(int(counter[-1]) - int(other_counter[-1])) == 1:
+            has_prose_peer = True
+            break
+    if not has_prose_peer:
+        return False
+    return any(
+        other is not line
+        and other is not body
+        and other.semantic_type is None
+        and other.font_signature == body.font_signature
+        and other.font_coverage >= 0.75
+        and 0.85 * height <= _line_effective_height(other, other.bbox) <= 1.15 * height
+        and 0.6 * height <= other.bbox[0] - bounds[0] <= 3.5 * height
+        and -0.15 * height <= other.bbox[1] - bounds[3] <= 0.42 * height
+        and _bbox_center_y(other.bbox) > _bbox_center_y(bounds) + 0.5 * height
+        and other.bbox[2] <= bounds[2] + 0.25 * height
+        and re.match(r"^[a-z][A-Za-z]+\s+\S+", other.text.strip())
+        for other in available
+    )
 
 
 def _classify_headings_after_extreme_local_metric_repair(lines, page_size, containers):
@@ -1453,6 +1560,8 @@ def _classify_document_structural_title_candidates(
                 for bbox in container_bboxes
             ]
             for line, bbox in geometry:
+                if prepared.preserve_non_title_roles and line.title_suppressed:
+                    continue
                 if page_index == 0 and _bbox_center_y(bbox) < 0.64 * local_page_height:
                     continue
                 related_lanes = [

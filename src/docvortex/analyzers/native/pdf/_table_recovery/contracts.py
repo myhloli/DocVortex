@@ -70,6 +70,8 @@ class NativeTableGlyph:
     # 旋转文字的排版 advance 框仅参与词间距，不能替换物理落格框。
     advance_bbox: BBox | None = None
     origin: tuple[float, float] | None = None
+    # 仅给采用紧墨迹的低位连接符留成员标记，在单元格阅读时使用，不参与物理落格。
+    calibrated_connector: bool = False
 
 
 @dataclass(frozen=True, slots=True)

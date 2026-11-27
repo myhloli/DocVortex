@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 from .layout_evidence import build_layout_evidence
+from .layout_diagnostics import retain_line_members
 
 import math
 import re
 import statistics
 import unicodedata
+from collections.abc import Iterable
+from dataclasses import replace
 from typing import Any
 
 from ....document.pdf._document import PDFPathInfo
 from ....schema import BBox
+from .algorithm_projection import numbered_algorithm_labels
 from .geometry import (
     _bbox_area,
     _bbox_center_x,
@@ -19,9 +23,10 @@ from .geometry import (
     _bbox_overlap_in_first,
     _bbox_overlap_in_smaller,
     _bbox_union_many,
+    _coerce_bbox,
 )
 from .models import _CodeCandidate, _LineItem, _PageSource
-from .native_text import _sanitize_pdf_control_text
+from .native_text import _fill_native_typography, _normalize_native_run_text, _sanitize_pdf_control_text
 from .spatial_text import project_pdf_spatial_text
 
 _MONOSPACE_FONT_HINTS = (
@@ -33,12 +38,129 @@ _MONOSPACE_FONT_HINTS = (
     "fixed",
     "code",
 )
+_EXTERNAL_CODE_MARKER = re.compile(r"\s*([0-9]{1,3}[.)])\s+(\S.*?)\s*")
+_CODE_MARKER_LABEL = re.compile(r"[0-9]{1,3}[.)]")
+_JOINED_CLOSING_BRACES = re.compile(r"^[ \t]*(?:}[ \t]*){2,}$", re.MULTILINE)
+_PROGRAM_ROW_BOUNDARY = re.compile(r"[;{}]\s*$|^\s*(?:def|class|if|for|while)\b.*:\s*$")
+
+
+def _split_background_code_markers(
+    lines: list[_LineItem], paths: Iterable[PDFPathInfo], page_size: tuple[float, float]
+) -> list[_LineItem]:
+    """在页级样式推断前拆开灰底代码首行与框外独立编号。"""
+    marked = [
+        (line, match)
+        for line in lines
+        if line.angle == 0 and line.text[:1].isdigit() and (match := _EXTERNAL_CODE_MARKER.fullmatch(line.text))
+    ]
+    if not marked:
+        return lines
+    width, height = page_size
+    panels = [
+        path.bbox
+        for path in paths
+        if path.form_depth == 0
+        and path.bbox in path.rectangle_bboxes
+        and path.fill_visible
+        and _path_has_visible_nonwhite_fill(path)
+        and path.bbox[2] - path.bbox[0] >= 0.5 * width
+        and 0.008 * height <= path.bbox[3] - path.bbox[1]
+        and _bbox_area(path.bbox) < 0.8 * width * height
+    ]
+    if not panels:
+        return lines
+
+    splits: dict[int, tuple[_LineItem, _LineItem]] = {}
+    next_source_index = max(line.source_index for line in lines) + 1
+    for line, match in marked:
+        em = max(1.0, line.effective_height)
+        possible = [box for box in panels if line.bbox[0] < box[0] < line.bbox[2] <= box[2] and abs(line.bbox[1] - box[1]) < em]
+        if len(possible) != 1:
+            continue
+        box = possible[0]
+        parts = _split_code_marker_glyphs(line, match.groups(), box, page_size, next_source_index)
+        if parts is None:
+            continue
+        marker, body = parts
+        inside = [
+            member
+            for member in lines
+            if member is not line and member.angle == 0 and _bbox_overlap_in_first(member.bbox, box) >= 0.8
+        ]
+        if (
+            len(inside) < 3
+            or any(member.bbox[1] < body.bbox[1] for member in inside)
+            or sum(bool(_PROGRAM_ROW_BOUNDARY.search(member.text)) for member in inside) < 2
+        ):
+            continue
+        members = [body, *inside]
+        monospace, widths = _monospace_character_support(members)
+        if monospace < 0.8 or not _monospace_advances_are_stable(widths):
+            continue
+        cell_width = statistics.median(value for group in widths.values() for value in group)
+        if _code_rows_have_spatial_structure(members, box, cell_width):
+            splits[line.source_index] = (marker, body)
+            next_source_index += 1
+    if not splits:
+        return lines
+    return [member for line in lines for member in splits.get(line.source_index, (line,))]
+
+
+def _split_code_marker_glyphs(
+    line: _LineItem,
+    texts: tuple[str, str],
+    panel: BBox,
+    page_size: tuple[float, float],
+    inner_source_index: int,
+) -> tuple[_LineItem, _LineItem] | None:
+    """以字形框验证序号和代码的物理分界，并为两边重建独立排版证据。"""
+    left_items, right_items = [], []
+    for char in line.chars:
+        box = _coerce_bbox(char.get("bbox"))
+        if box is None:
+            if str(char.get("char") or "").strip():
+                return None
+            # PDFium 会在两对象之间插入零宽空格，保留两段内部的空白。
+            (right_items if right_items else left_items).append((char, None))
+        elif box[2] <= panel[0] and not right_items:
+            left_items.append((char, box))
+        elif box[0] >= panel[0] and box[2] <= panel[2]:
+            right_items.append((char, box))
+        else:
+            return None
+    output = []
+    for offset, (items, text) in enumerate(zip((left_items, right_items), texts, strict=True)):
+        glyphs = [char for char, _box in items]
+        bounds = [box for _char, box in items if box is not None]
+        if not bounds or _normalize_native_run_text("".join(str(char.get("char") or "") for char in glyphs)) != text:
+            return None
+        member = _LineItem(
+            text=text,
+            bbox=_bbox_union_many(bounds),
+            angle=line.angle,
+            source_index=line.source_index if offset == 0 else inner_source_index,
+            chars=glyphs,
+            visual_row_id=line.visual_row_id,
+            run_index=line.run_index + offset,
+            split_from_row=True,
+            preserve_split_boundary=True,
+        )
+        _fill_native_typography(member, page_size)
+        output.append(member)
+    return output[0], output[1]
+
+
+def is_numbered_algorithm_projection(content: str) -> bool:
+    """带算法题名、连续行号和多条控制语句的空间投影可直接作为代码保留。"""
+    return bool(numbered_algorithm_labels(content))
 
 
 def _build_code_blocks(
     source: _PageSource,
     excluded_bboxes: list[BBox],
     claimed_line_indices: set[int],
+    *,
+    marginal_lines: Iterable[_LineItem] = (),
 ) -> tuple[list[dict[str, Any]], set[int]]:
     """检测代码背景、唯一认领其文本，并输出页内 code block。"""
 
@@ -47,7 +169,33 @@ def _build_code_blocks(
         excluded_bboxes,
         claimed_line_indices,
     )
+    if candidates:
+        members = _code_marginal_members(source, candidates, marginal_lines, claimed_line_indices)
+        if members:
+            source = replace(source, lines=[*source.lines, *members])
     return _materialize_code_candidates(source, candidates)
+
+
+def _code_marginal_members(source, candidates, marginal_lines, claimed):
+    """仅让已有内容证据的代码框取回同排版、相邻的等宽页边行。"""
+    recovered = []
+    by_index = {line.source_index: line for line in source.lines}
+    for line in marginal_lines:
+        if line.angle != 0 or line.semantic_type not in {"header", "footer"} or line.source_index in claimed:
+            continue
+        owners = [c for c in candidates if c.angle == 0 and _bbox_overlap_in_first(line.bbox, c.bbox) >= 0.98]
+        if len(owners) != 1 or _monospace_character_support([line])[0] < 0.8:
+            continue
+        owner = owners[0]
+        em = max(1.0, line.bbox[3] - line.bbox[1])
+        if any(
+            abs(other.bbox[0] - line.bbox[0]) <= 3 * em
+            and 0.6 * em <= abs(_bbox_center_y(other.bbox) - _bbox_center_y(line.bbox)) <= 2.3 * em
+            for other in (by_index[i] for i in owner.line_indices if i in by_index)
+        ):
+            owner.line_indices.add(line.source_index)
+            recovered.append(line)
+    return recovered
 
 
 def _build_rule_delimited_code_blocks(
@@ -159,12 +307,19 @@ def _materialize_code_candidates(
         ]
         if not members:
             continue
-        content = project_pdf_spatial_text(
-            _code_member_chars(members),
-            candidate.bbox,
-            candidate.angle,
-            preserve_blank_rows=True,
-        )
+        separated = _project_numbered_panel_rows(members, source.lines, candidate.bbox)
+        if separated is not None:
+            content, marker_index = separated
+        else:
+            marker_index = None
+            content = project_pdf_spatial_text(
+                _code_member_chars(members),
+                candidate.bbox,
+                candidate.angle,
+                preserve_blank_rows=True,
+            )
+            if candidate.angle == 0 and _JOINED_CLOSING_BRACES.search(content):
+                content = _restore_split_closing_braces(content, members, candidate.bbox)
         if not content:
             content = _fallback_code_content(members)
         if not content:
@@ -177,9 +332,111 @@ def _materialize_code_candidates(
                 "content": content,
             }
         )
+        if marker_index is not None:
+            blocks[-1]["_code_external_marker"] = marker_index
+        retain_line_members(blocks[-1], members, enabled=source.collect_layout_diagnostics)
         claimed.update(candidate.line_indices)
     blocks.sort(key=lambda block: (block["bbox"][1], block["bbox"][0]))
     return blocks, claimed
+
+
+def _project_numbered_panel_rows(members: list[_LineItem], page_lines: list[_LineItem], bbox: BBox) -> tuple[str, int] | None:
+    """在已按框拆开的代码中逐视觉行恢复缩进与空行，避免紧邻花括号被叠成一行。"""
+    if not any(line.preserve_split_boundary for line in members):
+        return None
+    ordered = sorted(members, key=lambda line: (line.bbox[1], line.bbox[0]))
+    first = ordered[0]
+    if not first.preserve_split_boundary or first.visual_row_id is None:
+        return None
+    markers = [
+        line
+        for line in page_lines
+        if line.visual_row_id == first.visual_row_id
+        and line.preserve_split_boundary
+        and line.bbox[2] <= bbox[0]
+        and _CODE_MARKER_LABEL.fullmatch(line.text)
+    ]
+    if len(markers) != 1:
+        return None
+    content = _project_physical_code_rows(ordered)
+    return (content, markers[0].source_index) if content is not None else None
+
+
+def _restore_split_closing_braces(content: str, members: list[_LineItem], bbox: BBox) -> str:
+    """只有投影把多个实际独立闭括号叠到同行，且其他非空行逐字相同时，采用源物理行。"""
+    monospace, widths = _monospace_character_support(members)
+    if monospace < 0.8 or not _monospace_advances_are_stable(widths):
+        return content
+    cell_width = statistics.median(value for values in widths.values() for value in values)
+    if not _code_rows_have_spatial_structure(members, bbox, cell_width):
+        return content
+    physical = _project_physical_code_rows(sorted(members, key=lambda line: (line.bbox[1], line.bbox[0])))
+    if physical is None:
+        return content
+    physical_lines = [line for line in physical.splitlines() if line.strip()]
+    position = 0
+    corrected = False
+    for line in content.splitlines():
+        if not line.strip():
+            continue
+        if position < len(physical_lines) and line == physical_lines[position]:
+            position += 1
+            continue
+        if not _JOINED_CLOSING_BRACES.fullmatch(line):
+            return content
+        count = line.count("}")
+        if [item.strip() for item in physical_lines[position : position + count]] != ["}"] * count:
+            return content
+        position += count
+        corrected = True
+    return physical if corrected and position == len(physical_lines) else content
+
+
+def _project_physical_code_rows(ordered: list[_LineItem]) -> str | None:
+    """复用 PDF 视觉行的来源身份，按实际节距还原空行和缩进。"""
+    grouped: dict[int, list[_LineItem]] = {}
+    for line in ordered:
+        if line.visual_row_id is None:
+            return None
+        grouped.setdefault(line.visual_row_id, []).append(line)
+    visual_rows = [(members, _bbox_union_many([member.bbox for member in members])) for members in grouped.values()]
+    deltas = [b[1] - a[1] for (_members, a), (_next_members, b) in zip(visual_rows, visual_rows[1:])]
+    widths = _monospace_character_support(ordered)[1]["narrow"]
+    if not deltas or min(deltas) <= 0 or not widths:
+        return None
+    row_pitch = _code_row_pitch(deltas)
+    cell_width = statistics.median(widths)
+    left = min(box[0] for _items, box in visual_rows)
+    rows = []
+    for index, (items, box) in enumerate(visual_rows):
+        text = project_pdf_spatial_text(_code_member_chars(items), box, 0)
+        if not text or "\n" in text:
+            return None
+        if index:
+            rows.extend([""] * max(0, round(deltas[index - 1] / row_pitch) - 1))
+        rows.append(" " * round((box[0] - left) / cell_width) + text)
+    return "\n".join(rows)
+
+
+def _order_code_marker_companions(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """让同一首行的框外编号紧接在其代码框之前，其余块保持原相对顺序。"""
+    wanted = {block["_code_external_marker"] for block in blocks if "_code_external_marker" in block}
+    if not wanted:
+        return blocks
+    markers = {}
+    for block in blocks:
+        lines = block.get("_text_lines", ())
+        if len(lines) == 1 and lines[0].source_index in wanted and _CODE_MARKER_LABEL.fullmatch(block["content"]):
+            markers[lines[0].source_index] = block
+    marker_ids = {id(block) for block in markers.values()}
+    ordered = []
+    for block in blocks:
+        if id(block) in marker_ids:
+            continue
+        if (marker := markers.pop(block.get("_code_external_marker"), None)) is not None:
+            ordered.append(marker)
+        ordered.append(block)
+    return ordered
 
 
 def _vertical_rule_candidate_height_coverage(
@@ -225,11 +482,15 @@ def _detect_rule_delimited_code_candidates(source, excluded_bboxes, claimed_line
     if windows is None:
         raise ValueError("native code window detection rejected normalized geometry")
     raw_candidates = []
+    protect_wrapped_prose = bool(getattr(source, "discarded_raster_forms", ()))
+    evidence = {"protect_wrapped_prose": True} if protect_wrapped_prose else {}
     for top, bottom, indices in windows:
         bbox = _bbox_union_many([horizontal[top].bbox, horizontal[bottom].bbox])
         members = [available[index] for index in indices]
-        if _rule_delimited_code_members_are_structured(members, bbox, median_height):
+        if _rule_delimited_code_members_are_structured(members, bbox, median_height, **evidence):
             raw_candidates.append(_CodeCandidate(bbox, 0, {line.source_index for line in members}))
+        elif protect_wrapped_prose:
+            _protect_bordered_list_label(source, members, bbox, median_height)
     accepted = []
     for candidate in sorted(raw_candidates, key=lambda item: _bbox_area(item.bbox)):
         if any(_bbox_overlap_in_smaller(candidate.bbox, existing.bbox) >= 0.85 for existing in accepted):
@@ -242,6 +503,8 @@ def _rule_delimited_code_members_are_structured(
     members: list[_LineItem],
     candidate_bbox: BBox,
     median_height: float,
+    *,
+    protect_wrapped_prose: bool = False,
 ) -> bool:
     """验证候选具有稳定基线、代码缩进或窄行号槽，并排除规则多列表格。"""
 
@@ -307,6 +570,8 @@ def _rule_delimited_code_members_are_structured(
         for line in members
     )
     monospace_ratio, advances = _monospace_character_support(members)
+    if protect_wrapped_prose and monospace_ratio < 0.8 and _rule_window_wraps_numbered_prose(ordered_rows, median_height):
+        return False
     if syntax_rows < 2 and not (monospace_ratio >= 0.8 and _monospace_advances_are_stable(advances)):
         return False
 
@@ -315,6 +580,54 @@ def _rule_delimited_code_members_are_structured(
         0.1,
         candidate_bbox[2] - candidate_bbox[0],
     )
+
+
+def _rule_window_wraps_numbered_prose(rows: list[list[_LineItem]], em: float) -> bool:
+    """多项连续自然句的同宽悬挂续行是正文段落，框线和散落的编程关键词不能认作代码。"""
+    ordered = [sorted(row, key=lambda line: line.bbox[0]) for row in rows]
+    markers = []
+    for index, row in enumerate(ordered):
+        first = row[0]
+        match = re.match(r"^\s*(\d{1,3})[.)]\s+([A-Za-z].{24,})", first.text)
+        if match and len(re.findall(r"[A-Za-z]{2,}", match[2])) >= 6:
+            markers.append((index, int(match[1]), first.bbox[0]))
+    wrapped = 0
+    for (start, number, left), (end, next_number, next_left) in zip(markers, markers[1:]):
+        if next_number != number + 1 or abs(next_left - left) > 0.35 * em or end < start + 2:
+            continue
+        continuation = ordered[start + 1][0]
+        tail = ordered[end - 1][-1].text.rstrip()
+        if 0.45 * em <= continuation.bbox[0] - left <= 2.5 * em and re.search(r"[A-Za-z][.!?]$", tail):
+            wrapped += 1
+    return wrapped >= 3
+
+
+def _protect_bordered_list_label(source, members, bounds, em):
+    """用真实方框和框内悬挂段落保留局部标签，避免去水印后将标签提升为全文标题。"""
+    if not members or not any(
+        max(abs(a - b) for a, b in zip(rect, bounds, strict=True)) <= 0.35 * em
+        for path in source.path_infos
+        for rect in path.rectangle_bboxes
+    ):
+        return
+    by_row = {}
+    for line in members:
+        key = (line.visual_row_id is None, line.visual_row_id if line.visual_row_id is not None else line.source_index)
+        by_row.setdefault(key, []).append(line)
+    rows = sorted(by_row.values(), key=lambda row: min(_bbox_center_y(line.bbox) for line in row))
+    label = rows[0][0]
+    if (
+        len(rows[0]) == 1
+        and label.semantic_type is None
+        and 2 <= len(label.text.split()) <= 6
+        and label.text.isupper()
+        and (label.dominant_font_weight or 0) >= 600
+        and 0 <= label.bbox[0] - bounds[0] <= 2.0 * em
+        and 0 <= label.bbox[1] - bounds[1] <= 2.5 * em
+        and _rule_window_wraps_numbered_prose(rows, em)
+    ):
+        label.semantic_type = "text"
+        label.title_suppressed = True
 
 
 def _code_member_chars(lines: list[_LineItem]) -> list[dict[str, Any]]:
@@ -337,6 +650,56 @@ def _code_member_chars(lines: list[_LineItem]) -> list[dict[str, Any]]:
     return output
 
 
+def _framed_template_candidates(source: _PageSource, excluded_bboxes: list[BBox], claimed: set[int]) -> list[_CodeCandidate]:
+    """在真实填充框内核对成对的模板指令与插值行，保留框上的题签和完整缩进。"""
+    if not any("{%" in line.text and "end" in line.text for line in source.lines):
+        return []
+    candidates = []
+    for path in source.path_infos:
+        box = path.bbox
+        if (
+            not path.fill_visible
+            or not _path_has_visible_nonwhite_fill(path)
+            or any(_bbox_overlap_in_smaller(box, other) >= 0.5 for other in excluded_bboxes)
+        ):
+            continue
+        members = sorted(
+            (line for line in source.lines if _bbox_overlap_in_first(line.bbox, box) > 0), key=lambda line: line.bbox[1]
+        )
+        if not members or any(
+            line.angle or line.source_index in claimed or line.bbox[0] < box[0] or line.bbox[2] > box[2] for line in members
+        ):
+            continue
+        em = statistics.median(max(1.0, line.effective_height) for line in members)
+        if (
+            abs(members[0].bbox[1] - box[1]) > em
+            or abs(members[-1].bbox[3] - box[3]) > em
+            or any(b.bbox[1] - a.bbox[3] > em for a, b in zip(members, members[1:]))
+        ):
+            continue
+        nesting = []
+        closed = expressions = 0
+        for line in members:
+            tag = re.fullmatch(r"\s*\{%-?\s*(\w+)\b.*?-?%\}\s*", line.text)
+            if tag:
+                word = tag[1]
+                if word.startswith("end"):
+                    if not nesting or nesting.pop() != word[3:]:
+                        break
+                    closed += 1
+                else:
+                    nesting.append(word)
+            elif re.search(r"\{\{[^{}]+\}\}", line.text):
+                expressions += 1
+            elif nesting or closed:
+                break
+        else:
+            if closed and not nesting and expressions and 2 * closed + expressions > len(members) / 2:
+                bounds = _bbox_union_many([box, *(line.bbox for line in members)])
+                candidates.append(_CodeCandidate(bounds, 0, {line.source_index for line in members}))
+    return candidates
+
+
 def _detect_code_candidates(
     source: _PageSource,
     excluded_bboxes: list[BBox],
@@ -348,7 +711,7 @@ def _detect_code_candidates(
     page_area = max(0.0, page_width) * max(0.0, page_height)
     if page_area <= 0 or not source.path_infos:
         return []
-    raw_candidates: list[_CodeCandidate] = []
+    raw_candidates = _framed_template_candidates(source, excluded_bboxes, claimed_line_indices)
     for path_info in source.path_infos:
         bbox = path_info.bbox
         width = bbox[2] - bbox[0]
@@ -378,7 +741,9 @@ def _detect_code_candidates(
         if total_support <= 0 or angle_support / total_support < 0.8:
             continue
         monospace_ratio, cell_widths = _monospace_character_support(angle_members)
-        if monospace_ratio < 0.8 or not _monospace_advances_are_stable(cell_widths):
+        if monospace_ratio < 0.8 and not _has_monospaced_program_with_comments(angle_members):
+            continue
+        if not _monospace_advances_are_stable(cell_widths):
             continue
         median_cell_width = statistics.median(width_value for values in cell_widths.values() for width_value in values)
         if not _code_rows_have_spatial_structure(
@@ -401,6 +766,24 @@ def _detect_code_candidates(
             continue
         accepted.append(candidate)
     return sorted(accepted, key=lambda item: (item.bbox[1], item.bbox[0]))
+
+
+def _has_monospaced_program_with_comments(lines: list[_LineItem]) -> bool:
+    """注释使用正文或 CJK 字体时，独立用有缩进和重复语法的程序行验证等宽支持。"""
+    body = [line for line in lines if not line.text.lstrip().startswith(("//", "/*", "* ", "*/", "# "))]
+    if len(body) == len(lines) or len(body) < max(3, len(lines) / 3):
+        return False
+    statements = [
+        line
+        for line in body
+        if re.match(r"^\s*(?:(?:if|while|for)\s*\(|return\b|\w[\w\s*\[\].,]*\([^)]*\)\s*[{;]|[\w.\[\]]+\s*=(?!=))", line.text)
+    ]
+    if len(statements) < 2:
+        return False
+    em = statistics.median(max(1.0, line.bbox[3] - line.bbox[1]) for line in body)
+    if max(line.bbox[0] for line in body) - min(line.bbox[0] for line in body) < 0.5 * em:
+        return False
+    return _monospace_character_support(body)[0] >= 0.8
 
 
 def _path_has_visible_nonwhite_fill(path_info: PDFPathInfo) -> bool:
@@ -556,11 +939,15 @@ def _code_rows_have_spatial_structure(
     deltas = [current - previous for previous, current in zip(row_tops, row_tops[1:]) if current > previous]
     if not deltas:
         return False
-    lower_count = max(1, math.ceil(0.6 * len(deltas)))
-    base_pitch = statistics.median(sorted(deltas)[:lower_count])
+    base_pitch = _code_row_pitch(deltas)
     if base_pitch <= 0:
         return False
     return all(abs(delta / base_pitch - round(delta / base_pitch)) <= 0.35 for delta in deltas)
+
+
+def _code_row_pitch(deltas: list[float]) -> float:
+    """从较短的行距求基本节距，避免空行抬高单行估计。"""
+    return statistics.median(sorted(deltas)[: math.ceil(0.6 * len(deltas))])
 
 
 def _fallback_code_content(lines: list[_LineItem]) -> str:

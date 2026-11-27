@@ -23,6 +23,39 @@ def form_owns_line(line: _LineItem, members: frozenset[int]) -> bool:
     )
 
 
+def repeated_panel_bbox(source: _PageSource, form: _PDFFormInfo) -> BBox | None:
+    """本 Form 的主体底板与框外并列底板同尺寸同边缘时，保留作为一幅图的卡片。"""
+    if not form.path_indices:
+        return None
+    area = _bbox_area(form.bbox)
+    panels = [
+        rect
+        for path in source.path_infos
+        if path.fill_visible and path.source_index in form.path_indices
+        for rect in path.rectangle_bboxes
+        if _bbox_area(rect) >= 0.7 * area and _bbox_overlap_in_first(rect, form.bbox) >= 0.95
+    ]
+    for x0, y0, x1, y1 in panels:
+        width, height = x1 - x0, y1 - y0
+        tolerance = 0.03 * min(width, height)
+        for path in source.path_infos:
+            if not path.fill_visible or path.source_index in form.path_indices:
+                continue
+            for left, top, right, bottom in path.rectangle_bboxes:
+                if abs(right - left - width) > tolerance or abs(bottom - top - height) > tolerance:
+                    continue
+                x_gap = max(left - x1, x0 - right)
+                y_gap = max(top - y1, y0 - bottom)
+                if (
+                    abs(top - y0) <= tolerance
+                    and -tolerance <= x_gap <= 0.35 * width
+                    or abs(left - x0) <= tolerance
+                    and -tolerance <= y_gap <= 0.35 * height
+                ):
+                    return x0, y0, x1, y1
+    return None
+
+
 def _page_frame_matches(source: _PageSource, form: _PDFFormInfo) -> bool:
     """声明框映射到 MediaBox 或 CropBox 的各边误差不超过对应页面尺寸的百分之二。"""
     if not form.structure_valid or form.declared_bbox is None:
@@ -304,6 +337,9 @@ def normalize_page_forms(sources: list[_PageSource]) -> None:
         if not removed:
             # 未展开时保留既有顶层候选范围；结构读取失败也不能提升未知子 Form。
             active = [form for form in source.form_infos if form.parent_id is None]
+        if source.discarded_raster_forms:
+            # 位图已被物理归属证明为装饰；不能再借 Form 候选遮住独立图件或表格。
+            active = [form for form in active if form.instance_id not in source.discarded_raster_forms]
         source.form_bboxes = [form.bbox for form in active if _bbox_area(form.bbox) > 0]
         source.retained_page_forms = {form.bbox for form in active if _page_frame_matches(source, form)}
         # 同一位置重复调用也可能拥有不同成员；不能让后一次调用覆盖前一次来源。

@@ -66,10 +66,11 @@ def test_prepare_page_materializes_table_against_original_semantic_lines(
         analysis_source: models._PageSource,
         *,
         excluded_bboxes: list[tuple[float, float, float, float]],
+        caption_owners: dict,
     ) -> list[models._TableCandidate]:
         """记录候选检测阶段可见的来源行。"""
 
-        assert excluded_bboxes == []
+        assert excluded_bboxes == [] and not caption_owners
         observed["detect"] = [line.source_index for line in analysis_source.lines]
         return []
 

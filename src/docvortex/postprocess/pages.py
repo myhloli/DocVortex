@@ -35,6 +35,7 @@ def _remove_private_block_metadata(block: dict[str, Any]) -> None:
         "_reference_start",
         "_paragraph_boundary",
         "_native_annotation_parent_bbox",
+        "_native_image_ready",
         "_pdf_structure",
     ):
         block.pop(field_name, None)

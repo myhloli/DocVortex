@@ -16,39 +16,95 @@ class PdfModel:
     def __init__(self) -> None:
         """保存本次结构分析结果与诊断，各文档间使用独立实例状态。"""
         self.diagnostics = ()
+        self.layout_page_confidences: tuple[float, ...] = ()
         self.extensions = {}
         self._tagged = None
         self._prepared_document = None
 
-    def _prepare_structure(self, pdf_doc: PDFDocument):
+    def _prepare_structure(self, pdf_doc: PDFDocument, *, collect_layout_diagnostics: bool = False):
         """在自动分类前获取结构覆盖证据，随后 predict 复用同一次读取。"""
         from .pdf.tagged import prepare_tagged_analysis
 
-        if self._prepared_document is not pdf_doc:
-            self._tagged = prepare_tagged_analysis(pdf_doc)
+        if self._prepared_document is not pdf_doc or (
+            collect_layout_diagnostics and self._tagged is not None and not self._tagged.collect_layout_diagnostics
+        ):
+            self._tagged = (
+                prepare_tagged_analysis(pdf_doc, collect_layout_diagnostics=True)
+                if collect_layout_diagnostics
+                else prepare_tagged_analysis(pdf_doc)
+            )
             self._prepared_document = pdf_doc
         return self._tagged
 
-    def predict(self, pdf_doc: PDFDocument, *, pdf_structure: Literal["auto", "off"] = "auto") -> list[list[dict[str, Any]]]:
-        """分析调用方持有的 PDFDocument，在所有文字匹配结束后统一输出可见英数。"""
+    def predict(
+        self,
+        pdf_doc: PDFDocument,
+        *,
+        pdf_structure: Literal["auto", "off"] = "auto",
+        collect_layout_diagnostics: bool = False,
+    ) -> list[list[dict[str, Any]]]:
+        """返回逐页模型。开启诊断时，layout_page_confidences 按物理页顺序提供 0 至 1 的版面伪置信度。"""
         from ...content import normalize_pdf_model_text
         from .pdf import pipeline
         from ...errors import InvalidRequestError
 
         if pdf_structure not in {"auto", "off"}:
             raise InvalidRequestError("pdf_structure_invalid", "pdf_structure must be auto or off", "pdf_structure")
-        self.diagnostics, self.extensions = (), {}
+        self.diagnostics, self.extensions, self.layout_page_confidences = (), {}, ()
         try:
-            tagged = self._prepare_structure(pdf_doc) if pdf_structure == "auto" else None
+            tagged = (
+                self._prepare_structure(pdf_doc, **({"collect_layout_diagnostics": True} if collect_layout_diagnostics else {}))
+                if pdf_structure == "auto"
+                else None
+            )
             if tagged is None:
-                pages = pipeline._analyze_native_document(pdf_doc)
+                if collect_layout_diagnostics:
+                    from .pdf.layout_diagnostics import suppress_repeated_marginal_visuals
+
+                    layout_pages = []
+                    pages = pipeline._analyze_native_document(pdf_doc, layout_pages=layout_pages)
+                    suppress_repeated_marginal_visuals(layout_pages)
+                    program_controls = {i: ev.program_controls for i, ev in enumerate(layout_pages) if ev.program_controls}
+                    self.diagnostics = tuple(
+                        diagnostic
+                        for index, (evidence, blocks) in enumerate(zip(layout_pages, pages, strict=True))
+                        for diagnostic in evidence.diagnose(blocks, index)
+                    )
+                else:
+                    pages = pipeline._analyze_native_document(pdf_doc)
             else:
                 from ...document.pdf.structure import STRUCTURE_EXTENSION
 
                 pages = tagged.predict()
                 self.diagnostics = tuple(tagged.diagnostics)
+                if collect_layout_diagnostics:
+                    self.diagnostics += tagged.layout_diagnostics
+                    program_controls = tagged.layout_program_controls
                 self.extensions[STRUCTURE_EXTENSION] = tagged.extension()
+            if collect_layout_diagnostics:
+                from .pdf.layout_diagnostics import discard_block_glyphs
+
+                for blocks in pages:
+                    for block in blocks:
+                        discard_block_glyphs(block)
             normalize_pdf_model_text(pages)
+            if collect_layout_diagnostics:
+                from .pdf.layout_risk_scoring import score_layout_pages
+
+                def vector_geometry(index):
+                    """只为严重区域候选读取原生绘图几何，无需整页渲染。"""
+                    return pdf_doc.page_size(index), pdf_doc.get_page_vector_geometry(index)
+
+                def source_lines(index):
+                    """候选图框通过廉价几何预筛后，再核对可见 PDF 图层中的真实文字位置。"""
+                    return pdf_doc.get_page_lines(index, visible_only=True)
+
+                self.layout_page_confidences = score_layout_pages(
+                    pages,
+                    program_controls=program_controls,
+                    vector_geometry=vector_geometry,
+                    source_lines=source_lines,
+                )
             return pages
         finally:
             self._tagged = None

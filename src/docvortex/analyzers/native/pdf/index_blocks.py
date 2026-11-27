@@ -13,6 +13,7 @@ from ....schema import BBox, BlockType
 from .models import _LineItem
 from .geometry import _bbox_center_x, _bbox_center_y, _bbox_overlap_in_smaller, _bbox_union_many, _rotate_bbox_to_upright
 from .line_layout import _line_effective_height, _lines_tight_output_bbox
+from .layout_diagnostics import retain_line_members
 
 
 _INDEX_PAGE_NUMBER_RE = re.compile(
@@ -41,6 +42,7 @@ def _extract_index_blocks(
     *,
     require_heading: bool = False,
     require_explicit_heading: bool = False,
+    collect_layout_diagnostics: bool = False,
 ) -> tuple[list[dict[str, object]], list[_LineItem]]:
     """用页码行尾和稳定版式识别目录；预判阶段可强制要求几何目录标题。"""
 
@@ -64,7 +66,7 @@ def _extract_index_blocks(
                 for line in row.members:
                     line.semantic_type = BlockType.INDEX
                     claimed_line_ids.add(id(line))
-            blocks.append(_index_rows_to_block(candidate, angle, page_size))
+            blocks.append(_index_rows_to_block(candidate, angle, page_size, collect_layout_diagnostics=collect_layout_diagnostics))
         eligible_rows = [row for row in eligible_rows if not any(id(line) in claimed_line_ids for line in row.members)]
         for band in _split_index_bands(eligible_rows):
             candidate = _trim_index_band_edges(band)
@@ -89,13 +91,19 @@ def _extract_index_blocks(
                 for line in row.members:
                     line.semantic_type = BlockType.INDEX
                     claimed_line_ids.add(id(line))
-            blocks.append(_index_rows_to_block(candidate, angle, page_size))
+            blocks.append(_index_rows_to_block(candidate, angle, page_size, collect_layout_diagnostics=collect_layout_diagnostics))
 
     remaining_lines = [line for line in lines if id(line) not in claimed_line_ids]
     return blocks, remaining_lines
 
 
-def _index_rows_to_block(rows: list[_IndexRow], angle: int, page_size: tuple[float, float]) -> dict[str, object]:
+def _index_rows_to_block(
+    rows: list[_IndexRow],
+    angle: int,
+    page_size: tuple[float, float],
+    *,
+    collect_layout_diagnostics: bool = False,
+) -> dict[str, object]:
     """统一保存已确认目录的逻辑行顺序和原生成员范围，页码随完整条目输出。"""
     members = [line for row in rows for line in row.members]
     block: dict[str, object] = {
@@ -107,6 +115,7 @@ def _index_rows_to_block(rows: list[_IndexRow], angle: int, page_size: tuple[flo
     tight = _lines_tight_output_bbox(members, page_size)
     if tight is not None:
         block["_tight_output_bbox"] = tight
+    retain_line_members(block, members, enabled=collect_layout_diagnostics)
     return block
 
 

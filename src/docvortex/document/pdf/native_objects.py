@@ -171,7 +171,7 @@ def _clipped_objects_of_type(
 
 
 def _text_object_visibility(
-    page: Any, page_bbox: BBox, rotation: int, paint_page_reader=None
+    page: Any, page_bbox: BBox, rotation: int, paint_page_reader=None, *, uncertain_coverage=None
 ) -> dict[int, tuple[bool, BBox | None]]:
     """一次遍历建立文字对象的绘制状态与有效裁剪；地址只在本次页面提取内使用。"""
     from ._object_bridge import read_text_visibility
@@ -187,7 +187,8 @@ def _text_object_visibility(
         if len(output) != len(records):
             # 非标准重复对象地址需要使用最终映射重新读框，保持原有合并可见性的语义。
             roots, paint = None, None
-        output = exclude_fully_overpainted_text(page, page_bbox, rotation, output, paint_page_reader, roots=roots, paint=paint)
+        output = exclude_fully_overpainted_text(page, page_bbox, rotation, output, paint_page_reader, roots=roots, paint=paint,
+                                              **({"uncertain_coverage": uncertain_coverage} if uncertain_coverage is not None else {}))
     return output
 
 
@@ -730,10 +731,13 @@ def _extract_page_image_infos(
     page: pdfium.PdfPage,
     page_bbox: BBox,
     page_rotation: int,
+    *,
+    form_raster_ids: dict[int, int] | None = None,
 ) -> list[PDFImageInfo]:
     """提取全部有效点阵图几何；单图指纹失败时保留 bbox 并按放行处理。"""
 
     image_infos: list[PDFImageInfo] = []
+    image_members: list[_ClippedObject] = []
     for member in _clipped_objects_of_type(page, pdfium_c.FPDF_PAGEOBJ_IMAGE):
         raw_obj, matrix = member.raw, member.matrix
         try:
@@ -747,13 +751,27 @@ def _extract_page_image_infos(
             continue
         fingerprint = _get_raw_image_fingerprint(raw_obj, page)
         smooth, blank_top = _image_visual_evidence(raw_obj, page, matrix, image_bbox, page_bbox, page_rotation)
+        image_members.append(member)
         image_infos.append(
             PDFImageInfo(
                 bbox=image_bbox,
                 fingerprint=fingerprint,
                 smooth_background=smooth,
                 blank_top_bbox=blank_top,
+                form_raster_id=form_raster_ids.get(ctypes.cast(raw_obj, ctypes.c_void_p).value) if form_raster_ids else None,
             )
+        )
+    if len(image_infos) > 1:
+        from .raster_composites import attach_raster_composites
+
+        attach_raster_composites(page, page_bbox, page_rotation, image_members, image_infos)
+        from .raster_backdrops import attach_raster_backdrops
+
+        attach_raster_backdrops(page, page_bbox, page_rotation, image_members, image_infos)
+        from .raster_occlusion import attach_raster_occlusion
+
+        attach_raster_occlusion(
+            page, page_bbox, _drawing_page_size(page_bbox, page_rotation), page_rotation, image_members, image_infos
         )
     return sorted(
         image_infos,

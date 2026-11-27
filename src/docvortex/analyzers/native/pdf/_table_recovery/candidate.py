@@ -123,8 +123,10 @@ def _order_consistency(
     text: NativeTableText,
     assignments: dict[int, int],
     specs: tuple[GridCellSpec, ...],
+    *,
+    align_rowspans: bool = False,
 ) -> float:
-    """衡量每条视觉行中的字符单元格序号是否保持从左到右单调。"""
+    """衡量视觉行从左到右的顺序；已证实的跨行表头按共同覆盖的逻辑行比较。"""
 
     comparable = 0
     ordered_pairs = 0
@@ -134,10 +136,16 @@ def _order_consistency(
             (glyph_by_id[glyph_id] for glyph_id in row.glyph_ids if glyph_id in assignments),
             key=lambda glyph: (glyph.bbox[0], glyph.glyph_id),
         )
+        logical_row = None
+        if align_rowspans and glyphs:
+            cells = [specs[assignments[g.glyph_id]] for g in glyphs]
+            logical_row = max(c.row for c in cells)
+            if any(c.row + c.rowspan <= logical_row for c in cells):
+                return 0.0
         previous_position: tuple[int, int] | None = None
         for glyph in glyphs:
             spec = specs[assignments[glyph.glyph_id]]
-            position = spec.row, spec.col
+            position = (spec.row if logical_row is None else logical_row), spec.col
             if previous_position is not None:
                 comparable += 1
                 if position >= previous_position:
@@ -175,6 +183,7 @@ def build_candidate(
     allow_single_row: bool = False,
     allow_single_column: bool = False,
     require_atomic_tokens: bool = False,
+    align_rowspans: bool = False,
     use_grid_index: bool = False,
     diagnostics: dict[str, object] | None = None,
 ) -> NativeTableCandidate | None:
@@ -256,7 +265,7 @@ def build_candidate(
         )
         for index, spec in enumerate(specs)
     )
-    order_consistency = _order_consistency(text, assignments, specs)
+    order_consistency = _order_consistency(text, assignments, specs, align_rowspans=align_rowspans)
     normalized_structure = max(0.0, min(1.0, structure_support))
     normalized_row = max(0.0, min(1.0, row_stability))
     normalized_column = max(0.0, min(1.0, column_stability))
@@ -282,6 +291,41 @@ def build_candidate(
         order_consistency=order_consistency,
         issues=issues,
     )
+
+
+def build_fully_assigned_table(
+    specs: list[GridCellSpec],
+    text: NativeTableText,
+    evidence: str,
+    *,
+    allow_header_token_split: bool = False,
+) -> NativeTableCandidate | None:
+    """已由源规则独立证明的网格仍须完整、唯一地落字，保留正确的跨行阅读顺序。"""
+    diagnostics = {}
+    candidate = build_candidate(
+        source="sparse_multiline",
+        rows=max(spec.row + spec.rowspan for spec in specs),
+        cols=max(spec.col + spec.colspan for spec in specs),
+        specs=tuple(specs),
+        text=text,
+        structure_support=1.0,
+        row_stability=1.0,
+        column_stability=1.0,
+        issues=(f"evidence={evidence}",),
+        align_rowspans=True,
+        require_atomic_tokens=not allow_header_token_split,
+        use_grid_index=True,
+        diagnostics=diagnostics,
+    )
+    if (
+        candidate is None
+        or candidate.text_capture < 1.0
+        or candidate.order_consistency < 1.0
+        or diagnostics.get("ambiguous_glyph_ratio", 1.0) > 0
+    ):
+        return None
+    sources = [source for cell in candidate.cells for source in cell.source_char_indices]
+    return candidate if len(sources) == len(set(sources)) == len(text.glyphs) else None
 
 
 def serialize_candidate_html(candidate: NativeTableCandidate) -> str:

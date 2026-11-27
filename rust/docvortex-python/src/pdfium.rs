@@ -461,7 +461,7 @@ pub fn read_pdfium_visual_batches(
         return Err(PyValueError::new_err("invalid PDFium visual frame"));
     }
     let (mut records, fonts) = read_pdfium_data(addresses, handle, count, extended)?;
-    apply_unicode_fallback(py, &mut records, unicode_fallback)?;
+    apply_unicode_fallback(py, &mut records, &fonts, unicode_fallback)?;
     Ok((
         PdfiumVisualCharacterBatches {
             records: records.into_iter(),
@@ -524,7 +524,7 @@ pub fn read_pdfium_char_batches(
     unicode_fallback: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<(Py<PdfiumCharacterBatches>, Fonts)> {
     let (mut records, fonts) = read_pdfium_data(addresses, handle, count, extended)?;
-    apply_unicode_fallback(py, &mut records, unicode_fallback)?;
+    apply_unicode_fallback(py, &mut records, &fonts, unicode_fallback)?;
     Ok((
         Py::new(
             py,
@@ -536,10 +536,11 @@ pub fn read_pdfium_char_batches(
     ))
 }
 
-/// 仅在真实文字读出 NUL 时调用宿主的资源恢复器，保留所有几何、对象和源索引。
+/// 仅为 NUL 或符号字体的单字节读数探测字体资源，保留所有几何、对象和源索引。
 pub(crate) fn apply_unicode_fallback(
     _py: Python<'_>,
     records: &mut [Record],
+    fonts: &Fonts,
     fallback: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<()> {
     let Some(fallback) = fallback else {
@@ -548,7 +549,12 @@ pub(crate) fn apply_unicode_fallback(
     let indices: Vec<usize> = records
         .iter()
         .enumerate()
-        .filter_map(|(i, r)| (r.0 == 0 && r.7 != 0 && r.10 == Some(false)).then_some(i))
+        .filter_map(|(i, r)| {
+            // PDF 字体描述符位 3 表示其编码使用符号，普通文字的 ASCII 数字无需读资源。
+            let unresolved = r.0 == 0
+                || (r.0 <= u8::MAX as u32 && fonts.get(r.4).is_some_and(|font| font.1 & 4 != 0));
+            (unresolved && r.7 != 0 && r.10 == Some(false)).then_some(i)
+        })
         .collect();
     if indices.is_empty() {
         return Ok(());

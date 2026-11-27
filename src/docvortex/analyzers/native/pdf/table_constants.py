@@ -35,6 +35,9 @@ _TABLE_SPLIT_NUMBER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# 年份槽及会计金额共用的单值形态，不删除小数点、负号、百分号或货币符号。
+_ACCOUNTING_AMOUNT_RE = re.compile(r"[+−-]?[$€£¥￥]?\(?[$€£¥￥]?[+−-]?\d+(?:[.,]\d+)*\)?[%‰]?|[-–—−]")
+
 
 _FILLED_GRID_MIN_PAGE_AREA_RATIO = 0.005
 

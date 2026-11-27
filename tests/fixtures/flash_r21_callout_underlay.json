@@ -1,0 +1,43 @@
+{
+  "source_url": "https://www.weather.gov/media/twc/thunderstormpreparedness.pdf",
+  "sha256": "ea0c073826bb64386712d322a547bce1592a7f9e9c5edae5cf3ae8261180466a",
+  "pages": 20,
+  "physical_page": 10,
+  "source_page_size": [
+    612,
+    792
+  ],
+  "map_bbox_pt": [
+    36.001,
+    408.6,
+    405.6,
+    732.0
+  ],
+  "note_bbox_pt": [
+    164.5,
+    415.714,
+    333.5,
+    519.394
+  ],
+  "visible_map_windows": [
+    [
+      0.065,
+      0.522,
+      0.235,
+      0.64
+    ],
+    [
+      0.155,
+      0.7,
+      0.65,
+      0.91
+    ]
+  ],
+  "note_interior": [
+    0.3,
+    0.54,
+    0.51,
+    0.64
+  ],
+  "note_text": "This map depicts the average number of days with thunderstorms each year."
+}

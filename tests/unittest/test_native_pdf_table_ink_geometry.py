@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from copy import deepcopy
 from dataclasses import replace
+import gzip
 import json
 import math
 from pathlib import Path
@@ -240,8 +241,11 @@ def test_changing_font_metadata_cannot_change_real_table_recovery() -> None:
     assert renamed.cells == original.cells
 
 
-def test_neighboring_column_bridge_does_not_prove_inflated_lines() -> None:
-    """异列居中文字可桥接两条正常行，不能把整行外框的增长当成字体虚高。"""
+@pytest.mark.parametrize(
+    "border", ["none", "both_sides", "single_side", "underline", "other_column", "short_vertical", "outside", "crosses_ink"]
+)
+def test_bridged_glyphs_require_a_closed_separator_to_prove_inflation(border: str) -> None:
+    """合并格可将邻行桥接，只有穿过其实际墨迹间隙、两端接实竖线的本表格线足以拆开。"""
     source = _two_line_input()
     chars = deepcopy(list(source.chars))
     for index, char in enumerate(chars):
@@ -262,12 +266,22 @@ def test_neighboring_column_bridge_does_not_prove_inflated_lines() -> None:
                 "writing_angle": 0.0,
             }
         )
-    source = replace(source, chars=tuple(chars))
+    x0, x1 = (34, 62) if border == "other_column" else ((-2, 28) if border == "outside" else (5, 28))
+    y = 15 if border == "crosses_ink" else 21
+    rules = [NativeTableRule((x0, y - 0.1, x1, y + 0.1), 0.2, "horizontal")] if border != "none" else []
+    if border not in {"none", "underline"}:
+        rules.append(NativeTableRule((x0 - 0.1, 7, x0 + 0.1, 35), 0.2, "vertical"))
+    if border not in {"none", "underline", "single_side"}:
+        rules.append(NativeTableRule((x1 - 0.1, 7, x1 + 0.1, 24 if border == "short_vertical" else 35), 0.2, "vertical"))
+    source = replace(source, chars=tuple(chars), drawing_lines=tuple(rules))
     pending = table_text._select_pending_glyphs(source)
     assert len(table_text._assign_visual_rows(pending, 10.0)) == 1
     assert len(table_text._assign_visual_rows(pending[:4], 10.0)) == 2
     text = table_text.build_native_table_text(source)
-    assert [g.bbox for g in text.glyphs] == [g.bbox for g in pending]
+    if border == "both_sides":
+        assert ["".join(token.text for token in row.tokens) for row in text.rows] == ["AB", "XY", "CD"]
+    else:
+        assert [g.bbox for g in text.glyphs] == [g.bbox for g in pending]
 
 
 def test_real_bridged_table_keeps_its_existing_structure_and_geometry() -> None:
@@ -340,3 +354,45 @@ def test_independent_geometric_guards_do_not_relax_each_other(case: str, calibra
         assert [glyph.bbox for glyph in result.glyphs] != [glyph.bbox for glyph in pending]
     else:
         assert [glyph.bbox for glyph in result.glyphs] == [glyph.bbox for glyph in pending]
+
+
+def test_physical_border_restores_the_actual_merged_tire_table() -> None:
+    """实物四列网格中读序、标点、缺测横杠和纵横合并必须同时与原页一致。"""
+    path = Path(__file__).parents[1] / "fixtures/native_pdf_table_ink_ruled_bridge.json.gz"
+    data = json.loads(gzip.decompress(path.read_bytes()))
+    assert data["sha"].startswith("e8e778aec3a34736")
+    source = NativeTableInput(
+        tuple(data["table_bbox"]),
+        tuple(data["page_size"]),
+        0,
+        tuple(data["chars"]),
+        tuple(NativeTableRule(**rule) for rule in data["rules"]),
+        tuple(NativeTableRectangle(**rect) for rect in data["rectangles"]),
+    )
+    before = deepcopy(source)
+    result = recover_native_pdf_table(source)
+    assert result is not None and (result.source, result.rows, result.cols) == ("vector_grid", 13, 4)
+    assert Counter(i for c in result.cells for i in c.source_char_indices) == Counter(c["char_idx"] for c in source.chars)
+    public = recover_table_region(_public_page(source), source.table_bbox)
+    assert public is not None
+    html_rows = BeautifulSoup(public.html, "html.parser").find_all("tr")
+    expected = [
+        ["单胎负荷指数", "单胎最大额定负荷对应的气压kPa", "最小破坏能J"],
+        ["轮辋名义直径代号<13", "轮辋名义直径代号≥13"],
+        ["≤121", "≤250", "136", "294"],
+        ["251~350", "203", "362"],
+        ["351~450", "271", "514"],
+        ["451~550", "-", "576"],
+        ["551~650", "-", "644"],
+        [">650", "-", "712"],
+        ["≥122", "≤550", "972"],
+        ["551~650", "1412"],
+        ["651~750", "1695"],
+        ["751~850", "2090"],
+        ["851~950", "2203"],
+    ]
+    assert [[c.get_text() for c in row.find_all(["td", "th"])] for row in html_rows] == expected
+    assert html_rows[0].find_all("td")[2]["colspan"] == "2"
+    assert html_rows[2].find("td")["rowspan"] == "6"
+    assert html_rows[8].find("td")["rowspan"] == "5"
+    assert source == before

@@ -13,6 +13,7 @@ from .._shared.xycut import sort_entries
 from ....schema import BBox
 
 from .annotation_text import (
+    _FOOTNOTE_RE,
     _normalize_annotation_text,
     _is_strong_caption_text,
     _caption_identifier,
@@ -21,6 +22,7 @@ from .geometry import (
     _bbox_axis_overlap_ratio,
     _bbox_center_x,
     _bbox_center_y,
+    _bbox_overlap_in_smaller,
     _bbox_union_many,
     _coerce_bbox,
     _rotate_bbox_to_upright,
@@ -44,11 +46,6 @@ _TABLE_FOOTNOTE_LANE_TOLERANCE = 0.5
 _TABLE_FOOTNOTE_MIN_LINE_HEIGHT_RATIO = 0.75
 _TABLE_FOOTNOTE_MAX_LINE_HEIGHT_RATIO = 1.25
 
-_FOOTNOTE_RE = re.compile(
-    r"^\s*(?:source(?:s|\(s\))?|data\s+source|note(?:s|\(s\))?"
-    r"|资料来源|数据来源|来源|注|备注)\s*[:：]\s*\S",
-    re.IGNORECASE | re.DOTALL,
-)
 _Direction = Literal["above", "below", "left", "right"]
 _AnnotationKind = Literal["caption", "footnote"]
 _TextBlockGroupMerger = Callable[
@@ -1333,6 +1330,48 @@ def _build_visual_annotation_regions(
     return regions
 
 
+def _confirmed_caption_rows_match(original: BBox, row: BBox | None) -> bool:
+    """用紧框与原行的双轴重叠及中心差复核同一物理题名行。"""
+    return (
+        row is not None
+        and _bbox_axis_overlap_ratio(original, row, axis="x") >= 0.85
+        and _bbox_axis_overlap_ratio(original, row, axis="y") >= 0.85
+        and abs(_bbox_center_y(original) - _bbox_center_y(row)) <= 0.45 * max(original[3] - original[1], row[3] - row[1])
+    )
+
+
+def materialize_deferred_raster_captions(
+    blocks: list[dict[str, Any]],
+    page_size: tuple[float, float],
+    captions: dict[BBox, tuple[BBox, str]],
+) -> None:
+    """正文组装后仅在空图位恢复唯一有源题名的裸位图，沿已有绑定入口保留父图。"""
+    for box, (row, text) in captions.items():
+        candidate = [
+            block
+            for block in blocks
+            if block.get("type") in {"text", "caption", "paragraph_title"}
+            and _block_angle(block) == 0
+            and " ".join(str(block.get("content", "")).split()) == " ".join(text.split())
+            and _confirmed_caption_rows_match(row, _block_first_local_row_bbox(block, page_size, 0))
+        ]
+        if len(candidate) != 1:
+            continue
+        owners = [
+            block
+            for block in blocks
+            if (bounds := _coerce_bbox(block.get("bbox"))) is not None and _bbox_overlap_in_smaller(bounds, box) > 0.05
+        ]
+        if owners:
+            if len(owners) != 1 or owners[0]["type"] != "image" or owners[0]["bbox"] != box:
+                continue
+            image = owners[0]
+        else:
+            image = {"type": "image", "bbox": box, "angle": 0, "content": ""}
+            blocks.append(image)
+        image["_confirmed_raster_caption_rows"] = ((row, False),)
+
+
 def _classify_and_bind_visual_annotations(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
@@ -1366,8 +1405,30 @@ def _classify_and_bind_visual_annotations(
         )
         is not None
     }
+    # 优先沿用表题横线或独立位图槽位给出的来源证据，避免邻图在后处理阶段抢走标题。
+    confirmed = []
+    for parent in parents:
+        if len(parent.member_indices) != 1:
+            continue
+        body = blocks[parent.member_indices[0]]
+        for row, above in body.get("_confirmed_table_caption_rows", ()) or body.get("_confirmed_raster_caption_rows", ()):
+            confirmed.append((_block_angle(body), row, body, above))
     for index in candidates:
         parent_block = blocks[index].get("_annotation_band_parent")
+        confirmed_direction = None
+        if confirmed and candidates[index] == "caption":
+            angle = _block_angle(blocks[index])
+            row = _block_first_local_row_bbox(blocks[index], page_size, angle)
+            # 标注物化会将原始文字框收紧至可见字，比较同向首行投影而不要求浮点框完全相等。
+            matches = {
+                (id(body), above): body
+                for source_angle, original, body, above in confirmed
+                if source_angle == angle and _confirmed_caption_rows_match(original, row)
+            }
+            if len(matches) == 1:
+                (_, above), parent_block = next(iter(matches.items()))
+                confirmed_direction = "above" if above else "below"
+                blocks[index]["_native_annotation_parent_bbox"] = parent_block["bbox"]
         if parent_block is None:
             continue
         parent = next(
@@ -1389,7 +1450,7 @@ def _classify_and_bind_visual_annotations(
                 and re.search(r"\b(?:graph|chart|plot)\b", str(blocks[index].get("content", "")), re.I)
             ):
                 continue
-            direction = "above" if blocks[index]["bbox"][3] <= parent_block["bbox"][1] else "below"
+            direction = confirmed_direction or ("above" if blocks[index]["bbox"][3] <= parent_block["bbox"][1] else "below")
             assignments[index] = _AnnotationRelation(parent, direction, 0.0, 1.0, 1.0, 0.0)
     assignments.update(
         _expand_stacked_bilingual_caption_assignments(

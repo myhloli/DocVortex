@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 import math
 from typing import Any
 
-from ..document.pdf import PDFPage, PDFPageSnapshot, PDFPageTextGeometry, PDFPageVectorGeometry
+from ..document.pdf import Char, PDFPage, PDFPageSnapshot, PDFPageTextGeometry, PDFPageVectorGeometry
 from ..schema import BBox
 from ..document.pdf.text.spacing import is_generated_cjk_space, is_ligature_expansion_space, join_tight_text, needs_tight_space
 from .native.pdf._script_geometry import ScriptRole, classify_char_script_roles
@@ -24,14 +24,27 @@ from .native.pdf.inline.types import (
 
 
 @dataclass(frozen=True, slots=True)
+class PDFTextLine:
+    """持有视觉页坐标、回正角度及文本行的原始字符成员。"""
+
+    bbox: BBox
+    angle: int
+    text: str
+    chars: tuple[Char, ...]
+    row_index: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class PDFTextEvidence:
-    """保存可脱离 PDF 句柄使用的页面文字证据，不暴露组行中间对象。"""
+    """保存可脱离 PDF 句柄使用的页面文字证据。"""
 
     page_size: tuple[float, float]
     geometry: PDFPageTextGeometry | None = None
     styles: tuple[PDFTextStyleLine, ...] = ()
     links: tuple[PDFTextLinkLine, ...] = ()
     scripts: tuple[PDFTextScriptLine, ...] = ()
+    lines: tuple[PDFTextLine, ...] = ()
+    vector_geometry: PDFPageVectorGeometry | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +76,7 @@ def prepare_text_evidence(
     table_regions: Sequence[BBox] = (),
     excluded_script_regions: Sequence[BBox] = (),
     snapshot: PDFPageSnapshot | None = None,
+    include_lines: bool = False,
 ) -> PDFTextEvidence:
     """读取一次字符及注释，按既定组行闭包生成页面文字证据。"""
     from .native.pdf.inline.detection import detect_pdf_text_link_lines, detect_pdf_text_style_lines
@@ -142,7 +156,14 @@ def prepare_text_evidence(
             )
             for line in scripts
         ]
-    return PDFTextEvidence(page_size, geometry, tuple(styles), tuple(links), tuple(scripts))
+    visual_lines = (
+        tuple(PDFTextLine(line.bbox, line.angle, line.text, tuple(line.chars), line.visual_row_id) for line in lines)
+        if include_lines
+        else ()
+    )
+    return PDFTextEvidence(
+        page_size, geometry, tuple(styles), tuple(links), tuple(scripts), visual_lines, vector_geometry if include_lines else None
+    )
 
 
 def apply_text_evidence(
@@ -216,6 +237,13 @@ def project_table_text(ocr_result: Any, table_size: tuple[int, int]) -> str:
     return project_ocr_table_text(ocr_result, table_size)
 
 
+def project_native_table_text(page: PDFTablePage, bbox: BBox, *, angle: int = 0) -> str:
+    """从指定表格区域投影可复制文字，供原生表格结构恢复失败时回退。"""
+    from .native.pdf.spatial_text import project_pdf_table_text
+
+    return project_pdf_table_text(page.geometry.chars, bbox, angle)
+
+
 __all__ = [
     "is_generated_cjk_space",
     "is_ligature_expansion_space",
@@ -223,6 +251,7 @@ __all__ = [
     "needs_tight_space",
     "PDFTableRecoveryError",
     "PDFTextEvidence",
+    "PDFTextLine",
     "PDFTablePage",
     "PDFTableResult",
     "prepare_text_evidence",
@@ -230,6 +259,7 @@ __all__ = [
     "prepare_table_page",
     "recover_table_region",
     "project_table_text",
+    "project_native_table_text",
     "ScriptRole",
     "classify_char_script_roles",
     "PDF_NATIVE_SCRIPT_MARKUP_KEY",

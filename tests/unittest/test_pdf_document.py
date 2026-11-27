@@ -1218,3 +1218,19 @@ def test_native_page_snapshot_decodes_each_path_once(monkeypatch: pytest.MonkeyP
             )
         assert shared_count == expected_count
         assert shared_count < separate_count
+
+
+def test_visible_page_lines_exclude_text_covered_by_opaque_paint():
+    """核对图框内的源行时排除被实心色块遮住的旧文字，并保留原有全量读取接口。"""
+    data = BytesIO()
+    canvas = Canvas(data, pagesize=(240, 360))
+    canvas.drawString(20, 290, "Visible upper line")
+    canvas.drawString(20, 230, "Concealed under solid paint")
+    canvas.setFillColorRGB(1, 1, 1)
+    canvas.rect(5, 210, 225, 40, stroke=0, fill=1)
+    canvas.save()
+    with pdf_document.PDFDocument(data.getvalue()) as document:
+        all_lines = document.get_page_lines(0)
+        visible = document.get_page_lines(0, visible_only=True)
+    assert [line["spans"][0]["text"].strip() for line in all_lines] == ["Visible upper line", "Concealed under solid paint"]
+    assert [line["spans"][0]["text"].strip() for line in visible] == ["Visible upper line"]

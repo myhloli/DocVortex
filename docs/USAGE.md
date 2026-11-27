@@ -204,6 +204,16 @@ structure tree for supported semantics and reading order, with geometric Flash
 analysis for uncovered or rejected content. The same path accepts ordinary
 Tagged PDF files and PDFs declaring PDF/UA.
 
+When the tree places a figure after text printed below its numbered caption,
+Flash checks the page's XY-Cut++ order. It adopts that order if the caption
+uniquely identifies the figure and the other body blocks retain their relative
+order. Matching consecutive folios on adjacent pages can establish where a
+misplaced page number belongs.
+On a single-column page, an early footer can also make geometric text enter
+the middle of the wrong section. Flash can restore the printed order when the
+folio is confirmed across pages and the tagged paragraphs and geometric
+paragraphs each keep their own internal order.
+
 ```python
 import docvortex
 
@@ -229,6 +239,17 @@ page identities. Result bundles carry the semantic output, extension and assets.
 `pdf_structure="off"` selects geometric parsing. An explicit `off` value on a
 non-PDF input reports `pdf_structure_invalid`. Code blocks on the structure path
 use declared language information or `txt`.
+
+For numbered algorithms recovered from a table candidate, Flash uses printed
+line numbers and glyph baselines to preserve statement boundaries, indentation
+and attached subscripts. For supported embedded Type 1 and Type 1C symbol
+fonts that lack a ToUnicode map, Flash can recover single characters from the
+actual font resource, character code and glyph name.
+
+A page-sized Form whose visible members are all confirmed discarded watermark
+rasters is excluded from figure detection. Independently drawn content such as
+QR codes can still be delivered as separate images, and a ruled table drawn
+entirely with outlines can retain its own cropped image.
 
 ## PDF classification and OCR requirements
 
@@ -299,6 +320,45 @@ Classification and metadata extraction do not start inference. The low-level
 text analysis, preserving explicit callers such as MinerU. Shared helpers that
 process supplied OCR results, such as table text projection, remain available
 and do not perform inference.
+
+To inspect native Flash PDF layout quality, call
+`model.predict(document, collect_layout_diagnostics=True)`. After prediction,
+`model.layout_page_confidences` contains one float per returned page in physical
+page order. The heuristic confidence ranges from 0 to 1. A page with no scored
+conflicts receives 1.0. Callers choose how to use these scores.
+
+The score also reflects grouping errors that remain in the returned layout.
+For example, the scorer checks whether a tagged paragraph flattened distinct
+printed bullet items, whether program lines have become headings with detached
+closing braces, and whether rows of aligned labels and values remain outside
+a table next to its caption. These checks use graded penalties of up to 0.30.
+A page that preserves the intended groups receives no penalty from these checks.
+If a distant numbered footnote interrupts two parts of the same printed line
+and source paragraph, the reading-order penalty is 0.03 per interruption,
+up to 0.09.
+
+Minor overlaps between independent top-level regions can lower confidence to
+0.91–0.98. Examples include a text line extending into a figure or equation,
+an image crossing a table boundary, and one paragraph box enclosing another.
+Each overlap type contributes up to 0.08 according to the overlap fraction.
+The strongest instance of each type counts once, with a combined cap of 0.09.
+The final score uses the larger of this penalty and the strongest structural
+penalty. Captions attached to their figures, near-full-page backgrounds, and
+text placed entirely on an image with no projected text are excluded from
+minor overlap scoring.
+
+For fragmented prose, each qualifying cut between adjacent text boxes on
+nearby lines in the same column contributes 0.03, up to four cuts per line
+and 0.60 per region. At least two affected lines are required. Repeated cuts
+at stable column positions are discounted.
+Other structural penalties include confirmed table or formula fragmentation.
+An aligned matrix of colored symbols incurs a 0.60 penalty when native blocks
+capture separate horizontal strips but leave at least four symbols uncovered
+on each of two intervening rows in the same columns.
+A large image can also receive a penalty when its text projection and visible
+PDF lines show that it absorbed a ruled table and an independent prose region.
+Text already covered by a separate native block is excluded from that check.
+Scores are heuristic and depend on the evidence available for that page.
 
 ## Page images and embedded assets
 

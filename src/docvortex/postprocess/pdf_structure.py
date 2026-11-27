@@ -52,11 +52,13 @@ def process_structure_blocks(page_model_list: list[dict], *, use_bbox: bool) -> 
     trusted = [finalize_structure_block(block, index) for index, block in enumerate(page_model_list) if STRUCTURE_KEY in block]
     visuals = {block[STRUCTURE_KEY]["node_id"]: block for block in trusted if block["type"] in {"image", "table", "code"}}
     for block in trusted:
-        parent = visuals.get(block[STRUCTURE_KEY].get("visual_parent"))
+        marker = block[STRUCTURE_KEY]
+        parent_id = marker.get("visual_parent") or marker.get("inferred_visual_parent")
+        parent = visuals.get(parent_id)
         if parent is not None:
             parent["content"].append(block)
         else:
-            if block[STRUCTURE_KEY].get("visual_parent"):
+            if parent_id:
                 block["type"] = "text"
             output.append(block)
     return output
@@ -74,6 +76,11 @@ def finish_structure_pages(pages: list[dict], extension: dict | None) -> None:
         if marker:
             identity = marker["node_id"]
             links.setdefault(identity, []).append({"page_idx": page_index, "block_path": path})
+            components = marker.get("component_node_ids", ())
+            if component := marker.get("component_node_id"):
+                components = (*components, component)
+            for component in components:
+                links.setdefault(component, []).append({"page_idx": page_index, "block_path": path})
             kind = block["type"]
             if kind in {"text", "ref_text", "list", "table"}:
                 block.pop("continues_prev", None)

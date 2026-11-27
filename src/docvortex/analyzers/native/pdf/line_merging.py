@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .layout_evidence import build_layout_evidence
+from .layout_diagnostics import combined_line_ranges
 
 import re
 from bisect import bisect_right
@@ -31,7 +32,10 @@ def _inherit_unanimous_structural_membership(merged: _LineItem, members: list[_L
     """同行片段共享明确段组或标题带时传递归属；不同归属不能由合并操作猜测。"""
     if not members:
         return
+    if any(line.layout_glyph_ranges for line in members):
+        merged.layout_glyph_ranges = combined_line_ranges(members)
     ordered = sorted(members, key=lambda line: line.bbox[0])
+    merged.edge_fonts = (ordered[0].edge_fonts[0], ordered[-1].edge_fonts[1])
     # 悬挂序号与标签合成同行时，传递标签释放字符前冻结的真实左缘。
     if (
         len(ordered) == 2

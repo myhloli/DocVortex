@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 import statistics
+import unicodedata
+from dataclasses import replace
 from typing import Any
 
 from loguru import logger
@@ -21,6 +23,7 @@ from ._table_recovery import (
     recover_native_pdf_table,
 )
 from ._table_recovery.contracts import PDFTableRecoveryError
+from .algorithm_projection import project_numbered_algorithm
 from .geometry import (
     _bbox_axis_overlap_ratio,
     _bbox_center_x,
@@ -29,14 +32,17 @@ from .geometry import (
     _bbox_union,
     _bbox_union_many,
     _point_in_bbox,
+    _rotate_bbox_from_upright,
     _rotate_bbox_to_upright,
 )
 from .line_layout import _font_signatures_share_family, _line_effective_height, _line_tight_output_bbox
+from .layout_diagnostics import glyph_index_ranges, glyph_ranges, retain_glyph_members, retain_line_members
 from .line_merging import _same_baseline_geometry
-from .models import _LineItem, _PageSource, _TableAnnotation, _TableCandidate
+from .models import _LineItem, _PageSource, _TableAnnotation, _TableCandidate, _VerifiedTableCandidate
 from .native_text import _normalize_native_run_text
 from .text_roles import metadata_field, text_role
-from .spatial_text import project_pdf_table_text
+from .spatial_text import _select_table_chars, project_pdf_table_text
+from .table_headers import _RecoveredTableHeader, recover_preceding_table_header
 from .table_text_styles import render_native_table_html_with_scripts
 from .table_annotations import _is_table_note_text
 
@@ -53,8 +59,13 @@ def _recover_native_table_html(
     *,
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
     preserve_font_styles: bool = False,
-) -> str:
-    """使用共享原生字符与绘图原语恢复高置信表格 HTML。"""
+    protected_lines: set[int] | None = None,
+    obstacles: list[BBox] | None = None,
+    verified_region: _VerifiedTableCandidate | None = None,
+    expected_sources: frozenset[int] = frozenset(),
+    layout_members: list[int] | None = None,
+) -> tuple[str, _RecoveredTableHeader | None]:
+    """恢复高置信表体，并在提供页内认领证据时核对遗漏的邻接表头。"""
 
     table_input = NativeTableInput(
         table_bbox=table_bbox,
@@ -70,8 +81,178 @@ def _recover_native_table_html(
         origins or {},
         _owned_script_inputs=_owned_script_inputs,
         preserve_font_styles=preserve_font_styles,
+        **({"preserve_printed_spacing": True} if verified_region and verified_region.verified_period_columns else {}),
+        **(
+            {"grid_tracks": verified_region.verified_grid_tracks}
+            if verified_region and verified_region.verified_grid_tracks
+            else {}
+        ),
     )
-    return recovered[0] if recovered is not None else ""
+    if recovered is None:
+        return "", None
+    content, body = recovered
+    if layout_members is not None:
+        layout_members.extend(index for cell in body.cells for index in cell.source_char_indices)
+    if verified_region is not None:
+        rows, cols = verified_region.verified_region_rows, verified_region.verified_region_columns
+        body_band = verified_region.verified_region_body_band
+        if (
+            _is_verified_table_region(table_input, body, rows, cols, expected_sources, body_band)
+            and (not verified_region.verified_period_columns or body.cols == verified_region.verified_period_columns)
+            and not _stripe_cells_cross_gutters(table_input, body, verified_region.verified_region_gutters)
+            and (body_band is None or not _stripe_currency_crosses_column_rules(table_input, body, body_band))
+        ):
+            return content, None
+        return "", None
+    if protected_lines is None or not content.startswith("<table><tbody>"):
+        return content, None
+    try:
+        header = recover_preceding_table_header(source, table_input, body, protected_lines, obstacles or [])
+        if header is not None:
+            rendered = render_native_table_html_with_scripts(
+                header.result,
+                header.table_input,
+                tight_bboxes or {},
+                origins or {},
+                _owned_script_inputs=_owned_script_inputs,
+                preserve_font_styles=preserve_font_styles,
+            )
+            # 表头和表体均使用同一序列化器，原有正文格的上下标及字距字节原样保留。
+            if rendered.endswith("</tbody></table>"):
+                if layout_members is not None:
+                    layout_members.extend(index for cell in header.result.cells for index in cell.source_char_indices)
+                return rendered.removesuffix("</tbody></table>") + content.removeprefix("<table><tbody>"), header
+    except Exception as exc:
+        logger.warning(f"Flash native table header recovery retained body: bbox={table_bbox}, error={exc}")
+    return content, None
+
+
+def _is_verified_table_region(
+    table_input: NativeTableInput,
+    body: NativeTableResult,
+    rows: int,
+    cols: int,
+    expected_sources: frozenset[int],
+    body_band: tuple[float, float] | None = None,
+) -> bool:
+    """结构与实体行带一致，原生字符均能在网格中找到唯一去处。"""
+    if body.rows != rows or body.cols < 2:
+        return False
+    if cols and (
+        body.cols != cols
+        or len(body.cells) != rows * cols
+        or any(not any(char.isalnum() for char in cell.content) for cell in body.cells)
+    ):
+        return False
+    assigned = [idx for cell in body.cells for idx in cell.source_char_indices]
+    sources = {glyph.source_index: glyph.bbox for glyph in body.text.glyphs}
+    return (
+        len(assigned) == len(expected_sources)
+        and set(assigned) == sources.keys() == expected_sources
+        and not _verified_region_cells_cross_rails(table_input, body, sources, body_band)
+    )
+
+
+def _verified_region_cells_cross_rails(
+    table_input: NativeTableInput,
+    body: NativeTableResult,
+    glyphs: dict[int, BBox],
+    body_band: tuple[float, float] | None = None,
+) -> bool:
+    """检查贯穿正文的实体列界，接回的表头可有自己的合并格。"""
+    left, top, right, bottom = table_input.table_bbox
+    em = body.text.median_glyph_height
+    body_top, body_bottom = body_band or (top, bottom)
+    rails = [
+        (rule.bbox[0] - left, rule.bbox[1] - top, rule.bbox[2] - left, rule.bbox[3] - top)
+        for rule in table_input.drawing_lines
+        if rule.orientation == "vertical"
+        and left + 0.5 * em < rule.bbox[0] <= rule.bbox[2] < right - 0.5 * em
+        and min(rule.bbox[3], body_bottom) - max(rule.bbox[1], body_top) >= 0.95 * (body_bottom - body_top)
+    ]
+    if not rails:
+        return False
+    for cell in body.cells:
+        boxes = [glyphs[idx] for idx in cell.source_char_indices]
+        for start, y0, end, y1 in rails:
+            row = [box for box in boxes if y0 <= _bbox_center_y(box) <= y1]
+            if any(box[2] <= start for box in row) and any(box[0] >= end for box in row):
+                return True
+    return False
+
+
+def _stripe_cells_cross_gutters(
+    table_input: NativeTableInput, body: NativeTableResult, gutters: tuple[tuple[float, float], ...]
+) -> bool:
+    """拒绝将宽列沟两侧的独立字段压到同格，保留实字跨越留白的真实合并格。"""
+    if not gutters:
+        return False
+    left = table_input.table_bbox[0]
+    intervals = [(a - left, b - left) for a, b in gutters]
+    glyphs = {glyph.source_index: glyph.bbox for glyph in body.text.glyphs if any(char.isalnum() for char in glyph.text)}
+    for cell in body.cells:
+        boxes = sorted(glyphs[idx] for idx in cell.source_char_indices if idx in glyphs)
+        if any(a[2] <= start and b[0] >= end for a, b in zip(boxes, boxes[1:]) for start, end in intervals):
+            return True
+    return False
+
+
+def _stripe_currency_crosses_column_rules(
+    table_input: NativeTableInput, body: NativeTableResult, body_band: tuple[float, float]
+) -> bool:
+    """用分段水平列线和原生金额右缘识别落入相邻格的独立货币字形。"""
+    glyphs = body.text.glyphs
+    symbols = [glyph for glyph in glyphs if len(glyph.text) == 1 and unicodedata.category(glyph.text) == "Sc"]
+    if not symbols:
+        return False
+    left, top, _, _ = table_input.table_bbox
+    em = body.text.median_glyph_height
+    centers = [_bbox_center_y(row.bbox) for row in body.text.rows]
+    pitches = [b - a for a, b in zip(centers, centers[1:]) if b > a]
+    # 第一条记录之前可能还印有一行金额表头，邻接短轨按该表自身节距定位。
+    rail_window = max(2.5 * em, 1.6 * statistics.median(pitches)) if pitches else 2.5 * em
+    rules = [
+        (rule.bbox[0] - left, rule.bbox[2] - left, _bbox_center_y(rule.bbox) - top)
+        for rule in table_input.drawing_lines
+        if rule.orientation == "horizontal"
+        and rule.bbox[2] - rule.bbox[0] >= 2 * em
+        and body_band[0] - rail_window <= _bbox_center_y(rule.bbox) <= body_band[1] + rail_window
+    ]
+    if len(rules) < 2:
+        return False
+    owners = {index: (cell.row, cell.col) for cell in body.cells for index in cell.source_char_indices}
+    decimal_glyphs = [glyph for glyph in glyphs if glyph.text.isdecimal()]
+    for symbol in symbols:
+        owner = owners[symbol.source_index]
+        near_rules = [rule for rule in rules if abs(_bbox_center_y(symbol.bbox) - rule[2]) <= rail_window]
+        for start, end, y in near_rules:
+            if not start <= _bbox_center_x(symbol.bbox) <= end:
+                continue
+            right_edges = {}
+            next_amount_edges = []
+            prior_digits = []
+            for digit in decimal_glyphs:
+                x = _bbox_center_x(digit.bbox)
+                if start <= x <= end:
+                    right_edges[digit.visual_row] = max(right_edges.get(digit.visual_row, x), digit.bbox[2])
+                if digit.visual_row != symbol.visual_row:
+                    continue
+                digit_owner = owners[digit.source_index]
+                if digit_owner == owner:
+                    prior_digits.append(x)
+                elif digit_owner[0] == owner[0] and start <= x <= end and digit.bbox[0] > symbol.bbox[2]:
+                    next_amount_edges.append(digit.bbox[2])
+            if not prior_digits or not next_amount_edges or any(start <= x <= end for x in prior_digits):
+                continue
+            if not any(
+                edge <= start and abs(rail_y - y) <= 0.15 * em and any(begin <= x <= edge for x in prior_digits)
+                for begin, edge, rail_y in near_rules
+            ):
+                continue
+            last_digit = max(next_amount_edges)
+            if sum(abs(x - last_digit) <= 0.5 * em for x in right_edges.values()) >= 3:
+                return True
+    return False
 
 
 def _overlapping_table_character_repairs(source: _PageSource) -> dict[int, BBox]:
@@ -105,10 +286,12 @@ def _materialize_table_blocks(
     source: _PageSource,
     candidates: list[_TableCandidate],
     *,
+    caption_owners: dict[int, list[tuple[BBox, bool]]] | None = None,
     tight_bboxes: dict[int, BBox] | None = None,
     origins: dict[int, tuple[float, float]] | None = None,
     calibrated_char_bboxes: dict[int, BBox] | None = None,
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
+    independent_grid_bboxes: list[BBox] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], set[int]]:
     """原子物化表体及其独立注释，仅认领整组成功输出的文本行。"""
 
@@ -131,7 +314,13 @@ def _materialize_table_blocks(
     native_rules = coerce_native_table_rules(source.drawing_lines)
     native_rectangles = coerce_native_table_rectangles(source.path_infos)
     for candidate in sorted(candidates, key=lambda item: item.score, reverse=True):
-        _separate_embedded_table_notes(source, candidate)
+        verified_region = candidate if isinstance(candidate, _VerifiedTableCandidate) else None
+        if verified_region is not None and any(
+            box not in accepted_candidate_bboxes for box in verified_region.verified_period_dependencies
+        ):
+            continue
+        if verified_region is None:
+            _separate_embedded_table_notes(source, candidate)
         # 候选去重仍使用包含注释的完整框，不能因输出表体收缩而放行重复表格。
         if any(_bbox_overlap_in_smaller(candidate.bbox, bbox) >= 0.5 for bbox in accepted_candidate_bboxes):
             continue
@@ -139,7 +328,11 @@ def _materialize_table_blocks(
         candidate_annotation_blocks, externalized_line_indices, failed_annotations = _materialize_table_annotations(
             source, candidate
         )
-        projection_line_indices = _candidate_projection_line_indices(source, candidate)
+        projection_line_indices = (
+            set(candidate.line_indices)
+            if verified_region is not None
+            else _candidate_projection_line_indices(source, candidate)
+        )
         for annotation in candidate.annotations:
             projection_line_indices.update(annotation.line_indices)
         projection_line_indices.difference_update(externalized_line_indices)
@@ -148,8 +341,21 @@ def _materialize_table_blocks(
             failed_annotations,
         )
         content = ""
+        recovered_content = ""
+        layout_members = [] if source.collect_layout_diagnostics else None
+        expected_sources = (
+            frozenset(
+                char["char_idx"]
+                for line in source.lines
+                if line.source_index in projection_line_indices
+                for char in line.chars
+                if char.get("char_idx") is not None and char.get("char", "").strip()
+            )
+            if verified_region is not None
+            else frozenset()
+        )
         try:
-            content = _recover_native_table_html(
+            recovered_content, header = _recover_native_table_html(
                 source,
                 body_bbox,
                 candidate.angle,
@@ -164,13 +370,43 @@ def _materialize_table_blocks(
                 or any(
                     _point_in_bbox(((box[0] + box[2]) / 2, (box[1] + box[3]) / 2), body_bbox) for box in calibrated.values()
                 ),
+                verified_region=verified_region,
+                expected_sources=expected_sources,
+                **({"layout_members": layout_members} if layout_members is not None else {}),
+                protected_lines=claimed
+                | {
+                    index
+                    for other in candidates
+                    for annotation in other.annotations
+                    if other is not candidate or annotation.kind != "caption"
+                    for index in annotation.line_indices
+                },
+                obstacles=[
+                    *source.image_bboxes,
+                    *source.form_bboxes,
+                    *source.signature_bboxes,
+                    *(other.core_bbox or other.bbox for other in candidates if other is not candidate),
+                    # 实体横线已确认的编号题注首行沿用检测器框，含紧连中文题名。
+                    *(
+                        _rotate_bbox_from_upright(row, source.page_size, candidate.angle)
+                        for row, _ in (caption_owners or {}).get(id(candidate), ())
+                    ),
+                ],
             )
+            if header is not None:
+                trimmed = _without_header_annotation_lines(source, candidate, header.line_indices)
+                candidate_annotation_blocks, externalized_line_indices, _ = _materialize_table_annotations(source, trimmed)
+                projection_line_indices.update(header.line_indices)
+                body_bbox = header.bbox
+            content = recovered_content
         except Exception as exc:
             logger.warning(
                 f"Flash native table recovery failed and fell back to projection: bbox={candidate.bbox}, error={exc}"
             )
         if content:
             logger.debug(f"Flash native table recovery accepted: bbox={body_bbox}, angle={candidate.angle}")
+        elif verified_region is not None:
+            continue
         elif _restore_front_matter_text_panel(source, body_bbox):
             # 只有结构恢复失败的弱候选才撤销；已验证的 HTML 单元格表保持原判定。
             continue
@@ -182,6 +418,8 @@ def _materialize_table_blocks(
                     body_bbox,
                     angle=candidate.angle,
                 )
+                if not (caption_owners and id(candidate) in caption_owners):
+                    content = project_numbered_algorithm(source.chars, body_bbox, candidate.angle, content)
         except Exception as exc:
             # 表体投影异常时同时撤销预构造注释，保持整组不输出、不认领。
             logger.warning(f"Flash table projection failed and rolled back: bbox={candidate.bbox}, error={exc}")
@@ -196,6 +434,19 @@ def _materialize_table_blocks(
                 "content": content,
             }
         )
+        if layout_members is not None:
+            ranges = (
+                glyph_index_ranges(layout_members)
+                if recovered_content
+                else glyph_ranges(_select_table_chars(source.chars, body_bbox))
+            )
+            retain_glyph_members(table_blocks[-1], ranges)
+        if caption_owners and id(candidate) in caption_owners:
+            table_blocks[-1]["_confirmed_table_caption_rows"] = caption_owners[id(candidate)]
+        if verified_region is not None and verified_region.verified_period_columns:
+            table_blocks[-1]["_verified_period_table"] = True
+        if independent_grid_bboxes is not None and verified_region is not None and verified_region.verified_region_columns:
+            independent_grid_bboxes.append(body_bbox)
         annotation_blocks.extend(candidate_annotation_blocks)
         accepted_candidate_bboxes.append(candidate.bbox)
         # 表体和成功外置的注释行在同一事务中各认领一次。
@@ -203,6 +454,27 @@ def _materialize_table_blocks(
     table_blocks.sort(key=lambda block: (block["bbox"][1], block["bbox"][0]))
     annotation_blocks.sort(key=lambda block: (block["bbox"][1], block["bbox"][0]))
     return table_blocks, annotation_blocks, claimed
+
+
+def _without_header_annotation_lines(
+    source: _PageSource, candidate: _TableCandidate, header_lines: frozenset[int]
+) -> _TableCandidate:
+    """从题注移出已逐字核验的表头行，并按剩余来源行重建题注框。"""
+    annotations = []
+    for annotation in candidate.annotations:
+        keep = annotation.line_indices - header_lines
+        if keep == annotation.line_indices:
+            annotations.append(annotation)
+        elif keep:
+            boxes = {
+                line.source_index: annotation.line_bboxes.get(line.source_index, line.bbox)
+                for line in source.lines
+                if line.source_index in keep
+            }
+            annotations.append(
+                replace(annotation, bbox=_bbox_union_many(list(boxes.values())), line_indices=keep, line_bboxes=boxes)
+            )
+    return replace(candidate, annotations=annotations)
 
 
 def _separate_embedded_table_notes(source: _PageSource, candidate: _TableCandidate) -> None:
@@ -466,6 +738,7 @@ def _build_table_annotation_blocks(
                 "_table_annotation_complete": True,
             }
         )
+        retain_line_members(blocks[-1], (line for line, _ in group), enabled=source.collect_layout_diagnostics)
     return blocks
 
 
@@ -599,6 +872,8 @@ def recover_table_result(
     *,
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
     preserve_font_styles: bool = False,
+    preserve_printed_spacing: bool = False,
+    grid_tracks: tuple[tuple[float, ...], tuple[float, ...]] | None = None,
 ) -> tuple[str, NativeTableResult] | None:
     """统一表格恢复和上下标物化，保留调用方接受或回退的决策权。"""
     try:
@@ -607,6 +882,29 @@ def recover_table_result(
         raise PDFTableRecoveryError(str(error)) from error
     if result is None:
         return None
+    if grid_tracks is not None:
+        from ._table_recovery.candidate import GridCellSpec, build_fully_assigned_table, serialize_candidate_html
+
+        x, y = grid_tracks
+        left, top = table_input.table_bbox[:2]
+        specs = [
+            GridCellSpec(r, c, 1, 1, (x[c] - left, y[r] - top, x[c + 1] - left, y[r + 1] - top))
+            for r in range(len(y) - 1)
+            for c in range(len(x) - 1)
+        ]
+        grid = build_fully_assigned_table(specs, result.text, "independent_closed_grid")
+        if grid is None:
+            return None
+        result = replace(
+            result,
+            rows=grid.rows,
+            cols=grid.cols,
+            cells=grid.cells,
+            html=serialize_candidate_html(grid),
+            source="vector_grid",
+            confidence=grid.score,
+            diagnostics=grid.issues,
+        )
     content = render_native_table_html_with_scripts(
         result,
         table_input,
@@ -614,5 +912,6 @@ def recover_table_result(
         origins,
         _owned_script_inputs=_owned_script_inputs,
         preserve_font_styles=preserve_font_styles,
+        **({"preserve_printed_spacing": True} if preserve_printed_spacing else {}),
     )
     return content, result

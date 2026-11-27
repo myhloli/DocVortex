@@ -945,8 +945,19 @@ def _should_connect_text_rows(
         and not mixed_cjk_continuation
         and not emphasized_enumeration_tail
     ):
-        # 显式样式位与显著字重同时变化仍是硬边界，不能被满栏几何放宽。
-        return False
+        # 行内强调可能跨越换行；两端实际字体相同且同字号、满栏紧排才放行，后续屏障照常检查。
+        continuous_run = (
+            previous_line.edge_fonts[1] is not None
+            and previous_line.edge_fonts[1] == current_line.edge_fonts[0]
+            and both_fill_lane
+            and aligned_left_edges
+            and height_ratio <= 1.1
+            and -0.15 * pair_height <= vertical_gap <= regular_gap + 0.25 * pair_height
+            and previous_line.text.rstrip()[-1:].isalpha()
+            and current_line.text.lstrip()[:1].islower()
+        )
+        if not continuous_run:
+            return False
     if (
         not is_hyphen_at_line_end(previous_line.text)
         and _is_structural_typography_gap(

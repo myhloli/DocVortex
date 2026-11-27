@@ -9,6 +9,7 @@ from typing import Any, Sequence
 from .....schema import BBox
 from ..geometry import _bbox_center_y, _bbox_union_many, _rotate_bbox_from_upright, _rotate_bbox_to_upright
 from ..line_layout import _effective_text_row_gap, _line_effective_height, _lines_tight_output_bbox, _title_fonts_compatible
+from ..layout_diagnostics import retain_line_members
 from ..models import _LineItem
 from ..text_roles import text_role
 from .common import _merge_text_line_content
@@ -63,6 +64,8 @@ def _build_grouped_page_footnote_blocks(
                 )
                 if tight_output_bbox is not None:
                     block["_tight_output_bbox"] = tight_output_bbox
+                if any(line.layout_glyph_ranges for line in ordered_lines):
+                    retain_line_members(block, ordered_lines, enabled=True)
                 blocks.append(block)
                 consumed_source_indices.update(line.source_index for line in ordered_lines)
     return blocks, consumed_source_indices

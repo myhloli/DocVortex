@@ -44,7 +44,10 @@ def _prepare_page_visual_blocks(page_model_list: list[dict[str, Any]]) -> list[t
         (index, block)
         for index, block in enumerate(page_model_list)
         if block.get("type") in MODEL_JSON_VISUAL_BLOCK_TYPES
-        and not (block.get("_pdf_structure", {}).get("image_ready") and block.get("image_base64"))
+        and not (
+            (block.get("_native_image_ready") or block.get("_pdf_structure", {}).get("image_ready"))
+            and block.get("image_base64")
+        )
     ]
 
 

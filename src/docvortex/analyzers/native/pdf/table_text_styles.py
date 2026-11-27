@@ -350,6 +350,44 @@ def _cell_script_roles_from_lines(
     )
 
 
+def _period_visible_spaces(glyphs, chars_by_source, origins) -> dict[int, bool]:
+    """用同一基线的源推进量判定确定可见的空格，保留真实数字分组留白。"""
+    decisions = {}
+    for left, right in zip(glyphs, glyphs[1:]):
+        a, b = left.source_index, right.source_index
+        if right.visual_row != left.visual_row or b != a + 2:
+            continue
+        previous = chars_by_source.get(a, {})
+        following = chars_by_source.get(b, {})
+        space = chars_by_source.get(a + 1, {})
+        if space.get("char") != " " or not previous or not following or previous.get("font") != following.get("font"):
+            continue
+        first = _coerce_bbox(previous.get("loose_bbox") or previous.get("bbox"))
+        second = _coerce_bbox(following.get("loose_bbox") or following.get("bbox"))
+        first_origin = origins.get(a) or previous.get("origin")
+        second_origin = origins.get(b) or following.get("origin")
+        if first is None or second is None or first_origin is None or second_origin is None:
+            continue
+        em = min(first[3] - first[1], second[3] - second[1])
+        if em <= 0 or abs(first_origin[1] - second_origin[1]) > 0.1 * em:
+            continue
+        gap = second[0] - first[2]
+        if 0.14 * em <= gap:
+            decisions[b] = True
+        elif space.get("is_generated") is False:
+            blank = _coerce_bbox(space.get("loose_bbox") or space.get("bbox"))
+            if (
+                blank is not None
+                and blank[2] - blank[0] >= 0.12 * em
+                and abs(blank[0] - first[2]) <= 0.1 * em
+                and -0.15 * em <= gap <= 0.055 * em
+                and second[0] < blank[0] + 0.25 * (blank[2] - blank[0])
+            ):
+                # 有字体宽度的空白被源文字矩阵完全抵销时，字形连续如普通词或金额。
+                decisions[b] = False
+    return decisions
+
+
 def _render_styled_cell(
     cell: NativeTableCell,
     glyphs: list[NativeTableGlyph],
@@ -361,12 +399,18 @@ def _render_styled_cell(
     origins: dict[int, tuple[float, float]] | None = None,
     preserve_font_styles: bool = False,
     _possible_space_indices: set[int] | None = None,
+    preserve_printed_spacing: bool = False,
 ) -> str:
     """按原字符来源安全插入上下标及可选的粗斜体，文字不匹配时保持转义回退。"""
 
     parts = build_cell_text_parts(glyphs, median_height)
     if "".join(text for text, _source_index in parts) != cell.content:
         return html.escape(cell.content, quote=False)
+    source_spacing = (
+        _period_visible_spaces(glyphs, chars_by_source, origins or {})
+        if preserve_printed_spacing and chars_by_source is not None
+        else {}
+    )
 
     rendered: list[str] = []
     active_role: ScriptRole = "body"
@@ -393,14 +437,21 @@ def _render_styled_cell(
         active_parts = []
 
     previous_source = None
-    for text, source_index in parts:
+    for index, (text, source_index) in enumerate(parts):
+        if text.isspace() and source_index is None and index + 1 < len(parts) and parts[index + 1][1] in source_spacing:
+            continue
+        if preserve_printed_spacing:
+            original = (chars_by_source or {}).get(source_index, {}).get("char")
+            if original in {"−", "–", "—", "’", "‘", "“", "”"}:
+                text = original
         role = roles.get(source_index, "body") if source_index is not None else "body"
         styles = active_styles if source_index is None else (False, False)
         if preserve_font_styles and chars_by_source is not None and source_index in chars_by_source:
             char = chars_by_source[source_index]
             styles = ("bold" in _char_font_styles(char), bool(_pdf_font_metadata(char)[1] & PDF_FONT_ITALIC_FLAG))
-        if (
-            chars_by_source is not None
+        if source_spacing.get(source_index) or (
+            source_index not in source_spacing
+            and chars_by_source is not None
             and role == active_role == "body"
             and previous_source in chars_by_source
             and source_index in chars_by_source
@@ -431,6 +482,7 @@ def render_native_table_html_with_scripts(
     *,
     _owned_script_inputs: tuple[Any, dict[int, int]] | None = None,
     preserve_font_styles: bool = False,
+    preserve_printed_spacing: bool = False,
 ) -> str:
     """为高置信原生表格恢复上下标，证据不足时返回原始 HTML。"""
 
@@ -538,7 +590,7 @@ def render_native_table_html_with_scripts(
                 )
                 for left, right in zip(glyphs, glyphs[1:])
             )
-    if not cell_roles and not has_missing_space and not preserve_font_styles:
+    if not cell_roles and not has_missing_space and not preserve_font_styles and not preserve_printed_spacing:
         return result.html
     return serialize_native_table_html(
         result.rows,
@@ -553,6 +605,7 @@ def render_native_table_html_with_scripts(
             origins=origins,
             preserve_font_styles=preserve_font_styles,
             _possible_space_indices=possible_space_indices,
+            preserve_printed_spacing=preserve_printed_spacing,
         ),
     )
 

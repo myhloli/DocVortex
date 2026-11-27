@@ -26,6 +26,7 @@ from .native_objects import (
     _image_bbox_from_matrix,
     _intersect_object_bbox,
     _object_clip_bbox,
+    _read_raw_path_subpaths,
     _shared_clipped_form_extent,
     _transform_object_bbox,
 )
@@ -65,9 +66,19 @@ def _visual_bbox(bounds: BBox, matrix: tuple, page_bbox: BBox, rotation: int) ->
     )
 
 
-def _read_form_declarations(page: Any) -> dict[tuple[int, ...], tuple[BBox, tuple]]:
+def _declares_watermark(form) -> bool:
+    """查看实际被调用 Form 的导出器水印声明，读取失败时仍保留其几何结构。"""
+    try:
+        piece = form.get("/PieceInfo")
+        compound = piece.get_object().get("/ADBE_CompoundType") if piece is not None else None
+        return compound is not None and compound.get_object().get("/Private") == "/Watermark"
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
+def _read_form_declarations(page: Any) -> dict[tuple[int, ...], tuple[BBox, tuple, bool]]:
     """只沿实际 Do 调用展开 Form，区分重复调用并隔离损坏资源和循环引用。"""
-    output: dict[tuple[int, ...], tuple[BBox, tuple]] = {}
+    output: dict[tuple[int, ...], tuple[BBox, tuple, bool]] = {}
     operations_cache = {}
 
     def walk(stream, resources, matrix: tuple, occurrence: tuple, active: frozenset, depth: int) -> None:
@@ -104,7 +115,7 @@ def _read_form_declarations(page: Any) -> dict[tuple[int, ...], tuple[BBox, tupl
                 bounds = tuple(float(v) for v in obj["/BBox"])
                 if len(bounds) != 4 or not all(math.isfinite(v) for v in (*bounds, *combined)):
                     raise ValueError("invalid PDF Form geometry")
-                output[path] = (bounds, combined)
+                output[path] = (bounds, combined, _declares_watermark(obj))
                 walk(obj, obj.get("/Resources", resources), combined, path, active | {key}, depth + 1)
 
     walk(page.get_contents(), page.get("/Resources", {}), _IDENTITY, (), frozenset(), 0)
@@ -127,6 +138,56 @@ def _read_char_form_owners(textpage, owners: dict[int, int]) -> list[int | None]
     raise RuntimeError("FPDFText_GetTextObject unsupported function signature or ABI")
 
 
+def _is_parallel_rule_path(obj, matrix: tuple) -> bool:
+    """证明同一描边是分离、同长且同向的细网格线，排除填充、曲线和统计条。"""
+    if raw.FPDFPath_CountSegments(obj) < 8:
+        return False
+    fill, stroke = ct.c_int(), ct.c_int()
+    width = ct.c_float()
+    if (
+        not raw.FPDFPath_GetDrawMode(obj, ct.byref(fill), ct.byref(stroke))
+        or fill.value
+        or not stroke.value
+        or not raw.FPDFPageObj_GetStrokeWidth(obj, ct.byref(width))
+    ):
+        return False
+    subpaths = _read_raw_path_subpaths(obj)
+    if len(subpaths) < 4 or any(path.closed or len(path.points) != 2 or len(path.straight_segments) != 1 for path in subpaths):
+        return False
+    segments = [tuple(_apply_pdf_matrix(point, matrix) for point in path.points) for path in subpaths]
+    thickness = width.value * max(math.hypot(*matrix[:2]), math.hypot(*matrix[2:4]))
+    for axis in (0, 1):
+        if any(abs(a[axis] - b[axis]) > 0.01 for a, b in segments):
+            continue
+        positions = sorted(a[axis] for a, _ in segments)
+        intervals = [sorted((a[1 - axis], b[1 - axis])) for a, b in segments]
+        tolerance = 0.01 * (intervals[0][1] - intervals[0][0])
+        if (
+            tolerance > 0
+            and all(
+                abs(left - intervals[0][0]) <= tolerance and abs(right - intervals[0][1]) <= tolerance
+                for left, right in intervals
+            )
+            and all(b - a > max(0.5, 4 * thickness) for a, b in zip(positions[:-1], positions[1:], strict=True))
+        ):
+            return True
+    return False
+
+
+def _has_enclosing_grid_crop(bbox: BBox, roots_by_area: list[tuple[float, BBox]]) -> bool:
+    """只在有显著更大的同处根裁片时解码网格路径，等尺寸重复摆放可立即退出。"""
+    left, top, right, bottom = bbox
+    if right <= left or bottom <= top:
+        return False
+    minimum_area = 4 * (right - left) * (bottom - top)
+    for area, (x0, y0, x1, y1) in roots_by_area:
+        if area < minimum_area:
+            break
+        if x0 <= left and y0 <= top and right <= x1 and bottom <= y1:
+            return True
+    return False
+
+
 def extract_form_structure(
     page,
     page_bbox: BBox,
@@ -134,17 +195,21 @@ def extract_form_structure(
     reader_page: Any | None,
     *,
     extent_cache: _FormExtentCache | None = None,
+    raster_ids: dict[int, int] | None = None,
 ) -> tuple[_PDFFormInfo, ...]:
     """在当前页面锁内收集调用树和成员；声明匹配失败时保留未知 Form，不猜测展开。"""
     forms: list[dict] = []
     text_objects: dict[int, int] = {}
     path_index = 0
     paint_order = 0
+    sole_paths: dict[int, tuple[Any, tuple]] = {}
 
     def walk(container, parent_matrix: tuple, ancestor_ids: tuple[int, ...], occurrence: tuple, clip, depth: int) -> None:
         """以与现有 Path 提取相同的深度优先顺序建立祖先归属和可见框。"""
         nonlocal path_index, paint_order
         if depth >= DRAWING_FORM_MAX_DEPTH:
+            for ancestor in ancestor_ids:
+                forms[ancestor]["has_untracked_content"] = True
             return
         is_form = bool(ancestor_ids)
         count = raw.FPDFFormObj_CountObjects(container) if is_form else raw.FPDFPage_CountObjects(container)
@@ -153,6 +218,8 @@ def extract_form_structure(
             obj = raw.FPDFFormObj_GetObject(container, index) if is_form else raw.FPDFPage_GetObject(container, index)
             matrix = _get_raw_object_matrix(obj) if obj else None
             if matrix is None:
+                for ancestor in ancestor_ids:
+                    forms[ancestor]["has_untracked_content"] = True
                 continue
             combined = _multiply_pdf_matrices(matrix, parent_matrix)
             effective_clip = _object_clip_bbox(obj, parent_matrix, clip)
@@ -191,12 +258,17 @@ def extract_form_structure(
                         text_indices=set(),
                         path_indices=set(),
                         image_bboxes=[],
+                        image_source_ids=[],
+                        has_untracked_content=False,
                     )
                 )
                 walk(obj, combined, (*ancestor_ids, instance_id), path, effective_clip, depth + 1)
             elif kind == raw.FPDF_PAGEOBJ_TEXT and ancestor_ids:
                 text_objects[ct.cast(obj, ct.c_void_p).value] = ancestor_ids[-1]
             elif kind == raw.FPDF_PAGEOBJ_PATH:
+                # 根 Form 必须只有这一个直接 Path；即使兄弟 Form 没有可提取叶子也不猜测。
+                if len(ancestor_ids) == 1 and count == 1:
+                    sole_paths[ancestor_ids[0]] = (obj, combined)
                 for ancestor in ancestor_ids:
                     forms[ancestor]["path_indices"].add(path_index)
                 path_index += 1
@@ -204,8 +276,16 @@ def extract_form_structure(
                 bbox = _image_bbox_from_matrix(combined, page_bbox, rotation)
                 bbox = _clip_object_visual_bbox(bbox, effective_clip, page_bbox, rotation) if bbox is not None else None
                 if bbox is not None:
+                    raster_id = None
+                    if ancestor_ids and raster_ids is not None:
+                        address = ct.cast(obj, ct.c_void_p).value
+                        raster_id = raster_ids.setdefault(address, len(raster_ids))
                     for ancestor in ancestor_ids:
                         forms[ancestor]["image_bboxes"].append(bbox)
+                        forms[ancestor]["image_source_ids"].append(raster_id)
+            elif kind != raw.FPDF_PAGEOBJ_TEXT:
+                for ancestor in ancestor_ids:
+                    forms[ancestor]["has_untracked_content"] = True
 
     walk(page.raw, _IDENTITY, (), (), None, 0)
     if not forms:
@@ -228,6 +308,11 @@ def extract_form_structure(
             # PDF 资源损坏只取消结构判定，不影响 PDFium 已恢复的原生内容。
             declarations = {}
     matched_tree = set(declarations) == {form["occurrence"] for form in forms}
+    root_boxes = [form["bbox"] for form in forms if form["parent_id"] is None]
+    roots_by_area = sorted(
+        (((right - left) * (bottom - top), (left, top, right, bottom)) for left, top, right, bottom in root_boxes),
+        reverse=True,
+    )
     output = []
     for form in forms:
         declaration = declarations.get(form["occurrence"])
@@ -247,20 +332,36 @@ def extract_form_structure(
                 visible_clip = _intersect_object_bbox(visible_clip, forms[parent_id]["clip"])
             form["clip"] = visible_clip
             form["bbox"] = _intersect_object_bbox(form["bbox"], visible_clip)
-            form["image_bboxes"] = [
-                clipped
-                for bbox in form["image_bboxes"]
+            clipped_images = [
+                (clipped, raster_id)
+                for bbox, raster_id in zip(form["image_bboxes"], form["image_source_ids"], strict=True)
                 if (clipped := _intersect_object_bbox(bbox, visible_clip))[2] > clipped[0] and clipped[3] > clipped[1]
             ]
+            form["image_bboxes"] = [bbox for bbox, _ in clipped_images]
+            form["image_source_ids"] = [raster_id for _, raster_id in clipped_images]
+        form_id = form["instance_id"]
+        parallel_rules_only = (
+            valid
+            and form_id in sole_paths
+            and _has_enclosing_grid_crop(form["bbox"], roots_by_area)
+            and _is_parallel_rule_path(*sole_paths[form_id])
+        )
         output.append(
             _PDFFormInfo(
-                **{key: value for key, value in form.items() if key not in {"text_indices", "path_indices", "image_bboxes"}},
+                **{
+                    key: value
+                    for key, value in form.items()
+                    if key not in {"text_indices", "path_indices", "image_bboxes", "image_source_ids"}
+                },
                 declared_bbox=declared_bbox,
                 media_bbox=media_bbox,
                 text_indices=frozenset(form["text_indices"]),
                 path_indices=frozenset(form["path_indices"]),
                 image_bboxes=tuple(form["image_bboxes"]),
+                image_source_ids=tuple(form["image_source_ids"]),
                 structure_valid=valid,
+                parallel_rules_only=parallel_rules_only,
+                declared_watermark=bool(valid and declaration[2]),
             )
         )
     return tuple(output)

@@ -31,6 +31,8 @@ from .common import (
     _URL_LINE_RE,
 )
 
+_RUNIN_TITLE_PREFIX = re.compile(r"^([A-Z][A-Za-z-]+(?: [A-Z][A-Za-z-]+){1,6}\.) [A-Z][a-z]")
+
 
 def _top_marginal_text_break_sources(lane: _TextLane, page_height: float) -> set[int]:
     """顶边独立编号或较小文字与稳定正文之间保留净空边界，不依赖跨页信息强制分类页眉。"""
@@ -993,6 +995,9 @@ def _leading_typography_reset_break_sources(
             output.add(current[0].source_index)
             continue
         following = rows[row_index + 2] if row_index + 2 < len(rows) else None
+        if following is not None and _has_printed_runin_boundary(previous, current, following, lane, regular_gap, gap_mad):
+            output.add(current[0].source_index)
+            continue
         local_emphasis = (
             previous_width <= 0.45 * lane_width
             and following is not None
@@ -1038,6 +1043,69 @@ def _leading_typography_reset_break_sources(
         ):
             output.add(current[0].source_index)
     return output
+
+
+def _has_printed_runin_boundary(
+    previous: tuple[_LineItem, BBox],
+    current: tuple[_LineItem, BBox],
+    following: tuple[_LineItem, BBox],
+    lane: _TextLane,
+    regular_gap: float,
+    gap_mad: float,
+) -> bool:
+    """识别完整段尾后带额外留白、同一行由粗体标签切回常规正文的段首。"""
+    first, before = previous
+    lead, box = current
+    tail, next_box = following
+    width = lane.right - lane.left
+    emphasis = lead.leading_emphasis_width
+    if (
+        width <= 0
+        or emphasis is None
+        or not 0.2 * width <= emphasis <= 0.65 * width
+        or lead.edge_fonts[0] is None
+        or lead.edge_fonts[1] is None
+        or lead.edge_fonts[0] == lead.edge_fonts[1]
+        or lead.edge_fonts[1] != first.edge_fonts[1]
+        or lead.edge_fonts[1] != tail.edge_fonts[0]
+        or tail.leading_emphasis_width is not None
+        or any(
+            line.angle
+            or line.paragraph_group is not None
+            or line.caption_start
+            or line.formula_candidate_only
+            or line.compact_formula_cluster
+            or line.paragraph_formula_context
+            or line.inline_math_regions
+            for line in (first, lead, tail)
+        )
+    ):
+        return False
+    text = lead.text.strip()
+    match = _RUNIN_TITLE_PREFIX.match(text)
+    if match is None or not first.paragraph_terminal or not re.search(r"[.!?][\])’\"']*$", first.text.rstrip()):
+        return False
+    if any(line.dominant_font_weight is None for line in (first, lead, tail)):
+        return False
+    if lead.dominant_font_weight < min(first.dominant_font_weight, tail.dominant_font_weight) + 100:
+        return False
+    # 以真实强调宽度约束提示语结束位置，排除只有首词加粗而句点落在普通体的句子。
+    row_width = box[2] - box[0]
+    expected_width = len(match[1]) / len(text) * row_width
+    if abs(expected_width - emphasis) > 0.1 * width:
+        return False
+    em = _line_effective_height(*previous)
+    gap = _effective_body_text_row_gap(previous, current)
+    continuation_gap = _effective_body_text_row_gap(current, following)
+    return (
+        em > 0
+        and 0.55 * width <= before[2] - before[0] <= 0.88 * width
+        and min(row_width, next_box[2] - next_box[0]) >= 0.82 * width
+        and max(abs(bounds[0] - lane.left) for bounds in (before, box, next_box)) <= 0.4 * em
+        and all(0.85 * em <= _line_effective_height(*row) <= 1.15 * em for row in (current, following))
+        and regular_gap + max(0.08 * em, 3 * gap_mad) <= gap <= regular_gap + 0.6 * em
+        and -0.25 * em <= continuation_gap <= regular_gap + 0.1 * em + 3 * gap_mad
+    )
 
 
 def _formula_style_text_row_break_sources(

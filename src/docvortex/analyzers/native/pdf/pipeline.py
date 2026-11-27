@@ -8,6 +8,7 @@ import re
 import statistics
 
 from collections import deque
+from collections.abc import Collection
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -37,12 +38,29 @@ from .auxiliary_text import (
     _marginal_text_matches,
 )
 from .char_geometry import DocumentGeometryPlan, apply_line_geometry_repairs, build_document_geometry_plan
-from .code_blocks import _build_code_blocks, _build_rule_delimited_code_blocks
+from .form_expansion import prepare_form_expansion
+from .layout_diagnostics import (
+    LayoutDiagnosticPage,
+    _marginal_banner_position,
+    block_glyphs,
+    glyph_ranges,
+    retain_glyph_members,
+    retain_line_members,
+)
+from .code_blocks import (
+    _build_code_blocks,
+    _build_rule_delimited_code_blocks,
+    _order_code_marker_companions,
+    _split_background_code_markers,
+    is_numbered_algorithm_projection,
+)
+from .line_layout import _line_effective_height
 from .text_assembly.footnotes import _has_leading_footnote_superscript
 from .text_assembly.continuity import group_native_inline_formula_prose
 from .title_analysis.structural import (
     _classify_short_cjk_section_leads,
     _classify_bold_numbered_heading_rows,
+    restore_hanging_title_rows,
     _mark_emphasized_quote_prose,
     _classify_native_display_resets,
     _restore_wrapped_bold_title_tails,
@@ -54,6 +72,7 @@ from .formulas import (
     classify_repeated_vector_decorations,
     _attach_unmapped_formula_ink,
     _build_formula_like_blocks,
+    _capture_formula_crop_ink,
     _native_math_word_fragments,
     _build_vector_formula_blocks,
     _unmapped_formula_ink_bboxes,
@@ -105,6 +124,8 @@ from .line_merging import (
     _restore_dense_split_visual_rows,
     merge_text_line_clusters,
 )
+from .raster_repaints import RasterRepaintReader, pure_vector_forms, resolve_raster_insets, resolve_raster_repaints
+from .raster_callout_projection import VisibleRasterReader, attach_callout_underlays
 from .models import (
     _AxisLine,
     _DocumentBodyProfile,
@@ -123,7 +144,9 @@ from .native_text import (
     _resplit_native_visual_runs,
     _sanitize_pdf_control_text,
 )
+from .raster_callouts import _recover_placed_repeated_rasters
 from .tables import _connected_horizontal_rule_bboxes, _detect_table_candidates, _materialize_table_blocks
+from .table_regions import _split_graphic_at_independent_grids
 from .table_filled_grid import _native_cjk_metric_scope
 from .text_assembly.annotations import (
     _merge_fragmented_header_blocks,
@@ -154,7 +177,11 @@ from .title_analysis.structural import (
     _classify_inline_typography_reset_titles,
     _promote_noninitial_document_title_band,
 )
-from .visual_annotations import _classify_and_bind_visual_annotations, _is_strong_caption_text
+from .visual_annotations import (
+    _classify_and_bind_visual_annotations,
+    _is_strong_caption_text,
+    materialize_deferred_raster_captions,
+)
 
 _TEXT_SEMANTIC_TYPES = {
     "doc_title",
@@ -218,14 +245,24 @@ def _filter_repeated_raster_watermark_bboxes(
     image_infos: list[PDFImageInfo],
     page_size: tuple[float, float],
     watermark_fingerprints: set[str],
+    confirmed_content: Collection[BBox] = (),
+    *,
+    discarded_ids: set[int] | None = None,
 ) -> list[tuple[float, float, float, float]]:
-    """仅删除命中跨页水印指纹且面积达标的 bbox，小尺寸同图继续保留。"""
+    """删除达标的重复水印，保留小尺寸栅格与有本页内容证据的出现位置。"""
 
-    return [
-        image_info.bbox
-        for image_info in image_infos
-        if not (image_info.fingerprint in watermark_fingerprints and _is_large_raster_image(image_info, page_size))
-    ]
+    kept = []
+    for info in image_infos:
+        if (
+            info.bbox not in confirmed_content
+            and info.fingerprint in watermark_fingerprints
+            and _is_large_raster_image(info, page_size)
+        ):
+            if discarded_ids is not None and info.form_raster_id is not None:
+                discarded_ids.add(info.form_raster_id)
+        else:
+            kept.append(info.bbox)
+    return kept
 
 
 def _table_detection_drawing_lines(
@@ -351,7 +388,7 @@ def _prepare_owned_geometry_evidence(owner, chars, identities=None):
     return evidence, identities
 
 
-def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
+def _collect_document_sources(pdf_doc: NativePdfSource, *, collect_layout_fingerprints: bool = False) -> _DocumentSources:
     """逐页收集原生证据，局部快照与字符引用在收集阶段退出时释放。"""
 
     from .inline.spacing import prepare_spacing_lines
@@ -366,6 +403,7 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
     page_owned_scripts = []
     page_geometry_evidence = []
     page_spacing_lines = []
+    trusted_text_bboxes = getattr(pdf_doc, "native_trusted_text_bboxes", None)
     for page_idx in range(pdf_doc.page_count):
         snapshot = pdf_doc._extract_native_page(page_idx)
         page_size = snapshot.page_size
@@ -388,6 +426,7 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
                 page_size,
                 page_rotation=snapshot.rotation,
             )
+        lines = _split_background_code_markers(lines, snapshot.path_infos, page_size)
         from .local_text import group_hanging_letter_paragraphs, restore_drop_cap_paragraphs
 
         restore_drop_cap_paragraphs(lines)
@@ -465,21 +504,71 @@ def _collect_document_sources(pdf_doc: NativePdfSource) -> _DocumentSources:
             form_bboxes=snapshot.form_bboxes,
             path_infos=snapshot.path_infos,
             form_infos=getattr(snapshot, "form_infos", ()),
+            text_visibility_uncertain=getattr(snapshot, "text_visibility_uncertain", False),
+            trusted_text_bboxes=trusted_text_bboxes(page_idx) if trusted_text_bboxes is not None else (),
         )
         page_sources.append(source)
         page_text_geometries.append(text_geometry)
 
     watermark_fingerprints = _detect_repeated_raster_watermark_fingerprints(page_image_infos, page_sizes)
-    for source, image_infos in zip(page_sources, page_image_infos, strict=True):
-        if len(source.lines) >= 3 and sum(len(line.text.strip()) for line in source.lines) >= 60:
+    placed_rasters = _recover_placed_repeated_rasters(
+        page_sources,
+        page_image_infos,
+        watermark_fingerprints,
+        _REPEATED_RASTER_IMAGE_MIN_PAGE_AREA_RATIO,
+        _REPEATED_RASTER_IMAGE_MIN_DISTINCT_PAGES,
+    )
+    from .raster_backdrops import filter_panel_backdrops
+    from .watermark_forms import discarded_raster_forms
+
+    for source, image_infos, placements, links in zip(
+        page_sources, page_image_infos, placed_rasters, page_link_lines, strict=True
+    ):
+        original_image_infos = image_infos
+        if not links:
+            image_infos = filter_panel_backdrops(source, image_infos, placements)
+        # 只有题名证据的裸位图等正文组装完再插入；已经连成图外侧注的容器照常参与布局。
+        source.raster_caption_rows = {
+            raster: evidence for raster, evidence in source.raster_caption_rows.items() if placements.get(raster) == raster
+        }
+        has_independent_text = len(source.lines) >= 3 and sum(len(line.text.strip()) for line in source.lines) >= 60
+        smooth_ids = set()
+        if has_independent_text:
             # 低纹理整页图只是底色，原生文字和内容图片仍由独立规则处理；无原生文字的图页保留。
+            if source.form_infos:
+                smooth_ids = {info.form_raster_id for info in image_infos if info.form_raster_id is not None and info.smooth_background}
             image_infos = [info for info in image_infos if not info.smooth_background]
+        if collect_layout_fingerprints:
+            source.layout_raster_fingerprints = {
+                info.bbox: info.fingerprint
+                for info in image_infos
+                if info.fingerprint and _marginal_banner_position(info.bbox, source.page_size)
+            }
+        repeat_ids = set() if has_independent_text and source.form_infos else None
         source.image_bboxes = _filter_repeated_raster_watermark_bboxes(
             image_infos,
             source.page_size,
             watermark_fingerprints,
+            placements.keys() - source.raster_caption_rows.keys() if source.raster_caption_rows else placements,
+            discarded_ids=repeat_ids,
         )
+        if smooth_ids or repeat_ids:
+            source.discarded_raster_forms = discarded_raster_forms(source, original_image_infos, smooth_ids, repeat_ids or set())
+        # 用原生连线补足位图的图外范围，并保留原位图身份供页面 Form 判断。
+        source.raster_callout_bboxes = {raster: box for raster, box in placements.items() if raster != box}
+        source.image_bboxes = [source.raster_callout_bboxes.get(box, box) for box in source.image_bboxes]
         source.image_bboxes = _exclude_proven_blank_top_under_display_title(source, image_infos)
+        if len(source.image_bboxes) >= 2:
+            source.inset_base_bboxes = frozenset(
+                info.bbox for info in image_infos
+                if info.fingerprint and not info.smooth_background and not info.quiet_band_backdrop
+                and _bbox_area(info.bbox) >= 0.5 * source.page_size[0] * source.page_size[1]
+            )
+        source.raster_composite_infos = tuple(
+            info
+            for info in image_infos
+            if info.composite_inner_bboxes or info.raster_pair or info.occluded_inner_bboxes or info.repainted_inner_bboxes
+        )
 
     from .text_noise import exclude_faint_native_noise
     from .graphics import group_native_raster_chart_descriptions
@@ -537,6 +626,9 @@ def _prepare_document_sources(
     sources: _DocumentSources,
     *,
     geometry_diagnostics: list[dict[str, Any]] | None = None,
+    layout_pages: list[LayoutDiagnosticPage] | None = None,
+    raster_repaint_reader: RasterRepaintReader | None = None,
+    visible_raster_reader: VisibleRasterReader | None = None,
 ) -> list[_PreparedPage]:
     """先完成全文几何和页眉判定，再按顺序消费原始页面并释放已用证据。"""
 
@@ -575,20 +667,29 @@ def _prepare_document_sources(
         page_index = len(prepared_pages)
         source, geometry, owned_script = pending.popleft()
         source.previous_table_grid = previous_table_grid
-        prepared_pages.append(
-            _prepare_page_source(
-                source,
-                tight_bboxes=geometry.tight_bboxes,
-                origins=geometry.origins,
-                geometry_plan=geometry_plan,
-                page_index=page_index,
-                style_lines=sources.page_style_lines[page_index],
-                link_lines=sources.page_link_lines[page_index],
-                table_header_separator_bboxes=separators[page_index],
-                repaired_char_bboxes=repaired_chars_by_page.pop(page_index, {}),
-                _owned_script_inputs=owned_script,
-            )
+        layout_page = None
+        if layout_pages is not None:
+            source.collect_layout_diagnostics = True
+            layout_page = LayoutDiagnosticPage(source.page_size)
+            layout_pages.append(layout_page)
+        prepare_kwargs = dict(
+            tight_bboxes=geometry.tight_bboxes,
+            origins=geometry.origins,
+            geometry_plan=geometry_plan,
+            page_index=page_index,
+            style_lines=sources.page_style_lines[page_index],
+            link_lines=sources.page_link_lines[page_index],
+            table_header_separator_bboxes=separators[page_index],
+            repaired_char_bboxes=repaired_chars_by_page.pop(page_index, {}),
+            _owned_script_inputs=owned_script,
+            raster_repaint_reader=raster_repaint_reader,
+            visible_raster_reader=visible_raster_reader,
+            layout_page=layout_page,
         )
+        expansion = prepare_form_expansion(source, prepare_kwargs)
+        prepared = _prepare_page_source(source, **prepare_kwargs)
+        prepared.form_expansion = expansion
+        prepared_pages.append(prepared)
         previous_table_grid = _trailing_table_continuation_grid(source, prepared_pages[-1])
         # 删除对象所有者引用，不清空共享字符容器，公式重建副本仍可安全使用。
         del source, geometry, owned_script
@@ -681,11 +782,21 @@ def _analyze_native_document(
     *,
     script_diagnostics: list[dict[str, Any]] | None = None,
     geometry_diagnostics: list[dict[str, Any]] | None = None,
+    layout_pages: list[LayoutDiagnosticPage] | None = None,
 ) -> list[list[dict[str, Any]]]:
     """逐页读取数字 PDF，并在轻量页面上完成跨页文本类型判定。"""
 
-    sources = _collect_document_sources(pdf_doc)
-    prepared_pages = _prepare_document_sources(sources, geometry_diagnostics=geometry_diagnostics)
+    sources = _collect_document_sources(
+        pdf_doc,
+        **({"collect_layout_fingerprints": True} if layout_pages is not None and pdf_doc.page_count >= 3 else {}),
+    )
+    prepared_pages = _prepare_document_sources(
+        sources,
+        geometry_diagnostics=geometry_diagnostics,
+        layout_pages=layout_pages,
+        raster_repaint_reader=getattr(pdf_doc, "_verify_raster_repaint", None),
+        visible_raster_reader=getattr(pdf_doc, "_visible_callout_underlay", None),
+    )
     if script_diagnostics is not None:
         script_diagnostics.extend(
             {
@@ -707,11 +818,28 @@ def _analyze_native_document(
 
     classify_repeated_vector_decorations(prepared_pages)
     profiles = _classify_document_text(prepared_pages)
+    for page_idx in getattr(pdf_doc, "reference_header_pages", ()):
+        prepared_pages[page_idx].reference_running_heading = True
     mark_document_reference_regions(prepared_pages)
     for page_index, prepared in enumerate(prepared_pages):
         if prepared.numbered_references:
             group_reference_lines(prepared.remaining_lines, prepared)
         _classify_small_emphasized_titles(prepared, page_index)
+    for page_index, prepared in enumerate(prepared_pages):
+        expansion, prepared.form_expansion = prepared.form_expansion, None
+        if expansion is None:
+            continue
+        prepared_pages[page_index] = expansion.prepared
+        sources.page_style_lines[page_index] = expansion.style_lines
+        sources.page_link_lines[page_index] = expansion.link_lines
+        if layout_pages is not None:
+            layout_pages[page_index] = expansion.evidence
+        if script_diagnostics is not None:
+            script_diagnostics[page_index]["script_lines"] = list(expansion.prepared.script_lines)
+            script_diagnostics[page_index]["lines"] = [
+                {"source_index": line.source_index, "text": line.text, "bbox": line.bbox, "angle": line.angle}
+                for line in expansion.prepared.remaining_lines
+            ]
     finalized_pages = [
         _finalize_prepared_page(
             prepared,
@@ -719,6 +847,7 @@ def _analyze_native_document(
             canonical_body_profile=profiles.canonical_body,
             document_body_profile=profiles.body,
             document_title_profile=profiles.title,
+            layout_page=layout_pages[page_index] if layout_pages is not None else None,
         )
         for page_index, prepared in enumerate(prepared_pages)
     ]
@@ -736,12 +865,26 @@ def _build_caption_supported_graphics(source: _PageSource) -> tuple[list[dict[st
         for line in source.lines
     ):
         return [], set()
-    table_caption = any(re.match(r"^\s*(?:table|tab\.?|表)\s*\d", line.text, re.IGNORECASE) for line in source.lines)
-    table_bboxes = [
-        candidate.core_bbox or candidate.bbox
-        for candidate in _detect_table_candidates(source)
-        if (table_caption and candidate.annotations) or has_native_closed_grid(source, candidate)
-    ]
+    table_captions = [line for line in source.lines if re.match(r"^\s*(?:table|tab\.?|表)\s*\d", line.text, re.IGNORECASE)]
+    table_bboxes = []
+    verified_tables = None
+    for candidate in _detect_table_candidates(source):
+        box = candidate.core_bbox or candidate.bbox
+        if (table_captions and candidate.annotations) or has_native_closed_grid(source, candidate):
+            table_bboxes.append(box)
+        elif not candidate.angle and any(
+            label.source_index in caption_indices and label.source_index not in candidate.line_indices
+            and 0 <= max(label.bbox[1] - box[3], box[1] - label.bbox[3]) <= 1.5 * _line_effective_height(label, label.bbox)
+            and _bbox_axis_overlap_ratio(label.bbox, box, axis="x") >= 0.8
+            for label in table_captions
+        ):
+            # 稀疏表的外置题注和原生数据列共同证明表体，图题扩张须在该屏障停止。
+            if verified_tables is None:
+                from .layout_visual_role_risk import collect_visual_tables
+
+                verified_tables = collect_visual_tables(source.lines, source.drawing_lines, source.path_infos, source.page_size)
+            if any(min(_bbox_overlap_in_first(box, r.bbox), _bbox_overlap_in_first(r.bbox, box)) >= 0.9 for r in verified_tables):
+                table_bboxes.append(box)
     code_bboxes = [block["bbox"] for block in _build_code_blocks(source, [], set())[0]]
     code_bboxes.extend(
         block["bbox"]
@@ -777,6 +920,10 @@ def _prepare_page_source(
     table_header_separator_bboxes: set[BBox] | None = None,
     repaired_char_bboxes: dict[int, BBox] | None = None,
     _owned_script_inputs=None,
+    raster_repaint_reader: RasterRepaintReader | None = None,
+    visible_raster_reader: VisibleRasterReader | None = None,
+    layout_page: LayoutDiagnosticPage | None = None,
+    _expanded_form_bboxes: tuple[BBox, ...] = (),
 ) -> _PreparedPage:
     """先认领视觉容器，再标注辅助文本并留下可跨页比较的轻量文本行。"""
 
@@ -784,6 +931,9 @@ def _prepare_page_source(
 
     if page_index == 0:
         _classify_first_page_correspondence_footnotes(source)
+    if layout_page is not None:
+        layout_page.record_rows([line for line in source.lines if not _is_strong_caption_text(line.text)])
+        layout_page.record_visual_tables(source.lines, source.drawing_lines, source.path_infos)
     # 在表格认领前保留有明确目录题名的稳定页码列，避免目录横线被误当数据网格。
     early_index_blocks, _ = _extract_index_blocks(
         source.lines,
@@ -791,15 +941,42 @@ def _prepare_page_source(
         source.image_bboxes + source.signature_bboxes,
         require_heading=True,
         require_explicit_heading=True,
+        collect_layout_diagnostics=source.collect_layout_diagnostics,
     )
     early_index_indices = {line.source_index for line in source.lines if line.semantic_type == "index"}
     caption_graphics, caption_graphic_claims = _build_caption_supported_graphics(source)
     caption_graphic_bboxes = [block["bbox"] for block in caption_graphics]
+    # 有物理边界的图例先确立图体所有权，避免旧局部图和新图例竞争同一批字行。
+    from .graphic_partitions import build_native_graphic_partitions
+
+    original_graphic_cores = _detect_strong_graphic_bboxes(source)
+    # 早期目录框也使用绝对页面坐标，已认领条目不能进入新图的裁片。
+    partition_graphics, partition_claims = build_native_graphic_partitions(
+        source, original_graphic_cores, caption_graphic_bboxes + [block["bbox"] for block in early_index_blocks]
+    )
+    caption_graphics.extend(partition_graphics)
+    caption_graphic_bboxes.extend(block["bbox"] for block in partition_graphics)
+    caption_graphic_claims.update(partition_claims)
+    # 已有独立题注图会先淘汰包含它的整页 Form；这类页面原本不依赖整页屏障。
+    preserve_non_title_roles = (
+        bool(source.discarded_raster_forms)
+        and len(source.drawing_lines) >= 4
+        and any(
+            form.instance_id in source.discarded_raster_forms
+            and not any(_bbox_overlap_in_smaller(form.bbox, graphic) >= 0.8 for graphic in caption_graphic_bboxes)
+            for form in source.form_infos
+        )
+    )
+    if preserve_non_title_roles:
+        from .watermark_forms import protect_native_non_titles
+
+        protect_native_non_titles(source)
     _classify_bold_numbered_heading_rows(
         source.lines,
         source.page_size,
-        source.image_bboxes + caption_graphic_bboxes + _detect_strong_graphic_bboxes(source),
+        source.image_bboxes + caption_graphic_bboxes + original_graphic_cores,
         appendix_only=True,
+        **({"respect_protected_roles": True} if preserve_non_title_roles else {}),
     )
     protected_line_indices = {line.source_index for line in source.lines if line.semantic_type is not None}
     analysis_source = replace(
@@ -810,9 +987,17 @@ def _prepare_page_source(
     form_bboxes = [
         bbox
         for bbox in _select_form_image_bboxes(source)
-        if not any(_bbox_overlap_in_smaller(bbox, graphic) >= 0.8 for graphic in caption_graphic_bboxes)
+        if not any(_bbox_overlap_in_first(bbox, expanded) >= 0.8 and _bbox_overlap_in_first(expanded, bbox) >= 0.8 for expanded in _expanded_form_bboxes)
+        and not any(_bbox_overlap_in_smaller(bbox, graphic) >= 0.8 for graphic in caption_graphic_bboxes)
     ]
     strong_graphic_bboxes = _detect_strong_graphic_bboxes(analysis_source) + caption_graphic_bboxes
+    raster_callout_bboxes = list(source.raster_callout_bboxes.values())
+    if raster_callout_bboxes:
+        strong_graphic_bboxes = [
+            box
+            for box in strong_graphic_bboxes
+            if not any(_bbox_overlap_in_first(box, callout) >= 0.85 for callout in raster_callout_bboxes)
+        ]
     if strong_graphic_bboxes:
         # 原生数值表的多列表头与重复金额列共同证明容器，不能被轴线外观抢先认领为图形。
         from .table_detection import _detect_aligned_numeric_tables
@@ -838,19 +1023,27 @@ def _prepare_page_source(
             table_header_separator_bboxes,
         ),
     )
+    # 在同一次页准备中按存活候选身份向物化器传递题注证据，不写入普通候选的值表示。
+    caption_owners = {}
+    # 图题已认领的图和代码仍是硬障碍；只允许结构验证后的表覆盖推断图形。
+    overridable_graphics = [box for box in strong_graphic_bboxes if box not in caption_graphic_bboxes]
     candidates = [
         candidate
         for candidate in _detect_table_candidates(
             table_analysis_source,
+            caption_owners=caption_owners,
             excluded_bboxes=strong_graphic_bboxes + rule_code_bboxes,
+            **({"vector_graphics": overridable_graphics} if overridable_graphics else {}),
         )
         if not any(_form_supersedes_nested_bbox(form_bbox, candidate.bbox) for form_bbox in form_bboxes)
     ]
     # 候选检测仍避开预分类边缘文本；已确认表格物化时回到原始行，
     # 让 core_bbox 内的误标页脚可被重新认领，表格外边缘文本不会被矩形扩张带入。
-    table_blocks, table_annotation_blocks, claimed_line_indices = _materialize_table_blocks(
+    independent_grid_bboxes = []
+    materialized_tables, table_annotation_blocks, claimed_line_indices = _materialize_table_blocks(
         source,
         candidates,
+        caption_owners=caption_owners,
         tight_bboxes=tight_bboxes,
         origins=origins,
         calibrated_char_bboxes={
@@ -861,10 +1054,24 @@ def _prepare_page_source(
         if geometry_plan is not None and geometry_plan.local_metric_repair_sources
         else None,
         _owned_script_inputs=_owned_script_inputs,
+        independent_grid_bboxes=independent_grid_bboxes,
     )
+    strong_graphic_bboxes = _split_graphic_at_independent_grids(strong_graphic_bboxes, independent_grid_bboxes)
+    if layout_page is not None:
+        layout_page.record_vector_visuals(strong_graphic_bboxes)
+        if source.layout_raster_fingerprints is not None:
+            layout_page.record_marginal_vectors(source.path_infos, caption_graphic_bboxes)
     from .graphics import _graphic_members_are_numeric_grid
 
-    for block in table_blocks:
+    table_blocks = []
+    for block in materialized_tables:
+        if not block.get("_confirmed_table_caption_rows") and is_numbered_algorithm_projection(block["content"]):
+            block["type"] = "code"
+            block["guess_lang"] = "txt"  # 编号伪代码保留缩进，无需按某一门编程语言高亮。
+            rule_code_blocks.append(block)
+            rule_code_bboxes.append(block["bbox"])
+            continue
+        table_blocks.append(block)
         members = [line for line in source.lines if _bbox_overlap_in_first(line.bbox, block["bbox"]) >= 0.95]
         block["_native_numeric_grid"] = _graphic_members_are_numeric_grid(members)
     claimed_line_indices.update(caption_graphic_claims)
@@ -882,6 +1089,7 @@ def _prepare_page_source(
         analysis_source,
         table_bboxes + active_form_bboxes + strong_graphic_bboxes + list(source.image_bboxes) + list(source.signature_bboxes),
         claimed_line_indices,
+        marginal_lines=(line for line in source.lines if line.semantic_type in {"header", "footer"}),
     )
     code_bboxes = [block["bbox"] for block in code_blocks]
     form_image_blocks, claimed_form_line_indices = _build_form_image_blocks(
@@ -889,17 +1097,102 @@ def _prepare_page_source(
         active_form_bboxes,
         claimed_line_indices | claimed_code_line_indices,
     )
+    deferred_filled_regions = []
+    fully_linked_line_indices = frozenset(
+        link.source_index
+        for link in link_lines or ()
+        if len(link.link_ranges) == 1 and link.link_ranges[0].start == 0 and link.link_ranges[0].end == len(link.text)
+    )
+    graphic_members: dict[int, set[int]] = {}
     graphic_blocks, claimed_graphic_line_indices = _build_graphic_like_blocks(
         analysis_source,
-        table_bboxes + active_form_bboxes + rule_code_bboxes + code_bboxes + caption_graphic_bboxes,
+        table_bboxes + active_form_bboxes + rule_code_bboxes + code_bboxes + caption_graphic_bboxes + raster_callout_bboxes,
         claimed_line_indices | claimed_code_line_indices | claimed_form_line_indices,
         strong_graphic_bboxes,
+        deferred=deferred_filled_regions,
+        all_lines=source.lines,
+        fully_linked_line_indices=fully_linked_line_indices,
+        members_by_block=graphic_members,
     )
+    fixed_raster_containers = table_blocks + rule_code_blocks + code_blocks + caption_graphics
+    raster_source = analysis_source
+    confirmed_raster_bboxes = []
+    if raster_repaint_reader is not None and len(source.image_bboxes) >= 2 and (graphic_blocks or form_image_blocks):
+        vector_forms = pure_vector_forms(source, form_image_blocks)
+        fixed_forms = [block for block in form_image_blocks if block not in vector_forms]
+        raster_bboxes, confirmed_raster_bboxes, consumed = resolve_raster_repaints(
+            source,
+            graphic_blocks + vector_forms,
+            fixed_raster_containers + fixed_forms,
+            fully_linked_line_indices,
+            raster_repaint_reader,
+        )
+        if consumed:
+            # 释放被接管矢量块的原生行，由最终位图裁片重新认领并投影。
+            for key in consumed:
+                claimed_graphic_line_indices.difference_update(graphic_members.get(key, ()))
+            graphic_blocks = [block for block in graphic_blocks if id(block) not in consumed]
+            form_image_blocks = [block for block in form_image_blocks if id(block) not in consumed]
+            raster_source = replace(analysis_source, image_bboxes=raster_bboxes)
+    if source.inset_base_bboxes and graphic_blocks:
+        protected = [block["bbox"] for block in fixed_raster_containers + form_image_blocks]
+        layers, insets = resolve_raster_insets(
+            source, raster_source.image_bboxes, graphic_blocks, graphic_members,
+            [*protected, *confirmed_raster_bboxes, *source.trusted_text_bboxes, *source.signature_bboxes],
+        )
+        if insets:
+            for key in insets:
+                claimed_graphic_line_indices.difference_update(graphic_members[key])
+            graphic_blocks = [block for block in graphic_blocks if id(block) not in insets]
+            raster_source = replace(raster_source, image_bboxes=[box for box in raster_source.image_bboxes if box not in layers])
     raster_image_blocks, claimed_raster_line_indices = _build_raster_image_blocks(
-        analysis_source,
+        raster_source,
         table_blocks + rule_code_blocks + code_blocks + form_image_blocks + graphic_blocks + caption_graphics,
         claimed_line_indices | claimed_code_line_indices | claimed_form_line_indices | claimed_graphic_line_indices,
+        **({"confirmed_bboxes": confirmed_raster_bboxes} if confirmed_raster_bboxes else {}),
     )
+    if layout_page is not None:
+        from .graphics import _raster_is_native_text_background
+        from .raster_composites import occluded_raster_boxes
+
+        original_raster_boxes = {projected: original for original, projected in source.raster_callout_bboxes.items()}
+        raster_boxes = [
+            original_raster_boxes.get(box, box) for box in raster_source.image_bboxes
+            if not _raster_is_native_text_background(source, box)
+        ]
+        hidden = occluded_raster_boxes(source, set(raster_boxes)) if source.raster_composite_infos else set()
+        layout_page.record_visuals("位图", (box for box in raster_boxes if box not in hidden))
+        if source.layout_raster_fingerprints:
+            layout_page.record_marginal_rasters(
+                source.layout_raster_fingerprints,
+                (*source.raster_callout_bboxes, *source.raster_caption_rows, *caption_graphic_bboxes),
+            )
+    if visible_raster_reader is not None and raster_source.image_bboxes and form_image_blocks:
+        attach_callout_underlays(
+            raster_source,
+            form_image_blocks,
+            fixed_raster_containers + graphic_blocks + raster_image_blocks,
+            visible_raster_reader,
+        )
+    if any(
+        info.raster_pair is not None and info.raster_pair[1] != info.bbox for info in analysis_source.raster_composite_infos
+    ):
+        from .raster_composites import prepare_backdrop_titles
+
+        prepare_backdrop_titles(analysis_source, raster_image_blocks)
+    if source.discarded_raster_forms:
+        from .watermark_forms import outlined_grid_crops
+
+        local_grid_crops = outlined_grid_crops(
+            source,
+            [
+                block["bbox"]
+                for block in table_blocks + form_image_blocks + graphic_blocks + raster_image_blocks + caption_graphics
+            ],
+        )
+        graphic_blocks.extend(local_grid_crops)
+        if layout_page is not None:
+            layout_page.record_vector_visuals(block["bbox"] for block in local_grid_crops)
     vector_formula_blocks, claimed_vector_number_indices = _build_vector_formula_blocks(
         analysis_source,
         table_blocks
@@ -1014,6 +1307,7 @@ def _prepare_page_source(
             # 整批补认领的图内标签须按原生位置投影，不能沿 PDF 对象序逐条追加。
             projected = _image_members_to_content(members, source.page_size, spatial=True)
             owner["content"] = "\n".join(filter(None, [original_image_content[id(owner)], projected]))
+            retain_line_members(owner, members, enabled=source.collect_layout_diagnostics)
     remaining_lines = [line for line in remaining_lines if line.source_index not in reclaimed]
     from .formulas import restore_leading_inline_fractions
 
@@ -1024,6 +1318,7 @@ def _prepare_page_source(
                 line,
                 chars=list(line.chars),
                 inline_math_regions=list(line.inline_math_regions),
+                layout_glyph_ranges=glyph_ranges(line.chars) if layout_page is not None else b"",
             )
             for line in remaining_lines
         ]
@@ -1082,8 +1377,9 @@ def _prepare_page_source(
         drawing_lines=source.drawing_lines,
         _owned_inputs=_owned_script_inputs,
     )
-    _compact_prepared_lines(remaining_lines, source.page_size)
-    _compact_prepared_lines(formula_candidate_lines, source.page_size)
+    formula_crop_ink = _capture_formula_crop_ink(remaining_lines + formula_candidate_lines)
+    _compact_prepared_lines(remaining_lines, source.page_size, collect_layout_diagnostics=layout_page is not None)
+    _compact_prepared_lines(formula_candidate_lines, source.page_size, collect_layout_diagnostics=layout_page is not None)
     prepared = _PreparedPage(
         page_size=source.page_size,
         remaining_lines=remaining_lines,
@@ -1101,10 +1397,12 @@ def _prepare_page_source(
             + caption_graphics
             + early_index_blocks
         ),
+        preserve_non_title_roles=preserve_non_title_roles,
         canonical_formula_source_lines=canonical_formula_source_lines,
         script_lines=script_lines,
         formula_candidate_lines=formula_candidate_lines,
         formula_ink_bboxes=_unmapped_formula_ink_bboxes(source.chars),
+        formula_crop_ink=formula_crop_ink,
         table_body_profile_lines=(
             [
                 replace(line, chars=[], inline_math_regions=[])
@@ -1115,6 +1413,8 @@ def _prepare_page_source(
             else []
         ),
         page_footnote_groups=early_footnote_groups,
+        deferred_filled_regions=deferred_filled_regions,
+        deferred_raster_captions=source.raster_caption_rows,
         bullet_paths=tuple(
             info
             for info in source.path_infos
@@ -1128,6 +1428,8 @@ def _prepare_page_source(
 def _compact_prepared_lines(
     lines: list[_LineItem],
     page_size: tuple[float, float],
+    *,
+    collect_layout_diagnostics: bool = False,
 ) -> None:
     """缓存后续仍需的字符尺度并释放字符字典，限制跨页阶段内存占用。"""
 
@@ -1146,6 +1448,16 @@ def _compact_prepared_lines(
         # 释放字符前冻结脚注首标的几何证据，供后续分项使用。
         line.footnote_marker_start = line.footnote_marker_start or _has_leading_footnote_superscript(line)
         line.native_math_words = _native_math_word_fragments(line)
+        if collect_layout_diagnostics:
+            line.layout_glyph_ranges = glyph_ranges(line.chars)
+        if line.chars and line.angle == 0:
+            first = next((c for c in line.chars if c.get("char", "").strip()), {})
+            last = next((c for c in reversed(line.chars) if c.get("char", "").strip()), {})
+            first_font, last_font = first.get("font") or {}, last.get("font") or {}
+            line.edge_fonts = (
+                (first_font["name"], first_font.get("flags", 0)) if first_font.get("name") else None,
+                (last_font["name"], last_font.get("flags", 0)) if last_font.get("name") else None,
+            )
         _freeze_wrapped_bold_title_evidence(line, page_size)
         line.chars.clear()
 
@@ -1198,6 +1510,7 @@ def _rebuild_canonical_formula_blocks(
         prepared.table_bboxes,
         prepared.page_size,
         drawing_lines=prepared.drawing_lines,
+        crop_ink=prepared.formula_crop_ink,
     )
     return blocks
 
@@ -1262,6 +1575,7 @@ def _finalize_prepared_page(
     canonical_body_profile: _DocumentBodyProfile | None = None,
     document_body_profile: _DocumentBodyProfile | None = None,
     document_title_profile: _DocumentTitleProfile | None = None,
+    layout_page: LayoutDiagnosticPage | None = None,
 ) -> list[dict[str, Any]]:
     """按预分类语义、公式、标题、正文的优先级完成单页文本并排序。"""
 
@@ -1273,6 +1587,7 @@ def _finalize_prepared_page(
         prepared.page_size,
         container_bboxes,
         require_heading=True,
+        collect_layout_diagnostics=layout_page is not None,
     )
     semantic_lines.extend(line for line in unresolved_lines if line.semantic_type is not None)
     formula_input = [
@@ -1298,6 +1613,7 @@ def _finalize_prepared_page(
         prepared.table_bboxes,
         prepared.page_size,
         drawing_lines=prepared.drawing_lines,
+        crop_ink=prepared.formula_crop_ink,
     )
     if prepared.canonical_formula_geometry and prepared.canonical_formula_source_lines:
         canonical_formula_blocks = _rebuild_canonical_formula_blocks(
@@ -1309,6 +1625,7 @@ def _finalize_prepared_page(
         ) == _formula_block_inventory(formula_blocks):
             formula_blocks = canonical_formula_blocks
     prepared.canonical_formula_source_lines.clear()
+    prepared.formula_crop_ink = None
     _attach_unmapped_formula_ink(formula_blocks, prepared.formula_ink_bboxes)
     if prepared.canonical_formula_geometry:
         for line in remaining_lines:
@@ -1320,10 +1637,19 @@ def _finalize_prepared_page(
         remaining_lines,
         prepared.page_size,
         container_bboxes,
+        collect_layout_diagnostics=layout_page is not None,
     )
     index_blocks.extend(fallback_index_blocks)
     semantic_lines.extend(line for line in remaining_lines if line.semantic_type is not None)
     remaining_lines = [line for line in remaining_lines if line.semantic_type is None]
+    if prepared.preserve_non_title_roles:
+        from .watermark_forms import protect_equation_fragments
+
+        protect_equation_fragments(
+            semantic_lines + remaining_lines,
+            [block["bbox"] for block in formula_blocks],
+            source_lines=prepared.remaining_lines,
+        )
     title_container_bboxes = [
         block["bbox"] for block in prepared.fixed_blocks if not isinstance(block.get("_inline_visual_row_id"), int)
     ]
@@ -1382,7 +1708,13 @@ def _finalize_prepared_page(
     from .title_analysis.panels import classify_panel_titles
 
     classify_panel_titles(remaining_lines, caption_container_bboxes, prepared.page_size[0])
-    _classify_bold_numbered_heading_rows(remaining_lines, prepared.page_size, title_container_bboxes)
+    _classify_bold_numbered_heading_rows(
+        remaining_lines,
+        prepared.page_size,
+        title_container_bboxes,
+        **({"respect_protected_roles": True} if prepared.preserve_non_title_roles else {}),
+    )
+    restore_hanging_title_rows(remaining_lines)
     remaining_lines = _restore_wrapped_bold_title_tails(remaining_lines, prepared.page_size)
     _restore_short_heading_with_image_displaced_prose(
         remaining_lines, [block["bbox"] for block in prepared.fixed_blocks if block.get("type") == "image"]
@@ -1409,6 +1741,7 @@ def _finalize_prepared_page(
         page_footnote_groups=prepared.page_footnote_groups,
         page_index=page_index,
         visual_bboxes=[block["bbox"] for block in prepared.fixed_blocks if block.get("type") == "image"],
+        layout_page=layout_page,
     )
     text_blocks = merge_overlapping_member_blocks(text_blocks, prepared.page_size)
     text_blocks = _merge_multiline_title_blocks(text_blocks)
@@ -1443,11 +1776,20 @@ def _finalize_prepared_page(
 
     text_blocks = split_local_list_blocks(text_blocks, prepared.bullet_paths)
     absolute_blocks = prepared.fixed_blocks + formula_blocks + index_blocks + text_blocks
+    if prepared.deferred_filled_regions:
+        from .graphics import materialize_deferred_filled_regions
+
+        materialize_deferred_filled_regions(
+            absolute_blocks, prepared.deferred_filled_regions, prepared.page_size,
+            collect_layout_diagnostics=layout_page is not None,
+        )
     recover_image_annotation_bands(absolute_blocks, prepared.page_size, prepared.drawing_lines)
     _apply_post_aggregation_tight_bboxes(
         absolute_blocks,
         prepared.page_size,
     )
+    if prepared.deferred_raster_captions:
+        materialize_deferred_raster_captions(absolute_blocks, prepared.page_size, prepared.deferred_raster_captions)
     visual_annotation_regions = _classify_and_bind_visual_annotations(
         absolute_blocks,
         prepared.page_size,
@@ -1468,9 +1810,21 @@ def _finalize_prepared_page(
         )
     )
     sorted_blocks = [next(front_matter) if (block.get("_reference_group") or 0) < 0 else block for block in sorted_blocks]
-    return [
-        normalized for block in sorted_blocks if (normalized := _normalize_output_block(block, prepared.page_size)) is not None
-    ]
+    if any("_callout_underlay" in block for block in sorted_blocks):
+        # 正文排段及卡片阅读序已经完毕，底图紧靠原来的独立说明图入列。
+        sorted_blocks = [item for block in sorted_blocks for item in (block.pop("_callout_underlay", None), block) if item]
+    if any(block.get("_deferred_backdrop_titles") is not None for block in sorted_blocks):
+        from .raster_composites import materialize_backdrop_titles
+
+        sorted_blocks = materialize_backdrop_titles(sorted_blocks)
+    sorted_blocks = _order_code_marker_companions(sorted_blocks)
+    output = []
+    for block in sorted_blocks:
+        if (normalized := _normalize_output_block(block, prepared.page_size)) is not None:
+            if layout_page is not None:
+                retain_glyph_members(normalized, block_glyphs(block))
+            output.append(normalized)
+    return output
 
 
 def _preserve_narrow_graphic_column_order(blocks: list[dict[str, Any]], page_size: tuple[float, float]) -> list[dict[str, Any]]:
@@ -1554,6 +1908,20 @@ def _numbered_panel_row_regions(
     ]
 
 
+def _period_table_side_number(block: dict, bounds: BBox, last_y: float, page_size: tuple[float, float]) -> bool:
+    """金额表页的独立页脚数码留在正文之后，保留其原文字块和字串。"""
+    if block.get("type") != "text" or block.get("angle", 0) != 0:
+        return False
+    bbox = _coerce_bbox(block.get("bbox"))
+    width, height = page_size
+    if bbox is None or bbox[1] < max(0.92 * height, last_y) or bbox[2] - bbox[0] > 0.025 * width:
+        return False
+    if not (bbox[2] < min(0.1 * width, bounds[0] - 0.02 * width) or bbox[0] > max(0.9 * width, bounds[2] + 0.02 * width)):
+        return False
+    number = "".join(block.get("content", "").split())
+    return len(number) <= 4 and number.isdecimal()
+
+
 def _sort_blocks_with_visual_row_groups(
     blocks: list[dict[str, Any]],
     page_size: tuple[float, float],
@@ -1566,6 +1934,20 @@ def _sort_blocks_with_visual_row_groups(
     bottom_marginals: list[dict[str, Any]] = []
     body_blocks: list[dict[str, Any]] = []
     local_page_height = page_size[1]
+    period_tables = [block["bbox"] for block in blocks if block.get("_verified_period_table")]
+    period_bounds = _bbox_union_many(period_tables) if period_tables else None
+    last_y = (
+        max(
+            (
+                block["bbox"][1]
+                for block in blocks
+                if block.get("bbox") and block.get("type") not in {"header", "footer", "page_footnote", "page_number"}
+            ),
+            default=0.0,
+        )
+        if period_bounds
+        else 0.0
+    )
     for block in blocks:
         block_type = block.get("type")
         bbox = block.get("bbox")
@@ -1573,7 +1955,9 @@ def _sort_blocks_with_visual_row_groups(
             block_type == "page_number" and isinstance(bbox, (list, tuple)) and _bbox_center_y(bbox) <= 0.5 * local_page_height
         ):
             top_marginals.append(block)
-        elif block_type in {"footer", "page_footnote"} or block_type == "page_number":
+        elif block_type in {"footer", "page_footnote", "page_number"} or (
+            period_bounds is not None and _period_table_side_number(block, period_bounds, last_y, page_size)
+        ):
             bottom_marginals.append(block)
         else:
             body_blocks.append(block)
@@ -1600,6 +1984,13 @@ def _sort_blocks_with_visual_row_groups(
     for group in numbered_step_member_groups(body_blocks, region_consumed_indices):
         region_groups.append([member for _, member in group])
         region_consumed_indices.update(index for index, _ in group)
+
+    if any(block.get("_raster_card_label_bbox") is not None for block in body_blocks):
+        from .raster_composites import card_row_groups
+
+        for group in card_row_groups(body_blocks, region_consumed_indices):
+            region_groups.append([member for _, member in group])
+            region_consumed_indices.update(index for index, _ in group)
 
     inline_grouped_indices = _collect_inline_image_text_groups(
         body_blocks,
@@ -1928,6 +2319,11 @@ def _normalize_output_block(
         "angle": 0 if normalized_type == "image" else int(block.get("angle", 0) or 0) % 360,
         "content": "" if normalized_type == "equation" else content,
     }
+    if normalized_type == "code" and (language := block.get("guess_lang")):
+        output_block["guess_lang"] = language
+    if payload := block.get("_visible_raster_payload"):
+        output_block["image_base64"] = payload
+        output_block["_native_image_ready"] = True
     inline_math_regions = []
     for value in block.get("_inline_math_regions", []):
         raw_region = _coerce_bbox(value)

@@ -331,3 +331,34 @@ def test_kvcache_algorithm_pdf_materializes_caption_and_code() -> None:
     assert all(probe in code_content for probe in probes)
     for probe in probes:
         assert sum(probe in str(block.get("content", "")) for block in page) == 1
+
+
+def test_shaded_program_keeps_proportional_comments_with_its_statements():
+    """灰底程序的非等宽注释不降低程序行自身的等宽支持，灰底散文仍须拒绝。"""
+    source = _code_source(
+        _mono_line("if (ready) {", (15, 15, 75, 23), 0),
+        _mono_line("// detail about this program", (25, 25, 165, 33), 1, font_name="Body"),
+        _mono_line("return value;", (25, 35, 90, 43), 2),
+        _mono_line("}", (15, 45, 20, 53), 3),
+    )
+    blocks, claimed = code_blocks._build_code_blocks(source, [], set())
+    assert len(blocks) == 1 and claimed == {0, 1, 2, 3}
+    assert "return value;" in blocks[0]["content"] and "// detail" in blocks[0]["content"]
+    source.lines[0].text = "Read this first"
+    source.lines[2].text = "Then read this"
+    assert code_blocks._build_code_blocks(source, [], set()) == ([], set())
+
+
+def test_confirmed_program_claims_only_its_own_marginal_line():
+    """已确认代码只取回框内同向等宽且紧邻的首行，真正的外部页眉仍独立。"""
+    intro = _mono_line("collecting ...", (15, 15, 85, 23), 0)
+    intro.semantic_type = "header"
+    header = _mono_line("Chapter header", (15, 0, 85, 8), 4)
+    header.semantic_type = "header"
+    source = _code_source(
+        intro, _mono_line("run suite", (15, 25, 60, 33), 1), _mono_line("output.log", (15, 35, 65, 43), 2), header
+    )
+    prepared = pipeline._prepare_page_source(source)
+    (program,) = [b for b in prepared.fixed_blocks if b["type"] == "code"]
+    assert program["content"].count("collecting ...") == 1 and "Chapter header" not in program["content"]
+    assert {line.source_index for line in prepared.remaining_lines} == {4}

@@ -5,17 +5,20 @@ from __future__ import annotations
 from copy import deepcopy
 from importlib import import_module
 from importlib.util import find_spec
+from io import BytesIO
 from types import SimpleNamespace
 from typing import get_type_hints
 from unittest.mock import MagicMock
 
 import pytest
+from reportlab.pdfgen.canvas import Canvas
 
 from docvortex.analyzers.pdf import (
     PDFTablePage,
     PDFTableRecoveryError,
     PDFTableResult,
     PDFTextEvidence,
+    PDFTextLine,
     PDFTextScriptLine,
     PDFTextScriptRange,
     apply_text_evidence,
@@ -23,9 +26,10 @@ from docvortex.analyzers.pdf import (
     is_ligature_expansion_space,
     prepare_table_page,
     prepare_text_evidence,
+    project_native_table_text,
     recover_table_region,
 )
-from docvortex.document.pdf import PDFPageTextGeometry, PDFPageVectorGeometry
+from docvortex.document.pdf import PDFDocument, PDFPageTextGeometry, PDFPageVectorGeometry
 from docvortex.public_api import PUBLIC_API
 
 
@@ -71,10 +75,12 @@ def test_new_api_annotations_resolve() -> None:
         PDFTablePage,
         PDFTableResult,
         PDFTextEvidence,
+        PDFTextLine,
         prepare_text_evidence,
         apply_text_evidence,
         prepare_table_page,
         recover_table_region,
+        project_native_table_text,
     ):
         assert get_type_hints(value)
 
@@ -131,6 +137,29 @@ def test_text_evidence_excludes_formula_regions_and_preserves_source(monkeypatch
     page.get_chars_with_geometry.assert_not_called()
     page.get_drawing_lines.assert_called_once()
     page.get_link_annotations.assert_called_once()
+
+
+def test_visual_text_lines_are_opt_in_and_detached_from_the_page() -> None:
+    """仅显式调用者获得旋转后的视觉行，可在源页面关闭后继续进行区域回填。"""
+    buffer = BytesIO()
+    pdf = Canvas(buffer, pagesize=(250, 200))
+    pdf.setPageRotation(180)
+    pdf.drawString(15, 160, "Rotated native")
+    pdf.save()
+
+    with PDFDocument(buffer.getvalue()) as document:
+        page = document[0]
+        snapshot = page.get_snapshot()
+        evidence = prepare_text_evidence(page, snapshot=snapshot, supported_angles=(0.0, 180.0), include_lines=True)
+        assert not prepare_text_evidence(page, snapshot=snapshot).lines
+
+    assert len(evidence.lines) == 1
+    line = evidence.lines[0]
+    assert line.text == "Rotated native"
+    assert line.angle == 180
+    assert line.row_index == 0
+    assert line.chars[0]["char"] == "R"
+    assert set(char["char_idx"] for char in line.chars) <= set(char["char_idx"] for char in evidence.geometry.chars)
 
 
 def test_table_page_is_reused_and_returns_materialized_html(monkeypatch: pytest.MonkeyPatch) -> None:

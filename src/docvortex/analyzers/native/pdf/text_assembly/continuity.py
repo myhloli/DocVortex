@@ -15,6 +15,12 @@ from .common import _merge_internal_text_block_group, _merge_text_line_content
 
 
 _REFERENCE_NUMBER = re.compile(r"^\s*(?:[\[［](\d{1,4})[\]］]|(\d{1,3})[.])\s*(?=\D)")
+_AUTHOR_INITIAL = re.compile(
+    r"^(?:[^\W\d_][\w’'-]+(?:\s+[\w’'-]+){0,2},\s*[A-Z](?=[.\s,–-])|(?:[A-Z]\.\s*){1,3}[^\W\d_][\w’'-]+)"
+)
+_AUTHOR_DATE = re.compile(r"^[^\W\d_][^.;:!?]{0,90}?\s*\(\s*(?:18|19|20)\d{2}[a-z]?\s*\)")
+_PUBLICATION_YEAR = re.compile(r"(?:(?:^|[.,;])\s*(?:18|19|20)\d{2}[a-z]?\s*[.,;)]|\((?:18|19|20)\d{2}[a-z]?\))")
+_FULL_NAME = re.compile(r"^(?:and\s+)?[A-ZÀ-Þ][^\W\d_]+\s+[A-ZÀ-Þ][^\W\d_]+")
 
 
 def _is_reference_heading(text: str) -> bool:
@@ -235,11 +241,110 @@ def _numbered_reference_regions(page: _PreparedPage, active: bool) -> list[tuple
     return regions
 
 
+def _unfinished_reference_tail(page: _PreparedPage) -> _LineItem | None:
+    """只用上页最后一个参考区中尚未收句的悬挂续行，为没有新条目的短页尾续接作证。"""
+    if not page.reference_regions:
+        return None
+    left, top, right, bottom = page.reference_regions[-1]
+    lines = [
+        line
+        for line in page.remaining_lines
+        if line.angle == 0
+        and not line.caption_start
+        and line.semantic_type in {None, "text"}
+        and left <= (line.bbox[0] + line.bbox[2]) / 2 < right
+        and top <= _bbox_center_y(line.bbox) <= bottom
+    ]
+    if len(lines) < 2:
+        return None
+    last = max(lines, key=lambda line: (line.bbox[1], line.bbox[0]))
+    indent = last.bbox[0] - min(line.bbox[0] for line in lines)
+    em = _line_effective_height(last, last.bbox)
+    if 0.45 * em <= indent <= 4 * em and not last.text.rstrip().endswith((".", "。", "!", "?", "！", "？")):
+        return last
+    return None
+
+
+def _continued_reference_bottom(
+    members: list[_LineItem], page: _PreparedPage, left: float, right: float, tail: _LineItem | None
+) -> float | None:
+    """从栏顶逐条验证作者署名或上页未完条目，参考区止于正文、题注或横跨本栏的实物。"""
+    top, floor = 0.055 * page.page_size[1], 0.94 * page.page_size[1]
+    stops = [
+        line.bbox[1]
+        for line in members
+        if top <= line.bbox[1]
+        and (
+            line.caption_start
+            or _is_reference_heading(line.text)
+            or (line.semantic_type == "paragraph_title" and (line.structural_title or line.explicit_section_title))
+        )
+    ]
+    stops.extend(
+        box[1]
+        for block in page.fixed_blocks
+        if block.get("type") in {"image", "image_block", "chart", "table", "code", "equation"}
+        and (box := block.get("bbox"))
+        and top <= box[1] < floor
+        and min(right, box[2]) - max(left, box[0]) >= 0.35 * (right - left)
+    )
+    limit = min(floor, *stops) if stops else floor
+    lines = [
+        line
+        for line in members
+        if line.angle == 0
+        and top <= _bbox_center_y(line.bbox) < limit
+        and line.semantic_type not in {"header", "footer", "page_number", "page_footnote"}
+    ]
+    if not lines:
+        return None
+    em = statistics.median(_line_effective_height(line, line.bbox) for line in lines)
+    rows: list[list[_LineItem]] = []
+    for line in sorted(lines, key=lambda item: (_bbox_center_y(item.bbox), item.bbox[0])):
+        if not rows or _bbox_center_y(line.bbox) - _bbox_center_y(rows[-1][0].bbox) > 0.5 * em:
+            rows.append([])
+        rows[-1].append(line)
+    for row in rows:
+        row.sort(key=lambda line: line.bbox[0])
+    texts = [" ".join(line.text for line in row).strip() for row in rows]
+    years = [i for i, text in enumerate(texts) if _PUBLICATION_YEAR.search(text)]
+    if len(years) >= 2:
+        named = _AUTHOR_INITIAL.match(texts[0]) or _FULL_NAME.match(texts[0]) or _AUTHOR_DATE.match(texts[0])
+        # 续条可先出现跨页断词和 DOI 链接，然后才到下一个有作者的编号条目。
+        linked_reference = re.search(r"https?://|\bdoi\s*:|\barxiv\s*:", " ".join(texts[: years[0] + 1]), re.I) and any(
+            (marker := _REFERENCE_NUMBER.match(text)) and _AUTHOR_INITIAL.match(text[marker.end() :])
+            for text in texts[years[0] + 1 : years[1] + 1]
+        )
+        # 已知书目内，出版年份可在长作者名单、书名或出版项后的独立行。
+        if (named or linked_reference) and not any(
+            rows[i][0].bbox[1] - max(line.bbox[3] for line in rows[i - 1]) > 2.5 * em for i in range(1, years[0] + 1)
+        ):
+            return limit
+    edge = min(line.bbox[0] for line in lines)
+    bottom = None
+    for row, text in zip(rows, texts):
+        first = row[0]
+        starts = bool(_AUTHOR_INITIAL.match(text) or _AUTHOR_DATE.match(text))
+        indent = (first.bbox[0] - edge) / em
+        linked = bottom is not None and 0.45 < indent <= 4 and first.bbox[1] - bottom <= 1.6 * em
+        if bottom is None and tail is not None:
+            linked = (
+                abs(first.bbox[0] - tail.bbox[0]) <= 0.5 * em
+                and first.font_signature == tail.font_signature
+                and 0.85 * em <= _line_effective_height(tail, tail.bbox) <= 1.15 * em
+                and (text[:1].islower() or text[:1].isdigit())
+            )
+        if not starts and not linked:
+            return bottom
+        bottom = max(line.bbox[3] for line in row)
+    return limit
+
+
 def mark_document_reference_regions(pages: list[_PreparedPage]) -> None:
     """沿实际栏序处理参考文献开始及章节结束事件，同页附录不丢弃此前的有效条目。"""
     active = False
     numbered_active = False
-    for page in pages:
+    for page_index, page in enumerate(pages):
         _width, height = page.page_size
         lines = page.remaining_lines
         headings = {line.source_index for line in lines if _is_reference_heading(line.text)}
@@ -267,16 +372,32 @@ def mark_document_reference_regions(pages: list[_PreparedPage]) -> None:
             continue
         layout = build_layout_evidence(lines, page.page_size, barriers=[block["bbox"] for block in page.fixed_blocks])
         corridors = sorted(set(layout.corridor((lane.left, 0, lane.right, 1)) for lane in layout.lanes))
+        # 真正写有当前章节名的运行页眉支持原有书目范围，即使条目是技术标准而不列作者年份。
+        inherited = active and not page.reference_running_heading
+        tail = _unfinished_reference_tail(pages[page_index - 1]) if inherited and page_index else None
+        if inherited and not corridors:
+            # 文献最后几行可能不足以建立栏位，仍按同一续条证据验证，空白页终止状态。
+            corridors = [(0.0, page.page_size[0])]
         for left, right in corridors:
-            top = 0.055 * height if active else None
             members = sorted(
                 [line for line in lines if left <= (line.bbox[0] + line.bbox[2]) / 2 < right], key=lambda line: line.bbox[1]
             )
+            if active and inherited:
+                bottom = _continued_reference_bottom(members, page, left, right, tail)
+                if bottom is not None:
+                    page.reference_regions.append((left, 0.055 * height, right, bottom))
+                active = bottom == 0.94 * height
+                tail = None
+                if not any(line.source_index in headings for line in members):
+                    continue
+                active = False
+            top = 0.055 * height if active else None
             for line in members:
                 if line.source_index in headings:
                     if top is not None and line.bbox[1] > top:
                         page.reference_regions.append((left, top, right, line.bbox[1]))
                     top, active = line.bbox[3], True
+                    inherited = False
                 elif active and (
                     re.match(r"^\s*(?:appendix\b|附录)", line.text, re.IGNORECASE)
                     or line.semantic_type == "paragraph_title"
@@ -549,6 +670,29 @@ def merge_overlapping_member_blocks(blocks: list[dict], page_size: tuple) -> lis
                     and -em <= sb[1] - fb[3] <= em
                     and second.get("_protected_hard_break_before") is not True
                 )
+                if (
+                    second.get("_paragraph_formula_context")
+                    and not second.get("_protected_hard_break_before")
+                    and abs(fb[0] - sb[0]) <= 0.5 * em
+                    and abs(fb[2] - sb[2]) <= 0.5 * em
+                    and first_text[-1:].isalpha()
+                ):
+                    # 行首公式刚与同行正文归组时，松框可能伸入上行；用真实墨迹确认未完满行的正常续排。
+                    tail = max(first["_text_lines"], key=lambda row: (row.ink_bbox or row.bbox)[1])
+                    tail_box = tail.ink_bbox or tail.bbox
+                    for row in second["_text_lines"]:
+                        ink = row.ink_bbox
+                        if (
+                            ink
+                            and tail.ink_bbox
+                            and abs(ink[0] - fb[0]) <= 0.5 * em
+                            and abs(tail_box[2] - fb[2]) <= 0.5 * em
+                            and 0 <= ink[1] - tail_box[3] <= 0.5 * em
+                            and str(second.get("content", "")).startswith(row.text)
+                            and any(unicodedata.category(c) == "Sm" for c in row.text)
+                        ):
+                            math_continuation = True
+                            break
                 adjacent = adjacent or bool(math_continuation)
                 narrow, host = sorted((first, second), key=lambda block: block["bbox"][2] - block["bbox"][0])
                 nb, hb = narrow["bbox"], host["bbox"]

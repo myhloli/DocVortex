@@ -41,7 +41,7 @@ def test_flash_materialization_prefers_native_html_and_keeps_claims(
     )
     html = "<table><tbody><tr><td>A</td><td>B</td></tr></tbody></table>"
     projection = MagicMock(return_value="fallback")
-    monkeypatch.setattr(table_materialization, "_recover_native_table_html", MagicMock(return_value=html))
+    monkeypatch.setattr(table_materialization, "_recover_native_table_html", MagicMock(return_value=(html, None)))
     monkeypatch.setattr(table_materialization, "project_pdf_table_text", projection)
 
     blocks, annotations, claimed = flash_tables._materialize_table_blocks(

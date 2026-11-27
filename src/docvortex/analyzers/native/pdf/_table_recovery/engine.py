@@ -11,7 +11,10 @@ from loguru import logger
 
 from .candidate import serialize_candidate_html
 from .banded_numeric import build_banded_numeric_candidate
-from .banded_rowspan import build_banded_rowspan_candidate
+from .body_tracks import build_body_track_candidate
+from .centered_values import build_centered_value_candidate
+from .column_groups import build_column_group_candidate
+from .banded_rowspan import build_banded_rowspan_candidate, refine_repeated_body_bands
 from .aligned_numeric import build_aligned_numeric_candidate, regroup_numeric_text
 from .contracts import (
     NativeTableCandidate,
@@ -23,6 +26,7 @@ from .contracts import (
 )
 from .geometry import bbox_intersection, normalize_bbox
 from .hierarchical import build_hierarchical_candidate, find_nested_table_evidence, preserves_nested_cells
+from .row_groups import build_row_group_candidate
 from .sparse_hybrid import build_sparse_hybrid_candidates, diagnose_sparse_hybrid_candidate_builds
 from .sparse_multiline import build_sparse_multiline_candidates, diagnose_sparse_multiline_candidate_builds
 from .rule_band import build_rule_band_candidates
@@ -554,6 +558,49 @@ def _evaluate_native_pdf_table(
             # 重复横线带内的独立数值行证明旧视觉行桥接；仅首列有跨行证据。
             selected = rowspan_candidate
             text = aligned_text
+    # 物理网格若只有表头/正文两带，仍可能在一个宽格内收下全部数据行。
+    coarse_band = selected is not None and selected.source == "vector_grid" and selected.rows == 2
+    if (selected is None or coarse_band) and not physical_topology_conflict and not nested_evidence:
+        body_candidate = build_body_track_candidate(table_input, text)
+        if body_candidate is not None and body_candidate.cols >= max(selected.cols if selected else 0, minimum_columns):
+            selected = body_candidate
+            candidates.append(body_candidate)
+            generated_candidates.append(body_candidate)
+    if not physical_topology_conflict and not nested_evidence and (selected is None or selected.source == "sparse_multiline"):
+        grouped = build_column_group_candidate(table_input, text, selected)
+        if grouped is not None and grouped.cols >= minimum_columns:
+            selected = grouped
+            generated_candidates.append(grouped)
+            candidates.append(grouped)
+    if selected is None and sparse_hybrid_allowed and not nested_evidence and minimum_columns <= 3:
+        centered = build_centered_value_candidate(table_input, text)
+        if centered is not None:
+            selected = centered
+            generated_candidates.append(centered)
+            candidates.append(centered)
+    if (
+        sparse_hybrid_allowed
+        and not nested_evidence
+        and (selected is None or "evidence=rule_band" in selected.issues)
+    ):
+        row_groups = build_row_group_candidate(table_input, text)
+        if (
+            row_groups is not None
+            and row_groups.cols >= minimum_columns
+            and (selected is None or row_groups.rows < selected.rows and row_groups.cols > selected.cols)
+        ):
+            selected = row_groups
+            generated_candidates.append(row_groups)
+            candidates.append(row_groups)
+    if selected is not None and (
+        _is_verified_line_candidate(selected)
+        or selected.score >= 0.98 and "evidence=rule_band" in selected.issues
+    ):
+        refined = refine_repeated_body_bands(table_input, text, selected)
+        if refined is not None:
+            selected = refined
+            candidates.append(refined)
+            generated_candidates.append(refined)
     if selected is not None:
         first_rejection_gate = None
     elif not generated_candidates:

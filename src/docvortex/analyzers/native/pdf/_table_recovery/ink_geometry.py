@@ -71,7 +71,41 @@ def _baseline_bands(anchors: list[_InkAnchor], body_height: float) -> list[_InkB
     ]
 
 
-def _bands_prove_false_merge(upper: _InkBand, lower: _InkBand, median_height: float) -> bool:
+def _separated_by_cell_border(upper: _InkBand, lower: _InkBand, table_input: NativeTableInput) -> bool:
+    """两带本身未直接误并时，用夹在墨迹间且左右均接竖轨的实体格线排除跨行桥接。"""
+    if table_input.angle or not table_input.drawing_lines:
+        return False
+    ox, oy, outer_right, _ = table_input.table_bbox
+    left = ox + max(upper.bbox[0], lower.bbox[0])
+    right = ox + min(upper.bbox[2], lower.bbox[2])
+    top, bottom = oy + upper.bbox[3], oy + lower.bbox[1]
+    tolerance = 0.15 * min(upper.height, lower.height)
+    for rule in table_input.drawing_lines:
+        x0, y0, x1, y1 = rule.bbox
+        if (
+            rule.orientation != "horizontal"
+            or y0 < top
+            or y1 > bottom
+            or x0 > left
+            or x1 < right
+            or x0 < ox - tolerance
+            or x1 > outer_right + tolerance
+        ):
+            continue
+        # 页眉、正文下划线、与局部墨迹异栏的短线不能证明两行属于不同单元格。
+        verticals = [
+            (v.bbox[0] + v.bbox[2]) / 2
+            for v in table_input.drawing_lines
+            if v.orientation == "vertical" and v.bbox[1] <= oy + upper.bbox[1] and v.bbox[3] >= oy + lower.bbox[3]
+        ]
+        if any(abs(x - x0) <= tolerance for x in verticals) and any(abs(x - x1) <= tolerance for x in verticals):
+            return True
+    return False
+
+
+def _bands_prove_false_merge(
+    upper: _InkBand, lower: _InkBand, median_height: float, table_input: NativeTableInput | None = None
+) -> bool:
     """联合大小、基线、墨迹留白和横向交叠，排除上下标及异列错位。"""
     smaller_height = min(upper.height, lower.height)
     larger_height = max(upper.height, lower.height)
@@ -91,7 +125,7 @@ def _bands_prove_false_merge(upper: _InkBand, lower: _InkBand, median_height: fl
     # 排除异列居中内容扩张整行外框形成的桥接；两带本身也必须被既有组行规则误并。
     # 纵向取字形边界中位数，不能让孤立大字或上下标代表整条正文基线。
     rows = get_native().table_visual_rows([upper.layout_bbox, lower.layout_bbox], [0, 1], median_height)
-    return len(rows) == 1
+    return len(rows) == 1 or (table_input is not None and _separated_by_cell_border(upper, lower, table_input))
 
 
 def _selected_ink_boxes(table_input: NativeTableInput, pending: Sequence[_PendingGlyph]) -> dict[int, BBox] | None:
@@ -161,7 +195,7 @@ def calibrate_inflated_table_glyphs(
     for row in original_rows:
         bands = _baseline_bands([anchors[g.source_index] for g in row if g.source_index in anchors], body_height)
         if not any(
-            _bands_prove_false_merge(upper, lower, median_height)
+            _bands_prove_false_merge(upper, lower, median_height, table_input)
             for index, upper in enumerate(bands)
             for lower in bands[index + 1 :]
         ):

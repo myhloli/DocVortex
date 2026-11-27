@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from dataclasses import dataclass, field
+import re
 import statistics
 import math
 import sys
+import unicodedata
 from collections import OrderedDict
 from typing import Any
 
@@ -258,6 +260,7 @@ def _build_rule_table_candidates(
     excluded_bboxes: list[BBox] | None = None,
     caption_candidates: list[tuple[_LineItem, BBox]] | None = None,
     defer_materialization: bool = False,
+    caption_edges: list | None = None,
 ) -> list[_TableCandidate] | list[_RuleCandidateDraft]:
     """枚举同跨度横线边界区间，再以连续多列文本分布确认表格。"""
 
@@ -288,7 +291,11 @@ def _build_rule_table_candidates(
         marker_cache,
         prepared_note_body_metrics,
     )
-    for rule_group in _group_long_horizontal_rules(axis_lines, median_height):
+    rule_groups = _group_long_horizontal_rules(axis_lines, median_height)
+    if any(len(group) >= 6 for group in rule_groups):
+        numbered = _numbered_rule_captions(lines, caption_candidates or [], page_size, angle)
+        rule_groups = _separate_captioned_rule_groups(rule_groups, numbered, vertical_axis_lines, median_height, caption_edges=caption_edges)
+    for rule_group in rule_groups:
         active_first_index = -1
         interval_prefix: _RuleIntervalPrefix | None = None
         band_indexes: OrderedDict[tuple[float, float], _RuleBandIndex | None] = OrderedDict()
@@ -610,6 +617,87 @@ def _expand_candidates_to_connected_rule_grids(
     return candidates
 
 
+def _has_narrow_table_values(rows, columns, component, paths):
+    """核对小网格的原生格值；只有标尺或反复出现的图符时保留原有图形归属。"""
+    boundaries = [_bbox_center_y(rule.bbox) for rule in component]
+    cell_text = {}
+    for row in rows:
+        band = bisect_right(boundaries, row.center_y) - 1
+        if not 0 <= band < len(boundaries) - 1:
+            continue
+        for fragment in row.fragments:
+            column = bisect_right(columns, _bbox_center_x(fragment.local_bbox)) - 1
+            if 0 <= column < len(columns) - 1:
+                location = band, column
+                cell_text[location] = cell_text.get(location, "") + fragment.text.strip()
+
+    def word(value):
+        """跨文字系统判定列名或非单符号格值，单个汉字等表意文字可有独立语义。"""
+        return sum(c.isalpha() for c in value) >= 2 or any(c.isalpha() and unicodedata.east_asian_width(c) in {"W", "F"} for c in value)
+
+    header_columns = {}
+    body_values = {}
+    for (band, column), text in cell_text.items():
+        if band < 2 and word(text):
+            header_columns.setdefault(band, set()).add(column)
+        if band and (word(text) or any(char.isdigit() for char in text)):
+            body_values.setdefault(band, set()).add(column)
+    multi_value_rows = sum(len(values) >= 2 for values in body_values.values())
+    named_columns = any(len(values) >= 2 for values in header_columns.values())
+    if multi_value_rows < 2 and not (named_columns and len(body_values) >= 3):
+        return False
+
+    # 少字格内的小型独立绘图和非行带/列带的填色都可能是图的数值载体。
+    # 普通整行交替底色、完整列底色和有真实文字的多列表不因此丢失。
+    colors = {}
+    sparse_paint = False
+    shapes = set()
+    for path in paths:
+        x0, y0, x1, y1 = path.bbox
+        row = bisect_right(boundaries, (y0 + y1) / 2) - 1
+        col = bisect_right(columns, (x0 + x1) / 2) - 1
+        if not 1 <= row < len(boundaries) - 1 or not 0 <= col < len(columns) - 1:
+            continue
+        left, right = columns[col : col + 2]
+        top, bottom = boundaries[row : row + 2]
+        tolerance = 0.12 * min(right - left, bottom - top)
+        if (
+            x1 - x0 <= tolerance
+            or y1 - y0 <= tolerance
+            or x0 < left - tolerance
+            or x1 > right + tolerance
+            or y0 < top - tolerance
+            or y1 > bottom + tolerance
+        ):
+            continue
+        text = cell_text.get((row, col), "")
+        sparse = sum(char.isalnum() for char in text) < 2
+        if path.fill_visible and path.fill_rgba and path.rectangle_bboxes:
+            color = path.fill_rgba[:3]
+            if color != (255, 255, 255):
+                colors[row, col] = color
+                sparse_paint |= sparse
+        elif sparse:
+            shapes.add((row, col))
+    if len(shapes) >= 2:
+        return False
+    if not sparse_paint or len(colors) < 2:
+        return True
+    patterns = set()
+    for row in range(2, len(boundaries) - 1):
+        pattern = tuple(colors.get((row, col)) for col in range(len(columns) - 1))
+        # 带可读行名的整行同色底纹可叠在固定列底色上，例如小计行；
+        # 只有标尺的图解仍保留空白行参与比较，不能漏掉“有色/无色”编码。
+        if (
+            pattern[0] is not None
+            and len(set(pattern)) == 1
+            and any(word(cell_text.get((row, col), "")) for col in range(len(columns) - 1))
+        ):
+            continue
+        patterns.add(pattern)
+    return len(patterns) <= 1 or all(len(set(pattern)) == 1 for pattern in patterns)
+
+
 def _build_closed_rule_grid_candidates(
     rows: list[_VisualRow],
     lines: list[_LineItem],
@@ -624,12 +712,26 @@ def _build_closed_rule_grid_candidates(
     previous_table_grid: _TableContinuationGrid | None = None,
     page_index: int | None = None,
     leading_obstacles: list[BBox] | None = None,
+    path_infos: list[PDFPathInfo] | tuple = (),
 ) -> list[_TableCandidate]:
     """用闭合物理网格接纳含空行或仅有表头文本的稀疏表格。"""
 
     candidates: list[_TableCandidate] = []
     row_interval_index = _build_row_interval_index(rows)
     components = grid_components if grid_components is not None else _connected_rule_grid_components(axis_lines, median_height)
+    min_long = max(40.0, 10.0 * median_height)
+    if angle == 0 and sum(rule.orientation == "vertical" for rule in axis_lines) >= 3:
+        short_rules = [
+            rule
+            for rule in axis_lines
+            if rule.orientation == "horizontal" and 3 * median_height <= rule.bbox[2] - rule.bbox[0] < min_long
+        ]
+        if len(short_rules) >= 4:
+            # 强闭合网格另用短横轨生成；普通横线候选的宽度门槛和区间枚举不变。
+            short_groups = _group_long_horizontal_rules(
+                short_rules, median_height, minimum_length=0.0, endpoint_tolerance=max(1.0, 0.25 * median_height)
+            )
+            components = [*components, *_split_connected_rule_groups(short_groups, axis_lines, median_height, minimum_edges=4)]
     # 复用方传入的分量仍由上面的调用/检测边界生成；这里只迭代，不重复扫描竖轨。
     for component in components:
         grid_bbox = _bbox_union_many([rule.bbox for rule in component])
@@ -658,6 +760,11 @@ def _build_closed_rule_grid_candidates(
         ):
             continue
 
+        if grid_bbox[2] - grid_bbox[0] < min_long and (
+            len(vertical_positions) < 3 or len(core_rows) < 3
+            or not _has_narrow_table_values(core_rows, vertical_positions, component, path_infos)
+        ):
+            continue
         if len(component) == 2:
             if len(vertical_positions) < 3:
                 continue
@@ -884,8 +991,14 @@ def _connected_rule_grid_components(
 ) -> list[list[_LocalAxisLine]]:
     """保留连续网格的横边界成员，供精确外轨和横边界数量校验。"""
 
+    groups = _group_long_horizontal_rules(axis_lines, median_height)
+    return _split_connected_rule_groups(groups, axis_lines, median_height, minimum_edges=2)
+
+
+def _split_connected_rule_groups(groups, axis_lines, median_height, *, minimum_edges):
+    """按贯穿相邻横边界的竖轨连接同一网格；短表额外要求重复出现的物理行边。"""
     output: list[list[_LocalAxisLine]] = []
-    for rule_group in _group_long_horizontal_rules(axis_lines, median_height):
+    for rule_group in groups:
         components: list[list[_LocalAxisLine]] = []
         for rule in rule_group:
             if not components or not _rule_bands_share_grid_tracks(
@@ -897,7 +1010,7 @@ def _connected_rule_grid_components(
                 components.append([rule])
             else:
                 components[-1].append(rule)
-        output.extend(component for component in components if len(component) >= 2)
+        output.extend(component for component in components if len(component) >= minimum_edges)
     return output
 
 
@@ -974,6 +1087,81 @@ def _rule_bands_share_grid_tracks(
     return has_outer_tracks or len(interior_tracks) >= 2
 
 
+_RULE_CAPTION_NUMBER = re.compile(
+    r"^(?:table|tab\.?|表格?)\s*[.:：–—-]?\s*"
+    r"(?P<number>\d+(?:[.．‑–－-]\d+)*|[ivxlcdm]+|[一二三四五六七八九十百]+)(?P<suffix>.*)$", re.IGNORECASE,
+)
+_JOINED_CHINESE_RULE_CAPTION = re.compile(r"^表格?\s*\d+(?:[.．‑–－-]\d+)*[\u3400-\u9fff]")
+
+
+def _numbered_rule_captions(lines, captions, page_size, angle):
+    """局部表界使用完整层级编号，补认中文表号紧连题名的源行，不放宽全页题注分类。"""
+    selected = list(captions)
+    known = {id(line) for line, _ in captions}
+    selected.extend(
+        (line, _rotate_bbox_to_upright(line.bbox, page_size, angle))
+        for line in lines
+        if id(line) not in known and _JOINED_CHINESE_RULE_CAPTION.match(line.text.strip())
+    )
+    numbered = []
+    for line, box in selected:
+        match = _RULE_CAPTION_NUMBER.match(line.text.strip())
+        if match:
+            suffix = match.group("suffix").strip(" .:：—–-")
+            if suffix and not suffix[0].islower():
+                number = re.sub(r"[．‑–－-]", ".", match.group("number").casefold())
+                numbered.append((box, number))
+    return numbered
+
+
+def _separate_captioned_rule_groups(groups, numbered, verticals, em, *, caption_edges=None):
+    """不同编号的独立题注以相同方向贴近各自表边时，不跨题注枚举横线草稿。"""
+    if len({number for _, number in numbered}) < 2:
+        return groups
+    result = []
+    for group in groups:
+        if len(group) < 6:
+            result.append(group)
+            continue
+        first, last = group[0].bbox, group[-1].bbox
+        ys = [_bbox_center_y(rule.bbox) for rule in group]
+        anchored = ([], [])
+        for box, number in numbered:
+            if box[0] < first[0] - em or box[2] > first[2] + em:
+                continue
+            gap = bisect_right(ys, _bbox_center_y(box))
+            # 表格内分组、跨列文字或指向其他表的数据单元不能截断贯穿的竖线。
+            if 0 < gap < len(group):
+                top, bottom = group[gap - 1].bbox[3], group[gap].bbox[1]
+                if box[1] < top or box[3] > bottom or any(
+                    first[0] - em <= _bbox_center_x(v.bbox) <= last[2] + em
+                    and v.bbox[1] <= top + 0.2 * em and v.bbox[3] >= bottom - 0.2 * em
+                    for v in verticals
+                ):
+                    continue
+            if gap < len(group) and 0 <= group[gap].bbox[1] - box[3] <= 2 * em:
+                anchored[0].append((gap, number, box))
+            if gap > 0 and 0 <= box[1] - group[gap - 1].bbox[3] <= 2 * em:
+                anchored[1].append((gap, number, box))
+        cuts = set()
+        for above, anchors in zip((True, False), anchored, strict=True):
+            anchors.sort()
+            outside = bool(anchors) and (anchors[0][0] == 0 if above else anchors[-1][0] == len(group))
+            for (i, left_number, left_box), (j, right_number, right_box) in zip(anchors, anchors[1:]):
+                if left_number == right_number or j - i < 3:
+                    continue
+                # 两个题注优先确认中间的三线表，另一个题注朝向的一侧也须有独立表轨。
+                # 首末可能仅留下页装饰线或不完整表轨，不能再并进已被题注界定的表。
+                if (above and len(group) - j >= 3) or (not above and i >= 3):
+                    cuts.update(index for index in (i, j) if 0 < index < len(group))
+                    if caption_edges is not None:
+                        for index, label in ((i, left_box), (j, right_box)):
+                            caption_edges.append((label, group[index if above else index - 1].bbox, above, em, outside))
+        edges = [0, *sorted(cuts), len(group)]
+        result.extend(group[i:j] for i, j in zip(edges, edges[1:]))
+    return result
+
+
 def _iter_rule_spans(rule_count: int):
     """按历史顺序枚举全部横线边界组合，不删除任何内部子候选。"""
 
@@ -985,14 +1173,17 @@ def _iter_rule_spans(rule_count: int):
 def _group_long_horizontal_rules(
     axis_lines: list[_LocalAxisLine],
     median_height: float,
+    *,
+    minimum_length: float | None = None,
+    endpoint_tolerance: float | None = None,
 ) -> list[list[_LocalAxisLine]]:
     """按近似左右端点聚合长横线，并去除同位置重复路径。"""
 
-    minimum_length = max(40.0, 10.0 * median_height)
+    minimum_length = max(40.0, 10.0 * median_height) if minimum_length is None else minimum_length
     horizontal_lines = [
         line for line in axis_lines if line.orientation == "horizontal" and line.bbox[2] - line.bbox[0] >= minimum_length
     ]
-    endpoint_tolerance = max(4.0, 2.0 * median_height)
+    endpoint_tolerance = max(4.0, 2.0 * median_height) if endpoint_tolerance is None else endpoint_tolerance
     span_groups: list[list[_LocalAxisLine]] = []
     for line in sorted(horizontal_lines, key=lambda item: (item.bbox[0], item.bbox[2], item.bbox[1])):
         target = next(

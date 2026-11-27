@@ -26,6 +26,13 @@ from .table_constants import _TABLE_CONTINUATION_RE
 from .table_annotations import _table_caption_candidates
 from .inline.detection import _font_styles_from_metadata
 from .table_filled_grid import _detect_filled_grid_table_candidates, _detect_tiled_fill_table_candidates
+from .table_open_grid import infer_captioned_open_grid
+from .table_periods import _detect_period_amount_tables
+from .table_regions import (
+    _detect_independent_closed_grid_regions,
+    _detect_repeated_fill_table_regions,
+    _detect_unruled_label_value_regions,
+)
 from .table_rules import (
     _RuleCandidateDraft,
     _build_closed_rule_grid_candidates,
@@ -41,6 +48,9 @@ from .table_rules import (
 def _detect_table_candidates(
     source: _PageSource,
     excluded_bboxes: list[BBox] | None = None,
+    *,
+    caption_owners: dict[int, list[tuple[BBox, bool]]] | None = None,
+    vector_graphics: list[BBox] | None = None,
 ) -> list[_TableCandidate]:
     """按文本方向融合横线区间、规则文本和填充行带，生成表格候选。"""
 
@@ -58,6 +68,7 @@ def _detect_table_candidates(
     ] + tiled
     filled_grid_bboxes = [candidate.bbox for candidate in filled_grid_candidates]
     rule_candidates: list[_TableCandidate] = []
+    caption_edges_by_angle = {}
     angles = sorted({line.angle for line in source.lines})
     for angle in angles:
         angle_lines = [line for line in source.lines if line.angle == angle]
@@ -103,6 +114,7 @@ def _detect_table_candidates(
             excluded_bboxes=local_excluded_bboxes,
             caption_candidates=caption_candidates,
             defer_materialization=True,
+            caption_edges=caption_edges_by_angle.setdefault(angle, []),
         )
         rule_candidates.extend(angle_rule_candidates)
         # 规则候选与闭合网格消费同一批横线/竖轨；复用上下文冻结的分量，
@@ -119,6 +131,7 @@ def _detect_table_candidates(
                 local_closed_grid_excluded_bboxes,
                 caption_candidates,
                 grid_components=shared_grid_components,
+                path_infos=source.path_infos,
                 previous_table_grid=source.previous_table_grid,
                 page_index=source.page_index,
                 leading_obstacles=[
@@ -137,6 +150,15 @@ def _detect_table_candidates(
         item
         for item in _detect_open_vertical_tables(source, excluded_bboxes)
         if not any(_bbox_overlap_in_first(item.core_bbox, candidate.core_bbox or candidate.bbox) >= 0.98 for candidate in base)
+        # 宽候选跨过本表的独立题注时，窄网格不能和跨表候选合并成含两份题注的单表。
+        and not (
+            item.inferred_grid_authoritative
+            and any(
+                _bbox_overlap_in_smaller(item.core_bbox, bounds) >= 0.5
+                and any(bounds[1] < annotation.bbox[1] < annotation.bbox[3] < bounds[3] for annotation in item.annotations)
+                for bounds in (candidate.core_bbox or candidate.bbox for candidate in base)
+            )
+        )
     ]
     # 长列线确认的完整表优先于其内部横线生成的片段；完整旧候选保持自己的物理边界和注释。
     base = [
@@ -178,15 +200,65 @@ def _detect_table_candidates(
     )
     for candidate in candidates:
         _trim_unruled_table_prose_tail(source, candidate)
+    occupied = [
+        *source.image_bboxes,
+        *source.form_bboxes,
+        *source.signature_bboxes,
+        *(candidate.core_bbox or candidate.bbox for candidate in candidates),
+    ]
+    non_graphics = [*(box for box in excluded_bboxes if box not in (vector_graphics or ())), *occupied]
+    stripes = _detect_repeated_fill_table_regions(source, non_graphics, vector_graphics or [])
+    candidates.extend(stripes)
+    candidates.extend(
+        _detect_unruled_label_value_regions(source, [*excluded_bboxes, *occupied, *(candidate.bbox for candidate in stripes)])
+    )
+    candidates.extend(
+        _detect_independent_closed_grid_regions(
+            source, [*non_graphics, *(candidate.bbox for candidate in stripes)], vector_graphics or []
+        )
+    )
+    candidates.extend(
+        _detect_period_amount_tables(
+            source, [*excluded_bboxes, *source.image_bboxes, *source.form_bboxes, *source.signature_bboxes], candidates
+        )
+    )
     _externalize_table_continuation_captions(
         source,
         candidates,
     )
     _bind_short_native_grid_captions(source, candidates)
+    if caption_owners is not None:
+        _bind_confirmed_rule_captions(source, candidates, caption_edges_by_angle, caption_owners)
     return sorted(
         candidates,
         key=lambda candidate: (candidate.bbox[1], candidate.bbox[0]),
     )
+
+
+def _bind_confirmed_rule_captions(source, candidates, edges_by_angle, caption_owners):
+    """用题注认领的物理横边匹配最终表体，仅将有唯一归属的原始题注行传向后处理。"""
+    for angle, edges in edges_by_angle.items():
+        if not edges:
+            continue
+        bodies = [
+            (candidate, _rotate_bbox_to_upright(candidate.core_bbox or candidate.bbox, source.page_size, angle))
+            for candidate in candidates if candidate.angle == angle
+        ]
+        owners = {}
+        for label, edge, above, em, outside in set(edges):
+            for index, (_, body) in enumerate(bodies):
+                if max(abs(body[0] - edge[0]), abs(body[2] - edge[2])) > em:
+                    continue
+                if abs(body[1 if above else 3] - _bbox_center_y(edge)) <= em:
+                    owners.setdefault(label, set()).add((outside, index, above))
+        for label, choices in owners.items():
+            # 首题在第一根横线上方或末题在末横线下方，可判定同系列的上下放置方向。
+            # 两种方向都能从序列外端解释、或都只能由内部距离解释时，继续要求唯一表体。
+            anchored = any(outside for outside, _, _ in choices)
+            matches = {(index, above) for outside, index, above in choices if outside == anchored}
+            if len(matches) == 1:
+                index, above = matches.pop()
+                caption_owners.setdefault(id(bodies[index][0]), []).append((label, above))
 
 
 def _bind_short_native_grid_captions(source: _PageSource, candidates: list[_TableCandidate]) -> None:
@@ -341,9 +413,257 @@ def _prose_rule_native_flags(source, candidates):
     return {index for index, conflict in zip(active_indices, flags, strict=True) if conflict}
 
 
+def _has_intertable_prose(source: _PageSource, gap: BBox, *, closed_grids: bool) -> bool:
+    """由表体外的源行确认正文屏障；贯穿区带的格线优先，弱横线还需验证独立双栏。"""
+    from .layout_evidence import build_layout_evidence
+    from .table_annotations import _is_table_note_text
+
+    left, top, right, bottom = gap
+    if any(
+        rule.orientation == "vertical"
+        and left <= _bbox_center_x(rule.bbox) <= right
+        and rule.bbox[1] <= top
+        and rule.bbox[3] >= bottom
+        for rule in source.drawing_lines
+    ):
+        return False
+    lines = [
+        line for line in source.lines
+        if line.angle == 0 and top < _bbox_center_y(line.bbox) < bottom
+        and left <= _bbox_center_x(line.bbox) <= right
+    ]
+    if closed_grids:
+        # 上下网格已分别通过闭合表判定。区带还须有两条相继的长正文行及句末；
+        # 单位/表题/单独一行表注不能用来切开真表。
+        prose = [
+            line for line in lines
+            if line.bbox[2] - line.bbox[0] >= 0.3 * (right - left)
+            and not line.caption_start and not _is_table_note_text(line.text)
+            and sum(char.isalpha() for char in line.text) >= 6
+        ]
+        if len(prose) < 2:
+            return False
+        first = min(prose, key=lambda line: _bbox_center_y(line.bbox))
+        last = max(prose, key=lambda line: _bbox_center_y(line.bbox))
+        return (
+            _bbox_center_y(last.bbox) - _bbox_center_y(first.bbox) > max(first.effective_height, last.effective_height)
+            and any(line.text.rstrip().endswith((".", "。", "!", "！", "?", "？", ":", "：")) for line in prose)
+        )
+    if len(lines) < 6:
+        return False
+    layout = build_layout_evidence(lines, source.page_size)
+    prose_lanes = 0
+    for lane in layout.lanes:
+        width = lane.right - lane.left
+        if width < 0.23 * (right - left):
+            continue
+        full = sum(box[2] - box[0] >= 0.85 * width for _, box in lane.lines)
+        if full >= 2 and any(re.search(r"[。！？.!?][”’）)\"]?\s*$", line.text) for line, _ in lane.lines):
+            prose_lanes += 1
+    return prose_lanes >= 2
+
+
+def _column_prose_rule_conflicts(source: _PageSource, candidates) -> set[int]:
+    """上下表均有独立结构且中间存在正文时，拒绝越过两者间隔的横线草稿。"""
+    drafts = []
+    grids = []
+    captions = {}
+    for index, item in enumerate(candidates):
+        if isinstance(item, _TableCandidate) and not item.angle:
+            grids.append(item.core_bbox or item.bbox)
+        elif isinstance(item, _RuleCandidateDraft) and not item.context.angle and item.boundaries:
+            top = item.boundaries[0].bbox
+            drafts.append((index, top, item.boundaries[-1].bbox))
+            if item.caption is None or not 0 <= top[1] - item.caption.bbox[3] <= item.context.median_height:
+                continue
+            prior = captions.get(id(item.caption))
+            if prior is None or top[1] < prior.boundaries[0].bbox[1]:
+                captions[id(item.caption)] = item
+    if not drafts or not captions and len(grids) < 2:
+        return set()
+
+    em = candidates[drafts[0][0]].context.median_height
+    # 同一个输入页可以同时包含闭合表及仅有横线的表。下表有紧贴的表题时先用表题
+    # 上沿界定正文；有独立闭合网格时直接使用表体边界，不将其内部长说明误计为正文。
+    draft_ends = [end for _, _, end in drafts]
+    regions = [(item.boundaries[0].bbox, item.caption.bbox[1], draft_ends, False) for item in captions.values()]
+    if len(grids) > 1:
+        regions.extend((lower, lower[1], grids, True) for lower in grids)
+    conflicts = set()
+    for lower, band_bottom, upper_choices, closed in regions:
+        ends = [box for box in upper_choices if box[3] <= band_bottom and _bbox_axis_overlap_ratio(box, lower, axis="x") >= 0.8]
+        if not ends:
+            continue
+        upper = max(ends, key=lambda box: box[3])
+        gap = (max(upper[0], lower[0]), upper[3], min(upper[2], lower[2]), band_bottom)
+        if gap[3] - gap[1] < 3 * em or gap[2] - gap[0] < 0.8 * max(upper[2] - upper[0], lower[2] - lower[0]):
+            continue
+        crossing = {
+            index for index, first, last in drafts
+            if first[1] <= upper[3] and last[3] >= lower[1]
+            and max(first[0], last[0]) <= gap[0] + em
+            and min(first[2], last[2]) >= gap[2] - em
+        }
+        if crossing and _has_intertable_prose(source, gap, closed_grids=closed):
+            conflicts.update(crossing)
+    return conflicts
+
+
+def _narrow_grid_exterior_prose_conflicts(source, candidates):
+    """独立窄网格旁若存在横线大候选误收的多个完整正文行，保留物理小表。"""
+    seed = next((item for item in candidates if isinstance(item, _RuleCandidateDraft) and not item.context.angle), None)
+    if seed is None:
+        return set()
+    em = seed.context.median_height
+    grids = [
+        item.core_bbox
+        for item in candidates
+        if isinstance(item, _TableCandidate)
+        and not item.angle
+        and item.core_bbox
+        and item.core_bbox[2] - item.core_bbox[0] < max(40.0, 10.0 * em)
+    ]
+    if not grids:
+        return set()
+    drafts = [
+        (i, item)
+        for i, item in enumerate(candidates)
+        if isinstance(item, _RuleCandidateDraft) and not item.context.angle and item.boundaries
+    ]
+    rejected = set()
+    for grid in grids:
+        for index, draft in drafts:
+            if index in rejected:
+                continue
+            outer = _bbox_union_many([draft.boundaries[0].bbox, draft.boundaries[-1].bbox])
+            if outer[2] - outer[0] < 2 * (grid[2] - grid[0]) or _bbox_overlap_in_first(grid, outer) < 0.94:
+                continue
+            # 若外部正文还被独立贯穿竖轨分成单元格，保留现有大表及嵌套结构判定。
+            if any(
+                rule.orientation == "vertical"
+                and outer[0] - em <= _bbox_center_x(rule.bbox) <= outer[2] + em
+                and not grid[0] - em <= _bbox_center_x(rule.bbox) <= grid[2] + em
+                and rule.bbox[1] <= grid[1] + em
+                and rule.bbox[3] >= grid[3] - em
+                for rule in source.drawing_lines
+            ):
+                continue
+            side_lines = [
+                line
+                for line in source.lines
+                if line.angle == 0
+                and grid[1] < _bbox_center_y(line.bbox) < grid[3]
+                and outer[0] - em <= line.bbox[0]
+                and line.bbox[2] <= outer[2] + em
+                and (line.bbox[2] <= grid[0] or line.bbox[0] >= grid[2])
+                and line.bbox[2] - line.bbox[0] >= 4 * em
+                and sum(c.isalpha() for c in line.text) >= 6
+                and line.text.rstrip().endswith((".", "。", "!", "！", "?", "？", ":", "："))
+            ]
+            if (
+                len(side_lines) >= 2
+                and max(_bbox_center_y(line.bbox) for line in side_lines)
+                - min(_bbox_center_y(line.bbox) for line in side_lines)
+                > em
+            ):
+                rejected.add(index)
+    return rejected
+
+
+def _enclosing_prose_drafts(source, candidates):
+    """两层横线候选共享全部多列成员时，避免把小表上下的独立正文一起认领。"""
+    if len(candidates) < 2:
+        return set()
+    groups = {}
+    for index, draft in enumerate(candidates):
+        if not isinstance(draft, _RuleCandidateDraft) or draft.context.angle:
+            continue
+        members = frozenset(fragment.line_index for row in draft.rows if len(row.fragments) >= 2 for fragment in row.fragments)
+        if members:
+            bounds = _bbox_union(draft.boundaries[0].bbox, draft.boundaries[-1].bbox)
+            groups.setdefault(members, []).append((index, draft, bounds))
+
+    rejected = set()
+    discarded_bounds = []
+    for peers in groups.values():
+        if len(peers) < 2:
+            continue
+        for index, outer, box in peers:
+            em = outer.context.median_height
+            for _, _, core in peers:
+                if not (
+                    box[1] + 2 * em < core[1] < core[3] < box[3] - 2 * em
+                    and box[0] <= core[0] + em
+                    and box[2] >= core[2] - em
+                    and max(core[0] - box[0], box[2] - core[2]) > 2 * em
+                ):
+                    continue
+                # 真正贯穿上下外框的竖边支持嵌套单元格，应保留外围候选。
+                if any(
+                    rule.orientation == "vertical"
+                    and box[0] - em <= _bbox_center_x(rule.bbox) <= box[2] + em
+                    and rule.bbox[1] <= box[1] + em
+                    and rule.bbox[3] >= box[3] - em
+                    for rule in source.drawing_lines
+                ):
+                    continue
+                # 内表有自己的上下横线及多列成员。两端都须有正文，其中一端至少两行。
+                prose = [
+                    row
+                    for row in outer.rows
+                    if len(row.fragments) == 1
+                    and row.bbox[2] - row.bbox[0] >= 0.45 * (core[2] - core[0])
+                    and sum(c.isalpha() for c in row.fragments[0].text) >= 6
+                ]
+                before = sum(row.bbox[3] < core[1] - em for row in prose)
+                after = sum(row.bbox[1] > core[3] + em for row in prose)
+                if before and after and max(before, after) >= 2:
+                    rejected.add(index)
+                    discarded_bounds.append(box)
+                    break
+    if not discarded_bounds:
+        return rejected
+    for peers in groups.values():
+        for i, shell, box in peers:
+            if i in rejected or shell.caption is not None:
+                continue
+            # 大框撤销后，恢复它内部的小表和共用下边线的下一张表的真实起点。
+            if not any(
+                _bbox_overlap_in_first(box, outer) >= 0.99
+                or (
+                    abs(box[1] - outer[3]) <= shell.context.median_height
+                    and _bbox_axis_overlap_ratio(box, outer, axis="x") >= 0.9
+                )
+                for outer in discarded_bounds
+            ):
+                continue
+            for _, body, body_box in peers:
+                if body.caption is None or box[1] >= body_box[1] or box[0] != body_box[0] or box[2:] != body_box[2:]:
+                    continue
+                # 两草稿仅相差一条已被识别的独立表题，其下所有源行的成员完全一致。
+                if len(shell.rows) != len(body.rows) + 1:
+                    continue
+                first, *rest = shell.rows
+                if (
+                    len(first.fragments) == 1
+                    and first.fragments[0].line_index == body.caption.source_index
+                    and first.center_y < body_box[1]
+                    and [f.line_index for row in rest for f in row.fragments]
+                    == [f.line_index for row in body.rows for f in row.fragments]
+                ):
+                    rejected.add(i)
+                    break
+    return rejected
+
+
 def _exclude_prose_spanning_rule_drafts(source, candidates):
-    """只移除原生确认跨越独立正文的弱线草稿，保留候选对象及原有顺序。"""
-    conflicts = _prose_rule_native_flags(source, candidates)
+    """拒绝与闭合网格前正文或两张有界表之间的独立正文冲突的草稿。"""
+    conflicts = (
+        _prose_rule_native_flags(source, candidates)
+        | _column_prose_rule_conflicts(source, candidates)
+        | _narrow_grid_exterior_prose_conflicts(source, candidates)
+        | _enclosing_prose_drafts(source, candidates)
+    )
     return [candidate for index, candidate in enumerate(candidates) if index not in conflicts]
 
 
@@ -1594,12 +1914,40 @@ def _detect_open_vertical_tables(source: _PageSource, excluded_bboxes: list[BBox
             continue
         # 表内的编号与字符必须在各列线之间；横跨多数列的自然句子不构成开边表格。
         long_tracks = [box for box in tracks if box[1] <= top + 0.5 * em]
-        if any(
+        crossing = any(
             line.bbox[0] + 0.3 * em < _bbox_center_x(box) < line.bbox[2] - 0.3 * em
             for row in data
             for line in row
             for box in long_tracks
-        ):
+        )
+        if crossing:
+            # 组行可能把紧排的相邻格文字合成一个行框；只有编号表题和真实竖轨能启动字形级复核。
+            local_source = replace(
+                source, lines=[line for line in source.lines if _bbox_axis_overlap_ratio(line.bbox, bounds, axis="x") >= 0.5]
+            )
+            annotations = _bounded_table_caption_annotations(local_source, bounds, em)
+            if not annotations or not any(
+                line.source_index in annotations[0].line_indices
+                and re.match(r"^\s*(?:table|tab\.?|表格?)\s*(?:\d+(?:\.\d+)*|[IVX]+)[.:：\s]", line.text, re.I)
+                for line in local_source.lines
+            ):
+                continue
+            inferred = infer_captioned_open_grid(source, bounds, _bbox_center_y(rule), long_tracks)
+            if inferred:
+                output.append(
+                    _TableCandidate(
+                        bbox=_bbox_union_many([bounds, *(annotation.bbox for annotation in annotations)]),
+                        local_bbox=bounds,
+                        core_bbox=bounds,
+                        angle=0,
+                        score=12,
+                        line_indices={line.source_index for line in members},
+                        annotations=annotations,
+                        inferred_grid=inferred,
+                        inferred_grid_authoritative=True,
+                        preserve_inline_font_styles=True,
+                    )
+                )
             continue
         bounds = (
             bounds[0],

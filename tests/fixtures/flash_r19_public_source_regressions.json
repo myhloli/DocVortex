@@ -1,0 +1,30 @@
+{
+  "leica": {
+    "source_url": "https://leica-camera.com/sites/default/files/2025-12/F_courrier_109_WEB.pdf",
+    "sha256": "5c0a785cc415a5cf31f93737886bbf4a8baca8b8eea5e32f8d38b7fe96b5e8da",
+    "pages": 31,
+    "physical_page": 16,
+    "body_region": [0.54, 0.48, 0.967, 0.82],
+    "article_bounds": ["Vlad Corneci", "pas notre salon"],
+    "paragraph_anchors": [
+      ["Vlad Corneci", "a transformé son salon"],
+      ["pouvant atteindre 100 pouces", "qui transforme instantanément le salon"],
+      ["latence extrêmement faible", "incroyablement nette"],
+      ["facilement déplacé", "reçoit des invités"]
+    ]
+  },
+  "rogers": {
+    "source_url": "https://about.rogers.com/wp-content/uploads/2019/10/Rogers-2013-Annual-Report.pdf",
+    "sha256": "ab1119d61604b1c2c8cfc1ecec60697c92016771a97377d2dbfdade6d125398f",
+    "pages": 132,
+    "physical_page": 23,
+    "columns": [[0.523, 0.655], [0.668, 0.798], [0.811, 0.943]],
+    "rows": [[0.597, 0.658], [0.668, 0.728], [0.738, 0.798], [0.808, 0.869]],
+    "row_major_anchors": [
+      "chairman roles", "lead director", "charters",
+      "whistleblower", "share ownership", "in camera",
+      "annual reviews", "external auditors", "new directors",
+      "education sessions", "independent advisors", "relationship standards"
+    ]
+  }
+}

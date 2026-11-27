@@ -227,7 +227,7 @@ pub fn read_pdfium_text_snapshot(
     let (mut records, raw_fonts) =
         unsafe { docvortex_pdfium::read_characters(addresses, handle, count, extended) }
             .map_err(read_error)?;
-    super::pdfium::apply_unicode_fallback(py, &mut records, unicode_fallback)?;
+    super::pdfium::apply_unicode_fallback(py, &mut records, &raw_fonts, unicode_fallback)?;
     if !supported(&records, frame)
         || visibility.as_ref().is_some_and(|items| {
             items.values().any(|(_, clip)| {

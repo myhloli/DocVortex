@@ -224,6 +224,7 @@ def test_author_year_references_do_not_enable_appendix_numbered_lists():
     )
     mark_document_reference_regions([references, appendix])
     assert not appendix.numbered_references
+    assert not appendix.reference_regions
 
 
 @pytest.mark.parametrize("marker", ["(B7)", "‹B7›", "⟦B7⟧"])
@@ -315,3 +316,116 @@ def test_reference_boundaries_survive_public_page_finalization():
     merge_para_text_blocks(pages)
     assert pages[1]["blocks"][0]["continues_prev"]
     assert not pages[1]["blocks"][1].get("continues_prev")
+
+
+def test_reference_carry_needs_evidence_in_the_new_column():
+    """前页的文献标题不会让后一页的普通正文或图后的段落带上参考硬组。"""
+    refs = _PreparedPage(
+        (600, 800),
+        [
+            _line("References", (40, 680, 160, 690), 0),
+            _line("Novak, J. (2020). Observations across", (40, 714, 460, 724), 1),
+            _line("several independent sites and", (56, 730, 460, 740), 2),
+        ],
+        [],
+        [],
+        [],
+    )
+    tail = _line("their associated field reports.", (56, 62, 318, 72), 0)
+    entries = [
+        _line("Lopez, M. (2019). Another field study.", (40, 79, 470, 89), 1),
+        _line("Journal of Experiments, 10, 101–121.", (56, 94, 457, 104), 2),
+        _line("Tan, A. (2022). Independent measurements.", (40, 111, 471, 121), 3),
+    ]
+    body = [
+        _line("Ordinary prose from the next section.", (40 + (i % 2) * 16, 270 + i * 15, 450, 280 + i * 15), 10 + i)
+        for i in range(4)
+    ]
+    next_page = _PreparedPage((600, 800), [tail, *entries, *body], [], [], [{"type": "image", "bbox": (40, 140, 450, 240)}])
+    unrelated = _PreparedPage((600, 800), body, [], [], [])
+    mark_document_reference_regions([refs, next_page, unrelated])
+    assert any(box[1] <= 66 < 118 <= box[3] <= 140 for box in next_page.reference_regions)
+    group_reference_lines(next_page.remaining_lines, next_page)
+    assert all(line.paragraph_group is None for line in body)
+    assert not unrelated.reference_regions
+
+
+def test_unfinished_author_year_entry_can_end_on_the_next_page():
+    """仅剩顶端续行时，依据上页未完条目的挂缩进保留它，并在左缘正文处终止。"""
+    refs = _PreparedPage(
+        (600, 800),
+        [
+            _line("Bibliography", (40, 650, 160, 660), 0),
+            _line("Young, M. (2012). Proceedings from", (40, 700, 440, 710), 1),
+            _line("the international conference on", (55, 715, 455, 725), 2),
+        ],
+        [],
+        [],
+        [],
+    )
+    finish = _line("materials, pp. 15–27.", (55, 60, 210, 70), 0)
+    prose = _line("This chapter introduces the next experiment.", (40, 114, 420, 124), 1)
+    page = _PreparedPage((600, 800), [finish, prose], [], [], [])
+    mark_document_reference_regions([refs, page])
+    assert len(page.reference_regions) == 1
+    assert page.reference_regions[0][1] <= 60 and 70 <= page.reference_regions[0][3] < 114
+
+
+@pytest.mark.parametrize("indent", [0, 14])
+def test_carried_bibliography_with_publication_years_inside_wrapped_names(indent):
+    """跨页作者名单的年代可在续行才出现；无悬挂缩进的书目也应保留整栏范围。"""
+    first = _PreparedPage(
+        (600, 800),
+        [
+            _line("References", (40, 600, 210, 610), 0),
+            _line("Paul Nguyen and Alex Martin. 2018. Collected essays.", (40, 623, 420, 633), 1),
+            _line("Series in History.", (54, 637, 311, 647), 2),
+        ],
+        [],
+        [],
+        [],
+    )
+    rows = [
+        "Eva Martin and Thomas Young. A line of authors,",
+        "and Marie Schmidt. 2020. Measurement of dispersions.",
+        "Society Proceedings, vol. 3.",
+        "Luis Pinto, Anna Brown and researchers",
+        "from two institutes. 2016. Experiments in the field.",
+        "Collected papers, pp. 19–23.",
+    ]
+    lines = [_line(s, (40 + (indent if i % 3 else 0), 62 + i * 16, 460, 72 + i * 16), i) for i, s in enumerate(rows)]
+    second = _PreparedPage((600, 800), lines, [], [], [])
+    mark_document_reference_regions([first, second])
+    assert any(r[1] <= 62 and r[3] >= 152 for r in second.reference_regions)
+
+
+def test_linked_citation_tail_and_date_on_its_own_line_protect_reference_items():
+    """跨页 DOI 续行、作者较多的编号条目和独占一行的年份均能建立栏内书目证据。"""
+    for prefix in (
+        ["Ortiz Moore and Claire Jones. Research with long authors", "Data about the surveys", "2018."],
+        ["vances in statistical models.", "M. (2018), https://doi.org/10.1000/example"],
+    ):
+        first = _PreparedPage(
+            (600, 800),
+            [
+                _line("References", (50, 520, 180, 531), 0),
+                _line("Anders, R. (2022). Earlier research.", (50, 545, 353, 556), 1),
+                _line("Collected papers.", (63, 560, 214, 571), 2),
+            ],
+            [],
+            [],
+            [],
+        )
+        data = prefix + [
+            "2. Peters, K. and Dixon, R.",
+            "Research on classification.",
+            "2019.",
+            "3. Smith, L. (2020). Other sources.",
+        ]
+        lines = [
+            _line(t, (50 if i == 0 or t[:1] in {"2", "3"} and ". " in t[:3] else 63, 65 + i * 14, 408, 75 + i * 14), i)
+            for i, t in enumerate(data)
+        ]
+        page = _PreparedPage((600, 800), lines, [], [], [])
+        mark_document_reference_regions([first, page])
+        assert any(r[1] <= 65 and r[3] >= lines[-1].bbox[3] for r in page.reference_regions)

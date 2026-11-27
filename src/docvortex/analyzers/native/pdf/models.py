@@ -13,7 +13,9 @@ from ....schema import BBox
 
 if TYPE_CHECKING:
     from ....document.pdf.form_structure import _PDFFormInfo
+    from ....document.pdf.native_contracts import PDFImageInfo
     from .inline.types import PDFTextScriptLine
+    from .form_expansion import FormExpansion
 
 _MARKER_REGEX_REFERENCES = (re.match, re._compile)
 
@@ -164,10 +166,13 @@ class _LineItem:
     numbered_heading_start: bool = False
     native_math_words: frozenset[str] = field(default_factory=frozenset)
     wrapped_title_parts: tuple[_LineItem, _LineItem] | None = field(compare=False, repr=False, default=None)
+    # 保留换行两端的实际字体；同行混排时主导字体不能代表最后或最先出现的字形。
+    edge_fonts: tuple[tuple[str, int] | None, tuple[str, int] | None] = field(compare=False, default=(None, None))
     native_title_label_left: float | None = field(compare=False, default=None)
     _marker_features: tuple | None = field(compare=False, repr=False, default=None)
     # 数字图形特征只绑定当前文字对象；几何、语义和认领状态每次重新判断。
     _graphic_numeric_features: tuple | None = field(compare=False, repr=False, default=None)
+    layout_glyph_ranges: bytes = field(compare=False, repr=False, default=b"")
 
     def __post_init__(self) -> None:
         """为旧调用与合成测试补齐可选来源几何字段。"""
@@ -267,6 +272,26 @@ class _TableCandidate:
 
 
 @dataclass(slots=True)
+class _VerifiedTableCandidate(_TableCandidate):
+    """全页新提名附上独立边界证据，旧候选的值表示不增加字段。"""
+
+    # 重复行带提出的候选必须恢复预期行数并保全字符，失败时原有内容所有权不变。
+    verified_region_rows: int = 0
+    # 独立闭合笔画给出精确列数，也允许从较大的误判图形组件中移走整幅表。
+    verified_region_columns: int = 0
+    # 重复底纹正文独立证实的公共列沟，用于校验欠分割的网格。
+    verified_region_gutters: tuple[tuple[float, float], ...] = ()
+    # 实体竖轨只需贯穿有底纹证明的正文，接回的框外表头不稀释此条件。
+    verified_region_body_band: tuple[float, float] | None = None
+    # 年份列确认精确列数，同时允许跨列总表头和没有金额的小节。
+    verified_period_columns: int = 0
+    # 用较小新表替换跨正文旧表时，其余已识别的金额行必须先由前面的独立表成功输出。
+    verified_period_dependencies: tuple[BBox, ...] = ()
+    # 分开绘制的完整外框和内轨限定每一个物理格，不用平均行高推算横线位置。
+    verified_grid_tracks: tuple[tuple[float, ...], tuple[float, ...]] | None = None
+
+
+@dataclass(slots=True)
 class _GraphicCandidate:
     """保存由紧凑绘图线组件形成的图形文本容器候选。"""
 
@@ -344,12 +369,36 @@ class _PageSource:
     publication_bboxes: list[BBox] = field(default_factory=list)
     drawing_component_cache: list[tuple[list[_AxisLine], float, list[_DrawingComponentSummary]]] = field(default_factory=list)
     form_infos: tuple[_PDFFormInfo, ...] = ()
+    # 整页装饰只按实际 Form 调用身份排除，子位图已由同一页面的源过滤证明。
+    discarded_raster_forms: frozenset[int] = frozenset()
     form_member_sources: dict[BBox, frozenset[int]] = field(default_factory=dict)
     form_path_sources: dict[BBox, frozenset[int]] = field(default_factory=dict)
     retained_page_forms: set[BBox] = field(default_factory=set)
+    # 原字符存在未决遮挡时，不用它们替换已有图框；该信号不触发PP。
+    text_visibility_uncertain: bool = False
     compound_baseline_cache: dict = field(default_factory=dict)
     isolated_path_cache: dict = field(default_factory=dict)
     previous_table_grid: _TableContinuationGrid | None = None
+    # 部分结构可用时，残余表仍需避开已认领的近邻题名虚边。
+    trusted_text_bboxes: tuple[BBox, ...] = ()
+    # 已证实由本页点阵图、原生引线及图外标签共同组成的占位。
+    raster_callout_bboxes: dict[BBox, BBox] = field(default_factory=dict)
+    # 记录重复位图的唯一邻接图题，以便语义组装时沿用同一父图证据。
+    raster_caption_rows: dict[BBox, tuple[BBox, str]] = field(default_factory=dict)
+    # 保留局部位图合成证据，待竞争容器筛选结束后裁定。
+    raster_composite_infos: tuple[PDFImageInfo, ...] = ()
+    collect_layout_diagnostics: bool = False
+    layout_raster_fingerprints: dict[BBox, str] | None = None
+    # 有独立原始位图身份的大幅内容图，供少数带标注内嵌图的页面核对整体归属。
+    inset_base_bboxes: frozenset[BBox] = frozenset()
+
+
+@dataclass(frozen=True, slots=True)
+class _DeferredFilledRegion:
+    """保存已由分面几何验证的图核及候选源行，供块装配后整组认领。"""
+
+    bbox: BBox
+    members: tuple[_LineItem, ...]
 
 
 @dataclass(slots=True)
@@ -361,6 +410,9 @@ class _PreparedPage:
     table_bboxes: list[BBox]
     drawing_lines: list[_AxisLine]
     fixed_blocks: list[dict[str, Any]]
+    deferred_filled_regions: list[_DeferredFilledRegion] = field(default_factory=list)
+    # 已确认的裸位图及其唯一源题名，正文组装完成后才进入排序。
+    deferred_raster_captions: dict[BBox, tuple[BBox, str]] = field(default_factory=dict)
     # 只保留小圆点候选的轻量路径证据，供完成文本聚合后恢复局部列表。
     bullet_paths: tuple[PDFPathInfo, ...] = ()
     canonical_formula_geometry: bool = False
@@ -373,11 +425,19 @@ class _PreparedPage:
     script_lines: list[PDFTextScriptLine] = field(default_factory=list)
     formula_candidate_lines: list[_LineItem] = field(default_factory=list)
     formula_ink_bboxes: list[BBox] = field(default_factory=list)
+    # 仅有异常宽松定界符的页面保留行墨迹，用于公式输出框的邻行核验。
+    formula_crop_ink: dict[int, tuple[str, BBox, bool]] | None = None
     # 稀疏表格页保留无字符载荷的原生行样式，防止表体认领后只用大题名反向统计正文。
     table_body_profile_lines: list[_LineItem] = field(default_factory=list)
     local_axis_table_cache: dict[tuple[int, int, int], tuple[list[_LocalAxisLine], list[_LocalAxisLine]]] = field(
         default_factory=dict
     )
+    # 被结构树作为 Artifact 隔离的书目运行页眉只用于确认上下文，不向正文回填。
+    reference_running_heading: bool = False
+    # 页内候选不参与整件样式学习，选定后同步其行内材料与诊断。
+    form_expansion: FormExpansion | None = None
+    # 残余水印排除后的页面应使用已确认的公式、目录及题项证据约束章节晋升。
+    preserve_non_title_roles: bool = False
 
 
 @dataclass(slots=True)

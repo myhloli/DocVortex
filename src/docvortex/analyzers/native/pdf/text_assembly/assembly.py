@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import statistics
 import re
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 from .....foundation._text import is_hyphen_at_line_end
 from .....schema import BBox
@@ -53,6 +53,9 @@ from .rows import (
     _structured_text_break_sources,
 )
 
+if TYPE_CHECKING:
+    from ..layout_diagnostics import LayoutDiagnosticPage
+
 
 def _build_text_blocks(
     lines: list[_LineItem],
@@ -63,6 +66,7 @@ def _build_text_blocks(
     page_footnote_groups: Sequence[set[int]] | None = None,
     page_index: int | None = None,
     visual_bboxes: Sequence[BBox] | None = None,
+    layout_page: LayoutDiagnosticPage | None = None,
 ) -> list[dict[str, Any]]:
     """先构建分组脚注，再按类型屏障、栏带和自然段边界聚合其余文本。"""
 
@@ -162,6 +166,10 @@ def _build_text_blocks(
             }
             structured_break_sources.update(rule_break_sources)
             protected_break_sources.update(rule_break_sources)
+            if layout_page is not None:
+                for previous, current in zip(lane.lines, lane.lines[1:]):
+                    if current[0].source_index in protected_break_sources:
+                        layout_page.record_break(previous[0], current[0])
             hanging_indent_groups = _build_hanging_indent_group_map(
                 lane,
                 table_bboxes,

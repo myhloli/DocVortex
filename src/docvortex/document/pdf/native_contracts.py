@@ -127,6 +127,16 @@ class PDFImageInfo:
     smooth_background: bool = False
     # 图片自身像素证明的白色/透明顶边，仅供原生布局排除相邻大标题使用。
     blank_top_bbox: BBox | None = None
+    composite_inner_bboxes: tuple[BBox, ...] = ()
+    shadow_ink_bbox: BBox | None = None
+    quiet_band_backdrop: bool = False
+    occluded_inner_bboxes: tuple[BBox, ...] = ()
+    # 原图的大部分被同槽后画版本重绘，合并裁片时保留两个框的并集。
+    repainted_inner_bboxes: tuple[BBox, ...] = ()
+    # 源绘制证实的搭档及保留裁片。两原候选均须通过最终容器筛选。
+    raster_pair: tuple[BBox, BBox] | None = None
+    # 本页 Form 家族内的实际 Image 放置编号；独立位图不需要该编号。
+    form_raster_id: int | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,6 +164,10 @@ class _PDFFormInfo:
     path_indices: frozenset[int]
     image_bboxes: tuple[BBox, ...]
     structure_valid: bool
+    parallel_rules_only: bool = False
+    image_source_ids: tuple[int | None, ...] = ()
+    declared_watermark: bool = False
+    has_untracked_content: bool = False
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -171,6 +185,7 @@ class _PDFPageSnapshot:
     link_annotations: list[PDFLinkAnnotation]
     native_text: Any = None
     form_infos: tuple[_PDFFormInfo, ...] = ()
+    text_visibility_uncertain: bool = False
 
     def __init__(
         self,
@@ -185,6 +200,7 @@ class _PDFPageSnapshot:
         link_annotations: list[PDFLinkAnnotation],
         native_text: Any = None,
         form_infos: tuple[_PDFFormInfo, ...] = (),
+        text_visibility_uncertain: bool = False,
     ) -> None:
         """保留既有text_geometry构造关键字和位置顺序，内部字段仅用于惰性兼容缓存。"""
         for name, value in (
@@ -199,6 +215,7 @@ class _PDFPageSnapshot:
             ("link_annotations", link_annotations),
             ("native_text", native_text),
             ("form_infos", form_infos),
+            ("text_visibility_uncertain", text_visibility_uncertain),
         ):
             object.__setattr__(self, name, value)
 

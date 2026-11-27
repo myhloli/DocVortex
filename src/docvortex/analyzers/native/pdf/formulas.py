@@ -44,12 +44,14 @@ from .models import _AxisLine, _FormulaAnchor, _LineItem, _PageSource, _TextLane
 from .native_text import _sanitize_pdf_control_text
 from .text_roles import has_prose, prose_residue, publication_text
 from .layout_evidence import build_layout_evidence
+from .layout_diagnostics import retain_line_members
 
 _FORMULA_NUMBER_SUFFIX_RE = re.compile(r"^(?P<prefix>.*?)(?P<marker>[(（﹙][^()（）﹙﹚\r\n]+[)）﹚])\s*$")
 _FORMULA_NUMBER_MARKER_RE = re.compile(
     r"^[（(﹙]\s*(?:(?:[A-Za-z][.]?)?\d+(?:[.\-]\d+)*)\s*[)）﹚]$",
 )
 _FORMULA_OPERATOR_CHARS = frozenset("=<>≤≥≠≈∝∈∑∫√±×÷−")
+_FORMULA_CROP_DELIMITER_RE = re.compile(r"[()\[\]{}]")
 
 
 _FORMULA_PAGE_MARGIN_RATIO = 0.05
@@ -125,6 +127,7 @@ class _VectorFormulaCandidate:
     bbox: BBox
     path_source_indices: set[int]
     has_number: bool = False
+    text_number: _LineItem | None = None
 
 
 def _build_vector_formula_blocks(
@@ -232,6 +235,8 @@ def _build_vector_formula_blocks(
         if not blocks[-1]["_vector_edge_decoration"]:
             blocks[-1].pop("_vector_shape")
             blocks[-1].pop("_vector_edge_decoration")
+        if source.collect_layout_diagnostics and candidate.text_number is not None:
+            retain_line_members(blocks[-1], (candidate.text_number,), enabled=True)
         hosts = {
             index
             for component in components
@@ -803,6 +808,7 @@ def _attach_vector_formula_text_numbers(
             candidate.bbox = _bbox_union(candidate.bbox, bbox)
             candidate.has_number = True
             claimed.add(line.source_index)
+            candidate.text_number = line
     return claimed
 
 
@@ -817,6 +823,69 @@ def _standalone_formula_number_marker(text: str) -> str | None:
     return marker if not prefix else None
 
 
+def _capture_formula_crop_ink(lines: list[_LineItem]) -> dict[int, tuple[str, BBox, bool]] | None:
+    """在释放字符前，仅为有异常定界符的页面保存可验证的行墨迹。"""
+    inflated = set()
+    for line in lines:
+        if line.angle or not _FORMULA_CROP_DELIMITER_RE.search(line.text):
+            continue
+        for char in line.chars:
+            if char.get("char") not in {"(", ")", "[", "]", "{", "}"} or char.get("is_generated"):
+                continue
+            tight = _coerce_bbox(char.get("tight_bbox"))
+            loose = _coerce_bbox(char.get("loose_bbox") or char.get("bbox"))
+            if tight and loose and 2 * (tight[3] - tight[1]) <= loose[3] - loose[1]:
+                inflated.add(line.source_index)
+                break
+    if not inflated:
+        return None
+
+    evidence = {}
+    for line in lines:
+        if line.angle:
+            continue
+        boxes = [
+            _coerce_bbox(char.get("tight_bbox"))
+            for char in line.chars
+            if char.get("char", "").strip() and not char.get("is_generated")
+        ]
+        if boxes and None not in boxes:
+            evidence[line.source_index] = (line.text, _bbox_union_many(boxes), line.source_index in inflated)
+    return evidence
+
+
+def _tighten_spatial_formula_crop(
+    block: dict[str, Any],
+    members: list[tuple[_LineItem, BBox]],
+    anchor_line: _LineItem,
+    crop_ink: dict[int, tuple[str, BBox, bool]],
+) -> None:
+    """仅在无编号空间公式的松框吞入邻行正文时收紧纵向裁图。"""
+    if anchor_line.angle or _split_trailing_formula_number(anchor_line.text):
+        return
+    ids = {line.source_index for line, _bbox in members}
+    if not any(crop_ink.get(index, (None, None, False))[2] for index in ids):
+        return
+    ink = []
+    for line, _bbox in members:
+        evidence = crop_ink.get(line.source_index)
+        if evidence is None or evidence[0] != line.text or _standalone_formula_number_marker(line.text):
+            return
+        ink.append(evidence[1])
+    old = block.get("_tight_output_bbox", block["bbox"])
+    top = max(old[1], min(box[1] for box in ink) - 0.75)
+    bottom = min(old[3], max(box[3] for box in ink) + 0.75)
+    if not old[1] <= top < bottom <= old[3]:
+        return
+    for index, (text, box, _) in crop_ink.items():
+        if index in ids or min(old[2], box[2]) - max(old[0], box[0]) < 0.15 * (old[2] - old[0]):
+            continue
+        cut = max(min(top, box[3]) - max(old[1], box[1]), min(old[3], box[3]) - max(bottom, box[1]))
+        if cut >= 0.4 * (box[3] - box[1]) and _has_sentence_words(text):
+            block["_tight_output_bbox"] = (old[0], top, old[2], bottom)
+            return
+
+
 @_formula_page_scope
 def _build_formula_like_blocks(
     lines: list[_LineItem],
@@ -824,6 +893,7 @@ def _build_formula_like_blocks(
     page_size: tuple[float, float],
     *,
     drawing_lines: list[_AxisLine] | None = None,
+    crop_ink: dict[int, tuple[str, BBox, bool]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[_LineItem]]:
     """仅依据栏带、右侧短锚点和空间连通关系聚合公式状区域。"""
 
@@ -1032,6 +1102,8 @@ def _build_formula_like_blocks(
                 )
                 if block is None:
                     continue
+                if crop_ink:
+                    _tighten_spatial_formula_crop(block, members, anchor_line, crop_ink)
                 blocks.append(block)
                 claimed_source_indices.update(line.source_index for line, _bbox in members)
 
@@ -2541,6 +2613,31 @@ def _split_visual_row_has_prose_continuation(
     row_bbox = _bbox_union_many([bbox for _line, bbox in fragment_geometry])
     if row_bbox[2] - row_bbox[0] < 0.75 * lane_width:
         return False
+    if (
+        abs(row_bbox[0] - lane.left) <= 0.75 * median_height
+        and re.fullmatch(r"[A-Za-z]{4,}[.,]?", anchor_line.text.strip())
+        and _display_math_has_prose(anchor_line.text)
+        and not any(_formula_line_has_math_operator(line.text) for line, _ in fragment_geometry)
+    ):
+        # 排除真正数学带旁被宽松字距切开的正文，保留普通段落已有的重组路径。
+        word_centers = [
+            _bbox_center_y(bbox)
+            for line, bbox in fragment_geometry
+            if re.fullmatch(r"[A-Za-z]{4,}[.,]?", line.text.strip())
+            and _display_math_has_prose(line.text)
+            and 0.75 * median_height <= _line_effective_height(line, bbox) <= 1.3 * median_height
+        ]
+        if len(word_centers) >= 3 and max(word_centers) - min(word_centers) <= 0.25 * median_height:
+            visual_center = _bbox_center_y(row_bbox)
+            if any(
+                line.source_index not in fragment_sources
+                and line.visual_row_id != anchor_line.visual_row_id
+                and abs(_bbox_center_y(bbox) - visual_center) >= 0.5 * median_height
+                and max(0.0, row_bbox[1] - bbox[3], bbox[1] - row_bbox[3]) <= 2.0 * median_height
+                and _formula_line_has_math_operator(line.text)
+                for line, bbox in lane.lines
+            ):
+                return True
     row_center = statistics.median(_bbox_center_y(bbox) for _line, bbox in fragment_geometry)
     if any(
         abs(_bbox_center_y(bbox) - row_center) > 0.25 * median_height
@@ -3027,4 +3124,6 @@ def _formula_members_to_block(
         block["_tight_output_bbox"] = tight_output_bbox
     if include_member_ids:
         block["_formula_members"] = [line.source_index for line, _bbox in members]
+    if any(line.layout_glyph_ranges for line, _ in members):
+        retain_line_members(block, (line for line, _ in members), enabled=True)
     return block

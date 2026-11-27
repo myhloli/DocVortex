@@ -6,6 +6,12 @@ import re
 import unicodedata
 
 
+_FOOTNOTE_RE = re.compile(
+    r"^\s*(?:source(?:s|\(s\))?|data\s+source|note(?:s|\(s\))?"
+    r"|资料来源|数据来源|来源|注|备注)\s*[:：]\s*\S",
+    re.IGNORECASE | re.DOTALL,
+)
+
 _IDENTIFIER_PATTERN = (
     r"(?:"
     r"(?:[A-Z]\s*[.-]?\s*)?\d+(?:\s*[-./–—]\s*[A-Z]?\d+)*[A-Z]?"
