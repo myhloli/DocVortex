@@ -152,6 +152,12 @@ class LayoutDiagnosticPage:
     accepted_suppressed_glyphs: GlyphRanges = b""
     visual_tables: tuple[VisualTableEvidence, ...] = ()
     program_controls: tuple[BBox, ...] = ()
+    vector_summary: tuple[int, int, int] | None = None
+
+    def record_vector_summary(self, drawing_lines: Sequence, path_infos: Sequence[PDFPathInfo]) -> None:
+        """记录原始页面绘图线数、可见路径数与总路径数，供版面评分复用免重读。"""
+        visible_paths = sum(1 for path in path_infos if path.fill_visible or path.stroke_visible)
+        self.vector_summary = (len(drawing_lines), visible_paths, len(path_infos))
 
     def record_visual_tables(
         self,
@@ -345,6 +351,37 @@ class LayoutDiagnosticPage:
                 return f"{kind}框占整页 {area / page_area:.1%}，图面覆盖 {covered:.1%}，区域 {_region(bounds)}"
         return None
 
+    def major_missing_visual(self, blocks: list[dict]) -> str | None:
+        """识别占整页非背景区域显著比例且未被有效承接的主体缺图，矢量图组允许由原生表格承接。"""
+        if not self.visual_sources:
+            return None
+        width, height = self.page_size
+        page_area = width * height
+        if page_area <= 0:
+            return None
+        visual_covers: list[BBox] = []
+        table_covers: list[BBox] = []
+        for block in blocks:
+            box = block.get("bbox")
+            if not box:
+                continue
+            rect = (box[0] * width, box[1] * height, box[2] * width, box[3] * height)
+            kind = block.get("type")
+            if kind in {"image", "chart", "equation", "image_block"} or (kind == "table" and bool(block.get("image_base64"))):
+                visual_covers.append(rect)
+            if kind == "table":
+                table_covers.append(rect)
+        for kind, bounds in self.visual_sources:
+            area = _bbox_area(bounds)
+            area_ratio = area / page_area
+            if area <= 0 or area_ratio > 0.85:
+                continue
+            covers = visual_covers + table_covers if kind == "矢量图组" else visual_covers
+            covered = _union_coverage(bounds, covers) / area
+            if covered < 0.50 and area_ratio * (1.0 - covered) >= 0.15:
+                return f"大面积{kind}缺失（占整页 {area_ratio:.1%}，图面覆盖 {covered:.1%}），区域 {_region(bounds)}"
+        return None
+
     def _visual_table_conflict(self, output: list[_OutputBlock]) -> str | None:
         """核查源表区由图片覆盖且缺少对应表格容器的角色冲突。"""
         if not self.visual_tables:
@@ -395,7 +432,9 @@ class LayoutDiagnosticPage:
                     continue
                 switches = [item for i, item in enumerate(sequence) if i == 0 or item[0] != sequence[i - 1][0]]
                 for first, second, third in zip(switches, switches[1:], switches[2:]):
-                    # 左右栏需在当前带有纵向重叠，独立上下双栏布局不视为折返。
+                    # 左右栏需在当前带有纵向重叠，独立上下双栏布局（第三块完全位于前两块下方）不视为折返。
+                    if max(first[1][3], second[1][3]) <= third[1][1]:
+                        continue
                     side = _bbox_union(first[1], third[1])
                     if _bbox_axis_overlap_ratio(side, second[1], axis="y") > 0:
                         names = "左→右→左" if first[0] == 0 else "右→左→右"

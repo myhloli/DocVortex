@@ -17,10 +17,22 @@ def _paragraph_with_insets(count):
     ]
 
 
-@pytest.mark.parametrize("count,points", [(1, 10), (2, 20), (3, 30)])
+@pytest.mark.parametrize("count,points", [(1, 8), (2, 16), (3, 24)])
 def test_nested_local_count_has_severity_boundary(count, points):
-    """一个或两个独立小框保持低分，同一正文内三个冲突达到默认门槛。"""
+    """一个或两个独立小标题框低于回落线，三个独立冲突跨过 0.80 门槛。"""
     assert nested_block_risk(_paragraph_with_insets(count))[0] == points
+
+
+def test_nested_block_weights_equations_and_large_insets_higher():
+    """公式子块和占父框面积达到 10% 的大子块按 15 分计权，小正文子块按 8 分计权。"""
+    parent = _paragraph_with_insets(0)[0]
+    eq_child = {"type": "equation", "bbox": (0.2, 0.2, 0.29, 0.23)}
+    small_child = {"type": "paragraph_title", "bbox": (0.4, 0.2, 0.49, 0.23)}
+    large_child = {"type": "text", "bbox": (0.2, 0.2, 0.6, 0.35)}
+    assert nested_block_risk([parent, eq_child])[0] == 15
+    assert nested_block_risk([parent, eq_child, small_child])[0] == 23
+    assert nested_block_risk([parent, large_child])[0] == 15
+    assert nested_block_risk([parent, eq_child, large_child])[0] == 30
 
 
 def test_visual_container_is_not_body_intrusion():
@@ -89,7 +101,7 @@ def test_broken_formula_in_body_corridor_still_counts():
     """公式片段可能没有压到父行墨迹，但位于正文栏内部时仍构成异常分配。"""
     blocks = _paragraph_with_insets(3)
     blocks[0]["lines"] = [{"bbox": (0.1, 0.4 + i * 0.04, 0.9, 0.43 + i * 0.04)} for i in range(5)]
-    assert nested_block_risk(blocks)[0] == 30
+    assert nested_block_risk(blocks)[0] == 24
 
 
 def test_inline_font_runs_are_one_physical_row():

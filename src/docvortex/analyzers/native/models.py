@@ -17,6 +17,7 @@ class PdfModel:
         """保存本次结构分析结果与诊断，各文档间使用独立实例状态。"""
         self.diagnostics = ()
         self.layout_page_confidences: tuple[float, ...] = ()
+        self.layout_page_assessments: tuple[Any, ...] = ()
         self.extensions = {}
         self._tagged = None
         self._prepared_document = None
@@ -50,13 +51,15 @@ class PdfModel:
 
         if pdf_structure not in {"auto", "off"}:
             raise InvalidRequestError("pdf_structure_invalid", "pdf_structure must be auto or off", "pdf_structure")
-        self.diagnostics, self.extensions, self.layout_page_confidences = (), {}, ()
+        self.diagnostics, self.extensions, self.layout_page_confidences, self.layout_page_assessments = (), {}, (), ()
         try:
             tagged = (
                 self._prepare_structure(pdf_doc, **({"collect_layout_diagnostics": True} if collect_layout_diagnostics else {}))
                 if pdf_structure == "auto"
                 else None
             )
+            major_missing_visuals: dict[int, str] = {}
+            vector_summaries: dict[int, tuple[int, int, int]] = {}
             if tagged is None:
                 if collect_layout_diagnostics:
                     from .pdf.layout_diagnostics import suppress_repeated_marginal_visuals
@@ -65,6 +68,12 @@ class PdfModel:
                     pages = pipeline._analyze_native_document(pdf_doc, layout_pages=layout_pages)
                     suppress_repeated_marginal_visuals(layout_pages)
                     program_controls = {i: ev.program_controls for i, ev in enumerate(layout_pages) if ev.program_controls}
+                    vector_summaries = {i: ev.vector_summary for i, ev in enumerate(layout_pages) if ev.vector_summary is not None}
+                    major_missing_visuals = {
+                        index: reason
+                        for index, (evidence, blocks) in enumerate(zip(layout_pages, pages, strict=True))
+                        if (reason := evidence.major_missing_visual(blocks)) is not None
+                    }
                     self.diagnostics = tuple(
                         diagnostic
                         for index, (evidence, blocks) in enumerate(zip(layout_pages, pages, strict=True))
@@ -80,6 +89,8 @@ class PdfModel:
                 if collect_layout_diagnostics:
                     self.diagnostics += tagged.layout_diagnostics
                     program_controls = tagged.layout_program_controls
+                    major_missing_visuals = tagged.layout_major_missing_visuals
+                    vector_summaries = tagged.layout_vector_summaries
                 self.extensions[STRUCTURE_EXTENSION] = tagged.extension()
             if collect_layout_diagnostics:
                 from .pdf.layout_diagnostics import discard_block_glyphs
@@ -89,22 +100,35 @@ class PdfModel:
                         discard_block_glyphs(block)
             normalize_pdf_model_text(pages)
             if collect_layout_diagnostics:
-                from .pdf.layout_risk_scoring import score_layout_pages
+                from ...document.pdf.native_contracts import PDFPageVectorGeometry
+                from .pdf.layout_risk_scoring import assess_layout_pages
+
+                empty_vector_geometry = PDFPageVectorGeometry((), ())
 
                 def vector_geometry(index):
-                    """只为严重区域候选读取原生绘图几何，无需整页渲染。"""
+                    """只为严重区域候选读取原生绘图几何，无矢量页直接复用空几何避免重开 PDFium。"""
+                    if vector_summaries.get(index) == (0, 0, 0):
+                        return pdf_doc.page_size(index), empty_vector_geometry
                     return pdf_doc.page_size(index), pdf_doc.get_page_vector_geometry(index)
 
                 def source_lines(index):
                     """候选图框通过廉价几何预筛后，再核对可见 PDF 图层中的真实文字位置。"""
                     return pdf_doc.get_page_lines(index, visible_only=True)
 
-                self.layout_page_confidences = score_layout_pages(
+                skip_vector_conflict = {
+                    index for index, (drawing_count, visible_paths, _) in vector_summaries.items() if drawing_count < 2 and visible_paths < 3
+                }
+                assessments = assess_layout_pages(
                     pages,
                     program_controls=program_controls,
                     vector_geometry=vector_geometry,
                     source_lines=source_lines,
+                    diagnostics=self.diagnostics,
+                    major_missing_visuals=major_missing_visuals,
+                    skip_vector_conflict=skip_vector_conflict,
                 )
+                self.layout_page_assessments = assessments
+                self.layout_page_confidences = tuple(item.confidence for item in assessments)
             return pages
         finally:
             self._tagged = None

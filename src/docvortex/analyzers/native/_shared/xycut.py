@@ -83,6 +83,8 @@ def sort_entries(
     *,
     beta: float = DEFAULT_BETA,
     density_threshold: float = DEFAULT_DENSITY_THRESHOLD,
+    root_median_width: float | None = None,
+    min_vertical_gap: float = MIN_GAP_THRESHOLD,
 ) -> list[dict[str, Any]]:
     """按绝对坐标 bbox 对字典对象执行确定性的 XYCut++ 排序。
 
@@ -94,6 +96,8 @@ def sort_entries(
         sortable_entries,
         beta=beta,
         density_threshold=density_threshold,
+        root_median_width=root_median_width,
+        min_vertical_gap=min_vertical_gap,
     )
     return [entry.payload for entry in sorted_entries] + invalid_entries
 
@@ -139,12 +143,14 @@ def _recursive_segment(
     *,
     beta: float,
     density_threshold: float,
+    root_median_width: float | None = None,
+    min_vertical_gap: float = MIN_GAP_THRESHOLD,
 ) -> list[_SortableEntry]:
     """在当前局部区域重新识别跨栏块、计算密度并递归切分。"""
     if len(entries) <= 1:
         return list(entries)
 
-    cross_layout_entries = _identify_cross_layout_elements(entries, beta)
+    cross_layout_entries = _identify_cross_layout_elements(entries, beta, median_width_override=root_median_width)
     cross_layout_ids = {entry.index for entry in cross_layout_entries}
     main_entries = [entry for entry in entries if entry.index not in cross_layout_ids]
 
@@ -155,6 +161,7 @@ def _recursive_segment(
         main_entries,
         beta=beta,
         density_threshold=density_threshold,
+        min_vertical_gap=min_vertical_gap,
     )
     return _merge_cross_layout_elements(sorted_main, cross_layout_entries)
 
@@ -164,6 +171,7 @@ def _segment_main_entries(
     *,
     beta: float,
     density_threshold: float,
+    min_vertical_gap: float = MIN_GAP_THRESHOLD,
 ) -> list[_SortableEntry]:
     """依据当前区域密度选择首选轴，并在切分后递归处理子区域。"""
     if len(entries) <= 1:
@@ -172,14 +180,16 @@ def _segment_main_entries(
     density_ratio = _compute_density_ratio(entries)
     prefer_horizontal_first = density_ratio > density_threshold
     horizontal_cut = _find_best_horizontal_cut_with_projection(entries)
-    vertical_cut = _find_best_vertical_cut_with_projection(entries)
+    vertical_cut = _find_best_vertical_cut_with_projection(entries, min_vertical_gap=min_vertical_gap)
 
     preferred_cut = horizontal_cut if prefer_horizontal_first else vertical_cut
     fallback_cut = vertical_cut if prefer_horizontal_first else horizontal_cut
+    preferred_threshold = MIN_GAP_THRESHOLD if prefer_horizontal_first else min_vertical_gap
+    fallback_threshold = min_vertical_gap if prefer_horizontal_first else MIN_GAP_THRESHOLD
     use_horizontal_cut = prefer_horizontal_first
 
-    if preferred_cut.gap < MIN_GAP_THRESHOLD:
-        if fallback_cut.gap < MIN_GAP_THRESHOLD:
+    if preferred_cut.gap < preferred_threshold:
+        if fallback_cut.gap < fallback_threshold:
             return _sort_by_y_then_x(entries)
         preferred_cut = fallback_cut
         use_horizontal_cut = not use_horizontal_cut
@@ -199,17 +209,27 @@ def _segment_main_entries(
                 group,
                 beta=beta,
                 density_threshold=density_threshold,
+                min_vertical_gap=min_vertical_gap,
             )
         )
     return result
 
 
-def _identify_cross_layout_elements(entries: Sequence[_SortableEntry], beta: float) -> list[_SortableEntry]:
+def _identify_cross_layout_elements(
+    entries: Sequence[_SortableEntry],
+    beta: float,
+    *,
+    median_width_override: float | None = None,
+) -> list[_SortableEntry]:
     """以当前区域中位宽度识别横跨多个栏区的宽元素。"""
     if len(entries) < 3:
         return []
 
-    median_width = median(entry.width for entry in entries)
+    median_width = (
+        median_width_override
+        if median_width_override is not None and median_width_override > 0
+        else median(entry.width for entry in entries)
+    )
     threshold = beta * median_width
     return [entry for entry in entries if entry.width >= threshold and _has_minimum_overlaps(entry, entries, MIN_OVERLAP_COUNT)]
 
@@ -279,13 +299,15 @@ def _calculate_bounding_region(
 
 def _find_best_vertical_cut_with_projection(
     entries: Sequence[_SortableEntry],
+    *,
+    min_vertical_gap: float = MIN_GAP_THRESHOLD,
 ) -> _CutInfo:
     """寻找纵向最大投影空白，并在必要时忽略窄元素重试。"""
     if len(entries) < 2:
         return _CutInfo(0.0, 0.0)
 
     edge_cut = _find_vertical_cut_by_edges(entries)
-    if edge_cut.gap >= MIN_GAP_THRESHOLD or len(entries) < 3:
+    if edge_cut.gap >= min_vertical_gap or len(entries) < 3:
         return edge_cut
 
     region = _calculate_bounding_region(entries)
@@ -298,7 +320,7 @@ def _find_best_vertical_cut_with_projection(
         return edge_cut
 
     filtered_cut = _find_vertical_cut_by_edges(filtered_entries)
-    if filtered_cut.gap > edge_cut.gap and filtered_cut.gap >= MIN_GAP_THRESHOLD:
+    if filtered_cut.gap > edge_cut.gap and filtered_cut.gap >= min_vertical_gap:
         return filtered_cut
     return edge_cut
 

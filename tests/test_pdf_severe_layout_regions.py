@@ -25,12 +25,18 @@ def test_prose_and_code_split_into_text_only():
 
 
 def test_one_display_equation_is_fragmented():
-    """三块横向连成的公式含真实重叠；仅两块重叠或分属上下两行时不能据此接管。"""
+    """三块横向连成的公式含真实重叠时触发碎片检测，两块独立显著重叠也由评分接管，上下分立公式则保持满分。"""
+    from docvortex.analyzers.native.pdf.layout_fragment_risk import fragmented_region
+
     a, b, c = [
         _block("equation", "", r) for r in [(0.12, 0.21, 0.26, 0.25), (0.21, 0.212, 0.26, 0.245), (0.266, 0.218, 0.41, 0.25)]
     ]
-    scores = score_layout_pages([[a, b, c], [a, b], [a, b, {**c, "bbox": (0.26, 0.30, 0.41, 0.35)}]])
-    assert scores == (0.40, 1.0, 1.0)
+    assert fragmented_region([a, b, c]) is not None
+    assert fragmented_region([a, b]) is None
+    assert fragmented_region([a, b, {**c, "bbox": (0.26, 0.30, 0.41, 0.35)}]) is None
+    separate = _block("equation", "", (0.12, 0.26, 0.26, 0.30))
+    scores = score_layout_pages([[a, b, c], [a, b], [a, separate]])
+    assert scores == (0.40, 0.40, 1.0)
 
 
 def test_true_figure_paths_and_reference_coverage():
@@ -82,11 +88,11 @@ def test_sparse_unboxed_table_needs_actual_rails_and_columns():
 
 
 def test_wide_repeated_crops_require_prose_collision():
-    """重复通栏裁图切进至少两行真正文时才接管，同宽但独立的方程不触发。"""
+    """重复通栏裁图切进至少两行真正文时才接管，并与顶层公式重叠联合扣分；同宽独立方程不触发。"""
     formulas = [_block("equation", "", (0.02, y, 0.87, y + 0.04)) for y in (0.1, 0.22, 0.34, 0.47)]
     text = [_block("text", "a regular printed sentence with multiple words", (0.14, y, 0.76, y + 0.012)) for y in (0.23, 0.35)]
     scores = score_layout_pages([formulas, formulas + text])
-    assert scores == (1.0, 0.40)
+    assert scores == (1.0, 0.30)
 
 
 def _sparse_table_page(angle, *, owning_table=False):

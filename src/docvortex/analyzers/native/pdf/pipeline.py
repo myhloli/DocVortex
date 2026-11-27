@@ -506,6 +506,11 @@ def _collect_document_sources(pdf_doc: NativePdfSource, *, collect_layout_finger
             form_infos=getattr(snapshot, "form_infos", ()),
             text_visibility_uncertain=getattr(snapshot, "text_visibility_uncertain", False),
             trusted_text_bboxes=trusted_text_bboxes(page_idx) if trusted_text_bboxes is not None else (),
+            raw_vector_summary=(
+                len(snapshot.drawing_lines),
+                sum(1 for path in snapshot.path_infos if path.fill_visible or path.stroke_visible),
+                len(snapshot.path_infos),
+            ),
         )
         page_sources.append(source)
         page_text_geometries.append(text_geometry)
@@ -670,7 +675,7 @@ def _prepare_document_sources(
         layout_page = None
         if layout_pages is not None:
             source.collect_layout_diagnostics = True
-            layout_page = LayoutDiagnosticPage(source.page_size)
+            layout_page = LayoutDiagnosticPage(source.page_size, vector_summary=source.raw_vector_summary)
             layout_pages.append(layout_page)
         prepare_kwargs = dict(
             tight_bboxes=geometry.tight_bboxes,

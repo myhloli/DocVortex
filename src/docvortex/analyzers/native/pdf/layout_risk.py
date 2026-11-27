@@ -359,9 +359,8 @@ def _embedded_formula_risk(blocks: list[_LocatedBlock], equations: list[BBox], e
     return best
 
 
-def _asset_risk(blocks: list[_LocatedBlock]) -> _Risk | None:
-    """识别互相重叠的独立公式、图块组成冲突和整页图的重复裁片。"""
-    equations = sorted((box for _, kind, box, _ in blocks if kind == "equation"), key=lambda box: box[1])
+def _overlapping_equation_risk(equations: list[BBox]) -> _Risk | None:
+    """识别两个独立展示公式框按较小框面积计算交叠达到一半以上的严重冲突。"""
     equation_tops = [box[1] for box in equations]
     for index, first in enumerate(equations):
         end = bisect_left(equation_tops, first[3], lo=index + 1)
@@ -372,6 +371,15 @@ def _asset_risk(blocks: list[_LocatedBlock]) -> _Risk | None:
             if overlap >= 0.50:
                 bounds = _region(_bbox_union(first, second))
                 return _STRONG, f"两个独立公式框交叠 {overlap:.0%}（按较小框面积），区域 {bounds}"
+    return None
+
+
+def _asset_risk(blocks: list[_LocatedBlock]) -> _Risk | None:
+    """识别互相重叠的独立公式、图块组成冲突和整页图的重复裁片。"""
+    equations = sorted((box for _, kind, box, _ in blocks if kind == "equation"), key=lambda box: box[1])
+    if overlap := _overlapping_equation_risk(equations):
+        return overlap
+    equation_tops = [box[1] for box in equations]
 
     images = [box for _, kind, box, _ in blocks if kind in _CROPS]
     # 有独立正文的整页背景可以包含已单独导出的真实插图。
@@ -483,13 +491,45 @@ def _image_text_order_risk(blocks: list[_LocatedBlock]) -> _Risk | None:
     return None
 
 
-def extract_layout_risk(blocks: list[dict], *, separate_severe: bool = False) -> dict[str, tuple[int, str]]:
-    """读取一页归一化块并按风险族返回最高可信度与所在区域，不修改输入。"""
+def _locate_upright_blocks(blocks: list[dict]) -> list[_LocatedBlock]:
+    """抽取未旋转且带有效归一化框的顶层块，避免调用方重复解析。"""
     located: list[_LocatedBlock] = []
     for index, block in enumerate(blocks):
         kind = block.get("type")
         if isinstance(kind, str) and not block.get("angle") and (box := _coerce_bbox(block.get("bbox"))):
             located.append((index, kind, box, block))
+    return located
+
+
+def _formula_ownership_risk(located: list[_LocatedBlock]) -> _Risk | None:
+    """汇总独立公式框重度交叠与正文行争抢公式裁片的归属风险。"""
+    equations = sorted((box for _, kind, box, _ in located if kind == "equation"), key=lambda box: box[1])
+    if len(equations) < 2:
+        return None
+    if overlap := _overlapping_equation_risk(equations):
+        return overlap
+    if len(equations) >= 3:
+        return _embedded_formula_risk(located, equations, [box[1] for box in equations])
+    return None
+
+
+def extract_scored_layout_risk(blocks: list[dict]) -> dict[str, tuple[int, str]]:
+    """仅提取进入页级伪置信度计分的活跃风险族，跳过已停用的弱诊断族。"""
+    located = _locate_upright_blocks(blocks)
+    return {
+        family: risk
+        for family, risk in (
+            ("formula_ownership", _formula_ownership_risk(located)),
+            ("grid_fragmentation", _grid_risk(located)),
+            ("table_structure", table_structure_risk(blocks)),
+        )
+        if risk is not None
+    }
+
+
+def extract_layout_risk(blocks: list[dict], *, separate_severe: bool = False) -> dict[str, tuple[int, str]]:
+    """读取一页归一化块并按风险族返回最高可信度与所在区域，不修改输入。"""
+    located = _locate_upright_blocks(blocks)
     line_heights = [_height(line) for _, kind, _, block in located if kind in _PROSE for line in _line_boxes(block)]
     factors = {
         family: risk
@@ -504,7 +544,6 @@ def extract_layout_risk(blocks: list[dict], *, separate_severe: bool = False) ->
         if risk is not None
     }
     if separate_severe and "asset_fragmentation" in factors:
-        equations = sorted((box for _, kind, box, _ in located if kind == "equation"), key=lambda box: box[1])
-        if len(equations) >= 3 and (risk := _embedded_formula_risk(located, equations, [b[1] for b in equations])):
+        if risk := _formula_ownership_risk(located):
             factors["formula_ownership"] = risk
     return factors

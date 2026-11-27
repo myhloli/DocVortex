@@ -15,35 +15,42 @@ def _block(kind, box, content="", *, lines=None):
 
 
 @pytest.mark.parametrize(
-    "blocks",
+    ("blocks", "expected"),
     [
-        [_block("equation", (0.1, 0.7, 0.5, 0.9)), _block("text", (0.32, 0.8, 0.49, 0.82), "otherwise")],
-        [_block("image", (0.48, 0.1, 0.91, 0.35)), _block("table", (0.1, 0.1, 0.91, 0.16))],
-        [_block("image", (0.1, 0.1, 0.8, 0.6)), _block("text", (0.35, 0.39, 0.92, 0.43), "A separate line of text.")],
-        [
-            _block("text", (0.32, 0.55, 0.87, 0.95), "Paragraph across two columns."),
-            _block("text", (0.34, 0.62, 0.62, 0.90), "Independent paragraph in one column."),
-        ],
-        [
-            _block(
-                "paragraph_title",
-                (0.1, 0.40, 0.7, 0.44),
-                "A heading across two lines",
-                lines=[(0.1, 0.40, 0.7, 0.42), (0.1, 0.42, 0.20, 0.44)],
-            ),
-            _block(
-                "text",
-                (0.1, 0.42, 0.7, 0.56),
-                "Body starts on the last heading baseline.",
-                lines=[(0.23, 0.42, 0.7, 0.44), (0.1, 0.45, 0.7, 0.47)],
-            ),
-        ],
+        ([_block("equation", (0.1, 0.7, 0.5, 0.9)), _block("text", (0.32, 0.8, 0.49, 0.82), "otherwise")], 0.82),
+        ([_block("image", (0.48, 0.1, 0.91, 0.35)), _block("table", (0.1, 0.1, 0.91, 0.16))], 0.75),
+        ([_block("image", (0.64, 0.1, 0.91, 0.35)), _block("table", (0.1, 0.1, 0.91, 0.16))], 0.96),
+        ([_block("image", (0.1, 0.1, 0.8, 0.6)), _block("text", (0.35, 0.39, 0.92, 0.43), "A separate line of text.")], 0.92),
+        (
+            [
+                _block("text", (0.32, 0.55, 0.87, 0.95), "Paragraph across two columns."),
+                _block("text", (0.34, 0.62, 0.62, 0.90), "Independent paragraph in one column."),
+            ],
+            0.92,
+        ),
+        (
+            [
+                _block(
+                    "paragraph_title",
+                    (0.1, 0.40, 0.7, 0.44),
+                    "A heading across two lines",
+                    lines=[(0.1, 0.40, 0.7, 0.42), (0.1, 0.42, 0.20, 0.44)],
+                ),
+                _block(
+                    "text",
+                    (0.1, 0.42, 0.7, 0.56),
+                    "Body starts on the last heading baseline.",
+                    lines=[(0.23, 0.42, 0.7, 0.44), (0.1, 0.45, 0.7, 0.47)],
+                ),
+            ],
+            0.95,
+        ),
     ],
 )
-def test_minor_overlap_reduces_confidence_without_needing_model_layout(blocks):
-    """目标页的各类局部框冲突都降低满分，交换块顺序也应得到同一轻度扣分。"""
+def test_minor_overlap_reduces_confidence_with_stratified_severity(blocks, expected):
+    """不同冲突类型按严重度分级扣分，重度图表冲突跨过 0.80，且与块顺序无关。"""
     a, b = score_layout_pages([blocks, list(reversed(blocks))])
-    assert 0.91 <= a == b < 1.0
+    assert a == b == expected
 
 
 def test_background_related_captions_numbers_and_wrapping_remain_clean():
@@ -77,11 +84,11 @@ def test_independent_label_inside_projected_image_differs_from_a_tagged_caption(
     image = {**_block("image", (0.1, 0.2, 0.7, 0.5), "Pressure reading"), "_pdf_structure": {"node_id": "fig"}}
     label = _block("text", (0.2, 0.3, 0.4, 0.34), "Pressure reading")
     attached = {**label, "_pdf_structure": {"node_id": "label", "visual_parent": "fig"}}
-    assert score_layout_pages([[image, label], [image, attached]]) == (0.92, 1.0)
+    assert score_layout_pages([[image, label], [image, attached]]) == (0.90, 1.0)
 
 
-def test_multiple_minor_families_are_bounded_and_severe_vectors_still_run():
-    """多个轻度问题有限扣分；同页更严重的矢量证据必须照常检测并优先采用。"""
+def test_multiple_overlap_pairs_and_families_escalate_and_combine_with_vectors():
+    """多处重叠按频次与跨域 Noisy-OR 递增；同页更严重矢量证据仍会执行并联合扣分。"""
     body = _block(
         "text",
         (0.1, 0.1, 0.45, 0.3),
@@ -92,11 +99,17 @@ def test_multiple_minor_families_are_bounded_and_severe_vectors_still_run():
     heading = _block("paragraph_title", (0.1, 0.27, 0.45, 0.32), "End of paragraph")
     blocks = [body, image, heading]
     single, both = score_layout_pages([[body, image], blocks])
-    assert (single, both) == (0.97, 0.92)
+    assert (single, both) == (0.96, 0.90)
     equation = _block("equation", (0.52, 0.6, 0.9, 0.74))
     clause = _block("text", (0.65, 0.65, 0.83, 0.67), "otherwise")
-    assert score_layout_pages([[body, image, image], [*blocks, equation, clause]]) == (single, 0.91)
+    second_clause = _block("text", (0.65, 0.68, 0.83, 0.70), "whereby")
+    repeated_img, multi_family, multi_eq = score_layout_pages(
+        [[body, image, image], [*blocks, equation, clause], [equation, clause, second_clause]]
+    )
+    assert repeated_img == 0.90 < single
+    assert multi_family == 0.74 <= 0.80
+    assert multi_eq == 0.74 <= 0.80
     with patch(
         "docvortex.analyzers.native.pdf.layout_risk_scoring.vector_conflict", return_value=("missing_chart", "图面缺失")
     ):
-        assert score_layout_pages([blocks], vector_geometry=lambda _: ((500, 600), None)) == (0.40,)
+        assert score_layout_pages([blocks], vector_geometry=lambda _: ((500, 600), None)) == (0.36,)

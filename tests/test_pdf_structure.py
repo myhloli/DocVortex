@@ -533,6 +533,21 @@ def test_reading_order_conflict_is_checked_on_original_before_selection():
         assert any(item.code == "pdf_structure_order_conflict" for item in result.diagnostics)
 
 
+def test_declared_pdf_ua_is_immune_to_unverified_order_conflict():
+    """声明 PDF/UA 的文档不因跨页回挂被当作未验证标签树整档回退。"""
+    from docvortex.analyzers.native.pdf.tagged import _unverified_order_conflict
+    from docvortex.document.pdf.structure import ContentReference, PDFStructure, StructureNode
+
+    nodes = tuple(
+        StructureNode(f"p{i}", "P", "P", i, page_index, (ContentReference(page_index, f"page:{page_index}", i),))
+        for i, page_index in enumerate((0, 1, 2, 0))
+    )
+    non_ua = PDFStructure(nodes, (), declared_ua=None)
+    ua = PDFStructure(nodes, (), declared_ua="1")
+    assert _unverified_order_conflict(non_ua, non_ua.page_membership()) == 0
+    assert _unverified_order_conflict(ua, ua.page_membership()) is None
+
+
 def test_structure_analysis_cleanup_on_success_and_failure():
     """模型释放临时原件和快照引用，读取异常也按输入所有权关闭引擎文档。"""
     from docvortex import api

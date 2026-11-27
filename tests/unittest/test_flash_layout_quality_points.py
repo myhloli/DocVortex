@@ -85,3 +85,14 @@ def test_distant_note_interrupting_same_printed_line_leaves_perfect_score():
         [first, rest, note],
     ]
     assert score_layout_pages(pages) == (0.97, 1, 1, 1, 1, 1)
+
+
+def test_grouping_loss_and_spatial_collision_combine_across_orthogonal_domains():
+    """归组缺失与顶层重叠分属正交域时，跨域按 Noisy-OR 联合扣分并可跨过 0.80 门槛。"""
+    title = _block("paragraph_title", "fn transform(value) {return value * 2;", (0.1, 0.15, 0.65, 0.19))
+    close = _block("text", "}", (0.1, 0.195, 0.11, 0.212))
+    equation = _block("equation", "", (0.1, 0.70, 0.5, 0.90))
+    clause = _block("text", "otherwise", (0.32, 0.80, 0.49, 0.82))
+    only_grouping, only_overlap, combined = score_layout_pages([[title, close], [equation, clause], [title, close, equation, clause]])
+    assert only_grouping > 0.80 and only_overlap == 0.82
+    assert combined <= 0.80 and combined < min(only_grouping, only_overlap)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from copy import deepcopy
 from collections import deque
 from dataclasses import dataclass, field
@@ -32,7 +33,6 @@ from ....document.pdf.text.spacing import is_generated_cjk_space, is_ligature_ex
 from ....document.pdf.structure import ContentReference, PDFStructure, StructureNode
 from ....result import Diagnostic
 from ....schema import BBox
-from .._shared.xycut import sort_entries
 from .geometry import _bbox_overlap_in_first, _bbox_union_many
 from .layout_diagnostics import (
     GlyphRanges,
@@ -999,6 +999,7 @@ def _tagged_layout_evidence(
     chars = _filter_native_direction_chars(chars, page_rotation=snapshot.rotation)
     lines = _build_native_line_items_from_chars(chars, snapshot.page_size, page_rotation=snapshot.rotation)
     evidence = LayoutDiagnosticPage(snapshot.page_size)
+    evidence.record_vector_summary(snapshot.drawing_lines, snapshot.path_infos)
     evidence.record_rows([line for line in lines if not _is_strong_caption_text(line.text)], explicit_body=explicit_body)
     drawing_lines = _coerce_pdf_drawing_lines(snapshot.drawing_lines)
     visible_drawings = _without_marked_drawings(snapshot.drawing_lines, artifacts)
@@ -1056,8 +1057,33 @@ def _tagged_layout_evidence(
     return evidence
 
 
+def _lis_indices(values: list[int]) -> set[int]:
+    """返回严格递增最长子序列的下标集合，用于屏蔽结构序列中的离群大秩队头。"""
+    if not values:
+        return set()
+    tails: list[int] = []
+    tail_idx: list[int] = []
+    prev = [-1] * len(values)
+    for i, value in enumerate(values):
+        pos = bisect_left(tails, value)
+        if pos == len(tails):
+            tails.append(value)
+            tail_idx.append(i)
+        else:
+            tails[pos] = value
+            tail_idx[pos] = i
+        if pos > 0:
+            prev[i] = tail_idx[pos - 1]
+    result: set[int] = set()
+    cursor = tail_idx[-1]
+    while cursor != -1:
+        result.add(cursor)
+        cursor = prev[cursor]
+    return result
+
+
 def _ordered_merge(trusted: list[dict], fallback: list[dict], page_size: tuple[float, float]) -> list[dict]:
-    """结构和规则序列分别保序，仅用 PDF point 几何决定两者的插入位置。"""
+    """结构和规则序列分别保序，使用受保护 XYCut++ 秩与 LIS 单调锚点避免队头阻塞。"""
     if not trusted:
         return fallback
     moved, kept = [], []
@@ -1068,25 +1094,34 @@ def _ordered_merge(trusted: list[dict], fallback: list[dict], page_size: tuple[f
         return trusted
     if not trusted and not moved:
         return fallback
-    candidates = sort_entries(
-        [
-            {"bbox": [value * page_size[index % 2] for index, value in enumerate(block["bbox"])], "block": block}
-            for block in [*trusted, *fallback, *moved]
-            if block.get("bbox")
-        ]
-    )
-    ranks = {id(item["block"]): index for index, item in enumerate(candidates)}
-    pending = deque(fallback)
-    for block in moved:
-        index = next((i for i, item in enumerate(pending) if ranks.get(id(item), len(ranks)) > ranks[id(block)]), len(pending))
-        pending.insert(index, block)
+    from .tagged_order import sort_tagged_blocks
+
+    all_blocks = [*trusted, *fallback, *moved]
+    ordered = sort_tagged_blocks(all_blocks, page_size)
+    ranks = {
+        id(all_blocks[idx]): pos
+        for pos, idx in enumerate(ordered)
+        if all_blocks[idx].get("bbox")
+    }
+    pending_all = [*fallback, *moved]
+    pending_pos = [block for block in pending_all if id(block) in ranks]
+    pending_unpos = [block for block in pending_all if id(block) not in ranks]
+    pending_pos.sort(key=lambda block: ranks[id(block)])
+    if not trusted:
+        return pending_pos + pending_unpos
+    pending = deque(pending_pos)
+    positioned_trusted = [(i, ranks[id(block)]) for i, block in enumerate(trusted) if id(block) in ranks]
+    anchor_positions = _lis_indices([rank for _, rank in positioned_trusted])
+    anchor_indices = {positioned_trusted[pos][0] for pos in anchor_positions}
     output = []
-    for block in trusted:
-        rank = ranks.get(id(block), len(ranks))
-        while pending and ranks.get(id(pending[0]), len(ranks)) < rank:
-            output.append(pending.popleft())
+    for i, block in enumerate(trusted):
+        if i in anchor_indices:
+            rank = ranks[id(block)]
+            while pending and ranks[id(pending[0])] < rank:
+                output.append(pending.popleft())
         output.append(block)
     output.extend(pending)
+    output.extend(pending_unpos)
     return output
 
 
@@ -1111,6 +1146,9 @@ class TaggedAnalysis:
     suppressed_layout_glyphs: dict[int, GlyphRanges] = field(default_factory=dict)
     layout_diagnostics: tuple[Diagnostic, ...] = ()
     layout_program_controls: dict[int, tuple[BBox, ...]] = field(default_factory=dict)
+    layout_major_missing_visuals: dict[int, str] = field(default_factory=dict)
+    layout_vector_summaries: dict[int, tuple[int, int, int]] = field(default_factory=dict)
+    order_repairs: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def complete(self) -> bool:
@@ -1155,7 +1193,15 @@ class TaggedAnalysis:
         from .tagged_captions import bind_orphan_figure_captions
         from .tagged_order import prefer_geometric_tagged_order
 
-        prefer_geometric_tagged_order(result, self.pages, self.orphan_caption_roles, self.document)
+        self.order_repairs = []
+        prefer_geometric_tagged_order(
+            result,
+            self.pages,
+            self.orphan_caption_roles,
+            self.document,
+            declared_ua=self.structure.declared_ua,
+            repairs=self.order_repairs,
+        )
         final_layout_pages = []
         for page_idx, (page, blocks) in enumerate(zip(self.pages, result, strict=True)):
             if self.orphan_caption_roles:
@@ -1203,6 +1249,14 @@ class TaggedAnalysis:
         if layout_pages is not None:
             suppress_repeated_marginal_visuals(final_layout_pages)
             self.layout_program_controls = {i: ev.program_controls for i, ev in enumerate(final_layout_pages) if ev.program_controls}
+            self.layout_vector_summaries = {
+                i: ev.vector_summary for i, ev in enumerate(final_layout_pages) if ev.vector_summary is not None
+            }
+            self.layout_major_missing_visuals = {
+                page_idx: reason
+                for page_idx, (evidence, blocks) in enumerate(zip(final_layout_pages, result, strict=True))
+                if (reason := evidence.major_missing_visual(blocks)) is not None
+            }
             self.layout_diagnostics = tuple(
                 diagnostic
                 for page_idx, (evidence, blocks) in enumerate(zip(final_layout_pages, result, strict=True))
@@ -1261,7 +1315,7 @@ class TaggedAnalysis:
             elif node.role == "H":
                 record["heading_level"] = max(1, node.heading_depth)
             nodes[node.identity] = record
-        return {
+        payload = {
             "version": 1,
             "used": any(self.blocks),
             "declared_ua": self.structure.declared_ua,
@@ -1284,6 +1338,9 @@ class TaggedAnalysis:
                 for page, claimed in zip(self.pages, self.claimed, strict=True)
             },
         }
+        if self.order_repairs:
+            payload["order_repairs"] = list(self.order_repairs)
+        return payload
 
 
 def _index_ranges(indices: frozenset[int]) -> list[list[int]]:
@@ -1298,7 +1355,9 @@ def _index_ranges(indices: frozenset[int]) -> list[list[int]]:
 
 
 def _unverified_order_conflict(structure: PDFStructure, node_pages: dict[str, frozenset[int]]) -> int | None:
-    """识别普通标签树把早期正文挂到多页后的位置，检查始终基于完整原件。"""
+    """识别普通非 PDF/UA 标签树把早期正文挂到多页后的位置，检查始终基于完整原件。"""
+    if structure.declared_ua:
+        return None
     nodes = list(structure.nodes())
     if any(node.role in {"H", "Title"} or re.fullmatch(r"H[1-9][0-9]*", node.role) for node in nodes):
         return None

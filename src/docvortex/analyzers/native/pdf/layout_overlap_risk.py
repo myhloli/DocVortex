@@ -1,11 +1,13 @@
-"""为独立顶层框之间可定位的轻微侵入计分。"""
+"""按角色冲突严重度与频次度量独立顶层框之间的空间争用。"""
 
+from collections import defaultdict
 import re
 
 from .geometry import _bbox_area, _bbox_axis_overlap_ratio, _bbox_overlap_in_first, _bbox_overlap_in_smaller, _coerce_bbox
 from .layout_risk import _block_text, _line_boxes
 
-# 同类取最重的一对，异类最多合计九个百分位，保持与严重结构故障的量级区别。
+# 各类重叠在空间碰撞域内分别按严重度与频次分级，域内上限保持 60 分。
+MAX_OVERLAP_POINTS = 60
 MAX_MINOR_OVERLAP_POINTS = 9
 _ROLES = {
     "text": "text",
@@ -17,6 +19,12 @@ _ROLES = {
     "equation": "equation",
 }
 _WORD = re.compile(r"[^\W\d_]{2,}")
+_OVERLAP_WEIGHTS = {
+    "equation_text": (18, 8),
+    "image_text": (10, 6),
+    "title_text": (10, 6),
+    "text_in_text": (8, 5),
+}
 
 
 def _declared_child(child, parent, parent_box):
@@ -77,8 +85,20 @@ def _overlap_strength(first, second):
     return None
 
 
-def minor_overlap_points(blocks):
-    """按页比较纵向相交的独立块；同一图框扫过多行正文时仅保留一次最大扣分。"""
+def _kind_overlap_points(kind: str, strengths: list[float]) -> int:
+    """按冲突类型、最强侵入比例与受控频次递增计算单类重叠扣分。"""
+    peak = max(strengths)
+    count = len(strengths)
+    if kind == "image_table":
+        raw = 25 if peak >= 0.45 else round(12 * peak)
+    else:
+        base, step = _OVERLAP_WEIGHTS[kind]
+        raw = round(base * peak) + step * min(count - 1, 4)
+    return min(MAX_OVERLAP_POINTS, raw)
+
+
+def overlap_risk(blocks) -> tuple[int, str] | None:
+    """汇总整页独立顶层块的角色重叠，跨类型采用 Noisy-OR 合成并返回归因。"""
     regions = []
     for block in blocks:
         role = _ROLES.get(block.get("type"))
@@ -87,7 +107,7 @@ def minor_overlap_points(blocks):
             continue
         regions.append((role, box, block))
     regions.sort(key=lambda r: r[1][1])
-    penalties = {}
+    by_kind: dict[str, list[float]] = defaultdict(list)
     for i, first in enumerate(regions):
         left, _, right, bottom = first[1]
         for j in range(i + 1, len(regions)):
@@ -99,7 +119,26 @@ def minor_overlap_points(blocks):
                 continue
             if evidence := _overlap_strength(first, second):
                 kind, strength = evidence
-                penalties[kind] = max(penalties.get(kind, 0), round(8 * strength))
-                if sum(penalties.values()) >= MAX_MINOR_OVERLAP_POINTS:
-                    return MAX_MINOR_OVERLAP_POINTS
-    return sum(penalties.values())
+                by_kind[kind].append(strength)
+    if not by_kind:
+        return None
+    scored: list[tuple[int, str, int, float]] = []
+    survived = 1.0
+    for kind, strengths in by_kind.items():
+        pts = _kind_overlap_points(kind, strengths)
+        if pts <= 0:
+            continue
+        scored.append((pts, kind, len(strengths), max(strengths)))
+        survived *= 1.0 - pts / 100.0
+    if not scored:
+        return None
+    points = max(1, min(MAX_OVERLAP_POINTS, round(100.0 * (1.0 - survived))))
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    summary = "、".join(f"{kind}×{count}({peak:.0%})" for _, kind, count, peak in scored)
+    return points, f"顶层块跨角色重叠：{summary}"
+
+
+def minor_overlap_points(blocks) -> int:
+    """兼容旧调用方，返回整页顶层块角色重叠扣分。"""
+    risk = overlap_risk(blocks)
+    return risk[0] if risk is not None else 0

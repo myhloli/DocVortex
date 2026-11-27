@@ -134,6 +134,12 @@ def test_reading_boundary_requires_a_continuous_two_column_band(reverse):
     )
     return_col = _block("text", (col_1[0], 25, col_1[1], 35), (3000 + col_1[0], 3020 + col_1[0]))
     assert [item.code for item in evidence.diagnose([first, next_col, return_col], 0)] == [READING_BOUNDARY]
+    # 独立上下两段双栏（第三块完全位于前两块下方）不视为同带折返。
+    lower_tier = _block("text", (col_1[0], 36, col_1[1], 45), (3000 + col_1[0], 3020 + col_1[0]))
+    upper_right = _block(
+        "text", (col_2[0], 10, col_2[1], 20), *[(y * 100 + col_2[0], y * 100 + col_2[0] + 20) for y in (10, 16, 30)]
+    )
+    assert evidence.diagnose([first, upper_right, lower_tier], 0) == []
     span = _block("paragraph_title", (10, 22, 90, 25))
     assert evidence.diagnose([first, next_col, span, return_col], 0) == []
     assert evidence.diagnose([first, return_col, next_col], 0) == []
@@ -161,11 +167,12 @@ def test_predict_uses_same_output_format_and_local_page_positions(pdf_structure)
     first = builder.node("P", [builder.text("Paragraph on first page")])
     two_columns = [builder.node("P", [builder.text("A left column line", page=1, x=20, y=y)], page=1) for y in (350, 332, 314)]
     right = builder.node("P", [builder.text("A right column line", page=1, x=165, y=y) for y in (350, 332, 314)], page=1)
-    with PDFDocument(builder.finish([first, two_columns[0], right, *two_columns[1:]])) as document:
+    with PDFDocument(builder.finish([first, two_columns[0], right, *two_columns[1:]], declared_ua="1")) as document:
         model = PdfModel()
         ordinary = model.predict(document, pdf_structure=pdf_structure)
         assert model.diagnostics == ()
         assert model.layout_page_confidences == ()
+        assert model.layout_page_assessments == ()
         with patch.object(document, "render_page", side_effect=AssertionError("诊断无需渲染整页")):
             inspected = model.predict(document, pdf_structure=pdf_structure, collect_layout_diagnostics=True)
         assert inspected == ordinary
@@ -173,9 +180,15 @@ def test_predict_uses_same_output_format_and_local_page_positions(pdf_structure)
         wanted = [(READING_BOUNDARY, 1)] if pdf_structure == "auto" else []
         assert [(item.code, item.page_index) for item in model.diagnostics if item.code == READING_BOUNDARY] == wanted
         assert model.layout_page_confidences == (1.0,) * len(inspected)
+        assert len(model.layout_page_assessments) == len(inspected)
+        assert all(item.confidence == 1.0 and item.primary_domain is None and item.reasons == () for item in model.layout_page_assessments)
+        with patch.object(document, "get_page_vector_geometry", side_effect=AssertionError("无路径页不应重读矢量几何")):
+            rechecked = model.predict(document, pdf_structure=pdf_structure, collect_layout_diagnostics=True)
+        assert rechecked == inspected
         model.predict(document, pdf_structure=pdf_structure)
         assert model.diagnostics == ()
         assert model.layout_page_confidences == ()
+        assert model.layout_page_assessments == ()
 
 
 def test_partial_tagged_analysis_checks_reading_order_after_merge():

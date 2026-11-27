@@ -231,7 +231,9 @@ figures, captions, links and formulas. `Title` uses `doc_title`, while `Hn` uses
 existing formula representation. Graphical formulas can use region images.
 
 The versioned `docvortex_pdf_structure` document extension retains source roles,
-heading levels, language, alternate text, attributes and final block paths.
+heading levels, language, alternate text, attributes and final block paths, and
+records `order_repairs` entries (`page_idx`, `action`) when deterministic
+reading-order repairs or non-PDF/UA single-page geometric fallbacks are applied.
 Diagnostics report rejected references, table spans and reading-order conflicts.
 Page selection reads structure from the original document and preserves original
 page identities. Result bundles carry the semantic output, extension and assets.
@@ -324,40 +326,45 @@ and do not perform inference.
 To inspect native Flash PDF layout quality, call
 `model.predict(document, collect_layout_diagnostics=True)`. After prediction,
 `model.layout_page_confidences` contains one float per returned page in physical
-page order. The heuristic confidence ranges from 0 to 1. A page with no scored
-conflicts receives 1.0. Callers choose how to use these scores.
+page order, and `model.layout_page_assessments` exposes the corresponding
+`PageLayoutAssessment` entries (`confidence`, `risk_points`, `domain_points`,
+`primary_domain`, and human-readable `reasons`). The heuristic confidence ranges
+from 0 to 1. A page with no scored conflicts receives 1.0. Callers choose how to
+use these scores.
 
-The score also reflects grouping errors that remain in the returned layout.
-For example, the scorer checks whether a tagged paragraph flattened distinct
-printed bullet items, whether program lines have become headings with detached
-closing braces, and whether rows of aligned labels and values remain outside
-a table next to its caption. These checks use graded penalties of up to 0.30.
-A page that preserves the intended groups receives no penalty from these checks.
-If a distant numbered footnote interrupts two parts of the same printed line
-and source paragraph, the reading-order penalty is 0.03 per interruption,
-up to 0.09.
+The scorer groups evidence into four orthogonal risk domains—`container_integrity`,
+`fragmentation`, `spatial_collision`, and `grouping_and_order`. Within each domain,
+only the strongest penalty applies; across domains, active penalties combine via
+Noisy-OR (`1 - prod(1 - p_d / 100)`) rounded to integer risk points.
 
-Minor overlaps between independent top-level regions can lower confidence to
-0.91–0.98. Examples include a text line extending into a figure or equation,
-an image crossing a table boundary, and one paragraph box enclosing another.
-Each overlap type contributes up to 0.08 according to the overlap fraction.
-The strongest instance of each type counts once, with a combined cap of 0.09.
-The final score uses the larger of this penalty and the strongest structural
-penalty. Captions attached to their figures, near-full-page backgrounds, and
-text placed entirely on an image with no projected text are excluded from
-minor overlap scoring.
+Grouping checks (`grouping_and_order`) inspect whether a tagged paragraph flattened
+distinct printed bullet items, whether program lines have become headings with
+detached closing braces, and whether rows of aligned labels and values remain
+outside a table next to its caption (up to 0.30). If a distant numbered footnote
+interrupts two parts of the same printed line and source paragraph, the
+reading-order penalty is 0.03 per interruption, up to 0.09.
 
-For fragmented prose, each qualifying cut between adjacent text boxes on
-nearby lines in the same column contributes 0.03, up to four cuts per line
-and 0.60 per region. At least two affected lines are required. Repeated cuts
-at stable column positions are discounted.
-Other structural penalties include confirmed table or formula fragmentation.
-An aligned matrix of colored symbols incurs a 0.60 penalty when native blocks
-capture separate horizontal strips but leave at least four symbols uncovered
-on each of two intervening rows in the same columns.
-A large image can also receive a penalty when its text projection and visible
-PDF lines show that it absorbed a ruled table and an independent prose region.
-Text already covered by a separate native block is excluded from that check.
+Spatial collisions (`spatial_collision`) combine nested-block intrusion and
+stratified cross-role overlap between independent top-level regions (capped at
+0.60):
+- Nested blocks inside a multi-line body paragraph score 0.15 per nested equation
+  or large inset (`>= 10%` of parent area) and 0.08 per smaller inset.
+- Top-level cross-role overlaps are weighted by conflict severity and pair count:
+  severe `image`/`table` overlap (`>= 45%` of the smaller box) scores 0.25,
+  while `equation_text`, `image_text`, `title_text`, and `text_in_text` scale
+  with overlap fraction and repeated pairs (combining across overlap kinds via
+  Noisy-OR). Captions attached to their figures, near-full-page backgrounds, and
+  text placed entirely on an image with no projected text are excluded.
+
+Structural fragmentation (`fragmentation`) and container checks
+(`container_integrity`) cover fragmented prose (0.03 per qualifying cut, up to
+0.60), overlapping or split display equations (0.60), table/grid fragmentation,
+aligned colored symbol matrices leaving uncovered rows (0.60), missing vector
+charts, large images absorbing a ruled table alongside independent prose, and
+high-precision layout diagnostics collected during the native pass
+(`TEXT_OWNERSHIP` at 0.60, `VISUAL_ROLE_CONFLICT` at 0.40, and major uncovered
+visual omissions `>= 15%` of page area up to `85%`, with native tables accepted
+as covering vector groups, at 0.40). `READING_BOUNDARY` remains diagnostic-only.
 Scores are heuristic and depend on the evidence available for that page.
 
 ## Page images and embedded assets

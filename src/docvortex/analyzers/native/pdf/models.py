@@ -389,6 +389,8 @@ class _PageSource:
     raster_composite_infos: tuple[PDFImageInfo, ...] = ()
     collect_layout_diagnostics: bool = False
     layout_raster_fingerprints: dict[BBox, str] | None = None
+    # 记录未过滤 snapshot 的 (绘图线数, 可见路径数, 总路径数)，供评分阶段免二次 PDFium 读盘。
+    raw_vector_summary: tuple[int, int, int] | None = None
     # 有独立原始位图身份的大幅内容图，供少数带标注内嵌图的页面核对整体归属。
     inset_base_bboxes: frozenset[BBox] = frozenset()
 

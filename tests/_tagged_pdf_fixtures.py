@@ -143,7 +143,7 @@ class TaggedPdfBuilder:
                 parents[mcid] = reference
         return reference
 
-    def finish(self, children):
+    def finish(self, children, *, declared_ua: str | None = None):
         """物化页面内容及结构根，返回确定性 PDF 字节。"""
         for page, commands in zip(self.pages, self.commands, strict=True):
             stream = DecodedStreamObject()
@@ -156,6 +156,21 @@ class TaggedPdfBuilder:
         self.root[NameObject("/ParentTree")] = self.writer._add_object(pdf_dictionary(Nums=numbers))
         self.writer._root_object[NameObject("/StructTreeRoot")] = self.root_ref
         self.writer._root_object[NameObject("/MarkInfo")] = pdf_dictionary(Marked=BooleanObject(True))
+        if declared_ua is not None:
+            xmp = DecodedStreamObject()
+            xmp.update(pdf_dictionary(Type=NameObject("/Metadata"), Subtype=NameObject("/XML")))
+            xmp.set_data(
+                (
+                    '<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>'
+                    '<x:xmpmeta xmlns:x="adobe:ns:meta/">'
+                    '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+                    '<rdf:Description rdf:about="" xmlns:pdfuaid="http://www.aiim.org/pdfua/ns/id/">'
+                    f"<pdfuaid:part>{declared_ua}</pdfuaid:part>"
+                    "</rdf:Description></rdf:RDF></x:xmpmeta>"
+                    '<?xpacket end="w"?>'
+                ).encode("utf-8")
+            )
+            self.writer._root_object[NameObject("/Metadata")] = self.writer._add_object(xmp)
         output = BytesIO()
         self.writer.write(output)
         return output.getvalue()

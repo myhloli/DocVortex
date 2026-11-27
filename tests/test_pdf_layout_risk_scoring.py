@@ -1,22 +1,120 @@
 """验证原生布局冲突与逐页伪置信度。"""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from docvortex.analyzers.native.pdf.layout_risk_scoring import score_layout_pages
+from docvortex.analyzers.native.pdf.layout_risk_scoring import (
+    PageLayoutAssessment,
+    assess_layout_pages,
+    score_layout_pages,
+)
 
 
-def test_confidence_uses_the_largest_structural_penalty_in_page_order():
-    """弱证据和空页得满分，同页多个结构冲突只取最大扣分。"""
+def test_confidence_uses_intra_domain_max_and_cross_domain_noisy_or():
+    """空页与弱证据得满分；同域取最大扣分，跨域按 Noisy-OR 独立合成。"""
     weak = {"marginal_role": (60, "页眉"), "column_reentry": (60, "读序")}
     table = {**weak, "table_structure": (30, "真实截表")}
+    formula = {"formula_ownership": (30, "公式碎片")}
     with (
-        patch("docvortex.analyzers.native.pdf.layout_risk_scoring.extract_layout_risk", side_effect=[{}, weak, table, table]),
+        patch(
+            "docvortex.analyzers.native.pdf.layout_risk_scoring.extract_scored_layout_risk",
+            side_effect=[{}, weak, table, table, formula],
+        ),
         patch(
             "docvortex.analyzers.native.pdf.layout_risk_scoring.spatial_fragmentation",
-            side_effect=[None, None, None, (57, "正文碎裂")],
+            side_effect=[None, None, None, (57, "正文碎裂"), (57, "正文碎裂")],
         ),
     ):
-        assert score_layout_pages([[], [], [], []]) == (1.0, 1.0, 0.70, 0.43)
+        assert score_layout_pages([[], [], [], [], []]) == (1.0, 1.0, 0.70, 0.30, 0.43)
+
+
+def test_non_severe_structural_risk_does_not_short_circuit_vector_check():
+    """30 分结构冲突不得遮蔽 60 分矢量检测，且同页仅读取一次矢量几何。"""
+    from docvortex.document.pdf.native_contracts import PDFPageVectorGeometry
+
+    table_block = {"type": "table", "bbox": [0.1, 0.1, 0.9, 0.6], "content": "<table></table>"}
+    read_vector = MagicMock(return_value=((600, 800), PDFPageVectorGeometry((), ())))
+    read_lines = MagicMock(return_value=[])
+    with (
+        patch(
+            "docvortex.analyzers.native.pdf.layout_risk_scoring.extract_scored_layout_risk",
+            return_value={"table_structure": (30, "表格截断")},
+        ),
+        patch("docvortex.analyzers.native.pdf.layout_risk_scoring.wants_vectors", return_value=True),
+        patch("docvortex.analyzers.native.pdf.layout_risk_scoring.vector_conflict", return_value=None),
+        patch("docvortex.analyzers.native.pdf.layout_risk_scoring.table_container_risk", return_value=(40, "表格吞并正文")),
+    ):
+        assessments = assess_layout_pages([[table_block]], vector_geometry=read_vector, source_lines=read_lines)
+    assert read_vector.call_count == 1
+    assert len(assessments) == 1
+    item = assessments[0]
+    assert isinstance(item, PageLayoutAssessment)
+    assert item.confidence == 0.60
+    assert item.risk_points == 40
+    assert item.primary_domain == "container_integrity"
+    assert item.domain_points == {
+        "container_integrity": 40,
+        "fragmentation": 0,
+        "spatial_collision": 0,
+        "grouping_and_order": 0,
+    }
+    assert item.reasons == ("container_integrity: 表格吞并正文",)
+
+
+def test_overlapping_independent_equations_trigger_fragmentation_fallback():
+    """两个显著重叠的独立公式裁片应计入公式归属 60 分，而分离或轻触公式保持满分。"""
+    first = {"type": "equation", "bbox": [0.20, 0.40, 0.52, 0.48], "content": ""}
+    second = {"type": "equation", "bbox": [0.30, 0.41, 0.50, 0.47], "content": ""}
+    stacked = {"type": "equation", "bbox": [0.20, 0.48, 0.52, 0.55], "content": ""}
+    touching = {"type": "equation", "bbox": [0.20, 0.46, 0.52, 0.54], "content": ""}
+    assessments = assess_layout_pages([[first, second], [first, stacked], [first, touching]])
+    assert [item.confidence for item in assessments] == [0.40, 1.0, 1.0]
+    assert assessments[0].primary_domain == "fragmentation"
+    assert any("交叠" in reason for reason in assessments[0].reasons)
+
+
+def test_high_precision_diagnostics_bridge_to_container_integrity_and_ignore_reading_boundary():
+    """TEXT_OWNERSHIP、VISUAL_ROLE_CONFLICT 与大面积主体缺图接入容器完整性，READING_BOUNDARY 不拉低置信度。"""
+    from docvortex.analyzers.native.pdf import MISSING_VISUAL, READING_BOUNDARY, TEXT_OWNERSHIP, VISUAL_ROLE_CONFLICT
+    from docvortex.analyzers.native.pdf.layout_diagnostics import LayoutDiagnosticPage
+    from docvortex.result import Diagnostic
+
+    diagnostics = (
+        Diagnostic(TEXT_OWNERSHIP, "可见正文源行 12/12 个字形无归属，页面未输出内容", 0),
+        Diagnostic(VISUAL_ROLE_CONFLICT, "原生表区支持 5 行 4 列，图件覆盖表区且缺少表格容器", 1),
+        Diagnostic(READING_BOUNDARY, "同一双栏正文带的输出顺序为 左→右→左", 2),
+        Diagnostic(MISSING_VISUAL, "位图框占整页 4.0%，图面覆盖 0.0%", 2),
+    )
+    assessments = assess_layout_pages(
+        [[], [], [], []],
+        diagnostics=diagnostics,
+        major_missing_visuals={3: "大面积位图缺失（占整页 45.0%，图面覆盖 10.0%）"},
+    )
+    assert [item.confidence for item in assessments] == [0.40, 0.60, 1.0, 0.60]
+    assert [item.primary_domain for item in assessments] == ["container_integrity", "container_integrity", None, "container_integrity"]
+
+    # 验证 major_missing_visual 的面积门控、整页底图排除以及矢量图组允许原生表格承接。
+    evidence = LayoutDiagnosticPage((100.0, 100.0))
+    evidence.record_visuals("位图", [(10, 10, 60, 50)])  # 20% 面积
+    assert evidence.major_missing_visual([]) is not None
+    assert evidence.major_missing_visual([{"type": "image", "bbox": [0.1, 0.1, 0.6, 0.5]}]) is None
+
+    backdrop = LayoutDiagnosticPage((100.0, 100.0))
+    backdrop.record_visuals("矢量图组", [(0, 0, 100, 95)])  # 95% 整页背景框
+    assert backdrop.major_missing_visual([]) is None
+
+    vec_table = LayoutDiagnosticPage((100.0, 100.0))
+    vec_table.record_visuals("矢量图组", [(10, 10, 60, 50)])  # 20% 矢量图组
+    assert vec_table.major_missing_visual([]) is not None
+    assert vec_table.major_missing_visual([{"type": "table", "bbox": [0.1, 0.1, 0.6, 0.5]}]) is None
+
+
+def test_skip_vector_conflict_avoids_redundant_geometry_reads():
+    """已知路径不足以触发矢量冲突的页应直接跳过 vector_conflict 的几何读取。"""
+    read_vector = MagicMock(return_value=((600, 800), None))
+    with patch("docvortex.analyzers.native.pdf.layout_risk_scoring.wants_vectors", return_value=True):
+        assessments = assess_layout_pages([[]], vector_geometry=read_vector, skip_vector_conflict={0})
+    assert read_vector.call_count == 0
+    assert assessments[0].confidence == 1.0
 
 
 def test_only_native_control_inside_equation_lowers_confidence():

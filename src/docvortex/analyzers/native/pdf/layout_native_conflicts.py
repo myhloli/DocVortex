@@ -27,7 +27,7 @@ def _physical_row_count(boxes):
 
 
 def nested_block_risk(blocks):
-    """同一个多行正文框内的独立小块累计扣分，单个小瑕疵不会触发默认门槛。"""
+    """同一个多行正文框内的独立小块按类型与面积占比累计扣分，对齐 0.80 默认回落门槛。"""
     best = None
     for parent in blocks:
         if parent.get("type") not in {"text", "list"} or len(parent.get("lines") or ()) < 3:
@@ -49,7 +49,15 @@ def nested_block_risk(blocks):
             and _bbox_overlap_in_first(other["bbox"], outer) >= 0.8
             and _inside_text_corridor(_rotate_bbox_to_upright(tuple(other["bbox"]), (1.0, 1.0), angle), line_boxes)
         ]
-        points = min(60, 10 * len(children))
+        if not children:
+            continue
+        points = min(
+            60,
+            sum(
+                15 if other.get("type") == "equation" or _bbox_area(other["bbox"]) >= 0.10 * area else 8
+                for other in children
+            ),
+        )
         if points and (best is None or points > best[0]):
             best = points, f"同一多行正文框异常包含 {len(children)} 个独立块，区域 {tuple(outer)}"
     return best

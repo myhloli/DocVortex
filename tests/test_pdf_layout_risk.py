@@ -263,3 +263,21 @@ def test_running_header_cannot_own_a_function_closing_brace():
     assert extract_layout_risk([end, start, stmt])["marginal_role"][0] == 30
     assert "marginal_role" not in extract_layout_risk([end, start])
     assert "marginal_role" not in extract_layout_risk([end, stmt, {**start, "bbox": (0.61, 0.09, 0.87, 0.10)}])
+
+
+def test_extract_scored_layout_risk_only_computes_scored_families():
+    """精简入口仅计算实际参与评分的三族因子，且结果与全量分离模式在同族键上完全一致。"""
+    from docvortex.analyzers.native.pdf.layout_risk import extract_scored_layout_risk
+
+    header = _block("header", (0.13, 0.06, 0.32, 0.074), "example log line")
+    code = _block("code", (0.12, 0.058, 0.88, 0.26), "second line")
+    first_eq = _block("equation", (0.39, 0.61, 0.55, 0.68))
+    second_eq = _block("equation", (0.44, 0.64, 0.56, 0.66))
+    blocks = [header, code, _prose(0.13, 0.30, 0.84, 0.42), first_eq, second_eq]
+    full = extract_layout_risk(blocks, separate_severe=True)
+    scored = extract_scored_layout_risk(blocks)
+    assert "marginal_role" in full and "marginal_role" not in scored
+    assert set(scored) <= {"formula_ownership", "grid_fragmentation", "table_structure"}
+    for key in ("formula_ownership", "grid_fragmentation", "table_structure"):
+        assert scored.get(key) == full.get(key)
+    assert scored["formula_ownership"][0] == 60
